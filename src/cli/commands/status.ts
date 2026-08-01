@@ -242,6 +242,16 @@ function requiresPersistedRunStatusReadModel(authority: CanonicalRunStatus): boo
     || authority.lifecycle === 'ORPHANED';
 }
 
+function isQuiescentRunAuthority(authority: CanonicalRunStatus): boolean {
+  return !authority.active
+    && !authority.resumable
+    && (
+      authority.lifecycle === 'IDLE'
+      || authority.lifecycle === 'COMPLETE'
+      || authority.lifecycle === 'ABORTED'
+    );
+}
+
 export interface StatusTaskSettlementDto
   extends ReturnType<typeof settlementProjectionDto> {
   /** Logical root task id; FIX attempts never create a second status row. */
@@ -468,6 +478,12 @@ export function loadTaskFiles(root: string): Task[] {
     ? tasks.filter(task => task.sprintId === activeSprintId)
     : tasks;
   return scopedTasks.sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function loadStatusSurfaceTasks(root: string): Task[] {
+  return isQuiescentRunAuthority(readCanonicalRunStatus(root))
+    ? []
+    : loadTaskFiles(root);
 }
 
 function logicalProgressStatus(status: Task['status']): LogicalProgressStatus {
@@ -889,22 +905,13 @@ export function buildStatusJsonSnapshot(
   deps: StatusCommandDeps,
   verbose = false,
 ): Record<string, unknown> {
-  const tasks = loadTaskFiles(root);
   const authority = readCanonicalRunStatus(root);
+  const tasks = isQuiescentRunAuthority(authority) ? [] : loadTaskFiles(root);
   const readModel = matchingRunStatusReadModel(root, authority);
   if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
     return buildNoActiveStatusJson(root, deps);
   }
-  if (
-    readModel
-    && !authority.active
-    && !authority.resumable
-    && (
-      authority.lifecycle === 'IDLE'
-      || authority.lifecycle === 'COMPLETE'
-      || authority.lifecycle === 'ABORTED'
-    )
-  ) {
+  if (isQuiescentRunAuthority(authority)) {
     return buildNoActiveStatusJson(root, deps);
   }
   if (!existsSync(dashPath)) {
@@ -1062,7 +1069,7 @@ export function registerStatus(
           noColor: opts.noColor ?? isNoColor(),
         });
         const followSnapshot = (): string => {
-          const tasks = loadTaskFiles(root);
+          const tasks = loadStatusSurfaceTasks(root);
           if (opts.raw) {
             const state = readDashboard(dashPath);
             const snapshot = state
@@ -1240,7 +1247,7 @@ export function registerStatus(
 
       // (A) Standalone mode: if no dashboard, try task files
       if (!existsSync(dashPath)) {
-        const tasks = loadTaskFiles(root);
+        const tasks = loadStatusSurfaceTasks(root);
         if (tasks.length > 0) {
           const authority = readCanonicalRunStatus(root);
           if (
@@ -1341,7 +1348,7 @@ export function registerStatus(
           const rawState = readDashboard(dashPath);
           if (!rawState) return null;
 
-          const tasks = loadTaskFiles(root);
+          const tasks = loadStatusSurfaceTasks(root);
           const authority = readCanonicalRunStatus(root);
           const readModel = matchingRunStatusReadModel(root, authority);
           if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
@@ -1430,7 +1437,7 @@ export function registerStatus(
       try {
         const rawData = readFileSync(dashPath, 'utf-8');
         const rawState = JSON.parse(rawData) as DashboardState;
-        const tasks = loadTaskFiles(root);
+        const tasks = loadStatusSurfaceTasks(root);
         const authority = readCanonicalRunStatus(root);
         const readModel = matchingRunStatusReadModel(root, authority);
         if (requiresPersistedRunStatusReadModel(authority) && !readModel) {

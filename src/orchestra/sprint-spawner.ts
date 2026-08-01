@@ -36,6 +36,7 @@ import {
   type AttendedExecutionApprovalExpectedDispatch,
 } from '../core/attended-execution-approval.js';
 import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
+import { createHostPreDispatchNoGoResult } from '../core/pre-dispatch-settlement.js';
 import {
   assertAttendedExecutionProposalMaterial,
   createAttendedExecutionProposalMaterialFromTask,
@@ -474,23 +475,11 @@ function writeProviderUnavailableNoGo(task: Task, projectRoot: string): void {
     + `registered/available at spawn time. Refusing to silently degrade to the claude CLI via the `
     + `docker backend. Ensure the provider is available at bootstrap (CLI logged in / daemon reachable) `
     + `so its host adapter is registered.`;
-  const result = {
-    taskId: task.id,
-    workerId: `honestfail-${task.id}`,
-    filesChanged: [] as string[],
-    linesAdded: 0,
-    linesRemoved: 0,
-    testsPassed: false,
-    selfAssessment: 'NO_GO',
-    notes: reason,
-    tokenUsage: {
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      provider: task.provider,
-      model: task.model,
-    },
-  };
+  const result = createHostPreDispatchNoGoResult(
+    task,
+    'PROVIDER_ADAPTER_UNAVAILABLE',
+    reason,
+  );
   try {
     writeFileSync(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
@@ -540,23 +529,11 @@ function writeForcedSkillUnavailableNoGo(
   }
   const reason =
     `Refusing to spawn without every explicitly forced skill active. ${reasonParts.join(' ')}`;
-  const result = {
-    taskId: task.id,
-    workerId: `honestfail-${task.id}`,
-    filesChanged: [] as string[],
-    linesAdded: 0,
-    linesRemoved: 0,
-    testsPassed: false,
-    selfAssessment: 'NO_GO',
-    notes: reason,
-    tokenUsage: {
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      provider: task.provider,
-      model: task.model,
-    },
-  };
+  const result = createHostPreDispatchNoGoResult(
+    task,
+    'FORCED_SKILL_UNAVAILABLE',
+    reason,
+  );
   try {
     writeFileSync(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),

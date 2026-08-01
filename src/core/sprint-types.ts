@@ -71,6 +71,10 @@ export interface Sprint {
   completedAt?: string;
   reasoning?: string;
   planningMode?: string;
+  /** Lifecycle surface that owns terminal side effects across checkpoint recovery. */
+  executionMode?: 'standard' | 'test';
+  /** Preserve task artifacts after terminal settlement when true. */
+  skipCleanup?: boolean;
   /** Requested-vs-actual planner provenance; persisted with sprint state/checkpoints. */
   plannerProof?: PlannerProof;
   /** True if a rollback was triggered during this sprint (all tasks NO_GO) */

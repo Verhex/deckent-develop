@@ -137,6 +137,14 @@ const workAttributionSchema = z.object({
   claimedOutsideScope: z.array(z.string()).optional(),
 });
 
+const preDispatchSettlementSchema = z.object({
+  version: z.literal(1),
+  state: z.literal('NOT_DISPATCHED'),
+  attemptId: z.string().min(1),
+  reasonCode: z.string().min(1),
+  evidenceRef: z.string().min(1),
+});
+
 /** Provider-agnostic token accounting (§1.3). `source` records provenance honestly. */
 const tokenUsageSchema = z.object({
   inputTokens: z.number().int().nonnegative(),
@@ -270,6 +278,7 @@ export const taskResultSchema = z.object({
   diskVerified: z.boolean().default(false),
   boundaryViolations: z.array(boundaryViolationSchema).default([]),
   workAttribution: workAttributionSchema.optional(),
+  preDispatchSettlement: preDispatchSettlementSchema.optional(),
 
   // resource accounting (orchestrator, provider-agnostic)
   tokenUsage: tokenUsageSchema,

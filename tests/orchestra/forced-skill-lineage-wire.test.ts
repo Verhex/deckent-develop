@@ -552,6 +552,13 @@ describe('spawnWorkers — forced skill honest NO_GO (487-023 FORCED-SKILL-LINEA
     expect(result!.selfAssessment).toBe('NO_GO');
     expect(result!.notes as string).toContain('typescript-expert');
     expect(result!.notes as string).toContain('SKILL.md');
+    expect(result!.preDispatchSettlement).toMatchObject({
+      version: 1,
+      state: 'NOT_DISPATCHED',
+      reasonCode: 'FORCED_SKILL_UNAVAILABLE',
+    });
+    expect(String((result!.preDispatchSettlement as { attemptId: string }).attemptId))
+      .toMatch(/^host-pre-dispatch:test-487:/u);
   });
 
   it('writes a typed NO_GO and skips spawn when a forced skill is administratively disabled (inactive)', async () => {
@@ -579,6 +586,10 @@ describe('spawnWorkers — forced skill honest NO_GO (487-023 FORCED-SKILL-LINEA
     expect(result!.selfAssessment).toBe('NO_GO');
     expect(result!.notes as string).toContain('testing-expert');
     expect(result!.notes as string).toContain('disabled');
+    expect(result!.preDispatchSettlement).toMatchObject({
+      state: 'NOT_DISPATCHED',
+      reasonCode: 'FORCED_SKILL_UNAVAILABLE',
+    });
   });
 
   it('spawns normally when the forced skill resolves and is active (positive control)', async () => {

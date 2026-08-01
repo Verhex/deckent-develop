@@ -3,6 +3,7 @@ import { existsSync, copyFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { execSync } from 'node:child_process';
 import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 import { DIRECTIVES_FILE } from '../../core/constants.js';
 import type { ModelType } from '../../core/types.js';
 import { resolveCanonicalModelIdentity } from '../../core/model-registry.js';
@@ -195,10 +196,12 @@ export function registerTestRun(program: Command): void {
 
         let sprint;
         try {
+          const bootstrap = await bootstrapProviders(config, root);
           sprint = await runSprint(root, config, {
             testMode: true,
             skipCleanup: opts.keep ?? false,
             timeoutMs,
+            connector: bootstrap.connector,
           });
         } finally {
           // Always restore sandbox

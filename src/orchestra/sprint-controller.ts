@@ -1860,6 +1860,8 @@ export async function runSprint(
   if (isResumeEvaluate && recoveredSprint) {
     // ─── Resume Path: skip PLAN/SPAWN/EXECUTE, jump to EVALUATE ─────
     sprint = recoveredSprint;
+    sprint.executionMode ??= opts?.testMode ? 'test' : 'standard';
+    sprint.skipCleanup ??= opts?.skipCleanup ?? false;
     if (!bindSprintLockToExecution(projectRoot, sprint.id)) {
       throw new BrainError(
         getMessage('lifecycle.execution_lock_bind_failed', config.language, {
@@ -1890,6 +1892,8 @@ export async function runSprint(
       projectRoot, config, opts, activeProvider, rollbackEnabled,
     );
     sprint = planResult.sprint;
+    sprint.executionMode = opts?.testMode ? 'test' : 'standard';
+    sprint.skipCleanup = opts?.skipCleanup ?? false;
     safetyPoint = planResult.safetyPoint;
     if (!bindSprintLockToExecution(projectRoot, sprint.id)) {
       throw new BrainError(
@@ -2063,17 +2067,30 @@ export async function runSprint(
         opts?.exactPlanAuthority,
       );
     } catch (e) {
+      const routingFailure = e instanceof Error ? e.message : String(e);
       writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'BRAIN→AUDITOR:PROVIDER_ROUTING_HOLD', {
         errorName: e instanceof Error ? e.name : 'UnknownError',
         errorCode: e instanceof Error && 'code' in e ? String(e.code) : null,
-        errorMessage: e instanceof Error ? e.message : String(e),
+        errorMessage: routingFailure,
       });
-      clearActiveSprint();
+      let pausePublicationError: unknown = null;
+      try {
+        pauseSprint(projectRoot, sprint, routingFailure, 'provider-routing-hold');
+        emitSprintEvent('SPRINT_PAUSED', {
+          sprintId: sprint.id,
+          reason: 'provider-routing-hold',
+          evidence: routingFailure,
+        });
+      } catch (pauseError) {
+        pausePublicationError = pauseError;
+        debugLog('runSprint:routeSprintTasks:pause', pauseError);
+      }
       releaseSprintLock(projectRoot);
-      clearSprintState(projectRoot);
+      clearActiveSprint();
       try { clearPid(projectRoot, sprint.id); } catch (pidError) {
         debugLog('runSprint:routeSprintTasks:clearPid', pidError);
       }
+      if (pausePublicationError) throw pausePublicationError;
       throw e;
     }
 

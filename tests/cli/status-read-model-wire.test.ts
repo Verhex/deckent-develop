@@ -1,9 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildNoActiveStatusJson } from '../../src/cli/commands/status.js';
+import {
+  buildNoActiveStatusJson,
+  buildStatusJsonSnapshot,
+} from '../../src/cli/commands/status.js';
 import { ProviderExecutionObservationStore } from '../../src/core/provider-execution-observation-store.js';
 import { publishCanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
 
@@ -35,6 +38,30 @@ describe('CLI canonical status read-model wire', () => {
         expect.objectContaining({ currentAttained: 0, unresolvedOpenIntervals: 1 }),
       ]);
       expect(fallback).not.toHaveBeenCalled();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not promote ambient task artifacts when IDLE read-model evidence is stale', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-status-idle-artifact-'));
+    try {
+      mkdirSync(join(root, '.tasks'), { recursive: true });
+      writeFileSync(join(root, '.tasks', 'task-489-001.json'), JSON.stringify({
+        id: '489-001',
+        title: 'orphan plan artifact',
+        status: 'PENDING',
+        sprintId: 'sprint-489',
+      }));
+
+      const status = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {});
+      expect(status).toMatchObject({
+        active: false,
+        lifecycle: 'IDLE',
+        statusReadModel: { state: 'unavailable-or-stale' },
+      });
+      expect(status).not.toHaveProperty('tasks');
+      expect(status).not.toHaveProperty('progress');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

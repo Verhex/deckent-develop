@@ -49,6 +49,21 @@ describe('event-stream-emit (Sprint 144 Task 015)', () => {
       expect(CHANNELS.SPRINT_PHASE_CHANGE).toBe('BRAIN→*:SPRINT_PHASE_CHANGE');
     });
 
+    it('pins completed-checkpoint recovery observability channels', () => {
+      expect(CHANNELS.RECOVERY_TERMINALIZATION_STARTED)
+        .toBe('BRAIN→*:RECOVERY_TERMINALIZATION_STARTED');
+      expect(CHANNELS.RECOVERY_EVIDENCE_REUSED)
+        .toBe('BRAIN→*:RECOVERY_EVIDENCE_REUSED');
+      expect(CHANNELS.RECOVERY_RECEIPT_AUTHORIZED)
+        .toBe('BRAIN→*:RECOVERY_RECEIPT_AUTHORIZED');
+      expect(CHANNELS.RECOVERY_CLEANUP_SETTLED)
+        .toBe('BRAIN→*:RECOVERY_CLEANUP_SETTLED');
+      expect(CHANNELS.RECOVERY_TERMINALIZATION_COMPLETED)
+        .toBe('BRAIN→*:RECOVERY_TERMINALIZATION_COMPLETED');
+      expect(CHANNELS.RECOVERY_TERMINALIZATION_HELD)
+        .toBe('BRAIN→*:RECOVERY_TERMINALIZATION_HELD');
+    });
+
     it('should define TASK_ASSIGN channel', () => {
       expect(CHANNELS.TASK_ASSIGN).toBe('BRAIN→WORKER:TASK_ASSIGN');
     });

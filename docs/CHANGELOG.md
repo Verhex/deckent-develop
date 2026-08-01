@@ -9,6 +9,30 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint490] - 2026-08-01
+
+### Added
+
+- Publish alpha root artifact
+- Publish beta root artifact
+- Publish gamma root artifact
+- Publish delta root artifact
+- Publish epsilon root artifact
+- Exercise intentional repair lineage
+- Join alpha and beta
+- Join gamma and delta
+- Join repaired lineage and epsilon
+- Build left branch
+
+### Fixed
+
+- Fix: Fix: Exercise intentional repair lineage
+- Fix: Build right branch
+- Fix: Fix: Validate right branch
+
+
+_Tasks: 14 total, 14 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint488] - 2026-08-01
 
 ### Added

@@ -140,6 +140,22 @@ describe('cleanup command (isolated)', () => {
     expect(decayOpt).toBeDefined();
   });
 
+  it('has an exact --sprint cleanup selector', () => {
+    const program = new Command();
+    registerCleanup(program);
+    const cmd = program.commands.find(c => c.name() === 'cleanup');
+    expect(cmd?.options.some(option => option.long === '--sprint')).toBe(true);
+  });
+
+  it('rejects malformed sprint selectors before reading task artifacts', async () => {
+    await runCommand(['cleanup', '--sprint', '../489']);
+    expect(printError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('invalid-sprint-id') }),
+    );
+    expect(readdirSync).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
   it('reads task files from .tasks/ directory', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['task-001-001.json', 'task-001-002.json'] as any);
@@ -316,6 +332,24 @@ describe('cleanup command (isolated)', () => {
     expect(calls.some(c => String(c).includes('1 prompt file(s)'))).toBe(true);
   });
 
+  it('A) --sprint dry-run excludes foreign task and prompt artifacts', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('.tasks'));
+    vi.mocked(readdirSync).mockReturnValue([
+      'task-489-001.json',
+      'task-488-001.json',
+      'task-xv-session.json',
+      '.prompt-489-001.txt',
+      '.prompt-488-001.txt',
+    ] as any);
+    await runCommand(['cleanup', '--sprint', 'sprint-489', '--dry-run']);
+    const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+    expect(calls).toContain('  task: task-489-001.json');
+    expect(calls).not.toContain('  task: task-488-001.json');
+    expect(calls).not.toContain('  task: task-xv-session.json');
+    expect(calls).toContain('  prompt → archive: .prompt-489-001.txt');
+    expect(calls).not.toContain('  prompt → archive: .prompt-488-001.txt');
+  });
+
   // ─── B) Sprint derived from real data ────────────────────────────
 
   it('B) sprint ID derived from sprint-state.json when it exists', async () => {
@@ -334,6 +368,16 @@ describe('cleanup command (isolated)', () => {
     expect(cleanup).toHaveBeenCalled();
     expect(capturedSprint.id).toBe('sprint-042');
     expect(capturedSprint.number).toBe(42);
+  });
+
+  it('B) exact --sprint selector supplies the cleanup number used by artifact ownership', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    let capturedSprint: any;
+    vi.mocked(cleanup).mockImplementation((_root: string, sprint: any) => {
+      capturedSprint = sprint;
+    });
+    await runCommand(['cleanup', '--sprint', 'sprint-489']);
+    expect(capturedSprint).toMatchObject({ id: 'sprint-489', number: 489 });
   });
 
   it('B) sprint ID falls back to task sprintId when sprint-state.json is missing', async () => {

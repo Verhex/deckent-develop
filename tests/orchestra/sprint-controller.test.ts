@@ -1504,7 +1504,7 @@ describe('Task Router wiring in sprint-controller', () => {
     expect(source).toContain('task.assignedSkills = routing.skills');
   });
 
-  it('routing phase persists context and rethrows instead of backward-compatible continuation', async () => {
+  it('routing phase persists context, parks a typed HOLD, and rethrows', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
     const source = actualFs.readFileSync(
       new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
@@ -1516,7 +1516,10 @@ describe('Task Router wiring in sprint-controller', () => {
     expect(boundary).toContain('routeSprintTasksImpl(');
     expect(boundary).toContain('{ projectRoot, sprintId: sprint.id }');
     expect(boundary).toContain('BRAIN→AUDITOR:PROVIDER_ROUTING_HOLD');
+    expect(boundary).toContain("pauseSprint(projectRoot, sprint, routingFailure, 'provider-routing-hold')");
+    expect(boundary).toContain("emitSprintEvent('SPRINT_PAUSED'");
     expect(boundary).toContain('throw e');
+    expect(boundary).not.toContain('clearSprintState(projectRoot)');
     expect(boundary).not.toContain("debugLog('runSprint:routeSprintTasks', e)");
   });
 

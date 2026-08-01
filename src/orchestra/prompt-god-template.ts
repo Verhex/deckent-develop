@@ -1303,6 +1303,14 @@ export function buildDependenciesBlock(
 This task depends on: ${deps.join(', ')}
 Ensure dependent tasks are complete before starting.
 
+### Dependency Settlement Authority
+The \`aggregate\` verdict below is host-evaluated logical-lineage authority. It is the ONLY
+dependency-status authority for this attempt. Raw \`.tasks/task-<dependency-id>.result\` files are
+attempt-scoped audit evidence and MUST NOT override the aggregate verdict. A repaired lineage
+intentionally retains the original attempt's \`NO_GO\`; when aggregate is \`DONE\`, use the declared
+dependency output artifacts and proceed. Do not reopen or downgrade that settlement by reading the
+original result file.
+
 ${entries.join('\n\n')}`;
   }
 
@@ -1343,13 +1351,23 @@ function formatAggregateEntry(
   }
 
   let aggregate: DependencyResultEntry['verdict'] = original?.verdict ?? 'NO_GO';
-  for (const { entry } of fixes) {
+  let resolvedAttemptId = original ? depId : fixes.at(-1)?.id ?? depId;
+  for (const { id, entry } of fixes) {
     if (VERDICT_RANK_DIGEST[entry.verdict] > VERDICT_RANK_DIGEST[aggregate]) {
       aggregate = entry.verdict;
+      resolvedAttemptId = id;
+    } else if (entry.verdict === aggregate) {
+      // Same-verdict retries are ordered by attempt id above. The latest
+      // matching attempt is the lineage tip workers should cite.
+      resolvedAttemptId = id;
     }
   }
 
-  const lines: string[] = [`## Dependency ${depId} (aggregate: ${aggregate})`];
+  const lines: string[] = [
+    `## Dependency ${depId} (aggregate: ${aggregate})`,
+    `- Canonical logical settlement: ${aggregate}`,
+    `- Resolved by attempt: ${resolvedAttemptId}`,
+  ];
   if (original) {
     lines.push(`### Original ${depId} (${original.verdict})`);
     const body = formatDependencyEntry(depId, entryToDigest(original))

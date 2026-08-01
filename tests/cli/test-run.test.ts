@@ -20,6 +20,21 @@ vi.mock('../../src/core/config.js', () => ({
   resolveEffectiveWorkers: vi.fn(),
 }));
 
+const { testConnector } = vi.hoisted(() => ({
+  testConnector: { getAvailableProviders: vi.fn(() => ['codex']) },
+}));
+vi.mock('../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn(async () => ({
+    connector: testConnector,
+    registered: ['codex'],
+    skipped: [],
+    defaultProvider: 'codex',
+    providerEnvOverrides: {},
+    modelAutoDetectPromise: Promise.resolve([]),
+    deckBroker: null,
+  })),
+}));
+
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   BrainError: class BrainError extends Error {
@@ -46,6 +61,7 @@ vi.mock('../../src/cli/helpers/process.js', () => ({
 
 import { existsSync } from 'node:fs';
 import { loadConfig } from '../../src/core/config.js';
+import { bootstrapProviders } from '../../src/core/provider.js';
 import { runSprint, BrainError } from '../../src/orchestra/brain.js';
 import { print, printError, formatSprintSummary } from '../../src/cli/helpers/output.js';
 import { resolveProjectRoot } from '../../src/cli/helpers/process.js';
@@ -149,7 +165,9 @@ describe('registerTestRun', () => {
       testMode: true,
       skipCleanup: false,
       timeoutMs: 300000,
+      connector: testConnector,
     });
+    expect(bootstrapProviders).toHaveBeenCalledWith(expect.any(Object), '/project');
   });
 
   it('passes skipCleanup=true when --keep is set', async () => {
@@ -171,6 +189,7 @@ describe('registerTestRun', () => {
       testMode: true,
       skipCleanup: true,
       timeoutMs: 300000,
+      connector: testConnector,
     });
     expect(print).toHaveBeenCalledWith('--keep flag active: task files preserved.');
   });
@@ -194,6 +213,7 @@ describe('registerTestRun', () => {
       testMode: true,
       skipCleanup: false,
       timeoutMs: 60000,
+      connector: testConnector,
     });
   });
 

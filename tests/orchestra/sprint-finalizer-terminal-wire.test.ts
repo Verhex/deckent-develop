@@ -9,6 +9,7 @@ import {
   buildFinalizerTerminalTruth,
   loadFinalizerAttemptTasks,
 } from '../../src/orchestra/sprint-finalizer.js';
+import { createHostPreDispatchNoGoResult } from '../../src/core/pre-dispatch-settlement.js';
 
 function task(id: string, fixForTaskId?: string): Task {
   return {
@@ -131,6 +132,73 @@ describe('finalizeSprint terminal truth wiring', () => {
     const nulChar = String.fromCharCode(0);
     expect(lineage.attemptIds.every(id => !id.includes(nulChar))).toBe(true);
     expect(lineage.logicalTaskId.includes(nulChar)).toBe(false);
+  });
+
+  it('treats a host pre-dispatch rejection as exact zero-work attempt evidence resolved by a later FIX', () => {
+    const rejected = task('490-006-fix', '490-006');
+    const resolved = task('490-006-fix-fix', '490-006-fix');
+    const rejectedResult = createHostPreDispatchNoGoResult(
+      rejected,
+      'FORCED_SKILL_UNAVAILABLE',
+      'forced skill unavailable before spawn',
+    );
+    const truth = buildFinalizerTerminalTruth({
+      tasks: [task('490-006'), rejected, resolved],
+      evaluations: new Map([
+        ['490-006', TaskEvaluation.NO_GO],
+        ['490-006-fix', TaskEvaluation.NO_GO],
+        ['490-006-fix-fix', TaskEvaluation.DONE],
+      ]),
+      results: [
+        result('490-006', 'attempt-original', 0, 10, true),
+        rejectedResult,
+        result('490-006-fix-fix', 'attempt-fix-fix', 100, 20, true),
+      ],
+    });
+
+    expect(truth.terminalEvidence.logicalTasks).toEqual([
+      expect.objectContaining({ logicalTaskId: '490-006', state: 'COMPLETED', attemptCount: 3 }),
+    ]);
+    expect(truth.terminalEvidence.holds).toEqual([]);
+    expect(truth.terminalEvidence.attributionExclusions).toEqual([]);
+    expect(truth.attempts[1]).toMatchObject({
+      identity: { taskId: '490-006-fix' },
+      authority: { state: 'TERMINAL', verdict: 'NO_GO', reasonCode: 'FORCED_SKILL_UNAVAILABLE' },
+      result: { state: 'NOT_APPLICABLE', reasonCode: 'FORCED_SKILL_UNAVAILABLE' },
+      attribution: { state: 'VERIFIED', filesChanged: [], linesAdded: 0, linesRemoved: 0 },
+    });
+  });
+
+  it('reconciles the reserved legacy honestfail zero-work shape without consulting worker notes', () => {
+    const rootTask = task('490-legacy');
+    const fixTask = task('490-legacy-fix', '490-legacy');
+    const legacyResult: TaskResult = {
+      taskId: rootTask.id,
+      workerId: `honestfail-${rootTask.id}`,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'NO_GO',
+      notes: 'arbitrary legacy producer detail',
+    };
+    const truth = buildFinalizerTerminalTruth({
+      tasks: [rootTask, fixTask],
+      evaluations: new Map([
+        [rootTask.id, TaskEvaluation.NO_GO],
+        [fixTask.id, TaskEvaluation.DONE],
+      ]),
+      results: [legacyResult, result(fixTask.id, 'attempt-legacy-fix', 100, 10, true)],
+    });
+
+    expect(truth.terminalEvidence.logicalTasks[0]).toMatchObject({ state: 'COMPLETED' });
+    expect(truth.terminalEvidence.holds).toEqual([]);
+    expect(truth.attempts[0]?.authority).toMatchObject({
+      state: 'TERMINAL',
+      verdict: 'NO_GO',
+      reasonCode: 'LEGACY_HOST_PRE_DISPATCH_REJECTION',
+    });
   });
 
   it('loads runtime-born FIX tasks from disk before final lineage folding', () => {

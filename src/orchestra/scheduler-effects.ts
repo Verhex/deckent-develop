@@ -48,6 +48,7 @@ import {
   type AttendedExecutionApprovalExpectedDispatch,
 } from '../core/attended-execution-approval.js';
 import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
+import { createHostPreDispatchNoGoResult } from '../core/pre-dispatch-settlement.js';
 import {
   assertAttendedExecutionProposalMaterial,
   createAttendedExecutionProposalMaterialFromTask,
@@ -357,11 +358,10 @@ function persistTask(projectRoot: string, task: Task): void {
 }
 
 /**
- * MF-2 (Sprint 250) parity: an honest NO_GO `.result` when a host-only
- * provider (codex/gemini/ollama, per `isAdapterProvider`) has no
- * registered/available host adapter at spawn time — reimplemented here
- * (not imported) because sprint-spawner.ts's `writeProviderUnavailableNoGo`
- * is unexported and this module must not import from sprint-spawner.ts.
+ * MF-2 (Sprint 250) parity: an honest host-owned pre-dispatch settlement when
+ * a host-only provider has no registered/available adapter. The canonical
+ * result contract lives in core so initial-wave and later-wave executors cannot
+ * drift while this module remains a leaf.
  */
 function writeProviderUnavailableResult(projectRoot: string, task: Task): void {
   const reason =
@@ -369,23 +369,11 @@ function writeProviderUnavailableResult(projectRoot: string, task: Task): void {
     + `registered/available at spawn time. Refusing to silently degrade to the claude CLI via the `
     + `docker backend. Ensure the provider is available at bootstrap (CLI logged in / daemon reachable) `
     + `so its host adapter is registered.`;
-  const result = {
-    taskId: task.id,
-    workerId: `honestfail-${task.id}`,
-    filesChanged: [] as string[],
-    linesAdded: 0,
-    linesRemoved: 0,
-    testsPassed: false,
-    selfAssessment: 'NO_GO',
-    notes: reason,
-    tokenUsage: {
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      provider: task.provider,
-      model: task.model,
-    },
-  };
+  const result = createHostPreDispatchNoGoResult(
+    task,
+    'PROVIDER_ADAPTER_UNAVAILABLE',
+    reason,
+  );
   try {
     writeFileSync(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),

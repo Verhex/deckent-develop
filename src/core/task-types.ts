@@ -761,6 +761,15 @@ export interface BrainAnswer {
 // ─── TaskResult ──────────────────────────────────────────────────────
 export type CrossVerifyVerdict = 'confirmed' | 'refuted' | 'unclear';
 
+/** Host authority for a task rejected before any worker/backend invocation. */
+export interface HostPreDispatchSettlement {
+  readonly version: 1;
+  readonly state: 'NOT_DISPATCHED';
+  readonly attemptId: string;
+  readonly reasonCode: string;
+  readonly evidenceRef: string;
+}
+
 /** Host-observed execution truth for one semantic cross-verification verdict. */
 export interface CrossVerifyExecutionEvidence {
   outcome: 'completed' | 'budget-exhausted' | 'failed';
@@ -833,6 +842,8 @@ export interface TaskResult {
     reasonCode?: string;
     claimedOutsideScope?: string[];
   };
+  /** Exact zero-work authority when dispatch was rejected before worker spawn. */
+  preDispatchSettlement?: HostPreDispatchSettlement;
   testsPassed: boolean;
   /** Provider compatibility evidence: commands recovered from a legacy testsPassed string array. */
   testCommands?: string[];

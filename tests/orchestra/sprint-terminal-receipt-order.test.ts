@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -8,7 +8,12 @@ import type { Task, TaskResult } from '../../src/core/types.js';
 import {
   buildFinalizerTerminalTruth,
   publishFencedSprintTerminalReceipt,
+  publishFinalSprintAuthority,
+  publishTestModeSprintTerminalReceipt,
+  shouldEmitStandardLifecycleEvents,
 } from '../../src/orchestra/sprint-finalizer.js';
+import { readCanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
+import { runRetroPhase } from '../../src/orchestra/sprint-phases.js';
 
 const temporaryRoots: string[] = [];
 
@@ -66,6 +71,14 @@ afterEach(() => {
 });
 
 describe('fenced sprint terminal receipt archive boundary', () => {
+  it('does not replay ordinary lifecycle events during completed-checkpoint recovery', () => {
+    expect(shouldEmitStandardLifecycleEvents()).toBe(true);
+    expect(shouldEmitStandardLifecycleEvents({ lifecycleContext: 'live-execution' })).toBe(true);
+    expect(shouldEmitStandardLifecycleEvents({
+      lifecycleContext: 'completed-checkpoint-recovery',
+    })).toBe(false);
+  });
+
   it('publishes one generation-fenced receipt carrying the exact logical settlement digest', () => {
     const sprintTask = task();
     const truth = buildFinalizerTerminalTruth({
@@ -153,6 +166,134 @@ describe('fenced sprint terminal receipt archive boundary', () => {
       candidate: false,
       reasons: expect.arrayContaining(['LINEAGE_NOT_COMPLETED']),
     });
+  });
+
+  it('publishes test-mode terminal authority without invoking the learning finalizer', () => {
+    const sprintTask = task();
+    const sprint = {
+      id: 'sprint-487',
+      number: 487,
+      tasks: [sprintTask],
+    } as Parameters<typeof publishFencedSprintTerminalReceipt>[0]['sprint'];
+
+    const settlement = publishTestModeSprintTerminalReceipt(
+      projectRoot(),
+      sprint,
+      new Map([['487-002', TaskEvaluation.DONE]]),
+      [result('DONE')],
+      { runId: 'test-run-487', coordinatorGeneration: 9 },
+    );
+
+    expect(settlement.receiptPublication.receipt).toMatchObject({
+      sprintId: 'sprint-487',
+      runId: 'test-run-487',
+      coordinatorGeneration: 9,
+    });
+    expect(settlement.terminalTruth.logicalMetrics).toMatchObject({
+      totalTasks: 1,
+      completedTasks: 1,
+      noGoTasks: 0,
+      unevaluatedTasks: 0,
+    });
+    expect(settlement.receiptPublication.terminalEvidence.cleanupEligibility).toMatchObject({
+      state: 'CANDIDATE',
+      candidate: true,
+    });
+  });
+
+  it('wires the reduced test RETRO phase to the fenced terminal receipt', async () => {
+    const sprintTask = task();
+    const sprint = {
+      id: 'sprint-487',
+      number: 487,
+      tasks: [sprintTask],
+      status: 'EVALUATING',
+      phase: 'EVALUATE',
+      workers: ['w-487-002'],
+      startedAt: '2026-07-31T00:00:00.000Z',
+    } as Parameters<typeof runRetroPhase>[1];
+    const root = projectRoot();
+
+    const outcome = await runRetroPhase(
+      root,
+      sprint,
+      new Map([['487-002', TaskEvaluation.DONE]]),
+      [result('DONE')],
+      { auth_mode: 'subscription', language: 'en' } as Parameters<typeof runRetroPhase>[4],
+      true,
+      'test-flow-487',
+    );
+
+    expect(outcome).toMatchObject({ totalTasks: 1, completedTasks: 1, noGoTasks: 0 });
+    const receipt = JSON.parse(readFileSync(
+      join(root, '.deckent', 'recently-works', 'sprint-487-terminal-receipt.json'),
+      'utf-8',
+    )) as { receipt: { runId: string; sprintId: string } };
+    expect(receipt.receipt).toEqual(expect.objectContaining({
+      runId: 'test-flow-487',
+      sprintId: 'sprint-487',
+    }));
+  });
+
+  it('publishes dashboard before the canonical COMPLETE read model so status retains the receipt', () => {
+    const root = projectRoot();
+    const sprintTask = task();
+    const sprint = {
+      id: 'sprint-487',
+      number: 487,
+      tasks: [sprintTask],
+      workers: [],
+      status: 'PAUSED',
+      phase: 'FIX',
+      startedAt: '2026-07-31T00:00:00.000Z',
+    } as Parameters<typeof publishFinalSprintAuthority>[1];
+    mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    writeFileSync(join(root, '.tasks', 'task-487-002.json'), JSON.stringify(sprintTask));
+    writeFileSync(join(root, '.tasks', 'task-487-002.result'), JSON.stringify(result('DONE')));
+    writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
+      sprintId: sprint.id,
+      status: 'PAUSED',
+      phase: 'FIX',
+      taskIds: [sprintTask.id],
+    }));
+    writeFileSync(join(root, '.dashboard'), JSON.stringify({
+      sprint: { id: sprint.id, number: sprint.number, status: 'PAUSED', phase: 'FIX' },
+      agents: [],
+      progress: { done: 0, active: 0, blocked: 1, total: 1 },
+      alerts: [],
+      updatedAt: '2026-07-31T00:00:00.000Z',
+    }));
+    publishTestModeSprintTerminalReceipt(
+      root,
+      sprint,
+      new Map([['487-002', TaskEvaluation.DONE]]),
+      [result('DONE')],
+    );
+
+    publishFinalSprintAuthority(root, sprint, {
+      totalTasks: 1,
+      completedTasks: 1,
+      techDebtTasks: 0,
+      noGoTasks: 0,
+      unevaluatedTasks: 0,
+      durationMs: 1,
+      coveragePercent: 100,
+      noGoRate: 0,
+      newDebtCount: 0,
+      resolvedDebtCount: 0,
+      totalOpenDebt: 0,
+      boundaryViolations: 0,
+      crossAssignments: 0,
+      contextLinesUsed: 0,
+    });
+
+    const model = readCanonicalRunStatusReadModel(root);
+    expect(model?.authority.lifecycle).toBe('COMPLETE');
+    expect(model?.terminalPublication.state).toBe('receipt-observed');
+    expect(model?.authority.conflicts).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ surface: 'dashboard' }),
+    ]));
   });
 
   it('wires one receipt publication before archive and guards every cleanup step with receipt evidence', () => {

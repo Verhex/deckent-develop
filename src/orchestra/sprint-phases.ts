@@ -4134,10 +4134,20 @@ export async function runRetroPhase(
       const freshDebt = getDebtItems(projectRoot);
       const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
       sprint.metrics = metrics;
+      // Test mode intentionally skips learning/retro/decay, but it is still a
+      // full lifecycle run. Publish the canonical exact-attempt receipt so the
+      // controller can authorize cleanup and COMPLETE through the same fenced
+      // terminal boundary as every other run surface.
+      const { publishTestModeSprintTerminalReceipt } = await import('./sprint-finalizer.js');
+      publishTestModeSprintTerminalReceipt(projectRoot, sprint, evaluations, results, {
+        defaultAuthMode: config.auth_mode,
+        ...(flowId ? { runId: flowId } : {}),
+      });
       return metrics;
     } catch (e) {
-      debugLog('runRetroPhase:calculateMetrics', e);
-      return undefined;
+      const message = e instanceof Error ? e.message : String(e);
+      debugLog('runRetroPhase:testModeTerminalSettlement', e);
+      return { finalizeFailed: true, error: message };
     }
   }
 }

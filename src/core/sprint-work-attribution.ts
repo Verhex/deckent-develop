@@ -1,4 +1,5 @@
 import type { TaskResult } from './task-types.js';
+import { resolveHostPreDispatchSettlement } from './pre-dispatch-settlement.js';
 
 export type SprintWorkAttributionState = 'VERIFIED' | 'HOLD' | 'UNAVAILABLE';
 
@@ -29,6 +30,17 @@ export interface SprintWorkAttributionProjection {
 export function projectAttributedTaskWork(
   result: TaskResult | undefined,
 ): AttributedTaskWorkProjection {
+  const preDispatchSettlement = resolveHostPreDispatchSettlement(result);
+  if (preDispatchSettlement) {
+    return {
+      state: 'VERIFIED',
+      attemptId: preDispatchSettlement.attemptId,
+      reasonCode: null,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+    };
+  }
   const attribution = result?.workAttribution;
   if (!result || attribution?.state !== 'VERIFIED') {
     return {

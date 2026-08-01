@@ -46,6 +46,9 @@ describe('Bug A: Dependency aggregate fix-aware', () => {
     });
     expect(block).toContain('179-001');
     expect(block).toContain('aggregate: DONE');
+    expect(block).toContain('Canonical logical settlement: DONE');
+    expect(block).toContain('Resolved by attempt: 179-001-fix');
+    expect(block).toContain('MUST NOT override the aggregate verdict');
   });
 
   it('(e) honest-gate intact: Brain re-evaluate UPDATE not blocked', () => {
@@ -93,6 +96,7 @@ describe('Bug A: Dependency aggregate fix-aware', () => {
       const prompt = buildWorkerPrompt(dependent, undefined, undefined, root);
       expect(prompt).toContain('Dependency dep-root (aggregate: DONE)');
       expect(prompt).toContain('Fix dep-root-fix (DONE)');
+      expect(prompt).toContain('Raw `.tasks/task-<dependency-id>.result` files are');
       expect(dependent.scope.filesRead).toContain('src/dependency.ts');
       expect(dependent.scope.filesWrite).not.toContain('src/dependency.ts');
     } finally {
@@ -100,7 +104,59 @@ describe('Bug A: Dependency aggregate fix-aware', () => {
     }
   });
 
-  it('(g) dependency projection consumes the newest redispatch audit verdict', () => {
+  it('(g) FIX-of-FIX prompt inherits logical-root dependencies without changing dispatch topology', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-fix-prompt-dependency-'));
+    const sprintId = 'sprint-fix-prompt-dependency';
+    const tasksDir = join(root, '.tasks');
+    const evalDir = join(root, '.deckent', 'runtime', 'evaluations', sprintId);
+    mkdirSync(tasksDir, { recursive: true });
+    mkdirSync(evalDir, { recursive: true });
+    const task = (id: string, overrides: Partial<Task> = {}): Task => ({
+      id, title: id, description: id, model: 'test-model', effort: 'normal', priority: 'NORMAL',
+      reason: 'test', scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      dependencies: [], goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: TaskStatus.PENDING, sprintId, ...overrides,
+    });
+    const dependency = task('dep-root', { status: TaskStatus.NO_GO });
+    const dependencyFix = task('dep-root-fix', {
+      status: TaskStatus.DONE, isPriorityFix: true, fixForTaskId: dependency.id,
+    });
+    const logicalRoot = task('logical-root', { dependencies: [dependency.id], status: TaskStatus.NO_GO });
+    const firstFix = task('logical-root-fix', {
+      isPriorityFix: true, fixForTaskId: logicalRoot.id, status: TaskStatus.NO_GO,
+    });
+    const secondFix = task('logical-root-fix-fix', {
+      isPriorityFix: true, fixForTaskId: firstFix.id, dependencies: [],
+    });
+    for (const record of [dependency, dependencyFix, logicalRoot, firstFix, secondFix]) {
+      writeFileSync(join(tasksDir, `task-${record.id}.json`), JSON.stringify(record));
+    }
+    writeFileSync(join(tasksDir, `task-${dependency.id}.result`), JSON.stringify({
+      taskId: dependency.id, workerId: 'w-dep', filesChanged: ['src/dependency.ts'],
+      linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0,
+      selfAssessment: 'NO_GO', notes: 'original failed',
+    }));
+    writeFileSync(join(tasksDir, `task-${dependencyFix.id}.result`), JSON.stringify({
+      taskId: dependencyFix.id, workerId: 'w-dep-fix', filesChanged: ['src/dependency.ts'],
+      linesAdded: 1, linesRemoved: 0, testsPassed: true, coverage: 100,
+      selfAssessment: 'DONE', notes: 'repair settled',
+    }));
+    writeFileSync(join(evalDir, `${dependency.id}-attempt-1.json`), JSON.stringify({ decision: 'NO_GO' }));
+    writeFileSync(join(evalDir, `${dependencyFix.id}-attempt-1.json`), JSON.stringify({ decision: 'DONE' }));
+
+    try {
+      const prompt = buildWorkerPrompt(secondFix, undefined, undefined, root);
+      expect(secondFix.dependencies).toEqual([]);
+      expect(prompt).toContain('This task depends on: dep-root');
+      expect(prompt).toContain('Dependency dep-root (aggregate: DONE)');
+      expect(prompt).toContain('Resolved by attempt: dep-root-fix');
+      expect(secondFix.scope.filesRead).toContain('src/dependency.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('(h) dependency projection consumes the newest redispatch audit verdict', () => {
     const root = mkdtempSync(join(tmpdir(), 'deckent-dependency-attempt-'));
     const sprintId = 'sprint-dependency-attempt';
     const taskId = 'dep-redispatched';

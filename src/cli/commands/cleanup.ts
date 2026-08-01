@@ -114,16 +114,40 @@ function ensureArchiveGitignore(root: string): void {
 }
 
 export function registerCleanup(program: Command): void {
+  const registerLang = getLangFromConfig(resolveProjectRoot());
   program
     .command('cleanup')
     .description('Clean up after a sprint')
     .option('--decay', 'Force run memory decay (compress .brain/ files)')
     .option('--dry-run', 'Preview what would be deleted without actually deleting')
-    .action((opts: { decay?: boolean; dryRun?: boolean }) => {
+    .option('--sprint <id>', getMessage('cleanup.sprint_option', registerLang))
+    .action((opts: { decay?: boolean; dryRun?: boolean; sprint?: string }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       const tasksDir = join(root, TASKS_DIR);
       const authority = readCanonicalRunStatus(root);
+      const requestedSprintId = opts.sprint?.trim();
+      if (requestedSprintId && !/^sprint-\d+$/u.test(requestedSprintId)) {
+        printError(new Error(getMessage('cleanup.authority_hold', lang, {
+          sprintId: requestedSprintId,
+          reason: 'invalid-sprint-id',
+        })));
+        process.exitCode = 1;
+        return;
+      }
+      if (
+        requestedSprintId
+        && authority.sprintId
+        && authority.sprintId !== requestedSprintId
+        && authority.lifecycle !== 'IDLE'
+      ) {
+        printError(new Error(getMessage('cleanup.authority_hold', lang, {
+          sprintId: requestedSprintId,
+          reason: `authority-owned-by-${authority.sprintId}`,
+        })));
+        process.exitCode = 1;
+        return;
+      }
       const terminalPublication = projectTerminalPublicationStatus(root, authority);
       const holdReason = cleanupAuthorityHoldReason(authority, terminalPublication);
       if (holdReason) {
@@ -134,7 +158,8 @@ export function registerCleanup(program: Command): void {
         process.exitCode = 1;
         return;
       }
-      let taskIdPrefix = authority.sprintId?.match(/^sprint-(\d+)$/u)?.[1];
+      const targetSprintId = requestedSprintId ?? authority.sprintId;
+      let taskIdPrefix = targetSprintId?.match(/^sprint-(\d+)$/u)?.[1];
       taskIdPrefix = taskIdPrefix ? `${taskIdPrefix}-` : undefined;
       const ownsTaskArtifact = (file: string): boolean => taskIdPrefix === undefined
         || file.startsWith(`task-${taskIdPrefix}`);
@@ -218,8 +243,8 @@ export function registerCleanup(program: Command): void {
               const classification = classifyTaskArtifact(f, content);
               if (classification.kind !== 'task-record') continue;
               const task = JSON.parse(content) as Task;
-              const belongsToRun = authority.sprintId === null
-                || task.sprintId === authority.sprintId
+              const belongsToRun = targetSprintId === null
+                || task.sprintId === targetSprintId
                 || (taskIdPrefix !== undefined && task.id.startsWith(taskIdPrefix));
               if (task.id === classification.taskId && belongsToRun) tasks.push(task);
             } catch {
@@ -236,12 +261,13 @@ export function registerCleanup(program: Command): void {
         }
 
         // B) Build sprint from real task data — not a synthetic placeholder
-        let sprintId: string | undefined;
-        let sprintNumber = 0;
+        let sprintId: string | undefined = targetSprintId ?? undefined;
+        const selectedSprintNumber = sprintId?.match(/^(?:sprint-)?(\d+)$/u)?.[1];
+        let sprintNumber = selectedSprintNumber ? parseInt(selectedSprintNumber, 10) : 0;
 
         // First: check sprint-state.json for active sprint info
         const sprintStatePath = join(root, '.deckent', 'sprint-state.json');
-        if (existsSync(sprintStatePath)) {
+        if (!sprintId && existsSync(sprintStatePath)) {
           try {
             const state = JSON.parse(readFileSync(sprintStatePath, 'utf-8')) as { sprintId?: string };
             if (state.sprintId) {
@@ -283,7 +309,7 @@ export function registerCleanup(program: Command): void {
         // foreign-run evidence never enters this run's archive.
         const taskArchiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${archiveSprintId}-tasks`);
         const archiveFailures: string[] = [];
-        if (authority.sprintId && existsSync(tasksDir)) {
+        if (targetSprintId && existsSync(tasksDir)) {
           const archivalSuffix = /\.(?:json|plan|hb|result|paused|log|timeout|partial-result)$/u;
           for (const artifactName of (readdirSync(tasksDir) as string[]).filter(
             name => ownsTaskArtifact(name) && archivalSuffix.test(name),

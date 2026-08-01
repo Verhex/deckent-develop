@@ -416,7 +416,10 @@ Workers MAY ONLY write files listed in `scope.filesWrite`. Auditor detects viola
 
 If your task depends on another task's output and it has not arrived:
 
-- Check `.tasks/task-{dep-id}.result` exists before proceeding
+- Use the prompt's host-evaluated `aggregate` dependency verdict as the only dependency-status
+  authority. Raw `.tasks/task-{dep-id}.result` files describe one attempt (often the original
+  `NO_GO`) and must never override a repaired logical lineage's aggregate `DONE`.
+- Verify the declared dependency output artifact, not the original attempt verdict.
 - Do NOT busy-wait — write `NO_GO` result explaining the dependency
 - Brain will reschedule via mid-sprint-adapter
 

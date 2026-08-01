@@ -14,6 +14,17 @@ vi.mock('../../../src/core/config.js', () => ({
     },
   }),
 }));
+vi.mock('../../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn(async () => ({
+    connector: { getAvailableProviders: () => ['codex'] },
+    registered: ['codex'],
+    skipped: [],
+    defaultProvider: 'codex',
+    providerEnvOverrides: {},
+    modelAutoDetectPromise: Promise.resolve([]),
+    deckBroker: null,
+  })),
+}));
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn().mockResolvedValue({
     id: 'sprint-test',

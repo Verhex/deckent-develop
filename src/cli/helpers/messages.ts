@@ -1077,6 +1077,10 @@ const MESSAGES: MessageMap = {
   },
 
   // ─── cleanup command ─────────────────────────────────────────────────
+  'cleanup.sprint_option': {
+    en: 'Clean only artifacts owned by the exact sprint ID',
+    tr: 'Yalnız exact sprint ID tarafından owned artifaktları temizle',
+  },
   'cleanup.decay_complete': {
     en: 'Decay complete: {before} → {after} lines',
     tr: 'Decay tamamlandı: {before} → {after} satır',
@@ -3466,6 +3470,7 @@ const MESSAGES: MessageMap = {
   'resume.dry_run': { en: '\n[dry-run] Would resume {count} task(s): {taskIds}. No workers spawned.', tr: '\n[dry-run] {count} görev sürdürülecek: {taskIds}. Worker başlatılmadı.' },
   'resume.none': { en: '(none)', tr: '(yok)' },
   'resume.nothing': { en: '\nAll tasks already completed or are not proven safe to resume.', tr: '\nTüm görevler tamamlanmış veya sürdürmenin güvenli olduğu kanıtlanmamış.' },
+  'resume.terminalizing': { en: '\nPublishing missing terminal authority for {sprintId} ({mode}) without redispatching work.', tr: '\n{sprintId} için eksik terminal authority, iş yeniden dispatch edilmeden yayımlanıyor ({mode}).' },
   'resume.retro_hint': { en: 'Run "deckent retro" to see the retrospective.', tr: 'Retrospektifi görmek için "deckent retro" çalıştırın.' },
   'resume.config_failed': { en: 'Failed to load config: {error}', tr: 'Config yüklenemedi: {error}' },
   'resume.stale_killing': { en: '\nStopping proven-stale workers...', tr: '\nBayatlığı kanıtlanan worker\'lar durduruluyor...' },

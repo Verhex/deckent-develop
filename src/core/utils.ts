@@ -1,7 +1,18 @@
 import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { BRAIN_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE, PROJECT_CONFIG_PATH, ERRORS_FILE, ERRORS_MAX_LINES } from './constants.js';
+import {
+  ARCHIVE_DIR,
+  ARCHIVE_SPRINTS_SUBDIR,
+  BRAIN_DIR,
+  DEBT_TABLE_HEADER,
+  DECKENT_FILE,
+  ERRORS_FILE,
+  ERRORS_MAX_LINES,
+  PROJECT_CONFIG_PATH,
+  RECENT_WORKS_DIR,
+  SPRINTS_DIR,
+} from './constants.js';
 import type { DebtItem } from './types.js';
 import { DebtPriority } from './types.js';
 
@@ -109,18 +120,26 @@ export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> 
 }
 
 /**
- * Scan .brain/sprints/ directory AND .deckent/config.json last_sprint_id,
- * take the max of both sources, return sprint-{max+1} padded to 3 digits.
- * Never goes backward — config acts as a floor when sprint files are missing.
+ * Scan every durable run-identity surface plus `.deckent/config.json`, take
+ * the maximum observed identity and return its successor. Test-mode runs do
+ * not write memory/finalizer state, so the event/metric and task-archive
+ * ledgers are required to prevent a cleaned test run from reusing an identity
+ * and appending a second generation to the first generation's event stream.
+ * Config remains a floor when other evidence is removed.
  * If no sources available, returns "sprint-001".
  */
 export function getNextSprintId(projectRoot: string): string {
-  // Source 1: scan .brain/sprints/ (file-based)
-  const sprintsDir = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
+  const evidenceDirectories = [
+    join(projectRoot, BRAIN_DIR, SPRINTS_DIR),
+    join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR),
+    join(projectRoot, RECENT_WORKS_DIR),
+  ];
   let maxFromFiles = 0;
-  if (existsSync(sprintsDir)) {
-    for (const file of readdirSync(sprintsDir)) {
-      const match = file.match(/^sprint-(\d+)\.md$/);
+  for (const directory of evidenceDirectories) {
+    if (!existsSync(directory)) continue;
+    for (const file of readdirSync(directory)) {
+      const match = file.match(/^sprint-(\d+)(?:\D|$)/)
+        ?? file.match(/^task-(\d+)-/);
       if (match?.[1]) {
         const num = parseInt(match[1], 10);
         if (num > maxFromFiles) maxFromFiles = num;

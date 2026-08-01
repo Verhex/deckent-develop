@@ -3,31 +3,31 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6ecb6deb0dd2f479d76022141272c35e28a012d92898a635392b7bda18d49f75"
+    "value": "6b1ca07b61fb2258b09c640fd9c5af0e6187e072f1517ef343a16cf796947d3c"
   },
   "summary": {
-    "total": 309,
-    "active": 309,
-    "terminal": 0,
-    "receipts": 21,
+    "total": 315,
+    "active": 312,
+    "terminal": 3,
+    "receipts": 22,
     "byState": {
-      "OPEN": 215,
+      "OPEN": 214,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 27,
-      "DONE": 0,
+      "VERIFY": 31,
+      "DONE": 3,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 240,
-      "P1": 53,
+      "P0": 244,
+      "P1": 55,
       "P2": 16
     },
     "byProgram": {
       "API": 5,
-      "ASSURANCE": 6,
+      "ASSURANCE": 7,
       "AUTHORITY": 24,
       "CODEX": 44,
       "CONNECTOR": 1,
@@ -41,9 +41,9 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 74,
+      "KERNEL": 78,
       "LEARNING": 4,
-      "OBS": 1,
+      "OBS": 2,
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
@@ -2313,10 +2313,10 @@
       "id": "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-31",
+      "state": "VERIFY",
+      "updated": "2026-08-01",
       "definitionDigest": "51433899496fb4df90d06ab5c3d10d9e609cc7b80652fed767cccb4a8c9ea429",
-      "progressDigest": "fd320de8a743ee6546c86f7ccad3a0c2c5367d0427f27de4012011c7c71c540c",
+      "progressDigest": "a41f70bcef68dac99efae02c811f1596a86c62e039c515dc26071c465516b7f3",
       "terminalClosureDigest": null
     },
     {
@@ -2335,10 +2335,10 @@
       "id": "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-01",
       "definitionDigest": "a1619703d97974b5f69374624fd6f4d15fb9d874aeae2f3add45ab90aa606a60",
-      "progressDigest": "6a00a173b1ab7d9be896db5b229041a4105cd8b02823652f50d203e9cb8f3a01",
+      "progressDigest": "0d5234c8bd11776d7719b3286e09b177ebf36a385bebd1c878d054d01eb3daf4",
       "terminalClosureDigest": null
     },
     {
@@ -2412,10 +2412,10 @@
       "id": "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-01",
       "definitionDigest": "9351804a3b66fabb554218fecf5477069a9c17705d17d7ad3fe1f4fdf3ba6051",
-      "progressDigest": "08e0a41f8754b31c2912757f043e649ad4e5dc86ff0fb1c437cff1ac4376bf3c",
+      "progressDigest": "6c36c1dd729442cd63cdb822a55d7ef48af8be6cc3ef8131f6f2fbfe24d91165",
       "terminalClosureDigest": null
     },
     {
@@ -2423,10 +2423,76 @@
       "id": "RECOVERY-BORN-488-STATUS-PROJECTION-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-01",
       "definitionDigest": "c8b06bda4afa2814f5de7b3c6d6bb4140b880860262ecfb44c30ae70fd7b34af",
-      "progressDigest": "f43586cef4eeeefb061ebca0dac74293cbc3eeb8f22924b10db1151f0dd4c6db",
+      "progressDigest": "a143133ce331a008224ed7de06ea6bc107ed2d0ead6b678ee2787b763c686e51",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3292,
+      "id": "RECOVERY-BORN-490-PRE-DISPATCH-SETTLEMENT-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "DONE",
+      "updated": "2026-08-01",
+      "definitionDigest": "c214467db6b96b42cd2273b9b5bfe4228d67dbafc11a84a721420faf45e9a302",
+      "progressDigest": "ae68d32f57de0134e6be9ed46aff0dd77eea04e8fc804c8f1796bc59e007e890",
+      "terminalClosureDigest": "5d4f3163ccf526732ddd621d2069a67e6a4db46e8928238742fa644fb845b9af"
+    },
+    {
+      "order": 3293,
+      "id": "RECOVERY-BORN-490-COMPLETED-CHECKPOINT-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "DONE",
+      "updated": "2026-08-01",
+      "definitionDigest": "c67169607462646f613d4ef967eb8b428c1e9cde1750e3f13f92e0129aa3000b",
+      "progressDigest": "e6f5288d9f91c50b27b86d246680ef2f5c757e7c1325ad78850cdae967f7d368",
+      "terminalClosureDigest": "c62167e12e312badd0b581521d5f5fa1d2bc9cca316886582f14cfe22da2e5c7"
+    },
+    {
+      "order": 3294,
+      "id": "RECOVERY-BORN-490-TERMINALIZATION-EVENTS-001",
+      "program": "OBS",
+      "priority": "P0",
+      "state": "DONE",
+      "updated": "2026-08-01",
+      "definitionDigest": "73dc3873b7e5c0add14af2fdde93385789970159ac24b878fbf385a62e0b9292",
+      "progressDigest": "d96e07a66642ee5577e569a9adc78950cf39c99e00e762dd286e7e55553bff14",
+      "terminalClosureDigest": "76ba125dda1408fb77e60be73f3c3f5c94a44c08e8a60813fdde70b91b9f6e9b"
+    },
+    {
+      "order": 3295,
+      "id": "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "72dba947ca53e9d415c04c0fe8f9cf76ccaf6c9d46c8d3074384fc447c190d6d",
+      "progressDigest": "eac759d9a621ad63047e2477826a6418d92550ff9cef44955cd5ba990c092140",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3296,
+      "id": "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "0253183b7f17b549605fc1b9b224a1543410d852205209e0f69643a554bd60e0",
+      "progressDigest": "aa7ec6cdcf22805f12139ae9036cced0ccfa902818180c2e816ff65ff56f05c5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3297,
+      "id": "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
+      "program": "ASSURANCE",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "2c26e9dff54c59731b1b34ba362aa0793718b558ccf6d283143ec604e912bc69",
+      "progressDigest": "386bb69538bb562746901e25987f81e067428cd3da808223497f4b86cf7ffef9",
       "terminalClosureDigest": null
     },
     {
@@ -3672,6 +3738,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-07-30T21:59:32+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-01-LIFECYCLE-RECOVERY-01",
+      "authorityDigest": "a995fee594531b899207a0ec33510411a8b825f1d104112f8deab3753497ad0b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-01T20:47:59+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -9301,6 +9377,8 @@
         "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
         "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
         "RECOVERY-BORN-488-STATUS-PROJECTION-001",
+        "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
+        "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001",
         "RECOVERY-RESUME-001",
         "STATUS-SURFACE-PARITY-001"
       ],
@@ -9836,7 +9914,8 @@
         "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
         "RECOVERY-BORN-486-NERVOUS-COLLISION-001",
         "RECOVERY-BORN-488-CONTINUOUS-REFILL-001",
-        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001"
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+        "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001"
       ],
       "children": [],
       "gates": [
@@ -10357,7 +10436,11 @@
         "RECOVERY-BORN-488-REPAIR-CAPABILITY-001",
         "RECOVERY-BORN-488-EVALUATION-TRUTH-001",
         "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
-        "RECOVERY-BORN-488-STATUS-PROJECTION-001"
+        "RECOVERY-BORN-488-STATUS-PROJECTION-001",
+        "RECOVERY-BORN-490-PRE-DISPATCH-SETTLEMENT-001",
+        "RECOVERY-BORN-490-COMPLETED-CHECKPOINT-001",
+        "RECOVERY-BORN-490-TERMINALIZATION-EVENTS-001",
+        "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001"
       ],
       "gates": [
         "G1"
@@ -10415,7 +10498,8 @@
         "RECOVERY-BORN-488-REPAIR-CAPABILITY-001",
         "RECOVERY-BORN-488-EVALUATION-TRUTH-001",
         "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
-        "RECOVERY-BORN-488-STATUS-PROJECTION-001"
+        "RECOVERY-BORN-488-STATUS-PROJECTION-001",
+        "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
@@ -12023,7 +12107,8 @@
       "dependents": [
         "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
         "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
-        "RECOVERY-BORN-488-LANDING-CHECKPOINT-001"
+        "RECOVERY-BORN-488-LANDING-CHECKPOINT-001",
+        "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001"
       ],
       "children": [],
       "gates": [
@@ -12483,23 +12568,25 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
+        "C": "1",
+        "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
-        "X": "0",
-        "S": "?"
+        "L": "1",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-01-LIFECYCLE-RECOVERY-01"
+      ],
       "acceptance": "Receipt `logicalProgress.lineages[].logicalTaskId` equals the canonical root task ID; attempt IDs remain exact and separate, embedded NUL/composite IDs never leak into logical identity or cross-surface consumers",
-      "evidence": "Sprint-487 truthful receipt has correct 32/32 totals and 44 exact attempts, but its lineage labels contain `taskId\\u0000attemptId`. Counts/status are unaffected; the evidence schema and producer mapping must be repaired before downstream consumers rely on logical IDs",
-      "updated": "2026-07-31"
+      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; `proof=sprint-490-terminal-logical-id`; finalizer now projects canonical root IDs separately from exact attempt IDs; focused terminal receipt proof rejects embedded NUL/composite identity and Sprint-490 published 14 canonical logical lineages over 20 exact attempts",
+      "updated": "2026-08-01"
     },
     {
       "order": 3282,
@@ -12519,7 +12606,9 @@
         "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
         "RECOVERY-BORN-488-STATUS-PROJECTION-001"
       ],
-      "children": [],
+      "children": [
+        "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -12538,7 +12627,8 @@
       "closureBlockedBy": [
         "KERNEL-ATTEMPT-001",
         "KERNEL-SETTLEMENT-001",
-        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "A repair is authorized only from the current unresolved lineage head; successful repair settles the logical task once; stale or redundant XFIX cannot replace a successful leaf, reopen DONE, double-count progress or poison dependants; repair continuation is evidence/risk policy plus operator authority, never an arbitrary global attempt ratio or silent infinite loop",
@@ -12565,13 +12655,13 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "~",
-        "W": "0",
+        "C": "1",
+        "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -12582,9 +12672,11 @@
         "SCHEDULER-001",
         "PROMPT-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-01-LIFECYCLE-RECOVERY-01"
+      ],
       "acceptance": "One versioned dependency read model resolves every logical prerequisite through its accepted lineage leaf; scheduler, prompt, handoff, Brain and recovery bind the same digest; a repaired dependency unblocks exactly once and no worker can receive stale original NO_GO evidence after aggregate admission",
-      "evidence": "Sprint-488 emitted `DEPENDENCY_REPAIR_UNBLOCKED` for repaired prerequisites, yet prompts for 003 and 015 read only root `.result` files and showed original NO_GO, causing immediate false NO_GO. The object aggregate formatter exists but task-builder still selected the legacy file reader",
+      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; task-builder and prompt template consume host-evaluated aggregate lineage state, generated FIX descendants inherit root dependency context/read grants, and focused aggregate tests pass. Sprint-490 then released 009/011/013/014 only through repaired logical lineages and completed 14/14. Shared versioned digest across every non-Sprint mode and every-environment proof remain open",
       "updated": "2026-08-01"
     },
     {
@@ -12848,13 +12940,13 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "~",
-        "W": "0",
+        "C": "1",
+        "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -12866,9 +12958,11 @@
         "RUN-STATUS-AUTHORITY-001",
         "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-01-LIFECYCLE-RECOVERY-01"
+      ],
       "acceptance": "Resume returns a typed resumed-and-running, resumed-and-paused, completed, aborted or failed outcome with exact next authority; explicit force finalize never prints COMPLETE before receipt and can publish a fenced ABORTED settlement preserving unresolved/deferred lineages; cleanup admits only that exact terminal receipt and never deletes forensic evidence implicitly",
-      "evidence": "Sprint-488 owner-approved source-runtime recovery published a generation-fenced ABORTED receipt for 20 logical tasks/33 attempts with 8 DONE, 1 settled NO_GO and 11 unresolved attempts, then matching cleanup converged status to IDLE without deleting an unrelated xverify task. Force-finalize no longer enters normal retrospective/learning/config finalization; receipt outcome is part of CAS identity and cleanup requires lifecycle/outcome parity. Cleanup now archives owned task/result evidence with byte readback verification before deleting live copies, so deletion is explicit and recoverable rather than implicit. Scoped contracts pass 115/115, build is clean, isolated built-binary containment passes and an external real-dist cleanup fixture proves byte-exact owned JSON/result archive plus foreign preservation. Historical Sprint-488 cleanup preceded archive-all hardening, so its task/result JSONs are absent while receipt/log/runtime evidence remains. The resume subprocess now must atomically publish a schema-v1 typed outcome bound to the exact sprint; parent/child exit-code disagreement or missing evidence is `failed`, while durable PAUSED is `resumed-paused` with exact resume/finalize authority and operator-action exit 2 rather than a generic internal error. Recovery-focused source proof passes 36/36. Fresh real PAUSED→resume outcomes, native platform matrix and dogfood replay remain open",
+      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; prior Sprint-488 ABORTED containment remains valid. Sprint-490 additionally exercised a completed-checkpoint terminalization-only recovery: persisted results/evaluations produced the missing fenced COMPLETE receipt without worker redispatch or evaluator replay, status observed the receipt, and exact cleanup converged to IDLE while retaining forensic terminal/event/gate/metric artifacts. Scoped recovery contracts pass; fresh genuinely PAUSED continuation, native platform matrix and non-Sprint adapters remain open",
       "updated": "2026-08-01"
     },
     {
@@ -12885,13 +12979,56 @@
         "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
       ],
       "dependents": [],
+      "children": [
+        "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001"
+      ],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUN-STATUS-AUTHORITY-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
+        "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-08-01-LIFECYCLE-RECOVERY-01"
+      ],
+      "acceptance": "CLI, MCP, Terminal, Desktop, dashboard, metrics, notification and finalizer consume one revisioned persisted snapshot with exact logical and attempt denominators; active/provider concurrency cannot remain non-zero after authority retirement; source/dist digest mismatch blocks dogfood admission and no adapter re-infers state",
+      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; terminal publication now orders COMPLETE dashboard before canonical read-model publication so the digest is not stale at birth. Sprint-490 status revision 51 projected receipt-backed COMPLETE with 14 logical DONE/20 attempts and active=0; sprint-scoped cleanup published revision 52 IDLE. Four historical provider observation intervals remain explicit HOLD evidence under RECOVERY-BORN-490-PROVIDER-OBSERVATION-001; Desktop/native/HA parity remains open",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3295,
+      "id": "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001",
+      "parent": "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+      "program": "KERNEL",
+      "outcome": "Successful lineage settlement cancels every not-yet-started redundant repair descendant",
+      "priority": "P0",
+      "dependsOn": [
+        "SCHEDULER-001"
+      ],
+      "dependents": [],
       "children": [],
       "gates": [
         "G1"
       ],
       "state": "OPEN",
       "truth": {
-        "C": "~",
+        "C": "0",
         "W": "0",
         "E": "1",
         "H": "1",
@@ -12902,14 +13039,85 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RUN-STATUS-AUTHORITY-001",
-        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
-        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
-        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
+        "SCHEDULER-001"
       ],
       "evidenceReceipts": [],
-      "acceptance": "CLI, MCP, Terminal, Desktop, dashboard, metrics, notification and finalizer consume one revisioned persisted snapshot with exact logical and attempt denominators; active/provider concurrency cannot remain non-zero after authority retirement; source/dist digest mismatch blocks dogfood admission and no adapter re-infers state",
-      "evidence": "Sprint-488 exposed active-count, blocked-count, summary and receipt contradictions. Manual recovery routes alert and estimate enrichment through the same sprint-id/terminal-authority fenced atomic dashboard writer. A schema-v1 atomic read model now binds lifecycle/generation, terminal receipt, logical lineages versus attempts, exact-task/attempt-scoped provider concurrency and typed HOLD evidence; start heartbeat, phase, pause/resume, terminal authority and cleanup are production writers. CLI JSON/human/watch, MCP, Terminal feed and API/dashboard status consume the matching revision and fail closed with `RUN_STATUS_READ_MODEL_UNAVAILABLE` instead of reconstructing live fields; finalizer dashboard/notification denominators consume its terminal logical progress. Real built-binary IDLE proof changed historical provider `currentAttained=4` to `0` while retaining four open rows as unresolved forensic evidence. Build identity v2 binds exact root plus bounded source-tree digest; a post-build source mutation produced `DECKENT_BINARY_IDENTITY_HOLD:build-source-mismatch`, and the cross-checkout override cannot bypass it. Status proof passes 97/97, terminal/finalizer proof 30/30 and build-identity proof 26/26. Fresh active multi-provider replay, actual Desktop shell parity, native platform matrix and HA/multi-process snapshot fencing remain open",
+      "acceptance": "When an accepted repair settles the logical root, queued FIX/XFIX descendants are atomically marked superseded before dispatch, active descendants receive a typed cancellation decision, progress remains one logical DONE and no later stale leaf can reopen or replace it",
+      "evidence": "Sprint-490 task 013 reached a successful second FIX while a prequeued third repair still spawned and executed. This did not corrupt final settlement, but it wasted provider capacity and proves repair-birth cancellation is not yet transactionally wired. Negative scope: do not cap retries globally or cancel unrelated lineages",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3296,
+      "id": "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001",
+      "parent": "RECOVERY-BORN-488-STATUS-PROJECTION-001",
+      "program": "KERNEL",
+      "outcome": "Terminal retirement closes or scopes historical provider execution intervals",
+      "priority": "P1",
+      "dependsOn": [
+        "PROVIDER-HOLD-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROVIDER-HOLD-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "COMPLETE and cleanup reconcile every interval owned by the exact run/attempt generation; foreign or historical intervals remain forensic but do not impose an admission HOLD on an unrelated IDLE/current run; reconciliation is idempotent and tenant/provider-principal fenced",
+      "evidence": "Sprint-490 COMPLETE and subsequent exact cleanup correctly projected currentAttained=0, but canonical read-model revisions 51 and 52 retained four open intervals outside the exact current task set as `unresolved-provider-observation`. The evidence is truthful; ownership/retirement policy is incomplete. Negative scope: never erase provider history or infer closure from USD=0",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3297,
+      "id": "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "ASSURANCE",
+      "outcome": "Legacy monolithic controller fixtures satisfy fail-closed terminal and atomic status contracts",
+      "priority": "P1",
+      "dependsOn": [
+        "RESULT-RECONCILIATION-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RESULT-RECONCILIATION-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Controller tests use complete atomic-filesystem/provider-observation mocks and exact attempt attribution fixtures; pause/resume and finalizer assertions exercise current fail-closed authority without weakening production receipt or status publication",
+      "evidence": "Changed-test batch passed 14/15 files and 314 assertions, while 25 cases in `sprint-controller.test.ts` failed on missing `renameSync`, absent temp DB directories, attribution-less terminal fixtures and a stale `appendRetroSection` mock. The exact changed routing-HOLD assertion passes in isolation. Negative scope: do not restore ambient/synthetic DONE or make status publication fail-open to satisfy legacy mocks",
       "updated": "2026-08-01"
     },
     {
@@ -13516,7 +13724,8 @@
         "LIMIT-001"
       ],
       "dependents": [
-        "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001"
+        "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
+        "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001"
       ],
       "children": [],
       "gates": [
@@ -16937,6 +17146,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "3300f9dc58ea9af252add0e0b00c6c3d1e6199fdf936a539ea1ad33cc8a2fc86"
+    "value": "d5bad51723e6686237da26ad46329f44ce7fd91854b702c056df7432dcf3bef8"
   }
 }

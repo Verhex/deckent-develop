@@ -189,6 +189,44 @@ export function collectDependencyResultEntries(
   return entries;
 }
 
+/**
+ * Resolve dependency context for a worker prompt without changing scheduler
+ * topology. Priority FIX attempts intentionally dispatch with `dependencies: []`,
+ * but their workers still need the logical root task's dependency settlement
+ * authority. Walk the explicit fixForTaskId chain and inherit every ancestor's
+ * dependency ids for prompt/read-context only.
+ */
+export function resolvePromptDependencyIds(
+  projectRoot: string,
+  task: Task,
+): readonly string[] {
+  const ordered = new Set(task.dependencies ?? []);
+  if (!task.fixForTaskId) return [...ordered];
+
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tasksDir)) return [...ordered];
+
+  const tasksById = new Map<string, Task>();
+  for (const file of readdirSync(tasksDir).sort()) {
+    if (!file.startsWith('task-') || !file.endsWith('.json')) continue;
+    try {
+      const candidate = JSON.parse(readFileSync(join(tasksDir, file), 'utf-8')) as Task;
+      if (candidate?.id) tasksById.set(candidate.id, candidate);
+    } catch { /* malformed task evidence cannot widen prompt authority */ }
+  }
+
+  const seen = new Set<string>([task.id]);
+  let parentId: string | undefined = task.fixForTaskId;
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
+    const parent = tasksById.get(parentId);
+    if (!parent) break;
+    for (const dependencyId of parent.dependencies ?? []) ordered.add(dependencyId);
+    parentId = parent.fixForTaskId;
+  }
+  return [...ordered];
+}
+
 // ─── Provider enum values for Zod schemas ────────────────────────────────
 const PROVIDER_NAMES = Object.keys(PROVIDER_MODEL_MAP) as [string, ...string[]];
 
@@ -2090,11 +2128,12 @@ export function buildWorkerPrompt(
     }
   }
 
-  const dependencyResults = task.dependencies?.length
+  const promptDependencyIds = resolvePromptDependencyIds(projectRoot, task);
+  const dependencyResults = promptDependencyIds.length > 0
     ? collectDependencyResultEntries(projectRoot, task.sprintId)
     : new Map<string, DependencyResultEntry>();
-  if (task.dependencies?.length) {
-    const dependencyIds = new Set(task.dependencies);
+  if (promptDependencyIds.length > 0) {
+    const dependencyIds = new Set(promptDependencyIds);
     const dependencyReadPaths = [...dependencyResults.entries()].flatMap(([attemptId, entry]) => {
       const rootId = entry.originalTaskId ?? attemptId;
       return dependencyIds.has(rootId) ? (entry.filesChanged ?? []) : [];
@@ -2111,7 +2150,7 @@ export function buildWorkerPrompt(
     skillPrompts: effectiveSkillPrompts,
     allAdrs,
     effort,
-    dependencies: task.dependencies,
+    dependencies: [...promptDependencyIds],
     tasksDir: join(projectRoot, TASKS_DIR),
     dependencyResults,
     sharedContext,

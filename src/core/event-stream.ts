@@ -107,6 +107,16 @@ export const CHANNELS = {
   FIX_REQUEST: 'BRAIN→WORKER:FIX_REQUEST',
   SPRINT_PHASE_CHANGE: 'BRAIN→*:SPRINT_PHASE_CHANGE',
 
+  // Completed-checkpoint recovery does not replay EXECUTE/EVALUATE/RETRO.
+  // These durable events expose the terminalization-only path without
+  // fabricating ordinary lifecycle transitions that did not run again.
+  RECOVERY_TERMINALIZATION_STARTED: 'BRAIN→*:RECOVERY_TERMINALIZATION_STARTED',
+  RECOVERY_EVIDENCE_REUSED: 'BRAIN→*:RECOVERY_EVIDENCE_REUSED',
+  RECOVERY_RECEIPT_AUTHORIZED: 'BRAIN→*:RECOVERY_RECEIPT_AUTHORIZED',
+  RECOVERY_CLEANUP_SETTLED: 'BRAIN→*:RECOVERY_CLEANUP_SETTLED',
+  RECOVERY_TERMINALIZATION_COMPLETED: 'BRAIN→*:RECOVERY_TERMINALIZATION_COMPLETED',
+  RECOVERY_TERMINALIZATION_HELD: 'BRAIN→*:RECOVERY_TERMINALIZATION_HELD',
+
   // User notification (Sprint 139 seed)
   NOTIFY: 'DECKENT→USER:NOTIFY',
 
@@ -446,9 +456,10 @@ export function reconstructState(
   for (const event of events) {
     switch (event.channel) {
       case CHANNELS.SPRINT_PHASE_CHANGE: {
-        const p = event.payload as { phase?: string };
-        if (p?.phase) {
-          state.phaseChanges.push({ phase: p.phase, timestamp: event.timestamp });
+        const p = event.payload as { phase?: string; toPhase?: string };
+        const phase = p?.phase ?? p?.toPhase;
+        if (phase) {
+          state.phaseChanges.push({ phase, timestamp: event.timestamp });
         }
         break;
       }

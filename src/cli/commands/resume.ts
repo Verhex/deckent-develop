@@ -14,6 +14,7 @@ import type { ResolvedConfig } from '../../core/config-types.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
 import { runSprint } from '../../orchestra/brain.js';
+import { terminalizeCompletedCheckpointRun } from '../../orchestra/completed-checkpoint-terminalizer.js';
 import {
   readCheckpoint, hasCheckpoint,
   detectStaleWorkers,
@@ -250,8 +251,9 @@ export function registerResume(program: Command): void {
     .option('--dry-run', 'Show what would be resumed without actually running', false)
     .option('--force-scope', getMessage('recover.force_scope_option', detectLang(resolveProjectRoot())), false)
     .option('--root <path>', 'Project root directory (defaults to cwd)')
+    .addOption(new Option('--test-mode').hideHelp())
     .addOption(new Option('--outcome-file <path>').hideHelp());
-  command.action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; forceScope: boolean; root?: string; outcomeFile?: string }) => {
+  command.action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; forceScope: boolean; testMode?: boolean; root?: string; outcomeFile?: string }) => {
       const projectRoot = opts.root ?? resolveProjectRoot();
       const lang = detectLang(projectRoot);
 
@@ -392,9 +394,39 @@ export function registerResume(program: Command): void {
       }
 
       if (resumableCount === 0) {
-        print(getMessage('resume.nothing', lang));
-        print(getMessage('resume.retro_hint', lang));
-        return;
+        const executionMode = checkpoint.executionMode ?? (opts.testMode ? 'test' : undefined);
+        if (!executionMode) {
+          print(getMessage('resume.nothing', lang));
+          print(getMessage('resume.retro_hint', lang));
+          return;
+        }
+        try {
+          const config = await loadConfig(projectRoot);
+          print(getMessage('resume.terminalizing', lang, {
+            sprintId: checkpoint.sprintId,
+            mode: executionMode,
+          }));
+          const terminalized = await terminalizeCompletedCheckpointRun(
+            projectRoot,
+            checkpoint,
+            config,
+            executionMode,
+          );
+          const outcome = publishResumeOutcome(
+            projectRoot,
+            checkpoint.sprintId,
+            String(terminalized.status),
+            opts.outcomeFile,
+          );
+          printResumeOutcome(outcome, lang);
+          return;
+        } catch (e) {
+          const reason = e instanceof Error ? e.message : String(e);
+          publishResumeFailure(projectRoot, checkpoint.sprintId, null, opts.outcomeFile, reason);
+          printError(getMessage('resume.failed', lang, { error: reason }));
+          process.exitCode = 1;
+          return;
+        }
       }
 
       // Load config and run sprint with resume context

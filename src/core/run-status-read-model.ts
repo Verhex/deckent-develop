@@ -30,6 +30,7 @@ import { projectTerminalPublicationStatus } from './sprint-terminal-publication-
 import { resolveTaskLineageRootId } from './task-lineage.js';
 import { TaskStatus, type Task } from './types.js';
 import { inspectTaskResultSettlementAuthority } from './task-result-settlement.js';
+import { classifyTaskArtifact } from './task-artifact-classifier.js';
 
 export const RUN_STATUS_READ_MODEL_SCHEMA_VERSION = 1 as const;
 
@@ -203,15 +204,33 @@ export function loadCanonicalRunTasks(
   for (const file of readdirSync(taskDirectory).sort()) {
     if (!file.startsWith('task-') || !file.endsWith('.json')) continue;
     const path = join(taskDirectory, file);
-    const raw = readJson(path) as Partial<Task> | null;
-    if (!raw || typeof raw.id !== 'string' || typeof raw.status !== 'string') {
+    let content: string;
+    try {
+      content = readFileSync(path, 'utf-8');
+    } catch {
       holds.push({
         reasonCode: 'malformed-task-artifact',
         evidenceRef: `task-artifact:${file}`,
-        detail: 'Task artifact is unreadable or lacks exact id/status identity',
+        detail: 'Task artifact is unreadable',
       });
       continue;
     }
+    const classification = classifyTaskArtifact(file, content);
+    if (classification.kind === 'non-task-artifact') {
+      if (
+        classification.reason === 'malformed-content'
+        || classification.reason === 'invalid-task-record'
+        || classification.reason === 'task-id-mismatch'
+      ) {
+        holds.push({
+          reasonCode: 'malformed-task-artifact',
+          evidenceRef: `task-artifact:${file}`,
+          detail: `Task artifact failed identity validation: ${classification.reason}`,
+        });
+      }
+      continue;
+    }
+    const raw = JSON.parse(content) as Task;
     if (raw.sprintId === authority.sprintId || expected.has(raw.id)) tasks.push(raw as Task);
   }
   return { tasks: Object.freeze(tasks), holds: Object.freeze(holds) };

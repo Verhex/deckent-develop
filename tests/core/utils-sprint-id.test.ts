@@ -120,6 +120,33 @@ describe('getNextSprintId', () => {
     expect(getNextSprintId('/project')).toBe('sprint-100');
   });
 
+  it('does not reuse a cleaned test sprint identity retained by the event ledger', () => {
+    mockExistsSync.mockImplementation((p: any) => String(p).endsWith('recently-works'));
+    mockReaddirSync.mockReturnValue([
+      'sprint-489-events.jsonl',
+      'sprint-489-seq',
+      'unrelated.json',
+    ] as any);
+
+    expect(getNextSprintId('/project')).toBe('sprint-490');
+  });
+
+  it('uses archived task evidence as a monotonic identity floor', () => {
+    mockExistsSync.mockImplementation(
+      (p: any) => String(p).endsWith('archive/sprints'),
+    );
+    mockReaddirSync.mockReturnValue(['sprint-512-tasks'] as any);
+
+    expect(getNextSprintId('/project')).toBe('sprint-513');
+  });
+
+  it('does not advance past an approved-but-not-started task projection', () => {
+    mockExistsSync.mockImplementation((p: any) => String(p).endsWith('.tasks'));
+    mockReaddirSync.mockReturnValue(['task-490-001.json'] as any);
+
+    expect(getNextSprintId('/project')).toBe('sprint-001');
+  });
+
   it('returns sprint-001 when directory has only non-matching files', () => {
     mockSprintsDirOnly();
     mockReaddirSync.mockReturnValue([

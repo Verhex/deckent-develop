@@ -11,9 +11,14 @@ const mockDeriveResumeDisposition = vi.fn();
 const mockReadSprintState = vi.fn();
 const mockClearSprintState = vi.fn();
 const mockReadCanonicalRunStatus = vi.fn();
+const mockTerminalizeCompletedCheckpointRun = vi.fn();
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: (...args: unknown[]) => mockRunSprint(...args),
+}));
+
+vi.mock('../../../src/orchestra/completed-checkpoint-terminalizer.js', () => ({
+  terminalizeCompletedCheckpointRun: (...args: unknown[]) => mockTerminalizeCompletedCheckpointRun(...args),
 }));
 
 const mockResetInterrupted = vi.fn();
@@ -122,6 +127,9 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
       parkedSettlements: [],
     });
     mockRunSprint.mockResolvedValue({ id: 'sprint-321', tasks: [], status: 'COMPLETE' });
+    mockTerminalizeCompletedCheckpointRun.mockResolvedValue({
+      id: 'sprint-321', tasks: [], status: 'COMPLETE', phase: 'COMPLETE',
+    });
     mockReadSprintState.mockReturnValue(null);
     mockReadCanonicalRunStatus.mockReturnValue({
       lifecycle: 'COMPLETE',
@@ -270,6 +278,28 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
     await runCommand(['sprint-321']);
 
     expect(mockRunSprint).not.toHaveBeenCalled();
+    expect(mockTerminalizeCompletedCheckpointRun).not.toHaveBeenCalled();
+  });
+
+  it('terminalizes a legacy completed test checkpoint without redispatching work', async () => {
+    const completed = {
+      ...FAKE_CHECKPOINT,
+      completedTasks: ['321-001', '321-002'],
+      pendingTasks: [],
+      activeWorkers: [],
+    };
+    mockReadCheckpoint.mockReturnValue(completed);
+    mockDeriveResumeDisposition.mockReturnValue({ resumableIds: [], parkedSettlements: [] });
+
+    await runCommand(['sprint-321', '--test-mode']);
+
+    expect(mockRunSprint).not.toHaveBeenCalled();
+    expect(mockTerminalizeCompletedCheckpointRun).toHaveBeenCalledWith(
+      '/fake/project',
+      completed,
+      { deckent_style: 'sprint' },
+      'test',
+    );
   });
 
   it('exits with error when no checkpoint found', async () => {

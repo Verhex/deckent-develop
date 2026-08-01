@@ -12283,3 +12283,43 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 488-020: Negative replay and regression ledger evidence (DEFERRED)
 
 ---
+## Sprint 490 — sprint-490
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-08-01
+**Duration:** 1145s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 14 |
+| Completed | 14 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1144654ms |
+
+### Tasks
+
+- 490-001: Publish alpha root artifact (DONE)
+- 490-002: Publish beta root artifact (DONE)
+- 490-003: Publish gamma root artifact (DONE)
+- 490-004: Publish delta root artifact (DONE)
+- 490-005: Publish epsilon root artifact (DONE)
+- 490-006: Exercise intentional repair lineage (DONE)
+- 490-007: Join alpha and beta (DONE)
+- 490-008: Join gamma and delta (DONE)
+- 490-009: Join repaired lineage and epsilon (DONE)
+- 490-010: Build left branch (DONE)
+- 490-011: Build right branch (NO_GO)
+- 490-012: Validate left branch (DONE)
+- 490-013: Validate right branch (DONE)
+- 490-014: Publish final DAG proof (DONE)
+- 490-006-fix-fix: Fix: Fix: Exercise intentional repair lineage (DONE)
+- 490-006-fix: Fix: Exercise intentional repair lineage (NO_GO)
+- 490-011-fix: Fix: Build right branch (DONE)
+- 490-013-fix-fix: Fix: Fix: Validate right branch (DONE)
+- 490-013-fix: Fix: Validate right branch (NO_GO)
+
+---

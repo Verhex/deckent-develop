@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 describe('production provider-routing boundary', () => {
-  it('threads durable context and rethrows routing failures instead of debug-only continuation', async () => {
+  it('threads durable context and parks routing failures as a resumable HOLD', async () => {
     const source = await readFile('src/orchestra/sprint-controller.ts', 'utf-8');
     const start = source.indexOf('// Phase 1.5: Route tasks to providers');
     const end = source.indexOf('try { updateLastSprintId', start);
@@ -13,9 +13,11 @@ describe('production provider-routing boundary', () => {
     expect(boundary).toContain('{ projectRoot, sprintId: sprint.id }');
     expect(boundary).toContain('opts?.exactPlanAuthority');
     expect(boundary).toContain('BRAIN→AUDITOR:PROVIDER_ROUTING_HOLD');
+    expect(boundary).toContain("pauseSprint(projectRoot, sprint, routingFailure, 'provider-routing-hold')");
+    expect(boundary).toContain("emitSprintEvent('SPRINT_PAUSED'");
     expect(boundary).toContain('releaseSprintLock(projectRoot)');
     expect(boundary).toContain('clearActiveSprint()');
-    expect(boundary).toContain('clearSprintState(projectRoot)');
+    expect(boundary).not.toContain('clearSprintState(projectRoot)');
     expect(boundary).toContain('throw e');
     expect(boundary).not.toMatch(/catch \(e\) \{ debugLog\('runSprint:routeSprintTasks'/);
   });

@@ -28,6 +28,7 @@ import {
   projectAttributedTaskWork,
   projectSprintWorkAttribution,
 } from '../core/sprint-work-attribution.js';
+import { resolveHostPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 
 import type { TaskDNA } from '../core/routing-types.js';
 
@@ -243,6 +244,19 @@ export interface FinalizeSprintOptions {
    * post-cleanup terminal publisher.
    */
   deferTerminalAuthority?: boolean;
+  /**
+   * Completed-checkpoint recovery reuses already-persisted evaluations and
+   * performs terminalization only. Suppress the ordinary EXECUTE→EVALUATE→
+   * RETRO→CLEANUP event replay and preserve the event sequence counter so the
+   * recovery-specific events can continue the original monotonic stream.
+   */
+  lifecycleContext?: 'live-execution' | 'completed-checkpoint-recovery';
+}
+
+export function shouldEmitStandardLifecycleEvents(
+  opts?: Pick<FinalizeSprintOptions, 'lifecycleContext'>,
+): boolean {
+  return opts?.lifecycleContext !== 'completed-checkpoint-recovery';
 }
 
 
@@ -1178,6 +1192,11 @@ export interface ForceAbortSprintSettlement {
   readonly terminalTruth: FinalizerTerminalTruth;
 }
 
+export interface TestModeSprintTerminalSettlement {
+  readonly receiptPublication: FinalizerTerminalReceiptPublication;
+  readonly terminalTruth: FinalizerTerminalTruth;
+}
+
 interface PersistedSprintTerminalReceipt {
   readonly version: 1;
   readonly terminalOutcome: SprintTerminalOutcome;
@@ -1287,11 +1306,14 @@ function terminalAttemptEvidence(
     ...results.map(result => result.taskId),
   ]);
   const identityFor = (taskId: string): ExactAttemptIdentity => {
-    const work = projectAttributedTaskWork(resultsById.get(taskId));
+    const result = resultsById.get(taskId);
+    const work = projectAttributedTaskWork(result);
+    const preDispatchSettlement = resolveHostPreDispatchSettlement(result);
     const settlement = notDispatchedSettlements.get(taskId);
     return {
       taskId,
       attemptId: work.attemptId
+        ?? preDispatchSettlement?.attemptId
         ?? (settlement && settlement.state !== 'RESUMABLE' ? `host:${settlement.reasonCode}` : ''),
     };
   };
@@ -1304,9 +1326,16 @@ function terminalAttemptEvidence(
     const identity = identityFor(taskId);
     const work = projectAttributedTaskWork(result);
     const notDispatchedSettlement = notDispatchedSettlements.get(taskId);
-    const hostTerminalNotDispatched = evaluation === TaskEvaluation.NOT_DISPATCHED
+    const preDispatchSettlement = resolveHostPreDispatchSettlement(result);
+    const projectedTerminalNotDispatched = evaluation === TaskEvaluation.NOT_DISPATCHED
       && notDispatchedSettlement !== undefined
       && notDispatchedSettlement.state !== 'RESUMABLE';
+    const hostTerminalNotDispatched = preDispatchSettlement !== null
+      || projectedTerminalNotDispatched;
+    const hostTerminalReasonCode = preDispatchSettlement?.reasonCode
+      ?? notDispatchedSettlement?.reasonCode
+      ?? 'HOST_PRE_DISPATCH_REJECTION';
+    const hostTerminalEvidenceRef = preDispatchSettlement?.evidenceRef;
     const parentId = task?.fixForTaskId;
     const supersedes = parentId && tasksById.has(parentId) ? identityFor(parentId) : null;
 
@@ -1314,8 +1343,8 @@ function terminalAttemptEvidence(
       ? {
           state: 'TERMINAL',
           verdict: 'NO_GO',
-          reasonCode: notDispatchedSettlement.reasonCode,
-          evidenceRef: sha256EvidenceRef('not-dispatched-settlement', {
+          reasonCode: hostTerminalReasonCode,
+          evidenceRef: hostTerminalEvidenceRef ?? sha256EvidenceRef('not-dispatched-settlement', {
             identity,
             settlement: notDispatchedSettlement,
           }),
@@ -1332,8 +1361,8 @@ function terminalAttemptEvidence(
     const resultEvidence: ExactAttemptEvidence<TaskResult>['result'] = hostTerminalNotDispatched
       ? {
           state: 'NOT_APPLICABLE',
-          reasonCode: notDispatchedSettlement.reasonCode,
-          evidenceRef: sha256EvidenceRef('not-dispatched-zero-work', {
+          reasonCode: hostTerminalReasonCode,
+          evidenceRef: hostTerminalEvidenceRef ?? sha256EvidenceRef('not-dispatched-zero-work', {
             identity,
             settlement: notDispatchedSettlement,
           }),
@@ -1356,7 +1385,7 @@ function terminalAttemptEvidence(
     const attribution: ExactAttemptEvidence<TaskResult>['attribution'] = hostTerminalNotDispatched
       ? {
           state: 'VERIFIED',
-          evidenceRef: sha256EvidenceRef('not-dispatched-zero-work-attribution', {
+          evidenceRef: hostTerminalEvidenceRef ?? sha256EvidenceRef('not-dispatched-zero-work-attribution', {
             identity,
             settlement: notDispatchedSettlement,
           }),
@@ -1665,6 +1694,56 @@ export function publishFencedAbortedSprintTerminalReceipt(input: {
   readonly now?: () => string;
 }): FinalizerTerminalReceiptPublication {
   return publishFencedTerminalReceipt(input, 'ABORTED', false);
+}
+
+/**
+ * Publish the same exact-attempt terminal authority as a normal sprint while
+ * deliberately omitting every learning side effect (retro, memory, promotion,
+ * decay and archive). `deckent test` is a lifecycle run, not a second terminal
+ * protocol: its reduced surface still has to satisfy the controller's fenced
+ * receipt boundary before cleanup or COMPLETE may be published.
+ */
+export function publishTestModeSprintTerminalReceipt(
+  projectRoot: string,
+  sprint: Sprint,
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  results: readonly TaskResult[],
+  opts: {
+    readonly defaultAuthMode?: 'subscription' | 'api' | 'hybrid';
+    readonly runId?: string;
+    readonly coordinatorGeneration?: number;
+  } = {},
+): TestModeSprintTerminalSettlement {
+  const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
+  const terminalTruth = buildFinalizerTerminalTruth({
+    tasks: attemptTasks,
+    evaluations,
+    results,
+    defaultAuthMode: opts.defaultAuthMode,
+    notDispatchedSettlements: projectNotDispatchedSettlements(
+      attemptTasks,
+      evaluations,
+      new Set(
+        attemptTasks
+          .filter(task => existsSync(join(
+            projectRoot,
+            TASKS_DIR,
+            `task-${task.id}.redispatch-attempted`,
+          )))
+          .map(task => task.id),
+      ),
+    ),
+  });
+  const receiptPublication = publishFencedSprintTerminalReceipt({
+    projectRoot,
+    sprint,
+    truth: terminalTruth,
+    ...(opts.runId ? { runId: opts.runId } : {}),
+    ...(opts.coordinatorGeneration !== undefined
+      ? { coordinatorGeneration: opts.coordinatorGeneration }
+      : {}),
+  });
+  return { receiptPublication, terminalTruth };
 }
 
 /**
@@ -2136,11 +2215,14 @@ export async function finalizeSprint(
   // Tüm consumer'lar (auditor, dashboard, CLI) bu event'i okuyarak
   // sprint'in EVALUATE fazına girdiğini anlar (ADR-035 broadcast kanalı).
   const sprintIdForEvents = getCurrentSprintId(projectRoot) ?? sprint.id;
-  writeEvent(
-    projectRoot, sprintIdForEvents, 'brain', '*',
-    CHANNELS.SPRINT_PHASE_CHANGE,
-    { fromPhase: 'EXECUTE', toPhase: 'EVALUATE', sprintId: sprint.id, timestamp: new Date().toISOString() },
-  );
+  const emitStandardLifecycleEvents = shouldEmitStandardLifecycleEvents(opts);
+  if (emitStandardLifecycleEvents) {
+    writeEvent(
+      projectRoot, sprintIdForEvents, 'brain', '*',
+      CHANNELS.SPRINT_PHASE_CHANGE,
+      { fromPhase: 'EXECUTE', toPhase: 'EVALUATE', sprintId: sprint.id, timestamp: new Date().toISOString() },
+    );
+  }
 
   // Build O(1) lookup index from results array — eliminates O(n²) linear scans
   const resultsMap = buildResultsMap(results);
@@ -2274,11 +2356,13 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:writeSprintLog', e); }
 
   // ─── SPRINT_PHASE_CHANGE: EVALUATE → RETRO ──────────────────────
-  writeEvent(
-    projectRoot, sprintIdForEvents, 'brain', '*',
-    CHANNELS.SPRINT_PHASE_CHANGE,
-    { fromPhase: 'EVALUATE', toPhase: 'RETRO', sprintId: sprint.id, timestamp: new Date().toISOString() },
-  );
+  if (emitStandardLifecycleEvents) {
+    writeEvent(
+      projectRoot, sprintIdForEvents, 'brain', '*',
+      CHANNELS.SPRINT_PHASE_CHANGE,
+      { fromPhase: 'EVALUATE', toPhase: 'RETRO', sprintId: sprint.id, timestamp: new Date().toISOString() },
+    );
+  }
 
   // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
   // ─── ADR-046 Step 5 — retroWriter (dual write contract) ─────────
@@ -3300,11 +3384,13 @@ export async function finalizeSprint(
   // ─── SPRINT_PHASE_CHANGE: RETRO → CLEANUP ───────────────────────
   // Final phase transition — sprint lifecycle complete.
   // Consumer: auditor marks sprint as finalized, dashboard shows COMPLETE.
-  writeEvent(
-    projectRoot, sprintIdForEvents, 'brain', '*',
-    CHANNELS.SPRINT_PHASE_CHANGE,
-    { fromPhase: 'RETRO', toPhase: 'CLEANUP', sprintId: sprint.id, timestamp: new Date().toISOString() },
-  );
+  if (emitStandardLifecycleEvents) {
+    writeEvent(
+      projectRoot, sprintIdForEvents, 'brain', '*',
+      CHANNELS.SPRINT_PHASE_CHANGE,
+      { fromPhase: 'RETRO', toPhase: 'CLEANUP', sprintId: sprint.id, timestamp: new Date().toISOString() },
+    );
+  }
 
   if (!opts?.deferTerminalAuthority) {
     publishFinalSprintAuthority(projectRoot, sprint, metrics, opts?.config?.language ?? 'en');
@@ -3313,9 +3399,11 @@ export async function finalizeSprint(
   // Counter cleanup must be the final filesystem action after the terminal
   // event. Deleting `<sprint>-seq` during retention and then emitting
   // RETRO→CLEANUP recreated the sequence at 1, breaking monotonicity.
-  try {
-    cleanupCounters(projectRoot, sprint.id);
-  } catch (e) { debugLog('finalizeSprint:cleanupCountersFinal', e); }
+  if (emitStandardLifecycleEvents) {
+    try {
+      cleanupCounters(projectRoot, sprint.id);
+    } catch (e) { debugLog('finalizeSprint:cleanupCountersFinal', e); }
+  }
 
   return metrics;
 }
@@ -3332,6 +3420,13 @@ export function publishFinalSprintAuthority(
 ): void {
   debugLog('finalizeSprint:breadcrumb', 'terminal authority publication — entering');
   persistFinalSprintState(projectRoot, sprint);
+  // Dashboard is an input to the canonical read-model conflict detector. It
+  // must reach the same COMPLETE generation before the model is published;
+  // publishing first and rewriting dashboard second immediately invalidated
+  // the model digest and made status hide an otherwise valid receipt.
+  try {
+    writeTerminalDashboardSnapshot(projectRoot, sprint, metrics);
+  } catch (e) { debugLog('finalizeSprint:terminalDashboard', e); }
   const statusModel = publishCanonicalRunStatusReadModel(projectRoot);
   if (
     statusModel.authority.sprintId !== sprint.id
@@ -3340,13 +3435,6 @@ export function publishFinalSprintAuthority(
   ) {
     throw new FinalizerTerminalEvidenceError('TERMINAL_STATUS_READ_MODEL_HOLD');
   }
-  try {
-    writeTerminalDashboardSnapshot(projectRoot, sprint, {
-      ...metrics,
-      totalTasks: statusModel.logicalProgress.total,
-      completedTasks: statusModel.logicalProgress.done,
-    });
-  } catch (e) { debugLog('finalizeSprint:terminalDashboard', e); }
   try {
     const done = statusModel.logicalProgress.done;
     const total = statusModel.logicalProgress.total;

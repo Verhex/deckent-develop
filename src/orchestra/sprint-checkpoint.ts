@@ -99,6 +99,10 @@ export interface SprintCheckpoint {
   brainPhase: SprintPhase;
   /** Event stream sequence offset — used to resume from this point */
   eventStreamOffset: number;
+  /** Persisted so terminalization-only recovery preserves test-vs-standard semantics. */
+  executionMode?: 'standard' | 'test';
+  /** Persisted cleanup policy; absent legacy checkpoints fail safe to retention. */
+  skipCleanup?: boolean;
   /**
    * Serialized dependency graph (Task 030).
    * Embedded so resume can restore topological ordering from checkpoint alone,
@@ -309,6 +313,8 @@ export function writeCheckpoint(
       activeWorkers,
       brainPhase: sprint.phase,
       eventStreamOffset,
+      executionMode: sprint.executionMode ?? 'standard',
+      skipCleanup: sprint.skipCleanup ?? false,
     };
 
     // Task 030: embed serialized dep graph if provided
@@ -1153,6 +1159,8 @@ export function buildPreplannedResumeSprint(
     tasks,
     workers: [],
     startedAt: checkpoint.timestamp,
+    executionMode: checkpoint.executionMode,
+    skipCleanup: checkpoint.skipCleanup,
   };
 }
 
