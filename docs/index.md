@@ -1,91 +1,68 @@
----
-layout: home
+# Deckent documentation
 
-hero:
-  name: "Deckent"
-  text: "AI Agent Orchestration"
-  tagline: Your AI development team, orchestrated. Run multi-agent runs with Brain, Workers, and Auditor — all from the CLI.
-  image:
-    src: /logo.svg
-    alt: Deckent
-  actions:
-    - theme: brand
-      text: Get Started
-      link: /guide/getting-started
-    - theme: alt
-      text: View on GitHub
-      link: https://github.com/VerhexIO/deckent
+English under `docs/en/` is canonical. Turkish under `docs/tr/` is a full-parity mirror. A future translation belongs under `docs/<lang>/` with the same relative file set; translated navigation must not create a second product contract.
 
-features:
-  - icon: 🧠
-    title: Brain Orchestrator
-    details: Intelligent run planning with AI task decomposition. Brain coordinates all agents and evaluates results with GO/NO-GO/TECH-DEBT verdicts.
-  - icon: ⚡
-    title: Parallel Workers
-    details: Multiple worker agents execute tasks concurrently within scoped boundaries. Each worker stays in its lane — enforced by the Auditor.
-  - icon: 🔍
-    title: Auditor Monitoring
-    details: Real-time boundary scanning, heartbeat monitoring, and drift detection. Never let an agent go off-script.
-  - icon: 🔌
-    title: Multi-Provider
-    details: Claude, OpenAI Codex, Google Gemini, and Ollama support. Mix providers per task — premium models for complex work, economy for simple tasks.
-  - icon: 🛠
-    title: Skills System
-    details: Extend agents with specialized skills for design, testing, docs, and more. Skills are sandboxed and versioned.
-  - icon: 📦
-    title: MCP Server
-    details: Full Model Context Protocol server for IDE integration. Works with Claude Desktop and any MCP-compatible editor.
----
+| Topic | English canonical | Türkçe ayna |
+|---|---|---|
+| Product overview | [Overview](./en/overview.md) | [Genel bakış](./tr/overview.md) |
+| Architecture | [Architecture](./en/architecture.md) | [Architecture](./tr/architecture.md) |
+| CLI | [CLI reference](./en/cli.md) | [CLI referansı](./tr/cli.md) |
+| MCP | [MCP reference](./en/mcp.md) | [MCP referansı](./tr/mcp.md) |
+| Databases | [Database reference](./en/db.md) | [Database referansı](./tr/db.md) |
+| Configuration | [Configuration](./en/configuration.md) | [Configuration](./tr/configuration.md) |
+| Glossary | [Glossary](./en/glossary.md) | [Glossary](./tr/glossary.md) |
 
-## Documentation
+## Guides
 
-### Guides
+| Topic | English canonical | Türkçe ayna |
+|---|---|---|
+| Getting started | [Guide](./en/guide/getting-started.md) | [Rehber](./tr/guide/getting-started.md) |
+| Run lifecycle | [Guide](./en/guide/run-lifecycle.md) | [Rehber](./tr/guide/run-lifecycle.md) |
+| Execution modes | [Guide](./en/guide/execution-modes.md) | [Rehber](./tr/guide/execution-modes.md) |
+| Interactive surfaces | [Guide](./en/guide/interactive-surfaces.md) | [Rehber](./tr/guide/interactive-surfaces.md) |
+| Connectors | [Guide](./en/guide/connectors.md) | [Rehber](./tr/guide/connectors.md) |
+| Workers and providers | [Guide](./en/guide/workers-and-providers.md) | [Rehber](./tr/guide/workers-and-providers.md) |
+| Memory and learning | [Guide](./en/guide/memory-learning.md) | [Rehber](./tr/guide/memory-learning.md) |
+| Nervous System | [Guide](./en/guide/nervous-system.md) | [Rehber](./tr/guide/nervous-system.md) |
+| Recovery and troubleshooting | [Guide](./en/guide/recovery-troubleshooting.md) | [Rehber](./tr/guide/recovery-troubleshooting.md) |
+| Cookbook | [Recipes](./en/guide/cookbook.md) | [Tarifler](./tr/guide/cookbook.md) |
 
-- [Getting Started](guide/getting-started.md)
-- [Installation](guide/installation.md)
-- [Quickstart](guide/quickstart.md)
-- [First Run](guide/first-sprint.md)
-- [Concepts](guide/concepts.md)
-- [Autonomous Engine](guide/autonomous-engine.md)
-- [Multi-Provider Fleet](guide/multi-provider-fleet.md)
-- [Docker Backend](guide/docker-backend.md)
-- [Nervous System](guide/nervous-system.md)
-- [Dashboard](guide/dashboard.md)
-- [Chat Mode / REPL](guide/chat-mode.md)
-- [FAQ](guide/faq.md)
-- [Troubleshooting](guide/troubleshooting.md)
+## Features and references
 
-### Reference
+| Topic | English canonical | Türkçe ayna |
+|---|---|---|
+| Feature catalog | [Catalog](./en/features/catalog.md) | [Katalog](./tr/features/catalog.md) |
+| HTTP/SSE API | [Reference](./en/reference/api-surface.md) | [Referans](./tr/reference/api-surface.md) |
+| Runtime contracts | [Reference](./en/reference/runtime-contracts.md) | [Referans](./tr/reference/runtime-contracts.md) |
+| Config schema, field by field | [Reference](./en/reference/configuration-schema.md) | [Referans](./tr/reference/configuration-schema.md) |
+| Error codes | [Reference](./en/reference/errors.md) | [Referans](./tr/reference/errors.md) |
+| MCP resources | [Reference](./en/reference/mcp-resources.md) | [Referans](./tr/reference/mcp-resources.md) |
+| Agents | [Reference](./en/reference/agents.md) | [Referans](./tr/reference/agents.md) |
+| Skills | [Reference](./en/reference/skills.md) | [Referans](./tr/reference/skills.md) |
+| SDK and plugins | [Reference](./en/reference/sdk-and-plugins.md) | [Referans](./tr/reference/sdk-and-plugins.md) |
+| Platform and security | [Reference](./en/reference/platform-security.md) | [Referans](./tr/reference/platform-security.md) |
+| Enterprise controls, integrations, and resources | [Reference](./en/reference/enterprise-and-resources.md) | [Referans](./tr/reference/enterprise-and-resources.md) |
+| Terminal, events, and worker wrappers | [Reference](./en/reference/terminal-events-and-wrappers.md) | [Referans](./tr/reference/terminal-events-and-wrappers.md) |
 
-- [CLI Commands](reference/cli-commands.md)
-- [Configuration](reference/config.md)
-- [MCP Tools](reference/mcp-tools.md)
-- [MCP Resources](reference/mcp-resources.md)
-- [API Endpoints](reference/api-endpoints.md)
-- [Skills](reference/skills.md)
-- [Agents](reference/agents.md)
-- [Multi-Provider](reference/multi-provider.md)
-- [Security](reference/security.md)
-- [Glossary](glossary.md)
+## Operations and governance
 
-### Architecture
+| Topic | English canonical | Türkçe ayna |
+|---|---|---|
+| Lifecycle internals | [Operations](./en/operations/lifecycle-internals.md) | [Operations](./tr/operations/lifecycle-internals.md) |
+| Evidence and settlement | [Operations](./en/operations/evidence-and-settlement.md) | [Operations](./tr/operations/evidence-and-settlement.md) |
+| Current frictions | [Operations](./en/operations/current-frictions.md) | [Operations](./tr/operations/current-frictions.md) |
+| Recovery runbook | [Operations](./en/operations/recovery-runbook.md) | [Operations](./tr/operations/recovery-runbook.md) |
+| Development and release | [Operations](./en/operations/development-and-release.md) | [Operations](./tr/operations/development-and-release.md) |
+| Developer handbook | [Operations](./en/operations/developer-handbook.md) | [Operations](./tr/operations/developer-handbook.md) |
+| Immutable Laws | [Governance](./en/governance/immutable-laws.md) | [Governance](./tr/governance/immutable-laws.md) |
+| ADR system | [Governance](./en/governance/adr-system.md) | [Governance](./tr/governance/adr-system.md) |
+| Authority and RBAC | [Governance](./en/governance/authority-rbac.md) | [Governance](./tr/governance/authority-rbac.md) |
 
-- [Architecture Overview](guide/architecture-overview.md)
-- [Agent & Skill Architecture](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/agent-skill-architecture.md)
-- [Authority Matrix](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/authority-matrix.md)
-- [Memory System](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md)
-- [Run Lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/sprint-lifecycle.md)
-- [ADR Index](adr/README.md)
+## Audit and planning ledgers
 
-### Cookbook
+- [Coverage matrix](./analysis/COVERAGE-MATRIX-2026-08.md)
+- [Code–documentation difference report (TR)](./analysis/CODE-DOC-DIFF-2026-08.md)
+- [Open questions (TR)](./analysis/OPEN-QUESTIONS-2026-08.md)
+- [Master Plan — read-only SSOT](./MASTER-PLAN.md)
 
-- [Cookbook Index](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/index.md)
-- [First Run](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/01-first-sprint.md)
-- [Multi-Provider Fleet](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/02-multi-provider-fleet.md)
-- [Memory Recall](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/03-memory-recall.md)
-- [Autonomous Mode](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/04-autonomous-mode.md)
-- [Recover a Stuck Run](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/09-recover-stuck-sprint.md)
-
-### Features
-
-_Feature documentation is being rewritten (2026-06-16) — links return once the new docs land._
+The pre-reset snapshot is preserved under `docs/archive/docs-pre-reset-2026-08-03/`; it is historical evidence and a coverage baseline, not current product authority. [Evidence: read-only archive inventory, 2026-08-01]

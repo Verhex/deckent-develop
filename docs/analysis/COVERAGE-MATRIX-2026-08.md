@@ -1,0 +1,682 @@
+# Coverage matrix — 2026-08
+
+Bu dosya Tur 2 dokümantasyon yeniden-yazımının ilerleme SSOT'udur. Satırlar; pre-reset arşivinin konu envanteri, gerçek runtime yüzeyleri ve feature manifest birleşimidir. Arşiv kapsam çıtasıdır; güncel davranış authority'si değildir.
+
+## Güncel özet
+
+- Toplam satır: **654**
+- Kapsandı: **612**
+- Güncel doluluk: **93.6%**
+- Kaynak bileşimi: arşiv konu/sources **184**, visible CLI path **211**, MCP tool **49**, SQLite DB **6**, effective-config leaf **164**, manifest/truth feature **40**.
+- `KAPSANDI`, hedef dokümanın mevcut ve kaynak/çalıştırma kanıtı taşıdığı anlamına gelir. `EKSİK`, dosyanın veya istenen doğrulama derinliğinin henüz tamamlanmadığını söyler.
+
+## Envanter yöntemi ve kanıt
+
+- Arşiv sayımı: `rg --files docs/archive/docs-pre-reset-2026-08-03` ve Markdown başlık taraması; `node_modules` ile `.vitepress/dist` build çıktıları konu kaynağı sayılmadı. Tekrarlayan audit/load-test ve historical plan/spec corpus'ları konu kümeleri halinde temsil edildi. [Kanıt: read-only filesystem inventory, 2026-08-01]
+- CLI: `buildProgram()` command tree recursive olarak yürütüldü; hidden olmayan **211** yol bulundu. [Kanıt: `dist/cli/index.js` üstünden read-only Node introspection, 2026-08-01; source owner `src/cli/index.ts:99`]
+- MCP: `TOOL_CATALOG` doğrudan built artifact'ten okundu; **49** canonical tool bulundu. [Kanıt: `dist/mcp/tools/index.js`; source owner `src/mcp/tools/index.ts:68-125`]
+- Config: `createDefaultConfig()` recursive leaf taramasında **164** alan bulundu. [Kanıt: built artifact introspection, 2026-08-01; source owner `src/core/config.ts`]
+- Feature manifest: gerçek yol `.deckent/settings/features-manifest.json`; 35 catalog kaydı ve 5 truth contract bulundu. Prompt'taki `.deckent/features-manifest.json` yolu mevcut değildir; karar `OQ-19` olarak typed HOLD'dur.
+
+## Matrix
+
+| Konu | Arşivdeki kaynak dosya | Yeni hedef dosya | Perspektif | Durum |
+|---|---|---|---|---|
+| Arşiv konusu: ADR-010: Tek Runtime Dependency — commander.js | `docs/archive/docs-pre-reset-2026-08-03/architecture/adr/010-single-runtime-dependency.md` | `docs/{lang}/governance/adr-system.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: ADR-090 (Ink): Ink ^7 + React ^19 as Runtime Dependencies for Native REPL | `docs/archive/docs-pre-reset-2026-08-03/architecture/adr/adr-090-ink-repl.md` | `docs/{lang}/governance/adr-system.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Agent / Skill Architecture & Routing | `docs/archive/docs-pre-reset-2026-08-03/architecture/agent-skill-architecture.md` | `docs/{lang}/reference/agents.md` | ikisi | KAPSANDI — 21 worker + 2 control role ve routing fallback'leri kanıtlı |
+| Arşiv konusu: Agent System | `docs/archive/docs-pre-reset-2026-08-03/architecture/agents.md` | `docs/{lang}/reference/agents.md` | ikisi | KAPSANDI — canonical prompt/pool/role contract kanıtlı |
+| Arşiv konusu: Deckent Architecture — Comprehensive Reference | `docs/archive/docs-pre-reset-2026-08-03/architecture/architecture.md` | `docs/{lang}/architecture.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Authority Matrix — Brain · Auditor · Worker RBAC Protocol V1.0 | `docs/archive/docs-pre-reset-2026-08-03/architecture/authority-matrix.md` | `docs/{lang}/governance/authority-rbac.md` | ikisi | KAPSANDI — authority chain, role ayrımı ve typed HOLD'lar güncel kaynakla doğrulandı |
+| Arşiv konusu: Deckent Memory System — 3-Tier Architecture (V1 Design) | `docs/archive/docs-pre-reset-2026-08-03/architecture/memory-system.md` | `docs/{lang}/guide/memory-learning.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Sprint Lifecycle — Deckent Orchestration | `docs/archive/docs-pre-reset-2026-08-03/architecture/sprint-lifecycle.md` | `docs/{lang}/operations/lifecycle-internals.md` | ikisi | KAPSANDI — sekiz-faz yürütme, evidence ve settlement source-derived olarak belgelendi |
+| Arşiv konusu: Memory V2 — Context Reduction Benchmark | `docs/archive/docs-pre-reset-2026-08-03/benchmark/memory-v2.md` | `docs/{lang}/overview.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Provider Fleet Notes | `docs/archive/docs-pre-reset-2026-08-03/benchmark/provider-fleet-notes.md` | `docs/{lang}/overview.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Changelog | `docs/archive/docs-pre-reset-2026-08-03/CHANGELOG.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Why Deckent | `docs/archive/docs-pre-reset-2026-08-03/comparison/why-deckent.md` | `docs/{lang}/overview.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Cookbook: First Sprint | `docs/archive/docs-pre-reset-2026-08-03/cookbook/01-first-sprint.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Multi-Provider Fleet Cookbook | `docs/archive/docs-pre-reset-2026-08-03/cookbook/02-multi-provider-fleet.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Project Memory Cookbook | `docs/archive/docs-pre-reset-2026-08-03/cookbook/03-memory-recall.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Cookbook: Autonomous Mode | `docs/archive/docs-pre-reset-2026-08-03/cookbook/04-autonomous-mode.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Cookbook: Status and Watch | `docs/archive/docs-pre-reset-2026-08-03/cookbook/05-status-and-watch.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Cookbook: Checkpoints and Approval | `docs/archive/docs-pre-reset-2026-08-03/cookbook/06-checkpoints-approval.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Recipe 07: Tech Debt Tracking | `docs/archive/docs-pre-reset-2026-08-03/cookbook/07-tech-debt-tracking.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Recipe 08: Cost and Budget | `docs/archive/docs-pre-reset-2026-08-03/cookbook/08-cost-and-budget.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Recipe 09: Recover a Stuck Sprint | `docs/archive/docs-pre-reset-2026-08-03/cookbook/09-recover-stuck-sprint.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Cookbook: Nervous System Alerts | `docs/archive/docs-pre-reset-2026-08-03/cookbook/10-nervous-alerts.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Cookbook: Add a REST API Endpoint | `docs/archive/docs-pre-reset-2026-08-03/cookbook/add-rest-api.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Cookbook: Fix a Bug with the Bug-Fixer Agent | `docs/archive/docs-pre-reset-2026-08-03/cookbook/fix-bug.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Getting Started with Deckent | `docs/archive/docs-pre-reset-2026-08-03/cookbook/getting-started-en.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Deckent Cookbook Index | `docs/archive/docs-pre-reset-2026-08-03/cookbook/index.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Multi-Provider Fleet and Cost Visibility | `docs/archive/docs-pre-reset-2026-08-03/cookbook/multi-provider-and-cost-en.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Cookbook: Update README and API Documentation | `docs/archive/docs-pre-reset-2026-08-03/cookbook/update-docs.md` | `docs/{lang}/guide/cookbook.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Memory V2 — Full DB-to-Markdown Export Design Document | `docs/archive/docs-pre-reset-2026-08-03/design/memory-v2-full-export.md` | `docs/{lang}/guide/memory-learning.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Multi-Project Isolation Design Document | `docs/archive/docs-pre-reset-2026-08-03/design/multi-project-isolation.md` | `docs/{lang}/reference/platform-security.md` | ikisi | KAPSANDI — tenant path/context/RBAC isolation güncel source kanıtlı |
+| Arşiv konusu: Native-Terminal Abonelik-Transport Tasarımı — "Sarmalayıcıdan Çıkış"ın Mimari Kilidi | `docs/archive/docs-pre-reset-2026-08-03/design/native-subscription-transport.md` | `docs/{lang}/reference/platform-security.md` | ikisi | KAPSANDI — API/terminal bağımsız auth ve token delivery kanıtlı |
+| Arşiv konusu: NL-Dispatch Default Kararı — `agenticDispatch` Kanıt Paketi (MASTER-PLAN #57 / Sıra-57) | `docs/archive/docs-pre-reset-2026-08-03/design/nl-dispatch-default-decision.md` | `docs/{lang}/guide/interactive-surfaces.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Global Install + Project Scope — Layer Model Design (ONB-GLOBAL) | `docs/archive/docs-pre-reset-2026-08-03/design/onb-global-install.md` | `docs/{lang}/guide/interactive-surfaces.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: TERM-5 — Sade Risk-Dili Karar Paketi (MASTER-PLAN #45, Sıra-45 🔬→karar) | `docs/archive/docs-pre-reset-2026-08-03/design/term5-risk-language.md` | `docs/{lang}/reference/terminal-events-and-wrappers.md` | ikisi | KAPSANDI — dört sınıf, live gate consumer'ları, unwired renderer ve mismatch typed HOLD ile belgelendi |
+| Arşiv konusu: Test Containment E2 Authority and Measurement Protocol | `docs/archive/docs-pre-reset-2026-08-03/design/test-containment-e2-authority.md` | `docs/{lang}/reference/platform-security.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: TOOL-CU — Computer-Use/Browser Opsiyonel Automation-Pack Tasarım Notu (MASTER-PLAN #83 / Sıra-83) | `docs/archive/docs-pre-reset-2026-08-03/design/tool-cu-pack.md` | `docs/{lang}/operations/lifecycle-internals.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Handoff: deckent Web Console — teal/gold re-theme + interactive terminal | `docs/archive/docs-pre-reset-2026-08-03/design/web-console/README.md` | `docs/{lang}/operations/lifecycle-internals.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: deckent — Web Console (Dashboard UI Kit) | `docs/archive/docs-pre-reset-2026-08-03/design/web-console/reference/README.md` | `docs/{lang}/operations/lifecycle-internals.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Agent Guide | `docs/archive/docs-pre-reset-2026-08-03/development/agent-guide.md` | `docs/{lang}/operations/developer-handbook.md` | ikisi | KAPSANDI — persona, prompt authority, catalog ve routing sınırları kaynakla doğrulandı |
+| Arşiv konusu: Brain Guide — Deckent Orchestrator Internals | `docs/archive/docs-pre-reset-2026-08-03/development/brain-guide.md` | `docs/{lang}/operations/developer-handbook.md` | ikisi | KAPSANDI — Brain/worker contract, lifecycle ve settlement sınırları güncellendi |
+| Arşiv konusu: Dashboard Development Guide | `docs/archive/docs-pre-reset-2026-08-03/development/dashboard-guide.md` | `docs/{lang}/operations/developer-handbook.md` | ikisi | KAPSANDI — dashboard/desktop develop ve validation yüzeyleri belgelendi |
+| Arşiv konusu: PLUGIN-GUIDE.md — Plugin Development Guide | `docs/archive/docs-pre-reset-2026-08-03/development/plugin-guide.md` | `docs/{lang}/operations/developer-handbook.md` | ikisi | KAPSANDI — plugin manifest, loader, isolation ve test contract'ları belgelendi |
+| Arşiv konusu: Repo Sync — develop → product | `docs/archive/docs-pre-reset-2026-08-03/development/repo-sync.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | KAPSANDI — develop→product boundary ve owner-controlled publish chain belgelendi |
+| Arşiv konusu: Clean-Clone Smoke Verify | `docs/archive/docs-pre-reset-2026-08-03/development/smoke-verify.md` | `docs/{lang}/operations/developer-handbook.md` | ikisi | KAPSANDI — clean-clone/package/runtime smoke contract'ı kaynaktan türetildi |
+| Arşiv konusu: Deckent Troubleshooting Guide | `docs/archive/docs-pre-reset-2026-08-03/development/troubleshooting.md` | `docs/{lang}/operations/developer-handbook.md` | ikisi | KAPSANDI — safe diagnosis ve owner-gated recovery prosedürü bağlandı |
+| Arşiv konusu: Worker Guide — Developer Reference | `docs/archive/docs-pre-reset-2026-08-03/development/worker-guide.md` | `docs/{lang}/operations/developer-handbook.md` | ikisi | KAPSANDI — worker contract, wrapper ve proof-of-function zinciri belgelendi |
+| Arşiv konusu: Documentation Policy — Core Docs & Update Rules | `docs/archive/docs-pre-reset-2026-08-03/DOC-POLICY.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | KAPSANDI — canonical/mirror/generated/archive ownership ve validation contract'ı belgelendi |
+| Arşiv konusu: Approval History — Ayarlanmış-Onayların Salt-Okunur Denetim İzi | `docs/archive/docs-pre-reset-2026-08-03/features/approval-history.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — EN/TR katalog güncel API/source kanıtlı |
+| Arşiv konusu: Approval Runtime — Runtime-Geneli Canlı Onay Zinciri (APR Pillar) | `docs/archive/docs-pre-reset-2026-08-03/features/approval-runtime.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — EN/TR katalog güncel API/source kanıtlı |
+| Arşiv konusu: Computer-Use Contract — TOOL-CU Dilim-1 Sözleşme Katmanı | `docs/archive/docs-pre-reset-2026-08-03/features/computer-use-contract.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — EN/TR katalog güncel contract/exec/CLI kanıtlı |
+| Arşiv konusu: Connect Auth-State — Config-Tabanlı, Ağsız Kimlik-Doğrulama Raporu | `docs/archive/docs-pre-reset-2026-08-03/features/connect-auth-state.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — EN/TR katalog gerçek binary çıktısı kanıtlı |
+| Arşiv konusu: Doctor Fix — `deckent doctor --fix` Kapalı-Whitelist Onarım | `docs/archive/docs-pre-reset-2026-08-03/features/doctor-fix.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — diagnostic canlı, repair çalıştırılmadı etiketi açık |
+| Arşiv konusu: Limit Gate — Subscription-Window Probe + Start-Gate (LIMIT-GATE-WIRE) | `docs/archive/docs-pre-reset-2026-08-03/features/limit-gate.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — EN/TR katalog admission/store/status kanıtlı |
+| Arşiv konusu: NPM Advisory — Bağımlılık-Mutasyonu Eskalasyon Kanalı (born-454) | `docs/archive/docs-pre-reset-2026-08-03/features/npm-advisory.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — advisory boundary dürüstçe etiketli |
+| Arşiv konusu: Onboarding Apply — `deckent onboard --apply/--dry-run/--yes` Plan→Yaz Zinciri | `docs/archive/docs-pre-reset-2026-08-03/features/onboarding-apply.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — plan-only gerçek binary kanıtlı, apply HOLD |
+| Arşiv konusu: Onboarding — `deckent onboard` Sihirbazı (ONB Ailesi) | `docs/archive/docs-pre-reset-2026-08-03/features/onboarding.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — plan-only gerçek binary kanıtlı, apply HOLD |
+| Arşiv konusu: OpenRouter — Adapter + Free-Model Probe + Doc-Route Öneri Motoru | `docs/archive/docs-pre-reset-2026-08-03/features/openrouter.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — adapter/probe kaynak kanıtlı, readiness kısmi |
+| Arşiv konusu: Provider→CLI Routing — Model:-pin → Plan → Spawn-CLI Zinciri (born-479/481) | `docs/archive/docs-pre-reset-2026-08-03/features/provider-cli-routing.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — registry/hold kaynağı kanıtlı |
+| Arşiv konusu: Feature Docs — Canlı Özellik Kataloğu | `docs/archive/docs-pre-reset-2026-08-03/features/README.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — 35 manifest + 5 truth + arşiv ekleri kataloglandı |
+| Arşiv konusu: REPL Surface — Mode-Indicator + Live-Footer + Approval-Card | `docs/archive/docs-pre-reset-2026-08-03/features/repl-surface.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — flag ve güncel kısıtlar kanıtlı |
+| Arşiv konusu: SDK — Embeddable Programmatic Client (`createDeckentClient`) | `docs/archive/docs-pre-reset-2026-08-03/features/sdk.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — client factory kaynak kanıtlı, runtime proof HOLD |
+| Arşiv konusu: TERM-RPC — Paylaşımlı Session/Action RPC Kontratı | `docs/archive/docs-pre-reset-2026-08-03/features/term-rpc.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — core/API/write-handler kısıtları kanıtlı |
+| Arşiv konusu: Tool Surface — Progressive-Disclosure Meta-Tool'ları | `docs/archive/docs-pre-reset-2026-08-03/features/tool-surface.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — truth-contract gerçek binary kanıtlı |
+| Arşiv konusu: VS Code Panel — TERM-RPC Bridge/Data/Refresh Soy-Zinciri | `docs/archive/docs-pre-reset-2026-08-03/features/vscode-panel.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — bridge/data/refresh ve v1 gap kanıtlı |
+| Arşiv konusu: Deckent Glossary | `docs/archive/docs-pre-reset-2026-08-03/glossary.md` | `docs/{lang}/glossary.md` | ikisi | KAPSANDI — current work model, authority ve runtime terimleri çift-dilli açıklandı |
+| Arşiv konusu: Deckent Governance Documents Master Index | `docs/archive/docs-pre-reset-2026-08-03/governance/INDEX.md` | `docs/{lang}/governance/adr-system.md` | ikisi | KAPSANDI — yasa, precedence, ADR ve RBAC docs ağına canonical index verildi |
+| Arşiv konusu: Architecture Overview | `docs/archive/docs-pre-reset-2026-08-03/guide/architecture-overview.md` | `docs/{lang}/architecture.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Autonomous Execution Engine | `docs/archive/docs-pre-reset-2026-08-03/guide/autonomous-engine.md` | `docs/{lang}/guide/execution-modes.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Autonomous Engine — Operations Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/autonomous-operations.md` | `docs/{lang}/guide/execution-modes.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Autonomous Runtime — F3-009 | `docs/archive/docs-pre-reset-2026-08-03/guide/autonomous.md` | `docs/{lang}/guide/execution-modes.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Chat Mode | `docs/archive/docs-pre-reset-2026-08-03/guide/chat-mode.md` | `docs/{lang}/guide/interactive-surfaces.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Core Concepts | `docs/archive/docs-pre-reset-2026-08-03/guide/concepts.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Config Recovery Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/config-recovery.md` | `docs/{lang}/guide/recovery-troubleshooting.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Dashboard Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/dashboard.md` | `docs/{lang}/guide/interactive-surfaces.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Deckent Nedir? | `docs/archive/docs-pre-reset-2026-08-03/guide/deckent-nedir.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Docker Backend Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/docker-backend.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Docker Worker Memory Budgeting | `docs/archive/docs-pre-reset-2026-08-03/guide/docker-memory.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Evolution & Learning | `docs/archive/docs-pre-reset-2026-08-03/guide/evolution-and-learning.md` | `docs/{lang}/guide/memory-learning.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Deckent — Frequently Asked Questions (FAQ) | `docs/archive/docs-pre-reset-2026-08-03/guide/faq.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Deckent Feature Matrix | `docs/archive/docs-pre-reset-2026-08-03/guide/feature-matrix.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — durum-etiketli EN/TR birleşik katalog mevcut |
+| Arşiv konusu: Your First Sprint | `docs/archive/docs-pre-reset-2026-08-03/guide/first-sprint.md` | `docs/{lang}/guide/run-lifecycle.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Getting Started with Deckent | `docs/archive/docs-pre-reset-2026-08-03/guide/getting-started-en.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Getting Started | `docs/archive/docs-pre-reset-2026-08-03/guide/getting-started.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Installation Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/installation.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Local Model Workers — Ollama Agentic Worker Kılavuzu | `docs/archive/docs-pre-reset-2026-08-03/guide/local-model-workers.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Multi-Provider Fleet Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/multi-provider-fleet.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Multi-Provider Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/multi-provider.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Nervous System — Kısa Giriş | `docs/archive/docs-pre-reset-2026-08-03/guide/nervous-system.md` | `docs/{lang}/guide/nervous-system.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Onboarding | `docs/archive/docs-pre-reset-2026-08-03/guide/onboarding.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Quickstart Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/quickstart.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: RAM Experiment Guide — Multi-Worker Memory Sizing | `docs/archive/docs-pre-reset-2026-08-03/guide/ram-experiment.md` | `docs/{lang}/guide/getting-started.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Gömülü Web Terminali | `docs/archive/docs-pre-reset-2026-08-03/guide/terminal-tr.md` | `docs/{lang}/guide/interactive-surfaces.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Embedded Web Terminal | `docs/archive/docs-pre-reset-2026-08-03/guide/terminal.md` | `docs/{lang}/guide/interactive-surfaces.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Troubleshooting Guide | `docs/archive/docs-pre-reset-2026-08-03/guide/troubleshooting.md` | `docs/{lang}/guide/recovery-troubleshooting.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Workers | `docs/archive/docs-pre-reset-2026-08-03/guide/workers.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: DEVİR BELGESİ — Codex Instruction-Hardening (Kalem 2 + Kalem 3) | `docs/archive/docs-pre-reset-2026-08-03/HANDOVER-CODEX-INSTRUCTION-HARDENING.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: DEVİR BELGESİ — Main Provider: Codex · Claude = yalnız worker | `docs/archive/docs-pre-reset-2026-08-03/HANDOVER-CODEX.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: index | `docs/archive/docs-pre-reset-2026-08-03/index.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Deckent Launch Announcement — Final Draft (Sprint 165 GA) | `docs/archive/docs-pre-reset-2026-08-03/launch/announce-final.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Show HN: Deckent — Open source AI orchestrator with sprint discipline + nervous system | `docs/archive/docs-pre-reset-2026-08-03/launch/announce-hn.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Reddit Launch Posts — Deckent v1.0.0-beta.1 | `docs/archive/docs-pre-reset-2026-08-03/launch/announce-reddit.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Twitter/X Thread — Deckent v1.0.0-beta.1 Launch | `docs/archive/docs-pre-reset-2026-08-03/launch/announce-twitter-thread.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: I Built an AI Orchestrator Over 150 Sprints — Here's What I Learned | `docs/archive/docs-pre-reset-2026-08-03/launch/blog-devto-launch.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: I Built an AI Orchestrator Over 150 Sprints — Here's What I Learned | `docs/archive/docs-pre-reset-2026-08-03/launch/blog-hashnode-launch.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Code of Conduct | `docs/archive/docs-pre-reset-2026-08-03/launch/CONDUCT.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Discord Bot Setup — Deckent Community Bot | `docs/archive/docs-pre-reset-2026-08-03/launch/discord-bot-setup.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Discord Server Setup — Deckent Community | `docs/archive/docs-pre-reset-2026-08-03/launch/discord-server-setup.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Telegram Bot Kurulum Rehberi | `docs/archive/docs-pre-reset-2026-08-03/launch/telegram-bot-setup.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Worker Output Contract — Live Proof | `docs/archive/docs-pre-reset-2026-08-03/LIVE-PROOF.md` | `docs/{lang}/operations/evidence-and-settlement.md` | ikisi | KAPSANDI — result, disk verify, evaluation, gate ve terminal receipt zinciri belgelendi |
+| Arşiv konusu: Agents Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/agents.md` | `docs/{lang}/reference/agents.md` | ikisi | KAPSANDI — EN/TR 21+2 katalog ve fallback gaps mevcut |
+| Arşiv konusu: API Endpoint Inventory | `docs/archive/docs-pre-reset-2026-08-03/reference/api-endpoints.md` | `docs/{lang}/reference/api-surface.md` | ikisi | KAPSANDI — REST/SSE/RPC route envanteri source-dispatch kanıtlı |
+| Arşiv konusu: Deckent HTTP API — Integration Examples | `docs/archive/docs-pre-reset-2026-08-03/reference/api-examples.md` | `docs/{lang}/reference/api-surface.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: API Surface Contract | `docs/archive/docs-pre-reset-2026-08-03/reference/api-surface.md` | `docs/{lang}/reference/api-surface.md` | ikisi | KAPSANDI — auth/rate/gate + route contract güncel source kanıtlı |
+| Arşiv konusu: Deckent Programmatic API Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/api.md` | `docs/{lang}/reference/api-surface.md` | ikisi | KAPSANDI — HTTP surface ve ayrı SDK method catalog'u mevcut |
+| Arşiv konusu: CLI Command Inventory | `docs/archive/docs-pre-reset-2026-08-03/reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — 211 visible path gerçek binary help ağacından envanterlendi |
+| Arşiv konusu: CLI Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/cli.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — bütün path'ler, flags ve doğrulanmış davranış/farklar belgelendi |
+| Arşiv konusu: Configuration Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164 default leaf alan-alan gerçek built output'tan yazıldı |
+| Arşiv konusu: Deckent Configuration Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/config.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — layer/mode/provider/field-level schema kanıtlı |
+| Arşiv konusu: Runtime Dependencies | `docs/archive/docs-pre-reset-2026-08-03/reference/dependencies.md` | `docs/{lang}/reference/enterprise-and-resources.md` | ikisi | KAPSANDI — process, container, terminal ve optional integration dependencies açıklandı |
+| Arşiv konusu: Deckent: Enterprise-Depth Features | `docs/archive/docs-pre-reset-2026-08-03/reference/enterprise-depth.md` | `docs/{lang}/reference/enterprise-and-resources.md` | ikisi | KAPSANDI — tenant, policy, audit, capacity ve integration control'leri source-derived işlendi |
+| Arşiv konusu: Enterprise Foundation: The ExecutionRequest Contract | `docs/archive/docs-pre-reset-2026-08-03/reference/enterprise-foundation.md` | `docs/{lang}/reference/platform-security.md` | ikisi | KAPSANDI — tenant/RBAC ve ExecutionRequest contract güncel source kanıtlı |
+| Arşiv konusu: Enterprise Integrations | `docs/archive/docs-pre-reset-2026-08-03/reference/enterprise-integrations.md` | `docs/{lang}/reference/enterprise-and-resources.md` | ikisi | KAPSANDI — connector, notification, event, data ve scheduled ingress'ler durumlarıyla belgelendi |
+| Arşiv konusu: Event Channels Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/event-channels.md` | `docs/{lang}/reference/terminal-events-and-wrappers.md` | ikisi | KAPSANDI — protocol envelope, durable stream ve channel family'leri kaynakla doğrulandı |
+| Arşiv konusu: ExecutionRequest Contract Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/execution-request.md` | `docs/{lang}/reference/runtime-contracts.md` | ikisi | KAPSANDI — full envelope/risk/migration state açıklandı |
+| Arşiv konusu: Deckent Feature Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/features.md` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — durum-etiketli EN/TR birleşik katalog mevcut |
+| Arşiv konusu: Deckent Terminoloji Sözlüğü (Glossary) | `docs/archive/docs-pre-reset-2026-08-03/reference/glossary.md` | `docs/{lang}/glossary.md` | ikisi | KAPSANDI — EN canonical tanım ve TR teknik-terim aynası mevcut |
+| Arşiv konusu: Deckent Health Check Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/health-check.md` | `docs/{lang}/reference/api-surface.md` | ikisi | KAPSANDI — health exposure/auth distinction source kanıtlı |
+| Arşiv konusu: Deckent Lifecycle & Architecture Diagrams | `docs/archive/docs-pre-reset-2026-08-03/reference/lifecycle-diagram.md` | `docs/{lang}/reference/runtime-contracts.md` | ikisi | KAPSANDI — Goal→Operation lineage ve aggregate boundaries mevcut |
+| Arşiv konusu: Managed Docs Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/managed-docs.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | KAPSANDI — generated ownership, check/regen ayrımı ve mevcut pipeline HOLD'u açıklandı |
+| Arşiv konusu: Marketplace Guide [EXPERIMENTAL] | `docs/archive/docs-pre-reset-2026-08-03/reference/marketplace.md` | `docs/{lang}/reference/sdk-and-plugins.md` | ikisi | KAPSANDI — install/source/security ve runtime-proof HOLD açık |
+| Arşiv konusu: MCP-GUIDE — Deckent MCP Kullanım Kılavuzu | `docs/archive/docs-pre-reset-2026-08-03/reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: MCP Module Overview | `docs/archive/docs-pre-reset-2026-08-03/reference/mcp-overview.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: MCP Resources Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/mcp-resources.md` | `docs/{lang}/reference/mcp-resources.md` | ikisi | KAPSANDI — sekiz resource URI/MIME/fallback alan-alan kanıtlı |
+| Arşiv konusu: MCP Tools Reference | `docs/archive/docs-pre-reset-2026-08-03/reference/mcp-tools.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Migration & Upgrade Guide | `docs/archive/docs-pre-reset-2026-08-03/reference/migration-guide.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | KAPSANDI — package/config/store migration ve rollback kanıt contract'ı belgelendi |
+| Arşiv konusu: Multi-Provider Guide | `docs/archive/docs-pre-reset-2026-08-03/reference/multi-provider.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: OpenRouter Free-Model Inventory | `docs/archive/docs-pre-reset-2026-08-03/reference/openrouter-free-models.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Performance Tuning Guide | `docs/archive/docs-pre-reset-2026-08-03/reference/performance.md` | `docs/{lang}/reference/enterprise-and-resources.md` | ikisi | KAPSANDI — concurrency admission, resource monitor ve bounded buffer davranışı belgelendi |
+| Arşiv konusu: Provider-Free Architecture | `docs/archive/docs-pre-reset-2026-08-03/reference/provider-free.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Publish Gate: Builtins Drift (`builtins_drift`) | `docs/archive/docs-pre-reset-2026-08-03/reference/publish-gate-builtins-drift.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | KAPSANDI — built-in/generated drift gate ve owner-controlled repair yönü belgelendi |
+| Arşiv konusu: Resource Profile | `docs/archive/docs-pre-reset-2026-08-03/reference/resource-profile.md` | `docs/{lang}/reference/enterprise-and-resources.md` | ikisi | KAPSANDI — resource samples, thresholds, pool admission ve uncertainty sınırları belgelendi |
+| Arşiv konusu: SECURITY.md — Deckent Security Model | `docs/archive/docs-pre-reset-2026-08-03/reference/security.md` | `docs/{lang}/reference/platform-security.md` | ikisi | KAPSANDI — auth/tenant/RBAC/scope/lock/plugin/container sınırları kanıtlı |
+| Arşiv konusu: Skill System | `docs/archive/docs-pre-reset-2026-08-03/reference/skills.md` | `docs/{lang}/reference/skills.md` | ikisi | KAPSANDI — 30 canonical skill ve lifecycle kanıtlı |
+| Arşiv konusu: Stack-Aware Routing | `docs/archive/docs-pre-reset-2026-08-03/reference/stack-aware-routing.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: REPL Terminal Compatibility Matrix | `docs/archive/docs-pre-reset-2026-08-03/reference/terminal-compat.md` | `docs/{lang}/reference/terminal-events-and-wrappers.md` | ikisi | KAPSANDI — pure seam'ler ile gerçek PTY/platform HOLD sınırı ayrı yazıldı |
+| Arşiv konusu: Terminal Tasarım-Dili — yazılı SSOT (583 tasarım-turu · DT-5, 2026-07-18) | `docs/archive/docs-pre-reset-2026-08-03/reference/terminal-design-language.md` | `docs/{lang}/reference/terminal-events-and-wrappers.md` | ikisi | KAPSANDI — interaction, semantic palette, risk language ve embedded security contract'ları belgelendi |
+| Arşiv konusu: Worker Wrapper Behavior Contract | `docs/archive/docs-pre-reset-2026-08-03/reference/worker-wrapper-contract.md` | `docs/{lang}/reference/terminal-events-and-wrappers.md` | ikisi | KAPSANDI — exit, timeout, heartbeat, diff attribution ve tool-scope invariant'ları işlendi |
+| Arşiv konusu: npm Publish Handoff — Deckent v1.0.0-beta.1 | `docs/archive/docs-pre-reset-2026-08-03/release/npm-publish-handoff.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Public Repo Flip Handoff — Sprint 165 (Final) | `docs/archive/docs-pre-reset-2026-08-03/release/public-repo-flip-handoff.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Public Repository Manifest | `docs/archive/docs-pre-reset-2026-08-03/release/public-repo-manifest.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Release Checklist | `docs/archive/docs-pre-reset-2026-08-03/release/release-checklist.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | KAPSANDI — validate/publish/rollback evidence ve owner authority checklist'i güncellendi |
+| Arşiv konusu: Deckent v1.0.0-beta.1 — Release Notes | `docs/archive/docs-pre-reset-2026-08-03/release/release-notes.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Deckent Roadmap | `docs/archive/docs-pre-reset-2026-08-03/release/roadmap.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Weekend Publish Runbook — deckent-dev → deckent (public) — 2026-08-01/02 | `docs/archive/docs-pre-reset-2026-08-03/release/weekend-publish-runbook.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Sprint Log | `docs/archive/docs-pre-reset-2026-08-03/SPRINT-LOG.md` | `docs/{lang}/operations/development-and-release.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Arşiv konusu: Agentic-Run Ecosystem | `docs/archive/docs-pre-reset-2026-08-03/vision/agentic-run-ecosystem.md` | `docs/{lang}/overview.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Deckent — Product Roadmap | `docs/archive/docs-pre-reset-2026-08-03/vision/roadmap.md` | `docs/{lang}/overview.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Deckent — Vizyon ve Strateji | `docs/archive/docs-pre-reset-2026-08-03/vision/VISION-TR.md` | `docs/{lang}/overview.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Deckent — Vision and Strategy | `docs/archive/docs-pre-reset-2026-08-03/vision/VISION.md` | `docs/{lang}/overview.md` | ikisi | KAPSANDI — çekirdek doc mevcut |
+| Arşiv konusu: Voice — deckent Bot Voice Feature | `docs/archive/docs-pre-reset-2026-08-03/voice.md` | `docs/{lang}/guide/connectors.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Arşiv konusu: Worker Guide | `docs/archive/docs-pre-reset-2026-08-03/worker-guide.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| ADR corpus: 55 file; G/D governance and architecture decisions | `docs/archive/docs-pre-reset-2026-08-03/adr/**/*.md` | `docs/{lang}/governance/adr-system.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Historical code/doc/config/security audits | `docs/archive/docs-pre-reset-2026-08-03/analysis/2026-05-22-*.md; analysis/*audit*.md` | `docs/{lang}/operations/current-frictions.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Provider, routing, cost and limit forensics | `docs/archive/docs-pre-reset-2026-08-03/analysis/*provider*.md; analysis/*routing*.md; analysis/*limit*.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Terminal, REPL, dashboard and desktop design/audits | `docs/archive/docs-pre-reset-2026-08-03/analysis/*term*.md; analysis/*repl*.md; analysis/*desktop*.md; analysis/*dashboard*.md` | `docs/{lang}/guide/interactive-surfaces.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Execution, recovery, scheduler and authority decisions | `docs/archive/docs-pre-reset-2026-08-03/analysis/*execution*.md; analysis/*recovery*.md; analysis/*scheduler*.md; analysis/*authority*.md` | `docs/{lang}/operations/lifecycle-internals.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Memory projection and migration analyses | `docs/archive/docs-pre-reset-2026-08-03/analysis/*memory*.md; alperen-analysis/*memory*.md` | `docs/{lang}/guide/memory-learning.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Public truth, beta blocker and dogfood RCA corpus | `docs/archive/docs-pre-reset-2026-08-03/analysis/*truth*.md; analysis/*beta*.md; analysis/*dogfood*.md` | `docs/{lang}/operations/current-frictions.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Alperen repository/docs/scripts/tests analyses | `docs/archive/docs-pre-reset-2026-08-03/alperen-analysis/**/*.md` | `docs/{lang}/operations/development-and-release.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Load and scale evidence: 324 reports | `docs/archive/docs-pre-reset-2026-08-03/audits/**/load-test-report.md` | `docs/{lang}/operations/evidence-and-settlement.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Agent, worker and prompt audit corpus | `docs/archive/docs-pre-reset-2026-08-03/audits/**/*agent*.md; audits/**/*worker*.md; audits/**/*prompt*.md` | `docs/{lang}/reference/agents.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| CLI/MCP/i18n/docs parity audit corpus | `docs/archive/docs-pre-reset-2026-08-03/audits/**/*cli*.md; audits/**/*mcp*.md; audits/**/*i18n*.md; audits/**/*doc*.md` | `docs/{lang}/operations/evidence-and-settlement.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Cross-platform installation validation corpus | `docs/archive/docs-pre-reset-2026-08-03/audits/**/*install*.md; audits/**/*linux*.md; audits/**/*macos*.md; audits/**/*wsl*.md` | `docs/{lang}/reference/platform-security.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Publish, security and dependency audit corpus | `docs/archive/docs-pre-reset-2026-08-03/audits/**/*publish*.md; audits/**/*security*.md; audits/**/*dependenc*.md` | `docs/{lang}/operations/development-and-release.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Core/orchestra/dead-code health corpus | `docs/archive/docs-pre-reset-2026-08-03/audits/**/*core*.md; audits/**/*orchestra*.md; audits/**/*dead-code*.md` | `docs/{lang}/operations/current-frictions.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Historical sprint plans/specs: orchestration and recovery | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*sprint*.md; superpowers/{plans,specs}/**/*recovery*.md` | `docs/{lang}/operations/lifecycle-internals.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Historical plans/specs: autonomous and nervous systems | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*autonomous*.md; superpowers/{plans,specs}/**/*nervous*.md` | `docs/{lang}/guide/execution-modes.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Historical plans/specs: terminal, tools and NL dispatch | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*terminal*.md; superpowers/{plans,specs}/**/*tool*.md; superpowers/{plans,specs}/**/*dispatch*.md` | `docs/{lang}/guide/interactive-surfaces.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Historical plans/specs: provider, routing, resource and cost | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*provider*.md; superpowers/{plans,specs}/**/*routing*.md; superpowers/{plans,specs}/**/*resource*.md` | `docs/{lang}/guide/workers-and-providers.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Historical plans/specs: memory, learning and training trace | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*memory*.md; superpowers/{plans,specs}/**/*training*.md` | `docs/{lang}/guide/memory-learning.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Historical plans/specs: connectors, bot, gateway and voice | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*gateway*.md; superpowers/{plans,specs}/**/*bot*.md; superpowers/{plans,specs}/**/*voice*.md` | `docs/{lang}/guide/connectors.md` | ikisi | KAPSANDI — EN/TR guide kaynak ve runtime kanıtlı |
+| Historical plans/specs: identity and RBAC | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*identity*.md; superpowers/{plans,specs}/**/*rbac*.md` | `docs/{lang}/governance/authority-rbac.md` | ikisi | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| Historical plans/specs: SDK, plugin and marketplace | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*sdk*.md; superpowers/{plans,specs}/**/*plugin*.md` | `docs/{lang}/reference/sdk-and-plugins.md` | ikisi | KAPSANDI — current SDK methods/plugin security source kanıtlı |
+| Historical plans/specs: docs tracking and managed docs | `docs/archive/docs-pre-reset-2026-08-03/superpowers/{plans,specs}/**/*doc*.md` | `docs/{lang}/operations/development-and-release.md` | dogfood | EKSİK — hedef mevcut; arşiv eşdeğeri güncel doğrulama henüz tamamlanmadı |
+| CLI: deckent init | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent start | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plan | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent attach | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent spawn | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent kill | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent retro | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent cleanup | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent doctor | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config set | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config get | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config export | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config import | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config keys | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config migrate | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config nervous | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config nervous set | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config nervous override | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config nervous list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent config nervous reset | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent history | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plugin | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plugin install | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plugin remove | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plugin update | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plugin list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plugin info | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plugin test | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plugin create | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent upgrade | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent onboard | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent analyze | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent archive-debt | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent dashboard | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent serve | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent web | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent sync | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent watch | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent run | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent run start | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent run status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent run retro | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent run history | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent runs | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent process | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent process submit | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent process status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent process result | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent test | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent lint | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent create | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent stats | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent enable | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent disable | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent delete | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent edit | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent reclassify | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent agent info | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill create | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill install | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill update | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill enable | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill disable | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill delete | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill info | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill search | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent skill publish | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent review | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent finalize | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent explain | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent set-directives | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent connect | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent plan-nl | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent do | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent heartbeat | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent chat | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent checkpoint | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent checkpoint list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent checkpoint approve | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent checkpoint reject | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs add | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs remove | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs update | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs run | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs track | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs track scan | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs track status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent docs track sync | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent output | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent task | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent task settle | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent cost | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent cost show | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent cost update | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent cost budget | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent recall | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent remember | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent memory | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent memory rebuild | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent memory export | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent memory stats | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent memory backup | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent memory relations | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent memory relations list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent memory relations review | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent trace | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent trace extract | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent resume | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous enable | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous accept | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous reject | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous edit | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous undo | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous history | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous recommendations | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous log | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous accept-panic | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent nervous baseline-refresh | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mode | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mode show | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mode sprint | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mode run | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mode task | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mode process | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mode auto | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mode global | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent features | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent truth | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent audit | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent audit-verify | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent recover | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent models | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent models list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent models refresh | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent models tier | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent flow | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent flow list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent flow add | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent flow run | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent flow approve | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent rbac | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent rbac check | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent rbac roles | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent rbac grant | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent rbac revoke | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent evolve | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent evolve report | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous enable | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous start | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous plan | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous stop | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous cleanup | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous pending | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous approve | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous reject | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous backlog | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous backlog add | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous backlog list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous backlog remove | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous-mission | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous-mission create-list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous-mission create-goal | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent autonomous-mission list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent bot | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent bot listen | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent bot start | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent bot stop | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent bot status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway listen | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway start | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway stop | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway pair | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway pair list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway pair approve | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent gateway pair reject | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mcp | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mcp add | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mcp list | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mcp remove | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent mcp get | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent resources | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent usage | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent kpi | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent image | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent image build | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent limits | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent openrouter-probe | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent xverify | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent provider-authority | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent provider-authority keyring | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent provider-authority keyring status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent provider-authority keyring init | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent provider-authority keyring rotate | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent execution-authority | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent execution-authority mount-adopt | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent cu-status | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| CLI: deckent help-info | `reference/cli.md; reference/cli-commands.md` | `docs/{lang}/cli.md` | ikisi | KAPSANDI — gerçek binary help audit |
+| MCP tool: deckent_init | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_set_directives | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_plan | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_start | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_status | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_doctor | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_retro | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_history | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_analyze_project | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_sync | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_config | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_review | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_run | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_kill | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_cleanup | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_help | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_agent_list | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_skill_list | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_checkpoint | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_docs | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_explain | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_memory_query | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_watch | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_nervous_subscribe | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_nervous_accept | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_nervous_reject | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_nervous_status | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_nervous_config | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_feature_query | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_truth | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_audit | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_recover | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_models | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_autonomous | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_process | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_usage | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_xverify | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_kpi | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_cost | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_agent_manage | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_skill_manage | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_memory_manage | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_autonomous_backlog | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_autonomous_status | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_nervous_edit | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_nervous_undo | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_autonomous_approve | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_autonomous_reject | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| MCP tool: deckent_execution_authority | `reference/mcp-tools.md; reference/mcp-guide.md` | `docs/{lang}/mcp.md` | ikisi | KAPSANDI — canonical catalog + source |
+| DB: .brain/memory.db | `architecture/memory-system.md; reference/api-surface.md` | `docs/{lang}/db.md` | ikisi | KAPSANDI — read-only PRAGMA snapshot |
+| DB: .deckent/autonomous/autonomous.db | `guide/autonomous.md; guide/autonomous-engine.md` | `docs/{lang}/db.md` | ikisi | KAPSANDI — read-only PRAGMA snapshot |
+| DB: .deckent/identity.db | `architecture/authority-matrix.md; reference/security.md` | `docs/{lang}/db.md` | ikisi | KAPSANDI — read-only PRAGMA snapshot |
+| DB: .deckent/provider-execution-observations.db | `reference/multi-provider.md` | `docs/{lang}/db.md` | ikisi | KAPSANDI — read-only PRAGMA snapshot |
+| DB: .deckent/runtime/invocations.db | `reference/execution-request.md` | `docs/{lang}/db.md` | ikisi | KAPSANDI — read-only PRAGMA snapshot |
+| DB: .deckent/runtime/run-flow-store/run-flow-authority.sqlite | `reference/lifecycle-diagram.md` | `docs/{lang}/db.md` | ikisi | KAPSANDI — read-only PRAGMA snapshot |
+| Config field: mode | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.performance.max_workers | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.performance.brain_model | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.performance.default_model | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.performance.haiku_allowed | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.performance.brain_planning | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.balanced.max_workers | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.balanced.brain_model | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.balanced.default_model | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.balanced.haiku_allowed | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.balanced.brain_planning | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.economic.max_workers | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.economic.brain_model | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.economic.default_model | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.economic.haiku_allowed | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.economic.brain_planning | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.api.max_workers | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.api.brain_model | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.api.default_model | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.api.haiku_allowed | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.api.budget_per_sprint | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.api.requires | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: modes.api.brain_planning | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: providers.brain | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: providers.worker | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: provider_overrides | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: cost_optimization | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: spawn_backend | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: auth_mode | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: human_checkpoints | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: fix_phase_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: max_fix_retries | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: fix_circuit_breaker.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: fix_circuit_breaker.max_unresolved_tasks | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: fix_circuit_breaker.min_unresolved_ratio_percent | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: lifecycle_recovery.coordinator_termination_grace_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: lifecycle_recovery.termination_poll_interval_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: lifecycle_recovery.forced_termination_verify_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: coverage_threshold | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: coverage_hard_floor | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: coverage_aspirational | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: max_reroutes | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: reroute_on_tech_debt | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: sprint_timeout_minutes | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: memory_budget | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: decay_after_sprints | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: patterns_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: project_identity_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: scan_interval | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: heartbeat_timeout | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: boundary_enforcement | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: lock_stale_threshold | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: skill_routing | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: search_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: search_provider | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: search_cache_ttl | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: notify_on_complete | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: notify_channel | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: notify_url | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: telemetry_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: telemetry_anonymous | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: detected_env | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: multi_ide_mode | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: output_splash | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: output_mode | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: output_theme | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: rollback_policy | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: evaluation_rubric | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: rubric_max_retries | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: adaptive_thresholds | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: agent_min_score | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: adaptive_config.min_samples | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: adaptive_config.no_go_threshold | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: adaptive_config.coverage_lookback | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: routing_engine | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: cleanup_delay_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: dependency_pipeline_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: debt_preflight_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: sprint_checkpoint_interval | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: token_throttle_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.docker_min_timeout | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.docker_max_timeout | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.tmux_min_timeout | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.tmux_max_timeout | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.subprocess_min_timeout | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.subprocess_max_timeout | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.effort_base.low | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.effort_base.normal | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.effort_base.high | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.loc_scaling_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.history_scaling_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.runtime_extension_enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.adaptive_multiplier | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: timeout.runtime_extension_max | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: observability.rotation.maxSizeMB | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: observability.rotation.archiveFormat | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: observability.rotation.keepLastN | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: sprint_file_retention.keep_last_n | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: sprint_file_retention.size_cap_mb | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: sprint_file_retention.archive_path | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: scheduler_shadow_retention.retention_days | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: scheduler_shadow_retention.archive_path | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: deckent_style | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: terminal.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: terminal.bind | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: terminal.maxSessions | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: terminal.idleTimeoutMs | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: terminal.scrollbackBytes | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: terminal.allowShellKind | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: prompt.adr_min_relevance | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: prompt.adr_render | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: prompt.persona_render | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: prompt.exclude_dynamic_system_prompt_sections | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.interval_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.backlog_path | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.pool_size | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.reactive.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.reactive.map_path | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.work_generator.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.work_generator.interval_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.rbac_policy.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: autonomous.rbac_policy.role | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.mode | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.safety_floor.locked_actions | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.safety_floor.cost_threshold_usd | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.safety_floor.bypass_allowed | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.channels.mcp | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.channels.cli | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.channels.file | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.channels.desktop | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.throttle_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.group_info_window_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.severity_min | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.quiet_hours.start | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.quiet_hours.end | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.quiet_hours.timezone | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.notifications.cross_channel_dedup | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.stale_worker.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.stale_worker.threshold_ms | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.scope_collision.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.debt_trend.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.debt_trend.threshold_rate | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.agent_routing.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.agent_routing.anomaly_threshold | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.directives_protection.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.directives_protection.auto_restore | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.dead_event_stream.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.cost_threshold.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.cost_threshold.reserve_for | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.prompt_quality.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.prompt_quality.reserve_for | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.worker_output_variance.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.worker_output_variance.reserve_for | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.self_modifying_warner.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.self_modifying_warner.reserve_for | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.task_mode_idle.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.build_failure_recurrence.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.token_spike.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.agent_routing_anomaly.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.scope_collision_rate.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.detectors.notification_delivery_health.enabled | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Config field: nervous_system.history_retention_days | `reference/config.md; reference/config-reference.md` | `docs/{lang}/reference/configuration-schema.md` | ikisi | KAPSANDI — 164-leaf built-default tablosunda doğrulandı |
+| Feature: sprint-controller | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — wiring ve unattended reliability gap kanıtlı |
+| Feature: task-builder | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — parser/scope/dependency/task export'ları kanıtlı |
+| Feature: result-evaluator | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — evaluator ve dogfood friction kanıtlı |
+| Feature: auditor | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — scan/disk verification kaynak kanıtlı |
+| Feature: event-stream | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — append/read/reconstruct kaynak kanıtlı |
+| Feature: sprint-checkpoint | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — checkpoint/resume kaynak kanıtlı |
+| Feature: sprint-retro-reporter | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — reporter ve gerçek output farkı kanıtlı |
+| Feature: authority-enforcer | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — runtime ve boundary kısıtı kanıtlı |
+| Feature: model-registry | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — registry production export'ları kanıtlı |
+| Feature: tmux-backend | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — stale default çelişkisi açık |
+| Feature: docker-backend | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — default/resolver wired, execution HOLD |
+| Feature: subprocess-backend | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — resolver/adapter wired, execution HOLD |
+| Feature: fix-phase | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — phase wiring ve certification gap kanıtlı |
+| Feature: dependency-scheduler | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — source ve ordering friction kanıtlı |
+| Feature: memory-v2 | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — source ve gerçek binary stats kanıtlı |
+| Feature: rollback | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — conditional policy dürüstçe etiketli |
+| Feature: autonomous-runtime | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — manifest ve read-only status kanıtlı |
+| Feature: approval-runtime | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — broker/API ve flag gaps kanıtlı |
+| Feature: tool-surface | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — truth-contract gerçek binary kanıtlı |
+| Feature: repl-surface | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — flag ve current constraint kanıtlı |
+| Feature: npm-advisory | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — advisory boundary kaynak kanıtlı |
+| Feature: routing-engine-v3 | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — source/callsite ve proof gap kanıtlı |
+| Feature: archive-debt | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — CLI entry ve parity gap kanıtlı |
+| Feature: skill-marketplace | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — CLI entry ve parity gap kanıtlı |
+| Feature: promotion-pipeline | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — source ve usage category kanıtlı |
+| Feature: nervous-system | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — 12 detector/default/parent gap kanıtlı |
+| Feature: self-modifying-detector | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — source ve opt-in gap kanıtlı |
+| Feature: managed-docs | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — pipeline ownership ve missing output açık |
+| Feature: heartbeat-daemon | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — source/CLI ve integration gap kanıtlı |
+| Feature: shared-memory | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — integration yokluğu roadmap etiketli |
+| Feature: handoff-protocol | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — integration yokluğu roadmap etiketli |
+| Feature: multi-agent-pipeline | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — sprint integration yokluğu roadmap etiketli |
+| Feature: ecosystem-intelligence | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — persistence/consumer gap kanıtlı |
+| Feature: human-checkpoint-cli | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — CLI/config ve adoption gap kanıtlı |
+| Feature: parallel-pipeline-manager-standalone | `features/README.md; feature-specific archive files` | `docs/{lang}/features/catalog.md` | ikisi | KAPSANDI — supersession dürüstçe etiketli |
+| Feature truth contract: training-trace | `.deckent/settings/features-manifest.json` | `docs/{lang}/features/catalog.md` | dogfood | KAPSANDI — code/wiring/flag/recent proof doğrulandı |
+| Feature truth contract: tool-surface | `.deckent/settings/features-manifest.json` | `docs/{lang}/features/catalog.md` | dogfood | KAPSANDI — code/wiring/flag var, proof yok etiketi açık |
+| Feature truth contract: worker-approval-gate | `.deckent/settings/features-manifest.json` | `docs/{lang}/features/catalog.md` | dogfood | KAPSANDI — code/wiring/flag var, proof yok etiketi açık |
+| Feature truth contract: routing-decision-journal | `.deckent/settings/features-manifest.json` | `docs/{lang}/features/catalog.md` | dogfood | KAPSANDI — callsite var, flag/proof yok etiketi açık |
+| Feature truth contract: prompt-gate-block | `.deckent/settings/features-manifest.json` | `docs/{lang}/features/catalog.md` | dogfood | KAPSANDI — half-wire durumu gerçek binary kanıtlı |
+
+## İlerleme hesabı
+
+Doluluk = KAPSANDI satırları / toplam satır = 612/654 = **93.6%**. Kalan **42** satır runtime katalog açığı değildir; tarihsel launch/handoff corpus'ları, 55-file ADR kopya corpus'u ve archive-level audit/load/platform kanıtlarının bugünkü koda karşı yeniden doğrulanmamış derinliğidir. Bunlar tamamlanmış sayılmadı.
