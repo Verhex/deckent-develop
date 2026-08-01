@@ -585,6 +585,7 @@ describe('cleanup E) prompt archive (isolated)', () => {
       expect.stringContaining('.tasks'),
       'sprint-042',
       expect.any(Number),
+      '042-',
     );
   });
 
@@ -618,6 +619,7 @@ describe('cleanup E) prompt archive (isolated)', () => {
       expect.any(String),
       expect.any(String),
       3, // custom retention value from config
+      undefined,
     );
   });
 

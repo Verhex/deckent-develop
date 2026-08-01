@@ -3,6 +3,7 @@ import { Command } from 'commander';
 
 const mockFinalizeSprint = vi.fn();
 const mockRunSprintRecoveryOperation = vi.fn();
+const mockForceAbortSprint = vi.fn();
 const mockPrint = vi.fn();
 const mockPrintError = vi.fn();
 
@@ -17,6 +18,9 @@ vi.mock('node:fs', () => ({
 }));
 vi.mock('../../../src/orchestra/brain.js', () => ({
   finalizeSprint: (...args: unknown[]) => mockFinalizeSprint(...args),
+}));
+vi.mock('../../../src/orchestra/sprint-finalizer.js', () => ({
+  forceAbortSprint: (...args: unknown[]) => mockForceAbortSprint(...args),
 }));
 vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
   evaluateResultSync: vi.fn(),
@@ -48,6 +52,12 @@ describe('deckent finalize recovery adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRunSprintRecoveryOperation.mockRejectedValue(new Error('typed HOLD'));
+    mockForceAbortSprint.mockReturnValue({
+      outcome: 'ABORTED',
+      terminalTruth: {
+        logicalMetrics: { totalTasks: 1, completedTasks: 1 },
+      },
+    });
   });
 
   it('does not finalize or print terminal completion when shared recovery holds', async () => {
@@ -68,5 +78,24 @@ describe('deckent finalize recovery adapter', () => {
     expect(mockFinalizeSprint).not.toHaveBeenCalled();
     expect(mockPrint).not.toHaveBeenCalledWith(expect.stringContaining('finalized:'));
     expect(mockPrintError).toHaveBeenCalled();
+  });
+
+  it('routes --force to ABORTED settlement and never invokes normal finalize', async () => {
+    mockRunSprintRecoveryOperation.mockResolvedValue({});
+    const program = new Command();
+    program.exitOverride();
+    registerFinalize(program);
+
+    await program.parseAsync(['node', 'test', 'finalize', '--force', '--sprint', 'sprint-482']);
+
+    expect(mockForceAbortSprint).toHaveBeenCalledWith(
+      '/fake/project',
+      expect.objectContaining({ id: 'sprint-482', status: 'ABORTED' }),
+      expect.any(Map),
+      expect.any(Array),
+      expect.objectContaining({ coordinatorGeneration: 1 }),
+    );
+    expect(mockFinalizeSprint).not.toHaveBeenCalled();
+    expect(mockPrint).toHaveBeenCalledWith(expect.stringContaining('ABORTED'));
   });
 });

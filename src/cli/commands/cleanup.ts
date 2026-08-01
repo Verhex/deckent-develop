@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, readdirSync, existsSync, statSync, mkdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { archivePromptFiles } from '../../orchestra/spawn-backend-docker.js';
 import { cleanTasksArchive } from '../../orchestra/sprint-docs-updater.js';
@@ -25,9 +25,14 @@ import {
 } from '../../core/run-status-authority.js';
 import { cleanupSprintMetadata } from '../../orchestra/sprint-controller.js';
 import { classifyTaskArtifact } from '../../core/task-artifact-classifier.js';
+import {
+  projectTerminalPublicationStatus,
+  type TerminalPublicationStatus,
+} from '../../core/sprint-terminal-publication-status.js';
 
 export function cleanupAuthorityHoldReason(
   authority: CanonicalRunStatus,
+  terminalPublication?: TerminalPublicationStatus,
 ): string | null {
   if (authority.active || authority.coordinator === 'alive') {
     return 'coordinator-active';
@@ -41,6 +46,14 @@ export function cleanupAuthorityHoldReason(
     || authority.lifecycle === 'ORPHANED'
   ) {
     return `run-${authority.lifecycle.toLowerCase()}`;
+  }
+  if (authority.lifecycle === 'COMPLETE' || authority.lifecycle === 'ABORTED') {
+    if (terminalPublication?.state !== 'receipt-observed' || !terminalPublication.receipt) {
+      return 'terminal-receipt-required';
+    }
+    if (terminalPublication.receipt.terminalOutcome !== authority.lifecycle) {
+      return 'terminal-outcome-mismatch';
+    }
   }
   return null;
 }
@@ -68,14 +81,14 @@ function getProjectSessionName(root: string): string {
   return TMUX_SESSION_NAME;
 }
 
-/** §2.4 — Copy a .log file to archiveDir + byte-verify. Returns true iff archive is byte-exact. */
+/** §2.4 — Copy one owned task artifact to archiveDir and byte-verify it. */
 export function archiveLogFileWithVerify(liveLogPath: string, archiveDir: string, content: Buffer): boolean {
   try {
     mkdirSync(archiveDir, { recursive: true });
     const archivePath = join(archiveDir, basename(liveLogPath));
     writeFileSync(archivePath, content);
-    const archiveSize = statSync(archivePath).size;
-    return archiveSize === content.length;
+    const archived = readFileSync(archivePath) as Buffer;
+    return archived.equals(content);
   } catch {
     return false;
   }
@@ -110,7 +123,8 @@ export function registerCleanup(program: Command): void {
       const lang = getLangFromConfig(root);
       const tasksDir = join(root, TASKS_DIR);
       const authority = readCanonicalRunStatus(root);
-      const holdReason = cleanupAuthorityHoldReason(authority);
+      const terminalPublication = projectTerminalPublicationStatus(root, authority);
+      const holdReason = cleanupAuthorityHoldReason(authority, terminalPublication);
       if (holdReason) {
         printError(new Error(getMessage('cleanup.authority_hold', lang, {
           sprintId: authority.sprintId ?? 'unknown',
@@ -119,13 +133,24 @@ export function registerCleanup(program: Command): void {
         process.exitCode = 1;
         return;
       }
+      let taskIdPrefix = authority.sprintId?.match(/^sprint-(\d+)$/u)?.[1];
+      taskIdPrefix = taskIdPrefix ? `${taskIdPrefix}-` : undefined;
+      const ownsTaskArtifact = (file: string): boolean => taskIdPrefix === undefined
+        || file.startsWith(`task-${taskIdPrefix}`);
+      const ownsPromptArtifact = (file: string): boolean => taskIdPrefix === undefined
+        || file.startsWith(`.prompt-${taskIdPrefix}`)
+        || file.startsWith(`.worker-${taskIdPrefix}`);
 
       if (opts.dryRun) {
         const locksDir = join(root, LOCKS_DIR);
         // A) Single readdirSync pass — eliminates double scan
         const allTaskFiles = existsSync(tasksDir) ? (readdirSync(tasksDir) as string[]) : [];
-        const taskFiles = allTaskFiles.filter(f => /\.(json|plan|hb|result|paused|log|timeout)$/.test(f));
-        const promptFiles = allTaskFiles.filter(f => f.startsWith('.prompt-'));
+        const taskFiles = allTaskFiles.filter(
+          f => ownsTaskArtifact(f) && /\.(json|plan|hb|result|paused|log|timeout)$/.test(f),
+        );
+        const promptFiles = allTaskFiles.filter(
+          f => ownsPromptArtifact(f) && (f.startsWith('.prompt-') || f.startsWith('.worker-')),
+        );
         const lockFiles = existsSync(locksDir)
           ? (readdirSync(locksDir) as string[]).filter(
             file => !isExecutionLockAuthorityArtifactName(file),
@@ -192,7 +217,10 @@ export function registerCleanup(program: Command): void {
               const classification = classifyTaskArtifact(f, content);
               if (classification.kind !== 'task-record') continue;
               const task = JSON.parse(content) as Task;
-              if (task.id === classification.taskId) tasks.push(task);
+              const belongsToRun = authority.sprintId === null
+                || task.sprintId === authority.sprintId
+                || (taskIdPrefix !== undefined && task.id.startsWith(taskIdPrefix));
+              if (task.id === classification.taskId && belongsToRun) tasks.push(task);
             } catch {
               // skip malformed task files
             }
@@ -232,6 +260,10 @@ export function registerCleanup(program: Command): void {
             if (m?.[1]) sprintNumber = parseInt(m[1], 10);
           }
         }
+        if (!taskIdPrefix && sprintId) {
+          const derivedSprintNumber = sprintId.match(/^sprint-(\d+)$/u)?.[1];
+          taskIdPrefix = derivedSprintNumber ? `${derivedSprintNumber}-` : undefined;
+        }
 
         const sprint: Sprint = {
           id: sprintId ?? `cleanup-${Date.now()}`,
@@ -245,18 +277,29 @@ export function registerCleanup(program: Command): void {
         // Compute archiveSprintId before cleanup so §2.4 and §E both use it
         const archiveSprintId = sprintId ?? `sprint-${sprintNumber || Date.now()}`;
 
-        // §2.4 — Archive .log files with byte-verify before live delete; archive-fail → live-RETAIN
-        const logArchiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${archiveSprintId}-tasks`);
-        const logFilesToRestore: Array<[string, Buffer]> = [];
-        if (existsSync(tasksDir)) {
-          for (const lf of (readdirSync(tasksDir) as string[]).filter(n => n.endsWith('.log'))) {
-            const liveLogPath = join(tasksDir, lf);
+        // §2.4 — Archive every owned task artifact with byte verification
+        // before live deletion. An archive failure restores that exact file;
+        // foreign-run evidence never enters this run's archive.
+        const taskArchiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${archiveSprintId}-tasks`);
+        const archiveFailures: string[] = [];
+        if (authority.sprintId && existsSync(tasksDir)) {
+          const archivalSuffix = /\.(?:json|plan|hb|result|paused|log|timeout|partial-result)$/u;
+          for (const artifactName of (readdirSync(tasksDir) as string[]).filter(
+            name => ownsTaskArtifact(name) && archivalSuffix.test(name),
+          )) {
+            const liveArtifactPath = join(tasksDir, artifactName);
             try {
-              const content = readFileSync(liveLogPath) as Buffer;
-              const ok = archiveLogFileWithVerify(liveLogPath, logArchiveDir, content);
-              if (!ok) logFilesToRestore.push([liveLogPath, content]);
-            } catch { /* unreadable → skip */ }
+              const content = readFileSync(liveArtifactPath) as Buffer;
+              const ok = archiveLogFileWithVerify(liveArtifactPath, taskArchiveDir, content);
+              if (!ok) archiveFailures.push(artifactName);
+            } catch { archiveFailures.push(artifactName); }
           }
+        }
+        if (archiveFailures.length > 0) {
+          throw new Error(getMessage('cleanup.archive_hold', lang, {
+            count: String(archiveFailures.length),
+            files: archiveFailures.slice(0, 5).join(', '),
+          }));
         }
 
         cleanup(root, sprint);
@@ -264,14 +307,14 @@ export function registerCleanup(program: Command): void {
         // lifecycle projections. Immutable job/receipt/forensic archives stay.
         if (sprintId) cleanupSprintMetadata(root, sprintId);
 
-        // Restore .log files whose archiving failed (archive-fail → live-RETAIN per §2.4)
-        for (const [liveLogPath, content] of logFilesToRestore) {
-          try { writeFileSync(liveLogPath, content); } catch { /* best-effort */ }
-        }
-
         // E) Archive .prompt-* files to .tasks/archive/sprint-{id}/ before deleting
         // Prompt files persist during sprint for analysis — archived on cleanup with retention policy
-        const archiveResult = archivePromptFiles(tasksDir, archiveSprintId, promptArchiveRetention);
+        const archiveResult = archivePromptFiles(
+          tasksDir,
+          archiveSprintId,
+          promptArchiveRetention,
+          taskIdPrefix ?? undefined,
+        );
         if (archiveResult.archived > 0) {
           print(`Archived ${archiveResult.archived} prompt file(s) → .tasks/archive/${archiveSprintId}/`);
         }

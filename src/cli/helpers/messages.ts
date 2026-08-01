@@ -1097,6 +1097,10 @@ const MESSAGES: MessageMap = {
     en: 'Cleanup held for {sprintId}: {reason}. Recover or finalize the run before removing mutable projections.',
     tr: '{sprintId} cleanup işlemi beklemeye alındı: {reason}. Değişebilir projection kayıtlarını kaldırmadan önce run’ı recover veya finalize edin.',
   },
+  'cleanup.archive_hold': {
+    en: 'Cleanup held: {count} owned task artifact(s) could not be archived and byte-verified ({files}). Live evidence was retained.',
+    tr: 'Cleanup beklemeye alındı: {count} owned task artifaktı arşivlenip byte-verify edilemedi ({files}). Live kanıt korundu.',
+  },
   'lifecycle.execution_lock_bind_failed': {
     en: 'Project leadership could not be bound to execution {sprintId}.',
     tr: 'Project leadership execution {sprintId} ile bağlanamadı.',
@@ -1122,6 +1126,10 @@ const MESSAGES: MessageMap = {
   'finalize.complete': {
     en: 'Run {sprintId} (sprint) finalized: {total} tasks ({done} done, {debt} debt, {noGo} no-go). MEMORY.md, RETRO.md, and config updated.',
     tr: 'Run {sprintId} (sprint) sonlandırıldı: {total} görev ({done} tamam, {debt} borç, {noGo} no-go). MEMORY.md, RETRO.md ve config güncellendi.',
+  },
+  'finalize.aborted': {
+    en: 'Run {sprintId} was force-finalized as ABORTED: {done}/{total} logical tasks were done and {unresolved} remained unresolved. No unresolved lineage was promoted to COMPLETE.',
+    tr: 'Run {sprintId}, ABORTED olarak zorla kapatıldı: {total} logical taskın {done} tanesi tamamlanmıştı, {unresolved} tanesi unresolved kaldı. Hiçbir unresolved lineage COMPLETE durumuna yükseltilmedi.',
   },
   'finalize.coordinator_terminated': {
     en: 'Coordinator PID {pid} reached verified termination ({escalation}).',

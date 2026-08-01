@@ -3,6 +3,8 @@ export const SPRINT_TERMINAL_PUBLICATION_VERSION = 1 as const;
 export type SprintTerminalPublicationVersion =
   typeof SPRINT_TERMINAL_PUBLICATION_VERSION;
 
+export type SprintTerminalOutcome = 'COMPLETE' | 'ABORTED';
+
 export interface SprintTerminalPublicationAuthorityV1 {
   readonly version: SprintTerminalPublicationVersion;
   readonly sprintId: string;
@@ -16,6 +18,7 @@ export interface SprintTerminalPublicationCommandV1 {
   readonly sprintId: string;
   readonly runId: string;
   readonly coordinatorGeneration: number;
+  readonly terminalOutcome: SprintTerminalOutcome;
   readonly logicalSettlementDigest: string;
   readonly priorAuthorityVersion: number;
 }
@@ -64,6 +67,7 @@ export type SprintTerminalPublicationContractErrorCode =
   | 'INVALID_IDENTITY'
   | 'INVALID_GENERATION'
   | 'INVALID_AUTHORITY_VERSION'
+  | 'INVALID_TERMINAL_OUTCOME'
   | 'INVALID_SETTLEMENT_DIGEST'
   | 'INVALID_RECEIPT';
 
@@ -102,10 +106,25 @@ function assertDigest(value: string): void {
   }
 }
 
+function assertTerminalOutcome(value: unknown): asserts value is SprintTerminalOutcome {
+  if (value !== 'COMPLETE' && value !== 'ABORTED') {
+    throw new SprintTerminalPublicationContractError('INVALID_TERMINAL_OUTCOME');
+  }
+}
+
+function receiptOutcome(receipt: SprintTerminalReceiptV1): SprintTerminalOutcome {
+  // V1 receipts published before the outcome amendment were COMPLETE-only.
+  // Normalize them at the contract boundary so existing terminal evidence
+  // stays readable without letting new publishers omit the outcome.
+  return (receipt as SprintTerminalReceiptV1 & {
+    readonly terminalOutcome?: SprintTerminalOutcome;
+  }).terminalOutcome ?? 'COMPLETE';
+}
+
 function freezeReceipt(
   receipt: SprintTerminalReceiptV1,
 ): SprintTerminalReceiptV1 {
-  return Object.freeze({ ...receipt });
+  return Object.freeze({ ...receipt, terminalOutcome: receiptOutcome(receipt) });
 }
 
 function freezeState(
@@ -134,6 +153,7 @@ function assertCommand(command: SprintTerminalPublicationCommandV1): void {
   assertIdentity(command.sprintId);
   assertIdentity(command.runId);
   assertGeneration(command.coordinatorGeneration);
+  assertTerminalOutcome(command.terminalOutcome);
   assertAuthorityVersion(command.priorAuthorityVersion);
   assertDigest(command.logicalSettlementDigest);
 }
@@ -146,6 +166,7 @@ function sameCommand(
     && receipt.sprintId === command.sprintId
     && receipt.runId === command.runId
     && receipt.coordinatorGeneration === command.coordinatorGeneration
+    && receiptOutcome(receipt) === command.terminalOutcome
     && receipt.logicalSettlementDigest === command.logicalSettlementDigest
     && receipt.priorAuthorityVersion === command.priorAuthorityVersion;
 }
@@ -153,7 +174,12 @@ function sameCommand(
 function assertReceiptMatchesState(state: SprintTerminalPublicationStateV1): void {
   const receipt = state.receipt;
   if (receipt === null) return;
-  assertCommand(receipt);
+  assertIdentity(receipt.sprintId);
+  assertIdentity(receipt.runId);
+  assertGeneration(receipt.coordinatorGeneration);
+  assertTerminalOutcome(receiptOutcome(receipt));
+  assertAuthorityVersion(receipt.priorAuthorityVersion);
+  assertDigest(receipt.logicalSettlementDigest);
   assertAuthorityVersion(receipt.authorityVersion);
   if (receipt.sprintId !== state.sprintId
     || receipt.runId !== state.runId

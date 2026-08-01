@@ -395,13 +395,17 @@ export function cleanup(
   }
 
   const tasksDir = join(projectRoot, TASKS_DIR);
+  const sprintTaskPrefix = `task-${sprint.number}-`;
   // Sprint 156 Task 4 follow-up (Sprint 157 hot fix, 2026-05-12):
   // TASK_FILE_EXTENSIONS unlink is now gated by cleanupPhase. On 'spawn-fail'
   // the task .json/.plan/.hb/.result files are PRESERVED for post-mortem
   // forensic — they would otherwise be wiped before any retry/recover. Stale
   // task file pruning still runs (always safe — only old-mtime files match).
   if (cleanupPhase === 'sprint-end' && existsSync(tasksDir)) {
-    for (const file of readdirSync(tasksDir).filter(f => TASK_FILE_EXTENSIONS.some(ext => f.endsWith(ext)))) {
+    for (const file of readdirSync(tasksDir).filter(
+      f => f.startsWith(sprintTaskPrefix)
+        && TASK_FILE_EXTENSIONS.some(ext => f.endsWith(ext)),
+    )) {
       try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTaskFile', e); }
     }
     // Atomic writers may leave a process-suffixed temp after a crash
@@ -409,10 +413,9 @@ export function cleanup(
     // preserves this evidence until terminal settlement; sprint-end cleanup
     // then retires only residue owned by the sprint being cleaned. Never use a
     // repository-wide tmp glob because another run may share the workspace.
-    const sprintPrefix = `task-${sprint.number}-`;
     for (const file of readdirSync(tasksDir)) {
       if (
-        file.startsWith(sprintPrefix)
+        file.startsWith(sprintTaskPrefix)
         && /\.(?:result|landing-proposal\.json)\.tmp(?:\.\d+)?$/u.test(file)
       ) {
         try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTaskTempResidue', e); }
@@ -445,7 +448,10 @@ export function cleanup(
   const STALE_SWEEP_EXTENSIONS: readonly string[] = [...TASK_FILE_EXTENSIONS, '.timeout', '.partial-result'];
   if (existsSync(tasksDir)) {
     for (const file of readdirSync(tasksDir)) {
-      if (STALE_SWEEP_EXTENSIONS.some(ext => file.endsWith(ext))) {
+      if (
+        (cleanupPhase !== 'sprint-end' || file.startsWith(sprintTaskPrefix))
+        && STALE_SWEEP_EXTENSIONS.some(ext => file.endsWith(ext))
+      ) {
         const fullPath = join(tasksDir, file);
         if (isStaleTaskFile(fullPath)) {
           try { unlinkSync(fullPath); } catch (e) { debugLog('cleanup:unlinkStaleTaskFile', e); }
@@ -462,7 +468,7 @@ export function cleanup(
   // own archivePromptFiles() call, leaving the archive directory empty.
   if (cleanupPhase === 'sprint-end' && existsSync(tasksDir)) {
     try {
-      archivePromptFiles(tasksDir, sprint.id);
+      archivePromptFiles(tasksDir, sprint.id, 5, `${sprint.number}-`);
     } catch (e) { debugLog('cleanup:archivePromptFiles', e); }
   }
 

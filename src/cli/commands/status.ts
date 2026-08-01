@@ -28,6 +28,7 @@ import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
 import type { CanonicalRunStatus } from '../../core/run-status-authority.js';
 import {
   foldTaskLineages,
+  resolveTaskLineageRootId,
 } from '../../core/task-lineage.js';
 import { classifyTaskArtifact } from '../../core/task-artifact-classifier.js';
 import {
@@ -464,11 +465,13 @@ export function projectStatusLogicalProgress(tasks: readonly Task[]): {
   readonly total: number;
   readonly attemptCount: number;
 } {
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
   const result = projectLogicalProgress({
     attempts: tasks.map(task => {
       const sequence = taskSequence(task);
       return {
         id: task.id,
+        logicalTaskId: resolveTaskLineageRootId(task, tasksById),
         status: logicalProgressStatus(task.status),
         ...(task.isPriorityFix && task.fixForTaskId
           ? { fixForAttemptId: task.fixForTaskId }

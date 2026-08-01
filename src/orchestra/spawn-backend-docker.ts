@@ -7362,6 +7362,7 @@ export function archivePromptFiles(
   tasksDir: string,
   sprintId: string,
   retentionSprints = 5,
+  taskIdPrefix?: string,
 ): { archived: number; cleaned: number } {
   let archived = 0;
   let cleaned = 0;
@@ -7378,7 +7379,10 @@ export function archivePromptFiles(
     for (const f of files) {
       const isPromptFile = f.startsWith('.prompt-') && f.endsWith('.txt');
       const isWorkerScript = f.startsWith('.worker-') && f.endsWith('.sh');
-      if (isPromptFile || isWorkerScript) {
+      const belongsToSprint = taskIdPrefix === undefined
+        || f.startsWith(`.prompt-${taskIdPrefix}`)
+        || f.startsWith(`.worker-${taskIdPrefix}`);
+      if ((isPromptFile || isWorkerScript) && belongsToSprint) {
         const src = join(tasksDir, f);
         const dst = join(archiveDir, f);
         try {
@@ -7394,7 +7398,7 @@ export function archivePromptFiles(
   // before sprint-end) into this sprint's archive dir, so those prompts inherit
   // the same retention instead of accumulating unbounded in staging.
   const orphanStaging = join(tasksDir, 'archive', '_orphaned');
-  if (existsSync(orphanStaging)) {
+  if (taskIdPrefix === undefined && existsSync(orphanStaging)) {
     try {
       for (const f of readdirSync(orphanStaging) as string[]) {
         try { renameSync(join(orphanStaging, f), join(archiveDir, f)); archived++; }

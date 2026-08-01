@@ -1408,6 +1408,7 @@ export type SprintTerminalHandoffHoldReason =
   | 'RECEIPT_MISSING'
   | 'RECEIPT_MALFORMED'
   | 'RECEIPT_SPRINT_MISMATCH'
+  | 'RECEIPT_OUTCOME_MISMATCH'
   | 'RECEIPT_CLEANUP_INELIGIBLE'
   | 'DUPLICATE_PUBLICATION'
   /** 487-030: an exact staged closure is NO_GO/PAUSED/HOLD/unsettled. */
@@ -1524,6 +1525,14 @@ export function resolveSprintTerminalHandoff(input: {
     );
   }
 
+  const terminalOutcome = receipt.terminalOutcome ?? 'COMPLETE';
+  if (terminalOutcome !== 'COMPLETE') {
+    return hold(
+      sprintId, artifactPath, 'RECEIPT_OUTCOME_MISMATCH',
+      `normal terminal handoff cannot consume ${terminalOutcome}`,
+    );
+  }
+
   const eligibility = artifact.terminalEvidence?.cleanupEligibility;
   const holds = artifact.terminalEvidence?.holds ?? [];
   if (eligibility?.candidate !== true || eligibility.state !== 'CANDIDATE' || holds.length > 0) {
@@ -1543,7 +1552,7 @@ export function resolveSprintTerminalHandoff(input: {
     metrics,
     handoffKey: [
       receipt.sprintId, receipt.runId, receipt.coordinatorGeneration,
-      receipt.authorityVersion, receipt.logicalSettlementDigest,
+      receipt.authorityVersion, terminalOutcome, receipt.logicalSettlementDigest,
     ].join(':'),
   };
 }

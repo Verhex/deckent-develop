@@ -10,6 +10,7 @@ import {
 } from '../../core/types.js';
 import { TASKS_DIR, BRAIN_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { finalizeSprint } from '../../orchestra/brain.js';
+import { forceAbortSprint } from '../../orchestra/sprint-finalizer.js';
 import { evaluateResultSync } from '../../orchestra/sprint-controller.js';
 import { loadConfig } from '../../core/config.js';
 import { debugLog } from '../../core/utils.js';
@@ -116,7 +117,7 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
     const resultFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
     for (const file of resultFiles) {
       const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(tasksDir, file)));
-      if (result) {
+      if (result && seenTaskIds.has(result.taskId)) {
         results.push(result);
         seenResultIds.add(result.taskId);
       }
@@ -126,7 +127,7 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
     const archivedResultFiles = readdirSync(archiveTasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
     for (const file of archivedResultFiles) {
       const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(archiveTasksDir, file)));
-      if (result && !seenResultIds.has(result.taskId)) {
+      if (result && seenTaskIds.has(result.taskId) && !seenResultIds.has(result.taskId)) {
         results.push(result);
         seenResultIds.add(result.taskId);
       }
@@ -313,7 +314,11 @@ export function registerFinalize(program: Command): void {
         // record. When neither exists, startedAt stays undefined and the
         // job summary honestly reports the duration as 'unknown'.
         let startedAt: string | undefined;
-        const sprintState = readJsonSafe<{ sprintId?: string; startedAt?: string }>(
+        const sprintState = readJsonSafe<{
+          sprintId?: string;
+          startedAt?: string;
+          phase?: SprintPhase;
+        }>(
           join(root, DECKENT_DIR, 'sprint-state.json'),
         );
         if (sprintState?.startedAt && sprintState.sprintId === sprintId) {
@@ -328,8 +333,12 @@ export function registerFinalize(program: Command): void {
         const sprint = {
           id: sprintId,
           number: parseInt(sprintId.replace('sprint-', ''), 10) || 0,
-          status: SprintStatus.COMPLETE,
-          phase: SprintPhase.COMPLETE,
+          status: opts.force ? SprintStatus.ABORTED : SprintStatus.COMPLETE,
+          phase: opts.force
+            ? sprintState?.sprintId === sprintId
+              ? sprintState.phase ?? SprintPhase.TRANSITION
+              : SprintPhase.TRANSITION
+            : SprintPhase.COMPLETE,
           tasks,
           workers: tasks.map(t => `w-${t.id}`),
           startedAt,
@@ -371,6 +380,19 @@ export function registerFinalize(program: Command): void {
             },
             terminationPolicy,
           });
+          const settlement = forceAbortSprint(root, sprint, evaluations, results, {
+            defaultAuthMode: config.auth_mode,
+            runId: sprintId,
+            coordinatorGeneration: Math.max(1, identity.generation),
+          });
+          const metrics = settlement.terminalTruth.logicalMetrics;
+          print(getMessage('finalize.aborted', lang, {
+            sprintId,
+            total: String(metrics.totalTasks),
+            done: String(metrics.completedTasks),
+            unresolved: String(Math.max(0, metrics.totalTasks - metrics.completedTasks)),
+          }));
+          return;
         }
 
         // Bug N fix (Sprint 166-T2): wire onRuleRegen to regenerateRules so manual

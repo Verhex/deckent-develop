@@ -29,6 +29,7 @@ function command(
     sprintId: 'sprint-486',
     runId: 'run-486-primary',
     coordinatorGeneration: 7,
+    terminalOutcome: 'COMPLETE',
     logicalSettlementDigest: DIGEST_A,
     priorAuthorityVersion: 12,
     ...overrides,
@@ -55,6 +56,7 @@ describe('transitionSprintTerminalPublication', () => {
           sprintId: 'sprint-486',
           runId: 'run-486-primary',
           coordinatorGeneration: 7,
+          terminalOutcome: 'COMPLETE',
           logicalSettlementDigest: DIGEST_A,
           priorAuthorityVersion: 12,
           authorityVersion: 13,
@@ -94,6 +96,22 @@ describe('transitionSprintTerminalPublication', () => {
       reasonCode: 'terminal_payload_conflict',
       receipt: first.receipt,
       state: { authorityVersion: 13, receipt: first.receipt },
+    });
+  });
+
+  it('HOLDs an ABORTED replay against a COMPLETE terminal winner', () => {
+    const first = transitionSprintTerminalPublication(state(), command());
+    if (first.decision !== 'published') throw new Error('fixture did not publish');
+
+    const conflict = transitionSprintTerminalPublication(
+      first.state,
+      command({ terminalOutcome: 'ABORTED' }),
+    );
+
+    expect(conflict).toMatchObject({
+      decision: 'hold',
+      reasonCode: 'terminal_payload_conflict',
+      receipt: { terminalOutcome: 'COMPLETE' },
     });
   });
 
@@ -153,6 +171,7 @@ describe('transitionSprintTerminalPublication', () => {
       'priorAuthorityVersion',
       'runId',
       'sprintId',
+      'terminalOutcome',
       'version',
     ]);
     expect(Object.keys(state()).sort()).toEqual([

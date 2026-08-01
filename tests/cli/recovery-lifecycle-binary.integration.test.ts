@@ -110,7 +110,7 @@ describe.skipIf(NESTED_FORK_RUNNER)('recovery lifecycle real binary', () => {
   });
 
   const linuxIt = process.platform === 'linux' ? it : it.skip;
-  linuxIt('force-finalize proves exact coordinator death before COMPLETE authority publication', async () => {
+  linuxIt('force-finalize proves exact coordinator death before ABORTED authority publication', async () => {
     const root = mkdtempSync(join(tmpdir(), 'finalize-containment-binary-'));
     onTestFinished(() => rmSync(root, { recursive: true, force: true }));
     mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
@@ -219,11 +219,11 @@ describe.skipIf(NESTED_FORK_RUNNER)('recovery lifecycle real binary', () => {
     expect(JSON.parse(readFileSync(
       join(root, '.deckent', 'recently-works', 'sprint-992-terminal-receipt.json'),
       'utf-8',
-    ))).toMatchObject({ receipt: { sprintId: 'sprint-992' } });
+    ))).toMatchObject({ receipt: { sprintId: 'sprint-992', terminalOutcome: 'ABORTED' } });
     expect(JSON.parse(readFileSync(join(root, '.deckent', 'sprint-state.json'), 'utf-8'))).toMatchObject({
       sprintId: 'sprint-992',
-      phase: 'COMPLETE',
-      status: 'COMPLETE',
+      phase: 'EVALUATE',
+      status: 'ABORTED',
     });
   }, 30_000);
 });

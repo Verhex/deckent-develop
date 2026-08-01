@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-08-01T05:22:03.984Z",
+    "generatedAt": "2026-08-01T10:12:50.721Z",
     "generatedBy": "scripts/sync-manifest.mjs",
     "sprintId": "sprint-488",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",

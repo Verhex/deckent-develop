@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "90fa3889273e30985d168d9abe4589ba4f877581bf06b86f897c2105276d1608"
+    "value": "11cbb551f206ca253bdc72c90098c5e7bafd890f284181a1158e7a68d957455c"
   },
   "summary": {
     "total": 309,
@@ -2204,9 +2204,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-07-31",
+      "updated": "2026-08-01",
       "definitionDigest": "dc5ffb283b50ecb2d21b46c9b01a6a86f91844b108c72a100df7c2d575bb39b7",
-      "progressDigest": "4fa593c8abc5bd307f7cde3048b757fac2dcdc76a9ce3665a57c285b5025410f",
+      "progressDigest": "c1ffd7df3f672b531a7b55e6e82284173dba981d0aaaae710e9bce667f9ab883",
       "terminalClosureDigest": null
     },
     {
@@ -2415,7 +2415,7 @@
       "state": "OPEN",
       "updated": "2026-08-01",
       "definitionDigest": "9351804a3b66fabb554218fecf5477069a9c17705d17d7ad3fe1f4fdf3ba6051",
-      "progressDigest": "20a3b3138cb8ff893ee1c58e307ab3fe5fce1ce23535e12726e4ce5e72eabdd3",
+      "progressDigest": "ff2b102157579f440f1dd21c4ca6707474692836cd2a61f62a1652c688a3e1c5",
       "terminalClosureDigest": null
     },
     {
@@ -12126,8 +12126,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Landing/temp/partial residue never enters task identity; external force-finalize proves generation-fenced coordinator death before terminal state/output, retains active state during grace, and clears PID authority only after verified settlement",
-      "evidence": "Finalize consumes the canonical task-artifact classifier and preserves landing/temp evidence across archive. Standalone built-binary proof creates a real owned coordinator, observes SIGTERM while state remains ACTIVE/EVALUATE, waits for exact death, then verifies fenced receipt, COMPLETE, PID removal, residue preservation and monotonic CLI status. Linux proof passes; Windows native/macOS/namespace matrix remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=force-finalize-terminal-binary`",
-      "updated": "2026-07-31"
+      "evidence": "Finalize consumes the canonical task-artifact classifier and excludes foreign result-only evidence. The immutable COMPLETE wording applies to normal settled finalization; explicit force-finalize now publishes only a fenced ABORTED receipt and cannot promote unresolved work. Standalone built-binary proof creates a real owned coordinator, observes SIGTERM while state remains ACTIVE/EVALUATE, waits for exact death, then verifies fenced ABORTED receipt and PID removal. Linux proof passes; Windows native/macOS/namespace matrix remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=force-finalize-terminal-binary`",
+      "updated": "2026-08-01"
     },
     {
       "order": 3272,
@@ -12868,7 +12868,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Resume returns a typed resumed-and-running, resumed-and-paused, completed, aborted or failed outcome with exact next authority; explicit force finalize never prints COMPLETE before receipt and can publish a fenced ABORTED settlement preserving unresolved/deferred lineages; cleanup admits only that exact terminal receipt and never deletes forensic evidence implicitly",
-      "evidence": "Sprint-488 recover returned generic error after re-entering PAUSED. Owner-authorized force-finalize printed a success-like Sprint Complete report, then exited non-zero with `TERMINAL_EVIDENCE_HOLD`. Manual recovery now parks below-threshold FAILED lineages through typed `unresolved-lineage-operator-decision` PAUSED and makes resumed coordinators publish the same exact PID/start-token/lease snapshot authority as fresh starts before evaluation or dispatch; resume and force-finalize live proof remain open",
+      "evidence": "Sprint-488 owner-approved source-runtime recovery published a generation-fenced ABORTED receipt for 20 logical tasks/33 attempts with 8 DONE, 1 settled NO_GO and 11 unresolved attempts, then matching cleanup converged status to IDLE without deleting an unrelated xverify task. Force-finalize no longer enters normal retrospective/learning/config finalization; receipt outcome is part of CAS identity and cleanup requires lifecycle/outcome parity. Cleanup now archives owned task/result evidence with byte readback verification before deleting live copies, so deletion is explicit and recoverable rather than implicit. Scoped contracts pass 115/115, build is clean, isolated built-binary containment passes and an external real-dist cleanup fixture proves byte-exact owned JSON/result archive plus foreign preservation. Historical Sprint-488 cleanup preceded archive-all hardening, so its task/result JSONs are absent while receipt/log/runtime evidence remains. Typed resume outcome parity, native platform and fresh dogfood replay remain open",
       "updated": "2026-08-01"
     },
     {
@@ -16937,6 +16937,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "09400704adbe9eed302e5e212f28693cfeff0cc0f55bdfd606f71813ee4cbfd0"
+    "value": "89b3d2cab1e4301051bbb2728f728391b07492fc9e18caf31b7e1637ea3d4741"
   }
 }

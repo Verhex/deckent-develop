@@ -33,7 +33,7 @@ import type { TaskDNA } from '../core/routing-types.js';
 
 import {
   BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE, RECENT_WORKS_DIR, TASKS_DIR,
-  SPRINT_PAUSE_STATE_FILE,
+  SPRINT_ACTIVE_FILE, SPRINT_PAUSE_STATE_FILE,
 } from '../core/constants.js';
 
 import { cleanupCounters, runRetention } from '../core/sprint-file-retention.js';
@@ -69,6 +69,7 @@ import {
   createSprintTerminalPublicationState,
   transitionSprintTerminalPublication,
   SPRINT_TERMINAL_PUBLICATION_VERSION,
+  type SprintTerminalOutcome,
   type SprintTerminalPublicationStateV1,
   type SprintTerminalReceiptV1,
 } from '../core/sprint-terminal-publication.js';
@@ -1170,8 +1171,15 @@ export interface FinalizerTerminalReceiptPublication {
   readonly artifactPath: string;
 }
 
+export interface ForceAbortSprintSettlement {
+  readonly outcome: 'ABORTED';
+  readonly receiptPublication: FinalizerTerminalReceiptPublication;
+  readonly terminalTruth: FinalizerTerminalTruth;
+}
+
 interface PersistedSprintTerminalReceipt {
   readonly version: 1;
+  readonly terminalOutcome: SprintTerminalOutcome;
   readonly publicationState: SprintTerminalPublicationStateV1;
   readonly receipt: SprintTerminalReceiptV1;
   readonly terminalEvidence: Pick<
@@ -1558,13 +1566,28 @@ export function publishFencedSprintTerminalReceipt(input: {
   readonly coordinatorGeneration?: number;
   readonly now?: () => string;
 }): FinalizerTerminalReceiptPublication {
+  return publishFencedTerminalReceipt(input, 'COMPLETE', true);
+}
+
+function publishFencedTerminalReceipt(
+  input: {
+    readonly projectRoot: string;
+    readonly sprint: Sprint;
+    readonly truth: FinalizerTerminalTruth;
+    readonly runId?: string;
+    readonly coordinatorGeneration?: number;
+    readonly now?: () => string;
+  },
+  terminalOutcome: SprintTerminalOutcome,
+  requireSettledAttempts: boolean,
+): FinalizerTerminalReceiptPublication {
   const exactAttemptsSettled = input.truth.terminalEvidence.logicalTasks.every(
     logicalTask => logicalTask.state === 'COMPLETED' || logicalTask.state === 'FAILED',
   )
     && input.truth.terminalEvidence.activeOrUnsettledAttempts.length === 0
     && input.truth.terminalEvidence.partialResults.length === 0
     && input.truth.terminalEvidence.holds.length === 0;
-  if (!exactAttemptsSettled) {
+  if (requireSettledAttempts && !exactAttemptsSettled) {
     throw new FinalizerTerminalEvidenceError(
       `TERMINAL_EVIDENCE_${input.truth.terminalEvidence.cleanupEligibility.state}`,
     );
@@ -1587,6 +1610,7 @@ export function publishFencedSprintTerminalReceipt(input: {
     sprintId: input.sprint.id,
     runId,
     coordinatorGeneration,
+    terminalOutcome,
     logicalSettlementDigest: input.truth.logicalSettlementDigest,
     priorAuthorityVersion: state.receipt?.priorAuthorityVersion ?? state.authorityVersion,
   });
@@ -1606,6 +1630,7 @@ export function publishFencedSprintTerminalReceipt(input: {
   });
   const artifact: PersistedSprintTerminalReceipt = {
     version: 1,
+    terminalOutcome,
     publicationState: transitioned.state,
     receipt: transitioned.receipt,
     terminalEvidence: {
@@ -1622,6 +1647,73 @@ export function publishFencedSprintTerminalReceipt(input: {
   writeFileSync(tempPath, JSON.stringify(artifact, null, 2) + '\n', 'utf-8');
   renameSync(tempPath, artifactPath);
   return { receipt: transitioned.receipt, terminalEvidence, artifactPath };
+}
+
+/**
+ * Publishes an operator-approved ABORTED settlement without converting open,
+ * paused, or failed lineages into completion. The exact terminal truth and its
+ * unresolved evidence remain in the same fenced artifact used by status and
+ * cleanup; only the run outcome differs from normal COMPLETE publication.
+ */
+export function publishFencedAbortedSprintTerminalReceipt(input: {
+  readonly projectRoot: string;
+  readonly sprint: Sprint;
+  readonly truth: FinalizerTerminalTruth;
+  readonly runId?: string;
+  readonly coordinatorGeneration?: number;
+  readonly now?: () => string;
+}): FinalizerTerminalReceiptPublication {
+  return publishFencedTerminalReceipt(input, 'ABORTED', false);
+}
+
+/**
+ * Canonical operator containment settlement. Unlike normal finalization this
+ * path deliberately performs no retrospective, learning, promotion, decay,
+ * archive, or synthetic COMPLETE work. It records the exact unresolved truth,
+ * publishes one fenced ABORTED receipt, then advances lifecycle authority.
+ */
+export function forceAbortSprint(
+  projectRoot: string,
+  sprint: Sprint,
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  results: readonly TaskResult[],
+  opts: {
+    readonly defaultAuthMode?: 'subscription' | 'api' | 'hybrid';
+    readonly runId?: string;
+    readonly coordinatorGeneration?: number;
+  } = {},
+): ForceAbortSprintSettlement {
+  const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
+  const truth = buildFinalizerTerminalTruth({
+    tasks: attemptTasks,
+    evaluations,
+    results: [...results],
+    defaultAuthMode: opts.defaultAuthMode,
+    notDispatchedSettlements: projectNotDispatchedSettlements(
+      attemptTasks,
+      evaluations,
+      new Set(
+        attemptTasks
+          .filter(task => existsSync(join(
+            projectRoot,
+            TASKS_DIR,
+            `task-${task.id}.redispatch-attempted`,
+          )))
+          .map(task => task.id),
+      ),
+    ),
+  });
+  const receiptPublication = publishFencedAbortedSprintTerminalReceipt({
+    projectRoot,
+    sprint,
+    truth,
+    ...(opts.runId ? { runId: opts.runId } : {}),
+    ...(opts.coordinatorGeneration !== undefined
+      ? { coordinatorGeneration: opts.coordinatorGeneration }
+      : {}),
+  });
+  publishAbortedSprintAuthority(projectRoot, sprint, truth.logicalMetrics);
+  return { outcome: 'ABORTED', receiptPublication, terminalTruth: truth };
 }
 
 
@@ -3262,6 +3354,84 @@ export function publishFinalSprintAuthority(
     );
   } catch (e) { debugLog('finalizeSprint:notify:sprint-finalized', e); }
   debugLog('finalizeSprint:breadcrumb', 'terminal authority publication — done');
+}
+
+function removeOwnedJsonProjection(path: string, sprintId: string): void {
+  if (!existsSync(path)) return;
+  const value = readJsonSafe<{ readonly sprintId?: unknown }>(path);
+  if (value?.sprintId === sprintId) unlinkSync(path);
+}
+
+/**
+ * Publish ABORTED lifecycle truth only after the fenced abort receipt exists.
+ * This writer is strict and atomic: a torn or foreign sprint-state must leave
+ * cleanup closed instead of exposing an unreceipted terminal projection.
+ */
+export function publishAbortedSprintAuthority(
+  projectRoot: string,
+  sprint: Sprint,
+  metrics: FinalizerLogicalMetrics,
+): void {
+  const statePath = join(projectRoot, SPRINT_STATE_FILE);
+  const existing = readSprintState(projectRoot);
+  if (existing?.sprintId && existing.sprintId !== sprint.id) {
+    throw new FinalizerTerminalEvidenceError('ABORT_AUTHORITY_SPRINT_MISMATCH');
+  }
+
+  const completedAt = sprint.completedAt ?? new Date().toISOString();
+  const phase = sprint.phase === SprintPhase.COMPLETE
+    ? SprintPhase.TRANSITION
+    : sprint.phase;
+  const state = {
+    sprintId: sprint.id,
+    phase,
+    status: SprintStatus.ABORTED,
+    startedAt: sprint.startedAt ?? existing?.startedAt ?? completedAt,
+    updatedAt: completedAt,
+    completedAt,
+    taskIds: sprint.tasks.map(task => task.id),
+  };
+  mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
+  const stateTempPath = `${statePath}.tmp-${process.pid}-${randomUUID()}`;
+  writeFileSync(stateTempPath, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+  renameSync(stateTempPath, statePath);
+
+  sprint.status = SprintStatus.ABORTED;
+  sprint.phase = phase;
+  sprint.completedAt = completedAt;
+
+  removeOwnedJsonProjection(join(projectRoot, SPRINT_PAUSE_STATE_FILE), sprint.id);
+  removeOwnedJsonProjection(join(projectRoot, SPRINT_ACTIVE_FILE), sprint.id);
+  cleanupCheckpointFiles(projectRoot, sprint.id);
+  clearPid(projectRoot, sprint.id);
+
+  const dashboard = {
+    sprint: {
+      id: sprint.id,
+      number: sprint.number,
+      phase,
+      status: SprintStatus.ABORTED,
+    },
+    agents: [],
+    progress: {
+      done: metrics.completedTasks,
+      active: 0,
+      blocked: Math.max(0, metrics.totalTasks - metrics.completedTasks),
+      total: metrics.totalTasks,
+    },
+    alerts: [],
+    updatedAt: completedAt,
+    completedAt,
+    terminalAuthority: {
+      sprintId: sprint.id,
+      outcome: 'ABORTED',
+      completedAt,
+    },
+  };
+  const dashboardPath = join(projectRoot, DASHBOARD_FILE);
+  const dashboardTempPath = `${dashboardPath}.tmp-${process.pid}-${randomUUID()}`;
+  writeFileSync(dashboardTempPath, JSON.stringify(dashboard, null, 2) + '\n', 'utf-8');
+  renameSync(dashboardTempPath, dashboardPath);
 }
 
 /**

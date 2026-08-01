@@ -106,6 +106,22 @@ describe('archivePromptFiles (.worker-*.sh extension)', () => {
     expect(existsSync(join(tasksDir, '.worker-156-004.log'))).toBe(true);
     expect(existsSync(join(tasksDir, '.prompt-156-005.json'))).toBe(true);
   });
+
+  it('archives only the requested sprint prefix when one is supplied', () => {
+    writeFileSync(join(tasksDir, '.prompt-156-001-owned.txt'), 'owned', 'utf-8');
+    writeFileSync(join(tasksDir, '.prompt-xv-independent.txt'), 'foreign', 'utf-8');
+
+    const result = archivePromptFiles(tasksDir, 'sprint-156', 5, '156-');
+
+    expect(result.archived).toBe(1);
+    expect(existsSync(join(
+      tasksDir,
+      'archive',
+      'sprint-156',
+      '.prompt-156-001-owned.txt',
+    ))).toBe(true);
+    expect(existsSync(join(tasksDir, '.prompt-xv-independent.txt'))).toBe(true);
+  });
 });
 
 // ═══ cleanup() — cleanupPhase Gating ════════════════════════════════════════

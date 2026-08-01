@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { cleanupAuthorityHoldReason } from '../../src/cli/commands/cleanup.js';
 import type { CanonicalRunStatus } from '../../src/core/run-status-authority.js';
+import type { TerminalPublicationStatus } from '../../src/core/sprint-terminal-publication-status.js';
 
 function authority(
   overrides: Partial<CanonicalRunStatus> = {},
@@ -23,6 +24,23 @@ function authority(
   };
 }
 
+function receipt(outcome: 'COMPLETE' | 'ABORTED'): TerminalPublicationStatus {
+  return {
+    version: 1,
+    state: 'receipt-observed',
+    receipt: {
+      version: 1,
+      sprintId: 'sprint-1',
+      runId: 'sprint-1',
+      coordinatorGeneration: 1,
+      terminalOutcome: outcome,
+      logicalSettlementDigest: 'a'.repeat(64),
+      priorAuthorityVersion: 0,
+      authorityVersion: 1,
+    },
+  };
+}
+
 describe('cleanup authority gate', () => {
   it('allows IDLE and terminal quiescent runs', () => {
     expect(cleanupAuthorityHoldReason(authority())).toBeNull();
@@ -30,7 +48,23 @@ describe('cleanup authority gate', () => {
       lifecycle: 'COMPLETE',
       sprintId: 'sprint-1',
       status: 'COMPLETE',
-    }))).toBeNull();
+    }), receipt('COMPLETE'))).toBeNull();
+    expect(cleanupAuthorityHoldReason(authority({
+      lifecycle: 'ABORTED',
+      sprintId: 'sprint-1',
+      status: 'ABORTED',
+    }), receipt('ABORTED'))).toBeNull();
+  });
+
+  it('holds terminal cleanup without a matching fenced receipt', () => {
+    const complete = authority({
+      lifecycle: 'COMPLETE',
+      sprintId: 'sprint-1',
+      status: 'COMPLETE',
+    });
+    expect(cleanupAuthorityHoldReason(complete)).toBe('terminal-receipt-required');
+    expect(cleanupAuthorityHoldReason(complete, receipt('ABORTED')))
+      .toBe('terminal-outcome-mismatch');
   });
 
   it('holds a live coordinator without touching its projections', () => {

@@ -5,6 +5,7 @@ import { DECKENT_DIR } from './constants.js';
 import type { CanonicalRunStatus } from './run-status-authority.js';
 import {
   SPRINT_TERMINAL_PUBLICATION_VERSION,
+  type SprintTerminalOutcome,
   type SprintTerminalReceiptV1,
 } from './sprint-terminal-publication.js';
 
@@ -26,9 +27,22 @@ function isTerminalReceipt(value: unknown): value is SprintTerminalReceiptV1 {
     && typeof receipt.sprintId === 'string'
     && typeof receipt.runId === 'string'
     && typeof receipt.coordinatorGeneration === 'number'
+    && (receipt.terminalOutcome === undefined
+      || receipt.terminalOutcome === 'COMPLETE'
+      || receipt.terminalOutcome === 'ABORTED')
     && typeof receipt.logicalSettlementDigest === 'string'
     && typeof receipt.priorAuthorityVersion === 'number'
     && typeof receipt.authorityVersion === 'number';
+}
+
+function normalizeTerminalReceipt(receipt: SprintTerminalReceiptV1): SprintTerminalReceiptV1 {
+  const legacy = receipt as SprintTerminalReceiptV1 & {
+    readonly terminalOutcome?: SprintTerminalOutcome;
+  };
+  return {
+    ...receipt,
+    terminalOutcome: legacy.terminalOutcome ?? 'COMPLETE',
+  };
 }
 
 function readTerminalReceipt(
@@ -50,7 +64,7 @@ function readTerminalReceipt(
       : parsed;
     if (!isTerminalReceipt(candidate)) return { receipt: null, conflict: 'malformed-receipt' };
     if (candidate.sprintId !== sprintId) return { receipt: null, conflict: 'sprint-mismatch' };
-    return { receipt: candidate };
+    return { receipt: normalizeTerminalReceipt(candidate) };
   } catch {
     return { receipt: null, conflict: 'malformed-receipt' };
   }

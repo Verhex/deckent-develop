@@ -140,7 +140,7 @@ describe('controller terminal handoff — receipt authority', () => {
       receipt: { logicalSettlementDigest: string };
     };
     expect(authorized.handoffKey).toBe(
-      `sprint-487:run-487:7:1:${onDisk.receipt.logicalSettlementDigest}`,
+      `sprint-487:run-487:7:1:COMPLETE:${onDisk.receipt.logicalSettlementDigest}`,
     );
   });
 
