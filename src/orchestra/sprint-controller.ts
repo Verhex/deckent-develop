@@ -125,9 +125,9 @@ import { captureVitestBaseline, writeBaseline } from './baseline-tracker.js';
 
 // ─── PID Manager ─────────────────────────────────────────────────
 import {
-  writePid, clearPid, writeStateSnapshot,
+  writePid, clearPid, writeStateSnapshot, createSprintStateSnapshot,
 } from './sprint-pid-manager.js';
-import type { SprintPidWriteAuthority, SprintStateSnapshot } from './sprint-pid-manager.js';
+import type { SprintPidWriteAuthority } from './sprint-pid-manager.js';
 
 // ─── Node Builtins (sync I/O for kill-cascade metadata cleanup) ──
 import { unlinkSync } from 'node:fs';
@@ -1783,6 +1783,66 @@ export async function runSprint(
     return crossVerifyInvocationFactory;
   };
 
+  /**
+   * Start the one coordinator snapshot writer shared by fresh and resumed
+   * generations. The first snapshot is a strict admission boundary: a process
+   * must not evaluate or dispatch under a PID lease that it failed to project.
+   * Later heartbeat writes remain best-effort and are torn down by the existing
+   * controller finally block.
+   */
+  const activateCoordinatorSnapshotWriter = async (activeSprint: Sprint): Promise<void> => {
+    const authority = coordinatorPidRecord;
+    if (!authority) {
+      throw new BrainError(
+        getMessage('lifecycle.coordinator_pid_authority_required', config.language, {
+          sprintId: activeSprint.id,
+        }),
+        activeSprint.phase,
+      );
+    }
+    const writeCoordinatorSnapshot = async (strict: boolean): Promise<void> => {
+      try {
+        let metricsJsonlSize = 0;
+        try {
+          const metricsPath = join(projectRoot, '.deckent', 'metrics.jsonl');
+          const metricsContent = await readFile(metricsPath, 'utf-8');
+          metricsJsonlSize = metricsContent.split('\n').filter(Boolean).length;
+        } catch { /* file absent/unreadable — zero is an honest snapshot */ }
+        writeStateSnapshot(
+          projectRoot,
+          activeSprint.id,
+          createSprintStateSnapshot(authority, {
+            currentWave: 0,
+            taskStatuses: Object.fromEntries(activeSprint.tasks.map(task => [task.id, task.status])),
+            metricsJsonlSize,
+          }),
+        );
+      } catch (error) {
+        if (strict) throw error;
+        debugLog('runSprint:writeStateSnapshot', error);
+      }
+    };
+
+    await writeCoordinatorSnapshot(true);
+    snapshotInterval = setInterval(() => void writeCoordinatorSnapshot(false), 30_000);
+    snapshotInterval.unref?.();
+    beforeExitHandler = (): void => {
+      try { void writeCoordinatorSnapshot(false); } catch { /* best effort */ }
+      try { clearPid(projectRoot, activeSprint.id); } catch { /* best effort */ }
+    };
+    process.on('beforeExit', beforeExitHandler);
+  };
+
+  const establishCoordinatorPidAuthority = (activeSprint: Sprint): SprintPidWriteAuthority => {
+    try {
+      return writePid(projectRoot, activeSprint.id, activeSprint.startedAt);
+    } catch (error) {
+      clearActiveSprint();
+      releaseSprintLock(projectRoot);
+      throw error;
+    }
+  };
+
   if (isResumeEvaluate && recoveredSprint) {
     // ─── Resume Path: skip PLAN/SPAWN/EXECUTE, jump to EVALUATE ─────
     sprint = recoveredSprint;
@@ -1797,10 +1857,16 @@ export async function runSprint(
     setObservabilitySprintId(sprint.id, { perSprintFile: true });
     setActiveSprint(projectRoot, sprint, spawnBackend);
     sprint.startedAt ??= now();
-    try {
-      coordinatorPidRecord = writePid(projectRoot, sprint.id, sprint.startedAt);
-    } catch (e) { debugLog('runSprint:writePid', e); }
+    coordinatorPidRecord = establishCoordinatorPidAuthority(sprint);
     writeSprintState(projectRoot, sprint);
+    try {
+      await activateCoordinatorSnapshotWriter(sprint);
+    } catch (error) {
+      clearPid(projectRoot, sprint.id);
+      clearActiveSprint();
+      releaseSprintLock(projectRoot);
+      throw error;
+    }
     results = resumeResults;
   } else {
     // ─── Fresh Path: PLAN → SPAWN → EXECUTE ─────────────────────────
@@ -1944,9 +2010,7 @@ export async function runSprint(
 
     // PID + Snapshot Setup
     sprint.startedAt ??= now();
-    try {
-      coordinatorPidRecord = writePid(projectRoot, sprint.id, sprint.startedAt);
-    } catch (e) { debugLog('runSprint:writePid', e); }
+    coordinatorPidRecord = establishCoordinatorPidAuthority(sprint);
     try {
       await runExactPlanAdmissionHooks(sprint, opts);
     } catch (error) {
@@ -1962,44 +2026,14 @@ export async function runSprint(
       throw error;
     }
 
-    const writePeriodicSnapshot = async (): Promise<void> => {
-      try {
-        const snap: SprintStateSnapshot = {
-          sprintId: sprint.id,
-          pid: process.pid,
-          startToken: coordinatorPidRecord?.startToken ?? null,
-          leaseId: coordinatorPidRecord?.leaseId,
-          startedAt: coordinatorPidRecord?.startedAt ?? sprint.startedAt!,
-          currentWave: 0,
-          taskStatuses: Object.fromEntries(sprint.tasks.map(t => [t.id, t.status])),
-          metricsJsonlSize: 0,
-          lastHeartbeat: new Date().toISOString(),
-        };
-        try {
-          const metricsPath = join(projectRoot, '.deckent', 'metrics.jsonl');
-          try {
-            const metricsContent = await readFile(metricsPath, 'utf-8');
-            snap.metricsJsonlSize = metricsContent.split('\n').filter(Boolean).length;
-          } catch { /* file doesn't exist or not readable — non-fatal */ }
-        } catch { /* non-fatal */ }
-        writeStateSnapshot(projectRoot, sprint.id, snap);
-      } catch (e) { debugLog('runSprint:writeStateSnapshot', e); }
-    };
-
-    void writePeriodicSnapshot();
-    snapshotInterval = setInterval(() => void writePeriodicSnapshot(), 30_000);
-    // MOAT-2 (ADR-G-013): the 30s periodic-snapshot timer is coordinator
-    // maintenance, not legitimate work that should keep the process alive. unref
-    // it so it can never pin the event loop past sprint completion even in the
-    // brief window before the finally block's fail-safe (below) runs. The
-    // `beforeExit` handler still flushes a final snapshot before a clean exit.
-    snapshotInterval.unref?.();
-
-    beforeExitHandler = (): void => {
-      try { void writePeriodicSnapshot(); } catch { /* best effort */ }
-      try { clearPid(projectRoot, sprint.id); } catch { /* best effort */ }
-    };
-    process.on('beforeExit', beforeExitHandler);
+    try {
+      await activateCoordinatorSnapshotWriter(sprint);
+    } catch (error) {
+      clearPid(projectRoot, sprint.id);
+      clearActiveSprint();
+      releaseSprintLock(projectRoot);
+      throw error;
+    }
 
     // Phase 1.5: Route tasks to providers
     try {

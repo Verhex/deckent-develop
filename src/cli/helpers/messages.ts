@@ -1101,6 +1101,10 @@ const MESSAGES: MessageMap = {
     en: 'Project leadership could not be bound to execution {sprintId}.',
     tr: 'Project leadership execution {sprintId} ile bağlanamadı.',
   },
+  'lifecycle.coordinator_pid_authority_required': {
+    en: 'Coordinator PID authority could not be established for execution {sprintId}.',
+    tr: 'Execution {sprintId} için coordinator PID authority oluşturulamadı.',
+  },
   'kill.settlements_reconciled': {
     en: 'Closed {count} host-owned execution settlement(s) after containment.',
     tr: 'Containment sonrası {count} host-owned execution settlement kapatıldı.',

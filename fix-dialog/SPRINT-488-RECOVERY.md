@@ -276,6 +276,21 @@ Fable şu soruları file:line kanıtıyla adjudicate etsin:
   recover/force-finalize authority'sini yayımlıyor; breaker policy değiştirilmedi.
 - Review punch-list 9 (subprocess verification-isolation parity) açık residual olarak korunuyor.
 
+### 2026-08-01 · Third-review R1 resume closure
+
+- İkinci-tur bağımsız kontrol, fresh PID authority zincirinin doğru olduğunu fakat legacy
+  resume-evaluate kolunun periodic/initial snapshot writer'ı hiç başlatmadığını buldu.
+- Fresh ve resume generation artık aynı `activateCoordinatorSnapshotWriter` lifecycle seam'ini
+  tüketiyor. Her ikisi exact `writePid` authority'sini `createSprintStateSnapshot` pure builder'ına
+  geçiriyor; `startedAt`, kernel `startToken` ve cross-platform `leaseId` ikinci bir saat/PID
+  okumasından yeniden türetilmiyor.
+- Initial snapshot strict admission boundary oldu: snapshot diske atomik yayımlanamazsa coordinator
+  EVALUATE/SPAWN'a ilerlemiyor, kendi PID/active/lock authority'sini retire edip hatayı taşıyor.
+  Sonraki 30 saniyelik heartbeat snapshot'ları best-effort kalıyor ve mevcut finally teardown'ını
+  tüketiyor.
+- Eski token/lease içermeyen Sprint-488 PID/snapshot artifact'leri yeni generation kanıtı değildir;
+  resume fresh authority üretir. Legacy artifact'i sahte biçimde sahiplenme veya migrate etme yoktur.
+
 ## 9. Evidence log
 
 | Time | Stage | Command/evidence | Outcome |
@@ -300,6 +315,8 @@ Fable şu soruları file:line kanıtıyla adjudicate etsin:
 | 2026-08-01 | Independent punch-list 1–4 | 7 exact test files | 239/239 PASS; TypeScript + diff PASS |
 | 2026-08-01 | Independent punch-list 5–8 | 10 exact regression files | 155/155 PASS; restart inventory, canonical collision, dashboard fence and operator PAUSE covered |
 | 2026-08-01 | Recovery changed-surface regression | 34 recovery test files | 652/652 PASS; no full-suite run |
+| 2026-08-01 | R1 resume lease/snapshot | `sprint-pid-manager.test.ts` + TypeScript + diff | 28/28 PASS; fresh/resume shared writer and exact authority projection covered |
+| 2026-08-01 | R1 adjacent recovery scope | 7 resume/recovery test files | 89/90 PASS; six files green, sole failure is an unchanged stale `commands/resume` mock expecting pre-connector options and is outside this diff |
 
 ## 10. Residual / owner-decision register
 

@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b7921fefed70b5b5db50886bf42cb6e7fb5fc60663077d5f2f4bb6179d79e7e1"
+    "value": "90fa3889273e30985d168d9abe4589ba4f877581bf06b86f897c2105276d1608"
   },
   "summary": {
     "total": 309,
@@ -2415,7 +2415,7 @@
       "state": "OPEN",
       "updated": "2026-08-01",
       "definitionDigest": "9351804a3b66fabb554218fecf5477069a9c17705d17d7ad3fe1f4fdf3ba6051",
-      "progressDigest": "11193633fabd2aefa25049d4bbf9f82e674a9847aeda20f111937ca62d9da7bd",
+      "progressDigest": "20a3b3138cb8ff893ee1c58e307ab3fe5fce1ce23535e12726e4ce5e72eabdd3",
       "terminalClosureDigest": null
     },
     {
@@ -12868,7 +12868,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Resume returns a typed resumed-and-running, resumed-and-paused, completed, aborted or failed outcome with exact next authority; explicit force finalize never prints COMPLETE before receipt and can publish a fenced ABORTED settlement preserving unresolved/deferred lineages; cleanup admits only that exact terminal receipt and never deletes forensic evidence implicitly",
-      "evidence": "Sprint-488 recover returned generic error after re-entering PAUSED. Owner-authorized force-finalize printed a success-like Sprint Complete report, then exited non-zero with `TERMINAL_EVIDENCE_HOLD`. Manual recovery now parks below-threshold FAILED lineages through typed `unresolved-lineage-operator-decision` PAUSED with exact recover/finalize commands before terminal receipt; resume and force-finalize live proof remain open",
+      "evidence": "Sprint-488 recover returned generic error after re-entering PAUSED. Owner-authorized force-finalize printed a success-like Sprint Complete report, then exited non-zero with `TERMINAL_EVIDENCE_HOLD`. Manual recovery now parks below-threshold FAILED lineages through typed `unresolved-lineage-operator-decision` PAUSED and makes resumed coordinators publish the same exact PID/start-token/lease snapshot authority as fresh starts before evaluation or dispatch; resume and force-finalize live proof remain open",
       "updated": "2026-08-01"
     },
     {
@@ -16937,6 +16937,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "116be4a66e5c67164c2aa91c032c14b8b4d2227b73d5b9bf3a4510c6993e076f"
+    "value": "09400704adbe9eed302e5e212f28693cfeff0cc0f55bdfd606f71813ee4cbfd0"
   }
 }

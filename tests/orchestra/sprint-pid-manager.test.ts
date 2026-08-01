@@ -27,6 +27,7 @@ import {
   listPidFiles,
   terminateOwnedSprintProcess,
   terminateOwnedSprintProcessAndWait,
+  createSprintStateSnapshot,
 } from '../../src/orchestra/sprint-pid-manager.js';
 import type { SprintStateSnapshot, OrphanInfo } from '../../src/orchestra/sprint-pid-manager.js';
 
@@ -81,11 +82,39 @@ describe('sprint-pid-manager', () => {
         new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
         'utf-8',
       );
-      expect(source.match(/coordinatorPidRecord = writePid\(projectRoot, sprint\.id, sprint\.startedAt\)/gu))
+      expect(source.match(/coordinatorPidRecord = establishCoordinatorPidAuthority\(sprint\)/gu))
         .toHaveLength(2);
-      expect(source).toContain('startToken: coordinatorPidRecord?.startToken ?? null');
-      expect(source).toContain('leaseId: coordinatorPidRecord?.leaseId');
-      expect(source).toContain('startedAt: coordinatorPidRecord?.startedAt ?? sprint.startedAt!');
+      expect(source.match(/await activateCoordinatorSnapshotWriter\(sprint\)/gu)).toHaveLength(2);
+      expect(source).toContain('createSprintStateSnapshot(authority');
+      expect(source).toContain('await writeCoordinatorSnapshot(true)');
+    });
+
+    it('projects resume snapshot identity only from the exact PID authority', () => {
+      const authority = {
+        pid: 4321,
+        sprintId: 'sprint-resumed',
+        startedAt: '2026-08-01T09:00:00.000Z',
+        startToken: 'kernel-start-token',
+        leaseId: '8bbca67c-462f-4b17-b54f-f9e6dcb8c29f',
+      };
+      const snapshot = createSprintStateSnapshot(authority, {
+        currentWave: 3,
+        taskStatuses: { '488-001': 'DONE', '488-002-fix': 'EXECUTING' },
+        metricsJsonlSize: 17,
+        observedAt: '2026-08-01T09:01:00.000Z',
+      });
+
+      expect(snapshot).toEqual({
+        sprintId: authority.sprintId,
+        pid: authority.pid,
+        startToken: authority.startToken,
+        leaseId: authority.leaseId,
+        startedAt: authority.startedAt,
+        currentWave: 3,
+        taskStatuses: { '488-001': 'DONE', '488-002-fix': 'EXECUTING' },
+        metricsJsonlSize: 17,
+        lastHeartbeat: '2026-08-01T09:01:00.000Z',
+      });
     });
 
     it('should overwrite PID file if previous process is dead', () => {

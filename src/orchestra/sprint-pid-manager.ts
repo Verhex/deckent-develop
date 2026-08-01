@@ -42,6 +42,35 @@ export interface SprintPidWriteAuthority {
   readonly leaseId: string;
 }
 
+export interface SprintStateSnapshotInput {
+  readonly currentWave: number;
+  readonly taskStatuses: Readonly<Record<string, string>>;
+  readonly metricsJsonlSize: number;
+  readonly observedAt?: string;
+}
+
+/**
+ * Project one exact coordinator lifetime authority into its snapshot shape.
+ * Fresh start and resume must consume this same builder: snapshot identity may
+ * never be reconstructed from a second clock read or an ambient PID.
+ */
+export function createSprintStateSnapshot(
+  authority: SprintPidWriteAuthority,
+  input: SprintStateSnapshotInput,
+): SprintStateSnapshot {
+  return {
+    sprintId: authority.sprintId,
+    pid: authority.pid,
+    startToken: authority.startToken,
+    leaseId: authority.leaseId,
+    startedAt: authority.startedAt,
+    currentWave: input.currentWave,
+    taskStatuses: { ...input.taskStatuses },
+    metricsJsonlSize: input.metricsJsonlSize,
+    lastHeartbeat: input.observedAt ?? new Date().toISOString(),
+  };
+}
+
 export interface OrphanInfo {
   sprintId: string;
   pid: number;
