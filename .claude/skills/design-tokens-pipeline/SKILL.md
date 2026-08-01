@@ -166,9 +166,11 @@ description: Use when creating or changing ANY design token (color, typography, 
   önkoşul-(e) kapsamında.
 
 **Açık maddeler:**
-- **DT-5 `⚡Live` sembolü** (critic 2026-08-01 #10): sembol-tablosundaki `⚡` DNA §7 /
-  ADR-G-010 emoji-ikon yasağıyla gerilimde — ya ASCII karşılık ya "belgele-kabul istisnası"
-  kaydı; karar Alperen'in (bugünkü diff dışı, mekanik taramada çıktı).
+- ✅ **DT-5 `⚡` sembolü KAPANDI** (Alperen 2026-08-01: ASCII'ye çevir): `»Live` +
+  chat-nervous-bridge ve repl approval-işareti dahil 3 kaynak-nokta `»` oldu; ADR-G-010
+  istisnasız. Aynı mini-turda: MASTER-PLAN 6165/6170 kanıtı filtreli-patch ayrı commit;
+  üretim-flip dilimi dogfood-sprint ONAYLI (DIRECTIVES.md paralel-oturum recovery-slice'ında —
+  planlama ilk güvenli sınırda).
 - **Component ürünleşme-önkoşulları** (a11y 2026-07-31): forced-colors focus `outline` yedeği
   (react-aria focus-ring) · error `aria-describedby` bağı · `:has()` yerine `isFocusVisible` ·
   input-kenarlık 1.4.11 muafiyeti = "alan daima prefix/label ile tanınır" sözleşmesi.

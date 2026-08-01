@@ -298,7 +298,7 @@ export class StatusRenderer {
     // per task (flag-gated at the emitter; absent events render nothing).
     const activity = readLatestActivity(this.config.projectRoot, sprintId);
     if (activity.length > 0) {
-      lines.push(bl(`⚡ Live activity:`));
+      lines.push(bl(`» Live activity:`));
       for (const row of activity) {
         lines.push(bl(`   ${row.taskId}: ${row.line}`));
       }

@@ -155,7 +155,7 @@ export function renderNervousPrompt(items: NervousNotification[], tty?: boolean)
   }
 
   const lines: string[] = [];
-  lines.push(`${BOLD}${YELLOW}⚡ nervous: ${items.length} pending${RESET}`);
+  lines.push(`${BOLD}${YELLOW}» nervous: ${items.length} pending${RESET}`);
   for (const n of items) {
     lines.push(
       `  ${severityPrefix(n.severity)} ${DIM}${n.id.slice(0, 12)}${RESET} ${n.detectorId}`,

@@ -1938,7 +1938,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {selection.model ? <Text color={GOLD}>{` · ${selection.model}`}</Text> : null}
         <Text dimColor>{`  ${cwd}`}</Text>
         {sessionTok > 0 ? <Text dimColor>{`  · Σ ${sessionTok} tok`}</Text> : null}
-        {approval !== 'suggest' ? <Text color={GOLD}>{`  · ⚡${approval}`}</Text> : null}
+        {approval !== 'suggest' ? <Text color={GOLD}>{`  · »${approval}`}</Text> : null}
         {/* 358-006: visible only after a /resume picker switch (gated upstream). */}
         {activeSessionId && activeSessionId !== sessionId ? <Text dimColor>{`  · ↺ ${activeSessionId}`}</Text> : null}
       </Box>
