@@ -177,6 +177,16 @@ function componentCardPaths() {
       if (f.endsWith('.html')) paths.push(join(patternsBase, f));
     }
   } catch { /* patterns/ henüz yok */ }
+  const surfacesBase = join(ROOT, 'design', 'claude-design', 'surfaces');
+  try {
+    for (const d of readdirSync(surfacesBase)) {
+      try {
+        for (const f of readdirSync(join(surfacesBase, d))) {
+          if (f.endsWith('.html')) paths.push(join(surfacesBase, d, f));
+        }
+      } catch { /* alt-dizin değil */ }
+    }
+  } catch { /* surfaces/ henüz yok */ }
   return paths;
 }
 function foundationsParity() {

@@ -144,7 +144,15 @@ description: Use when creating or changing ANY design token (color, typography, 
   `alpha.panelScrim` .86 · `alpha.panelEdge` .25 · `blur.panelFloat` 6px ·
   **progress ailesi:** component-rolleri `progress-track/fill/fill-done/fill-abort/arc`
   (watch-map'e ekleme) + `size.progressHairline/Bold` 2/6px + `size.progressRadialSm/Md`
-  40/64px + `duration.progressFlow` 1.6s.
+  40/64px + `duration.progressFlow` 1.6s · **settings-customize ailesi (2026-08-01):**
+  `fontSet.envanter-legacy` (Bricolage/Hanken/Geist seti — set-değiştirilebilirlik) ·
+  `space.accentSwatch` 28px · sergi-min-genişlik 220px · `desktop.settings.appearance.*`
+  i18n anahtar ailesi · preferences v2 (`fontSet` alanı + VERSION bump + migration).
+- **settings-customize ürünleşme-şartları** (a11y 2026-08-01): day-watch `inkMuted/buff`
+  4.33:1 < 4.5 (mevcut "day-watch muted" maddesiyle birleşik — koyulaştırma adayı ≈#63676a) ·
+  custom-accent doğrulaması AKTİF vardiya zemininde (yalnız-nova yetmez) · Custom = Radio +
+  koşullu TextField (input asla radio rolü almaz) · hex hatası `aria-invalid`+`describedby` ·
+  font-set "Selected" sözcük-taşıyıcı + "Active" pili `aria-checked`'e bağlı (kartta kapatıldı).
 - **Doc-drift kaydı (Alperen'e):** MCP-instruction/CLAUDE.md lifecycle metinleri
   "…DECAY→CLEANUP" yazıyor; typed authority `SprintPhase` enum'unda terminal faz **COMPLETE**
   (cleanup bir komuttur). Metinlerin enum'a hizalanması ayrı iş (critic 2026-08-01 #1 kökü).
