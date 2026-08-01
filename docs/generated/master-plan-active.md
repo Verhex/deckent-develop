@@ -5,19 +5,19 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):cacc7efb4ca9859fb5a8a9c94c7257dfd5f9a599d26ade3fab8d3f7a709871ef`
+**Source digest:** `sha256(normalized-lf-utf8):2c2d1fdfc0a4c1ba69ee3904d8a022d2df370d5169714bec2572f984e280d68f`
 
-**Rows:** 271 total · 271 active · 0 terminal
+**Rows:** 299 total · 299 active · 0 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 185 |
+| OPEN | 205 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
-| BLOCKED | 68 |
-| VERIFY | 18 |
+| BLOCKED | 67 |
+| VERIFY | 27 |
 | DONE | 0 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -72,6 +72,7 @@
 | 410 | `HOST-STATE-APPLY-001` | BLOCKED | P2 | OPS | `HOST-STATE-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Apply approved recoverable HOME-state prune |
 | 420 | `GIT-MAINT-REPORT-001` | BLOCKED | P2 | OPS | `OPS-BRANCH-001` | `DEPENDENCY_UNSATISFIED` | Read-only git object and pack health report |
 | 430 | `GIT-MAINT-APPLY-001` | BLOCKED | P2 | OPS | `GIT-MAINT-REPORT-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Approved local repository maintenance and repack |
+| 440 | `EXEC-TEMPO-001` | OPEN | P1 | OPS | — | — | Config-resolved high-parallelism execution tempo with batch-receipt owner approvals |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -154,7 +155,7 @@
 | 3000 | `KERNEL-001` | BLOCKED | P0 | KERNEL | `SSOT-003`, `TEST-675`, `TEST-676`, `CODEX-C5`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `DEPENDENCY_UNSATISFIED` | Goal→Mission→Flow→Run→WorkItem→Attempt→Operation canonical kernel parent |
 | 3010 | `KERNEL-ONTOLOGY-001` | OPEN | P0 | KERNEL | `SSOT-003`, `OPERATION-001` | — | Canonical entity identities, ownership, transitions and invariants |
 | 3020 | `KERNEL-STATE-001` | OPEN | P0 | KERNEL | `KERNEL-ONTOLOGY-001` | — | Durable event, snapshot and projection authority |
-| 3021 | `RUN-STATUS-AUTHORITY-001` | VERIFY | P0 | KERNEL | — | — | Canonical sprint runtime status authority and stale-state reconciliation |
+| 3021 | `RUN-STATUS-AUTHORITY-001` | OPEN | P0 | KERNEL | — | — | Canonical sprint runtime status authority and stale-state reconciliation |
 | 3030 | `KERNEL-ATTEMPT-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `AUTHORITY-001` | — | Claim, lease, fencing, retry, cancellation and idempotency contract |
 | 3040 | `KERNEL-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RECEIPT-001` | — | Canonical result, evidence, acceptance and terminal settlement |
 | 3050 | `MISSION-KIND-001` | OPEN | P0 | KERNEL | `KERNEL-ONTOLOGY-001`, `KERNEL-ATTEMPT-001` | — | First-class task, sprint, capability and process runners |
@@ -199,15 +200,37 @@
 | 3188 | `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `RECOVERY-COMMAND-SERVICE-001`, `RUNFLOW-001`, `PAUSED-FINALIZE-001` | — | Exhausted repair lineage becomes resumable PAUSE/HOLD instead of false COMPLETE |
 | 3189 | `RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001` | OPEN | P0 | COST | `LIMIT-001`, `KERNEL-SETTLEMENT-001` | — | Subscription reference price cannot become billed USD or API budget consumption |
 | 3190 | `AUTONOMY-CUTOVER-001` | BLOCKED | P0 | KERNEL | `GOAL-CANARY-001`, `RECOVERY-001` | `DEPENDENCY_UNSATISFIED` | Autonomous and Nervous execution through canonical kernel |
+| 3191 | `RECOVERY-BORN-483-EVALUATION-HONESTY-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `EVALUATION-001`, `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | — | Explicit failed mandatory deliverable cannot be rubric-promoted into allowed debt or terminal success |
+| 3192 | `RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001` | OPEN | P0 | PROVIDER | `PROVIDER-INGRESS-001`, `LIMIT-001`, `RUNNER-PROTOCOL-001` | — | Advertised worker concurrency must equal attainable provider execution concurrency |
+| 3193 | `RECOVERY-BORN-483-XVERIFY-PAYLOAD-001` | OPEN | P0 | EVAL | `XVERIFY-WIRE-001`, `EVALUATION-001`, `RECEIPT-001` | — | Cross-provider XVerify receives complete digest-bound material evidence and gates promotion honestly |
+| 3194 | `RECOVERY-BORN-483-PROMPT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `RUNFLOW-001`, `PROMPT-001`, `AUTHORITY-001` | — | Exact RunFlow worker prompt cannot ingest a stale competing execution directive |
+| 3195 | `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001` | VERIFY | P0 | KERNEL | — | — | Terminal authority publishes before archive and status never regresses during cleanup |
+| 3196 | `RECOVERY-BORN-485-FIX-AUTHORITY-001` | OPEN | P0 | KERNEL | `WORKER-DISCOVERY-001`, `PLANNER-001` | — | FIX retries repair diagnosed read authority and refuse unchanged impossible contracts |
+| 3197 | `RECOVERY-BORN-485-SEMANTIC-VERDICT-001` | OPEN | P0 | EVAL | `EVALUATION-001`, `TEST-DISCOVERY-001` | — | Passing evidence must exercise the acceptance-bound production consumer |
+| 3198 | `RECOVERY-BORN-485-USAGE-BILLING-001` | OPEN | P0 | COST | `LIMIT-001`, `RECEIPT-001`, `SPRINT-HONESTY-001` | — | FIX lineage usage, billing and KPI projections resolve through logical task authority |
+| 3199 | `RECOVERY-BORN-485-PROMPT-POLICY-001` | OPEN | P0 | AUTHORITY | `PROMPT-001`, `ROUTING-V3-CUTOVER-001` | — | Exact worker prompt preserves global run policy, forced skills and monotonic lifecycle instructions |
 | 3200 | `PROCESS-CUTOVER-001` | OPEN | P1 | KERNEL | `MISSION-KIND-001`, `RECOVERY-001` | — | Process mode through canonical WorkItem and Attempt authority |
 | 3210 | `SURFACE-CUTOVER-001` | BLOCKED | P0 | KERNEL | `DO-CUTOVER-001`, `AUTONOMY-CUTOVER-001`, `PROCESS-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | CLI, MCP, API, terminal, Desktop and connector adapters share use cases |
 | 3220 | `PLANNER-001` | BLOCKED | P0 | KERNEL | `KERNEL-ONTOLOGY-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Canonical planner authority and fail-loud structured parsing |
 | 3230 | `WORKER-REGISTRY-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `PRINCIPAL-001` | — | Durable Worker identity, claim, heartbeat, capability and settlement registry |
 | 3240 | `SPRINT-HONESTY-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `WORKER-REGISTRY-001` | — | Sprint completion metrics, linger and partial-result truth |
+| 3241 | `PRODUCTION-WIRING-AUTHORITY-001` | VERIFY | P0 | KERNEL | `PLANNER-001`, `EVALUATION-001`, `TEST-DISCOVERY-001` | — | Production changes cannot settle without canonical consumer and enablement reachability |
 | 3250 | `WORKER-DISCOVERY-001` | OPEN | P1 | KERNEL | `PLANNER-001`, `PROMPT-001` | — | Bounded discovery and scope-aware Worker prompt contract |
 | 3251 | `TEST-DISCOVERY-001` | VERIFY | P0 | KERNEL | — | — | Pre-dispatch test discovery contract for declared test paths |
 | 3260 | `RESULT-INGEST-001` | BLOCKED | P0 | KERNEL | `KERNEL-SETTLEMENT-001` | `DEPENDENCY_UNSATISFIED` | Result identity normalization, quarantine and missing-trace root-cause closure |
 | 3261 | `RESULT-RECONCILIATION-001` | VERIFY | P0 | KERNEL | — | — | Terminal-only atomic result ingestion and malformed-result reconciliation |
+| 3270 | `RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001` | VERIFY | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `SCHEDULER-001`, `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | — | EXECUTE always yields to runnable work or FIX without a result-count deadlock |
+| 3271 | `RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001` | VERIFY | P0 | KERNEL | `RECOVERY-COMMAND-SERVICE-001`, `RUN-STATUS-AUTHORITY-001`, `RESULT-RECONCILIATION-001` | — | Finalize discovers only canonical tasks and publishes COMPLETE only after exact coordinator containment |
+| 3272 | `RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001` | VERIFY | P0 | COST | `LIMIT-001`, `RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001` | — | Dogfood tuning cannot turn per-task subscription limits into a global dispatch stop |
+| 3273 | `RECOVERY-BORN-486-NERVOUS-COLLISION-001` | VERIFY | P1 | KERNEL | `SCHEDULER-001`, `RECOVERY-BORN-480-FIX-PRIORITY-001` | — | Nervous scope-collision decisions must execute real serialization or authority repair |
+| 3274 | `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001` | VERIFY | P0 | KERNEL | `TEST-DISCOVERY-001`, `PRODUCTION-WIRING-AUTHORITY-001` | — | Automatic finalization audits only the settled affected-test manifest |
+| 3275 | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001`, `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001` | — | Built-binary verification is scheduled only after terminal settlement |
+| 3276 | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001` | OPEN | P1 | KERNEL | `BUDGET-CONTINUATION-001`, `RESULT-RECONCILIATION-001` | — | Worker landing proposals use a structured atomic writer and malformed evidence cannot pass silently |
+| 3277 | `RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001` | OPEN | P1 | ASSURANCE | `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001`, `PRODUCTION-WIRING-AUTHORITY-001` | — | Worker verification cannot judge unrelated concurrent partial writes |
+| 3278 | `RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001` | VERIFY | P0 | KERNEL | — | — | A held terminal receipt can never publish a successful job or COMPLETE authority |
+| 3279 | `RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RUN-STATUS-AUTHORITY-001` | — | Build cannot report success when clean is held by active execution authority |
+| 3280 | `RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001` | VERIFY | P0 | KERNEL | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001`, `RUN-STATUS-AUTHORITY-001` | — | Cleanup consumes canonical task identity and retires only owned temporary residue |
+| 3281 | `RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001` | OPEN | P0 | KERNEL | — | — | Terminal receipt lineages expose canonical logical task identity separately from attempt identity |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
@@ -258,6 +281,7 @@
 | 6140 | `API-DEVELOPER-001` | OPEN | P1 | API | `API-CONTRACT-001`, `SURFACE-PARITY-001` | — | OpenAPI, generated SDKs, CLI/MCP parity and compatibility lifecycle |
 | 6150 | `API-OPERATIONS-001` | OPEN | P0 | API | `API-IDENTITY-001`, `LIMIT-001`, `API-EVENT-001` | — | Quotas, pagination, bulk operations, idempotency and regional operations |
 | 6160 | `SURFACE-ADAPTER-001` | OPEN | P1 | PRODUCT | `APP-SERVICE-001`, `SURFACE-CONTRACT-001`, `CAPABILITY-001` | — | Web, mobile, voice, chat, IDE, CI and ERP thin-adapter expansion |
+| 6165 | `DESKTOP-CUSTOMIZE-001` | OPEN | P1 | DESKTOP | `DESKTOP-REBORN-001` | — | User-facing interface personalization: theme/watch, font set and accent selection in the Desktop settings scene |
 | 6170 | `DESIGN-SYSTEM-001` | OPEN | P0 | PRODUCT | — | — | Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity |
 | 7000 | `ECOSYSTEM-001` | OPEN | P0 | ECOSYSTEM | `P02-647`, `SURFACE-CUTOVER-001`, `CAPABILITY-001`, `AUDIT-001` | — | Governed agent, skill, plugin, tool, MCP and extension ecosystem |
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
@@ -276,8 +300,12 @@
 | 8040 | `PACKAGING-001` | OPEN | P0 | RELEASE | `INSTALL-SCOPE-001`, `SUPPLY-CHAIN-001` | — | CLI, daemon, Desktop, service and container packaging supply chain |
 | 8050 | `DOCS-PRODUCT-001` | BLOCKED | P0 | DOCS | `DOCS-ADR-SYNC-001`, `DOCS-I18N-001`, `SURFACE-PARITY-001` | `DEPENDENCY_UNSATISFIED` | Current code-truth architecture, guide, reference and operations docs |
 | 8060 | `RELEASE-001` | BLOCKED | P0 | RELEASE | `TRUTH-BASELINE-001`, `PLATFORM-PROOF-001`, `PACKAGING-001`, `DOCS-PRODUCT-001` | `DEPENDENCY_UNSATISFIED` | Unified validate, soak, publish and rollback gate |
-| 8070 | `REPO-MIGRATION-001` | BLOCKED | P1 | REPO | `REPO-CLEANUP-APPLY-001`, `DOCS-TOPOLOGY-001`, `MEMORY-AUTHORITY-001` | `FRESH_REMOTE_APPROVAL_REQUIRED` | Rebaseline and execute repository cutover |
+| 8070 | `REPO-MIGRATION-001` | OPEN | P0 | REPO | `REPO-CLEANUP-APPLY-001`, `DOCS-TOPOLOGY-001`, `MEMORY-AUTHORITY-001` | — | Rebaseline and execute repository cutover |
 | 8080 | `OPERATIONS-PACK-001` | OPEN | P1 | OPS | `PACKAGING-001`, `STATE-RETENTION-001`, `AUDIT-001` | — | Install, backup, restore, diagnostics, support bundle and disaster recovery |
+| 8090 | `RELEASE-BETA-001` | OPEN | P0 | RELEASE | `REPO-MIGRATION-001`, `NPM-CHANNEL-001`, `DOCS-TRUTH-PASS-001` | — | Owner-approved scoped beta gate: public repo flip plus npm beta channel ahead of RELEASE-001 GA |
+| 8091 | `NPM-CHANNEL-001` | OPEN | P0 | RELEASE | — | — | npm name reservation and beta dist-tag channel under owner-manual publish |
+| 8092 | `DOCS-TRUTH-PASS-001` | OPEN | P0 | DOCS | — | — | Beta-scope public README and top-level docs reality pass from current code truth |
+| 8093 | `LAUNCH-COMMS-001` | OPEN | P1 | PRODUCT | `RELEASE-BETA-001` | — | Launch communications, demo assets and recurring social cadence |
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |

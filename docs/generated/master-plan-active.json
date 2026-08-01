@@ -3,54 +3,54 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "cacc7efb4ca9859fb5a8a9c94c7257dfd5f9a599d26ade3fab8d3f7a709871ef"
+    "value": "2c2d1fdfc0a4c1ba69ee3904d8a022d2df370d5169714bec2572f984e280d68f"
   },
   "summary": {
-    "total": 271,
-    "active": 271,
+    "total": 299,
+    "active": 299,
     "terminal": 0,
     "receipts": 21,
     "byState": {
-      "OPEN": 185,
+      "OPEN": 205,
       "READY": 0,
       "IN_PROGRESS": 0,
-      "BLOCKED": 68,
-      "VERIFY": 18,
+      "BLOCKED": 67,
+      "VERIFY": 27,
       "DONE": 0,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 207,
-      "P1": 48,
+      "P0": 230,
+      "P1": 53,
       "P2": 16
     },
     "byProgram": {
       "API": 5,
-      "ASSURANCE": 3,
-      "AUTHORITY": 22,
+      "ASSURANCE": 5,
+      "AUTHORITY": 24,
       "CODEX": 44,
       "CONNECTOR": 1,
-      "COST": 2,
+      "COST": 4,
       "DASHBOARD": 1,
       "DATA": 1,
-      "DESKTOP": 5,
-      "DOCS": 1,
+      "DESKTOP": 6,
+      "DOCS": 2,
       "DURABILITY": 1,
       "ECOSYSTEM": 3,
       "ENTERPRISE": 1,
-      "EVAL": 1,
+      "EVAL": 3,
       "EVOLUTION": 1,
-      "KERNEL": 53,
+      "KERNEL": 66,
       "LEARNING": 4,
       "OBS": 1,
       "ONBOARDING": 1,
-      "OPS": 5,
+      "OPS": 6,
       "PAEP": 35,
-      "PRODUCT": 7,
+      "PRODUCT": 8,
       "PROMPT": 2,
-      "PROVIDER": 1,
-      "RELEASE": 2,
+      "PROVIDER": 2,
+      "RELEASE": 4,
       "REPO": 1,
       "RESILIENCE": 1,
       "ROUTING": 2,
@@ -568,6 +568,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "3c081137fbdce2c6bf805bb7f0999931c867ab147d7dcec6df380e71825e9552",
       "progressDigest": "c0a65bbfe4b507ab9a08d1dfc97c59aa6f2eff608a394eeb41100c4e04033d00",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 440,
+      "id": "EXEC-TEMPO-001",
+      "program": "OPS",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "43f96298bf1f11816f123d837abccec5b28d64409d71beb598405de3ab40a1d4",
+      "progressDigest": "25e9b7b69ab474cce54c49bbe0d89adecb2bd906878210a742b526a371738fc4",
       "terminalClosureDigest": null
     },
     {
@@ -1477,10 +1488,10 @@
       "id": "RUN-STATUS-AUTHORITY-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-07-30",
+      "state": "OPEN",
+      "updated": "2026-07-31",
       "definitionDigest": "2db2c82e9653adf4b2261e847525e5cc4f676c8c2dccd3270786076c7066b63a",
-      "progressDigest": "8c84c4fd62d6b49b387ad326ef50c05e833aa28e3edf0dd217ca6fb20ec303bd",
+      "progressDigest": "0b1f649af1be046afa6a8ed904bb028cb7bc75bfad7cc3c98cae90045713202a",
       "terminalClosureDigest": null
     },
     {
@@ -1799,7 +1810,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "b6dd8ceed649e391a98858b21a9376a0d148c9a3d6907a1d8f192707483a19be",
-      "progressDigest": "34bd2a2fff5aa989d1657be3490f3b3f87b8bfef956a6d5d10a16840a16fb7a5",
+      "progressDigest": "d39ebe4ce6117549688b8824e492dae64d2b48328902e4e80945f512da5e81f5",
       "terminalClosureDigest": null
     },
     {
@@ -1821,7 +1832,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "249359322a5ceafe327ff34ca26c54dd760e6d3843b0ff1fe37eed9f51b95fcb",
-      "progressDigest": "b35981a767116abb978cb526ee89749aea0f3b942ff9cc5d159df9524d7f1630",
+      "progressDigest": "0c4474d174aa421fd7802637e486d0f13acfb0691d006ffd181c87b6ce50b192",
       "terminalClosureDigest": null
     },
     {
@@ -1830,9 +1841,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-30",
+      "updated": "2026-07-31",
       "definitionDigest": "eb3c4e7d495fd76e57ba08766033a3377e6e5c28d132a2dd38fa62fd2051c273",
-      "progressDigest": "b5cbd3478b7752f7d474f672983cf7b8f35a4670288250f26e2fa178be6ffd62",
+      "progressDigest": "cde1ecd53c17edf2c35fcfbe816edbf9dab0c0366b12c6ef5a91bc918e4151de",
       "terminalClosureDigest": null
     },
     {
@@ -1843,7 +1854,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "fb79d5712b9aee64f230d4dd343eaac6392296f148de30c680ec6a107eab2b25",
-      "progressDigest": "4afef1502b5a055d24cbd3aa82ee08e705096523c9914fc42e78d52f9dc7d840",
+      "progressDigest": "f01434399de925c8eb47fa2cf23cb44dc78fb344d69cfdc53c393ac3741b477a",
       "terminalClosureDigest": null
     },
     {
@@ -1887,7 +1898,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "17bfe806343bc4d6143d5bc3e930086d97fb8a10a4e63c321a809beb43f46689",
-      "progressDigest": "5c5ba87e10f5eec7163e9587d27199b8483f2c75b27dfd104a7988f325718678",
+      "progressDigest": "6e62311963fc5f959572f30fde0abf5635d0949e8ada54533b2fee32619a4c81",
       "terminalClosureDigest": null
     },
     {
@@ -1909,7 +1920,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "130286ccf29f59d9d19b4d05ce2b45788a7dd5477bf822eeb7b9170790cf9e98",
-      "progressDigest": "9d66fc90e1b3efd3235b472d13cda1ce3e7d6a5e4edd97ba5f1f34651f755ce8",
+      "progressDigest": "6c1ab623ec3bc3ad53df153d05ef8b5a7bec296af9c76fbbd193dfbc0dd33077",
       "terminalClosureDigest": null
     },
     {
@@ -1920,7 +1931,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "880625fb14f34c4b8ea398812fe66dbf862de1346e5a2d111b6c88faabc33fa3",
-      "progressDigest": "e86cfff57554f40387cf7504ad4b5603edd16a485e80eb95797863cd49d36d9d",
+      "progressDigest": "a61e374c57049ded4504c8d7e7d24ee1d2769ae119c69c12100a1eeab2b31209",
       "terminalClosureDigest": null
     },
     {
@@ -1968,6 +1979,105 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3191,
+      "id": "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "d74f024552787189c796305cfe34fbe2cf172c0ecd37dce72b21aabcfd26b70d",
+      "progressDigest": "0037990186f57191853aed8aac5b8139a05e66f509d162e0a412ade57f5e09fa",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3192,
+      "id": "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001",
+      "program": "PROVIDER",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "eb73065ad74dab8bd96bf6dc839e9d20f7c3ff36f7ceee84346a889f930d3e0c",
+      "progressDigest": "d6d7b6fc610ec5b9838c90bb3aa1696379e10cea7d82378314991d15b13b7683",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3193,
+      "id": "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
+      "program": "EVAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "b09bf6b47048f77a0b33823b943a7cf1570f163ead6ab1d62d2fba4ba1bcb9c8",
+      "progressDigest": "bc5ecebbe3d3ff2e6f60e195ddc280f67b2c35a01f3fc6e6ba11c80c0a39dac5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3194,
+      "id": "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "576a8db7a3feac8e68726ef85702a12972769ac6aded24bf5008d5326cfb1283",
+      "progressDigest": "ee8a5436d732bee56af85ef573e5613474cbb99983fb875fcaa696da8b36cff2",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3195,
+      "id": "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "b4c7538863f5fd35cfc196c095153ebd6488022b7fdff79639864582c4a6e52f",
+      "progressDigest": "be946314bfcbbd5010b5969c6f4eaf3569004c814f35b5f107f7efcadff1dcf0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3196,
+      "id": "RECOVERY-BORN-485-FIX-AUTHORITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "a8d876f88ae84bd1138985a3e49928c180a093b5e604ed1490a44db028aeff7e",
+      "progressDigest": "a3e388b42c981a91aabfff5a76ad5da1a8cc3ad57ef244e18b9918158e079de3",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3197,
+      "id": "RECOVERY-BORN-485-SEMANTIC-VERDICT-001",
+      "program": "EVAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "bc7f65de343af7f5ca7a3fcac290646823c9e7da62f0f6954c73b76b2c6f5b79",
+      "progressDigest": "c11f9db8d5fce9aa044393955a127637ca8462d641fe51491545f76325bb7259",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3198,
+      "id": "RECOVERY-BORN-485-USAGE-BILLING-001",
+      "program": "COST",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "79a1284aa8cd0aa4cd730aabaa88ebf5c4d585a42085dff12621c3e797857ab1",
+      "progressDigest": "5c3be03d42020151d8a7facaeead7fa26561fcb452d8424cec56d0f5ba3970fa",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3199,
+      "id": "RECOVERY-BORN-485-PROMPT-POLICY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "561d1889de198f49e0db9e146567db8151a9756fa7f883f10002e6fc3deac5a5",
+      "progressDigest": "7cacb6b3934e5ca26a2086181022a88dc67ef29171887dd5c5b060b0f1a560a0",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3200,
       "id": "PROCESS-CUTOVER-001",
       "program": "KERNEL",
@@ -2006,9 +2116,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-31",
       "definitionDigest": "7a2543df5147dd3413f5af3c76299207a08b574020a3d6da0df03b8cea670692",
-      "progressDigest": "1168d17547ffb7787a3bb1ff9b373946d37e4efd7ec5b21372e3678efdfd9e0a",
+      "progressDigest": "b64ca6f4771a9158582fed8cebcfbdf44fbd36f6f13d69015990eaf5cbdeacc6",
       "terminalClosureDigest": null
     },
     {
@@ -2017,9 +2127,20 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-07-31",
       "definitionDigest": "d3edabf6613a56d056af8e3321106fd5a49a755a0312e5ce98e4993d174dc610",
-      "progressDigest": "7b691ee49570d33b84cd75ab087952116fedf2735970812aa082c659976ec86a",
+      "progressDigest": "08910ab34e52ba57678062a52cb9d1f13c86f00adf54933d6408f60d764f821e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3241,
+      "id": "PRODUCTION-WIRING-AUTHORITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "fb1734825824afbb15e6e3baa5efb7336ad3c4259af97103d39872588bc7eedf",
+      "progressDigest": "971c7e4aa7debbdbcae1cd13ef491b2d83956e00059a7eb647972e895dcacd06",
       "terminalClosureDigest": null
     },
     {
@@ -2064,6 +2185,138 @@
       "updated": "2026-07-30",
       "definitionDigest": "d4aa106c67d528313dd65022a92ca5fc9af77bafe996edbe4f3d3d9e7bf7f26b",
       "progressDigest": "52879431d50f1eed207d01872057d77563802b271bab48ed1fa14221d46c155e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3270,
+      "id": "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "4deff69c513321f73bc0d0b5d103af4213b5bd6a9f2ba37af7f1f0d9004e8889",
+      "progressDigest": "e4c86cf19139285c51d7b57315f997d4b00548784d2cc083684c243643f7e15a",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3271,
+      "id": "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "dc5ffb283b50ecb2d21b46c9b01a6a86f91844b108c72a100df7c2d575bb39b7",
+      "progressDigest": "4fa593c8abc5bd307f7cde3048b757fac2dcdc76a9ce3665a57c285b5025410f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3272,
+      "id": "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001",
+      "program": "COST",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "7431bbdb269ab161c839c9419fd86d76701b1f96076f6c8cc1b42274bee6ffd7",
+      "progressDigest": "55abec24ebe1824468c552f97eee2e13e7a4f9558c307301203ec687c06b4a64",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3273,
+      "id": "RECOVERY-BORN-486-NERVOUS-COLLISION-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "85208038c2a10c193ea3bebf441f5c9b34b6c068732ca7c1f2d2ca22ed4b57d5",
+      "progressDigest": "d0228ee888441d5b5bbafe1ea5ea2e108a26f7655dfff445412877d408725219",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3274,
+      "id": "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "473d7c1f9eecdd3a9522d68aeedcc6c254fd6eb01c10b202252815d7b4ecb3a5",
+      "progressDigest": "ac9f5ee22c8e36e9829979d883c0355a970940ef8360a270b641b85cbbe25da3",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3275,
+      "id": "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "db0d8c55eac878ec4e6d7ced446373c893c46840e4f98f672699df4f6e7eef12",
+      "progressDigest": "4839f5a7ad731f973768a4f7f3dd428bd83e5d6db08437d99fd9bad50bf9c036",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3276,
+      "id": "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "384be8866b2f3707585ca2d633b978653d2f45dc9a053c5697a64af2a7e1cfcb",
+      "progressDigest": "422d758e6e6424de3cde46d83ad3710011a5c3d7f959bb309bcc7633136831c5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3277,
+      "id": "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
+      "program": "ASSURANCE",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "9aee6ca8c1681edeb9c8c2da4dd4fcd0509ae6076ce923b03d82606d644fa445",
+      "progressDigest": "578a6d1c343f00abb5d0138b81026f63ef9418d23d4622e6d9a436ccd966a243",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3278,
+      "id": "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "b924cce604d3bd3b1f92f1c4adcabfe02158204e872f04420199417abfcbe07b",
+      "progressDigest": "d5d41c6883f87c32f976599bfcbc50b2eb11babb92b6ed71e027119fedfd2255",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3279,
+      "id": "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
+      "program": "ASSURANCE",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "547be184e73a8094694bec2431ae59db04bfe816a1208ff385c51d353c2805e6",
+      "progressDigest": "77dfd416a7bfb9ff87cd153adb54b6657a028e594c88ad3be9f2f4008065388d",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3280,
+      "id": "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-31",
+      "definitionDigest": "867400f3a82a6f7ddfed53b4503e8bae37f5b9b40b1256f3a7549e2fa8a4b86c",
+      "progressDigest": "b3d11196e51b49ee02eff1de40c485459d32a2cf545852ddd5f9a967ae1ce252",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3281,
+      "id": "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "51433899496fb4df90d06ab5c3d10d9e609cc7b80652fed767cccb4a8c9ea429",
+      "progressDigest": "fd320de8a743ee6546c86f7ccad3a0c2c5367d0427f27de4012011c7c71c540c",
       "terminalClosureDigest": null
     },
     {
@@ -2617,6 +2870,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 6165,
+      "id": "DESKTOP-CUSTOMIZE-001",
+      "program": "DESKTOP",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "244d60af567af753a200593a211c5be05ca4d2053602b26eb0a48c6221b768a7",
+      "progressDigest": "8bf2dc95997189bd196a08fe2fe30f3ba4cb4f1d20b2b3995ada6a68ea0d3f85",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 6170,
       "id": "DESIGN-SYSTEM-001",
       "program": "PRODUCT",
@@ -2818,11 +3082,11 @@
       "order": 8070,
       "id": "REPO-MIGRATION-001",
       "program": "REPO",
-      "priority": "P1",
-      "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
       "definitionDigest": "9739c3632bf1d42abaf6c31d79c74a302993f2812f04ed918d3d76c2ab01102f",
-      "progressDigest": "3b03a298634637882590bc3ca2ee6806765bb52e560f20d1844a2dceb2d52ab0",
+      "progressDigest": "81d4a79916509b05e35ba6b140871e517a698fc4a2cb4d0880f74394687e2137",
       "terminalClosureDigest": null
     },
     {
@@ -2834,6 +3098,50 @@
       "updated": "2026-07-26",
       "definitionDigest": "8a37c8bb301614b7efe220442f3b554f88f4204b860b6d8750d850effa07048b",
       "progressDigest": "a97232d9c05c417119609fb5783a1c143d6771335d1e7125b78ff3b82ed7f5b1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8090,
+      "id": "RELEASE-BETA-001",
+      "program": "RELEASE",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "e8ec4f480369806dd8fa018bce897b06d43e2c8a84d5f2afa9d8bda06d26879e",
+      "progressDigest": "03ec08baaa9ecb1779e5826f9f3475cb8312caf049c45c66f5bac2079579b4ee",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8091,
+      "id": "NPM-CHANNEL-001",
+      "program": "RELEASE",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "53687d22de2fa6c89369ed3892a5ad9faa1630ad7146467421e6802f3d585edf",
+      "progressDigest": "87f8c4b703a89b173f0ee60f3a13fb6cf4c0d3a4307604a0c83c2192c6eb9b1b",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8092,
+      "id": "DOCS-TRUTH-PASS-001",
+      "program": "DOCS",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "bbddd35fbb2cbf7e2a9531e42c2adcab4e8fb20057e8fd6cc43ed8b6d5c8e384",
+      "progressDigest": "458f1194dff25fa43a95379e3a4a345b7b116117afcf59e7a3a88518edf0f9d9",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8093,
+      "id": "LAUNCH-COMMS-001",
+      "program": "PRODUCT",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "8767343edcbdd759484ff9a7e45e9ee2cb7f1fe98fc156f1b6acea4c53dc135c",
+      "progressDigest": "6b395209528c620d83621fdf03e0168c4b050477cedf5d69d27ebaaccc34a033",
       "terminalClosureDigest": null
     },
     {
@@ -5014,6 +5322,37 @@
       "updated": "2026-07-26"
     },
     {
+      "order": 440,
+      "id": "EXEC-TEMPO-001",
+      "parent": "P00",
+      "program": "OPS",
+      "outcome": "Config-resolved high-parallelism execution tempo with batch-receipt owner approvals",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Effective concurrency resolved from config, dependency DAG, collision and capacity admission — never an instruction literal; owner approval flow moves to batched receipts with Brain pre-summaries; settled-task/day baseline measured after first sustained week and plan estimates recalibrated",
+      "evidence": "Owner direction 2026-07-31: move toward ~8-worker production tempo for the 276-item active ledger; observed ~4 owner receipts/day is the throughput bottleneck; model estimate ~1700 worker-tasks, realistic full-plan horizon ~2.5-3 months at sustained tempo",
+      "updated": "2026-07-31"
+    },
+    {
       "order": 1000,
       "id": "CODEX-MAIN-001",
       "parent": "P01",
@@ -5349,7 +5688,8 @@
         "XVERIFY-UX-001"
       ],
       "dependents": [
-        "CODEX-C5"
+        "CODEX-C5",
+        "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001"
       ],
       "children": [],
       "gates": [
@@ -8684,6 +9024,7 @@
         "PLANNER-001",
         "WORKER-REGISTRY-001",
         "SPRINT-HONESTY-001",
+        "PRODUCTION-WIRING-AUTHORITY-001",
         "WORKER-DISCOVERY-001",
         "RESULT-INGEST-001"
       ],
@@ -8735,6 +9076,7 @@
         "PLANNER-001",
         "WORKER-REGISTRY-001",
         "SPRINT-HONESTY-001",
+        "PRODUCTION-WIRING-AUTHORITY-001",
         "WORKER-DISCOVERY-001",
         "RESULT-INGEST-001"
       ],
@@ -8844,14 +9186,19 @@
       "dependents": [
         "PAUSED-FINALIZE-001",
         "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
+        "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
+        "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
+        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
         "RECOVERY-RESUME-001",
         "STATUS-SURFACE-PARITY-001"
       ],
-      "children": [],
+      "children": [
+        "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001"
+      ],
       "gates": [
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "OPEN",
       "truth": {
         "C": "1",
         "W": "1",
@@ -8863,13 +9210,15 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001"
+      ],
       "evidenceReceipts": [
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "One resolver distinguishes IDLE, ACTIVE, PAUSED, ORPHANED, COMPLETE and ABORTED from durable PID, checkpoint, pause and terminal evidence without a surface-owned competing state machine",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=run-status-authority-targeted-and-binary`; focused core and subprocess status proofs pass and the real binary projects sprint-467 as PAUSED/resumable; native macOS/Windows, multi-process contention and scale evidence remain absent",
-      "updated": "2026-07-30"
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=run-status-authority-targeted-and-binary`; Sprint-483 exposed a closure-window contradiction between canonical `FIX/FIXING` and presentation `RETRO/RETROSPECTIVE` plus impossible `4/3` progress. Recovery now projects human, JSON and watch status through one canonical authority snapshot, bounds every progress bucket by total and exposes normalization metadata while retaining raw mode as an explicit diagnostic. Source-process status contracts pass 8/8 with deterministic OS-backed stdio capture. Item remains OPEN for native macOS/Windows, multi-process contention, scale and a fresh live closure-window replay",
+      "updated": "2026-07-31"
     },
     {
       "order": 3030,
@@ -8948,6 +9297,8 @@
         "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
         "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
+        "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
         "RECOVERY-DECISION-001",
         "RECOVERY-STALE-PROJECTION-001",
         "RESULT-INGEST-001",
@@ -9322,6 +9673,7 @@
         "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
         "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
         "RECOVERY-MODE-ADAPTERS-001"
       ],
       "children": [],
@@ -9366,7 +9718,9 @@
       ],
       "dependents": [
         "RECOVERY-BORN-480-FIX-PRIORITY-001",
-        "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001"
+        "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
+        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
+        "RECOVERY-BORN-486-NERVOUS-COLLISION-001"
       ],
       "children": [],
       "gates": [
@@ -9408,6 +9762,7 @@
         "BUDGET-CONTINUATION-001",
         "DESKTOP-RUNTIME-001",
         "RECOVERY-001",
+        "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001",
         "RECOVERY-TERMINATION-001"
       ],
       "children": [],
@@ -9678,6 +10033,7 @@
         "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
         "RECOVERY-BORN-480-SCOPE-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
         "RECOVERY-DO-DOGFOOD-001"
       ],
       "children": [],
@@ -9861,7 +10217,20 @@
         "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
         "RECOVERY-BORN-482-FIX-AUTHORITY-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
-        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
+        "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+        "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001",
+        "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
+        "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
+        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
+        "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
+        "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001",
+        "RECOVERY-BORN-486-NERVOUS-COLLISION-001",
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
+        "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
+        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001"
       ],
       "gates": [
         "G1"
@@ -9896,7 +10265,20 @@
         "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
         "RECOVERY-BORN-482-FIX-AUTHORITY-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
-        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
+        "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+        "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001",
+        "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
+        "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
+        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
+        "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
+        "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001",
+        "RECOVERY-BORN-486-NERVOUS-COLLISION-001",
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
+        "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
+        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
@@ -9916,7 +10298,9 @@
         "LIMIT-001",
         "RUNNER-PROTOCOL-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -10114,12 +10498,12 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
         "S": "?"
       },
       "blockerCode": null,
@@ -10130,7 +10514,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Attempt settlement binds files and bytes to its claim-time baseline and exact writer evidence; unchanged predecessor work is excluded from `filesChanged`; ambiguous ownership yields typed HOLD rather than a fabricated author claim",
-      "evidence": "Sprint-480 task 480-006 reports `src/cli/commands/recover.ts` with 24 additions/6 removals although that diff was authored by completed predecessor 480-004 before 006 dispatch; 006 produced no required MCP/test artifact and self-assessed `NO_GO`. Sprint-482 task 482-002-fix made no source change yet claimed the same six predecessor files and `213/289` lines; 482-002-fix-fix again inherited the whole shared diff and claimed `257/289`. Affected product and dogfood surfaces: result wrapper, scope baseline, evaluator, cost/quality metrics and promotion memory. Negative scope: no rewriting predecessor results, no ownership inference from final `git diff`, no shared-tree cleanup",
+      "evidence": "Historical Sprint-480/482 attempts inherited predecessor files and hundreds of ambient lines. Docker settlement now captures a claim-time scoped blob manifest before provider birth, publishes immutable baseline bytes through the host settlement store, reconciles exact scoped bytes and persists `workAttribution`. Sprint-483 replay produced distinct VERIFIED attempt receipts. Recovery additionally makes finalizer, retrospective and rich summary aggregate only VERIFIED attempt work; HOLD, legacy and unavailable claims contribute zero files/lines while cost remains independently accounted, and each reported file retains exact attempt IDs. Focused attribution/schema/finalizer regressions pass. Item remains OPEN for native/scale proof and a fresh multi-attempt final-summary replay. Negative scope: no predecessor-result rewrite, no ownership inference from final shared-tree diff, no shared-tree cleanup",
       "updated": "2026-07-31"
     },
     {
@@ -10146,7 +10530,8 @@
       ],
       "dependents": [
         "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
-        "RECOVERY-BORN-482-FIX-AUTHORITY-001"
+        "RECOVERY-BORN-482-FIX-AUTHORITY-001",
+        "RECOVERY-BORN-486-NERVOUS-COLLISION-001"
       ],
       "children": [],
       "gates": [
@@ -10196,8 +10581,8 @@
         "C": "1",
         "W": "1",
         "E": "1",
-        "H": "?",
-        "L": "0",
+        "H": "1",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -10209,7 +10594,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Force-finalize exact-sprint settlement cannot return terminal while a matching resume/recovery coordinator remains alive; death, ownership-HOLD or explicit external authority is part of the same receipt",
-      "evidence": "Sprint-480 force-finalize produced canonical COMPLETE but left the exact `deckent resume sprint-480` coordinator alive until the supervising session sent SIGINT and verified exit. Sprint-481 recurrence proved the other polarity: `deckent finalize --sprint sprint-481 --force` printed Complete and generated terminal docs/dashboard, but canonical status remained ORPHANED/resumable because `.deckent/sprint-state.json` stayed `PLANNING:SPAWN`; the build clean gate then correctly HOLDed on that authority plus three missing task receipts. Sprint-482 normal auto-finalization published canonical COMPLETE with `coordinator=absent` at `07:39:37Z` while exact PID 4159580 remained alive during the configured 180-second delayed cleanup and exited only at `07:42:37Z`; `runSprint:activeResourcesAtExit` and `lingerProbe` both reported `Timeout`, extending the same containment defect beyond the force surface. The finalize adapter and controller settlement must use the same ownership-fenced recovery operation and real-binary proof must show process death precedes terminal/non-active publication. Negative scope: no broad process-name kill, no PID-only signal, no clearing foreign generation authority, no second recovery service/store",
+      "evidence": "Sprint-480 force-finalize produced canonical COMPLETE but left the exact `deckent resume sprint-480` coordinator alive until the supervising session sent SIGINT and verified exit. Sprint-481 recurrence proved the other polarity: `deckent finalize --sprint sprint-481 --force` printed Complete and generated terminal docs/dashboard, but canonical status remained ORPHANED/resumable because `.deckent/sprint-state.json` stayed `PLANNING:SPAWN`; the build clean gate then correctly HOLDed on that authority plus three missing task receipts. Sprint-482 normal auto-finalization published canonical COMPLETE with `coordinator=absent` at `07:39:37Z` while exact PID 4159580 remained alive during the configured 180-second delayed cleanup and exited only at `07:42:37Z`; `runSprint:activeResourcesAtExit` and `lingerProbe` both reported `Timeout`, extending the same containment defect beyond the force surface. Force finalize now routes through the ownership/generation-fenced recovery operation before terminal publication; normal in-process finalization defers its single PID/state/dashboard/notification publisher until configured delayed cleanup has been awaited and completed, eliminating the ref'ed post-COMPLETE timer. A post-build real-binary fixture proved that an exact live coordinator receives bounded termination, is observed dead, and only then yields COMPLETE state with retired PID authority. Sprint-483 provided the fresh full normal-finalization replay: exact coordinator PID 282179 remained authoritative during delayed cleanup, `RUN_COMPLETED` was published only after cleanup, and the terminal proof converged to `COMPLETE`, `coordinator=absent`, with PID 282179 no longer present. Focused recovery/finalize/controller suites pass. Item remains OPEN for force/recovery-mode parity, native platform adapters and scale proof. Negative scope: no broad process-name kill, no PID-only signal, no clearing foreign generation authority, no second recovery service/store, no unref timer workaround",
       "updated": "2026-07-31"
     },
     {
@@ -10232,11 +10617,11 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
         "H": "?",
-        "L": "0",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -10249,8 +10634,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "One bounded provider-neutral recovery slice is proposed, previewed, approved, executed and settled through `deckent do`; Sol supervision captures authority, prompt, usage, diff, Nervous and receipt evidence; any finding is born-first; no direct Sprint start fallback unless typed recovery is required",
-      "evidence": "Next dogfood choice is `do`, not Autonomous: current AUTONOMY-CUTOVER-001 is blocked by Goal-v2/provider authority, while `do` is the narrower canonical intent→preview→approval journey. First slice targets force-finalize coordinator containment plus CLI/MCP/Nervous parity; after successful settlement, a separate Autonomous docs-only canary may be admitted",
-      "updated": "2026-07-30"
+      "evidence": "Canonical Do validation completed as flow `5c6c8fc3-ba9e-4c27-9d5b-a7ea016b0fcc`, sprint-483, revision 1, plan digest `47e62d2c90cb34d4179956bc583fa8ffd338af9647f7a4c8063fe705e506d6d8`: durable preview was approved and started unchanged, wave 1 settled 483-001/002 before dependent 483-003 dispatch, usage and attempt-scoped diffs were captured, and terminal state reached `COMPLETE` with coordinator absent. The journey is not accepted as fully successful: 483-003's mandatory MASTER integration failed before mutation, yet Brain promoted explicit `NO_GO` to `GO_WITH_TECH_DEBT` and emitted `RUN_COMPLETED`; XVerify was cross-provider but `UNCLEAR` because Description was host-truncated; exact workers also ingested a stale root `DIRECTIVES.md`; no sprint-specific Nervous notification/decision receipt was produced, only a live heartbeat. Canonical residuals are RECOVERY-BORN-483-EVALUATION-HONESTY-001, RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001, RECOVERY-BORN-483-XVERIFY-PAYLOAD-001 and RECOVERY-BORN-483-PROMPT-AUTHORITY-001; status projection conflict remains under RUN-STATUS-AUTHORITY-001. Autonomous widening remains blocked until these authority gaps are repaired and replayed",
+      "updated": "2026-07-31"
     },
     {
       "order": 3179,
@@ -10272,9 +10657,9 @@
       "truth": {
         "C": "1",
         "W": "1",
-        "E": "0",
-        "H": "?",
-        "L": "0",
+        "E": "1",
+        "H": "1",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -10286,7 +10671,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "`npm run build` followed immediately by the isolated recovery binary test deterministically emits the typed JSON payload; exit-zero/empty-output is forbidden; no sleep, retry masking or mock-only substitution",
-      "evidence": "The initial dogfood saw two same-shell `build && vitest` observations return child exit 0 with empty stdout before a standalone rerun passed. On 2026-07-31, after a clean successful build, the isolated test failed twice consecutively with the same `code=0/stdout=\"\"/stderr=\"\"`, while an exact manual fixture using the same built `dist/cli/entry.js`, cwd shape and sanitized environment emitted the expected typed JSON. This narrows the unresolved authority interaction to the Vitest child-entry context rather than the recovery command itself. Negative scope: no timing sleep, no retry masking, no accepting empty output, no provider call",
+      "evidence": "Repeated `exit=0/stdout=\"\"/stderr=\"\"` observations were narrowed to nested Node/Vitest pipe transport: a standalone file-backed Node parent also lost both piped streams while direct OS file descriptors retained the bytes. Recovery adds one dedicated async binary-contract runner with OS-backed stdout/stderr files, a bounded 30-second kill deadline, no retry and no sleep. It asserts non-empty parseable `status --json` plus read-only exact-identity `recover --dry-run --json`, including byte-for-byte fixture preservation. The source-process status contract uses the same transport and passes 8/8. On 2026-07-31 `npm run build` completed cleanly and the immediately following single-attempt `npm run test:binary-contracts` emitted `binary-contracts: PASS (status, recovery)`; no empty-success occurred. Item remains OPEN only for native-platform CI and repetition/scale evidence",
       "updated": "2026-07-31"
     },
     {
@@ -10438,7 +10823,7 @@
         "W": "1",
         "E": "1",
         "H": "?",
-        "L": "0",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -10451,7 +10836,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A dry-run preview yields a durable exact proposal reference that the owner can approve and run unchanged; revision, digest, scope, topology, lineage and task bytes remain identical, while expiry or source change requires an explicit new proposal",
-      "evidence": "The refined valid host preview produced digest `4a7e487845b0…`, but `deckent do --run --yes` replanned to `4564ee…`, and the next corrected run replanned again to `fb8351204e7b…`. The RunFlow Do adapter no longer rejects a dry-run proposal; it leaves the durable flow in `AWAITING_APPROVAL` and prints `deckent runs <flowId> --approve --start`, whose shared decision/start services consume the same stored revision and digest. The legacy flag-off golden-flow path is unchanged. Focused Do/RunFlow tests pass 22/22; fresh built-binary cross-invocation proof remains required. Affected product and dogfood surfaces: Do CLI, ApprovalBroker, RunFlow proposal store and operator trust. Negative scope: no implicit approval of a replacement digest, no text-intent equivalence, no surface-local approval cache",
+      "evidence": "The refined valid host preview produced digest `4a7e487845b0…`, but `deckent do --run --yes` replanned to `4564ee…`, and the next corrected run replanned again to `fb8351204e7b…`. The RunFlow Do adapter no longer rejects a dry-run proposal; it leaves the durable flow in `AWAITING_APPROVAL` and prints `deckent runs <flowId> --approve --start`, whose shared decision/start services consume the same stored revision and digest. Sprint-483 is the fresh built-binary cross-invocation proof: flow `5c6c8fc3-ba9e-4c27-9d5b-a7ea016b0fcc` revision 1 and digest `47e62d2c…` were previewed, owner-approved and started without replanning; the stored two-wave topology and three task artifacts were preserved. The item remains OPEN for expiry/source-drift negative live proof and every-environment/scale evidence. Affected product and dogfood surfaces: Do CLI, ApprovalBroker, RunFlow proposal store and operator trust. Negative scope: no implicit approval of a replacement digest, no text-intent equivalence, no surface-local approval cache",
       "updated": "2026-07-31"
     },
     {
@@ -10518,7 +10903,7 @@
         "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -10531,7 +10916,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A digest-bound proposal that forbids new paths can materialize only existing allowlisted `filesWrite` entries; any planner-added absent path blocks preview or requires a new explicitly approved revision, and prompt-lint cannot downgrade the violation to a warning",
-      "evidence": "Flow `64b619e2-2ced-4c20-b162-e4c9c914c475`, revision 1, digest `581fc20e…` proved the original defect: scope gate passed, prompt-lint only warned for two absent test paths and workers created both. Recovery implementation now introduces a provider-neutral `closed-allowlist` authority, canonicalizes it into the V4 plan digest while preserving byte-frozen V2/V3 projections, rejects untracked allowlist entries and planner-added writes before durable preview/event/artifact publication, and revalidates file presence plus task scope at exact-start before `.tasks` materialization. `--force-scope` cannot widen this authority; CLI `do --write-allowlist <paths...>` is explicit and legacy `do` fails closed instead of ignoring it. Focused tests pass 200/200, broader RunFlow/exact/Do regressions pass 156/156, TypeScript/lint/build pass and built-binary help exposes the option. Fresh live closed-scope Do replay remains required before DONE. Affected product and dogfood surfaces: Do preview, exact-plan digest, planner, scope gate, exact-start, worker authority and operator approval. Negative scope: no natural-language authority inference, no repository-wide existence scan on healthy dispatch, no implicit `--force-scope`, no post-approval allowlist mutation",
+      "evidence": "Flow `64b619e2-2ced-4c20-b162-e4c9c914c475`, revision 1, digest `581fc20e…` proved the original defect: scope gate passed, prompt-lint only warned for two absent test paths and workers created both. Recovery implementation now introduces a provider-neutral `closed-allowlist` authority, canonicalizes it into the V4 plan digest while preserving byte-frozen V2/V3 projections, rejects untracked allowlist entries and planner-added writes before durable preview/event/artifact publication, and revalidates file presence plus task scope at exact-start before `.tasks` materialization. `--force-scope` cannot widen this authority; CLI `do --write-allowlist <paths...>` is explicit and legacy `do` fails closed instead of ignoring it. Sprint-483 supplied the fresh live replay: the approved three-path allowlist materialized exactly those existing files, each worker was confined to one write path, and no unapproved path was created. The initial broader natural-language proposal was correctly blocked pre-start for an `undeclared-writer-collision`, demonstrating that topology rejection remains fail-closed. Focused tests pass 200/200, broader RunFlow/exact/Do regressions pass 156/156, TypeScript/lint/build pass. Item remains OPEN for expiry/source-drift, native platform and scale evidence. Affected product and dogfood surfaces: Do preview, exact-plan digest, planner, scope gate, exact-start, worker authority and operator approval. Negative scope: no natural-language authority inference, no repository-wide existence scan on healthy dispatch, no implicit `--force-scope`, no post-approval allowlist mutation",
       "updated": "2026-07-31"
     },
     {
@@ -10557,7 +10942,7 @@
         "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -10570,7 +10955,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A child becomes dispatchable only after every dependency logical lineage has one aggregate terminal receipt accepted as DONE or allowed debt; raw `.result`, worker exit and pre-evaluation status cannot release the edge; generated FIX attempts remain inside the parent lineage",
-      "evidence": "Sprint-482 task 482-002 spawned at `07:14:46Z` immediately after 482-001 raw result/worker exit, while Brain did not persist 482-001 aggregate evaluation DONE until `07:19:05Z`. Manual recovery now injects host evaluation into result collection, persists the aggregate verdict before status mutation/dependency release, reuses the same receipt in the full EVALUATE phase and fails typed when that receipt is absent. Hermetic race, dependency-pipeline and evaluator suites pass; fresh live replay remains required before DONE. Negative scope: no global wave barrier, no polling delay, no treating worker self-assessment as authority",
+      "evidence": "Sprint-482 task 482-002 spawned at `07:14:46Z` immediately after 482-001 raw result/worker exit, while Brain did not persist 482-001 aggregate evaluation DONE until `07:19:05Z`. Manual recovery now injects host evaluation into result collection, persists the aggregate verdict before status mutation/dependency release, reuses the same receipt in the full EVALUATE phase and fails typed when that receipt is absent. Sprint-483 supplied the fresh live dependency replay: topology declared wave 1 as 483-001/002 and wave 2 as dependent 483-003; 483-003 was not dispatched until both predecessor aggregate evaluations had settled. Hermetic race, dependency-pipeline and evaluator suites pass. Item remains OPEN for FIX-lineage dependency replay, native platform and scale proof. Negative scope: no global wave barrier, no polling delay, no treating worker self-assessment as authority",
       "updated": "2026-07-31"
     },
     {
@@ -10587,7 +10972,9 @@
         "RECOVERY-BORN-480-FIX-PRIORITY-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "RECOVERY-BORN-485-FIX-AUTHORITY-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -10607,7 +10994,8 @@
         "PLANNER-001",
         "ROUTING-001",
         "RECOVERY-BORN-480-SCOPE-001",
-        "RECOVERY-BORN-480-FIX-PRIORITY-001"
+        "RECOVERY-BORN-480-FIX-PRIORITY-001",
+        "RECOVERY-BORN-485-FIX-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "A generated FIX derives a minimal reviewed write-set delta from typed failure evidence, routes to an implementation-capable persona, de-duplicates bounded verification targets and refuses dispatch when the repair cannot be performed within authority; retries never repeat an unchanged impossible contract",
@@ -10627,7 +11015,10 @@
         "RUNFLOW-001",
         "PAUSED-FINALIZE-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -10667,8 +11058,12 @@
         "LIMIT-001",
         "KERNEL-SETTLEMENT-001"
       ],
-      "dependents": [],
-      "children": [],
+      "dependents": [
+        "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001"
+      ],
+      "children": [
+        "RECOVERY-BORN-485-USAGE-BILLING-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -10687,7 +11082,8 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "LIMIT-001",
-        "KERNEL-SETTLEMENT-001"
+        "KERNEL-SETTLEMENT-001",
+        "RECOVERY-BORN-485-USAGE-BILLING-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Subscription/local/free-tier attempts retain token and quota/reference-cost observability while incremental billed USD and API budget charge remain zero unless authoritative metered billing evidence exists; job, task, status, KPI and admission projections agree",
@@ -10733,6 +11129,361 @@
       "acceptance": "Triggers create governed missions; no alternate backlog/effect engine; bounded safety canary",
       "evidence": "2026-07-27 code/live truth: config `enabled=true, engine=v2`; v2 executor/provider authority HOLD, loop fiilen yok; CLI/MCP/API v1 control plane ve Flow bridge yalnız disabled v1 yolunda",
       "updated": "2026-07-27"
+    },
+    {
+      "order": 3191,
+      "id": "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Explicit failed mandatory deliverable cannot be rubric-promoted into allowed debt or terminal success",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-SETTLEMENT-001",
+        "EVALUATION-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+      ],
+      "dependents": [],
+      "children": [
+        "RECOVERY-BORN-485-SEMANTIC-VERDICT-001"
+      ],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-SETTLEMENT-001",
+        "EVALUATION-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-BORN-485-SEMANTIC-VERDICT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "A result with `selfAssessment=NO_GO`, failed verification or absent mandatory artifact remains failed/repairable unless disk evidence proves the exact deliverable already exists and satisfies acceptance; generic rubric points cannot promote it; FIX or typed PAUSE/HOLD precedes outer `RUN_COMPLETED`",
+      "evidence": "Sprint-483 task 483-003 was incorrectly score-promoted after an explicit NO_GO and absent mandatory artifact. Sprint-484 exact Do implemented the recovery: explicit NO_GO, `testsPassed=false` and attribution HOLD cannot be rubric-promoted; spurious reconciliation requires VERIFIED exact-attempt attribution, non-empty in-scope changes and every rubric row passing. Focused evaluation/reconciliation tests pass and the implementation sprint settled normally. Item remains OPEN for a fresh deliberately failing live replay across RunFlow outer settlement and native/scale evidence. Negative scope: no blanket worker trust, no score-only success, no synthetic artifact, no infinite retry",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3192,
+      "id": "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "PROVIDER",
+      "outcome": "Advertised worker concurrency must equal attainable provider execution concurrency",
+      "priority": "P0",
+      "dependsOn": [
+        "PROVIDER-INGRESS-001",
+        "LIMIT-001",
+        "RUNNER-PROTOCOL-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROVIDER-INGRESS-001",
+        "LIMIT-001",
+        "RUNNER-PROTOCOL-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Admission derives an effective per-provider/principal concurrency capability; authentication refresh is serialized only for the bounded credential mutation section, not the full provider execution lifetime; topology, status and metrics expose admitted versus attained concurrency and fail honestly when isolation is unavailable",
+      "evidence": "Sprint-487 wired exact-principal provider execution observations from Docker into a bounded SQLite store, passed caller-authored concurrency capability through host admission and composed a read-only attained projection into real CLI status. Missing provider capacity remains typed `HOLD/unknown`, never zero; 36-file scoped proof and the canonical closure canary pass. Fresh built multi-provider replay and durable admitted-capacity observation remain open. Negative scope: no credential-integrity lock removal, unbounded fan-out, provider-name hardcode or fabricated quota",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3193,
+      "id": "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "EVAL",
+      "outcome": "Cross-provider XVerify receives complete digest-bound material evidence and gates promotion honestly",
+      "priority": "P0",
+      "dependsOn": [
+        "XVERIFY-WIRE-001",
+        "EVALUATION-001",
+        "RECEIPT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "0",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "XVERIFY-WIRE-001",
+        "EVALUATION-001",
+        "RECEIPT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Every material claim field reaches the different-provider verifier intact or by content-addressed reference; host truncation yields typed HOLD/UNAVAILABLE and cannot be counted as successful verification or ignored by Brain promotion; verifier usage and billing evidence remain separately attributable",
+      "evidence": "Sprint-483 different-provider XVerify returned UNCLEAR after host truncation but Brain still accepted the producer and no further material check ran. Recovery routes production ingress through the exact typed V2 composition in advisory and enforced modes, separates payload transport from enforcement policy, carries structured criteria plus immutable evidence references, and records advisory CONFIRMED/REFUTED/UNCLEAR/UNAVAILABLE without fabricating a blocking result. Enforced UNCLEAR/unavailable remains HOLD; legacy string launch is isolated to compatibility callers without a production factory. Cross-verify suites pass 118/118 plus config/CLI regressions. Item remains OPEN for fresh different-provider live replay, multi-check admission policy, native and scale evidence",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3194,
+      "id": "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "AUTHORITY",
+      "outcome": "Exact RunFlow worker prompt cannot ingest a stale competing execution directive",
+      "priority": "P0",
+      "dependsOn": [
+        "RUNFLOW-001",
+        "PROMPT-001",
+        "AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [
+        "RECOVERY-BORN-485-PROMPT-POLICY-001"
+      ],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "0",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUNFLOW-001",
+        "PROMPT-001",
+        "AUTHORITY-001",
+        "RECOVERY-BORN-485-PROMPT-POLICY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "An exact approved task receives one digest-bound execution authority; repository instruction files may contribute invariant project policy, but a mutable Sprint/DIRECTIVES projection is included only when its identity and digest match the approved plan, otherwise it is excluded with typed provenance evidence",
+      "evidence": "Sprint-483 exact workers also discovered an unrelated stale root `DIRECTIVES.md`, creating two mutable task authorities. Recovery persists source authority through plan approval and spawn; an intent-sourced exact run excludes root DIRECTIVES, while a directives-sourced run admits only byte-identical SHA-256 content and emits typed provenance/audit evidence for source-kind exclusion or digest drift. The prompt names the approved exact task as the sole mutable execution directive while preserving AGENTS/CLAUDE/ADR as invariant policy. Focused RunFlow/prompt contracts pass. Item remains OPEN for fresh intent- and directives-sourced live replays, expiry/drift race, native and scale evidence",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3195,
+      "id": "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
+      "parent": "RUN-STATUS-AUTHORITY-001",
+      "program": "KERNEL",
+      "outcome": "Terminal authority publishes before archive and status never regresses during cleanup",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
+      ],
+      "children": [
+        "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001",
+        "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001"
+      ],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001",
+        "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "One fenced terminal receipt atomically precedes archive/cleanup; CLI, MCP, dashboard and job remain monotonic COMPLETE with logical progress bounded to N/N; temp/residue files cannot become task identity",
+      "evidence": "Sprint-487 wired exact terminal evidence and one fenced receipt before every archive/cleanup edge, then moved CLI and MCP onto one core receipt projection. Supervisor canary exposed and repaired locale-dependent FIX-leaf selection, fail-open receipt publication, and landing-proposal archival. Real built CLI now passes exact coordinator death, receipt-before-archive, residue preservation and monotonic status. Dashboard/job adoption and every-environment replay remain open. Negative scope: no timer mask, dashboard lifecycle authority or evidence deletion; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-terminal-binary`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3196,
+      "id": "RECOVERY-BORN-485-FIX-AUTHORITY-001",
+      "parent": "RECOVERY-BORN-482-FIX-AUTHORITY-001",
+      "program": "KERNEL",
+      "outcome": "FIX retries repair diagnosed read authority and refuse unchanged impossible contracts",
+      "priority": "P0",
+      "dependsOn": [
+        "WORKER-DISCOVERY-001",
+        "PLANNER-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "WORKER-DISCOVERY-001",
+        "PLANNER-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Typed failure evidence produces a minimal reviewed filesRead/filesWrite delta or PAUSE/HOLD; an unchanged authority fingerprint cannot consume another retry; nested FIX prompt retains the exact original acceptance without truncation",
+      "evidence": "Sprint-487 live replay dispatched original→FIX→FIX-FIX and XFIX repair waves after transactional resume reauthorized exact execution budgets. Repeated-fingerprint circuit breaking and repair settlement are wired; supervisor fixed the pause decision so repaired roots are excluded and only unresolved lineages plus blocked dependants remain. Automatic read-authority widening and a clean no-manual-recovery replay remain open. Negative scope: no repository-wide discovery, broad automatic write grant, repeated identical retry or prompt nesting drift",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3197,
+      "id": "RECOVERY-BORN-485-SEMANTIC-VERDICT-001",
+      "parent": "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+      "program": "EVAL",
+      "outcome": "Passing evidence must exercise the acceptance-bound production consumer",
+      "priority": "P0",
+      "dependsOn": [
+        "EVALUATION-001",
+        "TEST-DISCOVERY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "EVALUATION-001",
+        "TEST-DISCOVERY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Brain binds every mandatory criterion to executed, non-skipped evidence and the exact production symbol/consumer declared by the task; green unrelated tests, fixture-local reimplementation and skipped suites cannot authorize DONE",
+      "evidence": "Sprint-486 wired the semantic verdict gate into `result-evaluator` and added negative production-consumer replay. The finalizer now also rejects scoped Vitest exit-zero unless executed file/assertion counts are parseable. Fresh heterogeneous live NO_GO→FIX settlement and non-Vitest adapter evidence remain open. Negative scope: no score-only inference, exit-zero proxy or worker note as proof",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3198,
+      "id": "RECOVERY-BORN-485-USAGE-BILLING-001",
+      "parent": "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
+      "program": "COST",
+      "outcome": "FIX lineage usage, billing and KPI projections resolve through logical task authority",
+      "priority": "P0",
+      "dependsOn": [
+        "LIMIT-001",
+        "RECEIPT-001",
+        "SPRINT-HONESTY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "LIMIT-001",
+        "RECEIPT-001",
+        "SPRINT-HONESTY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Every original/FIX/FIX-FIX attempt retains tokens and reference cost; subscription/local billed USD stays zero; job, KPI, usage and cost surfaces consume the same lineage-aware aggregate and expose attempt versus logical denominators",
+      "evidence": "Sprint-486 wired `lineage-usage-authority` into CLI usage, MCP usage, sprint reporter and finalizer; subscription/local/free-tier billing remains reference-only while attempt tokens remain visible. Focused lineage and surface tests pass. A fresh mixed original/FIX live replay, API/Terminal/Desktop parity and scale evidence remain open. Negative scope: no dropped FIX usage, catalog-as-invoice or hidden attempts",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3199,
+      "id": "RECOVERY-BORN-485-PROMPT-POLICY-001",
+      "parent": "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "outcome": "Exact worker prompt preserves global run policy, forced skills and monotonic lifecycle instructions",
+      "priority": "P0",
+      "dependsOn": [
+        "PROMPT-001",
+        "ROUTING-V3-CUTOVER-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROMPT-001",
+        "ROUTING-V3-CUTOVER-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Content-addressed exact prompt binds task plus applicable run-wide constraints; forceSkills survive routing and FIX rotation; lifecycle timestamp/heartbeat writers use injected current authority; generated goCriteria cannot contradict the approved test/build policy",
+      "evidence": "Sprint-486 wired exact run-policy and prompt-authority checks, but forced-skill closure task 018 was NO_GO and the fenced heartbeat reducer remains an unconsumed foundation because task 023 was deferred. Prompt policy is therefore partial until every worker/FIX ingress and the single host heartbeat writer consume it in a fresh live replay. Negative scope: no provider branch, unbounded prompt dump or worker clock authority",
+      "updated": "2026-07-31"
     },
     {
       "order": 3200,
@@ -10836,10 +11587,12 @@
       ],
       "dependents": [
         "DO-CUTOVER-001",
+        "PRODUCTION-WIRING-AUTHORITY-001",
         "RECOVERY-BORN-480-SCOPE-001",
         "RECOVERY-BORN-481-GATE-TRUTH-001",
         "RECOVERY-BORN-482-CLOSED-SCOPE-001",
         "RECOVERY-BORN-482-FIX-AUTHORITY-001",
+        "RECOVERY-BORN-485-FIX-AUTHORITY-001",
         "WORKER-DISCOVERY-001"
       ],
       "children": [],
@@ -10891,12 +11644,12 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "~",
-        "W": "~",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
-        "X": "?",
+        "X": "0",
         "S": "?"
       },
       "blockerCode": null,
@@ -10907,8 +11660,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Single authoritative worker/attempt state; no file-only split brain; recovery and tenancy proof",
-      "evidence": "Code-truth audit",
-      "updated": "2026-07-26"
+      "evidence": "Sprint-487 added a fenced host heartbeat authority store, wired Docker and in-process writers plus Auditor consumption, and kept process truth separate from worker verdict. Supervisor additionally wired dynamic FIX/XFIX/dependency `TASK_ASSIGN` emission and heartbeat-discovered agents into the dashboard registry using exact task routing metadata. Fresh built replay, tenancy/multi-process proof and retirement of legacy heartbeat compatibility remain open",
+      "updated": "2026-07-31"
     },
     {
       "order": 3240,
@@ -10922,19 +11675,22 @@
         "WORKER-REGISTRY-001"
       ],
       "dependents": [
-        "CODEX-C8"
+        "CODEX-C8",
+        "RECOVERY-BORN-485-USAGE-BILLING-001"
       ],
-      "children": [],
+      "children": [
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
+      ],
       "gates": [
         "G1"
       ],
       "state": "OPEN",
       "truth": {
         "C": "1",
-        "W": "~",
-        "E": "0",
-        "H": "?",
-        "L": "0",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
         "X": "?",
         "S": "?"
       },
@@ -10942,12 +11698,55 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "KERNEL-SETTLEMENT-001",
-        "WORKER-REGISTRY-001"
+        "WORKER-REGISTRY-001",
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Summary includes pre-EVALUATE results; teardown linger root cause measured; no `0/N` false report",
-      "evidence": "2026-07-27 code-truth: `CLEANUP` phase enum'da yok; finalizer decay/COMPLETE/PID-checkpoint temizliğini delayed cleanup'tan önce yapıyor; finalizer failure marker'ı success'e dönebiliyor",
-      "updated": "2026-07-27"
+      "evidence": "Sprint-486 retained verified-attribution summaries and bounded logical progress. Automatic finalization no longer launches repository-wide Vitest: it derives an exact task-scope manifest, records command/executed/pass/fail/skip/timeout evidence, fails closed on missing required tests or empty exit-zero, and never launches the prior hidden second baseline suite. Standalone built-binary containment proves ACTIVE remains until exact coordinator death and only then becomes COMPLETE. Logical terminal receipt/denominator closure remains under 3195; cross-platform and scale remain open. Negative scope: no ambient diff ownership, mixed unlabeled denominators or implicit full-suite gate",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3241,
+      "id": "PRODUCTION-WIRING-AUTHORITY-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "Production changes cannot settle without canonical consumer and enablement reachability",
+      "priority": "P0",
+      "dependsOn": [
+        "PLANNER-001",
+        "EVALUATION-001",
+        "TEST-DISCOVERY-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
+        "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PLANNER-001",
+        "EVALUATION-001",
+        "TEST-DISCOVERY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Every production-code task carries a digest-bound language-neutral wiring contract from changed producer through canonical consumer, affected ingresses and enablement authority to exact executed proof; planner blocks missing authority, worker reports structured evidence, Brain emits typed UNWIRED/HOLD for test-only or disconnected code, and language adapters fail honestly instead of fabricating parity",
+      "evidence": "Sprint-487 closed the schema→task-builder→prompt→result-settlement→Brain evaluator→outer barrier chain and propagated the contract through Sprint, RunFlow, Do, Autonomous and Process. The previously missing bounded canonical closure canary now executes real file-backed lineage, collision, observation, receipt and CLI/MCP consumers. Fresh built dogfood and non-TypeScript language/runtime adapters remain open. Negative scope: no hot-path repo scan, language-specific core, test-count proxy or fabricated parity; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-wiring-closure-canary`",
+      "updated": "2026-07-31"
     },
     {
       "order": 3250,
@@ -10960,7 +11759,9 @@
         "PLANNER-001",
         "PROMPT-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-485-FIX-AUTHORITY-001"
+      ],
       "children": [
         "TEST-DISCOVERY-001"
       ],
@@ -10998,7 +11799,11 @@
       "outcome": "Pre-dispatch test discovery contract for declared test paths",
       "priority": "P0",
       "dependsOn": [],
-      "dependents": [],
+      "dependents": [
+        "PRODUCTION-WIRING-AUTHORITY-001",
+        "RECOVERY-BORN-485-SEMANTIC-VERDICT-001",
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -11069,7 +11874,10 @@
       "outcome": "Terminal-only atomic result ingestion and malformed-result reconciliation",
       "priority": "P0",
       "dependsOn": [],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -11095,6 +11903,449 @@
       "updated": "2026-07-30"
     },
     {
+      "order": 3270,
+      "id": "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "EXECUTE always yields to runnable work or FIX without a result-count deadlock",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-SETTLEMENT-001",
+        "SCHEDULER-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-SETTLEMENT-001",
+        "SCHEDULER-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Task-level budget failure is local; admitted PENDING work dispatches; admission-held PENDING and PAUSED repair descendants do not manufacture results; EXECUTE exits only after all in-flight attempts settle and FIX then starts",
+      "evidence": "Sprint-487 live resume replay drained initial work, spawned FIX/XFIX/FIX-FIX and dependency waves, and reached an evidence-honest PAUSED state only after the genuinely unresolved 006/017 lineages blocked canary 032. The replay proves the prior empty-slot/non-spawn deadlock is repaired; post-settlement binary staging and a clean terminal replay remain under dedicated children; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-live-repair-waves`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3271,
+      "id": "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Finalize discovers only canonical tasks and publishes COMPLETE only after exact coordinator containment",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RUN-STATUS-AUTHORITY-001",
+        "RESULT-RECONCILIATION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RUN-STATUS-AUTHORITY-001",
+        "RESULT-RECONCILIATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Landing/temp/partial residue never enters task identity; external force-finalize proves generation-fenced coordinator death before terminal state/output, retains active state during grace, and clears PID authority only after verified settlement",
+      "evidence": "Finalize consumes the canonical task-artifact classifier and preserves landing/temp evidence across archive. Standalone built-binary proof creates a real owned coordinator, observes SIGTERM while state remains ACTIVE/EVALUATE, waits for exact death, then verifies fenced receipt, COMPLETE, PID removal, residue preservation and monotonic CLI status. Linux proof passes; Windows native/macOS/namespace matrix remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=force-finalize-terminal-binary`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3272,
+      "id": "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "COST",
+      "outcome": "Dogfood tuning cannot turn per-task subscription limits into a global dispatch stop",
+      "priority": "P0",
+      "dependsOn": [
+        "LIMIT-001",
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "LIMIT-001",
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Effective dogfood config may tune worker turns/cache and explicitly disable legacy cost guard without changing product defaults; subscription/local/free-tier task ceilings settle only their attempt; only authoritative run-wide API/USD authority stops unrelated dispatch",
+      "evidence": "Project dogfood config sets `cost_guard.enabled=false`, worker `maxTurns=100` and `maxCacheReadTokens=10000000`; Brain/Auditor profiles and product defaults remain unchanged. Runtime uses separate task verdict and run-cost state; scoped live-loop proof dispatches the next task after token exhaustion. Fresh aggregate usage analysis will choose the later optimum; no numeric product default is inferred from this experiment; `historical-authority=owner-prompt-sprint486-core-fix-2026-07-31;historical-gates=G1;proof=dogfood-budget-locality-scoped`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3273,
+      "id": "RECOVERY-BORN-486-NERVOUS-COLLISION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Nervous scope-collision decisions must execute real serialization or authority repair",
+      "priority": "P1",
+      "dependsOn": [
+        "SCHEDULER-001",
+        "RECOVERY-BORN-480-FIX-PRIORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SCHEDULER-001",
+        "RECOVERY-BORN-480-FIX-PRIORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "A FIX-lineage self-collision is suppressed; a real competing-writer collision yields an executable reorder/serialization decision whose acceptance changes scheduler authority, while reject/ignore remains truthful and no inert recommendation claims remediation",
+      "evidence": "Sprint-487 wired identity-fenced `SCOPE_COLLISION_REORDER` actions into the scheduler and proved real competing writers serialize while an independent task consumes the free slot; lineage self-collisions are suppressed and reject/ignore are non-mutating. Fresh live Nervous acceptance/release replay remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-collision-scoped`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3274,
+      "id": "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
+      "parent": "SPRINT-HONESTY-001",
+      "program": "KERNEL",
+      "outcome": "Automatic finalization audits only the settled affected-test manifest",
+      "priority": "P0",
+      "dependsOn": [
+        "TEST-DISCOVERY-001",
+        "PRODUCTION-WIRING-AUTHORITY-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TEST-DISCOVERY-001",
+        "PRODUCTION-WIRING-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Finalizer derives shell-free exact tests from approved task scope plus host attribution, records command and executed counts, rejects timeout/unparseable exit-zero, fails when code needs tests but manifest is empty, and reserves full-suite for an explicit audit surface",
+      "evidence": "Sprint-487 added the language-neutral adapter registry, Vitest adapter, finalizer consumer and non-Vitest capability matrix. Supervisor removed a stale reporter assertion and 36 exact scoped files pass without a full suite; built-binary and cross-platform process proof remain the promotion boundary; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-scoped-audit`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3275,
+      "id": "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Built-binary verification is scheduled only after terminal settlement",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Planner represents source verification and post-settlement build/binary proof as separate authority stages; a sprint that forbids build while active never creates an impossible built-CLI dependency or spends FIX retries on stale `dist/`",
+      "evidence": "Sprint-487 task 006 and its FIX failed because tasks 001–005 changed source while active-sprint policy correctly prohibited build. Supervisor proved the required typed seam by compiling after containment and passing the real binary contract, then settled the lineage with explicit manual-recovery evidence. Automatic planning/stage transition remains open; no in-sprint build bypass is accepted",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3276,
+      "id": "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Worker landing proposals use a structured atomic writer and malformed evidence cannot pass silently",
+      "priority": "P1",
+      "dependsOn": [
+        "BUDGET-CONTINUATION-001",
+        "RESULT-RECONCILIATION-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "BUDGET-CONTINUATION-001",
+        "RESULT-RECONCILIATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Every worker/runtime has one cross-platform structured writer that validates exact attempt schema before same-directory atomic rename; malformed proposal produces typed HOLD/diagnostic and cannot be treated as a valid checkpoint",
+      "evidence": "Sprint-487 produced malformed JSON in `487-004-xfix` (unquoted array item) and `487-027-fix` (literal `\\\\n` separators) despite the prompt schema. Host parsing is fail-closed, but free-form shell serialization remains unreliable; no cleanup may erase this residual from the ledger",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3277,
+      "id": "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "ASSURANCE",
+      "outcome": "Worker verification cannot judge unrelated concurrent partial writes",
+      "priority": "P1",
+      "dependsOn": [
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
+        "PRODUCTION-WIRING-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
+        "PRODUCTION-WIRING-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Worker typecheck authority is scoped or runs against an immutable settled snapshot; another active task's partial source cannot create a false NO_GO or consume a FIX retry",
+      "evidence": "Sprint-487 workers invoked repository-wide `tsc --noEmit` while parallel writers were mid-change. Supervisor rerun after quiescence passed; the product needs snapshot/scoped typecheck authority rather than timing-dependent global judgment",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3278,
+      "id": "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001",
+      "parent": "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
+      "program": "KERNEL",
+      "outcome": "A held terminal receipt can never publish a successful job or COMPLETE authority",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Receipt publication failure or non-cleanup-eligible terminal evidence throws a typed terminal-evidence error before archive, job summary, notification, dashboard or COMPLETE state; CLI exits non-zero and artifacts remain recoverable",
+      "evidence": "Sprint-487 force-finalize exposed a false COMPLETE with no terminal receipt because finalizer swallowed `TERMINAL_EVIDENCE_HOLD`. Finalizer now fails closed at the receipt boundary and the focused source-order contract passes; the repaired 32/32 logical settlement subsequently permits the real built-binary receipt path. Fresh paused-run CLI replay and every-environment fault injection remain open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-finalizer-receipt-hold`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3279,
+      "id": "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "ASSURANCE",
+      "outcome": "Build cannot report success when clean is held by active execution authority",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "`npm run clean` returns a non-zero typed HOLD when active task/worker authority exists, so `npm run build` cannot terminate early with exit 0 while skipping TypeScript compilation and asset publication",
+      "evidence": "Acceptance was already satisfied: the supervising tool call omitted the child exit code and was initially misread as exit 0, while output correctly stopped before `tsc`. `scripts/clean.mjs` sets `process.exitCode=1`; the hermetic direct-entry contract asserts exit 1 and preserved dist. No product code change was warranted; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=clean-active-execution-hold-exit`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3280,
+      "id": "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Cleanup consumes canonical task identity and retires only owned temporary residue",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Cleanup never routes landing proposals, partial results or temp residue as executable Task records; terminal cleanup removes only the settled sprint's process-suffixed residue and preserves foreign-run evidence",
+      "evidence": "Sprint-487 cleanup initially crashed because suffix-only loading treated landing proposals as provider-routable tasks. CLI cleanup now uses the canonical task-artifact classifier; lifecycle cleanup scopes process-suffixed residue deletion to the settled sprint number. 51 focused cleanup/authority tests and the real CLI cleanup pass; every-environment replay remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-cleanup-artifact-identity`",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3281,
+      "id": "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001",
+      "parent": "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
+      "program": "KERNEL",
+      "outcome": "Terminal receipt lineages expose canonical logical task identity separately from attempt identity",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Receipt `logicalProgress.lineages[].logicalTaskId` equals the canonical root task ID; attempt IDs remain exact and separate, embedded NUL/composite IDs never leak into logical identity or cross-surface consumers",
+      "evidence": "Sprint-487 truthful receipt has correct 32/32 totals and 44 exact attempts, but its lineage labels contain `taskId\\u0000attemptId`. Counts/status are unaffected; the evidence schema and producer mapping must be repaired before downstream consumers rely on logical IDs",
+      "updated": "2026-07-31"
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "parent": "P04",
@@ -11110,6 +12361,7 @@
         "PLANNER-001",
         "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
         "RECOVERY-BORN-482-CLOSED-SCOPE-001",
+        "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
         "SURFACES-001",
         "TERMINAL-001"
       ],
@@ -11516,6 +12768,8 @@
         "P02-638",
         "PROVIDER-INGRESS-001",
         "REACHABILITY-001",
+        "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
+        "RECOVERY-BORN-485-USAGE-BILLING-001",
         "SURFACE-CONTRACT-001",
         "TRAINING-TRACE-001",
         "XVERIFY-TRUTH-001"
@@ -11605,7 +12859,10 @@
         "KERNEL-001",
         "PROVIDER-HOLD-001",
         "PROVIDER-INGRESS-001",
-        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
+        "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001",
+        "RECOVERY-BORN-485-USAGE-BILLING-001",
+        "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001"
       ],
       "children": [],
       "gates": [
@@ -11649,6 +12906,7 @@
       ],
       "dependents": [
         "CODEX-ADMISSION-001",
+        "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001",
         "XVERIFY-WIRE-001"
       ],
       "children": [
@@ -12668,7 +13926,8 @@
         "DESKTOP-RUNTIME-001",
         "DESKTOP-SECURITY-001",
         "DESKTOP-ENTERPRISE-001",
-        "DESKTOP-REBORN-001"
+        "DESKTOP-REBORN-001",
+        "DESKTOP-CUSTOMIZE-001"
       ],
       "gates": [
         "G2",
@@ -12692,7 +13951,8 @@
         "DESKTOP-RUNTIME-001",
         "DESKTOP-SECURITY-001",
         "DESKTOP-ENTERPRISE-001",
-        "DESKTOP-REBORN-001"
+        "DESKTOP-REBORN-001",
+        "DESKTOP-CUSTOMIZE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Electron security, IPC tiers, theme/i18n/accessibility and shared service authority",
@@ -12835,6 +14095,7 @@
         "SURFACE-CONTRACT-001"
       ],
       "dependents": [
+        "DESKTOP-CUSTOMIZE-001",
         "SURFACE-PARITY-001"
       ],
       "children": [],
@@ -13274,6 +14535,42 @@
       "acceptance": "Each adapter is capability-declared, identity-bound, accessible and contains no alternate core",
       "evidence": "“Every surface” product target",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 6165,
+      "id": "DESKTOP-CUSTOMIZE-001",
+      "parent": "DESKTOP-001",
+      "program": "DESKTOP",
+      "outcome": "User-facing interface personalization: theme/watch, font set and accent selection in the Desktop settings scene",
+      "priority": "P1",
+      "dependsOn": [
+        "DESKTOP-REBORN-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "DESKTOP-REBORN-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Settings scene offers theme + font + accent choices; every identity choice (fonts included) is runtime-switchable through the token layer; choices persist via preferences store; no hardcoded font-family or color on any surface",
+      "evidence": "Alperen requirement 2026-07-31 (\"app customize edilebilmeli — tema, font seçimi; arayüz ayarı sekmesi\"); token architecture: design/tokens/ + theme-tokens.ts customTokens seam",
+      "updated": "2026-07-31"
     },
     {
       "order": 6170,
@@ -13743,7 +15040,11 @@
         "DOCS-PRODUCT-001",
         "RELEASE-001",
         "REPO-MIGRATION-001",
-        "OPERATIONS-PACK-001"
+        "OPERATIONS-PACK-001",
+        "RELEASE-BETA-001",
+        "NPM-CHANNEL-001",
+        "DOCS-TRUTH-PASS-001",
+        "LAUNCH-COMMS-001"
       ],
       "gates": [
         "G2",
@@ -13771,7 +15072,11 @@
         "DOCS-PRODUCT-001",
         "RELEASE-001",
         "REPO-MIGRATION-001",
-        "OPERATIONS-PACK-001"
+        "OPERATIONS-PACK-001",
+        "RELEASE-BETA-001",
+        "NPM-CHANNEL-001",
+        "DOCS-TRUTH-PASS-001",
+        "LAUNCH-COMMS-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Supported/degraded/unsupported matrix for every declared component and surface",
@@ -14033,19 +15338,21 @@
       "parent": "EVERY-ENV-001",
       "program": "REPO",
       "outcome": "Rebaseline and execute repository cutover",
-      "priority": "P1",
+      "priority": "P0",
       "dependsOn": [
         "REPO-CLEANUP-APPLY-001",
         "DOCS-TOPOLOGY-001",
         "MEMORY-AUTHORITY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RELEASE-BETA-001"
+      ],
       "children": [],
       "gates": [
         "G2",
         "G5"
       ],
-      "state": "BLOCKED",
+      "state": "OPEN",
       "truth": {
         "C": "0",
         "W": "0",
@@ -14055,8 +15362,8 @@
         "X": "?",
         "S": "?"
       },
-      "blockerCode": "FRESH_REMOTE_APPROVAL_REQUIRED",
-      "blockerRemedy": "exact `DependsOn` + `gate:G5` receipt",
+      "blockerCode": null,
+      "blockerRemedy": null,
       "closureBlockedBy": [
         "REPO-CLEANUP-APPLY-001",
         "DOCS-TOPOLOGY-001",
@@ -14064,8 +15371,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Current target, source set, history, remotes, docs, memory, rollback and read-only transition approved",
-      "evidence": "Legacy 488 schedule expired unexecuted",
-      "updated": "2026-07-26"
+      "evidence": "Owner decision 2026-07-31: weekend clean-start cutover to public deckent — filtered sync with fresh secret audit, single launch commit, settle-first on uncommitted work, old repo archived read-only, local .brain/.deckent state carried privately; legacy public-repo-sync.sh absent and must be rebuilt; Legacy 488 schedule expired unexecuted",
+      "updated": "2026-07-31"
     },
     {
       "order": 8080,
@@ -14106,6 +15413,149 @@
       "acceptance": "Solo one-command and enterprise managed paths; encrypted/redacted support; recovery drills",
       "evidence": "Scale and every-environment requirement",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 8090,
+      "id": "RELEASE-BETA-001",
+      "parent": "EVERY-ENV-001",
+      "program": "RELEASE",
+      "outcome": "Owner-approved scoped beta gate: public repo flip plus npm beta channel ahead of RELEASE-001 GA",
+      "priority": "P0",
+      "dependsOn": [
+        "REPO-MIGRATION-001",
+        "NPM-CHANNEL-001",
+        "DOCS-TRUTH-PASS-001"
+      ],
+      "dependents": [
+        "LAUNCH-COMMS-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G5"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "REPO-MIGRATION-001",
+        "NPM-CHANNEL-001",
+        "DOCS-TRUTH-PASS-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Fresh filtered-sync secret audit clean; honest Current Status and platform matrix in public docs; owner-executed visibility flip, npm beta publish and read-only archive; real-binary npx smoke proof; RELEASE-001 GA conditions unchanged",
+      "evidence": "Owner decision 2026-07-31: publish weekend 2026-08-01/02 with clean-start history; GA gate is not relaxed — beta is an additional station before RELEASE-001",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 8091,
+      "id": "NPM-CHANNEL-001",
+      "parent": "EVERY-ENV-001",
+      "program": "RELEASE",
+      "outcome": "npm name reservation and beta dist-tag channel under owner-manual publish",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "RELEASE-BETA-001"
+      ],
+      "children": [],
+      "gates": [
+        "G5"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Tarball whitelist audit (dist, bin, README, LICENSE only); owner-run npm publish --tag beta --access public; latest tag untouched; fresh-machine npx deckent@beta init smoke proof",
+      "evidence": "Registry returned 404 for deckent on 2026-07-31 — name unregistered and squatting-exposed until reserved; npm publish is always owner-manual",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 8092,
+      "id": "DOCS-TRUTH-PASS-001",
+      "parent": "EVERY-ENV-001",
+      "program": "DOCS",
+      "outcome": "Beta-scope public README and top-level docs reality pass from current code truth",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "RELEASE-BETA-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "README rewritten from src reality (provider adapter families, XVerify subsystem, typed settlement, MCP tool surface); honest Current Status section; SECURITY.md, CONTRIBUTING.md and license hygiene present; no stale counts",
+      "evidence": "Owner statement 2026-07-31: docs stale for months while code advanced; verified code inventory — 7 provider families incl. Ollama/OpenRouter/Bedrock, 42 MCP tools, 2384 test files; beta-scope subset of DOCS-PRODUCT-001, which stays authoritative for GA six-language docs",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 8093,
+      "id": "LAUNCH-COMMS-001",
+      "parent": "EVERY-ENV-001",
+      "program": "PRODUCT",
+      "outcome": "Launch communications, demo assets and recurring social cadence",
+      "priority": "P1",
+      "dependsOn": [
+        "RELEASE-BETA-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RELEASE-BETA-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Demo asset (terminal recording), Show HN and X/LinkedIn drafts on verifiable-orchestration positioning, comparison page, weekly cadence plan; every outbound post owner-approved before publication",
+      "evidence": "Competitor scan 2026-07-31: category consolidating (Terragon, vibe-kanban, Roo Code shut down), Ruflo owns distribution while its orchestration claims are audit-refuted — deckent counter-position is evidence-backed settlement",
+      "updated": "2026-07-31"
     },
     {
       "order": 9000,
@@ -14213,6 +15663,8 @@
       ],
       "dependents": [
         "LEARNING-DOGFOOD-001",
+        "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
+        "RECOVERY-BORN-485-PROMPT-POLICY-001",
         "ROUTING-001",
         "WORKER-DISCOVERY-001"
       ],
@@ -14337,7 +15789,9 @@
       "dependsOn": [
         "PROMPT-V3-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-485-PROMPT-POLICY-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -14376,7 +15830,11 @@
         "CM-04"
       ],
       "dependents": [
+        "PRODUCTION-WIRING-AUTHORITY-001",
         "PROMOTION-001",
+        "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+        "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
+        "RECOVERY-BORN-485-SEMANTIC-VERDICT-001",
         "XVERIFY-TRUTH-001"
       ],
       "children": [],
@@ -14910,6 +16368,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "4b550ed2d4d21cac4160a4c39337200f1a49c08a111cf94b5b58e54524975cb8"
+    "value": "8d55c97d1e7ac15cf451930fcf8e5704573552d2b54d0438291b1866e0c227ea"
   }
 }
