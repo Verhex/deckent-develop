@@ -211,7 +211,7 @@ function foundationsParity() {
         .flatMap((m) => m[1].match(/#[0-9a-fA-F]{6}\b/g) ?? [])
         .map((h) => h.toLowerCase()),
     );
-    for (const m of html.matchAll(/#[0-9a-fA-F]{3,6}\b/g)) {
+    for (const m of html.matchAll(/(?<!&)#[0-9a-fA-F]{3,6}\b/g)) {  // (?<!&): &#183; gibi HTML-entity'leri hex değildir
       const hex = m[0].toLowerCase();
       if (hex.length !== 7) problems.push(`${card}: kısa/geçersiz hex "${m[0]}"`);
       else if (!allowed.has(hex) && !cardAllow.has(hex)) problems.push(`${card}: token-dışı hex "${m[0]}"`);

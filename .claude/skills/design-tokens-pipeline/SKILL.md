@@ -128,8 +128,6 @@ description: Use when creating or changing ANY design token (color, typography, 
 - **Component ürünleşme-önkoşulları** (a11y 2026-07-31): forced-colors focus `outline` yedeği
   (react-aria focus-ring) · error `aria-describedby` bağı · `:has()` yerine `isFocusVisible` ·
   input-kenarlık 1.4.11 muafiyeti = "alan daima prefix/label ile tanınır" sözleşmesi.
-- **Kart-şablonu kuralı** (critic #6): component kartlarında state-başlık yazımı ve component-adı
-  biçimi tek kurala bağlanacak (şablonlaştırma — sonraki kart üretiminde).
 - **NOVA-sahne flip-önkoşulları** (kimlik-turu denetimleri, 2026-07-31; pattern-denetimleriyle
   genişletildi 2026-08-01 — prototip: `design/prototypes/kimlik-turu-2026-07-31.html`, spec:
   `patterns/command-scene.html`): (a) worker-segment klavye erişimi (react-aria: ok-tuşu +
@@ -140,9 +138,19 @@ description: Use when creating or changing ANY design token (color, typography, 
   telemetry-river rotasyonu accent→novaGlowBright→go→amber); (f) canvas mikro-metin ≥10px;
   (g) Canvas/CSS nefes-tempo senkronu (≈6.3s vs 4s — tek ritim); (h) transport: poll ölür →
   birleşik `/api/live` SSE (anayasa Teknik); (i) nehir WCAG 2.2.2 pause/freeze + `role="log"`.
-- **Pattern-turu token-adayları (onay bekler):** `duration.riverArrive` 450ms ·
-  `alpha.glowText` .14 · `opacity.riverText` .86 · `selection-overlay` (prototipte token-dışı
-  beyaz .55) · `radius.panel` 10px · `radius.pill` 999px.
+- **Pattern/component-turu token-adayları (onay bekler):** `duration.riverArrive` 450ms ·
+  `alpha.glowText` .14 · `opacity.riverText` .86 · `selection-overlay` (token-dışı beyaz .55) ·
+  `radius.panel` 10px · `radius.pill` 999px · **panel-float ailesi (kanonik ad-seti):**
+  `alpha.panelScrim` .86 · `alpha.panelEdge` .25 · `blur.panelFloat` 6px ·
+  **progress ailesi:** component-rolleri `progress-track/fill/fill-done/fill-abort/arc`
+  (watch-map'e ekleme) + `size.progressHairline/Bold` 2/6px + `size.progressRadialSm/Md`
+  40/64px + `duration.progressFlow` 1.6s.
+- **Doc-drift kaydı (Alperen'e):** MCP-instruction/CLAUDE.md lifecycle metinleri
+  "…DECAY→CLEANUP" yazıyor; typed authority `SprintPhase` enum'unda terminal faz **COMPLETE**
+  (cleanup bir komuttur). Metinlerin enum'a hizalanması ayrı iş (critic 2026-08-01 #1 kökü).
+- ✅ **Kart-şablonu kuralı YAZILDI** (`design/claude-design/CARD-TEMPLATE.md`, 2026-08-01):
+  kabuk ölçüleri + ad-biçimi + EN-kanonik state dili + rozet standardı; eski "kart-şablonu
+  kuralı" açık maddesi kapandı — mevcut kartlar sıradaki dokunuşta hizalanır.
 - **NOVA accent-ailesi**: gerçek-veri prototip turunda seçilir; seçime kadar aday-token.
 - **Dashboard light-tema**: var mı yok mu — ADR-G-033 lens'iyle karar.
 - **day-watch muted/focus**: 4.33/4.25 — küçük-punto kullanım kuralı ya da inkMuted koyulaştırma.
