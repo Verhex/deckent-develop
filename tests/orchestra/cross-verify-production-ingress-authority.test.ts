@@ -21,9 +21,12 @@ import {
 } from '../../src/core/task-types.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlement,
   createTaskResultSettlementRefForAttempt,
   taskResultSettlementActiveClaimDigest,
   writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementAtomic,
+  writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
 import {
   CrossVerifyProductionIngressAuthority,
@@ -129,6 +132,7 @@ describe('CrossVerifyProductionIngressAuthority', () => {
         settlementRef: ref,
         fenceTokenHash: taskResultSettlementActiveClaimDigest(ref),
         runtimeImageRef: `sha256:${'9'.repeat(64)}`,
+        producerSettlementDigest: `sha256:${'8'.repeat(64)}`,
       });
 
       expect(bootstrapped).toMatchObject({
@@ -181,7 +185,7 @@ describe('CrossVerifyProductionIngressAuthority', () => {
     });
   });
 
-  it('resolves exact production authority in advisory mode without changing policy', async () => {
+  it('holds implementation verification before provider authority without a closed producer settlement', async () => {
     const providerAuthority = {
       state: 'ready',
       tenantId: 'tenant-a',
@@ -204,10 +208,75 @@ describe('CrossVerifyProductionIngressAuthority', () => {
       timeoutMs: 120_000,
     })).resolves.toMatchObject({
       state: 'hold',
-      reasonCode: 'xverify_execution_profile_unavailable',
-      verifierProvider: 'codex',
-      verifierModel: expect.any(String),
+      reasonCode: 'xverify_producer_settlement_missing',
     });
+  });
+
+  it('accepts only the exact closed producer result before advancing to provider authority', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'deckent-xverify-producer-'));
+    const projectRoot = join(base, 'project');
+    const stateRoot = join(base, 'host-state');
+    const originalDeckentHome = process.env.DECKENT_HOME;
+    try {
+      mkdirSync(projectRoot, { recursive: true });
+      mkdirSync(stateRoot, { recursive: true });
+      process.env.DECKENT_HOME = stateRoot;
+      const producerResult = result();
+      const ref = createTaskResultSettlementRefForAttempt(
+        projectRoot,
+        task().id,
+        randomUUID(),
+      );
+      writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref,
+        exitCode: 0,
+        result: producerResult,
+      }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'stopped-removed',
+        locksReleased: true,
+      });
+      const providerAuthority = {
+        state: 'ready',
+        tenantId: 'tenant-a',
+        projectId: 'project-a',
+        authorityEvidenceRef: 'provider-authority:test',
+        service: new Proxy({}, {
+          get() { throw new Error('profile authority should be the next boundary'); },
+        }),
+        close() {},
+      } as unknown as ProviderAuthorityRuntimeServiceOpenResult;
+      const ingress = new CrossVerifyProductionIngressAuthority({ providerAuthority });
+
+      await expect(ingress.compose({
+        projectRoot,
+        task: task(),
+        result: producerResult,
+        config: config(true),
+        operationClass: 'verify-implementation',
+        timeoutMs: 120_000,
+      })).resolves.toMatchObject({
+        state: 'hold',
+        reasonCode: 'xverify_execution_profile_unavailable',
+      });
+      await expect(ingress.compose({
+        projectRoot,
+        task: task(),
+        result: { ...producerResult, notes: 'ambient evaluate-time mutation' },
+        config: config(true),
+        operationClass: 'verify-implementation',
+        timeoutMs: 120_000,
+      })).resolves.toMatchObject({
+        state: 'hold',
+        reasonCode: 'xverify_producer_result_mismatch',
+      });
+    } finally {
+      if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+      else process.env.DECKENT_HOME = originalDeckentHome;
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 
   it('HOLDs before selector, claim, reservation or dispatch when profile authority is absent', async () => {
@@ -229,7 +298,7 @@ describe('CrossVerifyProductionIngressAuthority', () => {
       task: task(),
       result: result(),
       config: config(true),
-      operationClass: 'verify-implementation',
+      operationClass: 'adjudicate-claim',
       timeoutMs: 120_000,
     })).resolves.toMatchObject({
       state: 'hold',
@@ -267,7 +336,7 @@ describe('CrossVerifyProductionIngressAuthority', () => {
       task: task(),
       result: result(),
       config: config(true),
-      operationClass: 'verify-implementation',
+      operationClass: 'adjudicate-claim',
       timeoutMs: 120_000,
       verifierModel: 'claude-fable-5',
     })).resolves.toMatchObject({

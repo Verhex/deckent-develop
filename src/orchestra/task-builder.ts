@@ -38,7 +38,7 @@ import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
 import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { searchMemory } from '../core/memory-query.js';
-import { BRAIN_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH } from '../core/constants.js';
+import { BRAIN_DIR, EVALUATIONS_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH, TASKS_DIR } from '../core/constants.js';
 import { selectRelevantAdrs, buildAdrPromptSection, classifyInjectionTier } from './adr-selector.js';
 import type { AdrRelevance } from './adr-selector.js';
 import type { RunFlowPlanSourceAuthority } from '../core/run-flow-contract.js';
@@ -74,7 +74,13 @@ export function logInjectionAudit(
 }
 import { readBaseline } from './baseline-tracker.js';
 import { buildTaskPrompt } from './prompt-god-template.js';
-import type { SprintContext, SharedContextEntry, UpstreamHandoffEntry } from './prompt-god-template.js';
+import type {
+  DependencyResultEntry,
+  SprintContext,
+  SharedContextEntry,
+  UpstreamHandoffEntry,
+} from './prompt-god-template.js';
+import { readAuthoritativeTaskResult } from './task-result-authority.js';
 import { SharedMemory } from './shared-memory.js';
 import { HandoffProtocol } from './handoff-protocol.js';
 import type { WorkerCommsConfig, ToolsConfig } from '../core/config-types.js';
@@ -86,6 +92,102 @@ import { resolveVerifyCommands } from './worker-verify-tool.js';
 import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
 import { computeToolAllowlist } from '../core/tool-allowlist.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
+
+function exactDependencyPath(value: string): boolean {
+  if (value.length === 0 || value.startsWith('/') || value.startsWith('\\') || /^[A-Za-z]:/u.test(value)) {
+    return false;
+  }
+  return value.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..');
+}
+
+/**
+ * Collect host-evaluated dependency attempts and fold FIX/FIX-FIX records back
+ * to their logical root. Raw worker selfAssessment is deliberately ignored:
+ * without a Brain audit receipt the entry remains pending in the prompt.
+ */
+export function collectDependencyResultEntries(
+  projectRoot: string,
+  sprintId: string | undefined,
+): ReadonlyMap<string, DependencyResultEntry> {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  if (!sprintId || !existsSync(tasksDir)) return new Map();
+
+  const taskRecords = new Map<string, Task>();
+  const files = readdirSync(tasksDir).sort();
+  for (const file of files.filter(name => name.startsWith('task-') && name.endsWith('.json'))) {
+    try {
+      const record = JSON.parse(readFileSync(join(tasksDir, file), 'utf-8')) as Task;
+      if (record?.id) taskRecords.set(record.id, record);
+    } catch { /* malformed task evidence is not prompt authority */ }
+  }
+  const rootIdFor = (taskId: string): string => {
+    let current = taskId;
+    const seen = new Set<string>();
+    while (!seen.has(current)) {
+      seen.add(current);
+      const parent = taskRecords.get(current)?.fixForTaskId;
+      if (!parent) return current;
+      current = parent;
+    }
+    return taskId;
+  };
+
+  const evaluationDir = join(projectRoot, EVALUATIONS_DIR, sprintId);
+  const latestAuditByTask = new Map<string, { name: string; attempt: number }>();
+  if (existsSync(evaluationDir)) {
+    for (const name of readdirSync(evaluationDir)) {
+      const match = /^(.*)-attempt-(\d+)\.json$/u.exec(name);
+      if (!match) continue;
+      const taskId = match[1]!;
+      const attempt = Number(match[2]);
+      if (!Number.isSafeInteger(attempt) || attempt < 1) continue;
+      const current = latestAuditByTask.get(taskId);
+      if (!current || attempt > current.attempt) {
+        latestAuditByTask.set(taskId, { name, attempt });
+      }
+    }
+  }
+
+  const latestDecisionFor = (taskId: string): 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' | null => {
+    const latest = latestAuditByTask.get(taskId);
+    if (!latest) return null;
+    try {
+      const audit = JSON.parse(
+        readFileSync(join(evaluationDir, latest.name), 'utf-8'),
+      ) as { decision?: unknown };
+      return audit.decision === 'DONE'
+        || audit.decision === 'GO_WITH_TECH_DEBT'
+        || audit.decision === 'NO_GO'
+        ? audit.decision
+        : null;
+    } catch {
+      // Never fall back to an older verdict when the newest authority is corrupt.
+      return null;
+    }
+  };
+
+  const entries = new Map<string, DependencyResultEntry>();
+  for (const file of files.filter(name => name.startsWith('task-') && name.endsWith('.result'))) {
+    const taskId = file.slice('task-'.length, -'.result'.length);
+    try {
+      const decision = latestDecisionFor(taskId);
+      if (!decision) continue;
+      const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+      if (!authority.result) continue;
+      const result = authority.result;
+      const rootId = rootIdFor(taskId);
+      entries.set(taskId, {
+        verdict: decision,
+        filesChanged: (result.filesChanged ?? []).filter(exactDependencyPath),
+        linesAdded: result.linesAdded,
+        linesRemoved: result.linesRemoved,
+        notes: typeof result.notes === 'string' ? result.notes : undefined,
+        ...(rootId !== taskId ? { originalTaskId: rootId } : {}),
+      });
+    } catch { /* unavailable/contradictory authority stays pending */ }
+  }
+  return entries;
+}
 
 // ─── Provider enum values for Zod schemas ────────────────────────────────
 const PROVIDER_NAMES = Object.keys(PROVIDER_MODEL_MAP) as [string, ...string[]];
@@ -1988,6 +2090,21 @@ export function buildWorkerPrompt(
     }
   }
 
+  const dependencyResults = task.dependencies?.length
+    ? collectDependencyResultEntries(projectRoot, task.sprintId)
+    : new Map<string, DependencyResultEntry>();
+  if (task.dependencies?.length) {
+    const dependencyIds = new Set(task.dependencies);
+    const dependencyReadPaths = [...dependencyResults.entries()].flatMap(([attemptId, entry]) => {
+      const rootId = entry.originalTaskId ?? attemptId;
+      return dependencyIds.has(rootId) ? (entry.filesChanged ?? []) : [];
+    });
+    task.scope.filesRead = [...new Set([
+      ...(task.scope.filesRead ?? []),
+      ...dependencyReadPaths,
+    ])].sort();
+  }
+
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -1995,6 +2112,8 @@ export function buildWorkerPrompt(
     allAdrs,
     effort,
     dependencies: task.dependencies,
+    tasksDir: join(projectRoot, TASKS_DIR),
+    dependencyResults,
     sharedContext,
     upstreamHandoffs,
     preExistingFailures,

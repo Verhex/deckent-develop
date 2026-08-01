@@ -62,6 +62,32 @@ describe('sprint-pid-manager', () => {
       expect(content.startedAt).toBeDefined();
     });
 
+    it('returns and persists one exact coordinator lifetime authority', () => {
+      const startedAt = '2026-08-01T07:00:00.000Z';
+      const record = writePid(tmpRoot, 'sprint-authority', startedAt);
+      const persisted = JSON.parse(readFileSync(
+        join(tmpRoot, '.deckent', 'pids', 'sprint-authority.pid'),
+        'utf-8',
+      ));
+
+      expect(record.startedAt).toBe(startedAt);
+      expect(persisted).toEqual(record);
+      expect(record.startToken === null || typeof record.startToken === 'string').toBe(true);
+      expect(record.leaseId).toMatch(/^[0-9a-f-]{36}$/u);
+    });
+
+    it('wires the exact PID authority into both production snapshot paths', () => {
+      const source = readFileSync(
+        new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+        'utf-8',
+      );
+      expect(source.match(/coordinatorPidRecord = writePid\(projectRoot, sprint\.id, sprint\.startedAt\)/gu))
+        .toHaveLength(2);
+      expect(source).toContain('startToken: coordinatorPidRecord?.startToken ?? null');
+      expect(source).toContain('leaseId: coordinatorPidRecord?.leaseId');
+      expect(source).toContain('startedAt: coordinatorPidRecord?.startedAt ?? sprint.startedAt!');
+    });
+
     it('should overwrite PID file if previous process is dead', () => {
       // Write a fake PID file with a dead process (PID 99999999)
       const pidDir = join(tmpRoot, '.deckent', 'pids');

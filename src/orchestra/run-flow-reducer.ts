@@ -215,6 +215,19 @@ export function reduceRunFlow(context: RunFlowContext, event: RunFlowEvent): Run
       return { ...context, state: 'COMPLETED', updatedAt: event.timestamp };
     }
 
+    case 'RUN_PAUSED': {
+      if (context.state !== 'DETACHED_RUNNING' && context.state !== 'STARTING') {
+        fail(context, event, `expected state 'STARTING' or 'DETACHED_RUNNING'`);
+      }
+      const recovery = event.resumeCommand ? ` Resume: ${event.resumeCommand}` : '';
+      return {
+        ...context,
+        state: 'BLOCKED',
+        blockedReason: `${event.reason}${recovery}`,
+        updatedAt: event.timestamp,
+      };
+    }
+
     case 'RUN_FAILED': {
       if (context.state !== 'DETACHED_RUNNING' && context.state !== 'STARTING') {
         fail(context, event, `expected state 'STARTING' or 'DETACHED_RUNNING'`);

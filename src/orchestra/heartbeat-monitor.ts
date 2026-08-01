@@ -35,15 +35,12 @@
 import { existsSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import type { SpawnSyncReturns } from 'node:child_process';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { Heartbeat } from '../core/types.js';
 // SSOT: the host-captured HB/log freshness window (90s) is shared with the
 // sibling 5-layer liveness check so the two systems never drift apart.
 import { LIVENESS_FRESHNESS_MS } from './worker-liveness.js';
-// SSOT: the container-name prefix the docker backend actually uses to
-// `docker run --name` / `docker wait` — deriving it from the same constant means
-// the probe can never target a differently-named container than the backend spawns.
-import { CONTAINER_PREFIX } from './spawn-backend-docker.js';
+import { dockerContainerNameForTask } from '../core/task-result-settlement.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -71,6 +68,8 @@ export interface LivenessTarget {
   pid?: number;
   /** project `.tasks/` dir — enables the host-captured `.log`-activity secondary. */
   tasksDir?: string;
+  /** Canonical project authority used by daemon-global Docker container identity. */
+  projectRoot?: string;
 }
 
 /** Outcome of a host-liveness decision. */
@@ -110,9 +109,9 @@ export interface HostLivenessProbe {
 
 // ─── Name derivation (SSOT) ──────────────────────────────────────────────────
 
-/** Container name for a task — `deckent-w-<taskId>`, same as `docker run --name`. */
-export function dockerContainerName(taskId: string): string {
-  return `${CONTAINER_PREFIX}${taskId}`;
+/** Container name for a task — delegated to the Docker spawn authority SSOT. */
+export function dockerContainerName(projectRoot: string, taskId: string): string {
+  return dockerContainerNameForTask(projectRoot, taskId);
 }
 
 /** tmux window/pane target for a worker — the workerId (`w-<taskId>`). */
@@ -327,7 +326,7 @@ export function createHostLivenessProbe(deps: HostProbeDeps = {}): HostLivenessP
     probe(target: LivenessTarget): HostLivenessVerdict {
       switch (target.backend) {
         case 'docker': {
-          const name = dockerContainerName(target.taskId);
+          const name = dockerContainerName(target.projectRoot ?? process.cwd(), target.taskId);
           let alive = false;
           try {
             alive = dockerRunning(name);
@@ -499,7 +498,7 @@ export function readHeartbeatCurrentAction(hb: Pick<Heartbeat, 'currentAction'> 
 export function buildLivenessTarget(
   taskId: string,
   backend: WorkerBackendKind,
-  opts: { workerId?: string; pid?: number; tasksDir?: string } = {},
+  opts: { workerId?: string; pid?: number; tasksDir?: string; projectRoot?: string } = {},
 ): LivenessTarget {
   return {
     backend,
@@ -507,6 +506,7 @@ export function buildLivenessTarget(
     workerId: opts.workerId ?? `w-${taskId}`,
     pid: opts.pid,
     tasksDir: opts.tasksDir,
+    projectRoot: opts.projectRoot ?? (opts.tasksDir ? dirname(opts.tasksDir) : process.cwd()),
   };
 }
 

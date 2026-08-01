@@ -84,6 +84,12 @@ export interface CrossVerifyEnforcedAttemptContractV1
  */
 export interface CrossVerifyAdjudicationExecutionBindingV2 {
   readonly protocol: typeof CROSS_VERIFY_ADJUDICATION_PROTOCOL;
+  /**
+   * Immutable authority over the work being judged. For implementation
+   * verification this is the closed producer task-result settlement; for an
+   * attended standalone claim it is the host-authored claim receipt.
+   */
+  readonly producerSettlementDigest: string;
   readonly claimDigest: string;
   readonly evidenceManifestDigest: string;
   readonly adjudicationContractDigest: string;
@@ -345,6 +351,7 @@ function contractPayload(
 
 const ADJUDICATION_BINDING_FIELDS = new Set<keyof CrossVerifyAdjudicationExecutionBindingV2>([
   'protocol',
+  'producerSettlementDigest',
   'claimDigest',
   'evidenceManifestDigest',
   'adjudicationContractDigest',
@@ -392,6 +399,10 @@ function assertAdjudicationBinding(
     throw createExecutionAdmissionError('Unsupported xverify adjudication execution policy');
   }
   assertSha256Digest('xverify claimDigest', value.claimDigest);
+  assertSha256Digest(
+    'xverify producerSettlementDigest',
+    value.producerSettlementDigest,
+  );
   assertSha256Digest(
     'xverify evidenceManifestDigest',
     value.evidenceManifestDigest,

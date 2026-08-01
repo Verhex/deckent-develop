@@ -67,6 +67,7 @@ function inputV2(
     ...input({ operationClass: 'adjudicate-claim' }),
     adjudication: {
       protocol: 'xverify-adjudication-v2',
+      producerSettlementDigest: `sha256:${'a'.repeat(64)}`,
       claimDigest: `sha256:${'b'.repeat(64)}`,
       evidenceManifestDigest: `sha256:${'c'.repeat(64)}`,
       adjudicationContractDigest: `sha256:${'d'.repeat(64)}`,
@@ -172,6 +173,13 @@ describe('CrossVerifyEnforcedAttemptContractV2', () => {
     expect(createCrossVerifyEnforcedAttemptContractV2(inputV2({
       operationClass: 'verify-implementation',
     })).operationClass).toBe('verify-implementation');
+
+    expect(() => createCrossVerifyEnforcedAttemptContractV2(inputV2({
+      adjudication: {
+        ...inputV2().adjudication,
+        producerSettlementDigest: 'evaluate-time-ambient-snapshot',
+      },
+    }))).toThrow(/producerSettlementDigest/i);
   });
 
   it('detects semantic evidence substitution after contract creation', () => {

@@ -348,6 +348,54 @@ describe('exact-plan start attempt lifecycle', () => {
     expect(() => readFileSync(join(root, '.tasks', 'task-1-001.json'), 'utf8')).toThrow();
   });
 
+  it('materializes a digest-bound planned-new output while rejecting pre-start creation drift', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-planned-new-'));
+    const base = snapshot(root);
+    const approved: StoredApprovedSnapshot = {
+      ...base,
+      sprint: {
+        ...base.sprint,
+        tasks: [{
+          ...base.sprint.tasks[0]!,
+          scope: {
+            ...base.sprint.tasks[0]!.scope,
+            filesWrite: ['new/output.ts'],
+          },
+        }],
+      },
+      planDigestContext: {
+        configuredProvider: null,
+        configuredModel: null,
+        configuredBackend: null,
+        configuredAuthMode: 'subscription',
+        fallbackProvider: null,
+        fallbackPolicy: null,
+        executionBudgetPolicy: null,
+        configuredMaxWorkers: 1,
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['new/output.ts'],
+          plannedNewFiles: ['new/output.ts'],
+        },
+      },
+    };
+    const prepared = prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage(),
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' },
+      identityDeps,
+      spawnProcess: () => ({ pid: 200, startToken: 's200' }),
+    });
+    if (prepared.status !== 'process-spawned') throw new Error('unexpected fixture result');
+
+    expect(() => materializeExactPlanTaskArtifacts(root, {
+      capability: prepared.capability,
+      approvedSnapshot: approved,
+    })).not.toThrow();
+  });
+
   it('migrates only an adoption-bound missing structured-criteria projection before admission', () => {
     const root = mkdtempSync(join(tmpdir(), 'exact-start-adoption-'));
     const base = snapshot(root);

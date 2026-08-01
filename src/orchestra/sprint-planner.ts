@@ -971,7 +971,12 @@ export async function planSprint(
       );
     }
   } catch (poolErr) {
-    debugLog('planSprint:routing-v2', `V2 routing pool loading failed: ${poolErr}`);
+    debugLog('planSprint:routing-v3', `Routing/prompt admission failed closed: ${poolErr}`);
+    if (poolErr instanceof BrainError) throw poolErr;
+    throw new BrainError(
+      `ROUTING-V3 admission unavailable: ${poolErr instanceof Error ? poolErr.message : String(poolErr)}`,
+      SprintPhase.PLAN,
+    );
   }
 
   // Owner-policy budget snapshot: run at the shared dry-run/persist boundary so

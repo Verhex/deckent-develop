@@ -689,9 +689,10 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
               },
             });
             try {
-              coordinator.recordRunFailure({
+              coordinator.recordRunPaused({
                 flowId,
-                error: detail,
+                reason: detail,
+                resumeCommand: `deckent recover ${sprintResult.id} --resume`,
                 commandId: `child-paused-${flowId}`,
               });
             } catch { /* terminal attempt journal remains canonical */ }

@@ -12,6 +12,7 @@ import {
   LIVENESS_FRESHNESS_MS,
 } from '../../src/orchestra/worker-liveness.js';
 import type { Task } from '../../src/core/task-types.js';
+import { dockerContainerNameForTask } from '../../src/core/task-result-settlement.js';
 
 const baseTask: Task = {
   id: '191-009',
@@ -57,7 +58,7 @@ describe('checkWorkerLiveness — 5-layer signal evaluation', () => {
     const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
     const result = checkWorkerLiveness(task, root, {
       isDockerContainerRunning: (name) => {
-        expect(name).toBe('deckent-w-191-009');
+        expect(name).toBe(dockerContainerNameForTask(root, task.id));
         return true;
       },
     });

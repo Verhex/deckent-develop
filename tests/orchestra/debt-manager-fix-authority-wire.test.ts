@@ -110,7 +110,7 @@ describe('FIX authority wiring — handleEvaluation NO_GO', () => {
     spawnSyncMock.mockReturnValue({ status: 1, stdout: '' });
   });
 
-  it('accepted: persists a reviewed filesRead/filesWrite delta plus an authority fingerprint', () => {
+  it('accepted: persists inherited scope plus an authority fingerprint', () => {
     spawnSyncMock.mockReturnValue({
       status: 0,
       stdout: 'src/orchestra/target.ts\nsrc/orchestra/helper.ts\n',
@@ -126,11 +126,8 @@ describe('FIX authority wiring — handleEvaluation NO_GO', () => {
 
     const { payload } = readWrittenFixTask();
     expect(payload.repairAuthority.state).toBe('accepted');
-    expect(payload.repairAuthority.filesWrite).toEqual([
-      'src/orchestra/helper.ts',
-      'src/orchestra/target.ts',
-    ]);
-    expect(payload.repairAuthority.addedWritePaths).toEqual(['src/orchestra/helper.ts']);
+    expect(payload.repairAuthority.filesWrite).toEqual(['src/orchestra/target.ts']);
+    expect(payload.repairAuthority.addedWritePaths).toEqual([]);
     expect(payload.repairAuthority.filesRead).toEqual([]);
     expect(payload.repairAuthority.authorityFingerprint).toMatch(/^[a-f0-9]{64}$/u);
     expect(payload.repairAuthority.unresolvedFindings).toEqual([]);
@@ -152,7 +149,7 @@ describe('FIX authority wiring — handleEvaluation NO_GO', () => {
       .toBe(first.payload.repairAuthority.authorityFingerprint);
   });
 
-  it('hold: an evidenced path outside the reviewed boundary pauses the fix with unresolved findings', () => {
+  it('worker prose cannot grant scope or create a birth-time PAUSED fix', () => {
     const task = makeTask({
       scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/target.ts'] },
     });
@@ -163,16 +160,14 @@ describe('FIX authority wiring — handleEvaluation NO_GO', () => {
     handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
 
     const { payload } = readWrittenFixTask();
-    expect(payload.status).toBe(TaskStatus.PAUSED);
-    expect(payload.repairAuthority.state).toBe('hold');
-    expect(payload.repairAuthority.holdReason).toBe('unresolved_requirements');
-    expect(payload.repairAuthority.unresolvedFindings.length).toBeGreaterThan(0);
-    expect(payload.repairAuthority.evidenceWritePaths).toEqual(['tests/core/authority.test.ts']);
-    // Never a broad directory-level grant — the unresolved path is not admitted.
+    expect(payload.status).toBe(TaskStatus.PENDING);
+    expect(payload.repairAuthority.state).toBe('accepted');
+    expect(payload.repairAuthority.unresolvedFindings).toEqual([]);
+    expect(payload.repairAuthority.evidenceWritePaths).toEqual([]);
     expect(payload.repairAuthority.filesWrite).toEqual(['src/orchestra/target.ts']);
   });
 
-  it('evidence is read from the FULL notes, not the 500-char display truncation', () => {
+  it('late paths in full notes remain diagnostic-only', () => {
     spawnSyncMock.mockReturnValue({ status: 0, stdout: 'src/orchestra/target.ts\nsrc/orchestra/late-evidence.ts\n' });
     const padding = 'x'.repeat(600);
     const task = makeTask({
@@ -185,24 +180,22 @@ describe('FIX authority wiring — handleEvaluation NO_GO', () => {
     handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
 
     const { payload } = readWrittenFixTask();
-    expect(payload.repairAuthority.addedWritePaths).toContain('src/orchestra/late-evidence.ts');
+    expect(payload.repairAuthority.addedWritePaths).toEqual([]);
     expect(payload.repairAuthority.state).toBe('accepted');
   });
 
-  it('carries the prior repair lineage forward as originalAcceptance without recursive re-derivation', () => {
-    const outOfBoundaryNotes =
-      'Repair requires tests/core/authority.test.ts, which is outside the reviewed boundary.';
+  it('carries prior accepted repair lineage without recursively trusting prose', () => {
+    const outOfBoundaryNotes = 'Repair requires tests/core/authority.test.ts.';
     const origTask = makeTask({
       scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/target.ts'] },
     });
     const origResult = makeNoGoResult({ notes: outOfBoundaryNotes });
 
-    // Round 1: the original task fails and its FIX is parked (hold) — impossible
-    // authority under the reviewed boundary. Capture the real fingerprint it
+    // Round 1: the original task fails. Capture the real fingerprint it
     // persisted; nothing here is hand-derived, it comes straight from the writer.
     handleEvaluation('/root', origTask, TaskEvaluation.NO_GO, origResult);
     const firstFix = readWrittenFixTask(0);
-    expect(firstFix.payload.repairAuthority.state).toBe('hold');
+    expect(firstFix.payload.repairAuthority.state).toBe('accepted');
     const priorFingerprint = firstFix.payload.repairAuthority.authorityFingerprint;
     expect(typeof priorFingerprint).toBe('string');
 
@@ -225,11 +218,11 @@ describe('FIX authority wiring — handleEvaluation NO_GO', () => {
     expect(secondFix.payload.id).toBe(`${firstFix.payload.id}-fix`);
     expect(secondFix.payload.repairAuthority.originalAcceptance).toMatchObject({
       taskId: firstFix.payload.id,
-      state: 'hold',
+      state: 'accepted',
       authorityFingerprint: priorFingerprint,
     });
     expect(secondFix.payload.repairAuthority.authorityFingerprint).toBe(priorFingerprint);
-    expect(secondFix.payload.repairAuthority.holdReason).toBe('repeated_impossible_fingerprint');
+    expect(secondFix.payload.repairAuthority.state).toBe('accepted');
   });
 
   it('no evidence paths in notes: repairAuthority stays accepted with an empty added delta', () => {

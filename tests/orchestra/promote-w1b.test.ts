@@ -2,8 +2,8 @@
  * PROMOTE-W1b — Partial Promotion Wiring Tests (sprint-306, task 306-001)
  *
  * Verifies that `attemptPartialPromotion` is correctly wired into
- * `runEvaluatePhase` and that git-ops (in-scope commit + out-of-scope revert)
- * and the PARTIAL_PROMOTION_APPLIED event are emitted when the flag is on.
+ * `runEvaluatePhase` only for exact attempt attribution, without mutating the
+ * shared Git HEAD, and that the PARTIAL_PROMOTION_APPLIED event is emitted.
  *
  * Also includes a unit test for `revertFilesToHead` in worker-rollback.ts.
  */
@@ -177,8 +177,15 @@ function makeResult(taskId = '306-001', overrides: Partial<TaskResult> = {}): Ta
     linesRemoved: 5,
     testsPassed: true,
     coverage: 85,
-    selfAssessment: 'NO_GO',
+    // Rubric-originated NO_GO: worker did not author a concrete failure veto.
+    selfAssessment: 'DONE',
     notes: 'accidentally touched out-of-scope file',
+    workAttribution: {
+      state: 'VERIFIED',
+      attemptId: `attempt-${taskId}`,
+      baselineRef: 'HEAD:test',
+      scopeDigest: 'a'.repeat(64),
+    },
     ...overrides,
   };
 }
@@ -266,6 +273,7 @@ describe('PROMOTE-W1b — partial promotion wiring in runEvaluatePhase', () => {
     expect(evaluations.get(task.id)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
     expect(vi.mocked(handleEvaluation)).toHaveBeenCalledWith(
       root, task, TaskEvaluation.GO_WITH_TECH_DEBT, expect.anything(),
+      { allowPriorityFixCreation: true },
     );
   });
 
@@ -335,7 +343,7 @@ describe('PROMOTE-W1b — partial promotion wiring in runEvaluatePhase', () => {
     });
   });
 
-  it('flag-on + NO_GO + isPartialPromotable → git add + commit called for in-scope files', async () => {
+  it('flag-on + NO_GO + isPartialPromotable → never mutates shared Git HEAD', async () => {
     const task = makeTask();
     const result = makeResult();
     const sprint = makeSprint([task]);
@@ -359,16 +367,10 @@ describe('PROMOTE-W1b — partial promotion wiring in runEvaluatePhase', () => {
 
     await runEvaluatePhase(root, sprint, [result], evaluations, 90, makeConfig(true));
 
-    const execCalls = vi.mocked(execFileSync).mock.calls;
-    const addCall = execCalls.find(c => c[0] === 'git' && Array.isArray(c[1]) && c[1][0] === 'add');
-    const commitCall = execCalls.find(c => c[0] === 'git' && Array.isArray(c[1]) && c[1][0] === 'commit');
-    expect(addCall).toBeDefined();
-    expect(addCall![1]).toContain('--');
-    expect(addCall![1]).toContain('src/orchestra/sprint-phases.ts');
-    expect(commitCall).toBeDefined();
+    expect(vi.mocked(execFileSync)).not.toHaveBeenCalled();
   });
 
-  it('flag-on + NO_GO + isPartialPromotable → revertFilesToHead called for dropped files', async () => {
+  it('flag-on + NO_GO + isPartialPromotable → never reverts sibling worktree files', async () => {
     const task = makeTask();
     const result = makeResult();
     const sprint = makeSprint([task]);
@@ -393,7 +395,21 @@ describe('PROMOTE-W1b — partial promotion wiring in runEvaluatePhase', () => {
 
     await runEvaluatePhase(root, sprint, [result], evaluations, 90, makeConfig(true));
 
-    expect(vi.mocked(revertFilesToHead)).toHaveBeenCalledWith(root, dropped);
+    expect(vi.mocked(revertFilesToHead)).not.toHaveBeenCalled();
+  });
+
+  it('flag-on + ambient result never enters partial promotion', async () => {
+    const task = makeTask();
+    const result = makeResult('306-001', { workAttribution: undefined });
+    const sprint = makeSprint([task]);
+    const evaluations = new Map<string, TaskEvaluation>();
+    writeFileSync(join(root, '.tasks', `task-${task.id}.result`), JSON.stringify(result), 'utf-8');
+    vi.mocked(evaluateWithRubric).mockReturnValue(makeNoGoEvalResult());
+
+    await runEvaluatePhase(root, sprint, [result], evaluations, 90, makeConfig(true));
+
+    expect(vi.mocked(attemptPartialPromotion)).not.toHaveBeenCalled();
+    expect(evaluations.get(task.id)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('flag-OFF → full NO_GO, attemptPartialPromotion NOT called', async () => {
@@ -415,6 +431,7 @@ describe('PROMOTE-W1b — partial promotion wiring in runEvaluatePhase', () => {
     expect(evaluations.get(task.id)).toBe(TaskEvaluation.NO_GO);
     expect(vi.mocked(handleEvaluation)).toHaveBeenCalledWith(
       root, task, TaskEvaluation.NO_GO, expect.anything(),
+      { allowPriorityFixCreation: true },
     );
     expect(vi.mocked(attemptPartialPromotion)).not.toHaveBeenCalled();
   });

@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "c73681216fa60b288d45b3fbf49e5285e88db94953c765216904d87029871eb5"
+    "value": "b7921fefed70b5b5db50886bf42cb6e7fb5fc60663077d5f2f4bb6179d79e7e1"
   },
   "summary": {
     "total": 309,
@@ -2349,7 +2349,7 @@
       "state": "OPEN",
       "updated": "2026-08-01",
       "definitionDigest": "32baf34f5fc318f1b0e51a375792836ad99a014cdb5ede4718377f895f8cabfd",
-      "progressDigest": "7cdfdeff57edb6dfa25957a21e80eda1f0e37ab7b8dd3c4ad3068acea198bb71",
+      "progressDigest": "b15ada45ece82455fe4fd4d2a7d711520ab8431a389302c11fd9171b401383e7",
       "terminalClosureDigest": null
     },
     {
@@ -2371,7 +2371,7 @@
       "state": "OPEN",
       "updated": "2026-08-01",
       "definitionDigest": "c3ee4061134e13316a3a70d0ec7b533f28b97ac68ceb56da3529349c8d114e59",
-      "progressDigest": "847b7cc07d4cabb3c4951268218132e3bf3b1214de45834850b6103d327035f8",
+      "progressDigest": "e594fd08d64edf4561cde127076217a5b1406f5642f09cd4c05965c68125773d",
       "terminalClosureDigest": null
     },
     {
@@ -2415,7 +2415,7 @@
       "state": "OPEN",
       "updated": "2026-08-01",
       "definitionDigest": "9351804a3b66fabb554218fecf5477069a9c17705d17d7ad3fe1f4fdf3ba6051",
-      "progressDigest": "5df5924af1d1418ecd4f2aefd18e75939741073b1031ef3e48e51c2dcd0a0d7e",
+      "progressDigest": "11193633fabd2aefa25049d4bbf9f82e674a9847aeda20f111937ca62d9da7bd",
       "terminalClosureDigest": null
     },
     {
@@ -2426,7 +2426,7 @@
       "state": "OPEN",
       "updated": "2026-08-01",
       "definitionDigest": "c8b06bda4afa2814f5de7b3c6d6bb4140b880860262ecfb44c30ae70fd7b34af",
-      "progressDigest": "4321dcf6c0e4adeeb30562005ab2e1c14bae3e6de1194bfbadd0e164aff6cdb5",
+      "progressDigest": "92cbe494f657f387399126d2fef67c561a5128509e9545a8ec94f75f1688aadf",
       "terminalClosureDigest": null
     },
     {
@@ -12626,7 +12626,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Original, FIX, FIX-FIX and cross-dependency repair births publish the same durable queue identity; per-result settlement immediately reevaluates ready work; phase transitions cannot hide a newly written task; PAUSE is legal only after the queue, active attempts and authorized repair decisions reach a fenced quiescent snapshot",
-      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE",
+      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE. Manual recovery now routes local, reducer and dependency-respawn triggers through canonical spawn-time collision admission and reports only actual dispatches; fresh live replay remains required",
       "updated": "2026-08-01"
     },
     {
@@ -12704,7 +12704,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "One event-driven scheduler considers all admitted ready originals and repairs whenever a slot/provider capacity changes; wave subsets cannot hide global ready work; a slow attempt does not delay unrelated repair birth or dispatch; fairness, collision, dependency and provider limits remain canonical constraints",
-      "evidence": "Sprint-488 FIX/POSTFIX collectors waited on their local wave subset. Attempt 006 held the wave for roughly fourteen minutes while settled-result repairs and other globally ready work did not refill available capacity",
+      "evidence": "Sprint-488 FIX/POSTFIX collectors waited on their local wave subset. Attempt 006 held the wave for roughly fourteen minutes while settled-result repairs and other globally ready work did not refill available capacity. Manual recovery makes restarted subprocess inventory uncertainty explicit and retains per-task-timeout backends in liveness authority, preventing false reap/slot churn; global-graph live refill replay remains open",
       "updated": "2026-08-01"
     },
     {
@@ -12868,7 +12868,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Resume returns a typed resumed-and-running, resumed-and-paused, completed, aborted or failed outcome with exact next authority; explicit force finalize never prints COMPLETE before receipt and can publish a fenced ABORTED settlement preserving unresolved/deferred lineages; cleanup admits only that exact terminal receipt and never deletes forensic evidence implicitly",
-      "evidence": "Sprint-488 recover returned generic error after re-entering PAUSED. Owner-authorized force-finalize printed a success-like Sprint Complete report, then exited non-zero with `TERMINAL_EVIDENCE_HOLD`; status remained PAUSED/FIX with no receipt and cleanup correctly refused `run-paused`",
+      "evidence": "Sprint-488 recover returned generic error after re-entering PAUSED. Owner-authorized force-finalize printed a success-like Sprint Complete report, then exited non-zero with `TERMINAL_EVIDENCE_HOLD`. Manual recovery now parks below-threshold FAILED lineages through typed `unresolved-lineage-operator-decision` PAUSED with exact recover/finalize commands before terminal receipt; resume and force-finalize live proof remain open",
       "updated": "2026-08-01"
     },
     {
@@ -12909,7 +12909,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "CLI, MCP, Terminal, Desktop, dashboard, metrics, notification and finalizer consume one revisioned persisted snapshot with exact logical and attempt denominators; active/provider concurrency cannot remain non-zero after authority retirement; source/dist digest mismatch blocks dogfood admission and no adapter re-infers state",
-      "evidence": "Sprint-488 exposed active-count, blocked-count, summary and receipt contradictions. Current source status calls the strict logical projector without explicit logical IDs while the checked-in dist still uses older inference, so source and real CLI binary do not implement the same contract",
+      "evidence": "Sprint-488 exposed active-count, blocked-count, summary and receipt contradictions. Manual recovery routes alert and estimate enrichment through the same sprint-id/terminal-authority fenced atomic dashboard writer; source/dist digest and all-surface live parity remain open",
       "updated": "2026-08-01"
     },
     {
@@ -16937,6 +16937,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7f72d3dd0f07c05a19b4df959f2a795bd3e0a1768457fb9ca7e02e6edcd8af67"
+    "value": "116be4a66e5c67164c2aa91c032c14b8b4d2227b73d5b9bf3a4510c6993e076f"
   }
 }

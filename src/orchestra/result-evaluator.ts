@@ -162,14 +162,6 @@ export function isDocTask(task: Task): boolean {
  * for backward compatibility with CLI finalize command.
  */
 export async function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90, projectRoot?: string): Promise<TaskEvaluation> {
-  // Step 0 (488-011): Verification isolation HOLD — an admission/environment gap,
-  // never this task's own scoped failure. Checked before every other hard-failure
-  // path (including an honest worker self-NO_GO) so it always parks as tech debt
-  // instead of manufacturing a NO_GO or consuming FIX/retry budget.
-  if (isVerificationIsolationHold(result)) {
-    return TaskEvaluation.GO_WITH_TECH_DEBT;
-  }
-
   // Step 1a: Sprint 145 — TIMEOUT_WITH_WORK: worker was killed but has partial work
   // Attempt reconciliation via Spurious NO_GO helper if projectRoot available
   if ((result.selfAssessment as string) === 'TIMEOUT_WITH_WORK') {
@@ -1287,27 +1279,6 @@ export function evaluateWithRubric(
         score: 0,
         passed: false,
         reason: schemaCheck.reason,
-      }],
-      retryCount: 0,
-    };
-  }
-
-  // 488-011: Verification isolation HOLD fast-path — checked before the
-  // verification-task fast-path and every rubric criterion. This is an
-  // admission/environment gap (488-010's isolation gate could not grant this
-  // attempt an exclusive verification surface, or observed a concurrent
-  // foreign attempt's diagnostics), never this task's own scoped failure.
-  // Decision is capped at GO_WITH_TECH_DEBT — never DONE (nothing was
-  // actually verified) and never NO_GO (nothing to blame this task for).
-  if (isVerificationIsolationHold(result)) {
-    return {
-      decision: 'GO_WITH_TECH_DEBT',
-      totalScore: 75,
-      rubricScores: [{
-        criterion: 'verification_isolation',
-        score: 75,
-        passed: true,
-        reason: 'verification isolation HOLD — environment admission gap, not a scoped task failure; attempt parked without spending FIX/retry budget',
       }],
       retryCount: 0,
     };

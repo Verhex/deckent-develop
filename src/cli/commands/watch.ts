@@ -8,6 +8,7 @@ import { isSessionActive, createWatchLayout, attachToWorkerPane, TmuxError } fro
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getDefaultProviderName } from '../../orchestra/sprint-utils.js';
+import { dockerContainerNameForTask } from '../../core/task-result-settlement.js';
 
 /** H) Export cleanupWatchWindow so cleanup.ts can call it. */
 export function cleanupWatchWindow(): void {
@@ -93,11 +94,9 @@ export function getTaskBackend(root: string, taskId: string): string | null {
   }
 }
 
-/** Follow docker container logs for a worker — async spawn so the event
- *  loop is never blocked. Container name follows the deckent-w-<taskId>
- *  convention from spawn-backend-docker.ts (CONTAINER_PREFIX). */
-export function watchDockerLogs(taskId: string): void {
-  const containerName = `deckent-w-${taskId}`;
+/** Follow the exact project-scoped Docker worker container logs. */
+export function watchDockerLogs(projectRoot: string, taskId: string): void {
+  const containerName = dockerContainerNameForTask(projectRoot, taskId);
   print(`Following docker logs: ${containerName}`);
   print('Press Ctrl+C to stop.');
   const proc = spawn('docker', ['logs', '-f', containerName], { stdio: 'inherit' });
@@ -177,7 +176,7 @@ export function registerWatch(program: Command): void {
           // when the heartbeat reports a non-docker backend.
           const backend = getTaskBackend(root, taskId);
           if (backend === 'docker') {
-            watchDockerLogs(taskId);
+            watchDockerLogs(root, taskId);
             return;
           }
 

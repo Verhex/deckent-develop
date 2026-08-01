@@ -58,6 +58,7 @@ export interface BootstrapCrossVerifyRuntimeInput {
   readonly settlementRef: TaskResultSettlementRefV1;
   readonly fenceTokenHash: string;
   readonly runtimeImageRef: string;
+  readonly producerSettlementDigest: string;
 }
 
 function sha256(value: string): string {
@@ -173,6 +174,7 @@ export function bootstrapCrossVerifyRuntimeV2(
     }
     const executionBinding: CrossVerifyAdjudicationExecutionBindingV2 = {
       protocol: adjudicationContract.protocol,
+      producerSettlementDigest: input.producerSettlementDigest,
       claimDigest: adjudicationContract.claimDigest,
       evidenceManifestDigest: adjudicationContract.evidenceManifestDigest,
       adjudicationContractDigest:

@@ -207,12 +207,10 @@ describe('cascade composition — live tick chain (reducer → executor → debt
     const xfixTasks = handleCrossDependencies(root, sprint, evaluations);
 
     // dep1's healthy co-dependency (done1) is NEVER cross-blamed by the cascade chain.
-    // sibling's real failure DOES correctly cross-blame done1 — proving the exemption is
-    // scoped to the cascade-skipped task, not a blanket dep-on-done1 suppression.
-    expect(existsSync(xfixPath(root, '2000-done1'))).toBe(true);
-    const done1Xfix = xfixTasks.find(t => t.id === '2000-done1-xfix');
-    expect(done1Xfix?.description).toContain('2000-sibling');
-    expect(done1Xfix?.description).not.toContain('2000-dep1');
+    // sibling already has a direct repair lineage, so the same FIX wave must not
+    // concurrently rewrite done1 through a speculative xfix either.
+    expect(existsSync(xfixPath(root, '2000-done1'))).toBe(false);
+    expect(xfixTasks).toEqual([]);
     // No -xfix ever created for root (dep1/dep2's failed dependency) — trivially true
     // since root's own evaluation is NO_GO, not DONE/GWTD, but asserted for completeness.
     expect(existsSync(xfixPath(root, '2000-root'))).toBe(false);

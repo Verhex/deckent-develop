@@ -65,6 +65,11 @@ vi.mock('../../src/core/utils.js', () => ({
   ensureDeckentImport: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => ({
+  dockerContainerNameForTask: (root: string, taskId: string) =>
+    `deckent-w-canonical-${root.replaceAll('/', '_')}-${taskId}`,
+}));
+
 vi.mock('../../src/core/errors.js', () => ({
   DeckentError: class DeckentError extends Error {
     code: string;
@@ -122,11 +127,11 @@ describe('watchDockerLogs', () => {
     const mockProc = makeMockProc();
     vi.mocked(spawn).mockReturnValue(mockProc as unknown as ReturnType<typeof spawn>);
 
-    watchDockerLogs('279-007');
+    watchDockerLogs('/mock/root', '279-007');
 
     expect(spawn).toHaveBeenCalledWith(
       'docker',
-      ['logs', '-f', 'deckent-w-279-007'],
+      ['logs', '-f', 'deckent-w-canonical-_mock_root-279-007'],
       expect.objectContaining({ stdio: 'inherit' })
     );
   });
@@ -135,9 +140,9 @@ describe('watchDockerLogs', () => {
     const mockProc = makeMockProc();
     vi.mocked(spawn).mockReturnValue(mockProc as unknown as ReturnType<typeof spawn>);
 
-    watchDockerLogs('123-001');
+    watchDockerLogs('/mock/root', '123-001');
 
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('deckent-w-123-001'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('deckent-w-canonical-_mock_root-123-001'));
     expect(print).toHaveBeenCalledWith(expect.stringContaining('Ctrl+C'));
   });
 
@@ -145,7 +150,7 @@ describe('watchDockerLogs', () => {
     const mockProc = makeMockProc();
     vi.mocked(spawn).mockReturnValue(mockProc as unknown as ReturnType<typeof spawn>);
 
-    watchDockerLogs('500-001');
+    watchDockerLogs('/mock/root', '500-001');
 
     // Simulate docker not found error
     mockProc.emit('error', new Error('spawn docker ENOENT'));

@@ -26,6 +26,8 @@ import type { ProviderLimitReservationRequest } from '../core/provider-limit-tru
 import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlementRefForAttempt,
+  readClosedTaskResultSettlement,
+  readLatestTaskResultSettlementRef,
   readTaskResultSettlementActiveClaim,
   taskResultSettlementActiveClaimDigest,
   writeTaskResultSettlementAttemptAtomic,
@@ -78,6 +80,65 @@ function deterministicAttemptId(digest: string): string {
 
 function evidenceRef(kind: string, detail: unknown): string {
   return `xverify-production-ingress:${sha256(`${kind}\0${canonicalJson(detail)}`)}`;
+}
+
+type ProducerSettlementBinding =
+  | { readonly state: 'ready'; readonly digest: string }
+  | { readonly state: 'hold'; readonly reasonCode: string; readonly detail: unknown };
+
+/**
+ * Bind semantic evidence capture to the producer's immutable settlement, not
+ * to whatever bytes happen to exist when EVALUATE later starts. Standalone
+ * attended claim adjudication has no implementation worker, so its wx-created
+ * host claim/result pair is the producer receipt by construction.
+ */
+function resolveProducerSettlementBinding(input: {
+  readonly projectRoot: string;
+  readonly task: Task;
+  readonly result: TaskResult;
+  readonly operationClass: CrossVerifyOperationClass;
+}): ProducerSettlementBinding {
+  if (input.operationClass === 'adjudicate-claim') {
+    return {
+      state: 'ready',
+      digest: `sha256:${sha256(canonicalJson({
+        kind: 'host-authored-claim-receipt-v1',
+        task: input.task,
+        result: input.result,
+      }))}`,
+    };
+  }
+  const ref = readLatestTaskResultSettlementRef(input.projectRoot, input.task.id);
+  if (!ref) {
+    return {
+      state: 'hold',
+      reasonCode: 'xverify_producer_settlement_missing',
+      detail: input.task.id,
+    };
+  }
+  const closed = readClosedTaskResultSettlement(ref);
+  if (!closed) {
+    return {
+      state: 'hold',
+      reasonCode: 'xverify_producer_settlement_open',
+      detail: ref,
+    };
+  }
+  if (canonicalJson(closed.result) !== canonicalJson(input.result)) {
+    return {
+      state: 'hold',
+      reasonCode: 'xverify_producer_result_mismatch',
+      detail: ref,
+    };
+  }
+  return {
+    state: 'ready',
+    digest: `sha256:${sha256(canonicalJson({
+      kind: 'closed-task-result-settlement-v1',
+      ref,
+      settlement: closed,
+    }))}`,
+  };
 }
 
 function hold(
@@ -386,6 +447,15 @@ implements MandatoryCrossVerifyInvocationFactory {
     if (input.config.cross_verify?.enabled !== true) {
       return hold('xverify_disabled', input.task.id);
     }
+    const producerSettlement = resolveProducerSettlementBinding({
+      projectRoot: input.projectRoot,
+      task: input.task,
+      result: input.result,
+      operationClass: input.operationClass,
+    });
+    if (producerSettlement.state === 'hold') {
+      return hold(producerSettlement.reasonCode, producerSettlement.detail);
+    }
     const provider = exactVerifierProvider(input.task, input.config);
     if (!provider) {
       return hold('xverify_provider_scope_unavailable', input.task.id);
@@ -555,6 +625,7 @@ implements MandatoryCrossVerifyInvocationFactory {
       criteria: input.task.goNogo.items ?? null,
       evidencePaths,
       operationClass: input.operationClass,
+      producerSettlementDigest: producerSettlement.digest,
     }));
     const attemptId = deterministicAttemptId(attemptDigest);
     const settlementRef = createTaskResultSettlementRefForAttempt(
@@ -577,6 +648,7 @@ implements MandatoryCrossVerifyInvocationFactory {
         settlementRef,
         fenceTokenHash,
         runtimeImageRef: profile.immutableImageRef,
+        producerSettlementDigest: producerSettlement.digest,
       });
       if (bootstrap.state === 'hold') {
         return selectedHold(bootstrap.reasonCode, bootstrap.detail);

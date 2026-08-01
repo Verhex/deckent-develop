@@ -8,6 +8,7 @@ import {
   mkdirSync, renameSync, readdirSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { DECKENT_DIR, BRAIN_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { isPidAlive } from '../core/pid-liveness.js';
@@ -22,11 +23,23 @@ import {
 export interface SprintStateSnapshot {
   sprintId: string;
   pid: number;
+  /** Exact coordinator process lifetime captured with the PID record. */
+  startToken?: string | null;
+  /** Cross-platform process-lifetime lease shared only with this coordinator. */
+  leaseId?: string;
   startedAt: string;
   currentWave: number;
   taskStatuses: Record<string, string>;
   metricsJsonlSize: number;
   lastHeartbeat: string;
+}
+
+export interface SprintPidWriteAuthority {
+  readonly pid: number;
+  readonly sprintId: string;
+  readonly startedAt: string;
+  readonly startToken: string | null;
+  readonly leaseId: string;
 }
 
 export interface OrphanInfo {
@@ -66,7 +79,11 @@ function atomicWriteSync(filePath: string, data: string): void {
  * Write a PID file for the given sprint. Includes collision detection:
  * if a PID file already exists for this sprint, checks liveness before overwriting.
  */
-export function writePid(root: string, sprintId: string): void {
+export function writePid(
+  root: string,
+  sprintId: string,
+  startedAt = new Date().toISOString(),
+): SprintPidWriteAuthority {
   const filePath = pidFilePath(root, sprintId);
 
   // Collision check: if PID file already exists, verify the old process is dead
@@ -80,15 +97,18 @@ export function writePid(root: string, sprintId: string): void {
     // Old process is dead — safe to overwrite
   }
 
-  atomicWriteSync(filePath, JSON.stringify({
+  const record: SprintPidWriteAuthority = {
     pid: process.pid,
     sprintId,
-    startedAt: new Date().toISOString(),
+    startedAt,
     // Capture the kernel start token so a later kill can prove this exact
     // process (not a pid-reused impostor) before signalling. Additive — old
     // readers ignore it; old pid files without it degrade to 'unknown'.
     startToken: processStartToken(process.pid),
-  }, null, 2));
+    leaseId: randomUUID(),
+  };
+  atomicWriteSync(filePath, JSON.stringify(record, null, 2));
+  return record;
 }
 
 /**
@@ -98,7 +118,7 @@ export function writePid(root: string, sprintId: string): void {
 export function readPidRecord(
   root: string,
   sprintId: string,
-): { pid: number; sprintId: string; startedAt?: string; startToken?: string | null } | null {
+): { pid: number; sprintId: string; startedAt?: string; startToken?: string | null; leaseId?: string } | null {
   const filePath = pidFilePath(root, sprintId);
   try {
     const data = JSON.parse(readFileSync(filePath, 'utf-8')) as {
@@ -106,6 +126,7 @@ export function readPidRecord(
       sprintId?: string;
       startedAt?: string;
       startToken?: string | null;
+      leaseId?: string;
     };
     if (typeof data.pid !== 'number') return null;
     return {
@@ -113,6 +134,7 @@ export function readPidRecord(
       sprintId: data.sprintId ?? sprintId,
       startedAt: data.startedAt,
       startToken: data.startToken ?? null,
+      leaseId: data.leaseId,
     };
   } catch {
     return null;

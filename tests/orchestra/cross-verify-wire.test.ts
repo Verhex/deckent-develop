@@ -937,7 +937,7 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     });
   });
 
-  it('ignores wrapper marker notes and recovers the terminal verdict from the provider log', async () => {
+  it('uses a provider-log verdict only as advisory evidence without synthesizing settlement', async () => {
     defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
       writeFileSync(
         join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
@@ -1002,25 +1002,24 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       },
     });
 
-    const recovered = JSON.parse(readFileSync(
+    const unreconciled = JSON.parse(readFileSync(
       join(root, TASKS_DIR, 'task-276-001-xverify.result'),
       'utf-8',
     )) as Record<string, unknown>;
-    expect(recovered).toMatchObject({
-      selfAssessment: 'DONE',
-      testsPassed: true,
+    expect(unreconciled).toMatchObject({
+      selfAssessment: 'NO_GO',
+      testsPassed: false,
+      markerType: 'EXIT_WITHOUT_RESULT',
+      workPresent: false,
+      diffStat: '',
       exitCode: 0,
       tokenUsage: { inputTokens: 11, outputTokens: 22, cacheReadTokens: 33 },
       providerBilling: { source: 'provider-envelope', providerReportedUsd: 0.25 },
     });
-    expect(recovered).not.toHaveProperty('markerType');
-    expect(recovered).not.toHaveProperty('workPresent');
-    expect(recovered).not.toHaveProperty('diffStat');
-    expect(String(recovered.notes)).toMatch(/VERDICT: UNCLEAR exact receipt was not present$/);
     expect(JSON.parse(readFileSync(
       join(root, TASKS_DIR, 'task-276-001-xverify.json'),
       'utf-8',
-    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.DONE });
+    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.PENDING });
   });
 
   it('waits for a provider log finalized shortly after the wrapper marker', async () => {
@@ -1085,14 +1084,15 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       join(root, TASKS_DIR, 'task-276-001-xverify.result'),
       'utf-8',
     ))).toMatchObject({
-      selfAssessment: 'DONE',
-      testsPassed: true,
+      selfAssessment: 'NO_GO',
+      testsPassed: false,
+      markerType: 'EXIT_WITHOUT_RESULT',
       tokenUsage: { inputTokens: 101, outputTokens: 202, cacheReadTokens: 303 },
     });
     expect(JSON.parse(readFileSync(
       join(root, TASKS_DIR, 'task-276-001-xverify.json'),
       'utf-8',
-    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.DONE });
+    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.PENDING });
   });
 
   it('keeps the verifier task pending when no terminal verdict exists', async () => {

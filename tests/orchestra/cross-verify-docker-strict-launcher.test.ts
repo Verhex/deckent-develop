@@ -68,6 +68,13 @@ vi.mock('../../src/core/active-workers.js', () => ({
   markActive: vi.fn(),
   clearPending: vi.fn(),
 }));
+vi.mock('../../src/core/worker-heartbeat-authority-store.js', () => ({
+  WorkerHeartbeatAuthorityStore: class {
+    initialize() { return { state: 'READY' }; }
+    read() { return { latest: { hostSequence: 0 } }; }
+    observe() { return { state: 'ACCEPTED' }; }
+  },
+}));
 vi.mock('../../src/core/task-result-settlement.js', () =>
   import('../helpers/task-result-settlement-stub.js')
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub()));
@@ -232,6 +239,7 @@ function exactV2Input() {
       ...input,
       adjudication: {
         protocol: 'xverify-adjudication-v2',
+        producerSettlementDigest: `sha256:${'5'.repeat(64)}`,
         claimDigest: `sha256:${'6'.repeat(64)}`,
         evidenceManifestDigest: `sha256:${'7'.repeat(64)}`,
         adjudicationContractDigest: `sha256:${'8'.repeat(64)}`,

@@ -61,7 +61,17 @@ describe('R8/ADR-087 — reconciliation probes are async (non-blocking)', () => 
 
   it('reconcileSpuriousNoGo is async end-to-end (returns a Promise resolving to the verdict)', async () => {
     const task = { id: 't1', scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/foo.ts'] } } as Task;
-    const result = { taskId: 't1', selfAssessment: 'NO_GO', filesChanged: ['src/foo.ts'] } as TaskResult;
+    const result = {
+      taskId: 't1',
+      selfAssessment: 'NO_GO',
+      filesChanged: ['src/foo.ts'],
+      workAttribution: {
+        state: 'VERIFIED',
+        attemptId: 'attempt-t1',
+        baselineRef: 'HEAD:test',
+        scopeDigest: 'a'.repeat(64),
+      },
+    } as TaskResult;
     const pending = reconcileSpuriousNoGo(result, task, '/proj', {
       getGitDiffStats: () => ({ linesChanged: 120, filesChanged: ['src/foo.ts'] }),
       runTscCheck: () => true,

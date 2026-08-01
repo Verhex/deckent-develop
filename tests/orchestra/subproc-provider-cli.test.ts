@@ -247,6 +247,29 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
   // ─── mixed-provider sprint on ONE SubprocessBackend instance ───────────
 
   describe('mixed-provider sprint (spawn_backend=subprocess for both claude + codex tasks)', () => {
+    it('distinguishes restart-unknown inventory from observed-and-absent workers', () => {
+      const backend = new SubprocessBackend('/proj');
+      expect(backend.workerInventoryState('born-before-restart')).toBe('unknown');
+
+      backend.spawn('observed-worker', 'gpt-5.5' as ModelType, 'prompt', {});
+      expect(backend.workerInventoryState('observed-worker')).toBe('active');
+
+      backend.kill('observed-worker');
+      expect(backend.workerInventoryState('observed-worker')).toBe('absent');
+    });
+
+    it('keeps a per-task-timeout backend visible to list and kill authority', () => {
+      const backend = new SubprocessBackend('/proj');
+      backend.spawn('timed-worker', 'gpt-5.5' as ModelType, 'prompt', {
+        taskTimeoutSeconds: 30,
+      });
+
+      expect(backend.list()).toContain('timed-worker');
+      expect(backend.workerInventoryState('timed-worker')).toBe('active');
+      backend.kill('timed-worker');
+      expect(backend.workerInventoryState('timed-worker')).toBe('absent');
+    });
+
     it('each provider gets its OWN SubprocessSpawnBackend instance with the right CLI', () => {
       const backend = new SubprocessBackend('/proj');
       backend.spawn('t-mix-codex', 'gpt-5.5' as ModelType, 'prompt', {});

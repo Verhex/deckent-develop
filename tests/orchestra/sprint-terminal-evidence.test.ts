@@ -66,6 +66,42 @@ function coordinator(
 }
 
 describe('assembleSprintTerminalEvidence', () => {
+  it('settles host-confirmed dispatch exhaustion as FAILED without fabricating a worker result', () => {
+    const evidence = assembleSprintTerminalEvidence({
+      attempts: [{
+        logicalTaskId: 'logical-not-dispatched',
+        identity: { taskId: '488-nd', attemptId: 'host-redispatch-1' },
+        authority: {
+          state: 'TERMINAL',
+          verdict: 'NO_GO',
+          evidenceRef: 'host:dispatch-exhausted',
+          reasonCode: 'DISPATCH_EXHAUSTED',
+        },
+        result: {
+          state: 'NOT_APPLICABLE',
+          evidenceRef: 'host:dispatch-exhausted',
+          reasonCode: 'DISPATCH_EXHAUSTED',
+        },
+        attribution: {
+          state: 'VERIFIED',
+          evidenceRef: 'host:zero-work',
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+        },
+      }],
+      coordinatorEvidence: [],
+    });
+
+    expect(evidence.logicalTasks).toEqual([
+      expect.objectContaining({ state: 'FAILED', resolvingAttempt: { taskId: '488-nd', attemptId: 'host-redispatch-1' } }),
+    ]);
+    expect(evidence.holds).toEqual([]);
+    expect(evidence.activeOrUnsettledAttempts).toEqual([]);
+    expect(evidence.partialResults).toEqual([]);
+    expect(evidence.cleanupEligibility).toMatchObject({ state: 'BLOCKED', candidate: false });
+  });
+
   it('folds a superseding attempt lineage into one completed aggregate', () => {
     const first = completedAttempt({ identity: A1, verdict: 'NO_GO', marker: 'failed-first' });
     const second = completedAttempt({

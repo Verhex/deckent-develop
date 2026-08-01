@@ -31,6 +31,7 @@ export type AttemptTerminalAuthority =
       readonly state: 'TERMINAL';
       readonly verdict: TerminalVerdict;
       readonly evidenceRef: string;
+      readonly reasonCode?: string;
     }
   | {
       readonly state: 'UNKNOWN';
@@ -40,6 +41,12 @@ export type AttemptTerminalAuthority =
 
 export type AttemptResultEvidence<TResult> =
   | { readonly state: 'ABSENT' }
+  | {
+      /** Host-confirmed zero-work terminal outcome; no worker result may be fabricated. */
+      readonly state: 'NOT_APPLICABLE';
+      readonly evidenceRef: string;
+      readonly reasonCode: string;
+    }
   | {
       readonly state: 'PARTIAL';
       readonly evidenceRef: string;
@@ -365,6 +372,13 @@ function classifyAttempt<TResult>(
     } else if (attempt.authority.verdict !== attempt.result.verdict) {
       add('TERMINAL_VERDICT_CONTRADICTION', 'terminal authority and result verdict differ');
     }
+  } else if (attempt.result.state === 'NOT_APPLICABLE') {
+    if (!validText(attempt.result.evidenceRef) || !validText(attempt.result.reasonCode)) {
+      add('RESULT_EVIDENCE_UNKNOWN', 'not-applicable result evidence is incomplete');
+    }
+    if (attempt.authority.state !== 'TERMINAL' || attempt.authority.verdict !== 'NO_GO') {
+      add('TERMINAL_VERDICT_CONTRADICTION', 'not-applicable evidence requires terminal NO_GO authority');
+    }
   } else if (attempt.authority.state === 'TERMINAL') {
     if (attempt.result.state === 'ABSENT') {
       add('TERMINAL_RESULT_MISSING', 'terminal authority has no result evidence');
@@ -391,7 +405,7 @@ function partialProjection<TResult>(
   attempt: ExactAttemptEvidence<TResult>,
   codes: readonly SprintTerminalHoldCode[],
 ): PartialResultProjection<TResult> | null {
-  if (attempt.result.state === 'ABSENT') return null;
+  if (attempt.result.state === 'ABSENT' || attempt.result.state === 'NOT_APPLICABLE') return null;
   const terminalComplete = attempt.authority.state === 'TERMINAL'
     && attempt.result.state === 'COMPLETE'
     && attempt.authority.verdict === attempt.result.verdict
@@ -620,7 +634,7 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
       const codes = codesByAttempt.get(identityKey(attempt.identity)) ?? [];
       const unresolved = attempt.authority.state !== 'TERMINAL'
         || codes.length > 0
-        || attempt.result.state !== 'COMPLETE';
+        || (attempt.result.state !== 'COMPLETE' && attempt.result.state !== 'NOT_APPLICABLE');
       if (unresolved) mutable.unsettled.push(attemptProjection(attempt, codes));
       const partial = partialProjection(attempt, codes);
       if (partial) mutable.partial.push(partial);
@@ -638,11 +652,12 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
       state = 'PARTIAL';
     } else if (tip?.authority.state === 'ACTIVE') {
       state = 'ACTIVE';
-    } else if (tip?.authority.state === 'TERMINAL' && tip.result.state === 'COMPLETE') {
+    } else if (tip?.authority.state === 'TERMINAL'
+      && (tip.result.state === 'COMPLETE' || tip.result.state === 'NOT_APPLICABLE')) {
       resolvingAttempt = { ...tip.identity };
       if (tip.authority.verdict === 'NO_GO') {
         state = 'FAILED';
-      } else {
+      } else if (tip.result.state === 'COMPLETE') {
         state = 'COMPLETED';
         const verifiedAttribution = lineage.flatMap(attempt => {
           if (attempt.attribution.state !== 'VERIFIED') return [];

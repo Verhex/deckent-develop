@@ -83,6 +83,8 @@ export interface SprintContext {
   dependencies?: string[];
   /** Directory containing `.tasks/` result files (defaults to `<cwd>/.tasks`). Used for enriching dependency block. */
   tasksDir?: string;
+  /** Host-evaluated, lineage-aware dependency evidence collected by the prompt caller. */
+  dependencyResults?: ReadonlyMap<string, DependencyResultEntry>;
   /**
    * Minimum ADR relevance score required to include an ADR in the prompt
    * (Sprint 182 PQ-5 / F7). ADRs scoring below this threshold are dropped.
@@ -544,7 +546,13 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   const scopeBlock = buildScopeBlock(task.scope, scopeWarnings, boilerplate.hostConfig, ctx.trackedFiles);
 
   // ── 5. Dependencies Block ───────────────────────────────────────────
-  const depsBlock = buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir);
+  const depsBlock = ctx.dependencyResults
+    ? buildDependenciesBlock({
+        currentTaskId: task.id,
+        deps: task.dependencies?.length ? task.dependencies : (ctx.dependencies ?? []),
+        results: ctx.dependencyResults,
+      })
+    : buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir);
 
   // ── 5b. Shared Context Block (Sprint 278 COMM-1 / 278-003) ──────────
   // Caller (task-builder) populates ctx.sharedContext ONLY when
@@ -1328,6 +1336,7 @@ function formatAggregateEntry(
   for (const [id, entry] of results) {
     if (entry.originalTaskId === depId) fixes.push({ id, entry });
   }
+  fixes.sort((left, right) => left.id.localeCompare(right.id));
 
   if (!original && fixes.length === 0) {
     return `## Dependency ${depId} (Pending)\nPending (not yet complete)`;

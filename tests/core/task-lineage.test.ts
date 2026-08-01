@@ -3,6 +3,8 @@ import {
   computeLogicalTaskProgress,
   evaluateFixCircuitBreaker,
   foldTaskLineages,
+  projectNotDispatchedSettlements,
+  projectTaskLineageSettlements,
   resolveFixAncestorIds,
   resolveFixAttemptDepth,
   selectPendingFixTasks,
@@ -131,9 +133,52 @@ describe('task lineage authority', () => {
     expect(resolveFixAttemptDepth(tasks[2]!, byId)).toBe(2);
     expect(resolveFixAncestorIds(tasks[2]!, byId)).toEqual(['4-fix', '4']);
   });
+
+  it('uses one logical-tip settlement projection for repair and dispatch outcomes', () => {
+    const tasks = [
+      task('settled', TaskStatus.NO_GO),
+      task('settled-fix', TaskStatus.DONE, {
+        fixForTaskId: 'settled',
+      }),
+      task('dispatch', TaskStatus.PAUSED),
+    ];
+    const evaluations = new Map([
+      ['settled', TaskEvaluation.NO_GO],
+      ['settled-fix', TaskEvaluation.DONE],
+      ['dispatch', TaskEvaluation.NOT_DISPATCHED],
+    ]);
+    const dispatchSettlements = new Map([
+      ['dispatch', { state: 'FAILED', reasonCode: 'DISPATCH_EXHAUSTED' } as const],
+    ]);
+
+    expect(projectTaskLineageSettlements(tasks, evaluations, dispatchSettlements))
+      .toMatchObject([
+        { rootId: 'dispatch', resolvedTask: { id: 'dispatch' }, state: 'FAILED' },
+        { rootId: 'settled', resolvedTask: { id: 'settled-fix' }, state: 'COMPLETED' },
+      ]);
+  });
 });
 
 describe('post-FIX circuit breaker', () => {
+  it('projects NOT_DISPATCHED into resumable, exhausted, and dependency-starved states', () => {
+    const tasks = [
+      task('retry-open', TaskStatus.PAUSED),
+      task('retry-spent', TaskStatus.PAUSED),
+      task('starved', TaskStatus.PAUSED, { dependencies: ['retry-spent'] }),
+    ];
+    const evaluations = new Map(tasks.map(item => [item.id, TaskEvaluation.NOT_DISPATCHED]));
+
+    expect([...projectNotDispatchedSettlements(
+      tasks,
+      evaluations,
+      new Set(['retry-spent']),
+    )]).toEqual([
+      ['retry-open', { state: 'RESUMABLE', reasonCode: 'DISPATCH_RETRY_AVAILABLE' }],
+      ['retry-spent', { state: 'FAILED', reasonCode: 'DISPATCH_EXHAUSTED' }],
+      ['starved', { state: 'SKIPPED', reasonCode: 'DEPENDENCY_STARVED' }],
+    ]);
+  });
+
   it('scales the count threshold for a three-task run', () => {
     const tasks = [
       task('small-1', TaskStatus.NO_GO),
@@ -243,8 +288,17 @@ describe('post-FIX circuit breaker', () => {
       ['unresolved-fix', TaskEvaluation.NOT_DISPATCHED],
       ['dependent', TaskEvaluation.NOT_DISPATCHED],
     ]);
+    const dispatchSettlements = new Map([
+      ['unresolved-fix', { state: 'FAILED', reasonCode: 'DISPATCH_EXHAUSTED' } as const],
+      ['dependent', { state: 'SKIPPED', reasonCode: 'DEPENDENCY_STARVED' } as const],
+    ]);
 
-    expect(evaluateFixCircuitBreaker(tasks, evaluations, policy)).toMatchObject({
+    expect(evaluateFixCircuitBreaker(
+      tasks,
+      evaluations,
+      policy,
+      dispatchSettlements,
+    )).toMatchObject({
       totalTasks: 3,
       unresolvedTasks: 1,
       unresolvedTaskIds: ['unresolved'],

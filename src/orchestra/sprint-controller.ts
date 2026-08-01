@@ -96,7 +96,10 @@ import type {
   OuterStagedSettlementBarrier,
 } from './sprint-phases.js';
 import { publishFinalSprintAuthority } from './sprint-finalizer.js';
-import { evaluateFixCircuitBreaker } from '../core/task-lineage.js';
+import {
+  evaluateFixCircuitBreaker,
+  projectNotDispatchedSettlements,
+} from '../core/task-lineage.js';
 
 // ─── Pre-Start Guards (born-672a/672b — snapshot-start guard wiring) ─
 import { runPreStartGuards } from './pre-start-guards.js';
@@ -124,7 +127,7 @@ import { captureVitestBaseline, writeBaseline } from './baseline-tracker.js';
 import {
   writePid, clearPid, writeStateSnapshot,
 } from './sprint-pid-manager.js';
-import type { SprintStateSnapshot } from './sprint-pid-manager.js';
+import type { SprintPidWriteAuthority, SprintStateSnapshot } from './sprint-pid-manager.js';
 
 // ─── Node Builtins (sync I/O for kill-cascade metadata cleanup) ──
 import { unlinkSync } from 'node:fs';
@@ -1211,7 +1214,22 @@ export function applyCascadeCircuitBreaker(
     );
     return result?.cascadeSkipped !== true;
   });
-  const decision = evaluateFixCircuitBreaker(eligibleRootTasks, evaluations, policy);
+  const redispatchAttemptedIds = new Set(
+    eligibleRootTasks
+      .filter(task => existsSync(join(projectRoot, TASKS_DIR, `task-${task.id}.redispatch-attempted`)))
+      .map(task => task.id),
+  );
+  const notDispatchedSettlements = projectNotDispatchedSettlements(
+    eligibleRootTasks,
+    evaluations,
+    redispatchAttemptedIds,
+  );
+  const decision = evaluateFixCircuitBreaker(
+    eligibleRootTasks,
+    evaluations,
+    policy,
+    notDispatchedSettlements,
+  );
   if (!decision.shouldPause) return false;
 
   const reason = decision.forcedByBlockedDependents
@@ -1242,6 +1260,58 @@ export function applyCascadeCircuitBreaker(
     );
   } catch (e) {
     debugLog('runSprint:fix-circuit-breaker:event', e);
+  }
+  return true;
+}
+
+/**
+ * Park unresolved FAILED lineages that are below the mass-failure breaker.
+ * The breaker controls cascade containment; it never grants COMPLETE. This
+ * separate operator-decision seam closes the typed-but-exitless
+ * LINEAGE_NOT_COMPLETED receipt HOLD without changing breaker thresholds.
+ */
+export function applyUnresolvedLineageOperatorHold(
+  projectRoot: string,
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  policy: FixCircuitBreakerConfig = DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
+  lang = 'en',
+): boolean {
+  const eligibleRootTasks = sprint.tasks.filter(task => {
+    const result = readJsonSafe<TaskResult>(
+      join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
+    );
+    return result?.cascadeSkipped !== true;
+  });
+  const redispatchAttemptedIds = new Set(
+    eligibleRootTasks
+      .filter(task => existsSync(join(projectRoot, TASKS_DIR, `task-${task.id}.redispatch-attempted`)))
+      .map(task => task.id),
+  );
+  const decision = evaluateFixCircuitBreaker(
+    eligibleRootTasks,
+    evaluations,
+    policy,
+    projectNotDispatchedSettlements(eligibleRootTasks, evaluations, redispatchAttemptedIds),
+  );
+  if (decision.shouldPause || decision.unresolvedTaskIds.length === 0) return false;
+
+  sprint.phase = SprintPhase.FIX;
+  const reason = getMessage('pause.unresolved_lineage_operator_decision_reason', lang, {
+    unresolvedTasks: decision.unresolvedTaskIds.join(', '),
+  });
+  pauseSprint(projectRoot, sprint, reason, 'unresolved-lineage-operator-decision');
+  try {
+    writeEvent(
+      projectRoot,
+      getCurrentSprintId(projectRoot) ?? sprint.id,
+      'brain',
+      'user',
+      'BRAIN→USER:UNRESOLVED_LINEAGE_OPERATOR_DECISION',
+      { ...decision, timestamp: new Date().toISOString() },
+    );
+  } catch (e) {
+    debugLog('runSprint:unresolved-lineage-operator-decision:event', e);
   }
   return true;
 }
@@ -1614,6 +1684,7 @@ export async function runSprint(
   let scanInterval: ReturnType<typeof setInterval> | null = null;
   let snapshotInterval: ReturnType<typeof setInterval> | null = null;
   let beforeExitHandler: (() => void) | null = null;
+  let coordinatorPidRecord: SprintPidWriteAuthority | null = null;
 
   try {
   // K1 crash fence: project leadership is held at this point. Reconcile the
@@ -1725,7 +1796,10 @@ export async function runSprint(
     }
     setObservabilitySprintId(sprint.id, { perSprintFile: true });
     setActiveSprint(projectRoot, sprint, spawnBackend);
-    try { writePid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:writePid', e); }
+    sprint.startedAt ??= now();
+    try {
+      coordinatorPidRecord = writePid(projectRoot, sprint.id, sprint.startedAt);
+    } catch (e) { debugLog('runSprint:writePid', e); }
     writeSprintState(projectRoot, sprint);
     results = resumeResults;
   } else {
@@ -1869,7 +1943,10 @@ export async function runSprint(
     setActiveSprint(projectRoot, sprint, spawnBackend);
 
     // PID + Snapshot Setup
-    try { writePid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:writePid', e); }
+    sprint.startedAt ??= now();
+    try {
+      coordinatorPidRecord = writePid(projectRoot, sprint.id, sprint.startedAt);
+    } catch (e) { debugLog('runSprint:writePid', e); }
     try {
       await runExactPlanAdmissionHooks(sprint, opts);
     } catch (error) {
@@ -1890,7 +1967,9 @@ export async function runSprint(
         const snap: SprintStateSnapshot = {
           sprintId: sprint.id,
           pid: process.pid,
-          startedAt: sprint.startedAt ?? new Date().toISOString(),
+          startToken: coordinatorPidRecord?.startToken ?? null,
+          leaseId: coordinatorPidRecord?.leaseId,
+          startedAt: coordinatorPidRecord?.startedAt ?? sprint.startedAt!,
           currentWave: 0,
           taskStatuses: Object.fromEntries(sprint.tasks.map(t => [t.id, t.status])),
           metricsJsonlSize: 0,
@@ -2614,11 +2693,18 @@ export async function runSprint(
   // pause. The decision folds every retry into its planned root task and uses
   // the effective config's count + ratio thresholds, so small and large runs
   // share one scale-aware contract.
+  const fixCircuitPolicy = config.fix_circuit_breaker ?? DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG;
   if (applyCascadeCircuitBreaker(
     projectRoot,
     sprint,
     evaluations,
-    config.fix_circuit_breaker ?? DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
+    fixCircuitPolicy,
+    config.language,
+  ) || applyUnresolvedLineageOperatorHold(
+    projectRoot,
+    sprint,
+    evaluations,
+    fixCircuitPolicy,
     config.language,
   )) {
     if (heartbeatDaemon) {
@@ -2794,14 +2880,6 @@ export async function runSprint(
   if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
   if (beforeExitHandler) { process.removeListener('beforeExit', beforeExitHandler); beforeExitHandler = null; }
   try { clearPid(projectRoot, sprint.id); } catch { /* non-fatal */ }
-
-  updateDashboard(projectRoot, {
-    sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
-    agents: [],
-    progress: { done: sprint.tasks.length, active: 0, blocked: 0, total: sprint.tasks.length },
-    alerts: [],
-    updatedAt: now(),
-  });
 
   return sprint;
   } finally {

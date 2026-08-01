@@ -1027,6 +1027,10 @@ const MESSAGES: MessageMap = {
     en: 'The admitted FIX budget is exhausted for {unresolvedTasks}, and unfinished dependent tasks remain blocked: {blockedTasks}. The run was paused with its recovery authority preserved; COMPLETE is not an allowed settlement.',
     tr: '{unresolvedTasks} için kabul edilen FIX bütçesi tükendi ve tamamlanmamış bağımlı task’lar bloke kaldı: {blockedTasks}. Recovery authority korunarak run duraklatıldı; COMPLETE geçerli bir settlement değildir.',
   },
+  'pause.unresolved_lineage_operator_decision_reason': {
+    en: 'Logical tasks remain unresolved after repair settlement: {unresolvedTasks}. The circuit-breaker threshold was not reached, but COMPLETE is still invalid; the run is paused for an explicit recovery or force-finalize decision.',
+    tr: 'Repair settlement sonrasında çözümlenmemiş logical task’lar kaldı: {unresolvedTasks}. Circuit-breaker eşiğine ulaşılmadı ancak COMPLETE yine de geçersiz; run açık bir recover veya force-finalize kararı için duraklatıldı.',
+  },
   'pause.action_resume': {
     en: 'Resume',
     tr: 'Sürdür',

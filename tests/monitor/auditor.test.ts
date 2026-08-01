@@ -776,8 +776,35 @@ describe('updateDashboard', () => {
 
     expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
     const callArgs = mockedWriteFileSync.mock.calls[0]!;
-    expect(String(callArgs[0])).toContain('.dashboard');
+    expect(String(callArgs[0])).toContain('.dashboard.tmp.');
     expect(JSON.parse(callArgs[1] as string)).toEqual(state);
+    expect(mockedRenameSync).toHaveBeenCalledWith(
+      expect.stringContaining('.dashboard.tmp.'),
+      expect.stringContaining('.dashboard'),
+    );
+  });
+
+  it('rejects a stale watcher overwrite after terminal publication', () => {
+    const terminal: DashboardState = {
+      sprint: { id: 's1', number: 1, phase: 'COMPLETE' as never, status: 'COMPLETE' as never },
+      agents: [],
+      progress: { done: 1, active: 0, blocked: 0, total: 2 },
+      alerts: [],
+      updatedAt: '2026-08-01T00:00:00.000Z',
+      terminalAuthority: { sprintId: 's1', completedAt: '2026-08-01T00:00:00.000Z' },
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(terminal) as never);
+
+    updateDashboard('/project', {
+      ...terminal,
+      sprint: { ...terminal.sprint, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
+      progress: { done: 2, active: 1, blocked: 0, total: 2 },
+      terminalAuthority: undefined,
+    });
+
+    expect(mockedWriteFileSync).not.toHaveBeenCalled();
+    expect(mockedRenameSync).not.toHaveBeenCalled();
   });
 });
 
@@ -1360,6 +1387,7 @@ describe('writeScanToDashboard — result file progress', () => {
   const sprintInfo = { id: 'sprint-001', number: 1, phase: 'EXECUTE', status: 'ACTIVE' };
 
   it('sets progress.done from .result file count', () => {
+    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
     mockedExistsSync
       .mockReturnValueOnce(false)  // dashPath does not exist
       .mockReturnValueOnce(true);  // tasksDir exists for scanResultFiles
@@ -1377,6 +1405,7 @@ describe('writeScanToDashboard — result file progress', () => {
   });
 
   it('sets progress.active to heartbeats without matching result', () => {
+    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
     mockedExistsSync
       .mockReturnValueOnce(false)  // dashPath
       .mockReturnValueOnce(true);  // tasksDir
@@ -1398,6 +1427,7 @@ describe('writeScanToDashboard — result file progress', () => {
   });
 
   it('sets progress.done=0 and active=heartbeat count when no result files', () => {
+    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
     mockedExistsSync
       .mockReturnValueOnce(false)  // dashPath
       .mockReturnValueOnce(true);  // tasksDir
@@ -1429,7 +1459,7 @@ describe('writeScanToDashboard — result file progress', () => {
     mockedExistsSync
       .mockReturnValueOnce(true)   // dashPath exists
       .mockReturnValueOnce(true);  // tasksDir exists
-    mockedReadFileSync.mockReturnValueOnce(JSON.stringify(existingDash) as never);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingDash) as never);
     mockedReaddirSync.mockReturnValue(['task-001.result'] as never);
 
     writeScanToDashboard('/project', sprintInfo, {
@@ -1455,7 +1485,7 @@ describe('writeScanToDashboard — result file progress', () => {
     mockedExistsSync
       .mockReturnValueOnce(true)   // dashPath exists
       .mockReturnValueOnce(true);  // tasksDir exists
-    mockedReadFileSync.mockReturnValueOnce(JSON.stringify(existingDash) as never);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingDash) as never);
     mockedReaddirSync.mockReturnValue([
       'task-001.result', 'task-002.result', 'task-003.result',
     ] as never);
@@ -1639,7 +1669,7 @@ describe('validateTechDebt', () => {
 });
 
 describe('verifyWorkerResult (3-pipeline dispatch)', () => {
-  it('dispatches NO_GO to tryCodeVerifiedDone pipeline', async () => {
+  it('preserves NO_GO without ambient shared-worktree promotion', async () => {
     const result = await verifyWorkerResult('001', '/tmp/test', {
       taskId: '001',
       workerId: 'w-001',
@@ -1651,8 +1681,8 @@ describe('verifyWorkerResult (3-pipeline dispatch)', () => {
       selfAssessment: 'NO_GO',
       notes: 'Some real failure',
     });
-    // Should go through tryCodeVerifiedDone pipeline and fail (no Docker pattern)
     expect(result.verdict).toBe('FAIL');
+    expect(result.reason).toBe('Some real failure');
   });
 
   it('dispatches GO_WITH_TECH_DEBT to validateTechDebt pipeline', async () => {

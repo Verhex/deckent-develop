@@ -343,9 +343,9 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       expect(process.exitCode).toBeUndefined();
     });
 
-    it('renders an actionable closed-scope HOLD and does not persist a preview', async () => {
+    it('binds a force-scope acknowledged greenfield allowlist entry into the preview', async () => {
       mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
-      const { factory } = makeControllerFactory();
+      const { factory, getController } = makeControllerFactory();
 
       await runCommand([
         'do',
@@ -355,10 +355,14 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
         'tests/not-yet-created.test.ts',
       ], { createRunFlowController: factory });
 
-      expect(printError).toHaveBeenCalledWith(expect.stringContaining(
-        'ALLOWLIST_PATH_NOT_TRACKED:tests/not-yet-created.test.ts',
-      ));
-      expect(process.exitCode).toBe(1);
+      expect(printError).not.toHaveBeenCalled();
+      expect(getController().getContext().preview?.planDigestContext?.writeScopePolicy)
+        .toEqual({
+          mode: 'closed-allowlist',
+          filesWrite: ['tests/not-yet-created.test.ts'],
+          plannedNewFiles: ['tests/not-yet-created.test.ts'],
+        });
+      expect(process.exitCode).toBeUndefined();
       expect(loadApprovedSnapshot(tmpRoot, 'flow-1')).toBeUndefined();
     });
 

@@ -92,6 +92,7 @@ const startRequested = () => ev({ type: 'START_REQUESTED', revision: REVISION, p
 const runStarted = () => ev({ type: 'RUN_STARTED', handle: handle() });
 const runCompleted = () => ev({ type: 'RUN_COMPLETED', summary: 'ok' });
 const runFailed = () => ev({ type: 'RUN_FAILED', error: 'boom' });
+const runPaused = () => ev({ type: 'RUN_PAUSED', reason: 'repair authority held', resumeCommand: 'deckent recover sprint-1 --resume' });
 const flowAborted = () => ev({ type: 'FLOW_ABORTED' });
 
 /** Drives the reducer through the full happy-path trajectory, one stage at a time. */
@@ -172,6 +173,16 @@ describe('reduceRunFlow — happy path (full trajectory)', () => {
     const failed = reduceRunFlow(running, runFailed());
     expect(failed.state).toBe('FAILED');
     expect(failed.failureReason).toBe('boom');
+  });
+
+  it('DETACHED_RUNNING pauses as resumable BLOCKED rather than FAILED', () => {
+    const running = driveToState('DETACHED_RUNNING');
+    const paused = reduceRunFlow(running, runPaused());
+
+    expect(paused.state).toBe('BLOCKED');
+    expect(paused.failureReason).toBeUndefined();
+    expect(paused.blockedReason).toContain('repair authority held');
+    expect(paused.blockedReason).toContain('deckent recover sprint-1 --resume');
   });
 
   it('STARTING can terminate via RUN_FAILED (spawn itself failed)', () => {
@@ -467,6 +478,18 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // post-run commit proposal (same-feet-as---diff guarantee) — designed
       // store consumer, run-diff-service precedent.
       'orchestra/git-workflow-service.ts',
+      // Exact-plan authority is intentionally carried from planning through
+      // autonomous admission, sprint birth and worker prompt construction.
+      // These consumers import only the immutable contract types/constants;
+      // reducer mutation remains owned by run-flow-coordinator.
+      'orchestra/exact-plan-start-service.ts',
+      'orchestra/run-flow-plan-service.ts',
+      'orchestra/sprint-spawner.ts',
+      'orchestra/task-builder.ts',
+      'orchestra/autonomous/backlog-types.ts',
+      'orchestra/autonomous/execute-dispatcher.ts',
+      'orchestra/autonomous/mission-store/mission-kind-admission.ts',
+      'orchestra/autonomous/mission-store/mission-types.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });

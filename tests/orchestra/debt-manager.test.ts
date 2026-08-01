@@ -409,6 +409,27 @@ describe('handleCrossDependencies', () => {
     expect(writeFileSync).not.toHaveBeenCalled();
   });
 
+  it('does not create a late cross-fix after the direct fix lineage settled', () => {
+    const task1 = makeTask({ id: 'task-001', dependencies: [] });
+    const task2 = makeTask({ id: 'task-002', dependencies: ['task-001'] });
+    const sprint: Sprint = {
+      id: 'sprint-001', number: 1, status: 'ACTIVE' as any, phase: 'EXECUTE' as any,
+      tasks: [task1, task2], workers: [],
+    };
+    const evaluations = new Map([
+      ['task-001', TaskEvaluation.DONE],
+      ['task-002', TaskEvaluation.NO_GO],
+    ]);
+    vi.mocked(existsSync).mockImplementation(path => {
+      const value = String(path);
+      return value.endsWith('task-task-002-fix.json')
+        || value.endsWith('task-task-002-fix.result');
+    });
+
+    expect(handleCrossDependencies('/root', sprint, evaluations)).toEqual([]);
+    expect(writeFileSync).not.toHaveBeenCalled();
+  });
+
   it('creates cross-fix task when NO_GO depends on GO_WITH_TECH_DEBT task', () => {
     const task1 = makeTask({ id: 'task-001', dependencies: [] });
     const task2 = makeTask({ id: 'task-002', dependencies: ['task-001'] });

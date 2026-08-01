@@ -1,9 +1,14 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { TaskEvaluation } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
-import { buildFinalizerTerminalTruth } from '../../src/orchestra/sprint-finalizer.js';
+import {
+  buildFinalizerTerminalTruth,
+  loadFinalizerAttemptTasks,
+} from '../../src/orchestra/sprint-finalizer.js';
 
 function task(id: string, fixForTaskId?: string): Task {
   return {
@@ -65,6 +70,24 @@ function result(
 }
 
 describe('finalizeSprint terminal truth wiring', () => {
+  it('projects exhausted NOT_DISPATCHED as a settled failed lineage, not a receipt HOLD', () => {
+    const tasks = [task('488-nd')];
+    const truth = buildFinalizerTerminalTruth({
+      tasks,
+      evaluations: new Map([['488-nd', TaskEvaluation.NOT_DISPATCHED]]),
+      results: [],
+      notDispatchedSettlements: new Map([['488-nd', {
+        state: 'FAILED',
+        reasonCode: 'DISPATCH_EXHAUSTED',
+      }]]),
+    });
+
+    expect(truth.terminalEvidence.logicalTasks[0]).toMatchObject({ state: 'FAILED' });
+    expect(truth.terminalEvidence.holds).toEqual([]);
+    expect(truth.terminalEvidence.activeOrUnsettledAttempts).toEqual([]);
+    expect(truth.logicalMetrics).toMatchObject({ totalTasks: 1, noGoTasks: 1, unevaluatedTasks: 0 });
+  });
+
   it('folds original and FIX attempts into one finite logical denominator while retaining attempt evidence and lineage usage', () => {
     const tasks = [task('487-001'), task('487-001-fix', '487-001')];
     const evaluations = new Map<string, TaskEvaluation>([
@@ -110,6 +133,31 @@ describe('finalizeSprint terminal truth wiring', () => {
     expect(lineage.logicalTaskId.includes(nulChar)).toBe(false);
   });
 
+  it('loads runtime-born FIX tasks from disk before final lineage folding', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-finalizer-attempts-'));
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const rootTask = task('487-001');
+    const fixTask = task('487-001-fix', '487-001');
+    writeFileSync(
+      join(root, '.tasks', 'task-487-001-fix.json'),
+      JSON.stringify(fixTask),
+      'utf-8',
+    );
+
+    const attempts = loadFinalizerAttemptTasks(root, {
+      id: 'sprint-487',
+      number: 487,
+      status: 'ACTIVE',
+      phase: 'FIX',
+      tasks: [rootTask],
+      workers: [],
+    } as never);
+
+    expect(attempts.map(candidate => candidate.id)).toEqual(['487-001', '487-001-fix']);
+    expect(attempts[1]?.fixForTaskId).toBe('487-001');
+  });
+
   it('returns finite zero metrics for an empty sprint truth', () => {
     const truth = buildFinalizerTerminalTruth({
       tasks: [],
@@ -130,6 +178,7 @@ describe('finalizeSprint terminal truth wiring', () => {
     const finalizeSource = source.slice(source.indexOf('export async function finalizeSprint('));
 
     expect(finalizeSource.match(/buildFinalizerTerminalTruth\(\{/gu)).toHaveLength(1);
+    expect(finalizeSource).toContain('loadFinalizerAttemptTasks(projectRoot, sprint)');
     expect(finalizeSource).toContain('terminalTruth.usageTotals,\n  );');
     expect(finalizeSource).toContain('const usageTotals = terminalTruth.usageTotals;');
     expect(finalizeSource).toContain('projectSprintWorkAttribution(logicalResults)');

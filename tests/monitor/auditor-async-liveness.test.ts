@@ -32,6 +32,7 @@ import {
 import { AgentStatus } from '../../src/core/types.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
 import type { Heartbeat } from '../../src/core/types.js';
+import { dockerContainerNameForTask } from '../../src/core/task-result-settlement.js';
 
 // ─── Fake async spawn ───────────────────────────────────────────────
 
@@ -100,19 +101,24 @@ beforeEach(() => {
 
 describe('probeWorkerAlive', () => {
   it('returns a Promise (non-blocking async probe, not spawnSync)', () => {
-    const { spawnFn } = makeFakeSpawn(() => ({ stdout: 'deckent-w-001\n', code: 0 }));
+    const { spawnFn } = makeFakeSpawn(() => ({ stdout: 'true\n', code: 0 }));
     const result = probeWorkerAlive(makeHb({ backend: 'docker' }), { spawn: spawnFn });
     expect(typeof (result as Promise<boolean>).then).toBe('function');
     return result; // settle it so no dangling promise
   });
 
   it('detects a running Docker container (non-empty stdout → true)', async () => {
-    const { spawnFn, calls } = makeFakeSpawn(() => ({ stdout: 'deckent-w-001\n', code: 0 }));
-    const alive = await probeWorkerAlive(makeHb({ workerId: 'w-001', backend: 'docker' }), { spawn: spawnFn });
+    const projectRoot = join(tmpdir(), 'deckent-auditor-liveness-authority');
+    const containerName = dockerContainerNameForTask(projectRoot, '001');
+    const { spawnFn, calls } = makeFakeSpawn(() => ({ stdout: 'true\n', code: 0 }));
+    const alive = await probeWorkerAlive(
+      makeHb({ workerId: 'w-001', backend: 'docker' }),
+      { spawn: spawnFn, projectRoot },
+    );
     expect(alive).toBe(true);
     expect(calls[0]).toEqual({
       command: 'docker',
-      args: ['ps', '--filter', 'name=deckent-w-001', '--format', '{{.Names}}'],
+      args: ['inspect', '--format', '{{.State.Running}}', containerName],
     });
   });
 
@@ -173,7 +179,7 @@ describe('probeWorkerAlive', () => {
 
 describe('batchProbeLiveness', () => {
   it('probes N workers IN PARALLEL (all spawns start before any resolves)', () => {
-    const { spawnFn, calls } = makeFakeSpawn(() => ({ stdout: 'x\n', code: 0 }));
+    const { spawnFn, calls } = makeFakeSpawn(() => ({ stdout: 'true\n', code: 0 }));
     const hbs = Array.from({ length: 8 }, (_v, i) =>
       makeHb({ workerId: `w-${i}`, backend: 'docker' }));
 
@@ -184,16 +190,17 @@ describe('batchProbeLiveness', () => {
   });
 
   it('resolves a verdict for every worker', async () => {
+    const projectRoot = join(tmpdir(), 'deckent-auditor-batch-verdicts');
+    const aliveNames = new Set([0, 2].map(id => dockerContainerNameForTask(projectRoot, String(id))));
     const { spawnFn } = makeFakeSpawn((cmd, args) => {
       // alive only for even workers
-      const id = args[args.indexOf('--filter') + 1] ?? '';
-      const even = /w-(\d+)/.exec(id)?.[1];
-      return { stdout: even && Number(even) % 2 === 0 ? 'alive\n' : '', code: 0 };
+      const containerName = args.at(-1) ?? '';
+      return { stdout: aliveNames.has(containerName) ? 'true\n' : 'false\n', code: 0 };
     });
     const hbs = Array.from({ length: 4 }, (_v, i) =>
-      makeHb({ workerId: `w-${i}`, backend: 'docker' }));
+      makeHb({ workerId: `w-${i}`, taskId: String(i), backend: 'docker' }));
 
-    const verdicts = await batchProbeLiveness(hbs, { spawn: spawnFn });
+    const verdicts = await batchProbeLiveness(hbs, { spawn: spawnFn, projectRoot });
     expect(verdicts.get('w-0')).toBe(true);
     expect(verdicts.get('w-1')).toBe(false);
     expect(verdicts.get('w-2')).toBe(true);
@@ -201,25 +208,26 @@ describe('batchProbeLiveness', () => {
   });
 
   it('isolates a single failing probe — other workers are unaffected', async () => {
+    const projectRoot = join(tmpdir(), 'deckent-auditor-batch-isolation');
+    const failedName = dockerContainerNameForTask(projectRoot, '1');
     const { spawnFn } = makeFakeSpawn((_cmd, args) => {
-      const id = args[args.indexOf('--filter') + 1] ?? '';
-      if (id.includes('w-1')) return { error: true }; // this one fails
-      return { stdout: 'alive\n', code: 0 };
+      if (args.at(-1) === failedName) return { error: true }; // this one fails
+      return { stdout: 'true\n', code: 0 };
     });
     const hbs = [
-      makeHb({ workerId: 'w-0', backend: 'docker' }),
-      makeHb({ workerId: 'w-1', backend: 'docker' }),
-      makeHb({ workerId: 'w-2', backend: 'docker' }),
+      makeHb({ workerId: 'w-0', taskId: '0', backend: 'docker' }),
+      makeHb({ workerId: 'w-1', taskId: '1', backend: 'docker' }),
+      makeHb({ workerId: 'w-2', taskId: '2', backend: 'docker' }),
     ];
 
-    const verdicts = await batchProbeLiveness(hbs, { spawn: spawnFn });
+    const verdicts = await batchProbeLiveness(hbs, { spawn: spawnFn, projectRoot });
     expect(verdicts.get('w-0')).toBe(true);   // unaffected by w-1 failure
     expect(verdicts.get('w-1')).toBe(false);  // failed probe → fail-safe false
     expect(verdicts.get('w-2')).toBe(true);   // unaffected
   });
 
   it('populates the module-level liveness cache', async () => {
-    const { spawnFn } = makeFakeSpawn(() => ({ stdout: 'alive\n', code: 0 }));
+    const { spawnFn } = makeFakeSpawn(() => ({ stdout: 'true\n', code: 0 }));
     expect(getLivenessCacheSize()).toBe(0);
 
     await batchProbeLiveness([makeHb({ workerId: 'w-9', backend: 'docker' })], { spawn: spawnFn });
@@ -254,7 +262,7 @@ describe('isWorkerStale liveness-cache integration', () => {
     const hb = makeHb({ workerId: 'w-live', taskId: 'L1', backend: 'docker', timestamp: staleTs });
 
     // Warm the cache via the async batch path (docker container running).
-    const { spawnFn } = makeFakeSpawn(() => ({ stdout: 'deckent-w-live\n', code: 0 }));
+    const { spawnFn } = makeFakeSpawn(() => ({ stdout: 'true\n', code: 0 }));
     await batchProbeLiveness([hb], { spawn: spawnFn });
     expect(getCachedLiveness('w-live')).toBe(true);
 
@@ -326,7 +334,7 @@ describe('collectActiveHeartbeats', () => {
     writeHb('002', { workerId: 'w-002', status: AgentStatus.EXECUTING, backend: 'tmux' });
 
     const { spawnFn, calls } = makeFakeSpawn((cmd) =>
-      cmd === 'docker' ? { stdout: 'deckent-w-001\n', code: 0 } : { code: 1 });
+      cmd === 'docker' ? { stdout: 'true\n', code: 0 } : { code: 1 });
 
     const verdicts = await refreshLivenessFromDisk(root, { spawn: spawnFn });
     expect(calls).toHaveLength(2); // both active workers probed

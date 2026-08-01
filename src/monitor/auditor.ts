@@ -34,6 +34,7 @@ import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../core/config.js';
 import { validateTaskResult } from '../core/task-result-schema.js';
 import { RUNTIME_DIR } from '../core/constants.js';
 import { WorkerHeartbeatAuthorityStore } from '../core/worker-heartbeat-authority-store.js';
+import { dockerContainerNameForTask } from '../core/task-result-settlement.js';
 import type {
   WorkerHeartbeatAuthorityIdentity,
   WorkerHeartbeatAuthorityState,
@@ -235,6 +236,8 @@ export interface LivenessProbeOptions {
   spawn?: typeof spawn;
   /** Per-probe timeout in milliseconds (default 5_000 — matches the sync probe). */
   timeoutMs?: number;
+  /** Project authority required to resolve daemon-global Docker identity exactly. */
+  projectRoot?: string;
 }
 
 /**
@@ -316,13 +319,15 @@ export async function probeWorkerAlive(
   const workerId = hb.workerId;
 
   switch (hb.backend) {
-    case 'docker':
+    case 'docker': {
+      const containerName = dockerContainerNameForTask(opts.projectRoot ?? process.cwd(), hb.taskId);
       return runAsyncProbe(
         spawnFn, 'docker',
-        ['ps', '--filter', `name=deckent-${workerId}`, '--format', '{{.Names}}'],
+        ['inspect', '--format', '{{.State.Running}}', containerName],
         timeoutMs,
-        (_code, stdout) => stdout.trim().length > 0,
+        (code, stdout) => code === 0 && stdout.trim() === 'true',
       );
+    }
     case 'tmux':
       return runAsyncProbe(
         spawnFn, 'tmux',
@@ -409,7 +414,7 @@ export async function refreshLivenessFromDisk(
 ): Promise<Map<string, boolean>> {
   try {
     const heartbeats = collectActiveHeartbeats(projectRoot);
-    return await batchProbeLiveness(heartbeats, opts);
+    return await batchProbeLiveness(heartbeats, { ...opts, projectRoot });
   } catch {
     return new Map<string, boolean>();
   }
@@ -960,7 +965,26 @@ export function updateDashboard(
   state: DashboardState,
 ): void {
   const dashPath = join(projectRoot, DASHBOARD_FILE);
-  writeFileSync(dashPath, JSON.stringify(state, null, 2), 'utf-8');
+  const existing = readJsonSafe<DashboardState>(dashPath);
+  if (existing?.sprint && typeof existing.sprint.id === 'string') {
+    // A detached/stale watcher may finish after terminal publication or after
+    // the next sprint reset. It may enrich only its own live generation; it
+    // cannot roll a terminal snapshot backward or replace another sprint.
+    if (existing.sprint.id !== state.sprint.id) {
+      debugLog(
+        'updateDashboard:fenced',
+        `reject stale sprint=${state.sprint.id}; current=${existing.sprint.id}`,
+      );
+      return;
+    }
+    if (existing.terminalAuthority && !state.terminalAuthority) {
+      debugLog('updateDashboard:fenced', `reject non-terminal overwrite for ${state.sprint.id}`);
+      return;
+    }
+  }
+  const tmpPath = `${dashPath}.tmp.${process.pid}`;
+  writeFileSync(tmpPath, JSON.stringify(state, null, 2), 'utf-8');
+  renameSync(tmpPath, dashPath);
 }
 
 /**
@@ -1508,7 +1532,7 @@ export function startScanLoop(
       runScan();
       return;
     }
-    void batchProbeLiveness(active)
+    void batchProbeLiveness(active, { projectRoot })
       .catch(() => undefined) // probe refresh must never kill the loop
       .then(runScan);
   }, interval);
@@ -2164,12 +2188,9 @@ export async function verifyWorkerResult(
 
   switch (result.selfAssessment) {
     case 'NO_GO': {
-      const codeVerify = await tryCodeVerifiedDone(taskId, projectRoot);
-      if (codeVerify.triggered && codeVerify.verified) {
-        verification = { verdict: 'PASS', reason: `CODE_VERIFIED_DONE: ${codeVerify.reason}` };
-      } else {
-        verification = { verdict: 'FAIL', reason: `Honest NO_GO: ${codeVerify.reason}` };
-      }
+      // A worker NO_GO is never promoted from ambient shared-worktree state.
+      // Exact attempt settlement/reconciliation owns any later promotion.
+      verification = { verdict: 'FAIL', reason: result.notes?.trim() || 'NO_GO' };
       break;
     }
     case 'GO_WITH_TECH_DEBT':

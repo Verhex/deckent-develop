@@ -29,7 +29,7 @@ import { join } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
-import { ALL_PROVIDER_NAMES, TaskEvaluation, TaskStatus } from '../core/types.js';
+import { ALL_PROVIDER_NAMES, TaskEvaluation } from '../core/types.js';
 import type {
   Task,
   TaskResult,
@@ -953,53 +953,10 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
     const logPath = join(input.projectRoot, TASKS_DIR, `task-${verifierTaskId}.log`);
     const terminalVerdict = await waitForTerminalVerifierLog(logPath, input.timeoutMs);
     if (terminalVerdict) {
-
-        // The provider completed the verifier's sole acceptance criterion, but
-        // generic Docker wrappers cannot write a TaskResult for host-CLI output
-        // and therefore leave an EXIT_WITHOUT_RESULT/NO_GO marker. Reconcile
-        // ONLY this xverify task after the final-line parser has proven a real
-        // terminal protocol line. Generic implementation workers remain NO_GO.
-        // Preserve provider usage/billing and exit evidence; remove only stale
-        // marker discriminators that would make consumers classify this DONE
-        // audit as an unfinished wrapper exit.
-        let resultRecovered = false;
-        try {
-          const resultPath = join(input.projectRoot, TASKS_DIR, `task-${verifierTaskId}.result`);
-          if (existsSync(resultPath)) {
-            const recovered = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
-            recovered.selfAssessment = 'DONE';
-            recovered.testsPassed = true;
-            recovered.notes = `Recovered terminal verifier output from provider log.\n${terminalVerdict}`;
-            recovered.completedAt = typeof recovered.completedAt === 'string'
-              ? recovered.completedAt
-              : new Date().toISOString();
-            delete recovered.markerType;
-            delete recovered.workPresent;
-            delete recovered.diffStat;
-            atomicWriteFileSync(resultPath, JSON.stringify(recovered, null, 2) + '\n');
-            resultRecovered = true;
-          }
-        } catch (err) {
-          // Result repair is evidence hygiene, not verdict authority. A corrupt
-          // or unwritable marker must not discard the independently recovered
-          // terminal verdict returned below.
-          debugLog('cross-verify:terminal-result-recovery-failed', String(err));
-        }
-        if (resultRecovered) {
-          try {
-            const taskPath = join(input.projectRoot, TASKS_DIR, `task-${verifierTaskId}.json`);
-            const taskProjection = JSON.parse(readFileSync(taskPath, 'utf-8')) as Record<string, unknown>;
-            if (taskProjection['id'] !== verifierTaskId) {
-              throw new Error(`verifier task identity mismatch: ${String(taskProjection['id'])}`);
-            }
-            taskProjection['status'] = TaskStatus.DONE;
-            atomicWriteFileSync(taskPath, JSON.stringify(taskProjection, null, 2) + '\n');
-          } catch (err) {
-            // The recovered TaskResult remains primary truth. A failed task-status
-            // projection stays visible as PENDING drift and never erases verdict.
-            debugLog('cross-verify:terminal-task-finalization-failed', String(err));
-          }
-        }
+      // A provider log is semantic evidence, not execution settlement. It may
+      // inform an advisory verdict, but it cannot rewrite EXIT_WITHOUT_RESULT
+      // into a synthetic DONE result or task status. Mandatory verification
+      // must arrive through the host-owned settlement path above.
       return terminalVerdict;
     }
   } catch (err) {

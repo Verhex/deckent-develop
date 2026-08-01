@@ -14,7 +14,6 @@ import {
   mkdirSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
 
 // ─── Core (value imports — enums used at runtime) ──────────────────
 import {
@@ -77,7 +76,6 @@ import {
 
 // ─── Partial Promotion (PROMOTE-W1b) ─────────────────────────────
 import { attemptPartialPromotion } from './result-promoter.js';
-import { revertFilesToHead } from '../agents/worker-rollback.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
 import {
@@ -157,7 +155,9 @@ import {
   assertTaskResultAuthoritiesReady,
   readAuthoritativeTaskResult,
   readRuntimeBudgetEvaluationAuthority,
+  readVerificationIsolationEvaluationAuthority,
 } from './task-result-authority.js';
+import { decideFixRepairAuthority } from './fix-repair-authority.js';
 
 // ─── Overlap Detection (Sprint 324 — Task 324-004) ───────────────
 import { ResultMerger } from './result-merger.js';
@@ -243,6 +243,38 @@ function toTaskEvaluation(evalResult: EvaluationResult): TaskEvaluation {
     case 'NO_GO': return TaskEvaluation.NO_GO;
     default: return TaskEvaluation.NO_GO;
   }
+}
+
+/**
+ * Single production boundary between Brain verdict and FIX birth. Exact
+ * host-owned verification isolation evidence parks the attempt; worker notes
+ * never participate in this authority decision.
+ */
+function settleEvaluationWithRepairAuthority(
+  projectRoot: string,
+  task: Task,
+  evaluation: TaskEvaluation,
+  result: TaskResult,
+  policy: { allowPriorityFixCreation?: boolean } = {},
+): TaskEvaluation {
+  if (evaluation !== TaskEvaluation.NO_GO) {
+    handleEvaluation(projectRoot, task, evaluation, result, policy);
+    return evaluation;
+  }
+  const receipt = readVerificationIsolationEvaluationAuthority(projectRoot, task.id);
+  const repair = decideFixRepairAuthority('NO_GO', result, receipt);
+  if (repair.action !== 'park') {
+    handleEvaluation(projectRoot, task, evaluation, result, policy);
+    return evaluation;
+  }
+  handleEvaluation(projectRoot, task, TaskEvaluation.DEFERRED, result, {
+    allowPriorityFixCreation: false,
+  });
+  debugLog(
+    'settleEvaluationWithRepairAuthority',
+    `task=${task.id} receiptAttempt=${receipt?.attemptId ?? 'none'}; parked without FIX budget`,
+  );
+  return TaskEvaluation.DEFERRED;
 }
 
 /**
@@ -1739,32 +1771,15 @@ export async function runEvaluatePhase(
             rubricResult.isPartialPromotable === true &&
             gated.honest &&
             !hasConcreteEvaluationFailure(result) &&
+            result.workAttribution?.state === 'VERIFIED' &&
             !runtimeBudgetAuthority
           ) {
             try {
               const ppResult = await attemptPartialPromotion(projectRoot, task, result, rubricResult);
               if (ppResult.promoted) {
-                // in-scope commit
-                try {
-                  execFileSync('git', ['add', '--', ...ppResult.inScopeFiles], {
-                    cwd: projectRoot, stdio: ['ignore', 'ignore', 'pipe'],
-                  });
-                  execFileSync('git', ['commit', '-m',
-                    `partial-promotion: task-${task.id} in-scope work salvaged [PROMOTE-W1b]`], {
-                    cwd: projectRoot, stdio: ['ignore', 'ignore', 'pipe'],
-                  });
-                } catch (e) {
-                  debugLog('runEvaluatePhase:partialPromotion:commit', e);
-                }
-                // out-of-scope revert
-                if (ppResult.droppedFiles.length > 0) {
-                  try {
-                    revertFilesToHead(projectRoot, ppResult.droppedFiles);
-                  } catch (e) {
-                    debugLog('runEvaluatePhase:partialPromotion:revert', e);
-                  }
-                }
-                // upgrade verdict
+                // Verdict projection only. Mid-sprint Git commits/reverts move
+                // the shared HEAD and corrupt every concurrent attempt baseline.
+                // Physical promotion belongs to a fenced settlement adapter.
                 evaluation = TaskEvaluation.GO_WITH_TECH_DEBT;
                 // emit BRAIN→AUDITOR event
                 try {
@@ -2159,7 +2174,9 @@ export async function runEvaluatePhase(
           : undefined;
 
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
-        handleEvaluation(projectRoot, task, evaluation, result, initialFixPolicy);
+        evaluation = settleEvaluationWithRepairAuthority(
+          projectRoot, task, evaluation, result, initialFixPolicy,
+        );
         evaluations.set(task.id, evaluation);
         evaluatedThisInvocation.add(task.id);
 
@@ -2318,8 +2335,13 @@ export async function runEvaluatePhase(
               `task=${task.id} produced .result during extension window`,
             );
             const rubricResult = await safeRubricReconcile(projectRoot, sprint.id, task, lateResult);
-            const evaluation = toTaskEvaluation(rubricResult);
-            handleEvaluation(projectRoot, task, evaluation, lateResult, initialFixPolicy);
+            const evaluation = settleEvaluationWithRepairAuthority(
+              projectRoot,
+              task,
+              toTaskEvaluation(rubricResult),
+              lateResult,
+              initialFixPolicy,
+            );
             evaluations.set(task.id, evaluation);
             evaluatedThisInvocation.add(task.id);
             writeTaskEvaluationAudit(projectRoot, sprint.id, task, evaluation, rubricResult);
@@ -2412,8 +2434,13 @@ export async function runEvaluatePhase(
               `task=${task.id} produced .result during grace window`,
             );
             const graceRubric = await safeRubricReconcile(projectRoot, sprint.id, task, graceResult);
-            const graceEval = toTaskEvaluation(graceRubric);
-            handleEvaluation(projectRoot, task, graceEval, graceResult, initialFixPolicy);
+            const graceEval = settleEvaluationWithRepairAuthority(
+              projectRoot,
+              task,
+              toTaskEvaluation(graceRubric),
+              graceResult,
+              initialFixPolicy,
+            );
             evaluations.set(task.id, graceEval);
             evaluatedThisInvocation.add(task.id);
             writeTaskEvaluationAudit(projectRoot, sprint.id, task, graceEval, graceRubric);
@@ -2448,7 +2475,7 @@ export async function runEvaluatePhase(
         );
         const syntheticResult = gated.result;
         debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing) liveness=${liveness.status} reclassified=${gated.reclassified}`);
-        handleEvaluation(
+        settleEvaluationWithRepairAuthority(
           projectRoot,
           task,
           TaskEvaluation.NO_GO,
@@ -3241,13 +3268,10 @@ export async function runFixPhase(
           const ingestVerdict = fixVerdicts.get(fixTask.id);
           const fixRubricResult = ingestVerdict?.rubric
             ?? await safeRubricReconcile(projectRoot, sprint.id, fixTask, fixResult);
-          const fixEval = ingestVerdict?.evaluation ?? toTaskEvaluation(fixRubricResult);
+          let fixEval = ingestVerdict?.evaluation ?? toTaskEvaluation(fixRubricResult);
           const fixAttempt = resolveFixAttemptDepth(fixTask, tasksById);
-          handleEvaluation(
-            projectRoot,
-            fixTask,
-            fixEval,
-            fixResult,
+          fixEval = settleEvaluationWithRepairAuthority(
+            projectRoot, fixTask, fixEval, fixResult,
             { allowPriorityFixCreation: fixAttempt < maxFixRetries },
           );
           evaluations.set(fixTask.id, fixEval);
@@ -3510,7 +3534,9 @@ export async function runFixPhase(
                   selfAssessment: 'NO_GO',
                   notes: 'Re-dispatch attempt produced no result (worker crashed/timed out) — dispatch itself ran this round.',
                 };
-                handleEvaluation(projectRoot, rTask, TaskEvaluation.NO_GO, syntheticResult);
+                settleEvaluationWithRepairAuthority(
+                  projectRoot, rTask, TaskEvaluation.NO_GO, syntheticResult,
+                );
                 evaluations.set(rTask.id, TaskEvaluation.NO_GO);
               }
               continue;
@@ -3520,8 +3546,12 @@ export async function runFixPhase(
             const rIngest = fixVerdicts.get(rTask.id);
             const rRubricResult = rIngest?.rubric
               ?? await safeRubricReconcile(projectRoot, sprint.id, rTask, rResult);
-            const rEval = rIngest?.evaluation ?? toTaskEvaluation(rRubricResult);
-            handleEvaluation(projectRoot, rTask, rEval, rResult);
+            const rEval = settleEvaluationWithRepairAuthority(
+              projectRoot,
+              rTask,
+              rIngest?.evaluation ?? toTaskEvaluation(rRubricResult),
+              rResult,
+            );
             evaluations.set(rTask.id, rEval);
             // TT551: a NOT_DISPATCHED task re-run is the ORIGINAL work-item's
             // 2nd honest attempt (no fix task, so retryOf stays undefined).
@@ -3628,8 +3658,12 @@ export async function runFixPhase(
           const pIngest = fixVerdicts.get(pTask.id);
           const pRubricResult = pIngest?.rubric
             ?? await safeRubricReconcile(projectRoot, sprint.id, pTask, pResult);
-          const pEval = pIngest?.evaluation ?? toTaskEvaluation(pRubricResult);
-          handleEvaluation(projectRoot, pTask, pEval, pResult);
+          const pEval = settleEvaluationWithRepairAuthority(
+            projectRoot,
+            pTask,
+            pIngest?.evaluation ?? toTaskEvaluation(pRubricResult),
+            pResult,
+          );
           evaluations.set(pTask.id, pEval);
           persistBrainVerdict(
             projectRoot, pTask.id, pEval, pRubricResult.totalScore, { honest: true }, pResult,

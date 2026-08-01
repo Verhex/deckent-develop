@@ -119,7 +119,7 @@ import {
 } from '../nervous/respawn-request.js';
 
 // ─── Canonical Spawn Executor (SCHED3, born-634/635) ─────────────
-import { executeSpawnTask } from './scheduler-effects.js';
+import { executeSpawnTask, findActiveWriteCollisions } from './scheduler-effects.js';
 
 // ─── Token Counter (Sprint 196 — Task 196-005 / WP-4) ────────────
 // Orchestrator-side token-usage fill. `mergeWithWorkerClaim` /
@@ -234,6 +234,8 @@ export function shouldYieldExecuteToRepair(input: ExecuteRepairYieldInput): bool
   return input.pausedCount + input.heldPendingCount > 0 || input.repairCandidateCount > 0;
 }
 
+export { findActiveWriteCollisions } from './scheduler-effects.js';
+
 export function isProviderDispatchHoldFailure(
   result: Pick<
     TaskResult,
@@ -340,7 +342,7 @@ export {
 export type { ProviderExecutionHold };
 
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
-import { verifyDiskAgainstClaim, computeScopedDiskChanges, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
+import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
 import { normalizeTaskResultShape, validateTaskResult } from '../core/task-result-schema.js';
 import {
   sanitizeHostFacingFiles,
@@ -1315,7 +1317,7 @@ export async function waitForResults(
           let reclassifyToManualReview = false;
           if (isSyntheticExitNoResult) {
             const taskForScope = taskMap.get(taskId);
-            const diskVerify = taskForScope
+            const diskVerify = taskForScope && result.workAttribution?.state === 'VERIFIED'
               ? verifyDiskAgainstClaim(projectRoot, taskForScope.scope)
               : { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] as string[] };
             if (diskVerify.hasDiskEvidence) {
@@ -1373,28 +1375,25 @@ export async function waitForResults(
           // repository's final shared-worktree diff. Re-running LP-10 here
           // would re-attach predecessor/sibling bytes that the settlement
           // already excluded (RECOVERY-BORN-480-ATTRIBUTION-001).
-          if (enrichTask && !result.workAttribution) {
-            try {
-              const disk = computeScopedDiskChanges(projectRoot, enrichTask.scope);
-              if (disk.filesChanged.length > 0 || disk.linesAdded > 0 || disk.linesRemoved > 0) {
-                result.filesChanged = disk.filesChanged;
-                result.linesAdded = disk.linesAdded;
-                result.linesRemoved = disk.linesRemoved;
-              }
-            } catch (e) {
-              debugLog('collectResults:diskChangesEnrich', e);
-            }
-          }
+          // Missing claim-time attribution is UNKNOWN, never permission to
+          // attach the final shared-worktree diff. Docker settlement already
+          // supplies VERIFIED/HOLD evidence; legacy/unattributed results retain
+          // their own non-authoritative counters and cannot gain verdict/KPI
+          // weight from neighboring attempts.
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
           // Persist the orchestrator-enriched tokenUsage + cost back to the .result FILE.
           // enrichResultTokenUsage/enrichResultCost mutate the in-memory result only;
           // without this write the on-disk .result keeps the worker's 0/0 placeholder.
           persistEnrichedResult(projectRoot, result);
           reportResultContractDrift(projectRoot, sprint.id, taskId, result, config);
+          await syncTaskStatusFromResult(taskId, result);
+          // Transactional commit boundary: a result is not collected until its
+          // host-owned evaluation has synchronized the aggregate task state.
+          // If evaluation throws, the next tick must retry this exact result
+          // without a duplicate array entry or a permanently skipped task.
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
-          await syncTaskStatusFromResult(taskId, result);
           // Sprint 278 COMM-1 — write sharedNotes to SharedMemory (best-effort, opt-in)
           if (
             config?.worker_comms?.enabled
@@ -1439,10 +1438,10 @@ export async function waitForResults(
           // Persist enriched tokenUsage + cost to the .result FILE (see above).
           persistEnrichedResult(projectRoot, lateResult);
           reportResultContractDrift(projectRoot, sprint.id, taskId, lateResult, config);
+          await syncTaskStatusFromResult(taskId, lateResult);
           results.push(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
-          await syncTaskStatusFromResult(taskId, lateResult);
           debugLog('collectResults:lateResult', `taskId=${taskId} EXIT trap wrote .result (${lateResult.selfAssessment}), skipping synthetic NO_GO`);
           continue;
         }
@@ -1453,9 +1452,11 @@ export async function waitForResults(
         // produced code on disk. If so, convert to MANUAL_REVIEW_REQUIRED so a
         // human can review the partial work instead of losing it to a false NO_GO.
         const taskForScope = taskMap.get(taskId);
-        const diskVerify = taskForScope
-          ? verifyDiskAgainstClaim(projectRoot, taskForScope.scope)
-          : { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] as string[] };
+        // No result means no settled attempt-attribution receipt. The shared
+        // worktree can contain sibling bytes, so it cannot reclassify this
+        // timeout. Preserve the bytes for operator inspection, but keep the
+        // attempt verdict honest and unattributed.
+        const diskVerify = { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] as string[] };
 
         const syntheticResult: TaskResult = diskVerify.hasDiskEvidence
           ? {
@@ -1510,10 +1511,10 @@ export async function waitForResults(
             'utf-8',
           );
         } catch (e) { debugLog('collectResults:writeTimeoutResult', e); }
+        await syncTaskStatusFromResult(taskId, syntheticResult);
         results.push(syntheticResult);
         collected.add(taskId);
         newlyCollected.push(taskId);
-        await syncTaskStatusFromResult(taskId, syntheticResult);
 
         if (diskVerify.hasDiskEvidence) {
           // Override the status mutation: NO_GO → MANUAL_REVIEW_REQUIRED so the
@@ -1596,6 +1597,80 @@ export async function waitForResults(
   };
 
   const queueBackend = spawnOpts?.spawnBackend;
+  const vanishedWorkerSince = new Map<string, number>();
+  const configuredHeartbeatSeconds = (config as (ResolvedConfig & { heartbeat_timeout?: number }) | undefined)
+    ?.heartbeat_timeout;
+  const vanishedWorkerGraceMs =
+    typeof configuredHeartbeatSeconds === 'number' && Number.isFinite(configuredHeartbeatSeconds)
+      ? Math.max(30_000, Math.min(configuredHeartbeatSeconds * 1_000, 120_000))
+      : 90_000;
+
+  /**
+   * Bound an EXECUTING slot whose backend process vanished without writing a
+   * timeout/result artifact. Two-stage observation avoids spawn/list races;
+   * Docker gets one terminal reconciliation before a legacy timeout marker is
+   * authored. A still-pending settlement is surfaced as an authority fault,
+   * never waited forever.
+   */
+  const reapVanishedWorkers = async (): Promise<void> => {
+    if (!queueBackend) return;
+    let active: ReadonlySet<string>;
+    try {
+      active = new Set(queueBackend.list());
+    } catch (error) {
+      debugLog('reapVanishedWorkers:list', error);
+      return;
+    }
+    const nowMs = Date.now();
+    for (const task of sprint.tasks) {
+      const inFlight = task.status === TaskStatus.EXECUTING
+        || task.status === TaskStatus.CLAIMED
+        || task.status === TaskStatus.TESTING
+        || task.status === TaskStatus.DOCUMENTING;
+      if (!inFlight || collected.has(task.id) || active.has(task.id)) {
+        vanishedWorkerSince.delete(task.id);
+        continue;
+      }
+      const inventoryState = queueBackend.workerInventoryState?.(task.id) ?? 'absent';
+      if (inventoryState === 'unknown') {
+        // A restarted process-local backend has no durable inventory of children
+        // born under the previous coordinator. Absence from its empty map is not
+        // liveness evidence; an external settlement/heartbeat authority must
+        // resolve the task instead of this reaper manufacturing a timeout.
+        vanishedWorkerSince.delete(task.id);
+        continue;
+      }
+      const absentSince = vanishedWorkerSince.get(task.id);
+      if (absentSince === undefined) {
+        vanishedWorkerSince.set(task.id, nowMs);
+        continue;
+      }
+      if (nowMs - absentSince < vanishedWorkerGraceMs) continue;
+
+      if (queueBackend.reconcilePendingAttempts) {
+        await queueBackend.reconcilePendingAttempts({ mode: 'terminal-only' });
+      }
+      const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
+      if (authority.result) {
+        vanishedWorkerSince.delete(task.id);
+        continue;
+      }
+      if (authority.state === 'pending-settlement') {
+        throw new Error(`DECKENT_E091:vanished-worker-settlement-pending:${task.id}`);
+      }
+      const timeoutPath = join(projectRoot, TASKS_DIR, `task-${task.id}.timeout`);
+      const tmpPath = `${timeoutPath}.vanished.tmp.${process.pid}`;
+      writeFileSync(tmpPath, JSON.stringify({
+        taskId: task.id,
+        reasonCode: 'BACKEND_WORKER_VANISHED',
+        observedAt: new Date(nowMs).toISOString(),
+        backend: queueBackend.name,
+      }, null, 2), 'utf-8');
+      renameSync(tmpPath, timeoutPath);
+      vanishedWorkerSince.delete(task.id);
+      metric('worker.vanished_reaped', 1, { taskId: task.id, backend: queueBackend.name });
+    }
+  };
 
   // ─── Sprint 165 Bug Y — single-task spawn helper (idempotent) ────────
   // Centralizes the spawn dance: prompt resolution, allowedTools build,
@@ -1605,6 +1680,14 @@ export async function waitForResults(
   const spawnIfNotAssigned = async (nextTask: Task): Promise<boolean> => {
     if (assignedTaskIds.has(nextTask.id)) return false;
     if (providerDispatchHolds.has(resolveTaskProvider(nextTask))) return false;
+    const collisionBlockers = findActiveWriteCollisions(nextTask, sprint.tasks, collected);
+    if (collisionBlockers.length > 0) {
+      debugLog(
+        'spawnIfNotAssigned:collision',
+        `task=${nextTask.id} held behind active writer(s): ${collisionBlockers.join(',')}`,
+      );
+      return false;
+    }
     assignedTaskIds.add(nextTask.id);
     // born-452 THROW-ADAYLARI: the try/catch used to start only at the backend-spawn
     // call below, leaving prompt resolution + template rendering (resolveAgentPrompt /
@@ -1639,10 +1722,11 @@ export async function waitForResults(
           resolveAgentPrompt,
           resolveSkillPrompts,
           buildWriteTargets: buildSpawnWriteTargets,
+          collisionAuthority: { tasks: sprint.tasks, collectedIds: collected },
         },
       );
 
-      if (disposition.kind === 'routing-lineage-missing' || disposition.kind === 'provider-unavailable') {
+      if (disposition.kind !== 'spawned') {
         assignedTaskIds.delete(nextTask.id);
         return false;
       }
@@ -1958,9 +2042,9 @@ export async function waitForResults(
             'utf-8',
           );
         } catch (e) { debugLog('cascadeSkipDeadBlocked:write', e); }
+        await syncTaskStatusFromResult(t.id, skip);
         results.push(skip);
         collected.add(t.id);
-        await syncTaskStatusFromResult(t.id, skip);
         totalSkipped++;
         changed = true;
         debugLog('cascadeSkipDeadBlocked', `task ${t.id} skipped (dep ${failedDep} failed)`);
@@ -2079,6 +2163,7 @@ export async function waitForResults(
       resolveAgentPrompt,
       resolveSkillPrompts,
       buildWriteTargets: buildSpawnWriteTargets,
+      collisionAuthority: { tasks: sprint.tasks, collectedIds: collected },
     },
     killWorker: (taskId: string) => {
       if (queueBackend) queueBackend.kill(taskId);
@@ -2086,7 +2171,17 @@ export async function waitForResults(
     },
   });
 
-  const initiallyCollected = await collectResults();
+  let initiallyCollected: string[] = [];
+  try {
+    await reapVanishedWorkers();
+    initiallyCollected = await collectResults();
+  } catch (error) {
+    // The watcher loop owns the bounded same-error ceiling and retries any
+    // result that did not cross the transactional commit boundary above.
+    // Provider ingress HOLD remains authority-bearing and must propagate.
+    if (isProviderExecutionIngressHoldError(error)) throw error;
+    debugLog('waitForResults:initialCollect', error);
+  }
   const shadowTickInitial = captureShadowTick('initial', initiallyCollected);
   // ADR-064 (TOPP B): unified dispatch tick — replaces the dual
   // `await processQueue(...); await maybeRespawn();` sequence so the
@@ -2213,6 +2308,7 @@ export async function waitForResults(
       // Race: fs.watch / fallback-poll vs IPC heartbeat wakeup
       await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
       try {
+        await reapVanishedWorkers();
         const newlyCollected = await collectResults();
         // SCHED4 shadow snapshot — captured HERE, before drainNervousRespawns/
         // dispatch mutate anything this tick (see the closure's doc comment above).
@@ -2349,9 +2445,9 @@ export async function waitForResults(
         sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
         // Persist enriched tokenUsage + cost to the .result FILE (see above).
         persistEnrichedResult(projectRoot, result);
+        await syncTaskStatusFromResult(taskId, result);
         results.push(result);
         collected.add(taskId);
-        await syncTaskStatusFromResult(taskId, result);
       }
     }
   }

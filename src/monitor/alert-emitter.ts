@@ -9,12 +9,13 @@
  * instead of appending a new entry (DASH-UX-4).
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DASHBOARD_FILE } from '../core/constants.js';
 import { AlertLevel } from '../core/types.js';
 import type { Alert, DashboardState } from '../core/types.js';
 import { writeEvent, CHANNELS } from '../orchestra/event-stream.js';
+import { updateDashboard } from './auditor.js';
 
 export type AlertType = 'stale_md' | 'boundary_violation' | 'pattern_detected' | string;
 
@@ -103,7 +104,7 @@ export function emitAlert(
       };
       state.alerts = deduplicateAlert(state.alerts ?? [], incoming) as Alert[];
       state.updatedAt = timestamp;
-      writeFileSync(dashPath, JSON.stringify(state, null, 2), 'utf-8');
+      updateDashboard(projectRoot, state);
     }
   } catch {
     // Dashboard write failure must not break scan loop

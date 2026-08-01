@@ -504,8 +504,8 @@ describe('run-flow-plan-service', () => {
     expect(mocks.storedPlans.size).toBe(1);
   });
 
-  it('rejects an untracked closed-allowlist entry before durable preview publication', async () => {
-    await expect(planRunFlow(input({
+  it('binds an explicitly acknowledged untracked allowlist entry as planned-new intent', async () => {
+    await planRunFlow(input({
       previewOptions: {
         mode: 'structured',
         writeScopePolicy: {
@@ -514,6 +514,31 @@ describe('run-flow-plan-service', () => {
         },
       },
       acknowledgeScopePaths: true,
+      scopeEvidence: {
+        status: 'available',
+        trackedFiles: ['src/a.ts'],
+      },
+    }));
+
+    expect(mocks.generatePlanPreview.mock.calls[0]?.[4]).toMatchObject({
+      writeScopePolicy: {
+        mode: 'closed-allowlist',
+        filesWrite: ['src/a.ts', 'tests/not-yet-created.test.ts'],
+        plannedNewFiles: ['tests/not-yet-created.test.ts'],
+      },
+    });
+    expect(mocks.storedPlans.size).toBe(1);
+  });
+
+  it('rejects an untracked closed-allowlist entry without explicit scope acknowledgement', async () => {
+    await expect(planRunFlow(input({
+      previewOptions: {
+        mode: 'structured',
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['src/a.ts', 'tests/not-yet-created.test.ts'],
+        },
+      },
       scopeEvidence: {
         status: 'available',
         trackedFiles: ['src/a.ts'],

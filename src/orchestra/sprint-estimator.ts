@@ -2,12 +2,13 @@
 // Heuristic-based sprint duration estimation using task complexity scoring,
 // parallelism factors, and historical sprint data.
 
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Task } from '../core/types.js';
+import type { DashboardState, Task } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, DASHBOARD_FILE } from '../core/constants.js';
 import { getModelTier, type ModelTier } from '../core/model-equivalence.js';
 import { debugLog } from '../core/utils.js';
+import { updateDashboard } from '../monitor/auditor.js';
 
 // ─── Duration Baselines (minutes) ────────────────────────────────────────────
 
@@ -268,10 +269,10 @@ export function writeEstimateToDashboard(
   const dashPath = join(projectRoot, DASHBOARD_FILE);
   if (!existsSync(dashPath)) return;
 
-  let dashState: Record<string, unknown>;
+  let dashState: DashboardState & Record<string, unknown>;
   try {
     const raw = readFileSync(dashPath, 'utf-8');
-    dashState = JSON.parse(raw) as Record<string, unknown>;
+    dashState = JSON.parse(raw) as DashboardState & Record<string, unknown>;
   } catch {
     return;
   }
@@ -287,7 +288,7 @@ export function writeEstimateToDashboard(
   };
 
   try {
-    writeFileSync(dashPath, JSON.stringify(dashState, null, 2), 'utf-8');
+    updateDashboard(projectRoot, dashState);
   } catch (e) {
     debugLog('writeDashboardEstimate:writeFile', e);
   }

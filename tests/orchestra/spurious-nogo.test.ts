@@ -46,6 +46,12 @@ function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
     coverage: 0,
     selfAssessment: 'NO_GO',
     notes: 'Worker timeout',
+    workAttribution: {
+      state: 'VERIFIED',
+      attemptId: 'attempt-145-015',
+      baselineRef: 'HEAD:test',
+      scopeDigest: 'a'.repeat(64),
+    },
     ...overrides,
   };
 }
@@ -152,6 +158,15 @@ describe('reconcileSpuriousNoGo — NO_GO', () => {
 // ─── Test Suite 3: Scope and vitest edge cases ──────────────────────────
 
 describe('reconcileSpuriousNoGo — edge cases', () => {
+  it('ambient shared-worktree evidence cannot reconcile a NO_GO', async () => {
+    const result = makeResult({ workAttribution: undefined });
+    const reconciled = await reconcileSpuriousNoGo(result, makeTask(), '/workspace', makeDeps());
+
+    expect(reconciled.decision).toBe('NO_GO');
+    expect(reconciled.reconciled).toBe(false);
+    expect(reconciled.notes).toContain('VERIFIED work attribution');
+  });
+
   it('6. Scope violation (filesChanged ⊄ scope) → NO_GO + RBAC alert', async () => {
     const result = makeResult({ selfAssessment: 'NO_GO' });
     const task = makeTask({

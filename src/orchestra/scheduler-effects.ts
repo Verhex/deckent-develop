@@ -215,12 +215,43 @@ export interface SpawnTaskDeps {
   resolveSkillPrompts: (projectRoot: string, task: Task) => Promise<Array<{ name: string; content: string }>>;
   /** Caller-specific write-target/allowedTools scope builder (each existing caller keeps its own). */
   buildWriteTargets: (task: Task) => string[];
+  /** Live sprint authority used by every trigger for last-moment write collision admission. */
+  collisionAuthority?: {
+    tasks: readonly Task[];
+    collectedIds: ReadonlySet<string>;
+  };
 }
 
 export type SpawnDisposition =
   | { kind: 'spawned'; taskId: string }
   | { kind: 'routing-lineage-missing'; taskId: string; fixForTaskId: string; detail: string }
-  | { kind: 'provider-unavailable'; taskId: string; provider: string };
+  | { kind: 'provider-unavailable'; taskId: string; provider: string }
+  | { kind: 'collision-held'; taskId: string; blockerTaskIds: readonly string[] };
+
+/** Exact active writer overlap checked by the canonical spawn admission. */
+export function findActiveWriteCollisions(
+  candidate: Task,
+  tasks: readonly Task[],
+  collectedIds: ReadonlySet<string>,
+): readonly string[] {
+  const candidateWrites = new Set(
+    (candidate.scope?.filesWrite ?? []).map(path => path.replace(/\\/gu, '/').toLowerCase()),
+  );
+  if (candidateWrites.size === 0) return [];
+  return tasks
+    .filter(task => task.id !== candidate.id && !collectedIds.has(task.id))
+    .filter(task =>
+      task.status === TaskStatus.EXECUTING
+      || task.status === TaskStatus.CLAIMED
+      || task.status === TaskStatus.TESTING
+      || task.status === TaskStatus.DOCUMENTING,
+    )
+    .filter(task => (task.scope?.filesWrite ?? []).some(path =>
+      candidateWrites.has(path.replace(/\\/gu, '/').toLowerCase()),
+    ))
+    .map(task => task.id)
+    .sort();
+}
 
 function intendedWorkerBackend(
   task: Task,
@@ -378,6 +409,21 @@ export async function executeSpawnTask(
 ): Promise<SpawnDisposition> {
   const { task, taskTimeoutSeconds } = effect;
   const { projectRoot, sprintFallbackId, config, spawnOpts, backend } = deps;
+
+  const collisionBlockers = deps.collisionAuthority
+    ? findActiveWriteCollisions(
+        task,
+        deps.collisionAuthority.tasks,
+        deps.collisionAuthority.collectedIds,
+      )
+    : [];
+  if (collisionBlockers.length > 0) {
+    debugLog(
+      'executeSpawnTask:collision',
+      `task=${task.id} held behind active writer(s): ${collisionBlockers.join(',')}`,
+    );
+    return { kind: 'collision-held', taskId: task.id, blockerTaskIds: collisionBlockers };
+  }
 
   // ─── 1. Fix-task routing-lineage inheritance — BEFORE resolution ────────
   const lineage = applyFixRoutingLineage(task, projectRoot, sprintFallbackId);

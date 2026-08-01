@@ -312,6 +312,8 @@ describe('controller terminal handoff — production wiring', () => {
     // COMPLETE is published from the committed authority's metrics, never
     // from an unclaimed RETRO outcome.
     expect(runSprintSource).toContain('terminalPublication.metrics');
+    const afterAuthority = runSprintSource.slice(runSprintSource.indexOf('publishFinalSprintAuthority('));
+    expect(afterAuthority).not.toContain('progress: { done: sprint.tasks.length');
   });
 
   it('leaves PID and sprint-state authority intact on the HOLD path', () => {

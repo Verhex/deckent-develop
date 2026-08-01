@@ -71,11 +71,17 @@ interface RawDashboard {
 
 interface RawPidRecord {
   pid?: unknown;
+  startToken?: unknown;
+  leaseId?: unknown;
+  startedAt?: unknown;
 }
 
 interface RawCoordinatorSnapshot {
   sprintId?: unknown;
   pid?: unknown;
+  startToken?: unknown;
+  leaseId?: unknown;
+  startedAt?: unknown;
   lastHeartbeat?: unknown;
 }
 
@@ -146,16 +152,28 @@ function readCoordinatorState(
     typeof configuredTimeout === 'number'
     && Number.isFinite(configuredTimeout)
     && configuredTimeout >= 30
-      ? configuredTimeout * 1_000
+      ? Math.min(configuredTimeout * 1_000, 120_000)
       : 120_000;
   const heartbeatAt =
     typeof snapshot?.lastHeartbeat === 'string'
       ? Date.parse(snapshot.lastHeartbeat)
       : Number.NaN;
+  const leaseIdentityMatches =
+    typeof record.leaseId === 'string'
+    && record.leaseId.length > 0
+    && snapshot?.leaseId === record.leaseId;
+  const kernelIdentityMatches =
+    typeof record.startToken === 'string'
+    && record.startToken.length > 0
+    && snapshot?.startToken === record.startToken;
   if (
     snapshot?.sprintId === sprintId
     && snapshot.pid === record.pid
+    && (kernelIdentityMatches || leaseIdentityMatches)
+    && typeof record.startedAt === 'string'
+    && snapshot.startedAt === record.startedAt
     && Number.isFinite(heartbeatAt)
+    && heartbeatAt >= Date.parse(record.startedAt)
     && nowMs >= heartbeatAt
     && nowMs - heartbeatAt <= leaseTimeoutMs
   ) {

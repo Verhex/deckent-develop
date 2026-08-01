@@ -1,6 +1,6 @@
 // ─── Debt Management ───────────────────────────────────────────────
 // Extracted from brain.ts — debt resolution, escalation, cross-dependencies
-import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { evaluateScopeGate, applyScopeResolutions } from '../core/scope-gate.js';
@@ -20,6 +20,7 @@ import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 import { extractSprintFromDebtId } from '../core/memory-import.js';
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { getAgentRole } from '../core/agent-role-contract.js';
+import { resolveTaskLineageRootId } from '../core/task-lineage.js';
 import { resolveFixRepairAuthority } from './fix-repair-authority.js';
 import type {
   FixRepairAuthorityInput, FixRepairEvidence, FixRepairAuthorityResult,
@@ -64,42 +65,6 @@ function regateInheritedScope(
     return { ...scope, filesWrite };
   } catch {
     return scope; // fail-open: inherited scope is used unchanged
-  }
-}
-
-const FAILURE_EVIDENCE_PATH_RE =
-  /(?:src|tests|scripts)\/[\w\-/.]+\.(?:ts|tsx|mjs|cjs|js)/g;
-
-/**
- * Extract the bounded set of exact repo-relative paths a failed worker named
- * in its typed `TaskResult.notes` envelope. Read against the FULL notes
- * string — never a display-truncated slice — so a path only mentioned past
- * any later truncation boundary is still admitted into the repair review.
- */
-function extractFailureEvidencePaths(notes: string | undefined): string[] {
-  return [...new Set((notes ?? '').match(FAILURE_EVIDENCE_PATH_RE) ?? [])]
-    .map(candidate => candidate.replace(/\\/g, '/').replace(/^\.\/+/, ''))
-    .filter(candidate =>
-      !candidate.startsWith('/')
-      && !candidate.split('/').includes('..'),
-    )
-    .sort();
-}
-
-/** Bounded git-tracked check over exact candidate paths — never a full repo scan. */
-function queryTrackedPaths(projectRoot: string, candidates: readonly string[]): string[] {
-  if (candidates.length === 0) return [];
-  try {
-    const tracked = spawnSync('git', ['ls-files', '--', ...candidates], {
-      cwd: projectRoot,
-      encoding: 'utf-8',
-      maxBuffer: 4 * 1024 * 1024,
-      timeout: 5_000,
-    });
-    if (tracked.status !== 0 || typeof tracked.stdout !== 'string') return [];
-    return tracked.stdout.split('\n').map(path => path.trim()).filter(Boolean);
-  } catch {
-    return [];
   }
 }
 
@@ -160,27 +125,26 @@ export interface FixRepairAuthorityReview {
 /**
  * Wire the typed {@link resolveFixRepairAuthority} resolver into FIX
  * creation. Reviews BOTH the inherited filesRead and filesWrite surface (not
- * write-only) against the bounded failure evidence extracted from the full
- * `result.notes`, carries forward the prior repair lineage from
+ * write-only), carries forward the prior repair lineage from
  * `readOriginalAcceptance` as the repeated-fingerprint input, and returns the
- * exact fingerprinted delta to persist on the fix task — never a broad
- * directory-level grant.
+ * exact fingerprinted authority to persist on the fix task.
+ *
+ * Worker-authored prose is evidence for diagnosis, never scope authority.
+ * Until a host-authored typed scope-amendment receipt exists, FIX inherits the
+ * approved scope exactly: notes cannot grant a path and cannot create a
+ * birth-time PAUSED trap.
  */
 function buildFixRepairAuthority(
   projectRoot: string,
   task: Task,
-  result: TaskResult,
+  _result: TaskResult,
 ): FixRepairAuthorityReview {
   const reviewedDirectories = task.scope?.directories ?? [];
   const inheritedFilesRead = [...new Set(task.scope?.filesRead ?? [])].sort();
   const inheritedFilesWrite = [...new Set(task.scope?.filesWrite ?? [])].sort();
-  const evidenceWritePaths = extractFailureEvidencePaths(result.notes);
-  const failureEvidence: FixRepairEvidence[] = evidenceWritePaths.map(path => ({
-    path,
-    access: 'write',
-    evidenceRef: `result.notes:${path}`,
-  }));
-  const trackedPaths = queryTrackedPaths(projectRoot, evidenceWritePaths);
+  const evidenceWritePaths: string[] = [];
+  const failureEvidence: FixRepairEvidence[] = [];
+  const trackedPaths: string[] = [];
   const originalAcceptance = readOriginalAcceptance(projectRoot, task.id);
   const priorImpossibleFingerprints = originalAcceptance.state === 'hold'
     && originalAcceptance.authorityFingerprint
@@ -586,6 +550,16 @@ export function handleEvaluation(
     return;
   }
 
+  if (evaluation === TaskEvaluation.DEFERRED || evaluation === TaskEvaluation.NOT_DISPATCHED) {
+    updateTaskStatus(projectRoot, task.id, TaskStatus.PAUSED);
+    releaseAllLocks(projectRoot, workerId);
+    debugLog(
+      'handleEvaluation:parked',
+      `task=${task.id} evaluation=${evaluation}; PAUSED without debt or priority FIX`,
+    );
+    return;
+  }
+
   // NO_GO — keep locks, create fix task
   updateTaskStatus(projectRoot, task.id, TaskStatus.NO_GO);
 
@@ -750,6 +724,23 @@ export function handleCrossDependencies(
 ): Task[] {
   const fixTasks: Task[] = [];
   const noGoTasks = sprint.tasks.filter(t => evaluations.get(t.id) === TaskEvaluation.NO_GO);
+  const tasksById = new Map(sprint.tasks.map(task => [task.id, task]));
+  const tasksPath = join(projectRoot, TASKS_DIR);
+  try {
+    for (const file of readdirSync(tasksPath)) {
+      if (!file.startsWith('task-') || !file.endsWith('.json')) continue;
+      const persisted = readJsonSafe<Task>(join(tasksPath, file));
+      if (!persisted || (persisted.sprintId !== undefined && persisted.sprintId !== sprint.id)) continue;
+      tasksById.set(persisted.id, persisted);
+    }
+  } catch {
+    // An absent task directory simply means no repair lineage has been born.
+  }
+  const repairRoots = new Set(
+    [...tasksById.values()]
+      .filter(task => task.fixForTaskId !== undefined)
+      .map(task => resolveTaskLineageRootId(task, tasksById)),
+  );
 
   for (const noGoTask of noGoTasks) {
     // born-610 (advisor P0): a cascade-skipped NO_GO carries zero evidence about
@@ -767,14 +758,18 @@ export function handleCrossDependencies(
     // attempt has produced terminal evidence.
     const directFixPath =
       join(projectRoot, TASKS_DIR, `task-${noGoTask.id}-fix.json`);
-    const directFixResultPath =
-      join(projectRoot, TASKS_DIR, `task-${noGoTask.id}-fix.result`);
-    if (existsSync(directFixPath) && !existsSync(directFixResultPath)) continue;
+    if (existsSync(directFixPath)) continue;
     for (const depId of noGoTask.dependencies) {
       const depEval = evaluations.get(depId);
       if (depEval === TaskEvaluation.DONE || depEval === TaskEvaluation.GO_WITH_TECH_DEBT) {
         const depTask = sprint.tasks.find(t => t.id === depId);
         if (!depTask) continue;
+        // Cross-fix is an alternative diagnosis attempt, never a successor to
+        // an already-born direct/FIX-FIX lineage. Rewriting a DONE dependency
+        // while another repair for the same root exists caused overlapping
+        // scopes and let a late xfix spoil an already-settled logical task.
+        if (repairRoots.has(depId)) continue;
+        if (existsSync(join(projectRoot, TASKS_DIR, `task-${depId}-xfix.json`))) continue;
 
         // Apply fresh-eyes rotation to cross-fix tasks too — same retry
         // rationale as the direct NO_GO fix path.
@@ -808,6 +803,8 @@ export function handleCrossDependencies(
           createdAt: now(),
         };
         fixTasks.push(fixTask);
+        tasksById.set(fixTask.id, fixTask);
+        repairRoots.add(depId);
 
         const fixTaskPayload: unknown = {
           ...fixTask,

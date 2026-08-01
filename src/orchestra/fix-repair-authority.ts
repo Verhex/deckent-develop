@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { TaskResult } from '../core/task-types.js';
 import type { TaskVerificationIsolationHoldReceiptV1 } from '../core/task-result-settlement.js';
-import { isVerificationIsolationHold, type Verdict } from './result-evaluator.js';
+import type { Verdict } from './result-evaluator.js';
 
 export type FixRepairAccess = 'read' | 'write';
 
@@ -238,15 +238,12 @@ export interface FixRepairAuthorityBudgetDecision {
  * 1. A non-NO_GO decision never needs repair — nothing to fix.
  * 2. A host-observed verification isolation hold receipt (strongest signal,
  *    never worker prose) parks the attempt without spending budget.
- * 3. Worker-visible verification isolation HOLD evidence in the result
- *    (defense-in-depth for callers that bypass the evaluator's own fast-path)
- *    also parks the attempt without spending budget.
- * 4. Anything else is a scoped failure attributable to this task's own
+ * 3. Worker prose never authors repair authority. Anything else is a scoped failure attributable to this task's own
  *    change: normal repair authority applies and the budget is spent.
  */
 export function decideFixRepairAuthority(
   decision: Verdict,
-  result: TaskResult,
+  _result: TaskResult,
   hostIsolationHoldReceipt?: TaskVerificationIsolationHoldReceiptV1 | null,
 ): FixRepairAuthorityBudgetDecision {
   if (decision !== 'NO_GO') {
@@ -262,14 +259,6 @@ export function decideFixRepairAuthority(
       action: 'park',
       consumesRetryBudget: false,
       reason: `host-observed verification isolation hold (${hostIsolationHoldReceipt.reasonCodes.join(', ')}) — attempt parked, FIX/retry budget not spent`,
-    };
-  }
-
-  if (isVerificationIsolationHold(result)) {
-    return {
-      action: 'park',
-      consumesRetryBudget: false,
-      reason: 'verification isolation HOLD detected — environment admission gap, not a scoped task failure; attempt parked without spending FIX/retry budget',
     };
   }
 

@@ -69,6 +69,7 @@ import {
   TaskArtifactProjectionError,
 } from './task-artifact-projection.js';
 import {
+  bindExecutionWriteScopePolicy,
   evaluateExecutionWriteScopePolicy,
   normalizeExecutionWriteScopePolicy,
 } from '../core/execution-write-scope-policy.js';
@@ -562,6 +563,16 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     }
   }
   const scopeInput = input.scopeEvidence ?? await listTrackedFiles(input.projectRoot);
+  if (previewOptions?.writeScopePolicy && scopeInput.status === 'available') {
+    previewOptions = {
+      ...previewOptions,
+      writeScopePolicy: bindExecutionWriteScopePolicy(
+        previewOptions.writeScopePolicy,
+        scopeInput.trackedFiles,
+        input.acknowledgeScopePaths === true,
+      ),
+    };
+  }
   const authority = buildSourceAuthority(
     input.proposal,
     input.source,

@@ -455,6 +455,7 @@ export function collectRunDetail(root: string, row: InboxRow): InboxRunDetail {
     // Closure narrative — the durable event log carries the rich text (the
     // folded context flattens FLOW_ABORTED's reason to a bare 'aborted').
     for (const event of [...readFlowEvents(root, row.flowId)].reverse()) {
+      if (event.type === 'RUN_PAUSED') { reason = event.reason; break; }
       if (event.type === 'RUN_FAILED') { reason = event.error; break; }
       if (event.type === 'FLOW_ABORTED' && event.reason !== undefined) { reason = event.reason; break; }
       if (event.type === 'APPROVAL_REJECTED' && event.reason !== undefined) { reason = event.reason; break; }

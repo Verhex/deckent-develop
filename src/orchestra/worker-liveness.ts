@@ -5,7 +5,7 @@
  *
  * Five-layer liveness signals consulted BEFORE writing a synthetic NO_GO:
  *   L1 spawn-attempted — task.assignedWorker set (dispatcher reached it)
- *   L2 process alive — docker container with deckent-w-<id> running
+ *   L2 process alive — exact project+task-scoped Docker container running
  *   L3 heartbeat fresh — .tasks/task-<id>.hb mtime within freshness window
  *   L4 log growing — .tasks/task-<id>.log mtime within freshness window
  *   L5 partial-result — .tasks/task-<id>.partial-result has bytes
@@ -20,13 +20,14 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { Task } from '../core/task-types.js';
+import { dockerContainerNameForTask } from '../core/task-result-settlement.js';
 
 export type WorkerLivenessStatus = 'alive' | 'dead' | 'never-spawned';
 
 export interface WorkerLivenessSignals {
   /** L1 — task.assignedWorker is non-empty (dispatcher reached the task). */
   assignedWorker: boolean;
-  /** L2 — docker container `deckent-w-<id>` currently running. */
+  /** L2 — canonical project+task-scoped Docker container currently running. */
   dockerRunning: boolean;
   /** L3 — heartbeat file mtime within freshness window. */
   heartbeatFresh: boolean;
@@ -107,7 +108,7 @@ export function checkWorkerLiveness(
   // L2 — docker container check (only meaningful when docker backend in use;
   // probe returns false for non-docker backends, which is fine — other
   // signals still vote). Fail closed on any error.
-  const containerName = `deckent-w-${taskId}`;
+  const containerName = dockerContainerNameForTask(projectRoot, taskId);
   try {
     signals.dockerRunning = dockerProbe(containerName);
   } catch { /* fail closed — treat as not running */ }

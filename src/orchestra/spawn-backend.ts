@@ -92,6 +92,14 @@ export interface SpawnBackend {
   list(): string[];
 
   /**
+   * Classify this coordinator's authority over a task's worker inventory.
+   * Process-local backends return `unknown` for task ids they have never
+   * observed, which prevents a freshly restarted coordinator from treating an
+   * empty in-memory registry as proof that a live child vanished.
+   */
+  workerInventoryState?(taskId: string): 'active' | 'absent' | 'unknown';
+
+  /**
    * Check whether this backend is available in the current environment.
    * For TmuxBackend: checks if tmux is installed.
    * For SubprocessBackend: always true (requires only Node.js).
@@ -401,6 +409,9 @@ export class SubprocessBackend implements SpawnBackend {
    * silently defaulting to claude's (born-481).
    */
   private readonly backendsByProvider = new Map<string, SubprocessSpawnBackend>();
+  /** Per-task timeout backends are not provider-cached; retain their inventory authority. */
+  private readonly taskBackends = new Map<string, SubprocessSpawnBackend>();
+  private readonly observedTaskIds = new Set<string>();
 
   constructor(projectDir: string, opts?: { timeoutMs?: number }) {
     this.projectDir = projectDir;
@@ -455,10 +466,19 @@ export class SubprocessBackend implements SpawnBackend {
     const timeoutOverrideMs = opts?.taskTimeoutSeconds != null
       ? opts.taskTimeoutSeconds * 1000
       : undefined;
-    this.getBackendForProvider(provider, timeoutOverrideMs).spawn(taskId, model, prompt, opts);
+    const taskBackend = this.getBackendForProvider(provider, timeoutOverrideMs);
+    taskBackend.spawn(taskId, model, prompt, opts);
+    this.taskBackends.set(taskId, taskBackend);
+    this.observedTaskIds.add(taskId);
   }
 
   kill(taskId: string): void {
+    const taskBackend = this.taskBackends.get(taskId);
+    if (taskBackend?.listWorkers().includes(taskId)) {
+      taskBackend.kill(taskId);
+      this.taskBackends.delete(taskId);
+      return;
+    }
     // Scan every provider backend this instance has spawned through — a
     // mixed-provider sprint may hold the taskId on any one of them.
     for (const backend of this.backendsByProvider.values()) {
@@ -474,7 +494,20 @@ export class SubprocessBackend implements SpawnBackend {
   }
 
   list(): string[] {
-    return Array.from(this.backendsByProvider.values()).flatMap(b => b.listWorkers() as string[]);
+    const backends = new Set([
+      ...this.backendsByProvider.values(),
+      ...this.taskBackends.values(),
+    ]);
+    const active = new Set(Array.from(backends).flatMap(b => b.listWorkers() as string[]));
+    for (const taskId of this.taskBackends.keys()) {
+      if (!active.has(taskId)) this.taskBackends.delete(taskId);
+    }
+    return [...active];
+  }
+
+  workerInventoryState(taskId: string): 'active' | 'absent' | 'unknown' {
+    if (this.list().includes(taskId)) return 'active';
+    return this.observedTaskIds.has(taskId) ? 'absent' : 'unknown';
   }
 
   async isAvailable(): Promise<boolean> {
@@ -500,6 +533,7 @@ export class SandboxBackend implements SpawnBackend {
 
   private readonly projectDir: string;
   private readonly inner: SandboxSpawnBackend;
+  private readonly observedTaskIds = new Set<string>();
 
   constructor(projectDir: string, opts?: SandboxOptions) {
     this.projectDir = projectDir;
@@ -512,6 +546,7 @@ export class SandboxBackend implements SpawnBackend {
     const provider = modelRegistry.get(model)?.provider;
     if (!preflightClaudeAuthForLocalBackend(dir, taskId, provider, opts)) return;
     this.inner.spawn(taskId, model, prompt, opts);
+    this.observedTaskIds.add(taskId);
   }
 
   kill(taskId: string): void {
@@ -520,6 +555,11 @@ export class SandboxBackend implements SpawnBackend {
 
   list(): string[] {
     return this.inner.listWorkers() as string[];
+  }
+
+  workerInventoryState(taskId: string): 'active' | 'absent' | 'unknown' {
+    if (this.list().includes(taskId)) return 'active';
+    return this.observedTaskIds.has(taskId) ? 'absent' : 'unknown';
   }
 
   async isAvailable(): Promise<boolean> {

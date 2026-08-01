@@ -75,6 +75,8 @@ export function createTaskResultSettlementModuleStub(): Record<string, unknown> 
       `task-result-prompt:${artifact.promptSha256}`,
     taskResultSettlementPromptPath: (ref: ReturnType<typeof refFor>) =>
       `/host-state/task-result-settlements/${ref.taskId}/${ref.attemptId}/prompt.txt`,
+    taskResultSettlementActiveClaimDigest: (ref: ReturnType<typeof refFor>) =>
+      createHash('sha256').update(`${ref.taskId}\0${ref.attemptId}`).digest('hex'),
     taskResultSettlementAttemptPath: (ref: ReturnType<typeof refFor>) =>
       `/host-state/task-result-settlements/${ref.taskId}/${ref.attemptId}/attempt.json`,
     taskResultSettlementWorkAttributionBaselinePath: (ref: ReturnType<typeof refFor>) =>

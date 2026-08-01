@@ -102,6 +102,11 @@ export interface DashboardState {
   updatedAt: string;
   auditorLastScan?: string;
   violations?: number;
+  /** Fenced terminal projection; non-terminal writers may not overwrite it. */
+  terminalAuthority?: {
+    sprintId: string;
+    completedAt: string;
+  };
 }
 
 // ─── Lock System ────────────────────────────────────────────────────

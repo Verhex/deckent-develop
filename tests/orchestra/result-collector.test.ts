@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 
 import type { Task, Sprint, TaskResult, ResolvedConfig } from '../../src/core/types.js';
-import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
+import { TaskEvaluation, TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 
 // We test the timeout-detection logic in collectResults by calling waitForResults
 // with a minimal sprint containing one task that has a .timeout file.
@@ -236,6 +236,53 @@ describe('result-collector timeout detection', () => {
     expect(bRes!.selfAssessment).toBe('NO_GO');
     expect(bRes!.notes).toContain('Cascade-skipped'); // pre-fix: 'Worker timeout' (RED)
     expect(elapsed).toBeLessThan(4000);               // pre-fix: ~5000 ms (RED)
+  });
+});
+
+describe('waitForResults — transactional collect/evaluate/sync', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+  });
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
+  });
+
+  it('retries an evaluator throw without losing or duplicating the collected result', async () => {
+    const task = makeTask('transactional-001');
+    const sprint = makeSprint([task]);
+    const result: TaskResult = {
+      taskId: task.id,
+      workerId: `w-${task.id}`,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 100,
+      selfAssessment: 'DONE',
+    };
+    writeFileSync(
+      join(tmpDir, '.tasks', `task-${task.id}.result`),
+      JSON.stringify(result),
+      'utf-8',
+    );
+    const evaluateCollectedResult = vi.fn()
+      .mockRejectedValueOnce(new Error('transient evaluator fault'))
+      .mockResolvedValue(TaskEvaluation.DONE);
+
+    const results = await waitForResults(
+      tmpDir,
+      sprint,
+      5_000,
+      undefined,
+      { evaluateCollectedResult },
+    );
+
+    expect(evaluateCollectedResult).toHaveBeenCalledTimes(2);
+    expect(results.map(item => item.taskId)).toEqual([task.id]);
+    expect(task.status).toBe(TaskStatus.DONE);
   });
 });
 

@@ -4,6 +4,8 @@ import { TASKS_DIR } from '../core/constants.js';
 import {
   readLatestTaskResultSettlementRef,
   readClosedTaskResultSettlement,
+  readTaskVerificationIsolationHoldReceipt,
+  type TaskVerificationIsolationHoldReceiptV1,
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
@@ -29,6 +31,16 @@ export interface TaskResultAuthorityRead<T> {
 export interface RuntimeBudgetEvaluationAuthority {
   settlementRef: TaskResultSettlementRefV1;
   exhaustion: RuntimeBudgetStopEvidence;
+}
+
+/** Host-owned verification isolation authority for the exact settled attempt. */
+export function readVerificationIsolationEvaluationAuthority(
+  projectRoot: string,
+  taskId: string,
+): TaskVerificationIsolationHoldReceiptV1 | null {
+  const resultAuthority = readAuthoritativeTaskResult<unknown>(projectRoot, taskId);
+  if (resultAuthority.state !== 'settled' || !resultAuthority.settlementRef) return null;
+  return readTaskVerificationIsolationHoldReceipt(resultAuthority.settlementRef);
 }
 
 /**

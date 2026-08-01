@@ -39,6 +39,85 @@ export interface LogicalTaskProgress {
   readonly total: number;
 }
 
+export type TaskLineageSettlementState =
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'ACTIVE'
+  | 'UNSETTLED'
+  | 'RESUMABLE'
+  | 'SKIPPED';
+
+/**
+ * Canonical lifecycle projection consumed by pause, finalization and receipt
+ * publication paths. It deliberately contains no policy decision: callers may
+ * decide whether a FAILED ratio pauses a run or whether terminal evidence is
+ * cleanup-eligible, but they may not independently redefine the lineage tip.
+ */
+export interface TaskLineageSettlementProjection {
+  readonly rootId: string;
+  readonly rootTask: Task;
+  readonly resolvedTask: Task;
+  readonly attemptIds: readonly string[];
+  readonly evaluation: TaskEvaluation | undefined;
+  readonly notDispatchedSettlement: NotDispatchedSettlement | undefined;
+  readonly state: TaskLineageSettlementState;
+}
+
+export type NotDispatchedSettlement =
+  | { readonly state: 'RESUMABLE'; readonly reasonCode: 'DISPATCH_RETRY_AVAILABLE' }
+  | { readonly state: 'FAILED'; readonly reasonCode: 'DISPATCH_EXHAUSTED' }
+  | { readonly state: 'SKIPPED'; readonly reasonCode: 'DEPENDENCY_STARVED' };
+
+/**
+ * Project NOT_DISPATCHED from a transient observation into an explicit lifecycle
+ * state. The projector is pure: callers supply the host-owned one-shot dispatch
+ * evidence instead of letting core read ambient files.
+ */
+export function projectNotDispatchedSettlements(
+  tasks: readonly Task[],
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  redispatchAttemptedIds: ReadonlySet<string>,
+): ReadonlyMap<string, NotDispatchedSettlement> {
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
+  const lineages = foldTaskLineages(tasks);
+  const lineagesByRootId = new Map(lineages.map(lineage => [lineage.rootId, lineage]));
+  const projected = new Map<string, NotDispatchedSettlement>();
+
+  for (const lineage of lineages) {
+    const attemptId = lineage.resolvedTask.id;
+    if (evaluations.get(attemptId) !== TaskEvaluation.NOT_DISPATCHED) continue;
+    projected.set(attemptId, redispatchAttemptedIds.has(attemptId)
+      ? { state: 'FAILED', reasonCode: 'DISPATCH_EXHAUSTED' }
+      : { state: 'RESUMABLE', reasonCode: 'DISPATCH_RETRY_AVAILABLE' });
+  }
+
+  // Dependency starvation is derived only from already-terminal dependency
+  // authority. Iterate to a fixed point so chains remain deterministic.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const lineage of lineages) {
+      const attemptId = lineage.resolvedTask.id;
+      if (projected.get(attemptId)?.state !== 'RESUMABLE') continue;
+      const dependencyStarved = (lineage.rootTask.dependencies ?? []).some((dependencyId) => {
+        const dependency = tasksById.get(dependencyId);
+        const dependencyRootId = dependency
+          ? resolveTaskLineageRootId(dependency, tasksById)
+          : dependencyId;
+        const dependencyLineage = lineagesByRootId.get(dependencyRootId);
+        if (!dependencyLineage) return false;
+        const dependencySettlement = projected.get(dependencyLineage.resolvedTask.id);
+        return dependencySettlement?.state === 'FAILED' || dependencySettlement?.state === 'SKIPPED';
+      });
+      if (!dependencyStarved) continue;
+      projected.set(attemptId, { state: 'SKIPPED', reasonCode: 'DEPENDENCY_STARVED' });
+      changed = true;
+    }
+  }
+
+  return projected;
+}
+
 function timestamp(task: Task): string {
   return task.updatedAt ?? task.createdAt ?? '';
 }
@@ -83,8 +162,14 @@ export function resolveFixAncestorIds(
   return ancestors;
 }
 
-function resolveRootId(task: Task, tasksById: ReadonlyMap<string, Task>): string {
-  if (!task.isPriorityFix || !task.fixForTaskId) return task.id;
+export function resolveTaskLineageRootId(
+  task: Task,
+  tasksById: ReadonlyMap<string, Task>,
+): string {
+  // `fixForTaskId` is the lineage edge. `isPriorityFix` is dispatch metadata
+  // and legacy task records do not consistently persist it; making topology
+  // depend on that flag caused finalizer and scheduler folds to disagree.
+  if (!task.fixForTaskId) return task.id;
   const ancestors = resolveFixAncestorIds(task, tasksById);
   for (let index = ancestors.length - 1; index >= 0; index -= 1) {
     const ancestorId = ancestors[index]!;
@@ -104,7 +189,7 @@ export function foldTaskLineages(tasks: readonly Task[]): readonly TaskLineage[]
   const tasksById = new Map(tasks.map(task => [task.id, task]));
   const grouped = new Map<string, Task[]>();
   for (const task of tasks) {
-    const rootId = resolveRootId(task, tasksById);
+    const rootId = resolveTaskLineageRootId(task, tasksById);
     const group = grouped.get(rootId) ?? [];
     group.push(task);
     grouped.set(rootId, group);
@@ -130,6 +215,54 @@ export function foldTaskLineages(tasks: readonly Task[]): readonly TaskLineage[]
     });
   }
   return Object.freeze(lineages.sort((left, right) => left.rootId.localeCompare(right.rootId)));
+}
+
+/**
+ * Resolve every raw attempt through the same logical-tip and settlement-state
+ * classifier. Host-authored NOT_DISPATCHED evidence wins over task status;
+ * otherwise the resolving attempt's Brain evaluation is authoritative.
+ */
+export function projectTaskLineageSettlements(
+  tasks: readonly Task[],
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  notDispatchedSettlements: ReadonlyMap<string, NotDispatchedSettlement> = new Map(),
+): readonly TaskLineageSettlementProjection[] {
+  return Object.freeze(foldTaskLineages(tasks).map((lineage) => {
+    const evaluation = evaluations.get(lineage.resolvedTask.id);
+    const notDispatchedSettlement = notDispatchedSettlements.get(lineage.resolvedTask.id);
+    let state: TaskLineageSettlementState;
+    if (evaluation === TaskEvaluation.NOT_DISPATCHED && notDispatchedSettlement) {
+      state = notDispatchedSettlement.state === 'RESUMABLE'
+        ? 'RESUMABLE'
+        : notDispatchedSettlement.state === 'SKIPPED'
+          ? 'SKIPPED'
+          : 'FAILED';
+    } else if (
+      lineage.resolvedTask.status === TaskStatus.DONE
+      || evaluation === TaskEvaluation.DONE
+      || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT
+    ) {
+      state = 'COMPLETED';
+    } else if (
+      lineage.resolvedTask.status === TaskStatus.NO_GO
+      || evaluation === TaskEvaluation.NO_GO
+    ) {
+      state = 'FAILED';
+    } else if (IN_FLIGHT_STATUSES.has(lineage.resolvedTask.status)) {
+      state = 'ACTIVE';
+    } else {
+      state = 'UNSETTLED';
+    }
+    return Object.freeze({
+      rootId: lineage.rootId,
+      rootTask: lineage.rootTask,
+      resolvedTask: lineage.resolvedTask,
+      attemptIds: lineage.attemptIds,
+      evaluation,
+      notDispatchedSettlement,
+      state,
+    });
+  }));
 }
 
 export function computeLogicalTaskProgress(tasks: readonly Task[]): LogicalTaskProgress {
@@ -187,7 +320,7 @@ export function selectPendingFixTasks(
   const selected: Task[] = [];
   const selectedRoots = new Set<string>();
   for (const task of candidates) {
-    const rootId = resolveRootId(task, tasksById);
+    const rootId = resolveTaskLineageRootId(task, tasksById);
     if (selectedRoots.has(rootId)) continue;
     selectedRoots.add(rootId);
     selected.push(task);
@@ -206,21 +339,17 @@ export function evaluateFixCircuitBreaker(
   rootTasks: readonly Task[],
   evaluations: ReadonlyMap<string, TaskEvaluation>,
   policy: FixCircuitBreakerConfig,
+  notDispatchedSettlements: ReadonlyMap<string, NotDispatchedSettlement> = new Map(),
 ): FixCircuitBreakerDecision {
-  const lineages = foldTaskLineages(rootTasks);
+  const lineages = projectTaskLineageSettlements(
+    rootTasks,
+    evaluations,
+    notDispatchedSettlements,
+  );
   const logicalRoots = lineages.map(lineage => lineage.rootTask);
   const totalTasks = lineages.length;
   const unresolvedTaskIds = lineages
-    .filter((lineage) => {
-      const latestEvaluation = evaluations.get(lineage.resolvedTask.id);
-      const latestResolved = lineage.resolvedTask.status === TaskStatus.DONE
-        || latestEvaluation === TaskEvaluation.DONE
-        || latestEvaluation === TaskEvaluation.GO_WITH_TECH_DEBT;
-      if (latestResolved) return false;
-      return lineage.attemptIds.some(
-        attemptId => evaluations.get(attemptId) === TaskEvaluation.NO_GO,
-      );
-    })
+    .filter(lineage => lineage.state === 'FAILED')
     .map(lineage => lineage.rootId);
   const unresolvedTasks = unresolvedTaskIds.length;
   const unresolvedRatioPercent =

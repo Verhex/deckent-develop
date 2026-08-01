@@ -33,6 +33,7 @@ import {
   isLogActivityFresh,
   type LivenessTarget,
 } from '../../src/orchestra/heartbeat-monitor.js';
+import { dockerContainerNameForTask } from '../../src/core/task-result-settlement.js';
 import {
   readHeartbeat,
   isStaleHeartbeat,
@@ -64,26 +65,30 @@ function tasklistEmpty(): SpawnSyncReturns<string> {
 }
 
 describe('heartbeat-monitor — name derivation (SSOT)', () => {
-  it('docker container name is deckent-w-<taskId>', () => {
-    expect(dockerContainerName('418-002')).toBe('deckent-w-418-002');
+  it('derives the daemon-global Docker name from canonical project + task authority', () => {
+    const projectRoot = join(tmpdir(), 'deckent-liveness-name-authority');
+    expect(dockerContainerName(projectRoot, '418-002'))
+      .toBe(dockerContainerNameForTask(projectRoot, '418-002'));
   });
   it('tmux window target is the workerId (w-<taskId>)', () => {
     expect(tmuxWindowTarget('w-418-002')).toBe('w-418-002');
   });
   it('buildLivenessTarget derives w-<taskId> workerId by default', () => {
-    const t = buildLivenessTarget('418-002', 'docker');
-    expect(t).toEqual({ backend: 'docker', taskId: '418-002', workerId: 'w-418-002', pid: undefined, tasksDir: undefined });
+    const projectRoot = join(tmpdir(), 'deckent-liveness-target-authority');
+    const t = buildLivenessTarget('418-002', 'docker', { projectRoot });
+    expect(t).toEqual({ backend: 'docker', taskId: '418-002', workerId: 'w-418-002', pid: undefined, tasksDir: undefined, projectRoot });
   });
 });
 
 describe('hostLivenessProbe adapter matrix (docker / tmux / subprocess + Windows)', () => {
-  const dockerTarget: LivenessTarget = { backend: 'docker', taskId: '1', workerId: 'w-1' };
+  const dockerProjectRoot = join(tmpdir(), 'deckent-liveness-probe-authority');
+  const dockerTarget: LivenessTarget = { backend: 'docker', taskId: '1', workerId: 'w-1', projectRoot: dockerProjectRoot };
   const tmuxTarget: LivenessTarget = { backend: 'tmux', taskId: '2', workerId: 'w-2' };
 
   it('docker: container running → alive with container-state signal', () => {
     const probe = createHostLivenessProbe({
       isDockerContainerRunning: (name) => {
-        expect(name).toBe('deckent-w-1');
+        expect(name).toBe(dockerContainerNameForTask(dockerProjectRoot, '1'));
         return true;
       },
     });

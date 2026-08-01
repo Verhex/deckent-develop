@@ -523,6 +523,22 @@ export async function reconcileSpuriousNoGo(
   projectRoot: string,
   deps?: ReconciliationDeps,
 ): Promise<ReconciliationResult> {
+  if (result.workAttribution?.state !== 'VERIFIED') {
+    debugLog(
+      'reconcile:spurious-nogo',
+      `Task ${task.id}: exact attempt attribution absent — ambient worktree cannot change verdict`,
+    );
+    return {
+      decision: 'NO_GO',
+      reconciled: false,
+      notes: 'Attempt-scoped VERIFIED work attribution is required; ambient worktree evidence ignored',
+      linesChanged: 0,
+      filesChanged: [],
+      tscPassed: false,
+      vitestPassRatio: null,
+      scopeCompliant: true,
+    };
+  }
   const getGitDiff = deps?.getGitDiffStats ?? defaultGetGitDiffStats;
   const runTsc = deps?.runTscCheck ?? defaultRunTscCheck;
   const runVitest = deps?.runVitestScopeCheck ?? defaultRunVitestScopeCheck;

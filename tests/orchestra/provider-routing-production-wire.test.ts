@@ -19,4 +19,18 @@ describe('production provider-routing boundary', () => {
     expect(boundary).toContain('throw e');
     expect(boundary).not.toMatch(/catch \(e\) \{ debugLog\('runSprint:routeSprintTasks'/);
   });
+
+  it('fails plan admission closed when routing or its prompt gate throws', async () => {
+    const source = await readFile('src/orchestra/sprint-planner.ts', 'utf-8');
+    const start = source.indexOf('// ─── Routing Engine v3:');
+    const end = source.indexOf('// Owner-policy budget snapshot:', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+
+    const boundary = source.slice(start, end);
+    expect(boundary).toContain('Routing/prompt admission failed closed');
+    expect(boundary).toContain('if (poolErr instanceof BrainError) throw poolErr');
+    expect(boundary).toContain('ROUTING-V3 admission unavailable');
+    expect(boundary).not.toContain('V2 routing pool loading failed');
+  });
 });

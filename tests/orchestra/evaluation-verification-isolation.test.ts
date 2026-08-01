@@ -94,8 +94,8 @@ describe('isVerificationIsolationHold', () => {
   });
 });
 
-describe('evaluateResult isolation HOLD parking (488-011)', () => {
-  it('parks an isolation-hold NO_GO self-assessment as GO_WITH_TECH_DEBT, never NO_GO', async () => {
+describe('evaluateResult isolation prose is not authority (488-011)', () => {
+  it('does not let worker notes promote a NO_GO self-assessment', async () => {
     const task = baseTask();
     const result = baseResult({
       selfAssessment: 'NO_GO',
@@ -103,7 +103,7 @@ describe('evaluateResult isolation HOLD parking (488-011)', () => {
       notes: 'Verification isolation admission is required — worker cannot confirm tests.',
     });
     const evaluation = await evaluateResult(result, task);
-    expect(evaluation).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluation).toBe(TaskEvaluation.NO_GO);
   });
 
   it('still returns NO_GO for a genuine scoped failure with no isolation evidence', async () => {
@@ -118,8 +118,8 @@ describe('evaluateResult isolation HOLD parking (488-011)', () => {
   });
 });
 
-describe('evaluateWithRubric isolation HOLD fast-path (488-011)', () => {
-  it('caps an isolation-hold result at GO_WITH_TECH_DEBT', () => {
+describe('evaluateWithRubric isolation prose is not a verdict fast-path (488-011)', () => {
+  it('keeps a worker-note isolation claim inside the normal NO_GO rubric', () => {
     const task = baseTask();
     const result = baseResult({
       selfAssessment: 'NO_GO',
@@ -127,8 +127,8 @@ describe('evaluateWithRubric isolation HOLD fast-path (488-011)', () => {
       notes: 'Foreign verification diagnostics: foreign_attempt',
     });
     const evaluation = evaluateWithRubric(result, task);
-    expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
-    expect(evaluation.rubricScores.some(s => s.criterion === 'verification_isolation')).toBe(true);
+    expect(evaluation.decision).toBe('NO_GO');
+    expect(evaluation.rubricScores.some(s => s.criterion === 'verification_isolation')).toBe(false);
   });
 
   it('leaves a genuine scoped NO_GO untouched', () => {
@@ -164,13 +164,13 @@ describe('decideFixRepairAuthority FIX-budget isolation semantics (488-011, proo
     expect(decision.action).toBe('park');
   });
 
-  it('parks and does not spend budget when isolation HOLD evidence is present in worker notes', () => {
+  it('does not treat worker notes as repair-budget authority', () => {
     const decision = decideFixRepairAuthority(
       'NO_GO',
       baseResult({ notes: 'Verification isolation admission is required.' }),
     );
-    expect(decision.consumesRetryBudget).toBe(false);
-    expect(decision.action).toBe('park');
+    expect(decision.consumesRetryBudget).toBe(true);
+    expect(decision.action).toBe('repair');
   });
 
   it('spends the FIX/retry budget for a scoped NO_GO with no isolation evidence', () => {

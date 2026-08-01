@@ -14,7 +14,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { applyCascadeCircuitBreaker } from '../../src/orchestra/sprint-controller.js';
+import {
+  applyCascadeCircuitBreaker,
+  applyUnresolvedLineageOperatorHold,
+} from '../../src/orchestra/sprint-controller.js';
 import { TaskEvaluation, TaskStatus } from '../../src/core/task-types.js';
 import type { Task } from '../../src/core/task-types.js';
 import { SprintStatus } from '../../src/core/sprint-types.js';
@@ -47,6 +50,28 @@ const POLICY = {
 } as const;
 
 describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wire)', () => {
+  it('pauses a pure NOT_DISPATCHED lineage after its one re-dispatch authority is exhausted', () => {
+    const r = root();
+    mkdirSync(join(r, '.tasks'), { recursive: true });
+    const sprint = makeSprint(1);
+    sprint.tasks[0]!.status = TaskStatus.PAUSED;
+    writeFileSync(
+      join(r, '.tasks', 'task-t-0.redispatch-attempted'),
+      JSON.stringify({ taskId: 't-0', attemptedAt: new Date().toISOString() }),
+      'utf-8',
+    );
+
+    const paused = applyCascadeCircuitBreaker(
+      r,
+      sprint,
+      evalsFor(sprint, [TaskEvaluation.NOT_DISPATCHED]),
+      POLICY,
+    );
+
+    expect(paused).toBe(true);
+    expect(sprint.status).toBe(SprintStatus.PAUSED);
+  });
+
   it('pauses when post-FIX unresolved roots meet both count and ratio gates', () => {
     const r = root();
     const sprint = makeSprint(6);
@@ -137,6 +162,28 @@ describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wi
     );
 
     expect(paused).toBe(false);
+    expect(sprint.status).toBe(SprintStatus.EVALUATING);
+  });
+});
+
+describe('applyUnresolvedLineageOperatorHold', () => {
+  it('parks a below-threshold FAILED lineage instead of allowing receipt HOLD', () => {
+    const r = root();
+    const sprint = makeSprint(8);
+    const evaluations = evalsFor(sprint, [NG, NG, NG, OK, OK, OK, OK, OK]);
+
+    expect(applyCascadeCircuitBreaker(r, sprint, evaluations, POLICY)).toBe(false);
+    expect(applyUnresolvedLineageOperatorHold(r, sprint, evaluations, POLICY)).toBe(true);
+    expect(sprint.status).toBe(SprintStatus.PAUSED);
+    expect(sprint.phase).toBe('FIX');
+  });
+
+  it('does not park a fully completed lineage', () => {
+    const r = root();
+    const sprint = makeSprint(3);
+    const evaluations = evalsFor(sprint, [OK, OK, OK]);
+
+    expect(applyUnresolvedLineageOperatorHold(r, sprint, evaluations, POLICY)).toBe(false);
     expect(sprint.status).toBe(SprintStatus.EVALUATING);
   });
 });

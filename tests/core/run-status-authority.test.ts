@@ -94,10 +94,16 @@ describe('canonical run status authority', () => {
     json(root, '.deckent/sprint-active.json', { sprintId });
     json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
     json(root, '.deckent/config.json', { heartbeat_timeout: 90 });
-    json(root, `.deckent/pids/${sprintId}.pid`, { pid: hostPid });
+    json(root, `.deckent/pids/${sprintId}.pid`, {
+      pid: hostPid,
+      startToken: 's-host-namespace',
+      startedAt: '2026-07-30T11:50:00.000Z',
+    });
     json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
       sprintId,
       pid: hostPid,
+      startToken: 's-host-namespace',
+      startedAt: '2026-07-30T11:50:00.000Z',
       lastHeartbeat: '2026-07-30T11:59:30.000Z',
     });
 
@@ -109,6 +115,60 @@ describe('canonical run status authority', () => {
     });
   });
 
+  it('uses a fresh cross-platform lease when kernel start tokens are unavailable', () => {
+    const root = fixture();
+    const sprintId = 'sprint-portable-lease';
+    const nowMs = Date.parse('2026-07-30T12:00:00.000Z');
+    const hostPid = 2_147_483_647;
+    json(root, '.deckent/sprint-active.json', { sprintId });
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, `.deckent/pids/${sprintId}.pid`, {
+      pid: hostPid,
+      startToken: null,
+      leaseId: 'lease-portable-coordinator',
+      startedAt: '2026-07-30T11:50:00.000Z',
+    });
+    json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
+      sprintId,
+      pid: hostPid,
+      startToken: null,
+      leaseId: 'lease-portable-coordinator',
+      startedAt: '2026-07-30T11:50:00.000Z',
+      lastHeartbeat: '2026-07-30T11:59:30.000Z',
+    });
+
+    expect(readCanonicalRunStatus(root, { nowMs })).toMatchObject({
+      lifecycle: 'ACTIVE',
+      active: true,
+      coordinator: 'alive',
+      sprintId,
+    });
+  });
+
+  it('rejects a fresh snapshot from a different cross-platform lease', () => {
+    const root = fixture();
+    const sprintId = 'sprint-foreign-portable-lease';
+    const nowMs = Date.parse('2026-07-30T12:00:00.000Z');
+    const hostPid = 2_147_483_647;
+    json(root, '.deckent/sprint-active.json', { sprintId });
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, `.deckent/pids/${sprintId}.pid`, {
+      pid: hostPid, startToken: null, leaseId: 'lease-original',
+      startedAt: '2026-07-30T11:50:00.000Z',
+    });
+    json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
+      sprintId, pid: hostPid, startToken: null, leaseId: 'lease-foreign',
+      startedAt: '2026-07-30T11:50:00.000Z',
+      lastHeartbeat: '2026-07-30T11:59:30.000Z',
+    });
+
+    expect(readCanonicalRunStatus(root, { nowMs })).toMatchObject({
+      lifecycle: 'ORPHANED',
+      active: false,
+      coordinator: 'dead',
+    });
+  });
+
   it('expires stale namespace-fallback evidence to ORPHANED', () => {
     const root = fixture();
     const sprintId = 'sprint-stale-lease';
@@ -117,10 +177,16 @@ describe('canonical run status authority', () => {
     json(root, '.deckent/sprint-active.json', { sprintId });
     json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
     json(root, '.deckent/config.json', { heartbeat_timeout: 90 });
-    json(root, `.deckent/pids/${sprintId}.pid`, { pid: hostPid });
+    json(root, `.deckent/pids/${sprintId}.pid`, {
+      pid: hostPid,
+      startToken: 's-stale-lease',
+      startedAt: '2026-07-30T11:50:00.000Z',
+    });
     json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
       sprintId,
       pid: hostPid,
+      startToken: 's-stale-lease',
+      startedAt: '2026-07-30T11:50:00.000Z',
       lastHeartbeat: '2026-07-30T11:57:00.000Z',
     });
     json(root, `.deckent/${sprintId}-checkpoint.json`, { sprintId });
@@ -130,6 +196,54 @@ describe('canonical run status authority', () => {
       active: false,
       coordinator: 'dead',
       sprintId,
+    });
+  });
+
+  it('rejects a fresh namespace snapshot from a different process lifetime', () => {
+    const root = fixture();
+    const sprintId = 'sprint-reused-lease';
+    const nowMs = Date.parse('2026-07-30T12:00:00.000Z');
+    const hostPid = 2_147_483_647;
+    json(root, '.deckent/sprint-active.json', { sprintId });
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, `.deckent/pids/${sprintId}.pid`, {
+      pid: hostPid,
+      startToken: 's-original',
+      startedAt: '2026-07-30T11:50:00.000Z',
+    });
+    json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
+      sprintId,
+      pid: hostPid,
+      startToken: 's-reused',
+      startedAt: '2026-07-30T11:50:00.000Z',
+      lastHeartbeat: '2026-07-30T11:59:30.000Z',
+    });
+    json(root, `.deckent/${sprintId}-checkpoint.json`, { sprintId });
+
+    expect(readCanonicalRunStatus(root, { nowMs })).toMatchObject({
+      lifecycle: 'ORPHANED',
+      active: false,
+      coordinator: 'dead',
+    });
+  });
+
+  it('rejects matching process tokens when coordinator lifetime timestamps differ', () => {
+    const root = fixture();
+    const sprintId = 'sprint-started-at-drift';
+    const nowMs = Date.parse('2026-07-30T12:00:00.000Z');
+    const hostPid = 2_147_483_647;
+    json(root, '.deckent/sprint-active.json', { sprintId });
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, `.deckent/pids/${sprintId}.pid`, {
+      pid: hostPid, startToken: 's-same', startedAt: '2026-07-30T11:50:00.000Z',
+    });
+    json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
+      sprintId, pid: hostPid, startToken: 's-same', startedAt: '2026-07-30T11:50:00.001Z',
+      lastHeartbeat: '2026-07-30T11:59:30.000Z',
+    });
+
+    expect(readCanonicalRunStatus(root, { nowMs })).toMatchObject({
+      lifecycle: 'ORPHANED', active: false, coordinator: 'dead',
     });
   });
 

@@ -339,6 +339,7 @@ export type RunFlowEvent =
   | (RunFlowEventBase & { readonly type: 'START_REQUESTED'; readonly revision: number; readonly planDigest: string })
   | (RunFlowEventBase & { readonly type: 'RUN_STARTED'; readonly handle: RunHandle })
   | (RunFlowEventBase & { readonly type: 'RUN_COMPLETED'; readonly summary?: string })
+  | (RunFlowEventBase & { readonly type: 'RUN_PAUSED'; readonly reason: string; readonly resumeCommand?: string })
   | (RunFlowEventBase & { readonly type: 'RUN_FAILED'; readonly error: string })
   | (RunFlowEventBase & { readonly type: 'FLOW_ABORTED'; readonly reason?: string });
 

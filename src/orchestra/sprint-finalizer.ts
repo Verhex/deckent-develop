@@ -56,6 +56,11 @@ import {
   type LogicalProgressProjection,
 } from '../core/logical-progress-projection.js';
 import {
+  projectNotDispatchedSettlements,
+  resolveTaskLineageRootId,
+  type NotDispatchedSettlement,
+} from '../core/task-lineage.js';
+import {
   aggregateLineageUsageAuthority,
   type LineageBillingAuthority,
   type LineageUsageAuthorityAggregate,
@@ -97,7 +102,6 @@ import {
 // ─── Auditor (code verification — migrated Sprint 138) ────────────
 import {
   tryCodeVerifiedDone,
-  writeCodeVerifiedResult,
 } from '../monitor/auditor.js';
 
 // ─── Baseline Tracker ─────────────────────────────────────────────
@@ -1213,16 +1217,35 @@ function asTerminalVerdict(
   return null;
 }
 
-function logicalRootTaskId(taskId: string, tasksById: ReadonlyMap<string, Task>): string {
-  let currentId = taskId;
-  const seen = new Set<string>();
-  while (!seen.has(currentId)) {
-    seen.add(currentId);
-    const parentId = tasksById.get(currentId)?.fixForTaskId;
-    if (!parentId || !tasksById.has(parentId)) return currentId;
-    currentId = parentId;
+/**
+ * Merge PLAN-time roots with runtime-born FIX/FIX-FIX task artifacts. FIX
+ * attempts are intentionally not appended to `sprint.tasks`; final settlement
+ * therefore reloads the exact same-sprint task JSONs before lineage folding.
+ */
+export function loadFinalizerAttemptTasks(
+  projectRoot: string,
+  sprint: Sprint,
+): readonly Task[] {
+  const byId = new Map(sprint.tasks.map(task => [task.id, task]));
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  const prefix = `task-${sprint.number}-`;
+  if (!existsSync(tasksDir)) return [...byId.values()];
+  try {
+    for (const file of readdirSync(tasksDir)) {
+      if (!file.startsWith(prefix) || !file.endsWith('.json')) continue;
+      const candidate = readJsonSafe<Task>(join(tasksDir, file));
+      if (
+        !candidate
+        || typeof candidate.id !== 'string'
+        || !candidate.id.startsWith(`${sprint.number}-`)
+        || (candidate.sprintId !== undefined && candidate.sprintId !== sprint.id)
+      ) continue;
+      byId.set(candidate.id, candidate);
+    }
+  } catch (error) {
+    debugLog('loadFinalizerAttemptTasks', error);
   }
-  return currentId;
+  return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
 }
 
 function lineageBillingAuthority(
@@ -1245,6 +1268,7 @@ function terminalAttemptEvidence(
   tasks: readonly Task[],
   evaluations: ReadonlyMap<string, TaskEvaluation>,
   results: readonly TaskResult[],
+  notDispatchedSettlements: ReadonlyMap<string, NotDispatchedSettlement>,
 ): readonly ExactAttemptEvidence<TaskResult>[] {
   const tasksById = new Map(tasks.map(task => [task.id, task]));
   const resultsById = new Map(results.map(result => [result.taskId, result]));
@@ -1255,7 +1279,12 @@ function terminalAttemptEvidence(
   ]);
   const identityFor = (taskId: string): ExactAttemptIdentity => {
     const work = projectAttributedTaskWork(resultsById.get(taskId));
-    return { taskId, attemptId: work.attemptId ?? '' };
+    const settlement = notDispatchedSettlements.get(taskId);
+    return {
+      taskId,
+      attemptId: work.attemptId
+        ?? (settlement && settlement.state !== 'RESUMABLE' ? `host:${settlement.reasonCode}` : ''),
+    };
   };
 
   return [...candidateIds].sort().map(taskId => {
@@ -1265,10 +1294,24 @@ function terminalAttemptEvidence(
     const verdict = asTerminalVerdict(evaluation);
     const identity = identityFor(taskId);
     const work = projectAttributedTaskWork(result);
+    const notDispatchedSettlement = notDispatchedSettlements.get(taskId);
+    const hostTerminalNotDispatched = evaluation === TaskEvaluation.NOT_DISPATCHED
+      && notDispatchedSettlement !== undefined
+      && notDispatchedSettlement.state !== 'RESUMABLE';
     const parentId = task?.fixForTaskId;
     const supersedes = parentId && tasksById.has(parentId) ? identityFor(parentId) : null;
 
-    const authority: ExactAttemptEvidence<TaskResult>['authority'] = verdict
+    const authority: ExactAttemptEvidence<TaskResult>['authority'] = hostTerminalNotDispatched
+      ? {
+          state: 'TERMINAL',
+          verdict: 'NO_GO',
+          reasonCode: notDispatchedSettlement.reasonCode,
+          evidenceRef: sha256EvidenceRef('not-dispatched-settlement', {
+            identity,
+            settlement: notDispatchedSettlement,
+          }),
+        }
+      : verdict
       ? {
           state: 'TERMINAL',
           verdict,
@@ -1277,7 +1320,16 @@ function terminalAttemptEvidence(
       : evaluation === undefined
         ? { state: 'UNKNOWN', reasonCode: 'FINAL_EVALUATION_UNAVAILABLE' }
         : { state: 'UNSETTLED', evidenceRef: sha256EvidenceRef('evaluation', { identity, evaluation }) };
-    const resultEvidence: ExactAttemptEvidence<TaskResult>['result'] = !result
+    const resultEvidence: ExactAttemptEvidence<TaskResult>['result'] = hostTerminalNotDispatched
+      ? {
+          state: 'NOT_APPLICABLE',
+          reasonCode: notDispatchedSettlement.reasonCode,
+          evidenceRef: sha256EvidenceRef('not-dispatched-zero-work', {
+            identity,
+            settlement: notDispatchedSettlement,
+          }),
+        }
+      : !result
       ? { state: 'ABSENT' }
       : verdict
         ? {
@@ -1292,7 +1344,18 @@ function terminalAttemptEvidence(
             payload: result,
             reasonCode: 'FINAL_EVALUATION_UNAVAILABLE',
           };
-    const attribution: ExactAttemptEvidence<TaskResult>['attribution'] = work.state === 'VERIFIED'
+    const attribution: ExactAttemptEvidence<TaskResult>['attribution'] = hostTerminalNotDispatched
+      ? {
+          state: 'VERIFIED',
+          evidenceRef: sha256EvidenceRef('not-dispatched-zero-work-attribution', {
+            identity,
+            settlement: notDispatchedSettlement,
+          }),
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+        }
+      : work.state === 'VERIFIED'
       ? {
           state: 'VERIFIED',
           evidenceRef: sha256EvidenceRef('work-attribution', result?.workAttribution),
@@ -1306,7 +1369,9 @@ function terminalAttemptEvidence(
         };
 
     return {
-      logicalTaskId: logicalRootTaskId(taskId, tasksById),
+      logicalTaskId: task
+        ? resolveTaskLineageRootId(task, tasksById)
+        : taskId,
       identity,
       ...(supersedes ? { supersedes } : {}),
       authority,
@@ -1396,8 +1461,14 @@ export function buildFinalizerTerminalTruth(input: {
   readonly results: readonly TaskResult[];
   readonly defaultAuthMode?: 'subscription' | 'api' | 'hybrid';
   readonly coordinatorEvidence?: readonly CoordinatorTerminalEvidence[];
+  readonly notDispatchedSettlements?: ReadonlyMap<string, NotDispatchedSettlement>;
 }): FinalizerTerminalTruth {
-  const attempts = terminalAttemptEvidence(input.tasks, input.evaluations, input.results);
+  const attempts = terminalAttemptEvidence(
+    input.tasks,
+    input.evaluations,
+    input.results,
+    input.notDispatchedSettlements ?? new Map(),
+  );
   const terminalEvidence = assembleSprintTerminalEvidence({
     attempts,
     coordinatorEvidence: input.coordinatorEvidence ?? [],
@@ -1981,41 +2052,20 @@ export async function finalizeSprint(
   // Build O(1) lookup index from results array — eliminates O(n²) linear scans
   const resultsMap = buildResultsMap(results);
 
-  // 0. Code-aware evaluation reconciliation (Sprint 136)
-  // Check NO_GO tasks for the "Docker worker exited without writing result" pattern
-  // and physically verify code on disk before finalizing the evaluation.
+  // 0. Legacy ambient code observation (diagnostic-only).
+  // Shared-worktree git state is not exact-attempt verdict authority. Preserve
+  // this probe temporarily for forensic visibility, but it may never mutate an
+  // evaluation or synthesize a worker result at the finalizer boundary.
   const codeVerifiedTasks: string[] = [];
   for (const [taskId, evaluation] of evaluations) {
     if (evaluation !== TaskEvaluation.NO_GO) continue;
     try {
       const verifyResult = await tryCodeVerifiedDone(taskId, projectRoot);
       if (verifyResult.triggered && verifyResult.verified) {
-        // Rewrite the evaluation to DONE
-        evaluations.set(taskId, TaskEvaluation.DONE);
-        // Write a proper result file
-        await writeCodeVerifiedResult(taskId, projectRoot, verifyResult);
-        // Update results array with synthetic result
-        const existingIdx = results.findIndex(r => r.taskId === taskId);
-        const syntheticResult = {
-          taskId,
-          workerId: 'brain-reconcile',
-          filesChanged: verifyResult.verifiedFiles,
-          linesAdded: 0,
-          linesRemoved: 0,
-          testsPassed: false,
-          coverage: 0,
-          selfAssessment: 'DONE' as const,
-          notes: verifyResult.reason,
-        };
-        if (existingIdx >= 0) {
-          results[existingIdx] = syntheticResult;
-        } else {
-          results.push(syntheticResult);
-        }
-        // Update resultsMap
-        resultsMap.set(taskId, syntheticResult);
-        codeVerifiedTasks.push(taskId);
-        debugLog('finalizeSprint:codeReconcile', `Task ${taskId} reconciled to CODE_VERIFIED_DONE`);
+        debugLog(
+          'finalizeSprint:ambientCodeObservation',
+          `task=${taskId} observedFiles=${verifyResult.verifiedFiles.length}; verdict unchanged`,
+        );
       }
     } catch (e) {
       debugLog('finalizeSprint:codeReconcile', `Reconciliation failed for ${taskId}: ${e}`);
@@ -2030,13 +2080,23 @@ export async function finalizeSprint(
   // task-shaped consumers receive only each lineage's resolving attempt under
   // its logical root id. This prevents original + FIX attempts from inflating
   // jobs, KPI measurements, coverage, or rich output.
+  const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
   const terminalTruth = buildFinalizerTerminalTruth({
-    tasks: sprint.tasks,
+    tasks: attemptTasks,
     evaluations,
     results,
     defaultAuthMode: opts?.config?.auth_mode,
+    notDispatchedSettlements: projectNotDispatchedSettlements(
+      attemptTasks,
+      evaluations,
+      new Set(
+        attemptTasks
+          .filter(task => existsSync(join(projectRoot, TASKS_DIR, `task-${task.id}.redispatch-attempted`)))
+          .map(task => task.id),
+      ),
+    ),
   });
-  const tasksById = new Map(sprint.tasks.map(task => [task.id, task]));
+  const tasksById = new Map(attemptTasks.map(task => [task.id, task]));
   const resultsById = new Map(results.map(result => [result.taskId, result]));
   const logicalTasks = terminalTruth.terminalEvidence.logicalTasks.flatMap(logicalTask => {
     const rootTask = tasksById.get(logicalTask.logicalTaskId);
@@ -2640,7 +2700,7 @@ export async function finalizeSprint(
   let gateResult: SelfAuditResult | null = null;
   try {
     gateResult = await runSelfAuditGate(sprint.id, projectRoot, {
-      scopedManifest: deriveScopedSelfAuditManifest(sprint.tasks, results),
+      scopedManifest: deriveScopedSelfAuditManifest(attemptTasks, results),
       selfAuditEcosystem: resolveSelfAuditEcosystem(projectRoot ?? process.cwd()),
     });
     debugLog('finalizeSprint:selfAuditGate', `Gate completed: overallGate=${gateResult.overallGate}`);
@@ -3302,6 +3362,10 @@ export function writeTerminalDashboardSnapshot(
     alerts: [],
     updatedAt: new Date().toISOString(),
     completedAt: sprint.completedAt ?? new Date().toISOString(),
+    terminalAuthority: {
+      sprintId: sprint.id,
+      completedAt: sprint.completedAt ?? new Date().toISOString(),
+    },
   };
   writeFileSync(dashPath, JSON.stringify(snapshot, null, 2), 'utf-8');
   debugLog('writeTerminalDashboardSnapshot', `terminal snapshot written for ${sprint.id}`);

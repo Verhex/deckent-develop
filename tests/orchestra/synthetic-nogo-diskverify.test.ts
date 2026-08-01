@@ -163,7 +163,7 @@ describe('collectResults — synthetic exit-0-no-result uniform disk-verify gate
     try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
   });
 
-  it('(1) synthetic NO_GO + disk evidence → MANUAL_REVIEW_REQUIRED + filesChanged/linesAdded enriched + DISK_VS_CLAIM_MISMATCH emit', async () => {
+  it('(1) unattributed synthetic NO_GO ignores ambient disk evidence', async () => {
     const taskId = 'syn-001';
     const task = makeTask(taskId);
     const sprint = makeSprint([task]);
@@ -181,24 +181,16 @@ describe('collectResults — synthetic exit-0-no-result uniform disk-verify gate
     const r = results[0]!;
     // selfAssessment stays NO_GO (mirrors timeout-path contract — only taskRef.status flips).
     expect(r.selfAssessment).toBe('NO_GO');
-    // filesChanged/linesAdded enriched from disk-verify.
-    expect(r.filesChanged).toEqual(['src/orchestra/new-helper.ts', 'src/orchestra/extra.ts']);
-    expect(r.linesAdded).toBe(73);
-    // Notes annotated with reclassification breadcrumb.
-    expect(r.notes).toContain('disk-verify found evidence');
-    expect(r.notes).toContain('MANUAL_REVIEW_REQUIRED');
+    expect(r.filesChanged).toEqual([]);
+    expect(r.linesAdded).toBe(0);
+    expect(r.notes).not.toContain('disk-verify found evidence');
+    expect(r.notes).not.toContain('MANUAL_REVIEW_REQUIRED');
 
-    // Task status mutated to MANUAL_REVIEW_REQUIRED on the in-memory ref.
-    expect(task.status).toBe(TaskStatus.MANUAL_REVIEW_REQUIRED);
+    expect(task.status).toBe(TaskStatus.NO_GO);
 
-    // Audit event emitted with the canonical channel + cause='exit-0-no-result'.
     const events = readEventStream(tmpDir, 'sprint-test');
     const match = events.find(e => e.channel === 'BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH');
-    expect(match).toBeDefined();
-    expect(match!.payload.taskId).toBe(taskId);
-    expect(match!.payload.cause).toBe('exit-0-no-result');
-    expect(match!.payload.linesAdded).toBe(73);
-    expect(match!.payload.untrackedFiles).toEqual(['src/orchestra/new-helper.ts', 'src/orchestra/extra.ts']);
+    expect(match).toBeUndefined();
   });
 
   it('(2) synthetic NO_GO + NO disk evidence → NO_GO stays, no reclassification, no audit emit', async () => {

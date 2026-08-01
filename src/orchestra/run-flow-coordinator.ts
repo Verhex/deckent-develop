@@ -215,6 +215,13 @@ export interface RecordRunFailureCommand {
   commandId?: string;
 }
 
+export interface RecordRunPausedCommand {
+  flowId: string;
+  reason: string;
+  resumeCommand?: string;
+  commandId?: string;
+}
+
 export interface RecordCompletionCommand {
   readonly flowId: string;
   readonly summary?: string;
@@ -261,6 +268,8 @@ export interface RunFlowCoordinator {
   /** STARTING/DETACHED_RUNNING -> FAILED. Emits RUN_FAILED (born-698b/c:
    *  the honest closure for a run that died without completing). */
   recordRunFailure(cmd: RecordRunFailureCommand): RunFlowCommandResult;
+  /** STARTING/DETACHED_RUNNING -> BLOCKED. Emits resumable RUN_PAUSED. */
+  recordRunPaused(cmd: RecordRunPausedCommand): RunFlowCommandResult;
   /** Any non-terminal state -> CANCELLED. Emits FLOW_ABORTED (SURF-2 cancel). */
   abortFlow(cmd: AbortFlowCommand): RunFlowCommandResult;
 
@@ -613,6 +622,17 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
       const { flowId, error, commandId } = cmd;
       return runCommand(flowId, commandId, () => [
         buildEvent(flowId, commandId, { type: 'RUN_FAILED', error }),
+      ]);
+    },
+
+    recordRunPaused(cmd) {
+      const { flowId, reason, resumeCommand, commandId } = cmd;
+      return runCommand(flowId, commandId, () => [
+        buildEvent(flowId, commandId, {
+          type: 'RUN_PAUSED',
+          reason,
+          ...(resumeCommand !== undefined ? { resumeCommand } : {}),
+        }),
       ]);
     },
 

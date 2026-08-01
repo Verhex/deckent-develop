@@ -1440,6 +1440,12 @@ export async function respawnEligibleTasks(
   // spawnWorkers(), computed once per respawn wave.
   const sprintHistory = aggregateSprintHistory(projectRoot);
   let spawnedThisWave = 0;
+  const spawnedTaskIds: string[] = [];
+  const collectedIds = new Set(
+    sprint.tasks
+      .filter(task => task.status === TaskStatus.DONE || task.status === TaskStatus.NO_GO)
+      .map(task => task.id),
+  );
 
   for (const task of toSpawn) {
     if (spawnedThisWave > 0 && throttleFloorMs > 0) {
@@ -1482,6 +1488,7 @@ export async function respawnEligibleTasks(
         resolveAgentPrompt,
         resolveSkillPrompts,
         buildWriteTargets: buildAllowedWriteTargets,
+        collisionAuthority: { tasks: sprint.tasks, collectedIds },
       },
     );
 
@@ -1489,18 +1496,19 @@ export async function respawnEligibleTasks(
       debugLog('respawnEligibleTasks:routingLineageMissing', disposition.detail);
       continue;
     }
-    if (disposition.kind === 'provider-unavailable') {
+    if (disposition.kind !== 'spawned') {
       continue;
     }
 
     spawnedThisWave++;
+    spawnedTaskIds.push(task.id);
   }
 
   const waveDuration = Date.now() - waveStart;
-  metric('wave.transition', waveDuration, { from_wave: 'dep-wait', to_wave: `wave-${toSpawn.length}` });
+  metric('wave.transition', waveDuration, { from_wave: 'dep-wait', to_wave: `wave-${spawnedTaskIds.length}` });
   if (onWaveTransition) {
     try {
-      onWaveTransition(waveDuration, 'dep-wait', `wave-${toSpawn.length}`);
+      onWaveTransition(waveDuration, 'dep-wait', `wave-${spawnedTaskIds.length}`);
     } catch (e) { debugLog('respawnEligibleTasks:onWaveTransition', e); }
   }
 
@@ -1513,9 +1521,9 @@ export async function respawnEligibleTasks(
     CHANNELS.METRIC_EMITTED,
     {
       name: 'wave.respawn',
-      value: toSpawn.length,
+      value: spawnedTaskIds.length,
       durationMs: waveDuration,
-      spawnedTaskIds: toSpawn.map(t => t.id),
+      spawnedTaskIds,
       totalDone: sprint.tasks.filter(t => t.status === TaskStatus.DONE).length,
       totalPending: sprint.tasks.filter(t => t.status === TaskStatus.PENDING).length,
     },
@@ -1534,8 +1542,8 @@ export async function respawnEligibleTasks(
     debugLog('respawnEligibleTasks:checkpoint', `Checkpoint written at ${terminalCount} completed tasks`);
   }
 
-  debugLog('respawnEligibleTasks', `Spawned ${toSpawn.length} newly eligible tasks: ${toSpawn.map(t => t.id).join(', ')}`);
-  return toSpawn.map(t => t.id);
+  debugLog('respawnEligibleTasks', `Spawned ${spawnedTaskIds.length} newly eligible tasks: ${spawnedTaskIds.join(', ')}`);
+  return spawnedTaskIds;
 }
 
 // ─── Sprint 165 Bug Y — processQueue Stall Fix Helpers ──────────────

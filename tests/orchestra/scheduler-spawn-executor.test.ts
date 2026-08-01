@@ -234,6 +234,42 @@ describe('executeSpawnTask — provider-authority ingress', () => {
   });
 });
 
+describe('executeSpawnTask — canonical write collision admission', () => {
+  let root: string;
+
+  beforeEach(() => { root = makeTmpDir('sched3-collision'); });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); vi.clearAllMocks(); });
+
+  it('holds before prompt construction and backend dispatch for every trigger path', async () => {
+    const candidate = makeTask('700-COLLISION-CANDIDATE', {
+      scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] },
+    });
+    const active = makeTask('700-COLLISION-ACTIVE', {
+      status: TaskStatus.EXECUTING,
+      scope: { directories: [], filesRead: [], filesWrite: ['SRC\\shared.ts'] },
+    });
+    const backend = makeMockBackend();
+    const resolveAgentPrompt = vi.fn(async () => undefined);
+
+    const disposition = await executeSpawnTask(
+      { task: candidate },
+      baseDeps(root, {
+        backend,
+        resolveAgentPrompt,
+        collisionAuthority: { tasks: [candidate, active], collectedIds: new Set() },
+      }),
+    );
+
+    expect(disposition).toEqual({
+      kind: 'collision-held',
+      taskId: candidate.id,
+      blockerTaskIds: [active.id],
+    });
+    expect(resolveAgentPrompt).not.toHaveBeenCalled();
+    expect(backend.calls).toHaveLength(0);
+  });
+});
+
 // ─── executeSpawnTask — fix-routing lineage inheritance ──────────────────────
 
 describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
