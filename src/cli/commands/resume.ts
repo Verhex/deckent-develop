@@ -7,7 +7,7 @@ import {
   existsSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { Command } from 'commander';
+import { Option, type Command } from 'commander';
 
 import { loadConfig } from '../../core/config.js';
 import type { ResolvedConfig } from '../../core/config-types.js';
@@ -41,6 +41,13 @@ import {
   restoreProviderExecutionHolds,
   type ProviderExecutionHold,
 } from '../../core/provider-execution-hold.js';
+import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import {
+  createRecoveryResumeFailedOutcome,
+  createRecoveryResumeOutcome,
+  writeRecoveryResumeOutcome,
+  type RecoveryResumeOutcome,
+} from '../../core/recovery-resume-outcome.js';
 
 // ─── Register ───────────────────────────────────────────────────────
 
@@ -179,15 +186,72 @@ export function clearFailedResumePlanningState(projectRoot: string, sprintId: st
   }
 }
 
+function publishResumeOutcome(
+  projectRoot: string,
+  sprintId: string,
+  observedStatus: string | null,
+  outcomeFile: string | undefined,
+  reason?: string,
+): RecoveryResumeOutcome {
+  const authority = readCanonicalRunStatus(projectRoot, { sprintIdHint: sprintId });
+  const outcome = createRecoveryResumeOutcome({
+    sprintId,
+    observedStatus,
+    authority,
+    reason,
+  });
+  if (outcomeFile) writeRecoveryResumeOutcome(projectRoot, outcomeFile, outcome);
+  return outcome;
+}
+
+function publishResumeFailure(
+  projectRoot: string,
+  sprintId: string,
+  observedStatus: string | null,
+  outcomeFile: string | undefined,
+  reason: string,
+): RecoveryResumeOutcome {
+  const outcome = createRecoveryResumeFailedOutcome({
+    sprintId,
+    observedStatus,
+    authority: readCanonicalRunStatus(projectRoot, { sprintIdHint: sprintId }),
+    reason,
+  });
+  if (outcomeFile) writeRecoveryResumeOutcome(projectRoot, outcomeFile, outcome);
+  return outcome;
+}
+
+function printResumeOutcome(outcome: RecoveryResumeOutcome, lang: string): void {
+  if (outcome.outcome === 'completed') {
+    print(getMessage('resume.completed', lang));
+    print(getMessage('resume.retro_hint', lang));
+  } else if (outcome.outcome === 'resumed-paused') {
+    print(getMessage('resume.outcome_paused', lang, {
+      recoveryCommand: outcome.nextAuthority.recoveryCommand ?? '-',
+      finalizeCommand: outcome.nextAuthority.finalizeCommand ?? '-',
+    }));
+  } else if (outcome.outcome === 'resumed-running') {
+    print(getMessage('resume.outcome_running', lang));
+  } else if (outcome.outcome === 'aborted') {
+    print(getMessage('resume.outcome_aborted', lang));
+  } else {
+    printError(getMessage('resume.outcome_failed', lang, {
+      reason: outcome.reason ?? 'unknown',
+    }));
+  }
+  process.exitCode = outcome.exitCode;
+}
+
 export function registerResume(program: Command): void {
-  program
+  const command = program
     .command('resume <sprintId>')
     .description('Resume a sprint from its latest checkpoint')
     .option('--auto-approve', 'Auto-approve all worker actions (skip permission prompts)', false)
     .option('--dry-run', 'Show what would be resumed without actually running', false)
     .option('--force-scope', getMessage('recover.force_scope_option', detectLang(resolveProjectRoot())), false)
     .option('--root <path>', 'Project root directory (defaults to cwd)')
-    .action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; forceScope: boolean; root?: string }) => {
+    .addOption(new Option('--outcome-file <path>').hideHelp());
+  command.action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; forceScope: boolean; root?: string; outcomeFile?: string }) => {
       const projectRoot = opts.root ?? resolveProjectRoot();
       const lang = detectLang(projectRoot);
 
@@ -288,22 +352,24 @@ export function registerResume(program: Command): void {
               autoApprove: opts.autoApprove,
               acknowledgeScopePaths: opts.forceScope,
             });
-            if (resumed.status !== SprintStatus.COMPLETE) {
-              if (!restorePauseAuthority(pauseLease.lease)) {
-                printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
-              }
-              printError(getMessage('resume.not_complete', lang, { status: String(resumed.status) }));
-              process.exitCode = 1;
-              return;
+            if (resumed.status === SprintStatus.PAUSED && !restorePauseAuthority(pauseLease.lease)) {
+              printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
             }
-            print(getMessage('resume.completed', lang));
-            print(getMessage('resume.retro_hint', lang));
+            const outcome = publishResumeOutcome(
+              projectRoot,
+              checkpoint.sprintId,
+              String(resumed.status),
+              opts.outcomeFile,
+            );
+            printResumeOutcome(outcome, lang);
             return;
           } catch (e) {
             if (!restorePauseAuthority(pauseLease.lease)) {
               printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
             }
-            printError(getMessage('resume.failed', lang, { error: e instanceof Error ? e.message : String(e) }));
+            const reason = e instanceof Error ? e.message : String(e);
+            publishResumeFailure(projectRoot, checkpoint.sprintId, null, opts.outcomeFile, reason);
+            printError(getMessage('resume.failed', lang, { error: reason }));
             process.exitCode = 1;
             return;
           }
@@ -458,24 +524,30 @@ export function registerResume(program: Command): void {
           acknowledgeScopePaths: opts.forceScope,
           preplannedSprint,
         });
-        if (resumed.status !== SprintStatus.COMPLETE) {
+        if (resumed.status === SprintStatus.PAUSED) {
           if (!restorePauseAuthority(pauseLease.lease)) {
             printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
           }
           clearFailedResumePlanningState(projectRoot, checkpoint.sprintId);
-          printError(getMessage('resume.not_complete', lang, { status: String(resumed.status) }));
-          process.exitCode = 1;
-          return;
         }
-        print(getMessage('resume.completed', lang));
-        print(getMessage('resume.retro_hint', lang));
+        const outcome = publishResumeOutcome(
+          projectRoot,
+          checkpoint.sprintId,
+          String(resumed.status),
+          opts.outcomeFile,
+        );
+        printResumeOutcome(outcome, lang);
+        return;
       } catch (e) {
         if (!restorePauseAuthority(pauseLease.lease)) {
           printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
         }
         clearFailedResumePlanningState(projectRoot, checkpoint.sprintId);
-        printError(getMessage('resume.failed', lang, { error: e instanceof Error ? e.message : String(e) }));
-        process.exit(1);
+        const reason = e instanceof Error ? e.message : String(e);
+        publishResumeFailure(projectRoot, checkpoint.sprintId, null, opts.outcomeFile, reason);
+        printError(getMessage('resume.failed', lang, { error: reason }));
+        process.exitCode = 1;
+        return;
       }
     });
 }

@@ -48,6 +48,26 @@ vi.mock('../../src/core/provider.js', () => ({
   bootstrapProviders: vi.fn().mockResolvedValue({ connector: mockConnector }),
 }));
 
+vi.mock('../../src/core/execution-plan-digest.js', () => ({
+  applyWorkerExecutionBudgetPolicy: (tasks: Array<{ id: string }>) => tasks.map(task => ({
+    taskId: task.id,
+    state: 'admit',
+    profileRef: 'test:resume-race',
+  })),
+}));
+
+vi.mock('../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn().mockReturnValue({
+    lifecycle: 'COMPLETE',
+    sprintId: 'sprint-267',
+    status: 'COMPLETE',
+    reason: null,
+    resumable: false,
+    recoveryCommand: null,
+    finalizeCommand: null,
+  }),
+}));
+
 vi.mock('../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
@@ -170,6 +190,7 @@ async function runResume(extraArgs: string[] = []): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.exitCode = undefined;
   root = mkdtempSync(join(tmpdir(), 'deckent-resume-race-'));
   mkdirSync(join(root, '.deckent'), { recursive: true });
   mkdirSync(join(root, '.tasks'), { recursive: true });

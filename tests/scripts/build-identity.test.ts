@@ -5,9 +5,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   BUILD_IDENTITY_RELATIVE_PATH,
+  buildSourceTreeIdentity,
   writeBuildIdentity,
 } from '../../scripts/copy-assets.mjs';
-import { parseBuildIdentity } from '../../src/cli/worktree-binary-authority.js';
+import {
+  buildSourceTreeIdentity as buildRuntimeSourceTreeIdentity,
+  parseBuildIdentity,
+} from '../../src/cli/worktree-binary-authority.js';
 
 const roots: string[] = [];
 
@@ -15,11 +19,14 @@ function fixtureRoot(version = '9.8.7'): string {
   const root = mkdtempSync(join(tmpdir(), 'deckent-build-identity-'));
   roots.push(root);
   mkdirSync(join(root, 'dist'), { recursive: true });
+  mkdirSync(join(root, 'src'), { recursive: true });
   writeFileSync(
     join(root, 'package.json'),
     `${JSON.stringify({ name: 'deckent', version })}\n`,
     'utf-8',
   );
+  writeFileSync(join(root, 'tsconfig.json'), `${JSON.stringify({ include: ['src/**/*.ts'] })}\n`);
+  writeFileSync(join(root, 'src', 'entry.ts'), 'export const value = 1;\n');
   return root;
 }
 
@@ -38,13 +45,17 @@ describe('copy-assets build identity', () => {
     const expectedDigest = createHash('sha256')
       .update(realpathSync.native(root))
       .digest('hex');
+    const sourceTree = buildSourceTreeIdentity(root);
+    expect(buildRuntimeSourceTreeIdentity(root)).toEqual(sourceTree);
 
     expect(written).toBe(join(root, BUILD_IDENTITY_RELATIVE_PATH));
     expect(parsed).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       packageName: 'deckent',
       packageVersion: '9.8.7',
       sourceRootSha256: expectedDigest,
+      sourceTreeSha256: sourceTree.sourceTreeSha256,
+      sourceTreeFileCount: sourceTree.sourceTreeFileCount,
     });
     expect(raw).not.toContain(root);
 

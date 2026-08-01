@@ -58,6 +58,7 @@ import { isSprintLocked, releaseSprintLock } from '../core/multi-ide.js';
 import { pruneExpiredNervousPending } from '../core/pending-approvals.js';
 import { isExecutionLockAuthorityArtifactName } from '../core/file-lock.js';
 import { clearProviderExecutionHolds } from '../core/provider-execution-hold.js';
+import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -777,6 +778,17 @@ export function pauseSprint(
     });
   } catch (e) { debugLog('pauseSprint:updateDashboard', e); }
 
+  let statusReadModelPublicationError: unknown = null;
+  try {
+    const model = publishCanonicalRunStatusReadModel(projectRoot);
+    if (model.authority.sprintId !== sprint.id || model.authority.lifecycle !== 'PAUSED') {
+      throw new Error('PAUSE_STATUS_READ_MODEL_AUTHORITY_MISMATCH');
+    }
+  } catch (e) {
+    statusReadModelPublicationError = e;
+    debugLog('pauseSprint:publishRunStatusReadModel', e);
+  }
+
   // A parked run is an actionable human gate. Emit through both the general
   // notification dispatcher and Nervous live channel; plain status projects
   // the durable pause-state into its pending-approval list.
@@ -825,6 +837,8 @@ export function pauseSprint(
       },
     );
   } catch (e) { debugLog('pauseSprint:nervousRecommendation', e); }
+
+  if (statusReadModelPublicationError) throw statusReadModelPublicationError;
 
   return pauseState;
 }
@@ -914,6 +928,42 @@ export function resumeSprint(
       updatedAt: now(),
     });
   } catch (e) { debugLog('resumeSprint:updateDashboard', e); }
+  try {
+    const model = publishCanonicalRunStatusReadModel(projectRoot);
+    if (model.authority.sprintId !== sprint.id || model.authority.lifecycle !== 'ACTIVE') {
+      throw new Error('RESUME_STATUS_READ_MODEL_AUTHORITY_MISMATCH');
+    }
+  } catch (e) {
+    // Resume is transactional with its durable PAUSED authority. If the new
+    // read model cannot be published, restore task markers + pause/state bytes
+    // so recover remains possible and no half-resumed run is advertised.
+    sprint.status = SprintStatus.PAUSED;
+    for (const taskId of resumedTaskIds) {
+      const task = sprint.tasks.find(candidate => candidate.id === taskId);
+      if (!task) continue;
+      task.status = TaskStatus.PAUSED;
+      writeFileSync(
+        join(tasksPath, `task-${task.id}.json`),
+        JSON.stringify(task, null, 2),
+        'utf-8',
+      );
+      writeFileSync(
+        join(tasksPath, `task-${task.id}.paused`),
+        JSON.stringify({ taskId: task.id, previousStatus: TaskStatus.PENDING, pausedAt: now() }, null, 2),
+        'utf-8',
+      );
+    }
+    if (pauseState) {
+      writeFileSync(
+        join(projectRoot, PAUSE_STATE_FILE),
+        JSON.stringify(pauseState, null, 2),
+        'utf-8',
+      );
+    }
+    writeSprintState(projectRoot, sprint);
+    try { publishCanonicalRunStatusReadModel(projectRoot); } catch { /* preserve primary failure */ }
+    throw e;
+  }
   try {
     dismissRecommendationByKey(
       projectRoot,

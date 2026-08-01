@@ -20,9 +20,19 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { TASKS_DIR, SPRINT_STATE_FILE, RUNTIME_DIR, JOBS_DIR } from '../../core/constants.js';
+import {
+  TASKS_DIR,
+  SPRINT_STATE_FILE,
+  RUNTIME_DIR,
+  JOBS_DIR,
+  RUN_STATUS_READ_MODEL_FILE,
+} from '../../core/constants.js';
 import type { LiveFooterState, LiveFooterProviderState, LiveFooterAuthState } from './live-footer.js';
 import { readWorkerProgress, type ProgressReaderFs, type WorkerProgressSummary } from './progress-reader.js';
+import {
+  readCanonicalRunStatusReadModel,
+  type CanonicalRunStatusReadModel,
+} from '../../core/run-status-read-model.js';
 
 // ─── fs seam ────────────────────────────────────────────────────────────────
 
@@ -90,6 +100,8 @@ interface RawJobRecord {
 // ─── Pure core ──────────────────────────────────────────────────────────────
 
 export interface StateFeedInput {
+  /** Validated persisted lifecycle/logical-work authority. */
+  runStatusReadModel?: CanonicalRunStatusReadModel | null;
   sprintState: RawSprintState | null;
   /** One raw parsed object per readable task-<id>.hb file. */
   heartbeats: RawHeartbeat[];
@@ -163,6 +175,12 @@ export interface StateFeedState extends LiveFooterState {
    *  Omitted for every legacy record (no `completionRecord`, or no `flowId`
    *  watched) — same omit-when-absent convention as `next`/`workers`. */
   completion?: CorrelatedCompletionEvent;
+  /** Revision identity consumed by Terminal; omitted on legacy/missing authority. */
+  statusReadModel?: {
+    readonly state: 'persisted' | 'unavailable-or-stale';
+    readonly revision?: number;
+    readonly modelDigest?: string;
+  };
 }
 
 function normalizeAuth(value: unknown): LiveFooterAuthState | undefined {
@@ -243,13 +261,44 @@ function resolveWorkerCurrentAction(
  * (buildLiveFooter then honestly collapses to "idle").
  */
 export function computeLiveFooterState(input: StateFeedInput): StateFeedState {
-  const { sprintState, heartbeats, finishedTaskIds, providerCache, workerProgress, jobRecords, flowId } = input;
+  const {
+    runStatusReadModel,
+    sprintState,
+    heartbeats,
+    finishedTaskIds,
+    providerCache,
+    workerProgress,
+    jobRecords,
+    flowId,
+  } = input;
   const state: StateFeedState = {};
+
+  if (runStatusReadModel) {
+    state.statusReadModel = {
+      state: 'persisted',
+      revision: runStatusReadModel.revision,
+      modelDigest: runStatusReadModel.modelDigest,
+    };
+  }
 
   const heartbeatTaskIds = heartbeats
     .map((hb) => (typeof hb.taskId === 'string' ? hb.taskId : null))
     .filter((id): id is string => id !== null);
-  const activeTaskIds = heartbeatTaskIds.filter((id) => !finishedTaskIds.has(id));
+  const modelActiveAttemptIds = runStatusReadModel
+    ? new Set(
+        runStatusReadModel.logicalProgress.lineages
+          .filter(lineage => lineage.status === 'active')
+          .flatMap(lineage => lineage.attemptIds),
+      )
+    : null;
+  const lifecycleAllowsWorkers = !runStatusReadModel
+    || runStatusReadModel.authority.lifecycle === 'ACTIVE';
+  const activeTaskIds = lifecycleAllowsWorkers
+    ? heartbeatTaskIds.filter(id => (
+        !finishedTaskIds.has(id)
+        && (modelActiveAttemptIds === null || modelActiveAttemptIds.has(id))
+      ))
+    : [];
 
   if (activeTaskIds.length > 0) {
     const heartbeatsByTaskId = new Map(heartbeats.filter((hb) => typeof hb.taskId === 'string').map((hb) => [hb.taskId as string, hb]));
@@ -261,8 +310,22 @@ export function computeLiveFooterState(input: StateFeedInput): StateFeedState {
     }
   }
 
-  const sprintId = typeof sprintState?.sprintId === 'string' ? sprintState.sprintId : undefined;
-  const phase = typeof sprintState?.phase === 'string' ? sprintState.phase : undefined;
+  const modelAuthority = runStatusReadModel?.authority;
+  const lifecycleHasRun = modelAuthority
+    ? modelAuthority.lifecycle === 'ACTIVE'
+      || modelAuthority.lifecycle === 'PAUSED'
+      || modelAuthority.lifecycle === 'ORPHANED'
+    : true;
+  const sprintId = lifecycleHasRun && typeof modelAuthority?.sprintId === 'string'
+    ? modelAuthority.sprintId
+    : lifecycleHasRun && typeof sprintState?.sprintId === 'string'
+      ? sprintState.sprintId
+      : undefined;
+  const phase = lifecycleHasRun && typeof modelAuthority?.phase === 'string'
+    ? modelAuthority.phase
+    : lifecycleHasRun && typeof sprintState?.phase === 'string'
+      ? sprintState.phase
+      : undefined;
 
   if (sprintId !== undefined && phase !== undefined) {
     if (activeTaskIds.length === 1) {
@@ -311,6 +374,9 @@ export interface StateFeedOptions {
    * "inject a fake for hermetic tests" precedent as `fs` above, just a
    * separate seam because `readWorkerProgress` needs different primitives. */
   progressFs?: ProgressReaderFs;
+  /** Canonical read-model seam for hermetic adapters/tests. Production uses
+   * the persisted reader; supplying raw sprint-state is never a substitute. */
+  readRunStatusReadModel?: (projectRoot: string) => CanonicalRunStatusReadModel | null;
   /** The flowId of a currently-watched detached run-handle
    *  (`DetachedSpawnResult.flowId`, detached-start.ts) to correlate
    *  against — see `StateFeedState.completion`. When omitted (every caller
@@ -405,12 +471,28 @@ export function readLiveFooterState(options: StateFeedOptions): StateFeedState {
   const providerCacheFile = join(options.projectRoot, PROVIDER_HEALTH_CACHE_FILE);
 
   const sprintState = readJson<RawSprintState>(fs, sprintStateFile);
+  let runStatusReadModel: CanonicalRunStatusReadModel | null = null;
+  let runStatusReadModelInvalid = false;
+  try {
+    runStatusReadModel = (options.readRunStatusReadModel ?? readCanonicalRunStatusReadModel)(
+      options.projectRoot,
+    );
+  } catch {
+    runStatusReadModelInvalid = true;
+  }
+  if (
+    !runStatusReadModel
+    && (runStatusReadModelInvalid || fs.existsSync(join(options.projectRoot, RUN_STATUS_READ_MODEL_FILE)) || sprintState !== null)
+  ) {
+    return { statusReadModel: { state: 'unavailable-or-stale' } };
+  }
   const { heartbeats, finishedTaskIds } = readHeartbeatsAndResults(fs, tasksDir);
   const providerCache = readJson<RawProviderHealthCache>(fs, providerCacheFile);
   const workerProgress = readWorkerProgress(tasksDir, { fs: options.progressFs });
   const jobRecords = options.flowId ? readJobRecords(fs, join(options.projectRoot, JOBS_DIR)) : undefined;
 
   return computeLiveFooterState({
+    runStatusReadModel,
     sprintState,
     heartbeats,
     finishedTaskIds,

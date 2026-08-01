@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,6 +11,11 @@ import type { ProviderConcurrencyCapabilityEvidence } from '../../src/core/provi
 import type { StoredProviderExecutionInterval } from '../../src/core/provider-execution-observation-store.js';
 import { ProviderExecutionObservationStore } from '../../src/core/provider-execution-observation-store.js';
 import { readProviderConcurrencyRuntime } from '../../src/core/provider-concurrency-runtime-reader.js';
+import {
+  buildCanonicalRunStatusReadModel,
+  resolveCanonicalRunStatusReadModelPath,
+} from '../../src/core/run-status-read-model.js';
+import { readCanonicalRunStatus } from '../../src/core/run-status-authority.js';
 
 const PRINCIPAL = 'principal-digest-017';
 
@@ -68,10 +73,25 @@ describe('provider concurrency runtime projection', () => {
     expect(runtime).toMatchObject({
       admission: 'ADMITTED', admittedCeiling: 6, currentAttained: 1, peakAttained: 2,
     });
-    const snapshot = buildStatusJsonSnapshot('/path/without/dashboard', '/path/without/dashboard', {
-      providerConcurrencyRuntime: () => [runtime],
-    });
-    expect(snapshot.providerConcurrency).toEqual([runtime]);
+    const root = mkdtempSync(join(tmpdir(), 'deckent-provider-status-model-'));
+    try {
+      const authority = readCanonicalRunStatus(root);
+      const model = buildCanonicalRunStatusReadModel({
+        authority,
+        tasks: [],
+        providerConcurrency: [runtime],
+        terminalPublication: { version: 1, state: 'open', receipt: null },
+        runGeneration: null,
+        publishedAt: '2026-08-01T00:00:00.000Z',
+      });
+      const modelPath = resolveCanonicalRunStatusReadModelPath(root);
+      mkdirSync(join(root, '.deckent', 'runtime'), { recursive: true });
+      writeFileSync(modelPath, `${JSON.stringify(model, null, 2)}\n`);
+      const snapshot = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {});
+      expect(snapshot.providerConcurrency).toEqual([runtime]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('keeps missing capability as HOLD and unknown rather than rendering capacity as zero', () => {
@@ -117,6 +137,43 @@ describe('provider concurrency runtime projection', () => {
           admittedCeiling: 'unknown',
           currentAttained: 1,
           peakAttained: 1,
+        }),
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('requires exact task and attempt attribution when the caller supplies a run scope', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-provider-concurrency-status-'));
+    try {
+      const store = new ProviderExecutionObservationStore(root);
+      store.put({
+        source: 'provider-runtime',
+        observation: interval('current', '2026-07-31T12:00:00.000Z', null).start,
+      });
+      store.put({
+        source: 'provider-runtime',
+        observation: {
+          ...interval('stale', '2026-07-31T12:01:00.000Z', null).start,
+          taskId: 'task-stale',
+          attemptId: 'attempt-stale',
+        },
+      });
+      store.close();
+
+      expect(readProviderConcurrencyRuntime(root, {
+        currentTaskIds: new Set(['task-current', 'task-stale']),
+        currentAttemptIdsByTaskId: new Map([
+          ['task-current', new Set(['attempt-current'])],
+          ['task-stale', new Set<string>()],
+        ]),
+      })).toEqual([
+        expect.objectContaining({
+          currentAttained: 1,
+          peakAttained: 1,
+          unresolvedOpenIntervals: 1,
+          observationScope: 'exact-task-set',
         }),
       ]);
     } finally {

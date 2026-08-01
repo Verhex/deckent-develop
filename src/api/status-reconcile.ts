@@ -19,6 +19,12 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { readJsonSafe } from '../core/utils.js';
 import { SprintStatus, SprintPhase } from '../core/types.js';
+import {
+  readCanonicalRunStatusReadModel,
+  runStatusReadModelMatchesAuthority,
+  type CanonicalRunStatusReadModel,
+} from '../core/run-status-read-model.js';
+import { readCanonicalRunStatus } from '../core/run-status-authority.js';
 
 // Path must match SPRINT_STATE_FILE in orchestra/sprint-utils.ts
 const SPRINT_STATE_FILE = '.deckent/sprint-state.json';
@@ -71,7 +77,21 @@ function isTerminal(status?: string, phase?: string): boolean {
 /**
  * Build an idle/completed response when no live sprint is detected.
  */
-function idleResponse(sprintId: string | null | undefined): unknown {
+function readModelSurface(model: CanonicalRunStatusReadModel) {
+  return {
+    state: 'persisted',
+    schemaVersion: model.schemaVersion,
+    revision: model.revision,
+    runGeneration: model.runGeneration,
+    modelDigest: model.modelDigest,
+    holds: model.holds,
+  };
+}
+
+function idleResponse(
+  sprintId: string | null | undefined,
+  model?: CanonicalRunStatusReadModel,
+): unknown {
   return {
     sprint: {
       id: sprintId ?? null,
@@ -79,9 +99,17 @@ function idleResponse(sprintId: string | null | undefined): unknown {
       status: 'IDLE',
     },
     agents: [],
-    progress: { done: 0, active: 0, blocked: 0, total: 0 },
+    progress: model?.logicalProgress
+      ?? { done: 0, active: 0, blocked: 0, total: 0, attemptCount: 0, lineages: [] },
+    ...(model ? {
+      lifecycle: model.authority.lifecycle,
+      authority: model.authority,
+      terminalPublication: model.terminalPublication,
+      providerConcurrency: model.providerConcurrency,
+      statusReadModel: readModelSurface(model),
+    } : { statusReadModel: { state: 'unavailable-or-stale' } }),
     alerts: [],
-    updatedAt: new Date().toISOString(),
+    updatedAt: model?.publishedAt ?? new Date().toISOString(),
     idle: true,
   };
 }
@@ -105,6 +133,63 @@ export function reconcileStatusResponse(
   dashData: unknown,
 ): unknown {
   const statePath = join(projectRoot, SPRINT_STATE_FILE);
+  let model: CanonicalRunStatusReadModel | null = null;
+  let modelInvalid = false;
+  try {
+    const candidate = readCanonicalRunStatusReadModel(projectRoot);
+    const authority = readCanonicalRunStatus(projectRoot);
+    if (candidate && runStatusReadModelMatchesAuthority(candidate, authority)) model = candidate;
+    else if (candidate) modelInvalid = true;
+  } catch { modelInvalid = true; }
+  if (model) {
+    if (
+      model.authority.lifecycle === 'IDLE'
+      || model.authority.lifecycle === 'COMPLETE'
+      || model.authority.lifecycle === 'ABORTED'
+    ) {
+      return idleResponse(model.authority.sprintId, model);
+    }
+    const dashboard = dashData && typeof dashData === 'object'
+      ? dashData as DashboardLike
+      : {};
+    return {
+      ...dashboard,
+      sprint: {
+        ...(dashboard.sprint ?? {}),
+        id: model.authority.sprintId,
+        phase: model.authority.phase,
+        status: model.authority.status,
+      },
+      progress: model.logicalProgress,
+      active: model.authority.active,
+      lifecycle: model.authority.lifecycle,
+      resumable: model.authority.resumable,
+      authority: model.authority,
+      terminalPublication: model.terminalPublication,
+      providerConcurrency: model.providerConcurrency,
+      statusReadModel: readModelSurface(model),
+      updatedAt: model.publishedAt,
+    };
+  }
+  if (modelInvalid || existsSync(statePath)) {
+    const state = readJsonSafe<SprintStateFile>(statePath);
+    return {
+      sprint: {
+        id: state?.sprintId ?? null,
+        phase: null,
+        status: 'HOLD',
+      },
+      active: false,
+      lifecycle: 'UNAVAILABLE',
+      progress: null,
+      providerConcurrency: [],
+      terminalPublication: null,
+      statusReadModel: { state: 'unavailable-or-stale' },
+      alerts: [{ code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE' }],
+      updatedAt: new Date().toISOString(),
+      idle: false,
+    };
+  }
 
   // No sprint-state file — no active sprint.
   if (!existsSync(statePath)) {

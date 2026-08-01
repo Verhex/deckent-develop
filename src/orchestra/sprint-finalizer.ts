@@ -42,6 +42,7 @@ import { archiveStaleSchedulerShadowJournals } from '../core/scheduler-shadow-re
 // ─── Core — utils ─────────────────────────────────────────────────
 import { updateLastSprintId, debugLog, readJsonSafe } from '../core/utils.js';
 import { getDebtItems } from '../core/debt-store.js';
+import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
 
 // ─── Terminal truth (Sprint 486 task 486-007) ─────────────────────
 import {
@@ -3331,12 +3332,24 @@ export function publishFinalSprintAuthority(
 ): void {
   debugLog('finalizeSprint:breadcrumb', 'terminal authority publication — entering');
   persistFinalSprintState(projectRoot, sprint);
+  const statusModel = publishCanonicalRunStatusReadModel(projectRoot);
+  if (
+    statusModel.authority.sprintId !== sprint.id
+    || statusModel.authority.lifecycle !== 'COMPLETE'
+    || statusModel.terminalPublication.state !== 'receipt-observed'
+  ) {
+    throw new FinalizerTerminalEvidenceError('TERMINAL_STATUS_READ_MODEL_HOLD');
+  }
   try {
-    writeTerminalDashboardSnapshot(projectRoot, sprint, metrics);
+    writeTerminalDashboardSnapshot(projectRoot, sprint, {
+      ...metrics,
+      totalTasks: statusModel.logicalProgress.total,
+      completedTasks: statusModel.logicalProgress.done,
+    });
   } catch (e) { debugLog('finalizeSprint:terminalDashboard', e); }
   try {
-    const done = metrics.completedTasks ?? 0;
-    const total = metrics.totalTasks ?? sprint.tasks.length;
+    const done = statusModel.logicalProgress.done;
+    const total = statusModel.logicalProgress.total;
     const noGo = metrics.noGoTasks ?? 0;
     const debt = metrics.techDebtTasks ?? 0;
     const unevaluated = metrics.unevaluatedTasks ?? 0;
@@ -3432,6 +3445,7 @@ export function publishAbortedSprintAuthority(
   const dashboardTempPath = `${dashboardPath}.tmp-${process.pid}-${randomUUID()}`;
   writeFileSync(dashboardTempPath, JSON.stringify(dashboard, null, 2) + '\n', 'utf-8');
   renameSync(dashboardTempPath, dashboardPath);
+  publishCanonicalRunStatusReadModel(projectRoot);
 }
 
 /**

@@ -127,6 +127,7 @@ import { captureVitestBaseline, writeBaseline } from './baseline-tracker.js';
 import {
   writePid, clearPid, writeStateSnapshot, createSprintStateSnapshot,
 } from './sprint-pid-manager.js';
+import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
 import type { SprintPidWriteAuthority } from './sprint-pid-manager.js';
 
 // ─── Node Builtins (sync I/O for kill-cascade metadata cleanup) ──
@@ -1826,6 +1827,10 @@ export async function runSprint(
             metricsJsonlSize,
           }),
         );
+        // The coordinator heartbeat is also the canonical persisted read-model
+        // producer. Status surfaces consume this generation/revision instead of
+        // racing task, dashboard and provider-observation files independently.
+        publishCanonicalRunStatusReadModel(projectRoot);
       } catch (error) {
         if (strict) throw error;
         debugLog('runSprint:writeStateSnapshot', error);

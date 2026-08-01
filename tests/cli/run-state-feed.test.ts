@@ -17,6 +17,7 @@ import {
   type StateFeedFs,
   type StateFeedInput,
 } from '../../src/cli/helpers/run-state-feed.js';
+import type { CanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
 
 // ─── fake fs seam ────────────────────────────────────────────────────────────
 
@@ -51,6 +52,50 @@ function sprintStateJson(overrides: Record<string, unknown> = {}): string {
   });
 }
 
+function activeReadModel(phase = 'EXECUTE'): CanonicalRunStatusReadModel {
+  const attemptIds = ['354-001', '354-002', '354-003'];
+  return {
+    schemaVersion: 1,
+    revision: 1,
+    runGeneration: 'lease:test-354',
+    publishedAt: '2026-08-01T00:00:00.000Z',
+    modelDigest: 'b'.repeat(64),
+    authority: {
+      schemaVersion: 1,
+      lifecycle: 'ACTIVE',
+      active: true,
+      resumable: false,
+      sprintId: 'sprint-354',
+      phase,
+      status: 'ACTIVE',
+      reason: null,
+      recoveryCommand: null,
+      finalizeCommand: null,
+      coordinator: 'alive',
+      conflicts: [],
+    },
+    logicalProgress: {
+      done: 0,
+      active: attemptIds.length,
+      blocked: 0,
+      total: attemptIds.length,
+      attemptCount: attemptIds.length,
+      lineages: attemptIds.map(id => ({ logicalTaskId: id, attemptIds: [id], attemptCount: 1, status: 'active' })),
+    },
+    providerConcurrency: [],
+    terminalPublication: { version: 1, state: 'open', receipt: null },
+    holds: [],
+  } as CanonicalRunStatusReadModel;
+}
+
+function readActiveFeed(fs: StateFeedFs): ReturnType<typeof readLiveFooterState> {
+  return readLiveFooterState({
+    projectRoot: ROOT,
+    fs,
+    readRunStatusReadModel: () => activeReadModel(),
+  });
+}
+
 // ─── computeLiveFooterState — pure core ─────────────────────────────────────
 
 describe('computeLiveFooterState — pure core', () => {
@@ -63,6 +108,47 @@ describe('computeLiveFooterState — pure core', () => {
 
   it('returns an entirely empty state when nothing is known (idle collapse upstream)', () => {
     expect(computeLiveFooterState(baseInput())).toEqual({});
+  });
+
+  it('uses persisted IDLE authority to suppress stale sprint-state and heartbeat projections', () => {
+    const runStatusReadModel = {
+      schemaVersion: 1,
+      revision: 9,
+      runGeneration: null,
+      publishedAt: '2026-08-01T00:00:00.000Z',
+      modelDigest: 'a'.repeat(64),
+      authority: {
+        schemaVersion: 1,
+        lifecycle: 'IDLE',
+        active: false,
+        resumable: false,
+        sprintId: null,
+        phase: null,
+        status: null,
+        reason: null,
+        recoveryCommand: null,
+        finalizeCommand: null,
+        coordinator: 'absent',
+        conflicts: [],
+      },
+      logicalProgress: { done: 0, active: 0, blocked: 0, total: 0, attemptCount: 0, lineages: [] },
+      providerConcurrency: [],
+      terminalPublication: { version: 1, state: 'open', receipt: null },
+      holds: [],
+    } as CanonicalRunStatusReadModel;
+    const state = computeLiveFooterState({
+      ...baseInput(),
+      runStatusReadModel,
+      sprintState: { sprintId: 'sprint-stale', phase: 'EXECUTE', taskIds: ['stale-001'] },
+      heartbeats: [{ taskId: 'stale-001' }],
+    });
+    expect(state.running).toBeUndefined();
+    expect(state.workers).toBeUndefined();
+    expect(state.statusReadModel).toEqual({
+      state: 'persisted',
+      revision: 9,
+      modelDigest: 'a'.repeat(64),
+    });
   });
 
   it('one active worker -> "<taskId> · <phase>"', () => {
@@ -175,7 +261,7 @@ describe('readLiveFooterState — fs-fake seam', () => {
       },
       { [TASKS]: ['task-354-001.hb', 'task-354-002.result'] },
     );
-    const state = readLiveFooterState({ projectRoot: ROOT, fs });
+    const state = readActiveFeed(fs);
     expect(state.running).toBe('354-001 · EXECUTE');
     expect(state.startedAt).toBe('2026-07-01T23:05:46.765Z');
     expect(state.next).toBe('354-003');
@@ -198,7 +284,7 @@ describe('readLiveFooterState — fs-fake seam', () => {
       },
       { [TASKS]: ['task-354-001.hb', 'task-354-002.hb'] },
     );
-    const state = readLiveFooterState({ projectRoot: ROOT, fs });
+    const state = readActiveFeed(fs);
     expect(state.running).toBe('354-002 · EXECUTE');
   });
 
@@ -213,8 +299,8 @@ describe('readLiveFooterState — fs-fake seam', () => {
         throw new Error('EACCES');
       },
     };
-    expect(() => readLiveFooterState({ projectRoot: ROOT, fs })).not.toThrow();
-    const state = readLiveFooterState({ projectRoot: ROOT, fs });
+    expect(() => readActiveFeed(fs)).not.toThrow();
+    const state = readActiveFeed(fs);
     expect(state.running).toBe('sprint-354 · EXECUTE');
   });
 
@@ -222,7 +308,7 @@ describe('readLiveFooterState — fs-fake seam', () => {
     const fs = makeFakeFs({
       [PROVIDER_CACHE]: JSON.stringify({ provider: { name: 'claude', healthy: true }, auth: 'logged-in' }),
     });
-    const state = readLiveFooterState({ projectRoot: ROOT, fs });
+    const state = readActiveFeed(fs);
     expect(state.provider).toEqual({ name: 'claude', healthy: true });
     expect(state.auth).toBe('logged-in');
   });
@@ -239,11 +325,26 @@ describe('createRunStateFeed', () => {
   it('returns a () => LiveFooterState that re-reads the seam on every call', () => {
     const files: Record<string, string> = { [SPRINT_STATE]: sprintStateJson({ phase: 'PLAN', taskIds: [] }) };
     const fs = makeFakeFs(files, {});
-    const feed = createRunStateFeed({ projectRoot: ROOT, fs });
+    const feed = createRunStateFeed({
+      projectRoot: ROOT,
+      fs,
+      readRunStatusReadModel: () => {
+        const phase = (JSON.parse(files[SPRINT_STATE]!) as { phase: string }).phase;
+        return activeReadModel(phase);
+      },
+    });
 
-    expect(feed()).toEqual({ running: 'sprint-354 · PLAN', startedAt: '2026-07-01T23:05:46.765Z' });
+    expect(feed()).toMatchObject({
+      running: 'sprint-354 · PLAN',
+      startedAt: '2026-07-01T23:05:46.765Z',
+      statusReadModel: { state: 'persisted', revision: 1 },
+    });
 
     files[SPRINT_STATE] = sprintStateJson({ phase: 'EVALUATE', taskIds: [] });
-    expect(feed()).toEqual({ running: 'sprint-354 · EVALUATE', startedAt: '2026-07-01T23:05:46.765Z' });
+    expect(feed()).toMatchObject({
+      running: 'sprint-354 · EVALUATE',
+      startedAt: '2026-07-01T23:05:46.765Z',
+      statusReadModel: { state: 'persisted', revision: 1 },
+    });
   });
 });

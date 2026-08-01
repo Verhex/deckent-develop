@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, posix, relative, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { detectDeckentRepo } from '../orchestra/self-modifying-detector.js';
 
-export const BUILD_IDENTITY_SCHEMA_VERSION = 1 as const;
+export const BUILD_IDENTITY_SCHEMA_VERSION = 2 as const;
 export const BUILD_IDENTITY_RELATIVE_PATH = join('dist', 'build-identity.json');
 export const CROSS_CHECKOUT_BINARY_OVERRIDE_ENV = 'DECKENT_ALLOW_CROSS_CHECKOUT_BINARY' as const;
 
@@ -22,13 +22,21 @@ export interface DeckentBuildIdentity {
   readonly packageName: 'deckent';
   readonly packageVersion: string;
   readonly sourceRootSha256: string;
+  readonly sourceTreeSha256: string;
+  readonly sourceTreeFileCount: number;
+}
+
+export interface DeckentSourceTreeIdentity {
+  readonly sourceTreeSha256: string;
+  readonly sourceTreeFileCount: number;
 }
 
 export type WorktreeBinaryIssue =
   | 'runtime-root-mismatch'
   | 'build-identity-missing'
   | 'build-identity-invalid'
-  | 'build-root-mismatch';
+  | 'build-root-mismatch'
+  | 'build-source-mismatch';
 
 export type WorktreeBinaryAuthorityDecision =
   | {
@@ -56,6 +64,7 @@ interface EvaluateWorktreeBinaryAuthorityOptions {
   readonly platform?: NodeJS.Platform;
   readonly isDeckentCheckout?: boolean;
   readonly projectRootSha256?: string;
+  readonly projectSourceTreeIdentity?: DeckentSourceTreeIdentity;
 }
 
 interface ResolveWorktreeBinaryAuthorityOptions {
@@ -72,6 +81,81 @@ function canonicalRoot(root: string): string {
   } catch {
     return resolve(root);
   }
+}
+
+const SOURCE_INPUT_EXTENSIONS = Object.freeze(['.ts', '.tsx', '.json', '.md', '.template']);
+const SOURCE_INPUT_EXCLUDED_DIRECTORIES = new Set(['dashboard', 'desktop']);
+const SOURCE_INPUT_FILE_LIMIT = 100_000;
+const SOURCE_INPUT_MAX_BYTES = 64 * 1024 * 1024;
+
+function sourceInputFiles(root: string): string[] {
+  const files: string[] = [];
+  const addTree = (directory: string, atSourceRoot: boolean): void => {
+    for (const entry of readdirSync(directory).sort()) {
+      if (atSourceRoot && SOURCE_INPUT_EXCLUDED_DIRECTORIES.has(entry)) continue;
+      const path = join(directory, entry);
+      const stat = lstatSync(path, { bigint: true });
+      if (stat.isSymbolicLink()) throw new Error(`E_BUILD_SOURCE_SYMLINK:${path}`);
+      if (stat.isDirectory()) {
+        addTree(path, false);
+        continue;
+      }
+      if (!stat.isFile()) continue;
+      if (!SOURCE_INPUT_EXTENSIONS.some(extension => entry.endsWith(extension))) continue;
+      files.push(path);
+      if (files.length > SOURCE_INPUT_FILE_LIMIT) {
+        throw new Error('E_BUILD_SOURCE_FILE_LIMIT');
+      }
+    }
+  };
+  for (const name of ['package.json', 'tsconfig.json']) {
+    const path = join(root, name);
+    if (existsSync(path)) files.push(path);
+  }
+  const source = join(root, 'src');
+  if (!existsSync(source)) throw new Error('E_BUILD_SOURCE_TREE_MISSING');
+  addTree(source, true);
+  return files.sort((left, right) => relative(root, left).localeCompare(relative(root, right)));
+}
+
+function identityCheckedSourceBytes(path: string): Buffer {
+  const before = lstatSync(path, { bigint: true });
+  if (
+    !before.isFile()
+    || before.isSymbolicLink()
+    || before.nlink !== 1n
+    || before.size > BigInt(SOURCE_INPUT_MAX_BYTES)
+  ) throw new Error(`E_BUILD_SOURCE_INPUT_UNSAFE:${path}`);
+  const bytes = readFileSync(path);
+  const after = lstatSync(path, { bigint: true });
+  if (
+    after.dev !== before.dev
+    || after.ino !== before.ino
+    || after.size !== before.size
+    || after.mtimeNs !== before.mtimeNs
+    || BigInt(bytes.byteLength) !== before.size
+  ) throw new Error(`E_BUILD_SOURCE_INPUT_CHANGED:${path}`);
+  return bytes;
+}
+
+export function buildSourceTreeIdentity(root: string): DeckentSourceTreeIdentity {
+  const canonical = canonicalRoot(root);
+  const hash = createHash('sha256');
+  const files = sourceInputFiles(canonical);
+  for (const path of files) {
+    const relativePath = relative(canonical, path).split(/[\\/]/u).join('/');
+    const bytes = identityCheckedSourceBytes(path);
+    hash.update(relativePath);
+    hash.update('\0');
+    hash.update(String(bytes.byteLength));
+    hash.update('\0');
+    hash.update(createHash('sha256').update(bytes).digest('hex'));
+    hash.update('\n');
+  }
+  return Object.freeze({
+    sourceTreeSha256: hash.digest('hex'),
+    sourceTreeFileCount: files.length,
+  });
 }
 
 export function buildSourceRootSha256(root: string): string {
@@ -94,6 +178,8 @@ export function parseBuildIdentity(raw: string): DeckentBuildIdentity | undefine
     'packageVersion',
     'schemaVersion',
     'sourceRootSha256',
+    'sourceTreeFileCount',
+    'sourceTreeSha256',
   ];
   if (keys.length !== expectedKeys.length || keys.some((key, index) => key !== expectedKeys[index])) {
     return undefined;
@@ -105,6 +191,10 @@ export function parseBuildIdentity(raw: string): DeckentBuildIdentity | undefine
     || record['packageVersion'].length === 0
     || typeof record['sourceRootSha256'] !== 'string'
     || !/^[a-f0-9]{64}$/u.test(record['sourceRootSha256'])
+    || typeof record['sourceTreeSha256'] !== 'string'
+    || !/^[a-f0-9]{64}$/u.test(record['sourceTreeSha256'])
+    || !Number.isSafeInteger(record['sourceTreeFileCount'])
+    || (record['sourceTreeFileCount'] as number) < 1
   ) {
     return undefined;
   }
@@ -114,6 +204,8 @@ export function parseBuildIdentity(raw: string): DeckentBuildIdentity | undefine
     packageName: 'deckent',
     packageVersion: record['packageVersion'],
     sourceRootSha256: record['sourceRootSha256'],
+    sourceTreeSha256: record['sourceTreeSha256'],
+    sourceTreeFileCount: record['sourceTreeFileCount'] as number,
   };
 }
 
@@ -133,8 +225,10 @@ function decisionForIssue(
   issue: WorktreeBinaryIssue,
   options: EvaluateWorktreeBinaryAuthorityOptions,
 ): WorktreeBinaryAuthorityDecision {
+  const crossCheckoutOverrideEligible = issue === 'runtime-root-mismatch'
+    || issue === 'build-root-mismatch';
   return {
-    status: options.override ? 'override' : 'hold',
+    status: options.override && crossCheckoutOverrideEligible ? 'override' : 'hold',
     issue,
     projectRoot: options.projectRoot,
     runtimePackageRoot: options.runtimePackageRoot,
@@ -170,6 +264,15 @@ export function evaluateWorktreeBinaryAuthority(
     ?? buildSourceRootSha256(options.projectRoot);
   if (options.buildIdentity.sourceRootSha256 !== projectRootSha256) {
     return decisionForIssue('build-root-mismatch', options);
+  }
+
+  const sourceTree = options.projectSourceTreeIdentity
+    ?? buildSourceTreeIdentity(options.projectRoot);
+  if (
+    options.buildIdentity.sourceTreeSha256 !== sourceTree.sourceTreeSha256
+    || options.buildIdentity.sourceTreeFileCount !== sourceTree.sourceTreeFileCount
+  ) {
+    return decisionForIssue('build-source-mismatch', options);
   }
 
   return { status: 'allow', reason: 'matching-build-identity' };
@@ -220,5 +323,8 @@ export function resolveWorktreeBinaryAuthority(
     ...(build.state ? { buildIdentityState: build.state } : {}),
     override: options.env?.[CROSS_CHECKOUT_BINARY_OVERRIDE_ENV] === '1',
     platform: options.platform,
+    projectSourceTreeIdentity: runtimeKind === 'dist' && build.identity
+      ? buildSourceTreeIdentity(projectRoot)
+      : undefined,
   });
 }

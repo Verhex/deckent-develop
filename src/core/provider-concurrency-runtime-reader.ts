@@ -17,6 +17,12 @@ import { ProviderExecutionObservationStore } from './provider-execution-observat
  */
 export function readProviderConcurrencyRuntime(
   projectRoot: string,
+  options: {
+    /** Exact task identities belonging to the current persisted run revision. */
+    readonly currentTaskIds?: ReadonlySet<string>;
+    /** Exact host-owned execution attempts currently in dispatched state. */
+    readonly currentAttemptIdsByTaskId?: ReadonlyMap<string, ReadonlySet<string>>;
+  } = {},
 ): readonly ProviderConcurrencyRuntimeProjection[] {
   const dbPath = join(projectRoot, '.deckent', 'provider-execution-observations.db');
   if (!existsSync(dbPath)) return [];
@@ -26,13 +32,28 @@ export function readProviderConcurrencyRuntime(
     readOnly: true,
   });
   try {
-    return Object.freeze(store.listProviderPrincipalDigests().map(providerPrincipalDigest => (
-      projectProviderConcurrencyRuntime({
+    return Object.freeze(store.listProviderPrincipalDigests().map(providerPrincipalDigest => {
+      const allIntervals = store.listIntervals(providerPrincipalDigest);
+      const isCurrent = (interval: typeof allIntervals[number]): boolean => {
+        if (options.currentTaskIds === undefined) return true;
+        if (!options.currentTaskIds.has(interval.taskId)) return false;
+        const exactAttempts = options.currentAttemptIdsByTaskId?.get(interval.taskId);
+        return exactAttempts === undefined ? true : exactAttempts.has(interval.attemptId);
+      };
+      const intervals = allIntervals.filter(isCurrent);
+      const unresolvedOpenIntervals = options.currentTaskIds === undefined
+        ? 0
+        : allIntervals.filter(interval => interval.end === null && !isCurrent(interval)).length;
+      return projectProviderConcurrencyRuntime({
         providerPrincipalDigest,
         capability: null,
-        intervals: store.listIntervals(providerPrincipalDigest),
-      })
-    )));
+        intervals,
+        unresolvedOpenIntervals,
+        observationScope: options.currentTaskIds === undefined
+          ? 'all-observed'
+          : 'exact-task-set',
+      });
+    }));
   } finally {
     store.close();
   }

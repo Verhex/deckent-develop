@@ -61,6 +61,10 @@ export interface ProviderConcurrencyRuntimeProjectionRequest {
   readonly capability: ProviderConcurrencyCapabilityEvidence | null;
   /** Bounded direct provider-runtime intervals for this exact principal only. */
   readonly intervals: readonly StoredProviderExecutionInterval[];
+  /** Open observations outside the exact run/task scope projected by the caller. */
+  readonly unresolvedOpenIntervals?: number;
+  /** Whether intervals are the complete observation set or an exact run task-set projection. */
+  readonly observationScope?: 'all-observed' | 'exact-task-set';
 }
 
 export interface ProviderConcurrencyRuntimeProjection {
@@ -70,6 +74,9 @@ export interface ProviderConcurrencyRuntimeProjection {
   readonly admittedCeiling: number | 'unknown';
   readonly currentAttained: number;
   readonly peakAttained: number;
+  /** Retained open observations which are not current run execution authority. */
+  readonly unresolvedOpenIntervals: number;
+  readonly observationScope: 'all-observed' | 'exact-task-set';
   readonly evidenceRefs: readonly string[];
 }
 
@@ -120,6 +127,11 @@ export function projectProviderConcurrencyRuntime(
   request: ProviderConcurrencyRuntimeProjectionRequest,
 ): ProviderConcurrencyRuntimeProjection {
   assertProviderPrincipalDigest(request.providerPrincipalDigest);
+  const unresolvedOpenIntervals = request.unresolvedOpenIntervals ?? 0;
+  if (!Number.isSafeInteger(unresolvedOpenIntervals) || unresolvedOpenIntervals < 0) {
+    throw new TypeError('unresolvedOpenIntervals must be a non-negative safe integer');
+  }
+  const observationScope = request.observationScope ?? 'all-observed';
   const currentAttained = request.intervals.reduce((count, interval) => {
     if (interval.providerPrincipalDigest !== request.providerPrincipalDigest) {
       throw new ProviderLimitAdmissionError(
@@ -137,6 +149,8 @@ export function projectProviderConcurrencyRuntime(
       admittedCeiling: 'unknown',
       currentAttained,
       peakAttained: peakAttainedFromIntervals(request.providerPrincipalDigest, request.intervals),
+      unresolvedOpenIntervals,
+      observationScope,
       evidenceRefs: capability?.evidenceRefs ?? [],
     };
   }
@@ -146,6 +160,8 @@ export function projectProviderConcurrencyRuntime(
     admittedCeiling: capability.effectiveAdmittedCeiling,
     currentAttained,
     peakAttained: peakAttainedFromIntervals(request.providerPrincipalDigest, request.intervals),
+    unresolvedOpenIntervals,
+    observationScope,
     evidenceRefs: capability.evidenceRefs,
   };
 }

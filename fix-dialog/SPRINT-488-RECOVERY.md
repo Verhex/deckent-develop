@@ -318,7 +318,23 @@ Fable şu soruları file:line kanıtıyla adjudicate etsin:
 | 2026-08-01 | R1 resume lease/snapshot | `sprint-pid-manager.test.ts` + TypeScript + diff | 28/28 PASS; fresh/resume shared writer and exact authority projection covered |
 | 2026-08-01 | R1 adjacent recovery scope | 7 resume/recovery test files | 89/90 PASS; six files green, sole failure is an unchanged stale `commands/resume` mock expecting pre-connector options and is outside this diff |
 
-## 10. Residual / owner-decision register
+## 10. Owner-authorized terminal recovery outcome
+
+Owner approvalünden sonra Sprint-488 normal finalizer'a sokulmadı. Canonical force-recovery
+implementation'ı exact coordinator containment sonrası generation-fenced `ABORTED` receipt
+yayımladı: 20 logical task / 33 attempt içinde 8 `DONE`, 1 settled `NO_GO` ve 11 unresolved
+lineage korundu. Ardından cleanup yalnız receipt ile aynı sprint/outcome authority'sini kabul etti,
+Sprint-488'e ait live artifact'leri temizledi ve bağımsız XVerify task/result evidence'ını korudu.
+Canonical status `IDLE`, coordinator `absent`, `resumable=false` oldu; force yolunda retrospective,
+learning veya config mutation çalışmadı.
+
+Historical Sprint-488 cleanup, archive-before-delete hardening'inin son implementation adımından
+önce çalıştırıldığı için task/result JSON'ları archive'da yoktur. Terminal receipt, logs, runtime
+events/evaluations/routing evidence korunur. Sonraki isolated real-dist fixture owned task/result
+bytes'larının archive readback'i doğrulanmadan live kopyanın silinmediğini ve foreign XVerify
+artifact'inin korunmasını kanıtladı.
+
+## 11. Residual / owner-decision register
 
 Canonical xverify provider authority hâlâ açık residual'dır. Numeric/provider limit policy veya
 fabricated authority yazılmayacak. Ayrıca semantic verdict / production-wiring isolation
@@ -328,5 +344,39 @@ source düzeyinde bağlandı; fresh live verifier replay kanıtı henüz yoktur.
 Independent review punch-list 9 (subprocess verification-isolation parity) ilgili canonical program
 diliminde çözülmek üzere açıktır; bu source patch'leri hiçbir MASTER satırını DONE yapmaz.
 Canonical xverify ancak XVERIFY-WIRE/provider authority kapandıktan sonra tekrar zorunlu yapılır.
-Build, Sprint replay, finalize/cleanup ve commit/push bu implementation authority'sine dahil
-değildir; Sprint-488 forensic PAUSED/FIX durumu korunmuştur.
+Sprint-488 artık `ABORTED → cleanup → IDLE` terminal gerçeğindedir ve recovery implementation'ı
+`e941a66a` commit'iyle korunur. Fresh owner-started replay hâlâ yapılmadı. Canonical status şu anda
+`IDLE` yayımlasa da provider execution observation store'daki dört Sprint-488 interval'ı `end=null`
+kaldığı için ayrı status consumer'ı `currentAttained=4` göstermektedir. Bu tarihsel provider
+observation'ı silinmeyecek veya IDLE presentation katmanında gizlenmeyecek; exact run/generation
+attribution ve verified termination reconciliation ile `RECOVERY-BORN-488-STATUS-PROJECTION-001`
+altında çözülecektir.
+
+## 12. Approved next implementation train — status/recovery truth
+
+Owner approval: 2026-08-01. Dogfood execution bloke olduğu için implementation typed manual
+recovery seam'inde ilerler; ilk güvenli sınırdan sonra owner-started dogfood canary'ye döner.
+
+1. Run generation/revision/digest bağlı, atomic ve persisted canonical read model üret.
+2. Provider open interval'larını exact active task/attempt authority'sine bağla. Retired run'a ait
+   kapanmamış observation `currentAttained` değildir; silinmeyen typed forensic HOLD evidence'ıdır.
+3. CLI, MCP, Terminal, Desktop, dashboard, metrics, notification ve finalizer aynı snapshot
+   revision/digest'ini tüketir; hiçbir adapter task/dashboard/DB tarayarak lifecycle türetmez.
+4. Source/dist build identity mismatch'i plan/start/resume öncesi typed admission HOLD olur.
+5. Recover exact `resumed-running | resumed-paused | completed | aborted | failed` sonucu ve sonraki
+   authority komutunu yayımlar; generic error terminal kontratı değildir.
+6. Scoped/hermetic contracts, gerçek built-binary proof ve Linux/macOS/Windows-native/WSL adapter
+   karar matrisi geçmeden MASTER satırı DONE olmaz veya dogfood replay başlamaz.
+
+### Acceptance matrix
+
+| Concern | Required truth |
+|---|---|
+| Lifecycle | Tek persisted revision; IDLE/ACTIVE/PAUSED/ORPHANED/COMPLETE/ABORTED bütün yüzeylerde byte-semantically aynı |
+| Logical work | Original/FIX/XFIX attempt'leri tek logical denominator; exact attempt identity korunur |
+| Provider concurrency | Yalnız current run'a exact-attributed open provider windows sayılır; retired/stale windows ayrı HOLD evidence olur |
+| Terminal receipt | Receipt outcome/lifecycle/digest aynı revision'da; force hiçbir zaman COMPLETE üretmez |
+| Recovery | Exit code, JSON/human output ve next authority aynı typed outcome'u taşır |
+| Build identity | Aktif host adapter source/dist mismatch'te dispatch öncesi fail-closed |
+| Every environment | Platform adapter capability yoksa honest unsupported/HOLD; POSIX inference yok |
+| Scale/tenancy | Snapshot tenant/project/run/generation scoped, bounded ve atomic; global mutable singleton yok |

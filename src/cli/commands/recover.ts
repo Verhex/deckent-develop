@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import type { Command } from 'commander';
 import { restoreFromSnapshot } from '../../orchestra/task-restoration.js';
 import { print, printError } from '../helpers/output.js';
@@ -6,6 +7,12 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import {
+  readRecoveryResumeOutcome,
+  recoveryResumeOutcomePath,
+  removeRecoveryResumeOutcome,
+  type RecoveryResumeOutcome,
+} from '../../core/recovery-resume-outcome.js';
 import {
   readSprintRecoverySettlementIdentity,
   runSprintRecoveryOperation,
@@ -17,6 +24,13 @@ export interface ResumeRecoveryProcessOptions {
   autoApprove?: boolean;
   dryRun?: boolean;
   acknowledgeScopePaths?: boolean;
+  machineReadable?: boolean;
+}
+
+export interface ResumeRecoveryProcessResult {
+  readonly dryRun: boolean;
+  readonly exitCode: number;
+  readonly outcome: RecoveryResumeOutcome | null;
 }
 
 /**
@@ -34,7 +48,7 @@ export async function runResumeRecoveryProcess(
     spawnProcess?: typeof spawn;
   } = {},
   lang = 'en',
-): Promise<number> {
+): Promise<ResumeRecoveryProcessResult> {
   const authority = readCanonicalRunStatus(root);
   if (
     authority.sprintId !== sprintId
@@ -50,17 +64,59 @@ export async function runResumeRecoveryProcess(
   if (opts.autoApprove) args.push('--auto-approve');
   if (opts.dryRun) args.push('--dry-run');
   if (opts.acknowledgeScopePaths) args.push('--force-scope');
+  const outcomePath = opts.dryRun
+    ? null
+    : recoveryResumeOutcomePath(root, randomUUID());
+  if (outcomePath) args.push('--outcome-file', outcomePath);
   const spawnProcess = runtime.spawnProcess ?? spawn;
-  return await new Promise<number>((resolve, reject) => {
-    const child = spawnProcess(execPath, args, {
-      cwd: root,
-      stdio: 'inherit',
-      env: process.env,
-      shell: false,
+  let childExitCode = 1;
+  try {
+    childExitCode = await new Promise<number>((resolve, reject) => {
+      const child = spawnProcess(execPath, args, {
+        cwd: root,
+        stdio: opts.machineReadable ? ['inherit', 'ignore', 'ignore'] : 'inherit',
+        env: process.env,
+        shell: false,
+      });
+      child.once('error', reject);
+      child.once('close', code => resolve(code ?? 1));
     });
-    child.once('error', reject);
-    child.once('close', code => resolve(code ?? 1));
-  });
+    if (!outcomePath) {
+      return { dryRun: true, exitCode: childExitCode, outcome: null };
+    }
+    const outcome = readRecoveryResumeOutcome(root, outcomePath, sprintId);
+    if (!outcome || outcome.exitCode !== childExitCode) {
+      const authorityAfter = readCanonicalRunStatus(root, { sprintIdHint: sprintId });
+      return {
+        dryRun: false,
+        exitCode: 1,
+        outcome: {
+          schemaVersion: 1,
+          sprintId,
+          outcome: 'failed',
+          exitCode: 1,
+          observedStatus: authorityAfter.status,
+          observedAt: new Date().toISOString(),
+          reason: !outcome
+            ? 'resume-outcome-evidence-missing-or-invalid'
+            : `resume-outcome-exit-mismatch:${childExitCode}:${outcome.exitCode}`,
+          nextAuthority: {
+            lifecycle: authorityAfter.lifecycle,
+            resumable: authorityAfter.sprintId === sprintId && authorityAfter.resumable,
+            recoveryCommand: authorityAfter.sprintId === sprintId
+              ? authorityAfter.recoveryCommand
+              : null,
+            finalizeCommand: authorityAfter.sprintId === sprintId
+              ? authorityAfter.finalizeCommand
+              : null,
+          },
+        },
+      };
+    }
+    return { dryRun: false, exitCode: outcome.exitCode, outcome };
+  } finally {
+    if (outcomePath) removeRecoveryResumeOutcome(root, outcomePath);
+  }
 }
 
 function assertCanonicalSprintId(sprintId: string, lang: string): void {
@@ -136,16 +192,23 @@ export function registerRecover(program: Command): void {
         if (opts.resume && opts.restoreTasks) {
           throw new Error(getMessage('recover.resume_restore_conflict', lang));
         }
-        if (opts.resume && opts.json) {
-          throw new Error(getMessage('recover.resume_json_conflict', lang));
-        }
         if (opts.resume) {
-          const exitCode = await runResumeRecoveryProcess(root, sprintId, {
+          const result = await runResumeRecoveryProcess(root, sprintId, {
             autoApprove: opts.autoApprove,
             dryRun: opts.dryRun,
             acknowledgeScopePaths: opts.forceScope,
+            machineReadable: opts.json,
           }, {}, lang);
-          if (exitCode !== 0) process.exitCode = exitCode;
+          if (opts.json) {
+            print(JSON.stringify(result.outcome ?? {
+              schemaVersion: 1,
+              sprintId,
+              outcome: result.exitCode === 0 ? 'resumed-running' : 'failed',
+              exitCode: result.exitCode,
+              dryRun: true,
+            }));
+          }
+          if (result.exitCode !== 0) process.exitCode = result.exitCode;
           return;
         }
         if (!opts.dryRun && opts.json && !opts.force) {

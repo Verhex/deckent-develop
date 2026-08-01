@@ -36,6 +36,14 @@ vi.mock('../../../src/core/run-status-authority.js', () => ({
   })),
 }));
 
+vi.mock('../../../src/core/run-status-read-model.js', () => ({
+  publishCanonicalRunStatusReadModel: vi.fn(() => ({
+    schemaVersion: 1,
+    revision: 1,
+    modelDigest: 'a'.repeat(64),
+  })),
+}));
+
 const mockCleanupMemStore = {
   totalCount: vi.fn().mockReturnValue(100),
   close: vi.fn(),

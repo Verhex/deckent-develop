@@ -22,6 +22,7 @@ export const I18N_DIR = join(DECKENT_DIR, 'i18n');
 //     runtime = ephemeral per-run state, nervous = nervous-system files) ──
 export const SETTINGS_DIR = join(DECKENT_DIR, 'settings');
 export const RUNTIME_DIR = join(DECKENT_DIR, 'runtime');
+export const RUN_STATUS_READ_MODEL_FILE = join(RUNTIME_DIR, 'run-status-read-model.json');
 export const JOBS_DIR = join(RUNTIME_DIR, 'jobs');
 export const DECISIONS_LOG_DIR = join(RUNTIME_DIR, 'decisions');
 // Sprint 157 T-001: per-attempt forensic record of every Brain evaluation

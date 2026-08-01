@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   BUILD_IDENTITY_SCHEMA_VERSION,
   buildSourceRootSha256,
+  buildSourceTreeIdentity,
   evaluateWorktreeBinaryAuthority,
   parseBuildIdentity,
   shouldCheckWorktreeBinaryAuthority,
@@ -21,20 +22,33 @@ function makeRoot(name: string): string {
 
 function makeDeckentCheckout(root: string): void {
   mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, 'src'), { recursive: true });
   writeFileSync(
     join(root, 'package.json'),
     `${JSON.stringify({ name: 'deckent', version: '1.2.3' })}\n`,
     'utf-8',
   );
+  writeFileSync(join(root, 'tsconfig.json'), `${JSON.stringify({ include: ['src/**/*.ts'] })}\n`);
+  writeFileSync(join(root, 'src', 'entry.ts'), 'export const value = 1;\n');
 }
 
 function identityFor(root: string): DeckentBuildIdentity {
+  makeDeckentCheckout(root);
+  const sourceTree = buildSourceTreeIdentity(root);
   return {
     schemaVersion: BUILD_IDENTITY_SCHEMA_VERSION,
     packageName: 'deckent',
     packageVersion: '1.2.3',
     sourceRootSha256: buildSourceRootSha256(root),
+    sourceTreeSha256: sourceTree.sourceTreeSha256,
+    sourceTreeFileCount: sourceTree.sourceTreeFileCount,
   };
+}
+
+function foreignIdentity(): DeckentBuildIdentity {
+  const root = makeRoot('deckent-stale-build');
+  makeDeckentCheckout(root);
+  return identityFor(root);
 }
 
 afterEach(() => {
@@ -76,6 +90,36 @@ describe('worktree binary authority', () => {
     })).toEqual({ status: 'allow', reason: 'matching-build-identity' });
   });
 
+  it('holds a same-root dist runtime when a build input changes after the manifest was minted', () => {
+    const root = makeRoot('deckent-source-drift');
+    makeDeckentCheckout(root);
+    const buildIdentity = identityFor(root);
+    writeFileSync(join(root, 'src', 'entry.ts'), 'export const value = 2;\n');
+
+    expect(evaluateWorktreeBinaryAuthority({
+      projectRoot: root,
+      runtimePackageRoot: root,
+      runtimeKind: 'dist',
+      buildIdentity,
+      override: false,
+    })).toMatchObject({ status: 'hold', issue: 'build-source-mismatch' });
+  });
+
+  it('never lets the cross-checkout diagnostic override bypass same-root source drift', () => {
+    const root = makeRoot('deckent-source-drift-override');
+    makeDeckentCheckout(root);
+    const buildIdentity = identityFor(root);
+    writeFileSync(join(root, 'src', 'entry.ts'), 'export const value = 3;\n');
+
+    expect(evaluateWorktreeBinaryAuthority({
+      projectRoot: root,
+      runtimePackageRoot: root,
+      runtimeKind: 'dist',
+      buildIdentity,
+      override: true,
+    })).toMatchObject({ status: 'hold', issue: 'build-source-mismatch' });
+  });
+
   it('holds when a Deckent checkout is driven by another worktree runtime', () => {
     const projectRoot = makeRoot('deckent-worktree-a');
     const runtimeRoot = makeRoot('deckent-worktree-b');
@@ -92,7 +136,7 @@ describe('worktree binary authority', () => {
 
   it.each([
     ['missing', undefined, 'build-identity-missing'],
-    ['stale root digest', { ...identityFor(makeRoot('deckent-stale-build')) }, 'build-root-mismatch'],
+    ['stale root digest', { ...foreignIdentity() }, 'build-root-mismatch'],
   ] as const)('holds a same-root dist runtime with %s identity', (_label, buildIdentity, issue) => {
     const root = makeRoot('deckent-same-root');
     makeDeckentCheckout(root);
@@ -147,6 +191,10 @@ describe('worktree binary authority', () => {
       platform: 'win32',
       isDeckentCheckout: true,
       projectRootSha256: buildIdentity.sourceRootSha256,
+      projectSourceTreeIdentity: {
+        sourceTreeSha256: buildIdentity.sourceTreeSha256,
+        sourceTreeFileCount: buildIdentity.sourceTreeFileCount,
+      },
     })).toEqual({ status: 'allow', reason: 'matching-build-identity' });
     expect(evaluateWorktreeBinaryAuthority({
       projectRoot: '/Repo/Deckent',
@@ -157,6 +205,10 @@ describe('worktree binary authority', () => {
       platform: 'linux',
       isDeckentCheckout: true,
       projectRootSha256: buildIdentity.sourceRootSha256,
+      projectSourceTreeIdentity: {
+        sourceTreeSha256: buildIdentity.sourceTreeSha256,
+        sourceTreeFileCount: buildIdentity.sourceTreeFileCount,
+      },
     })).toMatchObject({ status: 'hold', issue: 'runtime-root-mismatch' });
   });
 

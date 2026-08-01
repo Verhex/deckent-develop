@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { reconcileStatusResponse } from '../../src/api/status-reconcile.js';
+import { publishCanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
 
 // ─── helpers ─────────────────────────────────────────────────────────
 
@@ -25,6 +26,18 @@ function writeSprintState(root: string, state: Record<string, unknown>): void {
   const dir = join(root, '.deckent');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'sprint-state.json'), JSON.stringify(state), 'utf-8');
+}
+
+function writeLiveSprintState(root: string, state: Record<string, unknown>): void {
+  writeSprintState(root, state);
+  const sprintId = String(state['sprintId']);
+  const pids = join(root, '.deckent', 'pids');
+  mkdirSync(pids, { recursive: true });
+  writeFileSync(join(pids, `${sprintId}.pid`), JSON.stringify({
+    pid: process.pid,
+    startedAt: '2026-08-01T00:00:00.000Z',
+    leaseId: `lease-${sprintId}`,
+  }));
 }
 
 function buildStaleDash(sprintId = 'sprint-281'): unknown {
@@ -61,6 +74,7 @@ describe('reconcileStatusResponse', () => {
       updatedAt: '2026-06-11T09:10:00.000Z',
       taskIds: ['281-001', '281-002'],
     });
+    publishCanonicalRunStatusReadModel(root);
 
     const stale = buildStaleDash('sprint-281');
     const result = reconcileStatusResponse(root, stale) as Record<string, unknown>;
@@ -75,10 +89,26 @@ describe('reconcileStatusResponse', () => {
     expect(result['agents']).toEqual([]);
   });
 
+  it('overrides dashboard lifecycle/progress with the persisted read-model revision', () => {
+    writeLiveSprintState(root, {
+      sprintId: 'sprint-900',
+      phase: 'EVALUATE',
+      status: 'RUNNING',
+      taskIds: [],
+    });
+    publishCanonicalRunStatusReadModel(root, {
+      publishedAt: '2026-08-01T00:00:00.000Z',
+    });
+    const result = reconcileStatusResponse(root, buildStaleDash('sprint-wrong')) as Record<string, unknown>;
+    expect(result['sprint']).toMatchObject({ id: 'sprint-900', phase: 'EVALUATE', status: 'RUNNING' });
+    expect(result['statusReadModel']).toMatchObject({ state: 'persisted', revision: 1 });
+    expect(result['progress']).toMatchObject({ total: 0, attemptCount: 0 });
+  });
+
   // ── test 2: live sprint-state → dashboard data untouched ────────
 
   it('returns dashboard data unchanged when sprint-state is ACTIVE', () => {
-    writeSprintState(root, {
+    writeLiveSprintState(root, {
       sprintId: 'sprint-282',
       status: 'ACTIVE',
       phase: 'EXECUTE',
@@ -86,6 +116,7 @@ describe('reconcileStatusResponse', () => {
       updatedAt: '2026-06-11T10:05:00.000Z',
       taskIds: ['282-001', '282-002'],
     });
+    publishCanonicalRunStatusReadModel(root);
 
     const liveDash = buildStaleDash('sprint-282');
     const result = reconcileStatusResponse(root, liveDash) as Record<string, unknown>;
@@ -117,7 +148,7 @@ describe('reconcileStatusResponse', () => {
 
   // ── test 4: dashboard shows COMPLETE phase → reconciled to idle ──
 
-  it('returns idle when dashboard itself already shows a terminal phase', () => {
+  it('does not let a display-only terminal dashboard override persisted run authority', () => {
     writeSprintState(root, {
       sprintId: 'sprint-280',
       status: 'ACTIVE',
@@ -126,6 +157,7 @@ describe('reconcileStatusResponse', () => {
       updatedAt: '2026-06-10T09:15:00.000Z',
       taskIds: ['280-001'],
     });
+    publishCanonicalRunStatusReadModel(root);
 
     // Dashboard already stamped as COMPLETE by writeTerminalDashboardSnapshot
     const terminalDash = {
@@ -140,9 +172,10 @@ describe('reconcileStatusResponse', () => {
     const result = reconcileStatusResponse(root, terminalDash) as Record<string, unknown>;
     const sprint = result['sprint'] as Record<string, unknown>;
 
-    expect(sprint['phase']).toBe('IDLE');
-    expect(sprint['status']).toBe('IDLE');
-    expect(result['idle']).toBe(true);
+    expect(sprint['phase']).toBe('EXECUTE');
+    expect(sprint['status']).toBe('ACTIVE');
+    expect(result['idle']).toBeUndefined();
+    expect(result['statusReadModel']).toMatchObject({ state: 'persisted' });
   });
 
   // ── test 5: ABORTED sprint-state → idle ─────────────────────────
@@ -156,6 +189,7 @@ describe('reconcileStatusResponse', () => {
       updatedAt: '2026-06-09T08:05:00.000Z',
       taskIds: [],
     });
+    publishCanonicalRunStatusReadModel(root);
 
     const result = reconcileStatusResponse(root, buildStaleDash('sprint-279')) as Record<string, unknown>;
     const sprint = result['sprint'] as Record<string, unknown>;

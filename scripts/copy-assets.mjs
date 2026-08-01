@@ -36,6 +36,10 @@ const DEFAULT_DIST = join(ROOT, 'dist');
  *  docs-config.ts (seedDocsConfig) — without it `deckent init` silently falls
  *  back to an inline minimal docs.json. */
 const ASSET_EXTENSIONS = ['.json', '.md', '.template'];
+const SOURCE_INPUT_EXTENSIONS = ['.ts', '.tsx', '.json', '.md', '.template'];
+const SOURCE_INPUT_EXCLUDED_DIRECTORIES = new Set(['dashboard', 'desktop']);
+const SOURCE_INPUT_FILE_LIMIT = 100_000;
+const SOURCE_INPUT_MAX_BYTES = 64 * 1024 * 1024;
 
 /** Bin entries from package.json — must have execute bit (Sprint 154 audit A2.F6/A3.F1). */
 export const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
@@ -173,6 +177,57 @@ function readRegularFileIdentityChecked(path, maxBytes = 1024 * 1024) {
   }
 }
 
+function listBuildSourceInputs(root) {
+  const files = [];
+  const visit = (directory, atSourceRoot) => {
+    for (const entry of readdirSync(directory).sort()) {
+      if (atSourceRoot && SOURCE_INPUT_EXCLUDED_DIRECTORIES.has(entry)) continue;
+      const path = join(directory, entry);
+      const stat = lstatSync(path, { bigint: true });
+      if (stat.isSymbolicLink()) throw new Error(`E_BUILD_SOURCE_SYMLINK:${path}`);
+      if (stat.isDirectory()) {
+        visit(path, false);
+        continue;
+      }
+      if (!stat.isFile()) continue;
+      if (!SOURCE_INPUT_EXTENSIONS.some(extension => entry.endsWith(extension))) continue;
+      files.push(path);
+      if (files.length > SOURCE_INPUT_FILE_LIMIT) throw new Error('E_BUILD_SOURCE_FILE_LIMIT');
+    }
+  };
+  for (const name of ['package.json', 'tsconfig.json']) {
+    const path = join(root, name);
+    if (existsSync(path)) files.push(path);
+  }
+  const source = join(root, 'src');
+  if (!existsSync(source)) throw new Error('E_BUILD_SOURCE_TREE_MISSING');
+  visit(source, true);
+  return files.sort((left, right) => relative(root, left).localeCompare(relative(root, right)));
+}
+
+export function buildSourceTreeIdentity(root) {
+  const canonicalRoot = realpathSync.native(root);
+  const files = listBuildSourceInputs(canonicalRoot);
+  const hash = createHash('sha256');
+  for (const path of files) {
+    const relativePath = relative(canonicalRoot, path).split(sep).join('/');
+    const content = Buffer.from(
+      readRegularFileIdentityChecked(path, SOURCE_INPUT_MAX_BYTES),
+      'utf8',
+    );
+    hash.update(relativePath);
+    hash.update('\0');
+    hash.update(String(content.byteLength));
+    hash.update('\0');
+    hash.update(createHash('sha256').update(content).digest('hex'));
+    hash.update('\n');
+  }
+  return Object.freeze({
+    sourceTreeSha256: hash.digest('hex'),
+    sourceTreeFileCount: files.length,
+  });
+}
+
 /**
  * Bind a compiled dist tree to the exact source checkout that produced it.
  * The distributable manifest contains only a one-way SHA-256 of the canonical
@@ -208,11 +263,14 @@ export function writeBuildIdentity(
   if (typeof pkg.version !== 'string' || pkg.version.length === 0) {
     throw new Error('Cannot write Deckent build identity: package version is missing');
   }
+  const sourceTree = buildSourceTreeIdentity(canonicalRoot);
   const manifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     packageName: 'deckent',
     packageVersion: pkg.version,
     sourceRootSha256: createHash('sha256').update(canonicalRoot).digest('hex'),
+    sourceTreeSha256: sourceTree.sourceTreeSha256,
+    sourceTreeFileCount: sourceTree.sourceTreeFileCount,
   };
   assertDirectoryBinding(outputBinding);
   const manifestPath = join(outputBinding.path, 'build-identity.json');

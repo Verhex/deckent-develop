@@ -34,6 +34,7 @@ import {
 } from '../core/constants.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
+import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
 // Staged-settlement barrier (487-030): the wiring settlement decision producer.
 import { resolveProductionWiringContract } from '../core/production-wiring-contract.js';
 import { getDebtItems } from '../core/debt-store.js';
@@ -618,9 +619,9 @@ export function findReadyUndispatchedTaskIds(
  * EXECUTE→EVALUATE→RETRO→CLEANUP — every transition must now reach disk.
  *
  * Mutates `sprint.phase` and `sprint.status` in place so subsequent reads
- * of the in-memory Sprint reflect the transition. Fail-soft: any I/O error
- * is swallowed via debugLog so an unwritable state file never aborts the
- * Brain's lifecycle.
+ * of the in-memory Sprint reflect the transition. Persistence is fail-closed:
+ * continuing after either authority write fails would make every external
+ * supervisor consume a stale lifecycle generation.
  *
  * Sprint 161 Task 2 (T-003).
  */
@@ -630,13 +631,12 @@ export function persistPhaseTransition(
   phase: SprintPhase,
   status: SprintStatus,
 ): void {
-  try {
-    sprint.phase = phase;
-    sprint.status = status;
-    writeSprintState(projectRoot, sprint);
-  } catch (e) {
-    debugLog('persistPhaseTransition', e);
-  }
+  sprint.phase = phase;
+  sprint.status = status;
+  writeSprintState(projectRoot, sprint);
+  // Phase changes are material lifecycle mutations; publish immediately so
+  // status does not wait for the periodic coordinator heartbeat.
+  publishCanonicalRunStatusReadModel(projectRoot);
 }
 
 /**

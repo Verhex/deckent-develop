@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "11cbb551f206ca253bdc72c90098c5e7bafd890f284181a1158e7a68d957455c"
+    "value": "bceeea89511e67f5ad63c52b6cc96bb79572dc6be12ee1793e4d376f3edb1be0"
   },
   "summary": {
     "total": 309,
@@ -2415,7 +2415,7 @@
       "state": "OPEN",
       "updated": "2026-08-01",
       "definitionDigest": "9351804a3b66fabb554218fecf5477069a9c17705d17d7ad3fe1f4fdf3ba6051",
-      "progressDigest": "ff2b102157579f440f1dd21c4ca6707474692836cd2a61f62a1652c688a3e1c5",
+      "progressDigest": "08e0a41f8754b31c2912757f043e649ad4e5dc86ff0fb1c437cff1ac4376bf3c",
       "terminalClosureDigest": null
     },
     {
@@ -2426,7 +2426,7 @@
       "state": "OPEN",
       "updated": "2026-08-01",
       "definitionDigest": "c8b06bda4afa2814f5de7b3c6d6bb4140b880860262ecfb44c30ae70fd7b34af",
-      "progressDigest": "92cbe494f657f387399126d2fef67c561a5128509e9545a8ec94f75f1688aadf",
+      "progressDigest": "f43586cef4eeeefb061ebca0dac74293cbc3eeb8f22924b10db1151f0dd4c6db",
       "terminalClosureDigest": null
     },
     {
@@ -12868,7 +12868,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Resume returns a typed resumed-and-running, resumed-and-paused, completed, aborted or failed outcome with exact next authority; explicit force finalize never prints COMPLETE before receipt and can publish a fenced ABORTED settlement preserving unresolved/deferred lineages; cleanup admits only that exact terminal receipt and never deletes forensic evidence implicitly",
-      "evidence": "Sprint-488 owner-approved source-runtime recovery published a generation-fenced ABORTED receipt for 20 logical tasks/33 attempts with 8 DONE, 1 settled NO_GO and 11 unresolved attempts, then matching cleanup converged status to IDLE without deleting an unrelated xverify task. Force-finalize no longer enters normal retrospective/learning/config finalization; receipt outcome is part of CAS identity and cleanup requires lifecycle/outcome parity. Cleanup now archives owned task/result evidence with byte readback verification before deleting live copies, so deletion is explicit and recoverable rather than implicit. Scoped contracts pass 115/115, build is clean, isolated built-binary containment passes and an external real-dist cleanup fixture proves byte-exact owned JSON/result archive plus foreign preservation. Historical Sprint-488 cleanup preceded archive-all hardening, so its task/result JSONs are absent while receipt/log/runtime evidence remains. Typed resume outcome parity, native platform and fresh dogfood replay remain open",
+      "evidence": "Sprint-488 owner-approved source-runtime recovery published a generation-fenced ABORTED receipt for 20 logical tasks/33 attempts with 8 DONE, 1 settled NO_GO and 11 unresolved attempts, then matching cleanup converged status to IDLE without deleting an unrelated xverify task. Force-finalize no longer enters normal retrospective/learning/config finalization; receipt outcome is part of CAS identity and cleanup requires lifecycle/outcome parity. Cleanup now archives owned task/result evidence with byte readback verification before deleting live copies, so deletion is explicit and recoverable rather than implicit. Scoped contracts pass 115/115, build is clean, isolated built-binary containment passes and an external real-dist cleanup fixture proves byte-exact owned JSON/result archive plus foreign preservation. Historical Sprint-488 cleanup preceded archive-all hardening, so its task/result JSONs are absent while receipt/log/runtime evidence remains. The resume subprocess now must atomically publish a schema-v1 typed outcome bound to the exact sprint; parent/child exit-code disagreement or missing evidence is `failed`, while durable PAUSED is `resumed-paused` with exact resume/finalize authority and operator-action exit 2 rather than a generic internal error. Recovery-focused source proof passes 36/36. Fresh real PAUSED→resume outcomes, native platform matrix and dogfood replay remain open",
       "updated": "2026-08-01"
     },
     {
@@ -12909,7 +12909,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "CLI, MCP, Terminal, Desktop, dashboard, metrics, notification and finalizer consume one revisioned persisted snapshot with exact logical and attempt denominators; active/provider concurrency cannot remain non-zero after authority retirement; source/dist digest mismatch blocks dogfood admission and no adapter re-infers state",
-      "evidence": "Sprint-488 exposed active-count, blocked-count, summary and receipt contradictions. Manual recovery routes alert and estimate enrichment through the same sprint-id/terminal-authority fenced atomic dashboard writer; source/dist digest and all-surface live parity remain open",
+      "evidence": "Sprint-488 exposed active-count, blocked-count, summary and receipt contradictions. Manual recovery routes alert and estimate enrichment through the same sprint-id/terminal-authority fenced atomic dashboard writer. A schema-v1 atomic read model now binds lifecycle/generation, terminal receipt, logical lineages versus attempts, exact-task/attempt-scoped provider concurrency and typed HOLD evidence; start heartbeat, phase, pause/resume, terminal authority and cleanup are production writers. CLI JSON/human/watch, MCP, Terminal feed and API/dashboard status consume the matching revision and fail closed with `RUN_STATUS_READ_MODEL_UNAVAILABLE` instead of reconstructing live fields; finalizer dashboard/notification denominators consume its terminal logical progress. Real built-binary IDLE proof changed historical provider `currentAttained=4` to `0` while retaining four open rows as unresolved forensic evidence. Build identity v2 binds exact root plus bounded source-tree digest; a post-build source mutation produced `DECKENT_BINARY_IDENTITY_HOLD:build-source-mismatch`, and the cross-checkout override cannot bypass it. Status proof passes 97/97, terminal/finalizer proof 30/30 and build-identity proof 26/26. Fresh active multi-provider replay, actual Desktop shell parity, native platform matrix and HA/multi-process snapshot fencing remain open",
       "updated": "2026-08-01"
     },
     {
@@ -16937,6 +16937,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "89b3d2cab1e4301051bbb2728f728391b07492fc9e18caf31b7e1637ea3d4741"
+    "value": "b58c223051b1ff0f5e3b671fc5c799ba04e670e85aeaf8cf172ead16e2eddfe3"
   }
 }

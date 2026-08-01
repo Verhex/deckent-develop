@@ -51,8 +51,8 @@ const MESSAGES: MessageMap = {
     tr: 'Proje checkout: {projectRoot}\nRuntime paketi: {runtimeRoot}',
   },
   'cli.binary_identity.hint': {
-    en: 'Run `npm run build:all`, then use `node dist/cli/entry.js <command>` from this checkout. For an intentional cross-checkout diagnostic only, set DECKENT_ALLOW_CROSS_CHECKOUT_BINARY=1.',
-    tr: 'Bu checkout içinde `npm run build:all` çalıştırın, ardından `node dist/cli/entry.js <komut>` kullanın. Yalnız bilinçli bir cross-checkout teşhisi için DECKENT_ALLOW_CROSS_CHECKOUT_BINARY=1 ayarlayın.',
+    en: 'Run `npm run build`, then use `node dist/cli/entry.js <command>` from this checkout. The diagnostic cross-checkout override never bypasses same-checkout source/build drift.',
+    tr: 'Bu checkout içinde `npm run build` çalıştırın, ardından `node dist/cli/entry.js <komut>` kullanın. Diagnostic cross-checkout override aynı-checkout source/build drift kontrolünü asla atlamaz.',
   },
   'cli.binary_identity.override': {
     en: 'DECKENT_BINARY_IDENTITY_OVERRIDE: explicit cross-checkout override accepted (reason: {issue}); runtime behavior may not match this source checkout.',
@@ -1042,6 +1042,10 @@ const MESSAGES: MessageMap = {
   'status.dashboard_read_failed': {
     en: 'Failed to read dashboard file.',
     tr: 'Dashboard dosyası okunamadı.',
+  },
+  'status.read_model_hold': {
+    en: 'RUN_STATUS_READ_MODEL_UNAVAILABLE: live run status is held until the canonical persisted read model is republished.',
+    tr: 'RUN_STATUS_READ_MODEL_UNAVAILABLE: canlı run durumu canonical persisted read model yeniden yayımlanana kadar HOLD durumundadır.',
   },
   'status.desc': {
     en: 'Show the current run dashboard',
@@ -3476,6 +3480,22 @@ const MESSAGES: MessageMap = {
   'resume.pause_clear_failed': { en: 'Resume HOLD: pause authority for {sprintId} could not be cleared safely.', tr: 'Resume HOLD: {sprintId} pause authority güvenli biçimde temizlenemedi.' },
   'resume.not_complete': { en: 'Run resumed but did not complete (status: {status}).', tr: 'Run sürdürüldü ancak tamamlanmadı (durum: {status}).' },
   'resume.completed': { en: '\nRun resumed and completed.', tr: '\nRun sürdürüldü ve tamamlandı.' },
+  'resume.outcome_running': {
+    en: 'Recovery outcome: resumed-running. The canonical coordinator authority remains active.',
+    tr: 'Recovery sonucu: resumed-running. Canonical coordinator authority aktif kalıyor.',
+  },
+  'resume.outcome_paused': {
+    en: 'Recovery outcome: resumed-paused. The run is durably paused; this is not an internal command failure. Resume: {recoveryCommand} · Abort: {finalizeCommand}',
+    tr: 'Recovery sonucu: resumed-paused. Run kalıcı olarak duraklatıldı; bu bir dahili komut hatası değildir. Sürdür: {recoveryCommand} · Sonlandır: {finalizeCommand}',
+  },
+  'resume.outcome_aborted': {
+    en: 'Recovery outcome: aborted. The run reached a truthful terminal ABORTED authority.',
+    tr: 'Recovery sonucu: aborted. Run dürüst terminal ABORTED authority durumuna ulaştı.',
+  },
+  'resume.outcome_failed': {
+    en: 'Recovery outcome: failed ({reason}).',
+    tr: 'Recovery sonucu: failed ({reason}).',
+  },
   'resume.failed': { en: 'Run resume failed: {error}', tr: 'Run sürdürme başarısız: {error}' },
   'features.manifest_not_found': { en: 'features-manifest.json not found. Run `node scripts/sync-manifest.mjs` to generate.', tr: 'features-manifest.json bulunamadı. Oluşturmak için `node scripts/sync-manifest.mjs` çalıştırın.' },
   'features.feature_not_found': { en: 'feature "{name}" not found.', tr: '"{name}" özelliği bulunamadı.' },

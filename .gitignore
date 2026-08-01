@@ -82,6 +82,7 @@ src/desktop/*.tsbuildinfo
 .deckent/runtime/terminal-token
 .deckent/runtime/run-flow-store/
 .deckent/runtime/prompt-lint.jsonl
+.deckent/runtime/run-status-read-model.json
 .deckent/runtime/archive/
 .deckent/pause-state.json
 # eye-loop isolated daemon workspace inside desktop sub-package (590)

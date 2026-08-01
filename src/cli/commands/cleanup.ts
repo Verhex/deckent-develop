@@ -29,6 +29,7 @@ import {
   projectTerminalPublicationStatus,
   type TerminalPublicationStatus,
 } from '../../core/sprint-terminal-publication-status.js';
+import { publishCanonicalRunStatusReadModel } from '../../core/run-status-read-model.js';
 
 export function cleanupAuthorityHoldReason(
   authority: CanonicalRunStatus,
@@ -372,6 +373,11 @@ export function registerCleanup(program: Command): void {
           const prunedIds = pruneExpiredNervousPending(root, Date.now());
           if (prunedIds.length > 0) print(getMessage('cleanup.pruned_expired_approvals', lang, { count: String(prunedIds.length) }));
         } catch { /* fail-soft */ }
+
+        // Cleanup retires the final run identity. Publish IDLE only after the
+        // owned lifecycle files are gone; unresolved provider observations are
+        // retained as forensic HOLD evidence rather than counted as active.
+        publishCanonicalRunStatusReadModel(root);
 
         // Only print cleanup.complete when not in decay mode (decay already showed its own summary)
         if (!opts.decay) {

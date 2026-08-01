@@ -37,6 +37,11 @@ import {
 } from '../../core/logical-progress-projection.js';
 import { projectTerminalPublicationStatus as projectSharedTerminalPublicationStatus } from '../../core/sprint-terminal-publication-status.js';
 import type { ProviderConcurrencyRuntimeProjection } from '../../core/provider-limit-admission.js';
+import {
+  readCanonicalRunStatusReadModel,
+  runStatusReadModelMatchesAuthority,
+  type CanonicalRunStatusReadModel,
+} from '../../core/run-status-read-model.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -199,14 +204,42 @@ export interface StatusCommandDeps {
   /** Canonical provider admission plus direct execution-observation projection. */
   readonly providerConcurrencyRuntime?: (
     projectRoot: string,
+    options?: { readonly currentTaskIds?: ReadonlySet<string> },
   ) => readonly ProviderConcurrencyRuntimeProjection[];
 }
 
-function projectProviderConcurrencyStatus(
+function matchingRunStatusReadModel(
   root: string,
-  deps: StatusCommandDeps,
-): readonly ProviderConcurrencyRuntimeProjection[] {
-  return deps.providerConcurrencyRuntime?.(root) ?? [];
+  authority: CanonicalRunStatus,
+): CanonicalRunStatusReadModel | null {
+  try {
+    const model = readCanonicalRunStatusReadModel(root);
+    return model && runStatusReadModelMatchesAuthority(model, authority) ? model : null;
+  } catch {
+    return null;
+  }
+}
+
+function runStatusReadModelSurface(
+  model: CanonicalRunStatusReadModel | null,
+): Record<string, unknown> {
+  return model
+    ? {
+        state: 'persisted',
+        schemaVersion: model.schemaVersion,
+        revision: model.revision,
+        runGeneration: model.runGeneration,
+        modelDigest: model.modelDigest,
+        holds: model.holds,
+      }
+    : { state: 'unavailable-or-stale' };
+}
+
+function requiresPersistedRunStatusReadModel(authority: CanonicalRunStatus): boolean {
+  return authority.active
+    || authority.resumable
+    || authority.lifecycle === 'PAUSED'
+    || authority.lifecycle === 'ORPHANED';
 }
 
 export interface StatusTaskSettlementDto
@@ -680,9 +713,28 @@ export function buildPendingApprovalsSection(root: string, lang: string): string
  */
 export function buildNoActiveStatusJson(
   root: string,
-  deps: StatusCommandDeps = {},
+  _deps: StatusCommandDeps = {},
 ): Record<string, unknown> {
   const authority = readCanonicalRunStatus(root);
+  const readModel = matchingRunStatusReadModel(root, authority);
+  if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
+    return {
+      active: false,
+      lifecycle: 'UNAVAILABLE',
+      resumable: authority.resumable,
+      sprintId: authority.sprintId,
+      authority,
+      logicalProgress: null,
+      terminalPublication: null,
+      providerConcurrency: [],
+      statusReadModel: runStatusReadModelSurface(null),
+      error: {
+        code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE',
+        disposition: 'HOLD',
+      },
+      pendingApprovals: readPendingApprovals(root),
+    };
+  }
   return {
     active: authority.active,
     lifecycle: authority.lifecycle,
@@ -694,8 +746,9 @@ export function buildNoActiveStatusJson(
     recoveryCommand: authority.recoveryCommand,
     finalizeCommand: authority.finalizeCommand,
     authority,
-    terminalPublication: projectTerminalPublicationStatus(root, authority),
-    providerConcurrency: projectProviderConcurrencyStatus(root, deps),
+    terminalPublication: readModel?.terminalPublication ?? null,
+    providerConcurrency: readModel?.providerConcurrency ?? [],
+    statusReadModel: runStatusReadModelSurface(readModel),
     pendingApprovals: readPendingApprovals(root),
   };
 }
@@ -744,10 +797,13 @@ export function projectDashboardThroughRunAuthority(
   state: DashboardState,
   tasks: readonly Task[],
   authority: CanonicalRunStatus,
+  canonicalProgress?: CanonicalRunStatusReadModel['logicalProgress'],
 ): CanonicalDashboardProjection {
-  const taskProgress = tasks.length > 0
-    ? projectStatusLogicalProgress(tasks)
-    : state.progress;
+  const taskProgress = canonicalProgress ?? (
+    hasNoDurableRunIdentity(authority)
+      ? (tasks.length > 0 ? projectStatusLogicalProgress(tasks) : state.progress)
+      : state.progress
+  );
   const progress = boundedDashboardProgress(taskProgress);
   const phase = authority.phase
     && Object.values(SprintPhase).includes(authority.phase as SprintPhase)
@@ -800,14 +856,12 @@ function statusFormatterData(
   tasks: readonly Task[],
 ): Record<string, unknown> {
   const lineages = foldTaskLineages(tasks);
-  const progress = tasks.length > 0
-    ? projectStatusLogicalProgress(tasks)
-    : {
-        done: state.progress?.done ?? 0,
-        active: state.progress?.active ?? 0,
-        blocked: state.progress?.blocked ?? 0,
-        total: state.progress?.total ?? 0,
-      };
+  const progress = {
+    done: state.progress?.done ?? 0,
+    active: state.progress?.active ?? 0,
+    blocked: state.progress?.blocked ?? 0,
+    total: state.progress?.total ?? 0,
+  };
   return {
     sprintId: state.sprint.id,
     phase: state.sprint.phase as string | undefined,
@@ -837,6 +891,22 @@ export function buildStatusJsonSnapshot(
 ): Record<string, unknown> {
   const tasks = loadTaskFiles(root);
   const authority = readCanonicalRunStatus(root);
+  const readModel = matchingRunStatusReadModel(root, authority);
+  if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
+    return buildNoActiveStatusJson(root, deps);
+  }
+  if (
+    readModel
+    && !authority.active
+    && !authority.resumable
+    && (
+      authority.lifecycle === 'IDLE'
+      || authority.lifecycle === 'COMPLETE'
+      || authority.lifecycle === 'ABORTED'
+    )
+  ) {
+    return buildNoActiveStatusJson(root, deps);
+  }
   if (!existsSync(dashPath)) {
     if (tasks.length === 0) return buildNoActiveStatusJson(root, deps);
     const sprintId = authority.sprintId ?? getCurrentSprintId(root) ?? detectSprintId(tasks);
@@ -848,10 +918,11 @@ export function buildStatusJsonSnapshot(
       resumable: authority.resumable,
       sprintId,
       authority,
-      terminalPublication: projectTerminalPublicationStatus(root, authority),
-      providerConcurrency: projectProviderConcurrencyStatus(root, deps),
+      terminalPublication: readModel?.terminalPublication ?? null,
+      providerConcurrency: readModel?.providerConcurrency ?? [],
+      statusReadModel: runStatusReadModelSurface(readModel),
       pendingApprovals: readPendingApprovals(root),
-      progress: projectStatusLogicalProgress(tasks),
+      progress: readModel?.logicalProgress ?? null,
       tasks: lineages.map(lineage => ({
         id: lineage.rootId,
         title: lineage.rootTask.title,
@@ -902,10 +973,13 @@ export function buildStatusJsonSnapshot(
   }
 
   const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
-  const logicalProgress = tasks.length > 0
-    ? projectStatusLogicalProgress(tasks)
-    : null;
-  const projection = projectDashboardThroughRunAuthority(state, tasks, authority);
+  const logicalProgress = tasks.length > 0 ? readModel?.logicalProgress ?? null : null;
+  const projection = projectDashboardThroughRunAuthority(
+    state,
+    tasks,
+    authority,
+    readModel?.logicalProgress,
+  );
   const projectedState = projection.dashboard;
   const snapshot = verbose
     ? {
@@ -931,8 +1005,9 @@ export function buildStatusJsonSnapshot(
     recoveryCommand: authority.recoveryCommand,
     finalizeCommand: authority.finalizeCommand,
     authority,
-    terminalPublication: projectTerminalPublicationStatus(root, authority),
-    providerConcurrency: projectProviderConcurrencyStatus(root, deps),
+    terminalPublication: readModel?.terminalPublication ?? null,
+    providerConcurrency: readModel?.providerConcurrency ?? [],
+    statusReadModel: runStatusReadModelSurface(readModel),
     logicalProgress,
     statusProjection: projection.metadata,
     pendingApprovals: readPendingApprovals(root),
@@ -1167,6 +1242,15 @@ export function registerStatus(
       if (!existsSync(dashPath)) {
         const tasks = loadTaskFiles(root);
         if (tasks.length > 0) {
+          const authority = readCanonicalRunStatus(root);
+          if (
+            requiresPersistedRunStatusReadModel(authority)
+            && !matchingRunStatusReadModel(root, authority)
+          ) {
+            printError(new Error(getMessage('status.read_model_hold', lang)));
+            process.exitCode = 2;
+            return;
+          }
           // Use canonical sprint-state.json as source of truth; fall back to task file scan
           const sprintId = getCurrentSprintId(root) ?? detectSprintId(tasks);
           const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
@@ -1191,7 +1275,7 @@ export function registerStatus(
           return;
         }
         if (jsonMode) {
-          output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
+          output(JSON.stringify(buildNoActiveStatusJson(root, deps), null, 2));
           return;
         }
         print(getMessage('status.no_active_sprint', lang));
@@ -1259,9 +1343,18 @@ export function registerStatus(
 
           const tasks = loadTaskFiles(root);
           const authority = readCanonicalRunStatus(root);
+          const readModel = matchingRunStatusReadModel(root, authority);
+          if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
+            return `\x1Bc${getMessage('status.read_model_hold', lang)}\n`;
+          }
           const state = opts.raw
             ? rawState
-            : projectDashboardThroughRunAuthority(rawState, tasks, authority).dashboard;
+            : projectDashboardThroughRunAuthority(
+                rawState,
+                tasks,
+                authority,
+                readModel?.logicalProgress,
+              ).dashboard;
           const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
           const sections: string[] = [];
           if (opts.raw) {
@@ -1339,9 +1432,20 @@ export function registerStatus(
         const rawState = JSON.parse(rawData) as DashboardState;
         const tasks = loadTaskFiles(root);
         const authority = readCanonicalRunStatus(root);
+        const readModel = matchingRunStatusReadModel(root, authority);
+        if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
+          printError(new Error(getMessage('status.read_model_hold', lang)));
+          process.exitCode = 2;
+          return;
+        }
         const state = opts.raw
           ? rawState
-          : projectDashboardThroughRunAuthority(rawState, tasks, authority).dashboard;
+          : projectDashboardThroughRunAuthority(
+              rawState,
+              tasks,
+              authority,
+              readModel?.logicalProgress,
+            ).dashboard;
         // ─── W0-TRUTH (#491) orphan-gate ─────────────────────────────
         // Crash-case: an ACTIVE-shaped .dashboard whose writer died must not be
         // presented as live. Stale + no live sprint + no task files → honest
@@ -1353,7 +1457,7 @@ export function registerStatus(
         });
         if (isOrphaned) {
           if (jsonMode) {
-            output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
+            output(JSON.stringify(buildNoActiveStatusJson(root, deps), null, 2));
             return;
           }
           print(getMessage('status.no_active_sprint', lang));
@@ -1373,7 +1477,7 @@ export function registerStatus(
         // BOTH surfaces.
         const spTerminal = state.sprint as { status?: string; phase?: string };
         if (jsonMode && !opts.raw && (spTerminal.status === 'COMPLETE' || spTerminal.phase === 'COMPLETE')) {
-          output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
+          output(JSON.stringify(buildNoActiveStatusJson(root, deps), null, 2));
           return;
         }
         if (jsonMode) {

@@ -10,6 +10,7 @@ const mockLoadConfig = vi.fn();
 const mockDeriveResumeDisposition = vi.fn();
 const mockReadSprintState = vi.fn();
 const mockClearSprintState = vi.fn();
+const mockReadCanonicalRunStatus = vi.fn();
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: (...args: unknown[]) => mockRunSprint(...args),
@@ -33,6 +34,10 @@ vi.mock('../../../src/core/config.js', () => ({
   loadConfig: (...args: unknown[]) => mockLoadConfig(...args),
 }));
 
+vi.mock('../../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn().mockResolvedValue({ connector: 'test-connector' }),
+}));
+
 const mockExistsSync = vi.fn();
 const mockMkdirSync = vi.fn();
 const mockWriteFileSync = vi.fn();
@@ -54,6 +59,10 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 vi.mock('../../../src/orchestra/sprint-utils.js', () => ({
   readSprintState: (...args: unknown[]) => mockReadSprintState(...args),
   clearSprintState: (...args: unknown[]) => mockClearSprintState(...args),
+}));
+
+vi.mock('../../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: (...args: unknown[]) => mockReadCanonicalRunStatus(...args),
 }));
 
 const mockPrint = vi.fn();
@@ -114,6 +123,15 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
     });
     mockRunSprint.mockResolvedValue({ id: 'sprint-321', tasks: [], status: 'COMPLETE' });
     mockReadSprintState.mockReturnValue(null);
+    mockReadCanonicalRunStatus.mockReturnValue({
+      lifecycle: 'COMPLETE',
+      sprintId: 'sprint-321',
+      status: 'COMPLETE',
+      reason: null,
+      resumable: false,
+      recoveryCommand: null,
+      finalizeCommand: null,
+    });
     mockExistsSync.mockReturnValue(false);
     mockMkdirSync.mockReturnValue(undefined);
     mockWriteFileSync.mockReturnValue(undefined);
@@ -214,7 +232,11 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
     expect(mockRunSprint).toHaveBeenCalledWith(
       '/fake/project',
       { deckent_style: 'sprint' },
-      { autoApprove: false },
+      expect.objectContaining({
+        autoApprove: false,
+        acknowledgeScopePaths: false,
+        connector: 'test-connector',
+      }),
     );
   });
 
@@ -264,8 +286,18 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
 
   it('does not claim completion when controller returns PAUSED', async () => {
     mockRunSprint.mockResolvedValue({ id: 'sprint-321', tasks: [], status: 'PAUSED' });
+    mockReadCanonicalRunStatus.mockReturnValue({
+      lifecycle: 'PAUSED',
+      sprintId: 'sprint-321',
+      status: 'PAUSED',
+      reason: 'operator-decision-required',
+      resumable: true,
+      recoveryCommand: 'deckent recover sprint-321 --resume',
+      finalizeCommand: 'deckent finalize --sprint sprint-321 --force',
+    });
     await runCommand(['sprint-321']);
-    expect(process.exitCode).toBe(1);
-    expect(mockPrintError).toHaveBeenCalledWith(expect.stringContaining('PAUSED'));
+    expect(process.exitCode).toBe(2);
+    expect(mockPrint).toHaveBeenCalledWith(expect.stringContaining('resumed-paused'));
+    expect(mockPrintError).not.toHaveBeenCalledWith(expect.stringContaining('did not complete'));
   });
 });

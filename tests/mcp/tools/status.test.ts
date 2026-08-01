@@ -53,6 +53,18 @@ vi.mock('../../../src/core/run-status-authority.js', () => ({
   readCanonicalRunStatus: mockReadCanonicalRunStatus,
 }));
 
+const { mockReadRunStatusModel, mockReadProviderConcurrency } = vi.hoisted(() => ({
+  mockReadRunStatusModel: vi.fn(),
+  mockReadProviderConcurrency: vi.fn(() => []),
+}));
+vi.mock('../../../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: mockReadRunStatusModel,
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+}));
+vi.mock('../../../src/core/provider-concurrency-runtime-reader.js', () => ({
+  readProviderConcurrencyRuntime: mockReadProviderConcurrency,
+}));
+
 import { readLatestJobState } from '../../../src/mcp/tools/job-runner.js';
 import { readDashboardSafe } from '../../../src/monitor/dashboard-manager.js';
 import { getCurrentSprintId } from '../../../src/monitor/sprint-state.js';
@@ -121,6 +133,19 @@ async function getStatusTool() {
 describe('deckent_status — dependencyGraph field (Task 139-031)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadRunStatusModel.mockReturnValue({
+      schemaVersion: 1,
+      revision: 1,
+      runGeneration: 'lease:test-139',
+      modelDigest: 'b'.repeat(64),
+      holds: [],
+      logicalProgress: {
+        done: 5, active: 1, blocked: 4, total: 10, attemptCount: 10, lineages: [],
+      },
+      providerConcurrency: [],
+      terminalPublication: { version: 1, state: 'open', receipt: null },
+    });
+    mockReadProviderConcurrency.mockReturnValue([]);
     vi.mocked(readLatestJobState).mockReturnValue(null);
     vi.mocked(getCurrentSprintId).mockReturnValue('sprint-139');
     mockReadCanonicalRunStatus.mockImplementation(() => {
@@ -156,6 +181,36 @@ describe('deckent_status — dependencyGraph field (Task 139-031)', () => {
   // ── MCP verbose=false ─────────────────────────────────────────────────────
 
   describe('verbose=false (default)', () => {
+    it('projects the persisted read-model revision and provider concurrency', async () => {
+      mockReadRunStatusModel.mockReturnValue({
+        schemaVersion: 1,
+        revision: 7,
+        runGeneration: 'lease:139',
+        modelDigest: 'a'.repeat(64),
+        holds: [],
+        logicalProgress: {
+          done: 5, active: 1, blocked: 4, total: 10, attemptCount: 10, lineages: [],
+        },
+        providerConcurrency: [{
+          providerPrincipalDigest: 'principal-139',
+          admission: 'HOLD',
+          admittedCeiling: 'unknown',
+          currentAttained: 1,
+          peakAttained: 1,
+          unresolvedOpenIntervals: 0,
+          observationScope: 'exact-task-set',
+          evidenceRefs: [],
+        }],
+        terminalPublication: { version: 1, state: 'open', receipt: null },
+      });
+      const tool = await getStatusTool();
+      const result = await tool.handler({ json: true, verbose: false });
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.statusReadModel).toMatchObject({ state: 'persisted', revision: 7 });
+      expect(parsed.providerConcurrency[0]).toMatchObject({ currentAttained: 1 });
+      expect(mockReadProviderConcurrency).not.toHaveBeenCalled();
+    });
+
     it('does NOT include dependencyGraph when verbose=false', async () => {
       const tool = await getStatusTool();
       const result = await tool.handler({ verbose: false });

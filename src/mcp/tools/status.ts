@@ -13,11 +13,13 @@ import { formatStatus, resolveOutputMode, type OutputMode } from '../../core/out
 import { readCanonicalRunStatus, type CanonicalRunStatus } from '../../core/run-status-authority.js';
 import { readPendingApprovals } from '../../core/pending-approvals.js';
 import { TaskStatus, type Task } from '../../core/types.js';
-import {
-  computeLogicalTaskProgress,
-  foldTaskLineages,
-} from '../../core/task-lineage.js';
+import { foldTaskLineages } from '../../core/task-lineage.js';
 import { projectTerminalPublicationStatus as projectSharedTerminalPublicationStatus } from '../../core/sprint-terminal-publication-status.js';
+import {
+  readCanonicalRunStatusReadModel,
+  runStatusReadModelMatchesAuthority,
+  type CanonicalRunStatusReadModel,
+} from '../../core/run-status-read-model.js';
 
 /**
  * Read the last N events from the event stream JSONL file.
@@ -332,6 +334,31 @@ export function projectTerminalPublicationStatus(
   return projectSharedTerminalPublicationStatus(root, authority);
 }
 
+function matchingRunStatusReadModel(
+  root: string,
+  authority: CanonicalRunStatus,
+): CanonicalRunStatusReadModel | null {
+  try {
+    const model = readCanonicalRunStatusReadModel(root);
+    return model && runStatusReadModelMatchesAuthority(model, authority) ? model : null;
+  } catch {
+    return null;
+  }
+}
+
+function statusReadModelSurface(model: CanonicalRunStatusReadModel | null) {
+  return model
+    ? {
+        state: 'persisted' as const,
+        schemaVersion: model.schemaVersion,
+        revision: model.revision,
+        runGeneration: model.runGeneration,
+        modelDigest: model.modelDigest,
+        holds: model.holds,
+      }
+    : { state: 'unavailable-or-stale' as const };
+}
+
 export function registerStatusTool(server: McpServer): void {
   server.registerTool(
     'deckent_status',
@@ -351,6 +378,8 @@ export function registerStatusTool(server: McpServer): void {
       // Use canonical sprint-state.json as single source of truth for sprintId
       const canonicalSprintId = getCurrentSprintId(root);
       const authority = readCanonicalRunStatus(root, { sprintIdHint: canonicalSprintId });
+      const readModel = matchingRunStatusReadModel(root, authority);
+      const providerConcurrency = readModel?.providerConcurrency ?? [];
       const pendingApprovals = readPendingApprovals(root);
 
       const latestJob = readLatestJobState(root);
@@ -359,6 +388,28 @@ export function registerStatusTool(server: McpServer): void {
         || authority.resumable
         || authority.lifecycle === 'PAUSED'
         || authority.lifecycle === 'ORPHANED';
+
+      if (canonicalHasLiveProjection && !readModel) {
+        const unavailable = {
+          active: false,
+          sprintId: authority.sprintId,
+          lifecycle: 'UNAVAILABLE',
+          authority,
+          progress: null,
+          providerConcurrency: [],
+          terminalPublication: null,
+          statusReadModel: statusReadModelSurface(null),
+          pendingApprovals,
+          error: {
+            code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE',
+            disposition: 'HOLD',
+          },
+        };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(unavailable) }],
+          isError: true,
+        };
+      }
 
       if (!existsSync(dashPath) || !canonicalHasLiveProjection) {
         // Part C: when .tasks/ files are unavailable but job is COMPLETE with task data,
@@ -374,7 +425,9 @@ export function registerStatusTool(server: McpServer): void {
             lifecycle: authority.lifecycle,
             resumable: authority.resumable,
             authority,
-            terminalPublication: projectTerminalPublicationStatus(root, authority),
+            terminalPublication: readModel?.terminalPublication ?? null,
+            providerConcurrency,
+            statusReadModel: statusReadModelSurface(readModel),
             pendingApprovals,
           };
           if (json) {
@@ -398,7 +451,9 @@ export function registerStatusTool(server: McpServer): void {
           recoveryCommand: authority.recoveryCommand,
           finalizeCommand: authority.finalizeCommand,
           authority,
-          terminalPublication: projectTerminalPublicationStatus(root, authority),
+          terminalPublication: readModel?.terminalPublication ?? null,
+          providerConcurrency,
+          statusReadModel: statusReadModelSurface(readModel),
           pendingApprovals,
         };
         if (json) {
@@ -487,7 +542,7 @@ export function registerStatusTool(server: McpServer): void {
         lineage => lineage.resolvedTask.status === TaskStatus.NO_GO,
       ).length;
       const logicalProgress = logicalTaskLineages.length > 0
-        ? computeLogicalTaskProgress(logicalTaskLineages.flatMap(lineage => lineage.attempts))
+        ? readModel?.logicalProgress
         : undefined;
 
       const verboseFields = verbose ? {
@@ -531,7 +586,9 @@ export function registerStatusTool(server: McpServer): void {
         recoveryCommand: authority.recoveryCommand,
         finalizeCommand: authority.finalizeCommand,
         authority,
-        terminalPublication: projectTerminalPublicationStatus(root, authority),
+        terminalPublication: readModel?.terminalPublication ?? null,
+        providerConcurrency,
+        statusReadModel: statusReadModelSurface(readModel),
         pendingApprovals,
         ...verboseFields,
       };
