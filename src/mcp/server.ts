@@ -46,7 +46,7 @@ Deckent is an AI agent orchestration CLI that runs multi-agent runs inside your 
 init → set_directives → plan → start → status → review → retro → cleanup
 
 ## Run Lifecycle
-PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
+PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE (cleanup is a separate command, not a phase)
 
 ## Tools (49)
 - deckent_init: Initialize Deckent in the current project directory

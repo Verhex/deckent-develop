@@ -124,6 +124,15 @@ description: Use when creating or changing ANY design token (color, typography, 
   yeni mimariye çevrildi; canlı-binary doğrulandı. Kalan borç değil-karar: light istenirse yeni
   token-seti + kontrast turu olarak açılır.
 
+- ✅ **Toplu karar turu (Alperen, 2026-08-01 — 4/4 onay):** (1) lifecycle doc-drift hizalandı —
+  8 dosyada "DECAY→CLEANUP" → "DECAY→COMPLETE (cleanup=komut)"; (2) TÜM token-aday havuzu
+  kaynağa alındı (panel-float ailesi · progress rolleri+ölçüleri [arc hariç — accent-bright
+  semantic rolü ister, bilinçli-aday] · river süreleri/alfaları · selectionOverlay ·
+  radius.panel/pill · accentSwatch); (3) day-watch `inkMuted` #6B6F72→**#63676a** (buff 4.87 AA;
+  validator muted/bg eşiği 3→4.5 — 4 vardiya geçiyor); (4) `fontSet.envanter-legacy` seçilebilir
+  set olarak kaynakta + **preferences-v2 ONAYLI-İŞ** (fontSet alanı + VERSION bump + migration —
+  implementasyon desktop/REBORN dilimi). Kartlardaki ADAY etiketleri "token'landı"ya çevrildi.
+
 **Açık maddeler:**
 - **Component ürünleşme-önkoşulları** (a11y 2026-07-31): forced-colors focus `outline` yedeği
   (react-aria focus-ring) · error `aria-describedby` bağı · `:has()` yerine `isFocusVisible` ·

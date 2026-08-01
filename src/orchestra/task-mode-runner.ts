@@ -2,7 +2,7 @@
 // Sprint 149 — Task 149-003
 //
 // Centralized one-shot task execution for `deckent_style === 'task'`.
-// Bypasses the full sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
+// Bypasses the full sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→COMPLETE)
 // and runs a single task directly via the spawn backend.
 //
 // Used by:

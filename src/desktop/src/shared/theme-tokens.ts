@@ -82,7 +82,9 @@ export const PRIMITIVES = {
   nightAccentText: '#1C0F0D',
   // inks
   ink: '#2B2F33',
-  inkMuted: '#6B6F72',
+  // 2026-08-01 a11y koyulaştırması (#6B6F72 idi): buff üstünde 4.33 → 4.87 (AA;
+  // buffRaised 5.37) — DESIGN-SYSTEM-001 settings-customize denetimi, Alperen onayı.
+  inkMuted: '#63676a',
   // One shade inkier than the D4-0 comp's #C2447C: the validator measured
   // paper-on-#C2447C at 4.47:1 (just under AA 4.5) — chart identity intact.
   magenta: '#BD4278',
@@ -224,6 +226,12 @@ export const COMPONENT_TOKENS = {
   'statuspill-go-text': 'go-text',
   'statuspill-caution-text': 'caution-text',
   'statuspill-abort-text': 'abort-text',
+  // 2026-08-01 progress ailesi (Alperen onayı). 'progress-arc' BİLİNÇLİ eksik:
+  // accent-bright semantic rolü ister (per-watch bright değerleri ayrı tasarım kararı).
+  'progress-track': 'border',
+  'progress-fill': 'accent',
+  'progress-fill-done': 'go',
+  'progress-fill-abort': 'abort',
 } as const satisfies Record<string, SemanticTokenName>;
 
 export type ComponentTokenName = keyof typeof COMPONENT_TOKENS;
@@ -352,7 +360,7 @@ const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const CONTRAST_REQUIREMENTS: Array<{ fg: SemanticTokenName; bg: SemanticTokenName; min: number }> = [
   { fg: 'text', bg: 'bg', min: 4.5 },
   { fg: 'text', bg: 'surface', min: 4.5 },
-  { fg: 'text-muted', bg: 'bg', min: 3 },
+  { fg: 'text-muted', bg: 'bg', min: 4.5 },  // 2026-08-01: 3→4.5 (4 vardiya da geçiyor)
   { fg: 'accent-text', bg: 'accent', min: 4.5 },
   { fg: 'go-text', bg: 'go', min: 4.5 },
   { fg: 'caution-text', bg: 'caution', min: 4.5 },

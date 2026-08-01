@@ -1335,7 +1335,7 @@ aynı objective bu MASTER addendum'u ve current execution plan ile sürdürülü
    settlement'a taşınır. Manuel müdahale yalnız typed ve kayda alınmış bootstrap/recovery/düzeltme
    seam'idir; ilk güvenli sınırda yeniden dogfood'a dönmek zorundadır.
 2. **Config-resolved Brain supervision.** Effective Brain PLAN→SPAWN→EXECUTE→EVALUATE→FIX→
-   RETRO→DECAY→CLEANUP lifecycle'ının status, heartbeat, usage/limit, Nervous, disk diff, result
+   RETRO→DECAY→COMPLETE lifecycle'ının status, heartbeat, usage/limit, Nervous, disk diff, result
    ve settlement kanıtlarını izler. Sentetik agent verdict'ü disk truth olmadan promotion
    authority değildir.
 3. **Config-resolved heterogeneous pool.** Provider/model/worker ceiling instruction metninden

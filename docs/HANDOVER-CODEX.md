@@ -14,7 +14,7 @@
 
 `deckent` — çok-ajanlı AI orkestrasyon CLI'ı. Brain (planlayıcı) · Worker (işçi) ·
 Auditor (denetçi) rolleri, 8-fazlı sprint yaşam döngüsü
-(`PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP`).
+(`PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE`).
 Kendi kendini dogfood eder: deckent, deckent'i geliştirmek için kullanılır.
 
 Bundan sonra **sen Brain'sin.** Planlama, değerlendirme, routing, karar senin.

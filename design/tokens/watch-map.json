@@ -88,6 +88,10 @@
     "statuspill-abort": "abort",
     "statuspill-go-text": "go-text",
     "statuspill-caution-text": "caution-text",
-    "statuspill-abort-text": "abort-text"
+    "statuspill-abort-text": "abort-text",
+    "progress-track": "border",
+    "progress-fill": "accent",
+    "progress-fill-done": "go",
+    "progress-fill-abort": "abort"
   }
 }

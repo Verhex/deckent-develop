@@ -1592,7 +1592,7 @@ export function sprintTerminalHandoffHoldError(held: SprintTerminalHandoffHold):
 }
 
 /**
- * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP.
+ * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE (cleanup ayrı komuttur).
  * Supports human checkpoints, configurable timeout, and provider routing.
  */
 export async function runSprint(

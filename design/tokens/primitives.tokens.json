@@ -36,7 +36,10 @@
       "nightAccent": { "$value": "#E2766B" },
       "nightAccentText": { "$value": "#1C0F0D" },
       "ink": { "$value": "#2B2F33" },
-      "inkMuted": { "$value": "#6B6F72" },
+      "inkMuted": {
+        "$value": "#63676a",
+        "$description": "2026-08-01 a11y koyulaştırması (#6B6F72 idi): buff üstü 4.87:1 (AA)."
+      },
       "magenta": { "$value": "#BD4278" },
       "magentaSea": { "$value": "#E88FB9" },
       "brass": { "$value": "#A98F54" },
@@ -103,6 +106,13 @@
   },
   "fontSet": {
     "$description": "Seçilebilir font-setleri (kişiselleştirme kuralı: kimlik seçimi = token-seti; DESKTOP-CUSTOMIZE-001). makine-izi = SEÇİLİ set (Alperen 2026-07-31: aday-turu + gerçek-veri kimlik-turu doğrulaması + flip onayı). Dosyalar: design/fonts/makine-izi/ (OFL, latin+latin-ext, cmap-doğrulandı).",
+    "envanter-legacy": {
+      "$type": "fontFamily",
+      "$description": "Tarihî set (D4-0 mirası; 2026-07-31 reddiyle kimlik-emekli) — set-değiştirilebilirlik için SEÇİLEBİLİR kayıt (Alperen onayı 2026-08-01). Dosyalar renderer/fonts'ta.",
+      "display": { "$value": ["Bricolage Grotesque", "system-ui", "sans-serif"] },
+      "body": { "$value": ["Hanken Grotesk", "system-ui", "-apple-system", "Segoe UI", "sans-serif"] },
+      "data": { "$value": ["Geist Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"] }
+    },
     "makine-izi": {
       "$type": "fontFamily",
       "display": {
@@ -124,7 +134,16 @@
     "control": {
       "$value": "0.25rem",
       "$description": "Squared-technical görünüm (index.css --radius)."
-    }
+    },
+    "panel": { "$value": "10px", "$description": "Floating/odak-panel köşesi (prototip-ölçüsü) — 2026-08-01 onay." },
+    "pill": { "$value": "999px", "$description": "Komuta-girdisi hap-formu." }
+  },
+  "size": {
+    "$type": "dimension",
+    "progressHairline": { "$value": "2px" },
+    "progressBold": { "$value": "6px" },
+    "progressRadialSm": { "$value": "40px" },
+    "progressRadialMd": { "$value": "64px" }
   },
   "space": {
     "$type": "dimension",
@@ -139,14 +158,17 @@
     "statuspillPadSmX": {
       "$value": "8px",
       "$description": "statuspill-pad-sm yatay (Alperen onayı 2026-07-31)."
-    }
+    },
+    "accentSwatch": { "$value": "28px", "$description": "Accent seçici swatch boyutu — 2026-08-01 onay." }
   },
   "duration": {
     "$type": "duration",
     "glide": {
       "$value": "240ms",
       "$description": "«Süzülme, sıçrama değil» — D4-0/NOVA belgeli geçiş süresi. reduced-motion: 0ms."
-    }
+    },
+    "riverArrive": { "$value": "450ms", "$description": "Nehir satır-doğuş süzülmesi — 2026-08-01 onay." },
+    "progressFlow": { "$value": "1600ms", "$description": "Indeterminate akış periyodu — yalnız gerçek süre-belirsizliğinde." }
   },
   "brightness": {
     "$type": "number",
@@ -158,10 +180,22 @@
     "$type": "number",
     "$description": "Accent-kanallı saydamlıklar (Alperen onayı 2026-07-31; kanonik adlar: accent-alpha-hover · glow-focus).",
     "accentHover": { "$value": 0.28 },
-    "glowFocus": { "$value": 0.14 }
+    "glowFocus": { "$value": 0.14 },
+    "glowText": {
+      "$value": "{alpha.glowFocus}",
+      "$description": "Nehir text-shadow ışıması — focus-ışımasıyla aynı yoğunluk (alias)."
+    },
+    "panelScrim": { "$value": 0.86, "$description": "Floating-panel zemini (surface-kanalı) — 2026-08-01 onay." },
+    "panelEdge": { "$value": 0.25, "$description": "Floating-panel kenarı (accent-kanalı)." },
+    "selectionOverlay": { "$value": 0.55, "$description": "Seçim-vurgusu — kanal = text rolü (beyaz emekli)." }
+  },
+  "blur": {
+    "$type": "dimension",
+    "panelFloat": { "$value": "6px", "$description": "Floating-panel backdrop-blur — 2026-08-01 onay." }
   },
   "opacity": {
     "$type": "number",
+    "riverText": { "$value": 0.86, "$description": "Nehir satır-mürekkebi opaklığı — 2026-08-01 onay." },
     "disabled": {
       "$value": 0.45,
       "$description": "opacity-disabled (Alperen onayı 2026-07-31). Disabled efektif-kontrast eşiği bu değerle sabitlenir — bilinen durum: danger .45'te 2.21:1 (a11y 2026-07-31 #2); yükseltme kararı ürünleşme-önkoşulu listesinde."

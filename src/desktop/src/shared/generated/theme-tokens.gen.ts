@@ -34,7 +34,7 @@ export const GEN_PRIMITIVES = {
   nightAccent: '#E2766B',
   nightAccentText: '#1C0F0D',
   ink: '#2B2F33',
-  inkMuted: '#6B6F72',
+  inkMuted: '#63676a',
   magenta: '#BD4278',
   magentaSea: '#E88FB9',
   brass: '#A98F54',
@@ -135,4 +135,8 @@ export const GEN_COMPONENT_TOKENS = {
   'statuspill-go-text': 'go-text',
   'statuspill-caution-text': 'caution-text',
   'statuspill-abort-text': 'abort-text',
+  'progress-track': 'border',
+  'progress-fill': 'accent',
+  'progress-fill-done': 'go',
+  'progress-fill-abort': 'abort',
 } as const;

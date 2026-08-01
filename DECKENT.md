@@ -263,7 +263,7 @@ hangi fonksiyonlar eklenecek/degistirilecek, neden gerekli oldugunu belirt.
 Bir sprint 8 fazdan olusur:
 
 ```
-PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
+PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE  <!-- cleanup = komut, faz değil (SprintPhase enum; hizalama 2026-08-01) -->
 ```
 
 | Faz | Aciklama | Sorumlu |

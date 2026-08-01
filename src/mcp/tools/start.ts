@@ -63,7 +63,7 @@ export function registerStartTool(
     'deckent_start',
     {
       title: 'Start Run',
-      description: 'Start a full run in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Pre-spawn cost admission always runs: acknowledgeCost=true or force=true may acknowledge a numeric budget overrun, but cannot override unknown pricing or an unavailable gate. Returns immediately with a jobId — the run continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
+      description: 'Start a full run in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE. Pre-spawn cost admission always runs: acknowledgeCost=true or force=true may acknowledge a numeric budget overrun, but cannot override unknown pricing or an unavailable gate. Returns immediately with a jobId — the run continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).'),
