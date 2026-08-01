@@ -33,14 +33,15 @@ describe('preferences-store (D4-1)', () => {
     expect(reread.corrupted).toBe(false);
   });
 
-  it('set() merges over current state (customTokens survive a watch-only change)', () => {
+  it('set() merges over current state (customTokens + fontSet survive a watch-only change)', () => {
     const store = createPreferencesStore({ baseDir });
-    store.set({ customTokens: { accent: '#112233' } });
+    store.set({ customTokens: { accent: '#112233' }, fontSet: 'envanter-legacy' });
     store.set({ watch: 'open-sea' });
     expect(store.get().preferences).toEqual({
-      version: 1,
+      version: 2,
       watch: 'open-sea',
       customTokens: { accent: '#112233' },
+      fontSet: 'envanter-legacy',
     });
   });
 
@@ -59,6 +60,34 @@ describe('preferences-store (D4-1)', () => {
 
   it('schema-invalid content (unknown watch) degrades to defaults', () => {
     const store = createPreferencesStore({ baseDir });
+    writeFileSync(
+      store.filePath,
+      JSON.stringify({ version: 2, watch: 'dog-watch', customTokens: {}, fontSet: 'makine-izi' }),
+      'utf-8'
+    );
+    expect(store.get()).toEqual({ preferences: DEFAULT_PREFERENCES, corrupted: true });
+  });
+
+  it('a valid v1 record migrates LOSSLESSLY to v2 (watch/customTokens preserved, fontSet defaulted)', () => {
+    const store = createPreferencesStore({ baseDir });
+    writeFileSync(
+      store.filePath,
+      JSON.stringify({ version: 1, watch: 'night-watch', customTokens: { accent: '#445566' } }),
+      'utf-8'
+    );
+    expect(store.get()).toEqual({
+      preferences: {
+        version: 2,
+        watch: 'night-watch',
+        customTokens: { accent: '#445566' },
+        fontSet: 'makine-izi',
+      },
+      corrupted: false,
+    });
+  });
+
+  it('a v1 record with an unknown watch does NOT migrate (defaults, corrupted)', () => {
+    const store = createPreferencesStore({ baseDir });
     writeFileSync(store.filePath, JSON.stringify({ version: 1, watch: 'dog-watch', customTokens: {} }), 'utf-8');
     expect(store.get()).toEqual({ preferences: DEFAULT_PREFERENCES, corrupted: true });
   });
@@ -67,6 +96,12 @@ describe('preferences-store (D4-1)', () => {
     const store = createPreferencesStore({ baseDir });
     writeFileSync(store.filePath, JSON.stringify({ version: 99, watch: 'day-watch', customTokens: {} }), 'utf-8');
     expect(store.get()).toEqual({ preferences: DEFAULT_PREFERENCES, corrupted: true });
+  });
+
+  it('set() rejects an unknown fontSet loudly (fail fast, nothing persisted)', () => {
+    const store = createPreferencesStore({ baseDir });
+    expect(() => store.set({ fontSet: 'comic-sans' as never })).toThrow();
+    expect(store.get().preferences).toEqual(DEFAULT_PREFERENCES);
   });
 
   it('set() rejects invalid input loudly (fail fast, nothing persisted)', () => {

@@ -1,9 +1,24 @@
 {
-  "$description": "Semantic + component indirection haritası — src/desktop/src/shared/theme-tokens.ts WATCHES ve COMPONENT_TOKENS ile bire-bir (drift testi: theme-tokens-gen-sync.test.ts). Semantic katman saf yönlendirmedir: her rol bir color.chart.* primitive ADI gösterir; watch değişimi bu katmanın yeniden-işaretlenmesidir. Rol ekleme/çıkarma = tasarım kararı → Alperen onayı.",
+  "$description": "Semantic + component indirection haritası — src/desktop/src/shared/theme-tokens.ts WATCHES ve COMPONENT_TOKENS ile bire-bir (drift testi: theme-tokens-gen-sync.test.ts). Semantic katman saf yönlendirmedir: her rol bir color.chart.* primitive ADI gösterir; watch değişimi bu katmanın yeniden-işaretlenmesidir. Rol ekleme/çıkarma = tasarım kararı → Alperen onayı. BİLİNÇLİ ÖRTÜŞME (belgele-kabul, Alperen 2026-08-01): nova'da caution≡brass (ikisi de novaAmber) ve border-strong her vardiyada text-muted primitive'ini paylaşır — roller semantic düzeyde ayrı kalır, görsel paylaşım tasarım tercihidir; ayrıştırma ancak gerçek karışıklık kanıtında yeni karar olur.",
   "semanticTokenNames": [
-    "bg", "surface", "border", "text", "text-muted", "accent",
-    "accent-text", "brass", "go", "caution", "abort",
-    "go-text", "caution-text", "abort-text", "focus-ring"
+    "bg",
+    "surface",
+    "border",
+    "text",
+    "text-muted",
+    "accent",
+    "accent-text",
+    "brass",
+    "go",
+    "caution",
+    "abort",
+    "go-text",
+    "caution-text",
+    "abort-text",
+    "focus-ring",
+    "accent-bright",
+    "border-strong",
+    "arc-idle"
   ],
   "watches": {
     "nova": {
@@ -21,7 +36,10 @@
       "go-text": "novaDeep",
       "caution-text": "novaDeep",
       "abort-text": "novaDeep",
-      "focus-ring": "novaGlow"
+      "focus-ring": "novaGlow",
+      "accent-bright": "novaGlowBright",
+      "border-strong": "novaTextMuted",
+      "arc-idle": "novaGlowIdle"
     },
     "day-watch": {
       "bg": "buff",
@@ -38,7 +56,10 @@
       "go-text": "buffRaised",
       "caution-text": "buffRaised",
       "abort-text": "buffRaised",
-      "focus-ring": "magenta"
+      "focus-ring": "magenta",
+      "accent-bright": "magentaBright",
+      "border-strong": "inkMuted",
+      "arc-idle": "magentaIdle"
     },
     "night-watch": {
       "bg": "night",
@@ -55,7 +76,10 @@
       "go-text": "night",
       "caution-text": "night",
       "abort-text": "night",
-      "focus-ring": "nightAccent"
+      "focus-ring": "nightAccent",
+      "accent-bright": "nightAccentBright",
+      "border-strong": "nightTextMuted",
+      "arc-idle": "nightAccentIdle"
     },
     "open-sea": {
       "bg": "deepSea",
@@ -72,7 +96,10 @@
       "go-text": "deepSea",
       "caution-text": "deepSea",
       "abort-text": "deepSea",
-      "focus-ring": "magentaSea"
+      "focus-ring": "magentaSea",
+      "accent-bright": "magentaSeaBright",
+      "border-strong": "seaTextMuted",
+      "arc-idle": "magentaSeaIdle"
     }
   },
   "componentTokens": {
@@ -81,7 +108,7 @@
     "card-bg": "surface",
     "card-border": "border",
     "input-bg": "surface",
-    "input-border": "border",
+    "input-border": "border-strong",
     "input-text": "text",
     "statuspill-go": "go",
     "statuspill-caution": "caution",
@@ -92,6 +119,9 @@
     "progress-track": "border",
     "progress-fill": "accent",
     "progress-fill-done": "go",
-    "progress-fill-abort": "abort"
+    "progress-fill-abort": "abort",
+    "progress-arc": "accent-bright",
+    "progress-arc-idle": "arc-idle",
+    "panelfloat-border": "border-strong"
   }
 }

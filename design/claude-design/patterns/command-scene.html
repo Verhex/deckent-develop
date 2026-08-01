@@ -368,18 +368,33 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
       <h4>NOVA-sahne flip-önkoşulları (kimlik-turu denetimleri, 2026-07-31 — aynen aktarım)</h4>
       <ol type="a">
         <li>worker-segment klavye erişimi (react-aria katmanı: ok-tuşu gezinme + Enter/Escape);</li>
-        <li>idle segment-yayı efektif ≥3:1 (bugün alfa .30 → 1.6–1.9:1);</li>
+        <li><s>idle segment-yayı efektif ≥3:1</s> — <b>ÇÖZÜLDÜ (rol-turu 2026-08-01):</b>
+        <code>arc-idle</code> rolü vardiya-başına <b>katı-kompozit</b> primitive olarak açıldı
+        (nova <code>novaGlowIdle</code> #20748D → 3.77:1; dört vardiya bg-bandı 3.48–3.77, validator
+        min 3 kilitli). Alpha-compositing kontrast-kritik katmanda emekli — üretim canvas'ı
+        <code>progress-arc-idle</code> token'ını tüketir (tüketim = flip işi);</li>
         <li>bayatlığa renk-dışı ikinci taşıyıcı (kesikli stroke + STALE etiketi) — accent=KOR seçilirse ZORUNLU (KOR vs amber 1.11:1);</li>
-        <li>picker/panel kenarlık ≥3:1 — KAPSAM: komuta-girdisi kenarı (bugün 2.23:1) + odak-paneli
-        kenarı (1.67:1) + approval metin-eşle input sınırı dahil;</li>
+        <li><s>picker/panel kenarlık ≥3:1</s> — <b>ÇÖZÜLDÜ (rol-turu 2026-08-01):</b>
+        <code>border-strong</code> rolü (muted kanalı — dört vardiyada bg üstü ≥4.8, validator min 3);
+        <code>input-border → border-strong</code> flip'i CANLI (desktop <code>--dk-c-input-border</code>
+        tüketicileri), floating-panel algılanabilir sınırı <code>panelfloat-border</code>;
+        accent-glow kenarı DEKORATİF beyanlı kalır (<code>alpha.panelEdge</code> .25);</li>
         <li>worker-kategorik WCOL paletinin (4 token-dışı renk) primitives'e token olarak önerilmesi;</li>
-        <li>(g) Canvas/CSS nefes-tempo senkronu (bugün ≈6.3s vs 4s — tek ritim);</li>
-        <li>canvas mikro-metin ≥10px.</li>
+        <li>canvas mikro-metin ≥10px;</li>
+        <li>Canvas/CSS nefes-tempo senkronu (bugün ≈6.3s vs 4s — tek ritim);</li>
+        <li>transport: poll ölür → birleşik <code>/api/live</code> SSE (anayasa Teknik);</li>
+        <li>nehir WCAG 2.2.2 pause/freeze + <code>role="log"</code> (telemetry-river kartında ZORUNLU-beyanlı).</li>
       </ol>
+      <p class="status">Harf-düzeni kanonik a–i listesiyle bire-bir (pipeline §6): f=mikro-metin,
+      g=tempo-senkron, h=SSE, i=nehir — kart-içi ve kartlar-arası tüm harf-referansları bu düzene işler.</p>
       <p class="status">Durum-notu: accent-turu kapandı (CAM GÖBEĞİ kalıcı — 2026-07-31), (c)'nin
       KOR-zorunluluk koşulu tetiklenmedi; ikinci taşıyıcı bu pattern-sözleşmesinde yine de
       accent'ten bağımsız flip-şartı olarak korunur (davranış tablosu, "Bayatlık" satırı).
-      Kaynak: <code>.claude/skills/design-tokens-pipeline/SKILL.md</code> §6 açık-maddeler.</p>
+      Rol-turu 2026-08-01 (Alperen "a11y-önce iki dilim" kararı): (b)+(d) tasarım/token
+      katmanında kapandı — <code>accent-bright · border-strong · arc-idle</code> rolleri +
+      7 ölçülmüş primitive + validator eşikleri kaynakta; (b-render: canvas'ın arc-idle
+      tüketimi)·(a)·(c)·(f)·(i) üretim-flip diliminde, (e)·(g)·(h SSE) mimari dilimde. Kaynak:
+      <code>.claude/skills/design-tokens-pipeline/SKILL.md</code> §6 açık-maddeler.</p>
     </div>
   </section>
 

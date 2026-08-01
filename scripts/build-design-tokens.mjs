@@ -109,7 +109,19 @@ function desktopGenTs({ dictionary }) {
   const components = Object.entries(watchMap.componentTokens)
     .map(([c, s]) => `  ${tsKey(c)}: '${s}',`)
     .join('\n');
-  return `/**\n * ${GENERATED_HEADER}\n * Eşitlik-kilidi: src/desktop/tests/theme-tokens-gen-sync.test.ts\n */\nexport const GEN_PRIMITIVES = {\n${primitives}\n} as const;\n\nexport const GEN_WATCHES = {\n${watches}\n} as const;\n\nexport const GEN_COMPONENT_TOKENS = {\n${components}\n} as const;\n`;
+  // fontSet.<set>.<rol> → seçilebilir set-sözlüğü (prefs-v2 fontSet alanının drift-kilidi)
+  const fontSetTokens = dictionary.allTokens.filter((t) => t.path[0] === 'fontSet' && t.path.length === 3);
+  const setNames = [...new Set(fontSetTokens.map((t) => t.path[1]))];
+  const fontSets = setNames
+    .map((set) => {
+      const body = fontSetTokens
+        .filter((t) => t.path[1] === set)
+        .map((t) => `    ${tsKey(t.path[2])}: [${(t.$value ?? t.value).map((f) => `'${f}'`).join(', ')}],`)
+        .join('\n');
+      return `  ${tsKey(set)}: {\n${body}\n  },`;
+    })
+    .join('\n');
+  return `/**\n * ${GENERATED_HEADER}\n * Eşitlik-kilidi: src/desktop/tests/theme-tokens-gen-sync.test.ts\n */\nexport const GEN_PRIMITIVES = {\n${primitives}\n} as const;\n\nexport const GEN_WATCHES = {\n${watches}\n} as const;\n\nexport const GEN_COMPONENT_TOKENS = {\n${components}\n} as const;\n\nexport const GEN_FONT_SETS = {\n${fontSets}\n} as const;\n`;
 }
 
 function terminalPaletteTs({ dictionary }) {

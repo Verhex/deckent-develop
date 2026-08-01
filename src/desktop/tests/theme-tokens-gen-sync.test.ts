@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENT_TOKENS, PRIMITIVES, WATCHES } from '../src/shared/theme-tokens.js';
+import { COMPONENT_TOKENS, FONT_SETS, PRIMITIVES, WATCHES } from '../src/shared/theme-tokens.js';
 import {
   GEN_COMPONENT_TOKENS,
+  GEN_FONT_SETS,
   GEN_PRIMITIVES,
   GEN_WATCHES,
 } from '../src/shared/generated/theme-tokens.gen.js';
@@ -24,5 +25,9 @@ describe('design-tokens pipeline ↔ desktop theme SSOT sync', () => {
 
   it('component token pointers are identical', () => {
     expect(GEN_COMPONENT_TOKENS).toEqual(COMPONENT_TOKENS);
+  });
+
+  it('font sets are identical', () => {
+    expect(GEN_FONT_SETS).toEqual(FONT_SETS);
   });
 });

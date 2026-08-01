@@ -98,6 +98,67 @@
 }
 
 /**
+ * «ENVANTER-LEGACY» — seçilebilir tarihî set (prefs-v2 `fontSet`, 2026-08-01
+ * onayı): Bricolage Grotesque (display), Hanken Grotesk (body), Geist Mono
+ * (data). Yüklenmesi seçime bağlı değildir (@font-face tembel: yalnız
+ * kullanılan yüz indirilir); theme-runtime --dk-font-* değişkenlerini çevirir.
+ */
+/* Bricolage Grotesque — latin-ext (30736B, OFL) */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/bricolage-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Bricolage Grotesque — latin (76888B, OFL) */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/bricolage-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* Hanken Grotesk — latin-ext (19588B, OFL) */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/hanken-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Hanken Grotesk — latin (34704B, OFL) */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/hanken-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* Geist Mono — latin-ext (14696B, OFL) */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('./fonts/geistmono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Geist Mono — latin (23128B, OFL) */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('./fonts/geistmono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/**
  * D4-1 («Köprüüstü»): ALL color comes from the three-layer watch tokens
  * (`--dk-p-*` / `--dk-s-*` / `--dk-c-*`), which theme-runtime.ts sets on
  * <html> synchronously at entry (main.ts) — before first paint — from the
@@ -125,7 +186,9 @@
   --space-8: 32px;
   --radius: 8px;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  /* D4-4 «Köprüüstü» type roles (D4-0 pairing, self-hosted above) */
+  /* Type-rol DEFAULT'ları (makine-izi). theme-runtime.ts, prefs-v2 `fontSet`
+     seçimini buildFontVariables ile bu değişkenlerin ÜZERİNE yazar (inline
+     style > :root) — set değişimi bu üç değişkenin çevrilmesidir. */
   --dk-font-display: 'Tektur', var(--font-sans);
   --dk-font-body: 'Chakra Petch', var(--font-sans);
   --dk-font-data: 'Spline Sans Mono', ui-monospace, 'Cascadia Mono', monospace;
@@ -400,7 +463,7 @@ select {
   font: inherit;
   color: var(--color-fg);
   background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--dk-c-input-border);
   border-radius: var(--radius);
   padding: var(--space-2) var(--space-3);
 }
@@ -815,7 +878,7 @@ select:focus-visible {
   font-size: 14px;
   color: var(--dk-s-text);
   background: var(--dk-s-surface);
-  border: 1px solid var(--dk-s-border);
+  border: 1px solid var(--dk-c-input-border);
   border-radius: 4px;
   padding: var(--space-2);
 }
@@ -862,7 +925,7 @@ select:focus-visible {
   font-size: 13px;
   color: var(--dk-s-text);
   background: var(--dk-s-surface);
-  border: 1px solid var(--dk-s-border);
+  border: 1px solid var(--dk-c-input-border);
   border-radius: 4px;
   padding: var(--space-2);
   resize: vertical;
@@ -1004,7 +1067,7 @@ select:focus-visible {
   animation: nova-arr .4s ease-out; align-items:baseline; }
 @keyframes nova-arr { from { opacity:0; transform:translateY(6px);} }
 .nova-river__src { flex:0 0 84px; color:var(--dk-s-text-muted); font-size:11px; text-align:right; }
-.nova-river__row[data-ci="1"] .nova-river__src { color:#7be8ff; } .nova-river__row[data-ci="2"] .nova-river__src { color:var(--dk-s-go); }
+.nova-river__row[data-ci="1"] .nova-river__src { color:var(--dk-p-novaGlowBright); } .nova-river__row[data-ci="2"] .nova-river__src { color:var(--dk-s-go); }
 .nova-river__row[data-ci="3"] .nova-river__src { color:var(--dk-s-caution); } .nova-river__row[data-ci="4"] .nova-river__src { color:#c792ea; }
 .nova-river__row[data-ci="0"] .nova-river__src { color:var(--dk-s-accent); } .nova-river__row[data-ci="5"] .nova-river__src { color:#ff9e64; }
 .nova-river__txt { color:var(--dk-s-text); opacity:.88; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -1015,7 +1078,7 @@ select:focus-visible {
 .nova-river__row--me .nova-river__txt { color:var(--dk-s-text); opacity:1; }
 .nova-cmd { flex-shrink:0; width:min(760px,90%); margin:6px auto 18px; }
 .nova-cmd__input { width:100%; background:rgba(10,20,29,.85); color:var(--dk-s-text);
-  border:1px solid rgba(var(--dk-s-accent-rgb),.35); border-radius:999px; outline:none; font-size:14px; padding:13px 22px;
+  border:1px solid var(--dk-c-input-border); border-radius:999px; outline:none; font-size:14px; padding:13px 22px;
   box-shadow:0 0 0 1px rgba(var(--dk-s-accent-rgb),.08), 0 0 34px rgba(var(--dk-s-accent-rgb),.14), inset 0 0 24px rgba(var(--dk-s-accent-rgb),.05);
   transition: box-shadow .3s, border-color .3s; }
 .nova-cmd__input:focus { border-color:var(--dk-s-accent); box-shadow:0 0 0 1px rgba(var(--dk-s-accent-rgb),.25), 0 0 54px rgba(var(--dk-s-accent-rgb),.3), inset 0 0 24px rgba(var(--dk-s-accent-rgb),.05); }
@@ -1026,7 +1089,7 @@ select:focus-visible {
 .nova-palette__box { width:min(520px,90%); background:var(--dk-s-surface); border:1px solid var(--dk-s-accent);
   border-radius:10px; box-shadow:0 0 60px rgba(var(--dk-s-accent-rgb),.2); overflow:hidden; }
 .nova-palette__input { width:100%; background:none; border:none; outline:none; color:var(--dk-s-text);
-  font-size:14px; padding:14px 18px; border-bottom:1px solid var(--dk-s-border); }
+  font-size:14px; padding:14px 18px; border-bottom:1px solid var(--dk-c-input-border); }
 .nova-palette__list { list-style:none; margin:0; padding:6px; }
 .nova-palette__list button { width:100%; text-align:left; background:none; border:none; cursor:pointer;
   color:var(--dk-s-text); font-size:13px; padding:9px 12px; border-radius:6px; }

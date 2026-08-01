@@ -71,52 +71,62 @@ footer{margin-top:44px;border-top:1px solid var(--line);padding-top:14px;font-fa
   <section>
     <div class="label">Semantic — vardiyalar</div>
     <div class="watches" id="watches"></div>
-    <p class="note">Rozetler: AAA ≥ 7:1 · AA ≥ 4.5:1 · AA-L ≥ 3:1 (yalnız large-text/glif kullanım).
+    <p class="note">Rozetler: AAA ≥ 7:1 · AA ≥ 4.5:1 · AA-L ≥ 3:1 (large-text/glif VE
+    non-text bileşen sınırları — WCAG 1.4.11: accent-bright/border-strong/arc-idle/focus satırları).
     Semantic katman saf yönlendirmedir — vardiya değişimi yalnız bu katmanın yeniden-işaretlenmesidir.</p>
     <p class="note"><b style="color:#43E39A;font-family:var(--f-data);font-size:11px;letter-spacing:.12em;font-weight:400">KARAR 2026-07-31</b> —
     durum-üstü mürekkep rolleri eklendi (<span style="font-family:var(--f-data)">go-text · caution-text · abort-text</span>,
     Alperen onayı). day-watch <span style="font-family:var(--f-data)">caution</span> mürekkebi ölçümle
     #8F6212'ye koyulaştırıldı (caution-text 5.03:1 · caution/bg 4.57:1 — AA). Rozetler dört vardiyada da yeşil.</p>
+    <p class="note"><b style="color:#7BE8FF;font-family:var(--f-data);font-size:11px;letter-spacing:.12em;font-weight:400">KARAR 2026-08-01</b> —
+    rol-turu: <span style="font-family:var(--f-data)">accent-bright · border-strong · arc-idle</span>
+    rolleri açıldı (18 rol). <span style="font-family:var(--f-data)">accent-bright</span> = vurgu-adımı
+    (~1.25×): koyu vardiyalarda AÇIK, açık vardiyada (day-watch) DERİN yönde — parlaklık değil
+    vurgu semantiği. <span style="font-family:var(--f-data)">arc-idle</span> = katı-kompozit
+    (alpha-compositing kontrast-kritik katmanda emekli; bg-bandı 3.48–3.77).
+    <span style="font-family:var(--f-data)">border-strong</span> muted kanalını paylaşır (belgele-kabul).</p>
   </section>
 
   <section>
     <div class="label">Decko — dashboard mevcut-durumu (ADR-G-033 observability yüzeyi)</div>
     <div class="ramps" id="decko"></div>
-    <p class="note">Teal/gold Decko mirası dashboard'da yaşıyor; NOVA-çekirdek birleşim kararı
-    accent-ailesi prototip turuyla birlikte verilecek (sessiz değiştirme yok).</p>
+    <p class="note">Teal/gold Decko mirası dashboard'da yaşıyor; NOVA-çekirdek birleşimi ayrı
+    Alperen kararı bekler (accent-turu 2026-07-31'de kapandı — CAM GÖBEĞİ; birleşim o turun
+    kapsamı dışındaydı; sessiz değiştirme yok).</p>
   </section>
 
-  <footer>kaynak: design/tokens/primitives.tokens.json + watch-map.json · rozetler: canlı WCAG hesabı · 2026-07-31</footer>
+  <footer>kaynak: design/tokens/primitives.tokens.json + watch-map.json · rozetler: canlı WCAG hesabı · 2026-08-01</footer>
 </div>
 <script>
 /* Üretilmiş kopya — design/tokens/primitives.tokens.json (build:tokens ile eşdeğer). */
 const PRIM = {
   novaDeep:'#04080D',novaRaised:'#0A141D',novaLine:'#14242F',novaText:'#D7E7EE',novaTextMuted:'#6E8A98',
-  novaGlow:'#38D3FF',novaGlowBright:'#7BE8FF',novaGlowDeep:'#04202B',novaAmber:'#E8B34C',novaGo:'#43E39A',novaAbort:'#FF6B5E',
+  novaGlow:'#38D3FF',novaGlowBright:'#7BE8FF',novaGlowIdle:'#20748D',novaGlowDeep:'#04202B',novaAmber:'#E8B34C',novaGo:'#43E39A',novaAbort:'#FF6B5E',
   buff:'#F2EDDC',buffRaised:'#FBF8EC',buffLine:'#DDD5BC',
   shallowWater:'#BDD7E2',deepSea:'#0E2430',deepSeaRaised:'#13303F',deepSeaLine:'#235064',
   seaText:'#D8E4E9',seaTextMuted:'#7FA3B2',seaAccentText:'#0E2430',
   night:'#12151A',nightRaised:'#181C23',nightLine:'#2A303A',nightText:'#E3DAD2',nightTextMuted:'#9B948B',
-  nightAccent:'#E2766B',nightAccentText:'#1C0F0D',
-  ink:'#2B2F33',inkMuted:'#63676a',magenta:'#BD4278',magentaSea:'#E88FB9',brass:'#A98F54',paperOnMagenta:'#FBF8EC',
+  nightAccent:'#E2766B',nightAccentBright:'#F0938A',nightAccentIdle:'#935E5B',nightAccentText:'#1C0F0D',
+  ink:'#2B2F33',inkMuted:'#63676a',magenta:'#BD4278',magentaBright:'#A93368',magentaIdle:'#B95C82',
+  magentaSea:'#E88FB9',magentaSeaBright:'#F5A8CC',magentaSeaIdle:'#8F6E87',brass:'#A98F54',paperOnMagenta:'#FBF8EC',
   go:'#2F7D46',caution:'#8F6212',abort:'#C0453E',
   nightGo:'#7FA06A',nightCaution:'#C99A55',nightAbort:'#E2766B',
   seaGo:'#7FC78F',seaCaution:'#E0B368',seaAbort:'#F08A80'
 };
 const GROUPS = [
-  ['NOVA — birincil kimlik',['novaDeep','novaRaised','novaLine','novaText','novaTextMuted','novaGlow','novaGlowBright','novaGlowDeep','novaAmber','novaGo','novaAbort']],
+  ['NOVA — birincil kimlik',['novaDeep','novaRaised','novaLine','novaText','novaTextMuted','novaGlow','novaGlowBright','novaGlowIdle','novaGlowDeep','novaAmber','novaGo','novaAbort']],
   ['Kâğıt / kara',['buff','buffRaised','buffLine']],
   ['Deniz',['shallowWater','deepSea','deepSeaRaised','deepSeaLine','seaText','seaTextMuted','seaAccentText']],
-  ['Gece (kırmızı-ışık disiplini)',['night','nightRaised','nightLine','nightText','nightTextMuted','nightAccent','nightAccentText']],
-  ['Mürekkep &amp; rota',['ink','inkMuted','magenta','magentaSea','brass','paperOnMagenta']],
+  ['Gece (kırmızı-ışık disiplini)',['night','nightRaised','nightLine','nightText','nightTextMuted','nightAccent','nightAccentBright','nightAccentIdle','nightAccentText']],
+  ['Mürekkep &amp; rota',['ink','inkMuted','magenta','magentaBright','magentaIdle','magentaSea','magentaSeaBright','magentaSeaIdle','brass','paperOnMagenta']],
   ['Durumlar',['go','caution','abort','nightGo','nightCaution','nightAbort','seaGo','seaCaution','seaAbort']]
 ];
-/* watch-map.json ile bire-bir — 12 semantik rolün tamamı sergilenir */
+/* watch-map.json ile bire-bir — 18 semantik rolün tamamı sergilenir (rol-turu 2026-08-01: accent-bright · border-strong · arc-idle) */
 const WATCHES = {
-  'nova':{tag:'BİRİNCİL — NOVA',bg:'novaDeep',surface:'novaRaised',border:'novaLine',text:'novaText',muted:'novaTextMuted',accent:'novaGlow',accentText:'novaGlowDeep',brass:'novaAmber',go:'novaGo',caution:'novaAmber',abort:'novaAbort',goText:'novaDeep',cautionText:'novaDeep',abortText:'novaDeep',focus:'novaGlow'},
-  'day-watch':{tag:'motor-mirası',bg:'buff',surface:'buffRaised',border:'buffLine',text:'ink',muted:'inkMuted',accent:'magenta',accentText:'paperOnMagenta',brass:'brass',go:'go',caution:'caution',abort:'abort',goText:'buffRaised',cautionText:'buffRaised',abortText:'buffRaised',focus:'magenta'},
-  'night-watch':{tag:'motor-mirası',bg:'night',surface:'nightRaised',border:'nightLine',text:'nightText',muted:'nightTextMuted',accent:'nightAccent',accentText:'nightAccentText',brass:'brass',go:'nightGo',caution:'nightCaution',abort:'nightAbort',goText:'night',cautionText:'night',abortText:'night',focus:'nightAccent'},
-  'open-sea':{tag:'motor-mirası',bg:'deepSea',surface:'deepSeaRaised',border:'deepSeaLine',text:'seaText',muted:'seaTextMuted',accent:'magentaSea',accentText:'seaAccentText',brass:'brass',go:'seaGo',caution:'seaCaution',abort:'seaAbort',goText:'deepSea',cautionText:'deepSea',abortText:'deepSea',focus:'magentaSea'}
+  'nova':{tag:'BİRİNCİL — NOVA',bg:'novaDeep',surface:'novaRaised',border:'novaLine',text:'novaText',muted:'novaTextMuted',accent:'novaGlow',accentText:'novaGlowDeep',brass:'novaAmber',go:'novaGo',caution:'novaAmber',abort:'novaAbort',goText:'novaDeep',cautionText:'novaDeep',abortText:'novaDeep',focus:'novaGlow',accentBright:'novaGlowBright',borderStrong:'novaTextMuted',arcIdle:'novaGlowIdle'},
+  'day-watch':{tag:'motor-mirası',bg:'buff',surface:'buffRaised',border:'buffLine',text:'ink',muted:'inkMuted',accent:'magenta',accentText:'paperOnMagenta',brass:'brass',go:'go',caution:'caution',abort:'abort',goText:'buffRaised',cautionText:'buffRaised',abortText:'buffRaised',focus:'magenta',accentBright:'magentaBright',borderStrong:'inkMuted',arcIdle:'magentaIdle'},
+  'night-watch':{tag:'motor-mirası',bg:'night',surface:'nightRaised',border:'nightLine',text:'nightText',muted:'nightTextMuted',accent:'nightAccent',accentText:'nightAccentText',brass:'brass',go:'nightGo',caution:'nightCaution',abort:'nightAbort',goText:'night',cautionText:'night',abortText:'night',focus:'nightAccent',accentBright:'nightAccentBright',borderStrong:'nightTextMuted',arcIdle:'nightAccentIdle'},
+  'open-sea':{tag:'motor-mirası',bg:'deepSea',surface:'deepSeaRaised',border:'deepSeaLine',text:'seaText',muted:'seaTextMuted',accent:'magentaSea',accentText:'seaAccentText',brass:'brass',go:'seaGo',caution:'seaCaution',abort:'seaAbort',goText:'deepSea',cautionText:'deepSea',abortText:'deepSea',focus:'magentaSea',accentBright:'magentaSeaBright',borderStrong:'seaTextMuted',arcIdle:'magentaSeaIdle'}
 };
 const DECKO = {
   zinc:['#fafafa','#a1a1aa','#27272a','#18181b','#09090b'],
@@ -125,7 +135,7 @@ const DECKO = {
 };
 function lum(hex){const c=[1,3,5].map(i=>{let v=parseInt(hex.slice(i,i+2),16)/255;return v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]}
 function ratio(a,b){const la=lum(a),lb=lum(b),[h,l]=la>=lb?[la,lb]:[lb,la];return (h+0.05)/(l+0.05)}
-function badge(r,min,lbl){const cls=r>=7?'b-aaa':r>=min?'b-aa':'b-fail';const t=r>=7?'AAA':r>=min?(lbl||'AA'):'FAIL';return `<span class="badge ${cls}">${r.toFixed(2)}:1 ${t}</span>`}
+function badge(r,min,lbl){/* lbl = non-text etiketi (AA-L): AAA text-kavramıdır, non-text satırda basılmaz */const pass_=r>=min;const cls=pass_?(!lbl&&r>=7?'b-aaa':'b-aa'):'b-fail';const t=pass_?(lbl||(r>=7?'AAA':'AA')):'FAIL';return `<span class="badge ${cls}">${r.toFixed(2)}:1 ${t}</span>`}
 document.getElementById('prims').innerHTML=GROUPS.map(([title,names])=>
   `<div style="margin-bottom:20px"><div class="label" style="margin-bottom:10px">${title}</div><div class="grid">`+
   names.map(n=>`<div class="chip"><div class="sw" style="background:${PRIM[n]}"></div><div class="meta"><div class="nm">${n}</div><div class="hx">${PRIM[n]}</div></div></div>`).join('')+
@@ -144,15 +154,19 @@ document.getElementById('watches').innerHTML=Object.entries(WATCHES).map(([name,
       <span class="pill" style="background:${P('abort')};color:${P('abortText')}">NO_GO</span>
     </div>
     <div style="font-family:var(--f-data);font-size:10px;letter-spacing:.1em;color:${P('muted')};margin-top:8px"><span style="display:inline-block;width:34px;height:10px;background:${P('brass')};vertical-align:-1px"></span> BRASS — enstrüman vurgusu</div>
+    <div style="font-family:var(--f-data);font-size:10px;letter-spacing:.1em;color:${P('muted')};margin-top:6px"><span style="display:inline-block;width:22px;height:10px;background:${P('accentBright')};vertical-align:-1px"></span> ACCENT-BRIGHT <span style="display:inline-block;width:22px;height:10px;background:${P('arcIdle')};vertical-align:-1px;margin-left:8px"></span> ARC-IDLE <span style="display:inline-block;width:22px;height:2px;background:${P('borderStrong')};vertical-align:3px;margin-left:8px"></span> BORDER-STRONG</div>
     <div class="ratios" style="background:${P('surface')};border:1px solid ${P('border')};padding:8px 10px">
       <div class="ratio" style="color:${P('muted')}"><span>text / bg</span>${badge(ratio(P('text'),P('bg')),4.5)}</div>
       <div class="ratio" style="color:${P('muted')}"><span>text / surface</span>${badge(ratio(P('text'),P('surface')),4.5)}</div>
-      <div class="ratio" style="color:${P('muted')}"><span>muted / bg</span>${badge(ratio(P('muted'),P('bg')),3,'AA-L')}</div>
+      <div class="ratio" style="color:${P('muted')}"><span>muted / bg</span>${badge(ratio(P('muted'),P('bg')),4.5)}</div>
       <div class="ratio" style="color:${P('muted')}"><span>accent-text / accent</span>${badge(ratio(P('accentText'),P('accent')),4.5)}</div>
       <div class="ratio" style="color:${P('muted')}"><span>focus-ring / bg</span>${badge(ratio(P('focus'),P('bg')),3,'AA-L')}</div>
       <div class="ratio" style="color:${P('muted')}"><span>go-text / go</span>${badge(ratio(P('goText'),P('go')),4.5)}</div>
       <div class="ratio" style="color:${P('muted')}"><span>caution-text / caution</span>${badge(ratio(P('cautionText'),P('caution')),4.5)}</div>
       <div class="ratio" style="color:${P('muted')}"><span>abort-text / abort</span>${badge(ratio(P('abortText'),P('abort')),4.5)}</div>
+      <div class="ratio" style="color:${P('muted')}"><span>accent-bright / bg</span>${badge(ratio(P('accentBright'),P('bg')),3,'AA-L')}</div>
+      <div class="ratio" style="color:${P('muted')}"><span>border-strong / bg</span>${badge(ratio(P('borderStrong'),P('bg')),3,'AA-L')}</div>
+      <div class="ratio" style="color:${P('muted')}"><span>arc-idle / bg</span>${badge(ratio(P('arcIdle'),P('bg')),3,'AA-L')}</div>
     </div>
   </div>`}).join('');
 document.getElementById('decko').innerHTML=Object.entries(DECKO).map(([name,cells])=>

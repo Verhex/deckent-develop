@@ -56,6 +56,9 @@ export const PRIMITIVES = {
   // 589-A sahnesinin bright-glow'u; kimlik-turu 2026-07-31'de CAM GÖBEĞİ
   // ailesi (main+bright) kalıcı seçilince primitive olarak kaydedildi.
   novaGlowBright: '#7BE8FF',
+  // arc-idle katı-kompozit (novaGlow @.53 over novaDeep): idle-yay alpha ile değil
+  // ölçülmüş katı renkle çizilir — bg 3.77 / surface 3.49 (≥3, WCAG 1.4.11). 2026-08-01.
+  novaGlowIdle: '#20748D',
   novaGlowDeep: '#04202B',
   novaAmber: '#E8B34C',
   novaGo: '#43E39A',
@@ -79,6 +82,10 @@ export const PRIMITIVES = {
   nightText: '#E3DAD2',
   nightTextMuted: '#9B948B',
   nightAccent: '#E2766B',
+  // accent-bright (night): night 8.05 / raised 7.52, adım 1.31. 2026-08-01 rol-turu.
+  nightAccentBright: '#F0938A',
+  // arc-idle katı-kompozit (nightAccentBright @.58 over night): bg 3.48 / surface 3.25. 2026-08-01.
+  nightAccentIdle: '#935E5B',
   nightAccentText: '#1C0F0D',
   // inks
   ink: '#2B2F33',
@@ -88,7 +95,16 @@ export const PRIMITIVES = {
   // One shade inkier than the D4-0 comp's #C2447C: the validator measured
   // paper-on-#C2447C at 4.47:1 (just under AA 4.5) — chart identity intact.
   magenta: '#BD4278',
+  // accent-bright (day): açık zeminde vurgu = DERİN — buff 5.33 / buffRaised 5.87,
+  // base'e adım 1.25 (nova bright adımı 1.24 ile simetrik). 2026-08-01 rol-turu.
+  magentaBright: '#A93368',
+  // arc-idle katı-kompozit (magentaBright @.78 over buff): bg 3.65 / surface 4.02. 2026-08-01.
+  magentaIdle: '#B95C82',
   magentaSea: '#E88FB9',
+  // accent-bright (open-sea): deepSea 8.64 / raised 7.46, adım 1.25. 2026-08-01 rol-turu.
+  magentaSeaBright: '#F5A8CC',
+  // arc-idle katı-kompozit (magentaSeaBright @.56 over deepSea): bg 3.61 / surface 3.12. 2026-08-01.
+  magentaSeaIdle: '#8F6E87',
   brass: '#A98F54',
   paperOnMagenta: '#FBF8EC',
   // states (chart-honest: gündüz mürekkepleri; gece varyantları kırmızıya kaçar)
@@ -127,6 +143,10 @@ export const SEMANTIC_TOKEN_NAMES = [
   'caution-text', // ink ON caution surfaces
   'abort-text',   // ink ON abort surfaces
   'focus-ring',   // keyboard focus indicator
+  // 2026-08-01 rol-turu (Alperen onayı: "tam rol aç" + a11y-önce dilim):
+  'accent-bright', // vurgu-varyantı (arc aktif-dolgu, ışıma-vurgusu); açık vardiyada DERİN
+  'border-strong', // etkileşimli bileşen sınırı ≥3:1 (WCAG 1.4.11) — muted kanalını paylaşır
+  'arc-idle',      // idle segment-yayı katı-kompoziti (bg-bandı 3.48–3.77; alpha-compositing emekli)
 ] as const;
 
 export type SemanticTokenName = (typeof SEMANTIC_TOKEN_NAMES)[number];
@@ -153,6 +173,9 @@ export const WATCHES: Record<WatchName, WatchDefinition> = {
     'caution-text': 'novaDeep',
     'abort-text': 'novaDeep',
     'focus-ring': 'novaGlow',
+    'accent-bright': 'novaGlowBright',
+    'border-strong': 'novaTextMuted',
+    'arc-idle': 'novaGlowIdle',
   },
   'day-watch': {
     bg: 'buff',
@@ -170,6 +193,9 @@ export const WATCHES: Record<WatchName, WatchDefinition> = {
     'caution-text': 'buffRaised',
     'abort-text': 'buffRaised',
     'focus-ring': 'magenta',
+    'accent-bright': 'magentaBright',
+    'border-strong': 'inkMuted',
+    'arc-idle': 'magentaIdle',
   },
   'night-watch': {
     bg: 'night',
@@ -187,6 +213,9 @@ export const WATCHES: Record<WatchName, WatchDefinition> = {
     'caution-text': 'night',
     'abort-text': 'night',
     'focus-ring': 'nightAccent',
+    'accent-bright': 'nightAccentBright',
+    'border-strong': 'nightTextMuted',
+    'arc-idle': 'nightAccentIdle',
   },
   'open-sea': {
     bg: 'deepSea',
@@ -204,6 +233,9 @@ export const WATCHES: Record<WatchName, WatchDefinition> = {
     'caution-text': 'deepSea',
     'abort-text': 'deepSea',
     'focus-ring': 'magentaSea',
+    'accent-bright': 'magentaSeaBright',
+    'border-strong': 'seaTextMuted',
+    'arc-idle': 'magentaSeaIdle',
   },
 };
 
@@ -218,7 +250,9 @@ export const COMPONENT_TOKENS = {
   'card-bg': 'surface',
   'card-border': 'border',
   'input-bg': 'surface',
-  'input-border': 'border',
+  // 2026-08-01 a11y-önce dilimi (önkoşul d): etkileşimli girdi sınırı ≥3:1 —
+  // 'border' (hairline, ~1.3:1) yerine 'border-strong' (muted kanalı, ≥4.8 her vardiya).
+  'input-border': 'border-strong',
   'input-text': 'text',
   'statuspill-go': 'go',
   'statuspill-caution': 'caution',
@@ -226,21 +260,76 @@ export const COMPONENT_TOKENS = {
   'statuspill-go-text': 'go-text',
   'statuspill-caution-text': 'caution-text',
   'statuspill-abort-text': 'abort-text',
-  // 2026-08-01 progress ailesi (Alperen onayı). 'progress-arc' BİLİNÇLİ eksik:
-  // accent-bright semantic rolü ister (per-watch bright değerleri ayrı tasarım kararı).
+  // 2026-08-01 progress ailesi (Alperen onayı). Arc, rol-turu kararıyla kapandı:
+  // accent-bright (aktif dolgu) + arc-idle (sessiz yay) rolleri açıldı.
   'progress-track': 'border',
   'progress-fill': 'accent',
   'progress-fill-done': 'go',
   'progress-fill-abort': 'abort',
+  'progress-arc': 'accent-bright',
+  'progress-arc-idle': 'arc-idle',
+  // Floating-panel algılanabilir sınırı (önkoşul d): accent-glow kenarı DEKORATİF
+  // kalır (alpha.panelEdge .25), sınır görevi border-strong'da.
+  'panelfloat-border': 'border-strong',
 } as const satisfies Record<string, SemanticTokenName>;
 
 export type ComponentTokenName = keyof typeof COMPONENT_TOKENS;
 
+// ─── Font sets (kimlik seçimi = token-seti; DESKTOP-CUSTOMIZE-001) ──────────
+
+/** Selectable font sets — mirrors `fontSet.*` in design/tokens/primitives.tokens.json
+ *  (drift lock: theme-tokens-gen-sync.test.ts vs GEN_FONT_SETS). */
+export const FONT_SET_NAMES = ['makine-izi', 'envanter-legacy'] as const;
+export type FontSetName = (typeof FONT_SET_NAMES)[number];
+
+export const DEFAULT_FONT_SET: FontSetName = 'makine-izi';
+
+export type FontSetDefinition = Record<'display' | 'body' | 'data', readonly string[]>;
+
+export const FONT_SETS: Record<FontSetName, FontSetDefinition> = {
+  // SEÇİLİ set (Alperen 2026-07-31: aday-turu + gerçek-veri kimlik-turu + flip onayı)
+  'makine-izi': {
+    display: ['Tektur', 'system-ui', 'sans-serif'],
+    body: ['Chakra Petch', 'system-ui', 'sans-serif'],
+    data: ['Spline Sans Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+  },
+  // Tarihî set (D4-0 mirası; kimlik-emekli) — set-değiştirilebilirlik kaydı (2026-08-01 onay)
+  'envanter-legacy': {
+    display: ['Bricolage Grotesque', 'system-ui', 'sans-serif'],
+    body: ['Hanken Grotesk', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+    data: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+  },
+};
+
+/** CSS variables the renderer stylesheet consumes for the three type roles. */
+export const FONT_CSS_VARS = {
+  display: '--dk-font-display',
+  body: '--dk-font-body',
+  data: '--dk-font-data',
+} as const;
+
+/** Serialize a family list to a CSS font-family value (quote names with spaces). */
+function fontStackCss(families: readonly string[]): string {
+  return families.map((f) => (f.includes(' ') ? `'${f}'` : f)).join(', ');
+}
+
+/** Font-role CSS variables for one selectable set (prefs-v2 `fontSet`). */
+export function buildFontVariables(fontSet: FontSetName = DEFAULT_FONT_SET): Record<string, string> {
+  const set = FONT_SETS[fontSet];
+  return {
+    [FONT_CSS_VARS.display]: fontStackCss(set.display),
+    [FONT_CSS_VARS.body]: fontStackCss(set.body),
+    [FONT_CSS_VARS.data]: fontStackCss(set.data),
+  };
+}
+
 // ─── Preferences schema (persisted by main/preferences-store.ts) ────────────
 
-export const DESKTOP_PREFERENCES_VERSION = 1;
+/** v2 (2026-08-01, prefs-v2 kararı): + fontSet. v1 dosyaları migratePreferences
+ *  ile KAYIPSIZ yükselir (watch/customTokens korunur, fontSet default alır). */
+export const DESKTOP_PREFERENCES_VERSION = 2;
 
-/** Hex color: #RGB or #RRGGBB (custom overrides are colors only in v1). */
+/** Hex color: #RGB or #RRGGBB (custom overrides are colors only). */
 const hexColorSchema = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
 
 export const desktopPreferencesSchema = z.object({
@@ -248,6 +337,14 @@ export const desktopPreferencesSchema = z.object({
   watch: z.enum(WATCH_NAMES),
   /** Partial semantic-token overrides ("custom" theming) applied on top of
    *  the selected watch. Keys outside SEMANTIC_TOKEN_NAMES are rejected. */
+  customTokens: z.record(z.enum(SEMANTIC_TOKEN_NAMES), hexColorSchema),
+  fontSet: z.enum(FONT_SET_NAMES),
+});
+
+/** v1 shape — only consumed by the v1→v2 migration in preferences-store.ts. */
+export const desktopPreferencesV1Schema = z.object({
+  version: z.literal(1),
+  watch: z.enum(WATCH_NAMES),
   customTokens: z.record(z.enum(SEMANTIC_TOKEN_NAMES), hexColorSchema),
 });
 
@@ -260,6 +357,7 @@ export const DEFAULT_PREFERENCES: DesktopPreferences = {
   version: DESKTOP_PREFERENCES_VERSION,
   watch: DEFAULT_WATCH,
   customTokens: {},
+  fontSet: DEFAULT_FONT_SET,
 };
 
 // ─── CSS-variable builder (consumed by renderer/theme-runtime.ts) ───────────
@@ -365,6 +463,13 @@ const CONTRAST_REQUIREMENTS: Array<{ fg: SemanticTokenName; bg: SemanticTokenNam
   { fg: 'go-text', bg: 'go', min: 4.5 },
   { fg: 'caution-text', bg: 'caution', min: 4.5 },
   { fg: 'abort-text', bg: 'abort', min: 4.5 },
+  // 2026-08-01 rol-turu: non-text bileşen eşikleri (WCAG 1.4.11)
+  { fg: 'accent-bright', bg: 'bg', min: 3 },
+  { fg: 'accent-bright', bg: 'surface', min: 3 },
+  { fg: 'border-strong', bg: 'bg', min: 3 },
+  { fg: 'border-strong', bg: 'surface', min: 3 },
+  { fg: 'arc-idle', bg: 'bg', min: 3 },
+  { fg: 'arc-idle', bg: 'surface', min: 3 },
 ];
 
 /**

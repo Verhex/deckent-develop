@@ -12,6 +12,7 @@ export const GEN_PRIMITIVES = {
   novaTextMuted: '#6E8A98',
   novaGlow: '#38D3FF',
   novaGlowBright: '#7BE8FF',
+  novaGlowIdle: '#20748D',
   novaGlowDeep: '#04202B',
   novaAmber: '#E8B34C',
   novaGo: '#43E39A',
@@ -32,11 +33,17 @@ export const GEN_PRIMITIVES = {
   nightText: '#E3DAD2',
   nightTextMuted: '#9B948B',
   nightAccent: '#E2766B',
+  nightAccentBright: '#F0938A',
+  nightAccentIdle: '#935E5B',
   nightAccentText: '#1C0F0D',
   ink: '#2B2F33',
   inkMuted: '#63676a',
   magenta: '#BD4278',
+  magentaBright: '#A93368',
+  magentaIdle: '#B95C82',
   magentaSea: '#E88FB9',
+  magentaSeaBright: '#F5A8CC',
+  magentaSeaIdle: '#8F6E87',
   brass: '#A98F54',
   paperOnMagenta: '#FBF8EC',
   go: '#2F7D46',
@@ -67,6 +74,9 @@ export const GEN_WATCHES = {
     'caution-text': 'novaDeep',
     'abort-text': 'novaDeep',
     'focus-ring': 'novaGlow',
+    'accent-bright': 'novaGlowBright',
+    'border-strong': 'novaTextMuted',
+    'arc-idle': 'novaGlowIdle',
   },
   'day-watch': {
     bg: 'buff',
@@ -84,6 +94,9 @@ export const GEN_WATCHES = {
     'caution-text': 'buffRaised',
     'abort-text': 'buffRaised',
     'focus-ring': 'magenta',
+    'accent-bright': 'magentaBright',
+    'border-strong': 'inkMuted',
+    'arc-idle': 'magentaIdle',
   },
   'night-watch': {
     bg: 'night',
@@ -101,6 +114,9 @@ export const GEN_WATCHES = {
     'caution-text': 'night',
     'abort-text': 'night',
     'focus-ring': 'nightAccent',
+    'accent-bright': 'nightAccentBright',
+    'border-strong': 'nightTextMuted',
+    'arc-idle': 'nightAccentIdle',
   },
   'open-sea': {
     bg: 'deepSea',
@@ -118,6 +134,9 @@ export const GEN_WATCHES = {
     'caution-text': 'deepSea',
     'abort-text': 'deepSea',
     'focus-ring': 'magentaSea',
+    'accent-bright': 'magentaSeaBright',
+    'border-strong': 'seaTextMuted',
+    'arc-idle': 'magentaSeaIdle',
   },
 } as const;
 
@@ -127,7 +146,7 @@ export const GEN_COMPONENT_TOKENS = {
   'card-bg': 'surface',
   'card-border': 'border',
   'input-bg': 'surface',
-  'input-border': 'border',
+  'input-border': 'border-strong',
   'input-text': 'text',
   'statuspill-go': 'go',
   'statuspill-caution': 'caution',
@@ -139,4 +158,20 @@ export const GEN_COMPONENT_TOKENS = {
   'progress-fill': 'accent',
   'progress-fill-done': 'go',
   'progress-fill-abort': 'abort',
+  'progress-arc': 'accent-bright',
+  'progress-arc-idle': 'arc-idle',
+  'panelfloat-border': 'border-strong',
+} as const;
+
+export const GEN_FONT_SETS = {
+  'envanter-legacy': {
+    display: ['Bricolage Grotesque', 'system-ui', 'sans-serif'],
+    body: ['Hanken Grotesk', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+    data: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+  },
+  'makine-izi': {
+    display: ['Tektur', 'system-ui', 'sans-serif'],
+    body: ['Chakra Petch', 'system-ui', 'sans-serif'],
+    data: ['Spline Sans Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+  },
 } as const;

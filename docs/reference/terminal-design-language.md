@@ -91,8 +91,11 @@ palet hex'leri NOVA koyu-zemin optimize; açık terminalde 1.6–2.8:1'e düşer
 
 Kaynak `design/tokens/terminal.map.json` → `npm run build:tokens` → `src/cli/helpers/generated/palette.ts`
 → tüketici `Theme`: success `32`/novaGo · error `31`/novaAbort · warning `33`/novaAmber ·
-info `34`/novaGlow(aday) · muted `2`/novaTextMuted · accent `36`/novaGlow. Yeni rol = önce token
+info `34`/novaGlow · muted `2`/novaTextMuted · accent `36`/novaGlow. Yeni rol = önce token
 kaynağına. Splash marka-renkleri tarihîdir ve kademe-degrade'e tabidir.
+`info`≡`accent` truecolor-örtüşmesi BİLİNÇLİDİR (belgele-kabul, Alperen 2026-08-01): ansi16
+kademesinde `34` vs `36` ile zaten ayrışırlar; semantic roller ayrı kalır, ayrıştırma ancak
+gerçek karışıklık kanıtında yeni karar olur.
 
 ### 6.4 · Test sözleşmesi
 

@@ -92,19 +92,20 @@ describe('buildCssVariables — the three-layer chain is materialized', () => {
 describe('desktopPreferencesSchema', () => {
   it('accepts the defaults and a full valid record', () => {
     expect(desktopPreferencesSchema.parse(DEFAULT_PREFERENCES)).toEqual(DEFAULT_PREFERENCES);
-    const full = { version: 1, watch: 'open-sea', customTokens: { accent: '#AABBCC' } };
+    const full = { version: 2, watch: 'open-sea', customTokens: { accent: '#AABBCC' }, fontSet: 'envanter-legacy' };
     expect(desktopPreferencesSchema.parse(full)).toEqual(full);
   });
 
   it('rejects an unknown watch, an unknown custom-token key, and a non-hex override', () => {
-    expect(desktopPreferencesSchema.safeParse({ version: 1, watch: 'dog-watch', customTokens: {} }).success).toBe(false);
-    expect(desktopPreferencesSchema.safeParse({ version: 1, watch: 'day-watch', customTokens: { chrome: '#fff' } }).success).toBe(false);
-    expect(desktopPreferencesSchema.safeParse({ version: 1, watch: 'day-watch', customTokens: { accent: 'red' } }).success).toBe(false);
+    expect(desktopPreferencesSchema.safeParse({ version: 2, watch: 'dog-watch', customTokens: {}, fontSet: 'makine-izi' }).success).toBe(false);
+    expect(desktopPreferencesSchema.safeParse({ version: 2, watch: 'day-watch', customTokens: { chrome: '#fff' }, fontSet: 'makine-izi' }).success).toBe(false);
+    expect(desktopPreferencesSchema.safeParse({ version: 2, watch: 'day-watch', customTokens: { accent: 'red' }, fontSet: 'makine-izi' }).success).toBe(false);
+    expect(desktopPreferencesSchema.safeParse({ version: 2, watch: 'day-watch', customTokens: {}, fontSet: 'comic-sans' }).success).toBe(false);
   });
 
   it('SEMANTIC_TOKEN_NAMES is the single custom-override vocabulary', () => {
     for (const token of SEMANTIC_TOKEN_NAMES) {
-      const record = { version: 1, watch: 'day-watch', customTokens: { [token]: '#010203' } };
+      const record = { version: 2, watch: 'day-watch', customTokens: { [token]: '#010203' }, fontSet: 'makine-izi' };
       expect(desktopPreferencesSchema.safeParse(record).success, token).toBe(true);
     }
   });

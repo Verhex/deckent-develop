@@ -62,4 +62,28 @@ describe('applyWatch (D4-1)', () => {
       expect(root.vars.get(name)).toBe(value);
     }
   });
+
+  it('applies the selected font set (prefs-v2); omitting fontSet never touches font vars', () => {
+    const root = makeFakeRoot();
+    applyWatch(root, { watch: 'nova', customTokens: {} }); // fontSet omitted → fonts untouched
+    expect(root.vars.has('--dk-font-display')).toBe(false);
+    // the zero-arg entry call uses DEFAULT_PREFERENCES → fontSet present → applied
+    applyWatch(root);
+    expect(root.vars.get('--dk-font-display')).toBe('Tektur, system-ui, sans-serif');
+    expect(root.vars.get('--dk-font-body')).toBe("'Chakra Petch', system-ui, sans-serif");
+    // a color-only re-apply must NOT revert the user's selected set
+    applyWatch(root, { watch: 'nova', customTokens: {}, fontSet: 'envanter-legacy' });
+    applyWatch(root, { watch: 'night-watch', customTokens: {} });
+    expect(root.vars.get('--dk-font-display')).toBe("'Bricolage Grotesque', system-ui, sans-serif");
+    applyWatch(root, { watch: 'nova', customTokens: {}, fontSet: 'envanter-legacy' });
+    expect(root.vars.get('--dk-font-display')).toBe("'Bricolage Grotesque', system-ui, sans-serif");
+    expect(root.vars.get('--dk-font-data')).toBe(
+      "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
+    );
+    // switching back restores the selected-set values (constant key set — idempotent)
+    applyWatch(root, { watch: 'nova', customTokens: {}, fontSet: 'makine-izi' });
+    expect(root.vars.get('--dk-font-data')).toBe(
+      "'Spline Sans Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
+    );
+  });
 });

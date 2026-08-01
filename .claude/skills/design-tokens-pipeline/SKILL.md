@@ -133,43 +133,73 @@ description: Use when creating or changing ANY design token (color, typography, 
   set olarak kaynakta + **preferences-v2 ONAYLI-İŞ** (fontSet alanı + VERSION bump + migration —
   implementasyon desktop/REBORN dilimi). Kartlardaki ADAY etiketleri "token'landı"ya çevrildi.
 
+- ✅ **Açık-defter karar turu (Alperen, 2026-08-01 — 7/7):** (1) **accent-bright TAM ROL** —
+  3 yeni ölçülmüş bright primitive (day `magentaBright` #A93368 · night `nightAccentBright`
+  #F0938A · sea `magentaSeaBright` #F5A8CC; vurgu-adımı 1.24–1.31 simetrik) + nova
+  `novaGlowBright`; `progress-arc` token'landı. Ek tasarım-sonucu: **arc-idle katı-kompozit
+  rolü** (4 primitive, bg-bandı 3.48–3.77 — tek-alpha day-watch fiziğinde ≥3'ü tutamıyordu;
+  alpha-compositing kontrast-kritik katmanda emekli) + **border-strong rolü** (muted kanalı,
+  ≥4.8 her vardiya; `input-border → border-strong` CANLI, `panelfloat-border` yeni; accent-glow
+  kenarı dekoratif-beyanlı). Validator: 6 yeni non-text eşiği (min 3). (2) **prefs-v2 ŞİMDİ
+  ELLE — TAMAM:** `DESKTOP_PREFERENCES_VERSION 1→2`, `fontSet` alanı, v1→v2 KAYIPSIZ migration,
+  `FONT_SETS`/`GEN_FONT_SETS` drift-kilidi (generator emisyonu + eşitlik-testi),
+  `applyWatch` font-değişken uygulaması, envanter-legacy `@font-face` geri-eklendi; desktop
+  205/205. Typed-seam kaydı: settings-UI seçici ürünleşme-dilimi işidir. (3) **flip-önkoşulları
+  A11Y-ÖNCE İKİ DİLİM:** (b)+(d) tasarım/token katmanında KAPANDI; (a)·(c)·(f) üretim-flip
+  dilimi, (e)·(g)·(h SSE) mimari dilim. (4) **dashboard light-tema YOK — kapandı** (ileride
+  istenirse YENİ karar: yeni token-seti + kontrast turu). (5) **rol örtüşmeleri BELGELE-KABUL**
+  (nova caution≡brass, terminal info≡accent — semantic ayrım korunur, görsel paylaşım bilinçli).
+  (6) **restart penceresi AÇILDI:** bot SIGTERM→build→bot yeni-dist (pid kaydı), binary
+  color-gate 4/4 kanıt (FORCE boyar · boş-NO_COLOR bastırır · FORCE>NO_COLOR · pipe boyasız);
+  MCP reconnect Alperen'de. (7) **day-watch focus-ring maddesi KAPANDI** (non-text 1.4.11
+  eşiği 3:1; magenta/buff 4.25 geçer — metin rolleri 4.5'te ayrıca korunuyor).
+
+- ✅ **Rol-turu çift-denetim + düzeltmeleri (2026-08-01):** a11y-auditor 24/24 çifti bağımsız
+  doğruladı (FINDINGS-7). Düzeltilenler: TÜM desktop girdi-kenarları `--dk-c-input-border`'a
+  tellendi (generic input/select + radio + changes-textarea + nova-cmd + nova-palette — nova-cmd
+  eski efektif 2.32:1 idi; glow dekoratif kaldı); nehir `#7be8ff` hardcode'u
+  `var(--dk-p-novaGlowBright)` oldu (kanun-10); arc-idle bandı 3.38→**3.48**–3.77 düzeltildi
+  (3.38 sea'nın .56-zam öncesi bayat sayımıydı); colors-kartı rozeti non-text satırda artık AAA
+  basmıyor; `applyWatch` fontSet-omit semantiği "fontlara dokunma" oldu (sessiz set-geri-dönüşü
+  ölür). Kayıtlı-kalan: (b-render) CommandScene canvas'ı hâlâ accent@.30 çizer — arc-idle/
+  progress-arc token tüketimi üretim-flip diliminin İLK işi; WCOL kalanları (#c792ea/#ff9e64)
+  önkoşul-(e) kapsamında.
+
 **Açık maddeler:**
+- **DT-5 `⚡Live` sembolü** (critic 2026-08-01 #10): sembol-tablosundaki `⚡` DNA §7 /
+  ADR-G-010 emoji-ikon yasağıyla gerilimde — ya ASCII karşılık ya "belgele-kabul istisnası"
+  kaydı; karar Alperen'in (bugünkü diff dışı, mekanik taramada çıktı).
 - **Component ürünleşme-önkoşulları** (a11y 2026-07-31): forced-colors focus `outline` yedeği
   (react-aria focus-ring) · error `aria-describedby` bağı · `:has()` yerine `isFocusVisible` ·
   input-kenarlık 1.4.11 muafiyeti = "alan daima prefix/label ile tanınır" sözleşmesi.
-- **NOVA-sahne flip-önkoşulları** (kimlik-turu denetimleri, 2026-07-31; pattern-denetimleriyle
-  genişletildi 2026-08-01 — prototip: `design/prototypes/kimlik-turu-2026-07-31.html`, spec:
-  `patterns/command-scene.html`): (a) worker-segment klavye erişimi (react-aria: ok-tuşu +
-  Enter/Escape); (b) idle segment-yayı efektif ≥3:1 (bugün .30 → 1.9:1; ölçüm: .53 → 3.75);
-  (c) bayatlığa renk-dışı ikinci taşıyıcı (kesikli stroke + STALE); (d) kenarlıklar ≥3:1 —
-  KAPSAM: picker/panel + komuta-girdisi (2.23) + odak-paneli (1.67) + approval metin-eşle input
-  (kartta kapatıldı); (e) worker-kategorik palet token'laması (geçici bağlayıcı sözleşme:
-  telemetry-river rotasyonu accent→novaGlowBright→go→amber); (f) canvas mikro-metin ≥10px;
-  (g) Canvas/CSS nefes-tempo senkronu (≈6.3s vs 4s — tek ritim); (h) transport: poll ölür →
-  birleşik `/api/live` SSE (anayasa Teknik); (i) nehir WCAG 2.2.2 pause/freeze + `role="log"`.
-- **Pattern/component-turu token-adayları (onay bekler):** `duration.riverArrive` 450ms ·
-  `alpha.glowText` .14 · `opacity.riverText` .86 · `selection-overlay` (token-dışı beyaz .55) ·
-  `radius.panel` 10px · `radius.pill` 999px · **panel-float ailesi (kanonik ad-seti):**
-  `alpha.panelScrim` .86 · `alpha.panelEdge` .25 · `blur.panelFloat` 6px ·
-  **progress ailesi:** component-rolleri `progress-track/fill/fill-done/fill-abort/arc`
-  (watch-map'e ekleme) + `size.progressHairline/Bold` 2/6px + `size.progressRadialSm/Md`
-  40/64px + `duration.progressFlow` 1.6s · **settings-customize ailesi (2026-08-01):**
-  `fontSet.envanter-legacy` (Bricolage/Hanken/Geist seti — set-değiştirilebilirlik) ·
-  `space.accentSwatch` 28px · sergi-min-genişlik 220px · `desktop.settings.appearance.*`
-  i18n anahtar ailesi · preferences v2 (`fontSet` alanı + VERSION bump + migration).
-- **settings-customize ürünleşme-şartları** (a11y 2026-08-01): day-watch `inkMuted/buff`
-  4.33:1 < 4.5 (mevcut "day-watch muted" maddesiyle birleşik — koyulaştırma adayı ≈#63676a) ·
-  custom-accent doğrulaması AKTİF vardiya zemininde (yalnız-nova yetmez) · Custom = Radio +
-  koşullu TextField (input asla radio rolü almaz) · hex hatası `aria-invalid`+`describedby` ·
-  font-set "Selected" sözcük-taşıyıcı + "Active" pili `aria-checked`'e bağlı (kartta kapatıldı).
-- **Doc-drift kaydı (Alperen'e):** MCP-instruction/CLAUDE.md lifecycle metinleri
-  "…DECAY→CLEANUP" yazıyor; typed authority `SprintPhase` enum'unda terminal faz **COMPLETE**
-  (cleanup bir komuttur). Metinlerin enum'a hizalanması ayrı iş (critic 2026-08-01 #1 kökü).
+- **NOVA-sahne flip-önkoşulları** (2026-08-01 dilim-kararı: a11y-önce): ~~(b) idle-yay~~ ve
+  ~~(d) kenarlıklar~~ tasarım/token katmanında KAPANDI (arc-idle + border-strong rolleri —
+  yukarıdaki 7/7 turu). KALAN — üretim-flip dilimi: (b-render) CommandScene
+  idle-yayının arc-idle/progress-arc token tüketimi (bugün accent@.30 alpha yolu — İLK iş);
+  (a) worker-segment klavye erişimi (react-aria: ok-tuşu + Enter/Escape); (c) bayatlık ikinci-taşıyıcı canvas implementasyonu
+  (kesikli stroke + STALE; hedef-durum spec'te çizili); (f) canvas mikro-metin ≥10px;
+  (i) nehir WCAG 2.2.2 pause/freeze + `role="log"`. KALAN — mimari dilim: (e) worker-kategorik
+  palet token'laması (geçici sözleşme: accent→novaGlowBright→go→amber rotasyonu);
+  (g) Canvas/CSS nefes-tempo senkronu (≈6.3s vs 4s); (h) poll ölür → birleşik `/api/live` SSE.
+- ✅ **Pattern/component-turu token-aday havuzu KAPANDI:** tamamı toplu-karar (2026-08-01 4/4)
+  + rol-turu (2026-08-01 7/7) ile kaynakta — arc dahil. Tek kalan ürün-işi: sergi-min-genişlik
+  220px (kart-içi ölçü, token değil) + `desktop.settings.appearance.*` i18n anahtarları
+  (settings-UI diliminde).
+- **settings-customize ürünleşme-şartları** (a11y 2026-08-01): ~~inkMuted~~ ÇÖZÜLDÜ (#63676a,
+  toplu-karar 3). Kalan: custom-accent doğrulaması AKTİF vardiya zemininde (yalnız-nova yetmez) ·
+  Custom = Radio + koşullu TextField (input asla radio rolü almaz) · hex hatası
+  `aria-invalid`+`describedby` · font-set "Selected" sözcük-taşıyıcı + "Active" pili
+  `aria-checked`'e bağlı (kartta kapatıldı) · settings-UI seçici (fontSet alanını yüzeye çıkarır).
+- ✅ **Doc-drift kaydı KAPANDI** (toplu-karar 2026-08-01 karar-1): 8 dosya enum'a hizalandı —
+  "…DECAY→COMPLETE (cleanup = komut)".
 - ✅ **Kart-şablonu kuralı YAZILDI** (`design/claude-design/CARD-TEMPLATE.md`, 2026-08-01):
   kabuk ölçüleri + ad-biçimi + EN-kanonik state dili + rozet standardı; eski "kart-şablonu
   kuralı" açık maddesi kapandı — mevcut kartlar sıradaki dokunuşta hizalanır.
-- **NOVA accent-ailesi**: gerçek-veri prototip turunda seçilir; seçime kadar aday-token.
-- **Dashboard light-tema**: var mı yok mu — ADR-G-033 lens'iyle karar.
-- **day-watch muted/focus**: 4.33/4.25 — küçük-punto kullanım kuralı ya da inkMuted koyulaştırma.
-- **Rol örtüşmeleri**: nova `caution`≡`brass`; terminal `info`≡`accent` (truecolor'da) — accent
-  turunda ayrıştır/belgele.
+- ✅ **NOVA accent-ailesi KAPANDI** (kimlik-turu 2026-07-31: CAM GÖBEĞİ kalıcı).
+- ✅ **Dashboard light-tema KAPANDI** (2026-08-01 karar: YOK — ileride istenirse yeni token-seti
+  + kontrast turu olarak YENİ karar açılır).
+- ✅ **day-watch muted/focus KAPANDI** (muted #63676a → 4.87 AA; focus-ring non-text 1.4.11
+  eşiği 3:1 — 4.25 geçer, 2026-08-01 karar-7).
+- ✅ **Rol örtüşmeleri KAPANDI — belgele-kabul** (2026-08-01 karar-5): nova `caution`≡`brass`
+  (novaAmber) ve terminal `info`≡`accent` (truecolor) görsel paylaşımı bilinçli; semantic ayrım
+  korunur, ayrıştırma ancak gerçek karışıklık kanıtında yeni karar olur (watch-map + DT-5 notlu).

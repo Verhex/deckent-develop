@@ -14,6 +14,10 @@
         "$value": "#7BE8FF",
         "$description": "589-A bright-glow; CAM GÖBEĞİ ailesi kalıcı seçimiyle (kimlik-turu 2026-07-31) kayıtlandı."
       },
+      "novaGlowIdle": {
+        "$value": "#20748D",
+        "$description": "arc-idle katı-kompozit (novaGlow @.53 over novaDeep) — bg 3.77 / surface 3.49. Rol-turu 2026-08-01."
+      },
       "novaGlowDeep": { "$value": "#04202B" },
       "novaAmber": { "$value": "#E8B34C" },
       "novaGo": { "$value": "#43E39A" },
@@ -34,6 +38,14 @@
       "nightText": { "$value": "#E3DAD2" },
       "nightTextMuted": { "$value": "#9B948B" },
       "nightAccent": { "$value": "#E2766B" },
+      "nightAccentBright": {
+        "$value": "#F0938A",
+        "$description": "accent-bright (night-watch): night 8.05 / raised 7.52, base-adımı 1.31. Rol-turu 2026-08-01."
+      },
+      "nightAccentIdle": {
+        "$value": "#935E5B",
+        "$description": "arc-idle katı-kompozit (nightAccentBright @.58 over night) — bg 3.48 / surface 3.25. Rol-turu 2026-08-01."
+      },
       "nightAccentText": { "$value": "#1C0F0D" },
       "ink": { "$value": "#2B2F33" },
       "inkMuted": {
@@ -41,7 +53,23 @@
         "$description": "2026-08-01 a11y koyulaştırması (#6B6F72 idi): buff üstü 4.87:1 (AA)."
       },
       "magenta": { "$value": "#BD4278" },
+      "magentaBright": {
+        "$value": "#A93368",
+        "$description": "accent-bright (day-watch): açık zeminde vurgu = DERİN — buff 5.33 / buffRaised 5.87, base-adımı 1.25 (nova 1.24 ile simetrik). Rol-turu 2026-08-01."
+      },
+      "magentaIdle": {
+        "$value": "#B95C82",
+        "$description": "arc-idle katı-kompozit (magentaBright @.78 over buff) — bg 3.65 / surface 4.02. Rol-turu 2026-08-01."
+      },
       "magentaSea": { "$value": "#E88FB9" },
+      "magentaSeaBright": {
+        "$value": "#F5A8CC",
+        "$description": "accent-bright (open-sea): deepSea 8.64 / raised 7.46, base-adımı 1.25. Rol-turu 2026-08-01."
+      },
+      "magentaSeaIdle": {
+        "$value": "#8F6E87",
+        "$description": "arc-idle katı-kompozit (magentaSeaBright @.56 over deepSea) — bg 3.61 / surface 3.12. Rol-turu 2026-08-01."
+      },
       "brass": { "$value": "#A98F54" },
       "paperOnMagenta": { "$value": "#FBF8EC" },
       "go": { "$value": "#2F7D46" },

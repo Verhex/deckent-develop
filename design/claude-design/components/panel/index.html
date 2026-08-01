@@ -187,9 +187,10 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
     <code>rgba(surface-kanal, .86)</code> scrim + kenar <code>rgba(accent-kanal, .25)</code> +
     <code>backdrop-blur(6px)</code>. Kullanım SINIRI: yalnız sahne-üstü GEÇİCİ paneller
     (odak-kartı, geçici telemetri) — kalıcı yerleşim panelleri flat/header'lı kullanır.
-    Başlık odak vurgusu olarak <code>accent</code> alır (prototip mirası). Radius, prototipteki
-    10px'ten <code>radius.control</code>'a normalize edildi (tek-radius kuralı; aşağıda beyan).
-    Kenar kontrastı bilinçli-düşük — «Kontrast» bölümünde beyanlı.</p>
+    Başlık odak vurgusu olarak <code>accent</code> alır (prototip mirası). Radius: bu kartın
+    yüzey-paneli <code>radius.control</code>'dadır; floating/odak varyantı flip'te
+    <code>radius.panel</code> (10px, 2026-08-01 toplu-onay) tüketir — not (3).
+    Accent-kenar dekoratif-beyanlı — «Kontrast» bölümünde ayrım.</p>
   </section>
 
   <section>
@@ -266,10 +267,10 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
     <p class="note">Rozetler bu sayfada canlı hesaplanır. Metin eşiği 4.5:1 (küçük punto),
     non-text sınır referansı 3:1. Hairline ve yüzey-katman farkı BİLİNÇLİ düşüktür
     (enstrüman-çizgisi disiplini): panel sınırı anlam taşıyan tek taşıyıcı değildir — içerik
-    kendi kontrastını taşır. Floating kenarın <code>rgba(accent-kanal, .25)</code> değeri spec
-    kaydında 1.67:1; bu sayfanın birleşik-zemin (scrim ∘ bg) hesabı yanda — her iki değer de
-    3:1 altında ve <b>flip-önkoşulu (d)</b> kapsamında beyanlıdır: kenar yalnız kenarlık-süsü
-    değil odak-çerçevesi olacaksa alpha yükseltilmeden flip yapılamaz.</p>
+    kendi kontrastını taşır. Floating accent-kenarı (<code>rgba(accent-kanal, .25)</code>, spec 1.67:1;
+    birleşik-zemin hesabı yanda) rol-turu 2026-08-01 kararıyla DEKORATİF-beyanlıdır — sınır
+    görevi taşımaz; algılanabilir sınır <code>panelfloat-border → border-strong</code> rolündedir
+    (muted kanalı, dört vardiyada ≥4.8:1). Önkoşul (d) bu ayrımla kapandı; not (2)'ye bakınız.</p>
   </section>
 
   <section>
@@ -294,9 +295,9 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
           <td><code>card-border</code>, 1px</td>
           <td>surface-üstünde bir kademe çukur</td><td>log / kod / ham-çıktı kuyusu</td></tr>
         <tr><td><code>panel--float</code></td>
-          <td><code>rgba(surface-kanal, .86)</code> <i>(aday: <code>alpha.panelScrim</code>)</i></td>
-          <td><code>rgba(accent-kanal, .25)</code> <i>(öneri: <code>alpha.panelEdge</code>)</i></td>
-          <td><code>backdrop-blur(6px)</code> <i>(öneri: <code>blur.panelFloat</code>)</i></td>
+          <td><code>rgba(surface-kanal, .86)</code> <i>(token'landı: <code>alpha.panelScrim</code>)</i></td>
+          <td><code>rgba(accent-kanal, .25)</code> <i>(token'landı: <code>alpha.panelEdge</code> — dekoratif)</i></td>
+          <td><code>backdrop-blur(6px)</code> <i>(token'landı: <code>blur.panelFloat</code>)</i></td>
           <td>sahne-üstü GEÇİCİ panel</td></tr>
         <tr><td><code>panel--marked</code></td>
           <td>varyantın zemini</td>
@@ -321,14 +322,16 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
     dashboard migrasyonunu ÖNERMEZ.</p>
     <p class="note"><b>Bilinçli boşluklar.</b>
     (1) <code>alpha.panelScrim = 0.86</code> · <code>alpha.panelEdge = 0.25</code> ·
-    <code>blur.panelFloat = 6px</code> kaynak token'larda YOK — kimlik-turu <code>.focus</code>
-    değerlerinden token-önerisi olarak burada beyan edildi; kaynağa eklenmesi ayrı Alperen
-    onayı 2026-08-01'de VERİLDİ — ad-seti kaynakta ve approval-dialog kartı aynı değerleri bu adlarla kompoze eder (pipeline §6 kaydı).
-    (2) Floating kenar kontrastı 3:1 altında (spec kaydı 1.67:1; canlı hesap yukarıda) —
-    flip-önkoşulu (d): alpha yükseltme kararı verilmeden floating varyant "vurgu-çerçevesi"
-    olarak pazarlanamaz.
-    (3) Prototipin <code>border-radius:10px</code>'i tek-radius kuralına göre
-    <code>radius.control (0.25rem)</code>'a normalize edildi — görsel sapma bilinçlidir.
+    <code>blur.panelFloat = 6px</code> KAYNAKTA (kimlik-turu <code>.focus</code> değerleri;
+    Alperen onayı 2026-08-01) — approval-dialog kartı aynı değerleri bu adlarla kompoze eder
+    (pipeline §6 kaydı).
+    (2) Floating kenar — ÇÖZÜM KAYITLI (rol-turu 2026-08-01): algılanabilir sınır
+    <code>panelfloat-border → border-strong</code> rolüne geçer (muted kanalı, dört vardiyada
+    ≥4.8:1); accent-glow kenarı (<code>alpha.panelEdge</code> .25, ölçüm 1.67:1) DEKORATİF
+    beyanlıdır ve sınır görevi taşımaz. Bu kartın görseli flip'e kadar eski kompoziti gösterir.
+    (3) Prototipin <code>border-radius:10px</code>'i artık kaynakta: <code>radius.panel</code>
+    (2026-08-01 toplu-onay) — floating/odak varyantı flip'te <code>radius.panel</code> tüketir,
+    yüzey-paneli <code>radius.control</code>'da kalır.
     (4) Terminal temsili bu kartın kapsamı DIŞINDA: panelin TUI karşılığı (box-drawing çerçeve /
     bölüm-ayracı) <code>surfaces/terminal/</code> kartı olarak ayrı iştir; burada simüle edilmedi.
     (5) Hairline (1.17:1) ve katman-farkı (1.08:1) non-text 3:1'in altındadır ve ÖYLE kalır —

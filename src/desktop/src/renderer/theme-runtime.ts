@@ -15,6 +15,7 @@
  */
 import {
   buildCssVariables,
+  buildFontVariables,
   DEFAULT_PREFERENCES,
   type DesktopPreferences,
   type SemanticTokenName,
@@ -36,16 +37,23 @@ export interface AppliedTheme {
 }
 
 /**
- * Apply `preferences` (watch + custom semantic overrides) to `root`.
- * Idempotent: the variable KEY SET is constant across watches, so re-applying
- * fully replaces the previous watch — no stale-property cleanup needed.
+ * Apply `preferences` (watch + custom semantic overrides + font set) to `root`.
+ * Idempotent: the variable KEY SET is constant across watches AND font sets,
+ * so re-applying fully replaces the previous state — no stale-property cleanup.
+ * `fontSet` OMITTED means "do not touch the font variables" (a color-only
+ * re-theme must never silently revert the user's set to the default); the
+ * stylesheet :root defaults carry until a fontSet-bearing apply arrives.
  */
 export function applyWatch(
   root: ThemeTargetElement,
-  preferences: Pick<DesktopPreferences, 'watch' | 'customTokens'> = DEFAULT_PREFERENCES,
+  preferences: Pick<DesktopPreferences, 'watch' | 'customTokens'> &
+    Partial<Pick<DesktopPreferences, 'fontSet'>> = DEFAULT_PREFERENCES,
 ): AppliedTheme {
   const customTokens = preferences.customTokens as Partial<Record<SemanticTokenName, string>>;
-  const variables = buildCssVariables(preferences.watch, customTokens);
+  const variables = {
+    ...buildCssVariables(preferences.watch, customTokens),
+    ...(preferences.fontSet !== undefined ? buildFontVariables(preferences.fontSet) : {}),
+  };
   for (const [name, value] of Object.entries(variables)) {
     root.style.setProperty(name, value);
   }

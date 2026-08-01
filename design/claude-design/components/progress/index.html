@@ -209,8 +209,8 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
     <p class="note"><b>SAHTE-CANLILIK YASAK:</b> indeterminate yalnız süre GERÇEKTEN
     bilinmezken kullanılır (örn. dış-provider el-sıkışması). Telemetri faz/percent veriyorsa
     determinate ZORUNLUDUR — "dolduruyormuş gibi" tahmini-animasyon anayasa-ihlalidir.
-    Akan segment rayın %26'sı, <code>novaGlow</code>; periyot 1.6s ease-in-out (token-aday,
-    aşağıda kayıtlı). <code>prefers-reduced-motion</code>: akan segment tamamen kalkar, ray
+    Akan segment rayın %26'sı, <code>novaGlow</code>; periyot
+    <code>duration.progressFlow</code> 1.6s ease-in-out (token'landı, 2026-08-01 toplu-onay). <code>prefers-reduced-motion</code>: akan segment tamamen kalkar, ray
     sabit kalır ve durum "working" metniyle taşınır (metin zaten zorunlu taşıyıcıdır) — ikinci
     örnek bu görünümün statik temsilidir. aria: <code>aria-valuenow</code> YOK,
     <code>aria-valuetext="working"</code> (metin caller-enjekte, EN default).</p>
@@ -233,7 +233,7 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
     yeniden icat yok). <code>NO_COLOR</code> satırı bilgi-kaybı-sıfır kanıtıdır: faz + sayım +
     yüzde + <code>x</code> işareti düz metinle taşınır. ansi16 kutucukları xterm-varsayılanıyla (ölçüm: kırmızı satır 3.44:1 — AA-altı TEMSİL; aynı bilgi diğer kademelerde AA-üstü)
     TEMSİLÎDİR — gerçek rengi terminalin kendi şeması çözer; ansi256 build'in en-yakın-xterm
-    çıktısıdır.  (ölçüm: kırmızı satır 3.44:1 — AA-altı TEMSİL; aynı bilgi diğer kademelerde AA-üstü)<code>novaGlowBright</code>'ın terminal karşılığı yoktur — accent/info rolüne
+    çıktısıdır. <code>novaGlowBright</code>'ın terminal karşılığı yoktur — accent/info rolüne
     dürüstçe çöker. Süre-bilinmez işte terminal spinner'ı ayrı bileşendir; TTY-degrade ve
     <code>NO_COLOR</code>/dumb-term'de "working…" düz metnine sessizleşir (anayasa §4).</p>
   </section>
@@ -284,23 +284,25 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
 
   <section>
     <div class="label">Ürünleşme-notları + bilinçli boşluklar</div>
-    <p class="note"><b>Component-rol adayları (kayıt):</b> <code>progress-track / fill / fill-done /
-    fill-abort / arc</code> rolleri 2026-08-01'de ONAYLANDI: track/fill/fill-done/fill-abort watch-map'te KAYITLI;
-    yalnız <code>arc</code> bilinçli-aday kaldı (accent-bright semantic rolü ister — per-watch
-    bright değerleri ayrı tasarım kararı).</p>
+    <p class="note"><b>Component-rolleri (kayıt):</b> <code>progress-track / fill / fill-done /
+    fill-abort</code> 2026-08-01'de ONAYLANDI ve watch-map'te KAYITLI. <code>progress-arc</code>
+    rol-turu kararıyla (Alperen 2026-08-01 "tam rol aç") KAPANDI: <code>accent-bright</code>
+    semantic rolü açıldı — nova <code>novaGlowBright</code> + üç yeni ölçülmüş bright primitive
+    (day <code>magentaBright</code> #A93368 · night <code>nightAccentBright</code> #F0938A ·
+    sea <code>magentaSeaBright</code> #F5A8CC; vurgu-adımı 1.24–1.31 simetrik). Ek:
+    <code>progress-arc-idle → arc-idle</code> (vardiya-başına katı-kompozit, bg-bandı 3.48–3.77,
+    validator min 3 — alpha-compositing kontrast-kritik katmanda emekli).</p>
     <p class="note"><b>Gerçek-veri kuralı:</b> progress değeri daima gerçek telemetriden
     (faz / percent / task-sayımı; <code>GET /api/sprint/live</code> sözleşmesi) hesaplanır;
     tahmini-animasyon ve "yaklaşık doluluk" YASAK. <code>prefers-reduced-motion</code> tüm akan
     animasyonları kapatır: linear geçişler anlık, indeterminate statik "working" metnine düşer;
     üründe bu media-query Canvas render'ına DA bağlanır (yalnız CSS değil — command-scene kuralı).</p>
-    <p class="note"><b>Boyut token-adayları:</b> 2px/6px ray yükseklikleri ile 40px/64px radial
-    çapları bu kartta ölçü-literal'dir — <code>size.progressHairline/Bold</code> ve
-    <code>size.progressRadialSm/Md</code> component-token adayı; kaynağa eklenmesi ayrı
-    Alperen-onayı işidir.</p>
-    <p class="note"><b>Akış-periyodu token-adayı:</b> indeterminate periyodu 1.6s ease-in-out
-    BEYANLI temsildir — <code>duration.glide</code> yalnız 240ms değer-geçişini karşılar; sürekli
-    akış için <code>duration.progressFlow</code> motion-token adayı gerekir. Token eklenmeden
-    üretim kodu bu süreyi hardcode EDEMEZ.</p>
+    <p class="note"><b>Boyut token'ları (2026-08-01 toplu-onay):</b> 2px/6px ray yükseklikleri
+    ile 40px/64px radial çapları kaynakta — <code>size.progressHairline/Bold</code> ve
+    <code>size.progressRadialSm/Md</code>; üretim kodu bu ölçüleri token'dan tüketir.</p>
+    <p class="note"><b>Akış-periyodu token'ı (2026-08-01 toplu-onay):</b> indeterminate periyodu
+    <code>duration.progressFlow</code> 1.6s kaynakta; <code>duration.glide</code> yalnız 240ms
+    değer-geçişini karşılar. Üretim kodu süreyi token'dan tüketir, hardcode EDEMEZ.</p>
     <p class="note"><b>Terminal renk-rampası hizasızlığı (kayıt):</b> mevcut CLI
     <code>progressBar</code> dolguyu success-yeşili, ≥%80'de warning-amber boyar — NOVA rol dili
     (accent/info dolgu · go=tamamlandı · abort=kesildi) ile hizasızdır. Hizalama ürünleşme-önkoşulu

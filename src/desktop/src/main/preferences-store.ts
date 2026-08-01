@@ -7,17 +7,19 @@
  * vitest.desktop.config.ts), explicit `baseDir` for hermetic tests, atomic
  * temp+rename writes with a chmod 0600 re-assert, corrupt/invalid content
  * degrades to DEFAULT_PREFERENCES with a console.warn — never a throw on the
- * read path. Versioned: `version` is store-owned; a file with an unknown
- * version is treated as corrupt-safe (defaults) until a real migration is
- * written for a v2 (the hook is `migratePreferences`).
+ * read path. Versioned: `version` is store-owned; v1 files migrate LOSSLESSLY
+ * to v2 in `migratePreferences` (fontSet gains the default); an unknown
+ * version is treated as corrupt-safe (defaults).
  */
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
+  DEFAULT_FONT_SET,
   DEFAULT_PREFERENCES,
   DESKTOP_PREFERENCES_VERSION,
   desktopPreferencesSchema,
+  desktopPreferencesV1Schema,
   type DesktopPreferences,
   type DesktopPreferencesInput,
 } from '../shared/theme-tokens';
@@ -47,12 +49,21 @@ export interface PreferencesStoreOptions {
   baseDir?: string;
 }
 
-/** Future-migration hook: v1 is current, so only v1 passes through. An
- *  unknown/older version returns null (treated as unusable → defaults) until
- *  a real migration lands here alongside a version bump. */
+/** Migration chain. v2 passes through; a valid v1 record upgrades LOSSLESSLY
+ *  (watch + customTokens preserved, fontSet gains the default — prefs-v2
+ *  kararı, 2026-08-01). Anything else returns null (unusable → defaults). */
 function migratePreferences(parsed: unknown): DesktopPreferences | null {
-  const result = desktopPreferencesSchema.safeParse(parsed);
-  if (result.success) return result.data;
+  const current = desktopPreferencesSchema.safeParse(parsed);
+  if (current.success) return current.data;
+  const v1 = desktopPreferencesV1Schema.safeParse(parsed);
+  if (v1.success) {
+    return {
+      version: DESKTOP_PREFERENCES_VERSION,
+      watch: v1.data.watch,
+      customTokens: v1.data.customTokens,
+      fontSet: DEFAULT_FONT_SET,
+    };
+  }
   return null;
 }
 
@@ -120,6 +131,7 @@ export function createPreferencesStore(options: PreferencesStoreOptions = {}): P
         version: DESKTOP_PREFERENCES_VERSION,
         watch: input.watch ?? current.watch,
         customTokens: input.customTokens ?? current.customTokens,
+        fontSet: input.fontSet ?? current.fontSet,
       };
       // Fail fast on a caller bug (unknown watch / bad hex) instead of
       // persisting a record only the silent-defaults path would surface.
