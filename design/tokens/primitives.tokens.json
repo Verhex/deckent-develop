@@ -127,6 +127,14 @@
     "unit": {
       "$value": "0.25rem",
       "$description": "4px taban artımı — Tailwind v4 spacing artımlarıyla uyumlu; desktop el-CSS'i bu ritme yakınsar (wiring dilimi)."
+    },
+    "statuspillPadSmY": {
+      "$value": "3px",
+      "$description": "statuspill-pad-sm dikey (Alperen onayı 2026-07-31 — component-turu)."
+    },
+    "statuspillPadSmX": {
+      "$value": "8px",
+      "$description": "statuspill-pad-sm yatay (Alperen onayı 2026-07-31)."
     }
   },
   "duration": {
@@ -134,6 +142,25 @@
     "glide": {
       "$value": "240ms",
       "$description": "«Süzülme, sıçrama değil» — D4-0/NOVA belgeli geçiş süresi. reduced-motion: 0ms."
+    }
+  },
+  "brightness": {
+    "$type": "number",
+    "$description": "Etkileşim parlaklık çarpanları (Alperen onayı 2026-07-31 — component-turu token-adayları; kanonik adlar: brightness-hover/active).",
+    "hover": { "$value": 1.18 },
+    "active": { "$value": 0.85 }
+  },
+  "alpha": {
+    "$type": "number",
+    "$description": "Accent-kanallı saydamlıklar (Alperen onayı 2026-07-31; kanonik adlar: accent-alpha-hover · glow-focus).",
+    "accentHover": { "$value": 0.28 },
+    "glowFocus": { "$value": 0.14 }
+  },
+  "opacity": {
+    "$type": "number",
+    "disabled": {
+      "$value": 0.45,
+      "$description": "opacity-disabled (Alperen onayı 2026-07-31). Disabled efektif-kontrast eşiği bu değerle sabitlenir — bilinen durum: danger .45'te 2.21:1 (a11y 2026-07-31 #2); yükseltme kararı ürünleşme-önkoşulu listesinde."
     }
   },
   "easing": {

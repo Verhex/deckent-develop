@@ -247,10 +247,11 @@ footer{margin-top:44px;border-top:1px solid var(--border);padding-top:14px;font-
         token'lı boyut — DNA kuralı) verilmeden aile seçilmedi. Ayrı karar.</li>
       <li><strong>loading/working yok:</strong> "Run basıldı → koşuyor" geri-bildirimi
         command-scene desenine ait — ayrı kart; bu kart taahhüt etmez.</li>
-      <li><strong>Token-adayları (onay bekler):</strong> hover/active parlaklık katsayıları
-        (1.18/.85) ve disabled opacity (.45) bugün mekanizma-sabiti — öneri:
-        <span class="tok">brightness-hover/active</span> · <span class="tok">opacity-disabled</span>
-        token'ları. Disabled efektif kontrast (danger 2.21:1) eşiği de bu kararla sabitlenir.</li>
+      <li><strong>Token'landı (Alperen onayı 2026-07-31):</strong> hover/active parlaklık katsayıları
+        (1.18/.85) ve disabled opacity (.45) artık kaynakta:
+        <span class="tok">brightness.hover/active</span> · <span class="tok">opacity.disabled</span>
+        (design/tokens/primitives.tokens.json). Disabled efektif-kontrast eşiği (danger 2.21:1)
+        opacity.disabled kaydında sabitlendi; yükseltme ürünleşme-önkoşulu.</li>
       <li><strong>Forced-colors şartı:</strong> focus halkası box-shadow'dur; yüksek-kontrast
         modunda kaybolmaması için üründe <code>outline: 2px solid transparent</code> yedeği /
         react-aria focus-ring zorunlu (a11y 2026-07-31 #1).</li>

@@ -114,10 +114,17 @@ description: Use when creating or changing ANY design token (color, typography, 
   `build:tokens` kalıba takılmıştı → doğrudan `node scripts/build-design-tokens.mjs`
   koşulmuştu (dist'e dokunmaz; kural-amacı-içi, şeffaf kayıt).
 
+- ✅ **Component token-adayları KABUL + kaynakta (Alperen 2026-07-31):** `brightness.hover/active`
+  (1.18/.85) · `alpha.accentHover` (.28) · `alpha.glowFocus` (.14) · `opacity.disabled` (.45 —
+  disabled efektif-kontrast bilinen-durumu kayıtta) · `space.statuspillPadSmY/X` (3px/8px).
+  Kartlar "token'landı" notuna çevrildi.
+- ✅ **Dashboard = dark TEK-KİMLİK (Alperen 2026-07-31, karar 1-a):** kırık `.light` yolu dürüstçe
+  söküldü (ThemeProvider + toggle'lar + ölü `lib/theme.ts` + tema i18n anahtarları); `dark:`
+  utilities `@custom-variant dark` + statik `html.dark` ile OS-bağımsız always-on. Kontrat-testleri
+  yeni mimariye çevrildi; canlı-binary doğrulandı. Kalan borç değil-karar: light istenirse yeni
+  token-seti + kontrast turu olarak açılır.
+
 **Açık maddeler:**
-- **Component token-adayları** (2026-07-31 dilim-3 denetimleri; onay bekler): `brightness-hover/active`
-  (1.18/.85) · `accent-alpha-hover` (.28) · `glow-focus` (.14) · `opacity-disabled` (.45 — disabled
-  efektif-kontrast eşiği bu kararla sabitlenir; bugün danger 2.21:1) · `statuspill-pad-sm`.
 - **Component ürünleşme-önkoşulları** (a11y 2026-07-31): forced-colors focus `outline` yedeği
   (react-aria focus-ring) · error `aria-describedby` bağı · `:has()` yerine `isFocusVisible` ·
   input-kenarlık 1.4.11 muafiyeti = "alan daima prefix/label ile tanınır" sözleşmesi.
