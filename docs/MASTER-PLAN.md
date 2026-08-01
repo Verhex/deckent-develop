@@ -1,8 +1,8 @@
 # Deckent — Canonical Master Plan
 
-**Son uzlaştırma:** 2026-07-30
+**Son uzlaştırma:** 2026-08-01
 
-**Reconciliation base:** `b5f5046fe16a35cc316fee61032a0e2fc053ed40`
+**Reconciliation base:** `f59503a43954219e50f0cd67fe2bb5caa1e8f29c`
 
 **Önceki planın lossless arşivi:** [`docs/archive/MASTER-PLAN-archived-2026-07-26.md`](archive/MASTER-PLAN-archived-2026-07-26.md)
 
@@ -396,26 +396,43 @@ P08 veya P10'a ertelenmiş “sonra ekleriz” işleri değildir.
 
 ## 6. Immediate execution train
 
-Deckent sprinti yalnız §12 owner start gate'inden sonra başlatılır. Sprint-485 foundation
-dogfood'u canonical `COMPLETE` ile kapandı; sekiz scoped test dosyası supervisor tarafından
-yeniden çalıştırıldı ve 42/42 assertion geçti. Buna rağmen disk-truth review iki Brain
-false-positive verdict'i (Task 6 yanlış production projection'ı, Task 7 default komutta skipped
-test) ve terminal/FIX/usage/prompt authority residual'ları buldu. Immediate front-of-queue:
+Deckent sprinti yalnız §12 owner start gate'inden sonra başlatılır. Sprint-488, dependency ve
+repair ağırlıklı canlı dogfood replay'inde `PAUSED/FIX` durumunda kaldı. Owner-authorized
+`finalize --force` önce yanıltıcı bir success summary bastı, ardından terminal receipt
+üretemediği için `TERMINAL_EVIDENCE_HOLD` ile non-zero kapandı; `cleanup --dry-run` doğru biçimde
+`run-paused` admission HOLD verdi. Kırık ama forensic olarak tam baseline
+`f59503a43954219e50f0cd67fe2bb5caa1e8f29c` commit'iyle `origin/main` üzerinde korunmaktadır.
+Bu noktadan itibaren Deckent dogfood execution bloke kabul edilir; yeni Sprint/RunFlow/Do/
+Autonomous/Process execution canary'si aşağıdaki on P0 authority dilimi scoped ve built-binary
+kanıt üretmeden başlatılmaz:
 
-1. `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001`,
-   `RECOVERY-BORN-485-FIX-AUTHORITY-001`,
-   `RECOVERY-BORN-485-SEMANTIC-VERDICT-001`,
-   `RECOVERY-BORN-485-USAGE-BILLING-001` ve
-   `RECOVERY-BORN-485-PROMPT-POLICY-001` için Sprint-486 runtime wiring + repair slice.
-2. Sprint-485 provider concurrency, execution observation, XVerify admission ve terminal evidence
-   foundation'larını mevcut canonical consumers'a bağla; yeni paralel authority yaratma.
-3. Dogfood performance config'inde owner-approved sekiz worker ceiling kullan; sayı product
-   policy'si değil effective-config projection'ıdır. Shared-file işleri dependency ile sırala.
-4. Yalnız scoped testler çalıştır; repository-wide self-audit/full-suite owner tarafından ayrıca
-   authorize edilmedikçe finalizer tarafından da başlatılmaz.
-5. `PRODUCTION-WIRING-AUTHORITY-001` ile her code task'a plan→prompt→result→Brain settlement
-   boyunca typed wiring contract ve gerçek production-consumer proof'u zorunlu kıl.
-6. Sprint-487 controlled live replay, ancak Sprint-486 disk review ve scoped gates sonrasında.
+1. `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001` — original/FIX/XFIX denemelerini tek logical
+   task authority'sinde fold et; başarılı lineage sonradan gereksiz repair ile bozulamasın.
+2. `RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001` — scheduler admission ile worker prompt'u aynı
+   aggregate dependency settlement'ını tüketsin.
+3. `RECOVERY-BORN-488-REPAIR-DISPATCH-001` — doğan her eligible FIX aynı durable queue'dan
+   dispatch edilsin; POSTFIX'te yazılıp görünmez kalmasın.
+4. `RECOVERY-BORN-488-LANDING-CHECKPOINT-001` — landing proposal worker lifecycle tarafından
+   structured/atomic ve her material disk değişiminden sonra güncellensin.
+5. `RECOVERY-BORN-488-CONTINUOUS-REFILL-001` — boşalan slot bütün run graph'ından yeni ready işi
+   alsın; bir yavaş attempt tüm wave'in repair kararını geciktirmesin.
+6. `RECOVERY-BORN-488-VERIFICATION-ISOLATION-001` — worker verification immutable attempt
+   snapshot/scoped authority üzerinde çalışsın; concurrent writer false NO_GO üretmesin.
+7. `RECOVERY-BORN-488-REPAIR-CAPABILITY-001` — FIX/XFIX routing write gerektiren işi read-only
+   persona'ya veremesin; scope canonical consumer closure'dan türesin.
+8. `RECOVERY-BORN-488-EVALUATION-TRUTH-001` — unwired code DONE olamasın; task defect ile
+   execution/authority/ambient-verification HOLD ayrı typed settlement olsun.
+9. `RECOVERY-BORN-488-RECOVERY-TERMINAL-001` — recover tekrar PAUSED olduğunda generic error
+   yerine exact recovery outcome; explicit force finalize ise success uydurmadan ABORTED receipt
+   ve cleanup authority üretsin.
+10. `RECOVERY-BORN-488-STATUS-PROJECTION-001` — CLI, MCP, Terminal, Desktop, metrics ve finalizer
+    aynı persisted logical read modelini kullansın; source/dist drift admission'da yakalansın.
+
+Bu dilimlerde yalnız scoped testler çalıştırılır; repository-wide self-audit/full-suite owner
+tarafından ayrıca authorize edilmedikçe finalizer tarafından da başlatılmaz. Her dilimin kabulü
+yalnız test yeşiliyle değil producer→canonical consumer→all ingress→effective enablement→real
+binary zinciriyle yapılır. On dilim kapandıktan sonra ilk replay düşük-risk, dependency+repair
+canary'sidir; canary terminal receipt ve cleanup settlement üretmeden kapsam genişletilmez.
 
 Historical Codex Worker programı iki ayrı hard blocker taşır:
 
@@ -686,6 +703,16 @@ specification'ını execute eder. Legacy provider adapter'ının varlığı PAEP
 | 3279 | RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001 | RECOVERY-DOGFOOD-BORN-001 | ASSURANCE | Build cannot report success when clean is held by active execution authority | P0 | RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001, RUN-STATUS-AUTHORITY-001 | G1 | VERIFY | 1/1/1/1/1/0/? | `npm run clean` returns a non-zero typed HOLD when active task/worker authority exists, so `npm run build` cannot terminate early with exit 0 while skipping TypeScript compilation and asset publication | Acceptance was already satisfied: the supervising tool call omitted the child exit code and was initially misread as exit 0, while output correctly stopped before `tsc`. `scripts/clean.mjs` sets `process.exitCode=1`; the hermetic direct-entry contract asserts exit 1 and preserved dist. No product code change was warranted; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=clean-active-execution-hold-exit` | 2026-07-31 |
 | 3280 | RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Cleanup consumes canonical task identity and retires only owned temporary residue | P0 | RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001, RUN-STATUS-AUTHORITY-001 | G1 | VERIFY | 1/1/1/1/1/0/? | Cleanup never routes landing proposals, partial results or temp residue as executable Task records; terminal cleanup removes only the settled sprint's process-suffixed residue and preserves foreign-run evidence | Sprint-487 cleanup initially crashed because suffix-only loading treated landing proposals as provider-routable tasks. CLI cleanup now uses the canonical task-artifact classifier; lifecycle cleanup scopes process-suffixed residue deletion to the settled sprint number. 51 focused cleanup/authority tests and the real CLI cleanup pass; every-environment replay remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-cleanup-artifact-identity` | 2026-07-31 |
 | 3281 | RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001 | RECOVERY-BORN-485-TERMINAL-PUBLICATION-001 | KERNEL | Terminal receipt lineages expose canonical logical task identity separately from attempt identity | P0 | — | G1 | OPEN | 0/0/1/1/0/0/? | Receipt `logicalProgress.lineages[].logicalTaskId` equals the canonical root task ID; attempt IDs remain exact and separate, embedded NUL/composite IDs never leak into logical identity or cross-surface consumers | Sprint-487 truthful receipt has correct 32/32 totals and 44 exact attempts, but its lineage labels contain `taskId\u0000attemptId`. Counts/status are unaffected; the evidence schema and producer mapping must be repaired before downstream consumers rely on logical IDs | 2026-07-31 |
+| 3282 | RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Logical task lineage has one causal settlement authority across original, FIX and XFIX attempts | P0 | KERNEL-ATTEMPT-001, KERNEL-SETTLEMENT-001, RECOVERY-BORN-482-REPAIR-SETTLEMENT-001 | G1 | OPEN | ~/0/1/1/0/0/? | A repair is authorized only from the current unresolved lineage head; successful repair settles the logical task once; stale or redundant XFIX cannot replace a successful leaf, reopen DONE, double-count progress or poison dependants; repair continuation is evidence/risk policy plus operator authority, never an arbitrary global attempt ratio or silent infinite loop | Sprint-488 repaired 002, 004, 011 and 014, then spawned unnecessary XFIX for already-successful 001, 010 and 013. `foldTaskLineages` selected later attempt depth/time without causal authorization and `forcedByBlockedDependents` bypassed ordinary thresholds. Baseline and raw artifacts are preserved in commit `f59503a4` | 2026-08-01 |
+| 3283 | RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Scheduler admission and worker prompt consume one aggregate dependency settlement | P0 | RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001, SCHEDULER-001, PROMPT-001 | G1 | OPEN | ~/0/1/1/0/0/? | One versioned dependency read model resolves every logical prerequisite through its accepted lineage leaf; scheduler, prompt, handoff, Brain and recovery bind the same digest; a repaired dependency unblocks exactly once and no worker can receive stale original NO_GO evidence after aggregate admission | Sprint-488 emitted `DEPENDENCY_REPAIR_UNBLOCKED` for repaired prerequisites, yet prompts for 003 and 015 read only root `.result` files and showed original NO_GO, causing immediate false NO_GO. The object aggregate formatter exists but task-builder still selected the legacy file reader | 2026-08-01 |
+| 3284 | RECOVERY-BORN-488-REPAIR-DISPATCH-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Every admitted repair enters one durable runnable queue and is dispatched before quiescence | P0 | RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001, RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001, RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001 | G1 | OPEN | ~/0/1/1/0/0/? | Original, FIX, FIX-FIX and cross-dependency repair births publish the same durable queue identity; per-result settlement immediately reevaluates ready work; phase transitions cannot hide a newly written task; PAUSE is legal only after the queue, active attempts and authorized repair decisions reach a fenced quiescent snapshot | Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE | 2026-08-01 |
+| 3285 | RECOVERY-BORN-488-LANDING-CHECKPOINT-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Host-owned structured landing checkpoint follows every material attempt mutation | P0 | RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001, BUDGET-CONTINUATION-001, RESULT-RECONCILIATION-001 | G1 | OPEN | ~/0/1/1/0/0/? | Every runtime uses one schema-validated same-directory atomic writer owned by the worker lifecycle; sequence and content advance after each material disk mutation and before terminal result; stale, malformed or missing proposals produce typed execution HOLD with resumable attribution; provider prose and shell quoting are not checkpoint authority | Sprint-488 attempts 002, 006, 011 and 014 changed disk after their last accepted proposal or never advanced beyond sequence 1. Host rejection was correctly fail-closed, but the new host helper had no production caller and checkpoint freshness remained model-dependent | 2026-08-01 |
+| 3286 | RECOVERY-BORN-488-CONTINUOUS-REFILL-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Free execution capacity refills from the whole run graph after every settlement | P0 | RECOVERY-BORN-488-REPAIR-DISPATCH-001, SCHEDULER-001, RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001 | G1 | OPEN | ~/0/1/1/0/0/? | One event-driven scheduler considers all admitted ready originals and repairs whenever a slot/provider capacity changes; wave subsets cannot hide global ready work; a slow attempt does not delay unrelated repair birth or dispatch; fairness, collision, dependency and provider limits remain canonical constraints | Sprint-488 FIX/POSTFIX collectors waited on their local wave subset. Attempt 006 held the wave for roughly fourteen minutes while settled-result repairs and other globally ready work did not refill available capacity | 2026-08-01 |
+| 3287 | RECOVERY-BORN-488-VERIFICATION-ISOLATION-001 | RECOVERY-DOGFOOD-BORN-001 | ASSURANCE | Attempt verification is isolated from unrelated concurrent workspace mutations | P0 | RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001, RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001, PRODUCTION-WIRING-AUTHORITY-001 | G1 | OPEN | ~/0/1/1/0/0/? | Language adapters execute acceptance-bound checks against an immutable attributed snapshot or equivalent fenced scope; direct repository-wide commands against active writers cannot decide task outcome; ambient failures settle as typed verification HOLD and consume no repair authority; post-settlement binary proof remains a distinct stage | Sprint-488 task 005 produced material code and passed TypeScript before three tests failed on concurrent heartbeat/settlement changes. `verification-isolation-authority` exists, but `enforceVerifyLoop` has no production worker-execution caller; workers still ran direct commands on the mutable shared workspace | 2026-08-01 |
+| 3288 | RECOVERY-BORN-488-REPAIR-CAPABILITY-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Repair routing binds write capability, scope closure and fresh-eyes policy without contradiction | P0 | RECOVERY-BORN-488-REPAIR-DISPATCH-001, PRODUCTION-WIRING-AUTHORITY-001, ROUTING-V3-CUTOVER-001 | G1 | OPEN | ~/0/1/1/0/0/? | Every repair derives required operations and canonical consumer closure before route admission; write tasks cannot reach read-only personas; fresh-eyes rotation selects only capability-compatible candidates; scope widening is minimal, reviewed and digest-bound; unavailable capability yields typed HOLD rather than guaranteed NO_GO | Sprint-488 001-xfix and 010-xfix were write repairs routed to read-only `code-reviewer`. Direct FIX selection has an implementer fallback, while XFIX used the rotated agent directly and bypassed that guard; 010 repair scope also omitted its real production consumer | 2026-08-01 |
+| 3289 | RECOVERY-BORN-488-EVALUATION-TRUTH-001 | RECOVERY-DOGFOOD-BORN-001 | EVAL | Evaluation separates product defect from execution, authority, dependency and ambient verification failures | P0 | RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001, RECOVERY-BORN-488-VERIFICATION-ISOLATION-001, RECOVERY-BORN-483-EVALUATION-HONESTY-001, PRODUCTION-WIRING-AUTHORITY-001 | G1 | OPEN | ~/0/1/1/0/0/? | DONE requires acceptance-bound producer→canonical consumer→all affected ingress→effective enablement proof; stale dependency, read-only route, budget landing, provider loss, concurrent verification and missing authority become exact HOLD classes and do not spend task-defect repair attempts; Brain scores cannot override mandatory wiring or disk truth | Sprint-488 accepted root 010 as DONE although exact follow-up found its exported enforcement symbol had no production caller. Conversely 003/015 failed on stale dependency prompts and 005/006 failed on execution protocol conditions, inflating NO_GO and triggering inappropriate repairs | 2026-08-01 |
+| 3290 | RECOVERY-BORN-488-RECOVERY-TERMINAL-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Resume and force-finalize publish truthful terminal or resumable operator outcomes | P0 | PAUSED-FINALIZE-001, RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001, RUN-STATUS-AUTHORITY-001, RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001 | G1 | OPEN | ~/0/1/1/0/0/? | Resume returns a typed resumed-and-running, resumed-and-paused, completed, aborted or failed outcome with exact next authority; explicit force finalize never prints COMPLETE before receipt and can publish a fenced ABORTED settlement preserving unresolved/deferred lineages; cleanup admits only that exact terminal receipt and never deletes forensic evidence implicitly | Sprint-488 recover returned generic error after re-entering PAUSED. Owner-authorized force-finalize printed a success-like Sprint Complete report, then exited non-zero with `TERMINAL_EVIDENCE_HOLD`; status remained PAUSED/FIX with no receipt and cleanup correctly refused `run-paused` | 2026-08-01 |
+| 3291 | RECOVERY-BORN-488-STATUS-PROJECTION-001 | RECOVERY-DOGFOOD-BORN-001 | KERNEL | Every surface and metric projects one persisted logical run read model | P0 | RUN-STATUS-AUTHORITY-001, RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001, RECOVERY-BORN-488-RECOVERY-TERMINAL-001, RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001 | G1 | OPEN | ~/0/1/1/0/0/? | CLI, MCP, Terminal, Desktop, dashboard, metrics, notification and finalizer consume one revisioned persisted snapshot with exact logical and attempt denominators; active/provider concurrency cannot remain non-zero after authority retirement; source/dist digest mismatch blocks dogfood admission and no adapter re-infers state | Sprint-488 exposed active-count, blocked-count, summary and receipt contradictions. Current source status calls the strict logical projector without explicit logical IDs while the checked-in dist still uses older inference, so source and real CLI binary do not implement the same contract | 2026-08-01 |
 
 ### P04 — Runtime-wide authority and security
 
@@ -1237,6 +1264,7 @@ code/live regressions remain governed by the canonical ledger and code-truth bas
 | Independent verification | Local config and pure selector now reject same-provider verification; exact Fable/Sol authority, all-ingress wiring and live settlement remain unproven | CM-04, XVERIFY-WIRE-001 |
 | Execution ontology | Goal, mission, autonomous, flow, run, process and sprint remain partially separate | KERNEL-001 |
 | Persistent goal lifecycle | Owner resumed the existing detailed goal, but the session API still reports `blocked` and exposes no truthful active transition; false `complete` is forbidden | KERNEL-STATE-001, GOAL-CRASH-001 |
+| Dogfood execution | Sprint-488 is durably `PAUSED/FIX`: repairs can poison successful lineages, dependency prompts can see stale roots, POSTFIX repair files can remain undispatched, status surfaces disagree, recover returns PAUSED as generic error, force-finalize cannot publish ABORTED receipt and cleanup therefore remains correctly held; baseline `f59503a4` preserves all forensic evidence | RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001 through RECOVERY-BORN-488-STATUS-PROJECTION-001 |
 | Product surfaces | Terminal/Desktop/API have substantial code but not one application-service cutover | P05, P06 |
 
 No sprint is promoted past its applicable stop line. Bypass, budget removal, fake capability

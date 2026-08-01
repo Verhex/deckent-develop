@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2c2d1fdfc0a4c1ba69ee3904d8a022d2df370d5169714bec2572f984e280d68f"
+    "value": "c73681216fa60b288d45b3fbf49e5285e88db94953c765216904d87029871eb5"
   },
   "summary": {
-    "total": 299,
-    "active": 299,
+    "total": 309,
+    "active": 309,
     "terminal": 0,
     "receipts": 21,
     "byState": {
-      "OPEN": 205,
+      "OPEN": 215,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -21,13 +21,13 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 230,
+      "P0": 240,
       "P1": 53,
       "P2": 16
     },
     "byProgram": {
       "API": 5,
-      "ASSURANCE": 5,
+      "ASSURANCE": 6,
       "AUTHORITY": 24,
       "CODEX": 44,
       "CONNECTOR": 1,
@@ -39,9 +39,9 @@
       "DURABILITY": 1,
       "ECOSYSTEM": 3,
       "ENTERPRISE": 1,
-      "EVAL": 3,
+      "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 66,
+      "KERNEL": 74,
       "LEARNING": 4,
       "OBS": 1,
       "ONBOARDING": 1,
@@ -2317,6 +2317,116 @@
       "updated": "2026-07-31",
       "definitionDigest": "51433899496fb4df90d06ab5c3d10d9e609cc7b80652fed767cccb4a8c9ea429",
       "progressDigest": "fd320de8a743ee6546c86f7ccad3a0c2c5367d0427f27de4012011c7c71c540c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3282,
+      "id": "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "a3fc83e06b1c6280071fac04dbc92c9679919a2dd921ebd0c5e4b7c5139643e0",
+      "progressDigest": "d137b36e650cc3e4fbfd827214c10648370c28dbe5ed6459835987271d8cf360",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3283,
+      "id": "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "a1619703d97974b5f69374624fd6f4d15fb9d874aeae2f3add45ab90aa606a60",
+      "progressDigest": "6a00a173b1ab7d9be896db5b229041a4105cd8b02823652f50d203e9cb8f3a01",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3284,
+      "id": "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "32baf34f5fc318f1b0e51a375792836ad99a014cdb5ede4718377f895f8cabfd",
+      "progressDigest": "7cdfdeff57edb6dfa25957a21e80eda1f0e37ab7b8dd3c4ad3068acea198bb71",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3285,
+      "id": "RECOVERY-BORN-488-LANDING-CHECKPOINT-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "bc86c483c5f0a87db5498e37a5e82dc226f4264f30ea469f59dd588b65818761",
+      "progressDigest": "a6818e10a41596d8fffe1f5a94c49b4bf7d65c52db241ec57eb70c3b014efa25",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3286,
+      "id": "RECOVERY-BORN-488-CONTINUOUS-REFILL-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "c3ee4061134e13316a3a70d0ec7b533f28b97ac68ceb56da3529349c8d114e59",
+      "progressDigest": "847b7cc07d4cabb3c4951268218132e3bf3b1214de45834850b6103d327035f8",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3287,
+      "id": "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001",
+      "program": "ASSURANCE",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "b7c6ca49816234d9b2d47edbbf14f0cc7fff2b1048baf85ae7b8c32d929d4bd8",
+      "progressDigest": "f9360a52db6d7dae84a4ca00dde9d87be15869fbc3d9d1238037c25f24a12640",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3288,
+      "id": "RECOVERY-BORN-488-REPAIR-CAPABILITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "bb24c798b24edbe31881103ce5cd3cfbe29eb812dcc05779ab2de7e7297dc78d",
+      "progressDigest": "5cd5f3f4bdd8c8f16878289633c7229d2626987cd9d8574f7dac0c3b3d53bef0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3289,
+      "id": "RECOVERY-BORN-488-EVALUATION-TRUTH-001",
+      "program": "EVAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "d57f2dd48037553b0d01892a7ff67df4817c44612fe85803752e9f04f95ce1ee",
+      "progressDigest": "f9df9286b2b9eee9ae8b48236223d0569e978b907fbe5cb6336981edcd4c3d5c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3290,
+      "id": "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "9351804a3b66fabb554218fecf5477069a9c17705d17d7ad3fe1f4fdf3ba6051",
+      "progressDigest": "5df5924af1d1418ecd4f2aefd18e75939741073b1031ef3e48e51c2dcd0a0d7e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3291,
+      "id": "RECOVERY-BORN-488-STATUS-PROJECTION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-01",
+      "definitionDigest": "c8b06bda4afa2814f5de7b3c6d6bb4140b880860262ecfb44c30ae70fd7b34af",
+      "progressDigest": "4321dcf6c0e4adeeb30562005ab2e1c14bae3e6de1194bfbadd0e164aff6cdb5",
       "terminalClosureDigest": null
     },
     {
@@ -9189,6 +9299,8 @@
         "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
         "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
         "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+        "RECOVERY-BORN-488-STATUS-PROJECTION-001",
         "RECOVERY-RESUME-001",
         "STATUS-SURFACE-PARITY-001"
       ],
@@ -9238,6 +9350,7 @@
         "KERNEL-SETTLEMENT-001",
         "MISSION-KIND-001",
         "RECOVERY-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
         "RECOVERY-DECISION-001",
         "RUNNER-PROTOCOL-001",
         "SCHEDULER-001",
@@ -9299,6 +9412,7 @@
         "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
         "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
         "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
         "RECOVERY-DECISION-001",
         "RECOVERY-STALE-PROJECTION-001",
         "RESULT-INGEST-001",
@@ -9720,7 +9834,9 @@
         "RECOVERY-BORN-480-FIX-PRIORITY-001",
         "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
         "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
-        "RECOVERY-BORN-486-NERVOUS-COLLISION-001"
+        "RECOVERY-BORN-486-NERVOUS-COLLISION-001",
+        "RECOVERY-BORN-488-CONTINUOUS-REFILL-001",
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001"
       ],
       "children": [],
       "gates": [
@@ -9903,7 +10019,8 @@
       ],
       "dependents": [
         "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
-        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001"
       ],
       "children": [],
       "gates": [
@@ -10230,7 +10347,17 @@
         "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
         "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
         "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
-        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001"
+        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+        "RECOVERY-BORN-488-LANDING-CHECKPOINT-001",
+        "RECOVERY-BORN-488-CONTINUOUS-REFILL-001",
+        "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001",
+        "RECOVERY-BORN-488-REPAIR-CAPABILITY-001",
+        "RECOVERY-BORN-488-EVALUATION-TRUTH-001",
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+        "RECOVERY-BORN-488-STATUS-PROJECTION-001"
       ],
       "gates": [
         "G1"
@@ -10278,7 +10405,17 @@
         "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
         "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
         "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
-        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001"
+        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+        "RECOVERY-BORN-488-LANDING-CHECKPOINT-001",
+        "RECOVERY-BORN-488-CONTINUOUS-REFILL-001",
+        "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001",
+        "RECOVERY-BORN-488-REPAIR-CAPABILITY-001",
+        "RECOVERY-BORN-488-EVALUATION-TRUTH-001",
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+        "RECOVERY-BORN-488-STATUS-PROJECTION-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
@@ -10299,7 +10436,8 @@
         "RUNNER-PROTOCOL-001"
       ],
       "dependents": [
-        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001"
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "RECOVERY-BORN-488-LANDING-CHECKPOINT-001"
       ],
       "children": [],
       "gates": [
@@ -11017,7 +11155,8 @@
       ],
       "dependents": [
         "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
-        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001"
+        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001"
       ],
       "children": [],
       "gates": [
@@ -11142,7 +11281,9 @@
         "EVALUATION-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-488-EVALUATION-TRUTH-001"
+      ],
       "children": [
         "RECOVERY-BORN-485-SEMANTIC-VERDICT-001"
       ],
@@ -11185,7 +11326,9 @@
         "LIMIT-001",
         "RUNNER-PROTOCOL-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-488-CONTINUOUS-REFILL-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -11720,7 +11863,10 @@
       ],
       "dependents": [
         "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
-        "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001"
+        "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
+        "RECOVERY-BORN-488-EVALUATION-TRUTH-001",
+        "RECOVERY-BORN-488-REPAIR-CAPABILITY-001",
+        "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001"
       ],
       "children": [],
       "gates": [
@@ -11876,7 +12022,8 @@
       "dependsOn": [],
       "dependents": [
         "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
-        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001"
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "RECOVERY-BORN-488-LANDING-CHECKPOINT-001"
       ],
       "children": [],
       "gates": [
@@ -11914,7 +12061,9 @@
         "SCHEDULER-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -12067,7 +12216,8 @@
       ],
       "dependents": [
         "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
-        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
+        "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001"
       ],
       "children": [],
       "gates": [
@@ -12106,7 +12256,8 @@
         "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
       ],
       "dependents": [
-        "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001"
+        "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
+        "RECOVERY-BORN-488-STATUS-PROJECTION-001"
       ],
       "children": [],
       "gates": [
@@ -12145,7 +12296,8 @@
         "RESULT-RECONCILIATION-001"
       ],
       "dependents": [
-        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001"
+        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
+        "RECOVERY-BORN-488-LANDING-CHECKPOINT-001"
       ],
       "children": [],
       "gates": [
@@ -12183,7 +12335,9 @@
         "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
         "PRODUCTION-WIRING-AUTHORITY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -12217,7 +12371,9 @@
       "outcome": "A held terminal receipt can never publish a successful job or COMPLETE authority",
       "priority": "P0",
       "dependsOn": [],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -12344,6 +12500,417 @@
       "acceptance": "Receipt `logicalProgress.lineages[].logicalTaskId` equals the canonical root task ID; attempt IDs remain exact and separate, embedded NUL/composite IDs never leak into logical identity or cross-surface consumers",
       "evidence": "Sprint-487 truthful receipt has correct 32/32 totals and 44 exact attempts, but its lineage labels contain `taskId\\u0000attemptId`. Counts/status are unaffected; the evidence schema and producer mapping must be repaired before downstream consumers rely on logical IDs",
       "updated": "2026-07-31"
+    },
+    {
+      "order": 3282,
+      "id": "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Logical task lineage has one causal settlement authority across original, FIX and XFIX attempts",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-ATTEMPT-001",
+        "KERNEL-SETTLEMENT-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+        "RECOVERY-BORN-488-STATUS-PROJECTION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-ATTEMPT-001",
+        "KERNEL-SETTLEMENT-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "A repair is authorized only from the current unresolved lineage head; successful repair settles the logical task once; stale or redundant XFIX cannot replace a successful leaf, reopen DONE, double-count progress or poison dependants; repair continuation is evidence/risk policy plus operator authority, never an arbitrary global attempt ratio or silent infinite loop",
+      "evidence": "Sprint-488 repaired 002, 004, 011 and 014, then spawned unnecessary XFIX for already-successful 001, 010 and 013. `foldTaskLineages` selected later attempt depth/time without causal authorization and `forcedByBlockedDependents` bypassed ordinary thresholds. Baseline and raw artifacts are preserved in commit `f59503a4`",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3283,
+      "id": "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Scheduler admission and worker prompt consume one aggregate dependency settlement",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "SCHEDULER-001",
+        "PROMPT-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-488-EVALUATION-TRUTH-001",
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "SCHEDULER-001",
+        "PROMPT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "One versioned dependency read model resolves every logical prerequisite through its accepted lineage leaf; scheduler, prompt, handoff, Brain and recovery bind the same digest; a repaired dependency unblocks exactly once and no worker can receive stale original NO_GO evidence after aggregate admission",
+      "evidence": "Sprint-488 emitted `DEPENDENCY_REPAIR_UNBLOCKED` for repaired prerequisites, yet prompts for 003 and 015 read only root `.result` files and showed original NO_GO, causing immediate false NO_GO. The object aggregate formatter exists but task-builder still selected the legacy file reader",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3284,
+      "id": "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Every admitted repair enters one durable runnable queue and is dispatched before quiescence",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-488-CONTINUOUS-REFILL-001",
+        "RECOVERY-BORN-488-REPAIR-CAPABILITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+        "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Original, FIX, FIX-FIX and cross-dependency repair births publish the same durable queue identity; per-result settlement immediately reevaluates ready work; phase transitions cannot hide a newly written task; PAUSE is legal only after the queue, active attempts and authorized repair decisions reach a fenced quiescent snapshot",
+      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3285,
+      "id": "RECOVERY-BORN-488-LANDING-CHECKPOINT-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Host-owned structured landing checkpoint follows every material attempt mutation",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "BUDGET-CONTINUATION-001",
+        "RESULT-RECONCILIATION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "BUDGET-CONTINUATION-001",
+        "RESULT-RECONCILIATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Every runtime uses one schema-validated same-directory atomic writer owned by the worker lifecycle; sequence and content advance after each material disk mutation and before terminal result; stale, malformed or missing proposals produce typed execution HOLD with resumable attribution; provider prose and shell quoting are not checkpoint authority",
+      "evidence": "Sprint-488 attempts 002, 006, 011 and 014 changed disk after their last accepted proposal or never advanced beyond sequence 1. Host rejection was correctly fail-closed, but the new host helper had no production caller and checkpoint freshness remained model-dependent",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3286,
+      "id": "RECOVERY-BORN-488-CONTINUOUS-REFILL-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Free execution capacity refills from the whole run graph after every settlement",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+        "SCHEDULER-001",
+        "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+        "SCHEDULER-001",
+        "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "One event-driven scheduler considers all admitted ready originals and repairs whenever a slot/provider capacity changes; wave subsets cannot hide global ready work; a slow attempt does not delay unrelated repair birth or dispatch; fairness, collision, dependency and provider limits remain canonical constraints",
+      "evidence": "Sprint-488 FIX/POSTFIX collectors waited on their local wave subset. Attempt 006 held the wave for roughly fourteen minutes while settled-result repairs and other globally ready work did not refill available capacity",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3287,
+      "id": "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "ASSURANCE",
+      "outcome": "Attempt verification is isolated from unrelated concurrent workspace mutations",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
+        "PRODUCTION-WIRING-AUTHORITY-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-488-EVALUATION-TRUTH-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001",
+        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001",
+        "PRODUCTION-WIRING-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Language adapters execute acceptance-bound checks against an immutable attributed snapshot or equivalent fenced scope; direct repository-wide commands against active writers cannot decide task outcome; ambient failures settle as typed verification HOLD and consume no repair authority; post-settlement binary proof remains a distinct stage",
+      "evidence": "Sprint-488 task 005 produced material code and passed TypeScript before three tests failed on concurrent heartbeat/settlement changes. `verification-isolation-authority` exists, but `enforceVerifyLoop` has no production worker-execution caller; workers still ran direct commands on the mutable shared workspace",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3288,
+      "id": "RECOVERY-BORN-488-REPAIR-CAPABILITY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Repair routing binds write capability, scope closure and fresh-eyes policy without contradiction",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+        "PRODUCTION-WIRING-AUTHORITY-001",
+        "ROUTING-V3-CUTOVER-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
+        "PRODUCTION-WIRING-AUTHORITY-001",
+        "ROUTING-V3-CUTOVER-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Every repair derives required operations and canonical consumer closure before route admission; write tasks cannot reach read-only personas; fresh-eyes rotation selects only capability-compatible candidates; scope widening is minimal, reviewed and digest-bound; unavailable capability yields typed HOLD rather than guaranteed NO_GO",
+      "evidence": "Sprint-488 001-xfix and 010-xfix were write repairs routed to read-only `code-reviewer`. Direct FIX selection has an implementer fallback, while XFIX used the rotated agent directly and bypassed that guard; 010 repair scope also omitted its real production consumer",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3289,
+      "id": "RECOVERY-BORN-488-EVALUATION-TRUTH-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "EVAL",
+      "outcome": "Evaluation separates product defect from execution, authority, dependency and ambient verification failures",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+        "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001",
+        "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+        "PRODUCTION-WIRING-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
+        "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001",
+        "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
+        "PRODUCTION-WIRING-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "DONE requires acceptance-bound producer→canonical consumer→all affected ingress→effective enablement proof; stale dependency, read-only route, budget landing, provider loss, concurrent verification and missing authority become exact HOLD classes and do not spend task-defect repair attempts; Brain scores cannot override mandatory wiring or disk truth",
+      "evidence": "Sprint-488 accepted root 010 as DONE although exact follow-up found its exported enforcement symbol had no production caller. Conversely 003/015 failed on stale dependency prompts and 005/006 failed on execution protocol conditions, inflating NO_GO and triggering inappropriate repairs",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3290,
+      "id": "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Resume and force-finalize publish truthful terminal or resumable operator outcomes",
+      "priority": "P0",
+      "dependsOn": [
+        "PAUSED-FINALIZE-001",
+        "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001",
+        "RUN-STATUS-AUTHORITY-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-488-STATUS-PROJECTION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PAUSED-FINALIZE-001",
+        "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001",
+        "RUN-STATUS-AUTHORITY-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Resume returns a typed resumed-and-running, resumed-and-paused, completed, aborted or failed outcome with exact next authority; explicit force finalize never prints COMPLETE before receipt and can publish a fenced ABORTED settlement preserving unresolved/deferred lineages; cleanup admits only that exact terminal receipt and never deletes forensic evidence implicitly",
+      "evidence": "Sprint-488 recover returned generic error after re-entering PAUSED. Owner-authorized force-finalize printed a success-like Sprint Complete report, then exited non-zero with `TERMINAL_EVIDENCE_HOLD`; status remained PAUSED/FIX with no receipt and cleanup correctly refused `run-paused`",
+      "updated": "2026-08-01"
+    },
+    {
+      "order": 3291,
+      "id": "RECOVERY-BORN-488-STATUS-PROJECTION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Every surface and metric projects one persisted logical run read model",
+      "priority": "P0",
+      "dependsOn": [
+        "RUN-STATUS-AUTHORITY-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUN-STATUS-AUTHORITY-001",
+        "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "CLI, MCP, Terminal, Desktop, dashboard, metrics, notification and finalizer consume one revisioned persisted snapshot with exact logical and attempt denominators; active/provider concurrency cannot remain non-zero after authority retirement; source/dist digest mismatch blocks dogfood admission and no adapter re-infers state",
+      "evidence": "Sprint-488 exposed active-count, blocked-count, summary and receipt contradictions. Current source status calls the strict logical projector without explicit logical IDs while the checked-in dist still uses older inference, so source and real CLI binary do not implement the same contract",
+      "updated": "2026-08-01"
     },
     {
       "order": 4000,
@@ -15665,6 +16232,7 @@
         "LEARNING-DOGFOOD-001",
         "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
         "RECOVERY-BORN-485-PROMPT-POLICY-001",
+        "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
         "ROUTING-001",
         "WORKER-DISCOVERY-001"
       ],
@@ -15790,7 +16358,8 @@
         "PROMPT-V3-001"
       ],
       "dependents": [
-        "RECOVERY-BORN-485-PROMPT-POLICY-001"
+        "RECOVERY-BORN-485-PROMPT-POLICY-001",
+        "RECOVERY-BORN-488-REPAIR-CAPABILITY-001"
       ],
       "children": [],
       "gates": [
@@ -16368,6 +16937,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "8d55c97d1e7ac15cf451930fcf8e5704573552d2b54d0438291b1866e0c227ea"
+    "value": "7f72d3dd0f07c05a19b4df959f2a795bd3e0a1768457fb9ca7e02e6edcd8af67"
   }
 }
