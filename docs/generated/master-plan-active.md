@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):6b1ca07b61fb2258b09c640fd9c5af0e6187e072f1517ef343a16cf796947d3c`
+**Source digest:** `sha256(normalized-lf-utf8):a0a6035aaf23b796a37011cee8c4069707aabfd35097fa4ad39f3263f63b0c8e`
 
-**Rows:** 315 total · 312 active · 3 terminal
+**Rows:** 315 total · 311 active · 4 terminal
 
 ## State summary
 
@@ -17,8 +17,8 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 31 |
-| DONE | 3 |
+| VERIFY | 30 |
+| DONE | 4 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -230,7 +230,6 @@
 | 3278 | `RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001` | VERIFY | P0 | KERNEL | — | — | A held terminal receipt can never publish a successful job or COMPLETE authority |
 | 3279 | `RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RUN-STATUS-AUTHORITY-001` | — | Build cannot report success when clean is held by active execution authority |
 | 3280 | `RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001` | VERIFY | P0 | KERNEL | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001`, `RUN-STATUS-AUTHORITY-001` | — | Cleanup consumes canonical task identity and retires only owned temporary residue |
-| 3281 | `RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001` | VERIFY | P0 | KERNEL | — | — | Terminal receipt lineages expose canonical logical task identity separately from attempt identity |
 | 3282 | `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001`, `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | — | Logical task lineage has one causal settlement authority across original, FIX and XFIX attempts |
 | 3283 | `RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001` | VERIFY | P0 | KERNEL | `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`, `SCHEDULER-001`, `PROMPT-001` | — | Scheduler admission and worker prompt consume one aggregate dependency settlement |
 | 3284 | `RECOVERY-BORN-488-REPAIR-DISPATCH-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`, `RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001`, `RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001` | — | Every admitted repair enters one durable runnable queue and is dispatched before quiescence |

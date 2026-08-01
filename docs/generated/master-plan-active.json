@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6b1ca07b61fb2258b09c640fd9c5af0e6187e072f1517ef343a16cf796947d3c"
+    "value": "a0a6035aaf23b796a37011cee8c4069707aabfd35097fa4ad39f3263f63b0c8e"
   },
   "summary": {
     "total": 315,
-    "active": 312,
-    "terminal": 3,
+    "active": 311,
+    "terminal": 4,
     "receipts": 22,
     "byState": {
       "OPEN": 214,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 31,
-      "DONE": 3,
+      "VERIFY": 30,
+      "DONE": 4,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -2313,11 +2313,11 @@
       "id": "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-01",
       "definitionDigest": "51433899496fb4df90d06ab5c3d10d9e609cc7b80652fed767cccb4a8c9ea429",
-      "progressDigest": "a41f70bcef68dac99efae02c811f1596a86c62e039c515dc26071c465516b7f3",
-      "terminalClosureDigest": null
+      "progressDigest": "f4329f195cf66595658230ee003dd7679640612d3c9327772631f39f0ff686cd",
+      "terminalClosureDigest": "7e28aa066c41be41f7c9dbe0815f48662591888e52f796acd0819c38caeae865"
     },
     {
       "order": 3282,
@@ -11554,8 +11554,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001",
-        "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001"
+        "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One fenced terminal receipt atomically precedes archive/cleanup; CLI, MCP, dashboard and job remain monotonic COMPLETE with logical progress bounded to N/N; temp/residue files cannot become task identity",
@@ -12554,39 +12553,6 @@
       "acceptance": "Cleanup never routes landing proposals, partial results or temp residue as executable Task records; terminal cleanup removes only the settled sprint's process-suffixed residue and preserves foreign-run evidence",
       "evidence": "Sprint-487 cleanup initially crashed because suffix-only loading treated landing proposals as provider-routable tasks. CLI cleanup now uses the canonical task-artifact classifier; lifecycle cleanup scopes process-suffixed residue deletion to the settled sprint number. 51 focused cleanup/authority tests and the real CLI cleanup pass; every-environment replay remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-cleanup-artifact-identity`",
       "updated": "2026-07-31"
-    },
-    {
-      "order": 3281,
-      "id": "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001",
-      "parent": "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
-      "program": "KERNEL",
-      "outcome": "Terminal receipt lineages expose canonical logical task identity separately from attempt identity",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-01-LIFECYCLE-RECOVERY-01"
-      ],
-      "acceptance": "Receipt `logicalProgress.lineages[].logicalTaskId` equals the canonical root task ID; attempt IDs remain exact and separate, embedded NUL/composite IDs never leak into logical identity or cross-surface consumers",
-      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; `proof=sprint-490-terminal-logical-id`; finalizer now projects canonical root IDs separately from exact attempt IDs; focused terminal receipt proof rejects embedded NUL/composite identity and Sprint-490 published 14 canonical logical lineages over 20 exact attempts",
-      "updated": "2026-08-01"
     },
     {
       "order": 3282,
@@ -17146,6 +17112,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d5bad51723e6686237da26ad46329f44ce7fd91854b702c056df7432dcf3bef8"
+    "value": "1b56c1218e4d1560d6219ca287a0932d2dc4e8ccee9fcbde1e51318975c35565"
   }
 }
