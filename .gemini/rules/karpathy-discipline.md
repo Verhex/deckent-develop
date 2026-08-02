@@ -39,7 +39,7 @@ philosophy as adapted for AI-agent workflows.
 - Prefer flat code over nested abstractions. Each layer of indirection must earn its existence by making the call-site simpler AND reducing duplication.
 - When in doubt between two approaches, choose the one with fewer new lines of code — all else equal.
 - Do NOT introduce new runtime dependencies unless the task explicitly requires it and the dependency is already in package.json.
-- Follow ADR-D-005 (Dependency Policy & Inventory): dependencies are admitted on merit, not by count; prefer a Node.js built-in when it genuinely suffices.
+- Follow ADR-D-005 (Dependency Policy): dependencies are admitted on **merit, not by count** — a real capability, version-pinned, source-audited, with rationale recorded in `docs/reference/dependencies.md`. Prefer a Node.js built-in where one genuinely suffices (a heuristic, not the retired "single runtime dependency" dogma); when you add a package, document its rationale + governing ADR.
 
 **Anti-patterns to avoid:**
 - Creating a helper function used exactly once
@@ -127,26 +127,8 @@ See also: .gemini/rules/worker-default.md, docs/adr/README.md (ADR-G-020, ADR-G-
 ## CUSTOM — Test Hermeticity
 
 **Every test MUST be hermetic — it must pass on a fresh checkout with no local state.**
-
-CI runs on a clean machine with no `.deckent/config.json`, no `.brain/memory.db`, and no
-`~/.deckent` directory. Tests that read gitignored state pass locally but fail in CI.
-The `test:ci-sim` script reproduces this by hiding those files before running the suite.
-
-Rules:
-- **Never read gitignored local state** — `.deckent/config.json`, `.brain/memory.db`,
-  `~/.deckent`, `.deck/` are gitignored and absent on a fresh checkout. Tests that
-  `readFileSync` these paths without a skip-guard will fail in CI.
-- **Use tmpdir for all file I/O** — create all test fixtures under `os.tmpdir()` (e.g.
-  `withSandboxHome()`), and clean up in `afterEach`. Never write to the project root or HOME.
-- **No spawnSync for subprocesses** — use async `spawn` (child_process) so the worker
-  does not freeze waiting for a subprocess. `spawnSync` blocks the event loop and causes
-  CI timeouts.
-- **CI=fresh checkout assumption** — write every test as if the only files present are
-  those committed to git. If your test needs external state, create it in a tmpdir fixture
-  at test-start and tear it down at test-end.
-- **Reference `test:ci-sim`** — before pushing, run `npm run test:ci-sim` to verify that
-  your tests pass under hidden gitignored state. This is the canonical hermetic reproducer
-  (ci-sim script introduced in Sprint 215).
+Enforced mechanically by `npm run lint:hermetic` (`scripts/lint-test-hermeticity.mjs`) and
+reproduced locally via `npm run test:ci-sim` — run these rather than re-deriving the rules here.
 
 Routing: CI tasks (test infra, pipeline fixes, hermetic reproducer) should use
 **ci-guardian agent** + **ci-testing skill**. This ensures the routing engine selects

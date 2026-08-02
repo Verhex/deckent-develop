@@ -1,274 +1,223 @@
-# DIRECTIVES — Sprint 490: Lifecycle Settlement Observation Canary
+# DIRECTIVES — Recovery Residual Closure Implementation Slice
 
 ## Goal
 
-Exercise Deckent's complete lifecycle on an isolated, non-product canary DAG: provider bootstrap,
-config-resolved routing, bounded parallel dispatch, dependency release, an intentional
-`NO_GO → FIX → DONE` lineage, exact result collection, terminal receipt publication, status
-projection and post-run cleanup eligibility. No tracked product source or test file may be changed.
+Close the four source-level residuals discovered by Sprint 490 before any new live replay:
+terminal `SPRINT-LOG` projection completeness, redundant repair-descendant cancellation,
+run-owned provider-observation retirement and fail-closed controller fixture parity.
 
-Provider, model, effort and concurrency decisions come exclusively from effective config, registry,
-auth/reachability evidence, routing policy and runtime admission. This document does not override
-those authorities.
+This is an implementation sprint only. Provider, model, effort and effective concurrency are
+resolved exclusively from effective config, registry, role policy, auth/reachability evidence,
+usage/limit authority and host admission. No instruction-level provider or model override exists.
 
-## Observation Contract
+## Execution Contract
 
-- All task writes stay under `.deckent/runtime/lifecycle-canary/`.
-- The first independent wave has six collision-free logical tasks, matching but not forcing the
-  currently admitted worker capacity.
-- Task `490-006` is a deliberate repair canary. Its original attempt must report honest `NO_GO`;
-  only a generated FIX descendant may repair the fixture and settle the lineage.
-- Task `490-009` depends on the repaired logical lineage, not merely the failed original attempt.
-- No worker may run `npm run build`, a full test suite, provider login/auth mutation, git commit,
-  cleanup, finalize or lifecycle control commands.
-- Every task verifies only its exact scoped artifact with an async-safe Node command.
-- Supervisor evidence to inspect: task/result/heartbeat/log/landing-proposal artifacts, provider
-  concurrency, event sequence, FIX lineage, dependency unblock order, terminal receipt, canonical
-  status read model and exact cleanup eligibility.
+- Preserve canonical terminal receipts and the persisted run-status read model as authority;
+  `docs/SPRINT-LOG.md` remains a human-readable projection only.
+- Every production change must close producer → consumer → entrypoint/policy wiring in this same
+  dependency DAG. A unit-green but unwired helper is `UNWIRED/HOLD`, never DONE.
+- Repair cancellation is lineage-scoped and generation-fenced. It must not cap retries, cancel an
+  unrelated lineage or infer success from file presence.
+- Provider observations are forensic evidence. Never delete history or close an interval from
+  USD, container absence or task-name heuristics; only exact run/attempt/fence authority may retire
+  or scope it.
+- Tests are exact scoped Vitest files only. Workers must not run `npm run build`, `npm test`, a full
+  suite, provider login/auth mutation, sprint lifecycle commands, git commit or cleanup.
+- New user-facing text is forbidden in mechanism modules; any required CLI text must use the
+  existing i18n message authority.
 
 ---
 
-## Task 1: Publish alpha root artifact
+## Task 1: Make terminal sprint-log projection an atomic idempotent upsert
 
-- Files: .deckent/runtime/lifecycle-canary/alpha.txt
-- Scope: .deckent/runtime/lifecycle-canary/
+- Files: src/orchestra/doc-updaters/sprint-log.ts, tests/orchestra/doc-updaters/sprint-log.test.ts
+- Scope: src/orchestra/doc-updaters/sprint-log.ts, tests/orchestra/doc-updaters/sprint-log.test.ts
 - Dependencies: none
 
-Create `alpha.txt` with exactly:
+Refactor the existing Tier-1 sprint-log updater around one exact sprint-section identity. A repeat
+write for the same sprint must replace/coalesce that sprint's section instead of appending a
+duplicate, preserve unrelated sections byte-for-byte, write by same-directory temporary file plus
+atomic rename and accept receipt-backed terminal COMPLETE or ABORTED status as explicit input.
+The existing retrospective detail payload and parse-compatible metric labels must be preserved.
 
-```text
-alpha=ready
-source=independent
-```
+**Test:** `npx vitest run tests/orchestra/doc-updaters/sprint-log.test.ts`
 
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/alpha.txt';const e='alpha=ready\nsource=independent\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
+**NO-GO:** Append-only duplicate remains possible, unrelated sprint text changes, write is
+non-atomic, or the projection is treated as settlement authority.
 
-**NO-GO:** Missing file, byte mismatch, out-of-scope write or synthetic DONE without disk proof.
+## Task 2: Wire COMPLETE and ABORTED terminal authorities to the shared sprint-log upsert
 
-## Task 2: Publish beta root artifact
+- Files: src/orchestra/sprint-finalizer.ts, tests/orchestra/sprint-finalizer-terminal-wire.test.ts
+- Scope: src/orchestra/sprint-finalizer.ts, tests/orchestra/sprint-finalizer-terminal-wire.test.ts
+- Dependencies: Task 1
 
-- Files: .deckent/runtime/lifecycle-canary/beta.txt
-- Scope: .deckent/runtime/lifecycle-canary/
+Invoke the shared projection only after the exact terminal receipt and canonical lifecycle
+authority have been published. Normal, completed-checkpoint recovery and force-abort paths must all
+converge: COMPLETE replaces RETROSPECTIVE, ABORTED creates or updates its exact section, repeated
+publication stays idempotent, and a projection failure cannot fabricate or reverse canonical
+settlement. Preserve current notification and read-model ordering.
+
+**Test:** `npx vitest run tests/orchestra/sprint-finalizer-terminal-wire.test.ts`
+
+**NO-GO:** Any call occurs before receipt/state authority, recovery bypasses the wire, ABORTED is
+still absent, or the solution reruns all doc updaters at terminal publication.
+
+## Task 3: Prove sprint-log terminal projection on a real temporary filesystem
+
+- Files: tests/orchestra/sprint-log-terminal-projection.integration.test.ts
+- Scope: tests/orchestra/sprint-log-terminal-projection.integration.test.ts
+- Dependencies: Task 2
+
+Add a hermetic real-filesystem integration contract covering RETROSPECTIVE→COMPLETE reconciliation,
+first-write ABORTED, repeat COMPLETE/ABORTED idempotency, exact-section duplicate coalescing,
+unrelated-section preservation and atomic-write failure behavior. Do not mock the filesystem writer.
+
+**Test:** `npx vitest run tests/orchestra/sprint-log-terminal-projection.integration.test.ts`
+
+**NO-GO:** Mock-only proof, duplicate section, foreign-section mutation, or canonical receipt/state
+is inferred from the Markdown projection.
+
+## Task 4: Define lineage-scoped redundant repair cancellation authority
+
+- Files: src/core/task-lineage.ts, src/core/task-types.ts, tests/core/task-lineage.test.ts
+- Scope: src/core/task-lineage.ts, src/core/task-types.ts, tests/core/task-lineage.test.ts
 - Dependencies: none
 
-Create `beta.txt` with exactly:
+Add one pure decision contract that, from explicit root/FIX/XFIX edges, current accepted resolving
+attempt and exact statuses, identifies only redundant queued descendants and produces typed active
+descendant cancellation decisions. A later stale leaf must never replace or reopen a settled root.
+The decision must be deterministic, idempotent and independent of provider/model names.
 
-```text
-beta=ready
-source=independent
-```
+**Test:** `npx vitest run tests/core/task-lineage.test.ts`
 
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/beta.txt';const e='beta=ready\nsource=independent\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
+**NO-GO:** Retry count is globally reduced, unrelated roots are selected, file existence becomes
+success authority, or later attempt depth automatically outranks accepted causal settlement.
 
-**NO-GO:** Missing file, byte mismatch, out-of-scope write or synthetic DONE without disk proof.
+## Task 5: Gate every repair dispatch against accepted lineage settlement
 
-## Task 3: Publish gamma root artifact
+- Files: src/orchestra/sprint-spawner.ts, tests/orchestra/redundant-fix-dispatch-gate.test.ts
+- Scope: src/orchestra/sprint-spawner.ts, tests/orchestra/redundant-fix-dispatch-gate.test.ts
+- Dependencies: Task 4
 
-- Files: .deckent/runtime/lifecycle-canary/gamma.txt
-- Scope: .deckent/runtime/lifecycle-canary/
+Wire the pure cancellation authority into the canonical spawn executor used by initial, refill,
+FIX, XFIX, dependency-respawn and recovery triggers. Immediately before claim/spawn, re-read the
+fenced lineage authority; atomically supersede redundant pending descendants and report them as
+non-dispatched rather than consuming a worker slot or FIX budget. Collision and dependency gates
+must retain their existing order for non-redundant work.
+
+**Test:** `npx vitest run tests/orchestra/redundant-fix-dispatch-gate.test.ts`
+
+**NO-GO:** One dispatch ingress bypasses the gate, superseded work counts as spawned/failed,
+unrelated ready work is delayed, or a time-of-check/time-of-use window remains.
+
+## Task 6: Settle already-active redundant repair descendants with typed cancellation
+
+- Files: src/orchestra/sprint-controller.ts, src/core/event-stream.ts, tests/orchestra/redundant-fix-active-cancellation.test.ts
+- Scope: src/orchestra/sprint-controller.ts, src/core/event-stream.ts, tests/orchestra/redundant-fix-active-cancellation.test.ts
+- Dependencies: Task 4
+
+When an accepted repair settles a logical root, publish one generation-fenced cancellation decision
+for any already-active redundant descendant and route it through the existing backend containment
+authority. Its eventual stale result remains forensic attempt evidence but cannot mutate logical
+DONE, reopen dependencies or inflate progress. Do not terminate unrelated work.
+
+**Test:** `npx vitest run tests/orchestra/redundant-fix-active-cancellation.test.ts`
+
+**NO-GO:** Cancellation is an unfenced process kill, stale result changes the logical verdict,
+events claim cancellation without an effect decision, or another lineage is touched.
+
+## Task 7: Prove repair cancellation across refill, dependency and recovery dispatch
+
+- Files: tests/orchestra/redundant-fix-lineage.integration.test.ts
+- Scope: tests/orchestra/redundant-fix-lineage.integration.test.ts
+- Dependencies: Task 5, Task 6
+
+Add a hermetic integration matrix with one accepted FIX, one prequeued redundant XFIX, one active
+redundant descendant, one unrelated repair and one dependent task. Prove the redundant descendants
+settle as superseded/cancelled, unrelated work refills the free slot, the dependent unblocks once,
+and logical progress remains one DONE for the repaired root.
+
+**Test:** `npx vitest run tests/orchestra/redundant-fix-lineage.integration.test.ts`
+
+**NO-GO:** Raw attempts inflate the denominator, a dependent unblocks twice, a redundant worker is
+born after settlement, or unrelated repair capacity is lost.
+
+## Task 8: Bind provider execution observations to exact run ownership
+
+- Files: src/core/provider-execution-observation.ts, src/core/provider-execution-observation-store.ts, tests/core/provider-execution-observation.test.ts, tests/core/provider-execution-observation-store.test.ts
+- Scope: src/core/provider-execution-observation.ts, src/core/provider-execution-observation-store.ts, tests/core/provider-execution-observation.test.ts, tests/core/provider-execution-observation-store.test.ts
 - Dependencies: none
 
-Create `gamma.txt` with exactly:
+Extend the versioned observation/store contract so every interval carries exact run identity in
+addition to task, attempt, principal and fence. Provide backward-compatible migration/read behavior
+that preserves legacy rows as explicitly unowned forensic evidence. Add bounded selectors and
+idempotent retirement/scoping operations keyed by run+attempt+fence; never delete foreign history.
 
-```text
-gamma=ready
-source=independent
-```
+**Test:** `npx vitest run tests/core/provider-execution-observation.test.ts tests/core/provider-execution-observation-store.test.ts`
 
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/gamma.txt';const e='gamma=ready\nsource=independent\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
+**NO-GO:** Task-name parsing stands in for run identity, legacy rows disappear, foreign principal
+data can be closed, or migration is destructive/non-idempotent.
 
-**NO-GO:** Missing file, byte mismatch, out-of-scope write or synthetic DONE without disk proof.
+## Task 9: Propagate exact run ownership through provider observation producers
 
-## Task 4: Publish delta root artifact
+- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-provider-execution-observation.test.ts, tests/orchestra/docker-provider-observation-wire.test.ts
+- Scope: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-provider-execution-observation.test.ts, tests/orchestra/docker-provider-observation-wire.test.ts
+- Dependencies: Task 8
 
-- Files: .deckent/runtime/lifecycle-canary/delta.txt
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: none
+Pass exact run identity through the Docker provider-runtime start/end producer, host ingestion and
+store write without trusting worker prose. Keep start/end identity equality and principal/fence
+validation fail-closed. If another backend uses the shared producer contract, preserve parity or
+emit a typed unsupported/HOLD outcome rather than silently omitting ownership.
 
-Create `delta.txt` with exactly:
+**Test:** `npx vitest run tests/orchestra/docker-provider-execution-observation.test.ts tests/orchestra/docker-provider-observation-wire.test.ts`
 
-```text
-delta=ready
-source=independent
-```
+**NO-GO:** Only tests know the run ID, the container can forge host ownership, start/end identity
+drifts, or unsupported backends silently claim parity.
 
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/delta.txt';const e='delta=ready\nsource=independent\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
+## Task 10: Retire exact-run provider intervals at terminal authority and scope status holds
 
-**NO-GO:** Missing file, byte mismatch, out-of-scope write or synthetic DONE without disk proof.
+- Files: src/orchestra/sprint-finalizer.ts, src/core/run-status-read-model.ts, tests/core/run-status-read-model.test.ts, tests/orchestra/provider-observation-terminal-retirement.test.ts
+- Scope: src/orchestra/sprint-finalizer.ts, src/core/run-status-read-model.ts, tests/core/run-status-read-model.test.ts, tests/orchestra/provider-observation-terminal-retirement.test.ts
+- Dependencies: Task 2, Task 8, Task 9
 
-## Task 5: Publish epsilon root artifact
+After COMPLETE or ABORTED receipt authority, reconcile only intervals owned by that exact
+run/attempt generation and project IDLE/current-run holds from the same ownership selector. Foreign
+or legacy-unowned intervals remain queryable forensic evidence but cannot impose an admission HOLD
+on an unrelated run. Repeat finalize/cleanup must be idempotent.
 
-- Files: .deckent/runtime/lifecycle-canary/epsilon.txt
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: none
+**Test:** `npx vitest run tests/core/run-status-read-model.test.ts tests/orchestra/provider-observation-terminal-retirement.test.ts`
 
-Create `epsilon.txt` with exactly:
+**NO-GO:** Terminalization closes foreign intervals, status hides a current-run open interval,
+historical evidence is deleted, or COMPLETE is published before receipt authority.
 
-```text
-epsilon=ready
-source=independent
-```
+## Task 11: Repair legacy controller fixtures without weakening production truth
 
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/epsilon.txt';const e='epsilon=ready\nsource=independent\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
+- Files: tests/orchestra/sprint-controller.test.ts
+- Scope: tests/orchestra/sprint-controller.test.ts
+- Dependencies: Task 6, Task 10
 
-**NO-GO:** Missing file, byte mismatch, out-of-scope write or synthetic DONE without disk proof.
+Bring the monolithic controller fixture harness up to the current production contracts: complete
+atomic filesystem mocks including rename, real temporary DB directory setup, exact attempt/work
+attribution, provider-observation ownership and current retrospective/finalizer seams. Remove stale
+mock expectations; do not alter production code merely to satisfy legacy fixtures.
 
-## Task 6: Exercise intentional repair lineage
+**Test:** `npx vitest run tests/orchestra/sprint-controller.test.ts`
 
-- Files: .deckent/runtime/lifecycle-canary/repair.txt
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: none
+**NO-GO:** Ambient/synthetic DONE returns, status publication becomes fail-open, tests skip cases,
+or assertions are weakened instead of supplying required authority evidence.
 
-This is a bounded lifecycle canary, not an implementation failure:
+## Task 12: Close the implementation sprint with one cross-slice wiring contract
 
-- On the original task `490-006`, read `repair.txt`, do not modify it, prove that it contains
-  `state=broken`, and return honest `NO_GO` with reason `intentional-repair-canary`.
-- On a generated FIX descendant for this task, replace the file atomically with exactly:
+- Files: tests/orchestra/recovery-residual-wiring.integration.test.ts
+- Scope: tests/orchestra/recovery-residual-wiring.integration.test.ts
+- Dependencies: Task 3, Task 7, Task 10, Task 11
 
-```text
-state=repaired
-authority=fix-descendant
-```
+Create one hermetic integration contract that executes the real production call graph for terminal
+COMPLETE and ABORTED log projection, accepted-repair descendant cancellation, exact-run provider
+interval retirement and canonical status publication. Assert production imports/callers rather
+than fixture-local reimplementations and verify no unrelated tracked file is written.
 
-Then read it back and return `DONE` only when the bytes match. No non-FIX attempt may claim GO.
+**Test:** `npx vitest run tests/orchestra/recovery-residual-wiring.integration.test.ts`
 
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/repair.txt';const e='state=repaired\nauthority=fix-descendant\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Original attempt claims DONE, FIX is not spawned, repair bytes differ, or lineage evidence is missing.
-
-## Task 7: Join alpha and beta
-
-- Files: .deckent/runtime/lifecycle-canary/join-a.txt
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: 490-001, 490-002
-
-Read both dependency artifacts, require their exact root payloads, then create `join-a.txt` with:
-
-```text
-join=a
-inputs=alpha,beta
-```
-
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/join-a.txt';const e='join=a\ninputs=alpha,beta\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Dependency content absent/mismatched, premature dispatch, output mismatch or out-of-scope write.
-
-## Task 8: Join gamma and delta
-
-- Files: .deckent/runtime/lifecycle-canary/join-b.txt
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: 490-003, 490-004
-
-Read both dependency artifacts, require their exact root payloads, then create `join-b.txt` with:
-
-```text
-join=b
-inputs=gamma,delta
-```
-
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/join-b.txt';const e='join=b\ninputs=gamma,delta\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Dependency content absent/mismatched, premature dispatch, output mismatch or out-of-scope write.
-
-## Task 9: Join repaired lineage and epsilon
-
-- Files: .deckent/runtime/lifecycle-canary/join-repair.txt
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: 490-005, 490-006
-
-Do not start from the original `490-006` NO_GO alone. Require the logical repair lineage to be
-settled by a FIX descendant and require both exact input payloads. Then create `join-repair.txt`:
-
-```text
-join=repair
-inputs=epsilon,repaired
-```
-
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/join-repair.txt';const e='join=repair\ninputs=epsilon,repaired\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Original NO_GO is treated as dependency success, FIX settlement is absent, or output differs.
-
-## Task 10: Build left branch
-
-- Files: .deckent/runtime/lifecycle-canary/branch-left.txt
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: 490-007, 490-008
-
-Verify both join artifacts and create `branch-left.txt`:
-
-```text
-branch=left
-inputs=join-a,join-b
-```
-
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/branch-left.txt';const e='branch=left\ninputs=join-a,join-b\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Premature dispatch, dependency mismatch or output mismatch.
-
-## Task 11: Build right branch
-
-- Files: .deckent/runtime/lifecycle-canary/branch-right.txt
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: 490-001, 490-009
-
-Verify both inputs and create `branch-right.txt`:
-
-```text
-branch=right
-inputs=join-repair,alpha
-```
-
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/branch-right.txt';const e='branch=right\ninputs=join-repair,alpha\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Repaired dependency lineage is unresolved, premature dispatch or output mismatch.
-
-## Task 12: Validate left branch
-
-- Files: .deckent/runtime/lifecycle-canary/left-valid.json
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: 490-010
-
-Verify the exact left branch and create `left-valid.json` as one canonical JSON line:
-
-```json
-{"branch":"left","valid":true}
-```
-
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/left-valid.json';const e='{\"branch\":\"left\",\"valid\":true}\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Invalid JSON, extra fields, dependency mismatch or output mismatch.
-
-## Task 13: Validate right branch
-
-- Files: .deckent/runtime/lifecycle-canary/right-valid.json
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: 490-011
-
-Verify the exact right branch and create `right-valid.json` as one canonical JSON line:
-
-```json
-{"branch":"right","valid":true}
-```
-
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/right-valid.json';const e='{\"branch\":\"right\",\"valid\":true}\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Invalid JSON, extra fields, dependency mismatch or output mismatch.
-
-## Task 14: Publish final DAG proof
-
-- Files: .deckent/runtime/lifecycle-canary/final.md
-- Scope: .deckent/runtime/lifecycle-canary/
-- Dependencies: 490-012, 490-013
-
-Require both validation artifacts and the repaired lineage payload, then create `final.md` exactly:
-
-```markdown
-# Lifecycle Observation Complete
-left=valid
-right=valid
-repair=recovered
-```
-
-**Test:** `node --input-type=module -e "import fs from 'node:fs';const p='.deckent/runtime/lifecycle-canary/final.md';const e='# Lifecycle Observation Complete\nleft=valid\nright=valid\nrepair=recovered\n';if(fs.readFileSync(p,'utf8')!==e)process.exit(1)"`
-
-**NO-GO:** Any upstream proof is absent, FIX lineage is unresolved, output differs or DONE is synthetic.
+**NO-GO:** Any feature is reachable only from tests, the four slices use conflicting settlement
+identity, a projection becomes authority, or proof requires build/full-suite/provider calls.

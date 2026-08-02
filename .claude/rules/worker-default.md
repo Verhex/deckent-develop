@@ -31,6 +31,9 @@ paths: ["src/**","tests/**"]
 - Run task-declared lint/type/build checks only when admitted; fix failures within the configured attempt budget
 - Run task-declared scoped tests; fix failures within the configured attempt budget
 - When the admitted verification budget is exhausted, write a typed NO_GO result with error details and executed evidence
+- For dependencies, the prompt's host-evaluated logical-lineage `aggregate` verdict is canonical.
+  Never downgrade it from a raw `.tasks/task-{dep-id}.result`; that file is attempt-scoped audit
+  evidence and may intentionally retain an original `NO_GO` after a FIX settles the lineage.
 - If blocked by another task → write NO_GO result explaining the dependency
 
 ## Agent Context

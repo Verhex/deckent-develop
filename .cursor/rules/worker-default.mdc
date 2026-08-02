@@ -33,6 +33,9 @@ alwaysApply: false
 - Run task-declared lint/type/build checks only when admitted; fix failures within the configured attempt budget
 - Run task-declared scoped tests; fix failures within the configured attempt budget
 - When the admitted verification budget is exhausted, write a typed NO_GO result with error details and executed evidence
+- For dependencies, the prompt's host-evaluated logical-lineage `aggregate` verdict is canonical.
+  Never downgrade it from a raw `.tasks/task-{dep-id}.result`; that file is attempt-scoped audit
+  evidence and may intentionally retain an original `NO_GO` after a FIX settles the lineage.
 - If blocked by another task → write NO_GO result explaining the dependency
 
 ## Agent Context
@@ -49,4 +52,29 @@ Accepted: **ADR-D-001**, **ADR-D-002**, **ADR-D-004**, **ADR-D-005**, **ADR-D-00
 <!-- AUTO-END -->
 
 <!-- CUSTOM-START -->
+
+## Karpathy 4-Discipline Anchor
+
+MUST follow karpathy-discipline.mdc when generating code.
+
+Before writing any code line, validate against all four disciplines:
+1. **Think Before Coding** — read + plan first, list ADR constraints, write .plan file
+2. **Simplicity First** — prefer existing patterns, YAGNI, avoid premature abstractions
+3. **Surgical Changes** — stay in scope.filesWrite, minimum-diff, preserve existing behavior
+4. **Goal-Driven Execution** — every change must map to a goCriteria item; honest self-assessment
+
+## Proof-of-Function (Tier-1 user-surface)
+
+A **user-surface** task (writes to `src/cli/commands/`, `src/dashboard/`, or `src/api/`) is
+Tier-1 and MUST carry a `Smoke:` directive line — a run-proven real-binary command plus its
+expected output (e.g. `Smoke: node dist/cli/entry.js serve --port 3211 → /api/status = 200`).
+Only a real-binary run (run-proven) closes a Tier-1 task — not a unit test.
+
+- **A mock-only test alone = GO_WITH_TECH_DEBT, never DONE.** The test must assert on the
+  REAL served HTML / real CLI stdout, not a mock. deckent runs the `Smoke:` command host-side
+  in-sprint (post-sprint-smoke) and downgrades DONE→GO_WITH_TECH_DEBT if it fails.
+- Tier-0 (internal/structural — `src/core/`, refactors) stays unit-test-sufficient.
+- Routing: surface tasks → `frontend-designer` (dashboard) / `api-builder` (api·serve·cli) /
+  `ci-guardian` (e2e harness). See ADR-G-009 + karpathy-discipline.mdc (Proof-of-Function DoD).
+
 <!-- CUSTOM-END -->

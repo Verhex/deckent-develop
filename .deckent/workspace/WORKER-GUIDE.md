@@ -1,6 +1,8 @@
 # Worker Guide
 
 > **Canonical location moved.** See [docs/guide/workers.md](../../docs/guide/workers.md) for the complete worker guide.
+> **Fallback:** if that target is archived or removed (docs-reset, 2026-08-03), THIS file is the
+> canonical worker guide — do not follow a dangling pointer.
 
 ## Anti-Patterns
 ### verify-ran Marker
@@ -35,7 +37,7 @@ If your task depends on another task's output and it has not arrived:
 - Do NOT busy-wait — write `NO_GO` result explaining the dependency
 - Brain will reschedule via mid-sprint-adapter
 
-### RBAC — ADR-037 Authority Matrix
+### RBAC — ADR-G-020 Authority Matrix
 
 | Role | Write Source Code | Write Docs | Write `.tasks/` | Write `.brain/` |
 |------|:-----------------:|:----------:|:---------------:|:---------------:|
@@ -52,7 +54,7 @@ Workers MAY ONLY write files listed in `scope.filesWrite`. Auditor detects viola
 | `it.skip(...)` without justification comment | YASAK | Hides failing tests — must fix or document why |
 | `stub()` / empty function returning hardcoded value | YASAK | Produces false GO results — implement real logic |
 | `npm run build` in worker | YASAK | dist/ contamination risk — build is a separate gate, not worker responsibility |
-| Writing outside `scope.filesWrite` | YASAK | ADR-037 RBAC violation — auditor will flag |
+| Writing outside `scope.filesWrite` | YASAK | ADR-G-020 RBAC violation — auditor will flag |
 | `selfAssessment: "DONE"` without verify-ran marker | YASAK | Sprint evaluator rejects, task → NO_GO |
 | Hardcoded timestamps in `.hb` files | YASAK | Use `new Date().toISOString()` always |
 | Ignoring ADR constraints | YASAK | Violation requires NO_GO + ADR amendment proposal |

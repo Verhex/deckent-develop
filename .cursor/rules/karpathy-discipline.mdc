@@ -1,5 +1,7 @@
 ---
-paths: ["src/**","tests/**",".codex/**","docs/**"]
+description: Deckent Karpathy 4-Discipline worker anchor
+globs: src/**,tests/**,.cursor/**,docs/**
+alwaysApply: false
 ---
 # Karpathy 4-Discipline Rule — Deckent Worker Anchor
 
@@ -119,7 +121,7 @@ Adapted from Andrej Karpathy software engineering philosophy for AI-agent workfl
 Canonical reference: multica-ai/andrej-karpathy-skills (external, public domain principles).
 Deckent-specific adaptations: Sprint 191, Worker Discipline Anchor project.
 
-See also: .codex/rules/worker-default.md, docs/adr/README.md (ADR-G-020, ADR-G-018).
+See also: .cursor/rules/worker-default.mdc, docs/adr/README.md (ADR-G-020, ADR-G-018).
 
 
 ---

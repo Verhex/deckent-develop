@@ -1,3 +1,3 @@
 # Heartbeat Tasks
 - [ ] tsc --noEmit
-- [ ] npx vitest run --reporter=verbose 2>&1 | tail -5
+- [ ] VITEST_MAX_FORKS=2 npx vitest run <task-scoped test dosyaları> — full-suite YASAK (16GB sınırı); scope'undaki test dosyalarıyla sınırla
