@@ -92,14 +92,21 @@ export function createScanBudget(
   };
 }
 
+// ⚠️ Baselines are computed on a BUILD-FREE tree (no `dist/`). CI's Type Check job
+// runs `npm run lint` straight after install, so `dist/` does not exist there; a local
+// tree that has been built produces a different graph (2026-08-02: 12392 vs 12463,
+// 1196 vs 1200) and this gate then fails for the wrong reason. Before refreshing these
+// numbers: `mv dist /tmp/x && npm run lint:hermetic && mv /tmp/x dist`.
+// Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
+// were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  count: 12463,
-  digest: 'edfbd7c19b164d82615b0532cadb412c0d693e93abc2d8d83cc83198ba35bdc1',
+  count: 12392,
+  digest: '8e65ea3eb6d3f0673827fb9699293944f039a2487ad18ce75d3f6f43279db32f',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  count: 1200,
-  digest: 'ced6ecc73dd53a9a65802deb57bb84b7e049abc2afb844a142a85e8f22d33d9c',
+  count: 1196,
+  digest: 'ff64153aa94c7eec484bfd6acde115b2d1ab4ac964df8c27b97f7264aadfe503',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
