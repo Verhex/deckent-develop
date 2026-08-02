@@ -38,6 +38,8 @@ Their `:check` counterparts detect drift without intentionally rewriting outputs
 
 Manual and generated documents have different owners. Do not hand-edit `docs/generated/**`; run the owning pipeline under proper authority. `docs/MASTER-PLAN.md` is the planning SSOT and is not a generated target to rewrite casually. [Evidence: owner Tur-2 boundary; `scripts/lint-master-plan.mjs:3-10,49-51`]
 
+Doc tracking is a separate live, opt-in capability: core scan/store modules persist document health; CLI and MCP expose scan/status actions; the API and dashboard project health; and sprint finalization can run a DB-only sync when `doc_tracking.sync_on_finalize:true`. Archived specs that label this entire surface “pending” are stale, but runtime adoption is not universal because the finalizer hook defaults off. [Evidence: `src/core/doc-tracking/scanner.ts:40`; `src/core/doc-tracking/store.ts`; `src/cli/commands/docs.ts:12-25`; `src/mcp/tools/docs.ts:18-41`; `src/api/docs-health-endpoint.ts:2-44`; `src/dashboard/src/nav-items.ts:69`; `src/orchestra/sprint-finalizer.ts:985-998,2564-2569`; `src/core/config-types.ts:1337`]
+
 ### Release gate
 
 `npm run release` runs master-plan lint, docs stats check, generated reference check, identity lint, full build, and publish validation. `prepublishOnly` runs the same documentation/identity checks and core build. [Evidence: `package.json:64-72`]
@@ -72,23 +74,23 @@ After a package upgrade, the CLI checks whether the configured worker image matc
 
 Bundled agent/skill assets have a generated/runtime copy and project projection. `lint:builtins-drift` compares the bundle contract; manifest, identity, CLI/MCP, docs-reference and stats checks each have separate owners. A green TypeScript build does not imply those projections are current. [Evidence: `scripts/builtins-drift-check.mjs`; `scripts/bundle-builtins.mjs`; `package.json:45-71`]
 
-The current generated-reference failure is not repaired by hand: five outputs are missing, and the ADR generator still reads `docs/adr/*.md` although accepted ADR authority is DB-first. Pipeline/input ownership is tracked as DOC-01..03 and DOC-07. [Evidence: real `docs:ref:check`; `scripts/gen-reference-docs.mjs:88-133,234-249`; `docs/analysis/CODE-DOC-DIFF-2026-08.md`]
+The owner restored the pipeline-owned ADR/reference inputs after the reset and ran the owning generator; `docs:ref:check` is now 5/5 in sync. The unresolved issue is narrower: the ADR generator still reads 51 `docs/adr/*.md` projections although accepted authority is DB-first. OQ-26 tracks that input-authority decision; it is not represented as current output drift. [Evidence: owner-verified `docs:ref` run, 2026-08-02; `scripts/gen-reference-docs.mjs:88-133,234-249`; OQ-26]
 
 ### Develop-to-product publication boundary
 
 The repository's sync script explicitly says the continuous two-repository model is retired. It is retained only as a one-time public-migration staging building block: dry-run partitions tracked files and performs bounded key-shape scanning; `--apply` extracts HEAD into a temporary/stated staging directory and prunes the exclusion list. It never commits or pushes. [Evidence: `scripts/sync-to-product.mjs:1-16,22-60,92-183`]
 
-Historical launch posts, release notes, public-flip handoffs and changelog were retained in the immutable pre-reset archive. They are not republished as current claims because this audit has no fresh public-release, registry, clean-install or cross-platform evidence. Their coverage rows remain `EKSİK` rather than silently presenting beta-era copy as current truth. [Evidence: coverage matrix rows 123-132,172-179; owner archive boundary]
+Historical launch posts, release notes, public-flip handoffs and changelog were retained in the immutable pre-reset archive. They are classified `TARİHSEL`: each is a dated event record, remains accessible for provenance, and is not republished as a current release/install claim. This classification does not assert fresh registry, clean-install, or cross-platform evidence. [Evidence: coverage matrix; archived source metadata; owner archive boundary]
 
 ## Dogfood / repository reality
 
 | Gate or surface | State | Current repository finding |
 |---|---|---|
 | Full build | ✅ owner-verified | Owner reported `npm run build:all` completed before this pass. |
-| Generated reference check | ⚠️ stale | Five expected targets are missing after the docs reset; pipeline regeneration is deferred to Claude + Alperen. [Evidence: real `npm run docs:ref:check` result from Tur 1; owner Tur-2 decision] |
-| Master-plan lint | ⚠️ stale input | `IDENTITY_REGISTRY_MISSING` currently fails the check; this task is forbidden from changing the generated source/target. [Evidence: real Tur-1 command output; owner Tur-2 decision] |
+| Generated reference check | ✅ owner-verified | Owner restored pipeline-owned inputs/outputs and `docs:ref:check` reports 5/5 in sync. [Evidence: owner-verified pipeline run, 2026-08-02] |
+| Master-plan lint | ✅ owner-verified | Restored identity projection cleared `IDENTITY_REGISTRY_MISSING`; lint reports 322 rows, 318 active items, and 22 receipts. [Evidence: owner-verified gate run, 2026-08-02] |
 | Provider observation schema | ⚠️ migration HOLD | Live DB is v1 while source expects v2; release documentation cannot close a runtime migration. [Evidence: real PRAGMA; OQ-07] |
 | Dashboard build cleanliness | ⚠️ friction | A clean/build output-policy conflict was observed and recorded. [Evidence: `PAZARTESI.md:47-52`] |
 | Publish-grade autonomous certificate | 🔜 roadmap | The accepted audit requires the stabilization and certification ladder before that claim. [Evidence: `PAZARTESI.md:36-60`] |
 
-Current release status in this documentation audit is therefore **HOLD**: the build is reported healthy, but generated-doc gates and autonomous certification are not green. No commit, push, release, or publish was performed. [Evidence: owner boundary; real gate outputs]
+Current publish-readiness status in this documentation audit remains **HOLD**: build and generated-doc gates are owner-verified green, but the provider-observation migration and publish-grade autonomous certificate remain open. No commit, push, release, or publish was performed. [Evidence: owner boundary; OQ-07; `PAZARTESI.md:36-60`]

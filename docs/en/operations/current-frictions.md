@@ -35,7 +35,7 @@ The CLI, MCP, API, terminal, dashboard, desktop, connector, worker, memory, and 
 | Stale bot PID | ⚠️ open | SIGTERM did not remove `bot.pid`; clean tolerated the dead PID, but PID hygiene remains unresolved. [Evidence: `PAZARTESI.md:48-49`] |
 | Dashboard build/clean policy conflict | ⚠️ open | `clean` preservation and `build:dashboard` empty-output expectations produced `E_DASHBOARD_BUILD_OUTPUT_NOT_EMPTY`. [Evidence: `PAZARTESI.md:50`] |
 | Stale run projections | ⚠️ open | Nineteen `STALE`/`STALE_DEAD` run-flow/run-job projections require typed recovery. [Evidence: `PAZARTESI.md:51`] |
-| Generated documentation projections | ⚠️ pipeline-owned | `docs:ref:check` reports five missing outputs and `lint:master-plan` reports `IDENTITY_REGISTRY_MISSING`; manual repair is forbidden for this documentation task. [Evidence: `PAZARTESI.md:52`; owner Tur-2 decision]
+| Generated documentation projections | ✅ closed by owner | The 2026-08-01 handoff recorded five missing outputs and `IDENTITY_REGISTRY_MISSING`; after restoring pipeline-owned inputs/outputs, the owner verified `docs:ref:check` 5/5 and master-plan lint green on 2026-08-02. [Evidence: `PAZARTESI.md:52`; owner-verified pipeline/gate runs, 2026-08-02] |
 | Provider observation migration | ⚠️ open | Source expects schema v2 while the live DB reports v1; migration belongs to runtime ownership, not docs. [Evidence: real PRAGMA snapshot; `src/core/provider-execution-observation-store.ts:14,114-169`; OQ-07] |
 
 ### Additional documentation audit findings

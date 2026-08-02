@@ -12,6 +12,10 @@ Deckent turns an intent into controlled execution through two related models. Th
 
 `deckent plan --help` and `deckent start --help` were run successfully against the built binary. Execution was not started because this documentation task explicitly forbids sprint/run/autonomous commands. [Evidence: recursive real-binary help audit, 2026-08-01; OQ-20]
 
+### Archived lifecycle plans, rechecked
+
+The 38 archived `superpowers/` sprint/recovery plans and design specs are dated implementation provenance, not current operating authority. Their assumptions about MCP-started sprints, provider choice in instruction text, tmux-first execution, or manual workflow steps are superseded by the repository contract: lifecycle execution is CLI-led, provider/backend/concurrency are effective-config decisions, and completion requires settlement plus disk evidence. The target lifecycle below is therefore source-derived and `⚠️ partial` wherever current code, vocabulary, or certification remains incomplete; an archived plan's “done” marker is not proof of live wiring. [Evidence: read-only archive filename inventory, 2026-08-02; `AGENTS.md:42-69`; `src/cli/commands/start.ts:246-403,518-778`; `src/orchestra/sprint-controller.ts:1594-2951`]
+
 ### The eight implementation phases
 
 | Phase | Product meaning | Current implementation boundary |

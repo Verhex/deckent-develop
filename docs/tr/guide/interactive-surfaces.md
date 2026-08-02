@@ -36,6 +36,12 @@ Feature truth run, tool-surface için code, wiring ve enablement buldu ama runti
 
 Dashboard API/read model'ler üzerinde projection kalır. Detay ve endpoint'ler [API surface](../reference/api-surface.md) içindedir. [Kanıt: `src/api/server.ts`; identity contract]
 
+### Archived web-console design'larının yeniden doğrulanması
+
+Archived web-console design güncel implementation contract değil, yararlı visual provenance'dır. Teal/gold palette, tier indicator taşıyan worker card'ları, terminal tab'ları ve resizable/maximizable dock current dashboard source'ta karşılık bulur. Hanken Grotesk/IBM Plex Mono typography iddiası bayattır: current self-hosted stack Tektur, Chakra Petch ve Spline Sans Mono'dur. [Kanıt: `src/dashboard/src/generated/theme.css:21-41`; `src/dashboard/src/index.css:9-20,64-66`; `src/dashboard/src/components/WorkerCard.tsx:58-61,179-203`; `src/dashboard/src/components/DockPanel.tsx:9-24,39-96`; `src/dashboard/src/components/terminal/TerminalPanel.tsx:18-66`]
+
+İki büyük interaction iddiası supersede edilmiştir. Canned browser-terminal prototype artık authenticated xterm/WebSocket/PTY surface'tir; archived “New Sprint” modal ve dashboard execution control'ları Terminal/Desktop control authority lehine kaldırılmıştır. Bu nedenle web surface `⚠️ kısmi`dır: current monitoring ve terminal wiring vardır, fakat archive'ın exact font'ları ve dashboard-control workflow'u canlı değildir. [Kanıt: `src/dashboard/src/components/terminal/TerminalView.tsx:1-66`; `src/dashboard/src/components/terminal/useTerminalSocket.ts:18-63`; `src/api/server.ts:2609-2699`; `src/dashboard/src/pages/DashboardPage.tsx:239-253,431-432`; `.deckent/workspace/IDENTITY.md:8-9,16`]
+
 ## Desktop
 
 Repository; main-process daemon lifecycle, security, connection profile, IPC handler, tray/menu/window management, preload boundary ve command/changes/engine-room/worker/radio view'leri için renderer shell içeren Electron/Vite Desktop application taşır. [Kanıt: `src/desktop/package.json`; `src/desktop/src/main/index.ts`; `src/desktop/src/main/security.ts`; `src/desktop/src/preload/index.ts`; `src/desktop/src/renderer/shell/`]

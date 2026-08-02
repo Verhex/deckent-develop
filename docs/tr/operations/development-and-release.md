@@ -38,6 +38,8 @@ npm run docs:master-plan
 
 Manual ve generated doc'ların owner'ı farklıdır. `docs/generated/**` elle edit edilmez; owning pipeline uygun authority ile çalıştırılır. `docs/MASTER-PLAN.md` planning SSOT'tur ve casually rewrite edilecek generated target değildir. [Kanıt: owner Tur-2 boundary; `scripts/lint-master-plan.mjs:3-10,49-51`]
 
+Doc tracking ayrı, canlı ve opt-in capability'dir: core scan/store module'leri document health persist eder; CLI ve MCP scan/status action sunar; API ile dashboard health projection sağlar; sprint finalization `doc_tracking.sync_on_finalize:true` olduğunda DB-only sync çalıştırabilir. Bu surface'i bütünüyle “pending” etiketleyen archived spec'ler bayattır; finalizer hook default-off olduğu için runtime adoption yine universal değildir. [Kanıt: `src/core/doc-tracking/scanner.ts:40`; `src/core/doc-tracking/store.ts`; `src/cli/commands/docs.ts:12-25`; `src/mcp/tools/docs.ts:18-41`; `src/api/docs-health-endpoint.ts:2-44`; `src/dashboard/src/nav-items.ts:69`; `src/orchestra/sprint-finalizer.ts:985-998,2564-2569`; `src/core/config-types.ts:1337`]
+
 ### Release gate
 
 `npm run release`; master-plan lint, docs stats check, generated reference check, identity lint, full build ve publish validation çalıştırır. `prepublishOnly` aynı documentation/identity check'leri ile core build'i çalıştırır. [Kanıt: `package.json:64-72`]
@@ -72,23 +74,23 @@ Package upgrade sonrası CLI, configured worker image'ın package ile eşleşmes
 
 Bundled agent/skill asset'lerinin generated/runtime copy ve project projection'ı vardır. `lint:builtins-drift` bundle contract'ı karşılaştırır; manifest, identity, CLI/MCP, docs-reference ve stats check'lerinin her biri ayrı owner'a sahiptir. Green TypeScript build bu projection'ların current olduğunu göstermez. [Kanıt: `scripts/builtins-drift-check.mjs`; `scripts/bundle-builtins.mjs`; `package.json:45-71`]
 
-Güncel generated-reference failure elle repair edilmez: beş output eksiktir ve accepted ADR authority DB-first olmasına rağmen ADR generator hâlâ `docs/adr/*.md` okur. Pipeline/input ownership DOC-01..03 ve DOC-07 olarak izlenir. [Kanıt: gerçek `docs:ref:check`; `scripts/gen-reference-docs.mjs:88-133,234-249`; `docs/analysis/CODE-DOC-DIFF-2026-08.md`]
+Owner reset sonrasında pipeline-owned ADR/reference input'larını restore edip owning generator'ı çalıştırdı; `docs:ref:check` artık 5/5 in-sync'tir. Çözülmemiş konu daha dardır: accepted authority DB-first olmasına rağmen ADR generator 51 `docs/adr/*.md` projection okumayı sürdürür. OQ-26 bu input-authority kararını izler; current output drift gibi sunulmaz. [Kanıt: owner-verified `docs:ref` run, 2026-08-02; `scripts/gen-reference-docs.mjs:88-133,234-249`; OQ-26]
 
 ### Develop-to-product publication sınırı
 
 Repository sync script'i continuous two-repository model'in retired olduğunu explicit söyler. Yalnız one-time public-migration staging building block'u olarak tutulur: dry-run tracked file'ları partition eder ve bounded key-shape scanning yapar; `--apply` HEAD'i temporary/declared staging directory'ye çıkarıp exclusion list'i prune eder. Commit veya push yapmaz. [Kanıt: `scripts/sync-to-product.mjs:1-16,22-60,92-183`]
 
-Historical launch post, release note, public-flip handoff ve changelog immutable pre-reset archive'da korunmuştur. Bu audit fresh public-release, registry, clean-install veya cross-platform evidence taşımadığı için current claim olarak yeniden yayımlanmazlar. Coverage row'ları beta-era copy'yi current truth gibi göstermek yerine `EKSİK` kalır. [Kanıt: coverage matrix satırları 123-132,172-179; owner archive boundary]
+Historical launch post, release note, public-flip handoff ve changelog immutable pre-reset archive'da korunmuştur. Her biri dated event record olduğu, provenance için erişilebilir kaldığı ve current release/install claim olarak yeniden yayımlanmadığı için `TARİHSEL` sınıfındadır. Bu sınıflandırma fresh registry, clean-install veya cross-platform evidence iddia etmez. [Kanıt: coverage matrix; archived source metadata; owner archive boundary]
 
 ## Dogfood / repository gerçeği
 
 | Gate veya surface | Durum | Current repository finding |
 |---|---|---|
 | Full build | ✅ owner-verified | Owner bu pass öncesi `npm run build:all` tamamlandığını bildirdi. |
-| Generated reference check | ⚠️ stale | Docs reset sonrasında beş expected target eksik; pipeline regeneration Claude + Alperen'e defer edildi. [Kanıt: Tur 1 gerçek `npm run docs:ref:check` sonucu; owner Tur-2 kararı] |
-| Master-plan lint | ⚠️ stale input | `IDENTITY_REGISTRY_MISSING` check'i fail eder; bu task generated source/target değiştiremez. [Kanıt: Tur-1 real command output; owner Tur-2 kararı] |
+| Generated reference check | ✅ owner-verified | Owner pipeline-owned input/output'ları restore etti; `docs:ref:check` 5/5 in-sync raporlar. [Kanıt: owner-verified pipeline run, 2026-08-02] |
+| Master-plan lint | ✅ owner-verified | Restored identity projection `IDENTITY_REGISTRY_MISSING` hatasını kapattı; lint 322 row, 318 active item ve 22 receipt raporlar. [Kanıt: owner-verified gate run, 2026-08-02] |
 | Provider observation schema | ⚠️ migration HOLD | Live DB v1, source v2 bekler; release documentation runtime migration kapatamaz. [Kanıt: gerçek PRAGMA; OQ-07] |
 | Dashboard build cleanliness | ⚠️ friction | Clean/build output-policy conflict gözlendi ve kaydedildi. [Kanıt: `PAZARTESI.md:47-52`] |
 | Publish-grade autonomous certificate | 🔜 roadmap | Kabul edilmiş audit, bu claim öncesi stabilization ve certification ladder ister. [Kanıt: `PAZARTESI.md:36-60`] |
 
-Bu documentation audit'inde current release status bu nedenle **HOLD**'dur: build healthy bildirilmiştir fakat generated-doc gate'leri ve autonomous certification green değildir. Commit, push, release veya publish yapılmadı. [Kanıt: owner boundary; real gate output'ları]
+Bu documentation audit'inde current publish-readiness status yine **HOLD**'dur: build ve generated-doc gate'leri owner-verified green'dir; provider-observation migration ile publish-grade autonomous certificate açıktır. Commit, push, release veya publish yapılmadı. [Kanıt: owner boundary; OQ-07; `PAZARTESI.md:36-60`]

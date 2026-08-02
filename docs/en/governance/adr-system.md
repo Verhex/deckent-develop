@@ -33,6 +33,12 @@ The exporter renders `summary.md`, `decisions.md`, `memory.md`, and `debt.md` fr
 
 Generated exports are evidence and browsing surfaces; they cannot create policy or override higher authority. [Evidence: `AGENTS.md:124-128`]
 
+### Legacy dependency decisions, rechecked
+
+The archived ADR-010 title says “single runtime dependency,” but its own later amendments had already replaced that rule with “minimal and ADR-justified.” The current package has **13 required runtime dependencies and 3 optional dependencies**, not the archived 13+1 inventory: `grammy` has replaced the listed `telegraf`, and `nodemailer` plus `openai` now join `discord.js` in the optional set. The archived package-by-package inventory is therefore provenance, not a current manifest. [Evidence: `package.json:100-131`; archived `architecture/adr/010-single-runtime-dependency.md`]
+
+ADR-090's version decision remains accurate: the package declares `ink ^7.0.5`, `react ^19.2.7`, and `react-dom ^19.2.7`; the installed manifests observed in this audit resolve to 7.0.5/19.2.7/19.2.7. Its stronger isolation statement is stale, however: Ink is imported by onboarding as well as the REPL, while the bare CLI dynamically mounts the Ink REPL only for a TTY. Current status is `⚠️ partial match`: versions and the reconciled-TUI rationale hold; “only mounted by `runInkRepl`” does not. [Evidence: `package.json:109-111`; `src/cli/commands/onboard.ts:4-5`; `src/cli/entry.ts:698-713`; `src/cli/repl/run.tsx:677`]
+
 ## Dogfood / repository reality
 
 | Area | State | Current repository finding |
@@ -40,7 +46,7 @@ Generated exports are evidence and browsing surfaces; they cannot create policy 
 | DB ADR schema | ✅ live | Memory entries carry taxonomy, authority, immutability, and enforcement metadata through additive migrations. |
 | DB→Markdown guarded export | ✅ live | Four export targets use a non-empty DB/empty-render wipe guard. |
 | ADR lint | ✅ live surface | `lint:adr` validates the generated decisions export by default. [Evidence: `package.json:42`; `scripts/adr-validator.mjs:170-187`] |
-| Generated ADR reference index | ⚠️ stale | The reference generator still parses `docs/adr/*.md`, while this reset and owner contract define DB-first ADR authority; its generated targets are missing. [Evidence: `scripts/gen-reference-docs.mjs:88-133,234-249`; owner Tur-2 decision] |
+| Generated ADR reference index | ✅ current projection / ⚠️ input-authority question | The owner restored the pipeline-owned ADR/master-plan inputs and projections; `docs:ref` rebuilt the reference targets and `docs:ref:check` is 5/5 in sync. The generator still parses 51 Markdown ADR projections while accepted authority remains DB-first, so OQ-26 remains open. [Evidence: owner-verified pipeline run, 2026-08-02; `scripts/gen-reference-docs.mjs:88-133,234-249,359-409`] |
 | Markdown as independent authority | not allowed | `.brain/exports/decisions.md` is a projection; hand-editing it cannot amend an ADR. |
 
-The generator/input mismatch is recorded in the code↔doc difference report. It must be corrected by the owning pipeline/runtime work, not by hand-writing generated documents.
+The generator/input authority question is recorded in the code↔doc difference report. It must be resolved by the owning pipeline/runtime work, not by hand-editing generated documents.

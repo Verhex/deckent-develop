@@ -6,6 +6,16 @@ Local server'ı `deckent serve` ile başlat; `deckent dashboard` monitoring-orie
 
 Server strict loopback/file-origin CORS uygular. Orchestration-control mutation'ları emergency control-mutation flag açmadıkça HTTP üzerinden disabled'dır; terminal/Desktop amaçlanan control surface'tir. [Kanıt: `src/api/server.ts:775-831`; `src/api/server.ts:570-600`]
 
+### Source-verified request pattern'leri
+
+```bash
+curl http://127.0.0.1:3100/api/health
+curl -H "Authorization: Bearer $DECKENT_API_TOKEN" http://127.0.0.1:3100/api/status
+curl -N "http://127.0.0.1:3100/api/events?token=$DECKENT_API_TOKEN"
+```
+
+İlk request explicit authentication exemption'dır. Status request configured bearer kullanır; yalnız explicitly permitted SSE path'leri query token kabul edebilir. OIDC exchange de identity'yi kendi gate'iyle kurduğu için generic bearer check'ten exempt'tir. Her route'un bearer gerektirdiğini söyleyen veya control mutation'ları normally available gösteren archived API example'ları bayattır; control mutation'ları default-disabled kalır. Bu örnekler source-verified syntax'tır, runtime endpoint smoke değildir—audit server'ı başlatmadı. [Kanıt: `src/api/server.ts:570-600,798-831,1033-1062,2187-2203`; `src/api/middleware/token.ts:22-45`; `src/core/config-types.ts:1058-1059`]
+
 ### Core read ve diagnostic route'ları
 
 | Method ve path | Contract | Kanıt |

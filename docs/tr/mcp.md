@@ -74,7 +74,7 @@ Baseline'daki tek MCP-only sonuç `deckent_feature_query`, CLI `features` comman
 
 ### Managed reference freshness
 
-Archived generated MCP reference 48 tool bildiriyor ve `deckent_execution_authority` içermiyor; güncel catalog/registration 49 tool içeriyor. Archived reference stale'dir. Reset generated içeriği immutable archive'a taşıdığı için live `docs/generated/` projection şu anda yoktur; elle değil pipeline ile geri üretilmelidir. [Kanıt: `docs/archive/docs-pre-reset-2026-08-03/reference/mcp-tools.md`; `src/mcp/tools/index.ts:68-125`; `npm run docs:ref:check` missing-reference çıktısı, 2026-08-01]
+Archived generated MCP reference 48 tool bildirir ve `deckent_execution_authority` içermez; stale provenance olarak kalır. Current catalog/registration 49 tool içerir ve owner pipeline-owned `docs/reference/mcp-tools.md` output'unu restore etmiştir; `docs:ref:check` artık 5/5 in-sync'tir. Live projection elle yazılmaz, pipeline ile regenerate edilmeye devam eder. [Kanıt: `docs/archive/docs-pre-reset-2026-08-03/reference/mcp-tools.md`; `src/mcp/tools/index.ts:68-125`; owner-verified pipeline run, 2026-08-02]
 
 ## Dogfood / repository gerçeği
 
@@ -84,5 +84,5 @@ Archived generated MCP reference 48 tool bildiriyor ve `deckent_execution_author
 | Tool schema/behavior documentation | ✅ source-verified | 49 tool'un tamamı registration ve implementation source'larından okundu. |
 | CLI parity | ⚠️ kısmi | Ratchet 37 CLI-only ve bir stale MCP-only baseline row ile geçer; behavioral gap'ler sürer. |
 | Safety annotation | ⚠️ kısmi | Audit ve model action'ları broad RO annotation'ın göstermediği side effect içerir. |
-| Generated MCP reference | ⚠️ stale/missing | Archived output 48 der; live managed projection yoktur ve pipeline-owned'dır. |
+| Generated MCP reference | ✅ current projection / ⚠️ stale archive | Archived output 48 der; live pipeline-owned output 49 der ve 5/5 in-sync'tir. |
 | `connect --json` count | ⚠️ mismatch | Real output canonical 49 yerine 31 tool raporladı; MCP-18 olarak kaydedildi. |

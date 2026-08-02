@@ -36,6 +36,12 @@ The feature truth run found tool-surface code, wiring, and enablement, but no ru
 
 The dashboard remains a projection over API/read models. Details and endpoints are in [API surface](../reference/api-surface.md). [Evidence: `src/api/server.ts`; identity contract]
 
+### Archived web-console designs, rechecked
+
+The archived web-console design remains useful visual provenance, not a current implementation contract. Its teal/gold palette, worker cards with a tier indicator, terminal tabs, and resizable/maximizable dock are represented in current dashboard source. Its Hanken Grotesk/IBM Plex Mono typography is stale: the current self-hosted stack is Tektur, Chakra Petch, and Spline Sans Mono. [Evidence: `src/dashboard/src/generated/theme.css:21-41`; `src/dashboard/src/index.css:9-20,64-66`; `src/dashboard/src/components/WorkerCard.tsx:58-61,179-203`; `src/dashboard/src/components/DockPanel.tsx:9-24,39-96`; `src/dashboard/src/components/terminal/TerminalPanel.tsx:18-66`]
+
+Two larger interaction claims were superseded. The canned browser-terminal prototype is now an authenticated xterm/WebSocket/PTY surface, while the archived “New Sprint” modal and dashboard execution controls were removed in favor of Terminal/Desktop control authority. The web surface is therefore `⚠️ partial`: current monitoring and terminal wiring exist, but the archive's exact fonts and dashboard-control workflow are not live. [Evidence: `src/dashboard/src/components/terminal/TerminalView.tsx:1-66`; `src/dashboard/src/components/terminal/useTerminalSocket.ts:18-63`; `src/api/server.ts:2609-2699`; `src/dashboard/src/pages/DashboardPage.tsx:239-253,431-432`; `.deckent/workspace/IDENTITY.md:8-9,16`]
+
 ## Desktop
 
 The repository contains an Electron/Vite Desktop application with main-process daemon lifecycle, security, connection profiles, IPC handlers, tray/menu/window management, a preload boundary, and renderer shells for command, changes, engine-room, worker, and radio views. [Evidence: `src/desktop/package.json`; `src/desktop/src/main/index.ts`; `src/desktop/src/main/security.ts`; `src/desktop/src/preload/index.ts`; `src/desktop/src/renderer/shell/`]

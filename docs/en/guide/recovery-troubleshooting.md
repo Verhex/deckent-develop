@@ -47,10 +47,10 @@ The 2026-08-01 handoff records:
 - clean preserves dashboard output while the dashboard builder requires an empty target, producing `E_DASHBOARD_BUILD_OUTPUT_NOT_EMPTY`;
 - 19 stale RunFlow/RunJob projections await typed recovery;
 - malformed result, result/status transaction, and final-gate authority contradictions remain;
-- generated references and identity registry projections are missing after the docs reset;
+- generated references and the identity registry projection were missing after the docs reset; the owner restored their pipeline-owned inputs/outputs on 2026-08-02 and both checks are now green;
 - provider observation source expects schema v2 while the live DB is v1.
 
-[Evidence: `PAZARTESI.md:37-58`; read-only PRAGMA and docs checks, 2026-08-01]
+[Evidence: `PAZARTESI.md:37-58`; read-only PRAGMA and docs checks, 2026-08-01; owner-verified pipeline/gate runs, 2026-08-02]
 
 The handoff's raw dashboard deletion workaround is historical incident evidence, not a generally authorized instruction. Do not run it without exact owner-approved scope. [Evidence: destructive-action rules; `PAZARTESI.md:50`]
 

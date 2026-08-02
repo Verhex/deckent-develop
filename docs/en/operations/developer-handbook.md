@@ -82,7 +82,7 @@ Manual docs, generated references and the planning ledger have different owners.
 | Worker/Brain authority split | ⚠️ partial | Contracts and enforcement seams exist, but repository-local policy is not an unbypassable enterprise boundary. [Evidence: `AGENTS.md:124-128`] |
 | Dashboard build | ✅ owner-verified | Owner reported `npm run build:all` green; this pass did not rerun it. |
 | Clean-clone/platform matrix | ⚠️ HOLD | Harnesses exist, but this documentation pass did not run the network/install/platform matrix. |
-| Generated docs | ⚠️ stale | Five generated reference targets and identity registry input remain missing; pipeline regeneration is owner-deferred. |
+| Generated docs | ✅ owner-verified current | Pipeline-owned targets were restored; generated-reference check is 5/5 and master-plan lint is green. Input-authority OQ-26 remains separate. |
 | Develop→product sync | ⚠️ operator-controlled | Script produces an inspectable staging tree; commit, push and public-repository changes stay manual/authorized. |
 
 See [Development and release](development-and-release.md), [Recovery runbook](recovery-runbook.md), [Agents](../reference/agents.md), and [Plugins](../reference/sdk-and-plugins.md).

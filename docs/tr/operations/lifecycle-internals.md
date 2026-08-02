@@ -12,6 +12,10 @@ Deckent bir intent'i iki ilişkili model üzerinden controlled execution'a dön�
 
 `deckent plan --help` ve `deckent start --help` built binary'de başarıyla çalıştırıldı. Bu documentation görevi sprint/run/autonomous command'larını açıkça yasakladığı için execution başlatılmadı. [Kanıt: recursive real-binary help audit, 2026-08-01; OQ-20]
 
+### Archived lifecycle plan'larının yeniden doğrulanması
+
+Archived `superpowers/` altındaki 38 sprint/recovery plan ve design spec, current operating authority değil dated implementation provenance'dır. MCP'den sprint başlatma, instruction text içinde provider seçimi, tmux-first execution veya manual workflow step varsayımları repository contract tarafından supersede edilmiştir: lifecycle execution CLI-led'dir; provider/backend/concurrency effective-config kararıdır; completion settlement ve disk evidence gerektirir. Bu nedenle aşağıdaki target lifecycle source-derived'dür ve current code, vocabulary veya certification eksik kaldığı yerde `⚠️ kısmi`dır; archived plan'ın “done” marker'ı live wiring kanıtı değildir. [Kanıt: read-only archive filename inventory, 2026-08-02; `AGENTS.md:42-69`; `src/cli/commands/start.ts:246-403,518-778`; `src/orchestra/sprint-controller.ts:1594-2951`]
+
 ### Sekiz implementation phase
 
 | Phase | Product anlamı | Current implementation boundary |

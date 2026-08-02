@@ -47,10 +47,10 @@ Preview yine yalnız authority snapshot kadar güvenilirdir. Status another acti
 - clean dashboard output'u korurken dashboard builder empty target ister ve `E_DASHBOARD_BUILD_OUTPUT_NOT_EMPTY` üretir;
 - 19 stale RunFlow/RunJob projection typed recovery bekler;
 - malformed result, result/status transaction ve final-gate authority contradiction'ları sürer;
-- docs reset sonrası generated reference ve identity registry projection'ları eksiktir;
+- docs reset sonrası generated reference ve identity registry projection'ları eksikti; owner 2026-08-02'de pipeline-owned input/output'ları restore etti ve iki check de artık green'dir;
 - provider observation source schema v2 beklerken live DB v1'dir.
 
-[Kanıt: `PAZARTESI.md:37-58`; read-only PRAGMA ve docs check'leri, 2026-08-01]
+[Kanıt: `PAZARTESI.md:37-58`; read-only PRAGMA ve docs check'leri, 2026-08-01; owner-verified pipeline/gate run'ları, 2026-08-02]
 
 Handoff'taki raw dashboard deletion workaround historical incident evidence'dır; genel yetkili instruction değildir. Exact owner-approved scope olmadan çalıştırmayın. [Kanıt: destructive-action rules; `PAZARTESI.md:50`]
 

@@ -35,7 +35,7 @@ CLI, MCP, API, terminal, dashboard, desktop, connector, worker, memory ve Nervou
 | Stale bot PID | ⚠️ açık | SIGTERM `bot.pid` kaldırmadı; clean dead PID'i tolerate etti fakat PID hygiene çözülmedi. [Kanıt: `PAZARTESI.md:48-49`] |
 | Dashboard build/clean policy conflict | ⚠️ açık | `clean` preservation ile `build:dashboard` empty-output expectation `E_DASHBOARD_BUILD_OUTPUT_NOT_EMPTY` üretti. [Kanıt: `PAZARTESI.md:50`] |
 | Stale run projection'ları | ⚠️ açık | On dokuz `STALE`/`STALE_DEAD` run-flow/run-job projection typed recovery gerektirir. [Kanıt: `PAZARTESI.md:51`] |
-| Generated documentation projection'ları | ⚠️ pipeline-owned | `docs:ref:check` beş missing output, `lint:master-plan` `IDENTITY_REGISTRY_MISSING` raporlar; bu documentation task'ında manual repair yasaktır. [Kanıt: `PAZARTESI.md:52`; owner Tur-2 kararı] |
+| Generated documentation projection'ları | ✅ owner tarafından kapatıldı | 2026-08-01 handoff beş missing output ve `IDENTITY_REGISTRY_MISSING` kaydetti; owner pipeline-owned input/output'ları restore ettikten sonra 2026-08-02'de `docs:ref:check` 5/5 ve master-plan lint green doğrulandı. [Kanıt: `PAZARTESI.md:52`; owner-verified pipeline/gate run'ları, 2026-08-02] |
 | Provider observation migration | ⚠️ açık | Source schema v2 beklerken live DB v1 bildirir; migration docs değil runtime ownership kapsamındadır. [Kanıt: gerçek PRAGMA snapshot; `src/core/provider-execution-observation-store.ts:14,114-169`; OQ-07] |
 
 ### Ek documentation audit bulguları

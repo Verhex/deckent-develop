@@ -38,6 +38,12 @@ Plugin code hook load öncesi containment, sandbox issue, signature ve publisher
 
 HTTP server per-IP sliding window kullanır; default maksimum 100 request/minute ve aksi yapılandırılmadıkça loopback exempt'tir. Core tenant limiter ayrıca tenant başına concurrent action izler. Terminal outbound byte ile session count/idle/scrollback ayrı terminal config alanlarıyla bound edilir. [Kanıt: `src/api/server.ts:152-205,1841-1860,2013-2063`; `src/core/rate-limiter.ts:26-91`; `src/core/config.ts:1723`]
 
+### Test containment E2 authority
+
+Archived E2 design; host-owned admission, candidate birth observation, finality ve cleanup evidence ister, test process'in JSON claim'ine güvenmez. Eski “yalnız R00; supervisor/control-plane/adapter yok” snapshot'ı artık current değildir: repository bugün containment supervisor, authority/session contract, deterministic CBOR/COSE structure ve Linux namespace, OCI, macOS Seatbelt, Windows AppContainer, WSL plan adapter'larını içerir. [Kanıt: `scripts/hermeticity/containment-control-plane.mjs:1-169`; `scripts/hermeticity/containment-supervisor.mjs:1-33,470-680`; `scripts/hermeticity/adapters/`]
+
+Durum yine `⚠️ kısmi`dır, certified değildir. Her adapter plan bilerek `proofEligible:false` döndürür ve production control-plane'in native live-evidence capability check'i hard-coded false'dur; bu nedenle enforce mode candidate birth öncesinde `E_CONTAINMENT_HOLD_LIVE_EVIDENCE_AUTHORITY_REQUIRED` döndürür. `deckent.containment.v2`, `NOT_BORN` ve fail-closed proof semantic'leri canlı; production activation hâlâ yoktur. [Kanıt: `scripts/hermeticity/containment-control-plane.mjs:19-23,62-70`; `scripts/hermeticity/evidence/measurement-contract.mjs:14,470-472`; `scripts/hermeticity/adapters/linux-namespace.mjs:324-395`; `package.json:28-30`]
+
 ## Platform matrix
 
 | Platform | Supported adapter biçimi | Dürüst kısıt |
@@ -55,4 +61,5 @@ HTTP server per-IP sliding window kullanır; default maksimum 100 request/minute
 - ✅ Auth, OIDC, CORS, tenant, RBAC, rate, scope, lock, plugin ve Docker authority module'ları vardır ve named surface'lere wired'dır.
 - ⚠️ Repository hook/execpolicy ile advisory scope check defense-in-depth'dir, managed enterprise enforcement değildir. Repository dışı administrative boundary için managed requirements gerekir. [Kanıt: `AGENTS.md`, precedence/enforcement notu]
 - ⚠️ `boundary_enforcement` default true'dur; project contract yine advisory/enforce davranışını effective-policy dependent anlatır. [Kanıt: `src/core/config.ts:1647-1655`; `AGENTS.md`, scope-enforcement gotcha]
+- ⚠️ E2 containment code-present ve fail-closed'dur; fakat native live-evidence authority `NOT_BORN` olduğu için production proof claim'i yoktur.
 - ⚠️ Bu documentation audit container başlatmadı, port açmadı, auth mutate etmedi veya multi-tenant HTTP request çalıştırmadı; environment proof'ları `HOLD` kalır. [Kanıt: task boundary]

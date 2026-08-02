@@ -6,6 +6,16 @@ Start the local server with `deckent serve`; `deckent dashboard` is the monitori
 
 The server uses strict loopback/file-origin CORS handling. Orchestration-control mutations are disabled over HTTP unless the emergency control-mutation flag re-enables them; terminal/Desktop is the intended control surface. [Evidence: `src/api/server.ts:775-831`; `src/api/server.ts:570-600`]
 
+### Source-verified request patterns
+
+```bash
+curl http://127.0.0.1:3100/api/health
+curl -H "Authorization: Bearer $DECKENT_API_TOKEN" http://127.0.0.1:3100/api/status
+curl -N "http://127.0.0.1:3100/api/events?token=$DECKENT_API_TOKEN"
+```
+
+The first request is an explicit authentication exemption. The status request uses the configured bearer, and only explicitly permitted SSE paths may accept the query token. OIDC exchange is also exempt from the generic bearer check because it establishes identity through its own gate. Archived API examples that say every route requires bearer auth or show control mutations as normally available are stale; control mutations remain default-disabled. These examples are source-verified syntax, not runtime endpoint smoke—the audit did not start the server. [Evidence: `src/api/server.ts:570-600,798-831,1033-1062,2187-2203`; `src/api/middleware/token.ts:22-45`; `src/core/config-types.ts:1058-1059`]
+
 ### Core read and diagnostic routes
 
 | Method and path | Contract | Evidence |

@@ -82,7 +82,7 @@ Manual docs, generated reference ve planning ledger farklı owner'lara sahiptir.
 | Worker/Brain authority split | ⚠️ kısmi | Contract ve enforcement seam'leri vardır; repository-local policy unbypassable enterprise boundary değildir. [Kanıt: `AGENTS.md:124-128`] |
 | Dashboard build | ✅ owner-verified | Owner `npm run build:all` sonucunu green bildirdi; bu pass yeniden çalıştırmadı. |
 | Clean-clone/platform matrix | ⚠️ HOLD | Harness'ler vardır; bu documentation pass network/install/platform matrix'i çalıştırmadı. |
-| Generated docs | ⚠️ bayat | Beş generated reference target ve identity registry input eksik kalır; pipeline regeneration owner tarafından ertelenmiştir. |
+| Generated docs | ✅ owner-verified güncel | Pipeline-owned target'lar restore edildi; generated-reference check 5/5 ve master-plan lint green'dir. Input-authority OQ-26 ayrı kalır. |
 | Develop→product sync | ⚠️ operator-controlled | Script inspect edilebilir staging tree üretir; commit, push ve public-repository change'leri manual/authorized kalır. |
 
 [Development ve release](development-and-release.md), [Recovery runbook](recovery-runbook.md), [Agents](../reference/agents.md) ve [Plugins](../reference/sdk-and-plugins.md) belgelerine bakın.

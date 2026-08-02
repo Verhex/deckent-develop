@@ -46,6 +46,10 @@ Approval requester'ları `brain`, `worker`, `auditor`, `nervous` veya `connector
 
 “Always allow” asla global değildir: grant; scope identity, approval scope, maximum risk ve expiry'ye bağlıdır. Current allow-scope module broker composition'ın downstream integration concern olduğunu açıkça söyler; module varlığı her approval ingress'in onu consume ettiğinin kanıtı değildir. [Kanıt: `src/core/approval-allowscope.ts:1-8,202-220`]
 
+### Archived identity/RBAC plan'larının yeniden doğrulanması
+
+Dört archived identity/RBAC plan, current completion certificate değil design intent ve dated task state anlatır. Current source tenant-aware `admin|operator|viewer` evaluator ile connector group→role→default permission mapping'i içerir; dolayısıyla “planned-only” durumları bayattır. Status yine `⚠️ kısmi`dır: enterprise RBAC default-off'tur, orchestration/approval/capability vocabulary'leri ayrıdır ve canonical cross-vocabulary mapping bu planlardan çıkarılmaz; OQ-23 olarak açıktır. [Kanıt: `src/core/rbac.ts:11-59,73-145`; `src/connectors/identity/role-map.ts:4-27`; `src/core/enterprise-config.ts:12-37`; archived identity/RBAC plan inventory]
+
 ## Dogfood / repository gerçeği
 
 | Control | Durum | Current constraint |

@@ -46,6 +46,10 @@ Approval requesters are `brain`, `worker`, `auditor`, `nervous`, or `connector`.
 
 “Always allow” is never global: a grant is bound to a scope identity, approval scope, maximum risk, and expiry. The current allow-scope module explicitly says broker composition is a downstream integration concern, so its existence is not proof that every approval ingress consumes it. [Evidence: `src/core/approval-allowscope.ts:1-8,202-220`]
 
+### Archived identity/RBAC plans, rechecked
+
+The four archived identity/RBAC plans describe design intent and dated task state, not a current completion certificate. Current source does contain the tenant-aware `admin|operator|viewer` evaluator and the connector group→role→default permission mapping, so their “planned-only” state is stale. Status remains `⚠️ partial`: enterprise RBAC defaults off, orchestration/approval/capability vocabularies are separate, and the canonical cross-vocabulary mapping remains OQ-23 rather than being inferred from those plans. [Evidence: `src/core/rbac.ts:11-59,73-145`; `src/connectors/identity/role-map.ts:4-27`; `src/core/enterprise-config.ts:12-37`; archived identity/RBAC plan inventory]
+
 ## Dogfood / repository reality
 
 | Control | State | Current constraint |

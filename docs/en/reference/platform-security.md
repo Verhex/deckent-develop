@@ -38,6 +38,12 @@ Plugin code is validated for containment, sandbox issues, signatures, and publis
 
 The HTTP server has a per-IP sliding window; default maximum is 100 requests/minute and loopback is exempt by default unless configured otherwise. The core tenant limiter separately tracks concurrent actions per tenant. Terminal outbound bytes and session count/idle/scrollback are independently bounded by terminal configuration. [Evidence: `src/api/server.ts:152-205,1841-1860,2013-2063`; `src/core/rate-limiter.ts:26-91`; `src/core/config.ts:1723`]
 
+### Test containment E2 authority
+
+The archived E2 design correctly requires host-owned admission, candidate birth observation, finality, and cleanup evidence rather than trusting a test process's JSON claim. Its old “R00 only; no supervisor/control-plane/adapters” snapshot is no longer current: the repository now contains a containment supervisor, authority/session contracts, deterministic CBOR/COSE structures, and Linux namespace, OCI, macOS Seatbelt, Windows AppContainer, and WSL plan adapters. [Evidence: `scripts/hermeticity/containment-control-plane.mjs:1-169`; `scripts/hermeticity/containment-supervisor.mjs:1-33,470-680`; `scripts/hermeticity/adapters/`]
+
+Status remains `⚠️ partial`, not certified. Every adapter plan deliberately returns `proofEligible:false`, and the production control plane's native live-evidence capability check is hard-coded false; enforce mode therefore returns `E_CONTAINMENT_HOLD_LIVE_EVIDENCE_AUTHORITY_REQUIRED` before candidate birth. `deckent.containment.v2`, `NOT_BORN`, and fail-closed proof semantics remain live, while production activation is still absent. [Evidence: `scripts/hermeticity/containment-control-plane.mjs:19-23,62-70`; `scripts/hermeticity/evidence/measurement-contract.mjs:14,470-472`; `scripts/hermeticity/adapters/linux-namespace.mjs:324-395`; `package.json:28-30`]
+
 ## Platform matrix
 
 | Platform | Supported adapter shape | Honest constraint |
@@ -55,4 +61,5 @@ The HTTP server has a per-IP sliding window; default maximum is 100 requests/min
 - ✅ Auth, OIDC, CORS, tenant, RBAC, rate, scope, lock, plugin, and Docker authority modules exist and are wired into their named surfaces.
 - ⚠️ Repository hooks/execpolicy and advisory scope checks are defense-in-depth, not managed enterprise enforcement. Managed requirements are needed for an administrative boundary outside the repository. [Evidence: `AGENTS.md`, precedence/enforcement note]
 - ⚠️ `boundary_enforcement` defaults true, but the project contract still describes advisory versus enforce behavior as effective-policy dependent. [Evidence: `src/core/config.ts:1647-1655`; `AGENTS.md`, scope-enforcement gotcha]
+- ⚠️ E2 containment is code-present and fail-closed, but native live-evidence authority is `NOT_BORN`; no production proof claim is made.
 - ⚠️ This documentation audit did not start containers, open ports, mutate auth, or exercise multi-tenant HTTP requests; those environment proofs remain `HOLD`. [Evidence: task boundary]
