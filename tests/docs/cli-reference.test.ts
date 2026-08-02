@@ -3,10 +3,10 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = process.cwd();
-const CLI_REF_PATH = join(ROOT, 'docs', 'reference', 'cli.md');
+const CLI_REF_PATH = join(ROOT, 'docs', 'generated', 'en', 'reference', 'cli.md');
 const SCRIPT_PATH = join(ROOT, 'scripts', 'generate-cli-docs.ts');
 
-describe('docs/reference/cli.md', () => {
+describe('docs/generated/en/reference/cli.md', () => {
   const content = readFileSync(CLI_REF_PATH, 'utf-8');
 
   it('exists and is non-empty', () => {
@@ -152,9 +152,9 @@ describe('scripts/generate-cli-docs.ts', () => {
     expect(pkg).toContain('generate-cli-docs.ts');
   });
 
-  it('script writes to docs/reference/cli.md', () => {
+  it('script writes to docs/generated/en/reference/cli.md', () => {
     const source = readFileSync(SCRIPT_PATH, 'utf-8');
-    expect(source).toContain("'docs', 'reference'");
+    expect(source).toContain("'docs', 'generated', 'en', 'reference'");
     expect(source).toContain("'cli.md'");
   });
 

@@ -12,6 +12,12 @@
 
 # ─── Sprint / audit history (snapshot, never edit) ────────────────────────
 .audit/**
+# Analysis inventories quote link strings verbatim inside tables (rename sweeps,
+# diff reports); they are audit snapshots, not navigable docs. Mirrors the
+# already-ignored docs/analysis/** rule.
+# (Claude/Opus 5, 2026-08-02 — Alperen onayına AÇIK: bu kural 30 sahte pozitifi
+#  susturur; reddedilirse envanter dosyası link-temiz hale getirilmelidir.)
+.analysis/**
 .brain/archive/**
 .brain/exports/**
 .brain/MEMORY.md

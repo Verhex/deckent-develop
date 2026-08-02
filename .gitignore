@@ -249,3 +249,12 @@ examples/voice-wrapper/
 .deckent/archive/
 # OpenRouter model-listesi TTL cache (provider-cache.json emsali)
 .deckent/settings/openrouter-models.json
+
+# ─── Analiz / arşiv snapshot'ları (2026-08-02, Alperen) ───────────────────
+# Bu üç ağaç kalıcı repo yükü değil, dönemsel kanıt snapshot'ıdır.
+# DİKKAT: hepsi hâlihazırda TRACKED — bu girdiler yalnız YENİ dosyaları
+# tutar. Mevcutları çıkarmak ayrı ve bilinçli bir `git rm --cached` adımıdır
+# (git geçmişi her hâlükârda korur: docs/archive → commit 97b91e69f).
+.analysis/
+docs/archive/
+docs/analysis/

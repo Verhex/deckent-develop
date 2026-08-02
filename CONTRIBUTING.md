@@ -413,5 +413,5 @@ Large sprints split into **waves** — dependency-ordered groups that run in par
 ## Questions?
 
 - Open an issue on [GitHub](https://github.com/VerhexIO/deckent/issues)
-- Read the [Architecture docs](docs/architecture/architecture.md)
+- Read the [Architecture docs](docs/en/architecture.md)
 - Visit [deckent.ai](https://deckent.ai)

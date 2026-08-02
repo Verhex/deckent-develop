@@ -351,6 +351,42 @@ function buildEmbedContent(existingContent, blockId, header, body) {
   return `${trimmed}\n${tail}`;
 }
 
+// ─── Generated reference tree: locales ───────────────────────────────────────
+//
+// Machine-written reference docs live under `docs/generated/<lang>/reference/`,
+// deliberately OUTSIDE the hand-written `docs/<lang>/reference/` tree so the two
+// can never be confused or hand-edited into each other (Alperen, 2026-08-02).
+// Only the prose chrome is localized; table payloads are identifiers (tool names,
+// CLI flags, agent ids) sourced from code and are not translated.
+export const REFERENCE_LOCALES = [
+  {
+    lang: 'en',
+    dir: 'docs/generated/en/reference',
+    headers: {
+      mcpTools:
+        '# MCP Tools Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nDeckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.',
+      mcpResources:
+        '# MCP Resources Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nMCP resources expose live project state (dashboard, directives, memory, debt, tasks, …) to MCP-compatible IDEs via the `deckent://` URI scheme.',
+      cli: '# CLI Command Index\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n> **Source-parsed** — extracted from `src/cli/commands/*.ts` `.command(...)` registrations.',
+      agents:
+        '# Agents Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nAgents are domain specialists that Brain assigns per task. Built-in agents live under `.deckent/agents/`; `temp-*` agents are runtime-generated and auto-promoted/demoted by the Evolution Pipeline.',
+    },
+  },
+  {
+    lang: 'tr',
+    dir: 'docs/generated/tr/reference',
+    headers: {
+      mcpTools:
+        '# MCP Tool Referansı\n\n> **Otomatik üretilir** — AUTOGEN bloğunu elle düzenlemeyin. Yeniden üretmek için `npm run docs:ref` çalıştırın.\n\nDeckent, orchestration yüzeyini MCP-uyumlu IDE\'lere (Claude Code, Cursor vb.) açan bir MCP sunucusu içerir. Aşağıdaki tool\'lar `src/mcp/tools/*.ts` içinde kayıtlıdır ve `deckent-mcp` stdio transport üzerinden sunulur.\n\n> Tablo içeriği koddan gelen tanımlayıcılardır (tool adları, parametreler); çevrilmez.',
+      mcpResources:
+        '# MCP Kaynak Referansı\n\n> **Otomatik üretilir** — AUTOGEN bloğunu elle düzenlemeyin. Yeniden üretmek için `npm run docs:ref` çalıştırın.\n\nMCP kaynakları; canlı proje durumunu (dashboard, directives, memory, debt, tasks, …) `deckent://` URI şeması üzerinden MCP-uyumlu IDE\'lere açar.\n\n> Tablo içeriği koddan gelen tanımlayıcılardır; çevrilmez.',
+      cli: '# CLI Komut Dizini\n\n> **Otomatik üretilir** — AUTOGEN bloğunu elle düzenlemeyin. Yeniden üretmek için `npm run docs:ref` çalıştırın.\n> **Kaynaktan ayrıştırılır** — `src/cli/commands/*.ts` içindeki `.command(...)` kayıtlarından çıkarılır.\n\n> Komut adları ve bayraklar tanımlayıcıdır; çevrilmez.',
+      agents:
+        '# Agent Referansı\n\n> **Otomatik üretilir** — AUTOGEN bloğunu elle düzenlemeyin. Yeniden üretmek için `npm run docs:ref` çalıştırın.\n\nAgent\'lar, Brain\'in task başına atadığı alan uzmanlarıdır. Yerleşik agent\'lar `.deckent/agents/` altında yaşar; `temp-*` agent\'ları runtime\'da üretilir ve Evolution Pipeline tarafından otomatik terfi/tenzil edilir.\n\n> Tablo içeriği koddan gelen tanımlayıcılardır; çevrilmez.',
+    },
+  },
+];
+
 // ─── Collect all generations (parse → render → expected content) ─────────────
 
 export function collectGenerations({ root = DEFAULT_ROOT } = {}) {
@@ -367,24 +403,44 @@ export function collectGenerations({ root = DEFAULT_ROOT } = {}) {
   const agents = parseAgents(agentsDir);
 
   const generations = [
-    {
-      id: 'mcp-tools',
-      target: 'docs/reference/mcp-tools.md',
-      targetDir: 'docs/reference',
-      mode: 'fresh',
-      header: '# MCP Tools Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nDeckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.',
-      body: renderMcpTools(tools),
-      count: tools.length,
-    },
-    {
-      id: 'mcp-resources',
-      target: 'docs/reference/mcp-resources.md',
-      targetDir: 'docs/reference',
-      mode: 'fresh',
-      header: '# MCP Resources Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nMCP resources expose live project state (dashboard, directives, memory, debt, tasks, …) to MCP-compatible IDEs via the `deckent://` URI scheme.',
-      body: renderMcpResources(resources),
-      count: resources.length,
-    },
+    ...REFERENCE_LOCALES.flatMap((locale) => [
+      {
+        id: `mcp-tools-${locale.lang}`,
+        target: `${locale.dir}/mcp-tools.md`,
+        targetDir: locale.dir,
+        mode: 'fresh',
+        header: locale.headers.mcpTools,
+        body: renderMcpTools(tools),
+        count: tools.length,
+      },
+      {
+        id: `mcp-resources-${locale.lang}`,
+        target: `${locale.dir}/mcp-resources.md`,
+        targetDir: locale.dir,
+        mode: 'fresh',
+        header: locale.headers.mcpResources,
+        body: renderMcpResources(resources),
+        count: resources.length,
+      },
+      {
+        id: `cli-${locale.lang}`,
+        target: `${locale.dir}/cli.md`,
+        targetDir: locale.dir,
+        mode: 'embed',
+        header: locale.headers.cli,
+        body: renderCliCommands(commands),
+        count: commands.length,
+      },
+      {
+        id: `agents-${locale.lang}`,
+        target: `${locale.dir}/agents.md`,
+        targetDir: locale.dir,
+        mode: 'fresh',
+        header: locale.headers.agents,
+        body: renderAgents(agents),
+        count: agents.length,
+      },
+    ]),
     {
       id: 'adr-index',
       target: 'docs/adr/README.md',
@@ -393,24 +449,6 @@ export function collectGenerations({ root = DEFAULT_ROOT } = {}) {
       header: '# Architecture Decision Records — Index\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nThe canonical source of truth for ADR content is `.brain/memory.db` (Memory V2). This index is generated by scanning `docs/adr/*.md` filenames.',
       body: renderAdrs(adrs),
       count: adrs.length,
-    },
-    {
-      id: 'cli',
-      target: 'docs/reference/cli.md',
-      targetDir: 'docs/reference',
-      mode: 'embed',
-      header: '## Command Index (auto-generated)\n\n> **Source-parsed** — extracted from `src/cli/commands/*.ts` `.command(...)` registrations.\n> Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.',
-      body: renderCliCommands(commands),
-      count: commands.length,
-    },
-    {
-      id: 'agents',
-      target: 'docs/reference/agents.md',
-      targetDir: 'docs/reference',
-      mode: 'fresh',
-      header: '# Agents Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nAgents are domain specialists that Brain assigns per task. Built-in agents live under `.deckent/agents/`; `temp-*` agents are runtime-generated and auto-promoted/demoted by the Evolution Pipeline.',
-      body: renderAgents(agents),
-      count: agents.length,
     },
   ];
 

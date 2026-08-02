@@ -308,7 +308,7 @@ describe('collectGenerations (--check round-trip)', () => {
     const adrDir = join(tmpRoot, 'docs/adr');
     const cliDir = join(tmpRoot, 'src/cli/commands');
     const agentsDir = join(tmpRoot, '.deckent/agents');
-    const refDir = join(tmpRoot, 'docs/reference');
+    const refDir = join(tmpRoot, 'docs/generated/en/reference');
     mkdirSync(toolsDir, { recursive: true });
     mkdirSync(resDir, { recursive: true });
     mkdirSync(adrDir, { recursive: true });
@@ -352,7 +352,7 @@ describe('collectGenerations (--check round-trip)', () => {
     expect(stillDrifting).toHaveLength(0);
   });
 
-  it('exposes target paths under docs/reference and docs/adr', () => {
+  it('exposes bilingual target paths under docs/generated/<lang>/reference and docs/adr', () => {
     // Empty setup; collectGenerations still returns gen descriptors with predictable targets.
     const toolsDir = join(tmpRoot, 'src/mcp/tools');
     const resDir = join(tmpRoot, 'src/mcp/resources');
@@ -363,10 +363,14 @@ describe('collectGenerations (--check round-trip)', () => {
 
     const gens = collectGenerations({ root: tmpRoot });
     const targets = gens.map((g: { target: string }) => g.target);
-    expect(targets).toContain('docs/reference/mcp-tools.md');
-    expect(targets).toContain('docs/reference/mcp-resources.md');
     expect(targets).toContain('docs/adr/README.md');
-    expect(targets).toContain('docs/reference/cli.md');
-    expect(targets).toContain('docs/reference/agents.md');
+    for (const lang of ['en', 'tr']) {
+      expect(targets).toContain(`docs/generated/${lang}/reference/mcp-tools.md`);
+      expect(targets).toContain(`docs/generated/${lang}/reference/mcp-resources.md`);
+      expect(targets).toContain(`docs/generated/${lang}/reference/cli.md`);
+      expect(targets).toContain(`docs/generated/${lang}/reference/agents.md`);
+    }
+    // Generated docs must never land inside the hand-written docs/<lang>/reference tree.
+    expect(targets.some((t) => /^docs\/(en|tr)\/reference\//.test(t))).toBe(false);
   });
 });

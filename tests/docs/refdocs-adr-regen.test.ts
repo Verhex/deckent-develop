@@ -136,7 +136,7 @@ describe('parseAdrs — new ADR-G/ADR-D taxonomy', () => {
 describe('collectGenerations — fresh-mode preserves trailing content after AUTOGEN:END', () => {
   it('round-trips a hand-written trailer note (e.g. docs/adr/README.md "Archived" note)', () => {
     const adrDir = join(tmpRoot, 'docs/adr');
-    const refDir = join(tmpRoot, 'docs/reference');
+    const refDir = join(tmpRoot, 'docs/generated/en/reference');
     mkdirSync(adrDir, { recursive: true });
     mkdirSync(refDir, { recursive: true });
     mkdirSync(join(tmpRoot, 'src/mcp/tools'), { recursive: true });

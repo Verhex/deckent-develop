@@ -7,7 +7,7 @@
 > (singular, non-empty — see `docs/release/release-checklist.md` step 6). For the
 > **automatically-generated, verbose per-sprint log** (every sprint's task-level
 > Added/Changed/Fixed, appended by the sprint-finalizer), see
-> [docs/CHANGELOG.md](docs/CHANGELOG.md) — that file is a machine-written archive, not release
+> [docs/archive/docs-pre-reset-2026-08-03/CHANGELOG.md](docs/archive/docs-pre-reset-2026-08-03/CHANGELOG.md) — that file is a machine-written archive, not release
 > notes.
 
 ## [1.0.0-beta.1] — 2026-04-22 (current)
@@ -188,7 +188,7 @@ See `docs/KNOWN_ISSUES.md` for the full list. Highlights: MCP tool count doc dri
 - Sprint 147 nervous system preflight: `nervous-types.ts` + ADR-040 draft
 - `scripts/prompt-linter.mjs` + `scripts/chain-gate-check.mjs` kalite gate'leri
 
-Full changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+Full changelog: [docs/archive/docs-pre-reset-2026-08-03/CHANGELOG.md](docs/archive/docs-pre-reset-2026-08-03/CHANGELOG.md)
 
 ---
 

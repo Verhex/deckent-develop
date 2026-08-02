@@ -1,7 +1,7 @@
 /**
  * generate-cli-docs.ts — Auto-generate CLI reference documentation
  *
- * Reads CLI command metadata and generates docs/reference/cli.md.
+ * Reads CLI command metadata and generates docs/generated/en/reference/cli.md.
  * Run: npm run docs:generate-cli
  *
  * Strategy: Reads command definitions from src/cli/commands/ source files
@@ -47,7 +47,7 @@ export interface CliCommand {
 
 export type CommandCategory =
   | 'Project Setup'
-  | 'Sprint Workflow'
+  | 'Run Workflow'
   | 'Monitoring'
   | 'Workers & Tasks'
   | 'Configuration'
@@ -104,12 +104,12 @@ export const CLI_COMMANDS: CliCommand[] = [
     ],
   },
 
-  // ── Sprint Workflow ─────────────────────────────────────────────
+  // ── Run Workflow ─────────────────────────────────────────────
   {
     name: 'start',
     args: '[description]',
     description: 'Start a new sprint. Optionally pass a one-line description for zero-config mode — Deckent creates a temporary DIRECTIVES.md and starts immediately.',
-    category: 'Sprint Workflow',
+    category: 'Run Workflow',
     options: [
       { flags: '--auto-approve', description: 'Auto-approve worker actions (--dangerously-skip-permissions)' },
       { flags: '--sandbox-mode', description: 'Run in sandbox mode (Docker)' },
@@ -127,7 +127,7 @@ export const CLI_COMMANDS: CliCommand[] = [
   {
     name: 'plan',
     description: 'Plan the next sprint without executing it. Reads DIRECTIVES.md, checks usage, and generates task files in .tasks/. Prompts for confirmation before writing.',
-    category: 'Sprint Workflow',
+    category: 'Run Workflow',
     options: [
       { flags: '--no-confirm', description: 'Skip confirmation, auto-approve plan' },
       { flags: '--structured', description: 'Force structured parsing (skip AI planner)' },
@@ -141,7 +141,7 @@ export const CLI_COMMANDS: CliCommand[] = [
   {
     name: 'test',
     description: 'Run a test sprint — no retro, no memory update, no decay. Useful for validating DIRECTIVES.md before committing to a full sprint.',
-    category: 'Sprint Workflow',
+    category: 'Run Workflow',
     options: [
       { flags: '--keep', description: 'Skip cleanup — leave task files in place after test' },
       { flags: '--timeout <ms>', description: 'Maximum sprint duration in milliseconds', defaultValue: '300000' },
@@ -155,7 +155,7 @@ export const CLI_COMMANDS: CliCommand[] = [
   {
     name: 'finalize',
     description: 'Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config metadata, and optionally run memory decay.',
-    category: 'Sprint Workflow',
+    category: 'Run Workflow',
     options: [
       { flags: '--skip-decay', description: 'Skip memory/debt decay phase' },
       { flags: '--skip-hooks', description: 'Skip plugin afterSprint hooks' },
@@ -168,7 +168,7 @@ export const CLI_COMMANDS: CliCommand[] = [
   {
     name: 'cleanup',
     description: 'Clean up after a sprint. Removes task files, heartbeat files, and lock files. Optionally runs memory decay.',
-    category: 'Sprint Workflow',
+    category: 'Run Workflow',
     options: [
       { flags: '--decay', description: 'Force run memory decay (compress .brain/ files)' },
     ],
@@ -180,7 +180,7 @@ export const CLI_COMMANDS: CliCommand[] = [
   {
     name: 'review',
     description: 'Review sprint tasks with evaluations. Shows task results, self-assessments, and lets you approve or reject outcomes.',
-    category: 'Sprint Workflow',
+    category: 'Run Workflow',
     options: [
       { flags: '--auto', description: 'Auto-approve/reject based on task results' },
       { flags: '--json', description: 'Output review state as JSON' },
@@ -194,7 +194,7 @@ export const CLI_COMMANDS: CliCommand[] = [
   {
     name: 'retro',
     description: 'Show the latest sprint retrospective from .brain/RETRO.md.',
-    category: 'Sprint Workflow',
+    category: 'Run Workflow',
     options: [
       { flags: '--raw', description: 'Show raw RETRO.md content without formatting' },
       { flags: '--compare', description: 'Show delta comparison with previous sprint' },
@@ -207,7 +207,7 @@ export const CLI_COMMANDS: CliCommand[] = [
   {
     name: 'explain',
     description: 'Explain what the last sprint did in human-friendly language. Reads sprint logs, task results, and retro to produce a plain-English summary.',
-    category: 'Sprint Workflow',
+    category: 'Run Workflow',
     examples: [
       'deckent explain',
     ],
@@ -690,7 +690,7 @@ export function generateCliDocs(commands: CliCommand[]): string {
 
 function main(): void {
   const projectRoot = join(__dirname, '..');
-  const outputDir = join(projectRoot, 'docs', 'reference');
+  const outputDir = join(projectRoot, 'docs', 'generated', 'en', 'reference');
   const outputPath = join(outputDir, 'cli.md');
 
   mkdirSync(outputDir, { recursive: true });
@@ -700,13 +700,13 @@ function main(): void {
 
   const totalCommands = CLI_COMMANDS.length;
   const totalSubcommands = CLI_COMMANDS.reduce((n, c) => n + (c.subcommands?.length ?? 0), 0);
-  console.log(`✓ Generated docs/reference/cli.md`);
+  console.log(`✓ Generated docs/generated/en/reference/cli.md`);
   console.log(`  ${totalCommands} top-level commands, ${totalSubcommands} subcommands`);
   console.log(`  Output: ${outputPath}`);
 }
 
 // Gate side-effect on direct invocation so importing this module (e.g. from
-// tests/docs/cli-reference.test.ts) does NOT overwrite docs/reference/cli.md.
+// tests/docs/cli-reference.test.ts) does NOT overwrite the generated cli.md.
 // The previous unconditional main() call clobbered AUTOGEN blocks maintained
 // by scripts/gen-reference-docs.mjs whenever the test suite imported this file.
 const __invokedDirectly = (() => {
