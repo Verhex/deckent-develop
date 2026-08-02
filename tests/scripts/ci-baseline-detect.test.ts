@@ -18,7 +18,7 @@ async function importDetect() {
 }
 
 describe('ci-baseline-detect', () => {
-  it.skip('README sprint badge is current (>= 214, never the stale 190)', () => {
+  it('README sprint badge is current (>= 214, never the stale 190)', () => {
     expect(fs.existsSync(README_PATH)).toBe(true);
     const readme = fs.readFileSync(README_PATH, 'utf-8');
     // Code-derived guard (Sprint 270): the literal "21X" expectation went stale

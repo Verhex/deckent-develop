@@ -142,6 +142,19 @@ Yani doküman yeniden yazımı **doküman testlerini sahipsiz bıraktı**.
   design-tokens kapısı sonradan eklenince kırılmıştı. `&&` zincirinde her halka zaten fail-closed
   olduğu için iddia kardeşleriyle aynı kalıba (`(?: && |$)`) getirildi.
 
+**🔴 EN BÜYÜK KEŞİF — Type Check kapısı tüm test işlerini gizliyormuş.** CI'ın `Type Check` işi
+en az 2026-08-01'den (c637ca0dd) beri kırıktı ve diğer BÜTÜN test işleri ona bağlı olduğu için
+`skipped` geçiyordu. Kök neden bulundu ve düzeltildi: hermetiklik tarama grafiği `dist/` ağacını
+da içeriyor; CI lint'i build'den önce koştuğu için orada `dist` yok, taban değer ise build almış
+yerel ağaçta üretiliyordu (12463↔12392, 1200↔1196). Taban değerler build'siz ağaca göre yeniden
+hesaplandı + tazeleme prosedürü koda yazıldı. **Type Check artık yeşil.**
+
+**Sonuç:** kapı açılınca gerçek test işleri ilk kez koştu ve **Dashboard · CLI · MCP-bundle ·
+Core+Agents · Orchestra işleri kırık çıktı.** Bunlar bugünkü işten değil — günlerdir görünmüyorlardı.
+Bu, FAZ 3'ün gerçek boyutunu değiştiriyor: elimizde bilinmeyen büyüklükte bir test borcu var.
+Docs+Scripts işinde kalan üç kırık ise ortama bağlı/eski: Windows `taskkill` testleri Linux runner'da,
+CI'da bulunmayan `.deckent/skills/docs` dizini, ve 60 sn'de zaman aşımına uğrayan containment ratchet'i.
+
 **⚠️ Hâlâ kırık ve BENİM KARARIM DEĞİL:** `.github/workflows/docs.yml` (VitePress site deploy)
 arşive giden `docs/.vitepress/**` üzerinde `npx vitepress build` koşuyor. Bu **OQ-18**'e bağlı
 (nested site devam mı edecek). İlgili 65 test `describe.skip` + OQ-18 referansıyla işaretlendi;

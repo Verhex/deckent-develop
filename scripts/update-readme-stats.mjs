@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // update-readme-stats.mjs — Sprint 172 Task C1
-// Single source of truth for stat badges/counts in README.md, README-TR.md, .deckent/workspace/IDENTITY.md.
+// Single source of truth for stat badges/counts in README.md, README.tr.md, .deckent/workspace/IDENTITY.md.
 // Reads from real sources (vitest test count, package.json version, src/mcp/* register calls,
 // docs/adr/* filenames, .deckent/agents+skills directories, src/dashboard/src/pages/*).
 //
@@ -386,7 +386,7 @@ export function collectGenerations({ root = DEFAULT_ROOT, coverage } = {}) {
       ],
     },
     {
-      target: 'README-TR.md',
+      target: 'README.tr.md',
       blocks: [
         { id: 'badges', body: badges },
         { id: 'stat-counts', body: statCounts },
