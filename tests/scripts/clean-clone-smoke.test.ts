@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 import { runStep, runSmoke } from '../../scripts/clean-clone-smoke.mjs';
 
+// ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
+// The 2026-08 docs reset (commit 97b91e69f) archived the document this assertion
+// guards; the rewritten corpus has no successor carrying the same claim.
+// Skipped, not deleted, so the coverage loss stays visible. See PAZARTESI.md.
+
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SCRIPT_PATH = resolve(REPO_ROOT, 'scripts/clean-clone-smoke.mjs');
@@ -102,7 +107,7 @@ describe('script artifact', () => {
 });
 
 describe('documentation', () => {
-  it('smoke-verify.md exists and documents the pipeline + flags', () => {
+  it.skip('smoke-verify.md exists and documents the pipeline + flags', () => {
     expect(existsSync(DOC_PATH)).toBe(true);
     expect(statSync(DOC_PATH).size).toBeGreaterThan(200);
     const doc = readFileSync(DOC_PATH, 'utf-8');

@@ -281,7 +281,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE
 
 ## MCP Tool Reference — MCP Arac Referansi
 
-> **Tam araç listesi (48 araç) koddan otomatik türetilir — bkz. `docs/reference/mcp-tools.md`** (`npm run docs:ref`).
+> **Tam araç listesi (49 araç) koddan otomatik türetilir — bkz. `docs/generated/tr/reference/mcp-tools.md`** (`npm run docs:ref`).
 > Eskiden burada duran el-yazımı tablo **drift etmişti** (33 vs 35 vs 46); canonical generated referans tek-kaynaktır.
 > Araç adları yukarıdaki `## MCP Integration` bölümünde listelenir; somut parametre örnekleri aşağıdadır.
 

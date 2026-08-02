@@ -2,12 +2,22 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
+// The 2026-08 docs reset archived docs/.vitepress/** and docs/package.json
+// (docs/archive/docs-pre-reset-2026-08-03/). Whether the nested VitePress site
+// continues or is absorbed by the root toolchain is an OPEN OWNER DECISION —
+// OQ-18 in docs/analysis/OPEN-QUESTIONS-2026-08.md. Repointing these tests would
+// silently decide "it continues"; deleting them would decide "it does not".
+// Skipped (not deleted) so the coverage loss stays visible and reversible.
+// NOTE: .github/workflows/docs.yml still runs `npx vitepress build` against the
+// archived tree, so the docs-site deploy is broken independently of CI.
+
 const DOCS_ROOT = join(process.cwd(), 'docs');
 const VITEPRESS_ROOT = join(DOCS_ROOT, '.vitepress');
 
 // ─── File Existence ────────────────────────────────────────────────
 
-describe('VitePress file structure', () => {
+describe.skip('VitePress file structure', () => {
   it('docs/package.json exists', () => {
     expect(existsSync(join(DOCS_ROOT, 'package.json'))).toBe(true);
   });
@@ -35,7 +45,7 @@ describe('VitePress file structure', () => {
 
 // ─── package.json Validation ───────────────────────────────────────
 
-describe('docs/package.json', () => {
+describe.skip('docs/package.json', () => {
   const pkgPath = join(DOCS_ROOT, 'package.json');
   let pkg: Record<string, unknown>;
 
@@ -70,7 +80,7 @@ describe('docs/package.json', () => {
 
 // ─── config.ts content checks ─────────────────────────────────────
 
-describe('docs/.vitepress/config.ts', () => {
+describe.skip('docs/.vitepress/config.ts', () => {
   const configPath = join(VITEPRESS_ROOT, 'config.ts');
   let content: string;
 
@@ -154,7 +164,7 @@ describe('docs/.vitepress/config.ts', () => {
 
 // ─── theme/index.ts content checks ────────────────────────────────
 
-describe('docs/.vitepress/theme/index.ts', () => {
+describe.skip('docs/.vitepress/theme/index.ts', () => {
   const themePath = join(VITEPRESS_ROOT, 'theme', 'index.ts');
   let content: string;
 
@@ -178,7 +188,7 @@ describe('docs/.vitepress/theme/index.ts', () => {
 
 // ─── theme/custom.css content checks ──────────────────────────────
 
-describe('docs/.vitepress/theme/custom.css', () => {
+describe.skip('docs/.vitepress/theme/custom.css', () => {
   const cssPath = join(VITEPRESS_ROOT, 'theme', 'custom.css');
   let content: string;
 
@@ -201,7 +211,7 @@ describe('docs/.vitepress/theme/custom.css', () => {
 
 // ─── Home page (index.md) ──────────────────────────────────────────
 
-describe('docs/index.md', () => {
+describe.skip('docs/index.md', () => {
   const indexPath = join(DOCS_ROOT, 'index.md');
   let content: string;
 

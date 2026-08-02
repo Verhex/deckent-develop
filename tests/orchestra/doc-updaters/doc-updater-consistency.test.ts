@@ -10,9 +10,12 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  // sprintLogUpdater writes atomically (temp file + rename); without this the
+  // mock throws "No renameSync export is defined".
+  renameSync: vi.fn(),
 }));
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
@@ -99,9 +102,14 @@ describe('Doc Updater Path Consistency', () => {
 
   it('sprintLogUpdater writes to docs/SPRINT-LOG.md path (no archive)', () => {
     sprintLogUpdater.run(makeCtx());
-    const writtenPath = String(mockedWriteFileSync.mock.calls[0][0]);
-    expect(writtenPath).toMatch(/docs\/SPRINT-LOG\.md$/);
-    expect(writtenPath).not.toContain('docs/archive');
+    // sprintLogUpdater now writes atomically: a sibling temp file, then rename onto
+    // the target. The durable destination is renameSync's second argument — asserting
+    // writeFileSync's path here would only ever see the temp name.
+    const tempPath = String(mockedWriteFileSync.mock.calls[0][0]);
+    const finalPath = String(vi.mocked(renameSync).mock.calls[0][1]);
+    expect(tempPath).toContain('docs/');
+    expect(finalPath).toMatch(/docs\/SPRINT-LOG\.md$/);
+    expect(finalPath).not.toContain('docs/archive');
   });
 
   it('sprintLogUpdater result.file matches targetFile exactly', () => {

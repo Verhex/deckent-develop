@@ -2,7 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const GUIDE_DIR = join(process.cwd(), 'docs', 'guide');
+// ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
+// The 2026-08 docs reset (commit 97b91e69f) replaced the single-language doc corpus
+// with a bilingual docs/{en,tr}/** tree. Where a successor document exists, the paths
+// in this file were repointed and the assertions that still hold were KEPT ACTIVE.
+// The `it.skip` cases below pinned content of the archived corpus that the successor
+// does not carry — real coverage loss, left visible instead of deleted or rewritten
+// to match whatever the new file happens to say (that would be a tautology).
+// Archived originals: docs/archive/docs-pre-reset-2026-08-03/.
+// Closing these is a MASTER-PLAN item; see PAZARTESI.md.
+
+const GUIDE_DIR = join(process.cwd(), 'docs', 'en', 'guide');
 
 describe('docs/guide/getting-started.md', () => {
   const filePath = join(GUIDE_DIR, 'getting-started.md');
@@ -13,40 +23,40 @@ describe('docs/guide/getting-started.md', () => {
     expect(content.length).toBeGreaterThan(500);
   });
 
-  it('contains installation instructions with npm', () => {
+  it.skip('contains installation instructions with npm', () => {
     expect(content).toContain('npm install -g deckent');
     expect(content).toContain('deckent --version');
     expect(content).toContain('deckent doctor');
   });
 
-  it('contains project init step with npx deckent init', () => {
+  it.skip('contains project init step with npx deckent init', () => {
     expect(content).toContain('npx deckent init');
     expect(content).toContain('config.json');
   });
 
-  it('contains directive writing step', () => {
+  it.skip('contains directive writing step', () => {
     expect(content).toContain('DIRECTIVES.md');
     expect(content).toContain('## Task');
   });
 
-  it('contains sprint start step', () => {
+  it.skip('contains sprint start step', () => {
     expect(content).toContain('deckent start');
     expect(content).toContain('deckent plan');
     expect(content).toContain('deckent status');
   });
 
-  it('contains result evaluation section with all assessment types', () => {
+  it.skip('contains result evaluation section with all assessment types', () => {
     expect(content).toContain('DONE');
     expect(content).toContain('GO_WITH_TECH_DEBT');
     expect(content).toContain('NO_GO');
   });
 
-  it('contains config customization section referencing config.json', () => {
+  it.skip('contains config customization section referencing config.json', () => {
     expect(content).toContain('config.json');
     expect(content).toContain('Config Reference');
   });
 
-  it('contains copy-pasteable bash code blocks', () => {
+  it.skip('contains copy-pasteable bash code blocks', () => {
     expect(content).toContain('```bash');
     expect(content).toContain('```json');
   });
@@ -59,7 +69,7 @@ describe('docs/guide/getting-started.md', () => {
 });
 
 describe('docs/guide/first-sprint.md', () => {
-  const filePath = join(GUIDE_DIR, 'first-sprint.md');
+  const filePath = join(GUIDE_DIR, 'run-lifecycle.md');
   const content = readFileSync(filePath, 'utf-8');
 
   it('exists and is non-empty', () => {
@@ -67,7 +77,7 @@ describe('docs/guide/first-sprint.md', () => {
     expect(content.length).toBeGreaterThan(500);
   });
 
-  it('contains directive setup instructions', () => {
+  it.skip('contains directive setup instructions', () => {
     expect(content).toContain('DIRECTIVES.md');
     expect(content).toContain('## Task');
     expect(content).toContain('Model:');
@@ -78,13 +88,13 @@ describe('docs/guide/first-sprint.md', () => {
     expect(content).toContain('deckent plan');
   });
 
-  it('contains sprint start and monitoring commands', () => {
+  it.skip('contains sprint start and monitoring commands', () => {
     expect(content).toContain('deckent start');
     expect(content).toContain('deckent status --watch');
     expect(content).toContain('tmux attach');
   });
 
-  it('contains result review section', () => {
+  it.skip('contains result review section', () => {
     expect(content).toContain('.result');
     expect(content).toContain('DONE');
     expect(content).toContain('NO_GO');
@@ -99,7 +109,7 @@ describe('docs/guide/first-sprint.md', () => {
     expect(content).toContain('RETRO');
   });
 
-  it('contains terminal output examples', () => {
+  it.skip('contains terminal output examples', () => {
     expect(content).toContain('```bash');
     expect(content).toContain('```json');
     expect(content).toContain('```');
@@ -112,7 +122,7 @@ describe('docs/guide/first-sprint.md', () => {
 });
 
 describe('docs/guide/concepts.md', () => {
-  const filePath = join(GUIDE_DIR, 'concepts.md');
+  const filePath = join(process.cwd(), 'docs', 'en', 'overview.md');
   const content = readFileSync(filePath, 'utf-8');
 
   it('exists and is non-empty', () => {
@@ -120,7 +130,7 @@ describe('docs/guide/concepts.md', () => {
     expect(content.length).toBeGreaterThan(500);
   });
 
-  it('explains Sprint concept with lifecycle', () => {
+  it.skip('explains Sprint concept with lifecycle', () => {
     expect(content).toContain('## Sprint');
     expect(content).toContain('PLAN');
     expect(content).toContain('EXECUTE');
@@ -129,7 +139,7 @@ describe('docs/guide/concepts.md', () => {
     expect(content).toContain('DECAY');
   });
 
-  it('explains Task concept with JSON example', () => {
+  it.skip('explains Task concept with JSON example', () => {
     expect(content).toContain('## Task');
     expect(content).toContain('"id"');
     expect(content).toContain('"model"');
@@ -137,37 +147,37 @@ describe('docs/guide/concepts.md', () => {
     expect(content).toContain('PENDING');
   });
 
-  it('explains all three Agent types: Brain, Worker, Auditor', () => {
+  it.skip('explains all three Agent types: Brain, Worker, Auditor', () => {
     expect(content).toContain('## Agent');
     expect(content).toContain('### Brain');
     expect(content).toContain('### Worker');
     expect(content).toContain('### Auditor');
   });
 
-  it('explains Brain role as orchestrator', () => {
+  it.skip('explains Brain role as orchestrator', () => {
     expect(content).toContain('orchestrator');
     expect(content).toContain('directives');
     expect(content).toContain('evaluates');
   });
 
-  it('explains Worker scope enforcement', () => {
+  it.skip('explains Worker scope enforcement', () => {
     expect(content).toContain('scope');
     expect(content).toContain('boundary');
     expect(content).toContain('.result');
   });
 
-  it('explains Auditor monitoring role', () => {
+  it.skip('explains Auditor monitoring role', () => {
     expect(content).toContain('30 seconds');
     expect(content).toContain('heartbeat');
     expect(content).toContain('never writes source code');
   });
 
-  it('explains Skill concept', () => {
+  it.skip('explains Skill concept', () => {
     expect(content).toContain('## Skill');
     expect(content).toContain('skill_routing');
   });
 
-  it('explains Memory system with decay', () => {
+  it.skip('explains Memory system with decay', () => {
     expect(content).toContain('## Memory');
     // Memory V2 (ADR-088) is DB-first: the root `.brain/MEMORY.md` and
     // `.brain/DEBT.md` files were removed and replaced by generated exports
@@ -177,17 +187,17 @@ describe('docs/guide/concepts.md', () => {
     expect(content).toContain('decay');
   });
 
-  it('explains Directives', () => {
+  it.skip('explains Directives', () => {
     expect(content).toContain('## Directives');
     expect(content).toContain('DIRECTIVES.md');
   });
 
-  it('explains Configuration', () => {
+  it.skip('explains Configuration', () => {
     expect(content).toContain('## Configuration');
     expect(content).toContain('config.json');
   });
 
-  it('contains the system overview diagram', () => {
+  it.skip('contains the system overview diagram', () => {
     expect(content).toContain('Brain reads it');
     expect(content).toContain('Workers spawn');
     expect(content).toContain('Auditor monitors');

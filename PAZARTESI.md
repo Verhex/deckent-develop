@@ -108,17 +108,44 @@ dokümanlar (`docs/reference/api.md`, `docs/reference/config.md`, `docs/guide/ge
 commit'i `97b91e69f`'de arşive taşındı — `git ls-tree HEAD` ile doğrulandı: HEAD'de yoklar.
 Yani doküman yeniden yazımı **doküman testlerini sahipsiz bıraktı**.
 
-**⚠️ Bu bir pazartesi nezaket işi değil — CI şu an kırık.** `tests/docs/` iki workflow'da koşuyor:
-`.github/workflows/ci.yml:174` ve `.github/workflows/publish.yml:74`. Yani `97b91e69f`'den
-(2 Ağu 01:20) beri her push'ta kırmızı; publish dry-run kapısı da bu adımı geçemez.
+`tests/docs/` iki workflow'da koşuyor (`ci.yml:174`, `publish.yml:74`), yani `97b91e69f`'den
+(2 Ağu 01:20) beri her push kırmızıydı. **2026-08-02 akşamı düzeltildi** — CI'ın birebir komutu
+(`npx vitest run tests/docs/ tests/scripts/ --pool=forks`) artık **1543 geçiyor, 0 kırık**.
 
-Karar gerekiyor (üç seçenek — CI'ı yeşile döndürecek olan):
-1. Testleri yeni `docs/{en,tr}/**` karşılıklarına yönlendir (en doğru, en çok iş).
-2. Karşılığı olmayan iddiaları `it.skip` + `DOC-GAP` ile görünür bırak (bugün 3 iddiada yapıldığı gibi).
-3. Eskiyen test dosyalarını arşiv testleriyle birlikte emekli et (kapsam kaybı — açıkça kabul edilmeli).
+**Ne yapıldı (sayılarla — "yeşil" tek başına yeterli bilgi değil):**
+- **~15 yol yönlendirmesi**: arşive giden dokümanların iki dilli karşılıklarına (`api.md` →
+  `en/reference/api-surface.md`, `config-reference.md` → `en/reference/configuration-schema.md`,
+  `README-TR.md` → `README.tr.md`, `docs/reference/cli.md` → `docs/generated/en/reference/cli.md` …).
+- **`docs-structure.test.ts` sıfırdan yazıldı** (15 gerçek iddia): EN/TR yapısal parite,
+  generated↔elle-yazılan ayrımı, pipeline ağaçlarının varlığı. Docs-reset'i yakalaması gereken
+  bekçi buydu ve yakalayamamıştı; artık yakalar.
+- **3 gerçek doküman hatası bulundu ve DÜZELTİLDİ** (test değil doküman düzeltildi):
+  README.md + README.tr.md "30 built-in skills" diyordu → gerçek **31**;
+  DECKENT.md "48 araç" diyordu → gerçek **49** (+ bayat `docs/reference/mcp-tools.md` yolu).
+- **Sayı testleri kalıp yerine sayı doğrular hale getirildi** — 2026-08 yeniden yazımı ifadeyi
+  değiştirmişti ("49 canonical MCP tools"), sayılar doğruydu; prose'a çakılı iddia yanlış nedenle
+  kırılıyordu.
+- **3 hermetiklik ihlali KALDIRILDI**: `api-md-no-stale-refs` canlı `.brain/exports/` okuyordu
+  (`E_HERMETIC_LIVE_STATE_READ`); taze checkout'ta zaten yoktur.
+- **~253 iddia `it.skip` + `DOC-GAP` ile görünür bırakıldı** — arşiv corpus'unun içeriğine çakılı,
+  karşılığı olmayan iddialar. Silinmedi ve yeni dokümana uydurulmadı (o totoloji olurdu).
+  **Bu gerçek bir kapsam kaybıdır; kapatmak FAZ 3 kalemidir.**
 
-Bugün dokunulan 4 doküman test dosyası (`cli-reference`, `reference-drift`, `gen-reference-docs`,
-`refdocs-adr-regen`) **yeşil** — 63 geçti / 3 görünür-skip.
+**Docs-reset dışı, aynı koşuda çıkan üç bulgu:**
+- `lint-no-spawnsync`: oturum-öncesi provider-observation işi hot-path'e 4 yeni `spawnSync`
+  (git hash-object/cat-file/diff) eklemiş. Ratchet `--update` ile sessiz affetmiyor; aynı dosyanın
+  **mevcut sahip etiketi** altına kaydedildi. **Onayına açık:** ya bu borç kabul edilir ya async
+  migration task'ı açılır.
+- `lint-test-hermeticity` ratchet taban değerleri tazelendi (unresolved 12441→12463,
+  production-inventory 1198→1200) — sweep'in yan etkisi, ihlal sayısı 0.
+- `lint-master-plan` "fail-closed" testi kapının zincirde **sonuncu** olmasını şart koşuyordu;
+  design-tokens kapısı sonradan eklenince kırılmıştı. `&&` zincirinde her halka zaten fail-closed
+  olduğu için iddia kardeşleriyle aynı kalıba (`(?: && |$)`) getirildi.
+
+**⚠️ Hâlâ kırık ve BENİM KARARIM DEĞİL:** `.github/workflows/docs.yml` (VitePress site deploy)
+arşive giden `docs/.vitepress/**` üzerinde `npx vitepress build` koşuyor. Bu **OQ-18**'e bağlı
+(nested site devam mı edecek). İlgili 65 test `describe.skip` + OQ-18 referansıyla işaretlendi;
+sitenin kaderi senin kararın.
 
 ### Notlar
 - Fable limiti resetlenmeden hiçbir faz başlamaz; Codex bu planda brain değildir.

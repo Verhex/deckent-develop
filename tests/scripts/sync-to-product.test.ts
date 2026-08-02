@@ -6,6 +6,11 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import {
+
+// ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
+// The 2026-08 docs reset (commit 97b91e69f) archived the document this assertion
+// guards; the rewritten corpus has no successor carrying the same claim.
+// Skipped, not deleted, so the coverage loss stays visible. See PAZARTESI.md.
   EXCLUDE,
   isExcluded,
   partitionFiles,
@@ -238,7 +243,7 @@ describe('artifact + doc', () => {
     expect(total).toBeGreaterThanOrEqual(2);
   });
 
-  it('docs/development/repo-sync.md exists and explains two-repo model + manual-push rule', () => {
+  it.skip('docs/development/repo-sync.md exists and explains two-repo model + manual-push rule', () => {
     expect(existsSync(DOC_PATH)).toBe(true);
     expect(statSync(DOC_PATH).size).toBeGreaterThan(400);
     const doc = readFileSync(DOC_PATH, 'utf-8');

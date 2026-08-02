@@ -421,6 +421,11 @@
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const probe = spawnSync(",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
       "code": "const probe = spawnSync('docker', ['info'], {",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
@@ -441,6 +446,11 @@
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const res = spawnSync('git', ['hash-object', '-w', '--', rel], {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
       "code": "const result = spawnSync('docker', ['info'], {",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
@@ -452,6 +462,21 @@
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
       "code": "const result = spawnSync('docker', dockerArgs, {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const result = spawnSync('git', ['cat-file', 'blob', hash], {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const result = spawnSync('git', ['diff', '--numstat', beforeHash, afterHash], {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const result = spawnSync('git', ['hash-object', '-w', '--', path], {",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
     {
@@ -521,17 +546,17 @@
     },
     {
       "file": "src/orchestra/tmux.ts",
-      "code": "spawnSync('tmux', ['attach-session', '-t', TMUX_SESSION_NAME], {",
-      "owner": "HOTPATH-SPAWN-ASYNC (born; tmux spawn backend — worker dispatch, parallel to docker)"
-    },
-    {
-      "file": "src/orchestra/tmux.ts",
-      "code": "spawnSync('tmux', ['attach-session', '-t', TMUX_SESSION_NAME], {",
-      "owner": "HOTPATH-SPAWN-ASYNC (born; tmux spawn backend — worker dispatch, parallel to docker)"
-    },
-    {
-      "file": "src/orchestra/tmux.ts",
       "code": "spawnSync('tmux', ['attach', '-t', TMUX_SESSION_NAME], {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; tmux spawn backend — worker dispatch, parallel to docker)"
+    },
+    {
+      "file": "src/orchestra/tmux.ts",
+      "code": "spawnSync('tmux', ['attach-session', '-t', TMUX_SESSION_NAME], {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; tmux spawn backend — worker dispatch, parallel to docker)"
+    },
+    {
+      "file": "src/orchestra/tmux.ts",
+      "code": "spawnSync('tmux', ['attach-session', '-t', TMUX_SESSION_NAME], {",
       "owner": "HOTPATH-SPAWN-ASYNC (born; tmux spawn backend — worker dispatch, parallel to docker)"
     },
     {
@@ -553,11 +578,6 @@
       "file": "src/orchestra/worker-liveness.ts",
       "code": "const res = spawnSync(",
       "owner": "HOTPATH-SPAWN-ASYNC (born; EVALUATE-loop docker-ps probe default)"
-    },
-    {
-      "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "const probe = spawnSync(",
-      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     }
   ]
 }

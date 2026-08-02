@@ -1882,8 +1882,12 @@ describe('CLI contract', () => {
     expect(scripts['docs:master-plan']).toBe(
       'node scripts/lint-master-plan.mjs --write',
     );
+    // Fail-closed means "present in the && chain", not "last in it": every link in
+    // an && chain gates the rest. The trailing-\$ anchor was incidental (the gate
+    // happened to be last until build-design-tokens was appended) and matched neither
+    // the intent nor the sibling assertions below, which use (?: && |$).
     expect(scripts['lint:gates']).toMatch(
-      /(?:^| && )node scripts\/lint-master-plan\.mjs --check$/,
+      /(?:^| && )node scripts\/lint-master-plan\.mjs --check(?: &&|$)/,
     );
     expect(scripts['release']).toMatch(/^npm run lint:master-plan(?: && |$)/);
     expect(scripts['prepublishOnly']).toMatch(

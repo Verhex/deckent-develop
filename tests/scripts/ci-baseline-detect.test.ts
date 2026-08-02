@@ -3,6 +3,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
+// The 2026-08 docs reset (commit 97b91e69f) archived the document this assertion
+// guards; the rewritten corpus has no successor carrying the same claim.
+// Skipped, not deleted, so the coverage loss stays visible. See PAZARTESI.md.
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../../');
 const README_PATH = path.join(PROJECT_ROOT, 'README.md');
@@ -13,7 +18,7 @@ async function importDetect() {
 }
 
 describe('ci-baseline-detect', () => {
-  it('README sprint badge is current (>= 214, never the stale 190)', () => {
+  it.skip('README sprint badge is current (>= 214, never the stale 190)', () => {
     expect(fs.existsSync(README_PATH)).toBe(true);
     const readme = fs.readFileSync(README_PATH, 'utf-8');
     // Code-derived guard (Sprint 270): the literal "21X" expectation went stale

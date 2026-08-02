@@ -16,14 +16,14 @@ describe('SECURITY.md location and content', () => {
     expect(content.trim().length).toBeGreaterThan(0);
   });
 
-  it('docs/reference/security.md exists', () => {
-    const path = join(ROOT, 'docs', 'reference', 'security.md');
+  it('docs/en/reference/platform-security.md exists', () => {
+    const path = join(ROOT, 'docs', 'en', 'reference', 'platform-security.md');
     expect(existsSync(path)).toBe(true);
   });
 
-  it('root SECURITY.md and docs/reference/security.md both exist and are non-empty', () => {
+  it('root SECURITY.md and docs/en/reference/platform-security.md both exist and are non-empty', () => {
     const rootContent = readFileSync(join(ROOT, 'SECURITY.md'), 'utf-8');
-    const docsContent = readFileSync(join(ROOT, 'docs', 'reference', 'security.md'), 'utf-8');
+    const docsContent = readFileSync(join(ROOT, 'docs', 'en', 'reference', 'platform-security.md'), 'utf-8');
     expect(rootContent.trim().length).toBeGreaterThan(0);
     expect(docsContent.trim().length).toBeGreaterThan(0);
   });
