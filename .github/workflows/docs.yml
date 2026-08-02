@@ -1,15 +1,24 @@
 name: Build and Deploy Docs
 
+# ⏸ PAUSED 2026-08-02 (Alperen). This workflow runs `npx vitepress build` against
+# docs/.vitepress/**, which the 2026-08 docs reset moved to
+# docs/archive/docs-pre-reset-2026-08-03/. Every automatic run therefore fails.
+# Whether the nested VitePress site continues or is absorbed by the root toolchain is
+# OQ-18 (docs/analysis/OPEN-QUESTIONS-2026-08.md) — an open owner decision, revisited in
+# PAZARTESI.md FAZ 3. Until then the automatic triggers are disabled so a known-broken
+# deploy stops reporting red; manual dispatch is kept so the decision can be tested.
+# Restore by re-enabling the push/pull_request blocks below.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'docs/**'
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'docs/**'
+  #     - '.github/workflows/docs.yml'
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - 'docs/**'
 
 permissions:
   contents: read

@@ -160,6 +160,24 @@ arşive giden `docs/.vitepress/**` üzerinde `npx vitepress build` koşuyor. Bu 
 (nested site devam mı edecek). İlgili 65 test `describe.skip` + OQ-18 referansıyla işaretlendi;
 sitenin kaderi senin kararın.
 
+### Alperen kararları — 2026-08-02 akşamı (4 soru, 4 karar)
+
+1. **VitePress docs sitesi → ŞİMDİLİK DURSUN, pazartesi karar.** `.github/workflows/docs.yml`
+   otomatik tetikleyicileri (push/pull_request) yoruma alındı; `workflow_dispatch` bırakıldı ki
+   karar denenebilsin. Bilinen-kırık bir deploy artık kırmızı raporlamıyor. **OQ-18 açık HOLD**;
+   seçenekler: (a) `.vitepress` + `docs/package.json` arşivden geri + yeni `docs/{en,tr}` yapısına
+   göre config → 65 test geri açılır, (b) nested site emekli + workflow silinir → 65 test kalıcı emekli.
+2. **Hot-path `spawnSync` → ASYNC MIGRATION TASK'I AÇILSIN.** `spawn-backend-docker.ts`'teki 4 git
+   çağrısı (`hash-object -w` ×2, `cat-file blob`, `diff --numstat`) worker-dispatch sırasında senkron
+   blokluyor. Ratchet kaydı geçici; **FAZ 3 MASTER-PLAN satırı**: bu 4 çağrı async'e taşınacak ve
+   ratchet'ten düşürülecek. Kod geri alınmıyor (provider-observation v2'nin dosya-diff kanıtı buna bağlı).
+3. **Type Check açılınca ortaya çıkan test borcu → ÖNCE ENVANTER.** Düzeltmeye girmeden önce her CI
+   işi koşulup kırıklar sınıflandırılacak: *docs-reset kurbanı · gerçek bug · ortam-bağımlı*. Boyut
+   görülmeden düzeltme kararı verilmiyor. (Envanter aşağıda.)
+4. **~253 DOC-GAP iddiası → FAZ 3'TE TEK TEK.** Toplu emekli edilmiyor. Her iddia için karar:
+   yeni dokümana taşınacak mı, kalıcı emekli mi? Her biri MASTER-PLAN satırı olur. Bugünkü sweep'te
+   1 iddia zaten geri açıldı (README sprint rozeti, stats üreticisi düzelince).
+
 ### Notlar
 - Fable limiti resetlenmeden hiçbir faz başlamaz; Codex bu planda brain değildir.
 - FAZ 1-2 sırası bilinçli: önce "olması gereken"i yaz, sonra kodu ona karşı ölç — tersi, bugünkü bozuk docs'u referans almak olur.
