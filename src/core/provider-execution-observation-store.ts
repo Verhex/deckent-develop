@@ -11,7 +11,7 @@ import {
   type ProviderExecutionObservationInput,
 } from './provider-execution-observation.js';
 
-export const PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION = 1 as const;
+export const PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION = 2 as const;
 
 const positiveInteger = z.number().int().positive();
 const storeInputSchema = z.object({
@@ -40,12 +40,26 @@ export interface ProviderExecutionObservationStoreInput {
 
 export interface StoredProviderExecutionInterval {
   readonly executionId: string;
+  /** Null is retained legacy evidence predating exact run ownership. */
+  readonly runId: string | null;
+  readonly ownership: 'run-owned' | 'legacy-unowned';
   readonly taskId: string;
   readonly attemptId: string;
   readonly providerPrincipalDigest: string;
   readonly fence: string;
-  readonly start: ProviderExecutionObservationInput;
-  readonly end: ProviderExecutionObservationInput | null;
+  readonly retired: boolean;
+  readonly start: ProviderExecutionObservationInput | LegacyProviderExecutionObservationInput;
+  readonly end: ProviderExecutionObservationInput | LegacyProviderExecutionObservationInput | null;
+}
+
+/** Persisted schema-v1 evidence is readable, but can never be treated as run-owned. */
+export type LegacyProviderExecutionObservationInput = Omit<ProviderExecutionObservationInput, 'runId'>;
+
+export interface ProviderExecutionObservationScope {
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly providerPrincipalDigest: string;
+  readonly fence: string;
 }
 
 export interface ProviderExecutionObservationWriteResult {
@@ -76,6 +90,8 @@ interface ExecutionRow {
   readonly attempt_id: string;
   readonly principal_digest: string;
   readonly fence: string;
+  readonly run_id: string | null;
+  readonly retired: number;
   readonly start_json: string;
   readonly end_json: string | null;
 }
@@ -98,6 +114,7 @@ function resolveRetention(
 export class ProviderExecutionObservationStore {
   private readonly db: Database.Database;
   private readonly retention: ProviderExecutionObservationRetention;
+  private readonly legacyReadSchema: boolean;
 
   constructor(projectRoot: string, options: ProviderExecutionObservationStoreOptions = {}) {
     this.retention = resolveRetention(options.retention);
@@ -111,17 +128,19 @@ export class ProviderExecutionObservationStore {
       this.db.pragma('synchronous = FULL');
     }
     const version = this.db.pragma('user_version', { simple: true }) as number;
-    if (version !== 0 && version !== PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION) {
+    if (version !== 0 && version !== 1 && version !== PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION) {
       this.db.close();
       throw new ProviderExecutionObservationStoreError(
         'SCHEMA_MISMATCH',
         `Unsupported provider execution observation store schema: ${version}`,
       );
     }
+    this.legacyReadSchema = options.readOnly === true && version === 1;
     if (options.readOnly) return;
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS provider_execution_intervals (
         execution_id TEXT PRIMARY KEY,
+        run_id TEXT,
         task_id TEXT NOT NULL,
         attempt_id TEXT NOT NULL,
         principal_digest TEXT NOT NULL,
@@ -130,6 +149,7 @@ export class ProviderExecutionObservationStore {
         end_json TEXT,
         start_sequence INTEGER NOT NULL,
         end_sequence INTEGER
+        ,retired INTEGER NOT NULL DEFAULT 0
       );
       CREATE INDEX IF NOT EXISTS idx_provider_execution_exact_principal
         ON provider_execution_intervals (principal_digest, start_sequence, execution_id);
@@ -139,6 +159,12 @@ export class ProviderExecutionObservationStore {
         payload_json TEXT NOT NULL
       );
     `);
+    if (version === 1) {
+      this.db.exec('ALTER TABLE provider_execution_intervals ADD COLUMN run_id TEXT;');
+      this.db.exec('ALTER TABLE provider_execution_intervals ADD COLUMN retired INTEGER NOT NULL DEFAULT 0;');
+    }
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_provider_execution_run_scope
+      ON provider_execution_intervals (run_id, attempt_id, principal_digest, fence, retired, start_sequence, execution_id);`);
     this.db.pragma(`user_version = ${PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION}`);
   }
 
@@ -159,17 +185,22 @@ export class ProviderExecutionObservationStore {
 
   listIntervals(providerPrincipalDigest: string): StoredProviderExecutionInterval[] {
     const rows = this.db.prepare(`
-      SELECT execution_id, task_id, attempt_id, principal_digest, fence, start_json, end_json
+      SELECT execution_id, task_id, attempt_id, principal_digest, fence,
+        ${this.legacyReadSchema ? 'NULL' : 'run_id'} AS run_id,
+        ${this.legacyReadSchema ? '0' : 'retired'} AS retired, start_json, end_json
       FROM provider_execution_intervals
       WHERE principal_digest = ?
       ORDER BY start_sequence, execution_id
     `).all(providerPrincipalDigest) as ExecutionRow[];
     return rows.map(row => ({
       executionId: row.execution_id,
+      runId: row.run_id,
+      ownership: row.run_id === null ? 'legacy-unowned' : 'run-owned',
       taskId: row.task_id,
       attemptId: row.attempt_id,
       providerPrincipalDigest: row.principal_digest,
       fence: row.fence,
+      retired: row.retired === 1,
       start: JSON.parse(row.start_json) as ProviderExecutionObservationInput,
       end: row.end_json === null ? null : JSON.parse(row.end_json) as ProviderExecutionObservationInput,
     }));
@@ -197,13 +228,43 @@ export class ProviderExecutionObservationStore {
     return rows.map(row => JSON.parse(row.payload_json) as ProviderExecutionObservationHold);
   }
 
+  /** Returns only active intervals owned by one exact run/attempt/principal/fence tuple. */
+  listOpenIntervalsForScope(
+    scope: ProviderExecutionObservationScope,
+    limit = 1_000,
+  ): StoredProviderExecutionInterval[] {
+    assertScope(scope);
+    assertLimit(limit);
+    if (this.legacyReadSchema) return [];
+    const rows = this.db.prepare(`
+      SELECT execution_id, task_id, attempt_id, principal_digest, fence, run_id, retired, start_json, end_json
+      FROM provider_execution_intervals
+      WHERE run_id = ? AND attempt_id = ? AND principal_digest = ? AND fence = ?
+        AND end_json IS NULL AND retired = 0
+      ORDER BY start_sequence, execution_id LIMIT ?
+    `).all(scope.runId, scope.attemptId, scope.providerPrincipalDigest, scope.fence, limit) as ExecutionRow[];
+    return rows.map(row => toStoredInterval(row));
+  }
+
+  /** Marks only matching open run-owned rows retired; it never deletes forensic evidence. */
+  retireOpenIntervalsForScope(scope: ProviderExecutionObservationScope): number {
+    assertScope(scope);
+    if (this.legacyReadSchema) return 0;
+    const result = this.db.prepare(`
+      UPDATE provider_execution_intervals SET retired = 1
+      WHERE run_id = ? AND attempt_id = ? AND principal_digest = ? AND fence = ?
+        AND end_json IS NULL AND retired = 0
+    `).run(scope.runId, scope.attemptId, scope.providerPrincipalDigest, scope.fence);
+    return result.changes;
+  }
+
   close(): void {
     this.db.close();
   }
 
   private putTransactional(raw: unknown): ProviderExecutionObservationWriteResult {
     const existing = this.db.prepare(`
-      SELECT execution_id, task_id, attempt_id, principal_digest, fence, start_json, end_json
+      SELECT execution_id, task_id, attempt_id, principal_digest, fence, run_id, retired, start_json, end_json
       FROM provider_execution_intervals WHERE execution_id = ?
     `).get((raw as { executionId?: unknown }).executionId) as ExecutionRow | undefined;
     let state = createInitialProviderExecutionObservationState();
@@ -237,10 +298,11 @@ export class ProviderExecutionObservationStore {
       }
       this.db.prepare(`
         INSERT INTO provider_execution_intervals (
-          execution_id, task_id, attempt_id, principal_digest, fence, start_json, start_sequence
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          execution_id, run_id, task_id, attempt_id, principal_digest, fence, start_json, start_sequence
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         observation.executionId,
+        observation.runId,
         observation.taskId,
         observation.attemptId,
         observation.providerPrincipalDigest,
@@ -281,4 +343,31 @@ export class ProviderExecutionObservationStore {
       )
     `).run(this.retention.maxClosedIntervals);
   }
+}
+
+function assertScope(scope: ProviderExecutionObservationScope): void {
+  for (const [name, value] of Object.entries(scope)) {
+    if (value.trim() === '') throw new TypeError(`${name} must be non-empty`);
+  }
+}
+
+function assertLimit(limit: number): void {
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    throw new TypeError('interval limit must be a positive safe integer');
+  }
+}
+
+function toStoredInterval(row: ExecutionRow): StoredProviderExecutionInterval {
+  return {
+    executionId: row.execution_id,
+    runId: row.run_id,
+    ownership: row.run_id === null ? 'legacy-unowned' : 'run-owned',
+    taskId: row.task_id,
+    attemptId: row.attempt_id,
+    providerPrincipalDigest: row.principal_digest,
+    fence: row.fence,
+    retired: row.retired === 1,
+    start: JSON.parse(row.start_json) as ProviderExecutionObservationInput | LegacyProviderExecutionObservationInput,
+    end: row.end_json === null ? null : JSON.parse(row.end_json) as ProviderExecutionObservationInput | LegacyProviderExecutionObservationInput,
+  };
 }

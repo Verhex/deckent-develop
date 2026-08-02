@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -29,6 +30,7 @@ function fixture(retention?: ConstructorParameters<typeof ProviderExecutionObser
 function start(overrides: Partial<ProviderExecutionObservationInput> = {}): ProviderExecutionObservationInput {
   return {
     type: 'start', executionId: 'exec-1', taskId: 'task-1', attemptId: 'attempt-1',
+    runId: 'run-1',
     providerPrincipalDigest: 'principal-a', fence: 'fence-1', sequence: 1,
     observedAt: '2026-07-31T00:00:00.000Z', ...overrides,
   } as ProviderExecutionObservationInput;
@@ -37,6 +39,7 @@ function start(overrides: Partial<ProviderExecutionObservationInput> = {}): Prov
 function end(overrides: Partial<ProviderExecutionObservationInput> = {}): ProviderExecutionObservationInput {
   return {
     type: 'end', executionId: 'exec-1', taskId: 'task-1', attemptId: 'attempt-1',
+    runId: 'run-1',
     providerPrincipalDigest: 'principal-a', fence: 'fence-1', sequence: 2,
     observedAt: '2026-07-31T00:01:00.000Z', outcome: 'completed', ...overrides,
   } as ProviderExecutionObservationInput;
@@ -122,5 +125,46 @@ describe('ProviderExecutionObservationStore', () => {
       .toEqual({ accepted: true, duplicate: true, contradiction: null });
     expect(store.listIntervals('principal-a')).toHaveLength(1);
     store.close();
+  });
+
+  it('selects and retires only exact run-owned open intervals without deleting foreign history', () => {
+    const { store } = fixture();
+    store.put({ source: 'provider-runtime', observation: start() });
+    store.put({ source: 'provider-runtime', observation: start({
+      executionId: 'foreign-run', runId: 'run-foreign', attemptId: 'attempt-foreign',
+      providerPrincipalDigest: 'principal-b', fence: 'fence-foreign',
+    }) });
+    const scope = {
+      runId: 'run-1', attemptId: 'attempt-1', providerPrincipalDigest: 'principal-a', fence: 'fence-1',
+    };
+    expect(store.listOpenIntervalsForScope(scope, 1).map(interval => interval.executionId)).toEqual(['exec-1']);
+    expect(store.retireOpenIntervalsForScope(scope)).toBe(1);
+    expect(store.retireOpenIntervalsForScope(scope)).toBe(0);
+    expect(store.listOpenIntervalsForScope(scope)).toEqual([]);
+    expect(store.listIntervals('principal-a')).toMatchObject([{ executionId: 'exec-1', retired: true }]);
+    expect(store.listIntervals('principal-b')).toMatchObject([{ executionId: 'foreign-run', retired: false }]);
+    store.close();
+  });
+
+  it('migrates v1 rows without assigning run ownership and preserves them in read-only mode', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-provider-observation-legacy-'));
+    roots.push(root);
+    const dbPath = join(root, 'observations.db');
+    const db = new Database(dbPath);
+    const legacyStart = { type: 'start', executionId: 'legacy-exec', taskId: 'task-491-008', attemptId: 'attempt-legacy', providerPrincipalDigest: 'principal-a', fence: 'fence-legacy', sequence: 1, observedAt: '2026-07-31T00:00:00.000Z' };
+    db.exec(`CREATE TABLE provider_execution_intervals (execution_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, attempt_id TEXT NOT NULL, principal_digest TEXT NOT NULL, fence TEXT NOT NULL, start_json TEXT NOT NULL, end_json TEXT, start_sequence INTEGER NOT NULL, end_sequence INTEGER);
+      CREATE TABLE provider_execution_contradictions (contradiction_id INTEGER PRIMARY KEY AUTOINCREMENT, principal_digest TEXT NOT NULL, payload_json TEXT NOT NULL); PRAGMA user_version = 1;`);
+    db.prepare('INSERT INTO provider_execution_intervals VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL)').run('legacy-exec', 'task-491-008', 'attempt-legacy', 'principal-a', 'fence-legacy', JSON.stringify(legacyStart), 1);
+    db.close();
+
+    const reader = new ProviderExecutionObservationStore('.', { dbPath, readOnly: true });
+    expect(reader.listIntervals('principal-a')).toMatchObject([{ executionId: 'legacy-exec', runId: null, ownership: 'legacy-unowned' }]);
+    expect(reader.listOpenIntervalsForScope({ runId: 'task-491-008', attemptId: 'attempt-legacy', providerPrincipalDigest: 'principal-a', fence: 'fence-legacy' })).toEqual([]);
+    reader.close();
+
+    const migrated = new ProviderExecutionObservationStore('.', { dbPath });
+    expect(migrated.listIntervals('principal-a')).toMatchObject([{ executionId: 'legacy-exec', runId: null, ownership: 'legacy-unowned' }]);
+    expect(migrated.retireOpenIntervalsForScope({ runId: 'run-1', attemptId: 'attempt-legacy', providerPrincipalDigest: 'principal-a', fence: 'fence-legacy' })).toBe(0);
+    migrated.close();
   });
 });

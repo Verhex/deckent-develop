@@ -636,6 +636,23 @@ export interface Task {
   updatedAt?: string;
 }
 
+/**
+ * A lineage-scoped effect requested after an explicitly accepted repair
+ * attempt settles its logical root. The executor owns the actual status
+ * mutation or backend containment; this record is decision evidence only.
+ */
+export type RepairDescendantCancellationAction =
+  | 'SUPERSEDE_QUEUED'
+  | 'CANCEL_ACTIVE';
+
+export interface RepairDescendantCancellationDecision {
+  readonly rootTaskId: string;
+  readonly acceptedResolvingAttemptId: string;
+  readonly descendantAttemptId: string;
+  readonly descendantStatus: TaskStatus;
+  readonly action: RepairDescendantCancellationAction;
+}
+
 // ─── Feedback Loop Metrics ───────────────────────────────────────────
 /** Tracks worker self-healing attempts (tsc + test verify loops) */
 export interface FeedbackLoop {

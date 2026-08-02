@@ -72,6 +72,7 @@ function freshRoot(prefix: string): string {
 function binding(executionId: string): DockerProviderExecutionObservationBinding {
   return {
     executionId,
+    runId: 'run-486-020',
     taskId: '486-020',
     attemptId: 'attempt-486-020',
     providerPrincipalDigest: PRINCIPAL,
@@ -150,13 +151,16 @@ describe('Docker provider execution boundary persistence', () => {
     expect(start).toMatchObject({
       type: 'start',
       executionId: input.executionId,
+      runId: input.runId,
       taskId: input.taskId,
       attemptId: input.attemptId,
       providerPrincipalDigest: PRINCIPAL,
       fence: FENCE,
       sequence: 1,
     });
-    expect(end).toMatchObject({ type: 'end', outcome: 'completed', sequence: 2 });
+    expect(end).toMatchObject({
+      type: 'end', runId: input.runId, outcome: 'completed', sequence: 2,
+    });
 
     const state = foldProviderExecutionObservations(
       createInitialProviderExecutionObservationState(),
@@ -182,7 +186,7 @@ describe('Docker provider execution boundary persistence', () => {
 
     const missingFence = await runShell(observationScript(input, directory, [
       'record_provider_execution_start',
-    ]));
+    ]), { DECKENT_PROVIDER_EXECUTION_FENCE: '' });
     expect(missingFence.code).toBe(79);
     expect(existsSync(directory)).toBe(false);
   });
@@ -256,6 +260,7 @@ describe('DockerSpawnBackend production wiring', () => {
   });
 
   it('wires the host-authored wrapper and active claim fence into the real Docker spawn ingress', () => {
+    vi.stubEnv('DECKENT_AUTH_SKIP', '1');
     const root = freshRoot('deckent-provider-observation-spawn-');
     const tasksDir = join(root, '.tasks');
     mkdirSync(tasksDir, { recursive: true });
@@ -308,6 +313,7 @@ describe('DockerSpawnBackend production wiring', () => {
     expect(startIndex).toBeLessThan(launchIndex);
     expect(endIndex).toBeGreaterThan(waitIndex);
     expect(script).toContain(`"taskId":"${taskId}"`);
+    expect(script).toContain('\\"runId\\":');
     expect(script).not.toContain('test-provider-secret');
     // docker run/health alone only materialize the wrapper. No provider event
     // exists until that wrapper reaches its explicit provider call boundary.

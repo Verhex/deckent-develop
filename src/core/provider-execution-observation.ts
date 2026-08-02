@@ -1,7 +1,7 @@
 // ─── Provider Execution Observation — evidence schema + pure reducers ────────
 // Immutable start/end observations of a single provider-attributed execution
-// window, bound to (executionId, taskId, attemptId, providerPrincipalDigest,
-// fence). This module derives attained concurrency, peak overlap and
+// window, bound to (executionId, runId, taskId, attemptId,
+// providerPrincipalDigest, fence). This module derives attained concurrency, peak overlap and
 // incomplete intervals from those observations. It is NOT settlement
 // authority: a worker's own claim about its execution is untrusted input
 // here, exactly like every other observation, and "container is running" is
@@ -15,7 +15,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
-export const PROVIDER_EXECUTION_OBSERVATION_SCHEMA_VERSION = 1 as const;
+export const PROVIDER_EXECUTION_OBSERVATION_SCHEMA_VERSION = 2 as const;
 
 const nonEmpty = z.string().min(1);
 
@@ -28,6 +28,7 @@ const providerExecutionOutcomeSchema = z.enum(['completed', 'failed', 'aborted']
 
 const identityFieldsSchema = {
   executionId: nonEmpty,
+  runId: nonEmpty,
   taskId: nonEmpty,
   attemptId: nonEmpty,
   providerPrincipalDigest: nonEmpty,
@@ -72,6 +73,7 @@ export interface ProviderExecutionObservation {
   readonly eventId: string;
   readonly type: 'start' | 'end';
   readonly executionId: string;
+  readonly runId: string;
   readonly taskId: string;
   readonly attemptId: string;
   readonly providerPrincipalDigest: string;
@@ -88,6 +90,7 @@ export function computeProviderExecutionObservationEventId(
   const canonical = [
     input.type,
     input.executionId,
+    input.runId,
     input.taskId,
     input.attemptId,
     input.providerPrincipalDigest,
@@ -105,6 +108,7 @@ function toObservation(input: ProviderExecutionObservationInput): ProviderExecut
     eventId: computeProviderExecutionObservationEventId(input),
     type: input.type,
     executionId: input.executionId,
+    runId: input.runId,
     taskId: input.taskId,
     attemptId: input.attemptId,
     providerPrincipalDigest: input.providerPrincipalDigest,
@@ -116,7 +120,8 @@ function toObservation(input: ProviderExecutionObservationInput): ProviderExecut
 }
 
 function sameIdentity(a: ProviderExecutionObservation, b: ProviderExecutionObservation): boolean {
-  return a.taskId === b.taskId
+  return a.runId === b.runId
+    && a.taskId === b.taskId
     && a.attemptId === b.attemptId
     && a.providerPrincipalDigest === b.providerPrincipalDigest
     && a.fence === b.fence;
@@ -137,6 +142,7 @@ export interface ProviderExecutionObservationHold {
 
 export interface ProviderExecutionInterval {
   readonly executionId: string;
+  readonly runId: string;
   readonly taskId: string;
   readonly attemptId: string;
   readonly providerPrincipalDigest: string;
@@ -309,6 +315,7 @@ export function listProviderExecutionIncompleteIntervals(
     if (record.end !== null) continue;
     incomplete.push({
       executionId,
+      runId: record.start.runId,
       taskId: record.start.taskId,
       attemptId: record.start.attemptId,
       providerPrincipalDigest: record.start.providerPrincipalDigest,

@@ -167,6 +167,8 @@ export const DOCKER_PROVIDER_EXECUTION_CLOSED_RETENTION_LIMIT = 256;
 
 export interface DockerProviderExecutionObservationBinding {
   readonly executionId: string;
+  /** Host-owned run identity; never sourced from the container. */
+  readonly runId: string;
   readonly taskId: string;
   readonly attemptId: string;
   readonly providerPrincipalDigest: string;
@@ -278,6 +280,7 @@ export function buildDockerProviderExecutionObservationShell(
   } = {},
 ): readonly string[] {
   assertObservationIdentityField('executionId', binding.executionId);
+  assertObservationIdentityField('runId', binding.runId);
   assertObservationIdentityField('taskId', binding.taskId);
   assertObservationIdentityField('attemptId', binding.attemptId);
   if (!/^[a-f0-9]{64}$/u.test(binding.providerPrincipalDigest)) {
@@ -304,11 +307,13 @@ export function buildDockerProviderExecutionObservationShell(
   }
   const prefix = `${directory}/${binding.executionId}`;
   const startJson = `{"type":"start","executionId":"${binding.executionId}",`
+    + `"runId":"${binding.runId}",`
     + `"taskId":"${binding.taskId}","attemptId":"${binding.attemptId}",`
     + `"providerPrincipalDigest":"${binding.providerPrincipalDigest}",`
     + `"fence":"$DECKENT_PROVIDER_EXECUTION_FENCE","sequence":1,`
     + `"observedAt":"$PROVIDER_OBSERVED_AT"}`;
   const endJson = `{"type":"end","executionId":"${binding.executionId}",`
+    + `"runId":"${binding.runId}",`
     + `"taskId":"${binding.taskId}","attemptId":"${binding.attemptId}",`
     + `"providerPrincipalDigest":"${binding.providerPrincipalDigest}",`
     + `"fence":"$DECKENT_PROVIDER_EXECUTION_FENCE","sequence":2,`
@@ -3443,6 +3448,8 @@ export interface DockerProviderExecutionObservationIngest {
 export function ingestDockerProviderExecutionObservations(input: {
   readonly tasksDir: string;
   readonly settlementRef: TaskResultSettlementRefV1;
+  /** Exact host-authored producer identity, retained outside the container. */
+  readonly binding: Readonly<DockerProviderExecutionObservationBinding>;
   readonly store: ProviderExecutionObservationStore;
 }): DockerProviderExecutionObservationIngest {
   const executionId = dockerProviderExecutionId({
@@ -3450,6 +3457,7 @@ export function ingestDockerProviderExecutionObservations(input: {
     taskId: input.settlementRef.taskId,
     attemptId: input.settlementRef.attemptId,
   });
+  const expectedFence = taskResultSettlementActiveClaimDigest(input.settlementRef);
   const directory = join(input.tasksDir, PROVIDER_EXECUTION_OBSERVATION_DIR_NAME);
   let ingested = 0;
   let duplicates = 0;
@@ -3472,8 +3480,12 @@ export function ingestDockerProviderExecutionObservations(input: {
     if (
       observation.type !== suffix
       || observation.executionId !== executionId
+      || input.binding.executionId !== executionId
+      || observation.runId !== input.binding.runId
       || observation.taskId !== input.settlementRef.taskId
       || observation.attemptId !== input.settlementRef.attemptId
+      || observation.providerPrincipalDigest !== input.binding.providerPrincipalDigest
+      || observation.fence !== expectedFence
     ) {
       debugLog(
         'docker-backend:provider-observation-foreign',
@@ -4740,6 +4752,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       undefined,
       ref,
       undefined,
+      undefined,
       recoveryContainment ?? (running
         ? { attemptId: ref.attemptId, reason: 'host-restart-budget-observer-loss' }
         : undefined),
@@ -5477,6 +5490,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         taskId,
         attemptId: attemptRef.attemptId,
       }),
+      runId: attemptRef.projectRootSha256,
       taskId,
       attemptId: attemptRef.attemptId,
       providerPrincipalDigest,
@@ -5934,6 +5948,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       opts?.executionLandingContext,
       attemptRef,
       opts?.hostTerminalResultContract,
+      providerExecutionObservationBinding,
     );
   }
 
@@ -6542,6 +6557,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     executionLandingContext?: SpawnBackendOptions['executionLandingContext'],
     settlementRef?: TaskResultSettlementRefV1,
     hostTerminalResultContract?: HostTerminalResultContractV1,
+    providerExecutionObservationBinding?: Readonly<DockerProviderExecutionObservationBinding>,
     recoveryContainment?: DockerRecoveryContainment,
   ): void {
     const child = nodeSpawn('docker', ['wait', containerId], {
@@ -6846,19 +6862,27 @@ export class DockerSpawnBackend implements SpawnBackend {
         });
         // Container exit is NOT provider settlement: only the window the
         // container itself emitted around the provider process is persisted.
-        try {
-          const observationStore = new ProviderExecutionObservationStore(projectDir);
+        if (!providerExecutionObservationBinding) {
+          debugLog(
+            'docker-backend:provider-observation-ingest-hold',
+            'unsupported/HOLD: exact host-authored Docker provider observation binding is unavailable',
+          );
+        } else {
           try {
-            ingestDockerProviderExecutionObservations({
-              tasksDir,
-              settlementRef,
-              store: observationStore,
-            });
-          } finally {
-            observationStore.close();
+            const observationStore = new ProviderExecutionObservationStore(projectDir);
+            try {
+              ingestDockerProviderExecutionObservations({
+                tasksDir,
+                settlementRef,
+                binding: providerExecutionObservationBinding,
+                store: observationStore,
+              });
+            } finally {
+              observationStore.close();
+            }
+          } catch (error) {
+            debugLog('docker-backend:provider-observation-ingest-hold', error);
           }
-        } catch (error) {
-          debugLog('docker-backend:provider-observation-ingest-hold', error);
         }
       }
 

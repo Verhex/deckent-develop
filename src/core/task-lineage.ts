@@ -3,6 +3,7 @@ import {
   TaskStatus,
   type Task,
   type FixCircuitBreakerConfig,
+  type RepairDescendantCancellationDecision,
 } from './types.js';
 
 const IN_FLIGHT_STATUSES = new Set<TaskStatus>([
@@ -176,6 +177,42 @@ export function resolveTaskLineageRootId(
     if (tasksById.has(ancestorId)) return ancestorId;
   }
   return task.id;
+}
+
+/**
+ * Decide which in-flight repair descendants are redundant once the caller's
+ * explicitly accepted resolving attempt has settled successfully.
+ *
+ * The accepted attempt ID is the causal authority. This intentionally does
+ * not use the deepest or newest leaf to resolve a root, so a later stale
+ * attempt cannot replace or reopen an already settled lineage. The returned
+ * records are deterministic, idempotent decision evidence; an executor owns
+ * any status transition or process containment.
+ */
+export function decideRedundantRepairDescendantCancellations(
+  tasks: readonly Task[],
+  acceptedResolvingAttemptId: string,
+): readonly RepairDescendantCancellationDecision[] {
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
+  const acceptedAttempt = tasksById.get(acceptedResolvingAttemptId);
+  if (acceptedAttempt?.status !== TaskStatus.DONE) return Object.freeze([]);
+
+  const rootTaskId = resolveTaskLineageRootId(acceptedAttempt, tasksById);
+  const decisions = tasks
+    .filter((task) => {
+      if (!IN_FLIGHT_STATUSES.has(task.status)) return false;
+      return resolveFixAncestorIds(task, tasksById).includes(acceptedResolvingAttemptId);
+    })
+    .map((task): RepairDescendantCancellationDecision => ({
+      rootTaskId,
+      acceptedResolvingAttemptId,
+      descendantAttemptId: task.id,
+      descendantStatus: task.status,
+      action: task.status === TaskStatus.PENDING ? 'SUPERSEDE_QUEUED' : 'CANCEL_ACTIVE',
+    }))
+    .sort((left, right) => left.descendantAttemptId.localeCompare(right.descendantAttemptId));
+
+  return Object.freeze(decisions);
 }
 
 /**

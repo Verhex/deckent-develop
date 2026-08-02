@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeLogicalTaskProgress,
+  decideRedundantRepairDescendantCancellations,
   evaluateFixCircuitBreaker,
   foldTaskLineages,
   projectNotDispatchedSettlements,
@@ -156,6 +157,54 @@ describe('task lineage authority', () => {
         { rootId: 'dispatch', resolvedTask: { id: 'dispatch' }, state: 'FAILED' },
         { rootId: 'settled', resolvedTask: { id: 'settled-fix' }, state: 'COMPLETED' },
       ]);
+  });
+
+  it('decides only queued or active descendants of the accepted settled repair', () => {
+    const tasks = [
+      task('root', TaskStatus.NO_GO),
+      task('root-fix', TaskStatus.DONE, { fixForTaskId: 'root' }),
+      task('root-fix-xfix', TaskStatus.PENDING, { fixForTaskId: 'root-fix' }),
+      task('root-fix-xfix-active', TaskStatus.EXECUTING, { fixForTaskId: 'root-fix' }),
+      task('other-root', TaskStatus.NO_GO),
+      task('other-root-fix', TaskStatus.PENDING, { fixForTaskId: 'other-root' }),
+    ];
+
+    expect(decideRedundantRepairDescendantCancellations(tasks, 'root-fix')).toEqual([
+      {
+        rootTaskId: 'root',
+        acceptedResolvingAttemptId: 'root-fix',
+        descendantAttemptId: 'root-fix-xfix',
+        descendantStatus: TaskStatus.PENDING,
+        action: 'SUPERSEDE_QUEUED',
+      },
+      {
+        rootTaskId: 'root',
+        acceptedResolvingAttemptId: 'root-fix',
+        descendantAttemptId: 'root-fix-xfix-active',
+        descendantStatus: TaskStatus.EXECUTING,
+        action: 'CANCEL_ACTIVE',
+      },
+    ]);
+  });
+
+  it('does not let a stale leaf replace accepted settlement or reopen the root', () => {
+    const tasks = [
+      task('root', TaskStatus.NO_GO),
+      task('root-fix', TaskStatus.DONE, { fixForTaskId: 'root' }),
+      task('root-fix-stale', TaskStatus.NO_GO, { fixForTaskId: 'root-fix' }),
+      task('root-fix-stale-child', TaskStatus.PENDING, { fixForTaskId: 'root-fix-stale' }),
+    ];
+
+    expect(decideRedundantRepairDescendantCancellations(tasks, 'root-fix')).toEqual([
+      {
+        rootTaskId: 'root',
+        acceptedResolvingAttemptId: 'root-fix',
+        descendantAttemptId: 'root-fix-stale-child',
+        descendantStatus: TaskStatus.PENDING,
+        action: 'SUPERSEDE_QUEUED',
+      },
+    ]);
+    expect(decideRedundantRepairDescendantCancellations(tasks, 'root-fix-stale')).toEqual([]);
   });
 });
 

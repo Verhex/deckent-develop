@@ -17,6 +17,7 @@ function start(overrides: Partial<ProviderExecutionObservationInput> = {}): Prov
   return {
     type: 'start',
     executionId: 'exec-1',
+    runId: 'run-1',
     taskId: 'task-1',
     attemptId: 'attempt-1',
     providerPrincipalDigest: 'digest-1',
@@ -31,6 +32,7 @@ function end(overrides: Partial<ProviderExecutionObservationInput> = {}): Provid
   return {
     type: 'end',
     executionId: 'exec-1',
+    runId: 'run-1',
     taskId: 'task-1',
     attemptId: 'attempt-1',
     providerPrincipalDigest: 'digest-1',
@@ -149,6 +151,15 @@ describe('provider-execution-observation reducer — typed HOLD', () => {
     let state = createInitialProviderExecutionObservationState();
     state = foldProviderExecutionObservation(state, start());
     state = foldProviderExecutionObservation(state, end({ attemptId: 'attempt-intruder' }));
+    expect(state.holds).toHaveLength(1);
+    expect(state.holds[0].reasonCode).toBe('foreign-attempt');
+    expect(getProviderExecutionAttainedConcurrency(state)).toBe(1);
+  });
+
+  it('holds when an end claims a different exact run than the recorded start', () => {
+    let state = createInitialProviderExecutionObservationState();
+    state = foldProviderExecutionObservation(state, start());
+    state = foldProviderExecutionObservation(state, end({ runId: 'run-intruder' }));
     expect(state.holds).toHaveLength(1);
     expect(state.holds[0].reasonCode).toBe('foreign-attempt');
     expect(getProviderExecutionAttainedConcurrency(state)).toBe(1);

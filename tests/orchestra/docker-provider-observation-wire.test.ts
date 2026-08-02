@@ -73,6 +73,7 @@ function emit(f: Fixture, body: readonly string[]): Promise<number | null> {
     ...buildDockerProviderExecutionObservationShell(
       {
         executionId: f.executionId,
+        runId: f.settlementRef.projectRootSha256,
         taskId: f.settlementRef.taskId,
         attemptId: f.settlementRef.attemptId,
         providerPrincipalDigest: PRINCIPAL,
@@ -97,6 +98,13 @@ function ingest(f: Fixture) {
   return ingestDockerProviderExecutionObservations({
     tasksDir: f.tasksDir,
     settlementRef: f.settlementRef,
+    binding: {
+      executionId: f.executionId,
+      runId: f.settlementRef.projectRootSha256,
+      taskId: f.settlementRef.taskId,
+      attemptId: f.settlementRef.attemptId,
+      providerPrincipalDigest: PRINCIPAL,
+    },
     store: f.store,
   });
 }
@@ -126,6 +134,7 @@ describe('Docker provider observation production wire', () => {
     expect(intervals).toHaveLength(1);
     expect(intervals[0]).toMatchObject({
       executionId: f.executionId,
+      runId: f.settlementRef.projectRootSha256,
       taskId: f.settlementRef.taskId,
       attemptId: f.settlementRef.attemptId,
       fence: f.fence,
@@ -154,7 +163,7 @@ describe('Docker provider observation production wire', () => {
     f.store.close();
   });
 
-  it('rejects a foreign-attempt emission instead of manufacturing overlap', async () => {
+  it('rejects container-forged run, principal, and fence ownership instead of manufacturing overlap', async () => {
     const f = fixture();
     expect(await emit(f, [
       'record_provider_execution_start || exit 79',
@@ -166,7 +175,9 @@ describe('Docker provider observation production wire', () => {
     const startPath = join(f.observationDir, `${f.executionId}.start.json`);
     const foreign = {
       ...JSON.parse(readFileSync(startPath, 'utf-8')) as Record<string, unknown>,
-      attemptId: 'attempt-from-another-run',
+      runId: 'run-from-another-owner',
+      providerPrincipalDigest: 'b'.repeat(64),
+      fence: 'e'.repeat(64),
     };
     writeFileSync(startPath, JSON.stringify(foreign), 'utf-8');
     const endPath = join(f.observationDir, `${f.executionId}.end.json`);
