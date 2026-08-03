@@ -4433,7 +4433,15 @@ export function resolveEntrypointIdentity(
   resolveReal = realpathSync.native,
 ) {
   if (!argvEntry) return { isMain: false, basis: 'no-entry' };
+  // Both operands are normalized ONCE, up front, so the two branches below cannot disagree
+  // about what "the same path" means. The canonical branch used to canonicalize a raw
+  // `modulePath` against an already-`resolve()`d `entryPath` while the lexical branch resolved
+  // both — the same function contradicting itself. Behaviour-neutral at the real call site
+  // (`fileURLToPath(import.meta.url)` and `process.argv[1]` are both native-absolute already,
+  // and `resolve` is idempotent on those), but the asymmetry was a live trap for any other
+  // caller and it made platform-dependent path normalization decide the answer.
   const entryPath = resolve(argvEntry);
+  const modulePathResolved = resolve(modulePath);
   const canonical = (candidate) => {
     try {
       return resolveReal(candidate);
@@ -4441,12 +4449,12 @@ export function resolveEntrypointIdentity(
       return null;
     }
   };
-  const moduleReal = canonical(modulePath);
+  const moduleReal = canonical(modulePathResolved);
   const entryReal = canonical(entryPath);
   if (moduleReal !== null && entryReal !== null) {
     return { isMain: moduleReal === entryReal, basis: 'canonical' };
   }
-  return { isMain: resolve(modulePath) === entryPath, basis: 'lexical-fallback' };
+  return { isMain: modulePathResolved === entryPath, basis: 'lexical-fallback' };
 }
 
 const entrypoint = resolveEntrypointIdentity(

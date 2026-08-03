@@ -2769,7 +2769,14 @@ describe('CLI contract', () => {
     );
   });
 
-  it.skipIf(process.platform === 'win32')(
+  // These two were still gated on `process.platform === 'win32'` — the exact blanket GUESS the
+  // capability probe at the top of this file exists to replace, left behind when the real-CLI
+  // case was converted. The first Windows matrix run disproved the guess directly: the real-CLI
+  // symlink case PASSED on windows-latest, so that runner can create symlinks, and these two
+  // were being skipped for no reason at all. Two unexplained skips on the platform we are trying
+  // to gather evidence for is precisely the silent coverage hole Law 2 forbids, so they now ask
+  // the same measured question every other symlink case asks.
+  it.skipIf(!symlinkCapability.supported)(
     'refuses a generated target symlink instead of writing through it',
     () => {
       const source = planFixture({ rows: [{ order: 10, id: 'TASK-A' }] });
@@ -2786,7 +2793,7 @@ describe('CLI contract', () => {
     },
   );
 
-  it.skipIf(process.platform === 'win32')(
+  it.skipIf(!symlinkCapability.supported)(
     'returns structured scan exit 2 for source and projection symlinks',
     () => {
       const source = planFixture({ rows: [{ order: 10, id: 'TASK-A' }] });
@@ -2839,7 +2846,17 @@ describe('CLI contract', () => {
   // These cases pin the decision itself; they need no child process, so they are hermetic and
   // cannot flake on process/filesystem timing.
   describe('entrypoint identity', () => {
-    const MODULE = '/repo/scripts/lint-master-plan.mjs';
+    // Every fixture path goes through `resolve()` so it is native-absolute on the host running
+    // it. Bare POSIX literals are NOT platform-neutral: on Windows the function `resolve()`s the
+    // entry argument but the literal `modulePath` stayed a POSIX string, so path normalization —
+    // not the contract — decided the outcome. That produced two visible failures and, worse, one
+    // SILENT one: 'does not run for an unrelated entry' passed on Windows for the wrong reason,
+    // returning false from path mangling rather than from the paths genuinely differing. A test
+    // that passes for the wrong reason is not testing anything. `resolve()` is idempotent on
+    // POSIX, so the Linux/macOS assertions are byte-identical to before.
+    const MODULE = resolve('/repo/scripts/lint-master-plan.mjs');
+    const LINKED_ENTRY = resolve('/tmp/link.mjs');
+    const UNRELATED_ENTRY = resolve('/repo/other.mjs');
 
     it('stays silent when imported as a library (no entry argument)', () => {
       expect(resolveEntrypointIdentity(MODULE, undefined)).toEqual({
@@ -2850,8 +2867,8 @@ describe('CLI contract', () => {
 
     it('runs when a symlinked entry resolves to this module', () => {
       const realpath = (candidate: string) =>
-        candidate === '/tmp/link.mjs' ? MODULE : candidate;
-      expect(resolveEntrypointIdentity(MODULE, '/tmp/link.mjs', realpath)).toEqual({
+        candidate === LINKED_ENTRY ? MODULE : candidate;
+      expect(resolveEntrypointIdentity(MODULE, LINKED_ENTRY, realpath)).toEqual({
         isMain: true,
         basis: 'canonical',
       });
@@ -2859,7 +2876,7 @@ describe('CLI contract', () => {
 
     it('does not run for an unrelated entry', () => {
       const realpath = (candidate: string) => candidate;
-      expect(resolveEntrypointIdentity(MODULE, '/repo/other.mjs', realpath)).toEqual({
+      expect(resolveEntrypointIdentity(MODULE, UNRELATED_ENTRY, realpath)).toEqual({
         isMain: false,
         basis: 'canonical',
       });
@@ -2876,7 +2893,7 @@ describe('CLI contract', () => {
         basis: 'lexical-fallback',
       });
       // Different path: still a decision, still reported as degraded, never swallowed.
-      expect(resolveEntrypointIdentity(MODULE, '/repo/other.mjs', failing)).toEqual({
+      expect(resolveEntrypointIdentity(MODULE, UNRELATED_ENTRY, failing)).toEqual({
         isMain: false,
         basis: 'lexical-fallback',
       });
@@ -2901,7 +2918,8 @@ describe('CLI contract', () => {
     // capability or not — that is what makes the skip safe rather than a coverage hole.
     expect(typeof symlinkCapability.supported).toBe('boolean');
     expect(symlinkCapability.reason).toMatch(/symlink creation (permitted|refused)/);
-    expect(resolveEntrypointIdentity('/m.mjs', '/m.mjs', (candidate) => candidate)).toEqual({
+    const selfEntry = resolve('/m.mjs');
+    expect(resolveEntrypointIdentity(selfEntry, selfEntry, (candidate) => candidate)).toEqual({
       isMain: true,
       basis: 'canonical',
     });
