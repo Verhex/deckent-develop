@@ -100,12 +100,12 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-03 (2nd refresh today, build-free): +24 entries from the TRUST-ANCHOR-001
-  // regression suite — 11 new trust-anchor cases in tests/scripts/lint-master-plan.test.ts
-  // exercise real git repos in tmpdir (execFileSync git + fixture writes), all hermetic.
-  // Prior refresh same day: DOC-GAP RETIRE wave (count 12401, file-set change only).
-  count: 12425,
-  digest: 'f7ce68eb993b78a85400b5571a4c244ac11f77e3e465adc7f9ec82a64577ecda',
+  // 2026-08-03 (build-free, FAZ4A-S2): −1 entry — the finalizer suites dropped their
+  // vi.mock('node:fs') registrations when rewritten onto real tmpdir isolation
+  // (tests/orchestra/finalize-sprint.test.ts + sprint-finalizer.test.ts).
+  // Prior refresh same day: +24 TRUST-ANCHOR-001 regression suite (count 12425).
+  count: 12424,
+  digest: '8fd758615db53cd51da7bdbf950c20cd688f6800a47783f8df4bc47fa8173135',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({

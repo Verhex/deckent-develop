@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):1d972f5fb327a268ef11e0084ee523de2ebf0e3bf3d41135b8f23cfc6f2053a6`
+**Source digest:** `sha256(normalized-lf-utf8):5b64f128354b29f164d6933dc09c5f89891e7a8b2192e884de31066819d41dff`
 
-**Rows:** 337 total · 330 active · 7 terminal
+**Rows:** 338 total · 331 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 233 |
+| OPEN | 234 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -79,6 +79,7 @@
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
+| 515 | `SEC-DEP-ADVISORY-001` | OPEN | P1 | TRUTH | — | — | Yeni upstream dependency advisory'leri (fast-uri GHSA-7p8r-x3mc-p8w7 · ip-address GHSA-mwp4-54f8-5fhr, ikisi de high) fail-closed Security Audit gate'ini repo-genelinde kırmızıya düşürdü — patch-bump veya SEC-05 signed-exception ile kapatılır |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
