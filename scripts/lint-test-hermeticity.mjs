@@ -100,13 +100,13 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  count: 12398,
-  digest: '31378e0ba8a198af44846eb0e98b0277e222c8a71b034b7f1bfa627c120f871f',
+  count: 12401,
+  digest: 'add52b91da95b036d12f9aa2f2ff4116df71011aaf61b25e4069efd6338f8994',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   count: 1196,
-  digest: 'dcf4d42af4a925879f694a962aaf14a3af4926c515fb19acf9ce9ea81b251180',
+  digest: '176f2340f34461eec01fda63187e5f7614cdcb47eceaf33088d709d815bf8dd4',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

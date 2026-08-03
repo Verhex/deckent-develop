@@ -4400,17 +4400,68 @@ export function main(argv = process.argv.slice(2), io = {}) {
   return ok ? 0 : 1;
 }
 
-const isMain = (() => {
-  try {
-    return (
-      realpathSync.native(fileURLToPath(import.meta.url)) ===
-      realpathSync.native(resolve(process.argv[1] ?? ''))
-    );
-  } catch {
-    return false;
+/**
+ * Decide whether this module is the process entrypoint.
+ *
+ * MASTER-CLI-SYMLINK-FLAKE-001 root cause: the previous guard wrapped both `realpathSync`
+ * calls in `try { … } catch { return false }`. Any resolution error — a symlinked entry whose
+ * target is momentarily unreadable, a pruned scratch directory, a sandbox that refuses
+ * `realpath` on one of the two paths — was swallowed into "not the entrypoint". The CLI then
+ * produced NO output and exited 0, which is indistinguishable from a successful run. That is
+ * the fail-open/silent-exit the acceptance criterion forbids, and it is why a full-file test
+ * run could intermittently observe empty stdout while the isolated test passed: the outcome
+ * depended on whether `realpath` happened to succeed, not on the contract.
+ *
+ * Contract now:
+ * - No entry argument at all (imported as a library) → not main, silently. This is the normal
+ *   path for `import { validateMasterPlan } from …` and must stay quiet.
+ * - Both paths resolve → canonical identity decides. Symlinked entries work because `realpath`
+ *   resolves them to the same target.
+ * - Either path fails to resolve → fall back to a lexical comparison instead of swallowing the
+ *   error, and report the degraded decision on stderr. A wrong answer is then loud, never silent.
+ *
+ * Pure and injectable so the contract is testable without spawning a process.
+ *
+ * @param {string} modulePath absolute path of this module
+ * @param {string | undefined} argvEntry `process.argv[1]`
+ * @param {(path: string) => string} [resolveReal] realpath implementation (injected in tests)
+ * @returns {{ isMain: boolean, basis: 'no-entry' | 'canonical' | 'lexical-fallback' }}
+ */
+export function resolveEntrypointIdentity(
+  modulePath,
+  argvEntry,
+  resolveReal = realpathSync.native,
+) {
+  if (!argvEntry) return { isMain: false, basis: 'no-entry' };
+  const entryPath = resolve(argvEntry);
+  const canonical = (candidate) => {
+    try {
+      return resolveReal(candidate);
+    } catch {
+      return null;
+    }
+  };
+  const moduleReal = canonical(modulePath);
+  const entryReal = canonical(entryPath);
+  if (moduleReal !== null && entryReal !== null) {
+    return { isMain: moduleReal === entryReal, basis: 'canonical' };
   }
-})();
+  return { isMain: resolve(modulePath) === entryPath, basis: 'lexical-fallback' };
+}
 
-if (isMain) {
+const entrypoint = resolveEntrypointIdentity(
+  fileURLToPath(import.meta.url),
+  process.argv[1],
+);
+
+if (entrypoint.basis === 'lexical-fallback') {
+  // Degraded identity resolution must never be silent, whichever way it decided.
+  process.stderr.write(
+    '[master-plan] WARN — entrypoint identity resolved lexically because realpath failed; '
+      + `treating this invocation as ${entrypoint.isMain ? 'the CLI entrypoint' : 'a library import'}.\n`,
+  );
+}
+
+if (entrypoint.isMain) {
   process.exitCode = main();
 }

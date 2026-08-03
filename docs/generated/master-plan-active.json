@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "705def8db35316614c203a8b90a23f0fc6a50980135da6ae034c8934c088fe80"
+    "value": "077fa646ce95e2baebcd7b145c8fcd38f3948c50a081f1ccee34b17751d768c7"
   },
   "summary": {
     "total": 327,
@@ -12,10 +12,10 @@
     "receipts": 24,
     "byState": {
       "OPEN": 224,
-      "READY": 1,
+      "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 29,
+      "VERIFY": 30,
       "DONE": 6,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -102,10 +102,10 @@
       "id": "MASTER-CLI-SYMLINK-FLAKE-001",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "READY",
+      "state": "VERIFY",
       "updated": "2026-08-03",
       "definitionDigest": "374341049d52f5c4d0874c4a6b6588c16aa2ff7be9009c09755611ca7f60e9dd",
-      "progressDigest": "30a08fdd354f7e76a8aac69958deea8fd0327f45635fa7ca33f8c17382f46de4",
+      "progressDigest": "1b3437a266981d79f9476400cd9178c59c2bb2fd224c9a86fb858f37f601d3d5",
       "terminalClosureDigest": null
     },
     {
@@ -3898,8 +3898,8 @@
       "authorityDigest": "491bf26b15e5acac17a2efd3565bf9a4890bada5530892edaade5df168a6ef91",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-03T15:32:29+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -4021,13 +4021,13 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
         "E": "1",
-        "H": "~",
-        "L": "0",
+        "H": "1",
+        "L": "1",
         "X": "0",
         "S": "-"
       },
@@ -4035,10 +4035,11 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-07-30-RECOVERY-RESIDUALS-01"
+        "GR-2026-07-30-RECOVERY-RESIDUALS-01",
+        "GR-2026-08-03-SYMLINK-ADMISSION-01"
       ],
       "acceptance": "Full-file ve isolated test koşuları aynı stdout/exit sonucunu üretir; symlink entrypoint fail-open veya sessiz exit yapmaz; root cause ve hermetic regression proof kayıtlıdır",
-      "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; 2026-07-30 proof: canonical validator and projection checks pass, 67-case full-file run intermittently returns empty stdout only for the real symlink entry test while the exact isolated test and manual real command pass; no deterministic closure claimed; 2026-08-03 READY-ELIGIBILITY (admission receipt bekliyor): bağımlılık yok, açık child yok, blocker yok; SSOT-003'ün TEK child'ı olduğu için 262 aktif satırın aggregate closure edge'ini bu satır açar (`SSOT-003` kendisi child'ı kapanmadan READY olamaz). READY state'i owner-issued scope-exact G1 admission receipt'i gerektirir (validator: ADMISSION_RECEIPT_MISSING); receipt yayımlanmadan state OPEN kalır",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; 2026-07-30 proof: canonical validator and projection checks pass, 67-case full-file run intermittently returns empty stdout only for the real symlink entry test while the exact isolated test and manual real command pass; no deterministic closure claimed; 2026-08-03 READY-ELIGIBILITY (admission receipt bekliyor): bağımlılık yok, açık child yok, blocker yok; SSOT-003'ün TEK child'ı olduğu için 262 aktif satırın aggregate closure edge'ini bu satır açar (`SSOT-003` kendisi child'ı kapanmadan READY olamaz). READY state'i owner-issued scope-exact G1 admission receipt'i gerektirir (validator: ADMISSION_RECEIPT_MISSING); receipt yayımlanmadan state OPEN kalır; `receipt=GR-2026-08-03-SYMLINK-ADMISSION-01`; `proof=entrypoint-identity-determinism-5-cases`; 2026-08-03 kapanışı. KÖK NEDEN: entrypoint guard iki `realpathSync.native` çağrısını `try { … } catch { return false }` içine alıyordu; herhangi bir çözümleme hatası (symlink hedefi anlık okunamaz, scratch dizin budanmış, sandbox realpath'i reddediyor) sessizce 'entrypoint değilim'e dönüşüyordu ve CLI hiç çıktı üretmeden exit 0 veriyordu — başarıdan ayırt edilemez. Full-file koşumda ara sıra boş stdout görülmesinin sebebi buydu: sonuç sözleşmeye değil realpath'in o an başarılı olup olmamasına bağlıydı. DÜZELTME: identity çözümü saf, enjekte edilebilir `resolveEntrypointIdentity()` fonksiyonuna çıkarıldı; hata yutulmuyor, lexical fallback'e düşüp kararı stderr'e WARN olarak bildiriyor. Kütüphane olarak import (argv[1] yok) hâlâ sessiz. KANIT: 5 hermetik vaka (no-entry · symlink canonical eşleşme · ilgisiz entry · realpath patlarken lexical fallback iki yönde · tek taraflı çözümleme) — hiçbiri process spawn etmiyor, bu yüzden zamanlamaya bağlı flake üretemezler; ayrıca gerçek binary symlink üzerinden koşuldu ve --help çıktısını verdi. KANITLAMADIĞI: `X` boyutu açık — symlink davranışı yalnız POSIX'te doğrulandı, gerçek CLI testi win32'de skipIf ile atlanıyor; STATE YOLU: READY → OPEN → VERIFY. READY→VERIFY doğrudan geçişi şema tarafından yasak (3.1 tablosu) ve READY→IN_PROGRESS aktif admission receipt'i ister; receipt bu slice'ın settlement'ında consumed edildiği için ara adım OPEN'dır. Bu bir gerileme değil, tüketilmiş admission'ın kaydıdır",
       "updated": "2026-08-03"
     },
     {
@@ -17666,6 +17667,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a758e4dd5b550155c1b4a9bbd0933130e6bf9c15f8f3b065f968eed0cd690174"
+    "value": "b9d4fa4a989d2b5814a0d62480580f0cd76f1cce6154a12b41566e8bb4ac873b"
   }
 }

@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):705def8db35316614c203a8b90a23f0fc6a50980135da6ae034c8934c088fe80`
+**Source digest:** `sha256(normalized-lf-utf8):077fa646ce95e2baebcd7b145c8fcd38f3948c50a081f1ccee34b17751d768c7`
 
 **Rows:** 327 total · 321 active · 6 terminal
 
@@ -14,10 +14,10 @@
 | State | Count |
 |---|---:|
 | OPEN | 224 |
-| READY | 1 |
+| READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 29 |
+| VERIFY | 30 |
 | DONE | 6 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -28,7 +28,7 @@
 |---:|---|---|---|---|---|---|---|
 | 20 | `SSOT-002` | VERIFY | P0 | TRUTH | `SSOT-001`, `SOURCE-MANIFEST-001`, `LEGACY-RESIDUAL-AUDIT-001` | — | Tüm kaynakları canonical, atomik ve dependency'li ledger'a uzlaştır |
 | 30 | `SSOT-003` | VERIFY | P0 | TRUTH | `SSOT-001` | — | MASTER schema validator ve generated active views |
-| 31 | `MASTER-CLI-SYMLINK-FLAKE-001` | READY | P0 | TRUTH | — | — | MASTER validator real-entry symlink contract'ını deterministic yap |
+| 31 | `MASTER-CLI-SYMLINK-FLAKE-001` | VERIFY | P0 | TRUTH | — | — | MASTER validator real-entry symlink contract'ını deterministic yap |
 | 40 | `TRUTH-BASELINE-001` | BLOCKED | P0 | TRUTH | `TEST-675`, `TEST-676`, `TEST-HERMETIC-001` | `BASELINE_CONFLICT` | Current HEAD için tek reference test, build, binary ve environment baseline |
 | 50 | `TEST-675` | OPEN | P0 | TRUTH | — | — | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur |
 | 60 | `TEST-676` | OPEN | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |

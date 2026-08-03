@@ -25,6 +25,7 @@ import {
   main as mainRaw,
   normalizedSha256,
   parseArgs,
+  resolveEntrypointIdentity,
   splitMarkdownRow,
   validateMasterPlan,
 } from '../../scripts/lint-master-plan.mjs';
@@ -264,7 +265,11 @@ describe('splitMarkdownRow', () => {
 describe('canonical MASTER validation', () => {
   it('validates the repository MASTER snapshot without pinning today’s row counts', () => {
     const source = readFileSync(join(REPO_ROOT, MASTER_PLAN_RELATIVE_PATH), 'utf8');
-    const result = validateMasterPlan(source);
+    // The ledger can carry ACTIVE admission receipts whose manifests pin real files by
+    // digest; those baselines are only checkable against a physical tree, so the repository
+    // snapshot is validated with the repository root. Validating it rootless would report
+    // RECEIPT_BASELINE_ROOT_REQUIRED for every active receipt and mask real findings.
+    const result = validateMasterPlan(source, { root: REPO_ROOT });
     expect(result.findings).toEqual([]);
     expect(result.items.length).toBeGreaterThan(0);
     expect(new Set(result.items.map((item) => item.id)).size).toBe(result.items.length);
@@ -2794,6 +2799,68 @@ describe('CLI contract', () => {
       );
     },
   );
+
+  // ─── MASTER-CLI-SYMLINK-FLAKE-001 — entrypoint identity determinism ─────────
+  //
+  // The old guard swallowed every realpath error into "not the entrypoint", so a symlinked or
+  // transiently unreadable entry made the CLI exit 0 with no output — indistinguishable from
+  // success, and dependent on whether realpath happened to work rather than on the contract.
+  // These cases pin the decision itself; they need no child process, so they are hermetic and
+  // cannot flake on process/filesystem timing.
+  describe('entrypoint identity', () => {
+    const MODULE = '/repo/scripts/lint-master-plan.mjs';
+
+    it('stays silent when imported as a library (no entry argument)', () => {
+      expect(resolveEntrypointIdentity(MODULE, undefined)).toEqual({
+        isMain: false,
+        basis: 'no-entry',
+      });
+    });
+
+    it('runs when a symlinked entry resolves to this module', () => {
+      const realpath = (candidate: string) =>
+        candidate === '/tmp/link.mjs' ? MODULE : candidate;
+      expect(resolveEntrypointIdentity(MODULE, '/tmp/link.mjs', realpath)).toEqual({
+        isMain: true,
+        basis: 'canonical',
+      });
+    });
+
+    it('does not run for an unrelated entry', () => {
+      const realpath = (candidate: string) => candidate;
+      expect(resolveEntrypointIdentity(MODULE, '/repo/other.mjs', realpath)).toEqual({
+        isMain: false,
+        basis: 'canonical',
+      });
+    });
+
+    it('falls back lexically instead of swallowing a realpath failure', () => {
+      const failing = () => {
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      };
+      // Same path: the invocation IS the entrypoint and must still run rather than
+      // silently exit 0 — this is the exact regression the flake came from.
+      expect(resolveEntrypointIdentity(MODULE, MODULE, failing)).toEqual({
+        isMain: true,
+        basis: 'lexical-fallback',
+      });
+      // Different path: still a decision, still reported as degraded, never swallowed.
+      expect(resolveEntrypointIdentity(MODULE, '/repo/other.mjs', failing)).toEqual({
+        isMain: false,
+        basis: 'lexical-fallback',
+      });
+    });
+
+    it('reports degraded resolution when only one side resolves', () => {
+      const partial = (candidate: string) => {
+        if (candidate === MODULE) throw new Error('EACCES');
+        return candidate;
+      };
+      expect(resolveEntrypointIdentity(MODULE, MODULE, partial).basis).toBe(
+        'lexical-fallback',
+      );
+    });
+  });
 
   it.skipIf(process.platform === 'win32')(
     'executes the real CLI contract when invoked through a symlink',
