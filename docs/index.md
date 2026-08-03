@@ -4,6 +4,7 @@ English under `docs/en/` is canonical. Turkish under `docs/tr/` is a full-parity
 
 | Topic | English canonical | Türkçe ayna |
 |---|---|---|
+| Vision and direction | [Vision](./en/vision.md) | [Vizyon](./tr/vision.md) |
 | Product overview | [Overview](./en/overview.md) | [Genel bakış](./tr/overview.md) |
 | Architecture | [Architecture](./en/architecture.md) | [Architecture](./tr/architecture.md) |
 | CLI | [CLI reference](./en/cli.md) | [CLI referansı](./tr/cli.md) |
