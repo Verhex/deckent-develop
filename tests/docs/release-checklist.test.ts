@@ -10,7 +10,7 @@ import { join } from 'node:path';
 // does not carry — real coverage loss, left visible instead of deleted or rewritten
 // to match whatever the new file happens to say (that would be a tautology).
 // Archived originals: docs/archive/docs-pre-reset-2026-08-03/.
-// Closing these is a MASTER-PLAN item; see PAZARTESI.md.
+// DECISION — sahip: RELEASE-001 — karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md.
 
 const DOC_PATH = join(process.cwd(), 'docs', 'en', 'operations', 'development-and-release.md');
 

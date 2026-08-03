@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 // ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
+// KARIŞIK — kalan skip sınıfı REWRITE (blanket-skip kurbanı, çoğu bugün geçer); sahip: DOCS-PRODUCT-001 — karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md.
 // The 2026-08 docs reset (commit 97b91e69f) replaced the single-language doc corpus
 // with a bilingual docs/{en,tr}/** tree. Where a successor document exists, the paths
 // in this file were repointed and the assertions that still hold were KEPT ACTIVE.
@@ -10,7 +11,8 @@ import { join } from 'path';
 // does not carry — real coverage loss, left visible instead of deleted or rewritten
 // to match whatever the new file happens to say (that would be a tautology).
 // Archived originals: docs/archive/docs-pre-reset-2026-08-03/.
-// Closing these is a MASTER-PLAN item; see PAZARTESI.md.
+// DOC-GAP dispozisyonu (2026-08-03, Alperen onayı): süperseded iddialar EMEKLİ edildi —
+// karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md; arşiv içerik docs/archive/docs-pre-reset-2026-08-03/ altında durur.
 
 const CHANGELOG_PATH = join(__dirname, '../../docs/CHANGELOG.md');
 
@@ -66,28 +68,6 @@ describe('CHANGELOG.md format validation', () => {
     const content = readChangelog();
     const versions = extractVersionHeaders(content);
     expect(versions.length).toBeGreaterThanOrEqual(150);
-  });
-
-  it.skip('latest entry is at the top and follows sprint naming convention', () => {
-    const content = readChangelog();
-    const versions = extractVersionHeaders(content);
-    expect(versions.length).toBeGreaterThan(0);
-    expect(versions[0]).toMatch(/sprint\d+/);
-  });
-
-  // Sprint 178: historical sprint33 + wave entries reside in root CHANGELOG.md (consolidation).
-  it.skip('sprint33 entry contains expected content sections', () => {
-    const content = readChangelog();
-    const sprint33Section = content.split('## [0.1.0-sprint33]')[1]?.split('## [0.1.0-sprint32]')[0];
-    expect(sprint33Section).toBeDefined();
-    expect(sprint33Section).toContain('### Added');
-  });
-
-  it.skip('has wave entries for early sprints', () => {
-    const content = readChangelog();
-    const versions = extractVersionHeaders(content);
-    const waveVersions = versions.filter((v) => v.includes('wave'));
-    expect(waveVersions.length).toBeGreaterThan(0);
   });
 
   it('extractVersionHeaders correctly parses all headers', () => {

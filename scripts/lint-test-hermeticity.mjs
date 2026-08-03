@@ -100,13 +100,18 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
+  // 2026-08-03: refreshed build-free after the approved DOC-GAP RETIRE wave deleted
+  // 8 fully-superseded doc test files (see docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md).
+  // Count unchanged, digest moved with the file-set change.
   count: 12401,
-  digest: '80a0d7c9757cf936d0a97216817f50f0beb42029fadebde2eb4f86f6ca9fd7d7',
+  digest: 'e3ae21f2b0753ed945cb9e7270532a2c5409efb5ac2633400956f4bc9d373a07',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
+  // 2026-08-03: same DOC-GAP RETIRE refresh as UNRESOLVED_BASELINE above — count unchanged,
+  // digest moved with the deleted files.
   count: 1196,
-  digest: '176f2340f34461eec01fda63187e5f7614cdcb47eceaf33088d709d815bf8dd4',
+  digest: '5410ec6789fa8f78acb93340ad449e6dd39b6b12e4b78f6c8c0bc9d38fe249ee',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

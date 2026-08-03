@@ -10,7 +10,8 @@ import { describe, it, expect } from 'vitest';
 // does not carry — real coverage loss, left visible instead of deleted or rewritten
 // to match whatever the new file happens to say (that would be a tautology).
 // Archived originals: docs/archive/docs-pre-reset-2026-08-03/.
-// Closing these is a MASTER-PLAN item; see PAZARTESI.md.
+// DOC-GAP dispozisyonu (2026-08-03, Alperen onayı): süperseded iddialar EMEKLİ edildi —
+// karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md; arşiv içerik docs/archive/docs-pre-reset-2026-08-03/ altında durur.
 
 const root = join(import.meta.dirname ?? __dirname, '../../');
 
@@ -22,11 +23,6 @@ describe('doc-honesty', () => {
     const content = readFileSync(join(root, 'docs/archive/beta-tracker.md'), 'utf8');
     expect(content).toMatch(/PARTIAL/);
     expect(content).toMatch(/Docker runtime/);
-  });
-
-  it.skip('Path B chat.ts LIVE note is present in vision/roadmap.md', () => {
-    const content = readFileSync(join(root, 'docs/en/overview.md'), 'utf8');
-    expect(content).toMatch(/Path B.*LIVE|chat\.ts.*Sprint 190/);
   });
 
   it('Sprint 185-200 section is marked historical in ROADMAP-GOD-LEVEL.md', () => {

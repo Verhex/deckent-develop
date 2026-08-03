@@ -10,7 +10,8 @@ import { join } from 'node:path';
 // does not carry — real coverage loss, left visible instead of deleted or rewritten
 // to match whatever the new file happens to say (that would be a tautology).
 // Archived originals: docs/archive/docs-pre-reset-2026-08-03/.
-// Closing these is a MASTER-PLAN item; see PAZARTESI.md.
+// DOC-GAP dispozisyonu (2026-08-03, Alperen onayı): süperseded iddialar EMEKLİ edildi —
+// karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md; arşiv içerik docs/archive/docs-pre-reset-2026-08-03/ altında durur.
 
 const DOC_PATH = join(process.cwd(), 'docs', 'en', 'reference', 'api-surface.md');
 
@@ -19,76 +20,6 @@ describe('docs/reference/api.md', () => {
 
   it('exists and is non-empty', () => {
     expect(content.length).toBeGreaterThan(500);
-  });
-
-  it.skip('contains HTTP API section', () => {
-    expect(content).toContain('## 11. HTTP API');
-  });
-
-  it.skip('documents all GET endpoints', () => {
-    expect(content).toContain('GET /api/status');
-    expect(content).toContain('GET /api/sprint');
-    expect(content).toContain('GET /api/history');
-    expect(content).toContain('GET /api/config');
-    expect(content).toContain('GET /api/doctor');
-    expect(content).toContain('GET /api/memory');
-    expect(content).toContain('GET /api/debt');
-    expect(content).toContain('GET /api/job/:jobId');
-    expect(content).toContain('GET /api/events');
-    expect(content).toContain('GET /api/worker/:taskId/log');
-  });
-
-  it.skip('documents all POST endpoints', () => {
-    expect(content).toContain('POST /api/start');
-    expect(content).toContain('POST /api/plan');
-    expect(content).toContain('POST /api/kill/:workerId');
-    expect(content).toContain('POST /api/set-directives');
-    expect(content).toContain('POST /api/config');
-  });
-
-  it.skip('contains curl examples', () => {
-    expect(content).toContain('curl http://localhost:3100/api/status');
-    expect(content).toContain('curl -X POST');
-  });
-
-  it.skip('documents SSE stream format', () => {
-    expect(content).toContain('SSE');
-    expect(content).toContain('Server-Sent Events');
-  });
-
-  it.skip('documents MCP Tools (21)', () => {
-    expect(content).toContain('### Tools (21)');
-    expect(content).toContain('deckent_init');
-    expect(content).toContain('deckent_set_directives');
-    expect(content).toContain('deckent_plan');
-    expect(content).toContain('deckent_start');
-    expect(content).toContain('deckent_status');
-    expect(content).toContain('deckent_doctor');
-    expect(content).toContain('deckent_retro');
-    expect(content).toContain('deckent_history');
-    expect(content).toContain('deckent_analyze_project');
-    expect(content).toContain('deckent_sync');
-    expect(content).toContain('deckent_config');
-    expect(content).toContain('deckent_review');
-    expect(content).toContain('deckent_run');
-    expect(content).toContain('deckent_kill');
-    expect(content).toContain('deckent_cleanup');
-    expect(content).toContain('deckent_help');
-    expect(content).toContain('deckent_agent_list');
-    expect(content).toContain('deckent_skill_list');
-    expect(content).toContain('deckent_checkpoint');
-  });
-
-  it.skip('documents MCP Resources (8)', () => {
-    expect(content).toContain('### Resources (8)');
-    expect(content).toContain('deckent://dashboard');
-    expect(content).toContain('deckent://directives');
-    expect(content).toContain('deckent://memory');
-    expect(content).toContain('deckent://debt');
-    expect(content).toContain('deckent://config');
-    expect(content).toContain('deckent://retro');
-    expect(content).toContain('deckent://tasks');
-    expect(content).toContain('deckent://agents');
   });
 
   it('contains authentication note', () => {

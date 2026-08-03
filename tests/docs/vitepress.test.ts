@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
+// DECISION — sahip: OQ-18 / DOCS-TOPOLOGY-001 — karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md.
 // The 2026-08 docs reset archived docs/.vitepress/** and docs/package.json
 // (docs/archive/docs-pre-reset-2026-08-03/). Whether the nested VitePress site
 // continues or is absorbed by the root toolchain is an OPEN OWNER DECISION —

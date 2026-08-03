@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
+// KARIŞIK — kalan skip sınıfı REWRITE (README yayın-kalite sözleşmesi); sahip: DOCS-RELEASE-TRUTH-001 — karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md.
 // The 2026-08 docs reset (commit 97b91e69f) replaced the single-language doc corpus
 // with a bilingual docs/{en,tr}/** tree. Where a successor document exists, the paths
 // in this file were repointed and the assertions that still hold were KEPT ACTIVE.
@@ -10,7 +11,8 @@ import { join } from 'node:path';
 // does not carry — real coverage loss, left visible instead of deleted or rewritten
 // to match whatever the new file happens to say (that would be a tautology).
 // Archived originals: docs/archive/docs-pre-reset-2026-08-03/.
-// Closing these is a MASTER-PLAN item; see PAZARTESI.md.
+// DOC-GAP dispozisyonu (2026-08-03, Alperen onayı): süperseded iddialar EMEKLİ edildi —
+// karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md; arşiv içerik docs/archive/docs-pre-reset-2026-08-03/ altında durur.
 
 const README_PATH = join(process.cwd(), 'README.md');
 
@@ -19,18 +21,6 @@ describe('README.md', () => {
 
   it('exists and is non-empty', () => {
     expect(content.length).toBeGreaterThan(100);
-  });
-
-  it.skip('starts with the project name heading', () => {
-    // README uses a centered HTML <h1> for the logo-aligned masthead rather
-    // than a markdown `# deckent` heading.
-    expect(content).toContain('<h1 align="center">deckent</h1>');
-  });
-
-  // Sprint 150 T-150-021: README overhauled with new tagline "The AI orchestrator for…".
-  // Test rewritten in Sprint 151 with new assertions.
-  it.skip('contains the tagline', () => {
-    expect(content).toContain('Your AI development team, orchestrated.');
   });
 
   it.skip('contains npm badge', () => {
@@ -46,53 +36,12 @@ describe('README.md', () => {
     expect(content).toContain('[![license]');
   });
 
-  it.skip('contains a top-of-README visual asset', () => {
-    // The historical GIF-demo placeholder was replaced by a real logo masthead
-    // plus inline terminal-output examples in the "90-second tour".
-    expect(content).toContain('docs/assets/logo.png');
-  });
-
   // Sprint 150 T-150-021: README overhaul removed historical quick-start block.
   // Re-asserted in Sprint 151 with new structure.
   it.skip('contains quick start section', () => {
     expect(content).toContain('## Quick Start');
     expect(content).toContain('npx deckent init');
     expect(content).toContain('npx deckent start');
-  });
-
-  it.skip('contains a "how it works" explainer section', () => {
-    // Restructured from "## How It Works" to "## What deckent actually is",
-    // which walks the Brain (plan) → Workers (build) → Auditor (watch) flow.
-    expect(content).toContain('## What deckent actually is');
-    expect(content).toContain('plan');
-    expect(content).toContain('build');
-    expect(content).toContain('Auditor');
-  });
-
-  it.skip('contains Architecture section with ASCII diagram', () => {
-    expect(content).toContain('## Architecture');
-    expect(content).toContain('Brain');
-    expect(content).toContain('Worker');
-    expect(content).toContain('Auditor');
-  });
-
-  it.skip('contains a Features section covering the core capabilities', () => {
-    // Heading is "## Features"; the legacy bullet labels were reworded.
-    expect(content).toContain('## Features');
-    expect(content).toContain('Sprint Lifecycle');
-    expect(content).toContain('Parallel workers');
-    expect(content).toContain('Memory');
-  });
-
-  // Sprint 150 T-150-021: README comparison dropped OpenHands (per memory
-  // `feedback_openclaw_not_openhands` — OpenClaw is the canonical competitor).
-  // Rewrite in Sprint 151.
-  it.skip('contains Comparison table', () => {
-    expect(content).toContain('## Comparison');
-    expect(content).toContain('Cursor');
-    expect(content).toContain('Devin');
-    expect(content).toContain('OpenHands');
-    expect(content).toContain('OpenClaw');
   });
 
   it.skip('documents requirements', () => {

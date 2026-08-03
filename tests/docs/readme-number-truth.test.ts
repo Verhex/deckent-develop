@@ -10,7 +10,7 @@ import { join } from 'node:path';
 // does not carry — real coverage loss, left visible instead of deleted or rewritten
 // to match whatever the new file happens to say (that would be a tautology).
 // Archived originals: docs/archive/docs-pre-reset-2026-08-03/.
-// Closing these is a MASTER-PLAN item; see PAZARTESI.md.
+// REWRITE — sayılar generated kaynaktan; sahip: DOCS-RELEASE-TRUTH-001 — karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md.
 
 // 379-001 DOCS-NUM-TRUTH — pins README.md / README.tr.md / DECKENT.md against the
 // live, code-derived counts named by the user-truth-audit as "GERÇEK" (real):

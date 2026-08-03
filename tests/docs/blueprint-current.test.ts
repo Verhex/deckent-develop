@@ -10,7 +10,7 @@ import { join } from 'node:path';
 // does not carry — real coverage loss, left visible instead of deleted or rewritten
 // to match whatever the new file happens to say (that would be a tautology).
 // Archived originals: docs/archive/docs-pre-reset-2026-08-03/.
-// Closing these is a MASTER-PLAN item; see PAZARTESI.md.
+// REWRITE — anti-X ürün-sesi kuralı docs/en/vision.md karşısına; sahip: DOCS-PRODUCT-001 — karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md.
 
 // NOTE: docs/vision/blueprint.md + blueprint-TR.md were intentionally retired —
 // the 2989-line stale master-plan was moved to docs/archive/ (commit c12dac9c)
