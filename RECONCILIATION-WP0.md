@@ -319,3 +319,93 @@ Not: MASTER'a geçersiz receipt yazılmadı; dosya commit'li temiz hâlinde (`li
 2. **P0 bütçesi** belirle (etiket indirimi değil, eşzamanlı admission limiti).
 3. 9 P1 adayını onayla/reddet.
 4. Bu ledger'ı Codex'e **xverify**'a gönder (karar #7).
+
+---
+
+## EK-3 — FAZ 3 Crosswalk: F-register · OQ-HOLD'lar · 20-aday backlog → MASTER Work ID (2026-08-03, Fable 5)
+
+> Amaç: Codex risk register'ı (F-001…F-024), 24 açık OQ HOLD'u ve CODE-DOC-DIFF'in 20-aday
+> backlog'unun her kalemi ya mevcut bir MASTER satırına bağlanır ya da yeni satır önerisi olur.
+> Sahipsiz kalem = FAZ 3 tanımı gereği ihlal. `docs/analysis/OPEN-QUESTIONS-2026-08.md`'ye
+> BİLEREK dokunulmadı: o ledger Codex formatındadır ve xverify turu şu an onun üstünde koşuyor;
+> çifte-yazım çakışma riski. Eşleme authority'si bu tablodur.
+
+### A. F-001…F-024 → Work ID
+
+| F | Alan | MASTER karşılığı | Durum |
+|---|---|---|---|
+| F-001 | Goal runtime | `GOAL-DAG/POLICY/ACCEPTANCE/PROVIDER/CRASH/CUTOVER/CANARY-001`, `MISSION-KIND-001` | KAPSANIYOR |
+| F-002 | Canonical mimari | `KERNEL-001` + `KERNEL-ONTOLOGY/STATE/ATTEMPT/SETTLEMENT-001` | KAPSANIYOR |
+| F-003 | Quality/CI | `TRUTH-BASELINE-001` + `TEST-675/676`, `TEST-HERMETIC/SPAWN/PLATFORM-001` | KAPSANIYOR — baseline sayısı F-003'te 591; bugünkü ratchet 539 (evidence tazelendi) |
+| F-004 | Plan/SSOT | `SSOT-002/003` — WP0 bu bulgunun uygulamasıydı | BÜYÜK ÖLÇÜDE KAPANDI (READY 0→1, ilk root DONE; kalan: P0 bütçesi) |
+| F-005 | Principal/approval | `PRINCIPAL-001`, `APPROVAL-001` | KAPSANIYOR |
+| F-006 | Settlement durability | `KERNEL-SETTLEMENT-001`, `GOAL-CRASH-001`, `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001` | KAPSANIYOR |
+| F-007 | Tenant memory | `TENANT-001`, `DATA-GOV-001` | KAPSANIYOR (memory-store composite-key detayı TENANT-001 acceptance'ına girer) |
+| F-008 | Approval choke-point | `APPROVAL-001`, `TOOL-AUTHORITY-001`, `OPERATION-001` | KAPSANIYOR |
+| F-009 | Learning governance | `PROMOTION-001`, `EVALUATION-001`, `LEARNING-001` | KAPSANIYOR |
+| F-010 | Run control/cancel | `RECOVERY-TERMINATION-001`, `RUNFLOW-001` | KAPSANIYOR |
+| F-011 | Provider/routing | PAEP ailesi (`P02-630…656`), `PROVIDER-INGRESS-001`, `REACHABILITY-001`, `LIMIT-001` | KAPSANIYOR |
+| F-012 | Training | `TRAINING-TRACE-001`, `FINE-TUNE-001` | KAPSANIYOR |
+| F-013 | Dashboard sınırı | `DASHBOARD-OBS-001` | KAPSANIYOR |
+| F-014 | Surface mimarisi | `SURFACES-001`, `APP-SERVICE-001`, `SURFACE-CONTRACT-001`, `SURFACE-PARITY-001`, `SURFACE-CUTOVER-001` | KAPSANIYOR |
+| F-015 | Desktop | `DESKTOP-001` ailesi, `PACKAGING-001` | KAPSANIYOR |
+| F-016 | Release/supply-chain | `RELEASE-001`, `PACKAGING-001`, `SUPPLY-CHAIN-001` | KAPSANIYOR |
+| F-017 | Docs/ops güvenliği | `DOCS-PRODUCT-001`, `LIFECYCLE-VOCAB-001` | KAPSANIYOR |
+| F-018 | i18n/a11y | **BOŞLUK** — FO-10-I18N Codex-scoped, DOCS-I18N-001 yalnız doküman; ürün-yüzeyi runtime i18n/a11y enforcement satırı YOK | → YENİ: `I18N-SURFACE-001` |
+| F-019 | Scale/HA | `SCALE-001`, `HA-001`, `STORAGE-001`, `LOAD-CHAOS-001`, `SLO-001` | KAPSANIYOR |
+| F-020 | Node floor | `RUNTIME-FLOOR-001` (WP0'da açıldı) | KAPSANIYOR |
+| F-021 | Docs metrikleri | `DOCS-RELEASE-TRUTH-001` | KAPSANIYOR |
+| F-022 | Provider obs adoption | **BOŞLUK** — `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` evidence'ında "P12 AÇIK" asılı; migration'ın kendi Work ID'si YOK | → YENİ: `PROVIDER-OBS-MIGRATION-001` |
+| F-023 | Learning settlement | `LEARNING-001` + `KERNEL-SETTLEMENT-001` (finalizer non-fatal catch'leri acceptance'a girer) | KAPSANIYOR |
+| F-024 | Every Environment | `EVERY-ENV-001`, `PLATFORM-PROOF-001`, `TEST-PLATFORM-001`; bugünkü validator-contract matrisi ilk gerçek 3-platform kanıtını üretti | KAPSANIYOR |
+
+### B. 24 açık OQ HOLD → Work ID
+
+| OQ | Work ID / karar sahibi |
+|---|---|
+| OQ-03 quickstart doğrulama sınırı | `DOCS-TRUTH-PASS-001` (owner-karar maddesi) |
+| OQ-04 lifecycle adlandırma | `LIFECYCLE-VOCAB-001` |
+| OQ-05 canonical Operation | `OPERATION-001` |
+| OQ-06 work-model "dead" header | `ORPHAN-WIRE-001` + `KERNEL-ONTOLOGY-001` |
+| OQ-07 obs DB migration | → YENİ `PROVIDER-OBS-MIGRATION-001` |
+| OQ-08 SQLite migration policy | `STORAGE-001` |
+| OQ-09 boş authority tabloları | `ORPHAN-WIRE-001` |
+| OQ-10 MCP dryRun default'ları | `SURFACE-PARITY-001` (bilinçli-istisna matrisi) |
+| OQ-11 MCP cleanup scope | `SURFACE-PARITY-001` + `RECOVERY-TERMINATION-001` |
+| OQ-12 readOnlyHint anlamı | → YENİ `MCP-ANNOTATION-SAFETY-001` |
+| OQ-13 `explainatory/standart` | → YENİ `CLI-VOCAB-001` |
+| OQ-14 run namespace | → YENİ `CLI-VOCAB-001` |
+| OQ-15 global config write path | `ENV-ADAPTER-001` |
+| OQ-16 provider-neutral preset'ler | `ZERO-HARDCODE-PROVIDER-001` |
+| OQ-18 VitePress sahipliği | `DOCS-TOPOLOGY-001` (owner-karar maddesi; PAZARTESI P10) |
+| OQ-19 features-manifest yolu | `CONFIG-TRUTH-001` |
+| OQ-20 quickstart execution authority | `DOCS-TRUTH-PASS-001` (owner-karar maddesi) |
+| OQ-21 agent "21+2" | `AGENT-SKILL-001` |
+| OQ-22 tool-scope enforcement | `TOOL-AUTHORITY-001` |
+| OQ-23 rol sözlüğü eşlemesi | `CAPABILITY-001` + `PRINCIPAL-001` |
+| OQ-24 stale review identity | `RECOVERY-STALE-PROJECTION-001` |
+| OQ-25 toolCount 31↔49 | `SURFACE-CONTRACT-001` |
+| OQ-26 ADR index girdisi | `DOCS-ADR-SYNC-001` |
+| OQ-27 risk-language | → YENİ `I18N-SURFACE-001` |
+
+### C. 20-aday backlog → Work ID
+
+1 KAPANDI (docs:ref restore, 2026-08-02) · 2 `RUNTIME-FLOOR-001` · 3 `ERROR-REGISTRY-001` ·
+4 → YENİ `PROVIDER-OBS-MIGRATION-001` · 5 `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`+`RECOVERY-STALE-PROJECTION-001` ·
+6 → YENİ `MCP-ANNOTATION-SAFETY-001` · 7 `SURFACE-PARITY-001` · 8 `SURFACE-PARITY-001` · 9 `SURFACE-PARITY-001` ·
+10 `LIFECYCLE-VOCAB-001` · 11 KERNEL ailesi · 12 `TOOL-AUTHORITY-001` · 13 `CAPABILITY-001` ·
+14 `CONFIG-TRUTH-001` · 15 `ZERO-HARDCODE-PROVIDER-001` · 16 → YENİ `I18N-SURFACE-001` ·
+17-18 → YENİ `CLI-VOCAB-001` · 19 `STORAGE-001` · 20 `DOCS-TOPOLOGY-001`+`SURFACE-PARITY-001`
+
+### Sonuç: 4 yeni satır önerisi (owner onayı bekliyor)
+
+| Öneri | Kapsadığı sahipsiz kalemler | Öncelik önerisi |
+|---|---|---|
+| `PROVIDER-OBS-MIGRATION-001` | F-022 · OQ-07 · DB-01 · aday-4 · PAZARTESI P12 | P1 (owner-controlled mutation; FAZ 4a ile çakışmaz) |
+| `MCP-ANNOTATION-SAFETY-001` | MCP-05 · MCP-06 · OQ-12 · aday-6 | P1 (güvenlik-kritik: destructive tool RO ilan ediliyor) |
+| `I18N-SURFACE-001` | F-018 · CLI-01 · CLI-02 · CLI-13 · GOV-03 · OQ-27 · aday-16 | P1 (quality-bar ihlali sürekli birikiyor) |
+| `CLI-VOCAB-001` | CLI-03…06 · CLI-11 · OQ-13 · OQ-14 · aday-17/18 | P1 (public contract; breaking-change kararı içerir) |
+
+Bu 4 satır dışında **sahipsiz kalem kalmadı**: 24 F-bulgusundan 22'si, 24 OQ'dan 20'si ve 20 adaydan
+16'sı mevcut satırlara bağlandı. 187 DOC-GAP iddiası (P7) bu crosswalk'un DIŞINDA — o ayrı,
+iddia-iddia karar dilimi olarak duruyor.

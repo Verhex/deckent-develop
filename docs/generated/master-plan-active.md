@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):59cd37d6d39c355e62422a57a953078dfea59c1a04ad39ee856ff74e6226c4b0`
+**Source digest:** `sha256(normalized-lf-utf8):c52f85231ad4c7c9102b6df0f84bb91e37f65ca464ccb755ecce9c4c9ed58f99`
 
-**Rows:** 328 total · 321 active · 7 terminal
+**Rows:** 332 total · 325 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 225 |
+| OPEN | 229 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -75,6 +75,10 @@
 | 450 | `RUNTIME-FLOOR-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Tek runtime minimum sürüm contractı: package engines, doctor, onboarding ve release gate aynı floor'u ilan ve test eder |
 | 460 | `ERROR-REGISTRY-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Emitted her typed error kodu tek registry'de message ve remediation ile kayıtlı; kullanıcıya görünen doküman aynı kaynaktan üretilir |
 | 470 | `CONFIG-TRUTH-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Config leaf metadata ve default üretimi tek canonical kaynaktan; manifest backend default'u aynı kaynağı tüketir |
+| 480 | `PROVIDER-OBS-MIGRATION-001` | OPEN | P1 | TRUTH | — | — | Provider-execution-observation DB'sinin owner-controlled v1→v2 migration'ı: backup, migrate, adoption proof |
+| 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
+| 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
+| 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
