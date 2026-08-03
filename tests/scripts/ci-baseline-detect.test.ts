@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 // ─── DOC-GAP (2026-08-02) ────────────────────────────────────────────────────
 // The 2026-08 docs reset (commit 97b91e69f) archived the document this assertion
 // guards; the rewritten corpus has no successor carrying the same claim.
-// Skipped, not deleted, so the coverage loss stays visible. See PAZARTESI.md.
+// Skipped, not deleted, so the coverage loss stays visible. Owner ledger: docs/MASTER-PLAN.md (TRUTH-BASELINE-001).
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../../');

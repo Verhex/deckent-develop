@@ -3,7 +3,7 @@
  * check-test-failures.mjs — per-file test failure ratchet
  *
  * Why this exists: the 2026-08 CI outage left ~560 failing tests across the suites
- * (see PAZARTESI.md, "TEST BORCU ENVANTERİ"). Fixing all of them before continuing
+ * (see docs/MASTER-PLAN.md, TRUTH-BASELINE-001 evidence). Fixing all of them before continuing
  * runtime work (FAZ 4) would serialise the schedule, but working on top of a red
  * suite destroys the regression signal — you cannot tell "my change broke this" from
  * "this was already broken". This gate keeps the signal without demanding a green
@@ -112,7 +112,7 @@ function writeBaseline(counts, previous) {
     version: 1,
     note: existsSync(BASELINE_PATH)
       ? JSON.parse(readFileSync(BASELINE_PATH, 'utf-8')).note
-      : 'Known test debt from the 2026-08 CI outage (PAZARTESI.md · TEST BORCU ENVANTERİ). '
+      : 'Known test debt from the 2026-08 CI outage (docs/MASTER-PLAN.md · TRUTH-BASELINE-001). '
         + 'NEW failures fail the gate; this file is not a target to grow. Reduce it — '
         + 'FAZ 3 packages P1-P6 exist to empty it.',
     entries,

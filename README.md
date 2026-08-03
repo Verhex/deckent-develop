@@ -71,7 +71,7 @@ Status labels in the detailed docs mean:
 
 The feature manifest currently lists 21 active, 4 lightly used, 9 dormant, and 1 dead entry. The live `truth --json` check reported five truth contracts: training trace was code/wired/enabled/proven; tool surface, worker approval gate, and routing journal lacked runtime proof; prompt-gate-block had no detected callsite and was the single half-wire candidate. [Evidence: `.deckent/settings/features-manifest.json`; real `node dist/cli/entry.js features --json` and `truth --json` outputs, 2026-08-01]
 
-The latest dogfood handoff does not certify unattended production reliability: its Codex audit records 0/31 intervention-free runs and documents settlement/gate contradictions that require the ordered certification ladder. These are not hidden behind product language; see [Current frictions](docs/en/operations/current-frictions.md) and the [difference report](docs/analysis/CODE-DOC-DIFF-2026-08.md). [Evidence: `PAZARTESI.md`, FAZ 4a/4c and certification sections]
+The latest dogfood handoff does not certify unattended production reliability: its Codex audit records 0/31 intervention-free runs and documents settlement/gate contradictions that require the ordered certification ladder. These are not hidden behind product language; see [Current frictions](docs/en/operations/current-frictions.md) and the [difference report](docs/analysis/CODE-DOC-DIFF-2026-08.md). [Evidence: `docs/MASTER-PLAN.md` — RECOVERY-BORN-488 family, RECOVERY-BORN-490-REPLAY-CERTIFICATION-001 and CODEX-MAIN-001 decision line]
 
 ## Documentation map
 

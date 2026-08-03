@@ -86,7 +86,7 @@ describe('reference docs drift — config-field parity', () => {
 
   // DOC-GAP (2026-08-02): the 2026-08 docs reset archived docs/reference/config.md
   // without carrying these two fields into the successor schema doc. Skipped rather
-  // than deleted so the gap stays visible; tracked in PAZARTESI.md.
+  // than deleted so the gap stays visible; tracked in docs/MASTER-PLAN.md (CONFIG-TRUTH-001).
   it.skip('configuration-schema.md documents worker_memory_limit field', () => {
     expect(configContent).toContain('worker_memory_limit');
   });
@@ -99,7 +99,7 @@ describe('reference docs drift — config-field parity', () => {
 // DOC-GAP (2026-08-02): the archived docs/reference/api.md pinned Brain memory
 // constants (BRAIN_TOTAL_LINE_BUDGET / MEMORY_MAX_LINES / MEMORY_DECAY_SPRINTS).
 // No successor doc carries them, so this drift gate has no target. Skipped, not
-// deleted, so the missing coverage stays visible; tracked in PAZARTESI.md.
+// deleted, so the missing coverage stays visible; tracked in docs/MASTER-PLAN.md (CONFIG-TRUTH-001).
 describe.skip('reference docs drift — api memory-constant sync (no successor doc)', () => {
   it('documents BRAIN_TOTAL_LINE_BUDGET, MEMORY_MAX_LINES, MEMORY_DECAY_SPRINTS', () => {
     expect(true).toBe(true);
