@@ -100,18 +100,19 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-03: refreshed build-free after the approved DOC-GAP RETIRE wave deleted
-  // 8 fully-superseded doc test files (see docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md).
-  // Count unchanged, digest moved with the file-set change.
-  count: 12401,
-  digest: 'e3ae21f2b0753ed945cb9e7270532a2c5409efb5ac2633400956f4bc9d373a07',
+  // 2026-08-03 (2nd refresh today, build-free): +24 entries from the TRUST-ANCHOR-001
+  // regression suite — 11 new trust-anchor cases in tests/scripts/lint-master-plan.test.ts
+  // exercise real git repos in tmpdir (execFileSync git + fixture writes), all hermetic.
+  // Prior refresh same day: DOC-GAP RETIRE wave (count 12401, file-set change only).
+  count: 12425,
+  digest: 'f7ce68eb993b78a85400b5571a4c244ac11f77e3e465adc7f9ec82a64577ecda',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-03: same DOC-GAP RETIRE refresh as UNRESOLVED_BASELINE above — count unchanged,
-  // digest moved with the deleted files.
+  // 2026-08-03 (2nd refresh today, TRUST-ANCHOR-001 slice): count unchanged, digest moved —
+  // scripts/lint-master-plan.mjs gained the child_process-backed anchor helpers.
   count: 1196,
-  digest: '5410ec6789fa8f78acb93340ad449e6dd39b6b12e4b78f6c8c0bc9d38fe249ee',
+  digest: '36dbbaf610520af2944fcdf342205c7c7a981e7d92e32dfe4b0cd4b548dc6ecb',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
