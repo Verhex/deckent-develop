@@ -72,39 +72,38 @@ jobs:
   # a real Linux kernel and is covered by the ubuntu leg; a synthetic in-runner WSL is not a
   # faithful proxy. That remains a declared gap, not a silent one.
   #
-  # Windows status 2026-08-03: root cause FOUND AND FIXED; the leg stays allow-failure for
-  # exactly one run so the fix earns a receipt instead of asserting one.
+  # Windows status 2026-08-03: GATING. All three legs are blocking — 3/3 green with zero skips
+  # on e1eb9d0ea (73 passed (73) on ubuntu, macOS AND Windows). No `continue-on-error` here by
+  # design; that allowance existed for exactly two runs and was retired against real evidence.
   #
-  # The first run of this leg produced real information — ubuntu and macOS passed, Windows
-  # failed to even parse the suite (`SyntaxError: Invalid or unexpected token` at the module
-  # import). That incompatibility pre-dated this leg: tests/scripts/ had never run in any
-  # platform matrix, so nothing could have caught it.
+  # What those two runs bought, kept here so the eliminated causes are not re-investigated:
   #
-  # Root cause (reproduced and ablated on Linux, not inferred): this repo had no .gitattributes,
-  # so Git for Windows' `core.autocrlf=true` gave the runner a CRLF working tree. Vite's SSR
+  # Run 1 — ubuntu and macOS passed, Windows could not even parse the suite (`SyntaxError:
+  # Invalid or unexpected token` at the module import). The incompatibility pre-dated this leg:
+  # tests/scripts/ had never run in any platform matrix, so nothing could have caught it. Root
+  # cause (reproduced and ablated on Linux, not inferred): the repo had no .gitattributes, so
+  # Git for Windows' `core.autocrlf=true` gave the runner a CRLF working tree. Vite's SSR
   # transform finds a script's shebang with `/^#!.*\n/`, which cannot match `\r\n` because `.`
   # does not match CR — the file-start offset stays 0, hoisted `__vite_ssr_import__` statements
   # land ABOVE the shebang, and the module runner's "blank the shebang if the code starts with
-  # `#`" guard therefore misses it. The `#!` survives into the evaluated function body. Proof:
-  # converting scripts/lint-master-plan.mjs to CRLF reproduces the identical failure on Linux,
-  # and removing only its shebang (CRLF untouched) turns the suite green 73/73. Fixed at the
-  # only layer we control — `.gitattributes` (`* text=auto eol=lf`), which overrides autocrlf on
-  # every host and covers all 93 shebang-bearing scripts, not just this one.
+  # `#`" guard therefore misses it, so `#!` survives into the evaluated function body. Fixed at
+  # the only layer we control: `.gitattributes` (`* text=auto eol=lf`), which overrides autocrlf
+  # on every host and covers all 93 shebang-bearing scripts rather than this one file. An
+  # earlier non-ASCII-escaping hypothesis was tested and DISPROVEN — do not re-try it.
   #
-  # An earlier non-ASCII-escaping hypothesis was tested and DISPROVEN (Windows still failed);
-  # it is recorded here so the eliminated cause is not re-tried.
+  # Run 2 — the suite ran on Windows for the first time (69/2/2) and exposed three further
+  # defects that no amount of Linux testing could have surfaced: an asymmetry in
+  # resolveEntrypointIdentity (canonical branch compared an un-normalized modulePath against a
+  # resolved entryPath while the lexical branch normalized both); a test that passed on Windows
+  # for the WRONG reason, returning false from path mangling rather than from the paths
+  # differing; and two symlink cases still gated on a blind `process.platform === 'win32'` guess
+  # that the run itself disproved, since the real-CLI symlink case passed on that same runner.
   #
-  # Why allow-failure survives the fix, for now: 73 tests are about to execute on Windows for
-  # the first time in this repo's history, so a second, unrelated Windows incompatibility is a
-  # live possibility. Keeping the leg non-blocking for one run means such a finding is
-  # information rather than a new hard block on main; the follow-up commit removes
-  # `continue-on-error` and cites that green run as its receipt. The leg is deliberately NOT
-  # removed from the matrix: a red leg is honest, a deleted leg would be a silent omission.
-  # Tracked in MASTER (MASTER-CLI-SYMLINK-FLAKE-001) — `X` stays 0 until a real 3/3 green run;
-  # a Linux repro proves the mechanism, never the platform.
+  # Keeping the leg red-but-visible rather than deleting it is what produced all of the above:
+  # a red leg is honest, a deleted leg would have been a silent omission. It is now green and
+  # gating, so a regression in any of these is a build failure, not a discovery.
   validator-contract:
     name: Validator Contract — ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:
