@@ -254,9 +254,68 @@ Sebep: 27 satırın çoğu `RECOVERY-BORN-*` — gerçek koşularda gözlenmiş 
 
 Doğrulama: `lint:master-plan` **OK** (327 satır, 23 receipt, projeksiyonlar in-sync) · `lint:link` 0 kırık.
 
+---
+
+# 🔴 EK-2 — READY MİMARİ OLARAK ULAŞILAMAZ (2026-08-03, kanıtlandı)
+
+Alperen "receipt taslağını hazırla, hepsi onaylandı" dedi. Receipt yazıldı ve validator **iki kez** reddetti. İkinci ret, planın başlangıç koşulunu tümden değiştiriyor.
+
+## Denenen
+
+`GR-2026-08-03-SYMLINK-ADMISSION-01` · `MASTER-CLI-SYMLINK-FLAKE-001` · G1 ·
+5 dosyalık exact manifest (`path@sha256`) · `owner=Alperen; decision=APPROVED; scope=…; exclusions=…` · `` `ONE_SHOT`: active ``
+
+## Validator'ın cevabı
+
+```
+RECEIPT_BASELINE_DRIFT      — active receipt'in docs/MASTER-PLAN.md baseline'ı drift etti
+EXTERNAL_GRANT_REQUIRED     — Active receipt GR-... is an unauthenticated MASTER projection;
+                              production admission requires the external immutable grant verifier
+```
+
+İkincisi belirleyici. Kaynak: `scripts/lint-master-plan.mjs:2130-2142`
+
+```js
+if (receipt.lifecycle?.status === 'active' && baselineMode !== 'structural-only') {
+  addFinding(findings, 'EXTERNAL_GRANT_REQUIRED', ...);
+  receipt.active = false;      // ← receipt PASİFLEŞTİRİLİR
+}
+```
+
+`--check` (yani CI kapısı) `baselineMode='disk'` ile koşar. Sonuç:
+
+> **MASTER içinde HİÇBİR aktif receipt var olamaz.** Aktif receipt olmadan hiçbir satır `READY` veya `IN_PROGRESS` olamaz (`ADMISSION_RECEIPT_MISSING`). Yani **READY=0 bir yazım eksikliği veya owner ihmali değil — validator tarafından mimari olarak dayatılıyor.**
+
+## Bunun anlamı
+
+Codex analizinin ilk Goal'ı — *"en az bir READY root üret"* — **mevcut araç zinciriyle imkânsız**. Ne ben ne Alperen elle yazarak çözebilir; harici immutable grant verifier'ı olmadan kapı açılmıyor.
+
+Bu, "0 READY"in üçüncü ve gerçek açıklaması. Önceki iki tespitim eksikti:
+1. ~~"Yazım boşluğu"~~ — eksik.
+2. ~~"Owner admission authority gerekiyor"~~ — eksik.
+3. **"Harici immutable grant verifier alt-sistemi yok"** — doğrusu bu.
+
+## Ve bir çelişki
+
+MASTER'ın kendi metni (`docs/MASTER-PLAN.md:144`) diyor ki:
+
+> *"…trust anchor **reviewed Git parent/CI protection**'dır; signed/append-only runtime settlement `KERNEL-SETTLEMENT-001`, `AUDIT-001` ve `RECEIPT-001` kapsamındadır."*
+
+Yani doküman "bu projeksiyon için güven çıpası Git-parent review'dur" derken validator "harici immutable grant verifier olmadan aktif receipt kabul etmem" diyor. **İkisi aynı anda doğru olamaz** — biri değişmeli.
+
+## Owner kararı gerekiyor (üç seçenek)
+
+| | Seçenek | Sonuç |
+|---|---|---|
+| **A** | Harici grant verifier'ı **önce inşa et** (`RECEIPT-001` kapsamı) | Governance-by-construction korunur; ilk gerçek iş kalemi bu olur; READY o zaman açılır |
+| **B** | Validator'ı dokümante edilmiş trust modeline **hizala** — reviewed Git parent/CI anchor'ı active receipt için yeterli sayılsın (dar, gerekçeli, tarihli exception) | READY hemen açılır; güven çıpası Git review'a iner (doküman zaten bunu söylüyor) |
+| **C** | READY'siz devam | MASTER kayıt tutar ama admission üretmez; execution authority oturum-içi owner'da kalır (bugüne kadarki fiilî durum) |
+
+Not: MASTER'a geçersiz receipt yazılmadı; dosya commit'li temiz hâlinde (`lint:master-plan` OK, 327 satır).
+
 ## Sıradaki owner kararları
 
-1. `MASTER-CLI-SYMLINK-FLAKE-001` için **G1 admission receipt'i** yayımla → 262 işin kilidi açılır.
+1. ⛔ ~~`MASTER-CLI-SYMLINK-FLAKE-001` için G1 admission receipt'i~~ → **yukarıdaki A/B/C kararı verilmeden imkânsız.**
 2. **P0 bütçesi** belirle (etiket indirimi değil, eşzamanlı admission limiti).
 3. 9 P1 adayını onayla/reddet.
 4. Bu ledger'ı Codex'e **xverify**'a gönder (karar #7).
