@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d74bd13e352249aa65df033b067aaf39b5050de98d7367b79eac514aa2f6fa50"
+    "value": "11e5635f2e20b2d5b85bd728dadec2ebd773f700e33d6beec672ac502847ec30"
   },
   "summary": {
-    "total": 332,
-    "active": 325,
+    "total": 333,
+    "active": 326,
     "terminal": 7,
     "receipts": 24,
     "byState": {
-      "OPEN": 229,
+      "OPEN": 230,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -21,8 +21,8 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 242,
-      "P1": 74,
+      "P0": 245,
+      "P1": 72,
       "P2": 16
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 51,
+      "TRUTH": 52,
       "XPLAT": 3
     }
   },
@@ -83,7 +83,7 @@
       "state": "VERIFY",
       "updated": "2026-08-03",
       "definitionDigest": "022d3fa2bf4d2b59ea7919c574a1d95f0c3cdf7cd11b4040e1520841d251156f",
-      "progressDigest": "57b648ae5aefc61b10f6dcfff3957e9fe00c58d6a56f2e334b61dcdfe4390683",
+      "progressDigest": "f806af1680dae2bb529491ca0de41b4aa91d8770710f551edb08ca646a262882",
       "terminalClosureDigest": null
     },
     {
@@ -248,7 +248,7 @@
       "state": "OPEN",
       "updated": "2026-08-03",
       "definitionDigest": "eae11c641886c39822d3a69e483ec9006272ecb29611ac3d9208abfbeb7a5e59",
-      "progressDigest": "1750e72a9225c750c3cb1ba67031044008a2155570417f8ec4aba00ada1c8284",
+      "progressDigest": "6cb72794df25cb95f7e680345f22cd0c89ab2d7ed656953b23c05458db25ef72",
       "terminalClosureDigest": null
     },
     {
@@ -667,6 +667,17 @@
       "updated": "2026-08-03",
       "definitionDigest": "a12c72e94bf9f5b90445dbdf7256ea38de6d5df9c0df17dabc02473ff10d5a50",
       "progressDigest": "7bf096d247691286fcab8b5b176d66f0d8c6b8b30d3e6782a632b04a64d7290e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 520,
+      "id": "TRUST-ANCHOR-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-03",
+      "definitionDigest": "6dda7a49b043f6b3b9ec477c607703b7e0993438e4804eeb7b399d6d98e2deeb",
+      "progressDigest": "f5d18df10fab901a8dbca2115d08cb43b2065f420af2fcec5750e06f5df1761e",
       "terminalClosureDigest": null
     },
     {
@@ -2998,7 +3009,7 @@
       "state": "OPEN",
       "updated": "2026-08-03",
       "definitionDigest": "19482a88ef3c23c7b03a6752d1d71e7c6313a9120745b39fcd129a07f07de558",
-      "progressDigest": "4d5fe8dca074f1159f2fa2221e70c738f9c726480dd4b2a60550ad35a72060da",
+      "progressDigest": "36e7c24e88ff71cf6765fed03fdf946130f9036cf2548e87bab4d3ea96a38069",
       "terminalClosureDigest": null
     },
     {
@@ -3170,11 +3181,11 @@
       "order": 6121,
       "id": "STATUS-SURFACE-PARITY-001",
       "program": "PRODUCT",
-      "priority": "P1",
+      "priority": "P0",
       "state": "VERIFY",
       "updated": "2026-08-03",
       "definitionDigest": "f600b19e95b3680622cbb6186f441fefd7ee9b583acb8e0590c190c93c21394b",
-      "progressDigest": "51bd7156b761b6167717658e20e4e8ad97db89962b979dff17527d98630dade4",
+      "progressDigest": "49246619d48a0f9ff0a2eea35c449e812877acfe1cd7ef5bdccfdc3c9c658408",
       "terminalClosureDigest": null
     },
     {
@@ -3423,11 +3434,11 @@
       "order": 8060,
       "id": "RELEASE-001",
       "program": "RELEASE",
-      "priority": "P1",
+      "priority": "P0",
       "state": "BLOCKED",
       "updated": "2026-08-03",
       "definitionDigest": "923158605bf56dc17a638dddc797d35d67827ba44c4b542cc8ba6c446add02dd",
-      "progressDigest": "a02850639ac70c7fddb4737b0a2a23b8779e372bbbe03ccaf31f122129ec24d5",
+      "progressDigest": "294f187a7309adff866b8aedfe147074cfbabdc46575c402643b0ce2c4db3ad9",
       "terminalClosureDigest": null
     },
     {
@@ -4003,7 +4014,7 @@
         "GR-2026-07-26-MASTER-01"
       ],
       "acceptance": "File-level source catalog, 125 alias exactly-once total mapping, completed residual audit, supersession and finish contract complete",
-      "evidence": "`receipt=GR-2026-07-26-MASTER-01`; all reconciliation manifests present; isolated commit proof pending; 2026-08-03 (PAZARTESI P13): açık soru defteri docs/analysis/OPEN-QUESTIONS-2026-08.md'de 29 kayıt — 24 açık HOLD, 5 owner kararıyla çözülmüş. OQ-29 (coverage sınıf sayımı) bu turda RESOLVED: çelişki Tur-3 prompt'unun düz-metin aritmetiğindeydi, matris 31 tarihsel + 11 canlı ile doğru kapatıldı. Kanıtlamadığı: kalan 24 HOLD'un her biri canonical Work ID veya explicit supersession almadı",
+      "evidence": "`receipt=GR-2026-07-26-MASTER-01`; all reconciliation manifests present; isolated commit proof pending; 2026-08-03 (PAZARTESI P13): açık soru defteri docs/analysis/OPEN-QUESTIONS-2026-08.md'de 29 kayıt — 24 açık HOLD, 5 owner kararıyla çözülmüş. OQ-29 (coverage sınıf sayımı) bu turda RESOLVED: çelişki Tur-3 prompt'unun düz-metin aritmetiğindeydi, matris 31 tarihsel + 11 canlı ile doğru kapatıldı. 2026-08-03 (xverify OQ-XV-03/04 kapanışı, Alperen kararı \"referanslı kapanış\"): 24 açık HOLD'un HER BİRİ artık bir Work ID'ye veya owner-karar sahibine bağlıdır — eşleme authority'si RECONCILIATION-WP0.md EK-3 crosswalk'udur ve bu ledger onu versioned evidence artifact olarak referanslar (commit 1a30bf9e6; 4 boşluk kalemi 480-510 satırlarıyla kapatıldı). Önceki \"eşlenmedi\" cümlesi EK-3'ten önce yazılmıştı ve xverify B-ekseni çelişkiyi doğru yakaladı; çelişki bu güncellemeyle canonical tarafta kapandı. DOC-GAP dispozisyon kaydı da aynı sınıf versioned artifact'tır: docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md",
       "updated": "2026-08-03"
     },
     {
@@ -4554,7 +4565,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Code, tests, CI, runtime writers, site and inbound refs fully mapped",
-      "evidence": "2026-07-21 docs analyses are revalidate sources; 2026-08-03 ölçüm (PAZARTESI P7 + P10): docs-reset sonrası 187 skip / 30 dosya DOC-GAP işaretiyle görünür bırakıldı — arşiv corpus'una çakılı, yeni dokümanda karşılığı olmayan iddialar; silinmedi ve yeni dokümana uydurulmadı. Owner kararı: toplu emekli edilmeyecek, her iddia tek tek gözden geçirilecek. P10 (OQ-18 VitePress) ayrı owner kararı: .github/workflows/docs.yml otomatik tetikleyicileri duraklatıldı, workflow_dispatch bırakıldı; 65 test describe.skip + OQ-18 referanslı",
+      "evidence": "2026-07-21 docs analyses are revalidate sources; 2026-08-03 ölçüm (PAZARTESI P7 + P10): docs-reset sonrası 187 skip / 30 dosya DOC-GAP işaretiyle görünür bırakıldı — arşiv corpus'una çakılı, yeni dokümanda karşılığı olmayan iddialar; silinmedi ve yeni dokümana uydurulmadı. Owner kararı: toplu emekli edilmeyecek, her iddia tek tek gözden geçirilecek. P10 (OQ-18 VitePress) ayrı owner kararı: .github/workflows/docs.yml otomatik tetikleyicileri duraklatıldı, workflow_dispatch bırakıldı; 65 test describe.skip + OQ-18 referanslı; 2026-08-03 (xverify OQ-XV-05 kapanışı): 187-skip DOC-GAP kümesinin dispozisyonu Alperen onayıyla UYGULANDI — 184 iddia sınıflandı, ~106 süperseded iddia emekli (8 test dosyası silindi, içerik arşivde), ~48 REWRITE ve ~30 DECISION iddiası sahip Work ID anotasyonuyla duruyor; karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md (commit 6da6667a7). Bu satırın kendi topology kararı (docs/docs1/.analysis/generated sahipliği + OQ-18 VitePress) hâlâ AÇIK — P7 kapanışı onu kapatmaz",
       "updated": "2026-08-03"
     },
     {
@@ -5924,6 +5935,37 @@
       "evidenceReceipts": [],
       "acceptance": "`status --mode` için doğru-yazımlı canonical değerler + versioned deprecation alias'ları; `deckent run` one-shot ↔ `run start|status|retro|history` namespace çarpışması collision-free canonical UX'e ayrılır; `mode run`'ın diske `sprint` yazması tek public `run` vocabulary kararına bağlanır; config read yüzeyi (bare `config` ↔ var-olmayan `config read`/`config show` önerileri) tek operation adında normalize edilir; hepsi JSON contract testi taşır",
       "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk). Sahipsiz kalemler: CLI-03 · CLI-04 · CLI-05 · CLI-06 · CLI-11 · OQ-13 · OQ-14 · aday-17 · aday-18. Public contract işi: `explainatory`/`standart` kullanıcıya görünen yazım hataları ve düzeltme breaking-change kararı içerir (alias+deprecation vs rename) — karar acceptance'ın parçası; recovery mesajı bugün var olmayan `deckent config read` öneriyor (src/core/config.ts:1922-1925)",
+      "updated": "2026-08-03"
+    },
+    {
+      "order": 520,
+      "id": "TRUST-ANCHOR-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Aktif receipt baseline'ı working-tree byte'ına değil reviewed parent commit blob'una karşı doğrulanır (git parent-diff kontrolü validator'da veya required CI check'te); `owner=` metni tek başına authority sayılmaz — protected-branch + bağımsız review kanıtı zincire girer; branch protection durumu makine-okunur evidence olarak kayıtlıdır ve sahte-READY senaryosu (xverify E-ekseni 5-adım) regression testi olarak fail-closed kanıtlanır",
+      "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur",
       "updated": "2026-08-03"
     },
     {
@@ -15140,7 +15182,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Linux/macOS/Win-native/WSL shells, screen readers, keyboard, contrast and locale",
-      "evidence": "Every-environment law; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "evidence": "Every-environment law; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi; 2026-08-03 xverify netleştirmesi (Alperen onayı): P1 etiketi ürün öneminin indirimi DEĞİLDİR — yorum açıkça şudur: bu satır Gate-0'dan itibaren PARALEL proof-track olarak yürür (codex-analysis 14 şartı), admission önceliği ayrı eksendir; Every-Environment yasası priority etiketiyle zayıflatılamaz",
       "updated": "2026-08-03"
     },
     {
@@ -15815,7 +15857,7 @@
       "parent": "SURFACE-PARITY-001",
       "program": "PRODUCT",
       "outcome": "CLI and MCP consume the same canonical sprint status projection",
-      "priority": "P1",
+      "priority": "P0",
       "dependsOn": [
         "RUN-STATUS-AUTHORITY-001"
       ],
@@ -15843,7 +15885,7 @@
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "CLI text/JSON and MCP status expose equivalent state, resumability and pending recovery approval without either adapter inferring lifecycle independently",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED; 2026-08-03 ölçüm (PAZARTESI P4): MCP paketi 121 → 70 kırık. CLI ile AYNI kök: deckent_status tool'u canlı run authority ve canonical persisted read model olmadan zengin projeksiyon alanlarını üretmiyor, HOLD payload'u dönüyor (src/mcp/tools/status.ts:392-411). status-history 15 → 0, status-rich 14 → 3. Bu, CLI↔MCP'nin gerçekten aynı canonical projection'ı tükettiğinin kanıtıdır; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED; 2026-08-03 ölçüm (PAZARTESI P4): MCP paketi 121 → 70 kırık. CLI ile AYNI kök: deckent_status tool'u canlı run authority ve canonical persisted read model olmadan zengin projeksiyon alanlarını üretmiyor, HOLD payload'u dönüyor (src/mcp/tools/status.ts:392-411). status-history 15 → 0, status-rich 14 → 3. Bu, CLI↔MCP'nin gerçekten aynı canonical projection'ı tükettiğinin kanıtıdır; 2026-08-03 P0→P1 indirimi 2026-08-03 xverify turunda GERİ ALINDI (Alperen onayı, codex-analysis/xverify-wp0-2026-08-03.md C-ekseni): indirim gerekçem \"dependents=0 → critical path değil\" idi ve YANLIŞTI — codex-analysis/14-critical-path-prioritization.md Gate-1 CLI/MCP drift closure'ı açıkça declared critical path'e koyar ve PAZARTESI P4'ü FAZ-4 öncesi kritik yolda tutar; graph-dependent sayısı declared release/admission path kararını çürütemez. P0 geri geldi",
       "updated": "2026-08-03"
     },
     {
@@ -16767,7 +16809,7 @@
       "parent": "EVERY-ENV-001",
       "program": "RELEASE",
       "outcome": "Unified validate, soak, publish and rollback gate",
-      "priority": "P1",
+      "priority": "P0",
       "dependsOn": [
         "TRUTH-BASELINE-001",
         "PLATFORM-PROOF-001",
@@ -16800,7 +16842,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "72h declared-platform soak, zero release blocker, signed artifacts, owner publish approval",
-      "evidence": "Legacy 535; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "evidence": "Legacy 535; 2026-08-03 P0→P1 indirimi 2026-08-03 xverify turunda GERİ ALINDI (Alperen onayı, xverify C-ekseni): \"dependent yok → critical path değil\" çıkarımım terminal düğümde yönü ters okuyordu — unified release gate SONUÇ düğümüdür, arkasında node olmaması critical-path dışılık değil tam tersine uç nokta olduğunun kanıtıdır. P0 geri geldi",
       "updated": "2026-08-03"
     },
     {
@@ -17841,6 +17883,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0b70837a7f305b4f9e21496df2446af5065ca95602752d2f7f9abf3bcf323d7c"
+    "value": "0bd935b1cf9996d7db1dc1b2ba7ca96a80e3626dbe98272fc3621efbb058339f"
   }
 }

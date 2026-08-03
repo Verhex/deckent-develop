@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):d74bd13e352249aa65df033b067aaf39b5050de98d7367b79eac514aa2f6fa50`
+**Source digest:** `sha256(normalized-lf-utf8):11e5635f2e20b2d5b85bd728dadec2ebd773f700e33d6beec672ac502847ec30`
 
-**Rows:** 332 total · 325 active · 7 terminal
+**Rows:** 333 total · 326 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 229 |
+| OPEN | 230 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -79,6 +79,7 @@
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
+| 520 | `TRUST-ANCHOR-001` | OPEN | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -302,7 +303,7 @@
 | 6100 | `CONNECTOR-IDENTITY-001` | OPEN | P0 | CONNECTOR | `PRINCIPAL-001`, `APPROVAL-001`, `APP-SERVICE-001` | — | Gateway and connector session identity, pairing and approval authority |
 | 6110 | `DASHBOARD-OBS-001` | OPEN | P1 | DASHBOARD | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Dashboard as honest, read-oriented observability projection |
 | 6120 | `SURFACE-PARITY-001` | BLOCKED | P0 | PRODUCT | `DESKTOP-REBORN-001`, `API-CONTRACT-001`, `CONNECTOR-IDENTITY-001`, `DASHBOARD-OBS-001` | `DEPENDENCY_UNSATISFIED` | Capability-by-capability parity and intentional negative-space matrix |
-| 6121 | `STATUS-SURFACE-PARITY-001` | VERIFY | P1 | PRODUCT | `RUN-STATUS-AUTHORITY-001` | — | CLI and MCP consume the same canonical sprint status projection |
+| 6121 | `STATUS-SURFACE-PARITY-001` | VERIFY | P0 | PRODUCT | `RUN-STATUS-AUTHORITY-001` | — | CLI and MCP consume the same canonical sprint status projection |
 | 6130 | `API-EVENT-001` | OPEN | P0 | API | `API-CONTRACT-001`, `KERNEL-SETTLEMENT-001`, `STORAGE-001` | — | Durable asynchronous jobs, event streams, webhooks and outbox delivery |
 | 6140 | `API-DEVELOPER-001` | OPEN | P1 | API | `API-CONTRACT-001`, `SURFACE-PARITY-001` | — | OpenAPI, generated SDKs, CLI/MCP parity and compatibility lifecycle |
 | 6150 | `API-OPERATIONS-001` | OPEN | P1 | API | `API-IDENTITY-001`, `LIMIT-001`, `API-EVENT-001` | — | Quotas, pagination, bulk operations, idempotency and regional operations |
@@ -325,7 +326,7 @@
 | 8030 | `PLATFORM-PROOF-001` | OPEN | P0 | XPLAT | `ENV-ADAPTER-001`, `TEST-PLATFORM-001` | — | Cross-platform CI, real-binary and hardware/OS certification |
 | 8040 | `PACKAGING-001` | OPEN | P0 | RELEASE | `INSTALL-SCOPE-001`, `SUPPLY-CHAIN-001` | — | CLI, daemon, Desktop, service and container packaging supply chain |
 | 8050 | `DOCS-PRODUCT-001` | BLOCKED | P0 | DOCS | `DOCS-ADR-SYNC-001`, `DOCS-I18N-001`, `SURFACE-PARITY-001` | `DEPENDENCY_UNSATISFIED` | Current code-truth architecture, guide, reference and operations docs |
-| 8060 | `RELEASE-001` | BLOCKED | P1 | RELEASE | `TRUTH-BASELINE-001`, `PLATFORM-PROOF-001`, `PACKAGING-001`, `DOCS-PRODUCT-001` | `DEPENDENCY_UNSATISFIED` | Unified validate, soak, publish and rollback gate |
+| 8060 | `RELEASE-001` | BLOCKED | P0 | RELEASE | `TRUTH-BASELINE-001`, `PLATFORM-PROOF-001`, `PACKAGING-001`, `DOCS-PRODUCT-001` | `DEPENDENCY_UNSATISFIED` | Unified validate, soak, publish and rollback gate |
 | 8070 | `REPO-MIGRATION-001` | OPEN | P0 | REPO | `REPO-CLEANUP-APPLY-001`, `DOCS-TOPOLOGY-001`, `MEMORY-AUTHORITY-001` | — | Rebaseline and execute repository cutover |
 | 8080 | `OPERATIONS-PACK-001` | OPEN | P1 | OPS | `PACKAGING-001`, `STATE-RETENTION-001`, `AUDIT-001` | — | Install, backup, restore, diagnostics, support bundle and disaster recovery |
 | 8090 | `RELEASE-BETA-001` | OPEN | P0 | RELEASE | `REPO-MIGRATION-001`, `NPM-CHANNEL-001`, `DOCS-TRUTH-PASS-001` | — | Owner-approved scoped beta gate: public repo flip plus npm beta channel ahead of RELEASE-001 GA |

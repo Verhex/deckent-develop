@@ -1,8 +1,17 @@
-# WP0 — Canonical Reconciliation Önerisi (onay bekliyor)
+# WP0 — Canonical Reconciliation: SETTLED KAYIT + VERSIONED EVIDENCE ARTIFACT
 
-> Yazan: Claude (Opus 5, high effort) · 2026-08-03 · HEAD `56d5406f0`
-> Girdi: `codex-analysis/**` (20 rapor + 9 appendix, tamamı okundu) · `PAZARTESI.md` · `docs/analysis/CODE-DOC-DIFF-2026-08.md` (54 fark) · `docs/generated/master-plan-active.json` (323 satır)
-> **Bu dosya MASTER'ı DEĞİŞTİRMEZ.** Alperen onayından sonra satırlar `docs/MASTER-PLAN.md`'ye taşınır ve bu dosya silinir.
+> Yazan: Claude · 2026-08-03 · başlangıç HEAD `56d5406f0`
+> Girdi: `codex-analysis/**` (20 rapor + 9 appendix, tamamı okundu) · `PAZARTESI.md` · `docs/analysis/CODE-DOC-DIFF-2026-08.md` (54 fark) · `docs/generated/master-plan-active.json` (başlangıçta 323 satır)
+>
+> **STATÜ GÜNCELLEMESİ (2026-08-03, Alperen kararı "referanslı kapanış" — xverify OQ-XV-03):**
+> Bu dosya artık "onay bekleyen öneri" DEĞİLDİR ve SİLİNMEYECEKTİR. İçindeki öneriler tur tur
+> Alperen onayıyla uygulandı (WP0 uygulaması `8a666d42b`, READY kilidi `1f33bd019`, 9 indirim
+> `5abf06860`, EK-3 crosswalk + 4 satır `1a30bf9e6`); dosya bundan böyle MASTER'ın `SSOT-002`
+> evidence'ından referanslanan **versioned evidence artifact**'tır. Eşleme tablolarının (EK-3)
+> authority'si MASTER üzerinden bu referansla akar; çelişki durumunda MASTER satır-evidence'ı kazanır.
+> Ana gövdedeki "onay bekliyor" / "MASTER'ı değiştirmez" cümleleri tarihsel bağlamdır, güncel statü değildir.
+> Adversarial doğrulama: `codex-analysis/xverify-wp0-2026-08-03.md` (B/E eksenleri bu statü
+> güncellemesinin doğrudan sebebidir).
 
 ---
 
