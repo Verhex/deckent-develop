@@ -1,0 +1,474 @@
+{
+  "version": 1,
+  "note": "Known test debt from the 2026-08 CI outage (PAZARTESI.md · TEST BORCU ENVANTERİ). NEW failures fail the gate; this file is not a target to grow. Reduce it — FAZ 3 packages P1-P6 exist to empty it. NOTE 1: tests/scripts/test-containment-inventory-ratchet.test.ts fails only on a BUILT tree (dist/ enters the hermeticity scan); CI runs it without dist and observes 0 — that shows up as an \"improved\" line, not a failure, which is why the default mode tolerates environment variance. NOTE 2: some suites are timing-sensitive (tests/mcp/tools/annotations.test.ts takes ~250s); if a file oscillates, record the highest observation rather than chasing it.",
+  "entries": [
+    {
+      "file": "tests/api/dashboard-data-parity.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/api/endpoints.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/api/provider-authority-front-door.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/api/run-flow-durability-1c.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/api/server-auth.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/api/server-body-schemas.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/api/server-edge.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/api/server-security.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/api/server.test.ts",
+      "failed": 9
+    },
+    {
+      "file": "tests/cli/autonomous-v1-provider-authority.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/chat-nervous-bridge.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/cleanup-log-archive.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/cli/cli-bin-invocation.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/command-registry.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/cli/commands.test.ts",
+      "failed": 14
+    },
+    {
+      "file": "tests/cli/commands/dashboard-overhaul.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/commands/doctor.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/commands/i18n-integration.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/cli/commands/plan.test.ts",
+      "failed": 12
+    },
+    {
+      "file": "tests/cli/commands/review-finalize-onboard-upgrade-plugin-archive-debt-improvements.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/commands/review-finalize-overhaul.test.ts",
+      "failed": 5
+    },
+    {
+      "file": "tests/cli/commands/spawn.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/cli/commands/status-agents.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/commands/status-mode.test.ts",
+      "failed": 7
+    },
+    {
+      "file": "tests/cli/commands/status.test.ts",
+      "failed": 20
+    },
+    {
+      "file": "tests/cli/commands/sync-onboard-upgrade-overhaul.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/dashboard.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/finalize-refinalize.test.ts",
+      "failed": 6
+    },
+    {
+      "file": "tests/cli/finalize-rule-regen.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/cli/helpers/process-runtime-provider-threading.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/index-runflow-wiring.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/mcp-client-gate.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/repl-nervous-wire.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/resume-race.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/run-rename-smoke.test.ts",
+      "failed": 7
+    },
+    {
+      "file": "tests/cli/spawn-multiprovider.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/cli/start-snapshot-branch.test.ts",
+      "failed": 7
+    },
+    {
+      "file": "tests/cli/status-read-model-wire.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/status-terminal-publication-race.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/status-terminal-receipt.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/cli/sync-eisdir.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/term-flow-composition.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/term-slice-541-544-e2e.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/cli/worktree-binary-authority-live.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/core/identity-generator.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/core/provider-concurrency-runtime-projection.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/core/run-status-read-model.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/core/task-execution-fence.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/integration/lifecycle.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/mcp/branch-coverage.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/mcp/run-budget-authority.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/mcp/run-provider-free.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/mcp/run-tool-parity.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/mcp/server.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/mcp/status-failed-tasks.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/mcp/status-terminal-receipt.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/mcp/tools-enrichment-004.test.ts",
+      "failed": 14
+    },
+    {
+      "file": "tests/mcp/tools.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/mcp/tools/annotations.test.ts",
+      "failed": 25
+    },
+    {
+      "file": "tests/mcp/tools/status-agents.test.ts",
+      "failed": 8
+    },
+    {
+      "file": "tests/mcp/tools/status-history.test.ts",
+      "failed": 15
+    },
+    {
+      "file": "tests/mcp/tools/status-rich.test.ts",
+      "failed": 14
+    },
+    {
+      "file": "tests/monitor/auditor-edge.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/avgcoverage-repair.test.ts",
+      "failed": 5
+    },
+    {
+      "file": "tests/orchestra/brain-ipc.test.ts",
+      "failed": 9
+    },
+    {
+      "file": "tests/orchestra/brain-pause-resume.test.ts",
+      "failed": 39
+    },
+    {
+      "file": "tests/orchestra/brain-provider.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/brain-rollback.test.ts",
+      "failed": 10
+    },
+    {
+      "file": "tests/orchestra/brain.test.ts",
+      "failed": 14
+    },
+    {
+      "file": "tests/orchestra/build-violation-guard.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/orchestra/buildworkerprompt-projectroot-thread.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/orchestra/canonical-wiring-closure.integration.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/orchestra/cascade-unblock-wire.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/decay-config-wire.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/docker-auth-precedence.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/docker-backend-owned-settlement.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/docker-container-start-failed.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/orchestra/docker-dist-guard.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/docker-final-only-containment.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/docker-multicli-buildarg.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/orchestra/docker-provider-auth.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/docker-provider-cli.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/orchestra/docker-restart-reconcile.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/orchestra/docker-settlement-monitor-wire.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/evaluate-enforcement-gates.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/orchestra/exec-throw-armor.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/f1014-auth-isolation.test.ts",
+      "failed": 6
+    },
+    {
+      "file": "tests/orchestra/finalize-sprint.test.ts",
+      "failed": 25
+    },
+    {
+      "file": "tests/orchestra/fix-dispatch-continuation.test.ts",
+      "failed": 7
+    },
+    {
+      "file": "tests/orchestra/fix-phase-map.test.ts",
+      "failed": 9
+    },
+    {
+      "file": "tests/orchestra/fix-retry-circuit-breaker.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/fix-task-enrichment.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/memory-limit-by-kind.test.ts",
+      "failed": 7
+    },
+    {
+      "file": "tests/orchestra/moat3-fixphase.test.ts",
+      "failed": 6
+    },
+    {
+      "file": "tests/orchestra/override-warning-surface.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/orchestra/pause-resume.test.ts",
+      "failed": 31
+    },
+    {
+      "file": "tests/orchestra/postfix-pending-scan.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/orchestra/rubric-armor-complete.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/runsprint-debt-integration.test.ts",
+      "failed": 13
+    },
+    {
+      "file": "tests/orchestra/rvdc-deadbranch.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/scheduler-fifo-composition.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/scheduler-shadow-retention-finalize.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/spawn-backend-docker.test.ts",
+      "failed": 8
+    },
+    {
+      "file": "tests/orchestra/spawn-throw-lifecycle.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/orchestra/sprint-controller.test.ts",
+      "failed": 25
+    },
+    {
+      "file": "tests/orchestra/sprint-finalizer-runflow.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/sprint-finalizer.test.ts",
+      "failed": 38
+    },
+    {
+      "file": "tests/orchestra/sprint-phases-rollback.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/sprint-reporter-lineage-summary.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/surf0-flowid-seam-pin.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/task-mode-agent-inject.test.ts",
+      "failed": 3
+    },
+    {
+      "file": "tests/orchestra/trn1-sprint-trace-wire.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/orchestra/wm5-auth-guard.test.ts",
+      "failed": 2
+    },
+    {
+      "file": "tests/orchestra/worker-auth-isolation.test.ts",
+      "failed": 4
+    },
+    {
+      "file": "tests/orchestra/wrapper-hb-allowlist.test.ts",
+      "failed": 8
+    },
+    {
+      "file": "tests/scripts/test-containment-inventory-ratchet.test.ts",
+      "failed": 1
+    },
+    {
+      "file": "tests/security/api-auth.test.ts",
+      "failed": 1
+    }
+  ]
+}

@@ -298,13 +298,13 @@ describe('collectGenerations', () => {
 
   it('clears drift after writing generated content', () => {
     seedMinimalProject(tmpRoot);
-    // Seed README/README-TR/IDENTITY with AUTOGEN scaffolds
+    // Seed README/README.tr/IDENTITY with AUTOGEN scaffolds
     writeFileSync(
       join(tmpRoot, 'README.md'),
       `# deckent\n\n<!-- AUTOGEN:START id="badges" -->\nstale\n<!-- AUTOGEN:END id="badges" -->\n<!-- AUTOGEN:START id="stat-counts" -->\nstale\n<!-- AUTOGEN:END id="stat-counts" -->\n`,
     );
     writeFileSync(
-      join(tmpRoot, 'README-TR.md'),
+      join(tmpRoot, 'README.tr.md'),
       `# deckent\n\n<!-- AUTOGEN:START id="badges" -->\nstale\n<!-- AUTOGEN:END id="badges" -->\n<!-- AUTOGEN:START id="stat-counts" -->\nstale\n<!-- AUTOGEN:END id="stat-counts" -->\n`,
     );
     mkdirSync(join(tmpRoot, '.deckent/workspace'), { recursive: true });
@@ -341,7 +341,7 @@ describe('main (CLI entry)', () => {
     seedMinimalProject(tmpRoot);
     // Missing markers → drift
     writeFileSync(join(tmpRoot, 'README.md'), '# no markers\n');
-    writeFileSync(join(tmpRoot, 'README-TR.md'), '# no markers\n');
+    writeFileSync(join(tmpRoot, 'README.tr.md'), '# no markers\n');
     mkdirSync(join(tmpRoot, '.deckent/workspace'), { recursive: true });
     writeFileSync(join(tmpRoot, '.deckent/workspace/IDENTITY.md'), '# no markers\n');
     const exit = main(['--check'], { root: tmpRoot });
@@ -352,7 +352,7 @@ describe('main (CLI entry)', () => {
     seedMinimalProject(tmpRoot);
     // Files exist but have NO AUTOGEN markers — write mode should inject them
     writeFileSync(join(tmpRoot, 'README.md'), '# deckent\n\nNo markers here.\n');
-    writeFileSync(join(tmpRoot, 'README-TR.md'), '# deckent\n\nNo markers here.\n');
+    writeFileSync(join(tmpRoot, 'README.tr.md'), '# deckent\n\nNo markers here.\n');
     mkdirSync(join(tmpRoot, '.deckent/workspace'), { recursive: true });
     writeFileSync(join(tmpRoot, '.deckent/workspace/IDENTITY.md'), '# Identity\n\nNo markers.\n');
 
@@ -377,7 +377,7 @@ describe('main (CLI entry)', () => {
       `# deckent\n\n<!-- AUTOGEN:START id="badges" -->\nstale\n<!-- AUTOGEN:END id="badges" -->\n<!-- AUTOGEN:START id="stat-counts" -->\nstale\n<!-- AUTOGEN:END id="stat-counts" -->\n`,
     );
     writeFileSync(
-      join(tmpRoot, 'README-TR.md'),
+      join(tmpRoot, 'README.tr.md'),
       `# deckent\n\n<!-- AUTOGEN:START id="badges" -->\nstale\n<!-- AUTOGEN:END id="badges" -->\n<!-- AUTOGEN:START id="stat-counts" -->\nstale\n<!-- AUTOGEN:END id="stat-counts" -->\n`,
     );
     mkdirSync(join(tmpRoot, '.deckent/workspace'), { recursive: true });

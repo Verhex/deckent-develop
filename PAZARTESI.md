@@ -263,6 +263,38 @@ P2'nin "mekanik" kısmını yuttu:
   tüketiciler güncellenmedi) **aynı alt-sistemde** — `run-status-read-model`. P1'e girmeden
   **önce P6 kapatılmalı**, yoksa P1 düzeltmeleri hâlâ şema hatasına çarpar.
 
+### 🔗 TEST BORCU ↔ FAZ 4 SIRALAMASI (Alperen onayı, 2026-08-03)
+Soru şuydu: bu 564 kırığı PAZARTESI.md işleri **bittikten sonra** mı düzeltelim? Cevap ikisi de değil —
+**ölçüm gösterdi ki P1 ile FAZ 4a fiilen aynı dosyalara dokunuyor.**
+
+P1 test dosyalarının dokunduğu üretim modülleri: `sprint-controller` · `sprint-finalizer` ·
+`brain` · `spawn-backend-docker` · `auditor` · `debt-manager`. FAZ 4a'nın 6 sistemi de tam oraya iniyor:
+
+| FAZ 4a maddesi | Dokunacağı yer | P1 çakışması |
+|---|---|---|
+| Atomic result writing + malformed-recovery | result-collector | ✅ |
+| Collect→evaluate→status transactionality | sprint-controller · finalizer | ✅ |
+| Continuous slot refill | sprint-controller | ✅ |
+| Repair scope augmentation | brain / FIX üretimi | ✅ |
+| Generated skill durability | brain / skill-pool | ✅ |
+| Criteria isolation | result-evaluator | kısmi |
+
+**Karar — üçe bölünür:**
+1. **FAZ 4'ten ÖNCE (çakışmayan, ucuz): P6 + P3 + P4 = 218 kırık.** CLI ve MCP yüzeyleri FAZ 4a'nın
+   patlama yarıçapı dışında; düzeltilince bir daha bozulmaz ve regresyon sinyalini geri getirir.
+   P6 zaten P1'in ön koşulu (`runId` wiring).
+2. **FAZ 4a İLE BİRLİKTE, aynı dilimde: P1 = 211 kırık.** Bu ayrı bir "test düzeltme işi" değil,
+   **FAZ 4a'nın kendi tamamlanma kriteridir**. Şimdi düzeltilirse FAZ 4a davranışı değiştirdiğinde
+   aynı 211 test ikinci kez yazılır. (Zaten 1-2 Ağustos'ta bu adım atlandığı için borç oluştu.)
+3. **Sonraya: P2 kalanı = 135.** Heterojen, 38 dosya, aciliyeti yok.
+
+**Sinyal koruması — test-failure ratchet (kuruldu, 2026-08-03).** 564 kırıkla FAZ 4'e girmenin
+gerçek tehlikesi "benim değişikliğim mi bozdu, zaten mi bozuktu" ayrımının kaybolmasıdır. Çözüm
+tüm suite'i yeşile çekmek değil; borç **dosya-dosya** kaydedildi:
+`scripts/test-failure-baseline.json` + `npm run lint:test-baseline`.
+Yeni kırık = FAIL; azalma = raporlanır ve `--update` ile ratchet'lenir. Projenin mevcut
+`spawnsync-baseline` / `error-handling-baseline` kültürüyle aynı desen.
+
 **Kritik yol önerisi (CI'ı yeşile götüren en kısa hat):**
 1. ~~P2-mekanik + P5~~ → **2026-08-03'te YAPILDI.** P5 yeşil (46→0, `lint:errors` OK);
    P2-mekanik uygulandı ama sayıyı düşürmedi (kırıklar P1'e taşındı).
