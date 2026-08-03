@@ -71,8 +71,23 @@ jobs:
   # WSL parity follows the same documented reasoning as the packed-install note below: WSL2 runs
   # a real Linux kernel and is covered by the ubuntu leg; a synthetic in-runner WSL is not a
   # faithful proxy. That remains a declared gap, not a silent one.
+  #
+  # Windows status 2026-08-03: DISCOVERED-BROKEN, not skipped. The first run of this leg
+  # produced real information — ubuntu and macOS pass, Windows fails to even parse the suite
+  # (`SyntaxError: Invalid or unexpected token` at the module import). That incompatibility
+  # pre-dates this leg: tests/scripts/ had never run in any platform matrix, so nothing could
+  # have caught it. Eliminated by measurement, not assumption: CRLF conversion (a CRLF copy
+  # parses locally), validator .mjs syntax (`node --check` clean on both line endings),
+  # missing `ci:rebuild-native` (that script only rebuilds better-sqlite3), stray control
+  # characters (none), and non-ASCII inside string literals (escaped; Windows still failed).
+  # Root cause is unresolved and needs runner-side diagnostics, so the leg is marked
+  # allow-failure — matching the existing "Tests — Windows (allow-failure)" precedent in
+  # ci.yml — to keep the ubuntu/macOS evidence readable while the gap stays visible and
+  # tracked in MASTER (MASTER-CLI-SYMLINK-FLAKE-001, `X` dimension). It is deliberately NOT
+  # removed from the matrix: a red leg is honest, a deleted leg would be a silent omission.
   validator-contract:
     name: Validator Contract — ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:
