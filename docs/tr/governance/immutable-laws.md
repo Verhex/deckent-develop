@@ -63,3 +63,5 @@ Product sonuçları:
 | Enterprise enforcement boundary | ⚠️ kısmi | Repository hook/policy'leri unbypassable admin boundary değildir; bu claim için managed requirements gerekir. [Kanıt: `AGENTS.md:124-128`] |
 
 Law'lar required direction'ı, status table current repository'nin gerçekten kanıtladığını tanımlar. Biri diğerinin yerine geçmez.
+
+Bu üç yasanın ürün konumlandırmasını, kitle aralığını ve non-goal'leri nasıl şekillendirdiği için: [Vizyon](../vision.md).

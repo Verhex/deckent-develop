@@ -6,7 +6,21 @@ Worker; task scope, provider/model decision, backend, budget/time limit, heartbe
 
 ## Provider ve model resolution
 
-Deckent configuration'da Claude, Codex, Gemini, Ollama ve OpenRouter tanır. Product identity provider-neutral'dir: effective config, runtime model registry, role policy, auth/account evidence, reachability, limits ve budget admission birlikte neyin çalışabileceğine karar verir. [Kanıt: `src/core/config.ts:1978-2021`; `src/core/model-registry.ts`; `.deckent/workspace/IDENTITY.md:10`; `AGENTS.md:74-88`]
+Product identity provider-neutral'dir: effective config, runtime model registry, role policy, auth/account evidence, reachability, limits ve budget admission birlikte neyin çalışabileceğine karar verir. [Kanıt: `src/core/config.ts:1978-2021`; `src/core/model-registry.ts`; `.deckent/workspace/IDENTITY.md:10`; `AGENTS.md:74-88`]
+
+Repository yedi provider adapter ailesi içerir. Hepsi aynı yoldan kullanılabilir hale gelmez; bu yüzden admission yolu, adapter varlığından ayrı listelenir:
+
+| Adapter ailesi | Nasıl kullanılabilir hale gelir | Kanıt |
+|---|---|---|
+| `claude` | Built-in bootstrap factory. | `src/providers/claude.ts`; `src/core/provider.ts:123` |
+| `codex` | Built-in bootstrap factory. | `src/providers/codex.ts`; `src/core/provider.ts:123` |
+| `gemini` | Built-in bootstrap factory. | `src/providers/gemini.ts`; `src/core/provider.ts:123` |
+| `ollama` | Built-in bootstrap; local endpoint varsayılmaz, probe edilir. | `src/providers/ollama.ts`; `src/core/provider.ts:678` |
+| `openai-compatible` | Tanımlı `ProviderAdapterKind`; custom endpoint configuration altında built-in adapter'a alias olur. | `src/core/config-types.ts:614-617`; `src/providers/openai-compatible.ts`; `src/core/provider.ts:1109` |
+| `openrouter` | `openrouter` config bloğu enabled olduğunda register edilir; secret'lar `process.env`'den değil config'ten çözülür. | `src/providers/openrouter.ts`; `src/core/provider.ts:1368-1385,1566` |
+| `bedrock` | Yalnız `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` ve bir AWS region değişkeninin üçü birden mevcutken runtime'da register edilir; configuration enum üyesi değildir ve adapter construction başarısız olursa sessiz yokluk yerine skipped olarak kaydedilir. | `src/providers/bedrock.ts`; `src/core/provider.ts:1538-1554` |
+
+`bedrock` config ile seçilmez, credential ile açılır; bu yüzden yalnız configuration'a bakan bir okur onu göremez. Bu asimetri mevcut davranıştır, dokümantasyon kısayolu değil. [Kanıt: `src/core/provider.ts:1538-1554`; `src/core/pricing-updater.ts`; `src/orchestra/token-counter.ts`; `src/agents/agentic-worker-entry.ts`]
 
 Current default mode table'ları hâlâ provider-specific model ID içerir. Bunlar compatibility/fallback input'tur; model reachability veya entitlement proof'u değildir. OQ-16 provider-neutrality gerilimini takip eder. [Kanıt: built `DEFAULT_MODES`, 2026-08-01; `src/core/config.ts:469-540`; OQ-16]
 

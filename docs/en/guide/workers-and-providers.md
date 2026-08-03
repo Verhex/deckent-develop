@@ -6,7 +6,21 @@ A worker is an admitted execution attempt with a task scope, provider/model deci
 
 ## Provider and model resolution
 
-Deckent recognizes Claude, Codex, Gemini, Ollama, and OpenRouter in configuration. Product identity is provider-neutral: effective config, runtime model registry, role policy, auth/account evidence, reachability, limits, and budget admission jointly decide what can run. [Evidence: `src/core/config.ts:1978-2021`; `src/core/model-registry.ts`; `.deckent/workspace/IDENTITY.md:10`; `AGENTS.md:74-88`]
+Product identity is provider-neutral: effective config, runtime model registry, role policy, auth/account evidence, reachability, limits, and budget admission jointly decide what can run. [Evidence: `src/core/config.ts:1978-2021`; `src/core/model-registry.ts`; `.deckent/workspace/IDENTITY.md:10`; `AGENTS.md:74-88`]
+
+The repository contains seven provider adapter families. They do not all become available the same way, so admission path is listed separately from adapter existence:
+
+| Adapter family | How it becomes available | Evidence |
+|---|---|---|
+| `claude` | Built-in bootstrap factory. | `src/providers/claude.ts`; `src/core/provider.ts:123` |
+| `codex` | Built-in bootstrap factory. | `src/providers/codex.ts`; `src/core/provider.ts:123` |
+| `gemini` | Built-in bootstrap factory. | `src/providers/gemini.ts`; `src/core/provider.ts:123` |
+| `ollama` | Built-in bootstrap; local endpoint must be probed, not assumed. | `src/providers/ollama.ts`; `src/core/provider.ts:678` |
+| `openai-compatible` | Declared `ProviderAdapterKind`; aliases a built-in adapter under custom endpoint configuration. | `src/core/config-types.ts:614-617`; `src/providers/openai-compatible.ts`; `src/core/provider.ts:1109` |
+| `openrouter` | Registered when the `openrouter` config block is enabled; secrets resolve through config, not `process.env`. | `src/providers/openrouter.ts`; `src/core/provider.ts:1368-1385,1566` |
+| `bedrock` | Registered at runtime only when `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and an AWS region variable are all present; it is not a configuration enum member, and a failed adapter construction is recorded as skipped rather than silently absent. | `src/providers/bedrock.ts`; `src/core/provider.ts:1538-1554` |
+
+`bedrock` is credential-gated rather than config-selected, so a reader inspecting only configuration will not see it. That asymmetry is current behavior, not a documentation shortcut. [Evidence: `src/core/provider.ts:1538-1554`; `src/core/pricing-updater.ts`; `src/orchestra/token-counter.ts`; `src/agents/agentic-worker-entry.ts`]
 
 The current default mode tables still contain provider-specific model IDs. Those are compatibility/fallback inputs, not proof that a model is reachable or entitled; OQ-16 tracks the provider-neutrality tension. [Evidence: built `DEFAULT_MODES`, 2026-08-01; `src/core/config.ts:469-540`; OQ-16]
 

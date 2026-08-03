@@ -275,14 +275,21 @@ birlikte uygulanmalı, aksi halde parite kırılır.
 
 ## Önerilen işlem sırası
 
-| # | İş | Nerede | Neden önce |
+| # | İş | Nerede | Durum |
 |---|---|---|---|
-| 1 | A1, A2, A4 kip/nitel düzeltmesi | `docs/en/vision.md` + `docs/tr/vision.md` | Vizyon en yeni doküman; kanıt-atıflı dokümanlarla çelişmesi en hızlı güven kaybı |
-| 2 | C2 provider envanteri | `guide/workers-and-providers.md` (en+tr) | Vizyonun moat iddiasını doğrudan zayıflatıyor |
-| 3 | B4 geri-linkler | `overview.md`, `governance/immutable-laws.md` (en+tr) | Tek satır; vizyonu keşfedilebilir yapar |
-| 4 | A3, A5 tek-cümle nitelemeleri | `vision.md` (en+tr) | Düşük şiddet, düşük maliyet |
-| 5 | C1/C3/C4 sayı-tek-kaynak | `mcp.md`, `glossary.md`, `architecture.md`, `agents.md`, `skills.md`, `nervous-system.md` | Yapısal; ayrı bir generated-projection kararı gerektirir |
-| 6 | B1, B2, B3 yeni içerik | yeni rehber sayfası + `overview.md` | En büyük iş; kapsam kararı Alperen'e ait |
+| 1 | A1, A2, A4 kip/nitel düzeltmesi | `docs/en/vision.md` + `docs/tr/vision.md` | ✅ uygulandı — 2026-08-03, owner onayı |
+| 2 | C2 provider envanteri | `guide/workers-and-providers.md` (en+tr) | ✅ uygulandı — 7 aile, admission yolu ayrı kolonda |
+| 3 | B4 geri-linkler | `overview.md`, `governance/immutable-laws.md` (en+tr) | ✅ uygulandı |
+| 4 | A3, A5 tek-cümle nitelemeleri | `vision.md` (en+tr) | ✅ uygulandı |
+| 5 | C1/C3/C4 sayı-tek-kaynak | `mcp.md`, `glossary.md`, `architecture.md`, `agents.md`, `skills.md`, `nervous-system.md` | ⏳ açık — yapısal; ayrı generated-projection kararı gerektirir |
+| 6 | B1, B2, B3 yeni içerik | yeni rehber sayfası + `overview.md` | ⏳ açık — en büyük iş; kapsam kararı Alperen'e ait |
+
+A1–A5 ve B4 için uygulanan düzeltmeler yönü değiştirmez; iddiaları **hedef-model** olarak işaretler ve
+her birini kendi statü dokümanına bağlar (`authority-rbac.md`, `memory-learning.md`,
+`current-frictions.md`, `architecture.md`). C2 ise eksik envanteri tamamlar: yedi adapter ailesi
+listelenir ve `bedrock`'un config değil credential ile açıldığı açıkça yazılır.
+
+Kalan iki madde (5, 6) `DOCS-RELEASE-TRUTH-001` ve `DOCS-PRODUCT-001` kapsamındadır.
 
 Madde 5 ve 6, `DOCS-RELEASE-TRUTH-001` ve `DOCS-PRODUCT-001` ledger satırlarının kapsamına giriyor;
 bu rapor onları değiştirmez, yalnız somut kanıt sağlar.

@@ -63,3 +63,5 @@ Product consequences:
 | Enterprise enforcement boundary | ⚠️ partial | Repository hooks/policies are not an unbypassable admin boundary; managed requirements are required for that claim. [Evidence: `AGENTS.md:124-128`] |
 
 The laws define the required direction; the status table states what the current repository has actually proven. Neither substitutes for the other.
+
+For how these three laws shape product positioning, audience span, and non-goals, see [Vision](../vision.md).

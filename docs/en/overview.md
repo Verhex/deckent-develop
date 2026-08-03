@@ -50,4 +50,4 @@ The declared platform matrix is macOS, Linux, Windows native, and WSL2. [Evidenc
 | Primary Terminal/Desktop direction | ⚠️ partial | The native chat/REPL, web-terminal API, and desktop source surfaces exist; this audit did not run their interactive/platform matrix. [Evidence: `src/cli/commands/chat.ts`; `src/api/terminal/session-manager.ts`; `src/desktop/`] |
 | Publish-grade autonomous execution | ⚠️ HOLD | Accepted audit reports 0/31 intervention-free end-to-end success pending stabilization/certification. [Evidence: `PAZARTESI.md:36-60`] |
 
-The vision is authoritative direction; status labels above prevent it from being misread as a claim that every end-to-end path is already certified.
+The vision is authoritative direction; status labels above prevent it from being misread as a claim that every end-to-end path is already certified. The direction itself — positioning, audience span, moat, surface doctrine, non-goals, and the signals that would falsify it — is stated in [Vision](./vision.md).

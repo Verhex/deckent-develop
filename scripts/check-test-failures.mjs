@@ -21,7 +21,9 @@
  *                      file that is absent from the baseline has any failure at all
  *   --strict           additionally fail on stale entries (file improved but baseline
  *                      not ratcheted) — use once the cleanup has settled
- *   --update           rewrite the baseline from the given reports (reviewed change only)
+ *   --update           merge the given reports into the baseline (reviewed change only):
+ *                      observed files are replaced, unobserved files are carried over —
+ *                      so updating after a partial run cannot erase debt it never saw
  *
  * Exit 0 — no new failures
  * Exit 1 — new failures (or, with --strict, stale entries)
@@ -88,17 +90,31 @@ function loadBaseline() {
   return JSON.parse(readFileSync(BASELINE_PATH, 'utf-8'));
 }
 
-function writeBaseline(counts) {
-  const entries = [...counts.entries()]
-    .filter(([, failed]) => failed > 0)
+/**
+ * Rewrite the baseline for the OBSERVED files only.
+ *
+ * A partial run must not erase debt it never looked at: updating after
+ * `vitest run tests/core/` would otherwise drop every orchestra/cli/mcp entry and
+ * silently turn their known failures into "new" ones on the next full run.
+ * Files present in the reports are replaced (including down to zero, which removes
+ * them); files absent from the reports are carried over untouched.
+ */
+function writeBaseline(counts, previous) {
+  const merged = new Map(previous.map((e) => [e.file, e.failed]));
+  for (const [file, failed] of counts) {
+    if (failed > 0) merged.set(file, failed);
+    else merged.delete(file);
+  }
+  const entries = [...merged.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([file, failed]) => ({ file, failed }));
   const baseline = {
     version: 1,
-    note:
-      'Known test debt from the 2026-08 CI outage (PAZARTESI.md · TEST BORCU ENVANTERİ). '
-      + 'NEW failures fail the gate; this file is not a target to grow. Reduce it — '
-      + 'FAZ 3 packages P1-P6 exist to empty it.',
+    note: existsSync(BASELINE_PATH)
+      ? JSON.parse(readFileSync(BASELINE_PATH, 'utf-8')).note
+      : 'Known test debt from the 2026-08 CI outage (PAZARTESI.md · TEST BORCU ENVANTERİ). '
+        + 'NEW failures fail the gate; this file is not a target to grow. Reduce it — '
+        + 'FAZ 3 packages P1-P6 exist to empty it.',
     entries,
   };
   writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`, 'utf-8');
@@ -117,7 +133,7 @@ function main() {
   const counts = collectFailures(reports);
 
   if (mode === 'update') {
-    const entries = writeBaseline(counts);
+    const entries = writeBaseline(counts, loadBaseline().entries);
     const total = entries.reduce((n, e) => n + e.failed, 0);
     process.stdout.write(
       `[test-failures] baseline written: ${entries.length} file(s), ${total} known failure(s)\n`,

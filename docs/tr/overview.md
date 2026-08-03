@@ -50,4 +50,4 @@ Bildirilen platform matrix; macOS, Linux, Windows native ve WSL2'dir. [Kanıt: `
 | Primary Terminal/Desktop yönü | ⚠️ kısmi | Native chat/REPL, web-terminal API ve desktop source surface'leri vardır; bu audit interactive/platform matrix'i çalıştırmadı. [Kanıt: `src/cli/commands/chat.ts`; `src/api/terminal/session-manager.ts`; `src/desktop/`] |
 | Publish-grade autonomous execution | ⚠️ HOLD | Kabul edilen audit, stabilization/certification bekleyen 0/31 intervention-free end-to-end success raporlar. [Kanıt: `PAZARTESI.md:36-60`] |
 
-Vision authoritative direction'dır; yukarıdaki status label'ları her end-to-end path certify olmuş gibi okunmasını önler.
+Vision authoritative direction'dır; yukarıdaki status label'ları her end-to-end path certify olmuş gibi okunmasını önler. Yönün kendisi — konumlandırma, kitle aralığı, moat, yüzey doktrini, non-goal'ler ve onu yanlışlayacak sinyaller — [Vizyon](./vision.md) dosyasında yazılıdır.

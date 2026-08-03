@@ -34,7 +34,7 @@ Deckent'in ürün yüzeyinin üç yüzü, tek motoru vardır. [Kanıt: `.deckent
 | **Worker** | Mühendislik, operasyon, veri ve iç sistemler için arka plan ve zamanlanmış yürütme | Kabul edilmiş işi scope, provider, bütçe ve kanıt kısıtları altında yürütür |
 | **Platform** | Genişletilebilir agent, skill, provider, MCP tool, connector ve proje-yerel orkestrasyon | Kalıcı orkestrasyon, memory, onay, routing, recovery, audit ve adapter'ları sağlar |
 
-Bunlar üç ürün ve üç runtime değildir. Tek kernel, tek policy sistemi, tek kanıt zinciri ve tek öğrenme döngüsü paylaşırlar. Chat'ten, CLI'dan, MCP'den, otonom bir zamanlamadan veya bir webhook'tan gelen istek; admission, routing ve spawn'a ulaşmadan önce aynı türde yapılandırılmış bir execution nesnesine dönüşür.
+Bunlar üç ürün ve üç runtime değildir. Tek kernel, tek policy sistemi, tek kanıt zinciri ve tek öğrenme döngüsü paylaşmak zorundadırlar. Bu tek normalize edilmiş grafik, tamamlanmış değil hedef modeldir — mevcut kaynak hâlâ birkaç rol sözlüğü taşıyor ve tek uçtan uca tip grafiğini tam benimsemiş değil; [Genel bakış](./overview.md) ve [Authority ve RBAC](./governance/authority-rbac.md) bunu kayda geçiriyor. Chat'ten, CLI'dan, MCP'den, otonom bir zamanlamadan veya bir webhook'tan gelen istek; admission, routing ve spawn'a ulaşmadan önce aynı türde yapılandırılmış bir execution nesnesine dönüşür.
 
 Bu üçü ayrı motorlara ayrıştığı an ürün ölür — bu yüzden paylaşılan kernel bir implementasyon detayı değil, vizyonun kendisidir.
 
@@ -81,11 +81,11 @@ Aynı motor altısını da kapsamak zorundadır. Yalnız kod-biçimli olanları 
 
 Birbirini tutan üç özellik. [Kanıt: `.deckent/workspace/IDENTITY.md:17`]
 
-**Deterministik, eval-backed orkestrasyon.** Yaşam döngüsü, modelin kendi kontrol akışını doğaçlaması değil; sabit ve denetlenebilir bir faz dizisidir. Sonuçlar, işin türüne uygun ilan edilmiş kriterlere karşı değerlendirilir — doküman içeriğine göre, audit bulgularına göre, kod ise kendi stack'inin komutlarına göre yargılanır. Determinizm koşumu tekrarlanabilir yapar; değerlendirme sonucunu güvenilir yapar.
+**Deterministik, eval-backed orkestrasyon.** Yaşam döngüsü, modelin kendi kontrol akışını doğaçlaması değil; sabit ve denetlenebilir bir yürütme dizisidir. (Yürütülen sıra yerleşmiştir; kamuya açık faz *sözlüğü* değil — OQ-04, [Architecture](./architecture.md).) Sonuçlar, işin türüne uygun ilan edilmiş kriterlere karşı değerlendirilir — doküman içeriğine göre, audit bulgularına göre, kod ise kendi stack'inin komutlarına göre yargılanır. Determinizm koşumu tekrarlanabilir yapar; değerlendirme sonucunu güvenilir yapar.
 
-**Yapı gereği yönetişim (governance by construction).** Yetki, scope, onay, bütçe ve tenancy; enterprise alıcılar için sonradan takılan seçenekler değil, execution modelinin yapısal özellikleridir. Bir worker, işin gerektirdiği asgari scope ve capability'yi alır. Risk, işin ihtiyaç duyduğunu ilan ettiği şeylerden türetilir — yani birinin "düşük" diye set edebileceği değiştirilebilir bir alan değil, tek bir doğruluk kaynağı vardır. Bireysel kullanıcı ile regüle kurum aynı yönetişimli motoru çalıştırır; farkları policy'dedir, türde değil.
+**Yapı gereği yönetişim (governance by construction).** Yetki, scope, onay, bütçe ve tenancy; enterprise alıcılar için sonradan takılan seçenekler olarak değil, execution modelinin yapısal özellikleri olarak durmalıdır. Gerekli tasarım budur; bugünkü varsayılanlar bu kontrollerin birkaçını hâlâ opt-in, birkaç enforcement yolunu da advisory bırakıyor ve kontrol-bazlı dürüst statü [Authority ve RBAC](./governance/authority-rbac.md) dosyasında yaşıyor. Bir worker, işin gerektirdiği asgari scope ve capability'yi alır. Risk, işin ihtiyaç duyduğunu ilan ettiği şeylerden türetilir — yani birinin "düşük" diye set edebileceği değiştirilebilir bir alan değil, tek bir doğruluk kaynağı vardır. Bireysel kullanıcı ile regüle kurum aynı yönetişimli motoru çalıştırır; farkları policy'dedir, türde değil.
 
-**Kapalı öğrenme döngüsü.** `outcome → evidence → routing → promotion → training trace`. Fiilen olan şey, bundan sonra olacak şeyi besler: sonuçlar routing'i, routing agent ve skill terfisini şekillendirir; tüm geçmiş planlama anında sorgulanabilir kalır. Yürütmeyi değiştirmeyen öğrenme bir log'dur. Deckent'in öğrenmesi yürütmeyi değiştirir.
+**Kapalı öğrenme döngüsü.** `outcome → evidence → routing → promotion → training trace`. Fiilen olan şey, bundan sonra olacak şeyi beslemelidir: sonuçlar routing'i, routing agent ve skill terfisini şekillendirir; tüm geçmiş planlama anında sorgulanabilir kalır. Yürütmeyi değiştirmeyen öğrenme bir log'dur. Bu döngünün organları uygulanmış ve memory katmanı canlıdır; uçtan uca üretim kapanışı ise henüz sertifikalı değildir — hangi halkaların kanıtlandığını [Memory ve öğrenme](./guide/memory-learning.md) söyler.
 
 Bunların hiçbiri tek başına eşsiz değildir. Tek, kurulabilir, provider-neutral bir motorda birlikte tutulduklarında moat olurlar.
 
@@ -121,7 +121,7 @@ Deckent'in ne olmadığını adlandırmak, vizyonu aşınmaya karşı korur.
 - **Vendor kontrolündeki bir SaaS değildir.** Yürütmenize vendor'ın sahip olduğu barındırılan bir platform değil, yerel proje durumuna sahip kurulu yazılımdır.
 - **Kılık değiştirmiş TypeScript-only araç değildir.** İş, fiilen içinde bulunduğu stack'e göre değerlendirilir. Bir Go projesi TypeScript build'iyle yargılanmaz; doküman test coverage'ıyla yargılanmaz.
 - **Varsayılan olarak tek-provider değildir.** Doğru model kullanımı; provider, model, tier ve akıl-yürütme derinliğinin açıkça karar edilmesidir — config ve registry'den çözülür, asla hardcode isimlerden değil.
-- **Kontrolsüz otonomi değildir.** Sistem kendi başına hareket eder, yetki kullanıcıda kalır. Scope, onay kapıları, bütçeler ve audit trail bu otonominin bedelidir; önündeki engel değil.
+- **Kontrolsüz otonomi değildir.** Sistem nerede kendi başına hareket ederse etsin, yetki kullanıcıda kalır. Müdahalesiz uçtan uca yürütme bugün sertifikalı değildir; süregelen HOLD ve sertifikasyon merdiveni [Güncel sürtünmeler](./operations/current-frictions.md) dosyasındadır. Scope, onay kapıları, bütçeler ve audit trail bu otonominin bedelidir; önündeki engel değil.
 - **Metrik vitrini değildir.** Agent, tool ve komut sayıları üretilmiş durum bilgisidir, kimlik değil. Bu dokümanda yer almazlar.
 
 ## Bu vizyonu ne yanlışlar

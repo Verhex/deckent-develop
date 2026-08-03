@@ -18,6 +18,7 @@ import {
 import { readCanonicalRunStatus } from '../../src/core/run-status-authority.js';
 
 const PRINCIPAL = 'principal-digest-017';
+const RUN_ID = 'run-provider-concurrency';
 
 function capability(
   overrides: Partial<ProviderConcurrencyCapabilityEvidence> = {},
@@ -41,18 +42,24 @@ function interval(
   start: string,
   end: string | null,
 ): StoredProviderExecutionInterval {
+  // v2 binds observations to an owning run. These cases scope by task/attempt, not by
+  // run, so every fixture interval belongs to the SAME run — introducing per-interval
+  // runs here would silently change what the assertions mean.
   return {
     executionId,
+    runId: RUN_ID,
+    ownership: 'run-owned',
+    retired: false,
     taskId: `task-${executionId}`,
     attemptId: `attempt-${executionId}`,
     providerPrincipalDigest: PRINCIPAL,
     fence: `fence-${executionId}`,
     start: {
-      type: 'start', executionId, taskId: `task-${executionId}`, attemptId: `attempt-${executionId}`,
+      type: 'start', executionId, runId: RUN_ID, taskId: `task-${executionId}`, attemptId: `attempt-${executionId}`,
       providerPrincipalDigest: PRINCIPAL, fence: `fence-${executionId}`, sequence: 1, observedAt: start,
     },
     end: end === null ? null : {
-      type: 'end', executionId, taskId: `task-${executionId}`, attemptId: `attempt-${executionId}`,
+      type: 'end', executionId, runId: RUN_ID, taskId: `task-${executionId}`, attemptId: `attempt-${executionId}`,
       providerPrincipalDigest: PRINCIPAL, fence: `fence-${executionId}`, sequence: 2, observedAt: end,
       outcome: 'completed',
     },

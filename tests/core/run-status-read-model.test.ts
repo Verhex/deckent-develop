@@ -53,6 +53,11 @@ function putOpenObservation(root: string, taskId: string): void {
       observation: {
         type: 'start',
         executionId: `execution-${taskId}`,
+        // v2 binds every observation to its owning run. Derived from the task id so
+        // '900-001' stays inside sprint-900 (the current run) while '488-002' remains
+        // evidence of a different, finished run — which is exactly what the
+        // "counts only exact current-run task observations" case distinguishes.
+        runId: `sprint-${taskId.split('-')[0]}`,
         taskId,
         attemptId: `attempt-${taskId}`,
         providerPrincipalDigest: 'principal-900',

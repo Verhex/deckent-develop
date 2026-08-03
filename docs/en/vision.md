@@ -34,7 +34,7 @@ Deckent's product surface has three faces and one engine. [Evidence: `.deckent/w
 | **Worker** | Background and scheduled execution for engineering, operations, data, and internal systems | Executes admitted work under scope, provider, budget, and evidence constraints |
 | **Platform** | Extensible agents, skills, providers, MCP tools, connectors, and project-local orchestration | Supplies durable orchestration, memory, approvals, routing, recovery, audit, and adapters |
 
-These are not three products and not three runtimes. They share one kernel, one policy system, one evidence chain, and one learning loop. A request from chat, CLI, MCP, an autonomous schedule, or a webhook becomes the same kind of structured execution object before it reaches admission, routing, and spawn.
+These are not three products and not three runtimes. They are required to share one kernel, one policy system, one evidence chain, and one learning loop. That single normalized graph is the target model rather than a finished one — the current source keeps several role vocabularies and has not fully adopted one end-to-end type graph, as [Overview](./overview.md) and [Authority and RBAC](./governance/authority-rbac.md) record. A request from chat, CLI, MCP, an autonomous schedule, or a webhook becomes the same kind of structured execution object before it reaches admission, routing, and spawn.
 
 The moment they diverge into three engines, the product is dead — so the shared kernel is the vision, not an implementation detail.
 
@@ -81,11 +81,11 @@ The same engine must cover all six. A system that only handles the code-shaped o
 
 Three properties, held together. [Evidence: `.deckent/workspace/IDENTITY.md:17`]
 
-**Deterministic, eval-backed orchestration.** The lifecycle is a fixed, inspectable sequence of phases, not a model improvising its own control flow. Outcomes are judged against declared criteria appropriate to the kind of work — documentation is judged by content, an audit by findings, code by the stack's own commands. Determinism is what makes a run reproducible; evaluation is what makes its result trustworthy.
+**Deterministic, eval-backed orchestration.** The lifecycle is a fixed, inspectable execution sequence, not a model improvising its own control flow. (The executed order is settled; the public phase *vocabulary* is not — see OQ-04 in [Architecture](./architecture.md).) Outcomes are judged against declared criteria appropriate to the kind of work — documentation is judged by content, an audit by findings, code by the stack's own commands. Determinism is what makes a run reproducible; evaluation is what makes its result trustworthy.
 
-**Governance by construction.** Authority, scope, approval, budget, and tenancy are structural properties of the execution model, not options bolted on for enterprise buyers. A worker receives the minimum scope and capability the job requires. Risk is derived from what the work declares it needs, so there is one source of truth rather than a mutable field someone can set to "low." The individual user and the regulated enterprise run the same governed engine; they differ in policy, not in kind.
+**Governance by construction.** Authority, scope, approval, budget, and tenancy belong in the execution model as structural properties, not as options bolted on for enterprise buyers. That is the required design; today's defaults still leave several of these controls opt-in and several enforcement paths advisory, and the honest per-control status lives in [Authority and RBAC](./governance/authority-rbac.md). A worker receives the minimum scope and capability the job requires. Risk is derived from what the work declares it needs, so there is one source of truth rather than a mutable field someone can set to "low." The individual user and the regulated enterprise run the same governed engine; they differ in policy, not in kind.
 
-**A closed learning loop.** `outcome → evidence → routing → promotion → training trace`. What actually happened feeds what happens next: results shape routing, routing shapes agent and skill promotion, and the whole history stays queryable at planning time. Learning that does not change execution is a log. Deckent's learning changes execution.
+**A closed learning loop.** `outcome → evidence → routing → promotion → training trace`. What actually happened must feed what happens next: results shape routing, routing shapes agent and skill promotion, and the whole history stays queryable at planning time. Learning that does not change execution is a log. The organs of this loop are implemented and its memory layer is live; end-to-end production closure is not yet certified, and [Memory and learning](./guide/memory-learning.md) states which links are proven.
 
 No one of these is unique. Held together, in one installable, provider-neutral engine, they are the moat.
 
@@ -121,7 +121,7 @@ Naming what Deckent is not protects the vision from erosion.
 - **Not a vendor-controlled SaaS.** It is installed software with local project state, not a hosted platform whose vendor owns your execution.
 - **Not a TypeScript-only tool in disguise.** Work is evaluated against the stack it is actually in. A Go project is not judged by a TypeScript build; documentation is not judged by test coverage.
 - **Not single-provider by default.** Correct model use means explicit provider, model, tier, and reasoning-depth decisions — resolved from configuration and registry, never from hardcoded names.
-- **Not autonomy without control.** The system acts on its own, and the user stays in authority. Scope, approval gates, budgets, and audit trails are the price of that autonomy, not an obstacle to it.
+- **Not autonomy without control.** Wherever the system acts on its own, the user stays in authority. Unattended end-to-end execution is not certified today; [Current frictions](./operations/current-frictions.md) carries the standing HOLD and the certification ladder. Scope, approval gates, budgets, and audit trails are the price of that autonomy, not an obstacle to it.
 - **Not a metrics showcase.** Counts of agents, tools, and commands are generated status, not identity. They do not appear in this document.
 
 ## What would falsify this vision

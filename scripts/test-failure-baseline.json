@@ -183,14 +183,6 @@
       "failed": 1
     },
     {
-      "file": "tests/core/provider-concurrency-runtime-projection.test.ts",
-      "failed": 2
-    },
-    {
-      "file": "tests/core/run-status-read-model.test.ts",
-      "failed": 2
-    },
-    {
       "file": "tests/core/task-execution-fence.test.ts",
       "failed": 1
     },
