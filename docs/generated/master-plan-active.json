@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "c52f85231ad4c7c9102b6df0f84bb91e37f65ca464ccb755ecce9c4c9ed58f99"
+    "value": "d74bd13e352249aa65df033b067aaf39b5050de98d7367b79eac514aa2f6fa50"
   },
   "summary": {
     "total": 332,
@@ -675,9 +675,9 @@
       "program": "CODEX",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "422514e738a1c0c31429544e783fc4b3e80d9634f9e6239e87ac1f01e57062de",
-      "progressDigest": "0da4d2adfed3b99409ba1d2e17a36bc85bd6d981c9b41de4d6a2acc90af16e14",
+      "progressDigest": "8af29e1a1b4a2c8bd481a6788293e88d1619b09fcf017872097a3b0343590bdd",
       "terminalClosureDigest": null
     },
     {
@@ -6034,8 +6034,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "CM, PA, FO, canary and independent verification children complete",
-      "evidence": "Config-only transition currently insufficient",
-      "updated": "2026-07-26"
+      "evidence": "Config-only transition currently insufficient; 2026-08-03 KARAR-SATIRI (FAZ 3 madde-3, Alperen'in 2026-08-01 kararının transkripsiyonu): Codex-dönemi denetim raporu (.analysis/codex-brain-audit-2026-08-01/, Codex öz-denetimi + Claude değerlendirmesi) iki bağımsız analizde aynı verdikte birleşti — %42 başarı, korunmuş-kanıtlı dönemde müdahalesiz uçtan-uca sprint başarısı 0/31, toplam yakım ~95,5B input token (oturum-düzeyi kümülatif, %97,8 cache-read dahil; Codex'in 63M raw-input sayısı aynı hikâyenin task-atfedilebilir alt sınırı). Raporun en kritik bulgusu gate-authority çelişkisi (476/478/481: tüm root'lar NO_GO iken final gate PASS) ayrı kök-neden işidir. KARAR: Codex'in 10 maddelik yeniden-yetkilendirme listesi aynen kabul; o karşılanana kadar Codex = worker + xverify, dispatch authority YOK. Bu satırın BLOCKED durumu ve çocuk canary merdiveni (C0-C10) o listenin ledger karşılığıdır",
+      "updated": "2026-08-03"
     },
     {
       "order": 1010,
@@ -17841,6 +17841,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f56af2523c5a0784bb81f811940e1598b1bd9bc96aa5506e39628eb0a3de39b9"
+    "value": "0b70837a7f305b4f9e21496df2446af5065ca95602752d2f7f9abf3bcf323d7c"
   }
 }

@@ -29,9 +29,9 @@ Hedef: **Deckent'i geliştiren modellerin ilk baktığı yer güncel olsun.** Ya
 - [ ] Çıktı: tek fark-raporu — her fark için `kod doğru / doc doğru / ikisi de yanlış` kararı + düzeltme yönü.
 
 ## FAZ 3 — İş planı revizyonu
-- [ ] Fark-raporu + mevcut MASTER-PLAN birleştirilir → **revize MASTER-PLAN** (Durum+Tarih sütunlu tek tablo korunur).
-- [ ] Önceliklendirme tek soruyla: **"Yayına giden en ince dilim ne?"** — o dilime girmeyen iş "sonra" kolonuna.
-- [ ] Codex-dönemi raporu (2026-08-01, %42 başarı / ~95B token analizi) karar-satırı olarak MASTER-PLAN'a işlenir.
+- [x] ~~Fark-raporu + mevcut MASTER-PLAN birleştirilir~~ → **2026-08-03 EK-3 crosswalk ile KAPANDI** (`RECONCILIATION-WP0.md`): 24 F-bulgusu + 24 açık OQ HOLD + 20-aday backlog eşlendi; 4 sahipsiz kalem Alperen onayıyla satır oldu (PROVIDER-OBS-MIGRATION-001 · MCP-ANNOTATION-SAFETY-001 · I18N-SURFACE-001 · CLI-VOCAB-001, sıra 480-510). MASTER 332 satır / 325 aktif. **Kalan tek parça: 187 DOC-GAP iddiası (P7)** — ayrı iddia-iddia karar dilimi, crosswalk dışı.
+- [ ] Önceliklendirme tek soruyla: **"Yayına giden en ince dilim ne?"** — o dilime girmeyen iş "sonra" kolonuna. *(P0 bütçesi karar bekliyor; Codex xverify turunun C-ekseni sayısal öneri getirecek.)*
+- [x] ~~Codex-dönemi raporu karar-satırı olarak MASTER-PLAN'a işlenir~~ → **2026-08-03 İŞLENDİ**: CODEX-MAIN-001 evidence'ına karar-satırı (%42 · 0/31 müdahalesiz · ~95,5B token · 10 maddelik yeniden-yetkilendirme listesi aynen kabul; Codex = worker + xverify, dispatch authority YOK).
 
 ## FAZ 4 — Runtime stabilizasyonu (Codex denetim raporu entegrasyonu)
 Kaynak: `.analysis/codex-brain-audit-2026-08-01/` (data.json + methodology.md, Codex öz-denetimi, 2026-08-01) + Claude değerlendirmesi (aşağıda). İki rapor aynı verdikte birleşiyor: **core bugün publish-grade autonomous değil; müdahalesiz uçtan-uca sprint başarısı 0/31.**
