@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "1d972f5fb327a268ef11e0084ee523de2ebf0e3bf3d41135b8f23cfc6f2053a6"
+    "value": "5b64f128354b29f164d6933dc09c5f89891e7a8b2192e884de31066819d41dff"
   },
   "summary": {
-    "total": 337,
-    "active": 330,
+    "total": 338,
+    "active": 331,
     "terminal": 7,
     "receipts": 26,
     "byState": {
-      "OPEN": 233,
+      "OPEN": 234,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 246,
-      "P1": 75,
+      "P1": 76,
       "P2": 16
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 52,
+      "TRUTH": 53,
       "XPLAT": 3
     }
   },
@@ -667,6 +667,17 @@
       "updated": "2026-08-03",
       "definitionDigest": "a12c72e94bf9f5b90445dbdf7256ea38de6d5df9c0df17dabc02473ff10d5a50",
       "progressDigest": "7bf096d247691286fcab8b5b176d66f0d8c6b8b30d3e6782a632b04a64d7290e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 515,
+      "id": "SEC-DEP-ADVISORY-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-03",
+      "definitionDigest": "808654b11f47a434539d6341c9b503170878f5a8975ca71e156ef4caa2b1b45a",
+      "progressDigest": "4a31b1bc24b698fbb3856cb3f0dc82ba5e51d655d056e9d9de5e7d87b2e9ba55",
       "terminalClosureDigest": null
     },
     {
@@ -5999,6 +6010,37 @@
       "evidenceReceipts": [],
       "acceptance": "`status --mode` için doğru-yazımlı canonical değerler + versioned deprecation alias'ları; `deckent run` one-shot ↔ `run start|status|retro|history` namespace çarpışması collision-free canonical UX'e ayrılır; `mode run`'ın diske `sprint` yazması tek public `run` vocabulary kararına bağlanır; config read yüzeyi (bare `config` ↔ var-olmayan `config read`/`config show` önerileri) tek operation adında normalize edilir; hepsi JSON contract testi taşır",
       "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk). Sahipsiz kalemler: CLI-03 · CLI-04 · CLI-05 · CLI-06 · CLI-11 · OQ-13 · OQ-14 · aday-17 · aday-18. Public contract işi: `explainatory`/`standart` kullanıcıya görünen yazım hataları ve düzeltme breaking-change kararı içerir (alias+deprecation vs rename) — karar acceptance'ın parçası; recovery mesajı bugün var olmayan `deckent config read` öneriyor (src/core/config.ts:1922-1925)",
+      "updated": "2026-08-03"
+    },
+    {
+      "order": 515,
+      "id": "SEC-DEP-ADVISORY-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Yeni upstream dependency advisory'leri (fast-uri GHSA-7p8r-x3mc-p8w7 · ip-address GHSA-mwp4-54f8-5fhr, ikisi de high) fail-closed Security Audit gate'ini repo-genelinde kırmızıya düşürdü — patch-bump veya SEC-05 signed-exception ile kapatılır",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "İki advisory ya güvenli sürüme bump edilir ya da SEC-05 allowlist'ine imzalı gerekçeyle işlenir; `dependency-audit` job'ı main'de yeşile döner; transitive zincir (`npm ls fast-uri ip-address`) evidence'a yazılır",
+      "evidence": "Açılış 2026-08-03: PR #32 CI koşusunda tespit (run 30856189200) — advisory 1130720 + 1130722; main'in aynı HEAD'i de aynı sebeple kırmızı, yani S2 kaynaklı değil upstream-yayın kaynaklı. Security Audit required-check DEĞİL (ruleset 4'lüsü dışında) ama Type-Check-maskesi dersinin aynısı burada da geçerli: kronik kırmızı gate gelecekteki gerçek bulguyu maskeler",
       "updated": "2026-08-03"
     },
     {
@@ -18084,6 +18126,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f28486bf17fb1ba034d7efb72d502e251833409e96628262f75f1445d639a2cd"
+    "value": "4150161c1fed9871f526042abea6dcc178fb8d796d60e3e1ff6502901f6709bd"
   }
 }
