@@ -217,6 +217,40 @@ Her CI işi yerelde koşuldu, kırıklar hata-imzasına göre sınıflandırıld
 işleri `skipped` geçiyordu. Yani 1-2 Ağustos'ta yapılan yoğun iş hiç CI görmedi. Öncelik sırası
 A → B → C → D önerilir: A mekanik ve tek hamlede ~230 kırığı kapatır.
 
+### 📐 FAZ 3 İŞ BÜYÜKLÜĞÜ ANALİZİ — 2026-08-03 (ölçüm, tahmin değil)
+Sınıf-A'nın mekanik kısmı kapandıktan **sonraki** gerçek durum. Boyut ölçekleri:
+**S** = tek oturumun küçük dilimi · **M** = yarım oturum · **L** = bir oturum · **XL** = birden çok oturum.
+
+| # | Paket | Boyut | Ölçülen kapsam | Doğa | Bağımlılık / risk |
+|---|---|---|---|---|---|
+| P1 | Atomik yazım + terminal-evidence testleri | **XL** | 181 kırık / 11 dosya | Gerçek mühendislik: üretim davranışı okunup test fixture'ları yeniden kurulacak | En büyük tek kaldıraç. Sweep ile kapanmadığı **denenerek** kanıtlandı |
+| P2 | Orchestra kalanı | **L** | 165 kırık / 41 dosya / **61 farklı imza** | Heterojen. İçinde ~28 hâlâ mekanik (`linkSync` 14, `statSync().isFile` 14) | ~28'i P0-hızında kapanır; kalan 137 vaka-vaka |
+| P3 | CLI drift'i | **L** | 116 kırık / 30 dosya / **41 imza** | Spy/beklenti drift'i; tek kök neden yok | En yoğun: `status` 20, `commands` 14, `plan` 12 |
+| P4 | MCP-bundle kalanı | **M-L** | 96 kırık / 24 dosya | Çoğu iddia drift'i (`expected undefined to be defined`) | `status-history` 15, `tools-enrichment` 14, `status-rich` 14 |
+| P5 | error-registry ratchet | **M** | **46 ihlal / 25 dosya** + 5 bayat baseline kaydı | Kapalı devre: her raw throw → typed error veya kayıt | Bağımsız, paralel koşabilir. `recover.ts` 8, `spawn-backend-docker.ts` 6 |
+| P6 | Core+Agents kalanı | **S** | 9 kırık / 6 dosya | 4'ü provider-observation `runId` wiring-closure; 3'ü P5 ile örtüşür | Küçük ama B sınıfı (gerçek bug) burada |
+| P7 | DOC-GAP kapanışı | **M** | **187 skip / 30 dosya** | Her iddia: yeni dokümana taşı mı, emekli mi? | Düşük risk, paralellenebilir; kod değil karar işi |
+| P8 | Dashboard entegrasyon testleri | **S** | 2 dosya | Canlı sunucu (`127.0.0.1:3000`) gerektiriyor | Harness kararı: ayağa kaldır mı, işaretle mi |
+| P9 | Ortam-bağımlı kırıklar | **S** | ~6 | Windows `taskkill` Linux runner'da, `.deckent/skills/docs`, 60 sn timeout | CI-only; koşullu skip yeterli olabilir |
+| P10 | OQ-18 · VitePress sitesi | **S-M** | 65 skip'li test + `docs.yml` | Owner kararı + uygulaması | Karar verilmeden iş başlamaz |
+| P11 | spawnSync async migration | **M** | 4 çağrı (git hash-object ×2, cat-file, diff) | Hot-path'ten async'e | Karar #2 ile onaylandı |
+| P12 | provider-observation DB v1→v2 | **M** | OQ-07 | Migration authority + kanıt | Owner yetkisi gerekiyor |
+| P13 | Açık HOLD defteri | **M** | **24 açık HOLD** | Karar backlog'u (OQ-03…OQ-28) | Çoğu başka paketleri bloke ediyor |
+
+**Toplam kırık test: 567** (Orchestra 346 · CLI 116 · MCP-bundle 96 · Core+Agents 9).
+Bugün ~650'den 567'ye indi (MCP-bundle 176→96).
+
+**Kritik yol önerisi (CI'ı yeşile götüren en kısa hat):**
+1. **P2'nin mekanik ~28'i + P5 (46 ihlal)** — hızlı kazanç, düşük risk, bağımsız.
+2. **P1 (181)** — tek başına kırıkların ~%32'si. Bunu kapatmadan Orchestra yeşile dönmez.
+3. **P3 + P4 (212)** — vaka-vaka, paralellenebilir.
+4. **P6, P8, P9** — küçük artıklar.
+P7/P10/P11/P12/P13 CI'ı bloke etmiyor; ürün/karar borcu olarak ayrı yürür.
+
+**Uyarı — asıl ders:** P1-P4'ün tamamı (558 kırık), 1-2 Ağustos'ta yazılan üretim kodunun
+**hiç yapılmamış test güncellemesidir**. Type Check kırmızı olduğu için CI hiçbirini görmedi.
+Aynı şeyin tekrarını engelleyen tek şey, Type Check'in bir daha kırmızı bırakılmaması.
+
 ### Notlar
 - Fable limiti resetlenmeden hiçbir faz başlamaz; Codex bu planda brain değildir.
 - FAZ 1-2 sırası bilinçli: önce "olması gereken"i yaz, sonra kodu ona karşı ölç — tersi, bugünkü bozuk docs'u referans almak olur.
