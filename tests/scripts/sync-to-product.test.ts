@@ -11,7 +11,7 @@ import {
 // DECISION — sahip: RELEASE-BETA-001 — karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md.
 // The 2026-08 docs reset (commit 97b91e69f) archived the document this assertion
 // guards; the rewritten corpus has no successor carrying the same claim.
-// Skipped, not deleted, so the coverage loss stays visible. See PAZARTESI.md.
+// Skipped, not deleted, so the coverage loss stays visible. Owner ledger: docs/MASTER-PLAN.md (RELEASE-BETA-001).
   EXCLUDE,
   isExcluded,
   partitionFiles,

@@ -35,7 +35,7 @@ describe('Blueprint file existence', () => {
 
   // DOC-GAP (2026-08-02): the archived docs/reference/api-surface.md documented the
   // `.tasks/` file format. The bilingual successor covers the HTTP/SSE surface only,
-  // so this claim has no home yet. Skipped, not deleted. See PAZARTESI.md.
+  // so this claim has no home yet. Skipped, not deleted. Owner ledger: docs/MASTER-PLAN.md (DOCS-PRODUCT-001).
   it.skip('docs/en/reference/api-surface.md contains task format', () => {
     // Sprint 172 doc-reorg (commit 1c8cef29): .contracts/ → docs/reference/.
     const content = readFileSync(join(ROOT, 'docs', 'en', 'reference', 'api-surface.md'), 'utf-8');

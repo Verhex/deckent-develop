@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):8360e3bb1e7dd520ba86e41fe1fe5b322e78a892d908c1ab6e6e22db1fc823ef`
+**Source digest:** `sha256(normalized-lf-utf8):11e6952472f429206bbd688a89110fd531d8d87aca517a91ca0be593bd656147`
 
-**Rows:** 333 total · 326 active · 7 terminal
+**Rows:** 337 total · 330 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 229 |
+| OPEN | 233 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -258,6 +258,10 @@
 | 3303 | `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | — | Multi-provider smoke proves config-resolved routing, auth isolation and provider observation retirement |
 | 3304 | `RECOVERY-BORN-490-FULL-SUITE-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001`, `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001`, `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | — | One explicit full-suite run certifies the completed recovery train after all narrower gates |
 | 3305 | `LIFECYCLE-VOCAB-001` | OPEN | P1 | KERNEL | — | — | Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir |
+| 3310 | `SKILL-DURABILITY-001` | OPEN | P0 | KERNEL | — | — | PLAN'da üretilen skill FIX turlarında kaybolmaz: generated-skill durability |
+| 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
+| 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
+| 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |

@@ -71,7 +71,7 @@ Detaylı dokümanlardaki status label'ları:
 
 Feature manifest şu anda 21 active, 4 lightly used, 9 dormant ve 1 dead entry listeler. Canlı `truth --json` check beş truth contract bildirdi: training trace code/wired/enabled/proven; tool surface, worker approval gate ve routing journal runtime proof'suz; prompt-gate-block detected callsite olmadan tek half-wire candidate. [Kanıt: `.deckent/settings/features-manifest.json`; real `node dist/cli/entry.js features --json` ve `truth --json` output'ları, 2026-08-01]
 
-Son dogfood handoff unattended production reliability'yi certify etmez: Codex audit 0/31 intervention-free run kaydeder ve sıralı certification ladder isteyen settlement/gate contradiction'ları belgeler. Bunlar product language arkasına saklanmaz; [Güncel sürtünmeler](docs/tr/operations/current-frictions.md) ve [fark raporuna](docs/analysis/CODE-DOC-DIFF-2026-08.md) bakın. [Kanıt: `PAZARTESI.md`, FAZ 4a/4c ve certification bölümleri]
+Son dogfood handoff unattended production reliability'yi certify etmez: Codex audit 0/31 intervention-free run kaydeder ve sıralı certification ladder isteyen settlement/gate contradiction'ları belgeler. Bunlar product language arkasına saklanmaz; [Güncel sürtünmeler](docs/tr/operations/current-frictions.md) ve [fark raporuna](docs/analysis/CODE-DOC-DIFF-2026-08.md) bakın. [Kanıt: `docs/MASTER-PLAN.md` — RECOVERY-BORN-488 ailesi, RECOVERY-BORN-490-REPLAY-CERTIFICATION-001 ve CODEX-MAIN-001 karar satırı]
 
 ## Dokümantasyon haritası
 
