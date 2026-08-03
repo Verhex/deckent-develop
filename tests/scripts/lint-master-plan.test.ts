@@ -31,6 +31,37 @@ import {
 } from '../../scripts/lint-master-plan.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/**
+ * Can this host actually create a symlink?
+ *
+ * MASTER-CLI-SYMLINK-FLAKE-001 `X` (cross-platform) evidence path: the real-CLI symlink case
+ * used to be gated on `process.platform === 'win32'`, which is a GUESS about capability, not a
+ * measurement. Windows with Developer Mode (or an elevated/`SeCreateSymbolicLinkPrivilege`
+ * session) creates symlinks fine, and WSL always can — those hosts were being skipped for no
+ * reason, so the matrix could never accumulate evidence there. Probing the capability instead
+ * means the case RUNS wherever the operating system permits it and is skipped only where the
+ * platform genuinely cannot express the contract — an honest `unsupported`, not a blanket
+ * assumption. See AGENTS.md Law 2 (Every Environment): unsupported must fail honestly, never
+ * silently generalise from one platform to another.
+ */
+const symlinkCapability = (() => {
+  const probeRoot = mkdtempSync(join(tmpdir(), 'deckent-symlink-probe-'));
+  try {
+    const target = join(probeRoot, 'target.txt');
+    writeFileSync(target, 'probe\n', 'utf8');
+    symlinkSync(target, join(probeRoot, 'link.txt'));
+    return { supported: true, reason: 'symlink creation permitted' };
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: unknown }).code)
+        : 'UNKNOWN';
+    return { supported: false, reason: `symlink creation refused (${code})` };
+  } finally {
+    rmSync(probeRoot, { recursive: true, force: true });
+  }
+})();
 const TEST_NOW_MS = Date.parse('2026-07-26T18:30:00+03:00');
 const execFileAsync = promisify(execFile);
 const LEDGER_HEADER = `| ${LEDGER_COLUMNS.join(' | ')} |`;
@@ -2862,7 +2893,21 @@ describe('CLI contract', () => {
     });
   });
 
-  it.skipIf(process.platform === 'win32')(
+  it('declares this host\'s symlink capability instead of assuming it', () => {
+    // Runs on EVERY platform, including hosts that cannot create symlinks. Law 2 forbids
+    // silently generalising one platform's result to another: the capability is measured and
+    // reported here, so a matrix leg that skips the real-CLI case still leaves a visible,
+    // typed record of WHY. The entrypoint contract itself is pure and must hold everywhere,
+    // capability or not — that is what makes the skip safe rather than a coverage hole.
+    expect(typeof symlinkCapability.supported).toBe('boolean');
+    expect(symlinkCapability.reason).toMatch(/symlink creation (permitted|refused)/);
+    expect(resolveEntrypointIdentity('/m.mjs', '/m.mjs', (candidate) => candidate)).toEqual({
+      isMain: true,
+      basis: 'canonical',
+    });
+  });
+
+  it.skipIf(!symlinkCapability.supported)(
     'executes the real CLI contract when invoked through a symlink',
     async () => {
       const root = mkdtempSync(join(tmpdir(), 'deckent-master-plan-entry-'));

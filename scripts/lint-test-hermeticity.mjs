@@ -101,7 +101,7 @@ export function createScanBudget(
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
   count: 12401,
-  digest: 'add52b91da95b036d12f9aa2f2ff4116df71011aaf61b25e4069efd6338f8994',
+  digest: 'ac68604d01f7ef5287c61b933a138e2115e6a9cd7721ffe730211e44d3eeb661',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({

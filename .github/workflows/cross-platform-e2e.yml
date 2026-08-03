@@ -55,6 +55,43 @@ jobs:
           DECKENT_E2E_BACKEND: ${{ matrix.backend }}
           DECKENT_E2E_PLATFORM: ${{ matrix.os }}
 
+  # MASTER-CLI-SYMLINK-FLAKE-001 `X` evidence leg.
+  #
+  # The validator's entrypoint-identity contract (symlinked invocation must run, never exit 0
+  # silently) was previously provable on Linux only: the real-CLI case was gated on
+  # `process.platform === 'win32'` and tests/scripts/ ran in no platform matrix at all, so the
+  # `X` truth dimension could never move off 0 with real evidence.
+  #
+  # This leg runs the validator contract on all three declared native platforms. The suite
+  # itself measures symlink capability at runtime instead of assuming it, so a Windows runner
+  # without SeCreateSymbolicLinkPrivilege still records a typed, visible capability status
+  # rather than silently skipping. The validator is dependency-free, so no native rebuild is
+  # needed here.
+  #
+  # WSL parity follows the same documented reasoning as the packed-install note below: WSL2 runs
+  # a real Linux kernel and is covered by the ubuntu leg; a synthetic in-runner WSL is not a
+  # faithful proxy. That remains a declared gap, not a silent one.
+  validator-contract:
+    name: Validator Contract — ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run MASTER validator contract suite
+        run: npx vitest run tests/scripts/lint-master-plan.test.ts --reporter=verbose
+
   # WSL-note (XPLAT-01, honest-gap disclosure): this matrix intentionally has NO
   # separate WSL leg. Installing/bootstrapping WSL2 inside a windows-latest GitHub
   # Actions runner is fragile and would not be a faithful proxy for a real user's
