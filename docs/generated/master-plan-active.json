@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "71cbbfdaf7ab83ba7b317dea45e7f8ea19c84b3190b509e95ad083dd6520e692"
+    "value": "c37684340bf74008b094ac41a36e66727d82e167327237a8e40e27823df44581"
   },
   "summary": {
     "total": 337,
@@ -2283,7 +2283,7 @@
       "state": "VERIFY",
       "updated": "2026-08-03",
       "definitionDigest": "d4aa106c67d528313dd65022a92ca5fc9af77bafe996edbe4f3d3d9e7bf7f26b",
-      "progressDigest": "2c876458405513cdf23f36474a54a7ebe4afe29d1623ac978ff161abf40c7d40",
+      "progressDigest": "f4639610f9b6f3b4d5577e8e0f255a458614f0ba9f1c1ef3b3ca54a7725df9b1",
       "terminalClosureDigest": null
     },
     {
@@ -12631,7 +12631,7 @@
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "Temporary or partial result artifacts never become terminal truth; collector rereads the canonical result and emits typed malformed recovery without double settlement",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=result-reconciliation-targeted`; settlement-authority and result-collector tests pass against the observed sprint-475 artifact class; a fresh live sprint replay and every-filesystem atomicity matrix remain unproven; 2026-08-03 ölçüm (PAZARTESI P1): durable-yazım authority kümesi 211 kırık / 19 dosya. Üç halka aynı desende kırılıyor: atomik yazım (writeFileSync temp → renameSync → readFileSync geri-okuma doğrulaması), finalizer terminal-evidence/receipt cleanup-uygunluğu ve worker-heartbeat-authority identity şeması. İki yaklaşım denendi ve YETMEDİ: (a) eksik mock export'larını eklemek hata imzasını değiştirdi, sayıyı değiştirmedi; (b) sahte fs'e bellek katmanı (write→rename→read turu) sprint-finalizer'da 38 kırığı hiç azaltmadı ve geri alındı. Doğru yaklaşım muhtemelen mock değil gerçek tmpdir izolasyonu. Kanıtlamadığı: bu kapanış FAZ 4a ile AYNI dilimde yapılmalı, ayrı bir test-düzeltme işi değildir",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=result-reconciliation-targeted`; settlement-authority and result-collector tests pass against the observed sprint-475 artifact class; a fresh live sprint replay and every-filesystem atomicity matrix remain unproven; 2026-08-03 ölçüm (PAZARTESI P1): durable-yazım authority kümesi 211 kırık / 19 dosya. Üç halka aynı desende kırılıyor: atomik yazım (writeFileSync temp → renameSync → readFileSync geri-okuma doğrulaması), finalizer terminal-evidence/receipt cleanup-uygunluğu ve worker-heartbeat-authority identity şeması. İki yaklaşım denendi ve YETMEDİ: (a) eksik mock export'larını eklemek hata imzasını değiştirdi, sayıyı değiştirmedi; (b) sahte fs'e bellek katmanı (write→rename→read turu) sprint-finalizer'da 38 kırığı hiç azaltmadı ve geri alındı. Doğru yaklaşım muhtemelen mock değil gerçek tmpdir izolasyonu. Kanıtlamadığı: bu kapanış FAZ 4a ile AYNI dilimde yapılmalı, ayrı bir test-düzeltme işi değildir; 2026-08-03 FAZ4A-S1 ölçüm settlement'ı (Fable): S1 planlandığı şekliyle KOŞULMADI çünkü halka zaten kanıtlanabilir sınırına settle olmuş — result-collector suite 27/27 yeşil, result-ailesi test-failure-baseline'da SIFIR kayıt, malformed sınıfı gözlemlenen 475-artifact sınıfına karşı kapsanıyor. Planın ~15 kırık tahmini yanlıştı: atomik-yazım halkasının borcu ayrı bir collector kümesinde değil, S2/S3 kümelerinin (finalizer 63 · controller/pause-resume 95+) İÇİNDE yaşıyor — S2 ölçümü bunu doğruladı: 31 kırık fs-mock'unda renameSync yokluğundan (üretim atomik temp→rename yoluna geçmiş, test mock'u geride kalmış), 7'si TERMINAL_EVIDENCE_HOLD'dan (fixture'lar projectLogicalProgress veri sözleşmesini taşımıyor). Ham replay artifact'ı iddiası da düzeltildi: .tasks/archive/sprint-491 yalnız prompt+worker-script taşıyor, ham .result YOK — L boyutunun kapanış yeri gerçek koşu, yani 4b merdiveni basamak-4; S1 için iş uydurulmadı (negative-space). S1 receipt'i MINT EDİLMEDİ — mutation olmayan ölçüm turu admission istemez",
       "updated": "2026-08-03"
     },
     {
@@ -18072,6 +18072,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f1a1ec6184fa8e75ec259decf46178818f5304489d034bbcb2aa9ca258dc87ce"
+    "value": "fe682b48d8987cdb84798dca12dae0db5f4a3c41bb83f149ef23056e3ee9287d"
   }
 }
