@@ -40,6 +40,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,6 +62,89 @@ export const SELF_REFERENTIAL_RECEIPT_PATHS = new Set([
 ]);
 export const ACTIVE_MARKDOWN_RELATIVE_PATH = 'docs/generated/master-plan-active.md';
 export const ACTIVE_JSON_RELATIVE_PATH = 'docs/generated/master-plan-active.json';
+
+/**
+ * TRUST-ANCHOR-001 — reviewed-parent baseline verification for ACTIVE receipts.
+ *
+ * The 2026-08-03 cross-provider xverify (codex-analysis/xverify-wp0-2026-08-03.md, axis E)
+ * refuted the previous model: this validator hashed CURRENT working-tree bytes, so an author
+ * who changed a source file and minted a matching active receipt IN THE SAME PATCH passed
+ * every check — the "reviewed Git parent" trust anchor lived only in a comment. This section
+ * makes the anchor real:
+ *
+ *   - The anchor for an active receipt is the PARENT of the commit that introduced the
+ *     receipt id into MASTER (`git log -S<id>`): the last state that existed BEFORE the
+ *     receipt was registered, i.e. the state a reviewer of that registration actually saw.
+ *   - A receipt not yet committed (authoring flow) anchors to HEAD: its baselines must match
+ *     the last COMMITTED state, so uncommitted source edits cannot vouch for themselves.
+ *   - Baseline hash must match the anchor blob (`git show <anchor>:<path>`), and an ABSENT
+ *     baseline requires the path to be absent at the anchor too.
+ *
+ * Degradation is typed, never silent: outside a git work tree (hermetic scratch fixtures)
+ * the check reports `no-git` and emits a stderr WARN instead of findings — enforcement is
+ * guaranteed by the required CI checks (branch ruleset 20321963), which always run inside
+ * the real repository with full history (validator-contract fetch-depth: 0).
+ */
+export function runGitCommand(args, cwd) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'buffer',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
+/**
+ * Resolve the trust anchor commit for one active receipt.
+ * @param {string} receiptId
+ * @param {string} root repository root the scan is bound to
+ * @param {(args: string[], cwd: string) => Buffer} git injectable for hermetic tests
+ * @returns {{mode: 'git', anchor: string} | {mode: 'no-git' | 'no-history' | 'no-parent', anchor: null}}
+ */
+export function resolveReceiptTrustAnchor(receiptId, root, git = runGitCommand) {
+  const text = (args) => {
+    try {
+      return git(args, root).toString('utf8').trim();
+    } catch {
+      return null;
+    }
+  };
+  if (text(['rev-parse', '--is-inside-work-tree']) !== 'true') {
+    return { mode: 'no-git', anchor: null };
+  }
+  if (text(['rev-parse', '--verify', 'HEAD']) === null) {
+    return { mode: 'no-history', anchor: null };
+  }
+  // Oldest commit whose diff changes the occurrence count of the receipt id — the
+  // registration commit. Empty output = receipt only exists in the working tree.
+  const introLog = text(['log', '--format=%H', `-S${receiptId}`, '--', 'docs/MASTER-PLAN.md']);
+  if (!introLog) {
+    const head = text(['rev-parse', 'HEAD']);
+    return head ? { mode: 'git', anchor: head } : { mode: 'no-history', anchor: null };
+  }
+  const intro = introLog.split('\n').at(-1);
+  const parent = text(['rev-parse', '--verify', '--quiet', `${intro}^`]);
+  if (!parent) {
+    // Receipt registered in the root commit: no reviewed pre-state exists.
+    return { mode: 'no-parent', anchor: null };
+  }
+  return { mode: 'git', anchor: parent };
+}
+
+/**
+ * Read one path's blob at the anchor commit; null when absent there.
+ * @param {string} anchor
+ * @param {string} path repo-relative
+ * @param {string} root
+ * @param {(args: string[], cwd: string) => Buffer} git
+ */
+export function readTrustAnchorBlob(anchor, path, root, git = runGitCommand) {
+  try {
+    return git(['show', `${anchor}:${path}`], root);
+  } catch {
+    return null;
+  }
+}
 const ACTIVE_WRITE_LOCK_RELATIVE_PATH = 'docs/generated/.master-plan-write.lock';
 
 export const PROGRAM_ROOTS = Object.freeze(
@@ -1450,6 +1534,7 @@ function validateLedger(
   nowMs,
   repositoryRoot,
   baselineMode,
+  gitRunner = runGitCommand,
 ) {
   const itemById = new Map();
   const orderSeen = new Map();
@@ -2136,6 +2221,60 @@ function validateLedger(
             undefined,
           );
           receipt.active = false;
+        }
+      }
+    }
+    // ─── TRUST-ANCHOR-001: reviewed-parent baseline verification ─────────────
+    //
+    // Working-tree hashes above prove only INTERNAL consistency; they cannot prove the
+    // baselines describe a state anyone reviewed. Here each still-active receipt's targets
+    // are re-verified against the trust anchor commit (parent of the receipt's registration
+    // commit, or HEAD for a not-yet-committed receipt). This is what closes the xverify
+    // axis-E forgery: source change + matching receipt in the same patch now fails, because
+    // the anchor predates that patch by construction.
+    if (
+      receipt.active &&
+      repositoryRoot &&
+      baselineMode !== 'structural-only'
+    ) {
+      const anchorResolution = resolveReceiptTrustAnchor(
+        receipt.id,
+        canonicalRepositoryRoot(repositoryRoot),
+        gitRunner,
+      );
+      if (anchorResolution.mode !== 'git') {
+        // Typed degradation, never silent: hermetic scratch fixtures run outside git and
+        // must not fail here — real enforcement is guaranteed by the required CI checks
+        // (ruleset 20321963), which always run inside the repository with full history.
+        process.stderr.write(
+          `[master-plan] WARN — trust-anchor verification degraded (${anchorResolution.mode}) `
+            + `for active receipt ${receipt.id}; reviewed-parent baseline check skipped. `
+            + 'Required CI checks enforce this on the real repository.\n',
+        );
+      } else {
+        for (const target of manifestTargets) {
+          const blob = readTrustAnchorBlob(
+            anchorResolution.anchor,
+            target.path,
+            canonicalRepositoryRoot(repositoryRoot),
+            gitRunner,
+          );
+          const violated = target.baseline === 'ABSENT'
+            ? blob !== null
+            : blob === null
+              || createHash('sha256').update(blob).digest('hex') !== target.baseline;
+          if (violated) {
+            addFinding(
+              findings,
+              'RECEIPT_BASELINE_UNREVIEWED',
+              `Active receipt ${receipt.id} baseline for ${target.path} does not match the `
+                + `reviewed trust anchor ${anchorResolution.anchor.slice(0, 12)} — a baseline `
+                + 'must pin committed, reviewable state, not bytes introduced alongside the receipt',
+              receipt.line,
+              undefined,
+            );
+            receipt.active = false;
+          }
         }
       }
     }
@@ -2985,6 +3124,7 @@ export function validateMasterPlan(source, options = {}) {
     validationNowMs,
     options.root,
     baselineMode === 'structural-only' ? 'structural-only' : 'disk',
+    options.git ?? runGitCommand,
   );
 
   return {
