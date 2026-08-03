@@ -350,30 +350,11 @@ describe('sprint-finalizer — load-test-report.md wiring', () => {
     expect(result).toContain('No metrics data found');
   });
 
-  it('fsPromises.mkdir and writeFile are called with the correct report path', async () => {
-    const fsMod = nodeFsMod as unknown as { promises: { mkdir: ReturnType<typeof vi.fn>; writeFile: ReturnType<typeof vi.fn> } };
-    const mkdirSpy = vi.mocked(fsMod.promises.mkdir);
-    const writeFileSpy = vi.mocked(fsMod.promises.writeFile);
-
-    // Reset call history
-    mkdirSpy.mockClear();
-    writeFileSpy.mockClear();
-
-    const mockGenerate = vi.mocked(observabilityMod.generateLoadReport);
-    mockGenerate.mockResolvedValueOnce('# Sprint Load Test Report\n\n## Wave Timeline\n\nNo wave data recorded.\n');
-
-    // Simulate what finalizeSprint does in the load report section
-    const projectRoot = PROJECT_ROOT;
-    const sprintId = 'sprint-136';
-    const reportDir = `${projectRoot}/docs/audits/${sprintId}`;
-    const reportPath = `${reportDir}/load-test-report.md`;
-    const report = await observabilityMod.generateLoadReport(projectRoot);
-    await fsMod.promises.mkdir(reportDir, { recursive: true });
-    await fsMod.promises.writeFile(reportPath, report);
-
-    expect(mkdirSpy).toHaveBeenCalledWith(reportDir, { recursive: true });
-    expect(writeFileSpy).toHaveBeenCalledWith(reportPath, expect.stringContaining('Wave Timeline'));
-  });
+  // RETIRED (FAZ4A-S2): the old "fsPromises.mkdir and writeFile are called with the
+  // correct report path" case simulated production inside the test and then asserted its
+  // own mock calls — a tautology from the fs-mock era that verified nothing about the
+  // finalizer. The real contract (report lands on disk at the canonical path) is pinned
+  // by "load-test-report.md is written under docs/audits/<sprintId>/" against real files.
 });
 
 describe('sprint-finalizer — gate.json wiring', () => {
@@ -520,6 +501,7 @@ describe('sprint-finalizer — finalizeSprint gate.json integration', () => {
     // untouched, so terminal evidence still settles).
     const writeSpy = vi.spyOn(nodeFsMod.promises, 'writeFile')
       .mockRejectedValue(new Error('ENOSPC: no space left'));
+    try {
 
     const sprint = makeSprint('sprint-137');
     const { evaluations, results } = settledFixture(sprint);
@@ -528,6 +510,7 @@ describe('sprint-finalizer — finalizeSprint gate.json integration', () => {
     await expect(
       finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
     ).resolves.toBeDefined();
+    } finally { writeSpy.mockRestore(); }
   });
 });
 
@@ -698,19 +681,13 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
   });
 
   it('gate.json is always written even when runSelfAuditGate succeeds', async () => {
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
     const sprint = makeSprint('sprint-138');
     const { evaluations, results } = settledFixture(sprint);
 
     await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    // gate.json must be written to .deckent/recently-works/sprint-138-gate.json
-    const gateWriteCall = fsMod.promises.writeFile.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-138-gate.json'),
-    );
-    expect(gateWriteCall).toBeDefined();
-    expect(gateWriteCall![0] as string).toContain('recently-works');
-    const parsed = JSON.parse(gateWriteCall![1] as string) as { overallGate: string };
+    const gatePath = join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-138-gate.json');
+    const parsed = JSON.parse(readFileSync(gatePath, 'utf8')) as { overallGate: string };
     expect(['PASS', 'GATE_FAILURE']).toContain(parsed.overallGate);
   });
 
@@ -720,18 +697,14 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
     const spawnSyncMock = vi.mocked(cpMod.spawnSync);
     spawnSyncMock.mockImplementation(() => { throw new Error('npx not found'); });
 
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
     const sprint = makeSprint('sprint-138');
     const { evaluations, results } = settledFixture(sprint);
 
     await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    // gate.json must STILL be written (fallback gate result)
-    const gateWriteCall = fsMod.promises.writeFile.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-138-gate.json'),
-    );
-    expect(gateWriteCall).toBeDefined();
-    const parsed = JSON.parse(gateWriteCall![1] as string) as { overallGate: string };
+    // gate.json must STILL be written (fallback gate result) — real disk truth.
+    const gatePath = join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-138-gate.json');
+    const parsed = JSON.parse(readFileSync(gatePath, 'utf8')) as { overallGate: string };
     expect(parsed.overallGate).toBe('GATE_FAILURE');
 
     // Restore spawnSync mock
@@ -739,7 +712,6 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
   });
 
   it('load-test-report.md is written under docs/audits/<sprintId>/', async () => {
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn> } };
     vi.mocked(observabilityMod.generateLoadReport).mockResolvedValueOnce(
       '# Sprint Load Test Report\n\n## Wave Timeline\n\nNo wave data recorded.\n',
     );
@@ -749,32 +721,25 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
 
     await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    // mkdir must create the report directory
-    const mkdirCall = fsMod.promises.mkdir.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('docs/audits/sprint-138'),
-    );
-    expect(mkdirCall).toBeDefined();
-
-    // load-test-report.md must be written
-    const reportWriteCall = fsMod.promises.writeFile.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).endsWith('load-test-report.md'),
-    );
-    expect(reportWriteCall).toBeDefined();
-    expect(reportWriteCall![1]).toContain('Wave Timeline');
+    const reportPath = join(PROJECT_ROOT, 'docs', 'audits', 'sprint-138', 'load-test-report.md');
+    expect(readFileSync(reportPath, 'utf8')).toContain('Wave Timeline');
   });
 
   it('finalizeSprint completes even when both gate and load-report write fail (fail-safe)', async () => {
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn> } };
-    fsMod.promises.writeFile.mockRejectedValue(new Error('ENOSPC'));
-    fsMod.promises.mkdir.mockRejectedValue(new Error('ENOSPC'));
+    const wSpy = vi.spyOn(nodeFsMod.promises, 'writeFile').mockRejectedValue(new Error('ENOSPC'));
+    const mSpy = vi.spyOn(nodeFsMod.promises, 'mkdir').mockRejectedValue(new Error('ENOSPC'));
+    try {
+      const sprint = makeSprint('sprint-138');
+      const { evaluations, results } = settledFixture(sprint);
 
-    const sprint = makeSprint('sprint-138');
-    const evaluations = new Map<string, TaskEvaluation>();
-
-    // finalizeSprint must NOT throw — all writes are non-fatal
-    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
-    expect(metrics).toBeDefined();
-    expect(metrics.totalTasks).toBe(1);
+      // finalizeSprint must NOT throw — async gate/report writes are non-fatal
+      const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+      expect(metrics).toBeDefined();
+      expect(metrics.totalTasks).toBe(1);
+    } finally {
+      wSpy.mockRestore();
+      mSpy.mockRestore();
+    }
   });
 
   it('spawnSync in runSelfAuditGate does not use shell: true (ADR-006 compliance)', async () => {
@@ -995,7 +960,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
   it('GATE_COMPUTED is NOT emitted when gate.json write fails', async () => {
     // When writeFile rejects, the GATE_COMPUTED event inside the try block is skipped.
-    vi.spyOn(nodeFsMod.promises, 'writeFile').mockRejectedValue(new Error('EACCES: permission denied'));
+    const eaccesSpy = vi.spyOn(nodeFsMod.promises, 'writeFile')
+      .mockRejectedValue(new Error('EACCES: permission denied'));
+    try {
 
     const sprint = makeSprint('sprint-139');
     const { evaluations, results } = settledFixture(sprint);
@@ -1007,16 +974,17 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
       call => call[4] === 'AUDITOR→BRAIN:GATE_COMPUTED',
     );
     expect(gateComputedCalls.length).toBe(0);
+    } finally { eaccesSpy.mockRestore(); }
   });
 
   // ─── LOAD_REPORT_WRITTEN ─────────────────────────────────────────
 
   it('emits LOAD_REPORT_WRITTEN after load-test-report.md is written', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
     vi.mocked(observabilityMod.generateLoadReport).mockResolvedValueOnce('# Load Report\n\n## Wave Timeline\n\nNo data.\n');
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const loadReportCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
