@@ -77,6 +77,7 @@ vi.mock('../../../src/mcp/tools/job-runner.js', () => ({
 }));
 
 vi.mock('../../../src/core/provider.js', () => ({
+  ProviderError: class ProviderError extends Error {},
   bootstrapProviders: vi.fn(),
 }));
 

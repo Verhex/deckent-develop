@@ -17,13 +17,14 @@ import type { Task, Sprint, ResolvedConfig, SystemProfile, TaskResult } from '..
 // ─── Mocks ──────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  renameSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   appendFileSync: vi.fn(),
   // Sprint 139 async I/O migration: sprint-finalizer uses
   // `import { promises as fsPromises } from 'node:fs'` which needs a
@@ -155,6 +156,7 @@ vi.mock('../../src/orchestra/debt-manager.js', () => ({
 }));
 
 vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
+  appendRetroSection: vi.fn(),
   trimMemoryWithHeader: vi.fn(),
   writeRetrospective: vi.fn(),
   writeSprintLog: vi.fn(),

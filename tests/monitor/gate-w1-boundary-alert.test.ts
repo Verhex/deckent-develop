@@ -23,7 +23,7 @@ vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
   appendFileSync: vi.fn(),
   mkdirSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
 }));
 
 import { checkAuthority, emitAuthorityViolation } from '../../src/orchestra/authority-enforcer.js';

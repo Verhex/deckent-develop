@@ -15,13 +15,14 @@ import { DEBT_TABLE_HEADER } from '../../src/core/constants.js';
 // ─── Module Mocks ───────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  renameSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   appendFileSync: vi.fn(),
   promises: {
     readFile: vi.fn(async () => ''),

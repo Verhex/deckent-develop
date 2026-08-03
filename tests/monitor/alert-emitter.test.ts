@@ -13,7 +13,7 @@ vi.mock('node:fs', () => ({
   appendFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn().mockReturnValue([]),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   renameSync: vi.fn(),
   unlinkSync: vi.fn(),
 }));

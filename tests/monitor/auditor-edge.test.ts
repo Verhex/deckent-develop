@@ -25,12 +25,14 @@ import { AlertLevel, TaskStatus, AgentStatus } from '../../src/core/types.js';
 import type { Task, TaskScope, DashboardState, Heartbeat, LockInfo } from '../../src/core/types.js';
 
 vi.mock('node:fs', () => ({
+  mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
   readFileSync: vi.fn(),
   readdirSync: vi.fn(),
   existsSync: vi.fn(),
   writeFileSync: vi.fn(),
   appendFileSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
 }));
 
 vi.mock('node:child_process', () => ({

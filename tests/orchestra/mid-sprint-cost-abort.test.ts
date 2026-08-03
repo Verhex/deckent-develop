@@ -17,7 +17,7 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(() => ''),
   mkdirSync: vi.fn(),
   appendFileSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   unlinkSync: vi.fn(),
   promises: {
     readFile: vi.fn(async () => ''),

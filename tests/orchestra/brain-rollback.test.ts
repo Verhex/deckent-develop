@@ -26,7 +26,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   appendFileSync: vi.fn(),
   // Sprint 139 async I/O migration: sprint-finalizer and other modules use
   // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
@@ -282,6 +282,7 @@ vi.mock('../../src/core/plugin-hooks.js', () => ({
 }));
 
 vi.mock('../../src/core/multi-ide.js', () => ({
+  bindSprintLockToExecution: vi.fn(),
   acquireSprintLock: vi.fn().mockReturnValue(true),
   releaseSprintLock: vi.fn(),
 }));

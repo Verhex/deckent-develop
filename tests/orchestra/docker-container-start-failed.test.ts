@@ -33,6 +33,8 @@ vi.mock('node:child_process', async () => {
 });
 
 vi.mock('node:fs', () => ({
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
+  chmodSync: vi.fn(),
   existsSync: vi.fn(() => true),
   readFileSync: vi.fn(() => '{}'), // task JSON parse path returns {} → no scope.filesWrite → spawn locks skipped
   writeFileSync: vi.fn(),

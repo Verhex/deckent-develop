@@ -36,6 +36,8 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs', () => ({
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
+  chmodSync: vi.fn(),
   existsSync: vi.fn(() => true),
   readFileSync: vi.fn((path: string) => path.endsWith('/.gemini/settings.json')
     ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'

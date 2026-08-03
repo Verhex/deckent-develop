@@ -40,6 +40,7 @@ import { join } from 'node:path';
 // callZeroConfigPlanner mock'lanır (do-real-plan.test.ts emsali); canned tek-task
 // GERÇEK-şekilli plan döner, böylece propose-yolu hermetik kalır.
 vi.mock('../../src/orchestra/planner.js', () => ({
+  normalizePlannerDependencies: vi.fn(),
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
   callZeroConfigPlanner: vi.fn(() => ({

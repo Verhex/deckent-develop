@@ -31,6 +31,8 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs', () => ({
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
+  chmodSync: vi.fn(),
   existsSync: vi.fn((path: string) => path.endsWith('/.claude/.credentials.json')),
   readFileSync: vi.fn((path: string) => budgetedDockerTaskJson(path, {
     model: path.includes('opus') ? 'claude-opus-4-8' : 'claude-sonnet-5',

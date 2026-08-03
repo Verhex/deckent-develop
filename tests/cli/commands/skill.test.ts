@@ -11,7 +11,7 @@ vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
   cpSync: vi.fn(),
   rmSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   unlinkSync: vi.fn(),
   chmodSync: vi.fn(),
 }));

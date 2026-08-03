@@ -17,13 +17,14 @@ import type { Task, Sprint } from '../../src/core/types.js';
 // ─── Mocks ──────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  renameSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   // Sprint 139 async I/O migration: sprint-finalizer and other modules use
   // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
   // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.

@@ -19,7 +19,7 @@ vi.mock('node:fs', () => ({
   chmodSync: vi.fn(),
   watch: vi.fn().mockReturnValue({ on: vi.fn(), close: vi.fn() }),
   cpSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   createReadStream: vi.fn(),
 }));
 

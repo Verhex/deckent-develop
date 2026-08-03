@@ -6,7 +6,7 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readdirSync: vi.fn(),
   watch: vi.fn().mockReturnValue({ close: vi.fn() }),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   mkdirSync: vi.fn(),
 }));
 

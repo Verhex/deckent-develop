@@ -29,7 +29,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   // Sprint 156 Task 4: archivePromptFiles uses renameSync to move .prompt-*.txt
   // and .worker-*.sh into .tasks/archive/sprint-{id}/ instead of unlinking.
   renameSync: vi.fn(),

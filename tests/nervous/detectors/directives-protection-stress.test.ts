@@ -5,7 +5,7 @@ import type { DetectorContext, DetectorResult, ObserverEvent, SprintStateSnapsho
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   writeFileSync: vi.fn(),
   unlinkSync: vi.fn(),
 }));

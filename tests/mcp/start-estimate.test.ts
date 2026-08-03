@@ -68,6 +68,7 @@ vi.mock('../../src/orchestra/brain.js', () => ({
 }));
 
 vi.mock('../../src/core/provider.js', () => ({
+  ProviderError: class ProviderError extends Error {},
   bootstrapProviders: vi.fn(),
 }));
 

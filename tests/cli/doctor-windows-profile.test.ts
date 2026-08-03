@@ -30,7 +30,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   chmodSync: vi.fn(),
   unlinkSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   readdirSync: vi.fn(),
   accessSync: vi.fn(),
   constants: { W_OK: 2 },

@@ -50,6 +50,7 @@ const fsState = {
 };
 
 vi.mock('node:fs', () => ({
+  linkSync: vi.fn(),
   existsSync: vi.fn((p: string) => fsState.existsSyncImpl(p)),
   readFileSync: vi.fn((p: string) => fsState.readFileSyncImpl(p)),
   writeFileSync: vi.fn(),
