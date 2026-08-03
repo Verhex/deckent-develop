@@ -223,8 +223,8 @@ Sınıf-A'nın mekanik kısmı kapandıktan **sonraki** gerçek durum. Boyut öl
 
 | # | Paket | Boyut | Ölçülen kapsam | Doğa | Bağımlılık / risk |
 |---|---|---|---|---|---|
-| P1 | Atomik yazım + terminal-evidence testleri | **XL** | 181 kırık / 11 dosya | Gerçek mühendislik: üretim davranışı okunup test fixture'ları yeniden kurulacak | En büyük tek kaldıraç. Sweep ile kapanmadığı **denenerek** kanıtlandı |
-| P2 | Orchestra kalanı | **L** | 165 kırık / 41 dosya / **61 farklı imza** | Heterojen. İçinde ~28 hâlâ mekanik (`linkSync` 14, `statSync().isFile` 14) | ~28'i P0-hızında kapanır; kalan 137 vaka-vaka |
+| P1 | **Durable-yazım authority'si**: atomik yazım + terminal-evidence + heartbeat-authority | **XL** | **211 kırık / 19 dosya** (2026-08-03 yeniden ölçüm; önce 181/11 sanılıyordu) | Gerçek mühendislik: üretim davranışı okunup test fixture'ları yeniden kurulacak | En büyük tek kaldıraç. Sweep ile kapanmadığı **iki kez denenerek** kanıtlandı |
+| P2 | Orchestra kalanı | **L** | **135 kırık / 38 dosya** (önce 165/41) | Heterojen; **mekanik artık kalmadı** | Fark P1'e geçti, kapanmadı |
 | P3 | CLI drift'i | **L** | 116 kırık / 30 dosya / **41 imza** | Spy/beklenti drift'i; tek kök neden yok | En yoğun: `status` 20, `commands` 14, `plan` 12 |
 | P4 | MCP-bundle kalanı | **M-L** | 96 kırık / 24 dosya | Çoğu iddia drift'i (`expected undefined to be defined`) | `status-history` 15, `tools-enrichment` 14, `status-rich` 14 |
 | P5 | error-registry ratchet | **M** | **46 ihlal / 25 dosya** + 5 bayat baseline kaydı | Kapalı devre: her raw throw → typed error veya kayıt | Bağımsız, paralel koşabilir. `recover.ts` 8, `spawn-backend-docker.ts` 6 |
@@ -237,14 +237,40 @@ Sınıf-A'nın mekanik kısmı kapandıktan **sonraki** gerçek durum. Boyut öl
 | P12 | provider-observation DB v1→v2 | **M** | OQ-07 | Migration authority + kanıt | Owner yetkisi gerekiyor |
 | P13 | Açık HOLD defteri | **M** | **24 açık HOLD** | Karar backlog'u (OQ-03…OQ-28) | Çoğu başka paketleri bloke ediyor |
 
-**Toplam kırık test: 567** (Orchestra 346 · CLI 116 · MCP-bundle 96 · Core+Agents 9).
-Bugün ~650'den 567'ye indi (MCP-bundle 176→96).
+**Toplam kırık test: 564** (Orchestra 346 · CLI 116 · MCP-bundle 96 · Core+Agents 6).
+~650 → 567 → 564. P5 3 test kazandırdı; P2-mekanik sayıyı düşürmedi (kırıklar P1'e taşındı).
+Dağılım: **P1 211 · P3 116 · P4 96 · P2 135 · P6 6** (P1+P2 = Orchestra 346).
+
+**⚠️ P1 KAPSAM GÜNCELLEMESİ (2026-08-03, ölçümle).** P1 ilk sanılandan geniş çıktı ve
+P2'nin "mekanik" kısmını yuttu:
+
+- **181 → 211 kırık · 11 → 19 dosya.** P2'de mekanik sandığım ~28 kırık (`linkSync`,
+  `statSync().isFile`) düzeltildi; export hataları bitti **ama testler kırılmayı bırakmadı** —
+  altlarından `heartbeat-authority identity` şeması çıktı. Yani onlar da P1'e ait.
+- **P1 tek bir alt-sistem değil, üç halkalı bir zincir:** (a) atomik yazım (`writeFileSync` temp →
+  `renameSync` → `readFileSync` geri-okuma doğrulaması), (b) finalizer terminal-evidence /
+  receipt cleanup-uygunluk zinciri, (c) `worker-heartbeat-authority` identity/revizyon şeması.
+  Üçü de aynı desende kırıyor: **sahte fs bir yazım/okuma turunu ve şema-doğrulamasını
+  taşıyamıyor.**
+- **İki deneme yapıldı, ikisi de yetmedi** (kayda geçsin, tekrar denenmesin):
+  1. Eksik export'ları mock'a eklemek → hata imzası değişti, sayı değişmedi.
+  2. Sahte fs'e bellek katmanı (`__mem` Map ile write→rename→read turu) → `sprint-finalizer`'da
+     38 kırık hiç azalmadı; sorun fs değil, finalizer'ın kanıt zinciri. Deneme geri alındı.
+- **Doğru yaklaşım muhtemelen mock değil izolasyon:** bu 19 dosya `vi.mock('node:fs')` yerine
+  gerçek `tmpdir` kullanmalı. Bu hem hermetiklik disiplinine uyar hem de yazım/okuma turunu
+  bedavaya çözer — ama dosya-dosya yeniden yazım demektir.
+- **Gizli bağımlılık:** P6'daki 4 `ZodError` (provider-observation `runId` zorunlu oldu,
+  tüketiciler güncellenmedi) **aynı alt-sistemde** — `run-status-read-model`. P1'e girmeden
+  **önce P6 kapatılmalı**, yoksa P1 düzeltmeleri hâlâ şema hatasına çarpar.
 
 **Kritik yol önerisi (CI'ı yeşile götüren en kısa hat):**
-1. **P2'nin mekanik ~28'i + P5 (46 ihlal)** — hızlı kazanç, düşük risk, bağımsız.
-2. **P1 (181)** — tek başına kırıkların ~%32'si. Bunu kapatmadan Orchestra yeşile dönmez.
-3. **P3 + P4 (212)** — vaka-vaka, paralellenebilir.
-4. **P6, P8, P9** — küçük artıklar.
+1. ~~P2-mekanik + P5~~ → **2026-08-03'te YAPILDI.** P5 yeşil (46→0, `lint:errors` OK);
+   P2-mekanik uygulandı ama sayıyı düşürmedi (kırıklar P1'e taşındı).
+2. **P6 (4 ZodError)** — küçük ama P1'in ön koşulu; `runId` wiring-closure kapatılmalı.
+3. **P1 (211)** — tek başına kalan kırıkların **%37'si**. Orchestra bunsuz yeşile dönmez.
+4. **P3 + P4 (212)** — vaka-vaka, paralellenebilir.
+5. **P2 kalanı (135)** — heterojen, 38 dosya.
+6. **P8, P9** — küçük artıklar.
 P7/P10/P11/P12/P13 CI'ı bloke etmiyor; ürün/karar borcu olarak ayrı yürür.
 
 **Uyarı — asıl ders:** P1-P4'ün tamamı (558 kırık), 1-2 Ağustos'ta yazılan üretim kodunun
