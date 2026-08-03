@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -25,7 +25,9 @@ import {
   main as mainRaw,
   normalizedSha256,
   parseArgs,
+  readTrustAnchorBlob,
   resolveEntrypointIdentity,
+  resolveReceiptTrustAnchor,
   splitMarkdownRow,
   validateMasterPlan,
 } from '../../scripts/lint-master-plan.mjs';
@@ -2961,5 +2963,221 @@ describe('CLI contract', () => {
     const stderr = memorySink();
     expect(main(['--check', '--root', root], { stderr: stderr.stream })).toBe(2);
     expect(stderr.text()).toContain('scan error');
+  });
+});
+
+// ─── TRUST-ANCHOR-001 — reviewed-parent baseline verification ─────────────────
+//
+// Born from the 2026-08-03 cross-provider xverify (codex-analysis/
+// xverify-wp0-2026-08-03.md, axis E): the validator hashed current working-tree
+// bytes, so "change the source and mint a matching active receipt in the same
+// patch" passed every check. These cases pin the closure: the anchor decision
+// logic hermetically (fake git, no processes), and the actual forgery scenario
+// against a REAL git repository, including the exact 5-step attack from the
+// report.
+describe('trust anchor', () => {
+  const gitCapability = (() => {
+    try {
+      execFileSync('git', ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] });
+      return { supported: true, reason: 'git available' };
+    } catch (error) {
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? String((error as { code?: unknown }).code)
+          : 'UNKNOWN';
+      return { supported: false, reason: `git unavailable (${code})` };
+    }
+  })();
+
+  const fakeGit = (responses: Record<string, string | null>) =>
+    (args: string[]): Buffer => {
+      const key = args.join(' ');
+      for (const [prefix, value] of Object.entries(responses)) {
+        if (key.startsWith(prefix)) {
+          if (value === null) throw new Error(`fake git failure for ${key}`);
+          return Buffer.from(value, 'utf8');
+        }
+      }
+      throw new Error(`fake git has no response for ${key}`);
+    };
+
+  describe('anchor resolution (hermetic, no processes)', () => {
+    it('degrades to a typed no-git mode outside a work tree', () => {
+      const git = fakeGit({ 'rev-parse --is-inside-work-tree': null });
+      expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
+        mode: 'no-git',
+        anchor: null,
+      });
+    });
+
+    it('reports no-history for a repository without commits', () => {
+      const git = fakeGit({
+        'rev-parse --is-inside-work-tree': 'true\n',
+        'rev-parse --verify HEAD': null,
+      });
+      expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
+        mode: 'no-history',
+        anchor: null,
+      });
+    });
+
+    it('anchors an uncommitted receipt to HEAD — the last reviewed state', () => {
+      const git = fakeGit({
+        'rev-parse --is-inside-work-tree': 'true\n',
+        'rev-parse --verify HEAD': 'aaa111\n',
+        'log --format=%H -SGR-X-01': '\n',
+        'rev-parse HEAD': 'aaa111\n',
+      });
+      expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
+        mode: 'git',
+        anchor: 'aaa111',
+      });
+    });
+
+    it('anchors a committed receipt to the PARENT of its registration commit', () => {
+      const git = fakeGit({
+        'rev-parse --is-inside-work-tree': 'true\n',
+        'rev-parse --verify HEAD': 'ccc333\n',
+        'log --format=%H -SGR-X-01': 'ccc333\nbbb222\n',
+        'rev-parse --verify --quiet bbb222^': 'aaa111\n',
+      });
+      // Oldest -S hit (bbb222) is the registration; its parent is the anchor.
+      expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
+        mode: 'git',
+        anchor: 'aaa111',
+      });
+    });
+
+    it('reports no-parent when the receipt was registered in the root commit', () => {
+      const git = fakeGit({
+        'rev-parse --is-inside-work-tree': 'true\n',
+        'rev-parse --verify HEAD': 'bbb222\n',
+        'log --format=%H -SGR-X-01': 'bbb222\n',
+        'rev-parse --verify --quiet bbb222^': null,
+      });
+      expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
+        mode: 'no-parent',
+        anchor: null,
+      });
+    });
+
+    it('readTrustAnchorBlob returns null for a path absent at the anchor', () => {
+      const git = fakeGit({ 'show aaa111:missing.ts': null });
+      expect(readTrustAnchorBlob('aaa111', 'missing.ts', '/scratch', git)).toBeNull();
+    });
+  });
+
+  describe.skipIf(!gitCapability.supported)('real-git forgery scenarios', () => {
+    const TARGET = 'src-example.ts';
+    const RECEIPT_ID = 'GR-2026-07-26-ANCHOR-FIXTURE-01';
+
+    const gitEnv = (root: string) => ({
+      ...process.env,
+      GIT_CONFIG_GLOBAL: join(root, '.empty-gitconfig'),
+      GIT_CONFIG_SYSTEM: join(root, '.empty-gitconfig'),
+      GIT_AUTHOR_NAME: 'fixture',
+      GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+      GIT_COMMITTER_NAME: 'fixture',
+      GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+    });
+    const git = (root: string, ...args: string[]) =>
+      execFileSync('git', args, {
+        cwd: root,
+        env: gitEnv(root),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+    const planWithReceipt = (targetDigest: string) =>
+      planFixture({
+        rows: [{ order: 10, id: 'TASK-A', gates: ['G1'], state: 'READY' }],
+        receipts: [
+          {
+            id: RECEIPT_ID,
+            workIds: ['TASK-A'],
+            manifest: `\`${TARGET}@${targetDigest}\``,
+            state: '`ONE_SHOT`: active',
+          },
+        ],
+      });
+
+    /** Scratch git repo whose initial commit holds the plan WITHOUT the receipt. */
+    const makeAnchoredRepo = (targetBytes: string) => {
+      const source = planFixture({
+        rows: [{ order: 10, id: 'TASK-A', gates: ['G1'], state: 'OPEN' }],
+      });
+      const root = makeScratchPlan(source);
+      writeFileSync(join(root, TARGET), targetBytes, 'utf8');
+      writeFileSync(join(root, '.empty-gitconfig'), '', 'utf8');
+      git(root, 'init', '-q');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'reviewed base state');
+      return root;
+    };
+
+    it('admits an uncommitted receipt whose baseline pins committed, reviewed bytes', () => {
+      const committed = 'export const value = 1;\n';
+      const root = makeAnchoredRepo(committed);
+      const digest = createHash('sha256').update(committed).digest('hex');
+      const source = planWithReceipt(digest);
+      writeFileSync(join(root, MASTER_PLAN_RELATIVE_PATH), source, 'utf8');
+      const result = validateMasterPlan(source, { nowMs: TEST_NOW_MS, root });
+      expect(result.findings.map((finding) => finding.code)).not.toContain(
+        'RECEIPT_BASELINE_UNREVIEWED',
+      );
+      expect(result.findings.map((finding) => finding.code)).not.toContain(
+        'ADMISSION_RECEIPT_MISSING',
+      );
+    });
+
+    it('rejects a receipt vouching for uncommitted working-tree edits', () => {
+      const root = makeAnchoredRepo('export const value = 1;\n');
+      const forged = 'export const value = "forged";\n';
+      writeFileSync(join(root, TARGET), forged, 'utf8');
+      const digest = createHash('sha256').update(forged).digest('hex');
+      const source = planWithReceipt(digest);
+      writeFileSync(join(root, MASTER_PLAN_RELATIVE_PATH), source, 'utf8');
+      // The old working-tree check ALONE would pass here — bytes match the manifest.
+      // The anchor check must catch that those bytes were never committed, let alone reviewed.
+      const codes = validateMasterPlan(source, { nowMs: TEST_NOW_MS, root })
+        .findings.map((finding) => finding.code);
+      expect(codes).toContain('RECEIPT_BASELINE_UNREVIEWED');
+      expect(codes).toContain('ADMISSION_RECEIPT_MISSING');
+    });
+
+    it('rejects the xverify 5-step attack: source change and receipt in the same commit', () => {
+      const root = makeAnchoredRepo('export const value = 1;\n');
+      const forged = 'export const value = "forged";\n';
+      writeFileSync(join(root, TARGET), forged, 'utf8');
+      const digest = createHash('sha256').update(forged).digest('hex');
+      const source = planWithReceipt(digest);
+      writeFileSync(join(root, MASTER_PLAN_RELATIVE_PATH), source, 'utf8');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'attack: mutate source and mint matching receipt');
+      // Post-commit, working tree and HEAD both agree with the manifest; only the
+      // registration-parent anchor still knows the state a reviewer actually saw.
+      const codes = validateMasterPlan(source, { nowMs: TEST_NOW_MS, root })
+        .findings.map((finding) => finding.code);
+      expect(codes).toContain('RECEIPT_BASELINE_UNREVIEWED');
+      expect(codes).toContain('ADMISSION_RECEIPT_MISSING');
+    });
+
+    it('accepts the legitimate two-commit flow: receipt registered against reviewed state', () => {
+      const committed = 'export const value = 1;\n';
+      const root = makeAnchoredRepo(committed);
+      const digest = createHash('sha256').update(committed).digest('hex');
+      const source = planWithReceipt(digest);
+      writeFileSync(join(root, MASTER_PLAN_RELATIVE_PATH), source, 'utf8');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'register admission receipt');
+      const result = validateMasterPlan(source, { nowMs: TEST_NOW_MS, root });
+      expect(result.findings.map((finding) => finding.code)).not.toContain(
+        'RECEIPT_BASELINE_UNREVIEWED',
+      );
+    });
+  });
+
+  it('declares this host\'s git capability instead of assuming it', () => {
+    expect(typeof gitCapability.supported).toBe('boolean');
+    expect(gitCapability.reason).toMatch(/git (available|unavailable)/);
   });
 });

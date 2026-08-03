@@ -111,7 +111,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
+      # TRUST-ANCHOR-001: full history is REQUIRED, not an optimization. The validator
+      # verifies every active receipt's baselines against the parent of the commit that
+      # registered the receipt (`git log -S<id>`). On the default shallow clone
+      # (fetch-depth: 1) that registration commit is invisible for any receipt older than
+      # HEAD, the lookup would degrade to an HEAD anchor, and the exact same-patch forgery
+      # this check exists to stop would pass again. These three legs are the ruleset's
+      # required checks (20321963) — the enforcement guarantee lives here.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

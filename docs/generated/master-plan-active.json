@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "11e5635f2e20b2d5b85bd728dadec2ebd773f700e33d6beec672ac502847ec30"
+    "value": "8360e3bb1e7dd520ba86e41fe1fe5b322e78a892d908c1ab6e6e22db1fc823ef"
   },
   "summary": {
     "total": 333,
     "active": 326,
     "terminal": 7,
-    "receipts": 24,
+    "receipts": 25,
     "byState": {
-      "OPEN": 230,
+      "OPEN": 229,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 29,
+      "VERIFY": 30,
       "DONE": 7,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -674,10 +674,10 @@
       "id": "TRUST-ANCHOR-001",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-03",
       "definitionDigest": "6dda7a49b043f6b3b9ec477c607703b7e0993438e4804eeb7b399d6d98e2deeb",
-      "progressDigest": "f5d18df10fab901a8dbca2115d08cb43b2065f420af2fcec5750e06f5df1761e",
+      "progressDigest": "73eff19e18a884e7a8a31a18d4e778e72227b959e53c20b8b7d509d384191de0",
       "terminalClosureDigest": null
     },
     {
@@ -3968,6 +3968,16 @@
         "transitionAt": "2026-08-03T15:32:29+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-03-TRUST-ANCHOR-01",
+      "authorityDigest": "a134d6f281f5bb202f47e2f42aa822fce92ac40a4dbb498d9251a1afb93e5152",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-03T22:25:03+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -5950,22 +5960,24 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
         "X": "?",
-        "S": "?"
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-03-TRUST-ANCHOR-01"
+      ],
       "acceptance": "Aktif receipt baseline'ı working-tree byte'ına değil reviewed parent commit blob'una karşı doğrulanır (git parent-diff kontrolü validator'da veya required CI check'te); `owner=` metni tek başına authority sayılmaz — protected-branch + bağımsız review kanıtı zincire girer; branch protection durumu makine-okunur evidence olarak kayıtlıdır ve sahte-READY senaryosu (xverify E-ekseni 5-adım) regression testi olarak fail-closed kanıtlanır",
-      "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur",
+      "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur; `receipt=GR-2026-08-03-TRUST-ANCHOR-01`; `proof=trust-anchor-forgery-fail-closed-84cases`; 2026-08-03 SETTLEMENT: (a) validator'a reviewed-parent doğrulaması eklendi — aktif receipt'in anchor'ı receipt'i tanıtan commit'in PARENT'ıdır (`git log -S`), commit'lenmemiş receipt HEAD'e (son reviewed state) çıpalanır; baseline anchor blob'uyla eşleşmezse `RECEIPT_BASELINE_UNREVIEWED` + admission düşer; (b) degradasyon typed: git dışında `no-git/no-history/no-parent` modu stderr WARN üretir, sessiz geçiş yok — zorlama garantisi ruleset 20321963'ün required check'lerinde (validator-contract 3 bacak + Type Check) ve o bacaklara eklenen `fetch-depth: 0`'da; (c) ruleset kanıtı makine-okunur: docs/evidence/trust-anchor/ruleset-20321963-2026-08-03.json (active, deletion+non_fast_forward+required_status_checks, bypass_actors BOŞ, current_user_can_bypass=never); (d) KANIT: 11 yeni vaka — 6 hermetik anchor-çözümü (sahte git, process yok) + 4 gerçek-git senaryosu (meşru authoring GEÇER, working-tree sahteciliği DÜŞER, xverify 5-adım aynı-commit saldırısı DÜŞER, meşru iki-commit akışı GEÇER) + git yetenek beyanı; suite 84/84. DÜRÜST SINIR-1 (bootstrap): bu dilimin KENDİ receipt'i ile implementasyonu aynı patch'te iniyor — doğduğu commit'te kendini zorlayamazdı; eski rejim altında admitted son dilim budur ve bundan SONRAKİ her aktif receipt parent-anchor'a tabidir. DÜRÜST SINIR-2: `owner=` metni hâlâ kriptografik authenticate edilmiyor — ruleset PR-akışını zorunlu kılarak yazar-dışı görünürlük getirir, imzalı-commit/review katmanı RECEIPT-001 kapsamında açık. X `?`: 3-platform koşusu bir sonraki CI turunda",
       "updated": "2026-08-03"
     },
     {
@@ -17883,6 +17895,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0bd935b1cf9996d7db1dc1b2ba7ca96a80e3626dbe98272fc3621efbb058339f"
+    "value": "fb16373c4f86f5e0d063d0eedb166d5fbee1bf9556b69086d132f26315cc207d"
   }
 }
