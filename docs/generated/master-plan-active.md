@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):5fd6bf0f9719555cce943e74632dcafb35a48fa45bad7b4b7a321e8677bb26df`
+**Source digest:** `sha256(normalized-lf-utf8):705def8db35316614c203a8b90a23f0fc6a50980135da6ae034c8934c088fe80`
 
 **Rows:** 327 total · 321 active · 6 terminal
 
@@ -118,7 +118,7 @@
 | 1310 | `CODEX-C7` | BLOCKED | P0 | CODEX | `CODEX-C6`, `KERNEL-ATTEMPT-001`, `WORKER-REGISTRY-001` | `DEPENDENCY_UNSATISFIED` | Two-worker concurrency canary |
 | 1320 | `CODEX-C8` | BLOCKED | P0 | CODEX | `CODEX-C7`, `KERNEL-SETTLEMENT-001`, `SPRINT-HONESTY-001` | `DEPENDENCY_UNSATISFIED` | Bounded full lifecycle micro-sprint |
 | 1330 | `CODEX-C9` | BLOCKED | P0 | CODEX | `CODEX-C8`, `ENV-ADAPTER-001` | `DEPENDENCY_UNSATISFIED` | Platform canary matrix |
-| 1340 | `CODEX-C10` | BLOCKED | P0 | CODEX | `CODEX-C9`, `P02-656`, `IM-07`, `SLO-001` | `DEPENDENCY_UNSATISFIED` | Exact Codex surface/model/platform default rollout and rollback rehearsal |
+| 1340 | `CODEX-C10` | BLOCKED | P1 | CODEX | `CODEX-C9`, `P02-656`, `IM-07`, `SLO-001` | `DEPENDENCY_UNSATISFIED` | Exact Codex surface/model/platform default rollout and rollback rehearsal |
 | 2000 | `P02-630` | BLOCKED | P0 | PAEP | `P01-TRUTH-GATE` | `DEPENDENCY_UNSATISFIED` | Provider Authority and Execution Control Plane parent |
 | 2010 | `P02-631` | OPEN | P0 | PAEP | `P01-TRUTH-GATE` | — | Accepted PAEP ADR and ownership boundaries |
 | 2020 | `P02-632` | VERIFY | P0 | PAEP | `CM-05` | — | Broker denial fail-closed on every backend |
@@ -279,10 +279,10 @@
 | 5030 | `TERMINAL-LIVE-001` | OPEN | P0 | TERMINAL | `WORKER-REGISTRY-001`, `KERNEL-SETTLEMENT-001` | — | Live Worker explanations, logs, progress and drill-down |
 | 5040 | `TERMINAL-REPL-001` | OPEN | P1 | TERMINAL | `TERMINAL-LIVE-001` | — | REPL cursor, queue, streaming, cancellation and context stability |
 | 5050 | `TERMINAL-REF-001` | OPEN | P1 | TERMINAL | `TERMINAL-TOOLS-001` | — | `@` references for files, resources, agents and skills |
-| 5060 | `TERMINAL-ONBOARD-001` | OPEN | P0 | TERMINAL | `CM-01`, `PRINCIPAL-001` | — | Conversational setup, doctor and capability discovery |
+| 5060 | `TERMINAL-ONBOARD-001` | OPEN | P1 | TERMINAL | `CM-01`, `PRINCIPAL-001` | — | Conversational setup, doctor and capability discovery |
 | 5070 | `TERMINAL-AUTH-001` | BLOCKED | P0 | TERMINAL | `P02-635`, `P02-644` | `DEPENDENCY_UNSATISFIED` | Provider login/session binding and real auth probes |
-| 5080 | `NATIVE-DEV-001` | BLOCKED | P0 | TERMINAL | `TERMINAL-DEV-001`, `DESKTOP-001` | `DEPENDENCY_UNSATISFIED` | Deckent terminal plus Desktop as Deckent's own primary development environment |
-| 5090 | `TERMINAL-XPLAT-001` | OPEN | P0 | TERMINAL | `TERMINAL-REPL-001`, `ENV-ADAPTER-001` | — | Native terminal platform and accessibility certification |
+| 5080 | `NATIVE-DEV-001` | BLOCKED | P1 | TERMINAL | `TERMINAL-DEV-001`, `DESKTOP-001` | `DEPENDENCY_UNSATISFIED` | Deckent terminal plus Desktop as Deckent's own primary development environment |
+| 5090 | `TERMINAL-XPLAT-001` | OPEN | P1 | TERMINAL | `TERMINAL-REPL-001`, `ENV-ADAPTER-001` | — | Native terminal platform and accessibility certification |
 | 5100 | `TERMINAL-CONTEXT-001` | OPEN | P0 | TERMINAL | `TERMINAL-REPL-001`, `PRINCIPAL-001`, `TENANT-001` | — | Multi-project, multi-session, local/remote and attach/detach context management |
 | 5110 | `TERMINAL-COLLAB-001` | OPEN | P1 | TERMINAL | `TERMINAL-CONTEXT-001`, `APPROVAL-001`, `AUDIT-001` | — | Solo, team and enterprise collaboration without operator overload |
 | 6000 | `SURFACES-001` | BLOCKED | P0 | PRODUCT | `KERNEL-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Shared product surfaces parent |
@@ -298,13 +298,13 @@
 | 6100 | `CONNECTOR-IDENTITY-001` | OPEN | P0 | CONNECTOR | `PRINCIPAL-001`, `APPROVAL-001`, `APP-SERVICE-001` | — | Gateway and connector session identity, pairing and approval authority |
 | 6110 | `DASHBOARD-OBS-001` | OPEN | P1 | DASHBOARD | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Dashboard as honest, read-oriented observability projection |
 | 6120 | `SURFACE-PARITY-001` | BLOCKED | P0 | PRODUCT | `DESKTOP-REBORN-001`, `API-CONTRACT-001`, `CONNECTOR-IDENTITY-001`, `DASHBOARD-OBS-001` | `DEPENDENCY_UNSATISFIED` | Capability-by-capability parity and intentional negative-space matrix |
-| 6121 | `STATUS-SURFACE-PARITY-001` | VERIFY | P0 | PRODUCT | `RUN-STATUS-AUTHORITY-001` | — | CLI and MCP consume the same canonical sprint status projection |
+| 6121 | `STATUS-SURFACE-PARITY-001` | VERIFY | P1 | PRODUCT | `RUN-STATUS-AUTHORITY-001` | — | CLI and MCP consume the same canonical sprint status projection |
 | 6130 | `API-EVENT-001` | OPEN | P0 | API | `API-CONTRACT-001`, `KERNEL-SETTLEMENT-001`, `STORAGE-001` | — | Durable asynchronous jobs, event streams, webhooks and outbox delivery |
 | 6140 | `API-DEVELOPER-001` | OPEN | P1 | API | `API-CONTRACT-001`, `SURFACE-PARITY-001` | — | OpenAPI, generated SDKs, CLI/MCP parity and compatibility lifecycle |
-| 6150 | `API-OPERATIONS-001` | OPEN | P0 | API | `API-IDENTITY-001`, `LIMIT-001`, `API-EVENT-001` | — | Quotas, pagination, bulk operations, idempotency and regional operations |
+| 6150 | `API-OPERATIONS-001` | OPEN | P1 | API | `API-IDENTITY-001`, `LIMIT-001`, `API-EVENT-001` | — | Quotas, pagination, bulk operations, idempotency and regional operations |
 | 6160 | `SURFACE-ADAPTER-001` | OPEN | P1 | PRODUCT | `APP-SERVICE-001`, `SURFACE-CONTRACT-001`, `CAPABILITY-001` | — | Web, mobile, voice, chat, IDE, CI and ERP thin-adapter expansion |
 | 6165 | `DESKTOP-CUSTOMIZE-001` | OPEN | P1 | DESKTOP | `DESKTOP-REBORN-001` | — | User-facing interface personalization: theme/watch, font set and accent selection in the Desktop settings scene |
-| 6170 | `DESIGN-SYSTEM-001` | OPEN | P0 | PRODUCT | — | — | Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity |
+| 6170 | `DESIGN-SYSTEM-001` | OPEN | P1 | PRODUCT | — | — | Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity |
 | 7000 | `ECOSYSTEM-001` | OPEN | P0 | ECOSYSTEM | `P02-647`, `SURFACE-CUTOVER-001`, `CAPABILITY-001`, `AUDIT-001` | — | Governed agent, skill, plugin, tool, MCP and extension ecosystem |
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
 | 7020 | `SUPPLY-CHAIN-001` | OPEN | P0 | SECURITY | `AGENT-SKILL-001`, `P02-650` | — | Signed agent, skill and plugin provenance |
@@ -321,7 +321,7 @@
 | 8030 | `PLATFORM-PROOF-001` | OPEN | P0 | XPLAT | `ENV-ADAPTER-001`, `TEST-PLATFORM-001` | — | Cross-platform CI, real-binary and hardware/OS certification |
 | 8040 | `PACKAGING-001` | OPEN | P0 | RELEASE | `INSTALL-SCOPE-001`, `SUPPLY-CHAIN-001` | — | CLI, daemon, Desktop, service and container packaging supply chain |
 | 8050 | `DOCS-PRODUCT-001` | BLOCKED | P0 | DOCS | `DOCS-ADR-SYNC-001`, `DOCS-I18N-001`, `SURFACE-PARITY-001` | `DEPENDENCY_UNSATISFIED` | Current code-truth architecture, guide, reference and operations docs |
-| 8060 | `RELEASE-001` | BLOCKED | P0 | RELEASE | `TRUTH-BASELINE-001`, `PLATFORM-PROOF-001`, `PACKAGING-001`, `DOCS-PRODUCT-001` | `DEPENDENCY_UNSATISFIED` | Unified validate, soak, publish and rollback gate |
+| 8060 | `RELEASE-001` | BLOCKED | P1 | RELEASE | `TRUTH-BASELINE-001`, `PLATFORM-PROOF-001`, `PACKAGING-001`, `DOCS-PRODUCT-001` | `DEPENDENCY_UNSATISFIED` | Unified validate, soak, publish and rollback gate |
 | 8070 | `REPO-MIGRATION-001` | OPEN | P0 | REPO | `REPO-CLEANUP-APPLY-001`, `DOCS-TOPOLOGY-001`, `MEMORY-AUTHORITY-001` | — | Rebaseline and execute repository cutover |
 | 8080 | `OPERATIONS-PACK-001` | OPEN | P1 | OPS | `PACKAGING-001`, `STATE-RETENTION-001`, `AUDIT-001` | — | Install, backup, restore, diagnostics, support bundle and disaster recovery |
 | 8090 | `RELEASE-BETA-001` | OPEN | P0 | RELEASE | `REPO-MIGRATION-001`, `NPM-CHANNEL-001`, `DOCS-TRUTH-PASS-001` | — | Owner-approved scoped beta gate: public repo flip plus npm beta channel ahead of RELEASE-001 GA |
@@ -345,5 +345,5 @@
 | 10040 | `SLO-001` | OPEN | P0 | OBS | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Product and platform SLI/SLO/error-budget contract |
 | 10050 | `LOAD-CHAOS-001` | OPEN | P0 | ASSURANCE | `HA-001`, `SLO-001`, `PLATFORM-PROOF-001` | — | Load, soak, fault, chaos and noisy-neighbor certification |
 | 10060 | `COST-001` | OPEN | P1 | COST | `LIMIT-001`, `SLO-001` | — | Provider, compute, storage and operator cost authority |
-| 10070 | `ENTERPRISE-MODULARITY-001` | OPEN | P0 | ENTERPRISE | `ENTERPRISE-AUTH-001`, `STORAGE-001` | — | Solo/community/enterprise module boundaries without core forks |
+| 10070 | `ENTERPRISE-MODULARITY-001` | OPEN | P1 | ENTERPRISE | `ENTERPRISE-AUTH-001`, `STORAGE-001` | — | Solo/community/enterprise module boundaries without core forks |
 | 10080 | `ASSURANCE-PACK-001` | OPEN | P0 | ASSURANCE | `DATA-GOV-001`, `LOAD-CHAOS-001`, `P02-655` | — | Security, privacy, reliability, performance and compliance evidence pack |

@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5fd6bf0f9719555cce943e74632dcafb35a48fa45bad7b4b7a321e8677bb26df"
+    "value": "705def8db35316614c203a8b90a23f0fc6a50980135da6ae034c8934c088fe80"
   },
   "summary": {
     "total": 327,
@@ -21,8 +21,8 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 251,
-      "P1": 60,
+      "P0": 242,
+      "P1": 69,
       "P2": 16
     },
     "byProgram": {
@@ -81,9 +81,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "022d3fa2bf4d2b59ea7919c574a1d95f0c3cdf7cd11b4040e1520841d251156f",
-      "progressDigest": "a8c4ce62b91b475be31a655a7adc9ec5126f3c17707f098f711725cb64726b31",
+      "progressDigest": "57b648ae5aefc61b10f6dcfff3957e9fe00c58d6a56f2e334b61dcdfe4390683",
       "terminalClosureDigest": null
     },
     {
@@ -147,9 +147,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-08-03",
       "definitionDigest": "6ac98c33266e9b97460126d109350d4712295693fa9c68297ae1f806833d53a5",
-      "progressDigest": "3ff3cacf7113a4e3e04e3eea5a72f6f9fc55a8c9a65aace8b4cca0b9ae7eae74",
+      "progressDigest": "6202d72b868979d0610e9ce53c95822e39c0b9192c01dbba962309e31f5b8007",
       "terminalClosureDigest": null
     },
     {
@@ -169,9 +169,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "73b659ebbe57961ab1a6fb811551995ed1b9e1f97a9eb9296706c7a813799d60",
-      "progressDigest": "8b041ae1fde66c41c798550c57945cec20e4e89799160717efb4b6c9002e511a",
+      "progressDigest": "1d6588889e158876aeab247b131b86ed069b55f5fd01f75ff3fecf468dc4977e",
       "terminalClosureDigest": null
     },
     {
@@ -180,9 +180,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "03807b4c23f4586036ec60d47de63e8b11ea26ec23a2060605a951dcefb26e49",
-      "progressDigest": "88f109737c28b3f08bb49c5fdab7107d73fbff84c7eb120fdc3fac8ab13812a4",
+      "progressDigest": "f25d01542e0867197f51ad6dbf8eceec4591b7040823a97685239ef617467a69",
       "terminalClosureDigest": null
     },
     {
@@ -235,9 +235,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "eae11c641886c39822d3a69e483ec9006272ecb29611ac3d9208abfbeb7a5e59",
-      "progressDigest": "1e832e4960e0af00bb9cbc78a4e5c39a695a01bfb3363fde2ffa0b945889e66f",
+      "progressDigest": "1750e72a9225c750c3cb1ba67031044008a2155570417f8ec4aba00ada1c8284",
       "terminalClosureDigest": null
     },
     {
@@ -1091,11 +1091,11 @@
       "order": 1340,
       "id": "CODEX-C10",
       "program": "CODEX",
-      "priority": "P0",
+      "priority": "P1",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "53bbefce0966d52b4510b87d6ad91a5dc6d4d377369df3551e0628b90fc5e4bd",
-      "progressDigest": "b82059d9af62aaeb466b161de15cd0a4eca58d89a3d21b78d0a3fb8f085801a9",
+      "progressDigest": "a3f497789c7e1bcded2511b508b83038f457d082f2781b28d7a41fc0940e0621",
       "terminalClosureDigest": null
     },
     {
@@ -1654,9 +1654,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-08-03",
       "definitionDigest": "bd13fbd19dc7b82df83e4e4de674ad1f43825cd56a8d1941f9aca0972f2d1c97",
-      "progressDigest": "630eeb4f72fcd6291bf2db8dd3d35da5e4c6a3340c3f32c287a6e84211a9ff95",
+      "progressDigest": "1355dd386b1f83c71c204955ce8df6145fdb36178b0bcc9590747f65c8949e28",
       "terminalClosureDigest": null
     },
     {
@@ -2127,9 +2127,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-28",
+      "updated": "2026-08-03",
       "definitionDigest": "2b65e08312116577e0a74758aaa86113f9bd762a059f57704d3004efdf0b26bf",
-      "progressDigest": "4eebb7417f350b54c377f6a95ab1fb1dd67c1b4dc8d7ba4f0031c84a187eda26",
+      "progressDigest": "4e929ad26773059b8b0727c71753dfea78d99c0b45398df12e8dfe31d85f9195",
       "terminalClosureDigest": null
     },
     {
@@ -2215,9 +2215,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-07-30",
+      "updated": "2026-08-03",
       "definitionDigest": "d4aa106c67d528313dd65022a92ca5fc9af77bafe996edbe4f3d3d9e7bf7f26b",
-      "progressDigest": "52879431d50f1eed207d01872057d77563802b271bab48ed1fa14221d46c155e",
+      "progressDigest": "2c876458405513cdf23f36474a54a7ebe4afe29d1623ac978ff161abf40c7d40",
       "terminalClosureDigest": null
     },
     {
@@ -2512,9 +2512,9 @@
       "program": "KERNEL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-03",
       "definitionDigest": "0253183b7f17b549605fc1b9b224a1543410d852205209e0f69643a554bd60e0",
-      "progressDigest": "aa7ec6cdcf22805f12139ae9036cced0ccfa902818180c2e816ff65ff56f05c5",
+      "progressDigest": "467a6661770d87053f7aabe1f46e26838e754919fbe675ee6213bcc6619c7812",
       "terminalClosureDigest": null
     },
     {
@@ -2906,11 +2906,11 @@
       "order": 5060,
       "id": "TERMINAL-ONBOARD-001",
       "program": "TERMINAL",
-      "priority": "P0",
+      "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "fc38aab3c9ab37cc6281c106e918547b01682e3a08b0dcadbbeaf858be32947a",
-      "progressDigest": "2cb93f44e8f492717853bb226d6ea5360f9a27c7c3b9602df2e1e2db737e6244",
+      "progressDigest": "eaeae6b8292274e4e744cf7a7eeb04acca291b06567e0eb7d24279dab3b559fd",
       "terminalClosureDigest": null
     },
     {
@@ -2928,22 +2928,22 @@
       "order": 5080,
       "id": "NATIVE-DEV-001",
       "program": "TERMINAL",
-      "priority": "P0",
+      "priority": "P1",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "72560c1ffa0155afd8d139d9dba6afa4f72c8f4482224c4c688ec3e38832f2a7",
-      "progressDigest": "2e22d28e0122b0633b9eb3985644b4a4f230df8d79a6356728ae3a51f7d84d9e",
+      "progressDigest": "e7e950ce43954b8ac660e8ca763776488ce995723e9c267a4fa3bb2a7b4234ab",
       "terminalClosureDigest": null
     },
     {
       "order": 5090,
       "id": "TERMINAL-XPLAT-001",
       "program": "TERMINAL",
-      "priority": "P0",
+      "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "19482a88ef3c23c7b03a6752d1d71e7c6313a9120745b39fcd129a07f07de558",
-      "progressDigest": "bbc86f7146c2968798e8d6b620f1ae146a609990391ecb61dd64fb8bf5d87d6e",
+      "progressDigest": "4d5fe8dca074f1159f2fa2221e70c738f9c726480dd4b2a60550ad35a72060da",
       "terminalClosureDigest": null
     },
     {
@@ -3095,9 +3095,9 @@
       "program": "DASHBOARD",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "7536d694516a2c56fc1c6f969787a7759a55adefdd7270753c0eafdad039b3bb",
-      "progressDigest": "f2a66c8ac2b8e38da8a52174d002573f24dee974bdac7adbbc50fd882355c10d",
+      "progressDigest": "52454adf8f77d4123ff9696b30a44b81ec18e24cdb1abb1c4fa610e3d07f042c",
       "terminalClosureDigest": null
     },
     {
@@ -3115,11 +3115,11 @@
       "order": 6121,
       "id": "STATUS-SURFACE-PARITY-001",
       "program": "PRODUCT",
-      "priority": "P0",
+      "priority": "P1",
       "state": "VERIFY",
-      "updated": "2026-07-30",
+      "updated": "2026-08-03",
       "definitionDigest": "f600b19e95b3680622cbb6186f441fefd7ee9b583acb8e0590c190c93c21394b",
-      "progressDigest": "4ac9c5fd6f0ed333c26f252a431f2fb361747bda585f4b1d545ccde38cb201f4",
+      "progressDigest": "51bd7156b761b6167717658e20e4e8ad97db89962b979dff17527d98630dade4",
       "terminalClosureDigest": null
     },
     {
@@ -3148,11 +3148,11 @@
       "order": 6150,
       "id": "API-OPERATIONS-001",
       "program": "API",
-      "priority": "P0",
+      "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "dbd0a20e3389c555da88c31a943a88ba5440500f4a458ab82f74864c6d78a5d3",
-      "progressDigest": "9ce58ba82709eabc0de2752d6f3db4790e5b50cbcfcf52285987d92b6f19bb27",
+      "progressDigest": "9c32d362d264c6b694aa18404b79e385a2334286b7ee1a71c492eb18b51a4a31",
       "terminalClosureDigest": null
     },
     {
@@ -3181,11 +3181,11 @@
       "order": 6170,
       "id": "DESIGN-SYSTEM-001",
       "program": "PRODUCT",
-      "priority": "P0",
+      "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-03",
       "definitionDigest": "2259a00760ec554081a886e622a4b4c09a4f2db77351a17570d904a61da2878f",
-      "progressDigest": "5e84ae920774574e6ef5be20df5f6420935749c9a85bbab8c91e0eea8cde6721",
+      "progressDigest": "f96a4ad5fc394c4ebf969b9221564985b7aaf6e2ce4d0b6aef69c3c09bd00e4f",
       "terminalClosureDigest": null
     },
     {
@@ -3368,11 +3368,11 @@
       "order": 8060,
       "id": "RELEASE-001",
       "program": "RELEASE",
-      "priority": "P0",
+      "priority": "P1",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "923158605bf56dc17a638dddc797d35d67827ba44c4b542cc8ba6c446add02dd",
-      "progressDigest": "732cf5447193e366fc65bc481071a9d3b13fcaecbf78203875a89703c72ddfcc",
+      "progressDigest": "a02850639ac70c7fddb4737b0a2a23b8779e372bbbe03ccaf31f122129ec24d5",
       "terminalClosureDigest": null
     },
     {
@@ -3643,11 +3643,11 @@
       "order": 10070,
       "id": "ENTERPRISE-MODULARITY-001",
       "program": "ENTERPRISE",
-      "priority": "P0",
+      "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "315661dceb146c6290f96a321b1f8535cebf7a4c1ae07dee7799f7170f6f6b32",
-      "progressDigest": "33ebe803c4fc66691743c2e17b0f6e36c0c624e311d4b01a46720f26b026e178",
+      "progressDigest": "d288e83388ebe581eed1189beff48a069c1602ff6a4f21258a04da391e76b165",
       "terminalClosureDigest": null
     },
     {
@@ -3948,8 +3948,8 @@
         "GR-2026-07-26-MASTER-01"
       ],
       "acceptance": "File-level source catalog, 125 alias exactly-once total mapping, completed residual audit, supersession and finish contract complete",
-      "evidence": "`receipt=GR-2026-07-26-MASTER-01`; all reconciliation manifests present; isolated commit proof pending",
-      "updated": "2026-07-26"
+      "evidence": "`receipt=GR-2026-07-26-MASTER-01`; all reconciliation manifests present; isolated commit proof pending; 2026-08-03 (PAZARTESI P13): açık soru defteri docs/analysis/OPEN-QUESTIONS-2026-08.md'de 29 kayıt — 24 açık HOLD, 5 owner kararıyla çözülmüş. OQ-29 (coverage sınıf sayımı) bu turda RESOLVED: çelişki Tur-3 prompt'unun düz-metin aritmetiğindeydi, matris 31 tarihsel + 11 canlı ile doğru kapatıldı. Kanıtlamadığı: kalan 24 HOLD'un her biri canonical Work ID veya explicit supersession almadı",
+      "updated": "2026-08-03"
     },
     {
       "order": 30,
@@ -4212,8 +4212,8 @@
         "GR-2026-07-27-TEST-CONTAINMENT-01"
       ],
       "acceptance": "Source-derived writer registry ve zero unauthorized write ratchet",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop Vitest surfaces; the attempted 97-event proof contract did not settle, the clean-index ratchet contains 8,939 unresolved effects without accepting false evidence and the previously observed 9,034 dirty-worktree count is ineligible to advance authority; clean-index containment provider-free matrix passes 15 files/159 tests and shared-worktree legacy CI-sim regression passes 35/35; root 413 pass/10 skip, dashboard 49/49, desktop 13/13 and earlier TypeScript proof remain prior-slice evidence; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; authenticated native execution, real Docker/native Windows, Node-version CI matrix, cross-platform and scale proofs remain open under TEST-CONTAINMENT-001",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop Vitest surfaces; the attempted 97-event proof contract did not settle, the clean-index ratchet contains 8,939 unresolved effects without accepting false evidence and the previously observed 9,034 dirty-worktree count is ineligible to advance authority; clean-index containment provider-free matrix passes 15 files/159 tests and shared-worktree legacy CI-sim regression passes 35/35; root 413 pass/10 skip, dashboard 49/49, desktop 13/13 and earlier TypeScript proof remain prior-slice evidence; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; authenticated native execution, real Docker/native Windows, Node-version CI matrix, cross-platform and scale proofs remain open under TEST-CONTAINMENT-001; 2026-08-03 KÖK NEDEN BULUNDU ve kapatıldı: CI'ın Type Check işi en az 2026-08-01'den beri E_HERMETIC_UNRESOLVED_DRIFT ile kırıktı ve diğer BÜTÜN test işleri ona bağlı olduğu için skipped geçiyordu — yüzlerce failure günlerce görünmedi. Sebep: hermetiklik tarama grafiği dist/ ağacını da içeriyor; CI lint'i build'den önce koşuyor (orada dist yok) fakat taban değerler build almış yerel ağaçta üretiliyordu (unresolved 12463↔12392, production-inventory 1200↔1196). Taban değerler build'siz ağaca göre yeniden hesaplandı ve tazeleme prosedürü sabitlerin başına yazıldı. Type Check YEŞİL. Kanıtlamadığı: taramayı dist'e kör hale getirmek kalıcı çözümdür ve henüz yapılmadı",
+      "updated": "2026-08-03"
     },
     {
       "order": 75,
@@ -4286,8 +4286,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Capability-classified bounded exceptions; remaining calls ratcheted",
-      "evidence": "2026-07-21 tests/scripts analyses",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-21 tests/scripts analyses; 2026-08-03 (PAZARTESI P11, owner onaylı): kapsam genişledi — test tarafı dışında ÜRETİM hot-path'ine 4 yeni spawnSync eklendi (spawn-backend-docker.ts: git hash-object -w ×2, cat-file blob, diff --numstat). Ratchet --update ile sessiz affetmediği için aynı dosyanın mevcut sahip etiketi altına kaydedildi (hotPathDebt 40 → 44). Owner kararı: bu 4 çağrı async'e taşınacak ve ratchet'ten düşürülecek; kod geri alınmıyor çünkü provider-observation v2'nin dosya-diff kanıtı buna bağlı",
+      "updated": "2026-08-03"
     },
     {
       "order": 90,
@@ -4324,8 +4324,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Linux, macOS, Windows native ve WSL tags generated ve enforced",
-      "evidence": "Stale `tests/PLATFORM.md` evidence",
-      "updated": "2026-07-26"
+      "evidence": "Stale `tests/PLATFORM.md` evidence; 2026-08-03 ölçüm (PAZARTESI P9): ortam-bağımlı kırıklar ~6 — Windows taskkill testleri Linux runner'da, CI'da bulunmayan .deckent/skills/docs dizini, 60 sn'de zaman aşan containment ratchet'i, dashboard'ın canlı-sunucu isteyen 2 dosyası. Bunlar ürün hatası değil platform-koşul eksikliğidir; platform registry'ye bağlanınca koşullu skip typed hale gelir",
+      "updated": "2026-08-03"
     },
     {
       "order": 100,
@@ -4503,8 +4503,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Code, tests, CI, runtime writers, site and inbound refs fully mapped",
-      "evidence": "2026-07-21 docs analyses are revalidate sources",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-21 docs analyses are revalidate sources; 2026-08-03 ölçüm (PAZARTESI P7 + P10): docs-reset sonrası 187 skip / 30 dosya DOC-GAP işaretiyle görünür bırakıldı — arşiv corpus'una çakılı, yeni dokümanda karşılığı olmayan iddialar; silinmedi ve yeni dokümana uydurulmadı. Owner kararı: toplu emekli edilmeyecek, her iddia tek tek gözden geçirilecek. P10 (OQ-18 VitePress) ayrı owner kararı: .github/workflows/docs.yml otomatik tetikleyicileri duraklatıldı, workflow_dispatch bırakıldı; 65 test describe.skip + OQ-18 referanslı",
+      "updated": "2026-08-03"
     },
     {
       "order": 150,
@@ -7704,7 +7704,7 @@
       "parent": "CODEX-CANARY-001",
       "program": "CODEX",
       "outcome": "Exact Codex surface/model/platform default rollout and rollback rehearsal",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [
         "CODEX-C9",
         "P02-656",
@@ -7738,8 +7738,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Owner-signed thresholds, quarantine, rollback and progressive product default flip",
-      "evidence": "IM unsupported means global unattended default remains HOLD",
-      "updated": "2026-07-26"
+      "evidence": "IM unsupported means global unattended default remains HOLD; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 2000,
@@ -10155,8 +10155,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Shadow differential, rollback, checkpoint semantics and all dispatch sites",
-      "evidence": "2026-07-27 code-truth: reducer enabled fakat tüm typed effects/call sites tek authority değil; ScheduledFlow ilk tick'i epoch nedeniyle hemen due, cursor RAM-only ve durable occurrence/drain yok",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: reducer enabled fakat tüm typed effects/call sites tek authority değil; ScheduledFlow ilk tick'i epoch nedeniyle hemen due, cursor RAM-only ve durable occurrence/drain yok; 2026-08-03 ölçüm (PAZARTESI P2): orchestra kalanı 135 kırık / 38 dosya / 61 farklı hata imzası; mekanik sınıf tükendi. Baskın imzalar: Docker provider principal, brain leadership binding, plan-phase DB dizini, spy beklenti drift'i",
+      "updated": "2026-08-03"
     },
     {
       "order": 3150,
@@ -12016,8 +12016,8 @@
         "GR-2026-07-28-RUNFLOW-START-ACTOR-01"
       ],
       "acceptance": "No surface-owned execution/state engine; parity and contract tests",
-      "evidence": "`receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; optional namespace-local mount-metadata reconciliation is one canonical service exposed through CLI and MCP; bot ownership is bound to project and kernel-start identity; RunFlow exact-start now preserves the same durable approval principal through CLI and Terminal instead of allowing an adapter-local actor label to change authorization, with focused cross-surface/start-service proof and fresh independent Fable 5 confirmation; the repaired live start remains pending, and RunFlow coordinator, autonomous status/approve, cancel, review/finalize/cleanup and recovery semantics still diverge across API, terminal and Desktop, while dashboard remains intentionally read-only",
-      "updated": "2026-07-28"
+      "evidence": "`receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; optional namespace-local mount-metadata reconciliation is one canonical service exposed through CLI and MCP; bot ownership is bound to project and kernel-start identity; RunFlow exact-start now preserves the same durable approval principal through CLI and Terminal instead of allowing an adapter-local actor label to change authorization, with focused cross-surface/start-service proof and fresh independent Fable 5 confirmation; the repaired live start remains pending, and RunFlow coordinator, autonomous status/approve, cancel, review/finalize/cleanup and recovery semantics still diverge across API, terminal and Desktop, while dashboard remains intentionally read-only; 2026-08-03 ölçüm (PAZARTESI P3): CLI paketi 117 → 95 kırık. Kök neden status yüzeyinin authority-first sözleşmesi: canlı status canonical persisted read model yoksa RUN_STATUS_READ_MODEL_UNAVAILABLE ile HOLD'a düşüyor (src/cli/commands/status.ts:737) ve quiescent run authority, .tasks dosyaları var olsa bile 'aktif sprint yok'a kısa devre yapıyor (status.ts:910-916). Testler eski sözleşmeyi kodluyordu; guard gevşetilmedi, testler yeni sözleşmeye göre yeniden ifade edildi (commands/status.test.ts 20 → 0). Kanıtlamadığı: cleanup komutu, worktree-binary-authority ve spawn spy drift'i ayrı köklerde açık",
+      "updated": "2026-08-03"
     },
     {
       "order": 3220,
@@ -12349,8 +12349,8 @@
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "Temporary or partial result artifacts never become terminal truth; collector rereads the canonical result and emits typed malformed recovery without double settlement",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=result-reconciliation-targeted`; settlement-authority and result-collector tests pass against the observed sprint-475 artifact class; a fresh live sprint replay and every-filesystem atomicity matrix remain unproven",
-      "updated": "2026-07-30"
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=result-reconciliation-targeted`; settlement-authority and result-collector tests pass against the observed sprint-475 artifact class; a fresh live sprint replay and every-filesystem atomicity matrix remain unproven; 2026-08-03 ölçüm (PAZARTESI P1): durable-yazım authority kümesi 211 kırık / 19 dosya. Üç halka aynı desende kırılıyor: atomik yazım (writeFileSync temp → renameSync → readFileSync geri-okuma doğrulaması), finalizer terminal-evidence/receipt cleanup-uygunluğu ve worker-heartbeat-authority identity şeması. İki yaklaşım denendi ve YETMEDİ: (a) eksik mock export'larını eklemek hata imzasını değiştirdi, sayıyı değiştirmedi; (b) sahte fs'e bellek katmanı (write→rename→read turu) sprint-finalizer'da 38 kırığı hiç azaltmadı ve geri alındı. Doğru yaklaşım muhtemelen mock değil gerçek tmpdir izolasyonu. Kanıtlamadığı: bu kapanış FAZ 4a ile AYNI dilimde yapılmalı, ayrı bir test-düzeltme işi değildir",
+      "updated": "2026-08-03"
     },
     {
       "order": 3270,
@@ -13277,8 +13277,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "COMPLETE and cleanup reconcile every interval owned by the exact run/attempt generation; foreign or historical intervals remain forensic but do not impose an admission HOLD on an unrelated IDLE/current run; reconciliation is idempotent and tenant/provider-principal fenced",
-      "evidence": "Sprint-490 COMPLETE and subsequent exact cleanup correctly projected currentAttained=0, but canonical read-model revisions 51 and 52 retained four open intervals outside the exact current task set as `unresolved-provider-observation`. The evidence is truthful; ownership/retirement policy is incomplete. Negative scope: never erase provider history or infer closure from USD=0",
-      "updated": "2026-08-01"
+      "evidence": "Sprint-490 COMPLETE and subsequent exact cleanup correctly projected currentAttained=0, but canonical read-model revisions 51 and 52 retained four open intervals outside the exact current task set as `unresolved-provider-observation`. The evidence is truthful; ownership/retirement policy is incomplete. Negative scope: never erase provider history or infer closure from USD=0; 2026-08-03 (PAZARTESI P6 + P12): provider-observation v2 run-binding wiring-closure KAPANDI (4 → 0 ZodError). Kök neden üretim değil test tarafıydı: v2 şeması her gözlemi sahibi olan run'a bağlıyor ve üretim bunu zaten taşıyor (spawn-backend-docker.ts:3484 observation.runId ↔ input.binding.runId karşılaştırması); bayat olan fixture'lardı. runId değerleri uydurulmadı, semantikten türetildi. P12 AÇIK: live DB hâlâ user_version=1 ve 53 legacy interval taşıyor; v1→v2 migration owner-controlled adoption proof'u bekliyor",
+      "updated": "2026-08-03"
     },
     {
       "order": 3297,
@@ -14823,7 +14823,7 @@
       "parent": "TERMINAL-001",
       "program": "TERMINAL",
       "outcome": "Conversational setup, doctor and capability discovery",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [
         "CM-01",
         "PRINCIPAL-001"
@@ -14852,8 +14852,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Safe enablement, auth status, global/project scope, honest unsupported states",
-      "evidence": "Legacy 202,203",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 202,203; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 5070,
@@ -14899,7 +14899,7 @@
       "parent": "TERMINAL-001",
       "program": "TERMINAL",
       "outcome": "Deckent terminal plus Desktop as Deckent's own primary development environment",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [
         "TERMINAL-DEV-001",
         "DESKTOP-001"
@@ -14928,8 +14928,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Five-day real dogfood, recovery, performance, accessibility and fallback evidence",
-      "evidence": "Legacy 583; no premature VS Code removal",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 583; no premature VS Code removal; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 5090,
@@ -14937,7 +14937,7 @@
       "parent": "TERMINAL-001",
       "program": "TERMINAL",
       "outcome": "Native terminal platform and accessibility certification",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [
         "TERMINAL-REPL-001",
         "ENV-ADAPTER-001"
@@ -14965,8 +14965,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Linux/macOS/Win-native/WSL shells, screen readers, keyboard, contrast and locale",
-      "evidence": "Every-environment law",
-      "updated": "2026-07-26"
+      "evidence": "Every-environment law; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 5100,
@@ -15583,8 +15583,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No fake/proxy metrics or second execution engine; freshness, empty/error states and tenant scope",
-      "evidence": "2026-06 delivered items preserved; residuals revalidate",
-      "updated": "2026-07-26"
+      "evidence": "2026-06 delivered items preserved; residuals revalidate; 2026-08-03 ölçüm (PAZARTESI P8): dashboard suite 1165 test geçiyor; 2 dosya canlı sunucu (127.0.0.1:3000) gerektirdiği için kırık. Harness kararı bekliyor: sunucu ayağa kaldırılsın mı, koşullu skip mi",
+      "updated": "2026-08-03"
     },
     {
       "order": 6120,
@@ -15640,7 +15640,7 @@
       "parent": "SURFACE-PARITY-001",
       "program": "PRODUCT",
       "outcome": "CLI and MCP consume the same canonical sprint status projection",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [
         "RUN-STATUS-AUTHORITY-001"
       ],
@@ -15668,8 +15668,8 @@
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "CLI text/JSON and MCP status expose equivalent state, resumability and pending recovery approval without either adapter inferring lifecycle independently",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED",
-      "updated": "2026-07-30"
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED; 2026-08-03 ölçüm (PAZARTESI P4): MCP paketi 121 → 70 kırık. CLI ile AYNI kök: deckent_status tool'u canlı run authority ve canonical persisted read model olmadan zengin projeksiyon alanlarını üretmiyor, HOLD payload'u dönüyor (src/mcp/tools/status.ts:392-411). status-history 15 → 0, status-rich 14 → 3. Bu, CLI↔MCP'nin gerçekten aynı canonical projection'ı tükettiğinin kanıtıdır; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 6130,
@@ -15757,7 +15757,7 @@
       "parent": "SURFACES-001",
       "program": "API",
       "outcome": "Quotas, pagination, bulk operations, idempotency and regional operations",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [
         "API-IDENTITY-001",
         "LIMIT-001",
@@ -15788,8 +15788,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Fairness, abuse controls, tenant limits, request tracing, admin audit and scale tests",
-      "evidence": "Solo-to-enterprise API requirement",
-      "updated": "2026-07-26"
+      "evidence": "Solo-to-enterprise API requirement; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 6160,
@@ -15873,7 +15873,7 @@
       "parent": "SURFACES-001",
       "program": "PRODUCT",
       "outcome": "Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [],
       "dependents": [],
       "children": [],
@@ -15896,8 +15896,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Single DTCG token source builds all three surfaces; Claude Design project stays component-synced; design-critic and a11y-contrast gates pass before approval; DT-5 terminal design-language SSOT closed; no AI-template regression",
-      "evidence": "2026-07-31 Alperen approval: identity=A (NOVA-core); Claude-side roster committed (.claude/skills: deckent-design-dna, design-tokens-pipeline, claude-design-sync; .claude/agents: design-critic, a11y-contrast-auditor, component-smith); Claude Design project 7dcf190e created; 2026-08-01 open-ledger round 7/7: accent-bright/border-strong/arc-idle semantic roles (18 total) + 7 measured primitives + 6 validator thresholds; progress-arc tokenized; flip-preconditions (b)+(d) closed at token layer; light-theme=NO closed; role overlaps documented-accepted; restart window executed with 4/4 binary color-gate proof",
-      "updated": "2026-08-01"
+      "evidence": "2026-07-31 Alperen approval: identity=A (NOVA-core); Claude-side roster committed (.claude/skills: deckent-design-dna, design-tokens-pipeline, claude-design-sync; .claude/agents: design-critic, a11y-contrast-auditor, component-smith); Claude Design project 7dcf190e created; 2026-08-01 open-ledger round 7/7: accent-bright/border-strong/arc-idle semantic roles (18 total) + 7 measured primitives + 6 validator thresholds; progress-arc tokenized; flip-preconditions (b)+(d) closed at token layer; light-theme=NO closed; role overlaps documented-accepted; restart window executed with 4/4 binary color-gate proof; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 7000,
@@ -16592,7 +16592,7 @@
       "parent": "EVERY-ENV-001",
       "program": "RELEASE",
       "outcome": "Unified validate, soak, publish and rollback gate",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [
         "TRUTH-BASELINE-001",
         "PLATFORM-PROOF-001",
@@ -16625,8 +16625,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "72h declared-platform soak, zero release blocker, signed artifacts, owner publish approval",
-      "evidence": "Legacy 535",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 535; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 8070,
@@ -17591,7 +17591,7 @@
       "parent": "SCALE-001",
       "program": "ENTERPRISE",
       "outcome": "Solo/community/enterprise module boundaries without core forks",
-      "priority": "P0",
+      "priority": "P1",
       "dependsOn": [
         "ENTERPRISE-AUTH-001",
         "STORAGE-001"
@@ -17620,8 +17620,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Same core contracts; enterprise adds governance depth; license/deploy boundaries explicit",
-      "evidence": "Legacy 497,534,570",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 497,534,570; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 10080,
@@ -17666,6 +17666,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "36930f09953ece1934f4dde12a6920e593499554b8e0ff874b90c2e5de79236b"
+    "value": "a758e4dd5b550155c1b4a9bbd0933130e6bf9c15f8f3b065f968eed0cd690174"
   }
 }
