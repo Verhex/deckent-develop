@@ -538,12 +538,32 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
   const mockWriteResult = vi.mocked(writeCodeVerifiedResult);
   const mockBuildResultsMap = vi.mocked(buildResultsMap);
 
+  // CONTRACT SUPERSEDED (FAZ4A-S2 discovery, evaluation-honesty train 483-490):
+  // the finalizer explicitly demoted code-verified reconciliation to a
+  // DIAGNOSTIC-ONLY ambient observation — "verdict unchanged"; it may never
+  // mutate an evaluation or synthesize a worker result at the finalizer
+  // boundary (RECOVERY-BORN-483-EVALUATION-HONESTY-001 class). The old tests
+  // pinned the retired mutation behavior (NO_GO → DONE flip + synthetic
+  // .result write); these pin the honest replacement.
+
+  const nogoTask = (taskId: string): Sprint['tasks'][number] => ({
+    id: taskId,
+    title: `Task ${taskId}`,
+    description: '',
+    model: 'sonnet',
+    effort: 'normal',
+    priority: 'HIGH',
+    reason: '',
+    scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/a.ts'] },
+    dependencies: [],
+    goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+    status: 'DONE',
+  }) as Sprint['tasks'][number];
+
   beforeEach(() => {
     mockTryCode.mockReset();
     mockWriteResult.mockReset().mockResolvedValue(undefined);
     mockBuildResultsMap.mockReset().mockReturnValue(new Map());
-
-    // Default: reconciliation not triggered
     mockTryCode.mockResolvedValue({
       triggered: false,
       verified: false,
@@ -551,44 +571,31 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
       verifiedFiles: [],
       evidenceMatched: false,
     });
-
-    // Reset fs mocks
   });
 
-  it('calls tryCodeVerifiedDone for every NO_GO evaluation during finalize', async () => {
+  it('probes tryCodeVerifiedDone diagnostically for NO_GO tasks only, then fails closed', async () => {
     const sprint = makeSprint('sprint-137');
-    sprint.tasks = [
-      { id: '137-001', title: 'Task 1', description: '', model: 'opus', effort: 'normal', priority: 'CRITICAL', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: [] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
-      { id: '137-002', title: 'Task 2', description: '', model: 'sonnet', effort: 'normal', priority: 'HIGH', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: [] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
-    ] as Sprint['tasks'];
-
+    sprint.tasks = [nogoTask('137-001'), makeSettledTask('137-002')];
     const evaluations = new Map<string, TaskEvaluation>([
       ['137-001', TaskEvaluation.NO_GO],
       ['137-002', TaskEvaluation.DONE],
     ]);
-    const results = [
-      { taskId: '137-002', workerId: 'w-002', filesChanged: ['src/foo.ts'], linesAdded: 10, linesRemoved: 0, testsPassed: true, coverage: 90, selfAssessment: 'DONE' as const, notes: '' , workAttribution: { state: 'VERIFIED' as const, attemptId: 'attempt-137-002', baselineRef: 'baseline:attempt-137-002', scopeDigest: 'attempt-137-0020000000000000000000000000000000000000000000000000' } },
-    ];
+    const { results } = settledFixture({ ...sprint, tasks: [sprint.tasks[1]] } as Sprint);
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    // Unresolved NO_GO lineage → plain finalize is refused at the archive boundary.
+    await expect(
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
+    ).rejects.toThrow(/TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE/);
 
-    // tryCodeVerifiedDone must be called for the NO_GO task (137-001)
+    // The diagnostic probe still ran for the NO_GO task and only for it.
     expect(mockTryCode).toHaveBeenCalledWith('137-001', PROJECT_ROOT);
-    // Must NOT be called for the DONE task (137-002)
     expect(mockTryCode).not.toHaveBeenCalledWith('137-002', PROJECT_ROOT);
   });
 
-  it('reconciles NO_GO → DONE when tryCodeVerifiedDone returns verified=true', async () => {
+  it('never mutates a NO_GO verdict, even when the probe reports verified=true', async () => {
     const sprint = makeSprint('sprint-137');
-    sprint.tasks = [
-      { id: '137-003', title: 'Docker task', description: '', model: 'sonnet', effort: 'normal', priority: 'HIGH', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/a.ts'] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
-    ] as Sprint['tasks'];
-
-    const evaluations = new Map<string, TaskEvaluation>([
-      ['137-003', TaskEvaluation.NO_GO],
-    ]);
-
-    // Simulate: .result MISSING + code physically present on disk
+    sprint.tasks = [nogoTask('137-003')];
+    const evaluations = new Map<string, TaskEvaluation>([['137-003', TaskEvaluation.NO_GO]]);
     mockTryCode.mockResolvedValueOnce({
       triggered: true,
       verified: true,
@@ -597,147 +604,29 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
       evidenceMatched: true,
     });
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
-
-    // Evaluation must be reconciled from NO_GO → DONE
-    expect(evaluations.get('137-003')).toBe(TaskEvaluation.DONE);
-    // writeCodeVerifiedResult must be called with the verify result
-    expect(mockWriteResult).toHaveBeenCalledWith('137-003', PROJECT_ROOT, expect.objectContaining({
-      triggered: true,
-      verified: true,
-      verifiedFiles: ['src/a.ts'],
-    }));
-  });
-
-  it('preserves honest NO_GO when tryCodeVerifiedDone returns verified=false', async () => {
-    const sprint = makeSprint('sprint-137');
-    sprint.tasks = [
-      { id: '137-004', title: 'Failed task', description: '', model: 'sonnet', effort: 'normal', priority: 'HIGH', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/b.ts'] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
-    ] as Sprint['tasks'];
-
-    const evaluations = new Map<string, TaskEvaluation>([
-      ['137-004', TaskEvaluation.NO_GO],
-    ]);
-
-    // Simulate: .result MISSING + no code on disk → honest NO_GO
-    mockTryCode.mockResolvedValueOnce({
-      triggered: true,
-      verified: false,
-      reason: 'No files were modified/created on disk — honest NO_GO',
-      verifiedFiles: [],
-      evidenceMatched: false,
-    });
-
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
-
-    // Evaluation must remain NO_GO
-    expect(evaluations.get('137-004')).toBe(TaskEvaluation.NO_GO);
-    // writeCodeVerifiedResult must NOT be called for unverified tasks
-    expect(mockWriteResult).not.toHaveBeenCalled();
-  });
-
-  it('preserves NO_GO and continues when tryCodeVerifiedDone throws (fail-safe)', async () => {
-    const sprint = makeSprint('sprint-137');
-    sprint.tasks = [
-      { id: '137-005', title: 'Crash task', description: '', model: 'sonnet', effort: 'normal', priority: 'HIGH', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: [] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
-    ] as Sprint['tasks'];
-
-    const evaluations = new Map<string, TaskEvaluation>([
-      ['137-005', TaskEvaluation.NO_GO],
-    ]);
-
-    // Simulate: helper throws an unexpected error
-    mockTryCode.mockRejectedValueOnce(new Error('Unexpected filesystem crash'));
-
-    // finalizeSprint must NOT throw — fail-safe catch preserves original NO_GO
     await expect(
       finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true }),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow(/TERMINAL_/);
 
-    // Evaluation must remain NO_GO (not changed to DONE)
-    expect(evaluations.get('137-005')).toBe(TaskEvaluation.NO_GO);
-    // writeCodeVerifiedResult must NOT be called
+    // The retired behavior flipped the verdict and synthesized a result; the honest
+    // contract does neither.
+    expect(evaluations.get('137-003')).toBe(TaskEvaluation.NO_GO);
     expect(mockWriteResult).not.toHaveBeenCalled();
   });
 
-  it('detects "Docker worker exited..." spurious NO_GO pattern via tryCodeVerifiedDone trigger', async () => {
+  it('preserves NO_GO and fails closed when the probe itself throws (fail-safe diagnostics)', async () => {
     const sprint = makeSprint('sprint-137');
-    sprint.tasks = [
-      { id: '137-006', title: 'Docker HB task', description: '', model: 'sonnet', effort: 'normal', priority: 'HIGH', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/c.ts'] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
-    ] as Sprint['tasks'];
+    sprint.tasks = [nogoTask('137-004')];
+    const evaluations = new Map<string, TaskEvaluation>([['137-004', TaskEvaluation.NO_GO]]);
+    mockTryCode.mockRejectedValueOnce(new Error('probe crashed'));
 
-    const evaluations = new Map<string, TaskEvaluation>([
-      ['137-006', TaskEvaluation.NO_GO],
-    ]);
-
-    // Simulate: Docker worker exited → triggered=true, code present → verified=true
-    // The tryCodeVerifiedDone helper internally checks for the
-    // "Docker worker exited without writing result file" pattern
-    mockTryCode.mockResolvedValueOnce({
-      triggered: true,
-      verified: true,
-      reason: 'Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern). Verified files: src/c.ts',
-      verifiedFiles: ['src/c.ts'],
-      evidenceMatched: true,
-    });
-
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
-
-    // Docker spurious NO_GO must be reconciled
-    expect(evaluations.get('137-006')).toBe(TaskEvaluation.DONE);
-    // Reason must contain the docker HB pattern reference
-    const writeCall = mockWriteResult.mock.calls[0];
-    expect(writeCall).toBeDefined();
-    const verifyResult = writeCall[2] as { reason: string };
-    expect(verifyResult.reason).toContain('docker HB shutdown bug pattern');
-  });
-
-  it('appends Code-Verified DONE section to RETRO.md when reconciliation succeeds', async () => {
-    const fsMod = nodeFsMod as unknown as {
-      existsSync: ReturnType<typeof vi.fn>;
-      readFileSync: ReturnType<typeof vi.fn>;
-      writeFileSync: ReturnType<typeof vi.fn>;
-    };
-
-    const sprint = makeSprint('sprint-137');
-    sprint.tasks = [
-      { id: '137-007', title: 'Reconcile task', description: '', model: 'sonnet', effort: 'normal', priority: 'HIGH', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/d.ts'] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
-    ] as Sprint['tasks'];
-
-    const evaluations = new Map<string, TaskEvaluation>([
-      ['137-007', TaskEvaluation.NO_GO],
-    ]);
-
-    mockTryCode.mockResolvedValueOnce({
-      triggered: true,
-      verified: true,
-      reason: 'Code physically verified',
-      verifiedFiles: ['src/d.ts'],
-      evidenceMatched: true,
-    });
-
-    // Make existsSync return true for RETRO.md, readFileSync return empty RETRO
-    fsMod.existsSync.mockReturnValue(false);
-    fsMod.readFileSync.mockReturnValue('# RETRO\n');
-
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
-
-    // writeFileSync must be called with a RETRO.md update that includes "Code-Verified DONE"
-    const retroWriteCall = fsMod.writeFileSync.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('RETRO.md'),
-    );
-    // RETRO.md is written by writeRetrospective (mocked), but the Code-Verified DONE section
-    // is appended by finalizeSprint directly — it needs existsSync to return true for RETRO.md
-    // Let's check: if existsSync returns false, finalizeSprint reads '' and appends anyway
-    if (retroWriteCall) {
-      expect(retroWriteCall[1]).toContain('Code-Verified DONE');
-    }
-    // Either way, the evaluation must be reconciled
-    expect(evaluations.get('137-007')).toBe(TaskEvaluation.DONE);
+    // Probe failure is swallowed (diagnostic), the unresolved NO_GO still refuses settle.
+    await expect(
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true }),
+    ).rejects.toThrow(/TERMINAL_/);
+    expect(evaluations.get('137-004')).toBe(TaskEvaluation.NO_GO);
   });
 });
-
-// ─── Auto-Archive Tests (Task 138-007) ───────────────────────────────────────
 
 describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () => {
   beforeEach(() => {
