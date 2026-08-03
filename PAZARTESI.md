@@ -178,6 +178,45 @@ sitenin kaderi senin kararın.
    yeni dokümana taşınacak mı, kalıcı emekli mi? Her biri MASTER-PLAN satırı olur. Bugünkü sweep'te
    1 iddia zaten geri açıldı (README sprint rozeti, stats üreticisi düzelince).
 
+### 📋 TEST BORCU ENVANTERİ — 2026-08-03 (karar #3'ün çıktısı)
+Her CI işi yerelde koşuldu, kırıklar hata-imzasına göre sınıflandırıldı. **Düzeltme yapılmadı.**
+
+| CI işi | Kırık test | Kırık dosya | Durum |
+|---|---|---|---|
+| Orchestra | **349** | 52 | en büyük yığın |
+| MCP + API + Integration + Security + Providers + Monitor + Skills + Analytics | **176** | 30 | |
+| CLI | **116** | 30 | |
+| Core + Agents | **9** | 6 | |
+| Dashboard | 0 test (2 dosya) | 2 | 1165 test geçiyor; 2 dosya canlı sunucu (`127.0.0.1:3000`) istiyor |
+| Docs + Scripts | **0** | 0 | bugün düzeltildi |
+| **TOPLAM** | **~650** | **~120** | |
+
+**Sınıflandırma — iyi haber: yığının çoğu tek desende toplanıyor.**
+
+- **A · Eksik modül/fs mock'ları (~230 kırık, en büyük sınıf).** Üretim kodu değişti, testlerin
+  `vi.mock` sahteleri güncellenmedi: `renameSync` (127), `ProviderError` export'u (48),
+  `chmodSync` (24), `statSync().isFile` (14), `bindSprintLockToExecution` (10), `mkdirSync` (6).
+  Kaynak izlendi: `run-status-read-model.ts` atomik yazımı **cd51e1821** (1 Ağu) ile,
+  `sprint-log.ts` atomik yazımı **10bb6c9ae** ile geldi — **ikisi de bugün push edilen yerel
+  birikimin içindeydi ve CI onları hiç test edemedi** (Type Check kapısı kapalıydı).
+  Düzeltme mekanik: eksik export'ları mock'a ekle. Deseni bugün 1 dosyada uyguladım
+  (`doc-updater-consistency`), çalışıyor. 324 dosya `node:fs` mock'luyor, 278'inde `renameSync` yok
+  — ama yalnız atomik-yazım yolunu tetikleyenler kırılıyor.
+- **B · provider-observation v2 wiring-closure (4 kırık).** Şema `runId`'yi zorunlu yaptı;
+  `run-status-read-model` ve `provider-concurrency-runtime-projection` tüketicileri onsuz çağırıyor
+  → `ZodError: runId Required`. Kendi scoped testleri geçiyordu, tüketicileri kırıktı. Bu tam olarak
+  kalite-çıtasındaki **"production wiring closure"** vakası.
+- **C · error-registry ratchet (3 kırık / 46 ihlal).** Kayıtsız 46 yeni `throw new Error(...)`
+  birikmiş; `lint:errors` kapalı devre.
+- **D · CLI spy/beklenti drift'i (116 kırık).** Tek kök neden yok; vaka-vaka bakılmalı.
+- **E · Ortam-bağımlı (CI-only, ~6).** Windows `taskkill` testleri Linux runner'da,
+  CI'da bulunmayan `.deckent/skills/docs`, 60 sn'de zaman aşan containment ratchet'i,
+  dashboard'ın canlı-sunucu isteyen 2 dosyası.
+
+**Çıkarım:** bu borç iki günde birikti ve **görünmezdi** — Type Check kırmızıydı, diğer bütün test
+işleri `skipped` geçiyordu. Yani 1-2 Ağustos'ta yapılan yoğun iş hiç CI görmedi. Öncelik sırası
+A → B → C → D önerilir: A mekanik ve tek hamlede ~230 kırığı kapatır.
+
 ### Notlar
 - Fable limiti resetlenmeden hiçbir faz başlamaz; Codex bu planda brain değildir.
 - FAZ 1-2 sırası bilinçli: önce "olması gereken"i yaz, sonra kodu ona karşı ölç — tersi, bugünkü bozuk docs'u referans almak olur.
