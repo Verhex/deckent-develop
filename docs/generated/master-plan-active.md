@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):22fcd6ea040a0e5b9e2b1ecf18d9c3906639ba371599daf3e651a6853bfd61e2`
+**Source digest:** `sha256(normalized-lf-utf8):59cd37d6d39c355e62422a57a953078dfea59c1a04ad39ee856ff74e6226c4b0`
 
-**Rows:** 327 total · 321 active · 6 terminal
+**Rows:** 328 total · 321 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 224 |
+| OPEN | 225 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 30 |
-| DONE | 6 |
+| VERIFY | 29 |
+| DONE | 7 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -28,7 +28,7 @@
 |---:|---|---|---|---|---|---|---|
 | 20 | `SSOT-002` | VERIFY | P0 | TRUTH | `SSOT-001`, `SOURCE-MANIFEST-001`, `LEGACY-RESIDUAL-AUDIT-001` | — | Tüm kaynakları canonical, atomik ve dependency'li ledger'a uzlaştır |
 | 30 | `SSOT-003` | VERIFY | P0 | TRUTH | `SSOT-001` | — | MASTER schema validator ve generated active views |
-| 31 | `MASTER-CLI-SYMLINK-FLAKE-001` | VERIFY | P0 | TRUTH | — | — | MASTER validator real-entry symlink contract'ını deterministic yap |
+| 32 | `XPLAT-SKIP-GUARD-001` | OPEN | P1 | TRUTH | — | — | Cross-platform matriste kapsam-beklenen platformda symlink vakası atlanırsa bacak fail etsin: skip-görünürlüğü gate-invariant olsun |
 | 40 | `TRUTH-BASELINE-001` | BLOCKED | P0 | TRUTH | `TEST-675`, `TEST-676`, `TEST-HERMETIC-001` | `BASELINE_CONFLICT` | Current HEAD için tek reference test, build, binary ve environment baseline |
 | 50 | `TEST-675` | OPEN | P0 | TRUTH | — | — | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur |
 | 60 | `TEST-676` | OPEN | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |
