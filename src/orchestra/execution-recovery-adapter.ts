@@ -28,6 +28,7 @@ import type {
   ExecutionRecoveryOperation,
   ExecutionRecoveryOutcome,
 } from '../core/execution-recovery.js';
+import { DeckentError } from '../core/errors.js';
 
 // ─── Native mode vocabulary ──────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ function capabilityForOperation(
       return 'terminate';
     default: {
       const exhaustive: never = operation;
-      throw new Error(
+      throw new DeckentError('E_UNHANDLED_EXECUTIONRECOVERYOPERATION_IN_CAPABILITYFOROPERATI', 
         `Unhandled ExecutionRecoveryOperation in capabilityForOperation: ${String(exhaustive)}`,
       );
     }

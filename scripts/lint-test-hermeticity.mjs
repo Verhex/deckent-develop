@@ -101,12 +101,12 @@ export function createScanBudget(
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
   count: 12392,
-  digest: '97f62c658ba6bbbe7111f652e3d4529d449e591ead1dcfe6134b4af90351cb49',
+  digest: '10d6a59f674b06ecbd119e9e77e3896263004049ff2c0c0f8b13892e1c28065e',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   count: 1196,
-  digest: '570185e0a05f23baccbd7d9206c6ac7c2c20d2ee188b182d68971d3b67115b34',
+  digest: '5a9b66ba16e0607c1d3636c1315330d18518ba6bb941c1e08c0dc2078fee8876',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

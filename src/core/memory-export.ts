@@ -19,6 +19,7 @@ import { mkdirSync, existsSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'node:path';
 import type { MemoryStore } from './memory-store.js';
 import type { MemoryEntryV2, EntryType } from './memory-types.js';
+import { DeckentError } from './errors.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -285,7 +286,7 @@ export interface AdrFsExportResult {
 function adrToFilename(id: string, title: string): string {
   const match = id.match(/^adr-(?:(g|d|ug|up)-)?(\d+)$/i);
   if (!match) {
-    throw new Error(`non-canonical ADR id: ${id}`);
+    throw new DeckentError('E_NON_CANONICAL_ADR_ID', `non-canonical ADR id: ${id}`);
   }
   const adrClass = match[1]?.toLowerCase() ?? null;
   const number = match[2]!.padStart(3, '0');
@@ -300,7 +301,7 @@ function adrToFilename(id: string, title: string): string {
 function adrFilenamePrefix(id: string): string {
   const match = id.match(/^adr-(?:(g|d|ug|up)-)?(\d+)$/i);
   if (!match) {
-    throw new Error(`non-canonical ADR id: ${id}`);
+    throw new DeckentError('E_NON_CANONICAL_ADR_ID', `non-canonical ADR id: ${id}`);
   }
   const adrClass = match[1]?.toLowerCase() ?? null;
   const number = match[2]!.padStart(3, '0');
@@ -389,7 +390,7 @@ export function exportAdrsToFs(
         name.toLowerCase().startsWith(prefix.toLowerCase()),
       );
       if (existingMatches.length > 1) {
-        throw new Error(
+        throw new DeckentError('E_AMBIGUOUS_ADR_PROJECTION_FOR', 
           `ambiguous ADR projection for ${adr.id}: ${existingMatches.join(', ')}`,
         );
       }

@@ -158,6 +158,7 @@ export {
   extractTokenUsageFromClaudeCli,
   extractTokenUsageFromAnthropicResponse,
 } from './token-counter.js';
+import { DeckentError } from '../core/errors.js';
 let cachedRespawn: typeof RespawnFn | undefined;
 async function loadRespawn(): Promise<typeof RespawnFn> {
   if (!cachedRespawn) {
@@ -1656,7 +1657,7 @@ export async function waitForResults(
         continue;
       }
       if (authority.state === 'pending-settlement') {
-        throw new Error(`DECKENT_E091:vanished-worker-settlement-pending:${task.id}`);
+        throw new DeckentError('E_DECKENT_E091', `DECKENT_E091:vanished-worker-settlement-pending:${task.id}`);
       }
       const timeoutPath = join(projectRoot, TASKS_DIR, `task-${task.id}.timeout`);
       const tmpPath = `${timeoutPath}.vanished.tmp.${process.pid}`;

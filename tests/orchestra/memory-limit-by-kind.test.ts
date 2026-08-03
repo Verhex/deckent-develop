@@ -54,7 +54,7 @@ vi.mock('node:fs', () => ({
   fsyncSync: vi.fn(),
   closeSync: vi.fn(),
   chmodSync: vi.fn(),
-  statSync: vi.fn(() => ({ mode: 0o100600 })),
+  statSync: vi.fn(() => ({ mode: 0o100600, isFile: () => true, isDirectory: () => false })),
   linkSync: vi.fn((source: unknown, target: unknown) => {
     const sourcePath = String(source);
     const targetPath = String(target);

@@ -50,6 +50,7 @@ import {
 } from '../core/task-result-settlement.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
 import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
+import { DeckentError } from '../core/errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -769,7 +770,7 @@ function archiveNotDispatchedResultProjection(
   if (!existsSync(source)) return;
   const ref = readLatestTaskResultSettlementRef(projectRoot, taskId);
   if (!ref) {
-    throw new Error(`Missing not-dispatched settlement reference for ${taskId}`);
+    throw new DeckentError('E_MISSING_NOT_DISPATCHED_SETTLEMENT_REFERENCE_FOR', `Missing not-dispatched settlement reference for ${taskId}`);
   }
   const archiveDir = join(projectRoot, RECENT_WORKS_DIR, 'recovery-not-dispatched');
   mkdirSync(archiveDir, { recursive: true });
@@ -780,7 +781,7 @@ function archiveNotDispatchedResultProjection(
   );
   if (existsSync(destination)) {
     if (readFileSync(destination, 'utf-8') !== readFileSync(source, 'utf-8')) {
-      throw new Error(`Conflicting not-dispatched recovery archive for ${taskId}`);
+      throw new DeckentError('E_CONFLICTING_NOT_DISPATCHED_RECOVERY_ARCHIVE_FOR', `Conflicting not-dispatched recovery archive for ${taskId}`);
     }
     unlinkSync(source);
     return;

@@ -45,7 +45,7 @@ vi.mock('node:fs', () => ({
   renameSync: vi.fn(),
   rmdirSync: vi.fn(),
   chmodSync: vi.fn(),
-  statSync: vi.fn(() => ({ mtimeMs: 1 })),
+  statSync: vi.fn(() => ({ mtimeMs: 1, isFile: () => true, isDirectory: () => false })),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({

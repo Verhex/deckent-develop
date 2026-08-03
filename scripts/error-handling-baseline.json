@@ -97,11 +97,6 @@
       "count": 1
     },
     {
-      "file": "src/cli/commands/init-templates.ts",
-      "fingerprint": "33a4c52fe25feb74f5b982f643eb4e1e60dd31c1beeeed38bbcfb2ac3ad16d1b",
-      "count": 1
-    },
-    {
       "file": "src/cli/commands/mcp.ts",
       "fingerprint": "25171274921613b0946e98c1f820d164ce54ea268beafab9c1123a93da7552b0",
       "count": 1
@@ -154,21 +149,6 @@
     {
       "file": "src/cli/commands/recover.ts",
       "fingerprint": "4588f7e2a0b492c8732a6de5aa5659e156ee3b60653b94c3b540fec9f42fa5ce",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/recover.ts",
-      "fingerprint": "b05d65b93ec78a702e03fd8f7911c84ec1703fde90665254b069065b63959355",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/recover.ts",
-      "fingerprint": "bb74e048a5a423e4c22110fe56d9801a5c0415ab299e335555b2e8dc000c1de1",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/recover.ts",
-      "fingerprint": "c435d9b613b46c029fbf0b95dd5fcc9ac53e82aef9a4a44edb070c0bcf78678a",
       "count": 1
     },
     {
@@ -1329,11 +1309,6 @@
     {
       "file": "src/orchestra/codex-spawn-readiness.ts",
       "fingerprint": "2477e74151e7513a2bde38c5d91c729e2b2871d6f6c366b0ff6b60be150dba4e",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/cross-verify-runner.ts",
-      "fingerprint": "1595d9b1c2555bda99eb417154cdc9615453a42331e1372c755a49001cd8a01a",
       "count": 1
     },
     {

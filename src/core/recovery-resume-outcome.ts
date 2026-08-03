@@ -3,6 +3,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import { DECKENT_DIR } from './constants.js';
 import type { CanonicalRunStatus } from './run-status-authority.js';
+import { DeckentError } from './errors.js';
 
 export const RECOVERY_RESUME_OUTCOME_SCHEMA_VERSION = 1 as const;
 
@@ -135,7 +136,7 @@ function assertOwnedOutcomePath(projectRoot: string, path: string): void {
     || !basename(exactPath).startsWith('recover-resume-outcome-')
     || !basename(exactPath).endsWith('.json')
   ) {
-    throw new Error('RECOVERY_RESUME_OUTCOME_PATH_OUTSIDE_RUNTIME');
+    throw new DeckentError('E_RECOVERY_RESUME_OUTCOME_PATH_OUTSIDE_RUNTIME', 'RECOVERY_RESUME_OUTCOME_PATH_OUTSIDE_RUNTIME');
   }
 }
 
@@ -144,7 +145,7 @@ export function recoveryResumeOutcomePath(
   nonce: string,
 ): string {
   if (!/^[a-zA-Z0-9-]{8,128}$/.test(nonce)) {
-    throw new Error('RECOVERY_RESUME_OUTCOME_NONCE_INVALID');
+    throw new DeckentError('E_RECOVERY_RESUME_OUTCOME_NONCE_INVALID', 'RECOVERY_RESUME_OUTCOME_NONCE_INVALID');
   }
   return join(projectRoot, DECKENT_DIR, 'runtime', `recover-resume-outcome-${nonce}.json`);
 }

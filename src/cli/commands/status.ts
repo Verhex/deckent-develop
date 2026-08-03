@@ -42,6 +42,7 @@ import {
   runStatusReadModelMatchesAuthority,
   type CanonicalRunStatusReadModel,
 } from '../../core/run-status-read-model.js';
+import { DeckentError } from '../../core/errors.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -530,7 +531,7 @@ export function projectStatusLogicalProgress(tasks: readonly Task[]): {
     }),
   });
   if (!result.ok) {
-    throw new Error(`STATUS_LOGICAL_PROGRESS_${result.diagnostic}`);
+    throw new DeckentError('E_STATUS_LOGICAL_PROGRESS', `STATUS_LOGICAL_PROGRESS_${result.diagnostic}`);
   }
   return result.projection;
 }

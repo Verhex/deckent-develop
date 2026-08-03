@@ -30,6 +30,7 @@ import {
   type TerminalPublicationStatus,
 } from '../../core/sprint-terminal-publication-status.js';
 import { publishCanonicalRunStatusReadModel } from '../../core/run-status-read-model.js';
+import { DeckentError } from '../../core/errors.js';
 
 export function cleanupAuthorityHoldReason(
   authority: CanonicalRunStatus,
@@ -323,7 +324,7 @@ export function registerCleanup(program: Command): void {
           }
         }
         if (archiveFailures.length > 0) {
-          throw new Error(getMessage('cleanup.archive_hold', lang, {
+          throw new DeckentError('E_CLEANUP_ARCHIVE_HOLD', getMessage('cleanup.archive_hold', lang, {
             count: String(archiveFailures.length),
             files: archiveFailures.slice(0, 5).join(', '),
           }));

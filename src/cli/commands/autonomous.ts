@@ -165,7 +165,7 @@ function createLiveAutonomousExactSprintExecutor(input: {
           : { terminalState: 'BLOCKED', reasonCode: `SPRINT_${sprint.status}` };
     },
     spawnDetached: () => {
-      throw new Error('AUTONOMOUS_EXACT_SPRINT_DETACHED_EXECUTOR_UNWIRED');
+      throw new DeckentError('E_AUTONOMOUS_EXACT_SPRINT_DETACHED_EXECUTOR_UNWIRED', 'AUTONOMOUS_EXACT_SPRINT_DETACHED_EXECUTOR_UNWIRED');
     },
     ...(input.verifyStartAuthorization
       ? { verifyStartAuthorization: input.verifyStartAuthorization }

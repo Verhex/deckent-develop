@@ -43,6 +43,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs', () => ({
+  linkSync: vi.fn(),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   chmodSync: vi.fn(),
   existsSync: vi.fn(() => true),

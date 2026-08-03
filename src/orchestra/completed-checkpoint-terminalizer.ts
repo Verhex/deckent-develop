@@ -24,6 +24,7 @@ import {
 import { runCleanupPhase } from './sprint-phases.js';
 import { readAuthoritativeTaskResult } from './task-result-authority.js';
 import { CHANNELS, writeEvent } from '../core/event-stream.js';
+import { DeckentError } from '../core/errors.js';
 
 type RecoveryTerminalizationStage =
   | 'initialize'
@@ -55,7 +56,7 @@ function completedCheckpointEvidence(
   for (const task of sprint.tasks) {
     const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
     const result = normalizeTaskResultShape(authority.result);
-    if (!result) throw new Error(`TERMINALIZATION_RESULT_AUTHORITY_MISSING:${task.id}:${authority.state}`);
+    if (!result) throw new DeckentError('E_TERMINALIZATION_RESULT_AUTHORITY_MISSING', `TERMINALIZATION_RESULT_AUTHORITY_MISSING:${task.id}:${authority.state}`);
     const recorded = (result as TaskResult & { brainEvaluation?: TaskEvaluation }).brainEvaluation
       ?? result.evaluationDecision
       ?? result.selfAssessment;
@@ -65,7 +66,7 @@ function completedCheckpointEvidence(
       && recorded !== TaskEvaluation.NO_GO
       && recorded !== TaskEvaluation.NOT_DISPATCHED
     ) {
-      throw new Error(`TERMINALIZATION_EVALUATION_AUTHORITY_MISSING:${task.id}:${String(recorded)}`);
+      throw new DeckentError('E_TERMINALIZATION_EVALUATION_AUTHORITY_MISSING', `TERMINALIZATION_EVALUATION_AUTHORITY_MISSING:${task.id}:${String(recorded)}`);
     }
     results.push(result);
     evaluations.set(task.id, recorded as TaskEvaluation);
@@ -128,7 +129,7 @@ export async function terminalizeCompletedCheckpointRun(
   try {
     const sprint = buildPreplannedResumeSprint(projectRoot, checkpoint, []);
     const executionMode = checkpoint.executionMode ?? legacyMode;
-    if (!executionMode) throw new Error('TERMINALIZATION_EXECUTION_MODE_UNAVAILABLE');
+    if (!executionMode) throw new DeckentError('E_TERMINALIZATION_EXECUTION_MODE_UNAVAILABLE', 'TERMINALIZATION_EXECUTION_MODE_UNAVAILABLE');
     sprint.executionMode = executionMode;
     // An old checkpoint did not persist cleanup intent. Retention is the only
     // safe default: evidence can be cleaned later, but cannot be reconstructed.
@@ -176,7 +177,7 @@ export async function terminalizeCompletedCheckpointRun(
       retroOutcome: metrics,
     });
     if (handoff.state === 'HOLD') {
-      throw new Error(`TERMINALIZATION_HANDOFF_HOLD:${handoff.reasonCode}:${handoff.detail}`);
+      throw new DeckentError('E_TERMINALIZATION_HANDOFF_HOLD', `TERMINALIZATION_HANDOFF_HOLD:${handoff.reasonCode}:${handoff.detail}`);
     }
     emitRecoveryEvent(
       projectRoot,
@@ -223,7 +224,7 @@ export async function terminalizeCompletedCheckpointRun(
     stage = 'publication';
     const publication = commitSprintTerminalHandoff(handoff);
     if (publication.state === 'HOLD') {
-      throw new Error(`TERMINALIZATION_PUBLICATION_HOLD:${publication.reasonCode}:${publication.detail}`);
+      throw new DeckentError('E_TERMINALIZATION_PUBLICATION_HOLD', `TERMINALIZATION_PUBLICATION_HOLD:${publication.reasonCode}:${publication.detail}`);
     }
     publishFinalSprintAuthority(projectRoot, sprint, metrics, config.language ?? 'en');
     sprint.status = SprintStatus.COMPLETE;

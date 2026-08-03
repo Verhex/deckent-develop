@@ -19,6 +19,7 @@ import {
   SprintRecoveryOperationError,
   type SprintRecoveryReport,
 } from '../../orchestra/sprint-recovery-operation.js';
+import { DeckentError } from '../../core/errors.js';
 
 export interface ResumeRecoveryProcessOptions {
   autoApprove?: boolean;
@@ -55,11 +56,11 @@ export async function runResumeRecoveryProcess(
     || !authority.resumable
     || (authority.lifecycle !== 'PAUSED' && authority.lifecycle !== 'ORPHANED')
   ) {
-    throw new Error(getMessage('recover.resume_authority_missing', lang, { sprintId }));
+    throw new DeckentError('E_RECOVER_RESUME_AUTHORITY_MISSING', getMessage('recover.resume_authority_missing', lang, { sprintId }));
   }
   const execPath = runtime.execPath ?? process.execPath;
   const entryPath = runtime.entryPath ?? process.argv[1];
-  if (!entryPath) throw new Error(getMessage('recover.resume_entry_missing', lang));
+  if (!entryPath) throw new DeckentError('E_RECOVER_RESUME_ENTRY_MISSING', getMessage('recover.resume_entry_missing', lang));
   const args = [entryPath, 'resume', sprintId, '--root', root];
   if (opts.autoApprove) args.push('--auto-approve');
   if (opts.dryRun) args.push('--dry-run');
@@ -121,7 +122,7 @@ export async function runResumeRecoveryProcess(
 
 function assertCanonicalSprintId(sprintId: string, lang: string): void {
   if (!/^sprint-\d+$/.test(sprintId)) {
-    throw new Error(getMessage('recover.invalid_sprint_id', lang, { sprintId }));
+    throw new DeckentError('E_RECOVER_INVALID_SPRINT_ID', getMessage('recover.invalid_sprint_id', lang, { sprintId }));
   }
 }
 
@@ -160,7 +161,7 @@ export async function runRecovery(
       SETTLEMENT_AUTHORITY_MISSING: 'recover.settlement_authority_missing',
       SETTLEMENT_FAILED: 'recover.settlement_failed',
     }[error.code] ?? 'recover.internal_error';
-    throw new Error(getMessage(key, lang, {
+    throw new DeckentError(`E_RECOVER_${error.code}`, getMessage(key, lang, {
       ...error.details,
       code: error.details.code ?? error.details.reason ?? error.code,
     }));
@@ -190,7 +191,7 @@ export function registerRecover(program: Command): void {
           throw new Error(getMessage('recover.dry_run_restore_conflict', lang));
         }
         if (opts.resume && opts.restoreTasks) {
-          throw new Error(getMessage('recover.resume_restore_conflict', lang));
+          throw new DeckentError('E_RECOVER_RESUME_RESTORE_CONFLICT', getMessage('recover.resume_restore_conflict', lang));
         }
         if (opts.resume) {
           const result = await runResumeRecoveryProcess(root, sprintId, {

@@ -883,7 +883,7 @@ export function persistDockerTaskResultSettlement(
   if (!existsSync(resultPath)) return false;
   const parsed = JSON.parse(readFileSync(resultPath, 'utf-8')) as unknown;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`Docker result settlement is not a JSON object: ${resultPath}`);
+    throw new DeckentError('E_DOCKER_RESULT_SETTLEMENT_IS_NOT_A_JSON_OBJECT', `Docker result settlement is not a JSON object: ${resultPath}`);
   }
   const result = normalizeTaskResultShape(
     parsed as Record<string, unknown> & { notes?: unknown },
@@ -2049,7 +2049,7 @@ export function captureScopeAttributionManifest(
     .map(line => line.slice(0, line.indexOf(SCOPE_BASELINE_DELIM))));
   for (const path of scopeFiles) {
     if (existsSync(resolve(projectRoot, path)) && !captured.has(path)) {
-      throw new Error(`attribution-baseline-capture-failed:${path}`);
+      throw new DeckentError('E_ATTRIBUTION_BASELINE_CAPTURE_FAILED', `attribution-baseline-capture-failed:${path}`);
     }
   }
   return buildScopeAttributionManifest(attemptId, scopeFiles, contentManifest);
@@ -2081,13 +2081,13 @@ function gitBlobHash(projectRoot: string, path: string): string | null {
   });
   const hash = (result.stdout ?? '').trim();
   if (result.status !== 0 || !/^[0-9a-f]{40,64}$/.test(hash)) {
-    throw new Error(`blob-hash-unavailable:${path}`);
+    throw new DeckentError('E_BLOB_HASH_UNAVAILABLE', `blob-hash-unavailable:${path}`);
   }
   return hash;
 }
 
 function countTextLines(bytes: Buffer): number {
-  if (bytes.includes(0)) throw new Error('binary-or-unmeasurable-numstat');
+  if (bytes.includes(0)) throw new DeckentError('E_BINARY_OR_UNMEASURABLE_NUMSTAT', 'binary-or-unmeasurable-numstat');
   if (bytes.length === 0) return 0;
   let lines = 0;
   for (const byte of bytes) if (byte === 0x0a) lines++;
@@ -2102,7 +2102,7 @@ function gitBlobLineCount(projectRoot: string, hash: string): number {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
-    throw new Error('baseline-blob-unavailable');
+    throw new DeckentError('E_BASELINE_BLOB_UNAVAILABLE', 'baseline-blob-unavailable');
   }
   return countTextLines(result.stdout);
 }
@@ -2125,7 +2125,7 @@ function blobNumstat(
     || !/^\d+$/.test(addedRaw ?? '')
     || !/^\d+$/.test(removedRaw ?? '')
   ) {
-    throw new Error('binary-or-unmeasurable-numstat');
+    throw new DeckentError('E_BINARY_OR_UNMEASURABLE_NUMSTAT', 'binary-or-unmeasurable-numstat');
   }
   return { added: Number(addedRaw), removed: Number(removedRaw) };
 }

@@ -40,6 +40,7 @@ import {
   type ApprovalDecision,
   type ApprovalRequest,
 } from '../../../core/approval-contract.js';
+import { DeckentError } from '../../../core/errors.js';
 
 const WORK_ITEM_STATUSES: ReadonlySet<WorkItemStatus> = new Set([
   'pending', 'running', 'done', 'failed', 'blocked', 'parked',
@@ -2580,7 +2581,7 @@ export class SqliteMissionStore implements MissionStore {
           adoptedDefinitionDigest,
         });
         if (fenceUpdate.changes !== 1) {
-          throw new Error(`MISSION_EXACT_PLAN_FENCE_CAS_CONFLICT: ${claim.workItemId}`);
+          throw new DeckentError('E_MISSION_EXACT_PLAN_FENCE_CAS_CONFLICT', `MISSION_EXACT_PLAN_FENCE_CAS_CONFLICT: ${claim.workItemId}`);
         }
       }
       return true;

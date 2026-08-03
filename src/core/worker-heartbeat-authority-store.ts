@@ -22,6 +22,7 @@ import {
   type WorkerHeartbeatAuthorityObservationInput,
   type WorkerHeartbeatAuthorityState,
 } from './worker-heartbeat-authority.js';
+import { DeckentError } from './errors.js';
 
 const STORE_SCHEMA_VERSION = 1 as const;
 const REVISION_FILE = /^([0-9]{16})\.json$/;
@@ -260,7 +261,7 @@ export class WorkerHeartbeatAuthorityStore {
   #readIdentity(path: string): WorkerHeartbeatAuthorityIdentity {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as StoredIdentity;
     if (parsed.storeSchemaVersion !== STORE_SCHEMA_VERSION || parsed.identity === undefined) {
-      throw new Error(`Unsupported worker heartbeat authority identity: ${path}`);
+      throw new DeckentError('E_UNSUPPORTED_WORKER_HEARTBEAT_AUTHORITY_IDENTITY', `Unsupported worker heartbeat authority identity: ${path}`);
     }
     return parsed.identity;
   }
@@ -274,7 +275,7 @@ export class WorkerHeartbeatAuthorityStore {
       const observation = JSON.parse(readFileSync(join(directory, revision), 'utf8')) as unknown;
       const expectedSequence = (state.latest?.hostSequence ?? 0) + 1;
       if (revision !== sequenceFile(expectedSequence)) {
-        throw new Error(`Invalid worker heartbeat authority revision sequence: ${join(directory, revision)}`);
+        throw new DeckentError('E_INVALID_WORKER_HEARTBEAT_AUTHORITY_REVISION_SEQUENCE', `Invalid worker heartbeat authority revision sequence: ${join(directory, revision)}`);
       }
       const next = foldWorkerHeartbeatAuthority(state, observation);
       if (
@@ -282,7 +283,7 @@ export class WorkerHeartbeatAuthorityStore {
         || next.latest?.hostSequence !== expectedSequence
         || next.holds.length !== state.holds.length
       ) {
-        throw new Error(`Invalid worker heartbeat authority revision: ${join(directory, revision)}`);
+        throw new DeckentError('E_INVALID_WORKER_HEARTBEAT_AUTHORITY_REVISION', `Invalid worker heartbeat authority revision: ${join(directory, revision)}`);
       }
       state = next;
     }
@@ -292,7 +293,7 @@ export class WorkerHeartbeatAuthorityStore {
   #nextTimestamp(authority: WorkerHeartbeatAuthorityState): string {
     const observed = this.#hostNow();
     const observedMillis = observed.getTime();
-    if (!Number.isFinite(observedMillis)) throw new Error('Host clock returned an invalid date');
+    if (!Number.isFinite(observedMillis)) throw new DeckentError('E_HOST_CLOCK_RETURNED_AN_INVALID_DATE', 'Host clock returned an invalid date');
     const previousMillis = authority.latest === null ? -1 : Date.parse(authority.latest.hostObservedAt);
     return new Date(Math.max(observedMillis, previousMillis + 1)).toISOString();
   }

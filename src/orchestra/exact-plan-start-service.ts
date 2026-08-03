@@ -61,6 +61,7 @@ import {
   evaluateExecutionWriteScopePolicy,
   normalizeExecutionWriteScopePolicy,
 } from '../core/execution-write-scope-policy.js';
+import { DeckentError } from '../core/errors.js';
 
 const DEFAULT_PREPARE_LEASE_MS = 60_000;
 
@@ -385,7 +386,7 @@ function assertRecoveryManifestAuthority(root: string, attempt: StartAttemptReco
   try {
     const manifest = loadRunFlowRecoveryManifest(root, attempt.flowId, attempt.generation);
     if (!manifest || manifest.attemptId !== attempt.attemptId) {
-      throw new Error('missing or mismatched recovery manifest');
+      throw new DeckentError('E_MISSING_OR_MISMATCHED_RECOVERY_MANIFEST', 'missing or mismatched recovery manifest');
     }
   } catch (cause) {
     throw new ExactPlanStartError(

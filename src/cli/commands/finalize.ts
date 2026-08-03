@@ -29,6 +29,7 @@ import {
   readSprintRecoverySettlementIdentity,
   runSprintRecoveryOperation,
 } from '../../orchestra/sprint-recovery-operation.js';
+import { DeckentError } from '../../core/errors.js';
 
 /**
  * Build a Sprint object and evaluations from .tasks/ directory contents.
@@ -289,7 +290,7 @@ export function registerFinalize(program: Command): void {
               }));
             }
             if (sweep.failed.length > 0) {
-              throw new Error(getMessage('finalize.workers_termination_failed', lang, {
+              throw new DeckentError('E_FINALIZE_WORKERS_TERMINATION_FAILED', getMessage('finalize.workers_termination_failed', lang, {
                 count: String(sweep.failed.length),
                 ids: sweep.failed.join(', '),
               }));

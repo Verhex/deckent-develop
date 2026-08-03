@@ -41,6 +41,7 @@ import {
   formatScopeGateLines,
   formatTopologyLines,
 } from '../repl/plan-preview-card.js';
+import { DeckentError } from '../../core/errors.js';
 
 export type RlFactory = () => {
   question: (q: string) => Promise<string>;
@@ -178,7 +179,7 @@ export function registerPlan(program: Command): void {
             || !opts.adoptionJustification
           )
         ) {
-          throw new Error(getMessage('plan.adoption_authority_required', lang));
+          throw new DeckentError('E_PLAN_ADOPTION_AUTHORITY_REQUIRED', getMessage('plan.adoption_authority_required', lang));
         }
 
         // ─── Interrogation (PLAN-INT-1) ──────────────────────────────────
@@ -263,7 +264,7 @@ export function registerPlan(program: Command): void {
             if (adoptionRequested) {
               const dependencyNormalization = normalizePlannerDependencies(sprint.tasks);
               if (dependencyNormalization.dropped.length > 0) {
-                throw new Error(getMessage('plan.adoption_dependency_hold', lang));
+                throw new DeckentError('E_PLAN_ADOPTION_DEPENDENCY_HOLD', getMessage('plan.adoption_dependency_hold', lang));
               }
               const taskProjection = approvedTaskProjection(sprint);
               adoptionInspection = inspectStructuredCriteriaProjectionAdoption(
@@ -478,7 +479,7 @@ export function registerPlan(program: Command): void {
         }
 
         if (!flowPlan) {
-          throw new Error('E_PLAN_DURABLE_RESULT_MISSING');
+          throw new DeckentError('E_E_PLAN_DURABLE_RESULT_MISSING', 'E_PLAN_DURABLE_RESULT_MISSING');
         }
 
         // Compatibility files are never a plan input or a pre-approval side

@@ -52,6 +52,7 @@ import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provi
 import { preflightCliBrainProviderAuthority } from '../provider-authority-process-runtime.js';
 import { ProviderExecutionIngressHoldError } from '../../core/provider-execution-ingress-authority.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import { DeckentError } from '../../core/errors.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -632,7 +633,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                   },
                 });
                 if (admitted.lifecyclePublication.status === 'uncertain') {
-                  throw new Error('EXACT_START_RUN_STARTED_PUBLICATION_UNCERTAIN');
+                  throw new DeckentError('E_EXACT_START_RUN_STARTED_PUBLICATION_UNCERTAIN', 'EXACT_START_RUN_STARTED_PUBLICATION_UNCERTAIN');
                 }
               },
               ...(runtime.providerAuthority

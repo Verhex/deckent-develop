@@ -1,4 +1,5 @@
 import type { ProductionWiringEvidence } from './production-wiring-contract.js';
+import { DeckentError } from './errors.js';
 
 export interface ProductionWiringAdapterRequest {
   readonly language: string;
@@ -47,7 +48,7 @@ export class ProductionWiringAdapterRegistry {
 
   register(adapter: ProductionWiringAdapter, priority = 0): void {
     if (!validIdentity(adapter.id) || !validIdentity(adapter.language) || !validIdentity(adapter.capability)) {
-      throw new Error('Production-wiring adapter identities must be non-empty');
+      throw new DeckentError('E_PRODUCTION_WIRING_ADAPTER_IDENTITIES_MUST_BE_NON_EMPTY', 'Production-wiring adapter identities must be non-empty');
     }
     this.entries.push({ adapter, priority, order: this.registrationOrder++ });
   }

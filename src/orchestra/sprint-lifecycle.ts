@@ -80,6 +80,7 @@ import { getChannelRegistry } from './ipc-registry.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
 import { clearHooks } from '../core/plugin-hooks.js';
+import { DeckentError } from '../core/errors.js';
 
 // ═══ Types ═════════════════════════════════════════════════════════
 
@@ -782,7 +783,7 @@ export function pauseSprint(
   try {
     const model = publishCanonicalRunStatusReadModel(projectRoot);
     if (model.authority.sprintId !== sprint.id || model.authority.lifecycle !== 'PAUSED') {
-      throw new Error('PAUSE_STATUS_READ_MODEL_AUTHORITY_MISMATCH');
+      throw new DeckentError('E_PAUSE_STATUS_READ_MODEL_AUTHORITY_MISMATCH', 'PAUSE_STATUS_READ_MODEL_AUTHORITY_MISMATCH');
     }
   } catch (e) {
     statusReadModelPublicationError = e;
@@ -931,7 +932,7 @@ export function resumeSprint(
   try {
     const model = publishCanonicalRunStatusReadModel(projectRoot);
     if (model.authority.sprintId !== sprint.id || model.authority.lifecycle !== 'ACTIVE') {
-      throw new Error('RESUME_STATUS_READ_MODEL_AUTHORITY_MISMATCH');
+      throw new DeckentError('E_RESUME_STATUS_READ_MODEL_AUTHORITY_MISMATCH', 'RESUME_STATUS_READ_MODEL_AUTHORITY_MISMATCH');
     }
   } catch (e) {
     // Resume is transactional with its durable PAUSED authority. If the new

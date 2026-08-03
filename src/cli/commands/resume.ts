@@ -49,6 +49,7 @@ import {
   writeRecoveryResumeOutcome,
   type RecoveryResumeOutcome,
 } from '../../core/recovery-resume-outcome.js';
+import { DeckentError } from '../../core/errors.js';
 
 // ─── Register ───────────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ export function authorizePreplannedResumeTasks(
   if (heldIndex >= 0) {
     const task = pendingTasks[heldIndex]!;
     const policy = policies[heldIndex]!;
-    throw new Error(
+    throw new DeckentError('E_RESUME_EXECUTION_BUDGET_HOLD', 
       `RESUME_EXECUTION_BUDGET_HOLD:${task.id}:${policy.reasonCode ?? 'unknown'}:${policy.profileRef}`,
     );
   }

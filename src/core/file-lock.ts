@@ -23,6 +23,7 @@ import { LOCKS_DIR } from './constants.js';
 import { trace } from './observability.js';
 import { debugLog } from './utils.js';
 import type { LockInfo } from './types.js';
+import { DeckentError } from './errors.js';
 
 // ─── Error Classes ───────────────────────────────────────────────
 
@@ -1657,7 +1658,7 @@ function validatePinnedExecutionLockDirectories(
   let namedLocks: ReturnType<typeof lstatSync> | undefined;
   try {
     const parentEntry = fstatSync(pinned.parentFd);
-    if (!parentEntry.isDirectory()) throw new Error('parent-not-directory');
+    if (!parentEntry.isDirectory()) throw new DeckentError('E_PARENT_NOT_DIRECTORY', 'parent-not-directory');
     inputIdentity = executionLockStatsIdentity(
       statSync(pinned.inputProjectRoot, { bigint: true }) as unknown as ReturnType<typeof statSync>,
       projectIdentity.mountId,

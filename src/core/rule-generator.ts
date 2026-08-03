@@ -9,6 +9,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MemoryEntryV2 } from './memory-types.js';
 import { ErrorRegistry } from './errors.js';
+import { DeckentError } from './errors.js';
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -277,7 +278,7 @@ export function formatAdrSection(adrs: MemoryEntryV2[]): string {
     .map(a => a.id)
     .filter(id => !/^adr-(?:(?:g|d|ug|up)-)?\d{3,}$/iu.test(id));
   if (invalid.length > 0) {
-    throw new Error(`E_NON_CANONICAL_ADR_ID: ${invalid.join(', ')}`);
+    throw new DeckentError('E_E_NON_CANONICAL_ADR_ID', `E_NON_CANONICAL_ADR_ID: ${invalid.join(', ')}`);
   }
 
   const ids = accepted.map(a => `**${a.id.toUpperCase()}**`).join(', ');

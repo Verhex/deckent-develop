@@ -14,6 +14,7 @@ import {
   type ExecutionRecoveryModeAdapter,
   type ExecutionRecoveryPlatform,
 } from './execution-recovery-adapter.js';
+import { DeckentError } from '../core/errors.js';
 
 export type ExecutionRecoveryMutation = 'resume' | 'settle' | 'abort' | 'terminate';
 
@@ -177,7 +178,7 @@ export class ExecutionRecoveryService {
       const adapter = registration.adapter as ExecutionRecoveryModeAdapter<unknown>;
       const key = this.#adapterKey(adapter.mode, adapter.platform);
       if (adapters.has(key)) {
-        throw new Error(`Duplicate execution recovery adapter registration: ${key}`);
+        throw new DeckentError('E_DUPLICATE_EXECUTION_RECOVERY_ADAPTER_REGISTRATION', `Duplicate execution recovery adapter registration: ${key}`);
       }
       adapters.set(key, adapter);
     }
