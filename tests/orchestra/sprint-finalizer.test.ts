@@ -1218,15 +1218,20 @@ describe('sprint-finalizer — triple-link relations (Task 143-007)', () => {
     expect(metrics).toBeDefined();
   });
 
-  it('skips triple-link when memory.db does not exist', async () => {
-    rmSync(join(PROJECT_ROOT, '.brain', 'memory.db'), { force: true });
+  it('skips triple-link when memory.db cannot exist (KPI ring failed)', async () => {
+    // Real-fs discovery: simply deleting memory.db no longer produces the skip —
+    // the KPI ring (recordKpiMeasurements → real KpiStore) runs BEFORE triple-link
+    // and CREATES the DB. The gate's false branch is only reachable when that ring
+    // fails; make `.brain` a FILE so KpiStore creation throws (swallowed, fail-safe)
+    // and the DB genuinely cannot exist at the gate.
+    rmSync(join(PROJECT_ROOT, '.brain'), { recursive: true, force: true });
+    writeFileSync(join(PROJECT_ROOT, '.brain'), '');
 
     const sprint = makeSprint('sprint-143');
     const { evaluations, results } = settledFixture(sprint);
 
     await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    // insertRelation should not be called when DB doesn't exist
     expect(mockInsertRelation).not.toHaveBeenCalled();
   });
 });
@@ -1319,7 +1324,7 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
         errors: [],
       };
     });
-    vi.mocked(writeEvent).mockImplementation((...args: unknown[]) => {
+    vi.mocked(eventStreamMod.writeEvent).mockImplementation((...args: unknown[]) => {
       const payload = args[5] as { toPhase?: string } | undefined;
       if (payload && payload.toPhase === 'CLEANUP') callOrder.push('retroCleanupEvent');
       return null;
