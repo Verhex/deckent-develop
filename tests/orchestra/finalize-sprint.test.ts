@@ -7,7 +7,7 @@
  *         decay trigger, afterSprint hooks, idempotency, edge cases.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import {
   TaskStatus, TaskEvaluation, SprintPhase,
   SprintStatus,
@@ -16,32 +16,17 @@ import type { Task, Sprint, SprintMetrics, TaskResult, ResolvedConfig } from '..
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  renameSync: vi.fn(),
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  appendFileSync: vi.fn(),
-  // Sprint 139 async I/O migration: sprint-finalizer uses
-  // `import { promises as fsPromises } from 'node:fs'`.
-  // Bind async implementations via `vi.fn(async () => ...)` so
-  // vi.clearAllMocks() preserves them (mockResolvedValue is wiped).
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
+// ─── REAL FILESYSTEM (FAZ4A-S2) ─────────────────────────────────────
+// The node:fs mock is deliberately GONE. The finalizer's atomic publication ring
+// (write temp → renameSync → read back → digest compare, e.g. run-status-read-model
+// PERSIST_FAILED) verifies its own writes; a mocked fs cannot carry that round-trip
+// — two recorded mock-layering attempts failed exactly here. Each test gets a real
+// scratch project root under tmpdir instead (hermetic, removed in afterEach).
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
+  // Real fs, mocked processes: git/tsc probes must not escape the sandbox. A bare
+  // vi.fn() would return undefined and crash callers reading `.status`.
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -256,7 +241,9 @@ vi.mock('../../src/agents/worker-ipc.js', () => {
 
 // ─── Imports (after mocks) ───────────────────────────────────────────
 
-import { existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { finalizeSprint } from '../../src/orchestra/sprint-controller.js';
 import type { FinalizeSprintOptions } from '../../src/orchestra/sprint-controller.js';
 import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs } from '../../src/orchestra/sprint-reporter.js';
@@ -266,7 +253,16 @@ import { runHooks } from '../../src/core/plugin-hooks.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────
 
-const PROJECT_ROOT = '/test/project';
+// Real per-file scratch root — assigned fresh in each describe's beforeEach.
+let PROJECT_ROOT = '';
+const freshProjectRoot = (): string => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-finalize-'));
+  return PROJECT_ROOT;
+};
+afterAll(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
 
 function createTestTask(id: string, title: string = `Task ${id}`): Task {
   return {
@@ -287,6 +283,12 @@ function createTestTask(id: string, title: string = `Task ${id}`): Task {
 }
 
 function createTestResult(taskId: string, passed: boolean = true, coverage: number = 95): TaskResult {
+  // Host-authored claim-time attribution is part of the terminal-evidence data
+  // contract (projectAttributedTaskWork): without a VERIFIED attemptId the
+  // finalizer correctly refuses to settle (TERMINAL_EVIDENCE_HOLD). The old
+  // fixture pre-dated that contract — the production behavior was right and the
+  // fixture was stale. Shape mirrors sprint-finalizer-terminal-wire.test.ts.
+  const attemptId = `attempt-${taskId}`;
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -297,6 +299,12 @@ function createTestResult(taskId: string, passed: boolean = true, coverage: numb
     coverage,
     selfAssessment: passed ? 'DONE' : 'NO_GO',
     notes: 'test result',
+    workAttribution: {
+      state: 'VERIFIED' as const,
+      attemptId,
+      baselineRef: `baseline:${attemptId}`,
+      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+    },
   };
 }
 
@@ -327,6 +335,7 @@ const defaultMetrics: SprintMetrics = {
   boundaryViolations: 0,
   crossAssignments: 0,
   contextLinesUsed: 0,
+  unevaluatedTasks: 0,
 };
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -335,8 +344,7 @@ describe('finalizeSprint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(calculateMetrics).mockReturnValue({ ...defaultMetrics });
-    vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readdirSync).mockReturnValue([]);
+    freshProjectRoot();
   });
 
   it('should return calculated metrics', async () => {
@@ -351,8 +359,14 @@ describe('finalizeSprint', () => {
     const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
 
     expect(metrics).toBeDefined();
-    expect(metrics.totalTasks).toBe(3);
-    expect(vi.mocked(calculateMetrics)).toHaveBeenCalledWith(sprint, evaluations, results, []);
+    // Terminal truth OVERRIDES calculateMetrics for logical fields
+    // (metrics = { ...baseMetrics, ...terminalTruth.logicalMetrics }): the mocked
+    // totalTasks:3 fantasy loses to the fixture's two real logical tasks. The old
+    // assertion pinned the mock, i.e. tested nothing about the sprint.
+    expect(metrics.totalTasks).toBe(2);
+    // calculateMetrics now receives the LOGICAL projections (rebuilt sprint/eval/
+    // result views + DB-first debt), not the raw caller arguments.
+    expect(vi.mocked(calculateMetrics)).toHaveBeenCalledTimes(1);
   });
 
   it('should set sprint.metrics', async () => {
@@ -364,7 +378,8 @@ describe('finalizeSprint', () => {
     await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
 
     expect(sprint.metrics).toBeDefined();
-    expect(sprint.metrics?.totalTasks).toBe(3);
+    // Truth-derived: one logical task in the fixture (mock value 3 is overridden).
+    expect(sprint.metrics?.totalTasks).toBe(1);
   });
 
   it('should call writeSprintLog', async () => {
@@ -378,7 +393,7 @@ describe('finalizeSprint', () => {
     expect(vi.mocked(writeSprintLog)).toHaveBeenCalledWith(
       PROJECT_ROOT,
       sprint,
-      expect.objectContaining({ totalTasks: 3 }),
+      expect.objectContaining({ totalTasks: 1 }),
       evaluations,
     );
   });
@@ -395,7 +410,7 @@ describe('finalizeSprint', () => {
       PROJECT_ROOT,
       sprint,
       evaluations,
-      expect.objectContaining({ totalTasks: 3 }),
+      expect.objectContaining({ totalTasks: 1 }),
       undefined, // agentMap
       undefined, // skillMap
       results,
@@ -492,27 +507,34 @@ describe('finalizeSprint', () => {
     expect(vi.mocked(updateProjectDocs)).not.toHaveBeenCalled();
   });
 
-  it('should handle empty evaluations gracefully', async () => {
+  it('refuses to settle an unevaluated task (fail-closed, was: empty evaluations gracefully)', async () => {
+    // Old semantic ("return zero metrics and carry on") is exactly the false-COMPLETE
+    // class the 485-490 recovery train eliminated: a task with no evaluation is
+    // UNKNOWN evidence, and unknown evidence may never finalize as a completed sprint.
     const tasks = [createTestTask('042-001')];
     const sprint = createTestSprint(tasks);
     const evaluations = new Map<string, TaskEvaluation>();
     const results: TaskResult[] = [];
 
-    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
-
-    expect(metrics).toBeDefined();
-    expect(vi.mocked(writeSprintLog)).toHaveBeenCalled();
-    expect(vi.mocked(writeRetrospective)).toHaveBeenCalled();
+    await expect(finalizeSprint(PROJECT_ROOT, sprint, evaluations, results))
+      .rejects.toThrow(/TERMINAL_EVIDENCE_HOLD/);
+    // KNOWN GAP, deliberately not asserted stronger here: the human sprint-log/retro
+    // projections are still written BEFORE the terminal-receipt gate throws, so a held
+    // finalize leaves a log entry without a receipt. That ordering defect is owned by
+    // RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001 (OPEN) — asserting not-called now
+    // would pin this slice to another slice's unfinished contract.
   });
 
-  it('should handle empty tasks gracefully', async () => {
+  it('refuses to archive a zero-task sprint (fail-closed, was: empty tasks gracefully)', async () => {
+    // cleanupEligibility adds NO_LOGICAL_TASKS → BLOCKED: an empty sprint has no
+    // evidence to archive as COMPLETE, so publication is typed-refused instead of
+    // minting a hollow terminal receipt.
     const sprint = createTestSprint([]);
     const evaluations = new Map<string, TaskEvaluation>();
     const results: TaskResult[] = [];
 
-    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
-
-    expect(metrics).toBeDefined();
+    await expect(finalizeSprint(PROJECT_ROOT, sprint, evaluations, results))
+      .rejects.toThrow(/TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE/);
   });
 
   it('should survive writeSprintLog failure', async () => {
@@ -580,7 +602,11 @@ describe('finalizeSprint', () => {
     expect(vi.mocked(updateLastSprintId)).toHaveBeenCalledTimes(2);
   });
 
-  it('should handle multiple tasks with mixed evaluations', async () => {
+  it('refuses plain finalize while a logical task is NO_GO (fail-closed, was: mixed evaluations)', async () => {
+    // A settled NO_GO leaves the lineage FAILED → LINEAGE_NOT_COMPLETED blocks the
+    // archive boundary. Real runs resolve this via FIX lineage or the owner-gated
+    // force-finalize/ABORTED path (sprint-488 canonical receipt) — never via a plain
+    // COMPLETE that the old "graceful" expectation encoded.
     const tasks = [
       createTestTask('042-001', 'Feature A'),
       createTestTask('042-002', 'Feature B'),
@@ -598,20 +624,8 @@ describe('finalizeSprint', () => {
       createTestResult('042-003', false, 0),
     ];
 
-    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
-
-    expect(metrics).toBeDefined();
-    expect(vi.mocked(writeRetrospective)).toHaveBeenCalledWith(
-      PROJECT_ROOT,
-      sprint,
-      evaluations,
-      expect.any(Object),
-      undefined, // agentMap
-      undefined, // skillMap
-      results,
-      // Sprint 192 Task 192-005: createIfMissing forwarded.
-      { createIfMissing: true },
-    );
+    await expect(finalizeSprint(PROJECT_ROOT, sprint, evaluations, results))
+      .rejects.toThrow(/TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE/);
   });
 
   it('should combine all options correctly', async () => {
@@ -669,8 +683,7 @@ describe('finalizeSprint — F5 prompt-version stats wire (B11)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(calculateMetrics).mockReturnValue({ ...defaultMetrics });
-    vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readdirSync).mockReturnValue([]);
+    freshProjectRoot();
   });
 
   it('records a prompt-version use per task agent (V1 routing path)', async () => {
@@ -697,13 +710,16 @@ describe('finalizeSprint — F5 prompt-version stats wire (B11)', () => {
   });
 
   it('does not record for a DEFERRED task (worker never executed)', async () => {
+    // DEFERRED is not a terminal verdict: the attempt stays UNSETTLED and the
+    // finalizer holds instead of settling — which also proves the original claim,
+    // since a held finalize can never reach the prompt-version stats wire.
     const task = { ...createTestTask('042-003'), assignedAgent: 'bug-fixer' };
     const sprint = createTestSprint([task]);
     const evaluations = new Map([['042-003', TaskEvaluation.DEFERRED]]);
     const results: TaskResult[] = [];
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
-
+    await expect(finalizeSprint(PROJECT_ROOT, sprint, evaluations, results))
+      .rejects.toThrow(/TERMINAL_EVIDENCE_HOLD/);
     expect(recordVersionUseSpy).not.toHaveBeenCalled();
   });
 });
