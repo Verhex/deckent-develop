@@ -3,26 +3,26 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "76e612137df3a872a5b70f253b0839eaa47d0ccfdf35d29977f6ae328d1fc4bf"
+    "value": "81083a1c201afdf2f5d30df7c960fe71104fd9b77396040927883cd492f46b18"
   },
   "summary": {
-    "total": 322,
+    "total": 323,
     "active": 318,
-    "terminal": 4,
-    "receipts": 22,
+    "terminal": 5,
+    "receipts": 23,
     "byState": {
       "OPEN": 221,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 30,
-      "DONE": 4,
+      "DONE": 5,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 250,
-      "P1": 56,
+      "P1": 57,
       "P2": 16
     },
     "byProgram": {
@@ -35,7 +35,7 @@
       "DASHBOARD": 1,
       "DATA": 1,
       "DESKTOP": 6,
-      "DOCS": 2,
+      "DOCS": 3,
       "DURABILITY": 1,
       "ECOSYSTEM": 3,
       "ENTERPRISE": 1,
@@ -3398,6 +3398,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 8094,
+      "id": "DOCS-VISION-001",
+      "program": "DOCS",
+      "priority": "P1",
+      "state": "DONE",
+      "updated": "2026-08-03",
+      "definitionDigest": "4985c86178dbbf9aa8af57dfc95099a10559110c4944350a58bc989efe3fc492",
+      "progressDigest": "e766ae03a39c4e8dda104b4ed9faa269d49d574fd1d70de9e6df98d9bf3202c2",
+      "terminalClosureDigest": "d6f533945bb85ca252b239e7ded2888adc5c99c319152bb852ed18fba1564385"
+    },
+    {
       "order": 9000,
       "id": "LEARNING-001",
       "program": "LEARNING",
@@ -3825,6 +3836,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-01T20:47:59+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-03-DOCS-VISION-01",
+      "authorityDigest": "8c1598541d27eee745263d5b39843dc7911c413d5672aef8be9c34bd3ece4a97",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-03T10:21:50+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -16169,7 +16190,8 @@
         "RELEASE-BETA-001",
         "NPM-CHANNEL-001",
         "DOCS-TRUTH-PASS-001",
-        "LAUNCH-COMMS-001"
+        "LAUNCH-COMMS-001",
+        "DOCS-VISION-001"
       ],
       "gates": [
         "G2",
@@ -17495,6 +17517,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ed418c1dfad4fa1a0383995d161c1c50fc21e617cdbd6e5e3ebeba653f134123"
+    "value": "6b958708ffd2ae20ce4d81bfcc9353f18369b531d7384908a7d537e31ecf0050"
   }
 }
