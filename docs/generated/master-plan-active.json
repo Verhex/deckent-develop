@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "c37684340bf74008b094ac41a36e66727d82e167327237a8e40e27823df44581"
+    "value": "1d972f5fb327a268ef11e0084ee523de2ebf0e3bf3d41135b8f23cfc6f2053a6"
   },
   "summary": {
     "total": 337,
     "active": 330,
     "terminal": 7,
-    "receipts": 25,
+    "receipts": 26,
     "byState": {
       "OPEN": 233,
       "READY": 0,
@@ -127,7 +127,7 @@
       "state": "BLOCKED",
       "updated": "2026-08-03",
       "definitionDigest": "2069ad6e437766f5bfa67ed3806ccbc6c42f7245047a37f19dd82f5e4154e780",
-      "progressDigest": "85d16d56143ab070f962c8082020f754938fa9f18e9eb8e56b328221037c07ba",
+      "progressDigest": "f243efddfa5a5f09599af79863cb005d012b8edfb576abea70bae2e8ea935ac4",
       "terminalClosureDigest": null
     },
     {
@@ -2303,9 +2303,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-01",
+      "updated": "2026-08-03",
       "definitionDigest": "dc5ffb283b50ecb2d21b46c9b01a6a86f91844b108c72a100df7c2d575bb39b7",
-      "progressDigest": "c1ffd7df3f672b531a7b55e6e82284173dba981d0aaaae710e9bce667f9ab883",
+      "progressDigest": "778da220618b03681502f5c6ce1560828d5b26a4eab0e5472c24ff07369da9c8",
       "terminalClosureDigest": null
     },
     {
@@ -4022,6 +4022,16 @@
         "transitionAt": "2026-08-03T22:25:03+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-04-FAZ4A-S2-01",
+      "authorityDigest": "8f68787f93b05779d8666dc6c8408506f49df276f487f479e7504244dbc89ce1",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-04T00:47:42+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -4196,7 +4206,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Hermetic suite, build artifacts stable, binary proofs ayrı provenance ile kaydedilir",
-      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda",
+      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; kritik yolda sıradaki S3 (controller/pause-resume, 95+)",
       "updated": "2026-08-03"
     },
     {
@@ -12709,10 +12719,12 @@
         "RUN-STATUS-AUTHORITY-001",
         "RESULT-RECONCILIATION-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-04-FAZ4A-S2-01"
+      ],
       "acceptance": "Landing/temp/partial residue never enters task identity; external force-finalize proves generation-fenced coordinator death before terminal state/output, retains active state during grace, and clears PID authority only after verified settlement",
-      "evidence": "Finalize consumes the canonical task-artifact classifier and excludes foreign result-only evidence. The immutable COMPLETE wording applies to normal settled finalization; explicit force-finalize now publishes only a fenced ABORTED receipt and cannot promote unresolved work. Standalone built-binary proof creates a real owned coordinator, observes SIGTERM while state remains ACTIVE/EVALUATE, waits for exact death, then verifies fenced ABORTED receipt and PID removal. Linux proof passes; Windows native/macOS/namespace matrix remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=force-finalize-terminal-binary`",
-      "updated": "2026-08-01"
+      "evidence": "Finalize consumes the canonical task-artifact classifier and excludes foreign result-only evidence. The immutable COMPLETE wording applies to normal settled finalization; explicit force-finalize now publishes only a fenced ABORTED receipt and cannot promote unresolved work. Standalone built-binary proof creates a real owned coordinator, observes SIGTERM while state remains ACTIVE/EVALUATE, waits for exact death, then verifies fenced ABORTED receipt and PID removal. Linux proof passes; Windows native/macOS/namespace matrix remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=force-finalize-terminal-binary`; `receipt=GR-2026-08-04-FAZ4A-S2-01`; 2026-08-04 FAZ4A-S2 settlement: finalizer'ın iki test kümesi (63 kırık) fs-mock'tan gerçek-tmpdir'e taşındı ve 80/80 yeşil — fail-closed sözleşmeler artık test tarafında da pinli: değerlendirilmemiş/boş/NO_GO/DEFERRED lineage typed refusal, sıfır-task sprint archive edilemez, held receipt COMPLETE yayımlayamaz. Üç üretim-gerçeği keşfi kayda geçti: (a) KPI halkası memory.db'yi finalize sırasında YARATIYOR — triple-link kapısının false dalı ancak KPI yazımı düşünce erişilebilir, test o gerçek yola çevrildi; (b) code-verified reconciliation üretimde diagnostiğe indirilmiş ('verdict unchanged') — NO_GO→DONE çevirme + sentetik result yazma emekli, eski testler ölü sözleşmeyi pinliyordu; (c) log/retro projeksiyonları receipt gate'inden ÖNCE yazılıyor — sahibi RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001, bu dilimde pinlenmedi",
+      "updated": "2026-08-03"
     },
     {
       "order": 3272,
@@ -18072,6 +18084,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "fe682b48d8987cdb84798dca12dae0db5f4a3c41bb83f149ef23056e3ee9287d"
+    "value": "f28486bf17fb1ba034d7efb72d502e251833409e96628262f75f1445d639a2cd"
   }
 }

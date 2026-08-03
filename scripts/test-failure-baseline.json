@@ -335,10 +335,6 @@
       "failed": 6
     },
     {
-      "file": "tests/orchestra/finalize-sprint.test.ts",
-      "failed": 25
-    },
-    {
       "file": "tests/orchestra/fix-dispatch-continuation.test.ts",
       "failed": 7
     },
@@ -409,10 +405,6 @@
     {
       "file": "tests/orchestra/sprint-finalizer-runflow.test.ts",
       "failed": 3
-    },
-    {
-      "file": "tests/orchestra/sprint-finalizer.test.ts",
-      "failed": 38
     },
     {
       "file": "tests/orchestra/sprint-phases-rollback.test.ts",
