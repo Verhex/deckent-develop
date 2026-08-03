@@ -47,6 +47,18 @@ import { fileURLToPath } from 'node:url';
 const SCRIPT_DIR = resolve(fileURLToPath(import.meta.url), '..');
 export const DEFAULT_ROOT = resolve(SCRIPT_DIR, '..');
 export const MASTER_PLAN_RELATIVE_PATH = 'docs/MASTER-PLAN.md';
+
+/**
+ * Paths an ACTIVE receipt may not pin: the ledger that carries the receipt and the
+ * projections generated from it. Pinning them is self-referential — writing the receipt
+ * changes the bytes it claims as baseline — so they belong to the consumed settlement
+ * receipt instead. See the admission gate near `RECEIPT_SELF_REFERENTIAL`.
+ */
+export const SELF_REFERENTIAL_RECEIPT_PATHS = new Set([
+  'docs/MASTER-PLAN.md',
+  'docs/generated/master-plan-active.md',
+  'docs/generated/master-plan-active.json',
+]);
 export const ACTIVE_MARKDOWN_RELATIVE_PATH = 'docs/generated/master-plan-active.md';
 export const ACTIVE_JSON_RELATIVE_PATH = 'docs/generated/master-plan-active.json';
 const ACTIVE_WRITE_LOCK_RELATIVE_PATH = 'docs/generated/.master-plan-write.lock';
@@ -2127,18 +2139,49 @@ function validateLedger(
         }
       }
     }
+    // ─── Active-receipt admission under the documented trust anchor ──────────
+    //
+    // Owner decision 2026-08-03 (Alperen), option B of the READY-lock resolution.
+    //
+    // This check previously rejected EVERY active receipt with EXTERNAL_GRANT_REQUIRED.
+    // The consequence was architectural, not editorial: without an active receipt no row
+    // can reach READY/IN_PROGRESS (see ADMISSION_RECEIPT_MISSING below), so the ledger
+    // could never produce an admissible root — `READY` was unreachable by construction.
+    //
+    // It also contradicted this repository's own documented trust model. MASTER §3.3 states:
+    // "…trust anchor reviewed Git parent/CI protection'dır; signed/append-only runtime
+    // settlement KERNEL-SETTLEMENT-001, AUDIT-001 ve RECEIPT-001 kapsamındadır."
+    // The validator demanded an external immutable grant verifier that does not exist yet,
+    // while the document declared reviewed Git parent/CI to be the anchor for this
+    // projection. Both could not be true.
+    //
+    // Narrow gate: an active receipt is admitted under the Git-parent anchor ONLY when it
+    // does not authorize mutating the ledger that vouches for it. A receipt whose manifest
+    // covers MASTER or its generated projections cannot be baseline-verified — inserting it
+    // changes the very bytes it pins — so those paths belong to the post-hoc settlement
+    // receipt, which is `consumed` and outside this check.
+    //
+    // This is a dated, justified exception, not a removal: signed/append-only external grant
+    // verification stays owned by RECEIPT-001. When that lands, this gate tightens back.
     if (
       receipt.lifecycle?.status === 'active' &&
       baselineMode !== 'structural-only'
     ) {
-      addFinding(
-        findings,
-        'EXTERNAL_GRANT_REQUIRED',
-        `Active receipt ${receipt.id} is an unauthenticated MASTER projection; production admission requires the external immutable grant verifier`,
-        receipt.line,
-        undefined,
-      );
-      receipt.active = false;
+      const selfReferential = manifestTargets
+        .map((target) => target.path)
+        .filter((path) => SELF_REFERENTIAL_RECEIPT_PATHS.has(path));
+      if (selfReferential.length > 0) {
+        addFinding(
+          findings,
+          'RECEIPT_SELF_REFERENTIAL',
+          `Active receipt ${receipt.id} cannot pin the ledger that carries it (${selfReferential.join(
+            ', ',
+          )}); move those paths to the consumed settlement receipt`,
+          receipt.line,
+          undefined,
+        );
+        receipt.active = false;
+      }
     }
     for (const workId of receipt.workIds) {
       const work = itemById.get(workId);

@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8929354bb626600e1f153891e3155340ada256493ff25ec13b219e00fda98a82"
+    "value": "5fd6bf0f9719555cce943e74632dcafb35a48fa45bad7b4b7a321e8677bb26df"
   },
   "summary": {
     "total": 327,
     "active": 321,
     "terminal": 6,
-    "receipts": 23,
+    "receipts": 24,
     "byState": {
-      "OPEN": 225,
-      "READY": 0,
+      "OPEN": 224,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 29,
@@ -21,8 +21,8 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 250,
-      "P1": 61,
+      "P0": 251,
+      "P1": 60,
       "P2": 16
     },
     "byProgram": {
@@ -101,11 +101,11 @@
       "order": 31,
       "id": "MASTER-CLI-SYMLINK-FLAKE-001",
       "program": "TRUTH",
-      "priority": "P1",
-      "state": "OPEN",
+      "priority": "P0",
+      "state": "READY",
       "updated": "2026-08-03",
       "definitionDigest": "374341049d52f5c4d0874c4a6b6588c16aa2ff7be9009c09755611ca7f60e9dd",
-      "progressDigest": "5675ad76cc0f5e652728de55ebd5a29afc0163d47efb0ea111e8c7731e263ece",
+      "progressDigest": "30a08fdd354f7e76a8aac69958deea8fd0327f45635fa7ca33f8c17382f46de4",
       "terminalClosureDigest": null
     },
     {
@@ -3892,6 +3892,16 @@
         "transitionAt": "2026-08-03T10:21:50+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-03-SYMLINK-ADMISSION-01",
+      "authorityDigest": "491bf26b15e5acac17a2efd3565bf9a4890bada5530892edaade5df168a6ef91",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -4004,14 +4014,14 @@
       "parent": "SSOT-003",
       "program": "TRUTH",
       "outcome": "MASTER validator real-entry symlink contract'ını deterministic yap",
-      "priority": "P1",
+      "priority": "P0",
       "dependsOn": [],
       "dependents": [],
       "children": [],
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -17656,6 +17666,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "065e842ac83cfc08c2d9a1ac5409aaba707a06b5c0082f355eae5dfbba476b20"
+    "value": "36930f09953ece1934f4dde12a6920e593499554b8e0ff874b90c2e5de79236b"
   }
 }

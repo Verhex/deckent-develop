@@ -2661,11 +2661,15 @@ describe('CLI contract', () => {
       nowMs: TEST_NOW_MS,
       root,
     });
-    expect(unauthenticated.findings.map((finding) => finding.code)).toEqual(
-      expect.arrayContaining([
-        'EXTERNAL_GRANT_REQUIRED',
-        'ADMISSION_RECEIPT_MISSING',
-      ]),
+    // Owner decision 2026-08-03 (option B): an active receipt whose manifest does not pin
+    // the ledger itself is admitted under the documented reviewed-Git-parent trust anchor
+    // (MASTER §3.3). The former blanket EXTERNAL_GRANT_REQUIRED made READY unreachable by
+    // construction and contradicted that documented anchor.
+    expect(unauthenticated.findings.map((finding) => finding.code)).not.toContain(
+      'EXTERNAL_GRANT_REQUIRED',
+    );
+    expect(unauthenticated.findings.map((finding) => finding.code)).not.toContain(
+      'ADMISSION_RECEIPT_MISSING',
     );
     expect(
       validateMasterPlan(source, {
@@ -2693,14 +2697,37 @@ describe('CLI contract', () => {
       ],
     });
     const absentRoot = makeScratchPlan(absentSource);
+    // An ABSENT baseline that is genuinely absent is a satisfied precondition, so the
+    // receipt stays active and admits its work item.
     expect(
       validateMasterPlan(absentSource, {
         nowMs: TEST_NOW_MS,
         root: absentRoot,
       }).findings.map((finding) => finding.code),
+    ).toEqual([]);
+
+    // The narrow gate that replaced the blanket rejection: an active receipt may not pin
+    // the ledger that carries it, because writing the receipt changes those very bytes.
+    const selfReferentialSource = planFixture({
+      rows: [{ order: 10, id: 'TASK-A', gates: ['G1'], state: 'READY' }],
+      receipts: [
+        {
+          id: 'GR-2026-07-26-FIXTURE-03',
+          workIds: ['TASK-A'],
+          manifest: '`docs/MASTER-PLAN.md@ABSENT`',
+          state: '`ONE_SHOT`: active',
+        },
+      ],
+    });
+    const selfReferentialRoot = makeScratchPlan(selfReferentialSource);
+    expect(
+      validateMasterPlan(selfReferentialSource, {
+        nowMs: TEST_NOW_MS,
+        root: selfReferentialRoot,
+      }).findings.map((finding) => finding.code),
     ).toEqual(
       expect.arrayContaining([
-        'EXTERNAL_GRANT_REQUIRED',
+        'RECEIPT_SELF_REFERENTIAL',
         'ADMISSION_RECEIPT_MISSING',
       ]),
     );
