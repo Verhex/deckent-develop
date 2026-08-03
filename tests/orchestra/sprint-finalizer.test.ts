@@ -7,30 +7,34 @@
  *         finalizeSprint integration (gate.json write, load-report write, fail-safe).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TaskEvaluation, SprintPhase, SprintStatus } from '../../src/core/types.js';
-import type { Sprint } from '../../src/core/types.js';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { TaskEvaluation, SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
+import type { Sprint, TaskResult } from '../../src/core/types.js';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// Real per-test scratch project root (fresh in the file-wide beforeEach below).
+let PROJECT_ROOT = '';
+beforeEach(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-finalizer-'));
+});
+afterAll(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  readFileSync: vi.fn().mockReturnValue('{}'),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn().mockReturnValue(false),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn().mockReturnValue([]),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(),
-  appendFileSync: vi.fn(),
-  promises: {
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    readFile: vi.fn().mockResolvedValue(''),
-    mkdir: vi.fn().mockResolvedValue(undefined),
-  },
-}));
+// ─── REAL FILESYSTEM (FAZ4A-S2) ─────────────────────────────────────
+// node:fs mock deliberately removed: the finalizer's atomic publication ring
+// (temp write → renameSync → read-back digest, run-status read model) verifies its
+// own writes and a mocked fs cannot carry the round-trip. Every test runs against a
+// fresh real scratch root under tmpdir instead.
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: '' }),
+  // Real fs, mocked processes: probes stay sandboxed and status-shaped.
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
 vi.mock('../../src/core/utils.js', async (importOriginal) => {
@@ -230,13 +234,13 @@ import { buildResultsMap } from '../../src/orchestra/result-collector.js';
 describe('sprint-finalizer — hook stubs', () => {
   describe('runHonestyCheck', () => {
     it('should return 0 violations (stub)', async () => {
-      const result = await runHonestyCheck('/tmp/project', 'sprint-134', []);
+      const result = await runHonestyCheck(PROJECT_ROOT, 'sprint-134', []);
       expect(result).toBe(0);
     });
 
     it('should be call-safe with any arguments', async () => {
-      const result = await runHonestyCheck('/tmp/project', 'sprint-999', [
-        { taskId: 't1', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 95, selfAssessment: 'DONE', notes: '' },
+      const result = await runHonestyCheck(PROJECT_ROOT, 'sprint-999', [
+        { taskId: 't1', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 95, selfAssessment: 'DONE', notes: '' , workAttribution: { state: 'VERIFIED' as const, attemptId: 'attempt-t1', baselineRef: 'baseline:attempt-t1', scopeDigest: 'attempt-t1000000000000000000000000000000000000000000000000000000' } },
       ]);
       expect(result).toBe(0);
     });
@@ -246,15 +250,15 @@ describe('sprint-finalizer — hook stubs', () => {
     it('should return false when no results have rubric scores', async () => {
       const evaluations = new Map<string, TaskEvaluation>();
       const results = [
-        { taskId: 't1', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 95, selfAssessment: 'DONE' as const, notes: '' },
+        { taskId: 't1', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 95, selfAssessment: 'DONE' as const, notes: '' , workAttribution: { state: 'VERIFIED' as const, attemptId: 'attempt-t1', baselineRef: 'baseline:attempt-t1', scopeDigest: 'attempt-t1000000000000000000000000000000000000000000000000000000' } },
       ];
-      const result = await writeRubricDetail('/tmp/project', 'sprint-134', results, evaluations);
+      const result = await writeRubricDetail(PROJECT_ROOT, 'sprint-134', results, evaluations);
       expect(result).toBe(false);
     });
 
     it('should return false for empty results', async () => {
       const evaluations = new Map<string, TaskEvaluation>();
-      const result = await writeRubricDetail('/tmp/project', 'sprint-134', [], evaluations);
+      const result = await writeRubricDetail(PROJECT_ROOT, 'sprint-134', [], evaluations);
       expect(result).toBe(false);
     });
   });
@@ -269,7 +273,7 @@ describe('sprint-finalizer — hook stubs', () => {
     });
 
     it('should have correct SelfAuditResult shape', async () => {
-      const result: SelfAuditResult = await runSelfAuditGate('sprint-134', '/tmp/project');
+      const result: SelfAuditResult = await runSelfAuditGate('sprint-134', PROJECT_ROOT);
       expect(result).toHaveProperty('tsc');
       expect(result).toHaveProperty('vitest');
       expect(result).toHaveProperty('honesty');
@@ -320,9 +324,9 @@ describe('sprint-finalizer — load-test-report.md wiring', () => {
       '# Sprint Load Test Report\n\n## Wave Timeline\n\nNo wave data recorded.\n\n## Percentile Distribution (p50/p95/p99)\n',
     );
 
-    const result = await observabilityMod.generateLoadReport('/tmp/project');
+    const result = await observabilityMod.generateLoadReport(PROJECT_ROOT);
     expect(result).toContain('Wave Timeline');
-    expect(mockGenerate).toHaveBeenCalledWith('/tmp/project');
+    expect(mockGenerate).toHaveBeenCalledWith(PROJECT_ROOT);
   });
 
   it('generateLoadReport throws → sprint continues (error should not propagate)', async () => {
@@ -331,7 +335,7 @@ describe('sprint-finalizer — load-test-report.md wiring', () => {
     mockGenerate.mockRejectedValueOnce(new Error('Disk full'));
 
     // The function should reject when called directly — finalizeSprint catches this
-    await expect(observabilityMod.generateLoadReport('/tmp/project')).rejects.toThrow('Disk full');
+    await expect(observabilityMod.generateLoadReport(PROJECT_ROOT)).rejects.toThrow('Disk full');
 
     // Verify the mock was called (sprint continues because finalizeSprint wraps in try/catch)
     expect(mockGenerate).toHaveBeenCalled();
@@ -341,7 +345,7 @@ describe('sprint-finalizer — load-test-report.md wiring', () => {
     const mockGenerate = vi.mocked(observabilityMod.generateLoadReport);
     mockGenerate.mockResolvedValueOnce('# Load Report\n\nNo metrics data found.\n');
 
-    const result = await observabilityMod.generateLoadReport('/tmp/project');
+    const result = await observabilityMod.generateLoadReport(PROJECT_ROOT);
     expect(result).toContain('# Load Report');
     expect(result).toContain('No metrics data found');
   });
@@ -359,7 +363,7 @@ describe('sprint-finalizer — load-test-report.md wiring', () => {
     mockGenerate.mockResolvedValueOnce('# Sprint Load Test Report\n\n## Wave Timeline\n\nNo wave data recorded.\n');
 
     // Simulate what finalizeSprint does in the load report section
-    const projectRoot = '/tmp/project';
+    const projectRoot = PROJECT_ROOT;
     const sprintId = 'sprint-136';
     const reportDir = `${projectRoot}/docs/audits/${sprintId}`;
     const reportPath = `${reportDir}/load-test-report.md`;
@@ -375,7 +379,7 @@ describe('sprint-finalizer — load-test-report.md wiring', () => {
 describe('sprint-finalizer — gate.json wiring', () => {
   it('runSelfAuditGate returns valid JSON with all required fields', async () => {
     // Verifies that the object written to gate.json has correct shape
-    const result: SelfAuditResult = await runSelfAuditGate('sprint-136', '/tmp/project');
+    const result: SelfAuditResult = await runSelfAuditGate('sprint-136', PROJECT_ROOT);
     const serialized = JSON.stringify(result, null, 2);
     const parsed = JSON.parse(serialized) as SelfAuditResult;
     expect(parsed).toHaveProperty('tsc');
@@ -406,7 +410,7 @@ describe('sprint-finalizer — gate.json wiring', () => {
 
     // runSelfAuditGate itself should still succeed regardless of the writeFile failure
     // (the failure is caught inside finalizeSprint's try/catch, not in runSelfAuditGate)
-    const result = await runSelfAuditGate('sprint-136', '/tmp/project');
+    const result = await runSelfAuditGate('sprint-136', PROJECT_ROOT);
     expect(result.overallGate).toBe('PASS');
 
     // Restore original mock
@@ -422,75 +426,107 @@ function makeSprint(id = 'sprint-137'): Sprint {
     number: 137,
     status: SprintStatus.COMPLETE,
     phase: SprintPhase.COMPLETE,
-    tasks: [],
+    // Terminal-evidence contract: a finalizable sprint needs at least one logical
+    // task whose lineage can COMPLETE — an empty sprint is NO_LOGICAL_TASKS and is
+    // (correctly) refused at the archive boundary.
+    tasks: [makeSettledTask(`${id}-main`)],
     workers: [],
   };
+}
+
+function makeSettledTask(taskId: string): Sprint['tasks'][number] {
+  return {
+    id: taskId,
+    title: `Task ${taskId}`,
+    description: '',
+    model: 'sonnet',
+    effort: 'normal',
+    priority: 'NORMAL',
+    reason: '',
+    scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+    dependencies: [],
+    goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+    status: TaskStatus.DONE,
+    sprintId: taskId.replace(/-main$/, ''),
+    createdAt: new Date().toISOString(),
+  } as Sprint['tasks'][number];
+}
+
+/** DONE evaluation + host-attributed result for every task on the sprint. */
+function settledFixture(sprint: Sprint): {
+  evaluations: Map<string, TaskEvaluation>;
+  results: TaskResult[];
+} {
+  const evaluations = new Map<string, TaskEvaluation>();
+  const results: TaskResult[] = [];
+  for (const task of sprint.tasks) {
+    const attemptId = `attempt-${task.id}`;
+    evaluations.set(task.id, TaskEvaluation.DONE);
+    results.push({
+      taskId: task.id,
+      workerId: `w-${task.id}`,
+      filesChanged: ['src/x.ts'],
+      linesAdded: 1,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 90,
+      selfAssessment: 'DONE',
+      notes: '',
+      workAttribution: {
+        state: 'VERIFIED' as const,
+        attemptId,
+        baselineRef: `baseline:${attemptId}`,
+        scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+      },
+    });
+  }
+  return { evaluations, results };
 }
 
 describe('sprint-finalizer — finalizeSprint gate.json integration', () => {
   beforeEach(() => {
     // Reset fs promise mocks before each test
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn> } };
-    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
   });
 
   it('finalizeSprint writes gate.json to .deckent/recently-works/ after runSelfAuditGate', async () => {
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
     const sprint = makeSprint('sprint-137');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    // gate.json must be written to .deckent/recently-works/sprint-137-gate.json
-    // (Sprint 150 de-scatter: gate/seq/events/pre-archive all live under recently-works,
-    //  managed by sprint-file-retention — NOT the legacy .deckent/ root).
-    const gateWriteCall = fsMod.promises.writeFile.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-137-gate.json'),
-    );
-    expect(gateWriteCall).toBeDefined();
-    // Canonical location: under recently-works, never the .deckent/ root.
-    expect(gateWriteCall![0] as string).toContain('recently-works');
-    // Content must be valid JSON with overallGate field
-    const writtenContent = gateWriteCall![1] as string;
-    const parsed = JSON.parse(writtenContent) as { overallGate: string };
+    // REAL disk truth (not a writeFile spy): gate.json lands under recently-works
+    // (Sprint 150 de-scatter), never the legacy .deckent/ root.
+    const gatePath = join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-137-gate.json');
+    const parsed = JSON.parse(readFileSync(gatePath, 'utf8')) as { overallGate: string };
     expect(['PASS', 'GATE_FAILURE']).toContain(parsed.overallGate);
   });
 
   it('finalizeSprint writes load-test-report.md under docs/audits/<sprintId>/', async () => {
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn> } };
     vi.mocked(observabilityMod.generateLoadReport).mockResolvedValueOnce('# Load Report\n\n## Wave Timeline\n\nNo data.\n');
 
     const sprint = makeSprint('sprint-137');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    // mkdir must be called for the report directory
-    const mkdirCall = fsMod.promises.mkdir.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('docs/audits/sprint-137'),
-    );
-    expect(mkdirCall).toBeDefined();
-
-    // writeFile must be called with the load-test-report.md path
-    const reportWriteCall = fsMod.promises.writeFile.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).endsWith('load-test-report.md'),
-    );
-    expect(reportWriteCall).toBeDefined();
-    expect(reportWriteCall![1]).toContain('Wave Timeline');
+    // REAL disk truth: report directory created and report written.
+    const reportPath = join(PROJECT_ROOT, 'docs', 'audits', 'sprint-137', 'load-test-report.md');
+    expect(readFileSync(reportPath, 'utf8')).toContain('Wave Timeline');
   });
 
   it('finalizeSprint completes normally when gate.json write fails (fail-safe)', async () => {
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
-    // Make ALL writeFile calls fail to simulate full filesystem failure
-    fsMod.promises.writeFile.mockRejectedValue(new Error('ENOSPC: no space left'));
+    // Async writeFile failure is non-fatal by contract: gate/load-report writes are
+    // fail-safe. Spy on the REAL fs.promises object (sync atomic publication ring is
+    // untouched, so terminal evidence still settles).
+    const writeSpy = vi.spyOn(nodeFsMod.promises, 'writeFile')
+      .mockRejectedValue(new Error('ENOSPC: no space left'));
 
     const sprint = makeSprint('sprint-137');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
     // finalizeSprint must not throw — gate write failure is non-fatal
     await expect(
-      finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true }),
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
     ).resolves.toBeDefined();
   });
 });
@@ -517,9 +553,6 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
     });
 
     // Reset fs mocks
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn> } };
-    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
   });
 
   it('calls tryCodeVerifiedDone for every NO_GO evaluation during finalize', async () => {
@@ -534,15 +567,15 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
       ['137-002', TaskEvaluation.DONE],
     ]);
     const results = [
-      { taskId: '137-002', workerId: 'w-002', filesChanged: ['src/foo.ts'], linesAdded: 10, linesRemoved: 0, testsPassed: true, coverage: 90, selfAssessment: 'DONE' as const, notes: '' },
+      { taskId: '137-002', workerId: 'w-002', filesChanged: ['src/foo.ts'], linesAdded: 10, linesRemoved: 0, testsPassed: true, coverage: 90, selfAssessment: 'DONE' as const, notes: '' , workAttribution: { state: 'VERIFIED' as const, attemptId: 'attempt-137-002', baselineRef: 'baseline:attempt-137-002', scopeDigest: 'attempt-137-0020000000000000000000000000000000000000000000000000' } },
     ];
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     // tryCodeVerifiedDone must be called for the NO_GO task (137-001)
-    expect(mockTryCode).toHaveBeenCalledWith('137-001', '/tmp/project');
+    expect(mockTryCode).toHaveBeenCalledWith('137-001', PROJECT_ROOT);
     // Must NOT be called for the DONE task (137-002)
-    expect(mockTryCode).not.toHaveBeenCalledWith('137-002', '/tmp/project');
+    expect(mockTryCode).not.toHaveBeenCalledWith('137-002', PROJECT_ROOT);
   });
 
   it('reconciles NO_GO → DONE when tryCodeVerifiedDone returns verified=true', async () => {
@@ -564,12 +597,12 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
       evidenceMatched: true,
     });
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
     // Evaluation must be reconciled from NO_GO → DONE
     expect(evaluations.get('137-003')).toBe(TaskEvaluation.DONE);
     // writeCodeVerifiedResult must be called with the verify result
-    expect(mockWriteResult).toHaveBeenCalledWith('137-003', '/tmp/project', expect.objectContaining({
+    expect(mockWriteResult).toHaveBeenCalledWith('137-003', PROJECT_ROOT, expect.objectContaining({
       triggered: true,
       verified: true,
       verifiedFiles: ['src/a.ts'],
@@ -595,7 +628,7 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
       evidenceMatched: false,
     });
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
     // Evaluation must remain NO_GO
     expect(evaluations.get('137-004')).toBe(TaskEvaluation.NO_GO);
@@ -618,7 +651,7 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
 
     // finalizeSprint must NOT throw — fail-safe catch preserves original NO_GO
     await expect(
-      finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true }),
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true }),
     ).resolves.toBeDefined();
 
     // Evaluation must remain NO_GO (not changed to DONE)
@@ -648,7 +681,7 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
       evidenceMatched: true,
     });
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
     // Docker spurious NO_GO must be reconciled
     expect(evaluations.get('137-006')).toBe(TaskEvaluation.DONE);
@@ -687,7 +720,7 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
     fsMod.existsSync.mockReturnValue(false);
     fsMod.readFileSync.mockReturnValue('# RETRO\n');
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
     // writeFileSync must be called with a RETRO.md update that includes "Code-Verified DONE"
     const retroWriteCall = fsMod.writeFileSync.mock.calls.find(
@@ -708,9 +741,6 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
 
 describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () => {
   beforeEach(() => {
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn> } };
-    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
   });
 
   it('calls archiveDirectives with projectRoot and sprintId during finalizeSprint', async () => {
@@ -719,11 +749,11 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
     mockArchive.mockClear();
 
     const sprint = makeSprint('sprint-138');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    expect(mockArchive).toHaveBeenCalledWith('/tmp/project', 'sprint-138', expect.anything(), expect.anything());
+    expect(mockArchive).toHaveBeenCalledWith(PROJECT_ROOT, 'sprint-138', expect.anything(), expect.anything());
   });
 
   it('archiveDirectives is called even when sprint has no tasks', async () => {
@@ -733,9 +763,9 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
 
     const sprint = makeSprint('sprint-138');
     sprint.tasks = [];
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     expect(mockArchive).toHaveBeenCalledOnce();
   });
@@ -750,7 +780,7 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
 
     // Must not throw — archiveDirectives failure is non-fatal
     await expect(
-      finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true }),
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true }),
     ).resolves.toBeDefined();
   });
 });
@@ -772,17 +802,14 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
     });
 
     // Reset fs promise mocks
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn> } };
-    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
   });
 
   it('gate.json is always written even when runSelfAuditGate succeeds', async () => {
     const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
     const sprint = makeSprint('sprint-138');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     // gate.json must be written to .deckent/recently-works/sprint-138-gate.json
     const gateWriteCall = fsMod.promises.writeFile.mock.calls.find(
@@ -802,9 +829,9 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
 
     const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
     const sprint = makeSprint('sprint-138');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     // gate.json must STILL be written (fallback gate result)
     const gateWriteCall = fsMod.promises.writeFile.mock.calls.find(
@@ -825,9 +852,9 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
     );
 
     const sprint = makeSprint('sprint-138');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     // mkdir must create the report directory
     const mkdirCall = fsMod.promises.mkdir.mock.calls.find(
@@ -852,7 +879,7 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
     const evaluations = new Map<string, TaskEvaluation>();
 
     // finalizeSprint must NOT throw — all writes are non-fatal
-    const metrics = await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
     expect(metrics).toBeDefined();
     expect(metrics.totalTasks).toBe(1);
   });
@@ -865,7 +892,7 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
     spawnSyncMock.mockReturnValue({ status: 0, stdout: '', stderr: '', pid: 0, signal: null, output: [] });
 
     // Use DI options to avoid actual spawnSync for tsc/vitest, but still check git diff call
-    await runSelfAuditGate('sprint-138', '/tmp/project', {
+    await runSelfAuditGate('sprint-138', PROJECT_ROOT, {
       runTsc: () => ({ status: 0, stdout: '', stderr: '' }),
       runVitest: () => ({ status: 0, stdout: '', stderr: '' }),
     });
@@ -890,19 +917,15 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
 describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
   beforeEach(() => {
     vi.mocked(eventStreamMod.writeEvent).mockClear();
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn>; readFile: ReturnType<typeof vi.fn> } };
-    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.readFile.mockReset().mockResolvedValue('');
   });
 
   // ─── SPRINT_PHASE_CHANGE ─────────────────────────────────────────
 
   it('emits SPRINT_PHASE_CHANGE EXECUTE→EVALUATE at the start of finalizeSprint', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const phaseChangeCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'BRAIN→*:SPRINT_PHASE_CHANGE',
@@ -921,9 +944,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
   it('emits SPRINT_PHASE_CHANGE EVALUATE→RETRO before writing RETRO.md', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const phaseChangeCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'BRAIN→*:SPRINT_PHASE_CHANGE',
@@ -939,9 +962,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
   it('emits SPRINT_PHASE_CHANGE RETRO→CLEANUP at the end of finalizeSprint', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const phaseChangeCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'BRAIN→*:SPRINT_PHASE_CHANGE',
@@ -957,9 +980,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
   it('emits all 3 SPRINT_PHASE_CHANGE events in correct order', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const phaseChangeCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'BRAIN→*:SPRINT_PHASE_CHANGE',
@@ -984,9 +1007,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
   it('emits METRIC_EMITTED with sprint.summary after metrics calculation', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const metricCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'BRAIN→*:METRIC_EMITTED',
@@ -1017,9 +1040,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
   it('METRIC_EMITTED payload includes coveragePercent field', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const metricCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'BRAIN→*:METRIC_EMITTED',
@@ -1037,9 +1060,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
   it('emits GATE_COMPUTED after gate.json is written', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const gateComputedCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'AUDITOR→BRAIN:GATE_COMPUTED',
@@ -1057,9 +1080,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
   it('GATE_COMPUTED payload includes tscStatus and vitestFail fields', async () => {
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const gateComputedCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'AUDITOR→BRAIN:GATE_COMPUTED',
@@ -1083,9 +1106,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
     fsMod.promises.writeFile.mockRejectedValue(new Error('EACCES: permission denied'));
 
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     // The gate.json write failed, so GATE_COMPUTED inside that try block was not reached
     const gateComputedCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
@@ -1101,7 +1124,7 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
     const evaluations = new Map<string, TaskEvaluation>();
     vi.mocked(observabilityMod.generateLoadReport).mockResolvedValueOnce('# Load Report\n\n## Wave Timeline\n\nNo data.\n');
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
     const loadReportCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
@@ -1122,9 +1145,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
     vi.mocked(observabilityMod.generateLoadReport).mockRejectedValueOnce(new Error('Disk full'));
 
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const loadReportCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
@@ -1145,7 +1168,7 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
 
     // Should resolve despite all writeEvent calls returning null
     const metrics = await finalizeSprint(
-      '/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true },
+      PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true },
     );
     expect(metrics).toBeDefined();
     expect(typeof metrics.totalTasks).toBe('number');
@@ -1163,16 +1186,13 @@ describe('sprint-finalizer — triple-link relations (Task 143-007)', () => {
       promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn>; readFile: ReturnType<typeof vi.fn> };
     };
     fsMod.existsSync.mockReturnValue(true); // memory.db exists
-    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.readFile.mockReset().mockResolvedValue('');
   });
 
   it('creates 3 triple-link relations during finalizeSprint', async () => {
     const sprint = makeSprint('sprint-143');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     // Triple-link: sprint-log → memory (depends_on), memory → retro (depends_on), retro → sprint-log (references)
     expect(mockInsertRelation).toHaveBeenCalledWith('sprint-log-sprint-143', 'memory-sprint-143', 'depends_on');
@@ -1182,9 +1202,9 @@ describe('sprint-finalizer — triple-link relations (Task 143-007)', () => {
 
   it('closes the MemoryStore after triple-link insertion', async () => {
     const sprint = makeSprint('sprint-143');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     expect(mockMemStoreClose).toHaveBeenCalled();
   });
@@ -1196,7 +1216,7 @@ describe('sprint-finalizer — triple-link relations (Task 143-007)', () => {
     const evaluations = new Map<string, TaskEvaluation>();
 
     // finalizeSprint must not throw
-    const metrics = await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
     expect(metrics).toBeDefined();
   });
 
@@ -1205,9 +1225,9 @@ describe('sprint-finalizer — triple-link relations (Task 143-007)', () => {
     fsMod.existsSync.mockReturnValue(false);
 
     const sprint = makeSprint('sprint-143');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     // insertRelation should not be called when DB doesn't exist
     expect(mockInsertRelation).not.toHaveBeenCalled();
@@ -1226,17 +1246,13 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
       errors: [],
     });
 
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn>; readFile: ReturnType<typeof vi.fn> } };
-    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
-    fsMod.promises.readFile.mockReset().mockResolvedValue('');
   });
 
   it('calls runPostFinalizeHooks during finalizeSprint', async () => {
     const sprint = makeSprint('sprint-143');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     expect(mockRunPostFinalizeHooks).toHaveBeenCalledOnce();
     const callArgs = mockRunPostFinalizeHooks.mock.calls[0][0] as {
@@ -1244,7 +1260,7 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
       sprintId: string;
       metrics: { sprintId: string };
     };
-    expect(callArgs.projectRoot).toBe('/tmp/project');
+    expect(callArgs.projectRoot).toBe(PROJECT_ROOT);
     expect(callArgs.sprintId).toBe('sprint-143');
     expect(callArgs.metrics.sprintId).toBe('sprint-143');
   });
@@ -1254,7 +1270,7 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     const evaluations = new Map<string, TaskEvaluation>();
     const ruleRegenFn = vi.fn();
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], {
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], {
       skipDecay: true,
       skipHooks: true,
       onRuleRegen: ruleRegenFn,
@@ -1268,7 +1284,7 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     const sprint = makeSprint('sprint-143');
     const evaluations = new Map<string, TaskEvaluation>();
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], {
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], {
       skipDecay: true,
       skipHooks: true,
       skipMemoryExport: true,
@@ -1290,7 +1306,7 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     const evaluations = new Map<string, TaskEvaluation>();
 
     // Must not throw — post-finalize hook failure is non-fatal
-    const metrics = await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
     expect(metrics).toBeDefined();
   });
 
@@ -1328,9 +1344,9 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     });
 
     const sprint = makeSprint('sprint-143');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     // Verify order: jobSummary → postFinalizeHooks → retroToCleanup
     const jobIdx = callOrder.indexOf('jobSummary');
@@ -1353,7 +1369,7 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
       ['143-001', TaskEvaluation.DONE],
     ]);
 
-    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
     const callArgs = mockRunPostFinalizeHooks.mock.calls[0][0] as {
       metrics: { totalTasks: number; completedTasks: number };
@@ -1376,33 +1392,33 @@ describe('runBudgetedDecay (mode-independent decay helper)', () => {
     vi.mocked(mockAuditBrainBudget).mockReturnValueOnce({ status: 'OK', decayableLines: 0, permanentLines: 0, totalLines: 0 });
 
     // Invoked exactly the way the autonomous per-item hook calls it.
-    expect(() => runBudgetedDecay('/tmp/project', 'sprint-42', { memoryBudget: 900, decaySprints: 20 })).not.toThrow();
+    expect(() => runBudgetedDecay(PROJECT_ROOT, 'sprint-42', { memoryBudget: 900, decaySprints: 20 })).not.toThrow();
 
-    expect(vi.mocked(mockAuditBrainBudget)).toHaveBeenCalledWith('/tmp/project', 900);
+    expect(vi.mocked(mockAuditBrainBudget)).toHaveBeenCalledWith(PROJECT_ROOT, 900);
     expect(vi.mocked(mockRunDecay)).toHaveBeenCalledWith(
-      '/tmp/project', 'sprint-42', { memoryBudget: 900, decaySprints: 20 },
+      PROJECT_ROOT, 'sprint-42', { memoryBudget: 900, decaySprints: 20 },
     );
   });
 
   it('forces decay when the budget is OVER, normal decay when OK', () => {
     // OVER → force:true
     vi.mocked(mockAuditBrainBudget).mockReturnValueOnce({ status: 'OVER', decayableLines: 1200, permanentLines: 0, totalLines: 1200 });
-    runBudgetedDecay('/tmp/project', 'sprint-7', { memoryBudget: 900, decaySprints: 20 });
+    runBudgetedDecay(PROJECT_ROOT, 'sprint-7', { memoryBudget: 900, decaySprints: 20 });
     expect(vi.mocked(mockRunDecay)).toHaveBeenLastCalledWith(
-      '/tmp/project', 'sprint-7', { force: true, memoryBudget: 900, decaySprints: 20 },
+      PROJECT_ROOT, 'sprint-7', { force: true, memoryBudget: 900, decaySprints: 20 },
     );
 
     // OK → no force
     vi.mocked(mockAuditBrainBudget).mockReturnValueOnce({ status: 'OK', decayableLines: 10, permanentLines: 0, totalLines: 10 });
-    runBudgetedDecay('/tmp/project', 'sprint-8', { memoryBudget: 900, decaySprints: 20 });
+    runBudgetedDecay(PROJECT_ROOT, 'sprint-8', { memoryBudget: 900, decaySprints: 20 });
     expect(vi.mocked(mockRunDecay)).toHaveBeenLastCalledWith(
-      '/tmp/project', 'sprint-8', { memoryBudget: 900, decaySprints: 20 },
+      PROJECT_ROOT, 'sprint-8', { memoryBudget: 900, decaySprints: 20 },
     );
   });
 
   it('never throws — an auditBrainBudget failure is swallowed (fail-safe)', () => {
     vi.mocked(mockAuditBrainBudget).mockImplementationOnce(() => { throw new Error('audit boom'); });
-    expect(() => runBudgetedDecay('/tmp/project', 'sprint-9')).not.toThrow();
+    expect(() => runBudgetedDecay(PROJECT_ROOT, 'sprint-9')).not.toThrow();
     expect(vi.mocked(mockRunDecay)).not.toHaveBeenCalled();
   });
 });
