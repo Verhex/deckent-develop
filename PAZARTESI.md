@@ -295,7 +295,9 @@ tüm suite'i yeşile çekmek değil; borç **dosya-dosya** kaydedildi:
 Yeni kırık = FAIL; azalma = raporlanır ve `--update` ile ratchet'lenir. Projenin mevcut
 `spawnsync-baseline` / `error-handling-baseline` kültürüyle aynı desen.
 
-**Kritik yol önerisi (CI'ı yeşile götüren en kısa hat):**
+**Kritik yol — CANONICAL SIRA (Alperen kararı, 2026-08-03 · xverify OQ-XV-06 kapanışı):**
+Aşağıdaki hat tek geçerli sıradır; yukarıdaki "üçe bölünür" bloğundaki `P6+P3+P4 → FAZ4` okuması
+bu kararla superseded'dır. MASTER'a emilirken bu sıra taşınacak.
 1. ~~P2-mekanik + P5~~ → **2026-08-03'te YAPILDI.** P5 yeşil (46→0, `lint:errors` OK);
    P2-mekanik uygulandı ama sayıyı düşürmedi (kırıklar P1'e taşındı).
 2. **P6 (4 ZodError)** — küçük ama P1'in ön koşulu; `runId` wiring-closure kapatılmalı.
