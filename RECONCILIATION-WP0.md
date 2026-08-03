@@ -190,3 +190,73 @@ Açık kalan: `X` (cross-platform) ve commit-bound settlement — bunlar `APPROV
 - 246 P0'ın satır-satır incelemesi yapılmadı; yalnız ölçülebilir ön eleme (dependents) üretildi.
 - Codex'in 24 finding'inin (F-001…F-024) her biri ayrı Work ID'ye bağlanmadı — bu tur PAZARTESI + code-doc katmanını kapattı; F-serisi bir sonraki turda.
 - Hiçbir test/build koşulmadı (bu tur analiz+planlama).
+
+
+---
+
+# EK — UYGULAMA SONUCU (2026-08-03, MASTER'a yazıldı)
+
+7 karar onaylandı ve uygulandı. **İkisi validator tarafından bloke edildi ve bu doğru davranıştı.**
+
+## ✅ Uygulananlar
+
+| # | Karar | Sonuç |
+|---|---|---|
+| 1 | `SSOT-001` → DONE | ✅ Truth `1/1/1/1/1/-/-`, `proof=master-archive-fresh-checkout-56d5406f0` ile yazıldı. Terminal satır sayısı 5 → **6** |
+| 4 | 4 yeni satır | ✅ `RUNTIME-FLOOR-001` (450), `ERROR-REGISTRY-001` (460), `CONFIG-TRUTH-001` (470) P00'a; `LIFECYCLE-VOCAB-001` (3305) P03'e. Ledger 323 → **327** |
+| 6 | Baseline 591/115 → 539/113 | ✅ `TRUTH-BASELINE-001` evidence'ına ratchet aracıyla birlikte yazıldı |
+| 3 | PAZARTESI kalemleri | ✅ kısmi: baseline/ratchet kaydı `TRUTH-BASELINE-001`'e işlendi; kalan 13 kalem evidence-only, sonraki turda |
+
+## ⛔ Validator'ın durdurdukları — governance-by-construction çalışıyor
+
+### Karar #2 (READY root) — **owner receipt'i olmadan mümkün değil**
+
+İki katmanlı engel çıktı:
+
+1. **`SSOT-003` READY OLAMAZ.** Tek child'ı `MASTER-CLI-SYMLINK-FLAKE-001` OPEN durumda; kural: *"doğrudan child'ların tamamı DONE/DISPOSED olmadan parent READY olamaz"*. Yani öneriyi `MASTER-CLI-SYMLINK-FLAKE-001`'e kaydırdım — o, 262 işi bekleten `SSOT-003`'ün gerçek kilidi.
+2. **O da READY olamadı:** `ADMISSION_RECEIPT_MISSING — READY mutation item has no active scope-exact G1 receipt`.
+
+`READY`, satıra + G1'e özel **owner-issued admission receipt'i** gerektiriyor:
+`GR-YYYY-MM-DD-<SCOPE>-NN` · exact file manifest (`path@sha256`) · `owner=Alperen; decision=APPROVED; scope=...; exclusions=...`. Bunu ben veremem, üretmedim.
+
+> **Bu, §0'daki tespitimin düzeltmesidir.** "0 READY yalnız yazım boşluğu" demiştim — **eksik**. Doğrusu: READY hem yazım hem **owner admission authority** gerektirir. Ledger'ın hiç READY içermemesinin gerçek nedeni, hiç admission receipt'i yayımlanmamış olması.
+
+Satır `OPEN` bırakıldı; READY-eligibility gerekçesi evidence'a yazıldı.
+
+### Karar #5 (P0 yeniden sınıflandırma) — **~90 hedefi yanlıştı**
+
+Codex'in 4 soruluk politikasını doğru uygulayınca:
+
+| Filtre | Kalan |
+|---|---:|
+| Aktif P0 | 246 |
+| `dependents=0` ve child'sız | 41 |
+| − güvenlik/tenant/authority (Q3) | 27 |
+| − `RECOVERY-BORN-*` gözlenmiş execution hatası (Q1) | 12 |
+| − TRUTH/ASSURANCE truth-sinyali (Q2) | **9** |
+
+**Savunulabilir P1 adayı: 9** (56 değil). Toplu indirme YAPILMADI.
+
+Sebep: 27 satırın çoğu `RECOVERY-BORN-*` — gerçek koşularda gözlenmiş execution hataları ("worker-writable heartbeat monotonic recovery'yi bozabiliyor", "scope hatası provider usage-limit sanılıyor"). Politikanın 1. sorusu bunları **P0 yapıyor**.
+
+**Bulgu:** P0 enflasyonu esas olarak "yanlış etiketleme" değil. 246 P0'ın büyük kısmı politikanın en az bir sorusundan gerçekten geçiyor. Gerçek çare, etiket düzeltmek değil **owner-set P0 bütçesi** (aynı anda kaç P0 admission alabilir) olmalı — bu bir owner kararıdır.
+
+9 aday: `CODEX-C10`, `TERMINAL-ONBOARD-001`, `NATIVE-DEV-001`, `TERMINAL-XPLAT-001`, `STATUS-SURFACE-PARITY-001`, `API-OPERATIONS-001`, `DESIGN-SYSTEM-001`, `RELEASE-001`, `ENTERPRISE-MODULARITY-001`. (`RELEASE-001` ve `STATUS-SURFACE-PARITY-001` tartışmalı — ikisi de owner onayı ister.)
+
+## Ledger'ın yeni hâli
+
+| Ölçü | Önce | Sonra |
+|---|---:|---:|
+| Toplam / aktif / terminal | 323 / 318 / 5 | **327 / 321 / 6** |
+| DONE | 5 | **6** |
+| READY | 0 | 0 *(admission receipt bekliyor)* |
+| P0 / P1 / P2 | 250 / 57 / 16 | 250 / **61** / 16 |
+
+Doğrulama: `lint:master-plan` **OK** (327 satır, 23 receipt, projeksiyonlar in-sync) · `lint:link` 0 kırık.
+
+## Sıradaki owner kararları
+
+1. `MASTER-CLI-SYMLINK-FLAKE-001` için **G1 admission receipt'i** yayımla → 262 işin kilidi açılır.
+2. **P0 bütçesi** belirle (etiket indirimi değil, eşzamanlı admission limiti).
+3. 9 P1 adayını onayla/reddet.
+4. Bu ledger'ı Codex'e **xverify**'a gönder (karar #7).

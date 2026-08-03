@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):81083a1c201afdf2f5d30df7c960fe71104fd9b77396040927883cd492f46b18`
+**Source digest:** `sha256(normalized-lf-utf8):8929354bb626600e1f153891e3155340ada256493ff25ec13b219e00fda98a82`
 
-**Rows:** 323 total · 318 active · 5 terminal
+**Rows:** 327 total · 321 active · 6 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 221 |
+| OPEN | 225 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 30 |
-| DONE | 5 |
+| VERIFY | 29 |
+| DONE | 6 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -26,7 +26,6 @@
 
 | Order | ID | State | Priority | Program | DependsOn | Blocker | Outcome |
 |---:|---|---|---|---|---|---|---|
-| 10 | `SSOT-001` | VERIFY | P0 | TRUTH | — | — | 2026-07-26 legacy MASTER'ı byte-identical archive et |
 | 20 | `SSOT-002` | VERIFY | P0 | TRUTH | `SSOT-001`, `SOURCE-MANIFEST-001`, `LEGACY-RESIDUAL-AUDIT-001` | — | Tüm kaynakları canonical, atomik ve dependency'li ledger'a uzlaştır |
 | 30 | `SSOT-003` | VERIFY | P0 | TRUTH | `SSOT-001` | — | MASTER schema validator ve generated active views |
 | 31 | `MASTER-CLI-SYMLINK-FLAKE-001` | OPEN | P1 | TRUTH | — | — | MASTER validator real-entry symlink contract'ını deterministic yap |
@@ -73,6 +72,9 @@
 | 420 | `GIT-MAINT-REPORT-001` | BLOCKED | P2 | OPS | `OPS-BRANCH-001` | `DEPENDENCY_UNSATISFIED` | Read-only git object and pack health report |
 | 430 | `GIT-MAINT-APPLY-001` | BLOCKED | P2 | OPS | `GIT-MAINT-REPORT-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Approved local repository maintenance and repack |
 | 440 | `EXEC-TEMPO-001` | OPEN | P1 | OPS | — | — | Config-resolved high-parallelism execution tempo with batch-receipt owner approvals |
+| 450 | `RUNTIME-FLOOR-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Tek runtime minimum sürüm contractı: package engines, doctor, onboarding ve release gate aynı floor'u ilan ve test eder |
+| 460 | `ERROR-REGISTRY-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Emitted her typed error kodu tek registry'de message ve remediation ile kayıtlı; kullanıcıya görünen doküman aynı kaynaktan üretilir |
+| 470 | `CONFIG-TRUTH-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Config leaf metadata ve default üretimi tek canonical kaynaktan; manifest backend default'u aynı kaynağı tüketir |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -250,6 +252,7 @@
 | 3302 | `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-488-LANDING-CHECKPOINT-001`, `RECOVERY-BORN-488-REPAIR-DISPATCH-001` | — | Sprint-488 landing and checkpoint defect classes recover through production authority |
 | 3303 | `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | — | Multi-provider smoke proves config-resolved routing, auth isolation and provider observation retirement |
 | 3304 | `RECOVERY-BORN-490-FULL-SUITE-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001`, `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001`, `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | — | One explicit full-suite run certifies the completed recovery train after all narrower gates |
+| 3305 | `LIFECYCLE-VOCAB-001` | OPEN | P1 | KERNEL | — | — | Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |

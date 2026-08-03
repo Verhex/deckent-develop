@@ -3,26 +3,26 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "81083a1c201afdf2f5d30df7c960fe71104fd9b77396040927883cd492f46b18"
+    "value": "8929354bb626600e1f153891e3155340ada256493ff25ec13b219e00fda98a82"
   },
   "summary": {
-    "total": 323,
-    "active": 318,
-    "terminal": 5,
+    "total": 327,
+    "active": 321,
+    "terminal": 6,
     "receipts": 23,
     "byState": {
-      "OPEN": 221,
+      "OPEN": 225,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 30,
-      "DONE": 5,
+      "VERIFY": 29,
+      "DONE": 6,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 250,
-      "P1": 57,
+      "P1": 61,
       "P2": 16
     },
     "byProgram": {
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 78,
+      "KERNEL": 79,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 43,
+      "TRUTH": 46,
       "XPLAT": 3
     }
   },
@@ -69,11 +69,11 @@
       "id": "SSOT-001",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-07-26",
+      "state": "DONE",
+      "updated": "2026-08-03",
       "definitionDigest": "5161b09660fbdd91ed48354b379d0f9d3357cf3fc669befcdb64d57d44caffb2",
-      "progressDigest": "7ee495e011b2751dc69b7dec0775c2a48caeaff372ef36274da2e318b8172332",
-      "terminalClosureDigest": null
+      "progressDigest": "971aa83e3a12f9dab6116e0fcf0a9f9be917c1285b0cee3ba3bdc4600e2f6997",
+      "terminalClosureDigest": "3d8c424ee9fbd560c122f4c0f4a7c3cf96503c7bfcef1c954fa87652d9ae1dc9"
     },
     {
       "order": 20,
@@ -103,9 +103,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-30",
+      "updated": "2026-08-03",
       "definitionDigest": "374341049d52f5c4d0874c4a6b6588c16aa2ff7be9009c09755611ca7f60e9dd",
-      "progressDigest": "06f9e15af4003cf094dc84f1cad52ad3d867ddacadf5c62533b262e2380d79f2",
+      "progressDigest": "5675ad76cc0f5e652728de55ebd5a29afc0163d47efb0ea111e8c7731e263ece",
       "terminalClosureDigest": null
     },
     {
@@ -114,9 +114,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-03",
       "definitionDigest": "2069ad6e437766f5bfa67ed3806ccbc6c42f7245047a37f19dd82f5e4154e780",
-      "progressDigest": "daa80bb440cd32b8f1f22c323e328b77981d4f5c10ee29cf69cf6829d32ee399",
+      "progressDigest": "64d131d378bd7e6b2ae8e7b3d4aff3fb123fbf85173ea23054cac3f675099e17",
       "terminalClosureDigest": null
     },
     {
@@ -579,6 +579,39 @@
       "updated": "2026-07-31",
       "definitionDigest": "43f96298bf1f11816f123d837abccec5b28d64409d71beb598405de3ab40a1d4",
       "progressDigest": "25e9b7b69ab474cce54c49bbe0d89adecb2bd906878210a742b526a371738fc4",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 450,
+      "id": "RUNTIME-FLOOR-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-03",
+      "definitionDigest": "cc9b46006ce0ad803edbe71c3726e8897ce181e3b62c1ff313c773fb0791af93",
+      "progressDigest": "480252ada95fd2029e7e83ee932450ec40987aa9630f04d8da9c202fb7bd2e30",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 460,
+      "id": "ERROR-REGISTRY-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-03",
+      "definitionDigest": "ec72a77629c86640972aa056c7cffe60601e86051705b74b296455996080ab39",
+      "progressDigest": "467959a2096a1621f4c4f7caf78dda5cb50b1dded529b913ce8be866868479f6",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 470,
+      "id": "CONFIG-TRUTH-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-03",
+      "definitionDigest": "5c7491631d048c8cc869c5c83bcda3f3bbee1df0b161179aea888d39e6bfd4f2",
+      "progressDigest": "b89add34769c5f282e3c39058d65148895739b7b6475e49b48cda29ae317403a",
       "terminalClosureDigest": null
     },
     {
@@ -2573,6 +2606,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3305,
+      "id": "LIFECYCLE-VOCAB-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-03",
+      "definitionDigest": "b7962ee26001db1c89dec587f1605fd52e7220864e8dde4ff4af551e769e4709",
+      "progressDigest": "2fe92f1ba250be11db6380e05443bff5303b970d720adea6663c2c66ebd9d57d",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "program": "AUTHORITY",
@@ -3852,45 +3896,6 @@
   ],
   "workItems": [
     {
-      "order": 10,
-      "id": "SSOT-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "2026-07-26 legacy MASTER'ı byte-identical archive et",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "LEGACY-RESIDUAL-AUDIT-001",
-        "OPS-BRANCH-001",
-        "SOURCE-MANIFEST-001",
-        "SSOT-002",
-        "SSOT-003"
-      ],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-26-MASTER-01"
-      ],
-      "acceptance": "Archive SHA-256 source hash ile aynı ve tracked fresh-clone proof'u var",
-      "evidence": "`receipt=GR-2026-07-26-MASTER-01`; archive hash doğrulandı; commit/fresh-clone evidence bekliyor",
-      "updated": "2026-07-26"
-    },
-    {
       "order": 20,
       "id": "SSOT-002",
       "parent": "P00",
@@ -3926,7 +3931,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "SSOT-001",
         "SOURCE-MANIFEST-001",
         "LEGACY-RESIDUAL-AUDIT-001"
       ],
@@ -3951,13 +3955,16 @@
         "AUTHORITY-001",
         "CM-01",
         "CODEX-MAIN-001",
+        "CONFIG-TRUTH-001",
         "DEBT-GOVERNANCE-001",
         "DOCS-ADR-SYNC-001",
         "DOCS-RELEASE-TRUTH-001",
+        "ERROR-REGISTRY-001",
         "EVERY-ENV-001",
         "KERNEL-001",
         "KERNEL-ONTOLOGY-001",
         "PRINCIPAL-001",
+        "RUNTIME-FLOOR-001",
         "SCALE-001",
         "TEST-PLATFORM-001",
         "XVERIFY-UX-001"
@@ -3981,7 +3988,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "SSOT-001",
         "MASTER-CLI-SYMLINK-FLAKE-001"
       ],
       "evidenceReceipts": [
@@ -4022,8 +4028,8 @@
         "GR-2026-07-30-RECOVERY-RESIDUALS-01"
       ],
       "acceptance": "Full-file ve isolated test koşuları aynı stdout/exit sonucunu üretir; symlink entrypoint fail-open veya sessiz exit yapmaz; root cause ve hermetic regression proof kayıtlıdır",
-      "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; 2026-07-30 proof: canonical validator and projection checks pass, 67-case full-file run intermittently returns empty stdout only for the real symlink entry test while the exact isolated test and manual real command pass; no deterministic closure claimed",
-      "updated": "2026-07-30"
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; 2026-07-30 proof: canonical validator and projection checks pass, 67-case full-file run intermittently returns empty stdout only for the real symlink entry test while the exact isolated test and manual real command pass; no deterministic closure claimed; 2026-08-03 READY-ELIGIBILITY (admission receipt bekliyor): bağımlılık yok, açık child yok, blocker yok; SSOT-003'ün TEK child'ı olduğu için 262 aktif satırın aggregate closure edge'ini bu satır açar (`SSOT-003` kendisi child'ı kapanmadan READY olamaz). READY state'i owner-issued scope-exact G1 admission receipt'i gerektirir (validator: ADMISSION_RECEIPT_MISSING); receipt yayımlanmadan state OPEN kalır",
+      "updated": "2026-08-03"
     },
     {
       "order": 40,
@@ -4064,8 +4070,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Hermetic suite, build artifacts stable, binary proofs ayrı provenance ile kaydedilir",
-      "evidence": "Handover ve legacy baseline'ları çelişkili",
-      "updated": "2026-07-26"
+      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür",
+      "updated": "2026-08-03"
     },
     {
       "order": 50,
@@ -5190,9 +5196,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Merge-base, owner session and active worktree before any retirement",
       "evidence": "Current multiple worktrees observed",
@@ -5337,9 +5341,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-07-26-MASTER-01"
       ],
@@ -5451,9 +5453,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-07-26-MASTER-01"
       ],
@@ -5635,6 +5635,111 @@
       "acceptance": "Effective concurrency resolved from config, dependency DAG, collision and capacity admission — never an instruction literal; owner approval flow moves to batched receipts with Brain pre-summaries; settled-task/day baseline measured after first sustained week and plan estimates recalibrated",
       "evidence": "Owner direction 2026-07-31: move toward ~8-worker production tempo for the 276-item active ledger; observed ~4 owner receipts/day is the throughput bottleneck; model estimate ~1700 worker-tasks, realistic full-plan horizon ~2.5-3 months at sustained tempo",
       "updated": "2026-07-31"
+    },
+    {
+      "order": 450,
+      "id": "RUNTIME-FLOOR-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Tek runtime minimum sürüm contractı: package engines, doctor, onboarding ve release gate aynı floor'u ilan ve test eder",
+      "priority": "P1",
+      "dependsOn": [
+        "SSOT-003"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SSOT-003"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "`doctor`, `package.json engines`, onboarding ve release gate tek kaynaktan aynı minimum Node sürümünü verir; drift CI'da fail-closed olur",
+      "evidence": "CODE-DOC-DIFF-2026-08 CLI-12: `doctor --json` \"v24.15.0 (>=18 required)\" derken `package.json` `engines>=24` ister; 2026-08-02 gerçek binary çıktısıyla yeniden üretildi. Kanıtlamadığı: hangi floor'un canonical olacağı owner kararıdır",
+      "updated": "2026-08-03"
+    },
+    {
+      "order": 460,
+      "id": "ERROR-REGISTRY-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Emitted her typed error kodu tek registry'de message ve remediation ile kayıtlı; kullanıcıya görünen doküman aynı kaynaktan üretilir",
+      "priority": "P1",
+      "dependsOn": [
+        "SSOT-003"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "0",
+        "H": "1",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SSOT-003"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Registry dışında emitted kod kalmaz; `lint:errors` fail-closed; error dokümanı generated",
+      "evidence": "CODE-DOC-DIFF-2026-08 ERR-01. 2026-08-03: kayıtsız 46 raw throw tipli `DeckentError`'a çevrildi ve `lint:errors` YEŞİL (`0 new violation, 321 baseline occurrence`), 5 bayat baseline kaydı aynı değişiklikte ratchet'lendi. Kanıtlamadığı: registry-generated doküman ve message/remediation bütünlüğü henüz yok",
+      "updated": "2026-08-03"
+    },
+    {
+      "order": 470,
+      "id": "CONFIG-TRUTH-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Config leaf metadata ve default üretimi tek canonical kaynaktan; manifest backend default'u aynı kaynağı tüketir",
+      "priority": "P1",
+      "dependsOn": [
+        "SSOT-003"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SSOT-003"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "164 config leaf için no-missing ve equality gate CI'da fail-closed; manifest default'u canonical config'ten türer",
+      "evidence": "CODE-DOC-DIFF-2026-08 CFG-03, CFG-04",
+      "updated": "2026-08-03"
     },
     {
       "order": 1000,
@@ -9387,7 +9492,9 @@
         "PROMPT-001",
         "ZERO-HARDCODE-FLOW-001"
       ],
-      "children": [],
+      "children": [
+        "LIFECYCLE-VOCAB-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -9406,7 +9513,8 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "SSOT-003",
-        "OPERATION-001"
+        "OPERATION-001",
+        "LIFECYCLE-VOCAB-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "IDs and state machines are versioned; no competing nouns or implicit conversion",
@@ -13491,6 +13599,37 @@
       "updated": "2026-08-01"
     },
     {
+      "order": 3305,
+      "id": "LIFECYCLE-VOCAB-001",
+      "parent": "KERNEL-ONTOLOGY-001",
+      "program": "KERNEL",
+      "outcome": "Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "`SprintPhase` enum, emitted transition, host guide ve read-model aynı phase kümesini taşır; CLEANUP çelişkisi kapanır",
+      "evidence": "CODE-DOC-DIFF-2026-08 ARCH-01; codex-analysis 06: executable controller RETRO/DECAY sonrası gerçek CLEANUP koşuyor fakat enum'da CLEANUP yok ve emitted transition DECAY→COMPLETE kaydediyor",
+      "updated": "2026-08-03"
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "parent": "P04",
@@ -17517,6 +17656,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6b958708ffd2ae20ce4d81bfcc9353f18369b531d7384908a7d537e31ecf0050"
+    "value": "065e842ac83cfc08c2d9a1ac5409aaba707a06b5c0082f355eae5dfbba476b20"
   }
 }
