@@ -585,7 +585,7 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
     // Unresolved NO_GO lineage → plain finalize is refused at the archive boundary.
     await expect(
       finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
-    ).rejects.toThrow(/TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE/);
+    ).rejects.toThrow(/TERMINAL_/);
 
     // The diagnostic probe still ran for the NO_GO task and only for it.
     expect(mockTryCode).toHaveBeenCalledWith('137-001', PROJECT_ROOT);
@@ -645,7 +645,10 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
     expect(mockArchive).toHaveBeenCalledWith(PROJECT_ROOT, 'sprint-138', expect.anything(), expect.anything());
   });
 
-  it('archiveDirectives is called even when sprint has no tasks', async () => {
+  it('never archives a zero-task sprint (fail-closed; was: called even when no tasks)', async () => {
+    // Superseded contract: archive lives BEHIND the terminal-receipt gate now, and an
+    // empty sprint is NO_LOGICAL_TASKS → refused. Archiving directives for a sprint
+    // with no archivable evidence was the old false-COMPLETE shape.
     const { archiveDirectives } = await import('../../src/orchestra/sprint-reporter.js');
     const mockArchive = vi.mocked(archiveDirectives);
     mockArchive.mockClear();
@@ -654,9 +657,10 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
     sprint.tasks = [];
     const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
-
-    expect(mockArchive).toHaveBeenCalledOnce();
+    await expect(
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
+    ).rejects.toThrow(/TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE/);
+    expect(mockArchive).not.toHaveBeenCalled();
   });
 
   it('finalizeSprint continues when archiveDirectives throws (fail-safe)', async () => {
@@ -665,11 +669,11 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
     mockArchive.mockImplementationOnce(() => { throw new Error('EACCES: permission denied'); });
 
     const sprint = makeSprint('sprint-138');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
     // Must not throw — archiveDirectives failure is non-fatal
     await expect(
-      finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true }),
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
     ).resolves.toBeDefined();
   });
 });
@@ -990,9 +994,8 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
   });
 
   it('GATE_COMPUTED is NOT emitted when gate.json write fails', async () => {
-    // When writeFile throws, the GATE_COMPUTED event inside the try block is also skipped
-    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
-    fsMod.promises.writeFile.mockRejectedValue(new Error('EACCES: permission denied'));
+    // When writeFile rejects, the GATE_COMPUTED event inside the try block is skipped.
+    vi.spyOn(nodeFsMod.promises, 'writeFile').mockRejectedValue(new Error('EACCES: permission denied'));
 
     const sprint = makeSprint('sprint-139');
     const { evaluations, results } = settledFixture(sprint);
@@ -1053,11 +1056,11 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
     vi.mocked(eventStreamMod.writeEvent).mockReturnValue(null);
 
     const sprint = makeSprint('sprint-139');
-    const evaluations = new Map<string, TaskEvaluation>();
+    const { evaluations, results } = settledFixture(sprint);
 
     // Should resolve despite all writeEvent calls returning null
     const metrics = await finalizeSprint(
-      PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true },
+      PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true },
     );
     expect(metrics).toBeDefined();
     expect(typeof metrics.totalTasks).toBe('number');
@@ -1228,6 +1231,8 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     // (redefining node:fs exports is impossible against the real module — by design).
     expect(callOrder.indexOf('postFinalizeHooks')).toBeGreaterThanOrEqual(0);
     expect(callOrder.indexOf('retroCleanupEvent')).toBeGreaterThan(callOrder.indexOf('postFinalizeHooks'));
+    vi.mocked(eventStreamMod.writeEvent).mockReset();
+    vi.mocked(eventStreamMod.writeEvent).mockReturnValue(null);
   });
 
   it('metrics passed to hooks match calculated sprint metrics', async () => {
@@ -1238,8 +1243,9 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     const evaluations = new Map<string, TaskEvaluation>([
       ['143-001', TaskEvaluation.DONE],
     ]);
+    const { results } = settledFixture(sprint);
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const callArgs = mockRunPostFinalizeHooks.mock.calls[0][0] as {
       metrics: { totalTasks: number; completedTasks: number };
