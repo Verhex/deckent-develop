@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Known test debt from the 2026-08 CI outage (PAZARTESI.md · TEST BORCU ENVANTERİ). NEW failures fail the gate; this file is not a target to grow. Reduce it — FAZ 3 packages P1-P6 exist to empty it. NOTE 1: tests/scripts/test-containment-inventory-ratchet.test.ts fails only on a BUILT tree (dist/ enters the hermeticity scan); CI runs it without dist and observes 0 — that shows up as an \"improved\" line, not a failure, which is why the default mode tolerates environment variance. NOTE 2: some suites are timing-sensitive (tests/mcp/tools/annotations.test.ts takes ~250s); if a file oscillates, record the highest observation rather than chasing it.",
+  "note": "Known test debt from the 2026-08 CI outage (PAZARTESI.md · TEST BORCU ENVANTERİ). NEW failures fail the gate; this file is not a target to grow. Reduce it — FAZ 3 packages P1-P6 exist to empty it. NOTE 1: tests/scripts/test-containment-inventory-ratchet.test.ts fails only on a BUILT tree (dist/ enters the hermeticity scan); CI runs it without dist and observes 0 — that shows up as an \"improved\" line, not a failure, which is why the default mode tolerates environment variance. NOTE 2: some suites are timing-sensitive (tests/mcp/tools/annotations.test.ts takes ~250s); if a file oscillates, record the highest observation rather than chasing it. NOTE 3: tests/mcp/tools/annotations.test.ts is deliberately kept at its HIGHEST observation (25). It runs ~250s and has been seen both fully failing and fully passing in the same tree; ratcheting it to 0 on a lucky run would turn the next unlucky one into a false FAIL that blocks unrelated work.",
   "entries": [
     {
       "file": "tests/api/dashboard-data-parity.test.ts",
@@ -231,12 +231,8 @@
       "failed": 8
     },
     {
-      "file": "tests/mcp/tools/status-history.test.ts",
-      "failed": 15
-    },
-    {
       "file": "tests/mcp/tools/status-rich.test.ts",
-      "failed": 14
+      "failed": 3
     },
     {
       "file": "tests/monitor/auditor-edge.test.ts",

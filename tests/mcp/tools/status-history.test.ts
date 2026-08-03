@@ -3,6 +3,41 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
+
+// Authority-first status (same contract as the CLI surface): the tool returns a HOLD
+// payload without the rich projection fields unless (a) a live run authority exists and
+// (b) the canonical persisted read model is present. These cases exercise the projection,
+// so both are supplied here — the guard itself is covered by its own cases.
+const runAuthorityState = vi.hoisted(() => ({
+  current: {
+    schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
+    sprintId: 'sprint-001', phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
+  } as Record<string, unknown>,
+}));
+
+/** Cases about the "no live run" surface must say so explicitly. */
+function setQuiescentRunAuthority(): void {
+  runAuthorityState.current = {
+    ...runAuthorityState.current,
+    lifecycle: 'IDLE', active: false, resumable: false, sprintId: null,
+    phase: null, status: null, coordinator: 'absent',
+  };
+}
+
+vi.mock('../../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => runAuthorityState.current),
+}));
+
+vi.mock('../../../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: vi.fn(() => ({
+    schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
+    holds: [], providerConcurrency: [], terminalPublication: null, authority: {},
+  })),
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+  projectRunStatusReadModelSurface: vi.fn(() => ({ state: 'persisted' })),
+}));
+
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
@@ -98,6 +133,13 @@ const sampleJobState = {
 
 describe('registerStatusTool', () => {
   beforeEach(() => {
+    // Reset the run authority so a case that declares quiescence does not leak
+    // into the next one (default: a live run, which is what the projection cases need).
+    runAuthorityState.current = {
+      ...runAuthorityState.current,
+      lifecycle: 'ACTIVE', active: true, resumable: false, sprintId: 'sprint-001',
+      phase: 'EXECUTE', status: 'RUNNING', coordinator: 'alive',
+    };
     vi.clearAllMocks();
     vi.mocked(readLatestJobState).mockReturnValue(null);
   });
@@ -133,6 +175,7 @@ describe('registerStatusTool', () => {
 
   describe('dashboard read', () => {
     it('returns active: false when dashboard file does not exist', async () => {
+      setQuiescentRunAuthority();
       vi.mocked(existsSync).mockReturnValue(false);
       const tool = await getStatusTool();
       const result = await tool.handler({});

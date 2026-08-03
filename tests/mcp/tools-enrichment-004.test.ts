@@ -6,6 +6,26 @@ import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
+
+// Authority-first status: the tool holds unless a live run authority AND the canonical
+// persisted read model exist. Projection cases supply both. (Same note as status-history.)
+vi.mock('../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => ({
+    schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
+    sprintId: 'sprint-001', phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
+  })),
+}));
+
+vi.mock('../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: vi.fn(() => ({
+    schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
+    holds: [], providerConcurrency: [], terminalPublication: null, authority: {},
+  })),
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+  projectRunStatusReadModelSurface: vi.fn(() => ({ state: 'persisted' })),
+}));
+
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
