@@ -1,0 +1,44 @@
+# Line-ending normalization — cross-platform correctness invariant (Law 2: Every Environment).
+#
+# WHY THIS FILE EXISTS (proven root cause, 2026-08-03, MASTER-CLI-SYMLINK-FLAKE-001):
+#
+# Without it, Git for Windows (which ships `core.autocrlf=true`, and which the GitHub
+# `windows-latest` runner image inherits) checks out every tracked text file with CRLF endings.
+# That silently breaks Vitest for any test that imports one of this repo's 93 shebang-bearing
+# scripts:
+#
+#   1. Vite's SSR transform locates the shebang with `/^#!.*\n/`. In JavaScript, `.` does not
+#      match `\r` (CR is a line terminator), so on a CRLF tree the pattern never matches and the
+#      computed file-start offset stays 0.
+#   2. Hoisted `__vite_ssr_import__` statements are therefore inserted at offset 0 — ABOVE the
+#      shebang instead of below it.
+#   3. The downstream module runner blanks the shebang only when the transformed code still
+#      STARTS with `#`. It no longer does, so `#!` survives into the evaluated function body and
+#      the module dies with `SyntaxError: Invalid or unexpected token`.
+#
+# Reproduced and ablated on Linux, not inferred: converting `scripts/lint-master-plan.mjs` to
+# CRLF reproduces the exact Windows failure, and removing only its shebang (CRLF untouched)
+# turns the same suite green 73/73.
+#
+# `eol=lf` in this file overrides `core.autocrlf` regardless of the runner or developer machine
+# setting, which is what makes the fix hold on every host rather than on ones we remembered to
+# configure. The repository index is already all-LF (`git ls-files --eol`), so this normalizes
+# checkout behaviour without rewriting any stored blob.
+#
+# Existing Windows/CRLF working copies do not fix themselves: re-checkout with
+# `git rm --cached -r . && git reset --hard` after pulling this file.
+
+# Detect text automatically (never force a rule onto a file Git sees as binary — this repo has
+# at least one tracked `.md` containing NUL bytes that must NOT be normalized), and give every
+# detected text file LF in the index AND in the working tree on all platforms.
+* text=auto eol=lf
+
+# Belt-and-braces binaries: byte-exactness matters more here than auto-detection being right.
+*.png    -text
+*.svg    text eol=lf
+*.woff2  -text
+*.db     -text
+*.db-shm -text
+*.db-wal -text
+# Signing/verification key material — must stay byte-identical.
+*.ed25519 -text
