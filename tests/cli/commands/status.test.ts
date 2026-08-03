@@ -36,6 +36,62 @@ vi.mock('../../../src/monitor/sprint-state.js', () => ({
   getCurrentSprintId: vi.fn().mockReturnValue(null),
 }));
 
+// status.ts holds live status (RUN_STATUS_READ_MODEL_UNAVAILABLE) unless the canonical
+// persisted read model exists AND matches the authority. These cases exercise the
+// RENDERING surface, not the persistence guard, so the model is supplied here. Tests that
+// want the HOLD path override `readCanonicalRunStatusReadModel` to return null — see the
+// no-active-sprint cases.
+// status.ts is authority-first: a quiescent (IDLE/COMPLETE/ABORTED) run authority short-
+// circuits to "no active sprint" even when .tasks files exist. That is deliberate product
+// behaviour, so the standalone/live rendering cases must declare an ACTIVE authority —
+// otherwise they assert a contract the command no longer has. Default stays quiescent so
+// the no-active-sprint cases keep testing what they always did.
+const runAuthorityState = vi.hoisted(() => ({
+  current: {
+    schemaVersion: 1 as const,
+    lifecycle: 'IDLE',
+    active: false,
+    resumable: false,
+    sprintId: null,
+    phase: null,
+    status: null,
+    reason: null,
+    recoveryCommand: null,
+    finalizeCommand: null,
+    coordinator: 'absent',
+    conflicts: [],
+  } as Record<string, unknown>,
+}));
+
+function setActiveRunAuthority(sprintId = 'sprint-001'): void {
+  runAuthorityState.current = {
+    ...runAuthorityState.current,
+    lifecycle: 'ACTIVE',
+    active: true,
+    sprintId,
+    phase: 'EXECUTE',
+    status: 'RUNNING',
+    coordinator: 'alive',
+  };
+}
+
+vi.mock('../../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => runAuthorityState.current),
+}));
+
+vi.mock('../../../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: vi.fn(() => ({
+    schemaVersion: 1,
+    revision: 1,
+    runGeneration: 1,
+    modelDigest: 'digest-test',
+    holds: [],
+    providerConcurrency: [],
+    authority: {},
+  })),
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+}));
+
 const shutdownHookState = vi.hoisted(() => ({
   hooks: [] as Array<() => Promise<void>>,
   register: vi.fn(),
@@ -93,6 +149,7 @@ function lastShutdownHook(): () => Promise<void> {
 
 describe('status command (isolated)', () => {
   beforeEach(() => {
+    runAuthorityState.current = { ...runAuthorityState.current, lifecycle: 'IDLE', active: false, resumable: false, sprintId: null, phase: null, status: null, coordinator: 'absent' };
     vi.clearAllMocks();
     shutdownHookState.hooks.length = 0;
     process.exitCode = undefined;
@@ -119,6 +176,7 @@ describe('status command (isolated)', () => {
   });
 
   it('(A) shows standalone status from task files when no dashboard', async () => {
+    setActiveRunAuthority();
     vi.mocked(existsSync).mockImplementation((p: any) => {
       if (String(p).includes('.dashboard')) return false;
       if (String(p).includes('.tasks')) return true;
@@ -135,6 +193,8 @@ describe('status command (isolated)', () => {
   });
 
   it('(A) standalone with --json outputs JSON', async () => {
+    // the task fixture below belongs to sprint-002; authority is the sprint-id source
+    setActiveRunAuthority('sprint-002');
     vi.mocked(existsSync).mockImplementation((p: any) => {
       if (String(p).includes('.dashboard')) return false;
       if (String(p).includes('.tasks')) return true;
@@ -155,6 +215,7 @@ describe('status command (isolated)', () => {
   });
 
   it('adds read-only raw/effective receipt evidence to standalone JSON and closes the projection', async () => {
+    setActiveRunAuthority();
     vi.mocked(existsSync).mockImplementation((p: any) => {
       if (String(p).includes('.dashboard')) return false;
       if (String(p).includes('.tasks')) return true;
@@ -207,6 +268,7 @@ describe('status command (isolated)', () => {
   });
 
   it('projects all status tasks through one bulk read instead of per-task queries', async () => {
+    setActiveRunAuthority();
     vi.mocked(existsSync).mockImplementation((path: any) => {
       if (String(path).includes('.dashboard')) return false;
       if (String(path).includes('.tasks')) return true;
@@ -258,6 +320,7 @@ describe('status command (isolated)', () => {
   });
 
   it('surfaces open receipt reconciliation evidence in human status', async () => {
+    setActiveRunAuthority();
     vi.mocked(existsSync).mockImplementation((p: any) => {
       if (String(p).includes('.dashboard')) return false;
       if (String(p).includes('.tasks')) return true;
@@ -364,6 +427,7 @@ describe('status command (isolated)', () => {
   });
 
   it('--json outputs raw JSON', async () => {
+    setActiveRunAuthority();
     const state = makeDashboard();
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
@@ -377,6 +441,7 @@ describe('status command (isolated)', () => {
   });
 
   it('(E) --json --verbose includes agent/skill info', async () => {
+    setActiveRunAuthority();
     const state = makeDashboard();
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
@@ -459,6 +524,7 @@ describe('status command (isolated)', () => {
   });
 
   it('--mode json emits one machine document without human settlement suffixes', async () => {
+    setActiveRunAuthority();
     vi.mocked(existsSync).mockImplementation((path: any) =>
       String(path).includes('.dashboard'));
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
@@ -492,6 +558,7 @@ describe('status command (isolated)', () => {
   });
 
   it('--watch --mode json emits ANSI-free NDJSON records', async () => {
+    setActiveRunAuthority();
     vi.mocked(existsSync).mockImplementation((path: any) =>
       String(path).includes('.dashboard'));
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
@@ -597,6 +664,7 @@ describe('status command (isolated)', () => {
   });
 
   it('--follow --json emits ANSI-free NDJSON instead of the human TUI', async () => {
+    setActiveRunAuthority();
     vi.mocked(existsSync).mockImplementation((path: any) =>
       String(path).includes('.dashboard'));
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));

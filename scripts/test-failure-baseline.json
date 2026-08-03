@@ -96,11 +96,7 @@
     },
     {
       "file": "tests/cli/commands/status-mode.test.ts",
-      "failed": 7
-    },
-    {
-      "file": "tests/cli/commands/status.test.ts",
-      "failed": 20
+      "failed": 1
     },
     {
       "file": "tests/cli/commands/sync-onboard-upgrade-overhaul.test.ts",

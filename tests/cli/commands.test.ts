@@ -43,6 +43,29 @@ vi.mock('node:readline', () => ({
   })),
 }));
 
+
+// Authority-first status: a quiescent run authority short-circuits to "no active sprint",
+// and live status is held unless the canonical persisted read model exists. These cases
+// exercise rendering, so both are supplied here. (Same pattern as
+// tests/cli/commands/status.test.ts — see the note there.)
+vi.mock('../../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: vi.fn(() => ({
+    schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
+    holds: [], providerConcurrency: [], authority: {},
+  })),
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+}));
+
+vi.mock('../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => ({
+    schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
+    // sprintId null: these cases derive the id from the dashboard/task fixtures, so the
+    // authority must not impose one — it only declares that a run is active.
+    sprintId: null, phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
+  })),
+}));
+
 vi.mock('../../src/core/config.js', () => ({
   resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
