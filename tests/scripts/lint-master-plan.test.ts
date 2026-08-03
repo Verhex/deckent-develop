@@ -202,7 +202,7 @@ function planFixture({
     '|---|---|---|',
     ...blockerRows,
     '',
-    '## 4. Kaynak disposition kataloğu',
+    '## 4. Kaynak disposition katalo\u011fu',
     '',
     'fixture',
     '',
@@ -294,7 +294,7 @@ describe('splitMarkdownRow', () => {
 });
 
 describe('canonical MASTER validation', () => {
-  it('validates the repository MASTER snapshot without pinning today’s row counts', () => {
+  it('validates the repository MASTER snapshot without pinning today\u2019s row counts', () => {
     const source = readFileSync(join(REPO_ROOT, MASTER_PLAN_RELATIVE_PATH), 'utf8');
     // The ledger can carry ACTIVE admission receipts whose manifests pin real files by
     // digest; those baselines are only checkable against a physical tree, so the repository
@@ -1094,7 +1094,7 @@ describe('canonical MASTER validation', () => {
           id: 'GR-2026-07-26-FIXTURE-01',
           workIds: ['TASK-A'],
           manifest:
-            '`docs//MASTER-PLAN.md@ABSENT`; `docs/Plan.md@ABSENT`; `DOCS/plan.md@ABSENT`; `docs/Straße.txt@ABSENT`; `docs/STRASSE.txt@ABSENT`; `docs/CON .txt@ABSENT`; `docs/evil\u202Ecod.exe@ABSENT`',
+            '`docs//MASTER-PLAN.md@ABSENT`; `docs/Plan.md@ABSENT`; `DOCS/plan.md@ABSENT`; `docs/Stra\u00dfe.txt@ABSENT`; `docs/STRASSE.txt@ABSENT`; `docs/CON .txt@ABSENT`; `docs/evil\u202Ecod.exe@ABSENT`',
         },
       ],
     });
@@ -1163,7 +1163,7 @@ describe('canonical MASTER validation', () => {
           id: 'GR-2026-07-26-FIXTURE-03',
           workIds: ['TASK-A'],
           ownerDecision:
-            'owner=Alperеn;decision=APPROVED;scope=fixture;exclusions=other',
+            'owner=Alper\u0435n;decision=APPROVED;scope=fixture;exclusions=other',
         },
       ],
     });
