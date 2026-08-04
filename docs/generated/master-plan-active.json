@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3cccb35d8417fa9c1570d2eca7785230876237698414e9112def9636669c2e2c"
+    "value": "a0103420847f3e2600f3f6c202931cda0d3c56c8aad0dcf7843fc680780261b6"
   },
   "summary": {
     "total": 346,
     "active": 339,
     "terminal": 7,
-    "receipts": 39,
+    "receipts": 40,
     "byState": {
       "OPEN": 239,
       "READY": 0,
@@ -4259,6 +4259,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-04T21:26:03Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-04-FAZ4B-B5-01",
+      "authorityDigest": "435b7f70828b189e6c5348ba3d3674012dc72bc49ed5982565e89a4870a301a2",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -18631,6 +18641,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "8df8225324d0e7a72516601377eaffcb25ffbafb8d971bcdd75128d17a008f4a"
+    "value": "bc433bae427c60c36321306248f54607f800b97b8df7b298f245d8ac8957d674"
   }
 }
