@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "83c86a57c85b59e4a888fc7ab9b876b5b00b71524f41afa32254ae67b8f55ecc"
+    "value": "7b38e816e02475e7a3e834ebfbc5abaa047621dee4aedc30bf6a5226e768a30e"
   },
   "summary": {
     "total": 339,
@@ -12,8 +12,8 @@
     "receipts": 27,
     "byState": {
       "OPEN": 234,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 30,
       "DONE": 7,
@@ -696,10 +696,10 @@
       "id": "TRUST-ANCHOR-002",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-04",
       "definitionDigest": "e482051b747fa13c88a5d36badb0f91de0bc9aeadfb01d5b6b4e4aeb98bc2628",
-      "progressDigest": "fd3e2a524404d66a4e885ab0ea8c33dc7a141920df0f60e63e7e0237db8bb09a",
+      "progressDigest": "a59a64cee7cfe24509d27aad01ff6afe6ea06b0981477920a1f556ab72128e84",
       "terminalClosureDigest": null
     },
     {
@@ -6110,7 +6110,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "1",
@@ -18180,6 +18180,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9fbe6fd6d17faa797a7006d5bffdb5c35645687175ce743137ffee6747e3af99"
+    "value": "02cfee9c7959956f442825e2fab736b76222b850f8deec778c7f64c892d3a622"
   }
 }
