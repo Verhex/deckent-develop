@@ -1,35 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import {
   TaskStatus, SprintPhase, SprintStatus, AlertLevel,
 } from '../../src/core/types.js';
-import type { Task, Sprint, ResolvedConfig } from '../../src/core/types.js';
+import type { Task, Sprint } from '../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  renameSync: vi.fn(),
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  // Sprint 139 async I/O migration: sprint-finalizer and other modules use
-  // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
-  // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
+// ─── REAL FILESYSTEM (FAZ4A-S3) ─────────────────────────────────────
+// The node:fs mock is deliberately GONE. pauseSprint/resumeSprint end with
+// publishCanonicalRunStatusReadModel — an atomic publication ring
+// (write temp → renameSync → read back → digest compare) that verifies its own
+// writes; a mocked fs cannot carry that round-trip (RunStatusReadModelError
+// PERSIST_FAILED). Same root cause + fix as FAZ4A-S2 (finalize-sprint /
+// sprint-finalizer). Each test gets a real scratch project root under tmpdir.
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
+  // Real fs, mocked processes: git/tsc probes must not escape the sandbox. A
+  // bare vi.fn() would return undefined and crash callers reading `.status`.
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -51,10 +39,11 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
   return {
     ...actual,
+    // readJsonSafe / readFileSafe stay REAL: resumeSprint loads
+    // .deckent/pause-state.json through readJsonSafe and the tests now feed it
+    // real files instead of mock return values.
     countBrainLines: vi.fn().mockReturnValue(100),
     getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
-    readJsonSafe: vi.fn().mockReturnValue(null),
-    readFileSafe: vi.fn().mockReturnValue(''),
   };
 });
 
@@ -150,23 +139,59 @@ vi.mock('../../src/core/provider.js', () => ({
   getProviderForModel: vi.fn().mockReturnValue('claude'),
 }));
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
+// pause/resume dispatch human-gate notifications through connectors; that
+// subsystem stays module-boundary-mocked (no network / messaging side effects).
+vi.mock('../../src/core/notify.js', () => ({
+  notify: vi.fn(async () => undefined),
+  notifyProgress: vi.fn(async () => undefined),
+  notifyAsync: vi.fn(),
+}));
+
+import {
+  mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { updateDashboard } from '../../src/monitor/auditor.js';
-import { readJsonSafe } from '../../src/core/utils.js';
 
 import {
   pauseSprint,
   resumeSprint,
 } from '../../src/orchestra/brain.js';
 
-const mockedWriteFileSync = vi.mocked(writeFileSync);
-const mockedExistsSync = vi.mocked(existsSync);
-const mockedMkdirSync = vi.mocked(mkdirSync);
-const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
-const mockedReadJsonSafe = vi.mocked(readJsonSafe);
 
 // ─── Helpers ────────────────────────────────────────────────────────
+
+// Real per-file scratch root — assigned fresh in each describe's beforeEach.
+let PROJECT_ROOT = '';
+function freshProjectRoot(): string {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-pause-'));
+  mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+  mkdirSync(join(PROJECT_ROOT, '.deckent', 'pids'), { recursive: true });
+  // A live coordinator PID authority: resumeSprint's terminal read-model
+  // publication requires canonical lifecycle ACTIVE, which production only
+  // derives when the coordinator process is alive (run-status-authority.ts).
+  writeFileSync(
+    join(PROJECT_ROOT, '.deckent', 'pids', 'sprint-001.pid'),
+    JSON.stringify({
+      pid: process.pid,
+      startToken: 'test-start-token',
+      startedAt: new Date().toISOString(),
+    }, null, 2),
+    'utf-8',
+  );
+  return PROJECT_ROOT;
+}
+
+afterAll(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
+
+function readJsonFile(path: string): any {
+  return JSON.parse(readFileSync(path, 'utf-8'));
+}
 
 function makeTask(id: string, status: TaskStatus): Task {
   return {
@@ -197,28 +222,30 @@ function makeSprint(tasks: Task[]): Sprint {
   };
 }
 
-function makeConfig(): ResolvedConfig {
+/** A complete on-disk PauseState mirroring what pauseSprint persists (schema v2). */
+function makeSavedPauseState() {
   return {
-    projectName: 'test',
-    activeModeConfig: {
-      max_workers: 4,
-      default_model: 'claude-sonnet-5',
-      brain_model: 'claude-opus-4-8',
-      brain_planning: 'auto',
-      haiku_allowed: false,
-    },
-  } as unknown as ResolvedConfig;
+    schemaVersion: 2,
+    sprintId: 'sprint-001',
+    pausedAt: '2026-01-01T00:00:00.000Z',
+    pausedTaskIds: ['001'],
+    reason: 'test reason',
+    reasonCode: 'manual-pause',
+    phase: SprintPhase.EXECUTE,
+    status: 'PAUSED',
+    recoveryCommand: 'deckent recover sprint-001 --resume',
+    finalizeCommand: 'deckent finalize --sprint sprint-001 --force',
+  };
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe('pauseSprint', () => {
-  const projectRoot = '/tmp/test-project';
+  let projectRoot = '';
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
+    projectRoot = freshProjectRoot();
   });
 
   it('transitions PENDING tasks to PAUSED', () => {
@@ -303,10 +330,12 @@ describe('pauseSprint', () => {
 
     pauseSprint(projectRoot, sprint);
 
-    // Should write task JSON and .paused marker
-    const writeFileCalls = mockedWriteFileSync.mock.calls.map(c => c[0] as string);
-    expect(writeFileCalls.some(p => p.includes('task-001.json'))).toBe(true);
-    expect(writeFileCalls.some(p => p.includes('task-001.paused'))).toBe(true);
+    // Real files: task JSON (PAUSED) and .paused marker must exist on disk.
+    const taskJsonPath = join(projectRoot, '.tasks', 'task-001.json');
+    const pausedMarkerPath = join(projectRoot, '.tasks', 'task-001.paused');
+    expect(existsSync(taskJsonPath)).toBe(true);
+    expect(existsSync(pausedMarkerPath)).toBe(true);
+    expect(readJsonFile(taskJsonPath).status).toBe(TaskStatus.PAUSED);
   });
 
   it('writes a .paused marker file with previousStatus', () => {
@@ -315,13 +344,9 @@ describe('pauseSprint', () => {
 
     pauseSprint(projectRoot, sprint);
 
-    const pausedWrite = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('task-001.paused'),
-    );
-    expect(pausedWrite).toBeDefined();
-    const content = JSON.parse(pausedWrite![1] as string);
-    expect(content.previousStatus).toBe(TaskStatus.EXECUTING);
-    expect(content.taskId).toBe('001');
+    const marker = readJsonFile(join(projectRoot, '.tasks', 'task-001.paused'));
+    expect(marker.previousStatus).toBe(TaskStatus.EXECUTING);
+    expect(marker.taskId).toBe('001');
   });
 
   it('persists pause state to .deckent/pause-state.json', () => {
@@ -330,8 +355,12 @@ describe('pauseSprint', () => {
 
     pauseSprint(projectRoot, sprint);
 
-    const writeFileCalls = mockedWriteFileSync.mock.calls.map(c => c[0] as string);
-    expect(writeFileCalls.some(p => p.includes('pause-state.json'))).toBe(true);
+    const pauseStatePath = join(projectRoot, '.deckent', 'pause-state.json');
+    expect(existsSync(pauseStatePath)).toBe(true);
+    const persisted = readJsonFile(pauseStatePath);
+    expect(persisted.sprintId).toBe('sprint-001');
+    expect(persisted.pausedTaskIds).toEqual(['001']);
+    expect(persisted.status).toBe('PAUSED');
   });
 
   it('updates dashboard with PAUSED sprint status', () => {
@@ -388,23 +417,28 @@ describe('pauseSprint', () => {
     expect(dashCall.progress.total).toBe(2);
   });
 
-  it('continues gracefully when writeFileSync throws', () => {
-    mockedWriteFileSync.mockImplementationOnce(() => { throw new Error('disk full'); });
+  it('continues gracefully when the task JSON write fails', () => {
+    // Real-fs failure injection: pre-create task-001.json as a DIRECTORY so
+    // production's writeFileSync throws EISDIR exactly on the task-file write
+    // (previously simulated with mockImplementationOnce(() => throw 'disk full')).
+    mkdirSync(join(projectRoot, '.tasks', 'task-001.json'));
 
     const tasks = [makeTask('001', TaskStatus.PENDING)];
     const sprint = makeSprint(tasks);
 
     expect(() => pauseSprint(projectRoot, sprint)).not.toThrow();
+    // The failed write is contained; the rest of the pause transaction lands.
+    expect(sprint.status).toBe(SprintStatus.PAUSED);
+    expect(existsSync(join(projectRoot, '.deckent', 'pause-state.json'))).toBe(true);
   });
 });
 
 describe('resumeSprint', () => {
-  const projectRoot = '/tmp/test-project';
+  let projectRoot = '';
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedReadJsonSafe.mockReturnValue(null);
+    projectRoot = freshProjectRoot();
   });
 
   it('transitions PAUSED tasks back to PENDING', () => {
@@ -445,11 +479,9 @@ describe('resumeSprint', () => {
 
     resumeSprint(projectRoot, sprint);
 
-    expect(mockedWriteFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('sprint-state.json'),
-      expect.stringContaining('"status": "ACTIVE"'),
-      'utf-8',
-    );
+    const state = readJsonFile(join(projectRoot, '.deckent', 'sprint-state.json'));
+    expect(state.sprintId).toBe('sprint-001');
+    expect(state.status).toBe('ACTIVE');
   });
 
   it('writes updated task JSON for resumed tasks', () => {
@@ -458,34 +490,37 @@ describe('resumeSprint', () => {
 
     resumeSprint(projectRoot, sprint);
 
-    const writeFileCalls = mockedWriteFileSync.mock.calls.map(c => c[0] as string);
-    expect(writeFileCalls.some(p => p.includes('task-001.json'))).toBe(true);
+    const taskJsonPath = join(projectRoot, '.tasks', 'task-001.json');
+    expect(existsSync(taskJsonPath)).toBe(true);
+    expect(readJsonFile(taskJsonPath).status).toBe(TaskStatus.PENDING);
   });
 
   it('removes .paused marker files when they exist', () => {
-    mockedExistsSync.mockImplementation((p) => (p as string).includes('.paused'));
+    const markerPath = join(projectRoot, '.tasks', 'task-001.paused');
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ taskId: '001', previousStatus: TaskStatus.PENDING, pausedAt: '2026-01-01T00:00:00.000Z' }, null, 2),
+      'utf-8',
+    );
 
     const tasks = [makeTask('001', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
     resumeSprint(projectRoot, sprint);
 
-    expect(mockedUnlinkSync).toHaveBeenCalledWith(
-      expect.stringContaining('task-001.paused'),
-    );
+    expect(existsSync(markerPath)).toBe(false);
   });
 
   it('removes the pause-state.json file when it exists', () => {
-    mockedExistsSync.mockImplementation((p) => (p as string).includes('pause-state.json'));
+    const pauseStatePath = join(projectRoot, '.deckent', 'pause-state.json');
+    writeFileSync(pauseStatePath, JSON.stringify(makeSavedPauseState(), null, 2), 'utf-8');
 
     const tasks = [makeTask('001', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
     resumeSprint(projectRoot, sprint);
 
-    expect(mockedUnlinkSync).toHaveBeenCalledWith(
-      expect.stringContaining('pause-state.json'),
-    );
+    expect(existsSync(pauseStatePath)).toBe(false);
   });
 
   it('updates dashboard with ACTIVE sprint status', () => {
@@ -500,14 +535,12 @@ describe('resumeSprint', () => {
   });
 
   it('returns the previously saved PauseState', () => {
-    const savedState = {
-      sprintId: 'sprint-001',
-      pausedAt: '2026-01-01T00:00:00.000Z',
-      pausedTaskIds: ['001'],
-      reason: 'test reason',
-    };
-    // readJsonSafe is now imported from core/utils.js — mock it to return the saved state
-    mockedReadJsonSafe.mockReturnValueOnce(savedState);
+    const savedState = makeSavedPauseState();
+    writeFileSync(
+      join(projectRoot, '.deckent', 'pause-state.json'),
+      JSON.stringify(savedState, null, 2),
+      'utf-8',
+    );
 
     const tasks = [makeTask('001', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
@@ -518,8 +551,6 @@ describe('resumeSprint', () => {
   });
 
   it('returns null when no saved pause state exists', () => {
-    mockedReadJsonSafe.mockReturnValue(null);
-
     const tasks = [makeTask('001', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
@@ -552,24 +583,27 @@ describe('resumeSprint', () => {
     expect(dashCall.progress.blocked).toBe(0);
   });
 
-  it('continues gracefully when unlinkSync throws', () => {
-    mockedExistsSync.mockReturnValue(true);
-    mockedUnlinkSync.mockImplementation(() => { throw new Error('permission denied'); });
+  it('continues gracefully when marker/state unlink fails', () => {
+    // Real-fs failure injection: both cleanup targets are pre-created as
+    // DIRECTORIES so unlinkSync throws (EISDIR/EPERM) exactly where the old
+    // test injected mockedUnlinkSync throwing 'permission denied'.
+    mkdirSync(join(projectRoot, '.tasks', 'task-001.paused'));
+    mkdirSync(join(projectRoot, '.deckent', 'pause-state.json'));
 
     const tasks = [makeTask('001', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
     expect(() => resumeSprint(projectRoot, sprint)).not.toThrow();
+    expect(sprint.status).toBe(SprintStatus.ACTIVE);
   });
 });
 
 describe('pauseSprint + resumeSprint roundtrip', () => {
-  const projectRoot = '/tmp/test-project';
+  let projectRoot = '';
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
+    projectRoot = freshProjectRoot();
   });
 
   it('tasks go PENDING → PAUSED → PENDING after pause/resume', () => {
@@ -587,6 +621,11 @@ describe('pauseSprint + resumeSprint roundtrip', () => {
     expect(tasks[0].status).toBe(TaskStatus.PENDING);
     expect(tasks[1].status).toBe(TaskStatus.PENDING);
     expect(sprint.status).toBe(SprintStatus.ACTIVE);
+
+    // Real-file roundtrip closure: markers and pause-state are gone again.
+    expect(existsSync(join(projectRoot, '.tasks', 'task-001.paused'))).toBe(false);
+    expect(existsSync(join(projectRoot, '.tasks', 'task-002.paused'))).toBe(false);
+    expect(existsSync(join(projectRoot, '.deckent', 'pause-state.json'))).toBe(false);
   });
 
   it('DONE tasks remain DONE through the full pause/resume cycle', () => {

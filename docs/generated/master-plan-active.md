@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):1b4fc1f87bdc3b1c3c98a7a1d9159d9946daba9a2aee27fe278eb7cc637754c7`
+**Source digest:** `sha256(normalized-lf-utf8):3a407f08f538e2d8e826eeafc74095a879c211c8453337fcbf0f134fb7980b4c`
 
-**Rows:** 339 total · 332 active · 7 terminal
+**Rows:** 340 total · 333 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 234 |
+| OPEN | 235 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -82,6 +82,7 @@
 | 515 | `SEC-DEP-ADVISORY-001` | OPEN | P1 | TRUTH | — | — | Yeni upstream dependency advisory'leri (fast-uri GHSA-7p8r-x3mc-p8w7 · ip-address GHSA-mwp4-54f8-5fhr, ikisi de high) fail-closed Security Audit gate'ini repo-genelinde kırmızıya düşürdü — patch-bump veya SEC-05 signed-exception ile kapatılır |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 525 | `TRUST-ANCHOR-002` | VERIFY | P0 | TRUTH | — | — | Xverify-E tur-2'nin dört mekanik kabul yolu fail-closed kapatılır: merge-introduction, rename-drift, shallow-clone, blob-okuma-hatası |
+| 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |

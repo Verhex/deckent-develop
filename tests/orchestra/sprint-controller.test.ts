@@ -7,7 +7,7 @@
  *         evaluateResultSync, isDocTask, getDefaultProvider.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import {
   TaskStatus, TaskEvaluation, SprintPhase,
   SprintStatus, AlertLevel,
@@ -16,37 +16,52 @@ import type { Task, Sprint, ResolvedConfig, SystemProfile, TaskResult } from '..
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  renameSync: vi.fn(),
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  appendFileSync: vi.fn(),
-  // Sprint 139 async I/O migration: sprint-finalizer uses
-  // `import { promises as fsPromises } from 'node:fs'` which needs a
-  // `promises` export on the mock alongside the existing sync surface.
-  // IMPORTANT: pass the async implementation directly to `vi.fn(...)` so
-  // `vi.clearAllMocks()` (used in many beforeEach hooks) preserves it.
-  // `mockResolvedValue(...)` would be wiped by clearAllMocks in vitest 3.x.
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
+// Spread the ACTUAL module first: names not explicitly stubbed below stay REAL,
+// so production code paths exercised against a real tmpdir (pause/resume/finalize
+// write→readback→digest contracts) never hit an `undefined is not a function`.
+// The explicitly stubbed names keep their historical no-op defaults for the
+// pure-function describes; the real-tmpdir describes re-point them at the real
+// implementations via useRealFileSystem() (spy-passthrough, calls still recorded).
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    renameSync: vi.fn(),
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    existsSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    readdirSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
+    appendFileSync: vi.fn(),
+    // Sprint 139 async I/O migration: sprint-finalizer uses
+    // `import { promises as fsPromises } from 'node:fs'` which needs a
+    // `promises` export on the mock alongside the existing sync surface.
+    // IMPORTANT: pass the async implementation directly to `vi.fn(...)` so
+    // `vi.clearAllMocks()` (used in many beforeEach hooks) preserves it.
+    // `mockResolvedValue(...)` would be wiped by clearAllMocks in vitest 3.x.
+    promises: {
+      ...actual.promises,
+      readFile: vi.fn(async () => ''),
+      writeFile: vi.fn(async () => undefined),
+      mkdir: vi.fn(async () => undefined),
+      appendFile: vi.fn(async () => undefined),
+      access: vi.fn(async () => undefined),
+      stat: vi.fn(async () => ({ size: 0 })),
+    },
+  };
+});
 
-vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn().mockResolvedValue('{}'),
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  mkdir: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    readFile: vi.fn().mockResolvedValue('{}'),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    mkdir: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
@@ -287,7 +302,10 @@ vi.mock('../../src/agents/worker-ipc.js', () => {
 
 // ─── Imports (after mocks) ───────────────────────────────────────────
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync, renameSync, appendFileSync, promises as mockedFsPromises } from 'node:fs';
+import * as mockedFspModule from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
 import { updateDashboard } from '../../src/monitor/auditor.js';
@@ -358,8 +376,9 @@ import { formatRichSprintSummary } from '../../src/cli/helpers/sprint-summary-ri
 const mockedFormatRichSprintSummary = vi.mocked(formatRichSprintSummary);
 
 // Sprint reporter mock access (for calculateMetrics override in job output tests)
-import { calculateMetrics } from '../../src/orchestra/sprint-reporter.js';
+import { calculateMetrics, buildAgentPerformance } from '../../src/orchestra/sprint-reporter.js';
 const mockedCalculateMetrics = vi.mocked(calculateMetrics);
+const mockedBuildAgentPerformance = vi.mocked(buildAgentPerformance);
 const mockedProviderRegistry = vi.mocked(providerRegistry);
 
 // Task router mock access
@@ -443,6 +462,48 @@ function setupFileMocks(): void {
   mockedWriteFileSync.mockReturnValue(undefined);
   mockedMkdirSync.mockReturnValue(undefined as never);
   mockedUnlinkSync.mockReturnValue(undefined);
+}
+
+// ─── Real-tmpdir harness (pause/resume/finalize honest contracts) ────
+//
+// pauseSprint/resumeSprint/finalizeSprint end in write→readback→digest
+// verification (publishCanonicalRunStatusReadModel / fenced terminal receipt).
+// A pure in-memory fs mock cannot carry that chain (recorded-failed approach);
+// these describes therefore run against a REAL mkdtemp project root. The fs
+// spies stay in place but pass through to the real implementations, so
+// existing `mockedWriteFileSync.mock.calls` style assertions keep working.
+const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+const realFsp = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+
+let PROJECT_ROOT = '';
+function freshProjectRoot(): string {
+  if (PROJECT_ROOT) realFs.rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = realFs.mkdtempSync(join(tmpdir(), 'deckent-sprint-controller-'));
+  return PROJECT_ROOT;
+}
+afterAll(() => {
+  if (PROJECT_ROOT) realFs.rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
+
+function useRealFileSystem(): void {
+  mockedReadFileSync.mockImplementation(realFs.readFileSync as never);
+  mockedWriteFileSync.mockImplementation(realFs.writeFileSync as never);
+  mockedExistsSync.mockImplementation(realFs.existsSync as never);
+  mockedMkdirSync.mockImplementation(realFs.mkdirSync as never);
+  mockedReaddirSync.mockImplementation(realFs.readdirSync as never);
+  mockedUnlinkSync.mockImplementation(realFs.unlinkSync as never);
+  mockedStatSync.mockImplementation(realFs.statSync as never);
+  vi.mocked(renameSync).mockImplementation(realFs.renameSync as never);
+  vi.mocked(appendFileSync).mockImplementation(realFs.appendFileSync as never);
+  vi.mocked(mockedFsPromises.readFile).mockImplementation(realFs.promises.readFile as never);
+  vi.mocked(mockedFsPromises.writeFile).mockImplementation(realFs.promises.writeFile as never);
+  vi.mocked(mockedFsPromises.mkdir).mockImplementation(realFs.promises.mkdir as never);
+  vi.mocked(mockedFsPromises.appendFile).mockImplementation(realFs.promises.appendFile as never);
+  vi.mocked(mockedFsPromises.access).mockImplementation(realFs.promises.access as never);
+  vi.mocked(mockedFsPromises.stat).mockImplementation(realFs.promises.stat as never);
+  vi.mocked(mockedFspModule.readFile).mockImplementation(realFsp.readFile as never);
+  vi.mocked(mockedFspModule.writeFile).mockImplementation(realFsp.writeFile as never);
+  vi.mocked(mockedFspModule.mkdir).mockImplementation(realFsp.mkdir as never);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────
@@ -615,16 +676,21 @@ describe('cleanup', () => {
 });
 
 describe('pauseSprint', () => {
+  // pauseSprint ends in publishCanonicalRunStatusReadModel (write→readback→
+  // digest against real files) — an in-memory fs stub cannot satisfy that
+  // honest contract, so these tests run over a real mkdtemp project root.
   beforeEach(() => {
     vi.clearAllMocks();
-    setupFileMocks();
+    useRealFileSystem();
+    freshProjectRoot();
+    realFs.mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
   });
 
   it('transitions PENDING tasks to PAUSED', () => {
     const task = makeTask({ id: '001-001', status: TaskStatus.PENDING });
     const sprint = makeSprint({ tasks: [task] });
 
-    const result = pauseSprint('/tmp/test', sprint, 'Test pause');
+    const result = pauseSprint(PROJECT_ROOT, sprint, 'Test pause');
 
     expect(task.status).toBe(TaskStatus.PAUSED);
     expect(result.pausedTaskIds).toContain('001-001');
@@ -634,7 +700,7 @@ describe('pauseSprint', () => {
     const task = makeTask({ id: '001-001', status: TaskStatus.EXECUTING });
     const sprint = makeSprint({ tasks: [task] });
 
-    pauseSprint('/tmp/test', sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(task.status).toBe(TaskStatus.PAUSED);
   });
@@ -643,7 +709,7 @@ describe('pauseSprint', () => {
     const task = makeTask({ id: '001-001', status: TaskStatus.DONE });
     const sprint = makeSprint({ tasks: [task] });
 
-    const result = pauseSprint('/tmp/test', sprint);
+    const result = pauseSprint(PROJECT_ROOT, sprint);
 
     expect(task.status).toBe(TaskStatus.DONE);
     expect(result.pausedTaskIds).not.toContain('001-001');
@@ -652,7 +718,7 @@ describe('pauseSprint', () => {
   it('sets sprint status to PAUSED', () => {
     const sprint = makeSprint();
 
-    pauseSprint('/tmp/test', sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(sprint.status).toBe(SprintStatus.PAUSED);
   });
@@ -660,7 +726,7 @@ describe('pauseSprint', () => {
   it('writes pause state JSON file', () => {
     const sprint = makeSprint();
 
-    pauseSprint('/tmp/test', sprint, 'usage limit');
+    pauseSprint(PROJECT_ROOT, sprint, 'usage limit');
 
     const writeCall = mockedWriteFileSync.mock.calls.find(call =>
       typeof call[0] === 'string' && (call[0] as string).includes('pause-state.json'),
@@ -676,19 +742,20 @@ describe('pauseSprint', () => {
     const task = makeTask({ id: '001-001', status: TaskStatus.PENDING });
     const sprint = makeSprint({ tasks: [task] });
 
-    pauseSprint('/tmp/test', sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     const markerCall = mockedWriteFileSync.mock.calls.find(call =>
       typeof call[0] === 'string' && (call[0] as string).includes('task-001-001.paused'),
     );
     expect(markerCall).toBeDefined();
+    expect(realFs.existsSync(join(PROJECT_ROOT, '.tasks', 'task-001-001.paused'))).toBe(true);
   });
 
   it('kills tmux workers without IPC channel', () => {
     const task = makeTask({ id: '001-001', status: TaskStatus.EXECUTING });
     const sprint = makeSprint({ tasks: [task] });
 
-    pauseSprint('/tmp/test', sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).toHaveBeenCalledWith('001-001');
   });
@@ -696,7 +763,7 @@ describe('pauseSprint', () => {
   it('updates dashboard with PAUSED status', () => {
     const sprint = makeSprint();
 
-    pauseSprint('/tmp/test', sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedUpdateDashboard).toHaveBeenCalled();
     const dashCall = mockedUpdateDashboard.mock.calls[0];
@@ -705,51 +772,69 @@ describe('pauseSprint', () => {
 });
 
 describe('resumeSprint', () => {
+  // Same honest contract as pauseSprint: resumeSprint must republish the
+  // canonical run-status read model (real write→readback→digest), so the
+  // fixture is a real paused-run root seeded via a real pauseSprint call.
+  const seedPausedRun = (sprint: Sprint): void => {
+    pauseSprint(PROJECT_ROOT, sprint, 'seed pause');
+    vi.clearAllMocks();
+    useRealFileSystem();
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    setupFileMocks();
+    useRealFileSystem();
+    freshProjectRoot();
+    realFs.mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+    // Resume happens under a LIVE coordinator: the ACTIVE authority branch in
+    // readCanonicalRunStatus requires .deckent/pids/<sprintId>.pid to point at
+    // an alive process. The vitest process itself stands in as coordinator.
+    realFs.mkdirSync(join(PROJECT_ROOT, '.deckent', 'pids'), { recursive: true });
+    realFs.writeFileSync(
+      join(PROJECT_ROOT, '.deckent', 'pids', 'sprint-001.pid'),
+      JSON.stringify({ pid: process.pid, sprintId: 'sprint-001' }),
+      'utf-8',
+    );
   });
 
   it('transitions PAUSED tasks to PENDING', () => {
-    const task = makeTask({ id: '001-001', status: TaskStatus.PAUSED });
-    const sprint = makeSprint({
-      tasks: [task],
-      status: SprintStatus.PAUSED,
-    });
+    const task = makeTask({ id: '001-001', status: TaskStatus.PENDING });
+    const sprint = makeSprint({ tasks: [task] });
+    seedPausedRun(sprint);
 
-    resumeSprint('/tmp/test', sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(task.status).toBe(TaskStatus.PENDING);
   });
 
   it('sets sprint status to ACTIVE', () => {
-    const task = makeTask({ id: '001-001', status: TaskStatus.PAUSED });
-    const sprint = makeSprint({
-      tasks: [task],
-      status: SprintStatus.PAUSED,
-    });
+    const task = makeTask({ id: '001-001', status: TaskStatus.PENDING });
+    const sprint = makeSprint({ tasks: [task] });
+    seedPausedRun(sprint);
 
-    resumeSprint('/tmp/test', sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(sprint.status).toBe(SprintStatus.ACTIVE);
   });
 
   it('removes .paused marker files', () => {
-    const task = makeTask({ id: '001-001', status: TaskStatus.PAUSED });
-    const sprint = makeSprint({ tasks: [task], status: SprintStatus.PAUSED });
-    mockedExistsSync.mockReturnValue(true);
+    const task = makeTask({ id: '001-001', status: TaskStatus.PENDING });
+    const sprint = makeSprint({ tasks: [task] });
+    seedPausedRun(sprint);
+    expect(realFs.existsSync(join(PROJECT_ROOT, '.tasks', 'task-001-001.paused'))).toBe(true);
 
-    resumeSprint('/tmp/test', sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(mockedUnlinkSync).toHaveBeenCalled();
+    expect(realFs.existsSync(join(PROJECT_ROOT, '.tasks', 'task-001-001.paused'))).toBe(false);
   });
 
   it('removes pause state file', () => {
-    const task = makeTask({ id: '001-001', status: TaskStatus.PAUSED });
-    const sprint = makeSprint({ tasks: [task], status: SprintStatus.PAUSED });
-    mockedExistsSync.mockReturnValue(true);
+    const task = makeTask({ id: '001-001', status: TaskStatus.PENDING });
+    const sprint = makeSprint({ tasks: [task] });
+    seedPausedRun(sprint);
 
-    resumeSprint('/tmp/test', sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     const unlinkCall = mockedUnlinkSync.mock.calls.find(call =>
       typeof call[0] === 'string' && (call[0] as string).includes('pause-state.json'),
@@ -758,10 +843,11 @@ describe('resumeSprint', () => {
   });
 
   it('updates dashboard with ACTIVE status', () => {
-    const task = makeTask({ id: '001-001', status: TaskStatus.PAUSED });
-    const sprint = makeSprint({ tasks: [task], status: SprintStatus.PAUSED });
+    const task = makeTask({ id: '001-001', status: TaskStatus.PENDING });
+    const sprint = makeSprint({ tasks: [task] });
+    seedPausedRun(sprint);
 
-    resumeSprint('/tmp/test', sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(mockedUpdateDashboard).toHaveBeenCalled();
     const dashCall = mockedUpdateDashboard.mock.calls[0];
@@ -1591,12 +1677,51 @@ describe('Task Router wiring in sprint-controller', () => {
 
 // ─── finalizeSprint + Rich Output Integration ────────────────────────
 
+// ─── finalizeSprint settled fixtures ─────────────────────────────────
+// The 485-490 terminal-evidence contract (publishFencedSprintTerminalReceipt)
+// refuses to settle without (a) a terminal logical task and (b) a VERIFIED
+// host-authored workAttribution on every attempt result. Fixtures mirror
+// tests/orchestra/finalize-sprint.test.ts (same production truth).
+
+function makeSettledSprint(tasks: Task[] = [makeTask({ status: TaskStatus.DONE })]): Sprint {
+  return makeSprint({
+    tasks,
+    status: SprintStatus.COMPLETE,
+    phase: SprintPhase.COMPLETE,
+    startedAt: new Date(Date.now() - 60_000).toISOString(),
+    completedAt: new Date().toISOString(),
+  });
+}
+
+function makeVerifiedResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskResult {
+  const attemptId = `attempt-${taskId}`;
+  return {
+    taskId,
+    workerId: `w-${taskId}`,
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: true,
+    coverage: 90,
+    selfAssessment: 'DONE',
+    notes: '',
+    workAttribution: {
+      state: 'VERIFIED' as const,
+      attemptId,
+      baselineRef: `baseline:${attemptId}`,
+      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+    },
+    ...overrides,
+  };
+}
+
 describe('finalizeSprint — rich output integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupFileMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedReaddirSync.mockReturnValue([]);
+    // finalizeSprint's terminal receipt is fenced (real write→readback), so it
+    // runs over a real mkdtemp root with passthrough fs spies.
+    useRealFileSystem();
+    freshProjectRoot();
     mockedSpawnSync.mockReturnValue({
       status: 0,
       stdout: ' src/foo.ts | 10 ++++\n 1 file changed, 10 insertions(+)\n',
@@ -1605,36 +1730,51 @@ describe('finalizeSprint — rich output integration', () => {
       output: [],
       signal: null,
     } as ReturnType<typeof spawnSync>);
+    // clearAllMocks wipes factory-created returns in vitest 3.x — restore.
+    mockedCalculateMetrics.mockReturnValue({
+      totalTasks: 1, completedTasks: 1, techDebtTasks: 0, noGoTasks: 0,
+      durationMs: 1000, coveragePercent: 90, noGoRate: 0, newDebtCount: 0,
+      resolvedDebtCount: 0, totalOpenDebt: 0, boundaryViolations: 0,
+      crossAssignments: 0, contextLinesUsed: 0,
+    });
+    mockedBuildAgentPerformance.mockReturnValue([
+      { agent: 'worker-001', tasks: 2, done: 2, debt: 0, noGo: 0, avgCoverage: 90 },
+    ]);
+    mockedFormatRichSprintSummary.mockReturnValue('Rich Sprint Summary Output');
   });
 
   it('calls formatRichSprintSummary during finalization', async () => {
-    const sprint = makeSprint();
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
-    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+    const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     expect(mockedFormatRichSprintSummary).toHaveBeenCalled();
   });
 
   it('passes sprint data and evaluations to formatRichSprintSummary', async () => {
-    const sprint = makeSprint();
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
-    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+    const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     expect(callArgs[0]).toMatchObject({ id: sprint.id });
-    expect(callArgs[1]).toBe(evaluations);
+    // Production passes the LOGICAL evaluations map derived from settled
+    // lineage truth (same content, new Map) — identity pin was pre-485 shape.
+    expect(callArgs[1]).toStrictEqual(evaluations);
   });
 
-  it('includes gitDiff from spawnSync in rich output options', async () => {
-    const sprint = makeSprint();
+  it('includes attribution-derived gitDiff in rich output options (was: raw spawnSync git diff)', async () => {
+    // Production truth: gitDiff is projected from VERIFIED workAttribution
+    // (`<path> | attempt <ids>`), not from a raw `git diff --stat` subprocess.
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
-    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+    const results = [makeVerifiedResult(sprint.tasks[0]!.id, { filesChanged: ['src/foo.ts'] })];
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     const opts = callArgs[2];
@@ -1644,33 +1784,33 @@ describe('finalizeSprint — rich output integration', () => {
   it('completes normally when formatRichSprintSummary throws', async () => {
     mockedFormatRichSprintSummary.mockImplementationOnce(() => { throw new Error('format error'); });
 
-    const sprint = makeSprint();
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
-    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+    const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    const metrics = await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
     expect(metrics).toBeDefined();
     expect(metrics.totalTasks).toBeDefined();
   });
 
   it('respects output_mode from config', async () => {
-    const sprint = makeSprint();
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
-    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+    const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
     const config = { ...makeConfig(), output_mode: 'quiet' } as any;
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true, config });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, config });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     expect(callArgs[2]?.outputMode).toBe('quiet');
   });
 
   it('defaults output_mode to normal when config has no output_mode', async () => {
-    const sprint = makeSprint();
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
-    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+    const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     expect(callArgs[2]?.outputMode).toBe('normal');
@@ -1678,24 +1818,27 @@ describe('finalizeSprint — rich output integration', () => {
 
   it('logs rich output to console when formatRichSprintSummary returns a string', async () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    mockedFormatRichSprintSummary.mockReturnValueOnce('RICH OUTPUT HERE');
+    try {
+      mockedFormatRichSprintSummary.mockReturnValueOnce('RICH OUTPUT HERE');
 
-    const sprint = makeSprint();
-    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
-    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+      const sprint = makeSettledSprint();
+      const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+      const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+      await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    expect(consoleSpy).toHaveBeenCalledWith('RICH OUTPUT HERE');
-    consoleSpy.mockRestore();
+      expect(consoleSpy).toHaveBeenCalledWith('RICH OUTPUT HERE');
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 
   it('passes agentPerf data from buildAgentPerformance to formatRichSprintSummary', async () => {
-    const sprint = makeSprint();
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
-    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+    const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     const opts = callArgs[2];
@@ -2369,11 +2512,12 @@ describe('interruptActiveSprint — SIGINT cleanup', () => {
 describe('finalizeSprint — job output reform', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupFileMocks();
+    // Same real-tmpdir harness as the rich-output describe: the fenced
+    // terminal receipt needs a real write→readback root.
+    useRealFileSystem();
+    freshProjectRoot();
     resetInterruptState();
     clearActiveSprint();
-    mockedExistsSync.mockReturnValue(false);
-    mockedReaddirSync.mockReturnValue([]);
     mockedSpawnSync.mockReturnValue({
       status: 0,
       stdout: ' src/foo.ts | 10 ++++\n',
@@ -2389,26 +2533,26 @@ describe('finalizeSprint — job output reform', () => {
       resolvedDebtCount: 0, totalOpenDebt: 0, boundaryViolations: 0,
       crossAssignments: 0, contextLinesUsed: 0,
     });
+    mockedBuildAgentPerformance.mockReturnValue([
+      { agent: 'worker-001', tasks: 2, done: 2, debt: 0, noGo: 0, avgCoverage: 90 },
+    ]);
+    mockedFormatRichSprintSummary.mockReturnValue('Rich Sprint Summary Output');
   });
 
   it('writes rich evaluations with per-task details to job JSON', async () => {
-    const sprint = makeSprint();
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([
       [sprint.tasks[0]!.id, TaskEvaluation.DONE],
     ]);
-    const results: TaskResult[] = [{
-      taskId: sprint.tasks[0]!.id,
-      workerId: 'w-001-001',
+    const results: TaskResult[] = [makeVerifiedResult(sprint.tasks[0]!.id, {
       filesChanged: ['src/foo.ts', 'tests/foo.test.ts'],
       linesAdded: 42,
       linesRemoved: 7,
-      testsPassed: true,
       coverage: 95,
-      selfAssessment: 'DONE',
       notes: 'All tests pass, feature complete',
-    }];
+    })];
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
       typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
@@ -2430,23 +2574,20 @@ describe('finalizeSprint — job output reform', () => {
   });
 
   it('sets techDebtDetail for GO_WITH_TECH_DEBT evaluations', async () => {
-    const sprint = makeSprint();
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([
       [sprint.tasks[0]!.id, TaskEvaluation.GO_WITH_TECH_DEBT],
     ]);
-    const results: TaskResult[] = [{
-      taskId: sprint.tasks[0]!.id,
-      workerId: 'w-001-001',
+    const results: TaskResult[] = [makeVerifiedResult(sprint.tasks[0]!.id, {
       filesChanged: ['src/bar.ts'],
       linesAdded: 15,
       linesRemoved: 3,
-      testsPassed: true,
       coverage: 80,
       selfAssessment: 'GO_WITH_TECH_DEBT',
       notes: 'Tests passed but no new test files written',
-    }];
+    })];
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
       typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
@@ -2459,27 +2600,17 @@ describe('finalizeSprint — job output reform', () => {
 
   it('summary does not double-count TECH_DEBT in completed tasks', async () => {
     const tasks = [
-      makeTask({ id: '001-001' }),
-      makeTask({ id: '001-002' }),
-      makeTask({ id: '001-003' }),
+      makeTask({ id: '001-001', status: TaskStatus.DONE }),
+      makeTask({ id: '001-002', status: TaskStatus.DONE }),
+      makeTask({ id: '001-003', status: TaskStatus.DONE }),
     ];
-    const sprint = makeSprint({ tasks });
+    const sprint = makeSettledSprint(tasks);
     const evaluations = new Map<string, TaskEvaluation>([
       ['001-001', TaskEvaluation.DONE],
       ['001-002', TaskEvaluation.GO_WITH_TECH_DEBT],
       ['001-003', TaskEvaluation.GO_WITH_TECH_DEBT],
     ]);
-    const results: TaskResult[] = tasks.map(t => ({
-      taskId: t.id,
-      workerId: `w-${t.id}`,
-      filesChanged: [],
-      linesAdded: 0,
-      linesRemoved: 0,
-      testsPassed: true,
-      coverage: 0,
-      selfAssessment: 'DONE' as const,
-      notes: '',
-    }));
+    const results: TaskResult[] = tasks.map(t => makeVerifiedResult(t.id, { coverage: 0 }));
 
     // Override calculateMetrics mock to return correct values for 3-task scenario
     mockedCalculateMetrics.mockReturnValueOnce({
@@ -2489,7 +2620,7 @@ describe('finalizeSprint — job output reform', () => {
       crossAssignments: 0, contextLinesUsed: 0,
     });
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
     const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
       typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
@@ -2509,24 +2640,18 @@ describe('finalizeSprint — job output reform', () => {
     expect(jobData.metrics.noGo).toBe(0);
   });
 
-  it('handles missing result for a task gracefully', async () => {
-    const sprint = makeSprint();
+  it('refuses to settle a task with no result/attempt evidence (fail-closed, was: graceful missing-result)', async () => {
+    // 485-490 honest terminal contract: a task with no attempt result is
+    // UNKNOWN evidence — production HOLDs instead of the old graceful job JSON.
+    const sprint = makeSettledSprint();
     const evaluations = new Map<string, TaskEvaluation>([
       [sprint.tasks[0]!.id, TaskEvaluation.NO_GO],
     ]);
     const results: TaskResult[] = []; // no result
 
-    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
-
-    const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
-    );
-    const jobData = JSON.parse(jobWriteCall![1] as string);
-    const taskEval = jobData.evaluations[sprint.tasks[0]!.id];
-    expect(taskEval.evaluation).toBe('NO_GO');
-    expect(taskEval.filesChanged).toEqual([]);
-    expect(taskEval.reason).toBe('');
-    expect(taskEval.selfAssessment).toBe('NO_GO');
+    await expect(
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
+    ).rejects.toThrow(/TERMINAL_/);
   });
 });
 

@@ -247,10 +247,6 @@
       "failed": 9
     },
     {
-      "file": "tests/orchestra/brain-pause-resume.test.ts",
-      "failed": 39
-    },
-    {
       "file": "tests/orchestra/brain-provider.test.ts",
       "failed": 2
     },
@@ -363,10 +359,6 @@
       "failed": 4
     },
     {
-      "file": "tests/orchestra/pause-resume.test.ts",
-      "failed": 31
-    },
-    {
       "file": "tests/orchestra/postfix-pending-scan.test.ts",
       "failed": 4
     },
@@ -397,10 +389,6 @@
     {
       "file": "tests/orchestra/spawn-throw-lifecycle.test.ts",
       "failed": 4
-    },
-    {
-      "file": "tests/orchestra/sprint-controller.test.ts",
-      "failed": 25
     },
     {
       "file": "tests/orchestra/sprint-finalizer-runflow.test.ts",
