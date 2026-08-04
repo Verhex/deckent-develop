@@ -111,7 +111,9 @@ describe('renderNervousPrompt', () => {
   it('returns ANSI-styled banner on TTY', () => {
     const n = makeNotification();
     const result = renderNervousPrompt([n], true);
-    expect(result).toContain('⚡');
+    // ADR-G-010 (2026-08-01): emoji glyphs retired to the ASCII family — the
+    // banner marker is now `»` (was `⚡`).
+    expect(result).toContain('»');
     expect(result).toContain('nervous');
     // Should contain ANSI codes
     expect(result).toContain('\x1b[');

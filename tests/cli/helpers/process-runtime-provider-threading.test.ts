@@ -5,11 +5,13 @@ import { join } from 'node:path';
 
 const {
   capturedControllerDeps,
+  capturedExecutorDeps,
   providerAuthority,
   runTaskMode,
   runSprint,
 } = vi.hoisted(() => ({
   capturedControllerDeps: { current: null as Record<string, unknown> | null },
+  capturedExecutorDeps: { current: null as Record<string, unknown> | null },
   providerAuthority: {
     state: 'hold' as const,
     reasonCode: 'keyring_unavailable',
@@ -76,6 +78,20 @@ vi.mock('../../../src/orchestra/process-controller.js', () => ({
   }),
 }));
 
+// The sprint side is now wired through the canonical exact-sprint executor
+// (executeSprint), not a direct runSprint dep — capture the executor deps so
+// the test can drive its in-process runtime seam directly.
+vi.mock('../../../src/orchestra/exact-plan-start-service.js', () => ({
+  createCanonicalExactSprintExecutor: vi.fn((deps: Record<string, unknown>) => {
+    capturedExecutorDeps.current = deps;
+    return { execute: vi.fn() };
+  }),
+}));
+
+vi.mock('../../../src/orchestra/run-diff-service.js', () => ({
+  captureGitBase: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { buildProcessController } from '../../../src/cli/helpers/process-runtime.js';
 
 describe('buildProcessController provider-authority runner threading', () => {
@@ -92,14 +108,30 @@ describe('buildProcessController provider-authority runner threading', () => {
     const controller = await buildProcessController(root);
     const deps = capturedControllerDeps.current as {
       runTask: (ctx: Record<string, unknown>) => Promise<unknown>;
-      runSprint: (projectRoot: string) => Promise<unknown>;
+      executeSprint: unknown;
     };
 
     await deps.runTask({ description: 'thread task', projectRoot: root });
-    await deps.runSprint(root);
 
     expect(runTaskMode.mock.calls[0]?.[0]).toMatchObject({
       providerAuthority,
+    });
+
+    // Sprint side: the controller wires the canonical exact-sprint executor;
+    // its in-process runtime must thread the SAME process-scoped authority
+    // into the sprint lifecycle's third (options) argument.
+    expect(deps.executeSprint).toBeDefined();
+    const executorDeps = capturedExecutorDeps.current as {
+      executeInProcess: (context: Record<string, unknown>) => Promise<unknown>;
+    };
+    await executorDeps.executeInProcess({
+      projectRoot: root,
+      config: {},
+      exactRef: { schemaVersion: 1, flowId: 'flow-thread', revision: 1, planDigest: 'a'.repeat(64) },
+      snapshot: {},
+      sprint: { id: 'sprint-thread' },
+      onExactPlanMaterialize: () => ({}),
+      onExecutionAdmitted: () => {},
     });
     expect(runSprint.mock.calls[0]?.[2]).toMatchObject({
       providerAuthority,

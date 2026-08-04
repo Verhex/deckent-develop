@@ -7,8 +7,14 @@ import { syncAdapterFiles, syncAdapterFilesWithReport } from '../../src/cli/comm
 // Live repro (2026-07-14): `.cursor/rules` is a DIRECTORY of `.mdc` files in
 // real-world Cursor projects (confirmed in this repo: .cursor/rules/*.mdc),
 // not a single file. `ensureDeckentImport()` readFileSync's whatever path it
-// is given, so passing that directory through crashes `deckent sync` with
+// is given, so passing that directory through crashed `deckent sync` with
 // `EISDIR: illegal operation on a directory, read` on the non-dry-run path.
+//
+// Contract evolution: `syncCursorAdapter` now treats `.cursor/rules` as the
+// directory it really is and syncs `.cursor/rules/deckent.mdc` inside it via
+// `ensureCursorRules` (owner-authored rules untouched). The EISDIR condition
+// is healed by design — the directory fixture syncs cleanly with NO typed
+// error, instead of merely being skipped.
 
 describe('sync: EISDIR regression (directory where a file is expected)', () => {
   let root: string;
@@ -35,16 +41,19 @@ describe('sync: EISDIR regression (directory where a file is expected)', () => {
     expect(readFileSync(join(root, 'GEMINI.md'), 'utf-8')).toContain('@DECKENT.md');
   });
 
-  it('collects a typed error for the directory entry instead of throwing', () => {
+  it('heals the directory entry: syncs .cursor/rules/deckent.mdc with no typed error', () => {
     const report = syncAdapterFilesWithReport(root);
-    expect(report.errors).toHaveLength(1);
-    expect(report.errors[0]?.label).toBe('.cursor/rules');
-    expect(report.errors[0]?.file).toContain('rules');
-    expect(report.errors[0]?.reason).toBeTruthy();
+    expect(report.errors).toHaveLength(0);
     expect(report.synced).toContain('CLAUDE.md');
     expect(report.synced).toContain('AGENTS.md');
     expect(report.synced).toContain('GEMINI.md');
-    expect(report.synced).not.toContain('.cursor/rules');
+    expect(report.synced).toContain('.cursor/rules');
+    // deckent.mdc is written INSIDE the directory, carrying the @DECKENT.md reference…
+    const mdcPath = join(root, '.cursor', 'rules', 'deckent.mdc');
+    expect(existsSync(mdcPath)).toBe(true);
+    expect(readFileSync(mdcPath, 'utf-8')).toContain('@DECKENT.md');
+    // …and owner-authored rules are left untouched.
+    expect(readFileSync(join(root, '.cursor', 'rules', 'some-rule.mdc'), 'utf-8')).toBe('# rule\n');
   });
 
   it('does not write anything and does not throw in dry-run mode, even with the directory collision', () => {

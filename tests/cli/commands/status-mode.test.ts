@@ -50,10 +50,12 @@ vi.mock('../../../src/core/run-status-read-model.js', () => ({
   runStatusReadModelMatchesAuthority: vi.fn(() => true),
 }));
 
+// The canonical sprint id resolves authority-first (authority.sprintId ?? dashboard), so the
+// authority mock must carry the run's real id — the dashboard fixture is presentation bytes.
 vi.mock('../../../src/core/run-status-authority.js', () => ({
   readCanonicalRunStatus: vi.fn(() => ({
     schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
-    sprintId: 'sprint-001', phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    sprintId: 'sprint-139', phase: 'EXECUTE', status: 'RUNNING', reason: null,
     recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
   })),
 }));

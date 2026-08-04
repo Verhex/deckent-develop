@@ -17,7 +17,8 @@
 
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -67,13 +68,18 @@ interface SpawnResult {
   stderr: string;
 }
 
-async function spawnEntry(args: readonly string[], timeoutMs = 8000): Promise<SpawnResult> {
+async function spawnEntry(
+  args: readonly string[],
+  timeoutMs = 8000,
+  cwd?: string,
+): Promise<SpawnResult> {
   return await new Promise<SpawnResult>((resolveResult, rejectResult) => {
     const child = spawn(process.execPath, [ENTRY_BIN, ...args], {
       // Inherit a clean env; the subscription-only paths gate on API-key
       // vars but `help`/`--version`/`unknown` don't need them at all.
       env: { ...process.env, DECKENT_OFFLINE: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
+      ...(cwd ? { cwd } : {}),
     });
     let stdout = '';
     let stderr = '';
@@ -137,7 +143,23 @@ describe.skipIf(!HAS_DIST)('cli bin invocation — async spawn smoke', () => {
   });
 
   it('`node dist/cli/entry.js unknowncommandfoo` prints commander unknown-command error', async () => {
-    const r = await spawnEntry(['unknowncommandfoo']);
-    expect((r.stderr + r.stdout).toLowerCase()).toContain('unknown command');
+    // A non-diagnostic invocation from the deckent checkout itself is gated by
+    // the worktree binary-identity authority (src/cli/worktree-binary-authority.ts):
+    // whenever dist/ drifts from src/ (normal mid-branch state) it HOLDs with
+    // DECKENT_BINARY_IDENTITY_HOLD before commander ever runs. The routing
+    // contract under test ("unknown arg → commander error") is cwd-independent,
+    // so prove it from a hermetic non-checkout user cwd instead of the repo.
+    // The empty src/ dir is required: without it the identity resolver's eager
+    // buildSourceTreeIdentity(projectRoot) throws an uncaught
+    // E_BUILD_SOURCE_TREE_MISSING (known production truth, reported upstream
+    // as a typed blocker — not fixed here).
+    const userCwd = mkdtempSync(join(tmpdir(), 'deckent-bin-invocation-'));
+    mkdirSync(join(userCwd, 'src'), { recursive: true });
+    try {
+      const r = await spawnEntry(['unknowncommandfoo'], 8000, userCwd);
+      expect((r.stderr + r.stdout).toLowerCase()).toContain('unknown command');
+    } finally {
+      rmSync(userCwd, { recursive: true, force: true });
+    }
   });
 });

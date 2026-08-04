@@ -272,8 +272,16 @@ describe.skipIf(DIST_ABSENT)(
         expect(result.stdout).toContain(getMessage('do.preview_banner_dry_run', 'en', { count: '1' }));
         expect(result.stdout).toContain(getMessage('runFlow.planPreview.heading', 'en'));
         expect(result.stdout).toContain('Refactor the worker module');
-        expect(result.stdout).toContain(getMessage('runFlow.planPreview.gate.pass', 'en'));
-        expect(result.stdout).toContain(getMessage('runFlow.planPreview.policy.allow', 'en'));
+        // Gate/policy contract evolution (e5464ac45 "feat(runflow): bind exact
+        // plan and start authority" — src/orchestra/run-flow-plan-service.ts):
+        // a scope-gate FAIL now escalates into the overall run gate
+        // (gateResult='fail') and forces policyDecision='deny'. This fixture's
+        // ambiguous worker.ts write is a deliberate, deterministic scope-gate
+        // FAIL, so the honest current preview is GATE: FAIL + POLICY: DENY —
+        // the dry-run still renders fully and exits 0, which is what this
+        // integration proof is actually about.
+        expect(result.stdout).toContain(getMessage('runFlow.planPreview.gate.fail', 'en'));
+        expect(result.stdout).toContain(getMessage('runFlow.planPreview.policy.deny', 'en'));
         expect(result.stdout).toContain(getMessage('runFlow.planPreview.digestLabel', 'en'));
         expect(result.stdout).toContain(getMessage('do.dry_run_complete', 'en'));
 

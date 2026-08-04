@@ -90,6 +90,29 @@ vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
   evaluateResultSync: vi.fn().mockReturnValue('GO'),
 }));
 
+// FAZ4B finalize collaborators (same set as review-finalize-overhaul.test.ts):
+// the non-force path proves coordinator death via sprint-recovery-operation
+// before terminal publication; --force settles through forceAbortSprint.
+vi.mock('../../../src/orchestra/sprint-finalizer.js', () => ({
+  forceAbortSprint: vi.fn(),
+}));
+
+vi.mock('../../../src/orchestra/sprint-recovery-operation.js', () => ({
+  containSprintRecoveryCoordinator: vi.fn().mockResolvedValue({ action: 'none' }),
+  readSprintRecoverySettlementIdentity: vi.fn().mockReturnValue({ generation: 1, fenceToken: 'fence-1' }),
+  runSprintRecoveryOperation: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../../src/cli/commands/kill.js', () => ({
+  killSingle: vi.fn(),
+}));
+
+// finalize.ts dynamic-imports rule-generator for the onRuleRegen wire — keep
+// the CLI cold path free of MemoryStore/better-sqlite3 in this suite.
+vi.mock('../../../src/core/rule-generator.js', () => ({
+  regenerateRules: vi.fn().mockResolvedValue({ filesWritten: [], filesSkipped: [], errors: [] }),
+}));
+
 vi.mock('../../../src/core/config.js', () => ({
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
@@ -220,7 +243,13 @@ describe('B: Finalize --sprint Flag', () => {
   });
 
   it('--sprint filters tasks by sprint ID', async () => {
-    vi.mocked(existsSync).mockReturnValue(true);
+    // Only the .tasks dir exists — no sprint log (already-finalized guard),
+    // no review state, no archive dir under .brain.
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      const s = String(p);
+      if (s.includes('.brain')) return false;
+      return s.includes('.tasks');
+    });
     vi.mocked(readdirSync).mockImplementation((p: unknown) => {
       if (String(p).includes('.tasks')) return ['task-001.json', 'task-002.json'] as unknown as ReturnType<typeof readdirSync>;
       return [] as unknown as ReturnType<typeof readdirSync>;
@@ -228,26 +257,34 @@ describe('B: Finalize --sprint Flag', () => {
     // task-001 is sprint-063, task-002 is sprint-064
     const task063 = { id: '001', sprintId: 'sprint-063', status: 'DONE', title: 'Old task' };
     const task064 = { id: '002', sprintId: 'sprint-064', status: 'DONE', title: 'New task' };
-    const { readJsonSafe } = await import('../../../src/core/utils.js');
-    vi.mocked(readJsonSafe).mockImplementation((p: unknown) => {
-      if (String(p).includes('task-001')) return task063 as any;
-      if (String(p).includes('task-002')) return task064 as any;
-      return null;
+    // Canonical task records are read via readFileSync + classifyTaskArtifact
+    // (buildSprintFromTasks); readJsonSafe now serves only results/sprint-state.
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      const s = String(p);
+      if (s.includes('task-001.json')) return JSON.stringify(task063) as any;
+      if (s.includes('task-002.json')) return JSON.stringify(task064) as any;
+      throw new Error(`ENOENT: ${s}`);
     });
+    const { readJsonSafe } = await import('../../../src/core/utils.js');
+    vi.mocked(readJsonSafe).mockReturnValue(null);
     const { registerFinalize } = await import('../../../src/cli/commands/finalize.js');
     const program = new Command();
     program.exitOverride();
     registerFinalize(program);
-    // With --sprint sprint-063, only task-001 should be included
-    // Since finalizeSprint is mocked, we check that it was called
+    // With --sprint sprint-063, only task-001 should be included.
+    // No --force: the forced path settles through forceAbortSprint (ABORTED),
+    // never finalizeSprint — the normal path is the one that finalizes.
     const { finalizeSprint } = await import('../../../src/orchestra/brain.js');
     try {
-      await program.parseAsync(['node', 'test', 'finalize', '--sprint', 'sprint-063', '--force']);
+      await program.parseAsync(['node', 'test', 'finalize', '--sprint', 'sprint-063']);
     } catch {
       // exitOverride
     }
     // finalizeSprint should be called since tasks were found
     expect(vi.mocked(finalizeSprint)).toHaveBeenCalled();
+    // Filter proof: only the sprint-063 task entered the finalized sprint.
+    const sprintArg = vi.mocked(finalizeSprint).mock.calls[0]?.[1] as { tasks: Array<{ id: string }> };
+    expect(sprintArg.tasks.map(t => t.id)).toEqual(['001']);
   });
 
   it('does not call finalizeSprint when sprint filter matches no tasks', async () => {
