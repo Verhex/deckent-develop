@@ -1,6 +1,6 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import {
   TaskStatus, TaskEvaluation, SprintPhase, SprintStatus, DebtPriority, AgentStatus,
 } from '../../src/core/types.js';
@@ -11,37 +11,53 @@ import { MEMORY_MAX_LINES, SPRINT_LOG_MAX_LINES } from '../../src/core/constants
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  appendFileSync: vi.fn(),
-  renameSync: vi.fn(),
-  // Sprint 139 async I/O migration: sprint-finalizer and other modules use
-  // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
-  // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
+// FAZ4A-S5: spread the ACTUAL module first (sprint-controller.test.ts pattern) —
+// names not explicitly stubbed below stay REAL, so the real-tmpdir runSprint
+// describes (useRealFileSystem passthrough) never hit `undefined is not a
+// function` on fs names this legacy mock never listed (rmSync, watch, ...).
+// The stubbed names keep their historical no-op defaults for the pure-function
+// describes; the runSprint describes re-point them at the real implementations
+// via useRealFileSystem() (spy-passthrough, calls still recorded).
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    existsSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    readdirSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
+    appendFileSync: vi.fn(),
+    renameSync: vi.fn(),
+    // Sprint 139 async I/O migration: sprint-finalizer and other modules use
+    // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
+    // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
+    promises: {
+      ...actual.promises,
+      readFile: vi.fn(async () => ''),
+      writeFile: vi.fn(async () => undefined),
+      mkdir: vi.fn(async () => undefined),
+      appendFile: vi.fn(async () => undefined),
+      access: vi.fn(async () => undefined),
+      stat: vi.fn(async () => ({ size: 0 })),
+    },
+  };
+});
 
-vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn().mockRejectedValue(new Error('ENOENT')),
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  mkdir: vi.fn().mockResolvedValue(undefined),
-  stat: vi.fn().mockRejectedValue(new Error('ENOENT')),
-  access: vi.fn().mockRejectedValue(new Error('ENOENT')),
-  unlink: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    readFile: vi.fn().mockRejectedValue(new Error('ENOENT')),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    stat: vi.fn().mockRejectedValue(new Error('ENOENT')),
+    access: vi.fn().mockRejectedValue(new Error('ENOENT')),
+    unlink: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
@@ -180,8 +196,15 @@ vi.mock('../../src/core/provider.js', () => ({
 }));
 
 const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
-import { stat as fspStat, writeFile as fspWriteFile } from 'node:fs/promises';
+const actualFsp = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+import {
+  readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync,
+  appendFileSync, renameSync, promises as fsPromisesNs,
+} from 'node:fs';
+import {
+  stat as fspStat, writeFile as fspWriteFile, readFile as fspReadFile,
+  mkdir as fspMkdir, access as fspAccess, unlink as fspUnlink,
+} from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
 import { resetDashboard, updateDashboard, detectDeadlocks, startScanLoop, writeScanToDashboard } from '../../src/monitor/auditor.js';
@@ -213,6 +236,43 @@ const mockedUpdateTaskStatus = vi.mocked(updateTaskStatus);
 const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
 const mockedFspStat = vi.mocked(fspStat);
 const mockedFspWriteFile = vi.mocked(fspWriteFile);
+const mockedAppendFileSync = vi.mocked(appendFileSync);
+const mockedRenameSync = vi.mocked(renameSync);
+
+// ─── Real-filesystem passthrough (FAZ4A-S5, sprint-controller.test.ts pattern) ──
+// runSprint's PLAN phase (a) opens the provider-execution-observation SQLite
+// store — better-sqlite3 is a NATIVE binding that bypasses the node:fs mock
+// entirely, so the mocked no-op mkdirSync leaves it staring at a directory
+// that does not exist ("Cannot open database because the directory does not
+// exist") — and (b) ends in publishCanonicalRunStatusReadModel, an atomic
+// write→rename→readback→digest ring an in-memory fs mock cannot carry
+// (RunStatusReadModelError PERSIST_FAILED; FAZ4A-S2/S3/S4 recorded root
+// cause). The runSprint describes therefore run over a REAL mkdtemp project
+// root; the fs spies stay in place but pass through to the real
+// implementations, so `mocked*.mock.calls` assertions keep working.
+function useRealFileSystem(): void {
+  mockedReadFileSync.mockImplementation(actualFs.readFileSync as never);
+  mockedWriteFileSync.mockImplementation(actualFs.writeFileSync as never);
+  mockedExistsSync.mockImplementation(actualFs.existsSync as never);
+  mockedMkdirSync.mockImplementation(actualFs.mkdirSync as never);
+  mockedReaddirSync.mockImplementation(actualFs.readdirSync as never);
+  mockedUnlinkSync.mockImplementation(actualFs.unlinkSync as never);
+  mockedStatSync.mockImplementation(actualFs.statSync as never);
+  mockedAppendFileSync.mockImplementation(actualFs.appendFileSync as never);
+  mockedRenameSync.mockImplementation(actualFs.renameSync as never);
+  vi.mocked(fsPromisesNs.readFile).mockImplementation(actualFs.promises.readFile as never);
+  vi.mocked(fsPromisesNs.writeFile).mockImplementation(actualFs.promises.writeFile as never);
+  vi.mocked(fsPromisesNs.mkdir).mockImplementation(actualFs.promises.mkdir as never);
+  vi.mocked(fsPromisesNs.appendFile).mockImplementation(actualFs.promises.appendFile as never);
+  vi.mocked(fsPromisesNs.access).mockImplementation(actualFs.promises.access as never);
+  vi.mocked(fsPromisesNs.stat).mockImplementation(actualFs.promises.stat as never);
+  vi.mocked(fspReadFile).mockImplementation(actualFsp.readFile as never);
+  mockedFspWriteFile.mockImplementation(actualFsp.writeFile as never);
+  vi.mocked(fspMkdir).mockImplementation(actualFsp.mkdir as never);
+  mockedFspStat.mockImplementation(actualFsp.stat as never);
+  vi.mocked(fspAccess).mockImplementation(actualFsp.access as never);
+  vi.mocked(fspUnlink).mockImplementation(actualFsp.unlink as never);
+}
 
 import {
   readContext, createTask,
@@ -297,6 +357,90 @@ const spawnOk = { status: 0, stdout: '', stderr: '', pid: 1, signal: null, outpu
 const originalDeckentHome = process.env.DECKENT_HOME;
 let sandboxDeckentHome = '';
 
+// ─── Real-tmpdir runSprint fixture (FAZ4A-S5) ───────────────────────
+// Mirrors runsprint-debt-integration.test.ts: real .tasks/.deckent/pids/.brain
+// roots + pre-seeded real `.result` files. The result fixture carries
+// host-authored VERIFIED workAttribution (without it the finalizer honestly
+// refuses to settle — TERMINAL_EVIDENCE_HOLD) and a per-test attempt nonce:
+// the terminal-handoff once-ledger is module-global and keyed by the
+// logicalSettlementDigest, so a byte-identical fixture across tests would
+// correctly read as a replay (DUPLICATE_PUBLICATION HOLD).
+let RUN_ROOT = '';
+let attemptNonce = 0;
+
+function freshRunRoot(): string {
+  attemptNonce += 1;
+  if (RUN_ROOT) actualFs.rmSync(RUN_ROOT, { recursive: true, force: true });
+  RUN_ROOT = actualFs.mkdtempSync(join(tmpdir(), 'deckent-brain-run-'));
+  actualFs.mkdirSync(join(RUN_ROOT, '.tasks'), { recursive: true });
+  actualFs.mkdirSync(join(RUN_ROOT, '.deckent', 'pids'), { recursive: true });
+  // memory.db must EXIST so DB-first paths open the (mocked) MemoryStore.
+  actualFs.mkdirSync(join(RUN_ROOT, '.brain'), { recursive: true });
+  actualFs.writeFileSync(join(RUN_ROOT, '.brain', 'memory.db'), '', 'utf-8');
+  return RUN_ROOT;
+}
+
+afterAll(() => {
+  if (RUN_ROOT) actualFs.rmSync(RUN_ROOT, { recursive: true, force: true });
+});
+
+function makeRunConfig(): ResolvedConfig {
+  return makeConfig({ projectRoot: RUN_ROOT });
+}
+
+function makeRunResult(
+  taskId = '001-001',
+  selfAssessment: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' = 'DONE',
+): string {
+  const attemptId = `attempt-${taskId}-${attemptNonce}`;
+  return JSON.stringify({
+    taskId,
+    workerId: `w-${taskId}`,
+    filesChanged: ['src/foo.ts'],
+    linesAdded: 10,
+    linesRemoved: 0,
+    testsPassed: selfAssessment !== 'NO_GO',
+    coverage: selfAssessment === 'NO_GO' ? 0 : 95,
+    selfAssessment,
+    notes: 'brain.test real-run result',
+    workAttribution: {
+      state: 'VERIFIED',
+      attemptId,
+      baselineRef: `baseline:${attemptId}`,
+      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+    },
+  });
+}
+
+/**
+ * Materialize a full runSprint fixture on a REAL project root.
+ * Single directive line → planSprint creates exactly one task '001-001';
+ * its pre-written `.result` file is found immediately by the collector
+ * (worker spawn is a mocked no-op). Pass `results: new Map()` for the
+ * missing-result (timeout → synthetic NO_GO) path.
+ */
+function setupRealSprint(opts: {
+  directives?: string;
+  results?: ReadonlyMap<string, string>;
+} = {}): void {
+  useRealFileSystem();
+  freshRunRoot();
+  // `git ls-files` must report a tracked src/ path so the pre-spawn
+  // scope-gate classifies legacy-fallback scopes as new-plausible instead of
+  // suspect; every other git subcommand keeps empty stdout.
+  mockedSpawnSync.mockImplementation((_command, args) => {
+    const isLsFiles = Array.isArray(args) && args[0] === 'ls-files';
+    return {
+      status: 0, stdout: isLsFiles ? 'src/index.ts\n' : '', stderr: '', pid: 1, signal: null, output: [],
+    } as never;
+  });
+  actualFs.writeFileSync(join(RUN_ROOT, 'DIRECTIVES.md'), opts.directives ?? 'Build the system', 'utf-8');
+  const results = opts.results ?? new Map([['001-001', makeRunResult()]]);
+  for (const [taskId, json] of results) {
+    actualFs.writeFileSync(join(RUN_ROOT, '.tasks', `task-${taskId}.result`), json, 'utf-8');
+  }
+}
+
 beforeEach(() => {
   sandboxDeckentHome = actualFs.mkdtempSync(join(tmpdir(), 'deckent-brain-test-state-'));
   process.env.DECKENT_HOME = sandboxDeckentHome;
@@ -320,6 +464,25 @@ beforeEach(() => {
   // Reset async fs mocks (node:fs/promises) — stat defaults to ENOENT (file not found)
   mockedFspStat.mockRejectedValue(new Error('ENOENT'));
   mockedFspWriteFile.mockResolvedValue(undefined);
+  // FAZ4A-S5: useRealFileSystem() passthroughs persist across vi.clearAllMocks
+  // (which clears call history only, not implementations) — restore every
+  // remaining fs mock to its historical no-op default so the pure-function
+  // describes stay hermetic regardless of describe order.
+  mockedWriteFileSync.mockImplementation(() => undefined);
+  mockedMkdirSync.mockImplementation(() => undefined as never);
+  mockedUnlinkSync.mockImplementation(() => undefined);
+  mockedAppendFileSync.mockImplementation(() => undefined);
+  mockedRenameSync.mockImplementation(() => undefined);
+  vi.mocked(fsPromisesNs.readFile).mockImplementation((async () => '') as never);
+  vi.mocked(fsPromisesNs.writeFile).mockImplementation(async () => undefined);
+  vi.mocked(fsPromisesNs.mkdir).mockImplementation((async () => undefined) as never);
+  vi.mocked(fsPromisesNs.appendFile).mockImplementation(async () => undefined);
+  vi.mocked(fsPromisesNs.access).mockImplementation(async () => undefined);
+  vi.mocked(fsPromisesNs.stat).mockImplementation((async () => ({ size: 0 })) as never);
+  vi.mocked(fspReadFile).mockImplementation((async () => { throw new Error('ENOENT'); }) as never);
+  vi.mocked(fspMkdir).mockImplementation((async () => undefined) as never);
+  vi.mocked(fspAccess).mockImplementation(async () => { throw new Error('ENOENT'); });
+  vi.mocked(fspUnlink).mockImplementation(async () => undefined);
 });
 
 afterEach(() => {
@@ -1354,7 +1517,13 @@ describe('calculateMetrics', () => {
       ['t2', TaskEvaluation.GO_WITH_TECH_DEBT],
       ['t3', TaskEvaluation.NO_GO],
     ]);
-    const m = calculateMetrics(makeSprint(), evaluations, [makeResult()]);
+    // born-484: totalTasks = folded logical lineages of sprint.tasks (one
+    // planned root = one task), NOT the evaluations map size — the sprint
+    // fixture must therefore carry the three evaluated tasks itself.
+    const sprint = makeSprint({
+      tasks: [makeTask({ id: 't1' }), makeTask({ id: 't2' }), makeTask({ id: 't3' })],
+    });
+    const m = calculateMetrics(sprint, evaluations, [makeResult()]);
     expect(m.totalTasks).toBe(3);
     expect(m.completedTasks).toBe(2); // DONE + DEBT
     expect(m.techDebtTasks).toBe(1);
@@ -1373,7 +1542,10 @@ describe('calculateMetrics', () => {
       ['t1', TaskEvaluation.DONE],
       ['t2', TaskEvaluation.NO_GO],
     ]);
-    const m = calculateMetrics(makeSprint(), evaluations, []);
+    // born-484: the denominator is sprint.tasks lineage count — the sprint
+    // fixture must carry both evaluated tasks for 1 NO_GO of 2 to hold.
+    const sprint = makeSprint({ tasks: [makeTask({ id: 't1' }), makeTask({ id: 't2' })] });
+    const m = calculateMetrics(sprint, evaluations, []);
     expect(m.noGoRate).toBe(0.5); // 1 NO_GO of 2 → canonical fraction, not 50%
   });
 
@@ -1501,9 +1673,14 @@ describe('cleanup', () => {
 
   it('deletes ALL task extensions (.json, .plan, .hb, .result, .paused, .log)', () => {
     mockedExistsSync.mockReturnValue(true);
+    // Sprint-end unlink is scoped to the sprint's OWN files via the
+    // `task-${sprint.number}-` prefix (sprint-lifecycle.ts sprintTaskPrefix) —
+    // a shared-workspace safety so cleanup never wipes another run's tasks.
+    // Fixture uses sprint 101 so the unpadded prefix ('task-101-') and the
+    // padStart(3) task-id file naming ('task-101-001.*') agree.
     const taskFiles = [
-      'task-001.json', 'task-001.plan', 'task-001.hb',
-      'task-001.result', 'task-001.paused', 'task-001.log',
+      'task-101-001.json', 'task-101-001.plan', 'task-101-001.hb',
+      'task-101-001.result', 'task-101-001.paused', 'task-101-001.log',
     ];
     mockedReaddirSync.mockImplementation((p: unknown) => {
       if (String(p).includes('.tasks')) return taskFiles as never;
@@ -1511,7 +1688,7 @@ describe('cleanup', () => {
     });
     // statSync returns recent file so stale pass doesn't re-delete
     mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
-    cleanup(ROOT, makeSprint());
+    cleanup(ROOT, makeSprint({ id: 'sprint-101', number: 101 }));
     for (const file of taskFiles) {
       expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining(file));
     }
@@ -1536,22 +1713,22 @@ describe('cleanup', () => {
 
   it('handles stale files older than 24h', () => {
     mockedExistsSync.mockReturnValue(true);
-    // First readdirSync call (main pass) returns empty, second (stale pass) returns stale file
-    let callCount = 0;
+    // Both the main sprint-end pass and the stale sweep are scoped to the
+    // sprint's own `task-${sprint.number}-` prefix (sprint-lifecycle.ts) —
+    // the stale fixture file must belong to the cleaned sprint to be swept.
     mockedReaddirSync.mockImplementation((p: unknown) => {
       if (String(p).includes('.tasks')) {
-        callCount++;
         // Both main and stale passes see the file
-        return ['task-old.json'] as never;
+        return ['task-101-old.json'] as never;
       }
       return [] as never;
     });
     // statSync returns a timestamp older than 24h
     const oldTime = Date.now() - 86_400_000 - 1000;
     mockedStatSync.mockReturnValue({ mtimeMs: oldTime } as never);
-    cleanup(ROOT, makeSprint());
+    cleanup(ROOT, makeSprint({ id: 'sprint-101', number: 101 }));
     // File should be deleted (at least once from main pass, possibly again from stale pass)
-    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-old.json'));
+    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-101-old.json'));
   });
 
   it('skips non-task files during cleanup', () => {
@@ -1597,48 +1774,29 @@ describe('isStaleTaskFile', () => {
 });
 
 describe('runSprint', () => {
-  const config = makeConfig();
-
-  function setupFullSprint() {
-    // Phase 1: readContext mocks
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      const p = String(path);
-      if (p.includes('task-') && p.endsWith('.result')) return JSON.stringify(makeResult());
-      if (p.includes('task-') && p.endsWith('.json')) return JSON.stringify(makeTask());
-      return '';
-    });
-    mockedSpawnSync.mockReturnValue(spawnOk);
-
-    // Phase 3: waitForResults — stat (node:fs/promises) is used by result-collector
-    mockedExistsSync.mockReturnValue(true);
-    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
-    mockedReaddirSync.mockReturnValue([] as never);
-  }
+  // Real-tmpdir harness (FAZ4A-S5): see setupRealSprint/useRealFileSystem —
+  // a mocked fs cannot carry runSprint's sqlite open + atomic publication ring.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('returns a sprint with COMPLETE status', async () => {
-    setupFullSprint();
-    // Supply a directive so planSprint creates at least one task
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      const p = String(path);
-      if (p.includes('DIRECTIVES')) return 'Build X';
-      if (p.includes('.result')) return JSON.stringify(makeResult());
-      if (p.includes('.json') && p.includes('task-')) return JSON.stringify(makeTask());
-      return '';
-    });
+    setupRealSprint();
 
-    const sprint = await runSprint(ROOT, config);
+    const sprint = await runSprint(RUN_ROOT, makeRunConfig());
     expect(sprint.status).toBe(SprintStatus.COMPLETE);
     expect(sprint.phase).toBe(SprintPhase.COMPLETE);
   });
 
   it('sets startedAt and completedAt', async () => {
-    setupFullSprint();
-    const sprint = await runSprint(ROOT, config);
+    setupRealSprint();
+    const sprint = await runSprint(RUN_ROOT, makeRunConfig());
     expect(sprint.startedAt).toBeDefined();
     expect(sprint.completedAt).toBeDefined();
   });
 
   it('throws BrainError on PLAN phase failure', async () => {
+    const config = makeConfig();
     mockedReadFileSync.mockImplementation(() => { throw new Error('disk fail'); });
     mockedSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: 'err', pid: 1, signal: null, output: [] } as never);
 
@@ -1651,66 +1809,61 @@ describe('runSprint', () => {
     await expect(runSprint(ROOT, config)).rejects.toThrow(BrainError);
   });
 
-  it('handles EVALUATE phase with partial results', async () => {
-    setupFullSprint();
-    // No results for the task (simulating timeout)
-    mockedExistsSync.mockImplementation((path: unknown) => {
-      return !String(path).includes('.result');
-    });
+  it('parks the sprint PAUSED in FIX when a task result is missing', async () => {
+    // Pre-485 this expected a "graceful" COMPLETE. Honest lifecycle (455-003):
+    // a missing result becomes a synthetic NO_GO, and a NO_GO whose FIX worker
+    // cannot spawn (no-op mocked backend) parks the sprint as PAUSED in FIX —
+    // never a false COMPLETE.
+    vi.useFakeTimers();
+    setupRealSprint({ results: new Map() }); // no result on disk → timeout path
 
-    const sprint = await runSprint(ROOT, config);
-    expect(sprint.status).toBe(SprintStatus.COMPLETE);
-  });
+    // Advance fake time in minute steps until the sprint promise settles: the
+    // no-result path chains several independent timer budgets (execute timeout,
+    // runtime-extension poll, liveness grace-poll, FIX-phase waits), so a
+    // single big jump leaves later waits pending forever.
+    let settled = false;
+    const sprintPromise = runSprint(RUN_ROOT, makeRunConfig()).finally(() => { settled = true; });
+    for (let i = 0; i < 240 && !settled; i++) {
+      await vi.advanceTimersByTimeAsync(60_000);
+    }
+    expect(settled).toBe(true);
+    const sprint = await sprintPromise;
+    expect(sprint.status).toBe(SprintStatus.PAUSED);
+  }, 60_000);
 
   it('skips FIX phase when all tasks are DONE', async () => {
-    setupFullSprint();
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      const p = String(path);
-      if (p.includes('DIRECTIVES')) return 'Build X';
-      if (p.includes('.result')) return JSON.stringify(makeResult());
-      return '';
-    });
+    setupRealSprint();
 
-    const sprint = await runSprint(ROOT, config);
+    const sprint = await runSprint(RUN_ROOT, makeRunConfig());
     expect(sprint.status).toBe(SprintStatus.COMPLETE);
+    // No FIX attempt was appended for the single DONE task
+    expect(sprint.tasks.some(t => t.isPriorityFix)).toBe(false);
   });
 
   it('recovers from RETRO/DECAY errors', async () => {
-    setupFullSprint();
-    // Make writeFileSync throw only for RETRO
-    let callCount = 0;
-    mockedWriteFileSync.mockImplementation(() => {
-      callCount++;
-      if (callCount > 5) throw new Error('write fail');
-    });
+    setupRealSprint();
+    // Fail ONLY `.brain/` writes (retro/sprint-log/decay targets): the
+    // canonical run-status publication ring (.deckent/…) must stay real or
+    // the sprint would honestly HOLD long before RETRO.
+    mockedWriteFileSync.mockImplementation(((path: unknown, ...rest: unknown[]) => {
+      if (String(path).includes('.brain')) throw new Error('write fail');
+      return (actualFs.writeFileSync as (...a: unknown[]) => void)(path, ...rest);
+    }) as never);
 
-    const sprint = await runSprint(ROOT, config);
+    const sprint = await runSprint(RUN_ROOT, makeRunConfig());
     // Should still complete despite RETRO errors
     expect(sprint.status).toBe(SprintStatus.COMPLETE);
-    // Reset mock so subsequent tests get clean writeFileSync
-    mockedWriteFileSync.mockReset();
   });
 
   it('passes autoApprove opts to spawnWorkers', async () => {
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      const p = String(path);
-      if (p.includes('DIRECTIVES')) return 'Build X';
-      if (p.includes('.result')) return JSON.stringify(makeResult());
-      return '';
-    });
-    mockedExistsSync.mockReturnValue(true);
-    mockedReaddirSync.mockReturnValue([] as never);
-    mockedSpawnSync.mockReturnValue(spawnOk);
-    // Phase 3: waitForResults uses fs/promises.stat to detect result files
-    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
+    setupRealSprint();
 
-    await runSprint(ROOT, config, { autoApprove: true });
+    await runSprint(RUN_ROOT, makeRunConfig(), { autoApprove: true });
     // spawnWorker should have been called with autoApprove: true
     const calls = mockedSpawnWorker.mock.calls;
-    if (calls.length > 0) {
-      const opts = calls[0]?.[4] as { autoApprove?: boolean } | undefined;
-      expect(opts?.autoApprove).toBe(true);
-    }
+    expect(calls.length).toBeGreaterThan(0);
+    const opts = calls[0]?.[4] as { autoApprove?: boolean } | undefined;
+    expect(opts?.autoApprove).toBe(true);
   });
 });
 
@@ -2032,27 +2185,13 @@ describe('buildWorkerPrompt UTC timestamp instruction (Sprint 19)', () => {
 
 // ─── Sprint 14: Scan loop integration in runSprint ────────────────
 describe('runSprint scan loop integration (Sprint 14)', () => {
-  const config = makeConfig();
-
-  function setupFullSprint() {
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      const p = String(path);
-      if (p.includes('DIRECTIVES')) return 'Build X';
-      if (p.includes('task-') && p.endsWith('.result')) return JSON.stringify(makeResult());
-      if (p.includes('task-') && p.endsWith('.json')) return JSON.stringify(makeTask());
-      return '';
-    });
-    mockedSpawnSync.mockReturnValue(spawnOk);
-    mockedExistsSync.mockReturnValue(true);
-    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
-    mockedReaddirSync.mockReturnValue([] as never);
-  }
+  // Real-tmpdir harness (FAZ4A-S5): runSprint cannot live on a mocked fs.
 
   it('calls startScanLoop after spawn', async () => {
-    setupFullSprint();
-    await runSprint(ROOT, config);
+    setupRealSprint();
+    await runSprint(RUN_ROOT, makeRunConfig());
     expect(mockedStartScanLoop).toHaveBeenCalledWith(
-      ROOT,
+      RUN_ROOT,
       expect.stringContaining('sprint-'),
       undefined,
       expect.any(Function),
@@ -2060,50 +2199,39 @@ describe('runSprint scan loop integration (Sprint 14)', () => {
   });
 
   it('clears scanInterval during cleanup', async () => {
-    setupFullSprint();
+    setupRealSprint();
     const fakeInterval = setInterval(() => {}, 99999);
     mockedStartScanLoop.mockReturnValue(fakeInterval);
 
     const clearSpy = vi.spyOn(globalThis, 'clearInterval');
-    await runSprint(ROOT, config);
-    expect(clearSpy).toHaveBeenCalledWith(fakeInterval);
-    clearSpy.mockRestore();
-    clearInterval(fakeInterval);
+    try {
+      await runSprint(RUN_ROOT, makeRunConfig());
+      expect(clearSpy).toHaveBeenCalledWith(fakeInterval);
+    } finally {
+      clearSpy.mockRestore();
+      clearInterval(fakeInterval);
+    }
   });
 
   it('spawnWorkers does not import startAuditor', async () => {
     // startAuditor is no longer in the tmux mock — if it were called, it would throw
     const sprint = makeSprint();
-    await expect(spawnWorkers(ROOT, sprint, config)).resolves.not.toThrow();
+    await expect(spawnWorkers(ROOT, sprint, makeConfig())).resolves.not.toThrow();
     expect(mockedEnsureSession).toHaveBeenCalled();
   });
 });
 
 // ─── Sprint 15: Dashboard reset on new sprint ─────────────────────
 describe('runSprint dashboard reset (Sprint 15)', () => {
-  const config = makeConfig();
-
-  function setupFullSprint() {
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      const p = String(path);
-      if (p.includes('DIRECTIVES')) return 'Build X';
-      if (p.includes('task-') && p.endsWith('.result')) return JSON.stringify(makeResult());
-      if (p.includes('task-') && p.endsWith('.json')) return JSON.stringify(makeTask());
-      return '';
-    });
-    mockedSpawnSync.mockReturnValue(spawnOk);
-    mockedExistsSync.mockReturnValue(true);
-    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
-    mockedReaddirSync.mockReturnValue([] as never);
-  }
+  // Real-tmpdir harness (FAZ4A-S5): runSprint cannot live on a mocked fs.
 
   it('calls resetDashboard after PLAN and before SPAWN', async () => {
-    setupFullSprint();
-    await runSprint(ROOT, config);
+    setupRealSprint();
+    await runSprint(RUN_ROOT, makeRunConfig());
 
     expect(mockedResetDashboard).toHaveBeenCalledTimes(1);
     expect(mockedResetDashboard).toHaveBeenCalledWith(
-      ROOT,
+      RUN_ROOT,
       expect.stringContaining('sprint-'),
       expect.any(Number),
     );
@@ -2115,10 +2243,10 @@ describe('runSprint dashboard reset (Sprint 15)', () => {
   });
 
   it('continues sprint even if resetDashboard throws', async () => {
-    setupFullSprint();
+    setupRealSprint();
     mockedResetDashboard.mockImplementationOnce(() => { throw new Error('disk full'); });
 
-    const sprint = await runSprint(ROOT, config);
+    const sprint = await runSprint(RUN_ROOT, makeRunConfig());
     expect(sprint.status).toBe(SprintStatus.COMPLETE);
   });
 });
