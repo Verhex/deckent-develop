@@ -239,22 +239,6 @@
       "failed": 2
     },
     {
-      "file": "tests/orchestra/brain-ipc.test.ts",
-      "failed": 9
-    },
-    {
-      "file": "tests/orchestra/brain-provider.test.ts",
-      "failed": 2
-    },
-    {
-      "file": "tests/orchestra/brain-rollback.test.ts",
-      "failed": 10
-    },
-    {
-      "file": "tests/orchestra/brain.test.ts",
-      "failed": 14
-    },
-    {
       "file": "tests/orchestra/build-violation-guard.test.ts",
       "failed": 1
     },

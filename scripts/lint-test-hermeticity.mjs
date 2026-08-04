@@ -100,12 +100,11 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-04 (build-free, FAZ4A-S4): +2 net — the debt/FIX trio dropped its
-  // vi.mock('node:fs') registrations but runsprint-debt-integration now seeds real
-  // .result/.tasks fixtures and avgcoverage-repair runs OutcomeTracker against tmpdir.
-  // Prior refresh: TRUST-ANCHOR-002 regression suite (count 12438).
-  count: 12440,
-  digest: '8e57a0c9ec3eeb94b644596cd7099b6c26af1f16fab2cac0a8b9586ac51eb85a',
+  // 2026-08-04 (build-free, FAZ4A-S5): +1 net — brain quartet moved to real-tmpdir
+  // (brain.test hybrid useRealFileSystem, rollback/ipc full conversion, provider
+  // fixture alignment). Prior refresh: FAZ4A-S4 debt/FIX trio (count 12440).
+  count: 12441,
+  digest: 'af0b5d435f1664cd7e37bc5b531db69823c67e8e48e2070263681e008820b98d',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
