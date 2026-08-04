@@ -16,7 +16,8 @@
  * dilution-fix (a `coverage: null` call must not move avgCoverage).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskEvaluation, SprintPhase, SprintStatus } from '../../src/core/types.js';
@@ -26,24 +27,18 @@ import { createSkillDefinition } from '../../src/core/skill-types.js';
 
 // ─── Mocks (mirrors tests/orchestra/sprint-finalizer.test.ts's finalizeSprint harness) ──
 
-vi.mock('node:fs', () => ({
-  readFileSync: vi.fn().mockReturnValue('{}'),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn().mockReturnValue(false),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn().mockReturnValue([]),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  appendFileSync: vi.fn(),
-  promises: {
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    readFile: vi.fn().mockResolvedValue(''),
-    mkdir: vi.fn().mockResolvedValue(undefined),
-  },
-}));
+// ─── REAL FILESYSTEM (FAZ4A-S4) ─────────────────────────────────────
+// The node:fs mock is deliberately GONE. The finalizer's atomic publication ring
+// (temp write → renameSync → read-back digest; run-status read model, terminal
+// receipt) verifies its own writes — a mocked fs cannot carry that round-trip
+// (RECORDED-FAILED approach from FAZ4A-S2). Each test gets a fresh real scratch
+// project root under tmpdir instead; OutcomeTracker/PromptVersionManager run REAL
+// against it, which is exactly what feeds the 8d2 block's learnings input.
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: '' }),
+  // Real fs, mocked processes: git/tsc probes must not escape the sandbox. A bare
+  // vi.fn() would return undefined and crash callers reading `.status`/`.stderr`.
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
 vi.mock('../../src/core/utils.js', async (importOriginal) => {
@@ -216,8 +211,14 @@ vi.mock('../../src/orchestra/event-stream.js', () => ({
   },
 }));
 
-import * as nodeFsMod from 'node:fs';
 import { finalizeSprint } from '../../src/orchestra/sprint-finalizer.js';
+
+// ─── Real scratch project root (fresh per test, FAZ4A-S4) ─────────────────
+
+let PROJECT_ROOT = '';
+afterAll(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
 
 // ─── Fixture Helpers ──────────────────────────────────────────────────────
 
@@ -245,11 +246,18 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     dependencies: [],
     goNogo: { goCriteria: 'done', noGoCriteria: 'fail', techDebtAcceptable: 'none' },
     status: 'DONE',
+    sprintId: 'sprint-591',
+    createdAt: new Date().toISOString(),
     ...overrides,
   } as unknown as Task;
 }
 
 function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskResult {
+  // Host-authored claim-time attribution is part of the terminal-evidence data
+  // contract (projectAttributedTaskWork): without a VERIFIED attemptId the
+  // finalizer correctly refuses to settle (TERMINAL_EVIDENCE_HOLD). Shape mirrors
+  // tests/orchestra/finalize-sprint.test.ts (FAZ4A-S2 canonical fixture).
+  const attemptId = `attempt-${taskId}`;
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -259,6 +267,12 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
     testsPassed: true,
     selfAssessment: 'DONE',
     notes: '',
+    workAttribution: {
+      state: 'VERIFIED' as const,
+      attemptId,
+      baselineRef: `baseline:${attemptId}`,
+      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+    },
     ...overrides,
   } as unknown as TaskResult;
 }
@@ -280,22 +294,9 @@ beforeEach(() => {
   // above (calculateMetrics, getRecentSprintStats, etc.), which are set exactly
   // once at module-eval time and never re-applied per test.
   vi.clearAllMocks();
-  const fsMod = nodeFsMod as unknown as {
-    existsSync: ReturnType<typeof vi.fn>;
-    readFileSync: ReturnType<typeof vi.fn>;
-    readdirSync: ReturnType<typeof vi.fn>;
-    writeFileSync: ReturnType<typeof vi.fn>;
-    mkdirSync: ReturnType<typeof vi.fn>;
-    promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn>; readFile: ReturnType<typeof vi.fn> };
-  };
-  fsMod.existsSync.mockReturnValue(false);
-  fsMod.readFileSync.mockReturnValue('{}');
-  fsMod.readdirSync.mockReturnValue([]);
-  fsMod.writeFileSync.mockReturnValue(undefined);
-  fsMod.mkdirSync.mockReturnValue(undefined);
-  fsMod.promises.writeFile.mockResolvedValue(undefined);
-  fsMod.promises.mkdir.mockResolvedValue(undefined);
-  fsMod.promises.readFile.mockResolvedValue('');
+  // Fresh REAL scratch root per test (hermetic; previous root removed first).
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-acr-'));
 });
 
 // ═══ Group A — agent block (sprint-finalizer "8d2" sync) ═══════════════════
@@ -306,16 +307,25 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
 
     const tasks = [
       makeTask('t1', { assignedAgent: 'bug-fixer' }),
-      makeTask('t2', { assignedAgent: 'bug-fixer' }), // no result at all — measurement gap
+      makeTask('t2', { assignedAgent: 'bug-fixer' }),
       makeTask('t3', { assignedAgent: 'bug-fixer' }),
     ];
+    // t2's measurement gap is now an attributed result WITHOUT a coverage field.
+    // The old fixture gave t2 no result at all — under the honest terminal-evidence
+    // contract a DONE-evaluated task with an ABSENT result is a TERMINAL_RESULT_MISSING
+    // hold and can never settle; the 8d2 semantics under test (coverage-less ⇒
+    // excluded from the average) are identical either way.
     const results = [
       makeResult('t1', { coverage: 90 }),
+      makeResultNoCoverage('t2'),
       makeResult('t3', { coverage: 80 }),
     ];
     const sprint = makeSprint('sprint-591a', tasks);
 
-    await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
+
+    // Real-disk proof the finalize actually settled (terminal receipt published).
+    expect(existsSync(join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-591a-terminal-receipt.json'))).toBe(true);
 
     expect(mockSaveAgent).toHaveBeenCalled();
     // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
@@ -342,7 +352,7 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
     ];
     const sprint = makeSprint('sprint-591b', tasks);
 
-    await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
     // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
     const saved = { stats: mockSaveAgent.mock.calls[0][1] };
@@ -361,7 +371,7 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
     const results = [makeResult('t1', { coverage: 0 })];
     const sprint = makeSprint('sprint-591c', tasks);
 
-    await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
     // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
     const saved = { stats: mockSaveAgent.mock.calls[0][1] };
@@ -390,7 +400,10 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
     ];
     const sprint = makeSprint('sprint-591d', tasks);
 
-    await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
+
+    // Real-disk proof the finalize actually settled (terminal receipt published).
+    expect(existsSync(join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-591d-terminal-receipt.json'))).toBe(true);
 
     expect(mockSaveSkill).toHaveBeenCalled();
     const saved = { stats: mockSaveSkill.mock.calls[0][1] };
@@ -405,7 +418,7 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
     const results = [makeResult('t1', { coverage: 100 })];
     const sprint = makeSprint('sprint-591e', tasks);
 
-    await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
     const saved = { stats: mockSaveSkill.mock.calls[0][1] };
     expect(saved.stats.successCount).toBe(1);
@@ -416,35 +429,18 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
 // ═══ Group C — updateAgentStats / updateSkillStats twin fix ════════════════
 // Bypasses this file's module-level agent-pool.js/skill-pool.js mock via
 // vi.importActual to exercise the REAL classes end-to-end against a real tmpdir
-// (Test Hermeticity: no gitignored state, cleaned up in afterEach).
+// (Test Hermeticity: no gitignored state, cleaned up in afterEach). node:fs is
+// real for the whole file now (FAZ4A-S4), so no per-group fs re-routing is needed.
 
 describe('updateAgentStats / updateSkillStats — null coverage does not dilute avgCoverage (born-591 twin fix)', () => {
   let tempDir: string;
 
-  beforeEach(async () => {
-    const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
-    tempDir = realFs.mkdtempSync(join(tmpdir(), 'avgcov-pool-'));
-
-    const fsMod = nodeFsMod as unknown as {
-      existsSync: ReturnType<typeof vi.fn>;
-      readFileSync: ReturnType<typeof vi.fn>;
-      readdirSync: ReturnType<typeof vi.fn>;
-      writeFileSync: ReturnType<typeof vi.fn>;
-      mkdirSync: ReturnType<typeof vi.fn>;
-    };
-    // Route the mocked node:fs surface to the REAL implementation for this
-    // group only — the outer beforeEach already reset every mock to the
-    // Group A/B-safe inert defaults before this runs.
-    fsMod.existsSync.mockImplementation(realFs.existsSync);
-    fsMod.readFileSync.mockImplementation(realFs.readFileSync as unknown as (...args: unknown[]) => unknown);
-    fsMod.readdirSync.mockImplementation(realFs.readdirSync as unknown as (...args: unknown[]) => unknown);
-    fsMod.writeFileSync.mockImplementation(realFs.writeFileSync as unknown as (...args: unknown[]) => unknown);
-    fsMod.mkdirSync.mockImplementation(realFs.mkdirSync as unknown as (...args: unknown[]) => unknown);
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'avgcov-pool-'));
   });
 
-  afterEach(async () => {
-    const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
-    realFs.rmSync(tempDir, { recursive: true, force: true });
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   it('updateAgentStats(coverage=null) advances totalUses/successRate but leaves avgCoverage untouched', async () => {
