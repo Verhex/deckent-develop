@@ -261,6 +261,26 @@ vi.mock('../../../src/cli/commands/quick-start.js', () => ({
   cleanupZeroConfig: vi.fn(),
 }));
 vi.mock('../../../src/cli/commands/doctor.js', () => ({ runDoctorChecks: vi.fn() }));
+// plan.ts no longer calls brain.planSprint directly: the non-dry-run path plans
+// through the durable run-flow service (planRunFlow) and settles the approval
+// CAS via decideRunFlowPlan. Both are mocked at this seam (importOriginal keeps
+// RunFlowPlanServiceError and every newer export real) so the i18n assertions
+// exercise the REAL approval/rejection print path without durable-plan I/O.
+vi.mock('../../../src/orchestra/run-flow-plan-service.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/orchestra/run-flow-plan-service.js')>();
+  return { ...actual, planRunFlow: vi.fn(), decideRunFlowPlan: vi.fn() };
+});
+// Approved-projection publication preflight/publish are durable-artifact I/O
+// (no-clobber inspection + atomic publish) — mocked so the approval path can
+// reach its i18n print without a real .tasks/ projection on the mocked fs.
+vi.mock('../../../src/orchestra/task-artifact-projection.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/orchestra/task-artifact-projection.js')>();
+  return {
+    ...actual,
+    inspectTaskArtifactsNoClobber: vi.fn(),
+    publishTaskArtifactsNoClobber: vi.fn(),
+  };
+});
 vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
@@ -281,6 +301,7 @@ vi.mock('../../../src/cli/helpers/prompt.js', () => ({
 
 import { loadConfig } from '../../../src/core/config.js';
 import { runSprint, readContext, planSprint } from '../../../src/orchestra/brain.js';
+import { planRunFlow } from '../../../src/orchestra/run-flow-plan-service.js';
 import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { registerStart } from '../../../src/cli/commands/start.js';
@@ -301,6 +322,24 @@ function makeSprint() {
     tasks: [{ id: '001-001', title: 'Task One', model: 'sonnet', priority: 'NORMAL' }],
     reasoning: undefined,
     planningMode: undefined,
+  };
+}
+
+/**
+ * Minimal durable-plan-flow result consumed by plan.ts's approval/rejection
+ * path: sprint + digest identity, plus a preview whose scope gate passes and
+ * whose topology is absent (both gate blocks are skipped, so control flow
+ * reaches the promptConfirm → plan.approved / plan.rejected i18n prints).
+ */
+function makeFlowPlan() {
+  return {
+    flowId: 'flow-001',
+    revision: 1,
+    planDigest: 'a'.repeat(64),
+    sprint: makeSprint(),
+    preview: { scopeGateResult: 'pass', scopeGateOverridden: false },
+    approval: 'awaiting',
+    reusedDurablePlan: false,
   };
 }
 
@@ -379,8 +418,11 @@ describe('plan command — i18n integration', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(loadConfig).mockResolvedValue(makeConfig('en') as any);
-    vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
+    // plan.ts derives the flow intent summary from context.directives — it must
+    // be a string or the command errors before any approval print.
+    vi.mocked(readContext).mockReturnValue({ directives: '', memory: '', retro: '', debt: '', patterns: [] } as any);
     vi.mocked(planSprint).mockReturnValue(makeSprint() as any);
+    vi.mocked(planRunFlow).mockResolvedValue(makeFlowPlan() as any);
   });
   afterEach(() => { process.exitCode = undefined; });
 

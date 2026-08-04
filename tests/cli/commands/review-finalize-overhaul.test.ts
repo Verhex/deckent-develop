@@ -61,8 +61,33 @@ vi.mock('../../../src/cli/helpers/config-reader.js', () => ({
   getLangFromConfig: vi.fn().mockReturnValue('en'),
 }));
 
-vi.mock('../../../src/core/utils.js', () => ({
+vi.mock('../../../src/core/utils.js', async (importOriginal) => ({
+  // Partial mock: only readJsonSafe is a controllable seam — debugLog and the
+  // other pure helpers stay REAL so deeper collaborators keep working.
+  ...(await importOriginal<Record<string, unknown>>()),
   readJsonSafe: vi.fn(),
+}));
+
+// FAZ4B finalize --force truth: the forced path settles through the sprint
+// recovery operation + forceAbortSprint (ABORTED receipt), NOT finalizeSprint.
+vi.mock('../../../src/orchestra/sprint-finalizer.js', () => ({
+  forceAbortSprint: vi.fn(),
+}));
+
+vi.mock('../../../src/orchestra/sprint-recovery-operation.js', () => ({
+  containSprintRecoveryCoordinator: vi.fn(),
+  readSprintRecoverySettlementIdentity: vi.fn(),
+  runSprintRecoveryOperation: vi.fn(),
+}));
+
+vi.mock('../../../src/cli/commands/kill.js', () => ({
+  killSingle: vi.fn(),
+}));
+
+// finalize.ts dynamic-imports rule-generator for the onRuleRegen wire — keep
+// the CLI cold path free of MemoryStore/better-sqlite3 in this suite.
+vi.mock('../../../src/core/rule-generator.js', () => ({
+  regenerateRules: vi.fn().mockResolvedValue({ filesWritten: [], filesSkipped: [], errors: [] }),
 }));
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs';
@@ -72,12 +97,26 @@ import { registerFinalize, detectIncompleteTasks, detectMixedSprints } from '../
 import { promptSelect } from '../../../src/cli/helpers/prompt.js';
 import { readJsonSafe } from '../../../src/core/utils.js';
 import { finalizeSprint } from '../../../src/orchestra/brain.js';
+import { forceAbortSprint } from '../../../src/orchestra/sprint-finalizer.js';
+import {
+  containSprintRecoveryCoordinator,
+  readSprintRecoverySettlementIdentity,
+  runSprintRecoveryOperation,
+} from '../../../src/orchestra/sprint-recovery-operation.js';
+import { killSingle } from '../../../src/cli/commands/kill.js';
 import { killWorker } from '../../../src/orchestra/tmux.js';
 import { evaluateResultSync } from '../../../src/orchestra/sprint-controller.js';
 import { loadConfig } from '../../../src/core/config.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
 import { getLangFromConfig } from '../../../src/cli/helpers/config-reader.js';
 import { resolveProjectRoot } from '../../../src/cli/helpers/process.js';
+
+// i18n-FIRST: finalize output assertions run against the REAL message catalog
+// (the mocked getMessage delegates to it), so the expected strings are the
+// exact user-facing production strings, never mock-invented ones.
+const actualMessages = await vi.importActual<typeof import('../../../src/cli/helpers/messages.js')>(
+  '../../../src/cli/helpers/messages.js',
+);
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -260,24 +299,45 @@ describe('finalize overhaul', () => {
       totalTasks: 2, completedTasks: 1, techDebtTasks: 1, noGoTasks: 0,
       coveragePercent: 90, durationMs: 5000,
     } as any);
-    vi.mocked(getMessage).mockImplementation((key: string, _lang: string, vars?: Record<string, string>) => {
-      if (key === 'finalize.no_tasks') return 'No tasks found.';
-      if (key === 'finalize.complete') return `Finalized ${vars?.sprintId}`;
-      return key;
-    });
+    // i18n-FIRST: user-facing output flows through the REAL message catalog.
+    vi.mocked(getMessage).mockImplementation(
+      (key: string, lang: string, vars?: Record<string, string>) =>
+        actualMessages.getMessage(key, lang, vars),
+    );
     vi.mocked(getLangFromConfig).mockReturnValue('en');
     vi.mocked(resolveProjectRoot).mockReturnValue('/mock/root');
     vi.mocked(loadConfig).mockResolvedValue({} as any);
     vi.mocked(evaluateResultSync).mockReturnValue('DONE' as any);
+    // FAZ4B recovery/abort collaborators (used only on the --force path and
+    // the non-force coordinator-containment step).
+    vi.mocked(readSprintRecoverySettlementIdentity).mockReturnValue({
+      generation: 1, fenceToken: 'fence-1',
+    } as any);
+    vi.mocked(containSprintRecoveryCoordinator).mockResolvedValue({ action: 'none' } as any);
+    vi.mocked(runSprintRecoveryOperation).mockResolvedValue(undefined as any);
+    vi.mocked(killSingle).mockReturnValue(true as any);
+    vi.mocked(forceAbortSprint).mockReturnValue({
+      outcome: 'ABORTED',
+      receiptPublication: {},
+      terminalTruth: {
+        logicalMetrics: {
+          totalTasks: 1, completedTasks: 0, techDebtTasks: 0,
+          noGoTasks: 1, unevaluatedTasks: 0, coveragePercent: 0,
+        },
+      },
+    } as any);
     process.exitCode = undefined;
   });
 
   it('blocks finalize when tasks are in-progress without --force', async () => {
     const executingTask = { ...sampleTask, status: 'EXECUTING' };
-    vi.mocked(readJsonSafe).mockImplementation((p: string) => {
-      if (p.includes('task-001.json')) return executingTask;
-      return null;
+    // Task records are read via readFileSync + classifyTaskArtifact (canonical
+    // artifact path); results still go through readJsonSafe.
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('task-001.json')) return JSON.stringify(executingTask);
+      throw new Error(`ENOENT: ${String(p)}`);
     });
+    vi.mocked(readJsonSafe).mockReturnValue(null);
     vi.mocked(existsSync).mockImplementation((p: any) => {
       if (String(p).includes('.tasks') && !String(p).includes('task-')) return true;
       return false;
@@ -287,29 +347,41 @@ describe('finalize overhaul', () => {
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.join('\n')).toContain('Cannot finalize');
     expect(finalizeSprint).not.toHaveBeenCalled();
+    expect(forceAbortSprint).not.toHaveBeenCalled();
   });
 
-  it('allows finalize with --force even with in-progress tasks', async () => {
+  it('--force with in-progress tasks kills live workers and settles through forceAbortSprint (ABORTED), not finalizeSprint', async () => {
     const executingTask = { ...sampleTask, status: 'EXECUTING' };
-    vi.mocked(readJsonSafe).mockImplementation((p: string) => {
-      if (p.includes('task-001.json')) return executingTask;
-      return null;
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('task-001.json')) return JSON.stringify(executingTask);
+      throw new Error(`ENOENT: ${String(p)}`);
     });
+    vi.mocked(readJsonSafe).mockReturnValue(null);
     vi.mocked(existsSync).mockImplementation((p: any) => {
       if (String(p).includes('.tasks') && !String(p).includes('task-')) return true;
       return false;
     });
     vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
     await runFinalize(['finalize', '--force']);
-    expect(finalizeSprint).toHaveBeenCalled();
+    // born-610: live workers must die before terminal settlement…
+    expect(killSingle).toHaveBeenCalledWith('/mock/root', '001', 'en');
+    // …then recovery containment + the fenced ABORTED settlement run.
+    expect(runSprintRecoveryOperation).toHaveBeenCalled();
+    expect(forceAbortSprint).toHaveBeenCalled();
+    expect(finalizeSprint).not.toHaveBeenCalled();
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.join('\n')).toContain('force-finalized as ABORTED');
   });
 
   it('blocks duplicate finalize without --force', async () => {
-    vi.mocked(readJsonSafe).mockImplementation((p: string) => {
-      if (p.includes('task-001.json')) return sampleTask;
-      if (p.includes('.result')) return sampleResult;
-      return null;
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('task-001.json')) return JSON.stringify(sampleTask);
+      throw new Error(`ENOENT: ${String(p)}`);
     });
+    vi.mocked(readJsonSafe).mockImplementation(((p: string) => {
+      if (String(p).includes('.result')) return sampleResult;
+      return null;
+    }) as any);
     vi.mocked(existsSync).mockImplementation((p: any) => {
       const s = String(p);
       if (s.includes('review-')) return false;
@@ -327,12 +399,16 @@ describe('finalize overhaul', () => {
 
   it('detects mixed sprint IDs and warns', async () => {
     const task2 = { ...sampleTask, id: '002', sprintId: 'sprint-058' };
-    vi.mocked(readJsonSafe).mockImplementation((p: string) => {
-      if (p.includes('task-002.json')) return task2;
-      if (p.includes('task-001.json')) return sampleTask;
-      if (p.includes('.result')) return sampleResult;
-      return null;
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      const s = String(p);
+      if (s.includes('task-002.json')) return JSON.stringify(task2);
+      if (s.includes('task-001.json')) return JSON.stringify(sampleTask);
+      throw new Error(`ENOENT: ${s}`);
     });
+    vi.mocked(readJsonSafe).mockImplementation(((p: string) => {
+      if (String(p).includes('.result')) return sampleResult;
+      return null;
+    }) as any);
     vi.mocked(existsSync).mockImplementation((p: any) => {
       const s = String(p);
       if (s.includes('review-')) return false;
@@ -342,7 +418,8 @@ describe('finalize overhaul', () => {
     vi.mocked(readdirSync).mockReturnValue(['task-001.json', 'task-002.json'] as any);
     await runFinalize(['finalize']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-    expect(calls.join('\n')).toContain('Mixed sprint IDs');
+    // Real catalog string: 'Warning: mixed sprint IDs detected: …'
+    expect(calls.join('\n')).toContain('mixed sprint IDs detected');
   });
 
   it('integrates review rejected tasks as NO_GO', async () => {
@@ -352,11 +429,10 @@ describe('finalize overhaul', () => {
       createdAt: '2026-03-25T00:00:00Z',
       updatedAt: '2026-03-25T00:00:00Z',
     };
-    vi.mocked(readJsonSafe).mockImplementation((p: string) => {
-      if (p.includes('task-001.json')) return sampleTask;
-      if (p.includes('.result')) return sampleResult;
+    vi.mocked(readJsonSafe).mockImplementation(((p: string) => {
+      if (String(p).includes('.result')) return sampleResult;
       return null;
-    });
+    }) as any);
     vi.mocked(existsSync).mockImplementation((p: any) => {
       const s = String(p);
       if (s.includes('.tasks') && !s.includes('task-')) return true;
@@ -369,7 +445,9 @@ describe('finalize overhaul', () => {
       return [] as any;
     });
     vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('review-')) return JSON.stringify(reviewState);
+      const s = String(p);
+      if (s.includes('review-')) return JSON.stringify(reviewState);
+      if (s.includes('task-001.json')) return JSON.stringify(sampleTask);
       return '{}';
     });
     await runFinalize(['finalize']);

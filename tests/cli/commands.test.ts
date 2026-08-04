@@ -54,6 +54,9 @@ vi.mock('../../src/core/run-status-read-model.js', () => ({
     holds: [], providerConcurrency: [], authority: {},
   })),
   runStatusReadModelMatchesAuthority: vi.fn(() => true),
+  // cleanup retires the run identity through this seam — the hand-written mock
+  // must keep pace with the module's real export list (publish added later).
+  publishCanonicalRunStatusReadModel: vi.fn(),
 }));
 
 vi.mock('../../src/core/run-status-authority.js', () => ({
@@ -134,6 +137,23 @@ vi.mock('../../src/orchestra/brain.js', () => ({
       this.phase = phase;
     }
   },
+}));
+
+// `deckent plan` no longer plans through brain.planSprint — the production seam
+// is the durable run-flow plan service (planRunFlow → decideRunFlowPlan).
+// Hybrid mock: keep the real error classes, stub only the seam functions.
+vi.mock('../../src/orchestra/run-flow-plan-service.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/run-flow-plan-service.js')>()),
+  planRunFlow: vi.fn(),
+  decideRunFlowPlan: vi.fn(),
+}));
+
+// Approved-plan projection publication (no-clobber preflight + publish) hits the
+// real filesystem — stubbed at the module seam, error class kept real.
+vi.mock('../../src/orchestra/task-artifact-projection.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/task-artifact-projection.js')>()),
+  inspectTaskArtifactsNoClobber: vi.fn(),
+  publishTaskArtifactsNoClobber: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -227,7 +247,9 @@ import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { countBrainLines, ensureDeckentImport, readJsonSafe } from '../../src/core/utils.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../src/core/config.js';
-import { runSprint, readContext, planSprint, cleanup, runDecay, BrainError, confirmDraftTasks } from '../../src/orchestra/brain.js';
+import { runSprint, readContext, planSprint, cleanup, runDecay, BrainError } from '../../src/orchestra/brain.js';
+import { planRunFlow, decideRunFlowPlan, type PlanRunFlowResult } from '../../src/orchestra/run-flow-plan-service.js';
+import { readCanonicalRunStatus, type CanonicalRunStatus } from '../../src/core/run-status-authority.js';
 import { isSessionActive, attach, ensureSession, spawnWorker, killWorker, destroy, setupWatchWindow, TmuxError } from '../../src/orchestra/tmux.js';
 import { readTask } from '../../src/agents/worker.js';
 
@@ -929,12 +951,30 @@ describe('spawn command', () => {
 // ─── Cleanup Command ────────────────────────────────────────────────
 
 describe('cleanup command', () => {
+  // Honest-gate authority: the file-wide default mock declares an ACTIVE run
+  // with a live coordinator, which cleanup now (correctly) refuses with
+  // "Cleanup held for … coordinator-active". These cases exercise the actual
+  // cleanup mechanics, so they need a quiescent (IDLE) authority instead.
+  const idleAuthority: CanonicalRunStatus = {
+    schemaVersion: 1, lifecycle: 'IDLE', active: false, resumable: false,
+    sprintId: null, phase: null, status: null, reason: null,
+    recoveryCommand: null, finalizeCommand: null, coordinator: 'absent', conflicts: [],
+  };
+  const activeAuthority: CanonicalRunStatus = {
+    schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
+    sprintId: null, phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
+  };
   beforeEach(() => {
     vi.clearAllMocks();
     captureOutput();
     process.exitCode = undefined;
+    vi.mocked(readCanonicalRunStatus).mockReturnValue(idleAuthority);
   });
   afterEach(() => {
+    // vi.clearAllMocks() does NOT reset implementations — restore the file-wide
+    // ACTIVE default so later describes see the same authority they always did.
+    vi.mocked(readCanonicalRunStatus).mockReturnValue(activeAuthority);
     restoreOutput();
     process.exitCode = undefined;
   });
@@ -942,7 +982,10 @@ describe('cleanup command', () => {
   it('cleans up with tasks', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeTask()) as unknown as ReturnType<typeof readFileSync>);
+    // Task-artifact identity contract: the live file is `task-<id>.json`, so the
+    // record inside `task-001.json` must carry id '001' or the classifier
+    // (correctly) rejects it as task-id-mismatch and cleanup counts 0 tasks.
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeTask({ id: '001' })) as unknown as ReturnType<typeof readFileSync>);
     vi.mocked(cleanup).mockImplementation(() => {});
     vi.mocked(destroy).mockImplementation(() => {});
     await runCommand(registerCleanup, ['cleanup']);
@@ -1178,10 +1221,41 @@ describe('start command', () => {
 // ─── Plan Command ───────────────────────────────────────────────────
 
 describe('plan command', () => {
+  // `deckent plan` plans through the durable run-flow seam (planRunFlow →
+  // approval CAS via decideRunFlowPlan), not brain.planSprint. Build a
+  // PlanRunFlowResult around the sprint fixture; topology/scope gates pass.
+  function mockPlanFlow(sprint: Sprint): void {
+    vi.mocked(planRunFlow).mockResolvedValue({
+      flowId: 'flow-test', revision: 1, planDigest: 'digest-plan-test',
+      sprint,
+      preview: {
+        topology: undefined,
+        scopeGateResult: 'pass', scopeGateOverridden: false,
+      },
+      context: {}, sourceAuthority: {}, lineage: {},
+      approval: 'awaiting', reusedDurablePlan: false,
+    } as unknown as PlanRunFlowResult);
+  }
+
+  // Drives the REAL promptConfirm ('Approve this plan?') through the mocked
+  // readline seam — answering 'y' approves the DRAFT plan deterministically.
+  let approvalQuestion: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     captureOutput();
     process.exitCode = undefined;
+    approvalQuestion = vi.fn().mockResolvedValue('y');
+    vi.mocked(createInterface).mockReturnValue({
+      question: approvalQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(readContext).mockReturnValue({
+      directives: '', memory: '', retro: '', debt: [],
+      patterns: '', decisions: '', existingTasks: [],
+      projectState: { gitStatus: '', fileTree: [] },
+    } as unknown as ReturnType<typeof readContext>);
   });
   afterEach(() => {
     restoreOutput();
@@ -1189,13 +1263,7 @@ describe('plan command', () => {
   });
 
   it('plans and shows task table', async () => {
-    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(readContext).mockReturnValue({
-      directives: '', memory: '', retro: '', debt: [],
-      patterns: '', decisions: '', existingTasks: [],
-      projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(planSprint).mockReturnValue(makeSprint({
+    mockPlanFlow(makeSprint({
       tasks: [makeTask({ id: 'task-001', title: 'CLI Module', model: 'claude-sonnet-5', priority: 'HIGH' })],
     }));
     await runCommand(registerPlan, ['plan']);
@@ -1211,13 +1279,7 @@ describe('plan command', () => {
   });
 
   it('shows multiple tasks', async () => {
-    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(readContext).mockReturnValue({
-      directives: '', memory: '', retro: '', debt: [],
-      patterns: '', decisions: '', existingTasks: [],
-      projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(planSprint).mockReturnValue(makeSprint({
+    mockPlanFlow(makeSprint({
       tasks: [
         makeTask({ id: 'task-001', title: 'A' }),
         makeTask({ id: 'task-002', title: 'B' }),
@@ -1229,46 +1291,31 @@ describe('plan command', () => {
     expect(stdout()).toContain('2 tasks');
   });
 
-  it('--structured passes mode=structured to planSprint', async () => {
-    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(readContext).mockReturnValue({
-      directives: '', memory: '', retro: '', debt: [],
-      patterns: '', decisions: '', existingTasks: [],
-      projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [makeTask()] }));
+  it('--structured passes mode=structured to planRunFlow', async () => {
+    mockPlanFlow(makeSprint({ tasks: [makeTask()] }));
     await runCommand(registerPlan, ['plan', '--structured']);
-    expect(vi.mocked(planSprint)).toHaveBeenCalledWith(
-      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
-      expect.objectContaining({ mode: 'structured' }),
+    expect(vi.mocked(planRunFlow)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previewOptions: expect.objectContaining({ mode: 'structured' }),
+      }),
     );
   });
 
   it('--no-confirm skips approval flow', async () => {
-    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(readContext).mockReturnValue({
-      directives: '', memory: '', retro: '', debt: [],
-      patterns: '', decisions: '', existingTasks: [],
-      projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [makeTask()] }));
+    mockPlanFlow(makeSprint({ tasks: [makeTask()] }));
     await runCommand(registerPlan, ['plan', '--no-confirm']);
-    expect(vi.mocked(planSprint)).toHaveBeenCalledWith(
-      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
-      expect.objectContaining({ asDraft: false }),
+    expect(vi.mocked(planRunFlow)).toHaveBeenCalled();
+    // No interactive approval prompt — the plan is auto-approved through the
+    // run-flow approval CAS directly.
+    expect(approvalQuestion).not.toHaveBeenCalled();
+    expect(vi.mocked(decideRunFlowPlan)).toHaveBeenCalledWith(
+      expect.any(String), 'flow-test',
+      expect.objectContaining({ decision: 'approve' }),
     );
-    // No approval prompt, no confirmDraftTasks call
-    expect(vi.mocked(confirmDraftTasks)).not.toHaveBeenCalled();
   });
 
   it('shows reasoning when present', async () => {
-    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(readContext).mockReturnValue({
-      directives: '', memory: '', retro: '', debt: [],
-      patterns: '', decisions: '', existingTasks: [],
-      projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(planSprint).mockReturnValue(makeSprint({
+    mockPlanFlow(makeSprint({
       tasks: [makeTask()],
       reasoning: 'AI planned this',
       planningMode: 'ai',
@@ -1681,7 +1728,12 @@ describe('init command', () => {
     // DECKENT.md now references the summary export directly instead of the
     // legacy .brain/MEMORY.md file.
     expect(content).toContain('@.brain/exports/summary.md');
-    expect(content).toContain('@.claude/rules/brain.md');
+    // Host-adapter neutrality: DECKENT.md no longer freezes provider-specific
+    // rule paths — Brain/Auditor/Worker rules load from the selected host
+    // adapter's generated rule projection instead.
+    expect(content).toContain('## Agent Instructions');
+    expect(content).toContain("host adapter's generated");
+    expect(content).not.toContain('@.claude/rules/brain.md');
     expect(content).toContain('@.deckent/workspace/BOOT.md');
   });
 
