@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "7b38e816e02475e7a3e834ebfbc5abaa047621dee4aedc30bf6a5226e768a30e"
+    "value": "1b4fc1f87bdc3b1c3c98a7a1d9159d9946daba9a2aee27fe278eb7cc637754c7"
   },
   "summary": {
     "total": 339,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 234,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 30,
+      "VERIFY": 31,
       "DONE": 7,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -696,10 +696,10 @@
       "id": "TRUST-ANCHOR-002",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-04",
       "definitionDigest": "e482051b747fa13c88a5d36badb0f91de0bc9aeadfb01d5b6b4e4aeb98bc2628",
-      "progressDigest": "a59a64cee7cfe24509d27aad01ff6afe6ea06b0981477920a1f556ab72128e84",
+      "progressDigest": "36d6b0e3d0406bb4db9e6b60d4a6c5e322b5d92a461fab9d0a88ed7aa00436d3",
       "terminalClosureDigest": null
     },
     {
@@ -4060,8 +4060,8 @@
       "authorityDigest": "ff663452f44e75a594e5dbc30ff301d4884cf0c52816a69082dfbc05ff37acd7",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-04T05:47:45Z"
       },
       "g7AttemptIdentity": null
     }
@@ -6110,12 +6110,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
-        "E": "0",
-        "H": "?",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -6127,7 +6127,7 @@
         "GR-2026-08-04-TRUST-ANCHOR-002-01"
       ],
       "acceptance": "Resolver'da: receipt HEAD blob'unda varken `-S` tarihte bulamıyorsa `history-unresolved` FAIL-CLOSED; `--follow` rename boyunca gerçek registration commit'ini bulur; shallow repository typed FAIL-CLOSED; multi-parent introduction FAIL-CLOSED; root-commit registration (`no-parent`) FAIL-CLOSED; blob okuma üç-durumlu (`ok/absent/error`) — error asla ABSENT'i karşılamaz (OQ-XVE-05); `ci.yml` Type Check `fetch-depth: 0` alır; Codex'in merge/rename/shallow saldırıları birebir gerçek-git regresyon testi olarak DÜŞER; degradasyon WARN'ı yalnız git-dışı/commit-siz ortama (hermetik fixture) daralır",
-      "evidence": "Açılış: Alperen 2026-08-04 kararı (\"TRUST-ANCHOR-002 önce\") — kaynak codex-analysis/xverify-e-2026-08-03.md A/B REFUTED mekanik bulguları. Pre-work admission receipt'i bu satırla AYNI commit'te ve implementasyondan ÖNCE kayıtlıdır — FAZ4A-SLICE-PLAN §3 revizyonunun (iki-adım rejim, OQ-XVE-06 cevabı) ilk gerçek uygulaması budur; `receipt=GR-2026-08-04-TRUST-ANCHOR-002-01`",
+      "evidence": "Açılış: Alperen 2026-08-04 kararı (\"TRUST-ANCHOR-002 önce\") — kaynak codex-analysis/xverify-e-2026-08-03.md A/B REFUTED mekanik bulguları. Pre-work admission receipt'i bu satırla AYNI commit'te ve implementasyondan ÖNCE kayıtlıdır — FAZ4A-SLICE-PLAN §3 revizyonunun (iki-adım rejim, OQ-XVE-06 cevabı) ilk gerçek uygulaması budur; `receipt=GR-2026-08-04-TRUST-ANCHOR-002-01`; 2026-08-04 SETTLEMENT: suite 92/92 (84'e +8: shallow/history-unresolved/merge-introduction hermetik + blob üç-durum + merge/rename/shallow gerçek-git saldırıları), gerçek repo lint:master-plan OK (yeni fail-closed modlar yanlış-pozitif üretmedi), tsc temiz, hermetic build-free tazelendi (12438 / inventory cf17650d); `proof=xverify-e-mechanical-quartet-fail-closed-92cases`; iki-adım rejimin dogfood kanıtı Git-tarihli: yeni validator × pre-work commit (8cae888dc, receipt aktif) = OK — anchor kontrolü aktif fazda GERÇEKTEN koştu; × implementasyon commit'i = RECEIPT_BASELINE_DRIFT ×3 + ADMISSION_RECEIPT_MISSING (bilinçli aktif-faz drift'i, fail-closed); settlement bu satırla consume eder. Kapsam dışı bırakılan: parent≠reviewed ve required-check self-modification yapısal sınırları TRUST-ANCHOR-001'de owner kararı bekler (solo-hesap mitigasyon araştırması: docs/analysis/github-solo-mitigations-2026-08-04.md — VerhexIO org + public repo → merge queue ve path-scoped required-reviewer FREE, GitHub-App ayrı-integration-ID required check FREE desen; karar-girdisi, policy üretmez)",
       "updated": "2026-08-04"
     },
     {
@@ -18180,6 +18180,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "02cfee9c7959956f442825e2fab736b76222b850f8deec778c7f64c892d3a622"
+    "value": "7bccc550e3375f2fb83fad2b994b46e38e40a3dac412eeab88e6a75ffd86ae6b"
   }
 }
