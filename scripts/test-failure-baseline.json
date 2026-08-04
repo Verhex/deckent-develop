@@ -51,10 +51,6 @@
       "failed": 1
     },
     {
-      "file": "tests/cli/command-registry.test.ts",
-      "failed": 2
-    },
-    {
       "file": "tests/cli/commands/dashboard-overhaul.test.ts",
       "failed": 1
     },

@@ -100,19 +100,18 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-04 (build-free, FAZ4B-B2): count unchanged, file-set/digest moved — CLI-core
-  // suites gained real-fixture writers (terminal receipts, run-flow snapshots, exact-attempt
-  // journals). Prior refresh: FAZ4A-S7 (count 12442).
+  // 2026-08-04 (build-free, EXEC-AUTH-REG mikro-fix): count unchanged, digest moved —
+  // command-registry.ts gained the execution-authority entry (graph edge content).
+  // Prior refresh: FAZ4B-B2 (count 12442).
   count: 12442,
-  digest: 'ac29fb713aba58f034adca805f77bb3466da04cb069428b8592c4d13e8fa233a',
+  digest: 'f99a1919a53470cd9862d579dfaa754cbee8edeb8a32db0842d3ea6d8c564b87',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-04 (PROD-SPRINT-PREFIX-PAD-001): count unchanged, digest moved —
-  // sprint-lifecycle.ts + sprint-finalizer.ts prefix derivation switched to the
-  // canonical padded sprint-id segment.
+  // 2026-08-04 (EXEC-AUTH-REG): count unchanged, digest moved — command-registry.ts
+  // gained the execution-authority entry. Prior: PREFIX-PAD prefix derivation.
   count: 1196,
-  digest: 'e30beb32e5d00da682eb2162fd0d2edfa580a76f7406dfd05e8a82a8ac1f045d',
+  digest: '19565ea0cb16091f1125406ed7ed3c3abf10f078de677808b6784a467988cfd8',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
