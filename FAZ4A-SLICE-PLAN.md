@@ -47,10 +47,16 @@ zinciri); S4/S5/S6 bağımsız ve §10.1 runtime-slot bütçesine (2) göre para
 (S3'ün controller değişikliklerine oturur). Her alt-dilim kapanışında `check-test-failures --update`
 ile ratchet DÜŞÜRÜLÜR ve sayı PR gövdesine yazılır — "yeşil" tek başına rapor değildir.
 
-## 3. Admission receipt şablonu (her alt-dilim için)
+## 3. Admission receipt şablonu (her alt-dilim için) — pre-work admission rejimi
 
-Oturum başında, HEAD'de, hedef dosyaların **commit'li** hash'leri alınır (parent-anchor bunu şart
-koşar — commit'lenmemiş düzenleme kendine kefil olamaz):
+> **Revizyon 2026-08-03 (xverify-E D-ekseni, REFUTED):** eski mint+consume-aynı-settlement
+> şablonu anchor kontrolüne HİÇ girmiyordu (validator yalnız `active` receipt'i doğrular) —
+> yanlış READY üretmese de admission kanıtı değildi. Yeni akış iki adımlıdır:
+
+**Adım 1 — pre-work admission (iş başlamadan, KENDİ commit'inde):** receipt `active` olarak
+kaydedilir ve tek başına commit'lenir. Bu commit'in parent'ı = dilimin başlangıç durumu; validator
+parent-anchor doğrulamasını BU aşamada gerçekten koşar (baseline hash'ler parent'taki blob'larla
+eşleşmek zorunda). Hash'ler HEAD'den alınır:
 
 ```bash
 for f in <target-paths>; do echo "$f@$(git show HEAD:$f | sha256sum | cut -d' ' -f1)"; done
@@ -62,8 +68,15 @@ for f in <target-paths>; do echo "$f@$(git show HEAD:$f | sha256sum | cut -d' ' 
   owner=Alperen; decision=APPROVED;
   scope=exact <k>-path FAZ4A-S<n> slice (production fix + P1 test-cluster rewrite + ratchet düşüşü);
   exclusions=push,sprint,provider-call,build,destructive-action,other-files |
-  <Recorded RFC3339> | `ONE_SHOT`: consumed@<settlement RFC3339> |
+  <Recorded RFC3339> | `ONE_SHOT`: active |
 ```
+
+**Adım 2 — settlement (dilim kapanışında):** aynı satırın state hücresi
+`` `ONE_SHOT`: consumed@<settlement RFC3339> `` olur; bu değişiklik settlement commit'iyle iner.
+Böylece consumed kayıt, "aktif receipt anchor'a karşı doğrulanmışken iş yapıldı" iddiasının
+Git-tarihli kanıtını taşır (OQ-XVE-06'nın cevabı). Aktif receipt implementasyon sırasında
+working-tree drift'e düşer — bu bilinçli validator davranışıdır ve dilim PR'ı içinde yalnız
+settlement commit'inde çözülür.
 
 ## 4. Doğrulama sözleşmesi (her alt-dilimde aynen)
 

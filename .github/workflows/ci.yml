@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # merge_group: main'de merge queue rule'u aktif (Alperen, 2026-08-04). Kuyruk, required
+  # check'leri PR branch'inde değil final merge result üzerinde yeniden koşar; bu event
+  # dinlenmezse kuyruk check sonucu alamaz ve hiçbir PR merge olamaz.
+  merge_group:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -40,7 +44,12 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 — this job runs lint:gates → lint-master-plan, whose trust-anchor
+      # resolution is history-sensitive; a shallow clone is now a fail-closed finding
+      # (xverify-E: depth-1 previously degraded to a WARN pass on this leg).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'

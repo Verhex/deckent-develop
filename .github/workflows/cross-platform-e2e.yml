@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # merge_group: main'de merge queue rule'u aktif (Alperen, 2026-08-04) — required
+  # Validator Contract bacakları kuyruğun final merge result'ında da koşmak zorunda.
+  merge_group:
 
 concurrency:
   group: cross-platform-${{ github.ref }}

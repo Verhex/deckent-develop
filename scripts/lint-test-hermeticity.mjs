@@ -100,19 +100,20 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-03 (build-free, FAZ4A-S2): −1 entry — the finalizer suites dropped their
-  // vi.mock('node:fs') registrations when rewritten onto real tmpdir isolation
-  // (tests/orchestra/finalize-sprint.test.ts + sprint-finalizer.test.ts).
-  // Prior refresh same day: +24 TRUST-ANCHOR-001 regression suite (count 12425).
-  count: 12424,
-  digest: '8fd758615db53cd51da7bdbf950c20cd688f6800a47783f8df4bc47fa8173135',
+  // 2026-08-03 (build-free, TRUST-ANCHOR-002): +14 entries — xverify-E regression cases
+  // in tests/scripts/lint-master-plan.test.ts (merge-introduction, rename --follow,
+  // shallow-clone attacks) drive real scratch git repos and a file:// depth-1 clone.
+  // Prior refresh same day: FAZ4A-S2 real-tmpdir rewrite (count 12424).
+  count: 12438,
+  digest: '3762b4d6cf78e777ab1a74492faa16827881086d80f73ff34d0c7ac1da738a28',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-03 (2nd refresh today, TRUST-ANCHOR-001 slice): count unchanged, digest moved —
-  // scripts/lint-master-plan.mjs gained the child_process-backed anchor helpers.
+  // 2026-08-03 (TRUST-ANCHOR-002): count unchanged, digest moved — the anchor resolver in
+  // scripts/lint-master-plan.mjs gained fail-closed modes (shallow/merge/history-unresolved)
+  // and the three-state blob reader (OQ-XVE-05).
   count: 1196,
-  digest: '36dbbaf610520af2944fcdf342205c7c7a981e7d92e32dfe4b0cd4b548dc6ecb',
+  digest: 'cf17650d2684762da5d0b40f9280a166c58800caf14b27cb996431b192e7e08c',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

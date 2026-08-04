@@ -80,10 +80,14 @@ export const ACTIVE_JSON_RELATIVE_PATH = 'docs/generated/master-plan-active.json
  *   - Baseline hash must match the anchor blob (`git show <anchor>:<path>`), and an ABSENT
  *     baseline requires the path to be absent at the anchor too.
  *
- * Degradation is typed, never silent: outside a git work tree (hermetic scratch fixtures)
- * the check reports `no-git` and emits a stderr WARN instead of findings — enforcement is
- * guaranteed by the required CI checks (branch ruleset 20321963), which always run inside
- * the real repository with full history (validator-contract fetch-depth: 0).
+ * Degradation is typed, never silent, and split in two classes (xverify-E 2026-08-03):
+ * outside a git work tree or before any commit (hermetic scratch fixtures) the check
+ * reports `no-git`/`no-history` as a stderr WARN — enforcement is guaranteed by the
+ * required CI checks (branch ruleset 20321963), which all run with full history
+ * (fetch-depth: 0). Every other unresolvable state (shallow clone, root-commit
+ * registration, receipt present in HEAD but invisible to `-S`, merge introduction) is a
+ * FAIL-CLOSED finding: the repository has history, so an untraceable anchor indicts the
+ * receipt, not the environment.
  */
 export function runGitCommand(args, cwd) {
   return execFileSync('git', args, {
@@ -96,10 +100,22 @@ export function runGitCommand(args, cwd) {
 
 /**
  * Resolve the trust anchor commit for one active receipt.
+ *
+ * Modes fall into three classes the caller must keep distinct:
+ *   - 'git'                — anchor resolved; verify baselines against it.
+ *   - 'no-git'/'no-history'— environment cannot carry the check at all (hermetic scratch
+ *                            fixtures); typed WARN, enforcement guaranteed by required CI.
+ *   - 'shallow' / 'no-parent' / 'history-unresolved' / 'merge-introduction'
+ *                          — the repository HAS history but the reviewed pre-state cannot be
+ *                            proven; FAIL-CLOSED (xverify-E: each of these was a demonstrated
+ *                            acceptance path when treated as benign degradation).
+ *
  * @param {string} receiptId
  * @param {string} root repository root the scan is bound to
  * @param {(args: string[], cwd: string) => Buffer} git injectable for hermetic tests
- * @returns {{mode: 'git', anchor: string} | {mode: 'no-git' | 'no-history' | 'no-parent', anchor: null}}
+ * @returns {{mode: 'git', anchor: string}
+ *   | {mode: 'no-git' | 'no-history' | 'shallow' | 'no-parent'
+ *       | 'history-unresolved' | 'merge-introduction', anchor: null}}
  */
 export function resolveReceiptTrustAnchor(receiptId, root, git = runGitCommand) {
   const text = (args) => {
@@ -115,34 +131,80 @@ export function resolveReceiptTrustAnchor(receiptId, root, git = runGitCommand) 
   if (text(['rev-parse', '--verify', 'HEAD']) === null) {
     return { mode: 'no-history', anchor: null };
   }
+  // xverify-E: a depth-1 clone grafts HEAD into a root commit, so `-S` "finds" a
+  // registration whose parent is unreachable and the old resolver degraded to a WARN pass.
+  // A shallow repository is structurally blind for anchor resolution — fail closed.
+  if (text(['rev-parse', '--is-shallow-repository']) === 'true') {
+    return { mode: 'shallow', anchor: null };
+  }
   // Oldest commit whose diff changes the occurrence count of the receipt id — the
-  // registration commit. Empty output = receipt only exists in the working tree.
-  const introLog = text(['log', '--format=%H', `-S${receiptId}`, '--', 'docs/MASTER-PLAN.md']);
+  // registration commit. `--follow` keeps the search attached to the canonical plan file
+  // across renames (xverify-E: without it a rename commit was mistaken for the
+  // registration, silently advancing the anchor past an already-mutated baseline).
+  const introLog = text([
+    'log', '--follow', '--format=%H', `-S${receiptId}`, '--', 'docs/MASTER-PLAN.md',
+  ]);
   if (!introLog) {
+    // No history hit. That is legitimate ONLY while the receipt exists solely in the
+    // working tree (authoring flow → anchor HEAD). If the receipt is already present in
+    // the committed HEAD blob, the empty search is a history anomaly — xverify-E showed a
+    // merge-introduced receipt is invisible to `-S` (merge diffs are not opened), and the
+    // old resolver then let the receipt anchor to its own HEAD bytes. Fail closed.
     const head = text(['rev-parse', 'HEAD']);
-    return head ? { mode: 'git', anchor: head } : { mode: 'no-history', anchor: null };
+    if (!head) {
+      return { mode: 'no-history', anchor: null };
+    }
+    let committedPlan = null;
+    try {
+      committedPlan = git(['show', 'HEAD:docs/MASTER-PLAN.md'], root).toString('utf8');
+    } catch {
+      committedPlan = null;
+    }
+    if (committedPlan !== null && committedPlan.includes(receiptId)) {
+      return { mode: 'history-unresolved', anchor: null };
+    }
+    return { mode: 'git', anchor: head };
   }
   const intro = introLog.split('\n').at(-1);
+  // Defensive: should `-S` ever surface a multi-parent introduction, there is no single
+  // reviewed pre-state to pick — refusing beats guessing a parent.
+  const parentsLine = text(['rev-list', '--parents', '-n', '1', intro]);
+  const parentHashes = parentsLine ? parentsLine.split(/\s+/).slice(1) : [];
+  if (parentHashes.length > 1) {
+    return { mode: 'merge-introduction', anchor: null };
+  }
   const parent = text(['rev-parse', '--verify', '--quiet', `${intro}^`]);
   if (!parent) {
-    // Receipt registered in the root commit: no reviewed pre-state exists.
+    // Receipt registered in the root commit: no reviewed pre-state exists. This is a
+    // provable absence of a trust anchor, not an environment limitation — fail closed.
     return { mode: 'no-parent', anchor: null };
   }
   return { mode: 'git', anchor: parent };
 }
 
 /**
- * Read one path's blob at the anchor commit; null when absent there.
+ * Read one path's blob at the anchor commit.
+ *
+ * xverify-E OQ-XVE-05: collapsing every `git show` failure into "absent" let an object-read
+ * error satisfy an ABSENT baseline. Existence is therefore probed separately: a path that
+ * provably exists at the anchor but cannot be read is an 'error', never 'absent'.
+ *
  * @param {string} anchor
  * @param {string} path repo-relative
  * @param {string} root
  * @param {(args: string[], cwd: string) => Buffer} git
+ * @returns {{status: 'ok', blob: Buffer} | {status: 'absent'} | {status: 'error'}}
  */
 export function readTrustAnchorBlob(anchor, path, root, git = runGitCommand) {
   try {
-    return git(['show', `${anchor}:${path}`], root);
+    return { status: 'ok', blob: git(['show', `${anchor}:${path}`], root) };
   } catch {
-    return null;
+    try {
+      git(['cat-file', '-e', `${anchor}:${path}`], root);
+      return { status: 'error' };
+    } catch {
+      return { status: 'absent' };
+    }
   }
 }
 const ACTIVE_WRITE_LOCK_RELATIVE_PATH = 'docs/generated/.master-plan-write.lock';
@@ -2242,27 +2304,44 @@ function validateLedger(
         canonicalRepositoryRoot(repositoryRoot),
         gitRunner,
       );
-      if (anchorResolution.mode !== 'git') {
+      if (anchorResolution.mode === 'no-git' || anchorResolution.mode === 'no-history') {
         // Typed degradation, never silent: hermetic scratch fixtures run outside git and
         // must not fail here — real enforcement is guaranteed by the required CI checks
-        // (ruleset 20321963), which always run inside the repository with full history.
+        // (ruleset 20321963), which all run inside the repository with full history.
         process.stderr.write(
           `[master-plan] WARN — trust-anchor verification degraded (${anchorResolution.mode}) `
             + `for active receipt ${receipt.id}; reviewed-parent baseline check skipped. `
             + 'Required CI checks enforce this on the real repository.\n',
         );
+      } else if (anchorResolution.mode !== 'git') {
+        // xverify-E (2026-08-03, REFUTED round): shallow / no-parent / history-unresolved /
+        // merge-introduction each let a forged receipt through when treated as benign
+        // degradation. The repository HAS history here — an unresolvable reviewed pre-state
+        // is an anchoring failure of THIS receipt, not an environment limitation.
+        addFinding(
+          findings,
+          'RECEIPT_BASELINE_UNREVIEWED',
+          `Active receipt ${receipt.id} has no resolvable reviewed trust anchor `
+            + `(${anchorResolution.mode}) — a receipt whose registration history cannot be `
+            + 'traced to a reviewed parent commit cannot vouch for its own baselines',
+          receipt.line,
+          undefined,
+        );
+        receipt.active = false;
       } else {
         for (const target of manifestTargets) {
-          const blob = readTrustAnchorBlob(
+          const read = readTrustAnchorBlob(
             anchorResolution.anchor,
             target.path,
             canonicalRepositoryRoot(repositoryRoot),
             gitRunner,
           );
+          // OQ-XVE-05: a read 'error' is never treated as absence — it violates both an
+          // ABSENT baseline (existence proven) and a hash baseline (bytes unverifiable).
           const violated = target.baseline === 'ABSENT'
-            ? blob !== null
-            : blob === null
-              || createHash('sha256').update(blob).digest('hex') !== target.baseline;
+            ? read.status !== 'absent'
+            : read.status !== 'ok'
+              || createHash('sha256').update(read.blob).digest('hex') !== target.baseline;
           if (violated) {
             addFinding(
               findings,
