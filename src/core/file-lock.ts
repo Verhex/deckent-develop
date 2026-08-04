@@ -3323,6 +3323,38 @@ export function adoptExecutionLockAuthorityMount(
       try { unlinkSync(stagingPath); } catch { /* renamed or never published */ }
     }
 
+    // The parent-directory root binding (62aafff34) is a byte-identical copy of the
+    // anchor and validateExecutionLockAuthorityFiles enforces raw equality on every
+    // acquire. Adoption that rewrites only the anchor leaves the stale binding behind
+    // and permanently fail-closes the root (mount-adoption broken end-to-end) — the
+    // binding must be republished atomically with the SAME adopted bytes.
+    const bindingPath = executionLockRootBindingPath(pinned);
+    const bindingStagingPath =
+      `${bindingPath}.mount-adoption-${process.pid}-${randomBytes(6).toString('hex')}`;
+    let bindingStagingFd: number | undefined;
+    try {
+      bindingStagingFd = openSync(
+        bindingStagingPath,
+        fsConstants.O_WRONLY
+          | fsConstants.O_CREAT
+          | fsConstants.O_EXCL
+          | fsConstants.O_NOFOLLOW,
+        0o600,
+      );
+      writeFileSync(bindingStagingFd, adoptedAnchorRaw, 'utf8');
+      fsyncSync(bindingStagingFd);
+      closeSync(bindingStagingFd);
+      bindingStagingFd = undefined;
+      executionLockPathIdentity(bindingStagingPath, MAX_EXECUTION_LOCK_ANCHOR_BYTES);
+      renameSync(bindingStagingPath, bindingPath);
+      fsyncExecutionLockDirectory(pinned.stableParentPath);
+    } finally {
+      if (bindingStagingFd !== undefined) {
+        try { closeSync(bindingStagingFd); } catch { /* preserve adoption failure */ }
+      }
+      try { unlinkSync(bindingStagingPath); } catch { /* renamed or never published */ }
+    }
+
     const anchorAfterReplace = readExecutionLockAuthorityAnchor(anchorPath);
     const sentinelAfter =
       readExecutionLockAuthoritySentinel(sentinelPath);
