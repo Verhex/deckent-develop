@@ -13,36 +13,28 @@
  * - deleteSafetyPoint called on successful sprint
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TaskStatus, TaskEvaluation, SprintPhase, SprintStatus } from '../../src/core/types.js';
-import type { Task, Sprint, ResolvedConfig } from '../../src/core/types.js';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import type { ResolvedConfig } from '../../src/core/types.js';
+import { DEBT_TABLE_HEADER } from '../../src/core/constants.js';
 
-// ─── Mocks ──────────────────────────────────────────────────────────
-
-vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  appendFileSync: vi.fn(),
-  // Sprint 139 async I/O migration: sprint-finalizer and other modules use
-  // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
-  // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
+// ─── REAL FILESYSTEM (FAZ4A-S5) ─────────────────────────────────────
+// The node:fs mock is deliberately GONE. runSprint's coordinator heartbeat
+// publishes the canonical run-status read-model through an atomic ring
+// (write temp → renameSync → read back → digest compare) that verifies its
+// own writes; a mocked fs cannot carry that round-trip. Same root cause +
+// fix as FAZ4A-S2/S3/S4 (finalize-sprint / sprint-finalizer /
+// runsprint-debt-integration). The old file additionally mocked
+// sprint-phases.js and REIMPLEMENTED the rollback choreography inside its
+// own runRollbackCheck mock — the spies were driven by test-local code, not
+// production. Now the REAL runSprint → runPreStartGuards →
+// createSafetyPoint/saveSafetyPoint and the REAL runRollbackCheck →
+// getRollbackPolicy/rollback/recordRollbackInDebt/deleteSafetyPoint chains
+// exercise the spy-mocked rollback.js module, on a real tmpdir root per test.
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
+  // Real fs, mocked processes: git/tsc probes must not escape the sandbox. A
+  // bare vi.fn() would return undefined and crash callers reading `.status`.
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -50,12 +42,7 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
   spawnWorker: vi.fn(),
   killWorker: vi.fn(),
   listWorkers: vi.fn().mockReturnValue([]),
-}));
-
-vi.mock('../../src/orchestra/spawn-backend.js', () => ({
-  TmuxBackend: vi.fn(),
-  SubprocessBackend: vi.fn(),
-  SpawnBackendFactory: { create: vi.fn() },
+  startAuditor: vi.fn(),
 }));
 
 vi.mock('../../src/monitor/auditor.js', () => ({
@@ -66,20 +53,9 @@ vi.mock('../../src/monitor/auditor.js', () => ({
   writeScanToDashboard: vi.fn(),
 }));
 
-vi.mock('../../src/core/utils.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
-  return {
-    ...actual,
-    countBrainLines: vi.fn().mockReturnValue(100),
-    getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
-    updateLastSprintId: vi.fn(),
-    parseDebtTable: vi.fn().mockReturnValue([]),
-  };
-});
-
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn(),
-  releaseAllLocks: vi.fn().mockReturnValue(0),
+  releaseAllLocks: vi.fn(),
   createWorkerStateMachine: vi.fn(() => ({
     transition: vi.fn(),
     canTransition: vi.fn(() => true),
@@ -90,61 +66,107 @@ vi.mock('../../src/agents/worker.js', () => ({
   isWorkerStoppable: vi.fn(() => true),
 }));
 
-vi.mock('../../src/orchestra/planner.js', () => ({
-  resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
-  normalizePlannerDependencies: () => ({ resolvedCount: 0, dropped: [] }),
-  callBrainPlanner: vi.fn().mockReturnValue(null),
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  const mockAdapter = {
+    name: 'claude',
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('claude --model sonnet /dev/null'),
+    buildPlannerCommand: (prompt: string, model: string) => ({
+      command: 'claude',
+      args: ['-p', prompt, '--model', model, '--output-format', 'json'],
+    }),
+  };
+  return {
+    ...actual,
+    providerRegistry: {
+      getDefault: vi.fn().mockReturnValue(mockAdapter),
+      registerProvider: vi.fn(),
+      getProvider: vi.fn().mockReturnValue(mockAdapter),
+      hasProvider: vi.fn().mockImplementation((name: string) => name === 'claude'),
+      listProviders: vi.fn().mockReturnValue(['claude']),
+      setDefault: vi.fn(),
+      unregisterProvider: vi.fn(),
+      clear: vi.fn(),
+      size: 0,
+    },
+    ProviderError: class ProviderError extends Error {
+      providerName: string;
+      constructor(message: string, providerName: string) {
+        super(message);
+        this.name = 'ProviderError';
+        this.providerName = providerName;
+      }
+    },
+    ProviderNotFoundError: class ProviderNotFoundError extends Error {
+      providerName: string;
+      constructor(providerName: string) {
+        super(`Provider not found: "${providerName}"`);
+        this.name = 'ProviderNotFoundError';
+        this.providerName = providerName;
+      }
+    },
+  };
+});
+
+vi.mock('../../src/core/plugin-hooks.js', () => ({
+  runHooks: vi.fn().mockResolvedValue(undefined),
+  clearHooks: vi.fn(),
+  loadPluginHooks: vi.fn().mockResolvedValue(0),
+  resolveCiGuardianConfig: vi.fn().mockReturnValue({ enabled: false }),
+  runCiRegressionCheck: vi.fn().mockReturnValue({ regressionDetected: false, tscPassed: true, targetedTestsPassed: true, targetedTestFiles: [], alerts: [], testCountDelta: 0 }),
+  runPreSprintValidation: vi.fn().mockReturnValue({ passed: true, tscPassed: true, testsPassed: true, testCount: 0, testPassed: 0, testFailed: 0, coverage: 0, baselineSaved: false }),
 }));
 
-vi.mock('../../src/core/system-profile.js', () => ({
-  getSystemProfile: vi.fn().mockReturnValue({
-    platform: 'linux',
-    hasTmux: true,
-    recommendedMaxWorkers: 4,
-  }),
+vi.mock('../../src/core/stack-detector.js', () => ({
+  detectProjectStack: vi.fn().mockReturnValue({ languages: [], frameworks: [], tools: [] }),
+  detectFullStack: vi.fn().mockReturnValue({ language: '', framework: '', buildTool: '', testFramework: '', commands: { build: '', test: '', lint: '' } }),
+}));
+
+vi.mock('../../src/core/skill-pool.js', () => ({
+  SkillPoolManager: vi.fn().mockImplementation(() => ({
+    loadSkills: vi.fn().mockReturnValue(new Map()),
+  })),
+}));
+
+vi.mock('../../src/core/skill-selector.js', () => ({
+  selectSkills: vi.fn().mockReturnValue({ skills: [], reason: '' }),
+}));
+
+vi.mock('../../src/orchestra/spawn-backend.js', () => ({
+  TmuxBackend: vi.fn(),
+  SubprocessBackend: vi.fn(),
+  SpawnBackendFactory: { create: vi.fn() },
 }));
 
 vi.mock('../../src/orchestra/result-watcher.js', () => ({
   createResultWatcher: vi.fn().mockReturnValue({
-    waitForChange: vi.fn().mockResolvedValue(undefined),
+    waitForChange: vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 5_000))),
     close: vi.fn(),
   }),
 }));
 
-vi.mock('../../src/orchestra/debt-manager.js', () => ({
-  handleEvaluation: vi.fn(),
-  handleCrossDependencies: vi.fn(),
-  escalateDebt: vi.fn(),
-  resolveDebt: vi.fn(),
-  runDecay: vi.fn(),
-  decay: vi.fn(),
-}));
-
-vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
-  writeRetrospective: vi.fn(),
-  writeSprintLog: vi.fn(),
-  calculateMetrics: vi.fn().mockReturnValue({
-    totalTasks: 1,
-    completedTasks: 0,
-    techDebtTasks: 0,
-    noGoTasks: 1,
-    durationMs: 1000,
-    coveragePercent: 0,
-    noGoRate: 100,
-    newDebtCount: 0,
-    resolvedDebtCount: 0,
-    totalOpenDebt: 0,
-    boundaryViolations: 0,
-    crossAssignments: 0,
-    contextLinesUsed: 0,
+vi.mock('../../src/orchestra/runtime-budget-monitor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/runtime-budget-monitor.js')>()),
+  // This fixture exercises the rollback choreography after result collection.
+  // Runtime budget settlement has its own contract tests; resolve immediately
+  // here so the hermetic backend does not wait for a host usage envelope it
+  // never emits.
+  waitForTerminalRuntimeBudgetUsage: vi.fn().mockResolvedValue({
+    terminal: true,
+    decision: { state: 'within-budget' },
   }),
-  updateProjectDocs: vi.fn(),
-  trimMemoryWithHeader: vi.fn(),
-  compareWithPreviousSprint: vi.fn(),
-  readPreviousSprintMetrics: vi.fn().mockReturnValue(null),
 }));
 
-// ─── Rollback mock (spy-able) ────────────────────────────────────────
+// ─── Rollback mock (spy-able, COMPLETE export list) ──────────────────
+// The spies below are called by PRODUCTION code (runPreStartGuards /
+// runRollbackCheck), not by any test-local reimplementation. Every runtime
+// export of src/orchestra/rollback.ts is present — a missing export is the
+// fix-phase-map stale-mock failure mode.
 const mockCreateSafetyPoint = vi.fn();
 const mockRollback = vi.fn();
 const mockGetRollbackPolicy = vi.fn();
@@ -158,11 +180,11 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
   getRollbackPolicy: (...args: unknown[]) => mockGetRollbackPolicy(...args),
   recordRollbackInDebt: (...args: unknown[]) => mockRecordRollbackInDebt(...args),
   saveSafetyPoint: (...args: unknown[]) => mockSaveSafetyPoint(...args),
-  loadSafetyPoint: vi.fn().mockReturnValue(null),
   deleteSafetyPoint: (...args: unknown[]) => mockDeleteSafetyPoint(...args),
   deleteSafetyPointFile: vi.fn(),
+  loadSafetyPoint: vi.fn().mockReturnValue(null),
   isCleanWorkingTree: vi.fn().mockReturnValue(true),
-  safetyBranchExists: vi.fn().mockReturnValue(true),
+  safetyBranchExists: vi.fn().mockReturnValue(false),
   getDirtyFiles: vi.fn().mockReturnValue([]),
   getCurrentCommitSha: vi.fn().mockReturnValue('abc123'),
   getCurrentBranch: vi.fn().mockReturnValue('main'),
@@ -170,341 +192,246 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
   cleanOrphanSafetyPoint: vi.fn().mockReturnValue(false),
 }));
 
+vi.mock('../../src/orchestra/coverage-validator.js', () => ({
+  parseCoverageFromVitest: vi.fn(),
+  validateCoverage: vi.fn(),
+  validateWorkerCoverage: vi.fn().mockReturnValue(null),
+  isDocOnlyTask: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('../../src/core/system-profile.js', () => ({
+  getSystemProfile: vi.fn().mockReturnValue({
+    platform: 'linux',
+    hasTmux: true,
+    recommendedMaxWorkers: 4,
+    cpuCores: 4,
+    totalMemMB: 16000,
+    freeMemMB: 8000,
+  }),
+}));
+
+vi.mock('../../src/core/config.js', () => ({
+  resolveBrainModel: () => 'claude-sonnet-5',
+  readAuthMode: vi.fn().mockReturnValue('subscription'),
+  resolveLiveTraceEnabled: vi.fn().mockReturnValue(false),
+  resolveBrainPlanningMode: (c: { brain_planning?: string; activeModeConfig?: { brain_planning?: string } }) =>
+    c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',
+  resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
+}));
+
+vi.mock('../../src/core/agent-pool.js', async (importOriginal) => ({
+  // Partial mock over the REAL module: new exports keep working as the
+  // surface grows — only the pool manager is stubbed.
+  ...(await importOriginal<typeof import('../../src/core/agent-pool.js')>()),
+  AgentPoolManager: vi.fn().mockImplementation(() => ({
+    loadAgents: vi.fn().mockReturnValue(new Map()),
+    selectOrCreateAgent: vi.fn().mockReturnValue(null),
+    releaseAgent: vi.fn(),
+    cleanup: vi.fn(),
+  })),
+}));
+
+vi.mock('../../src/core/agent-selector.js', () => ({
+  selectAgent: vi.fn().mockReturnValue(null),
+}));
+
 vi.mock('../../src/agents/worker-ipc.js', () => ({
   ChannelRegistry: vi.fn().mockImplementation(() => ({
     register: vi.fn(),
-    remove: vi.fn(),
-    get: vi.fn().mockReturnValue(null),
-    list: vi.fn().mockReturnValue([]),
-    clear: vi.fn(),
+    unregister: vi.fn(),
+    get: vi.fn().mockReturnValue(undefined),
+    getAll: vi.fn().mockReturnValue(new Map()),
+    size: 0,
   })),
-  WorkerChannel: vi.fn(),
 }));
 
-// ─── Sub-module mocks (Sprint 136 refactor — extracted from sprint-controller) ──
-
-vi.mock('../../src/orchestra/sprint-phases.js', () => ({
-  runPlanPhase: vi.fn(),
-  runSpawnPhase: vi.fn().mockResolvedValue({ taskQueue: [], scanInterval: null }),
-  runEvaluatePhase: vi.fn().mockResolvedValue(undefined),
-  runRollbackCheck: vi.fn(),
-  runFixPhase: vi.fn().mockResolvedValue(undefined),
-  runRetroPhase: vi.fn().mockResolvedValue(undefined),
-  runDecayPhase: vi.fn(),
-  runCleanupPhase: vi.fn().mockReturnValue(null),
-}));
-
-vi.mock('../../src/orchestra/sprint-lifecycle.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/orchestra/sprint-lifecycle.js')>();
-  return {
-    ...actual,
-    setActiveSprint: vi.fn(),
-    clearActiveSprint: vi.fn(),
-    safeDashboardUpdate: vi.fn(),
-    waitForHumanApproval: vi.fn().mockResolvedValue(true),
-  };
-});
-
-vi.mock('../../src/orchestra/sprint-spawner.js', () => ({
-  spawnWorkers: vi.fn().mockResolvedValue([]),
-  respawnEligibleTasks: vi.fn().mockResolvedValue([]),
-  validateTaskDependencies: vi.fn().mockReturnValue([]),
-  routeSprintTasks: vi.fn(),
-}));
-
-vi.mock('../../src/orchestra/result-collector.js', () => ({
-  waitForResults: vi.fn().mockResolvedValue([]),
-  resolveAgentPrompt: vi.fn().mockResolvedValue(undefined),
-  resolveSkillPrompts: vi.fn().mockResolvedValue([]),
-  buildResultsMap: vi.fn().mockReturnValue(new Map()),
-  estimateTokenUsage: vi.fn(),
-  enrichResultTokenUsage: vi.fn(),
-  handleWorkerQuestion: vi.fn(),
-  checkWorkerQuestions: vi.fn().mockReturnValue([]),
-}));
-
-vi.mock('../../src/orchestra/sprint-utils.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/orchestra/sprint-utils.js')>();
-  return {
-    ...actual,
-    now: vi.fn().mockReturnValue(new Date().toISOString()),
-    writeSprintState: vi.fn(),
-    clearSprintState: vi.fn(),
-    readSprintState: vi.fn(),
-    detectOrphanWorkers: vi.fn().mockReturnValue([]),
-  };
-});
-
-vi.mock('../../src/orchestra/ipc-registry.js', () => ({
-  getChannelRegistry: vi.fn().mockReturnValue({
-    register: vi.fn(), remove: vi.fn(), get: vi.fn().mockReturnValue(null),
-    has: vi.fn().mockReturnValue(false), clear: vi.fn(), size: 0,
-  }),
-  registerWorkerChannel: vi.fn(),
-  unregisterWorkerChannel: vi.fn(),
-  handleWorkerQuestion: vi.fn(),
-  checkWorkerQuestions: vi.fn().mockReturnValue([]),
-}));
-
-vi.mock('../../src/orchestra/coverage-validator.js', () => ({
-  validateWorkerCoverage: vi.fn().mockReturnValue(null),
-}));
-
-vi.mock('../../src/orchestra/baseline-tracker.js', () => ({
-  captureVitestBaseline: vi.fn().mockReturnValue(null),
-  writeBaseline: vi.fn(),
-  readBaseline: vi.fn().mockReturnValue(null),
-}));
-
-vi.mock('../../src/orchestra/sprint-pid-manager.js', () => ({
-  writePid: vi.fn(),
-  clearPid: vi.fn(),
-  writeStateSnapshot: vi.fn(),
-}));
-
-vi.mock('../../src/core/observability.js', () => ({
-  metric: vi.fn(),
-  trace: vi.fn((_name: string, fn: () => unknown) => fn()),
-  structuredLog: vi.fn(),
-  initObservability: vi.fn(),
-  setObservabilitySprintId: vi.fn(),
-  getObservabilitySprintId: vi.fn().mockReturnValue(null),
-  getMetricsPath: vi.fn().mockReturnValue('/tmp/metrics.jsonl'),
-  getPerSprintMetricsPath: vi.fn().mockReturnValue(null),
-  resetObservability: vi.fn(),
-  generateLoadReport: vi.fn().mockResolvedValue('# Load Report\n'),
-  TELEMETRY_ENABLED: false,
-}));
-
-vi.mock('../../src/core/plugin-hooks.js', () => ({
-  loadPluginHooks: vi.fn().mockResolvedValue(undefined),
-  clearHooks: vi.fn(),
-}));
-
-vi.mock('../../src/core/multi-ide.js', () => ({
-  bindSprintLockToExecution: vi.fn(),
-  acquireSprintLock: vi.fn().mockReturnValue(true),
-  releaseSprintLock: vi.fn(),
-}));
-
-vi.mock('../../src/core/config.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/core/config.js')>();
-  return {
-    ...actual,
-    resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
-  };
-});
-
-vi.mock('../../src/orchestra/task-builder.js', () => ({
-  buildWorkerPrompt: vi.fn().mockReturnValue('mock prompt'),
-  createTask: vi.fn(),
-  extractScopeFromDirective: vi.fn(),
-  parseStructuredDirectives: vi.fn(),
-  plannerTaskToParams: vi.fn(),
-  resolveWorkerEffort: vi.fn(),
-}));
-
-vi.mock('../../src/core/provider.js', () => ({
-  ProviderRegistry: vi.fn().mockImplementation(() => ({
-    registerProvider: vi.fn(),
-    getProvider: vi.fn(),
-    listProviders: vi.fn().mockReturnValue([]),
-    getDefault: vi.fn().mockReturnValue(null),
-  })),
-  providerRegistry: {
-    registerProvider: vi.fn(),
-    getProvider: vi.fn(),
-    listProviders: vi.fn().mockReturnValue([]),
-    getDefault: vi.fn().mockReturnValue(null),
-  },
+// ── MemoryStore mock for DB-first code paths ─────────────────────
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
+  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
+  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
+  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
 }));
 
 // ─── Imports (after mocks) ───────────────────────────────────────────
 import {
-  readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync,
+  mkdtempSync, rmSync, mkdirSync, writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { runSprint } from '../../src/orchestra/brain.js';
+import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 import {
   createSafetyPoint, rollback as rollbackFn, getRollbackPolicy,
   recordRollbackInDebt, isCleanWorkingTree, safetyBranchExists,
 } from '../../src/orchestra/rollback.js';
-import {
-  runPlanPhase, runSpawnPhase, runEvaluatePhase, runRollbackCheck,
-  runRetroPhase, runCleanupPhase,
-} from '../../src/orchestra/sprint-phases.js';
-import { waitForResults as waitForResultsImpl } from '../../src/orchestra/result-collector.js';
 
-const mockedReadFileSync = vi.mocked(readFileSync);
-const mockedWriteFileSync = vi.mocked(writeFileSync);
-const mockedExistsSync = vi.mocked(existsSync);
-const mockedMkdirSync = vi.mocked(mkdirSync);
-const mockedReaddirSync = vi.mocked(readdirSync);
+// Real production module for policy unit tests — the mocked module above only
+// serves the runSprint integration spies. Testing a mock's own implementation
+// would be a fixture-local reimplementation.
+const actualRollback = await vi.importActual<typeof import('../../src/orchestra/rollback.js')>(
+  '../../src/orchestra/rollback.js',
+);
+
 const mockedSpawnSync = vi.mocked(spawnSync);
-const mockedStatSync = vi.mocked(statSync);
+
+// ─── Constants ──────────────────────────────────────────────────────
+
+const DEBT_SEPARATOR = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
+
+// planSprint creates sprint-001 (no sprint files exist → maxNumber=0 →
+// sprintNumber=1). One "## Task N:" block per task → ids 001-001, 001-002, …
+const EXPECTED_SPRINT_ID = 'sprint-001';
+
+// ─── Real project root (fresh per test) ─────────────────────────────
+
+let PROJECT_ROOT = '';
+let attemptNonce = 0;
+function freshProjectRoot(): string {
+  attemptNonce += 1;
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-brb-'));
+  mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+  mkdirSync(join(PROJECT_ROOT, '.deckent', 'pids'), { recursive: true });
+  mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
+  writeFileSync(join(PROJECT_ROOT, '.brain', 'memory.db'), '', 'utf-8');
+  return PROJECT_ROOT;
+}
+
+afterAll(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-function makeTask(overrides: Partial<Task> = {}): Task {
-  return {
-    id: '001-001',
-    title: 'Test task',
-    description: 'desc',
-    model: 'opus',
-    effort: 'normal',
-    priority: 'NORMAL',
-    reason: 'test',
-    scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
-    dependencies: [],
-    goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
-    status: TaskStatus.PENDING,
-    sprintId: 'sprint-001',
-    createdAt: new Date().toISOString(),
-    ...overrides,
-  };
-}
-
-function makeSprint(tasks: Task[] = []): Sprint {
-  return {
-    id: 'sprint-001',
-    number: 1,
-    status: SprintStatus.ACTIVE,
-    phase: SprintPhase.SPAWN,
-    tasks,
-    workers: tasks.map(t => `w-${t.id}`),
-  };
-}
-
 function makeConfig(): ResolvedConfig {
   return {
-    projectName: 'test-project',
-    projectRoot: '/tmp/test',
-    mode: 'auto',
+    mode: 'pro_plan',
+    projectRoot: PROJECT_ROOT,
+    projectName: 'test',
+    language: 'tr',
+    version: '0.1.0',
     activeModeConfig: {
       max_workers: 4,
-      default_model: 'opus',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: false,
       brain_planning: 'structured',
-      brain_model: 'claude-opus-4-8',
     },
-  } as unknown as ResolvedConfig;
+    modes: {} as never,
+    spawn_backend: 'docker',
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
+  };
 }
 
-function setupFsForRunSprint(tasks: Task[], results: Array<{ taskId: string; selfAssessment: string; testsPassed: boolean; coverage: number }>) {
-  // Build TaskResult objects for each result spec
-  const taskResults = results.map(r => ({
-    taskId: r.taskId,
-    workerId: 'worker-1',
-    filesChanged: [],
-    linesAdded: 0,
+function makeTaskResult(opts: {
+  taskId: string;
+  selfAssessment: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  testsPassed?: boolean;
+  coverage?: number;
+}): string {
+  const { taskId } = opts;
+  // Host-authored claim-time attribution is part of the terminal-evidence data
+  // contract (projectAttributedTaskWork): without a VERIFIED attemptId the
+  // finalizer correctly refuses to settle (TERMINAL_EVIDENCE_HOLD). The
+  // attemptId carries a per-test nonce: the controller's once-ledger for
+  // terminal publications is module-global and keyed by the
+  // logicalSettlementDigest — a byte-identical fixture across tests would be
+  // a replay of the SAME settled authority (DUPLICATE_PUBLICATION HOLD).
+  const attemptId = `attempt-${taskId}-${attemptNonce}`;
+  return JSON.stringify({
+    taskId,
+    workerId: `w-${taskId}`,
+    filesChanged: ['src/foo.ts'],
+    linesAdded: 10,
     linesRemoved: 0,
-    testsPassed: r.testsPassed,
-    coverage: r.coverage,
-    selfAssessment: r.selfAssessment,
-    notes: '',
-  }));
-
-  // Build sprint object that runPlanPhase should return
-  const sprint = makeSprint(tasks);
-
-  // Configure sprint-phases mocks
-  // runPlanPhase mock needs to simulate createSafetyPoint/saveSafetyPoint calls
-  // when rollbackEnabled=true, since those spies are checked in tests
-  vi.mocked(runPlanPhase).mockImplementation(async (_root, _config, _opts, _provider, rollbackEnabled) => {
-    let safetyPoint = null;
-    if (rollbackEnabled) {
-      safetyPoint = mockCreateSafetyPoint(_root, sprint.id);
-      mockSaveSafetyPoint(_root, safetyPoint);
-    }
-    return { sprint, safetyPoint };
+    testsPassed: opts.testsPassed ?? opts.selfAssessment !== 'NO_GO',
+    coverage: opts.coverage ?? (opts.selfAssessment === 'NO_GO' ? 0 : 95),
+    selfAssessment: opts.selfAssessment,
+    notes: 'Rollback integration test result',
+    workAttribution: {
+      state: 'VERIFIED',
+      attemptId,
+      baselineRef: `baseline:${attemptId}`,
+      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+    },
   });
-  vi.mocked(runSpawnPhase).mockResolvedValue({ taskQueue: [], scanInterval: null as unknown as ReturnType<typeof setInterval> });
-  vi.mocked(runEvaluatePhase).mockImplementation(async (_root, _sprint, _results, evaluations) => {
-    for (const r of taskResults) {
-      const task = tasks.find(t => t.id === r.taskId);
-      if (!task) continue;
-      if (r.selfAssessment === 'NO_GO' || !r.testsPassed) evaluations.set(r.taskId, TaskEvaluation.NO_GO);
-      else if (r.selfAssessment === 'GO_WITH_TECH_DEBT' || r.coverage < 90) evaluations.set(r.taskId, TaskEvaluation.GO_WITH_TECH_DEBT);
-      else evaluations.set(r.taskId, TaskEvaluation.DONE);
-    }
-  });
-  vi.mocked(runRollbackCheck).mockImplementation((_root, sprint, evaluations, rollbackEnabled, safetyPoint) => {
-    if (!rollbackEnabled) return;
-    const evalValues = [...evaluations.values()];
-    const policy = mockGetRollbackPolicy(evalValues.map(e =>
-      e === TaskEvaluation.DONE ? 'DONE' : e === TaskEvaluation.NO_GO ? 'NO_GO' : 'GO_WITH_TECH_DEBT'
-    ));
-    if (policy === 'auto' && safetyPoint) {
-      const rollbackResult = mockRollback('/tmp/test', safetyPoint);
-      sprint.rolledBack = true;
-      sprint.rollbackResult = rollbackResult.message;
-      if (rollbackResult.success) {
-        mockRecordRollbackInDebt('/tmp/test', sprint.id, rollbackResult);
-      }
-    } else if (policy !== 'auto') {
-      // Successful sprint — delete safety point
-      mockDeleteSafetyPoint('/tmp/test', sprint.id);
-    }
-  });
-
-  // Minimal FS mocks for remaining file operations in runSprint itself
-  mockedExistsSync.mockReturnValue(false);
-  mockedWriteFileSync.mockImplementation(() => undefined);
-  mockedMkdirSync.mockImplementation(() => undefined);
-  mockedReaddirSync.mockReturnValue([] as never);
-
-  // waitForResults mock (called from sprint-controller.ts) returns our task results
-  vi.mocked(waitForResultsImpl).mockResolvedValue(taskResults as never);
 }
 
-// ─── Tests: getRollbackPolicy ────────────────────────────────────────
+/**
+ * Materialize a full runSprint fixture on the REAL project root.
+ * @param results - list of per-task result specs; one "## Task N:" directive
+ *                  block is generated per entry and the result JSON is
+ *                  pre-written as a real `.tasks/task-<id>.result` file.
+ */
+function setupProject(
+  results: Array<{ taskId: string; selfAssessment: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'; testsPassed?: boolean; coverage?: number }>,
+): void {
+  // git commands in readContext + the pre-spawn scope-gate's `git ls-files`
+  // call both go through this mock. `git ls-files` must report a tracked
+  // src/ path so evaluateScopeGate classifies legacy-fallback scopes
+  // (filesWrite: ['src/']) as new-plausible instead of suspect.
+  mockedSpawnSync.mockImplementation((_command, args) => {
+    const isLsFiles = Array.isArray(args) && args[0] === 'ls-files';
+    return {
+      status: 0, stdout: isLsFiles ? 'src/index.ts\n' : '', stderr: '', pid: 1, signal: null, output: [],
+    } as never;
+  });
+
+  const directives = results
+    .map((r, i) => `## Task ${i + 1}: Build feature ${i + 1}\nBuild feature ${i + 1} for task ${r.taskId}\n`)
+    .join('\n');
+  writeFileSync(join(PROJECT_ROOT, 'DIRECTIVES.md'), directives, 'utf-8');
+  writeFileSync(join(PROJECT_ROOT, 'DEBT.md'), [DEBT_TABLE_HEADER, DEBT_SEPARATOR].join('\n'), 'utf-8');
+
+  // Pre-written real result files: the EXECUTE collector finds them
+  // immediately (worker spawn is a mocked no-op backend).
+  for (const r of results) {
+    writeFileSync(join(PROJECT_ROOT, '.tasks', `task-${r.taskId}.result`), makeTaskResult(r), 'utf-8');
+  }
+}
+
+// ─── Tests: getRollbackPolicy (REAL production implementation) ───────
 
 describe('getRollbackPolicy', () => {
-  beforeEach(() => {
-    mockGetRollbackPolicy.mockImplementation(
-      (evals: Array<'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'>) => {
-        if (evals.length === 0) return 'never';
-        const noGoCount = evals.filter(e => e === 'NO_GO').length;
-        if (noGoCount === evals.length) return 'auto';
-        if (noGoCount > 0) return 'ask';
-        return 'never';
-      }
-    );
-  });
-
   it('returns "never" for empty evaluations', () => {
-    const result = getRollbackPolicy([]);
-    expect(result).toBe('never');
+    expect(actualRollback.getRollbackPolicy([])).toBe('never');
   });
 
   it('returns "auto" when all tasks are NO_GO', () => {
-    const result = getRollbackPolicy(['NO_GO', 'NO_GO', 'NO_GO']);
-    expect(result).toBe('auto');
+    expect(actualRollback.getRollbackPolicy(['NO_GO', 'NO_GO', 'NO_GO'])).toBe('auto');
   });
 
   it('returns "ask" when some tasks are NO_GO', () => {
-    const result = getRollbackPolicy(['DONE', 'NO_GO', 'DONE']);
-    expect(result).toBe('ask');
+    expect(actualRollback.getRollbackPolicy(['DONE', 'NO_GO', 'DONE'])).toBe('ask');
   });
 
   it('returns "never" when all tasks are DONE', () => {
-    const result = getRollbackPolicy(['DONE', 'DONE', 'DONE']);
-    expect(result).toBe('never');
+    expect(actualRollback.getRollbackPolicy(['DONE', 'DONE', 'DONE'])).toBe('never');
   });
 
   it('returns "never" when all tasks are GO_WITH_TECH_DEBT', () => {
-    const result = getRollbackPolicy(['GO_WITH_TECH_DEBT', 'GO_WITH_TECH_DEBT']);
-    expect(result).toBe('never');
+    expect(actualRollback.getRollbackPolicy(['GO_WITH_TECH_DEBT', 'GO_WITH_TECH_DEBT'])).toBe('never');
   });
 
   it('returns "auto" for single NO_GO', () => {
-    const result = getRollbackPolicy(['NO_GO']);
-    expect(result).toBe('auto');
+    expect(actualRollback.getRollbackPolicy(['NO_GO'])).toBe('auto');
   });
 
   it('returns "ask" for mix of DONE and NO_GO', () => {
-    const result = getRollbackPolicy(['DONE', 'NO_GO']);
-    expect(result).toBe('ask');
+    expect(actualRollback.getRollbackPolicy(['DONE', 'NO_GO'])).toBe('ask');
   });
 });
 
@@ -513,73 +440,66 @@ describe('getRollbackPolicy', () => {
 describe('RunSprintOptions.rollback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    freshProjectRoot();
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+      name: 'test-measured',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+    } as never);
 
-    // Default mock implementations for rollback functions
+    // Default rollback-module behavior. getRollbackPolicy delegates to the
+    // REAL production policy so the choreography (auto/ask/never) is derived
+    // from the actual evaluations runSprint computed — no per-test forcing.
     mockCreateSafetyPoint.mockReturnValue({
-      id: 'sprint-001',
-      branchName: 'deckent-backup-sprint-001',
+      id: EXPECTED_SPRINT_ID,
+      branchName: `deckent-backup-${EXPECTED_SPRINT_ID}`,
       commitSha: 'abc123',
       createdAt: new Date().toISOString(),
       wasClean: true,
     });
     mockRollback.mockReturnValue({ success: true, message: 'Rolled back successfully' });
-    mockGetRollbackPolicy.mockReturnValue('never');
+    mockGetRollbackPolicy.mockImplementation(
+      (evals: Array<'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'>) => actualRollback.getRollbackPolicy(evals),
+    );
     mockRecordRollbackInDebt.mockImplementation(() => undefined);
     mockSaveSafetyPoint.mockImplementation(() => undefined);
     mockDeleteSafetyPoint.mockReturnValue(true);
   });
 
   it('createSafetyPoint is called when rollback is enabled (default)', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
+    setupProject([{ taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 }]);
 
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 },
-    ]);
+    await runSprint(PROJECT_ROOT, makeConfig());
 
-    await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true });
-
-    expect(mockCreateSafetyPoint).toHaveBeenCalledWith('/tmp/test', 'sprint-001');
+    expect(mockCreateSafetyPoint).toHaveBeenCalledWith(PROJECT_ROOT, EXPECTED_SPRINT_ID);
   });
 
   it('createSafetyPoint is NOT called when rollback: false', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
+    setupProject([{ taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 }]);
 
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 },
-    ]);
-
-    await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true, rollback: false });
+    await runSprint(PROJECT_ROOT, makeConfig(), { rollback: false });
 
     expect(mockCreateSafetyPoint).not.toHaveBeenCalled();
   });
 
   it('safety point is saved to disk after creation', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
+    setupProject([{ taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 }]);
 
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 },
-    ]);
+    await runSprint(PROJECT_ROOT, makeConfig());
 
-    await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true });
-
-    expect(mockSaveSafetyPoint).toHaveBeenCalled();
+    expect(mockSaveSafetyPoint).toHaveBeenCalledWith(
+      PROJECT_ROOT,
+      expect.objectContaining({ id: EXPECTED_SPRINT_ID }),
+    );
   });
 
   it('rollback is triggered when all tasks are NO_GO', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
+    setupProject([{ taskId: '001-001', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 }]);
 
-    // All NO_GO → getRollbackPolicy returns 'auto'
-    mockGetRollbackPolicy.mockReturnValue('auto');
-
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 },
-    ]);
-
-    const sprint = await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true });
+    const sprint = await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(mockRollback).toHaveBeenCalled();
     expect(sprint.rolledBack).toBe(true);
@@ -587,109 +507,72 @@ describe('RunSprintOptions.rollback', () => {
   });
 
   it('recordRollbackInDebt is called after successful rollback', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
-
-    mockGetRollbackPolicy.mockReturnValue('auto');
     mockRollback.mockReturnValue({ success: true, message: 'Rolled back to deckent-backup-sprint-001' });
+    setupProject([{ taskId: '001-001', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 }]);
 
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 },
-    ]);
-
-    await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true });
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(mockRecordRollbackInDebt).toHaveBeenCalledWith(
-      '/tmp/test',
-      'sprint-001',
+      PROJECT_ROOT,
+      EXPECTED_SPRINT_ID,
       expect.objectContaining({ success: true }),
     );
   });
 
   it('no rollback on partial success (mix of DONE and NO_GO)', async () => {
-    const task1 = makeTask({ id: '001-001' });
-    const task2 = makeTask({ id: '001-002' });
-    const config = makeConfig();
-
-    // Partial failure → 'ask' policy (no auto-rollback)
-    mockGetRollbackPolicy.mockReturnValue('ask');
-
-    setupFsForRunSprint([task1, task2], [
+    setupProject([
       { taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 },
       { taskId: '001-002', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 },
     ]);
 
-    const sprint = await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true });
+    const sprint = await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(mockRollback).not.toHaveBeenCalled();
     expect(sprint.rolledBack).toBeUndefined();
   });
 
   it('no rollback when all tasks succeed', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
+    setupProject([{ taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 }]);
 
-    mockGetRollbackPolicy.mockReturnValue('never');
-
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 },
-    ]);
-
-    const sprint = await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true });
+    const sprint = await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(mockRollback).not.toHaveBeenCalled();
     expect(sprint.rolledBack).toBeUndefined();
   });
 
   it('deleteSafetyPoint called after successful sprint (no rollback)', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
+    setupProject([{ taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 }]);
 
-    mockGetRollbackPolicy.mockReturnValue('never');
+    await runSprint(PROJECT_ROOT, makeConfig());
 
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'DONE', testsPassed: true, coverage: 95 },
-    ]);
-
-    await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true });
-
-    expect(mockDeleteSafetyPoint).toHaveBeenCalled();
+    // Production contract (runRollbackCheck): deleteSafetyPoint receives the
+    // SafetyPoint object, not the sprint id.
+    expect(mockDeleteSafetyPoint).toHaveBeenCalledWith(
+      PROJECT_ROOT,
+      expect.objectContaining({ id: EXPECTED_SPRINT_ID }),
+    );
   });
 
   it('deleteSafetyPoint NOT called when sprint is rolled back', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
-
-    mockGetRollbackPolicy.mockReturnValue('auto');
     mockRollback.mockReturnValue({ success: true, message: 'Rolled back' });
+    setupProject([{ taskId: '001-001', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 }]);
 
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 },
-    ]);
-
-    await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true });
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(mockDeleteSafetyPoint).not.toHaveBeenCalled();
   });
 
   it('sprint.rolledBack is false/undefined when rollback: false', async () => {
-    const task = makeTask({ id: '001-001' });
-    const config = makeConfig();
+    setupProject([{ taskId: '001-001', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 }]);
 
-    mockGetRollbackPolicy.mockReturnValue('auto');
-
-    setupFsForRunSprint([task], [
-      { taskId: '001-001', selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 },
-    ]);
-
-    const sprint = await runSprint('/tmp/test', config, { testMode: true, skipCleanup: true, rollback: false });
+    const sprint = await runSprint(PROJECT_ROOT, makeConfig(), { rollback: false });
 
     expect(sprint.rolledBack).toBeUndefined();
     expect(mockRollback).not.toHaveBeenCalled();
   });
 });
 
-// ─── Tests: rollback module directly (via re-exported mocked fns) ────
+// ─── Tests: rollback module surface (via mocked module bindings) ─────
 
 describe('isCleanWorkingTree (via re-export)', () => {
   it('is exported from brain.ts', () => {
@@ -717,8 +600,8 @@ describe('rollback (via re-export)', () => {
 
 describe('getRollbackPolicy (direct)', () => {
   it('empty evaluations returns never', () => {
-    mockGetRollbackPolicy.mockImplementation((evals: unknown[]) => evals.length === 0 ? 'never' : 'auto');
-    expect(getRollbackPolicy([])).toBe('never');
+    expect(typeof getRollbackPolicy).toBe('function');
+    expect(actualRollback.getRollbackPolicy([])).toBe('never');
   });
 });
 

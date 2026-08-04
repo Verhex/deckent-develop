@@ -8,7 +8,7 @@
  * - IPC heartbeat wakeup in waitForResults
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
@@ -16,30 +16,20 @@ import type { Task, Sprint } from '../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  renameSync: vi.fn(),
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  // Sprint 139 async I/O migration: sprint-finalizer and other modules use
-  // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
-  // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
+// ─── REAL FILESYSTEM (FAZ4A-S5, pattern from FAZ4A-S3 brain-pause-resume) ──
+// The node:fs mock is deliberately GONE. pauseSprint ends in the canonical
+// run-status read-model publication ring (write temp → renameSync → read back
+// → digest compare → RunStatusReadModelError PERSIST_FAILED on any gap) and
+// additionally VERIFIES the published authority (sprintId + lifecycle ===
+// 'PAUSED'). A mocked fs cannot carry that round-trip — this mock approach is
+// recorded-failed in this repo. Each test gets a real scratch project root
+// under tmpdir instead (hermetic, removed on the next fresh root).
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
+  // Real fs, mocked processes: git/tsc/tmux probes must not escape the
+  // sandbox. A bare vi.fn() would return undefined and crash callers reading
+  // `.status`.
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -63,6 +53,8 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
     ...actual,
     countBrainLines: vi.fn().mockReturnValue(100),
     getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
+    // NOTE (FAZ4A-S5): readJsonSafe/readFileSafe are deliberately REAL —
+    // the sprint-state authority ring depends on real readback.
   };
 });
 
@@ -150,7 +142,13 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   updateProjectDocs: vi.fn(),
 }));
 
-import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
+// ─── Imports after mocks ─────────────────────────────────────────────
+
+import {
+  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { updateDashboard } from '../../src/monitor/auditor.js';
 import {
   pauseSprint,
@@ -160,12 +158,48 @@ import {
 } from '../../src/orchestra/brain.js';
 import { WorkerChannel, ChannelRegistry } from '../../src/agents/worker-ipc.js';
 
-const mockedWriteFileSync = vi.mocked(writeFileSync);
-const mockedExistsSync = vi.mocked(existsSync);
-const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 
 // ─── Helpers ─────────────────────────────────────────────────────────
+
+const SPRINT_ID = 'sprint-001';
+
+// Real per-test scratch root — assigned fresh in the pauseSprint describe's
+// beforeEach. The registry describes don't touch the filesystem at all.
+let PROJECT_ROOT = '';
+const freshProjectRoot = (): string => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-bipc-'));
+  // Directories production expects to already exist:
+  //  - .tasks: pauseSprint writes task-XXX.json/.paused there without creating
+  //    the directory itself (write failures are debug-swallowed, so a missing
+  //    dir would silently drop the markers).
+  //  - .deckent/pids: coordinator liveness authority (see below).
+  mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+  mkdirSync(join(PROJECT_ROOT, '.deckent', 'pids'), { recursive: true });
+  // Coordinator pid authority: the canonical run-status read-model publication
+  // resolves run authority from a live coordinator pid (otherwise the run is
+  // honestly ORPHANED). In production pause is executed by the live
+  // coordinator process — the vitest process stands in for it here (its own
+  // pid is provably alive).
+  writeFileSync(
+    join(PROJECT_ROOT, '.deckent', 'pids', `${SPRINT_ID}.pid`),
+    JSON.stringify({
+      pid: process.pid,
+      startToken: 'test-start-token',
+      startedAt: new Date().toISOString(),
+    }, null, 2),
+    'utf-8',
+  );
+  return PROJECT_ROOT;
+};
+afterAll(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
+
+function pausedMarkerPath(id: string): string {
+  return join(PROJECT_ROOT, '.tasks', `task-${id}.paused`);
+}
 
 function makeMockProc(hasSend = true): ChildProcess & { _emit: (msg: unknown) => void } {
   const emitter = new EventEmitter() as ChildProcess & { _emit: (msg: unknown) => void };
@@ -189,14 +223,14 @@ function makeTask(id: string, status: TaskStatus = TaskStatus.PENDING): Task {
     dependencies: [],
     goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
     status,
-    sprintId: 'sprint-001',
+    sprintId: SPRINT_ID,
     createdAt: new Date().toISOString(),
   } as Task;
 }
 
 function makeSprint(tasks: Task[]): Sprint {
   return {
-    id: 'sprint-001',
+    id: SPRINT_ID,
     number: 1,
     status: SprintStatus.ACTIVE,
     phase: SprintPhase.EXECUTE,
@@ -279,12 +313,10 @@ describe('registerWorkerChannel / unregisterWorkerChannel', () => {
 // ─── Tests: pauseSprint IPC Integration ──────────────────────────────
 
 describe('pauseSprint — IPC channel integration', () => {
-  const projectRoot = '/tmp/test-ipc-project';
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
+    // Fresh real project root per test (hermetic — no cross-test file bleed)
+    freshProjectRoot();
     // Clean up registry before each test
     getChannelRegistry().closeAll();
   });
@@ -300,7 +332,7 @@ describe('pauseSprint — IPC channel integration', () => {
 
     const tasks = [makeTask('pause-001', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     // proc.send should have been called with PAUSE
     expect(proc.send).toHaveBeenCalled();
@@ -315,7 +347,7 @@ describe('pauseSprint — IPC channel integration', () => {
 
     const tasks = [makeTask('tmux-task-001', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     // proc.send should NOT have been called since there is no registered channel
     expect(proc.send).not.toHaveBeenCalled();
@@ -324,13 +356,15 @@ describe('pauseSprint — IPC channel integration', () => {
   it('writes .paused file as fallback when no IPC channel exists', () => {
     const tasks = [makeTask('file-task-001', TaskStatus.PENDING)];
     const sprint = makeSprint(tasks);
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
-    // writeFileSync should be called for the .paused marker
-    const pausedFileCall = mockedWriteFileSync.mock.calls.find(
-      (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.paused'),
-    );
-    expect(pausedFileCall).toBeDefined();
+    // The .paused marker must be a REAL durable file now (not a mock call)
+    expect(existsSync(pausedMarkerPath('file-task-001'))).toBe(true);
+    const marker = JSON.parse(readFileSync(pausedMarkerPath('file-task-001'), 'utf-8')) as {
+      taskId: string; previousStatus: string;
+    };
+    expect(marker.taskId).toBe('file-task-001');
+    expect(marker.previousStatus).toBe(TaskStatus.PENDING);
   });
 
   it('writes .paused file even when IPC channel exists (dual mode)', () => {
@@ -340,13 +374,10 @@ describe('pauseSprint — IPC channel integration', () => {
 
     const tasks = [makeTask('dual-001', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
-    // File-based marker should still be written
-    const pausedFileCall = mockedWriteFileSync.mock.calls.find(
-      (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.paused'),
-    );
-    expect(pausedFileCall).toBeDefined();
+    // File-based marker should still be written (dual mode: IPC + durable file)
+    expect(existsSync(pausedMarkerPath('dual-001'))).toBe(true);
   });
 
   it('only sends PAUSE to channels for tasks that are pauseable', () => {
@@ -364,7 +395,7 @@ describe('pauseSprint — IPC channel integration', () => {
       makeTask('done-001', TaskStatus.DONE),
     ];
     const sprint = makeSprint(tasks);
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     // chA should get PAUSE (task is EXECUTING)
     const callsA = (procA.send as ReturnType<typeof vi.fn>).mock.calls;
@@ -378,7 +409,7 @@ describe('pauseSprint — IPC channel integration', () => {
   it('updates sprint status to PAUSED after pauseSprint', () => {
     const tasks = [makeTask('status-001', TaskStatus.PENDING)];
     const sprint = makeSprint(tasks);
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(sprint.status).toBe(SprintStatus.PAUSED);
   });
@@ -386,7 +417,7 @@ describe('pauseSprint — IPC channel integration', () => {
   it('updates dashboard to show PAUSED status', () => {
     const tasks = [makeTask('dashboard-001', TaskStatus.PENDING)];
     const sprint = makeSprint(tasks);
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedUpdateDashboard).toHaveBeenCalled();
     const lastCall = mockedUpdateDashboard.mock.calls[mockedUpdateDashboard.mock.calls.length - 1];
@@ -403,21 +434,18 @@ describe('pauseSprint — IPC channel integration', () => {
     const sprint = makeSprint(tasks);
 
     // Should not throw despite IPC error
-    expect(() => pauseSprint(projectRoot, sprint)).not.toThrow();
+    expect(() => pauseSprint(PROJECT_ROOT, sprint)).not.toThrow();
 
-    // File-based marker should still be written
-    const pausedFileCall = mockedWriteFileSync.mock.calls.find(
-      (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.paused'),
-    );
-    expect(pausedFileCall).toBeDefined();
+    // File-based marker should still be written (real durable file)
+    expect(existsSync(pausedMarkerPath('error-001'))).toBe(true);
   });
 
   it('returns a PauseState with correct sprintId and pausedTaskIds', () => {
     const tasks = [makeTask('ps-001', TaskStatus.PENDING), makeTask('ps-002', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
-    const state = pauseSprint(projectRoot, sprint, 'Test pause');
+    const state = pauseSprint(PROJECT_ROOT, sprint, 'Test pause');
 
-    expect(state.sprintId).toBe('sprint-001');
+    expect(state.sprintId).toBe(SPRINT_ID);
     expect(state.reason).toBe('Test pause');
     expect(state.pausedTaskIds).toContain('ps-001');
     expect(state.pausedTaskIds).toContain('ps-002');

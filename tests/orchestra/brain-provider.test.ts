@@ -565,42 +565,68 @@ describe('cleanup with SpawnBackend', () => {
   it('archives .tasks/.prompt-*.txt hidden tmpfiles into archive/sprint-{id}/', () => {
     // Sprint 156 Task 4: prompt files are archived (renameSync) instead of unlinked
     // so they retain post-mortem forensic value. Production filter requires `.txt`.
+    // FAZ4A-S5 sprint-ownership contract: cleanup() calls
+    // archivePromptFiles(tasksDir, sprint.id, 5, `${sprint.number}-`) — only
+    // tmpfiles whose taskId belongs to THIS sprint (`.prompt-{sprintNumber}-…`)
+    // are archived; another run's prompts in a shared workspace are preserved.
+    // Fixture names therefore carry the real `.prompt-{taskId}-{hash}.txt`
+    // shape (tmux.ts writePromptFile) with taskIds of sprint number 1.
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([
       'task-001-001.json',
-      '.prompt-abc123.txt',
-      '.prompt-def456.txt',
+      '.prompt-1-001-abc123.txt',
+      '.prompt-1-002-def456.txt',
       'task-001-001.hb',
     ] as never);
     const sprint = makeSprint();
 
     cleanup(ROOT, sprint);
 
-    // Both .prompt-*.txt files should be renamed (archived), not deleted.
+    // Both sprint-owned .prompt-*.txt files should be renamed (archived), not deleted.
     expect(renameSync).toHaveBeenCalledWith(
-      expect.stringContaining('.prompt-abc123.txt'),
+      expect.stringContaining('.prompt-1-001-abc123.txt'),
       expect.stringContaining('archive'),
     );
     expect(renameSync).toHaveBeenCalledWith(
-      expect.stringContaining('.prompt-def456.txt'),
+      expect.stringContaining('.prompt-1-002-def456.txt'),
       expect.stringContaining('archive'),
     );
+  });
+
+  it('does NOT archive another run\'s prompt files (sprint-ownership filter)', () => {
+    // The taskIdPrefix guard exists because runs can share a workspace: a
+    // foreign `.prompt-9-…` tmpfile must survive this sprint's cleanup.
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockImplementation((p: any) => {
+      if (String(p).includes('archive')) return [] as any;
+      return ['.prompt-1-001-mine.txt', '.prompt-9-001-other.txt'] as any;
+    });
+    const sprint = makeSprint(); // number: 1
+
+    cleanup(ROOT, sprint);
+
+    const archived = vi.mocked(renameSync).mock.calls.map(c => String(c[0]));
+    expect(archived.some(p => p.includes('.prompt-1-001-mine.txt'))).toBe(true);
+    expect(archived.some(p => p.includes('.prompt-9-001-other.txt'))).toBe(false);
   });
 
   it('does not archive non-prompt hidden files', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     // F0.3 (05a1fd42): archivePromptFiles also drains .tasks/archive/_orphaned/
     // via its own readdirSync call. A blanket single-list mock makes
-    // '.prompt-xyz.txt' appear in both the main .tasks/ scan and the
+    // '.prompt-1-001-xyz.txt' appear in both the main .tasks/ scan and the
     // _orphaned scan, producing 2 renames instead of 1. Path-aware mock:
     // main .tasks/ listing vs. archive/* listings (staging + retention root) are separate.
+    // FAZ4A-S5: fixture carries the sprint-owned `.prompt-{taskId}-{hash}.txt`
+    // name — cleanup() only archives prompts whose taskId prefix matches
+    // `${sprint.number}-` (sprint-ownership filter, see test above).
     vi.mocked(readdirSync).mockImplementation((p: any) => {
       const path = String(p);
       if (path.includes('archive')) return [] as any;
       return [
         '.gitkeep',
         '.dashboard',
-        '.prompt-xyz.txt',
+        '.prompt-1-001-xyz.txt',
       ] as any;
     });
     const sprint = makeSprint();
