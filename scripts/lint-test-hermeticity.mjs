@@ -103,8 +103,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-04 (build-free, EXEC-AUTH-REG mikro-fix): count unchanged, digest moved —
   // command-registry.ts gained the execution-authority entry (graph edge content).
   // Prior refresh: FAZ4B-B2 (count 12442).
-  count: 12442,
-  digest: '38540a9979993a7923600a5da3a63a0094b02ae2b04a857530895781084b2b74',
+  count: 12443,
+  digest: 'ca14449d0ae15c5e04f6ac50e8da46cf3d8aeac4221f343c136938eb7352e4bc',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
