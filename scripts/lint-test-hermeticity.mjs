@@ -108,11 +108,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-04 (PROD-SPRINT-PREFIX-PAD-001): count unchanged, digest moved —
-  // sprint-lifecycle.ts + sprint-finalizer.ts prefix derivation switched to the
-  // canonical padded sprint-id segment.
+  // 2026-08-04 (EXEC-AUTH-REG): count unchanged, digest moved — command-registry.ts
+  // gained the execution-authority entry. Prior: PREFIX-PAD prefix derivation.
   count: 1196,
-  digest: 'e30beb32e5d00da682eb2162fd0d2edfa580a76f7406dfd05e8a82a8ac1f045d',
+  digest: '19565ea0cb16091f1125406ed7ed3c3abf10f078de677808b6784a467988cfd8',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
