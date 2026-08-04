@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5a8af86426ea5b42acb9582640189f8723bc930ee872eeabc34b938d1ec8f1cd"
+    "value": "3cccb35d8417fa9c1570d2eca7785230876237698414e9112def9636669c2e2c"
   },
   "summary": {
-    "total": 344,
-    "active": 337,
+    "total": 346,
+    "active": 339,
     "terminal": 7,
     "receipts": 39,
     "byState": {
-      "OPEN": 237,
+      "OPEN": 239,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,8 +22,8 @@
     },
     "byPriority": {
       "P0": 248,
-      "P1": 80,
-      "P2": 16
+      "P1": 81,
+      "P2": 17
     },
     "byProgram": {
       "API": 5,
@@ -37,7 +37,7 @@
       "DESKTOP": 6,
       "DOCS": 3,
       "DURABILITY": 1,
-      "ECOSYSTEM": 3,
+      "ECOSYSTEM": 5,
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
@@ -3483,6 +3483,28 @@
       "updated": "2026-08-04",
       "definitionDigest": "f9966b2806ff1abe2830e73eaf3b675dd8309a0cb77346ebd4162bbe0c5c671d",
       "progressDigest": "35b1d091778d6bae1d7572da2dd2f504ab64e78bcdba97f5f718817a18f711ab",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7110,
+      "id": "A2A-INTEROP-001",
+      "program": "ECOSYSTEM",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "fe481488f31d7e6a25bc93d431bad90403df0d161b8de9860b65442bd88c55e7",
+      "progressDigest": "6708123325db3cc976e8d9756a3d0063a3eced3e8f4346d38d8c9abe00e44879",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7120,
+      "id": "SKILLMD-INGEST-001",
+      "program": "ECOSYSTEM",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "eedc087101877777fe25273e08c31ea74725b976bc5a9eb59c843e405f689865",
+      "progressDigest": "b48e8c6163c79744eb3c90f6b669e10a9c341e4f4e84a5ef8be2bd4fba953037",
       "terminalClosureDigest": null
     },
     {
@@ -16764,7 +16786,8 @@
         "PROVIDER-EXTENSION-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
-        "DEP-SUPPLY-DEFENSE-001"
+        "DEP-SUPPLY-DEFENSE-001",
+        "A2A-INTEROP-001"
       ],
       "gates": [
         "G2",
@@ -16796,7 +16819,8 @@
         "PROVIDER-EXTENSION-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
-        "DEP-SUPPLY-DEFENSE-001"
+        "DEP-SUPPLY-DEFENSE-001",
+        "A2A-INTEROP-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Provenance, install, permissions, sandbox, update, revoke and quarantine are one trust plane",
@@ -16817,7 +16841,9 @@
         "ROUTING-001",
         "SUPPLY-CHAIN-001"
       ],
-      "children": [],
+      "children": [
+        "SKILLMD-INGEST-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -16835,7 +16861,8 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "CAPABILITY-001"
+        "CAPABILITY-001",
+        "SKILLMD-INGEST-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Manifests versioned; task role/skill selection measured; no catalog inflation or dead entries",
@@ -17188,6 +17215,69 @@
       "evidenceReceipts": [],
       "acceptance": "Owner değerlendirmesi: kapsam ve tasarım kararı verilir; kabul kriterleri, platform matrisi ve enforcement modu (advisory/enforce) değerlendirme sonucunda tiplenir; karar redde de çıkabilir",
       "evidence": "Açılış: Alperen 2026-08-04 talebi (\"değerlendirilecek madde\"). Tetikleyici: 2026-08-04 \"Shai-Hulud: Here We Go Again\" npm worm'u — keyv@6.0.0 başlangıç, ~1.684 zehirli versiyon/420 paket adı, preinstall `setup.mjs` + Bun-derlenmiş payload, repo'lara `.claude/settings.json` SessionStart ve `.vscode/tasks.json` folderOpen hook'ları, `gh-token-monitor` persistence ve dead-man's-switch token izleyicisi. Bu repo aynı gün denetlendi ve TEMİZ: hiçbir lockfile'da etkilenen versiyon yok (desktop `keyv@4.5.4` integrity-pinli, saldırı öncesi sürüm), IOC dosyası/persistence/editör-hook izi yok, o gün install koşmadı. Değerlendirme sorusu (Dual-Lens): deckent worker'ları kullanıcı projelerinde bağımlılık kurabildiği için bu savunma katmanı hem dogfood hem son-kullanıcı ürünü olarak hangi kapsamda inşa edilmeli. Kaynaklar: safedep.io/keyv-npm-supply-chain-compromise, thehackernews.com/2026/08/keyv-linked-npm-worm-poisons-hundreds.html",
+      "updated": "2026-08-04"
+    },
+    {
+      "order": 7110,
+      "id": "A2A-INTEROP-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "ECOSYSTEM",
+      "outcome": "A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Owner G2 kararı yönü tipler (inbound/outbound/ikisi), binding seçimi ve ADR sınırı (\"execution identity hiçbir zaman A2A task/context ID'sinden türetilmez\") kayda girer; implementation admission MCPV2 P3 HTTP-transport kararıyla koordine edilir; taslak iş paketleri A0-A3 `a2aplan.md` içindedir",
+      "evidence": "Açılış: Alperen 2026-08-04 talebi (\"iş planımıza alalım\"). Kaynak: a2a-protocol.org spec v1.0.0; Linux Foundation 2026-04 bir-yıl raporu 150+ kuruluş + Google/Microsoft/AWS platform entegrasyonu + production kullanım; 2026-08-04 rekabet günlüğü Hermes v0.20 çift-yönlü A2A sinyali. Mevcut kodda A2A yok — greenfield, kırılma riski yok",
+      "updated": "2026-08-04"
+    },
+    {
+      "order": 7120,
+      "id": "SKILLMD-INGEST-001",
+      "parent": "AGENT-SKILL-001",
+      "program": "ECOSYSTEM",
+      "outcome": "Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Owner scope kararı sonrası: converter CLI ingest hattında (`src/cli/commands/skill.ts` + yeni `src/core/skill-md-adapter.ts`); `fm.name→id` eşlemesi (deckent `name`=display title, SKILL.md `name`=identifier — semantik çakışma); activation köprüsü `migrateV1SkillToActivation` üzerinden (aksi halde skill yüklenir ama asla route edilmez); `skill-types.ts`e typed `source` alanı; `lint-manifests.mjs` uyumu; `native_skills_passthrough` ile çift-enjeksiyon reconciliation'ı; CLI zod şeması ↔ `validateSkillDefinition` diverjansının kapatılması; referenced-files (`scripts/`,`data/` yardımcı dosyaları) desteği ayrı scope kararıdır",
+      "evidence": "Açılış: Alperen 2026-08-04 kararı (\"skill.md formatına dönelim, kabul\"). 2026-08-04 repo analizi: hazır gerçek korpus mevcut (`.claude/skills` 10 + `.codex/skills` 7 dizin, en zor iki vaka dahil: quoted uzun description + nested metadata map); `parseMarkdownTitleAndLead` frontmatter'ı bugün parse etmeden atıyor ve doğrudan unit testi yok; YAML dependency yok — ADR-D-005 kapsamında el-yazımı parser sertleştirme (~40 satır) vs dependency kararı owner'dadır",
       "updated": "2026-08-04"
     },
     {
@@ -18541,6 +18631,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a66523343b7aa7d3d114f4311645689d28c97ece1133adc21c89c631ab0b297b"
+    "value": "8df8225324d0e7a72516601377eaffcb25ffbafb8d971bcdd75128d17a008f4a"
   }
 }
