@@ -187,54 +187,6 @@
       "failed": 1
     },
     {
-      "file": "tests/mcp/branch-coverage.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/mcp/run-budget-authority.test.ts",
-      "failed": 2
-    },
-    {
-      "file": "tests/mcp/run-provider-free.test.ts",
-      "failed": 2
-    },
-    {
-      "file": "tests/mcp/run-tool-parity.test.ts",
-      "failed": 2
-    },
-    {
-      "file": "tests/mcp/server.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/mcp/status-failed-tasks.test.ts",
-      "failed": 4
-    },
-    {
-      "file": "tests/mcp/status-terminal-receipt.test.ts",
-      "failed": 4
-    },
-    {
-      "file": "tests/mcp/tools-enrichment-004.test.ts",
-      "failed": 14
-    },
-    {
-      "file": "tests/mcp/tools.test.ts",
-      "failed": 3
-    },
-    {
-      "file": "tests/mcp/tools/annotations.test.ts",
-      "failed": 25
-    },
-    {
-      "file": "tests/mcp/tools/status-agents.test.ts",
-      "failed": 8
-    },
-    {
-      "file": "tests/mcp/tools/status-rich.test.ts",
-      "failed": 3
-    },
-    {
       "file": "tests/monitor/auditor-edge.test.ts",
       "failed": 2
     },
