@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):79b1e4c214882d64e7af600db4722c990e436e2d9f25e3b033fa5d4df4cbdab7`
+**Source digest:** `sha256(normalized-lf-utf8):6233ba36ec265cbee93261c52aa44e631be0c2ab464dc54f7eaa90f7a2554161`
 
-**Rows:** 341 total · 334 active · 7 terminal
+**Rows:** 342 total · 335 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 235 |
+| OPEN | 236 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -328,6 +328,7 @@
 | 7070 | `PROVIDER-EXTENSION-001` | OPEN | P1 | PROVIDER | `P02-637`, `P02-646`, `P02-647` | — | OpenRouter and future provider extensions through PAEP |
 | 7080 | `IDE-ADAPTER-001` | OPEN | P2 | SURFACE | `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | VS Code, JetBrains and future IDE adapters as non-canonical clients |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
+| 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 8000 | `EVERY-ENV-001` | OPEN | P0 | XPLAT | `SSOT-003`, `TEST-PLATFORM-001` | — | Every-environment architecture and release parent |
 | 8010 | `ENV-ADAPTER-001` | OPEN | P0 | XPLAT | `KERNEL-001`, `AUTHORITY-001` | — | PlatformAdapter contracts for process, paths, locks, IPC, credentials, terminal and services |
 | 8020 | `INSTALL-SCOPE-001` | OPEN | P0 | ONBOARDING | `ENV-ADAPTER-001`, `MEMORY-AUTHORITY-001` | — | Global install plus project-scoped state and learning |

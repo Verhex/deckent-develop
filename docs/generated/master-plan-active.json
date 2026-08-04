@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "79b1e4c214882d64e7af600db4722c990e436e2d9f25e3b033fa5d4df4cbdab7"
+    "value": "6233ba36ec265cbee93261c52aa44e631be0c2ab464dc54f7eaa90f7a2554161"
   },
   "summary": {
-    "total": 341,
-    "active": 334,
+    "total": 342,
+    "active": 335,
     "terminal": 7,
     "receipts": 34,
     "byState": {
-      "OPEN": 235,
+      "OPEN": 236,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 247,
-      "P1": 78,
+      "P1": 79,
       "P2": 16
     },
     "byProgram": {
@@ -55,7 +55,7 @@
       "RESILIENCE": 1,
       "ROUTING": 2,
       "SCALE": 1,
-      "SECURITY": 3,
+      "SECURITY": 4,
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
@@ -3450,6 +3450,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "6580d65877d2b535593bfac8ca97169721790b3e2fb2b6ad7f416c883ad64cdc",
       "progressDigest": "795c475d477a643f708e071988acbead28b6a01d5f19b276f0cb8fd67a4b0177",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7100,
+      "id": "DEP-SUPPLY-DEFENSE-001",
+      "program": "SECURITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "f9966b2806ff1abe2830e73eaf3b675dd8309a0cb77346ebd4162bbe0c5c671d",
+      "progressDigest": "35b1d091778d6bae1d7572da2dd2f504ab64e78bcdba97f5f718817a18f711ab",
       "terminalClosureDigest": null
     },
     {
@@ -16610,7 +16621,8 @@
         "TOOL-COMPUTER-001",
         "PROVIDER-EXTENSION-001",
         "IDE-ADAPTER-001",
-        "ORPHAN-WIRE-001"
+        "ORPHAN-WIRE-001",
+        "DEP-SUPPLY-DEFENSE-001"
       ],
       "gates": [
         "G2",
@@ -16641,7 +16653,8 @@
         "TOOL-COMPUTER-001",
         "PROVIDER-EXTENSION-001",
         "IDE-ADAPTER-001",
-        "ORPHAN-WIRE-001"
+        "ORPHAN-WIRE-001",
+        "DEP-SUPPLY-DEFENSE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Provenance, install, permissions, sandbox, update, revoke and quarantine are one trust plane",
@@ -17002,6 +17015,38 @@
       "acceptance": "Each deliverable wired, intentionally public or owner-disposed; fresh-clone reachability proof",
       "evidence": "Waits cleanup manifest and surface cutover",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 7100,
+      "id": "DEP-SUPPLY-DEFENSE-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "SECURITY",
+      "outcome": "npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Owner değerlendirmesi: kapsam ve tasarım kararı verilir; kabul kriterleri, platform matrisi ve enforcement modu (advisory/enforce) değerlendirme sonucunda tiplenir; karar redde de çıkabilir",
+      "evidence": "Açılış: Alperen 2026-08-04 talebi (\"değerlendirilecek madde\"). Tetikleyici: 2026-08-04 \"Shai-Hulud: Here We Go Again\" npm worm'u — keyv@6.0.0 başlangıç, ~1.684 zehirli versiyon/420 paket adı, preinstall `setup.mjs` + Bun-derlenmiş payload, repo'lara `.claude/settings.json` SessionStart ve `.vscode/tasks.json` folderOpen hook'ları, `gh-token-monitor` persistence ve dead-man's-switch token izleyicisi. Bu repo aynı gün denetlendi ve TEMİZ: hiçbir lockfile'da etkilenen versiyon yok (desktop `keyv@4.5.4` integrity-pinli, saldırı öncesi sürüm), IOC dosyası/persistence/editör-hook izi yok, o gün install koşmadı. Değerlendirme sorusu (Dual-Lens): deckent worker'ları kullanıcı projelerinde bağımlılık kurabildiği için bu savunma katmanı hem dogfood hem son-kullanıcı ürünü olarak hangi kapsamda inşa edilmeli. Kaynaklar: safedep.io/keyv-npm-supply-chain-compromise, thehackernews.com/2026/08/keyv-linked-npm-worm-poisons-hundreds.html",
+      "updated": "2026-08-04"
     },
     {
       "order": 8000,
@@ -18354,6 +18399,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "729e93f9c95cdf54ff000580ac5268a3a4bd82e8107b0ea95cd533ee558f9577"
+    "value": "08dd3c3e523cb2946acf9fadb284e25de0316a3552669dfb263d3d90a6fe4104"
   }
 }
