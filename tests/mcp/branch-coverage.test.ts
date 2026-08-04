@@ -113,6 +113,25 @@ vi.mock('../../src/mcp/helpers/format.js', () => ({
   wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
 }));
 
+// Authority-first status: status.ts only reads (and error-paths on) .dashboard
+// when the canonical run authority reports a live run AND a matching persisted
+// read model exists — supply both so the JSON-parse-error branch is reachable.
+vi.mock('../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => ({
+    schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
+    sprintId: null, phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
+  })),
+}));
+
+vi.mock('../../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: vi.fn(() => ({
+    schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
+    holds: [], providerConcurrency: [], terminalPublication: null, authority: {},
+  })),
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import { runSprint, BrainError } from '../../src/orchestra/brain.js';
 import { writeJobState } from '../../src/mcp/tools/job-runner.js';

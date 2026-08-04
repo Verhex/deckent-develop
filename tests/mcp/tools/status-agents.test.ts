@@ -6,21 +6,25 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 
 // Authority-first status: the tool holds unless a live run authority AND the canonical
 // persisted read model exist. Projection cases supply both. (Same note as status-history.)
-vi.mock('../../src/core/run-status-authority.js', () => ({
-  readCanonicalRunStatus: vi.fn(() => ({
+// The "no active sprint" case flips the authority to IDLE explicitly.
+const runAuthorityState = vi.hoisted(() => ({
+  current: {
     schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
-    sprintId: 'sprint-001', phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    sprintId: 'sprint-030', phase: 'EXECUTE', status: 'RUNNING', reason: null,
     recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
-  })),
+  } as Record<string, unknown>,
 }));
 
-vi.mock('../../src/core/run-status-read-model.js', () => ({
+vi.mock('../../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => runAuthorityState.current),
+}));
+
+vi.mock('../../../src/core/run-status-read-model.js', () => ({
   readCanonicalRunStatusReadModel: vi.fn(() => ({
-    schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
+    schemaVersion: 1, revision: 1, runGeneration: 'lease:test', modelDigest: 'digest-test',
     holds: [], providerConcurrency: [], terminalPublication: null, authority: {},
   })),
   runStatusReadModelMatchesAuthority: vi.fn(() => true),
-  projectRunStatusReadModelSurface: vi.fn(() => ({ state: 'persisted' })),
 }));
 
 vi.mock('node:fs', () => ({
@@ -112,6 +116,12 @@ describe('MCP status tool agent/skill enrichment', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(readLatestJobState).mockReturnValue(null);
+    // Default: a live run so the projection cases pass the authority-first guard.
+    runAuthorityState.current = {
+      ...runAuthorityState.current,
+      lifecycle: 'ACTIVE', active: true, resumable: false, sprintId: 'sprint-030',
+      phase: 'EXECUTE', status: 'RUNNING', coordinator: 'alive',
+    };
   });
 
   it('includes agentAssignments in response', async () => {
@@ -173,6 +183,12 @@ describe('MCP status tool agent/skill enrichment', () => {
   });
 
   it('backward compatible: no agentAssignments in no-dashboard response', async () => {
+    // No run: the canonical authority honestly reports IDLE (no live coordinator).
+    runAuthorityState.current = {
+      ...runAuthorityState.current,
+      lifecycle: 'IDLE', active: false, resumable: false, sprintId: null,
+      phase: null, status: null, coordinator: 'absent',
+    };
     vi.mocked(existsSync).mockReturnValue(false);
     const tool = await getStatusTool();
     const result = await tool.handler({});

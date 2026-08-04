@@ -125,7 +125,76 @@ vi.mock('../../src/mcp/helpers/format.js', () => ({
   wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
 }));
 
+// Authority-first status: status.ts consults the canonical run-status authority +
+// persisted read model before trusting .dashboard. Default is "no live run";
+// the active-dashboard test overrides readCanonicalRunStatus per-test.
+vi.mock('../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => ({
+    schemaVersion: 1, lifecycle: 'IDLE', active: false, resumable: false,
+    sprintId: null, phase: null, status: null, reason: null,
+    recoveryCommand: null, finalizeCommand: null, coordinator: 'none', conflicts: [],
+  })),
+}));
+
+vi.mock('../../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: vi.fn(() => ({
+    schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
+    holds: [], providerConcurrency: [], terminalPublication: null, authority: {},
+  })),
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+}));
+
+// deckent_plan now delegates to the exact-plan flow service (planRunFlow) instead of
+// calling planSprint directly. Mirror its surface: forward to the mocked planSprint
+// (same arg order as the real generatePlanPreview call) and derive the topology
+// waves + a real sha256 planDigest from the returned sprint.
+vi.mock('../../src/orchestra/run-flow-plan-service.js', () => ({
+  planRunFlow: vi.fn(async (input: {
+    projectRoot: string;
+    config: unknown;
+    recommendation?: { maxWorkers?: number };
+    proposal?: { flowId?: string; revision?: number };
+    source?: { brainContext?: unknown };
+    previewOptions?: { mode?: string };
+  }) => {
+    const { planSprint: planSprintMock } = await import('../../src/orchestra/brain.js');
+    const sprint = await planSprintMock(
+      input.projectRoot,
+      input.config as never,
+      input.source?.brainContext as never,
+      input.recommendation as never,
+      { mode: input.previewOptions?.mode } as never,
+    );
+    const maxWorkers = input.recommendation?.maxWorkers ?? 4;
+    const tasks: Array<{ id: string }> = (sprint as { tasks?: Array<{ id: string }> })?.tasks ?? [];
+    const waves: Array<{ wave: number; slots: Array<{ taskId: string }> }> = [];
+    for (let i = 0; i < tasks.length; i += maxWorkers) {
+      waves.push({
+        wave: waves.length + 1,
+        slots: tasks.slice(i, i + maxWorkers).map(t => ({ taskId: t.id })),
+      });
+    }
+    const { createHash } = await import('node:crypto');
+    return {
+      flowId: input.proposal?.flowId ?? 'flow-test',
+      revision: input.proposal?.revision ?? 1,
+      approval: null,
+      sprint,
+      preview: {
+        topology: { waves, configuredMaxWorkers: maxWorkers },
+        scopeGateResult: 'skipped',
+        topologyGateResult: 'pass',
+        planDigestVersion: 2,
+      },
+      planDigest: createHash('sha256')
+        .update(JSON.stringify(tasks.map(t => t.id)))
+        .digest('hex'),
+    };
+  }),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
+import { readCanonicalRunStatus } from '../../src/core/run-status-authority.js';
 import {
   readContext, planSprint, runSprint,
 } from '../../src/orchestra/brain.js';
@@ -394,6 +463,13 @@ describe('MCP Tools', () => {
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue(JSON.stringify(dashState));
       vi.mocked(readLatestJobState).mockReturnValue(null);
+      // Live-run authority required for the dashboard projection; sprintId stays
+      // null so the .dashboard sprint.id fixture is what status.ts surfaces.
+      vi.mocked(readCanonicalRunStatus).mockReturnValue({
+        schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
+        sprintId: null, phase: 'EXECUTE', status: 'RUNNING', reason: null,
+        recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
+      } as never);
 
       const result = await mock.tools.get('deckent_status')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
@@ -409,6 +485,12 @@ describe('MCP Tools', () => {
 
       vi.mocked(existsSync).mockReturnValue(false);
       vi.mocked(readLatestJobState).mockReturnValue(null);
+      // Explicit no-live-run authority (mockReturnValue from the previous test persists).
+      vi.mocked(readCanonicalRunStatus).mockReturnValue({
+        schemaVersion: 1, lifecycle: 'IDLE', active: false, resumable: false,
+        sprintId: null, phase: null, status: null, reason: null,
+        recoveryCommand: null, finalizeCommand: null, coordinator: 'none', conflicts: [],
+      } as never);
 
       const result = await mock.tools.get('deckent_status')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
@@ -428,6 +510,12 @@ describe('MCP Tools', () => {
         status: 'RUNNING',
         startedAt: '2026-03-18T10:00:00Z',
       });
+      // Explicit no-live-run authority (independent of sibling-test mock state).
+      vi.mocked(readCanonicalRunStatus).mockReturnValue({
+        schemaVersion: 1, lifecycle: 'IDLE', active: false, resumable: false,
+        sprintId: null, phase: null, status: null, reason: null,
+        recoveryCommand: null, finalizeCommand: null, coordinator: 'none', conflicts: [],
+      } as never);
 
       const result = await mock.tools.get('deckent_status')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);

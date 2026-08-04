@@ -57,8 +57,23 @@ vi.mock('../../src/core/run-status-authority.js', () => ({
   readCanonicalRunStatus: vi.fn(),
 }));
 
+// Authority-first status: the tool surfaces `terminalPublication` ONLY from the
+// canonical persisted run-status read model (RECOVERY-BORN-488-STATUS-PROJECTION-001);
+// it never re-projects the receipt MCP-locally. Each integration case therefore arms
+// a persisted read model whose terminalPublication comes from the SAME shared
+// projection (core/sprint-terminal-publication-status) the finalizer persists.
+vi.mock('../../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: vi.fn(() => null),
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+}));
+
 import { readDashboardSafe } from '../../src/monitor/dashboard-manager.js';
 import { readCanonicalRunStatus } from '../../src/core/run-status-authority.js';
+import {
+  readCanonicalRunStatusReadModel,
+  type CanonicalRunStatusReadModel,
+} from '../../src/core/run-status-read-model.js';
+import { projectTerminalPublicationStatus as projectSharedTerminalPublicationStatus } from '../../src/core/sprint-terminal-publication-status.js';
 
 // ─── Mock Server ─────────────────────────────────────────────────────────────
 
@@ -115,6 +130,26 @@ const sampleDashboard = {
   agents: [{ id: 'w-001', status: 'DONE' }],
   alerts: [],
 };
+
+/**
+ * Arm the canonical persisted read model for the given authority. The
+ * terminalPublication field is computed lazily (at read time) through the real
+ * shared CLI/MCP projection so the case never fabricates a receipt shape.
+ */
+function armPersistedReadModel(authority: CanonicalRunStatus): void {
+  vi.mocked(readCanonicalRunStatusReadModel).mockImplementation(() => ({
+    schemaVersion: 1,
+    revision: 1,
+    runGeneration: authority.sprintId ? 'lease:test-lease' : null,
+    publishedAt: '2026-08-01T00:00:00.000Z',
+    authority,
+    logicalProgress: { done: 0, active: 0, blocked: 0, total: 0, attemptCount: 0, lineages: [] },
+    providerConcurrency: [],
+    terminalPublication: projectSharedTerminalPublicationStatus('/project', authority),
+    holds: [],
+    modelDigest: 'digest-test',
+  } as unknown as CanonicalRunStatusReadModel));
+}
 
 // ─── Unit tests: projectTerminalPublicationStatus ────────────────────────────
 
@@ -176,13 +211,15 @@ describe('deckent_status — terminalPublication reflects canonical authority (4
 
   it('surfaces terminal-authority-observed with a null receipt when the run is COMPLETE (no live dashboard)', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readCanonicalRunStatus).mockReturnValue(makeAuthority({
+    const authority = makeAuthority({
       lifecycle: 'COMPLETE',
       active: false,
       resumable: false,
       sprintId: 'sprint-333',
       status: 'COMPLETE',
-    }));
+    });
+    vi.mocked(readCanonicalRunStatus).mockReturnValue(authority);
+    armPersistedReadModel(authority);
 
     const tool = await getStatusTool();
     const result = await tool.handler({ json: true });
@@ -201,13 +238,15 @@ describe('deckent_status — terminalPublication reflects canonical authority (4
 
   it('surfaces terminal-authority-observed for an ABORTED run without fabricating a receipt', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readCanonicalRunStatus).mockReturnValue(makeAuthority({
+    const authority = makeAuthority({
       lifecycle: 'ABORTED',
       active: false,
       resumable: false,
       sprintId: 'sprint-333',
       status: 'ABORTED',
-    }));
+    });
+    vi.mocked(readCanonicalRunStatus).mockReturnValue(authority);
+    armPersistedReadModel(authority);
 
     const tool = await getStatusTool();
     const result = await tool.handler({ json: true });
@@ -228,13 +267,15 @@ describe('deckent_status — terminalPublication reflects canonical authority (4
       state: sampleDashboard,
       repaired: false,
     });
-    vi.mocked(readCanonicalRunStatus).mockReturnValue(makeAuthority({
+    const authority = makeAuthority({
       lifecycle: 'ACTIVE',
       active: true,
       resumable: false,
       sprintId: 'sprint-333',
       status: 'ACTIVE',
-    }));
+    });
+    vi.mocked(readCanonicalRunStatus).mockReturnValue(authority);
+    armPersistedReadModel(authority);
 
     const tool = await getStatusTool();
     const result = await tool.handler({ json: true });
@@ -251,7 +292,9 @@ describe('deckent_status — terminalPublication reflects canonical authority (4
 
   it('surfaces state=open for an IDLE run (no active or terminal sprint)', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readCanonicalRunStatus).mockReturnValue(makeAuthority({ lifecycle: 'IDLE' }));
+    const authority = makeAuthority({ lifecycle: 'IDLE' });
+    vi.mocked(readCanonicalRunStatus).mockReturnValue(authority);
+    armPersistedReadModel(authority);
 
     const tool = await getStatusTool();
     const result = await tool.handler({ json: true });

@@ -86,6 +86,13 @@ describe('deckent_run — provider-free (Fix A)', () => {
       execution_budget: {
         roles: { worker: { default: { maxTurns: 4 } } },
         landing: { reserve_ratio: 0.25 },
+        // ADR-G-037: codex reports usage final-only — a live ceiling needs
+        // owner-authored wall-clock containment or the policy holds pre-spawn.
+        final_only_usage: {
+          action: 'allow-wall-clock-containment',
+          roles: ['worker'],
+          max_wall_clock_seconds: 3600,
+        },
       },
     } as never);
 
@@ -121,6 +128,12 @@ describe('deckent_run — provider-free (Fix A)', () => {
       execution_budget: {
         roles: { worker: { default: { maxTurns: 4 } } },
         landing: { reserve_ratio: 0.25 },
+        // ADR-G-037: gemini reports usage final-only — same owner containment grant.
+        final_only_usage: {
+          action: 'allow-wall-clock-containment',
+          roles: ['worker'],
+          max_wall_clock_seconds: 3600,
+        },
       },
     } as never);
 

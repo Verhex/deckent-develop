@@ -140,6 +140,13 @@ describe('deckent_run MCP — owner budget authority', () => {
       execution_budget: {
         roles: { worker: { default: { maxTurns: 4, maxTokens: 20_000 } } },
         landing: { reserve_ratio: 0.25 },
+        // ADR-G-037: codex reports usage final-only — a live ceiling needs an
+        // owner-authored wall-clock containment grant or the policy holds.
+        final_only_usage: {
+          action: 'allow-wall-clock-containment',
+          roles: ['worker'],
+          max_wall_clock_seconds: 3600,
+        },
       },
     } as never);
 
@@ -174,6 +181,12 @@ describe('deckent_run MCP — owner budget authority', () => {
       execution_budget: {
         roles: { worker: { default: { maxTurns: 4 } } },
         landing: { reserve_ratio: 0.25 },
+        // ADR-G-037: codex final-only usage — owner containment grant required.
+        final_only_usage: {
+          action: 'allow-wall-clock-containment',
+          roles: ['worker'],
+          max_wall_clock_seconds: 3600,
+        },
       },
     } as never);
     const authority = { verifyAndClaim: vi.fn() };

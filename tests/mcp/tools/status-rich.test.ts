@@ -19,7 +19,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 const runAuthorityState = vi.hoisted(() => ({
   current: {
     schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
-    sprintId: 'sprint-001', phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    sprintId: 'sprint-139', phase: 'EXECUTE', status: 'RUNNING', reason: null,
     recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
   } as Record<string, unknown>,
 }));
@@ -176,7 +176,7 @@ describe('deckent_status — inputSchema', () => {
     // into the next one (default: a live run, which is what the projection cases need).
     runAuthorityState.current = {
       ...runAuthorityState.current,
-      lifecycle: 'ACTIVE', active: true, resumable: false, sprintId: 'sprint-001',
+      lifecycle: 'ACTIVE', active: true, resumable: false, sprintId: 'sprint-139',
       phase: 'EXECUTE', status: 'RUNNING', coordinator: 'alive',
     };
     vi.clearAllMocks();
