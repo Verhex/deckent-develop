@@ -97,6 +97,33 @@ const mockSpawnSync = vi.mocked(spawnSync);
 const mockReadFileSync = vi.mocked(readFileSync);
 const TEST_EXECUTION_OPTIONS = TEST_DOCKER_EXECUTION_OPTIONS;
 
+// The full node:fs mock cannot carry the WorkerHeartbeatAuthorityStore
+// write→rename→readback identity chain: an identity.json readback would fall
+// through to the generic fixture ('{}') and trip the store's schema guard with
+// E_UNSUPPORTED_WORKER_HEARTBEAT_AUTHORITY_IDENTITY. Surfacing ENOENT instead
+// routes the store onto its honest uninitialized-attempt path (read → null,
+// observe → typed HOLD). Real persistence is proven by the store's own
+// real-fs tests (tests/core/worker-heartbeat-authority-store.test.ts).
+function throwHeartbeatAuthorityEnoent(path: string): never {
+  const error = new Error(`ENOENT: no such file or directory, open '${path}'`) as NodeJS.ErrnoException;
+  error.code = 'ENOENT';
+  throw error;
+}
+
+/** Standard readFileSync route: heartbeat-authority → ENOENT, gemini settings → auth selection, else task JSON. */
+function budgetedDockerReadFileSync(
+  input: { authMode?: 'api' | 'subscription'; model?: string } = {},
+): (path: unknown) => string {
+  return (path) => {
+    const p = String(path);
+    if (p.includes('worker-heartbeat-authority')) throwHeartbeatAuthorityEnoent(p);
+    if (p.endsWith('/.gemini/settings.json')) {
+      return '{"security":{"auth":{"selectedType":"gemini-api-key"}}}';
+    }
+    return budgetedDockerTaskJson(path, input);
+  };
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 interface SpawnSyncOutcome {
@@ -321,9 +348,7 @@ describe('buildGeminiAuthSelectionBootstrap', () => {
 describe('DockerSpawnBackend: memory budget defaults (Sprint 191 T-001)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockReadFileSync.mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
-      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : budgetedDockerTaskJson(path));
+    mockReadFileSync.mockImplementation(budgetedDockerReadFileSync() as typeof readFileSync);
     installSpawnRouter();
   });
 
@@ -464,17 +489,13 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
-      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : budgetedDockerTaskJson(path));
+    vi.mocked(fs.readFileSync).mockImplementation(budgetedDockerReadFileSync());
     installSpawnRouter();
   });
 
   it('default subscription mounts only the Claude credential file', async () => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
-      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : budgetedDockerTaskJson(path));
+    vi.mocked(fs.readFileSync).mockImplementation(budgetedDockerReadFileSync());
 
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('auth-default', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
@@ -489,8 +510,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
   it('authMode="api" in task JSON skips ~/.claude mount and stamps env=api', async () => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation((path) =>
-      budgetedDockerTaskJson(path, { authMode: 'api' }));
+    vi.mocked(fs.readFileSync).mockImplementation(budgetedDockerReadFileSync({ authMode: 'api' }));
     const prevKey = process.env.ANTHROPIC_API_KEY;
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
 
@@ -511,8 +531,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
   it('authMode="api" without ANTHROPIC_API_KEY throws SpawnBackendError', async () => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation((path) =>
-      budgetedDockerTaskJson(path, { authMode: 'api' }));
+    vi.mocked(fs.readFileSync).mockImplementation(budgetedDockerReadFileSync({ authMode: 'api' }));
     const prevKey = process.env.ANTHROPIC_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
 
@@ -530,9 +549,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
     ['gemini-2.5-flash', 'GOOGLE_API_KEY'],
   ] as const)('%s subscription mode is held before unmetered Docker work', async (model, envName) => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
-      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : budgetedDockerTaskJson(path));
+    vi.mocked(fs.readFileSync).mockImplementation(budgetedDockerReadFileSync());
     const previous = process.env[envName];
     process.env[envName] = 'host-api-key-must-not-leak';
 
@@ -552,8 +569,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
     ['gemini-2.5-flash', 'GOOGLE_API_KEY'],
   ] as const)('%s API mode is held before unmetered Docker work', async (model, envName) => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation((path) =>
-      budgetedDockerTaskJson(path, { authMode: 'api' }));
+    vi.mocked(fs.readFileSync).mockImplementation(budgetedDockerReadFileSync({ authMode: 'api' }));
     const previous = process.env[envName];
     process.env[envName] = 'provider-specific-api-key';
 
@@ -581,9 +597,7 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     // Reset readFileSync mock: authMode tests override it with JSON.stringify({authMode:'api'})
     // and vi.clearAllMocks() does not reset implementations — only call history.
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation((path) => (String(path).endsWith('/.gemini/settings.json')
-      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : budgetedDockerTaskJson(path)) as unknown as Buffer);
+    vi.mocked(fs.readFileSync).mockImplementation(budgetedDockerReadFileSync() as unknown as typeof fs.readFileSync);
     vi.mocked(fs.existsSync).mockReturnValue(true);
     installSpawnRouter();
   });
@@ -642,9 +656,7 @@ describe('DockerSpawnBackend: provider-aware command + isolated OAuth credential
   beforeEach(async () => {
     vi.clearAllMocks();
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
-      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : budgetedDockerTaskJson(path));
+    vi.mocked(fs.readFileSync).mockImplementation(budgetedDockerReadFileSync());
     installSpawnRouter();
   });
 

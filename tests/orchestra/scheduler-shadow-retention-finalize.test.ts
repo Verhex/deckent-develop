@@ -77,7 +77,30 @@ function makeResult(taskId: string, selfAssessment: TaskResult['selfAssessment']
     coverage: 90,
     selfAssessment,
     notes: '',
+    // Finalizer terminal-evidence gerçeği: attempt kimliği host-VERIFIED
+    // workAttribution'dan gelir; attribution'sız bir result attemptId '' →
+    // INVALID_IDENTITY hold → finalizeSprint TERMINAL_EVIDENCE_HOLD fırlatır.
+    workAttribution: {
+      state: 'VERIFIED',
+      attemptId: `attempt-${taskId}-1`,
+      baselineRef: `baseline-${taskId}`,
+      scopeDigest: `scope-${taskId}`,
+    },
   };
+}
+
+/** Minimal settled task — the fenced terminal receipt is only cleanup-eligible
+ *  when at least one logical lineage settles (an empty sprint assembles as
+ *  NO_LOGICAL_TASKS → BLOCKED → TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE). */
+function makeSettledTask(taskId: string): Sprint['tasks'][number] {
+  return {
+    id: taskId, title: `Task ${taskId}`, description: '', model: 'sonnet',
+    effort: 'normal', priority: 'HIGH', reason: '',
+    scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+    dependencies: [],
+    goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+    status: 'DONE',
+  } as unknown as Sprint['tasks'][number];
 }
 
 const FINALIZE_OPTS = {
@@ -132,9 +155,10 @@ describe('scheduler-shadow retention — real finalizeSprint() integration', () 
     seedJournal(tmpDir, 'sprint-new.jsonl', 0);
 
     const sprint = makeSprint('sprint-9001', 9001);
-    const evaluations = new Map<string, TaskEvaluation>();
+    sprint.tasks = [makeSettledTask('9001-001')];
+    const evaluations = new Map<string, TaskEvaluation>([['9001-001', TaskEvaluation.DONE]]);
 
-    await finalizeSprint(tmpDir, sprint, evaluations, [], FINALIZE_OPTS);
+    await finalizeSprint(tmpDir, sprint, evaluations, [makeResult('9001-001')], FINALIZE_OPTS);
 
     expect(existsSync(schedShadowPath(tmpDir, 'sprint-old.jsonl'))).toBe(false);
     expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-old.jsonl'))).toBe(true);
@@ -162,9 +186,10 @@ describe('scheduler-shadow retention — config override via real finalizeSprint
     seedJournal(tmpDir, 'sprint-mid.jsonl', 10); // > default keep, but > 7d override → archive
 
     const sprint = makeSprint('sprint-9002', 9002);
-    const evaluations = new Map<string, TaskEvaluation>();
+    sprint.tasks = [makeSettledTask('9002-001')];
+    const evaluations = new Map<string, TaskEvaluation>([['9002-001', TaskEvaluation.DONE]]);
 
-    await finalizeSprint(tmpDir, sprint, evaluations, [], FINALIZE_OPTS);
+    await finalizeSprint(tmpDir, sprint, evaluations, [makeResult('9002-001')], FINALIZE_OPTS);
 
     expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-old.jsonl'))).toBe(true);
     expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-mid.jsonl'))).toBe(true);

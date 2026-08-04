@@ -58,7 +58,7 @@ vi.mock('node:fs', () => ({
   renameSync: vi.fn(),
   rmdirSync: vi.fn(),
   chmodSync: vi.fn(),
-  statSync: vi.fn(() => ({ mtimeMs: 1 })),
+  statSync: vi.fn(() => ({ mtimeMs: 1, isFile: () => true, isDirectory: () => false })),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({
@@ -155,6 +155,19 @@ function isProviderCredentialPath(path: string): boolean {
     || path.endsWith('/.gemini/google_accounts.json');
 }
 
+// Heartbeat-authority identity readbacks must surface ENOENT: the full node:fs
+// mock cannot carry the WorkerHeartbeatAuthorityStore write→readback chain, and
+// the '{}' fallback would trip the store's schema guard
+// (E_UNSUPPORTED_WORKER_HEARTBEAT_AUTHORITY_IDENTITY). ENOENT routes the store
+// onto its honest uninitialized-attempt path (read → null, observe → typed
+// HOLD); real persistence is proven in tests/core/worker-heartbeat-authority-store.test.ts.
+function throwHeartbeatAuthorityEnoentIfMatched(p: string): void {
+  if (!p.includes('worker-heartbeat-authority')) return;
+  const error = new Error(`ENOENT: no such file or directory, open '${p}'`) as NodeJS.ErrnoException;
+  error.code = 'ENOENT';
+  throw error;
+}
+
 function stubTaskEnvelope(
   taskId: string,
   model: string,
@@ -162,8 +175,13 @@ function stubTaskEnvelope(
 ): void {
   fsState.existsSyncImpl = (p: string) =>
     p.endsWith(`task-${taskId}.json`)
-    || (authMode === 'subscription' && p.endsWith('/.claude/.credentials.json'));
+    || (authMode === 'subscription' && p.endsWith('/.claude/.credentials.json'))
+    // The host-owned broker lease (prepareProviderAuthBroker) copies the
+    // subscription credential into tmpdir()/deckent-provider-auth/…; the
+    // principal-digest resolver then re-checks those exact broker paths.
+    || (authMode === 'subscription' && p.includes('deckent-provider-auth'));
   fsState.readFileSyncImpl = (p: string) => {
+    throwHeartbeatAuthorityEnoentIfMatched(p);
     if (p.endsWith(`task-${taskId}.json`)) {
       return budgetedDockerTaskJson(p, { authMode, model });
     }
@@ -173,9 +191,12 @@ function stubTaskEnvelope(
 
 function resetFsStubs(): void {
   fsState.existsSyncImpl = isProviderCredentialPath;
-  fsState.readFileSyncImpl = (path) => path.endsWith('/.gemini/settings.json')
-    ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-    : '{}';
+  fsState.readFileSyncImpl = (path) => {
+    throwHeartbeatAuthorityEnoentIfMatched(path);
+    return path.endsWith('/.gemini/settings.json')
+      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+      : '{}';
+  };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

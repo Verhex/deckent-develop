@@ -33,11 +33,14 @@ function mkSprint(tasks: Array<{ id: string; title: string }>): Sprint {
 }
 
 /** A structurally-valid TaskResult. `evidence` overrides the file/test fields
- *  the SURF-3 result-evidence record now carries (default: none). */
+ *  the SURF-3 result-evidence record now carries (default: none). Work-model
+ *  truth: worker-claimed file/line evidence only projects into the completion
+ *  record when a host-VERIFIED `workAttribution` accompanies it, so evidence
+ *  overrides may also carry that attribution block. */
 function mkResult(
   taskId: string,
   selfAssessment: TaskResult['selfAssessment'],
-  evidence: Partial<Pick<TaskResult, 'filesChanged' | 'linesAdded' | 'linesRemoved' | 'testsPassed' | 'coverage'>> = {},
+  evidence: Partial<Pick<TaskResult, 'filesChanged' | 'linesAdded' | 'linesRemoved' | 'testsPassed' | 'coverage' | 'workAttribution'>> = {},
 ): TaskResult {
   return {
     taskId,
@@ -116,9 +119,11 @@ describe('buildSprintCompletionRecord — TERM5-FIN rich completion-record', () 
 
     const record = buildSprintCompletionRecord(sprint, evaluations, resultsMap);
 
+    // Attribution-authority truth: without a host-VERIFIED workAttribution the
+    // summary keeps the honest UNAVAILABLE state and contributes zero work.
     expect(record.taskSummary).toEqual([
-      { taskId: '427-001', title: 'TERM5-FIN', evaluation: TaskEvaluation.DONE, selfAssessment: 'DONE', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 0 },
-      { taskId: '427-002', title: 'TERM5-FEED', evaluation: TaskEvaluation.GO_WITH_TECH_DEBT, selfAssessment: 'GO_WITH_TECH_DEBT', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 0 },
+      { taskId: '427-001', title: 'TERM5-FIN', evaluation: TaskEvaluation.DONE, selfAssessment: 'DONE', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 0, workAttributionState: 'UNAVAILABLE', attemptId: null, attributionReason: 'ATTRIBUTION_AUTHORITY_UNAVAILABLE' },
+      { taskId: '427-002', title: 'TERM5-FEED', evaluation: TaskEvaluation.GO_WITH_TECH_DEBT, selfAssessment: 'GO_WITH_TECH_DEBT', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 0, workAttributionState: 'UNAVAILABLE', attemptId: null, attributionReason: 'ATTRIBUTION_AUTHORITY_UNAVAILABLE' },
     ]);
   });
 
@@ -128,6 +133,14 @@ describe('buildSprintCompletionRecord — TERM5-FIN rich completion-record', () 
     const resultsMap = new Map<string, TaskResult>([
       ['427-001', mkResult('427-001', 'DONE', {
         filesChanged: ['a.ts', 'b.ts', 'c.ts'], linesAdded: 45, linesRemoved: 12, testsPassed: true, coverage: 87,
+        // Host-authored claim-time attribution: only a VERIFIED state lets the
+        // worker-claimed file/line evidence project into the completion record.
+        workAttribution: {
+          state: 'VERIFIED',
+          attemptId: 'attempt-427-001-1',
+          baselineRef: 'baseline-427-001',
+          scopeDigest: 'scope-digest-427-001',
+        },
       })],
     ]);
 
@@ -135,6 +148,7 @@ describe('buildSprintCompletionRecord — TERM5-FIN rich completion-record', () 
 
     expect(record.taskSummary[0]).toMatchObject({
       taskId: '427-001', filesChanged: 3, linesAdded: 45, linesRemoved: 12, testsPassed: true, coverage: 87,
+      workAttributionState: 'VERIFIED', attemptId: 'attempt-427-001-1', attributionReason: null,
     });
   });
 
@@ -145,8 +159,9 @@ describe('buildSprintCompletionRecord — TERM5-FIN rich completion-record', () 
 
     const record = buildSprintCompletionRecord(sprint, evaluations, resultsMap);
 
+    // No result at all → attribution reason is the typed RESULT_UNAVAILABLE.
     expect(record.taskSummary).toEqual([
-      { taskId: '427-005', title: 'Untracked', evaluation: TaskEvaluation.NO_GO, selfAssessment: 'NO_GO', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0 },
+      { taskId: '427-005', title: 'Untracked', evaluation: TaskEvaluation.NO_GO, selfAssessment: 'NO_GO', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0, workAttributionState: 'UNAVAILABLE', attemptId: null, attributionReason: 'RESULT_UNAVAILABLE' },
     ]);
     expect(record.verdictSummary).toEqual({ done: 0, techDebt: 0, noGo: 1 });
   });

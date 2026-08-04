@@ -41,14 +41,19 @@ describe('SURF-0 flowId correlation chain — every hop stays wired', () => {
   it('start.ts forwards --flow-id into the runSprint options object (432-002)', () => {
     expect(flowBranchStart).toBeGreaterThanOrEqual(0);
     expect(flowBranchEnd).toBeGreaterThan(flowBranchStart);
+    // Exact-plan two-phase start (B3): the approved snapshot is admitted via
+    // startApprovedRun() into `exactSprint` before runSprint — the pin follows
+    // that admission seam while still requiring the same `flowId` forwarding.
     expect(flowBranchSrc).toMatch(
-      /runSprint\([\s\S]*?preplannedSprint: approvedSnapshot!\.sprint,[\s\S]*?flowId,[\s\S]*?\}\);/,
+      /runSprint\([\s\S]*?preplannedSprint: exactSprint,[\s\S]*?flowId,[\s\S]*?\}\);/,
     );
   });
 
   it('runSprint forwards opts?.flowId into runRetroPhase — the middle hop (CC seam fix)', () => {
+    // Call-site is now multiline and carries trailing args after flowId —
+    // the pin only requires the positional chain up to opts?.flowId intact.
     expect(controllerSrc).toMatch(
-      /runRetroPhase\(projectRoot, sprint, evaluations, results, config, opts\?\.testMode, opts\?\.flowId\)/,
+      /runRetroPhase\(\s*projectRoot,\s*sprint,\s*evaluations,\s*results,\s*config,\s*opts\?\.testMode,\s*opts\?\.flowId,/,
     );
   });
 

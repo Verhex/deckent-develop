@@ -34,32 +34,58 @@ import { join } from 'node:path';
 let dockerWaitDataCallback: ((data: Buffer) => void) | undefined;
 let dockerWaitCloseCallback: ((code: number | null, signal: NodeJS.Signals | null) => void) | undefined;
 
-vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(() => ({ stdout: '', stderr: '', status: 0 })),
-  spawn: vi.fn(() => {
-    const stub = {
-      stdout: {
-        on: (event: string, cb: (data: Buffer) => void) => {
-          if (event === 'data') dockerWaitDataCallback = cb;
+vi.mock('node:child_process', async () => {
+  const { PassThrough } = await import('node:stream');
+  return {
+    spawnSync: vi.fn(() => ({ stdout: '', stderr: '', status: 0 })),
+    spawn: vi.fn((_cmd: string, args: readonly string[]) => {
+      // `docker logs [-f]` follower/capture children (started when a settlementRef
+      // is present) need REAL stream objects — followContainerActivity calls
+      // stderr.resume() and hands stdout to captureStreamToLog. Never-emitting
+      // PassThroughs keep the follow harmlessly idle without clobbering the
+      // `docker wait` data/close callbacks below.
+      if (Array.isArray(args) && args[0] === 'logs') {
+        return {
+          stdout: new PassThrough(),
+          stderr: new PassThrough(),
+          on: vi.fn(),
+          once: vi.fn(),
+          kill: vi.fn(),
+        } as unknown as ChildProcess;
+      }
+      const stub = {
+        stdout: {
+          on: (event: string, cb: (data: Buffer) => void) => {
+            if (event === 'data') dockerWaitDataCallback = cb;
+          },
         },
-      },
-      stderr: { on: vi.fn() },
-      on: vi.fn(),
-      once: (event: string, cb: (code: number | null, signal: NodeJS.Signals | null) => void) => {
-        if (event === 'close') dockerWaitCloseCallback = cb;
-      },
-    };
-    return stub as unknown as ChildProcess;
-  }),
-}));
+        stderr: { on: vi.fn(), resume: vi.fn() },
+        on: vi.fn(),
+        once: (event: string, cb: (code: number | null, signal: NodeJS.Signals | null) => void) => {
+          if (event === 'close') dockerWaitCloseCallback = cb;
+        },
+        kill: vi.fn(),
+      };
+      return stub as unknown as ChildProcess;
+    }),
+  };
+});
 
 import {
   DockerSpawnBackend,
+  buildScopeAttributionManifest,
   computeDistFingerprint,
   distFingerprintsChanged,
   applyDistMutationAdvisory,
   type DistFingerprint,
 } from '../../src/orchestra/spawn-backend-docker.js';
+import {
+  claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlementRef,
+  writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementWorkAttributionBaselineAtomic,
+  type TaskResultSettlementRefV1,
+} from '../../src/core/task-result-settlement.js';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -237,12 +263,46 @@ interface MonitorContainerAccess {
     model: string,
     projectDir: string,
     distFingerprintBefore: DistFingerprint | null,
+    liveCtx?: unknown,
+    executionBudget?: unknown,
+    executionLandingPolicy?: unknown,
+    executionContinuation?: unknown,
+    executionLandingContext?: unknown,
+    settlementRef?: TaskResultSettlementRefV1,
   ): void;
+}
+
+/**
+ * born-480 attribution truth: monitorContainer now reconciles the worker's
+ * claim against the exact attempt's spawn-time work-attribution baseline
+ * BEFORE the dist advisory runs. Without a claimed attempt + baseline the host
+ * honestly rewrites the result to NO_GO (ATTRIBUTION_AUTHORITY_UNAVAILABLE),
+ * so the "advisory never touches selfAssessment" claim can only be observed
+ * with real settlement authority in place — exactly like production spawn.
+ */
+function grantWorkAttributionAuthority(
+  projectDir: string,
+  taskId: string,
+): TaskResultSettlementRefV1 {
+  const ref = createTaskResultSettlementRef(projectDir, taskId);
+  writeTaskResultSettlementAttemptAtomic(ref);
+  claimTaskResultSettlementAttemptAtomic(ref);
+  // No task JSON on disk → scope.filesWrite resolves to [] — the manifest is
+  // header-only but carries the matching attemptId + scope digest.
+  writeTaskResultSettlementWorkAttributionBaselineAtomic(
+    ref,
+    buildScopeAttributionManifest(ref.attemptId, [], ''),
+  );
+  return ref;
 }
 
 function invokeMonitor(
   backend: DockerSpawnBackend,
-  args: { taskId: string; tasksDir: string; projectDir: string; distFingerprintBefore: DistFingerprint | null },
+  args: {
+    taskId: string; tasksDir: string; projectDir: string;
+    distFingerprintBefore: DistFingerprint | null;
+    settlementRef?: TaskResultSettlementRefV1;
+  },
 ): void {
   (backend as unknown as MonitorContainerAccess).monitorContainer(
     args.taskId,
@@ -251,6 +311,12 @@ function invokeMonitor(
     'claude-sonnet-5',
     args.projectDir,
     args.distFingerprintBefore,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    args.settlementRef,
   );
   // The mocked `docker wait` spawn stub captured the 'data' handler synchronously above.
   expect(dockerWaitDataCallback).toBeDefined();
@@ -282,8 +348,9 @@ describe('DockerSpawnBackend.monitorContainer — dist-mutation wiring', () => {
     // Simulate an in-container `npm run build` rewriting dist/ before exit.
     writeFileWithMtime(join(distDir, 'index.js'), 'a-rebuilt', 9_000_000);
 
+    const settlementRef = grantWorkAttributionAuthority(projectDir, taskId);
     const backend = new DockerSpawnBackend(projectDir);
-    invokeMonitor(backend, { taskId, tasksDir, projectDir, distFingerprintBefore: before });
+    invokeMonitor(backend, { taskId, tasksDir, projectDir, distFingerprintBefore: before, settlementRef });
 
     const written = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
     expect(written.distMutated).toBe(true);

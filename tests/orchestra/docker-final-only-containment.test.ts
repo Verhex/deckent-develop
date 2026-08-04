@@ -121,11 +121,29 @@ function capturedTaskTimeout(): number | null {
   return entry ? Number.parseInt(entry.slice('TASK_TIMEOUT='.length), 10) : null;
 }
 
+// Heartbeat-authority identity readbacks must surface ENOENT: the full node:fs
+// mock cannot carry the WorkerHeartbeatAuthorityStore write→readback chain, and
+// the '{}' fallback would trip the store's schema guard
+// (E_UNSUPPORTED_WORKER_HEARTBEAT_AUTHORITY_IDENTITY). ENOENT routes the store
+// onto its honest uninitialized-attempt path (read → null, observe → typed
+// HOLD); real persistence is proven in tests/core/worker-heartbeat-authority-store.test.ts.
+function budgetedTaskRead(model: string): typeof readFileSync {
+  return ((path: unknown) => {
+    const p = String(path);
+    if (p.includes('worker-heartbeat-authority')) {
+      const error = new Error(`ENOENT: no such file or directory, open '${p}'`) as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      throw error;
+    }
+    return budgetedDockerTaskJson(path, { model });
+  }) as typeof readFileSync;
+}
+
 describe('DockerSpawnBackend: final-only usage containment (XVER-CODEX)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     installSpawnRouter();
-    mockReadFileSync.mockImplementation(path => budgetedDockerTaskJson(path, { model: 'gpt-5.6-sol' }));
+    mockReadFileSync.mockImplementation(budgetedTaskRead('gpt-5.6-sol'));
   });
 
   it('refuses a final-only provider with a live ceiling when the owner authorized no containment', () => {
@@ -170,7 +188,7 @@ describe('DockerSpawnBackend: final-only usage containment (XVER-CODEX)', () => 
   });
 
   it('leaves an incremental-usage provider on its configured timeout', () => {
-    mockReadFileSync.mockImplementation(path => budgetedDockerTaskJson(path, { model: 'claude-sonnet-5' }));
+    mockReadFileSync.mockImplementation(budgetedTaskRead('claude-sonnet-5'));
     new DockerSpawnBackend('/test/project', { timeoutSeconds: 2700 }).spawn(
       'incremental-untouched',
       'claude-sonnet-5' as ModelType,

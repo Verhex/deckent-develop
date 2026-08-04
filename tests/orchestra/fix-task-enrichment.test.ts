@@ -172,7 +172,13 @@ describe('FIX prompt enrichment — handleEvaluation NO_GO', () => {
     expect(second.payload.description).toBe(first.payload.description);
   });
 
-  it('adds only tracked failure-evidence files inside the reviewed scope boundary', () => {
+  // AUTHORITY-CONTRACT (post-210 tightening): worker-authored prose is
+  // evidence for DIAGNOSIS, never scope authority. Until a host-authored typed
+  // scope-amendment receipt exists, buildFixRepairAuthority derives NO
+  // failure-evidence paths from result.notes: the FIX inherits the approved
+  // scope EXACTLY (notes cannot grant a path) and cannot create a birth-time
+  // PAUSED trap (notes cannot park a repair either).
+  it('worker prose never widens the FIX write scope — inherited authority is carried exactly', () => {
     spawnSyncMock.mockReturnValue({
       status: 0,
       stdout: 'tests/cli/recover.test.ts\ntests/mcp/recover.test.ts\n',
@@ -192,21 +198,18 @@ describe('FIX prompt enrichment — handleEvaluation NO_GO', () => {
     handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
 
     const { payload } = readWrittenFixTask();
-    expect(payload.scope.filesWrite).toEqual([
-      'src/recover.ts',
-      'tests/cli/recover.test.ts',
-      'tests/mcp/recover.test.ts',
-    ]);
+    // Notes named two extra test files — none may be granted from prose.
+    expect(payload.scope.filesWrite).toEqual(['src/recover.ts']);
     expect(payload.repairAuthority).toMatchObject({
       state: 'accepted',
-      addedWritePaths: [
-        'tests/cli/recover.test.ts',
-        'tests/mcp/recover.test.ts',
-      ],
+      addedWritePaths: [],
+      evidenceWritePaths: [],
+      inheritedFilesWrite: ['src/recover.ts'],
+      filesWrite: ['src/recover.ts'],
     });
   });
 
-  it('parks an impossible FIX contract instead of dispatching unchanged authority', () => {
+  it('out-of-scope prose cannot park the FIX — no birth-time PAUSED trap, authority stays accepted', () => {
     const task = makeTask({
       scope: {
         directories: ['src/'],
@@ -221,10 +224,13 @@ describe('FIX prompt enrichment — handleEvaluation NO_GO', () => {
     handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
 
     const { payload } = readWrittenFixTask();
-    expect(payload.status).toBe(TaskStatus.PAUSED);
+    // Prose naming an out-of-boundary path is NOT a typed scope amendment:
+    // the fix dispatches PENDING under the inherited authority, unparked.
+    expect(payload.status).toBe(TaskStatus.PENDING);
     expect(payload.repairAuthority).toMatchObject({
-      state: 'hold',
-      evidenceWritePaths: ['tests/cli/recover.test.ts'],
+      state: 'accepted',
+      evidenceWritePaths: [],
+      filesWrite: ['src/recover.ts'],
     });
   });
 });

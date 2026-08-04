@@ -269,10 +269,19 @@ describe('buildWorkerPrompt projectRoot thread — collector-path (result-collec
       });
 
       process.chdir(cwdFixture);
+      // auth_mode is REQUIRED for the queue dispatch path: billing-mode
+      // resolution fails closed when a real config leaves it unresolved
+      // (evaluateRunCostBudget → runBudgetHold → dispatch suppressed +
+      // dispatchHoldShouldComplete early exit). Mirrors makeConfig in
+      // dispatch-evaluate-race.test.ts (the green sibling of this branch).
       const results = await waitForResults(
         projectRoot, sprint, 3000, undefined,
         { spawnBackend: backend, autoApprove: true }, undefined,
-        { dependency_pipeline_enabled: false, activeModeConfig: { max_workers: 4 } } as unknown as ResolvedConfig,
+        {
+          dependency_pipeline_enabled: false,
+          activeModeConfig: { max_workers: 4 },
+          auth_mode: 'api',
+        } as unknown as ResolvedConfig,
       );
 
       const bCall = backend.calls.find(c => c.taskId === 'b');

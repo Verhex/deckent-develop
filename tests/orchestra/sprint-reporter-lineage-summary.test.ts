@@ -53,9 +53,13 @@ describe('buildReporterLogicalLineageSummary', () => {
         }),
       ],
       logicalProgress: {
+        // Canonical contract: every attempt carries the producer-assigned
+        // logicalTaskId shared across its repair lineage (invalid-logical-task-id
+        // is a typed rejection, not a repair).
         attempts: [
-          { id: 'attempt-original', status: 'blocked', sequence: 1 },
+          { logicalTaskId: '486-012', id: 'attempt-original', status: 'blocked', sequence: 1 },
           {
+            logicalTaskId: '486-012',
             id: 'attempt-fix', status: 'done', fixForAttemptId: 'attempt-original', sequence: 2,
           },
         ],
@@ -83,7 +87,7 @@ describe('buildReporterLogicalLineageSummary', () => {
     expect(summary.logicalOutcomes).toMatchObject({ done: 1, active: 0, blocked: 0, total: 1 });
     expect(summary.exactAttempts).toEqual({ count: 2 });
     expect(summary.logicalOutcomes.lineages[0]).toMatchObject({
-      logicalTaskId: 'attempt-original', attemptCount: 2, attemptIds: ['attempt-original', 'attempt-fix'],
+      logicalTaskId: '486-012', attemptCount: 2, attemptIds: ['attempt-original', 'attempt-fix'],
     });
     expect(summary.attribution).toMatchObject({
       filesChanged: ['src/orchestra/sprint-reporter.ts'],
@@ -115,7 +119,9 @@ describe('buildReporterLogicalLineageSummary', () => {
         },
       })],
       logicalProgress: {
-        attempts: [{ id: 'attempt-original', status: 'done' }],
+        // logicalTaskId is present so the projection reaches the denominator
+        // check — the typed rejection under test is the attempt-denominator.
+        attempts: [{ logicalTaskId: '486-012', id: 'attempt-original', status: 'done' }],
         denominator: { kind: 'attempt', total: 1 },
       },
       usageAuthority: {

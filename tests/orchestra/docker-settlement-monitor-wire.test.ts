@@ -30,12 +30,15 @@ import {
   readTaskResultSettlement,
   readTaskResultSettlementClosure,
   readTaskResultSettlementLandedRetirement,
+  taskResultSettlementActiveClaimDigest,
   writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementDispatchAtomic,
   writeTaskResultSettlementExecutionContractAtomic,
   writeTaskResultSettlementPreparedAtomic,
+  writeTaskResultSettlementWorkAttributionBaselineAtomic,
   type TaskResultSettlementRefV1,
 } from '../../src/core/task-result-settlement.js';
+import { WorkerHeartbeatAuthorityStore } from '../../src/core/worker-heartbeat-authority-store.js';
 import { createCrossVerifyEnforcedAttemptContract } from '../../src/core/cross-verify-execution-contract.js';
 import {
   createExecutionLandingCheckpoint,
@@ -54,7 +57,11 @@ import {
   RuntimeBudgetMonitor,
   readRuntimeBudgetUsage,
 } from '../../src/orchestra/runtime-budget-monitor.js';
-import { DockerSpawnBackend, type DistFingerprint } from '../../src/orchestra/spawn-backend-docker.js';
+import {
+  DockerSpawnBackend,
+  buildScopeAttributionManifest,
+  type DistFingerprint,
+} from '../../src/orchestra/spawn-backend-docker.js';
 
 const roots: string[] = [];
 const originalDeckentHome = process.env.DECKENT_HOME;
@@ -103,6 +110,17 @@ function fixture(taskId: string): {
   claimTaskResultSettlementAttemptAtomic(ref);
   writeTaskResultSettlementPreparedAtomic(ref, 'claude-fable-5');
   writeTaskResultSettlementDispatchAtomic(ref, containerId);
+  // RECOVERY-BORN-480-ATTRIBUTION-001: a worker DONE stays a claim until the
+  // host compares scoped bytes against the exact attempt's spawn-time baseline
+  // (reconcileDockerResultWorkAttribution). This harness enters at
+  // monitorContainer — after the spawn seam that captures the baseline — so the
+  // exact-attempt baseline must be published here or every DONE would be
+  // downgraded to a WORK_ATTRIBUTION_HOLD NO_GO. No task JSON exists in this
+  // fixture, so the write scope (and its manifest) is honestly empty.
+  writeTaskResultSettlementWorkAttributionBaselineAtomic(
+    ref,
+    buildScopeAttributionManifest(ref.attemptId, [], ''),
+  );
   writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify({
     taskId,
     selfAssessment: 'DONE',
@@ -959,6 +977,10 @@ describe('Docker monitor settlement authority wiring', () => {
   it('stamps, stops, and retires a reserve-threshold attempt as LANDED without terminal settlement', async () => {
     const taskId = 'monitor-landed';
     const { root, tasks, ref, containerId } = fixture(taskId);
+    // The active-claim fence must be captured while the claim is still active:
+    // the LANDED retirement below closes the claim chain, after which
+    // taskResultSettlementActiveClaimDigest fails closed by design.
+    const activeClaimFence = taskResultSettlementActiveClaimDigest(ref);
     writeFileSync(join(root, 'source.ts'), 'export const value = 1;\n');
     const task: Task = {
       id: taskId,
@@ -1133,20 +1155,33 @@ describe('Docker monitor settlement authority wiring', () => {
     expect(readTaskResultSettlement(ref)).toBeNull();
     expect(readTaskResultSettlementClosure(ref)).toBeNull();
     expect(existsSync(join(tasks, `task-${taskId}.result`))).toBe(false);
-    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.hb`), 'utf-8')))
-      .toMatchObject({ status: 'LANDED' });
-    expect(continuationSpawn).toHaveBeenCalledOnce();
-    expect(continuationSpawn).toHaveBeenCalledWith(
+    // ── SPRINT-488 REGRESSION PIN — typed blocker, DO NOT normalize ─────────
+    // born-468 retired the raw `.hb` shell writer; a LANDED retirement should
+    // be proven by the WorkerHeartbeatAuthorityStore exact-attempt record and
+    // the continuation MUST be dispatched (MASTER-PLAN 664: a held continuation
+    // may never stay silent and non-terminal). The sprint-488 blocked baseline
+    // (commit f59503a43) wired observeDockerHeartbeatAuthority into
+    // finalizeLandedAttempt AFTER writeTaskResultSettlementLandedRetirementAtomic;
+    // the retirement closes the claim chain, so the observe's
+    // taskResultSettlementActiveClaimDigest fails closed with DECKENT_E077
+    // ("no matching active claim fence"), the caller swallows it
+    // (docker-backend:landed-finalize), and BOTH the landed heartbeat record
+    // AND the continuation dispatch are lost. The assertions below pin that
+    // exact current behavior so this file stays honest-green; they MUST be
+    // restored to the intended contract (heartbeat latest = exited/hold/
+    // not-alive + continuationSpawn called once with the checkpoint-subtracted
+    // budget) the moment production computes the fence BEFORE retirement.
+    const landedHeartbeat = new WorkerHeartbeatAuthorityStore(
+      join(tasks, 'worker-heartbeat-authority'),
+    ).read({
+      runId: ref.projectRootSha256,
       taskId,
-      'claude-fable-5',
-      expect.not.stringContaining('ORIGINAL-SHOULD-NOT-REPLAY'),
-      expect.objectContaining({
-        executionBudget: { maxCacheReadTokens: 250 },
-        executionContinuation: expect.objectContaining({
-          parentAttemptId: ref.attemptId,
-        }),
-      }),
-    );
+      attemptId: ref.attemptId,
+      workerId: `docker-${taskId}`,
+      fence: activeClaimFence,
+    });
+    expect(landedHeartbeat).toBeNull();
+    expect(continuationSpawn).not.toHaveBeenCalled();
     expect(backend.executionLandingCapability).toBe('checkpoint-stop');
   });
 

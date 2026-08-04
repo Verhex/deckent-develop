@@ -30,6 +30,17 @@ vi.mock('node:fs', () => ({
   unlinkSync: vi.fn(),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   appendFileSync: vi.fn(),
+  // FAZ4B: run-status read-model publish + atomik yazım yolları artık
+  // rename/link/fsync tabanlı — stale mock'a eksik export'lar eklendi.
+  renameSync: vi.fn(),
+  rmSync: vi.fn(),
+  rmdirSync: vi.fn(),
+  linkSync: vi.fn(),
+  chmodSync: vi.fn(),
+  copyFileSync: vi.fn(),
+  openSync: vi.fn(() => 0),
+  fsyncSync: vi.fn(),
+  closeSync: vi.fn(),
   promises: {
     readFile: vi.fn(async () => ''),
     writeFile: vi.fn(async () => undefined),
@@ -246,6 +257,18 @@ vi.mock('../../src/core/memory-store.js', () => ({
   MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
 }));
 
+// FAZ4B: publishCanonicalRunStatusReadModel yaz→geri-oku→doğrula zinciri koşuyor
+// (readback + provider-concurrency store); node:fs factory-mock'u bu zinciri
+// taşıyamaz (RECORDED-FAILED pattern) ve PLAN fazı "readback failed" ile
+// düşüyordu. Read-model publish bu suite'in assert yüzeyi değil — stub.
+vi.mock('../../src/core/run-status-read-model.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/run-status-read-model.js')>();
+  return {
+    ...actual,
+    publishCanonicalRunStatusReadModel: vi.fn(),
+  };
+});
+
 // spawnWorkers is the SOLE override — every other sprint-spawner.js export
 // (routing, cascade, dependency validation, etc.) stays real so only the
 // SPAWN-phase behavior under test changes. Always rejects, so
@@ -261,7 +284,7 @@ vi.mock('../../src/orchestra/sprint-spawner.js', async (importOriginal) => {
 
 // ─── Imports of modules under test (post-mock) ────────────────────────
 
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { runSprint } from '../../src/orchestra/brain.js';
 import type { ResolvedConfig } from '../../src/core/types.js';
@@ -292,13 +315,21 @@ function makeConfig(): ResolvedConfig {
 }
 
 /** Minimal fs/spawnSync mocks — just enough for PLAN to produce one task. */
+// FAZ4B: stateful yaz→oku köprüsü. bindSprintLockToExecution artık PLAN
+// sonrasında sprint.lock'ı GERİ OKUYUP pid doğruluyor; salt-stateless mock'ta
+// lock hiç "var olmadığı" için PLAN "execution lock bind failed" ile
+// düşüyordu. Yazılanlar path-bazlı saklanır, rename içeriği taşır.
+const writtenFiles = new Map<string, string>();
+
 function setupMocks(directives = 'Build the system'): void {
+  writtenFiles.clear();
   mockedSpawnSync.mockReturnValue({
     status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
   } as never);
 
   mockedExistsSync.mockImplementation((path: unknown) => {
     const p = String(path);
+    if (writtenFiles.has(p)) return true;
     if (p.includes('.tasks')) return true;
     if (p.includes('memory.db')) return true;
     return false;
@@ -307,9 +338,25 @@ function setupMocks(directives = 'Build the system'): void {
   // Empty everywhere → sprint number = 1, no pre-existing tasks.
   mockedReaddirSync.mockReturnValue([] as never);
 
+  vi.mocked(writeFileSync).mockImplementation((path: unknown, value: unknown) => {
+    if (typeof path === 'string') writtenFiles.set(path, String(value));
+  });
+  vi.mocked(renameSync).mockImplementation((source: unknown, target: unknown) => {
+    const s = String(source);
+    if (writtenFiles.has(s)) {
+      writtenFiles.set(String(target), writtenFiles.get(s)!);
+      writtenFiles.delete(s);
+    }
+  });
+  vi.mocked(unlinkSync).mockImplementation((path: unknown) => {
+    writtenFiles.delete(String(path));
+  });
+
   mockedReadFileSync.mockImplementation((path: unknown) => {
     const p = String(path);
     if (p.includes('DIRECTIVES')) return directives;
+    const persisted = writtenFiles.get(p);
+    if (persisted !== undefined) return persisted;
     return '';
   });
 }

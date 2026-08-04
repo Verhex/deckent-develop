@@ -28,7 +28,14 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn((path: string) => /\.(claude|codex|gemini)\/(\.credentials\.json|auth\.json|gemini-credentials\.json|google_accounts\.json)$/.test(path)),
+  // The host-owned broker lease (prepareProviderAuthBroker) copies each
+  // subscription credential into tmpdir()/deckent-provider-auth/…; the
+  // principal-digest resolver re-checks those exact broker paths, so they must
+  // exist alongside the host provider-home credentials.
+  existsSync: vi.fn((path: string) =>
+    /\.(claude|codex|gemini)\/(\.credentials\.json|auth\.json|gemini-credentials\.json|google_accounts\.json)$/.test(path)
+    || path.includes('deckent-provider-auth')),
+  linkSync: vi.fn(),
   readFileSync: vi.fn((path: string) => path.endsWith('/.gemini/settings.json')
     ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
     : '{}'),
@@ -42,7 +49,7 @@ vi.mock('node:fs', () => ({
   renameSync: vi.fn(),
   rmdirSync: vi.fn(),
   chmodSync: vi.fn(),
-  statSync: vi.fn(() => ({ mtimeMs: 1 })),
+  statSync: vi.fn(() => ({ mtimeMs: 1, isFile: () => true, isDirectory: () => false })),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({
@@ -156,7 +163,20 @@ function expectDockerMeteringHold(taskId: string, model: ModelType): void {
 }
 
 function spawnBudgetedClaude(taskId: string, model: ModelType): void {
-  mockReadFileSync.mockImplementation(path => budgetedDockerTaskJson(path, { model }));
+  // Heartbeat-authority identity readbacks must surface ENOENT: the full
+  // node:fs mock cannot carry the WorkerHeartbeatAuthorityStore
+  // write→readback chain, and the '{}' fallback would trip the store's schema
+  // guard (E_UNSUPPORTED_WORKER_HEARTBEAT_AUTHORITY_IDENTITY). ENOENT routes
+  // the store onto its honest uninitialized-attempt path; real persistence is
+  // proven in tests/core/worker-heartbeat-authority-store.test.ts.
+  mockReadFileSync.mockImplementation(((path: unknown) => {
+    if (String(path).includes('worker-heartbeat-authority')) {
+      const error = new Error(`ENOENT: no such file or directory, open '${String(path)}'`) as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      throw error;
+    }
+    return budgetedDockerTaskJson(path, { model });
+  }) as typeof readFileSync);
   new DockerSpawnBackend('/test/project').spawn(
     taskId,
     model,

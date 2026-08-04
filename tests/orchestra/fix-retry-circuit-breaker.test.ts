@@ -108,10 +108,27 @@ describe('FIX retry fingerprint circuit breaker', () => {
   });
 
   it('parks an unchanged impossible fingerprint before another provider-dispatchable task exists', () => {
-    const root = makeTask();
+    // AUTHORITY-CONTRACT: worker prose never authors repair authority, so an
+    // "impossible" FIX contract can only arise from structurally invalid
+    // authority input (e.g. a non-exact reviewed directory). The invalid
+    // directory is inherited verbatim by every FIX generation, keeping the
+    // authority fingerprint byte-stable across rounds — exactly the unchanged
+    // impossible fingerprint the circuit breaker must park.
+    const root = makeTask({
+      scope: {
+        directories: ['src/orchestra/', '/outside-repo-absolute/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/target.ts'],
+      },
+    });
     const result = makeNoGoResult();
     handleEvaluation('/root', root, TaskEvaluation.NO_GO, result);
     const firstFix = writtenFix();
+    expect(firstFix.status).toBe(TaskStatus.PAUSED);
+    expect(firstFix.repairAuthority).toMatchObject({
+      state: 'hold',
+      holdReason: 'unresolved_requirements',
+    });
 
     readFileSyncMock.mockImplementation((path: string) => {
       if (String(path).endsWith(`task-${firstFix.id}.json`)) {
@@ -136,7 +153,7 @@ describe('FIX retry fingerprint circuit breaker', () => {
     });
   });
 
-  it('permits one bounded retry only after an exact authority and evidence delta', () => {
+  it('permits one bounded retry only after an exact authority delta from the prior impossible fingerprint', () => {
     const prior = makeTask({
       id: '487-018-root-fix',
       isPriorityFix: true,
@@ -174,15 +191,16 @@ describe('FIX retry fingerprint circuit breaker', () => {
       { allowPriorityFixCreation: true },
     );
 
+    // The retry's authority input is now structurally valid, so its
+    // fingerprint differs from the prior impossible one — a real delta,
+    // and the bounded retry is admitted (PENDING, accepted).
+    // AUTHORITY-CONTRACT: worker prose still grants nothing — the retry
+    // carries EXACTLY the inherited write authority, no notes-derived paths.
     const admittedRetry = writtenFix();
     expect(admittedRetry.status).toBe(TaskStatus.PENDING);
     expect(admittedRetry.repairAuthority.state).toBe('accepted');
-    expect(admittedRetry.repairAuthority.addedWritePaths)
-      .toEqual(['tests/core/outside-authority.test.ts']);
-    expect(admittedRetry.scope.filesWrite).toEqual([
-      'src/orchestra/target.ts',
-      'tests/core/outside-authority.test.ts',
-    ]);
+    expect(admittedRetry.repairAuthority.addedWritePaths).toEqual([]);
+    expect(admittedRetry.scope.filesWrite).toEqual(['src/orchestra/target.ts']);
   });
 
   it('parks an exhausted failed attempt without creating an infinite FIX chain or completion', () => {

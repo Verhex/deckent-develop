@@ -240,6 +240,18 @@ function makeFixConfig(): ResolvedConfig {
     projectName: 'test',
     projectRoot: '/tmp/test-project',
     version: '0.4.0',
+    // Dynamic FIX tasks are re-authorized from owner policy before dispatch;
+    // a missing execution_budget is a typed budget-policy hold (DECKENT_E077)
+    // that would fail the whole phase before the rubric armor ever runs.
+    worker_provider: 'claude',
+    execution_budget: {
+      roles: {
+        worker: {
+          default: { maxCacheReadTokens: 5_000_000, maxTurns: 48 },
+        },
+      },
+      landing: { reserve_ratio: 0.25 },
+    },
   } as ResolvedConfig;
 }
 
@@ -385,7 +397,13 @@ describe('runFixPhase re-eval fault armor (369-001)', () => {
     const fixB = makeFixTask('369-fix-b', '369-orig-b');
     writeFixTaskFile(root, fixA);
     writeFixTaskFile(root, fixB);
-    const sprint = makeSprint([]);
+    // Lineage-membership gate: a pending FIX child is only selected when its
+    // ancestor root is a member of the CURRENT sprint and already terminal
+    // (parent NO_GO — a stale child may never race an in-flight ancestor).
+    const sprint = makeSprint([
+      makeTask('369-orig-a', { status: TaskStatus.NO_GO }),
+      makeTask('369-orig-b', { status: TaskStatus.NO_GO }),
+    ]);
 
     const resultA = makeResult(fixA.id, { selfAssessment: 'DONE' });
     const resultB = makeResult(fixB.id, { selfAssessment: 'DONE' });
@@ -409,7 +427,7 @@ describe('runFixPhase re-eval fault armor (369-001)', () => {
   it('FIX-phase fault with worker NO_GO stays NO_GO (no silent promotion)', async () => {
     const fixA = makeFixTask('369-fix-c', '369-orig-c');
     writeFixTaskFile(root, fixA);
-    const sprint = makeSprint([]);
+    const sprint = makeSprint([makeTask('369-orig-c', { status: TaskStatus.NO_GO })]);
 
     const resultA = makeResult(fixA.id, { selfAssessment: 'NO_GO', testsPassed: false });
     vi.mocked(waitForResults).mockResolvedValue([resultA]);
@@ -427,7 +445,7 @@ describe('runFixPhase re-eval fault armor (369-001)', () => {
   it('surfaces the FIX-phase fault as BRAIN→AUDITOR:EVALUATION_FAULT', async () => {
     const fixA = makeFixTask('369-fix-d', '369-orig-d');
     writeFixTaskFile(root, fixA);
-    const sprint = makeSprint([]);
+    const sprint = makeSprint([makeTask('369-orig-d', { status: TaskStatus.NO_GO })]);
 
     const resultA = makeResult(fixA.id, { selfAssessment: 'DONE' });
     vi.mocked(waitForResults).mockResolvedValue([resultA]);

@@ -30,6 +30,12 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(() => ''),
   mkdirSync: vi.fn(),
   appendFileSync: vi.fn(),
+  // FAZ4B: releaseEvaluateLock / lock-file temizliği unlinkSync + rmSync +
+  // statSync okuyor — stale mock'a eksik export'lar eklendi.
+  unlinkSync: vi.fn(),
+  rmSync: vi.fn(),
+  renameSync: vi.fn(),
+  statSync: vi.fn(() => ({ size: 0, mtimeMs: Date.now() })),
   promises: {
     readFile: vi.fn(async () => ''),
     writeFile: vi.fn(async () => undefined),
@@ -42,9 +48,25 @@ vi.mock('node:fs', () => ({
 
 vi.mock('../../src/core/utils.js', () => ({
   readJsonSafe: vi.fn(() => null),
+  // FAZ4B: loadConfig fallback yolu readJsonSafeAsync okuyor — stale mock'a
+  // eksik export eklendi (fail-soft ama gürültü/yan-yol üretiyordu).
+  readJsonSafeAsync: vi.fn(async () => null),
   parseDebtTable: vi.fn(() => []),
   debugLog: vi.fn(),
 }));
+
+// FAZ4B: persistPhaseTransition → publishCanonicalRunStatusReadModel →
+// readProviderConcurrencyRuntime gerçek better-sqlite3 store açıyordu
+// (`/tmp/test-project` diskte yok → "unable to open database file" →
+// EVALUATE erken abort). Bu unit suite'te read-model publish yan-etkidir;
+// hybrid spread ile yalnız publish stub'lanır.
+vi.mock('../../src/core/run-status-read-model.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/run-status-read-model.js')>();
+  return {
+    ...actual,
+    publishCanonicalRunStatusReadModel: vi.fn(),
+  };
+});
 
 // Results are injected directly in this cascade unit suite. Settlement
 // authority is exercised by dedicated real-disk tests; declare the legacy
@@ -58,6 +80,9 @@ vi.mock('../../src/orchestra/task-result-authority.js', () => ({
     rawResultPath: `${projectRoot}/.tasks/task-${taskId}.result`,
   })),
   readRuntimeBudgetEvaluationAuthority: vi.fn(() => null),
+  // FAZ4B: stale mock eksik export — evaluate yolu artık verification-isolation
+  // authority'sini de okuyor; absent-authority seam'iyle tutarlı null döner.
+  readVerificationIsolationEvaluationAuthority: vi.fn(() => null),
 }));
 
 // Result evaluator: rubric scoring and FailureContext type are real; only
@@ -130,17 +155,16 @@ vi.mock('../../src/core/notify.js', () => ({
   notify: vi.fn(async () => undefined),
 }));
 
-vi.mock('../../src/core/constants.js', () => ({
-  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-  BRAIN_DIR: '.brain',
-  TASKS_DIR: '.tasks',
-  DEBT_FILE: 'DEBT.md',
-  DECKENT_VERSION: '0.4.0-test',
-  DECKENT_DIR: '.deckent',
-  // born-630 (406-002): permission-store→approval-allowscope zinciri artık
-  // SETTINGS_DIR'i modül-yüklemede okuyor — factory-mock'a eksik export eklendi.
-  SETTINGS_DIR: '.deckent/settings',
-}));
+// FAZ4B: stale factory-mock eksik export'lar (SPRINT_ACTIVE_FILE vb.) yüzünden
+// runEvaluatePhase'i erken düşürüyordu — hybrid importOriginal-spread pattern'e
+// geçildi; gerçek constants korunur, test-özel override'lar üstte kalır.
+vi.mock('../../src/core/constants.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/constants.js')>();
+  return {
+    ...actual,
+    DECKENT_VERSION: '0.4.0-test',
+  };
+});
 
 // event-stream: capture every writeEvent invocation. CHANNELS + getCurrentSprintId
 // must remain functional because sprint-spawner internals reference them.
@@ -251,6 +275,23 @@ function makeConfig(): ResolvedConfig {
     projectName: 'test',
     projectRoot: '/tmp/test-project',
     version: '0.4.0',
+    // FAZ4B (ADR-G-037): runFixPhase artık fix-task'ları spawn'dan önce
+    // owner-authored worker budget policy'den geçiriyor; policy yoksa
+    // FIX_EXECUTION_BUDGET_HOLD ile typed failure dönüyor ve unblock
+    // hiç koşmuyordu. Owner-grant fixture'ı (final-only-usage dahil) eklendi.
+    execution_budget: {
+      roles: {
+        worker: {
+          default: { maxCacheReadTokens: 5_000_000, maxTurns: 48 },
+        },
+      },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: {
+        action: 'allow-wall-clock-containment',
+        roles: ['worker'],
+        max_wall_clock_seconds: 600,
+      },
+    },
   } as ResolvedConfig;
 }
 
