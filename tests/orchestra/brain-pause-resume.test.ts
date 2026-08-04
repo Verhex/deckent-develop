@@ -10,38 +10,28 @@
  *  5. Dashboard shows PAUSED phase/status
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import {
   TaskStatus, SprintPhase, SprintStatus, AlertLevel,
 } from '../../src/core/types.js';
-import type { Task, Sprint, ResolvedConfig } from '../../src/core/types.js';
+import type { Task, Sprint } from '../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  renameSync: vi.fn(),
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  // Sprint 139 async I/O migration: sprint-finalizer and other modules use
-  // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
-  // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
+// ─── REAL FILESYSTEM (FAZ4A-S3, pattern from FAZ4A-S2) ──────────────
+// The node:fs mock is deliberately GONE. pauseSprint/resumeSprint end in the
+// canonical run-status read-model publication ring (write temp → renameSync →
+// read back → digest compare → RunStatusReadModelError PERSIST_FAILED on any
+// gap) and additionally VERIFY the published authority (sprintId + lifecycle).
+// A mocked fs cannot carry that round-trip — this mock approach is
+// recorded-failed twice in this repo. Each test gets a real scratch project
+// root under tmpdir instead (hermetic, removed on the next fresh root).
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
+  // Real fs, mocked processes: git/tsc/tmux probes must not escape the
+  // sandbox. A bare vi.fn() would return undefined and crash callers reading
+  // `.status`.
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -65,8 +55,9 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
     ...actual,
     countBrainLines: vi.fn().mockReturnValue(100),
     getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
-    readJsonSafe: vi.fn().mockReturnValue(null),
-    readFileSafe: vi.fn().mockReturnValue(''),
+    // NOTE (FAZ4A-S3): readJsonSafe/readFileSafe are deliberately REAL now —
+    // resumeSprint reads the durable pause-state through readJsonSafe and the
+    // sprint-state authority ring depends on real readback.
   };
 });
 
@@ -169,10 +160,13 @@ vi.mock('../../src/core/provider.js', () => ({
 
 // ─── Imports after mocks ─────────────────────────────────────────────
 
-import { writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import {
+  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { updateDashboard } from '../../src/monitor/auditor.js';
 import { killWorker } from '../../src/orchestra/tmux.js';
-import { readJsonSafe } from '../../src/core/utils.js';
 
 import {
   pauseSprint,
@@ -180,15 +174,61 @@ import {
   getChannelRegistry,
 } from '../../src/orchestra/brain.js';
 
-const mockedWriteFileSync = vi.mocked(writeFileSync);
-const mockedExistsSync = vi.mocked(existsSync);
-const mockedMkdirSync = vi.mocked(mkdirSync);
-const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 const mockedKillWorker = vi.mocked(killWorker);
-const mockedReadJsonSafe = vi.mocked(readJsonSafe);
 
 // ─── Helpers ────────────────────────────────────────────────────────
+
+const SPRINT_ID = 'sprint-001';
+
+// Real per-file scratch root — assigned fresh in each describe's beforeEach.
+let PROJECT_ROOT = '';
+const freshProjectRoot = (): string => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-bpr-'));
+  // Directories production expects to already exist:
+  //  - .tasks: pauseSprint/resumeSprint write task-XXX.json/.paused there
+  //    without creating the directory themselves (write failures are
+  //    debug-swallowed, so a missing dir would silently drop the markers).
+  //  - .deckent/pids: coordinator liveness authority (see below).
+  mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+  mkdirSync(join(PROJECT_ROOT, '.deckent', 'pids'), { recursive: true });
+  // Coordinator pid authority: resumeSprint's canonical read-model publication
+  // verifies lifecycle === 'ACTIVE', which run-status-authority only resolves
+  // when a live coordinator pid exists (otherwise the run is honestly
+  // ORPHANED and resume rolls back transactionally). In production resume is
+  // executed by the live coordinator process — the vitest process stands in
+  // for it here (its own pid is provably alive).
+  writeFileSync(
+    join(PROJECT_ROOT, '.deckent', 'pids', `${SPRINT_ID}.pid`),
+    JSON.stringify({
+      pid: process.pid,
+      startToken: 'test-start-token',
+      startedAt: new Date().toISOString(),
+    }, null, 2),
+    'utf-8',
+  );
+  return PROJECT_ROOT;
+};
+afterAll(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
+
+function readJsonFile<T>(path: string): T {
+  return JSON.parse(readFileSync(path, 'utf-8')) as T;
+}
+
+function taskFilePath(id: string): string {
+  return join(PROJECT_ROOT, '.tasks', `task-${id}.json`);
+}
+
+function pausedMarkerPath(id: string): string {
+  return join(PROJECT_ROOT, '.tasks', `task-${id}.paused`);
+}
+
+function pauseStatePath(): string {
+  return join(PROJECT_ROOT, '.deckent', 'pause-state.json');
+}
 
 function makeTask(id: string, status: TaskStatus): Task {
   return {
@@ -203,33 +243,20 @@ function makeTask(id: string, status: TaskStatus): Task {
     dependencies: [],
     goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
     status,
-    sprintId: 'sprint-001',
+    sprintId: SPRINT_ID,
     createdAt: new Date().toISOString(),
   } as Task;
 }
 
 function makeSprint(tasks: Task[]): Sprint {
   return {
-    id: 'sprint-001',
+    id: SPRINT_ID,
     number: 1,
     status: SprintStatus.ACTIVE,
     phase: SprintPhase.EXECUTE,
     tasks,
     workers: tasks.map(t => `w-${t.id}`),
   };
-}
-
-function makeConfig(): ResolvedConfig {
-  return {
-    projectName: 'test',
-    activeModeConfig: {
-      max_workers: 4,
-      default_model: 'claude-sonnet-5',
-      brain_model: 'claude-opus-4-8',
-      brain_planning: 'auto',
-      haiku_allowed: false,
-    },
-  } as unknown as ResolvedConfig;
 }
 
 /** Creates a mock WorkerChannel and registers it in the module's ChannelRegistry. */
@@ -245,24 +272,27 @@ function registerMockChannel(taskId: string) {
   return channel;
 }
 
+/** Shared per-test reset: fresh real root + cleared mocks + empty registry. */
+function resetTestBed(): void {
+  vi.clearAllMocks();
+  freshProjectRoot();
+  // The module-level registry is a real singleton — closeAll() (the real
+  // ChannelRegistry API; there is no clear()) empties it between tests.
+  getChannelRegistry().closeAll();
+}
+
 // ─── pauseSprint — worker-stopping behavior ──────────────────────────
 
 describe('pauseSprint — stops active workers', () => {
-  const projectRoot = '/tmp/test-project';
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
-    // Clear the channel registry between tests
-    getChannelRegistry().clear?.();
+    resetTestBed();
   });
 
   it('calls killWorker for EXECUTING tasks without an IPC channel (tmux backend)', () => {
     const tasks = [makeTask('001', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).toHaveBeenCalledWith('001');
   });
@@ -271,7 +301,7 @@ describe('pauseSprint — stops active workers', () => {
     const tasks = [makeTask('002', TaskStatus.PENDING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).toHaveBeenCalledWith('002');
   });
@@ -280,7 +310,7 @@ describe('pauseSprint — stops active workers', () => {
     const tasks = [makeTask('003', TaskStatus.CLAIMED)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).toHaveBeenCalledWith('003');
   });
@@ -292,7 +322,7 @@ describe('pauseSprint — stops active workers', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).toHaveBeenCalledWith('004');
     expect(mockedKillWorker).toHaveBeenCalledWith('005');
@@ -303,7 +333,7 @@ describe('pauseSprint — stops active workers', () => {
     const tasks = [makeTask('010', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).not.toHaveBeenCalledWith('010');
     expect(channel.pause).toHaveBeenCalled();
@@ -314,7 +344,7 @@ describe('pauseSprint — stops active workers', () => {
     const tasks = [makeTask('011', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(channel.pause).toHaveBeenCalledTimes(1);
   });
@@ -323,7 +353,7 @@ describe('pauseSprint — stops active workers', () => {
     const tasks = [makeTask('099', TaskStatus.DONE)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).not.toHaveBeenCalledWith('099');
   });
@@ -332,7 +362,7 @@ describe('pauseSprint — stops active workers', () => {
     const tasks = [makeTask('098', TaskStatus.NO_GO)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).not.toHaveBeenCalledWith('098');
   });
@@ -342,7 +372,7 @@ describe('pauseSprint — stops active workers', () => {
     const tasks = [makeTask('012', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    expect(() => pauseSprint(projectRoot, sprint)).not.toThrow();
+    expect(() => pauseSprint(PROJECT_ROOT, sprint)).not.toThrow();
     expect(tasks[0].status).toBe(TaskStatus.PAUSED);
   });
 
@@ -354,7 +384,7 @@ describe('pauseSprint — stops active workers', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(mockedKillWorker).toHaveBeenCalledTimes(3);
     expect(mockedKillWorker).toHaveBeenCalledWith('020');
@@ -366,26 +396,20 @@ describe('pauseSprint — stops active workers', () => {
 // ─── pauseSprint — .paused file format ──────────────────────────────
 
 describe('pauseSprint — .paused file format', () => {
-  const projectRoot = '/tmp/test-project';
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
-    getChannelRegistry().clear?.();
+    resetTestBed();
   });
 
   it('writes .paused marker with taskId, previousStatus, and pausedAt', () => {
     const tasks = [makeTask('030', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
-    const call = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('task-030.paused'),
+    expect(existsSync(pausedMarkerPath('030'))).toBe(true);
+    const content = readJsonFile<{ taskId: string; previousStatus: string; pausedAt: string }>(
+      pausedMarkerPath('030'),
     );
-    expect(call).toBeDefined();
-    const content = JSON.parse(call![1] as string);
     expect(content.taskId).toBe('030');
     expect(content.previousStatus).toBe(TaskStatus.EXECUTING);
     expect(typeof content.pausedAt).toBe('string');
@@ -396,12 +420,9 @@ describe('pauseSprint — .paused file format', () => {
     const tasks = [makeTask('031', TaskStatus.PENDING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
-    const call = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('task-031.paused'),
-    );
-    const content = JSON.parse(call![1] as string);
+    const content = readJsonFile<{ previousStatus: string }>(pausedMarkerPath('031'));
     expect(content.previousStatus).toBe(TaskStatus.PENDING);
   });
 
@@ -409,12 +430,9 @@ describe('pauseSprint — .paused file format', () => {
     const tasks = [makeTask('032', TaskStatus.TESTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
-    const call = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('task-032.paused'),
-    );
-    const content = JSON.parse(call![1] as string);
+    const content = readJsonFile<{ previousStatus: string }>(pausedMarkerPath('032'));
     expect(content.previousStatus).toBe(TaskStatus.TESTING);
   });
 
@@ -422,13 +440,10 @@ describe('pauseSprint — .paused file format', () => {
     const tasks = [makeTask('033', TaskStatus.PENDING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
-    const jsonCall = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('task-033.json'),
-    );
-    expect(jsonCall).toBeDefined();
-    const task = JSON.parse(jsonCall![1] as string);
+    expect(existsSync(taskFilePath('033'))).toBe(true);
+    const task = readJsonFile<Task>(taskFilePath('033'));
     expect(task.status).toBe(TaskStatus.PAUSED);
   });
 });
@@ -436,20 +451,15 @@ describe('pauseSprint — .paused file format', () => {
 // ─── pauseSprint — dashboard ─────────────────────────────────────────
 
 describe('pauseSprint — dashboard shows PAUSED state', () => {
-  const projectRoot = '/tmp/test-project';
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
-    getChannelRegistry().clear?.();
+    resetTestBed();
   });
 
   it('calls updateDashboard with SprintStatus.PAUSED', () => {
     const tasks = [makeTask('040', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint, 'Limit exceeded');
+    pauseSprint(PROJECT_ROOT, sprint, 'Limit exceeded');
 
     expect(mockedUpdateDashboard).toHaveBeenCalled();
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
@@ -461,7 +471,7 @@ describe('pauseSprint — dashboard shows PAUSED state', () => {
     const sprint = makeSprint(tasks);
     sprint.phase = SprintPhase.EXECUTE;
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
     expect(dashState.sprint.phase).toBe(SprintPhase.EXECUTE);
@@ -471,7 +481,7 @@ describe('pauseSprint — dashboard shows PAUSED state', () => {
     const tasks = [makeTask('042', TaskStatus.PENDING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint, 'Weekly budget reached');
+    pauseSprint(PROJECT_ROOT, sprint, 'Weekly budget reached');
 
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
     expect(dashState.alerts).toHaveLength(1);
@@ -483,7 +493,7 @@ describe('pauseSprint — dashboard shows PAUSED state', () => {
     const tasks = [makeTask('043', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
     expect(dashState.progress.active).toBe(0);
@@ -497,7 +507,7 @@ describe('pauseSprint — dashboard shows PAUSED state', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
     expect(dashState.progress.blocked).toBe(2);
@@ -508,13 +518,8 @@ describe('pauseSprint — dashboard shows PAUSED state', () => {
 // ─── resumeSprint — PAUSED → PENDING transition ──────────────────────
 
 describe('resumeSprint — PAUSED → PENDING transition', () => {
-  const projectRoot = '/tmp/test-project';
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedReadJsonSafe.mockReturnValue(null);
-    getChannelRegistry().clear?.();
+    resetTestBed();
   });
 
   it('transitions all PAUSED tasks to PENDING', () => {
@@ -525,7 +530,7 @@ describe('resumeSprint — PAUSED → PENDING transition', () => {
     const sprint = makeSprint(tasks);
     sprint.status = SprintStatus.PAUSED;
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(tasks[0].status).toBe(TaskStatus.PENDING);
     expect(tasks[1].status).toBe(TaskStatus.PENDING);
@@ -538,7 +543,7 @@ describe('resumeSprint — PAUSED → PENDING transition', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(tasks[0].status).toBe(TaskStatus.DONE);
     expect(tasks[1].status).toBe(TaskStatus.PENDING);
@@ -551,7 +556,7 @@ describe('resumeSprint — PAUSED → PENDING transition', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(tasks[0].status).toBe(TaskStatus.NO_GO);
     expect(tasks[1].status).toBe(TaskStatus.PENDING);
@@ -562,7 +567,7 @@ describe('resumeSprint — PAUSED → PENDING transition', () => {
     const sprint = makeSprint(tasks);
     sprint.status = SprintStatus.PAUSED;
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(sprint.status).toBe(SprintStatus.ACTIVE);
   });
@@ -571,51 +576,58 @@ describe('resumeSprint — PAUSED → PENDING transition', () => {
     const tasks = [makeTask('057', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
-    const jsonCall = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('task-057.json'),
-    );
-    expect(jsonCall).toBeDefined();
-    const task = JSON.parse(jsonCall![1] as string);
+    expect(existsSync(taskFilePath('057'))).toBe(true);
+    const task = readJsonFile<Task>(taskFilePath('057'));
     expect(task.status).toBe(TaskStatus.PENDING);
   });
 
   it('removes .paused marker file for each resumed task', () => {
-    mockedExistsSync.mockImplementation((p) => (p as string).includes('.paused'));
     const tasks = [makeTask('058', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
-
-    resumeSprint(projectRoot, sprint);
-
-    expect(mockedUnlinkSync).toHaveBeenCalledWith(
-      expect.stringContaining('task-058.paused'),
+    writeFileSync(
+      pausedMarkerPath('058'),
+      JSON.stringify({ taskId: '058', previousStatus: TaskStatus.EXECUTING, pausedAt: new Date().toISOString() }, null, 2),
+      'utf-8',
     );
+
+    resumeSprint(PROJECT_ROOT, sprint);
+
+    expect(existsSync(pausedMarkerPath('058'))).toBe(false);
   });
 
   it('removes pause-state.json on resume', () => {
-    mockedExistsSync.mockImplementation((p) => (p as string).includes('pause-state.json'));
     const tasks = [makeTask('059', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
-
-    resumeSprint(projectRoot, sprint);
-
-    expect(mockedUnlinkSync).toHaveBeenCalledWith(
-      expect.stringContaining('pause-state.json'),
+    writeFileSync(
+      pauseStatePath(),
+      JSON.stringify({
+        schemaVersion: 2,
+        sprintId: SPRINT_ID,
+        pausedAt: new Date().toISOString(),
+        pausedTaskIds: ['059'],
+        reason: 'Manual pause',
+        reasonCode: 'manual-pause',
+        phase: SprintPhase.EXECUTE,
+        status: 'PAUSED',
+        recoveryCommand: `deckent recover ${SPRINT_ID} --resume`,
+        finalizeCommand: `deckent finalize --sprint ${SPRINT_ID} --force`,
+      }, null, 2),
+      'utf-8',
     );
+
+    resumeSprint(PROJECT_ROOT, sprint);
+
+    expect(existsSync(pauseStatePath())).toBe(false);
   });
 });
 
 // ─── resumeSprint — IPC RESUME for subprocess backend ────────────────
 
 describe('resumeSprint — IPC RESUME signal', () => {
-  const projectRoot = '/tmp/test-project';
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedReadJsonSafe.mockReturnValue(null);
-    getChannelRegistry().clear?.();
+    resetTestBed();
   });
 
   it('sends IPC RESUME to subprocess workers that have a registered channel', () => {
@@ -623,7 +635,7 @@ describe('resumeSprint — IPC RESUME signal', () => {
     const tasks = [makeTask('060', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(channel.resume).toHaveBeenCalledTimes(1);
   });
@@ -637,7 +649,7 @@ describe('resumeSprint — IPC RESUME signal', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(ch1.resume).toHaveBeenCalledTimes(1);
     expect(ch2.resume).toHaveBeenCalledTimes(1);
@@ -648,7 +660,7 @@ describe('resumeSprint — IPC RESUME signal', () => {
     const tasks = [makeTask('063', TaskStatus.DONE)];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(channel.resume).not.toHaveBeenCalled();
   });
@@ -661,7 +673,7 @@ describe('resumeSprint — IPC RESUME signal', () => {
     const tasks = [makeTask('064', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
-    expect(() => resumeSprint(projectRoot, sprint)).not.toThrow();
+    expect(() => resumeSprint(PROJECT_ROOT, sprint)).not.toThrow();
     expect(tasks[0].status).toBe(TaskStatus.PENDING);
   });
 
@@ -670,7 +682,7 @@ describe('resumeSprint — IPC RESUME signal', () => {
     const tasks = [makeTask('065', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     // No IPC calls expected — tmux workers re-spawn through sprint loop
     expect(mockedUpdateDashboard).toHaveBeenCalled();
@@ -681,20 +693,15 @@ describe('resumeSprint — IPC RESUME signal', () => {
 // ─── resumeSprint — dashboard ────────────────────────────────────────
 
 describe('resumeSprint — dashboard shows ACTIVE state', () => {
-  const projectRoot = '/tmp/test-project';
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedReadJsonSafe.mockReturnValue(null);
-    getChannelRegistry().clear?.();
+    resetTestBed();
   });
 
   it('calls updateDashboard with SprintStatus.ACTIVE', () => {
     const tasks = [makeTask('070', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(mockedUpdateDashboard).toHaveBeenCalled();
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
@@ -709,7 +716,7 @@ describe('resumeSprint — dashboard shows ACTIVE state', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
     expect(dashState.progress.active).toBe(2);
@@ -719,7 +726,7 @@ describe('resumeSprint — dashboard shows ACTIVE state', () => {
     const tasks = [makeTask('074', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
     expect(dashState.progress.blocked).toBe(0);
@@ -729,7 +736,7 @@ describe('resumeSprint — dashboard shows ACTIVE state', () => {
     const tasks = [makeTask('075', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     const dashState = mockedUpdateDashboard.mock.calls[0][1];
     expect(dashState.alerts).toHaveLength(0);
@@ -739,28 +746,28 @@ describe('resumeSprint — dashboard shows ACTIVE state', () => {
 // ─── Full pause/resume roundtrip ─────────────────────────────────────
 
 describe('pause/resume roundtrip', () => {
-  const projectRoot = '/tmp/test-project';
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
-    mockedReadJsonSafe.mockReturnValue(null);
-    getChannelRegistry().clear?.();
+    resetTestBed();
   });
 
   it('EXECUTING → PAUSED → PENDING full cycle (tmux worker gets killed then must re-spawn)', () => {
     const tasks = [makeTask('080', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
     expect(tasks[0].status).toBe(TaskStatus.PAUSED);
     expect(sprint.status).toBe(SprintStatus.PAUSED);
     expect(mockedKillWorker).toHaveBeenCalledWith('080');
+    // Durable artifacts of the pause are real files now:
+    expect(existsSync(pausedMarkerPath('080'))).toBe(true);
+    expect(existsSync(pauseStatePath())).toBe(true);
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
     expect(tasks[0].status).toBe(TaskStatus.PENDING);
     expect(sprint.status).toBe(SprintStatus.ACTIVE);
+    // Resume consumes the durable pause artifacts:
+    expect(existsSync(pausedMarkerPath('080'))).toBe(false);
+    expect(existsSync(pauseStatePath())).toBe(false);
   });
 
   it('IPC subprocess: pause sends PAUSE, resume sends RESUME', () => {
@@ -768,11 +775,11 @@ describe('pause/resume roundtrip', () => {
     const tasks = [makeTask('081', TaskStatus.EXECUTING)];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
     expect(channel.pause).toHaveBeenCalledTimes(1);
     expect(mockedKillWorker).not.toHaveBeenCalledWith('081');
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
     expect(channel.resume).toHaveBeenCalledTimes(1);
   });
 
@@ -783,8 +790,8 @@ describe('pause/resume roundtrip', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
-    resumeSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(tasks[0].status).toBe(TaskStatus.DONE);
     expect(tasks[1].status).toBe(TaskStatus.PENDING);
@@ -798,15 +805,14 @@ describe('pause/resume roundtrip', () => {
     ];
     const sprint = makeSprint(tasks);
 
-    pauseSprint(projectRoot, sprint);
+    pauseSprint(PROJECT_ROOT, sprint);
 
     expect(channel.pause).toHaveBeenCalledTimes(1);
     expect(mockedKillWorker).toHaveBeenCalledWith('085');
     expect(mockedKillWorker).not.toHaveBeenCalledWith('084');
 
-    resumeSprint(projectRoot, sprint);
+    resumeSprint(PROJECT_ROOT, sprint);
 
     expect(channel.resume).toHaveBeenCalledTimes(1);
   });
 });
-
