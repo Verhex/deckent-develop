@@ -23,6 +23,7 @@ vi.mock('../../../src/core/utils.js', () => ({
   ensureDeckentImport: vi.fn(),
   countBrainLines: vi.fn().mockReturnValue(50),
   getNextSprintId: vi.fn().mockReturnValue('sprint-002'),
+  debugLog: vi.fn(),  // FAZ4B: plan/start/status/run/kill artık debugLog import ediyor (mock-drift onarımı)
 }));
 
 vi.mock('../../../src/core/analyzer.js', () => ({
@@ -47,6 +48,8 @@ vi.mock('../../../src/core/config.js', () => ({
     brain_planning: 'auto',
   }),
   validatePartialConfig: vi.fn(),
+  readAuthMode: vi.fn().mockReturnValue('max'),          // FAZ4B: start.ts import ediyor (mock-drift onarımı)
+  resolveDefaultModel: vi.fn().mockReturnValue('sonnet'), // FAZ4B: run.ts import ediyor (mock-drift onarımı)
 }));
 
 vi.mock('../../../src/core/provider.js', async (importOriginal) => {
@@ -68,11 +71,14 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
   }),
   runSprint: vi.fn().mockResolvedValue({ id: 'sprint-001', tasks: [], metrics: null }),
   runDecay: vi.fn().mockReturnValue({ trimmed: 0 }),
+  buildWorkerPrompt: vi.fn().mockReturnValue('worker prompt'),  // FAZ4B: run.ts import ediyor (mock-drift onarımı)
   BrainError: class BrainError extends Error {},
 }));
 
 vi.mock('../../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn().mockReturnValue({ ok: true, checks: [], score: 100 }),
+  buildProviderDiagnosticAuthChecks: vi.fn().mockReturnValue([]),        // FAZ4B: doctor.ts import ediyor (mock-drift onarımı)
+  runProviderDiagnosticsWithOllama: vi.fn().mockResolvedValue({ checks: [] }),  // FAZ4B: doctor.ts import ediyor (mock-drift onarımı)
 }));
 
 vi.mock('../../../src/core/system-profile.js', () => ({
@@ -90,6 +96,7 @@ vi.mock('../../../src/core/config-migration.js', () => ({
 
 vi.mock('../../../src/orchestra/sprint-reporter.js', () => ({
   generateProjectIdentity: vi.fn().mockReturnValue('# Identity'),
+  collectSprintFiles: vi.fn().mockReturnValue([]),  // FAZ4B: history.ts import ediyor (mock-drift onarımı)
 }));
 
 vi.mock('../../../src/mcp/tools/job-runner.js', () => ({
@@ -149,39 +156,24 @@ function createMockServer(): MockServer {
 
 async function registerAllTools(server: MockServer) {
   const serverArg = server as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer;
-  const [
-    { registerInitTool },
-    { registerSetDirectivesTool },
-    { registerPlanTool },
-    { registerStartTool },
-    { registerStatusTool },
-    { registerDoctorTool },
-    { registerRetroTool },
-    { registerHistoryTool },
-    { registerAnalyzeTool },
-    { registerSyncTool },
-    { registerConfigTool },
-    { registerReviewTool },
-    { registerRunTool },
-    { registerKillTool },
-    { registerCleanupTool },
-  ] = await Promise.all([
-    import('../../../src/mcp/tools/init.js'),
-    import('../../../src/mcp/tools/directives.js'),
-    import('../../../src/mcp/tools/plan.js'),
-    import('../../../src/mcp/tools/start.js'),
-    import('../../../src/mcp/tools/status.js'),
-    import('../../../src/mcp/tools/doctor.js'),
-    import('../../../src/mcp/tools/retro.js'),
-    import('../../../src/mcp/tools/history.js'),
-    import('../../../src/mcp/tools/analyze.js'),
-    import('../../../src/mcp/tools/sync.js'),
-    import('../../../src/mcp/tools/config.js'),
-    import('../../../src/mcp/tools/review.js'),
-    import('../../../src/mcp/tools/run.js'),
-    import('../../../src/mcp/tools/kill.js'),
-    import('../../../src/mcp/tools/cleanup.js'),
-  ]);
+  // NOT (FAZ4B onarımı): Promise.all ile 15 eşzamanlı dynamic import, Vite module-runner'da
+  // (büyük ortak dependency graph + vi.mock kombinasyonu nedeniyle) deadlock yaratıyordu —
+  // beforeEach 10s hook-timeout'a takılıyor, 25 test de setup'ta ölüyordu. Sıralı import şart.
+  const { registerInitTool } = await import('../../../src/mcp/tools/init.js');
+  const { registerSetDirectivesTool } = await import('../../../src/mcp/tools/directives.js');
+  const { registerPlanTool } = await import('../../../src/mcp/tools/plan.js');
+  const { registerStartTool } = await import('../../../src/mcp/tools/start.js');
+  const { registerStatusTool } = await import('../../../src/mcp/tools/status.js');
+  const { registerDoctorTool } = await import('../../../src/mcp/tools/doctor.js');
+  const { registerRetroTool } = await import('../../../src/mcp/tools/retro.js');
+  const { registerHistoryTool } = await import('../../../src/mcp/tools/history.js');
+  const { registerAnalyzeTool } = await import('../../../src/mcp/tools/analyze.js');
+  const { registerSyncTool } = await import('../../../src/mcp/tools/sync.js');
+  const { registerConfigTool } = await import('../../../src/mcp/tools/config.js');
+  const { registerReviewTool } = await import('../../../src/mcp/tools/review.js');
+  const { registerRunTool } = await import('../../../src/mcp/tools/run.js');
+  const { registerKillTool } = await import('../../../src/mcp/tools/kill.js');
+  const { registerCleanupTool } = await import('../../../src/mcp/tools/cleanup.js');
 
   registerInitTool(serverArg);
   registerSetDirectivesTool(serverArg);

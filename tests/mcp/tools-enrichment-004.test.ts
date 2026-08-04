@@ -9,21 +9,70 @@ import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 
 // Authority-first status: the tool holds unless a live run authority AND the canonical
 // persisted read model exist. Projection cases supply both. (Same note as status-history.)
-vi.mock('../src/core/run-status-authority.js', () => ({
+// sprintId stays null so status.ts falls back to the .dashboard sprint.id fixture.
+vi.mock('../../src/core/run-status-authority.js', () => ({
   readCanonicalRunStatus: vi.fn(() => ({
     schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
-    sprintId: 'sprint-001', phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    sprintId: null, phase: 'EXECUTE', status: 'RUNNING', reason: null,
     recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
   })),
 }));
 
-vi.mock('../src/core/run-status-read-model.js', () => ({
+vi.mock('../../src/core/run-status-read-model.js', () => ({
   readCanonicalRunStatusReadModel: vi.fn(() => ({
     schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
     holds: [], providerConcurrency: [], terminalPublication: null, authority: {},
   })),
   runStatusReadModelMatchesAuthority: vi.fn(() => true),
-  projectRunStatusReadModelSurface: vi.fn(() => ({ state: 'persisted' })),
+}));
+
+// deckent_plan now delegates to the exact-plan flow service (planRunFlow) instead of
+// calling planSprint directly. Mirror its surface: forward to the mocked planSprint
+// (same arg order as the real generatePlanPreview call) and derive the topology
+// waves + a real sha256 planDigest from the returned sprint.
+vi.mock('../../src/orchestra/run-flow-plan-service.js', () => ({
+  planRunFlow: vi.fn(async (input: {
+    projectRoot: string;
+    config: unknown;
+    recommendation?: { maxWorkers?: number };
+    proposal?: { flowId?: string; revision?: number };
+    source?: { brainContext?: unknown };
+    previewOptions?: { mode?: string };
+  }) => {
+    const { planSprint } = await import('../../src/orchestra/brain.js');
+    const sprint = await planSprint(
+      input.projectRoot,
+      input.config as never,
+      input.source?.brainContext as never,
+      input.recommendation as never,
+      { mode: input.previewOptions?.mode } as never,
+    );
+    const maxWorkers = input.recommendation?.maxWorkers ?? 4;
+    const tasks: Array<{ id: string }> = (sprint as { tasks?: Array<{ id: string }> })?.tasks ?? [];
+    const waves: Array<{ wave: number; slots: Array<{ taskId: string }> }> = [];
+    for (let i = 0; i < tasks.length; i += maxWorkers) {
+      waves.push({
+        wave: waves.length + 1,
+        slots: tasks.slice(i, i + maxWorkers).map(t => ({ taskId: t.id })),
+      });
+    }
+    const { createHash } = await import('node:crypto');
+    return {
+      flowId: input.proposal?.flowId ?? 'flow-test',
+      revision: input.proposal?.revision ?? 1,
+      approval: null,
+      sprint,
+      preview: {
+        topology: { waves, configuredMaxWorkers: maxWorkers },
+        scopeGateResult: 'skipped',
+        topologyGateResult: 'pass',
+        planDigestVersion: 2,
+      },
+      planDigest: createHash('sha256')
+        .update(JSON.stringify(tasks.map(t => t.id)))
+        .digest('hex'),
+    };
+  }),
 }));
 
 vi.mock('node:fs', () => ({

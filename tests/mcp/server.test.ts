@@ -160,7 +160,8 @@ describe('DECKENT_MCP_INSTRUCTIONS', () => {
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('FIX');
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('RETRO');
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('DECAY');
-    expect(DECKENT_MCP_INSTRUCTIONS).toContain('CLEANUP');
+    // Lifecycle now ends at COMPLETE — cleanup is a separate command, not a phase.
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('COMPLETE');
   });
 
   it('instructions contains workflow steps in order', () => {
