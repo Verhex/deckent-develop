@@ -385,7 +385,7 @@ describe('spawnWorkerMultiProvider', () => {
     vi.mocked(spawnWorker).mockImplementation(() => {});
   });
 
-  it('blocks a budgetless remote worker before creating a backend or session', async () => {
+  it('blocks a budgetless remote worker before creating an execution backend or session', async () => {
     await expect(spawnWorkerMultiProvider(
       'budgetless-remote',
       'gpt-4.1',
@@ -393,7 +393,15 @@ describe('spawnWorkerMultiProvider', () => {
       fixtureState.root,
       {},
     )).rejects.toThrow('Remote execution budget is required');
-    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+    // Ingress entry now unconditionally creates ONE leadership-free recovery
+    // backend (terminal-only reconcile of already-dispatched attempts — read
+    // side, never a dispatch). Budget admission must still block everything
+    // execution-shaped: no second backend, no session, no spawn.
+    expect(SpawnBackendFactory.create).toHaveBeenCalledTimes(1);
+    expect(SpawnBackendFactory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ backend: 'docker', projectDir: fixtureState.root }),
+    );
+    expect(mockBackendSpawn).not.toHaveBeenCalled();
     expect(ensureSession).not.toHaveBeenCalled();
     expect(spawnWorker).not.toHaveBeenCalled();
   });
@@ -419,7 +427,14 @@ describe('spawnWorkerMultiProvider', () => {
         root,
         {},
       )).rejects.toThrow('Remote execution budget is required');
-      expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+      // Same ingress-recovery exception as above: exactly one terminal-only
+      // reconcile backend is allowed; the forged Task-JSON budget must still
+      // never reach an execution backend or worker spawn.
+      expect(SpawnBackendFactory.create).toHaveBeenCalledTimes(1);
+      expect(SpawnBackendFactory.create).toHaveBeenCalledWith(
+        expect.objectContaining({ backend: 'docker', projectDir: root }),
+      );
+      expect(mockBackendSpawn).not.toHaveBeenCalled();
       expect(spawnWorker).not.toHaveBeenCalled();
     } finally {
       rmSync(root, { recursive: true, force: true });

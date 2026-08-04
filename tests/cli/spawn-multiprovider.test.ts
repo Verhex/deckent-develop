@@ -105,6 +105,7 @@ afterEach(() => {
 describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () => {
   let adapterSpawnSpy: ReturnType<typeof vi.fn>;
   let adapterRefreshSpy: ReturnType<typeof vi.fn>;
+  let dockerSpawnSpy: ReturnType<typeof vi.fn>;
   let mockAdapter: { spawn: ReturnType<typeof vi.fn>; refreshSupportedModels: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
@@ -117,13 +118,32 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
     vi.mocked(getProviderAdapterForTask).mockImplementation((p: string) =>
       p === 'ollama' ? (mockAdapter as any) : null,
     );
-    // SpawnBackendFactory control: docker backend
+    // SpawnBackendFactory control: docker backend. `dockerSpawnSpy` is captured
+    // so tests can prove the docker backend never EXECUTES a worker on the
+    // adapter route — `SpawnBackendFactory.create` itself IS legitimately called
+    // exactly once per spawnWorkerMultiProvider call: the leadership-free
+    // ingress recovery (`reconcilePendingAttempts({ mode: 'terminal-only' })`)
+    // always resolves a docker recovery backend BEFORE any routing decision.
+    dockerSpawnSpy = vi.fn();
     vi.mocked(SpawnBackendFactory.create).mockReturnValue({
       name: 'docker',
       ...TEST_MEASURED_LANDING_CAPABILITIES,
-      spawn: vi.fn(),
+      spawn: dockerSpawnSpy,
     } as any);
   });
+
+  /**
+   * Shared assertion for the adapter route: the only SpawnBackendFactory.create
+   * call is the pre-routing terminal-only recovery reconciliation; the docker
+   * backend's spawn() is never reached.
+   */
+  function expectDockerBackendUsedOnlyForIngressRecovery(): void {
+    expect(SpawnBackendFactory.create).toHaveBeenCalledTimes(1);
+    expect(SpawnBackendFactory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ backend: 'docker', projectDir: projectRoot }),
+    );
+    expect(dockerSpawnSpy).not.toHaveBeenCalled();
+  }
 
   // ── Core fix: ollama bypasses spawnBackend='docker' ────────────────────────
 
@@ -148,8 +168,8 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       }),
     );
 
-    // Docker backend NOT invoked
-    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+    // Docker backend created only for ingress recovery — never executes the worker
+    expectDockerBackendUsedOnlyForIngressRecovery();
 
     // Return value labels the backend as host-adapter
     expect(result.backend).toBe('host-adapter');
@@ -186,7 +206,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
     );
 
     expect(adapterSpawnSpy).toHaveBeenCalledOnce();
-    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+    expectDockerBackendUsedOnlyForIngressRecovery();
     expect(result.backend).toBe('host-adapter');
     expect(result.provider).toBe('ollama');
   });
@@ -202,7 +222,8 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
 
     expect(adapterRefreshSpy).not.toHaveBeenCalled();
     expect(adapterSpawnSpy).not.toHaveBeenCalled();
-    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+    // Only the pre-routing ingress-recovery backend exists; no provider work ran.
+    expectDockerBackendUsedOnlyForIngressRecovery();
   });
 
   it('rejects an unregistered OpenRouter model before provider work', async () => {
@@ -216,7 +237,8 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
 
     expect(adapterRefreshSpy).not.toHaveBeenCalled();
     expect(adapterSpawnSpy).not.toHaveBeenCalled();
-    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+    // Only the pre-routing ingress-recovery backend exists; no provider work ran.
+    expectDockerBackendUsedOnlyForIngressRecovery();
   });
 
   // ── allowedTools forwarded correctly to adapter ────────────────────────────

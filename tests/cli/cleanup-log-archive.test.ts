@@ -88,10 +88,29 @@ function createProjectRoot(suffix: string): string {
   );
   mkdirSync(join(root, '.tasks'), { recursive: true });
   mkdirSync(join(root, '.brain'), { recursive: true });
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
+  // Cleanup is authority-gated: readCanonicalRunStatus must resolve a
+  // quiescent terminal run (COMPLETE, coordinator not alive/unknown) AND the
+  // shared terminal-publication projection must observe a matching receipt
+  // whose terminalOutcome equals the canonical lifecycle — otherwise
+  // cleanupAuthorityHoldReason holds the whole command (exitCode 1) before
+  // any archive/delete work. A sprintId-only state resolves ORPHANED → hold.
   writeFileSync(
     join(root, '.deckent', 'sprint-state.json'),
-    JSON.stringify({ sprintId: 'sprint-042' }),
+    JSON.stringify({ sprintId: 'sprint-042', phase: 'COMPLETE', status: 'COMPLETE' }),
+  );
+  writeFileSync(
+    join(root, '.deckent', 'recently-works', 'sprint-042-terminal-receipt.json'),
+    JSON.stringify({
+      version: 1,
+      sprintId: 'sprint-042',
+      runId: 'run-042',
+      coordinatorGeneration: 1,
+      terminalOutcome: 'COMPLETE',
+      logicalSettlementDigest: 'a'.repeat(64),
+      priorAuthorityVersion: 0,
+      authorityVersion: 1,
+    }),
   );
   return root;
 }

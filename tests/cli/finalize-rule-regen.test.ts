@@ -59,7 +59,17 @@ vi.mock('../../src/cli/commands/review.js', () => ({
   loadReviewState: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('../../src/core/utils.js', () => ({
+// FAZ4B: the non-force finalize path proves coordinator death via the sprint
+// recovery operation before terminal publication — inert typed no-ops here.
+vi.mock('../../src/orchestra/sprint-recovery-operation.js', () => ({
+  containSprintRecoveryCoordinator: vi.fn().mockResolvedValue({ action: 'none' }),
+  readSprintRecoverySettlementIdentity: vi.fn().mockReturnValue({ generation: 1, fenceToken: 'fence-1' }),
+  runSprintRecoveryOperation: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../src/core/utils.js', async (importActual) => ({
+  // Partial mock: readJsonSafe is the seam; debugLog & friends stay real.
+  ...(await importActual<Record<string, unknown>>()),
   readJsonSafe: vi.fn((path: string) => {
     if (path.endsWith('.json')) {
       return {
@@ -92,6 +102,21 @@ vi.mock('node:fs', async (importActual) => {
       return true;
     }),
     readdirSync: vi.fn(() => ['task-001-001.json', 'task-001-001.result']),
+    // buildSprintFromTasks reads canonical task records via readFileSync +
+    // classifyTaskArtifact (filename/id must agree); everything else falls
+    // through to the real fs.
+    readFileSync: vi.fn((path: unknown, ...rest: unknown[]) => {
+      if (typeof path === 'string' && path.endsWith('task-001-001.json')) {
+        return JSON.stringify({
+          id: '001-001',
+          title: 'demo',
+          sprintId: 'sprint-166',
+          status: 'DONE',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        });
+      }
+      return (actual.readFileSync as (...args: unknown[]) => unknown)(path, ...rest);
+    }),
   };
 });
 

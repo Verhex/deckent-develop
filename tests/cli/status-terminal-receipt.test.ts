@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { buildStatusJsonSnapshot } from '../../src/cli/commands/status.js';
+import { publishCanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
 
 const SPRINT_ID = 'sprint-487';
 const DIGEST = 'a'.repeat(64);
@@ -37,6 +38,20 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
 });
 
+/**
+ * The status surface projects `terminalPublication` ONLY from the persisted
+ * canonical run-status read-model matching the current run authority
+ * (RECOVERY-BORN-488-STATUS-PROJECTION-001); it never re-projects the receipt
+ * CLI-locally. Each case therefore persists the read-model with the REAL
+ * production publisher — whose terminalPublication comes from the SAME shared
+ * projection (core/sprint-terminal-publication-status) the finalizer uses —
+ * after all run-state fixtures are on disk. Hand-faked receipts never enter
+ * the surface: an absent/stale read-model honestly renders null/UNAVAILABLE.
+ */
+function armPersistedReadModel(root: string): void {
+  publishCanonicalRunStatusReadModel(root);
+}
+
 describe('CLI terminal receipt status projection', () => {
   it('keeps canonical COMPLETE and its receipt when stale dashboard and task residue remain', async () => {
     const root = await createRoot();
@@ -54,6 +69,7 @@ describe('CLI terminal receipt status projection', () => {
         id: '487-001', title: 'stale task', status: 'EXECUTING', sprintId: SPRINT_ID,
       }),
     ]);
+    armPersistedReadModel(root);
 
     const snapshot = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {});
 
@@ -87,6 +103,7 @@ describe('CLI terminal receipt status projection', () => {
         isPriorityFix: true, fixForTaskId: '487-001', updatedAt: '2026-07-31T16:00:01.000Z',
       }),
     ]);
+    armPersistedReadModel(root);
 
     const snapshot = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {}) as {
       progress: { done: number; active: number; blocked: number; total: number };
@@ -107,6 +124,7 @@ describe('CLI terminal receipt status projection', () => {
       }),
       writeJson(join(root, '.deckent', 'recently-works', `${SPRINT_ID}-terminal-receipt.json`), receipt('sprint-foreign')),
     ]);
+    armPersistedReadModel(root);
 
     const snapshot = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {});
 

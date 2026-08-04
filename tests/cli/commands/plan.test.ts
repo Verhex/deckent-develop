@@ -31,6 +31,104 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
   cleanupDraftTasks: vi.fn(),
 }));
 
+// Non-dry-run planning no longer calls planSprint directly — it goes through
+// the exact-plan flow service (planRunFlow → flowId + revision + planDigest,
+// then decideRunFlowPlan approve/reject). Mirror the proven MCP seam
+// (tests/mcp/tools.test.ts): delegate to the mocked planSprint with the same
+// arg order as the real preview generation, and derive a real sha256
+// planDigest + a pass-verdict execution topology from the returned sprint.
+vi.mock('../../../src/orchestra/run-flow-plan-service.js', () => {
+  class RunFlowPlanServiceError extends Error {
+    readonly code: string;
+    readonly details: Record<string, unknown>;
+    constructor(code: string, details: Record<string, unknown> = {}) {
+      super(code);
+      this.code = code;
+      this.details = details;
+    }
+  }
+  return {
+    RunFlowPlanServiceError,
+    decideRunFlowPlan: vi.fn(),
+    planRunFlow: vi.fn(async (input: {
+      projectRoot: string;
+      config: unknown;
+      recommendation?: { maxWorkers?: number };
+      proposal?: { flowId?: string; revision?: number };
+      source?: { brainContext?: unknown };
+      previewOptions?: { mode?: string };
+    }) => {
+      const { planSprint: planSprintMock } = await import('../../../src/orchestra/brain.js');
+      const sprint = await planSprintMock(
+        input.projectRoot,
+        input.config as never,
+        input.source?.brainContext as never,
+        input.recommendation as never,
+        { mode: input.previewOptions?.mode } as never,
+      );
+      const maxWorkers = input.recommendation?.maxWorkers ?? 4;
+      const tasks: Array<{ id: string }> = (sprint as { tasks?: Array<{ id: string }> })?.tasks ?? [];
+      const waves: Array<{ wave: number; slots: number[] }> = [];
+      for (let i = 0; i < tasks.length; i += maxWorkers) {
+        waves.push({
+          wave: waves.length + 1,
+          slots: tasks.slice(i, i + maxWorkers).map((_t, j) => i + j + 1),
+        });
+      }
+      const { createHash } = await import('node:crypto');
+      return {
+        flowId: input.proposal?.flowId ?? 'flow-test',
+        revision: input.proposal?.revision ?? 1,
+        approval: 'awaiting',
+        reusedDurablePlan: false,
+        sprint,
+        preview: {
+          topology: {
+            schemaVersion: 1,
+            configuredMaxWorkers: maxWorkers,
+            effectiveConcurrency: Math.min(maxWorkers, Math.max(tasks.length, 1)),
+            taskSlots: tasks.map((_t, i) => i + 1),
+            collisions: [],
+            authoredEdges: [],
+            syntheticEdges: [],
+            effectiveEdges: [],
+            waves,
+            findings: [],
+            verdict: 'pass',
+          },
+          scopeGateResult: 'skipped',
+          topologyGateResult: 'pass',
+          planDigestVersion: 2,
+        },
+        planDigest: createHash('sha256')
+          .update(JSON.stringify(tasks.map(t => t.id)))
+          .digest('hex'),
+      };
+    }),
+  };
+});
+
+// Approved-plan compatibility projection (task-file publish) touches the real
+// filesystem at projectRoot ('/mock/root' here) — mock the whole boundary.
+// The error classes must exist because plan.ts narrows with `instanceof`.
+vi.mock('../../../src/orchestra/task-artifact-projection.js', () => {
+  class TaskArtifactProjectionError extends Error {
+    readonly code: string;
+    readonly details: Record<string, unknown>;
+    constructor(code: string, details: Record<string, unknown> = {}) {
+      super(code);
+      this.code = code;
+      this.details = details;
+    }
+  }
+  return {
+    TaskArtifactProjectionError,
+    inspectTaskArtifactsNoClobber: vi.fn(),
+    publishTaskArtifactsNoClobber: vi.fn(),
+    inspectStructuredCriteriaProjectionAdoption: vi.fn(),
+  };
+});
+
 // --dry-run does not call planSprint directly — it delegates to the shared
 // plan-preview-service (TERM2 424-001). Mock this boundary explicitly instead
 // of relying on it falling through to the real implementation (which pulls in
@@ -61,6 +159,8 @@ import {
   readContext, planSprint, confirmDraftTasks, cleanupDraftTasks,
 } from '../../../src/orchestra/brain.js';
 import { generatePlanPreview } from '../../../src/orchestra/plan-preview-service.js';
+import { decideRunFlowPlan, planRunFlow } from '../../../src/orchestra/run-flow-plan-service.js';
+import { publishTaskArtifactsNoClobber } from '../../../src/orchestra/task-artifact-projection.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { promptConfirm } from '../../../src/cli/helpers/prompt.js';
 import { registerPlan } from '../../../src/cli/commands/plan.js';
@@ -179,12 +279,16 @@ describe('plan command (isolated)', () => {
     );
   });
 
-  it('--no-confirm sets asDraft=false and skips prompt', async () => {
+  it('--no-confirm auto-approves the exact plan and skips prompt', async () => {
     setupMocks();
     await runCommand(['plan', '--no-confirm']);
-    expect(planSprint).toHaveBeenCalledWith(
-      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
-      expect.objectContaining({ asDraft: false }),
+    // asDraft is no longer a planSprint argument: the flow service always plans
+    // durably and --no-confirm resolves as an immediate approve decision.
+    expect(planSprint).toHaveBeenCalled();
+    expect(decideRunFlowPlan).toHaveBeenCalledWith(
+      '/mock/root',
+      expect.any(String),
+      expect.objectContaining({ decision: 'approve' }),
     );
     expect(promptConfirm).not.toHaveBeenCalled();
     expect(confirmDraftTasks).not.toHaveBeenCalled();
@@ -195,14 +299,27 @@ describe('plan command (isolated)', () => {
     vi.mocked(promptConfirm).mockResolvedValue(true);
     await runCommand(['plan']);
     expect(promptConfirm).toHaveBeenCalledWith('Approve this plan?');
-    expect(confirmDraftTasks).toHaveBeenCalled();
+    // Approval settles via the flow-service decision CAS (not legacy
+    // confirmDraftTasks) and only then publishes the task projection.
+    expect(decideRunFlowPlan).toHaveBeenCalledWith(
+      '/mock/root',
+      expect.any(String),
+      expect.objectContaining({ decision: 'approve' }),
+    );
+    expect(publishTaskArtifactsNoClobber).toHaveBeenCalled();
   });
 
-  it('rejected plan does not call confirmDraftTasks', async () => {
+  it('rejected plan records a reject decision and publishes nothing', async () => {
     setupMocks();
     vi.mocked(promptConfirm).mockResolvedValue(false);
     await runCommand(['plan']);
     expect(confirmDraftTasks).not.toHaveBeenCalled();
+    expect(decideRunFlowPlan).toHaveBeenCalledWith(
+      '/mock/root',
+      expect.any(String),
+      expect.objectContaining({ decision: 'reject' }),
+    );
+    expect(publishTaskArtifactsNoClobber).not.toHaveBeenCalled();
     expect(print).toHaveBeenCalledWith('Plan rejected.');
   });
 
@@ -307,16 +424,19 @@ describe('plan command (isolated)', () => {
     expect(cleanupDraftTasks).not.toHaveBeenCalled();
   });
 
-  // ─── C) cleanupDraftTasks idempotency ─────────────────────────────
+  // ─── C) exact-plan flow delegation (legacy draft cleanup retired) ──
 
-  it('calls cleanupDraftTasks before planning', async () => {
+  it('delegates planning to the exact-plan flow service without legacy draft cleanup', async () => {
     setupMocks();
     await runCommand(['plan', '--no-confirm']);
-    expect(cleanupDraftTasks).toHaveBeenCalledWith('/mock/root');
-    // cleanupDraftTasks should be called before planSprint
-    const cleanupOrder = vi.mocked(cleanupDraftTasks).mock.invocationCallOrder[0];
-    const planOrder = vi.mocked(planSprint).mock.invocationCallOrder[0];
-    expect(cleanupOrder).toBeLessThan(planOrder!);
+    // The CLI no longer owns the DRAFT-task lifecycle: planRunFlow is the
+    // durable planning authority, so no ad-hoc cleanupDraftTasks call remains.
+    expect(planRunFlow).toHaveBeenCalledWith(expect.objectContaining({
+      projectRoot: '/mock/root',
+      proposal: expect.objectContaining({ origin: 'cli', tenant: 'local' }),
+    }));
+    expect(cleanupDraftTasks).not.toHaveBeenCalled();
+    expect(confirmDraftTasks).not.toHaveBeenCalled();
   });
 
   // ─── D) Registers --dry-run option ────────────────────────────────

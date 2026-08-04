@@ -131,6 +131,12 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
 }
 
 function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskResult {
+  // FAZ4A terminal-evidence contract (projectAttributedTaskWork): a result
+  // without a VERIFIED work attribution is an unattributable work claim → the
+  // finalizer records a HOLD and refuses to settle (TERMINAL_EVIDENCE_HOLD).
+  // Host-authored claim-time attribution is therefore part of the honest
+  // fixture shape (mirrors tests/orchestra/finalize-sprint.test.ts).
+  const attemptId = `attempt-${taskId}`;
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -141,6 +147,12 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
     coverage: 95,
     selfAssessment: 'DONE',
     notes: 'ok',
+    workAttribution: {
+      state: 'VERIFIED' as const,
+      attemptId,
+      baselineRef: `baseline:${attemptId}`,
+      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+    },
     ...overrides,
   } as TaskResult;
 }
@@ -241,6 +253,7 @@ beforeEach(() => {
 afterEach(() => {
   try { rmSync(root, { recursive: true, force: true }); } catch { /* non-fatal */ }
   vi.clearAllMocks();
+  process.exitCode = undefined;
 });
 
 describe('buildSprintFromTasks — evaluationDecision ?? selfAssessment success detection (FINALIZE-RECOUNT 1a)', () => {
@@ -548,8 +561,20 @@ describe('persistFinalSprintState — orphan-state cleanup (bug 3)', () => {
   });
 });
 
-describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
-  it('--force counts archived tasks, recovers startedAt from sprint-state, stamps terminal state, clears pid', async () => {
+// FAZ4B truth: `finalize --force` is no longer a "finalizeSprint with extras"
+// — it settles through the sprint recovery operation + forceAbortSprint. The
+// canonical outputs are (a) ONE fenced ABORTED terminal receipt under
+// `.deckent/recently-works/<sprintId>-terminal-receipt.json` (archive-aware
+// logicalProgress lives there) and (b) an ABORTED sprint-state stamp + pid
+// cleanup. It deliberately performs NO learning side effects (no jobs summary,
+// no agent/skill stats, no retro/memory/decay) — the old assertions on
+// `.deckent/runtime/jobs/` and the stats sidecar pinned the retired pipeline.
+describe('finalize CLI — end-to-end force-finalize (ABORTED settlement, tmpdir)', () => {
+  function receiptPath(): string {
+    return join(root, '.deckent', 'recently-works', `${SPRINT_ID}-terminal-receipt.json`);
+  }
+
+  it('--force counts archived tasks in the fenced ABORTED receipt, preserves startedAt, stamps ABORTED state, clears pid', async () => {
     // Live .tasks/ task + archived task (sprint-267 "5/5 instead of 6/6")
     const tasksDir = join(root, '.tasks');
     writeTaskFixture(tasksDir, makeTask('900-001', { assignedAgent: 'test-agent-268' }));
@@ -574,35 +599,36 @@ describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
     writeFileSync(pidPath, JSON.stringify({ pid: 999999, sprintId: SPRINT_ID, startedAt }), 'utf-8');
 
     await runFinalizeCli(['--force']);
+    expect(process.exitCode).toBeUndefined();
 
-    // Archive-aware totals: 2/2, not 1/1
-    const job = readJson<{ metrics: { totalTasks: number; done: number; duration: string; durationMs: number } }>(
-      join(root, '.deckent', 'runtime', 'jobs', `${SPRINT_ID}.json`),
-    );
-    expect(job.metrics.totalTasks).toBe(2);
-    expect(job.metrics.done).toBe(2);
-    // Duration recovered from sprint-state (≥ 2 minutes), not 0ms/'unknown'
-    expect(job.metrics.duration).not.toBe('unknown');
-    expect(job.metrics.durationMs).toBeGreaterThanOrEqual(110_000);
-    // Terminal state + pid cleanup (orphan-state fix)
-    const state = readJson<{ status: string; phase: string }>(statePath);
-    expect(state.status).toBe(SprintStatus.COMPLETE);
-    expect(state.phase).toBe(SprintPhase.COMPLETE);
+    // Archive-aware logical totals in the fenced receipt: 2/2, not 1/1
+    const receipt = readJson<{
+      terminalOutcome: string;
+      logicalProgress: { total: number; done: number };
+      terminalEvidence: { holds: unknown[] };
+    }>(receiptPath());
+    expect(receipt.terminalOutcome).toBe('ABORTED');
+    expect(receipt.logicalProgress.total).toBe(2);
+    expect(receipt.logicalProgress.done).toBe(2);
+    expect(receipt.terminalEvidence.holds).toEqual([]);
+    // ABORTED lifecycle stamp preserves the recovered start + clears the pid
+    const state = readJson<{ status: string; sprintId: string; startedAt: string }>(statePath);
+    expect(state.status).toBe(SprintStatus.ABORTED);
+    expect(state.sprintId).toBe(SPRINT_ID);
+    expect(state.startedAt).toBe(startedAt);
     expect(existsSync(pidPath)).toBe(false);
-    // Stats recorded exactly once for the sprint (V1 default path) —
-    // born-605: sidecar-ledger'dan okunur (manifest artık stats taşımaz).
-    const agent = readSidecarStats(root, 'agents', 'test-agent-268');
-    expect(agent.totalUses).toBe(2);
-    expect(agent.successRate).toBe(1);
+    // No learning side effects on abort: the stats sidecar is never created.
+    expect(existsSync(join(root, '.deckent', 'stats', 'catalog-stats.json'))).toBe(false);
   });
 
-  it('without recoverable startedAt the duration is "unknown" and a foreign sprint-state is preserved', async () => {
+  it('a foreign sprint-state blocks the ABORTED lifecycle stamp with a typed hold (fail-closed), state preserved', async () => {
     const tasksDir = join(root, '.tasks');
     writeTaskFixture(tasksDir, makeTask('900-001'));
     writeResultFixture(tasksDir, makeResult('900-001'));
 
-    // sprint-state belongs to ANOTHER sprint — must be neither used for
-    // duration nor stamped COMPLETE.
+    // sprint-state belongs to ANOTHER (possibly live) sprint — force-abort of
+    // sprint-900 must not stamp it. publishAbortedSprintAuthority throws
+    // ABORT_AUTHORITY_SPRINT_MISMATCH → CLI printError + exitCode=1.
     const stateDir = join(root, '.deckent');
     mkdirSync(stateDir, { recursive: true });
     const statePath = join(stateDir, 'sprint-state.json');
@@ -614,17 +640,18 @@ describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
 
     await runFinalizeCli(['--force']);
 
-    const job = readJson<{ metrics: { duration: string } }>(
-      join(root, '.deckent', 'runtime', 'jobs', `${SPRINT_ID}.json`),
-    );
-    expect(job.metrics.duration).toBe('unknown');
-
+    expect(process.exitCode).toBe(1);
+    // Receipt-first ordering: the fenced ABORTED receipt was committed BEFORE
+    // the lifecycle authority refused — evidence is durable, projection is not.
+    const receipt = readJson<{ terminalOutcome: string }>(receiptPath());
+    expect(receipt.terminalOutcome).toBe('ABORTED');
+    // The foreign sprint-state is untouched.
     const state = readJson<{ sprintId: string; status: string }>(statePath);
     expect(state.sprintId).toBe('sprint-901');
     expect(state.status).toBe('ACTIVE');
   });
 
-  it('double CLI finalize --force keeps agent stats idempotent end-to-end', async () => {
+  it('double CLI finalize --force is idempotent end-to-end and records no agent stats at all', async () => {
     const tasksDir = join(root, '.tasks');
     writeTaskFixture(tasksDir, makeTask('900-001', { assignedAgent: 'test-agent-268' }));
     writeResultFixture(tasksDir, makeResult('900-001'));
@@ -634,8 +661,22 @@ describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
     await runFinalizeCli(['--force']);
     await runFinalizeCli(['--force']);
 
-    const agent = readSidecarStats(root, 'agents', 'test-agent-268');
-    expect(agent.totalUses).toBe(1); // NOT 2 — re-finalize is stats-idempotent
-    expect(agent.successRate).toBe(1);
+    // Both settlements replay the same fenced ABORTED truth (no crash, no
+    // exit-code drift) …
+    expect(process.exitCode).toBeUndefined();
+    const receipt = readJson<{
+      terminalOutcome: string;
+      logicalProgress: { total: number; done: number };
+    }>(receiptPath());
+    expect(receipt.terminalOutcome).toBe('ABORTED');
+    expect(receipt.logicalProgress.total).toBe(1);
+    expect(receipt.logicalProgress.done).toBe(1);
+    // …and the abort path performs no learning side effects on either run:
+    // the stats sidecar never comes into existence (stronger than the old
+    // "counted exactly once" claim, which pinned the retired pipeline).
+    expect(existsSync(join(root, '.deckent', 'stats', 'catalog-stats.json'))).toBe(false);
+    const state = readJson<{ status: string; sprintId: string }>(join(root, '.deckent', 'sprint-state.json'));
+    expect(state.status).toBe(SprintStatus.ABORTED);
+    expect(state.sprintId).toBe(SPRINT_ID);
   });
 });
