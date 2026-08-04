@@ -1,11 +1,14 @@
-// ─── Sprint 359 Task 002: WRAPPER-HB-GATE + ALLOWLIST-SSOT (born-468 + born-471) ──
+// ─── Sprint 359 Task 002 (FAZ4A-S7 realigned): WRAPPER-HB retirement + ALLOWLIST-SSOT ──
 //
-// Two same-file fixes on spawn-backend-docker.ts:
-//   (a) born-468 WRAPPER-HB-GATE — the wrapper's background heartbeat tick
-//       used to unconditionally clobber a worker's own (richer) heartbeat
-//       every 15s. buildHeartbeatGateFn() now stales-gates the write
-//       (skip if $HBFILE mtime < WRAPPER_HB_STALE_THRESHOLD_SECONDS) and
-//       writes atomically (tmp+mv).
+// Two same-file contracts on spawn-backend-docker.ts:
+//   (a) heartbeat authority (post born-468 evolution) — the wrapper's shell
+//       heartbeat writer was RETIRED entirely: host observations are published
+//       only through WorkerHeartbeatAuthorityStore (monotonic hostSequence
+//       proof that can never regress). buildHeartbeatGateFn() /
+//       buildHeartbeatWrapperLoop() remain exported as INERT compatibility
+//       seams (`write_hb_if_stale() { return 0; }`) that must never supply a
+//       shell timestamp or write a competing raw heartbeat, and the generated
+//       worker script must not embed any wrapper heartbeat loop.
 //   (b) born-471 ALLOWLIST-SSOT — buildDockerAllowedTools() derives the
 //       docker backend's --allowedTools Write()/Edit() grant SOLELY from
 //       scope.filesWrite when it is non-empty; scope.directories (read
@@ -146,45 +149,52 @@ describe('buildDockerAllowedTools (born-471 ALLOWLIST-SSOT)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// (a) born-468 WRAPPER-HB-GATE — buildHeartbeatGateFn / buildHeartbeatWrapperLoop
+// (a) heartbeat authority — buildHeartbeatGateFn / buildHeartbeatWrapperLoop are
+// INERT compatibility seams. Host heartbeat observations flow exclusively
+// through WorkerHeartbeatAuthorityStore (monotonic hostSequence — never
+// regresses); the wrapper must never fabricate a shell heartbeat.
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('buildHeartbeatGateFn / buildHeartbeatWrapperLoop (born-468 WRAPPER-HB-GATE) — text-level', () => {
+describe('buildHeartbeatGateFn / buildHeartbeatWrapperLoop — inert compatibility seams (heartbeat authority moved to WorkerHeartbeatAuthorityStore)', () => {
   const gateFn = buildHeartbeatGateFn('hbgate-001');
 
-  it('checks $HBFILE mtime via stat and computes an age', () => {
-    expect(gateFn).toContain('stat -c %Y "$HBFILE"');
-    expect(gateFn).toContain('hb_age=$((hb_now - hb_mtime))');
+  it('is the exact inert no-op — never probes $HBFILE mtime or computes an age', () => {
+    expect(gateFn).toBe('write_hb_if_stale() { return 0; }');
+    expect(gateFn).not.toContain('stat -c %Y');
+    expect(gateFn).not.toContain('hb_age');
   });
 
-  it('gates the write on the WRAPPER_HB_STALE_THRESHOLD_SECONDS threshold', () => {
+  it('retains the documented threshold constant but no longer gates any write on it', () => {
     expect(WRAPPER_HB_STALE_THRESHOLD_SECONDS).toBe(40);
-    expect(gateFn).toContain(`"$hb_age" -lt ${WRAPPER_HB_STALE_THRESHOLD_SECONDS}`);
+    expect(gateFn).not.toContain(String(WRAPPER_HB_STALE_THRESHOLD_SECONDS));
     expect(gateFn).toContain('return 0');
   });
 
-  it('writes atomically via tmp file + mv', () => {
-    expect(gateFn).toContain('hb_tmp="$HBFILE.hbwrap.$$"');
-    expect(gateFn).toContain('> "$hb_tmp"');
-    expect(gateFn).toContain('mv "$hb_tmp" "$HBFILE"');
+  it('performs no write at all — no tmp file, no mv, no redirection into $HBFILE', () => {
+    expect(gateFn).not.toContain('hb_tmp');
+    expect(gateFn).not.toContain('mv ');
+    expect(gateFn).not.toContain('>');
   });
 
-  it('embeds the taskId into the fallback heartbeat payload', () => {
-    expect(gateFn).toContain('\\"taskId\\":\\"hbgate-001\\"');
-    expect(gateFn).toContain('\\"workerId\\":\\"docker-hbgate-001\\"');
+  it('embeds no shell-fabricated heartbeat payload (no taskId/workerId JSON)', () => {
+    expect(gateFn).not.toContain('taskId');
+    expect(gateFn).not.toContain('workerId');
+    expect(gateFn).not.toContain('hbgate-001');
   });
 
-  it('buildHeartbeatWrapperLoop combines the gate fn with the 15s background driver', () => {
+  it('buildHeartbeatWrapperLoop is the same inert seam — no 15s background driver, no subshell fork', () => {
     const loop = buildHeartbeatWrapperLoop('hbgate-002');
-    expect(loop).toContain('write_hb_if_stale() {');
-    expect(loop).toContain('while true; do sleep 15;');
-    expect(loop).toContain('write_hb_if_stale "$SEQ"');
-    expect(loop.trim().endsWith(') &')).toBe(true);
+    expect(loop).toBe(buildHeartbeatGateFn('hbgate-002'));
+    expect(loop).not.toContain('while true');
+    expect(loop).not.toContain('sleep 15');
+    expect(loop.trim().endsWith(') &')).toBe(false);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// (a) born-468 — sh-fragment unit tests: real `sh` execution against real files
+// (a) sh-fragment unit tests: real `sh` execution against real files — proves
+// the inert seam NEVER writes: a worker's heartbeat (its monotonic proof) can
+// never be regressed or clobbered by the wrapper, fresh OR stale OR missing.
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Run `write_hb_if_stale <seq>` for real via `sh`, against a real $HBFILE path. */
@@ -211,7 +221,7 @@ async function runHeartbeatGate(hbFilePath: string, seq: number): Promise<void> 
   });
 }
 
-describe('write_hb_if_stale — real sh execution (proof-of-function)', () => {
+describe('write_hb_if_stale — real sh execution (proof-of-function: seam never writes)', () => {
   it('fresh $HBFILE (mtime just now) is NOT overwritten', async () => {
     const dir = freshTmp('deckent-hbgate-fresh-');
     const hbFile = join(dir, 'task-x.hb');
@@ -219,8 +229,6 @@ describe('write_hb_if_stale — real sh execution (proof-of-function)', () => {
       workerId: 'w-x', taskId: 'x', status: 'EXECUTING', sequence: 7, currentAction: 'editing src/x.ts',
     });
     writeFileSync(hbFile, richContent, 'utf-8');
-    // mtime defaults to "now" from the writeFileSync above — well under the
-    // WRAPPER_HB_STALE_THRESHOLD_SECONDS=40 gate.
 
     await runHeartbeatGate(hbFile, 99);
 
@@ -230,36 +238,34 @@ describe('write_hb_if_stale — real sh execution (proof-of-function)', () => {
     expect(after).not.toContain('"sequence":99');
   });
 
-  it('stale $HBFILE (mtime backdated past the threshold) IS overwritten with valid fallback JSON', async () => {
+  it('stale $HBFILE (mtime backdated past the retired threshold) is ALSO left untouched — the worker\'s monotonic proof never regresses', async () => {
     const dir = freshTmp('deckent-hbgate-stale-');
     const hbFile = join(dir, 'task-y.hb');
     const oldContent = JSON.stringify({ workerId: 'w-y', taskId: 'y', status: 'EXECUTING', sequence: 3 });
     writeFileSync(hbFile, oldContent, 'utf-8');
     const past = new Date(Date.now() - (WRAPPER_HB_STALE_THRESHOLD_SECONDS + 30) * 1000);
     utimesSync(hbFile, past, past);
+    const staleMtimeMs = past.getTime();
 
     await runHeartbeatGate(hbFile, 12);
 
+    // Byte-identical AND mtime-identical: the seam neither rewrote nor touched
+    // the file. Staleness is now the host's problem (WorkerHeartbeatAuthorityStore
+    // + container-state liveness), never a shell-fabricated overwrite.
     const after = readFileSync(hbFile, 'utf-8');
-    expect(after).not.toBe(oldContent);
-    const parsed = JSON.parse(after) as { taskId: string; sequence: number; backend: string; status: string };
-    expect(parsed.taskId).toBe('hbgate-run');
-    expect(parsed.sequence).toBe(12);
-    expect(parsed.backend).toBe('docker');
-    expect(parsed.status).toBe('EXECUTING');
+    expect(after).toBe(oldContent);
+    const { statSync } = await import('node:fs');
+    expect(Math.floor(statSync(hbFile).mtimeMs / 1000)).toBe(Math.floor(staleMtimeMs / 1000));
   });
 
-  it('missing $HBFILE is created with valid fallback JSON', async () => {
+  it('missing $HBFILE is NOT created — the wrapper never fabricates a heartbeat', async () => {
     const dir = freshTmp('deckent-hbgate-missing-');
     const hbFile = join(dir, 'task-z.hb');
     expect(existsSync(hbFile)).toBe(false);
 
     await runHeartbeatGate(hbFile, 2);
 
-    expect(existsSync(hbFile)).toBe(true);
-    const parsed = JSON.parse(readFileSync(hbFile, 'utf-8')) as { taskId: string; sequence: number };
-    expect(parsed.taskId).toBe('hbgate-run');
-    expect(parsed.sequence).toBe(2);
+    expect(existsSync(hbFile)).toBe(false);
   });
 
   it('never leaves a dangling .hbwrap.$$ tmp file behind after a write', async () => {
@@ -369,9 +375,14 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
       + 'Edit(.tasks/,src/orchestra/spawn-backend-docker.ts),Bash,Glob,Grep"',
     );
     expect(scriptContent).not.toContain('docs/adr');
-    // The gated heartbeat loop must be present too (born-468 wired into the real script).
-    expect(scriptContent).toContain('write_hb_if_stale() {');
-    expect(scriptContent).toContain('stat -c %Y "$HBFILE"');
+    // Heartbeat-authority contract: the generated script must NOT embed any
+    // wrapper heartbeat writer/loop — host observations flow exclusively
+    // through WorkerHeartbeatAuthorityStore. $HBFILE stays plumbed for the
+    // worker CLI's own writes + on_exit fsync/read-back only.
+    expect(scriptContent).not.toContain('write_hb_if_stale');
+    expect(scriptContent).not.toContain('stat -c %Y "$HBFILE"');
+    expect(scriptContent).toContain('HBFILE=');
+    expect(scriptContent).toContain('fsync_file "$HBFILE"');
   });
 
   it('fails closed before Docker dispatch when no persisted task envelope exists', async () => {

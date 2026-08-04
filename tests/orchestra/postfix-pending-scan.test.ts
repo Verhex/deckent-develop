@@ -5,50 +5,58 @@
 // respawnEligibleTasks call, leaving a PENDING+dependency-eligible task with
 // zero dispatch attempts. This suite covers the safety-net block wired at the
 // very end of `runFixPhase` (src/orchestra/sprint-phases.ts): after the
-// existing NO_GO/NOT_DISPATCHED fix machinery runs, ONE single pass reuses
-// respawnEligibleTasks (the same wave mechanism spawnWorkers/EVALUATE use
-// elsewhere) to catch anything still PENDING+eligible, spawns it, and waits
-// for its result via the same waitForResults seam the fix pipeline uses.
+// existing NO_GO/NOT_DISPATCHED fix machinery runs, a BOUNDED re-scan loop
+// reuses respawnEligibleTasks (the same wave mechanism spawnWorkers/EVALUATE
+// use elsewhere) to catch anything still PENDING+eligible, spawns it, waits
+// for its results via the same waitForResults seam the fix pipeline uses, and
+// re-scans after every completed wave (structurally bounded by the number of
+// sprint tasks) so a root→consumer→verifier chain drains in one lifecycle.
 //
 // respawnEligibleTasks itself is mocked here (its own dependency-graph
 // internals are already covered by tests/orchestra/sprint-spawner.test.ts and
 // the dependency-pipeline-*.test.ts suites) — this suite isolates the NEW
 // wiring: is it called, are its spawned tasks waited-on and evaluated, and
-// does the whole thing stay a no-op when nothing is eligible.
+// does the whole thing stay a no-op when nothing is eligible. Mocking the
+// seam also keeps the suite independent of the production
+// `config.dependency_pipeline_enabled` gate inside the real function.
+//
+// ─── REAL FILESYSTEM (FAZ4A-S7, mirrors S4's fix-phase-map.test.ts) ──
+// The node:fs / constants / utils mocks are deliberately GONE. runFixPhase's
+// entry (`persistPhaseTransition` → `publishCanonicalRunStatusReadModel`) is
+// an atomic write→rename→readback→digest publication chain an in-memory fs
+// mock cannot carry (RECORDED-FAILED approach, do not retry) — under the old
+// mock the phase failed BEFORE ever reaching the postfix scan, so the seam
+// under test never ran. Each test gets a fresh real scratch project root
+// under tmpdir with real `.tasks` / `.deckent` directories.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   TaskEvaluation, TaskStatus, SprintPhase, SprintStatus,
 } from '../../src/core/types.js';
 import type { Task, TaskResult, Sprint, ResolvedConfig, EvaluationResult } from '../../src/core/types.js';
 
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => false),
-  readdirSync: vi.fn(() => [] as string[]),
-  writeFileSync: vi.fn(),
-  readFileSync: vi.fn(() => ''),
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
+// Real fs, mocked processes: git/tsc probes must not escape the sandbox. A bare
+// vi.fn() would return undefined and crash callers reading `.status`.
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
+  execSync: vi.fn(() => ''),
+  execFileSync: vi.fn(() => ''),
+  spawn: vi.fn(),
+  exec: vi.fn(),
 }));
 
-vi.mock('../../src/core/utils.js', () => ({
-  readJsonSafe: vi.fn(() => null),
-  parseDebtTable: vi.fn(() => []),
-  debugLog: vi.fn(),
-}));
-
+// HYBRID (importOriginal spread): only the rubric grader + spurious-NO_GO
+// reconcile are stubbed; classifyFixPhaseTasks & friends stay REAL. Impls are
+// passed at factory time so vi.clearAllMocks preserves the passthrough.
 vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/orchestra/result-evaluator.js')>();
   return {
     ...actual,
     evaluateWithRubric: vi.fn(),
-    reconcileEvaluationSpuriousNoGo: vi.fn((evaluation) => evaluation),
+    reconcileEvaluationSpuriousNoGo: vi.fn(async (evaluation: EvaluationResult) => evaluation),
   };
 });
 
@@ -65,8 +73,8 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
 }));
 
 // Partial mock: keep the REAL applyCascadeToSprint/applyUnblockToSprint (used
-// elsewhere in runFixPhase) and mock ONLY the new respawnEligibleTasks seam
-// this task wires up — isolates the postfix-scan wiring under test.
+// elsewhere in runFixPhase) and mock ONLY the respawnEligibleTasks seam this
+// task wires up — isolates the postfix-scan wiring under test.
 vi.mock('../../src/orchestra/sprint-spawner.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/orchestra/sprint-spawner.js')>();
   return {
@@ -129,28 +137,20 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
 
 vi.mock('../../src/cli/helpers/splash.js', () => ({
   showSplash: vi.fn(() => ''),
+  showSplashIfEnabled: vi.fn(() => ''),
 }));
 
-vi.mock('../../src/core/constants.js', () => ({
-  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-  BRAIN_DIR: '.brain',
-  TASKS_DIR: '.tasks',
-  DEBT_FILE: 'DEBT.md',
-  DECKENT_VERSION: '0.4.0-test',
-  DECKENT_DIR: '.deckent',
-  // born-630 (406-002): permission-store→approval-allowscope zinciri artık
-  // SETTINGS_DIR'i modül-yüklemede okuyor — factory-mock'a eksik export eklendi.
-  SETTINGS_DIR: '.deckent/settings',
-  SPRINT_STATE_FILE: '.deckent/sprint-state.json',
-  SPRINT_ACTIVE_FILE: '.deckent/sprint-active.json',
-}));
-
-vi.mock('../../src/orchestra/event-stream.js', () => ({
-  writeEvent: vi.fn(),
-  getCurrentSprintId: vi.fn(() => 'sprint-361'),
-  readEvents: vi.fn(() => []),
-  SCOPE_INSUFFICIENT_CHANNEL: 'WORKER→BRAIN:SCOPE_INSUFFICIENT',
-}));
+// HYBRID: real CHANNELS/constants (the real sprint-spawner module imports
+// them at load), stubbed write/read seams for call-based assertions.
+vi.mock('../../src/orchestra/event-stream.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/event-stream.js')>();
+  return {
+    ...actual,
+    writeEvent: vi.fn(),
+    getCurrentSprintId: vi.fn(() => 'sprint-361'),
+    readSequence: vi.fn(() => 0),
+  };
+});
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────
 
@@ -162,6 +162,8 @@ import { handleEvaluation } from '../../src/orchestra/debt-manager.js';
 import { writeEvent } from '../../src/orchestra/event-stream.js';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+let root: string;
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -213,7 +215,7 @@ function makeConfig(): ResolvedConfig {
     modes: {},
     language: 'en',
     projectName: 'test',
-    projectRoot: '/tmp/test-project',
+    projectRoot: root,
     version: '0.4.0',
   } as ResolvedConfig;
 }
@@ -237,21 +239,37 @@ function postFixScanEvent(): Record<string, unknown> | undefined {
 describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks does NOT reset implementations — restore seam defaults so
+    // a previous test's mockResolvedValue can never leak into the next. Tests
+    // queue one wave via mockResolvedValueOnce; the bounded re-scan loop then
+    // falls back to this empty default and terminates.
+    vi.mocked(respawnEligibleTasks).mockResolvedValue([]);
+    vi.mocked(waitForResults).mockResolvedValue([]);
+    root = mkdtempSync(join(tmpdir(), 'deckent-pps-'));
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'runtime'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
   });
 
-  it('parent DONE + child PENDING: post-FIX single pass dispatches the never-spawned child', async () => {
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('parent DONE + child PENDING: post-FIX pass dispatches the never-spawned child', async () => {
     const parent = makeTask({ id: '361-003', status: TaskStatus.DONE });
     const child = makeTask({ id: '361-008', status: TaskStatus.PENDING, dependencies: ['361-003'] });
     const sprint = makeSprint([parent, child]);
     const evaluations = new Map<string, TaskEvaluation>();
 
-    vi.mocked(respawnEligibleTasks).mockResolvedValue(['361-008']);
+    vi.mocked(respawnEligibleTasks).mockResolvedValueOnce(['361-008']);
     vi.mocked(waitForResults).mockResolvedValue([makeResult('361-008')]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
-    expect(respawnEligibleTasks).toHaveBeenCalledTimes(1);
+    // Wave 1 dispatches the stalled child; the bounded re-scan (wave 2) finds
+    // nothing further eligible and terminates without a second dispatch.
+    expect(respawnEligibleTasks).toHaveBeenCalledTimes(2);
     expect(waitForResults).toHaveBeenCalledTimes(1);
     const waitedSprint = vi.mocked(waitForResults).mock.calls[0][1] as Sprint;
     expect(waitedSprint.tasks.map(t => t.id)).toEqual(['361-008']);
@@ -272,9 +290,7 @@ describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
     const sprint = makeSprint([task]);
     const evaluations = new Map<string, TaskEvaluation>();
 
-    vi.mocked(respawnEligibleTasks).mockResolvedValue([]);
-
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     expect(respawnEligibleTasks).toHaveBeenCalledTimes(1);
     expect(waitForResults).not.toHaveBeenCalled();
@@ -282,13 +298,13 @@ describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
     expect(evaluations.size).toBe(0);
   });
 
-  it('a NEW failure from the post-FIX pass is a single-pass NO_GO — no immediate second respawn attempt', async () => {
+  it('a NEW failure from the post-FIX pass is a single-pass NO_GO — no second dispatch wave', async () => {
     const parent = makeTask({ id: '361-010', status: TaskStatus.DONE });
     const child = makeTask({ id: '361-011', status: TaskStatus.PENDING, dependencies: ['361-010'] });
     const sprint = makeSprint([parent, child]);
     const evaluations = new Map<string, TaskEvaluation>();
 
-    vi.mocked(respawnEligibleTasks).mockResolvedValue(['361-011']);
+    vi.mocked(respawnEligibleTasks).mockResolvedValueOnce(['361-011']);
     vi.mocked(waitForResults).mockResolvedValue([makeResult('361-011', {
       testsPassed: false,
       selfAssessment: 'NO_GO',
@@ -296,19 +312,21 @@ describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
     })]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('NO_GO'));
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
-    // Exactly one respawn/wait round within this single runFixPhase call —
-    // the single-pass guard means a new failure does NOT trigger another
-    // immediate respawnEligibleTasks/waitForResults invocation here.
-    expect(respawnEligibleTasks).toHaveBeenCalledTimes(1);
+    // Exactly one dispatch/wait round within this single runFixPhase call —
+    // the bounded re-scan (wave 2) runs the eligibility scan once more, finds
+    // the failed task no longer spawnable, and does NOT trigger another
+    // immediate waitForResults round for it.
+    expect(respawnEligibleTasks).toHaveBeenCalledTimes(2);
     expect(waitForResults).toHaveBeenCalledTimes(1);
 
     expect(evaluations.get('361-011')).toBe(TaskEvaluation.NO_GO);
     // Standard NO_GO path — same handleEvaluation used everywhere else,
     // which is what creates the normal "-fix" task for a LATER sprint.
+    // (The postfix loop passes no minting policy → default {}.)
     expect(handleEvaluation).toHaveBeenCalledWith(
-      '/tmp/test-project', child, TaskEvaluation.NO_GO, expect.objectContaining({ taskId: '361-011' }),
+      root, child, TaskEvaluation.NO_GO, expect.objectContaining({ taskId: '361-011' }), {},
     );
     expect(postFixScanEvent()).toMatchObject({ spawned: 1, succeeded: 0, failed: 1 });
   });
@@ -318,10 +336,10 @@ describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
     const sprint = makeSprint([task]);
     const evaluations = new Map<string, TaskEvaluation>();
 
-    vi.mocked(respawnEligibleTasks).mockResolvedValue(['361-012']);
+    vi.mocked(respawnEligibleTasks).mockResolvedValueOnce(['361-012']);
     vi.mocked(waitForResults).mockResolvedValue([]);
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     expect(evaluations.has('361-012')).toBe(false);
     expect(handleEvaluation).not.toHaveBeenCalled();

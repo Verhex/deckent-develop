@@ -16,10 +16,23 @@
  *      did not, so a raw-DONE repair claim aggregated onto its `fixForTaskId`
  *      and released the root's dependants.
  *
- * Mock shape mirrors tests/orchestra/cascade-unblock-wire.test.ts (same phase,
- * same hermetic no-disk contract).
+ * ─── REAL FILESYSTEM (FAZ4A-S7, mirrors S4's fix-phase-map.test.ts) ──
+ * The node:fs / constants / utils / task-result-authority mocks are
+ * deliberately GONE. runFixPhase's entry (`persistPhaseTransition` →
+ * `publishCanonicalRunStatusReadModel`) is an atomic write→rename→readback→
+ * digest publication chain that an in-memory fs mock cannot carry
+ * (RECORDED-FAILED approach, do not retry). Each test gets a fresh real
+ * scratch project root under tmpdir; fix-task discovery goes through REAL
+ * `.tasks/task-*.json` files and the real readJsonSafe, the NOT_DISPATCHED
+ * one-round budget marker (`.redispatch-attempted`) and task-status
+ * persistence are asserted on real disk — exactly like production.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   TaskEvaluation, TaskStatus, SprintPhase, SprintStatus,
 } from '../../src/core/types.js';
@@ -29,48 +42,25 @@ import type {
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => true),
-  readdirSync: vi.fn(() => [] as string[]),
-  writeFileSync: vi.fn(),
-  readFileSync: vi.fn(() => ''),
-  mkdirSync: vi.fn(),
-  appendFileSync: vi.fn(),
-  statSync: vi.fn(() => ({ mtimeMs: 0, size: 0 })),
-  unlinkSync: vi.fn(),
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
+// Real fs, mocked processes: git/tsc probes must not escape the sandbox. A bare
+// vi.fn() would return undefined and crash callers reading `.status`.
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
+  execSync: vi.fn(() => ''),
+  execFileSync: vi.fn(() => ''),
+  spawn: vi.fn(),
+  exec: vi.fn(),
 }));
 
-vi.mock('../../src/core/utils.js', () => ({
-  readJsonSafe: vi.fn(() => null),
-  parseDebtTable: vi.fn(() => []),
-  debugLog: vi.fn(),
-}));
-
-vi.mock('../../src/orchestra/task-result-authority.js', () => ({
-  assertTaskResultAuthoritiesReady: vi.fn(),
-  readAuthoritativeTaskResult: vi.fn((projectRoot: string, taskId: string) => ({
-    state: 'absent',
-    result: null,
-    settlementRef: null,
-    rawResultPath: `${projectRoot}/.tasks/task-${taskId}.result`,
-  })),
-  readRuntimeBudgetEvaluationAuthority: vi.fn(() => null),
-}));
-
+// HYBRID (importOriginal spread): only the rubric grader + spurious-NO_GO
+// reconcile are stubbed; classifyFixPhaseTasks & friends stay REAL. Impls are
+// passed at factory time so vi.clearAllMocks preserves the passthrough.
 vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/orchestra/result-evaluator.js')>();
   return {
     ...actual,
     evaluateWithRubric: vi.fn(),
-    reconcileEvaluationSpuriousNoGo: vi.fn((evaluation) => evaluation),
+    reconcileEvaluationSpuriousNoGo: vi.fn(async (evaluation: EvaluationResult) => evaluation),
   };
 });
 
@@ -111,6 +101,21 @@ vi.mock('../../src/core/stack-detector.js', () => ({
   detectProjectStack: vi.fn(() => ({})),
 }));
 
+vi.mock('../../src/orchestra/rollback.js', () => ({
+  createSafetyPoint: vi.fn(),
+  rollback: vi.fn(),
+  getRollbackPolicy: vi.fn(),
+  recordRollbackInDebt: vi.fn(),
+  saveSafetyPoint: vi.fn(),
+  deleteSafetyPoint: vi.fn(),
+  deleteSafetyPointFile: vi.fn(),
+  isCleanWorkingTree: vi.fn().mockReturnValue(true),
+  safetyBranchExists: vi.fn().mockReturnValue(false),
+  isGitRepo: vi.fn().mockReturnValue(true),
+  cleanOrphanSafetyPoint: vi.fn().mockReturnValue(false),
+  loadSafetyPoint: vi.fn().mockReturnValue(null),
+}));
+
 vi.mock('../../src/core/plugin-hooks.js', () => ({
   runHooks: vi.fn(),
   runCiRegressionCheck: vi.fn(),
@@ -125,21 +130,11 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
 
 vi.mock('../../src/cli/helpers/splash.js', () => ({
   showSplash: vi.fn(() => ''),
+  showSplashIfEnabled: vi.fn(() => ''),
 }));
 
 vi.mock('../../src/core/notify.js', () => ({
   notify: vi.fn(async () => undefined),
-}));
-
-vi.mock('../../src/core/constants.js', () => ({
-  RUNTIME_DIR: '.deckent/runtime',
-  BRAIN_DIR: '.brain',
-  TASKS_DIR: '.tasks',
-  DEBT_FILE: 'DEBT.md',
-  DECKENT_VERSION: '0.4.0-test',
-  DECKENT_DIR: '.deckent',
-  SETTINGS_DIR: '.deckent/settings',
-  SPRINTS_DIR: 'sprints',
 }));
 
 type CapturedEvent = {
@@ -199,14 +194,12 @@ vi.mock('../../src/orchestra/scheduler-effects.js', async (importOriginal) => {
 import {
   runFixPhase, resolveFixContinuation,
 } from '../../src/orchestra/sprint-phases.js';
-import { existsSync, readdirSync } from 'node:fs';
-import { readJsonSafe } from '../../src/core/utils.js';
 import { evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
 import { waitForResults } from '../../src/orchestra/sprint-controller.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-const PROJECT_ROOT = '/tmp/test-project-487';
+let root: string;
 
 function makeTask(id: string, deps: string[] = [], overrides: Partial<Task> = {}): Task {
   return {
@@ -259,7 +252,7 @@ function makeConfig(): ResolvedConfig {
     modes: {},
     language: 'en',
     projectName: 'test',
-    projectRoot: PROJECT_ROOT,
+    projectRoot: root,
     version: '0.4.0',
     worker_provider: 'claude',
     execution_budget: {
@@ -282,16 +275,21 @@ function makeEvalResult(decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'): Evalu
   };
 }
 
-/** Publish the given fix tasks as `.tasks/task-<id>.json` files on the mocked FS. */
+/** Publish the given fix tasks as REAL `.tasks/task-<id>.json` files on disk. */
 function publishFixTasks(fixTasks: Task[]): void {
-  vi.mocked(existsSync).mockReturnValue(true);
-  vi.mocked(readdirSync).mockReturnValue(
-    fixTasks.map(t => `task-${t.id}.json`) as unknown as ReturnType<typeof readdirSync>,
-  );
-  vi.mocked(readJsonSafe).mockImplementation((path: string) => {
-    const match = fixTasks.find(t => path.endsWith(`task-${t.id}.json`));
-    return (match ?? null) as never;
-  });
+  for (const task of fixTasks) {
+    writeFileSync(
+      join(root, '.tasks', `task-${task.id}.json`),
+      JSON.stringify(task, null, 2),
+      'utf-8',
+    );
+  }
+}
+
+function readTaskFile(taskId: string): Task {
+  return JSON.parse(
+    readFileSync(join(root, '.tasks', `task-${taskId}.json`), 'utf-8'),
+  ) as Task;
 }
 
 function eventsOn(channel: string): CapturedEvent[] {
@@ -303,10 +301,26 @@ const UNBLOCK_WITHHELD = 'BRAIN→*:DEPENDENCY_UNBLOCK_WITHHELD';
 
 async function runFix(sprint: Sprint, evaluations: Map<string, TaskEvaluation>) {
   return runFixPhase(
-    PROJECT_ROOT, sprint, evaluations, [], makeConfig(),
+    root, sprint, evaluations, [], makeConfig(),
     undefined, 'v1', undefined,
   );
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  capturedEvents.length = 0;
+  // clearAllMocks does NOT reset implementations — restore collector defaults
+  // so one test's mockImplementation can never leak into the next.
+  vi.mocked(waitForResults).mockResolvedValue([]);
+  root = mkdtempSync(join(tmpdir(), 'deckent-fdc-'));
+  mkdirSync(join(root, '.tasks'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'runtime'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+});
+
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+});
 
 // ─── resolveFixContinuation (pure) ──────────────────────────────────
 
@@ -324,10 +338,10 @@ describe('487-019 — resolveFixContinuation', () => {
   });
 
   it('a NO_GO attempt withholds the release (repair-rejected)', () => {
-    const root = makeTask('487-001', [], { status: TaskStatus.NO_GO });
-    const fix = makeTask('487-001-fix', [], { isPriorityFix: true, fixForTaskId: root.id });
+    const root0 = makeTask('487-001', [], { status: TaskStatus.NO_GO });
+    const fix = makeTask('487-001-fix', [], { isPriorityFix: true, fixForTaskId: root0.id });
     const decision = resolveFixContinuation(
-      fix, TaskEvaluation.NO_GO, new Map([[root.id, root], [fix.id, fix]]),
+      fix, TaskEvaluation.NO_GO, new Map([[root0.id, root0], [fix.id, fix]]),
     );
     expect(decision.rootTaskId).toBe('487-001');
     expect(decision.accepted).toBe(false);
@@ -337,10 +351,10 @@ describe('487-019 — resolveFixContinuation', () => {
   });
 
   it('GO_WITH_TECH_DEBT counts as an accepted aggregate settlement', () => {
-    const root = makeTask('487-002', [], { status: TaskStatus.NO_GO });
-    const fix = makeTask('487-002-fix', [], { isPriorityFix: true, fixForTaskId: root.id });
+    const root0 = makeTask('487-002', [], { status: TaskStatus.NO_GO });
+    const fix = makeTask('487-002-fix', [], { isPriorityFix: true, fixForTaskId: root0.id });
     const decision = resolveFixContinuation(
-      fix, TaskEvaluation.GO_WITH_TECH_DEBT, new Map([[root.id, root], [fix.id, fix]]),
+      fix, TaskEvaluation.GO_WITH_TECH_DEBT, new Map([[root0.id, root0], [fix.id, fix]]),
     );
     expect(decision.accepted).toBe(true);
     expect(decision.projectOntoRoot).toBe(true);
@@ -349,30 +363,30 @@ describe('487-019 — resolveFixContinuation', () => {
   });
 
   it('a fix-of-a-fix resolves to the ROOT, not the intermediate attempt', () => {
-    const root = makeTask('487-003', [], { status: TaskStatus.NO_GO });
+    const root0 = makeTask('487-003', [], { status: TaskStatus.NO_GO });
     const fix1 = makeTask('487-003-fix', [], {
-      isPriorityFix: true, fixForTaskId: root.id, status: TaskStatus.NO_GO,
+      isPriorityFix: true, fixForTaskId: root0.id, status: TaskStatus.NO_GO,
     });
     const fix2 = makeTask('487-003-fix-fix', [], {
       isPriorityFix: true, fixForTaskId: fix1.id,
     });
     const decision = resolveFixContinuation(
       fix2, TaskEvaluation.DONE,
-      new Map([[root.id, root], [fix1.id, fix1], [fix2.id, fix2]]),
+      new Map([[root0.id, root0], [fix1.id, fix1], [fix2.id, fix2]]),
     );
     expect(decision.rootTaskId).toBe('487-003');
     expect(decision.unblockDependents).toBe(true);
   });
 
   it('an accepted attempt whose lineage still has an in-flight sibling withholds the release', () => {
-    const root = makeTask('487-004', [], { status: TaskStatus.NO_GO });
-    const fixA = makeTask('487-004-fix-a', [], { isPriorityFix: true, fixForTaskId: root.id });
+    const root0 = makeTask('487-004', [], { status: TaskStatus.NO_GO });
+    const fixA = makeTask('487-004-fix-a', [], { isPriorityFix: true, fixForTaskId: root0.id });
     const fixB = makeTask('487-004-fix-b', [], {
-      isPriorityFix: true, fixForTaskId: root.id, status: TaskStatus.EXECUTING,
+      isPriorityFix: true, fixForTaskId: root0.id, status: TaskStatus.EXECUTING,
     });
     const decision = resolveFixContinuation(
       fixA, TaskEvaluation.DONE,
-      new Map([[root.id, root], [fixA.id, fixA], [fixB.id, fixB]]),
+      new Map([[root0.id, root0], [fixA.id, fixA], [fixB.id, fixB]]),
     );
     expect(decision.accepted).toBe(true);
     expect(decision.projectOntoRoot).toBe(true);
@@ -396,18 +410,13 @@ describe('487-019 — resolveFixContinuation', () => {
 // ─── runFixPhase wiring ─────────────────────────────────────────────
 
 describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    capturedEvents.length = 0;
-  });
-
   it('accepted FIX folds into the logical lineage and is never counted as a new task', async () => {
-    const root = makeTask('487-010', [], { status: TaskStatus.NO_GO });
+    const rootTask = makeTask('487-010', [], { status: TaskStatus.NO_GO });
     const dependent = makeTask('487-011', ['487-010'], { status: TaskStatus.PAUSED });
     const fixTask = makeTask('487-010-fix', [], {
       isPriorityFix: true, fixForTaskId: '487-010',
     });
-    const sprint = makeSprint([root, dependent]);
+    const sprint = makeSprint([rootTask, dependent]);
     const rootCountBefore = sprint.tasks.length;
     const evaluations = new Map([['487-010', TaskEvaluation.NO_GO]]);
 
@@ -427,13 +436,13 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
   });
 
   it('accepted FIX releases the root dependants (PAUSED → PENDING) on aggregate DONE', async () => {
-    const root = makeTask('487-020', [], { status: TaskStatus.NO_GO });
+    const rootTask = makeTask('487-020', [], { status: TaskStatus.NO_GO });
     const depA = makeTask('487-021', ['487-020'], { status: TaskStatus.PAUSED });
     const depB = makeTask('487-022', ['487-020'], { status: TaskStatus.PAUSED });
     const fixTask = makeTask('487-020-fix', [], {
       isPriorityFix: true, fixForTaskId: '487-020',
     });
-    const sprint = makeSprint([root, depA, depB]);
+    const sprint = makeSprint([rootTask, depA, depB]);
     const evaluations = new Map([['487-020', TaskEvaluation.NO_GO]]);
 
     publishFixTasks([fixTask]);
@@ -442,9 +451,14 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
 
     await runFix(sprint, evaluations);
 
-    expect(root.status).toBe(TaskStatus.DONE);
+    expect(rootTask.status).toBe(TaskStatus.DONE);
     expect(depA.status).toBe(TaskStatus.PENDING);
     expect(depB.status).toBe(TaskStatus.PENDING);
+    // Real-file proof: the settled root and the reopened dependants reach disk
+    // (persistTaskStatus), so spawner disk-reads see the release.
+    expect(readTaskFile('487-020').status).toBe(TaskStatus.DONE);
+    expect(readTaskFile('487-021').status).toBe(TaskStatus.PENDING);
+    expect(readTaskFile('487-022').status).toBe(TaskStatus.PENDING);
 
     const applied = eventsOn(UNBLOCK_APPLIED);
     expect(applied).toHaveLength(1);
@@ -458,12 +472,12 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
   });
 
   it('NO_GO FIX preserves PAUSE — dependants stay parked and the withholding is observable', async () => {
-    const root = makeTask('487-030', [], { status: TaskStatus.NO_GO });
+    const rootTask = makeTask('487-030', [], { status: TaskStatus.NO_GO });
     const dependent = makeTask('487-031', ['487-030'], { status: TaskStatus.PAUSED });
     const fixTask = makeTask('487-030-fix', [], {
       isPriorityFix: true, fixForTaskId: '487-030',
     });
-    const sprint = makeSprint([root, dependent]);
+    const sprint = makeSprint([rootTask, dependent]);
     const evaluations = new Map([['487-030', TaskEvaluation.NO_GO]]);
 
     publishFixTasks([fixTask]);
@@ -475,7 +489,7 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
 
     await runFix(sprint, evaluations);
 
-    expect(root.status).toBe(TaskStatus.NO_GO);
+    expect(rootTask.status).toBe(TaskStatus.NO_GO);
     expect(dependent.status).toBe(TaskStatus.PAUSED);
     // The root keeps its unresolved projection — a rejected attempt never
     // rewrites the lineage verdict.
@@ -496,7 +510,7 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
   });
 
   it('an accepted attempt withholds the release while a sibling repair attempt is in flight', async () => {
-    const root = makeTask('487-040', [], { status: TaskStatus.NO_GO });
+    const rootTask = makeTask('487-040', [], { status: TaskStatus.NO_GO });
     const dependent = makeTask('487-041', ['487-040'], { status: TaskStatus.PAUSED });
     const fixA = makeTask('487-040-fix-a', [], {
       isPriorityFix: true, fixForTaskId: '487-040',
@@ -504,7 +518,7 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
     const fixB = makeTask('487-040-fix-b', [], {
       isPriorityFix: true, fixForTaskId: '487-040', status: TaskStatus.EXECUTING,
     });
-    const sprint = makeSprint([root, dependent]);
+    const sprint = makeSprint([rootTask, dependent]);
     const evaluations = new Map([['487-040', TaskEvaluation.NO_GO]]);
 
     publishFixTasks([fixA, fixB]);
@@ -516,7 +530,7 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
     // Lineage folding still happens (the accepted attempt IS the root's verdict)…
     expect(evaluations.get('487-040')).toBe(TaskEvaluation.DONE);
     // …but the dependency release waits for the aggregate to settle.
-    expect(root.status).toBe(TaskStatus.NO_GO);
+    expect(rootTask.status).toBe(TaskStatus.NO_GO);
     expect(dependent.status).toBe(TaskStatus.PAUSED);
     expect(eventsOn(UNBLOCK_APPLIED)).toHaveLength(0);
 
@@ -530,12 +544,12 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
   });
 
   it('the FIX wave ingests results under Brain authority — a raw self-claim cannot release a dependency', async () => {
-    const root = makeTask('487-050', [], { status: TaskStatus.NO_GO });
+    const rootTask = makeTask('487-050', [], { status: TaskStatus.NO_GO });
     const dependent = makeTask('487-051', ['487-050'], { status: TaskStatus.PAUSED });
     const fixTask = makeTask('487-050-fix', [], {
       isPriorityFix: true, fixForTaskId: '487-050',
     });
-    const sprint = makeSprint([root, dependent]);
+    const sprint = makeSprint([rootTask, dependent]);
     const evaluations = new Map([['487-050', TaskEvaluation.NO_GO]]);
 
     publishFixTasks([fixTask]);
@@ -585,15 +599,8 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
 // dependants — with no Brain verdict. These pin the seam on all three.
 
 describe('487-019-xfix — every FIX-phase wave ingests under Brain authority', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    capturedEvents.length = 0;
-    // No fix tasks on disk: the main FIX wave is a no-op so each test drives
-    // exactly one sibling wave.
-    vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockReturnValue(null as never);
-    vi.mocked(existsSync).mockReturnValue(true);
-  });
+  // No fix tasks are written to the real `.tasks/` directory in these tests:
+  // the main FIX wave is a no-op so each test drives exactly one sibling wave.
 
   /** Record the ingest seam each wave was given, then answer with a raw DONE claim. */
   function collectViaRawDoneClaim(seen: { taskId: string; seamWired: boolean; verdict?: TaskEvaluation }[]) {
@@ -629,10 +636,8 @@ describe('487-019-xfix — every FIX-phase wave ingests under Brain authority', 
     const sprint = makeSprint([candidate, dependent]);
     const evaluations = new Map([['487-060', TaskEvaluation.NOT_DISPATCHED]]);
 
-    // The one-round budget marker must be unspent for the wave to run.
-    vi.mocked(existsSync).mockImplementation(
-      (p: unknown) => !String(p).endsWith('.redispatch-attempted'),
-    );
+    // The one-round budget marker (`task-487-060.redispatch-attempted`) does
+    // not exist on the fresh real scratch root, so the wave is admitted.
     const seen: { taskId: string; seamWired: boolean; verdict?: TaskEvaluation }[] = [];
     collectViaRawDoneClaim(seen);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('NO_GO'));
@@ -650,6 +655,9 @@ describe('487-019-xfix — every FIX-phase wave ingests under Brain authority', 
     // …so nothing released the dependant.
     expect(dependent.status).toBe(TaskStatus.PAUSED);
     expect(eventsOn(UNBLOCK_APPLIED)).toHaveLength(0);
+    // Real-file proof: the one-round budget marker was burned on real disk
+    // BEFORE the attempt, so a re-entrant FIX phase can never retry this task.
+    expect(existsSync(join(root, '.tasks', 'task-487-060.redispatch-attempted'))).toBe(true);
   });
 
   it('the POSTFIX-PENDING-SCAN safety net settles on the Brain verdict, not the raw claim', async () => {
@@ -661,11 +669,12 @@ describe('487-019-xfix — every FIX-phase wave ingests under Brain authority', 
     collectViaRawDoneClaim(seen);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('NO_GO'));
 
-    // respawnEligibleTasks is a no-op unless the dependency pipeline is on —
-    // enabling it is what makes the safety-net wave observable here.
+    // respawnEligibleTasks is a no-op unless the dependency pipeline is on
+    // (sprint-spawner.ts guard) — enabling it is what makes the REAL
+    // safety-net wave observable here (executeSpawnTask tail stubbed).
     const config = { ...makeConfig(), dependency_pipeline_enabled: true } as ResolvedConfig;
     await runFixPhase(
-      PROJECT_ROOT, sprint, evaluations, [], config,
+      root, sprint, evaluations, [], config,
       undefined, 'v1', undefined,
     );
 
