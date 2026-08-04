@@ -122,6 +122,15 @@ function makeBareProject(): string {
   mkdirSync(join(root, '.tasks'), { recursive: true });
   mkdirSync(join(root, '.locks'), { recursive: true });
   mkdirSync(join(root, '.brain'), { recursive: true });
+  // The worktree binary-identity resolver (src/cli/worktree-binary-authority.ts,
+  // resolveWorktreeBinaryAuthority) eagerly hashes <cwd>/src on EVERY
+  // non-diagnostic dist-binary invocation, before its own user-project allow
+  // check. A src-less cwd therefore crashes with an uncaught
+  // E_BUILD_SOURCE_TREE_MISSING instead of running the command — known
+  // production truth, reported upstream as a typed blocker (not fixed here).
+  // These fixtures are user projects, so give them the src/ dir the resolver
+  // requires; nothing in status/history reads it.
+  mkdirSync(join(root, 'src'), { recursive: true });
   return root;
 }
 

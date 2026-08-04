@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "050ad4b7d1b91e8eb9f5ce14c2ca8e5a229401460eac13b166601ef868d9750d"
+    "value": "87584fd4cb6e131ab1111e2d37b2d45efa1c8f0ac349865b4ccb892932595cd1"
   },
   "summary": {
-    "total": 342,
-    "active": 335,
+    "total": 343,
+    "active": 336,
     "terminal": 7,
-    "receipts": 35,
+    "receipts": 36,
     "byState": {
-      "OPEN": 236,
+      "OPEN": 237,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 247,
-      "P1": 79,
+      "P1": 80,
       "P2": 16
     },
     "byProgram": {
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 83,
+      "KERNEL": 84,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
@@ -127,7 +127,7 @@
       "state": "BLOCKED",
       "updated": "2026-08-04",
       "definitionDigest": "2069ad6e437766f5bfa67ed3806ccbc6c42f7245047a37f19dd82f5e4154e780",
-      "progressDigest": "17554c1f9b24a29bc5aee5b8f9ec8ad808a5084ee1dbd0f9a193b8d7e83f4504",
+      "progressDigest": "4ba809822b64bb2fcfc5681a257f3618ebcb450781ffd76ba8bba8c37f073bf3",
       "terminalClosureDigest": null
     },
     {
@@ -666,7 +666,7 @@
       "state": "OPEN",
       "updated": "2026-08-04",
       "definitionDigest": "a12c72e94bf9f5b90445dbdf7256ea38de6d5df9c0df17dabc02473ff10d5a50",
-      "progressDigest": "439d6efb6ee8abd3aefa184fde24dde608e025bdaae369e8b82a240dd3c01aeb",
+      "progressDigest": "9d162f497301e14b8e1df275f9f18ea47eaa558a7762c7def7e9c0534ca0023e",
       "terminalClosureDigest": null
     },
     {
@@ -2771,6 +2771,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3335,
+      "id": "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "f9ab28fc85c4e3bf7ac71af21ad0e58838e6994bb34651f6c7e7499a8ee8edcd",
+      "progressDigest": "7f7076182fa208172eb9f50550b2c50ce23789a0f82a41d636e6e509b5bd66ba",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "program": "AUTHORITY",
@@ -4177,6 +4188,16 @@
         "transitionAt": "2026-08-04T16:34:39Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-04-FAZ4B-B3-01",
+      "authorityDigest": "673f30e8b24e736c117eef02f698c67c5cda00b3c2135576de2fa3f79668e41c",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-04T19:45:10Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -4351,7 +4372,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Hermetic suite, build artifacts stable, binary proofs ayrı provenance ile kaydedilir",
-      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; 2026-08-04 FAZ4A-S3 ratchet düşüşü: 476/111 → 381/108 (−95; brain-pause-resume + pause-resume + sprint-controller kümeleri sıfırlandı, birleşik 236/236) — S3 pre-work admission rejimiyle koştu (receipt implementasyondan önce kendi commit'inde, parent 718c27f80); kritik yolda sıradaki: S4/S5/S6 (§10.1 slot bütçesiyle paralellenebilir), S7 en son; 2026-08-04 FAZ4A-S4 ratchet düşüşü: 381/108 → 354/105 (−27; runsprint-debt-integration + fix-phase-map + avgcoverage-repair sıfırlandı, birleşik 31/31) ve ÖLÇÜM-KAPANIŞI: S6 skill kümesi + S4 evaluator yarısı zaten settle (212/212, 7 suite) — S1 emsali, iş uydurulmadı; kalan: S5 brain dörtlüsü (35) sonra S7; 2026-08-04 FAZ4A-S5 ratchet düşüşü: 354/105 → 319/101 (−35; brain + brain-rollback + brain-ipc + brain-provider sıfırlandı, birleşik 262/262) — brain.test hibrit useRealFileSystem, rollback/ipc tam dönüşüm; S5a gerçek üretim bug'ı buldu (PROD-SPRINT-PREFIX-PAD-001 satırı); kalan tek dilim: S7 (refill/heartbeat); 2026-08-04 FAZ4A-S7 ratchet düşüşü + FAZ4A KAPANIŞI: 319/101 → 300/98 (−19; wrapper-hb + fix-dispatch-continuation + postfix-pending-scan sıfırlandı, birleşik 35/35) — FAZ4A yedi diliminin tamamı settle: S1+S6+evaluator ölçümle (iş uydurulmadı), S2-S5+S7 gerçek-tmpdir dönüşümüyle; kümülatif 539/113 → 300/98 (−239 kırık, −15 dosya), üretim koduna sıfır dokunuş, 1 gerçek üretim bug'ı kayda girdi (PROD-SPRINT-PREFIX-PAD-001); kalan borç FAZ4B+ işi: orchestra dağınık (~60: docker ~16 · auth-isolation ~12 · moat3 6 · memory-limit 7 · diğer) + CLI 116 + MCP 96 sınıflarının güncel karşılıkları; 2026-08-04 FAZ4B-B1 ratchet düşüşü: 300/98 → 231/86 (−69; MCP SINIFININ TAMAMI SIFIRLANDI — tests/mcp 1031/1031, 12 dosya) — kök nedenler: eşzamanlı-import deadlock'u + 5 bayat mock'ta 7 eksik export (annotations), ADR-G-037 final-only-usage owner-grant'ının fixture'larda olmaması, deckent_plan'ın planRunFlow seam'ine geçişi, authority-first status (yanlış-derinlik mock path'leri sessiz ölüydü), lifecycle metninde CLEANUP fazının kaldırılması; hepsi test-taraflı drift, üretim bug'ı yok; kalan: B2 CLI çekirdeği (~60) → B3 CLI smoke (~20) → B4 api+orchestra dağınık (~136); 2026-08-04 FAZ4B-B2 ratchet düşüşü: 231/86 → 169/75 (−62; CLI çekirdeğinin 12 dosyası sıfırlandı — tam-sınıf koşu 7477 testte 29 kırık kaldı: B3 smoke 12 + command-registry 2 GERÇEK-POZİTİF + 15 tekli, 2 tekli kendiliğinden iyileşti); üretim bug'ı yok, 1 gerçek üretim drift'i typed bulgu olarak CLI-VOCAB-001'e taşındı (execution-authority registry satırı eksik); kalan: B3 CLI smoke+tekliler (~31) → B4 api+orchestra (~136)",
+      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; 2026-08-04 FAZ4A-S3 ratchet düşüşü: 476/111 → 381/108 (−95; brain-pause-resume + pause-resume + sprint-controller kümeleri sıfırlandı, birleşik 236/236) — S3 pre-work admission rejimiyle koştu (receipt implementasyondan önce kendi commit'inde, parent 718c27f80); kritik yolda sıradaki: S4/S5/S6 (§10.1 slot bütçesiyle paralellenebilir), S7 en son; 2026-08-04 FAZ4A-S4 ratchet düşüşü: 381/108 → 354/105 (−27; runsprint-debt-integration + fix-phase-map + avgcoverage-repair sıfırlandı, birleşik 31/31) ve ÖLÇÜM-KAPANIŞI: S6 skill kümesi + S4 evaluator yarısı zaten settle (212/212, 7 suite) — S1 emsali, iş uydurulmadı; kalan: S5 brain dörtlüsü (35) sonra S7; 2026-08-04 FAZ4A-S5 ratchet düşüşü: 354/105 → 319/101 (−35; brain + brain-rollback + brain-ipc + brain-provider sıfırlandı, birleşik 262/262) — brain.test hibrit useRealFileSystem, rollback/ipc tam dönüşüm; S5a gerçek üretim bug'ı buldu (PROD-SPRINT-PREFIX-PAD-001 satırı); kalan tek dilim: S7 (refill/heartbeat); 2026-08-04 FAZ4A-S7 ratchet düşüşü + FAZ4A KAPANIŞI: 319/101 → 300/98 (−19; wrapper-hb + fix-dispatch-continuation + postfix-pending-scan sıfırlandı, birleşik 35/35) — FAZ4A yedi diliminin tamamı settle: S1+S6+evaluator ölçümle (iş uydurulmadı), S2-S5+S7 gerçek-tmpdir dönüşümüyle; kümülatif 539/113 → 300/98 (−239 kırık, −15 dosya), üretim koduna sıfır dokunuş, 1 gerçek üretim bug'ı kayda girdi (PROD-SPRINT-PREFIX-PAD-001); kalan borç FAZ4B+ işi: orchestra dağınık (~60: docker ~16 · auth-isolation ~12 · moat3 6 · memory-limit 7 · diğer) + CLI 116 + MCP 96 sınıflarının güncel karşılıkları; 2026-08-04 FAZ4B-B1 ratchet düşüşü: 300/98 → 231/86 (−69; MCP SINIFININ TAMAMI SIFIRLANDI — tests/mcp 1031/1031, 12 dosya) — kök nedenler: eşzamanlı-import deadlock'u + 5 bayat mock'ta 7 eksik export (annotations), ADR-G-037 final-only-usage owner-grant'ının fixture'larda olmaması, deckent_plan'ın planRunFlow seam'ine geçişi, authority-first status (yanlış-derinlik mock path'leri sessiz ölüydü), lifecycle metninde CLEANUP fazının kaldırılması; hepsi test-taraflı drift, üretim bug'ı yok; kalan: B2 CLI çekirdeği (~60) → B3 CLI smoke (~20) → B4 api+orchestra dağınık (~136); 2026-08-04 FAZ4B-B2 ratchet düşüşü: 231/86 → 169/75 (−62; CLI çekirdeğinin 12 dosyası sıfırlandı — tam-sınıf koşu 7477 testte 29 kırık kaldı: B3 smoke 12 + command-registry 2 GERÇEK-POZİTİF + 15 tekli, 2 tekli kendiliğinden iyileşti); üretim bug'ı yok, 1 gerçek üretim drift'i typed bulgu olarak CLI-VOCAB-001'e taşındı (execution-authority registry satırı eksik); kalan: B3 CLI smoke+tekliler (~31) → B4 api+orchestra (~136); 2026-08-04 FAZ4B-B3 ratchet düşüşü: 167/74 → 140/56 (−27; CLI sınıfı MCP gibi TAMAMEN sıfır — 7477/7477) — B3a yeni gerçek üretim-bug adayı kayda geçirdi (PROD-BINARY-IDENTITY-EAGER-CRASH-001, satır 3335: src'siz kullanıcı projesinde ham-stack çökme); kalan borç yalnız: orchestra 107/37 + api 22/9 + süpürme 7/5 + eski-baseline artıkları",
       "updated": "2026-08-04"
     },
     {
@@ -6145,10 +6166,11 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-08-04-FAZ4B-B2-01",
-        "GR-2026-08-04-EXEC-AUTH-REG-01"
+        "GR-2026-08-04-EXEC-AUTH-REG-01",
+        "GR-2026-08-04-FAZ4B-B3-01"
       ],
       "acceptance": "`status --mode` için doğru-yazımlı canonical değerler + versioned deprecation alias'ları; `deckent run` one-shot ↔ `run start|status|retro|history` namespace çarpışması collision-free canonical UX'e ayrılır; `mode run`'ın diske `sprint` yazması tek public `run` vocabulary kararına bağlanır; config read yüzeyi (bare `config` ↔ var-olmayan `config read`/`config show` önerileri) tek operation adında normalize edilir; hepsi JSON contract testi taşır",
-      "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk). Sahipsiz kalemler: CLI-03 · CLI-04 · CLI-05 · CLI-06 · CLI-11 · OQ-13 · OQ-14 · aday-17 · aday-18. Public contract işi: `explainatory`/`standart` kullanıcıya görünen yazım hataları ve düzeltme breaking-change kararı içerir (alias+deprecation vs rename) — karar acceptance'ın parçası; recovery mesajı bugün var olmayan `deckent config read` öneriyor (src/core/config.ts:1922-1925); `receipt=GR-2026-08-04-FAZ4B-B2-01`; 2026-08-04 FAZ4B-B2 kanıt-taşıma + YENİ TYPED BULGU: command-registry coverage guard'ı gerçek drift yakaladı — `execution-authority` komutu CLI'da register'lı (src/cli/commands/execution-authority.ts + index.ts), MCP tool'u var (deckent_execution_authority), i18n anahtarı yazılı (messages.ts:468 cmdCatalog.execution-authority.summary) ama src/cli/command-registry.ts COMMAND_REGISTRY'de satırı YOK; 2 test kırığı bu drift'in dürüst alarmı olarak ratchet'te bilinçli tutuluyor — fix tek registry satırı, kategori/risk etiketi owner-sözlük kararı — 2026-08-04 KAPANDI; `receipt=GR-2026-08-04-EXEC-AUTH-REG-01`; settlement: Enterprise/Değiştir/core + cli,mcp + deckent_execution_authority eşlemesiyle satır eklendi (provider-authority emsali, Alperen 'hallet' yetkisi), guard suite 20/20, ratchet 169→167; ayrıca B2 pinledi: cleanup honest-gate (authority-hold + terminal-receipt zorunluluğu), plan'ın durable exact-flow seam'i (DRAFT yaşam döngüsü CLI'dan çıktı), task-artifact dosya-adı↔record-id kimlik disiplini, DECKENT.md host-adapter-nötrlüğü, start --flow-id exact-child capability üçlüsü, finalize --force = forceAbortSprint fenced-ABORTED (öğrenme yan-etkisiz)",
+      "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk). Sahipsiz kalemler: CLI-03 · CLI-04 · CLI-05 · CLI-06 · CLI-11 · OQ-13 · OQ-14 · aday-17 · aday-18. Public contract işi: `explainatory`/`standart` kullanıcıya görünen yazım hataları ve düzeltme breaking-change kararı içerir (alias+deprecation vs rename) — karar acceptance'ın parçası; recovery mesajı bugün var olmayan `deckent config read` öneriyor (src/core/config.ts:1922-1925); `receipt=GR-2026-08-04-FAZ4B-B2-01`; 2026-08-04 FAZ4B-B2 kanıt-taşıma + YENİ TYPED BULGU: command-registry coverage guard'ı gerçek drift yakaladı — `execution-authority` komutu CLI'da register'lı (src/cli/commands/execution-authority.ts + index.ts), MCP tool'u var (deckent_execution_authority), i18n anahtarı yazılı (messages.ts:468 cmdCatalog.execution-authority.summary) ama src/cli/command-registry.ts COMMAND_REGISTRY'de satırı YOK; 2 test kırığı bu drift'in dürüst alarmı olarak ratchet'te bilinçli tutuluyor — fix tek registry satırı, kategori/risk etiketi owner-sözlük kararı — 2026-08-04 KAPANDI; `receipt=GR-2026-08-04-EXEC-AUTH-REG-01`; settlement: Enterprise/Değiştir/core + cli,mcp + deckent_execution_authority eşlemesiyle satır eklendi (provider-authority emsali, Alperen 'hallet' yetkisi), guard suite 20/20, ratchet 169→167; `receipt=GR-2026-08-04-FAZ4B-B3-01`; 2026-08-04 FAZ4B-B3 settlement: CLI SINIFI TAMAMEN SIFIRLANDI (7477/7477) — gerçek-binary smoke ailesi run-proven korunarak 22/22 (mock'a çevrim yok), drift teklileri 14 dosyada hizalandı; öne çıkan pinler: ⚡→» (ADR-G-010), --write-allowlist yetki flag'i, cursor-adapter EISDIR'ı artık iyileştirir, exact-plan start iki-fazlı (parent STARTING → child admission DETACHED_RUNNING), scope-gate FAIL dürüst GATE:FAIL+POLICY:DENY; typed docs bulgusu: mcp_client_enabled docs-reset sonrası yalnız arşivde belgeli — canlı docs/en+tr referansına taşınmalı (docs-reset kontrol-listesi kalemi); ayrıca B2 pinledi: cleanup honest-gate (authority-hold + terminal-receipt zorunluluğu), plan'ın durable exact-flow seam'i (DRAFT yaşam döngüsü CLI'dan çıktı), task-artifact dosya-adı↔record-id kimlik disiplini, DECKENT.md host-adapter-nötrlüğü, start --flow-id exact-child capability üçlüsü, finalize --force = forceAbortSprint fenced-ABORTED (öğrenme yan-etkisiz)",
       "updated": "2026-08-04"
     },
     {
@@ -9956,7 +9978,8 @@
         "RESULT-INGEST-001",
         "SKILL-DURABILITY-001",
         "PROD-SPAWNSYNC-ASYNC-001",
-        "PROD-SPRINT-PREFIX-PAD-001"
+        "PROD-SPRINT-PREFIX-PAD-001",
+        "PROD-BINARY-IDENTITY-EAGER-CRASH-001"
       ],
       "gates": [
         "G2",
@@ -10011,7 +10034,8 @@
         "RESULT-INGEST-001",
         "SKILL-DURABILITY-001",
         "PROD-SPAWNSYNC-ASYNC-001",
-        "PROD-SPRINT-PREFIX-PAD-001"
+        "PROD-SPRINT-PREFIX-PAD-001",
+        "PROD-BINARY-IDENTITY-EAGER-CRASH-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
@@ -14350,6 +14374,37 @@
       "updated": "2026-08-04"
     },
     {
+      "order": 3335,
+      "id": "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "worktree-binary-authority kaynak-ağaç hash'i eager: src/ dizini olmayan kullanıcı projesinde her non-diagnostic deckent komutu typed HOLD yerine ham stack'le çöküyor",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "resolveWorktreeBinaryAuthority'de projectSourceTreeIdentity hesabı lazy olur (yalnız deckent-checkout + dist yolunda) veya E_BUILD_SOURCE_TREE_MISSING typed karara düşürülür; src'siz kullanıcı-projesi replay'i fail-closed regresyon testi olur; unit suite'in tüm fixture'ları src/ içerdiği için bugünkü kör nokta kapanır",
+      "evidence": "Açılış 2026-08-04: FAZ4B-B3a typed blocker — src/cli/worktree-binary-authority.ts:326-328 ternary'si buildSourceTreeIdentity'yi user-project-allow kararından ÖNCE eager çağırıyor; E_BUILD_SOURCE_TREE_MISSING yakalanmıyor. Dual-Lens: son-kullanıcı ürün yüzeyinde gerçek (her src'siz projede çökme); dogfood'da maskeli (checkout hep src'li). Kanıt: B3a gerçek-binary koşuları — 3 test dosyasının 12 kırığının kökü buydu, fixture'lara src/ eklenerek test tarafı kapandı, üretim fix'i bu satırın işi",
+      "updated": "2026-08-04"
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "parent": "P04",
@@ -18410,6 +18465,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b7b03fc5ea521bc6cd0b25af4ca8c820cd1cffe77089285d5d214c357498c2ef"
+    "value": "6280a4d9b8918941dc967629770665075bce9c2cd1f4ad41728b0dccfb37bb95"
   }
 }

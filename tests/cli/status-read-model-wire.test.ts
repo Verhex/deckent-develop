@@ -20,6 +20,7 @@ describe('CLI canonical status read-model wire', () => {
         observation: {
           type: 'start',
           executionId: 'historical-execution',
+          runId: 'run-488',
           taskId: '488-002',
           attemptId: 'attempt-488-002',
           providerPrincipalDigest: 'principal-488',

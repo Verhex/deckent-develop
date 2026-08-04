@@ -104,7 +104,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // command-registry.ts gained the execution-authority entry (graph edge content).
   // Prior refresh: FAZ4B-B2 (count 12442).
   count: 12442,
-  digest: 'f99a1919a53470cd9862d579dfaa754cbee8edeb8a32db0842d3ea6d8c564b87',
+  digest: 'e4d256c8624ef67f531e79d02f7c7bd90efc9356c1bdff1a23e2e727d326b8d9',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({

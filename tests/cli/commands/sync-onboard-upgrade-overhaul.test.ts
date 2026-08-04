@@ -69,7 +69,7 @@ vi.mock('../../../src/core/stack-detector.js', () => ({
 
 // ─── Imports ─────────────────────────────────────────────────────────
 
-import { existsSync, readdirSync, statSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
@@ -159,13 +159,19 @@ describe('sync: syncAdapterFiles', () => {
   });
 
   it('syncs CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules, .codex/AGENTS.md', () => {
+    // The cursor adapter now reads an existing .cursor/rules/deckent.mdc via
+    // ensureCursorRules (real fs read) — give the mocked readFileSync a string
+    // so the update path can run instead of choking on undefined.
+    vi.mocked(readFileSync).mockReturnValue('# owner rules\n');
     const synced = syncAdapterFiles('/project');
     expect(synced).toContain('CLAUDE.md');
     expect(synced).toContain('AGENTS.md');
     expect(synced).toContain('GEMINI.md');
     expect(synced).toContain('.cursor/rules');
     expect(synced).toContain('.codex/AGENTS.md');
-    expect(ensureDeckentImport).toHaveBeenCalledTimes(5);
+    // 4, not 5: `.cursor/rules` is synced through ensureCursorRules
+    // (deckent.mdc inside the directory), no longer through ensureDeckentImport.
+    expect(ensureDeckentImport).toHaveBeenCalledTimes(4);
   });
 
   it('dry-run does NOT call ensureDeckentImport', () => {

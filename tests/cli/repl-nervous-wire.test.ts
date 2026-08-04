@@ -137,7 +137,7 @@ describe('/nervous slash wire — chat-native', () => {
     expect(out).not.toContain('should-not-be-called');
   });
 
-  it('/nervous renders the visible banner on TTY (ansi + ⚡) when pending exists', async () => {
+  it('/nervous renders the visible banner on TTY (ansi + ») when pending exists', async () => {
     const n = makeNotification({ detectorId: 'visible-detector' });
     writePending(root, [n]);
 
@@ -149,7 +149,9 @@ describe('/nervous slash wire — chat-native', () => {
     }));
 
     const out = lines.join('\n');
-    expect(out).toContain('⚡');
+    // ADR-G-010 (2026-08-01): emoji glyphs retired to the ASCII family — the
+    // banner marker is now `»` (was `⚡`).
+    expect(out).toContain('»');
     expect(out).toContain('nervous');
     expect(out).toContain('visible-detector');
     expect(out).toContain('\x1b[');

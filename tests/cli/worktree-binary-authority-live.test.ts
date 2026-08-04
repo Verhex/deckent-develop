@@ -76,6 +76,15 @@ describe.skipIf(!HAS_REBUILT_BINARY)('worktree binary authority — rebuilt CLI'
       `${JSON.stringify({ name: 'deckent', version: '0.0.0-test' })}\n`,
       'utf-8',
     );
+    // A real Deckent checkout always carries a src/ tree, and the identity
+    // resolver hashes it (buildSourceTreeIdentity) before deciding. Mirrors
+    // tests/cli/worktree-binary-authority.test.ts's fixture shape. KNOWN
+    // PRODUCTION TRUTH (typed blocker, not fixed here): without src/ the
+    // resolver's eager buildSourceTreeIdentity(projectRoot) throws an
+    // uncaught E_BUILD_SOURCE_TREE_MISSING instead of reaching the typed
+    // HOLD (src/cli/worktree-binary-authority.ts resolveWorktreeBinaryAuthority).
+    mkdirSync(join(checkout, 'src'), { recursive: true });
+    writeFileSync(join(checkout, 'src', 'entry.ts'), 'export const value = 1;\n', 'utf-8');
   });
 
   afterEach(() => {
@@ -89,7 +98,9 @@ describe.skipIf(!HAS_REBUILT_BINARY)('worktree binary authority — rebuilt CLI'
 
       expect(result.code).toBe(1);
       expect(result.stderr).toContain('DECKENT_BINARY_IDENTITY_HOLD');
-      expect(result.stderr).toContain('npm run build:all');
+      // Catalog contract (src/cli/helpers/messages.ts `cli.binary_identity.hint`):
+      // the rebuild hint says `npm run build` (not the retired `build:all` form).
+      expect(result.stderr).toContain('npm run build');
       expect(existsSync(join(checkout, '.tasks'))).toBe(false);
       expect(existsSync(join(checkout, '.deckent', 'sprint-state.json'))).toBe(false);
     },

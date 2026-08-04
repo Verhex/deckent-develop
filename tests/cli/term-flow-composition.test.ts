@@ -40,7 +40,10 @@ import { join } from 'node:path';
 // callZeroConfigPlanner mock'lanır (do-real-plan.test.ts emsali); canned tek-task
 // GERÇEK-şekilli plan döner, böylece propose-yolu hermetik kalır.
 vi.mock('../../src/orchestra/planner.js', () => ({
-  normalizePlannerDependencies: vi.fn(),
+  // run-flow-plan-service now consumes the real DependencyNormalizationResult
+  // shape ({ resolvedCount, dropped }) at plan time; the dependency-free fixture
+  // sprint honestly resolves nothing and drops nothing.
+  normalizePlannerDependencies: vi.fn(() => ({ resolvedCount: 0, dropped: [] })),
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
   callZeroConfigPlanner: vi.fn(() => ({
@@ -69,7 +72,8 @@ import {
 import { compileRunProposal } from '../../src/orchestra/run-proposal-compiler.js';
 import { buildSprintCompletionRecord } from '../../src/orchestra/sprint-finalizer.js';
 import { loadApprovedSnapshot, loadRunHandle } from '../../src/core/run-flow-store.js';
-import type { RunHandle } from '../../src/orchestra/run-job-service.js';
+import { getRunFlowCoordinator } from '../../src/orchestra/run-flow-coordinator-registry.js';
+import type { SpawnExactProcessResult } from '../../src/orchestra/exact-plan-start-service.js';
 import {
   createRunCompletionWatch,
   parseRunCompletionRecord,
@@ -179,11 +183,17 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
     'exact-snapshot -> tek-detached-job(mock-spawn) -> rich-result -> idle-new-turn, ' +
     'duplicate-event never produces a double-start',
     async () => {
-      const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => ({
-        flowId, jobId: `job-${flowId}`, logRef: '/fake/log.log',
-      }));
+      // Current spawn boundary: the exact-plan start service hands the spawn a
+      // typed SpawnExactProcessContext and expects back the spawned process
+      // identity ({ pid }) — the job handle is persisted by the child itself
+      // (born-681 single-writer), never returned by the parent spawn.
+      const spawnStart = vi.fn((): SpawnExactProcessResult => ({ pid: process.pid }));
       const deps: RunFlowControllerDeps = {
         root, config: makeConfig(), now: nowFn, generateFlowId: () => 'flow-tf-1', spawnStart,
+        // The exact-plan scope gate is fail-closed when repository scope evidence
+        // cannot be acquired; the tmpdir root is not a git repo, so hermetic runs
+        // supply the evidence directly (same pattern as run-flow-controller-complete).
+        scopeEvidence: { status: 'available' as const, trackedFiles: [] },
       };
       const controller = createRunFlowController(deps);
 
@@ -235,9 +245,16 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
 
       // ── 5. exact-snapshot -> tek-detached-job(mock-spawn) ────────────
       const started = controller.startApproved!();
-      expect(started.state).toBe('DETACHED_RUNNING');
+      // Parent-side start settles at STARTING: DETACHED_RUNNING is only
+      // reduced once the (here: faked) child admits itself via the
+      // coordinator's recordRunStarted (same trajectory as
+      // run-flow-controller-complete.test.ts's driveToDetachedRunning).
+      expect(started.state).toBe('STARTING');
       expect(spawnStart).toHaveBeenCalledTimes(1);
-      expect(spawnStart).toHaveBeenCalledWith(expect.objectContaining({ id: 'sprint-tf-1' }), 'flow-tf-1');
+      expect(spawnStart).toHaveBeenCalledWith(expect.objectContaining({
+        capability: expect.objectContaining({ flowId: 'flow-tf-1' }),
+        sprint: expect.objectContaining({ id: 'sprint-tf-1' }),
+      }));
       // startApproved() never re-plans — the exact previewed Sprint is consumed.
       expect(mockPlanSprint).toHaveBeenCalledTimes(1);
 
@@ -247,16 +264,25 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
       expect(storedSnapshot?.sprint.id).toBe('sprint-tf-1');
 
       // born-681 tek-yazar: parent disk-handle yazmaz (child persist-before-run);
-      // iş-kimliği in-memory context.handle'da.
+      // iş-kimliği child admission'dan gelir — parent context handle taşımaz.
       expect(loadRunHandle(root, 'flow-tf-1')).toBeUndefined();
-      expect(started.handle?.jobId).toBe('job-flow-tf-1');
+      expect(started.handle).toBeUndefined();
+
+      // The detached child (faked here) admits the run with the coordinator —
+      // this is what reduces STARTING -> DETACHED_RUNNING and binds the jobId.
+      getRunFlowCoordinator(root).recordRunStarted({
+        handle: { flowId: 'flow-tf-1', jobId: 'job-flow-tf-1', logRef: '/fake/log.log' },
+        commandId: 'test-admitted-job-flow-tf-1',
+      });
+      const admitted = getRunFlowCoordinator(root).getFlow('flow-tf-1');
+      expect(admitted.state).toBe('DETACHED_RUNNING');
+      expect(admitted.handle?.jobId).toBe('job-flow-tf-1');
 
       // Double-start pin, layer 1: a second startApproved() call (e.g. a
-      // duplicated caller invocation) is a CAS-verified no-op — spawnStart is
-      // NEVER invoked a second time (run-job-service.ts's own contract).
+      // duplicated caller invocation) is a state-guarded no-op — spawnStart is
+      // NEVER invoked a second time (run-flow-controller.ts's own contract).
       const startedAgain = controller.startApproved!();
-      expect(startedAgain.state).toBe('DETACHED_RUNNING');
-      expect(startedAgain.handle!.jobId).toBe('job-flow-tf-1');
+      expect(startedAgain.state).toBe('STARTING');
       expect(spawnStart).toHaveBeenCalledTimes(1);
 
       // ── 6. rich-result + idle-new-turn ───────────────────────────────

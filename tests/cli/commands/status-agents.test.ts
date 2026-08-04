@@ -32,6 +32,25 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
+// Authority-first status: live rendering is held unless an ACTIVE run authority AND the
+// canonical persisted read model exist (same pattern as tests/cli/commands/status.test.ts).
+// These cases exercise the agent/skill RENDERING surface, so both are supplied here.
+vi.mock('../../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => ({
+    schemaVersion: 1, lifecycle: 'ACTIVE', active: true, resumable: false,
+    sprintId: 'sprint-001', phase: 'EXECUTE', status: 'RUNNING', reason: null,
+    recoveryCommand: null, finalizeCommand: null, coordinator: 'alive', conflicts: [],
+  })),
+}));
+
+vi.mock('../../../src/core/run-status-read-model.js', () => ({
+  readCanonicalRunStatusReadModel: vi.fn(() => ({
+    schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
+    holds: [], providerConcurrency: [], authority: {},
+  })),
+  runStatusReadModelMatchesAuthority: vi.fn(() => true),
+}));
+
 vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn().mockImplementation((key: string) => {
     if (key === 'status.no_active_sprint') return 'No active run (sprint).';

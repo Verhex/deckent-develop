@@ -8,6 +8,7 @@ import {
   projectDashboardThroughRunAuthority,
 } from '../../src/cli/commands/status.js';
 import { readCanonicalRunStatus } from '../../src/core/run-status-authority.js';
+import { publishCanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
 import type { DashboardState } from '../../src/core/types.js';
 
 const SPRINT_ID = 'sprint-486';
@@ -73,6 +74,11 @@ describe('status terminal publication archive-window race', () => {
       writeJson(join(tasks, 'task-486-009.json.partial'), { id: '486-009', status: 'DONE' }),
       writeFile(join(tasks, 'task-486-009.tmp'), 'partial', 'utf8'),
     ]);
+
+    // The status surface serves ACTIVE projections only from the persisted
+    // canonical read-model; arm it with the REAL publisher after all
+    // run-state fixtures are on disk (same contract as status-terminal-receipt).
+    publishCanonicalRunStatusReadModel(root);
 
     const dashPath = join(root, '.dashboard');
     const json = buildStatusJsonSnapshot(root, dashPath, {});

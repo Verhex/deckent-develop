@@ -15,6 +15,8 @@ const {
   providerAuthorityHold,
   runTaskModeSpy,
   runSprintSpy,
+  createExactExecutorSpy,
+  exactExecuteSpy,
   state,
 } = vi.hoisted(() => ({
   bootstrapProvidersSpy: vi.fn().mockResolvedValue({ registered: [], skipped: [] }),
@@ -36,6 +38,8 @@ const {
     projectRoot: '/fixture',
   }),
   runSprintSpy: vi.fn().mockResolvedValue({}),
+  createExactExecutorSpy: vi.fn(),
+  exactExecuteSpy: vi.fn(),
   state: {
     configured: true,
     root: '',
@@ -118,6 +122,24 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
   runSprint: (...args: unknown[]) => runSprintSpy(...args),
 }));
 
+// The v1 sprint path no longer hands buildEngineRuntime a bare `runSprint(root)`
+// callback — it composes `executeSprint` from the canonical exact-sprint
+// executor (createCanonicalExactSprintExecutor), whose `executeInProcess`
+// closure is where the shared providerAuthority is threaded into the sprint
+// lifecycle. Capture its deps so the test can drive executeInProcess directly.
+vi.mock('../../src/orchestra/exact-plan-start-service.js', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('../../src/orchestra/exact-plan-start-service.js')
+  >();
+  return {
+    ...actual,
+    createCanonicalExactSprintExecutor: (deps: unknown) => {
+      createExactExecutorSpy(deps);
+      return { execute: exactExecuteSpy };
+    },
+  };
+});
+
 vi.mock('../../src/orchestra/autonomous/runtime-loop.js', async (importOriginal) => {
   const actual = await importOriginal<
     typeof import('../../src/orchestra/autonomous/runtime-loop.js')
@@ -163,6 +185,8 @@ describe('autonomous-v1 provider authority process composition', () => {
     closeProviderAuthoritySpy.mockClear();
     runTaskModeSpy.mockClear();
     runSprintSpy.mockClear();
+    createExactExecutorSpy.mockClear();
+    exactExecuteSpy.mockClear();
   });
 
   afterEach(() => {
@@ -179,8 +203,11 @@ describe('autonomous-v1 provider authority process composition', () => {
     const runtimeOptions = buildEngineRuntimeSpy.mock.calls[0]?.[0] as {
       admitProviderExecution?: (candidate: BacklogEntry) => unknown;
       runTask: (ctx: Record<string, unknown>) => Promise<unknown>;
-      runSprint: (projectRoot: string) => Promise<unknown>;
+      executeSprint: unknown;
     };
+    // buildEngineRuntime now receives the canonical exact-sprint executor's
+    // `execute` as `executeSprint` (the bare `runSprint(root)` option is gone).
+    expect(runtimeOptions.executeSprint).toBe(exactExecuteSpy);
     expect(runtimeOptions.admitProviderExecution).toBeTypeOf('function');
     expect(runtimeOptions.admitProviderExecution?.(entry)).toMatchObject({
       decision: 'hold',
@@ -201,7 +228,21 @@ describe('autonomous-v1 provider authority process composition', () => {
       description: 'thread authority',
       projectRoot: root,
     });
-    await runtimeOptions.runSprint(root);
+    // Drive the sprint side through the executor deps the CLI composed: its
+    // `executeInProcess` closure is where providerAuthority reaches the real
+    // sprint lifecycle (the mocked sprint-controller runSprint).
+    const executorDeps = createExactExecutorSpy.mock.calls[0]?.[0] as {
+      executeInProcess: (context: Record<string, unknown>) => Promise<unknown>;
+    };
+    await executorDeps.executeInProcess({
+      projectRoot: root,
+      config: { mode: 'balanced' },
+      sprint: { id: 'sprint-fixture' },
+      exactRef: { schemaVersion: 1, flowId: 'flow-fixture', revision: 1, planDigest: 'digest-fixture' },
+      snapshot: {},
+      onExactPlanMaterialize: () => {},
+      onExecutionAdmitted: () => {},
+    });
     const taskAuthority = (runTaskModeSpy.mock.calls[0]?.[0] as {
       providerAuthority?: unknown;
     }).providerAuthority;
