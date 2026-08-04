@@ -3025,8 +3025,11 @@ describe('trust anchor', () => {
       const git = fakeGit({
         'rev-parse --is-inside-work-tree': 'true\n',
         'rev-parse --verify HEAD': 'aaa111\n',
-        'log --format=%H -SGR-X-01': '\n',
+        'rev-parse --is-shallow-repository': 'false\n',
+        'log --follow --format=%H -SGR-X-01': '\n',
         'rev-parse HEAD': 'aaa111\n',
+        // Committed plan does NOT contain the receipt — genuinely working-tree-only.
+        'show HEAD:docs/MASTER-PLAN.md': '# plan without the receipt\n',
       });
       expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
         mode: 'git',
@@ -3038,7 +3041,9 @@ describe('trust anchor', () => {
       const git = fakeGit({
         'rev-parse --is-inside-work-tree': 'true\n',
         'rev-parse --verify HEAD': 'ccc333\n',
-        'log --format=%H -SGR-X-01': 'ccc333\nbbb222\n',
+        'rev-parse --is-shallow-repository': 'false\n',
+        'log --follow --format=%H -SGR-X-01': 'ccc333\nbbb222\n',
+        'rev-list --parents -n 1 bbb222': 'bbb222 aaa111\n',
         'rev-parse --verify --quiet bbb222^': 'aaa111\n',
       });
       // Oldest -S hit (bbb222) is the registration; its parent is the anchor.
@@ -3048,11 +3053,13 @@ describe('trust anchor', () => {
       });
     });
 
-    it('reports no-parent when the receipt was registered in the root commit', () => {
+    it('fails closed with no-parent when the receipt was registered in the root commit', () => {
       const git = fakeGit({
         'rev-parse --is-inside-work-tree': 'true\n',
         'rev-parse --verify HEAD': 'bbb222\n',
-        'log --format=%H -SGR-X-01': 'bbb222\n',
+        'rev-parse --is-shallow-repository': 'false\n',
+        'log --follow --format=%H -SGR-X-01': 'bbb222\n',
+        'rev-list --parents -n 1 bbb222': 'bbb222\n',
         'rev-parse --verify --quiet bbb222^': null,
       });
       expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
@@ -3061,9 +3068,79 @@ describe('trust anchor', () => {
       });
     });
 
-    it('readTrustAnchorBlob returns null for a path absent at the anchor', () => {
-      const git = fakeGit({ 'show aaa111:missing.ts': null });
-      expect(readTrustAnchorBlob('aaa111', 'missing.ts', '/scratch', git)).toBeNull();
+    // xverify-E: a depth-1 clone grafts HEAD into a root commit; the old resolver saw a
+    // registration with an unreachable parent and degraded into a WARN pass.
+    it('fails closed in a shallow repository instead of degrading', () => {
+      const git = fakeGit({
+        'rev-parse --is-inside-work-tree': 'true\n',
+        'rev-parse --verify HEAD': 'aaa111\n',
+        'rev-parse --is-shallow-repository': 'true\n',
+      });
+      expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
+        mode: 'shallow',
+        anchor: null,
+      });
+    });
+
+    // xverify-E: `git log -S` does not open merge diffs, so a merge-introduced receipt was
+    // invisible to the search, mistaken for uncommitted, and anchored to its own HEAD bytes.
+    it('fails closed when the receipt is committed but invisible to the -S search', () => {
+      const git = fakeGit({
+        'rev-parse --is-inside-work-tree': 'true\n',
+        'rev-parse --verify HEAD': 'mmm999\n',
+        'rev-parse --is-shallow-repository': 'false\n',
+        'log --follow --format=%H -SGR-X-01': '\n',
+        'rev-parse HEAD': 'mmm999\n',
+        'show HEAD:docs/MASTER-PLAN.md': '| `GR-X-01` | registry row |\n',
+      });
+      expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
+        mode: 'history-unresolved',
+        anchor: null,
+      });
+    });
+
+    it('fails closed when the registration commit is a merge — no single reviewed pre-state', () => {
+      const git = fakeGit({
+        'rev-parse --is-inside-work-tree': 'true\n',
+        'rev-parse --verify HEAD': 'mmm999\n',
+        'rev-parse --is-shallow-repository': 'false\n',
+        'log --follow --format=%H -SGR-X-01': 'mmm999\n',
+        'rev-list --parents -n 1 mmm999': 'mmm999 aaa111 bbb222\n',
+      });
+      expect(resolveReceiptTrustAnchor('GR-X-01', '/scratch', git)).toEqual({
+        mode: 'merge-introduction',
+        anchor: null,
+      });
+    });
+
+    it('readTrustAnchorBlob reports a path absent at the anchor as absent', () => {
+      const git = fakeGit({
+        'show aaa111:missing.ts': null,
+        'cat-file -e aaa111:missing.ts': null,
+      });
+      expect(readTrustAnchorBlob('aaa111', 'missing.ts', '/scratch', git)).toEqual({
+        status: 'absent',
+      });
+    });
+
+    // OQ-XVE-05: an object-read error must never satisfy an ABSENT baseline.
+    it('readTrustAnchorBlob distinguishes a read error from absence', () => {
+      const git = fakeGit({
+        'show aaa111:broken.ts': null,
+        'cat-file -e aaa111:broken.ts': '\n',
+      });
+      expect(readTrustAnchorBlob('aaa111', 'broken.ts', '/scratch', git)).toEqual({
+        status: 'error',
+      });
+    });
+
+    it('readTrustAnchorBlob returns the blob bytes for a readable path', () => {
+      const git = fakeGit({ 'show aaa111:ok.ts': 'export const ok = true;\n' });
+      const read = readTrustAnchorBlob('aaa111', 'ok.ts', '/scratch', git);
+      expect(read.status).toBe('ok');
+      expect(read.status === 'ok' && read.blob.toString('utf8')).toBe(
+        'export const ok = true;\n',
+      );
     });
   });
 
@@ -3173,6 +3250,89 @@ describe('trust anchor', () => {
       expect(result.findings.map((finding) => finding.code)).not.toContain(
         'RECEIPT_BASELINE_UNREVIEWED',
       );
+    });
+
+    // xverify-E variant: the receipt lands inside a MERGE commit. Plain `git log -S` never
+    // opens merge diffs, so the search comes back empty; the old resolver mistook that for
+    // an uncommitted receipt and anchored it to its own HEAD bytes.
+    it('rejects the xverify merge-introduction attack: receipt lands only in a merge commit', () => {
+      const root = makeAnchoredRepo('export const value = 1;\n');
+      // Side branch mutates the target; main gains an unrelated commit.
+      git(root, 'checkout', '-q', '-b', 'side');
+      const forged = 'export const value = "forged";\n';
+      writeFileSync(join(root, TARGET), forged, 'utf8');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'side: mutate target');
+      git(root, 'checkout', '-q', '-');
+      writeFileSync(join(root, 'unrelated.txt'), 'noise\n', 'utf8');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'main: unrelated');
+      // Merge WITHOUT committing, then smuggle the matching receipt into the merge commit
+      // itself — its diff is invisible to a plain `-S` search.
+      git(root, 'merge', '--no-commit', '--no-ff', 'side');
+      const digest = createHash('sha256').update(forged).digest('hex');
+      const source = planWithReceipt(digest);
+      writeFileSync(join(root, MASTER_PLAN_RELATIVE_PATH), source, 'utf8');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'merge introduces receipt');
+      const codes = validateMasterPlan(source, { nowMs: TEST_NOW_MS, root })
+        .findings.map((finding) => finding.code);
+      expect(codes).toContain('RECEIPT_BASELINE_UNREVIEWED');
+      expect(codes).toContain('ADMISSION_RECEIPT_MISSING');
+    });
+
+    // xverify-E variant: register the receipt under the plan's old filename, mutate the
+    // target with a matching baseline, then rename the plan into place. Without --follow
+    // the rename commit was mistaken for the registration, anchoring PAST the mutation.
+    it('rejects the xverify rename attack: rename must not advance the trust anchor', () => {
+      const committed = 'export const value = 1;\n';
+      const root = makeAnchoredRepo(committed);
+      // Move the canonical plan aside FIRST so registration happens under the old name.
+      const oldPath = 'docs/OLD-PLAN.md';
+      git(root, 'mv', MASTER_PLAN_RELATIVE_PATH, oldPath);
+      git(root, 'commit', '-q', '-m', 'plan lives under old name');
+      const forged = 'export const value = "forged";\n';
+      const digest = createHash('sha256').update(forged).digest('hex');
+      const source = planWithReceipt(digest);
+      writeFileSync(join(root, oldPath), source, 'utf8');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'register receipt under old name');
+      // Mutate the target AFTER registration, then rename the plan into canonical place.
+      writeFileSync(join(root, TARGET), forged, 'utf8');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'mutate target after registration');
+      git(root, 'mv', oldPath, MASTER_PLAN_RELATIVE_PATH);
+      git(root, 'commit', '-q', '-m', 'rename plan to canonical path');
+      // --follow resolves the TRUE registration commit under the old name; its parent
+      // predates the mutation, so the baseline cannot match reviewed state.
+      const codes = validateMasterPlan(source, { nowMs: TEST_NOW_MS, root })
+        .findings.map((finding) => finding.code);
+      expect(codes).toContain('RECEIPT_BASELINE_UNREVIEWED');
+      expect(codes).toContain('ADMISSION_RECEIPT_MISSING');
+    });
+
+    // xverify-E variant: a depth-1 clone of an attacked repo previously produced a
+    // `no-parent` WARN and passed. Shallow history is now a fail-closed finding.
+    it('rejects the same-commit attack from a depth-1 shallow clone', () => {
+      const root = makeAnchoredRepo('export const value = 1;\n');
+      const forged = 'export const value = "forged";\n';
+      writeFileSync(join(root, TARGET), forged, 'utf8');
+      const digest = createHash('sha256').update(forged).digest('hex');
+      const source = planWithReceipt(digest);
+      writeFileSync(join(root, MASTER_PLAN_RELATIVE_PATH), source, 'utf8');
+      git(root, 'add', '-A');
+      git(root, 'commit', '-q', '-m', 'attack: mutate source and mint matching receipt');
+      const shallowRoot = `${root}-shallow`;
+      execFileSync(
+        'git',
+        ['clone', '-q', '--depth', '1', `file://${root}`, shallowRoot],
+        { env: gitEnv(root), stdio: ['ignore', 'pipe', 'pipe'] },
+      );
+      writeFileSync(join(shallowRoot, '.empty-gitconfig'), '', 'utf8');
+      const codes = validateMasterPlan(source, { nowMs: TEST_NOW_MS, root: shallowRoot })
+        .findings.map((finding) => finding.code);
+      expect(codes).toContain('RECEIPT_BASELINE_UNREVIEWED');
+      expect(codes).toContain('ADMISSION_RECEIPT_MISSING');
     });
   });
 

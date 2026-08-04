@@ -40,7 +40,12 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 — this job runs lint:gates → lint-master-plan, whose trust-anchor
+      # resolution is history-sensitive; a shallow clone is now a fail-closed finding
+      # (xverify-E: depth-1 previously degraded to a WARN pass on this leg).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
