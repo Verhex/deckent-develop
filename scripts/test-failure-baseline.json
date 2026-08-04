@@ -239,10 +239,6 @@
       "failed": 2
     },
     {
-      "file": "tests/orchestra/avgcoverage-repair.test.ts",
-      "failed": 5
-    },
-    {
       "file": "tests/orchestra/brain-ipc.test.ts",
       "failed": 9
     },
@@ -335,10 +331,6 @@
       "failed": 7
     },
     {
-      "file": "tests/orchestra/fix-phase-map.test.ts",
-      "failed": 9
-    },
-    {
       "file": "tests/orchestra/fix-retry-circuit-breaker.test.ts",
       "failed": 2
     },
@@ -365,10 +357,6 @@
     {
       "file": "tests/orchestra/rubric-armor-complete.test.ts",
       "failed": 3
-    },
-    {
-      "file": "tests/orchestra/runsprint-debt-integration.test.ts",
-      "failed": 13
     },
     {
       "file": "tests/orchestra/rvdc-deadbranch.test.ts",

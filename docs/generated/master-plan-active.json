@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3a407f08f538e2d8e826eeafc74095a879c211c8453337fcbf0f134fb7980b4c"
+    "value": "23977df946ef438fe246365470cd950d17f6f34cb04122f18dc421650f974f85"
   },
   "summary": {
     "total": 340,
     "active": 333,
     "terminal": 7,
-    "receipts": 28,
+    "receipts": 29,
     "byState": {
       "OPEN": 235,
       "READY": 0,
@@ -127,7 +127,7 @@
       "state": "BLOCKED",
       "updated": "2026-08-04",
       "definitionDigest": "2069ad6e437766f5bfa67ed3806ccbc6c42f7245047a37f19dd82f5e4154e780",
-      "progressDigest": "3da429f844a648c0e51828f88ffd63bf36516a92ee79eb050d74245feb6c3241",
+      "progressDigest": "83885cf7d93b159c5ba8f0e919ac38a8c18ca77b7755d84b7eae10d34dc7df72",
       "terminalClosureDigest": null
     },
     {
@@ -2171,9 +2171,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-31",
+      "updated": "2026-08-04",
       "definitionDigest": "a8d876f88ae84bd1138985a3e49928c180a093b5e604ed1490a44db028aeff7e",
-      "progressDigest": "a3e388b42c981a91aabfff5a76ad5da1a8cc3ad57ef244e18b9918158e079de3",
+      "progressDigest": "39502213a767b55cd92f0d729bc6f35c9796c42dacc577a91f82ca30e343d33c",
       "terminalClosureDigest": null
     },
     {
@@ -2523,9 +2523,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-04",
       "definitionDigest": "bb24c798b24edbe31881103ce5cd3cfbe29eb812dcc05779ab2de7e7297dc78d",
-      "progressDigest": "5cd5f3f4bdd8c8f16878289633c7229d2626987cd9d8574f7dac0c3b3d53bef0",
+      "progressDigest": "ddf3219e80d3d33d1c66253c1984452c9f659a220f21b2cc3cefaea0f6a0dfa6",
       "terminalClosureDigest": null
     },
     {
@@ -4085,6 +4085,16 @@
         "transitionAt": "2026-08-04T08:53:14Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-04-FAZ4A-S4-01",
+      "authorityDigest": "0db3431284ceda612dc19d9b682fffd45032176b1056fb0d14d8cf284f2cbe6e",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-04T09:53:44Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -4259,7 +4269,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Hermetic suite, build artifacts stable, binary proofs ayrı provenance ile kaydedilir",
-      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; 2026-08-04 FAZ4A-S3 ratchet düşüşü: 476/111 → 381/108 (−95; brain-pause-resume + pause-resume + sprint-controller kümeleri sıfırlandı, birleşik 236/236) — S3 pre-work admission rejimiyle koştu (receipt implementasyondan önce kendi commit'inde, parent 718c27f80); kritik yolda sıradaki: S4/S5/S6 (§10.1 slot bütçesiyle paralellenebilir), S7 en son",
+      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; 2026-08-04 FAZ4A-S3 ratchet düşüşü: 476/111 → 381/108 (−95; brain-pause-resume + pause-resume + sprint-controller kümeleri sıfırlandı, birleşik 236/236) — S3 pre-work admission rejimiyle koştu (receipt implementasyondan önce kendi commit'inde, parent 718c27f80); kritik yolda sıradaki: S4/S5/S6 (§10.1 slot bütçesiyle paralellenebilir), S7 en son; 2026-08-04 FAZ4A-S4 ratchet düşüşü: 381/108 → 354/105 (−27; runsprint-debt-integration + fix-phase-map + avgcoverage-repair sıfırlandı, birleşik 31/31) ve ÖLÇÜM-KAPANIŞI: S6 skill kümesi + S4 evaluator yarısı zaten settle (212/212, 7 suite) — S1 emsali, iş uydurulmadı; kalan: S5 brain dörtlüsü (35) sonra S7",
       "updated": "2026-08-04"
     },
     {
@@ -12253,10 +12263,12 @@
         "WORKER-DISCOVERY-001",
         "PLANNER-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-04-FAZ4A-S4-01"
+      ],
       "acceptance": "Typed failure evidence produces a minimal reviewed filesRead/filesWrite delta or PAUSE/HOLD; an unchanged authority fingerprint cannot consume another retry; nested FIX prompt retains the exact original acceptance without truncation",
-      "evidence": "Sprint-487 live replay dispatched original→FIX→FIX-FIX and XFIX repair waves after transactional resume reauthorized exact execution budgets. Repeated-fingerprint circuit breaking and repair settlement are wired; supervisor fixed the pause decision so repaired roots are excluded and only unresolved lineages plus blocked dependants remain. Automatic read-authority widening and a clean no-manual-recovery replay remain open. Negative scope: no repository-wide discovery, broad automatic write grant, repeated identical retry or prompt nesting drift",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-487 live replay dispatched original→FIX→FIX-FIX and XFIX repair waves after transactional resume reauthorized exact execution budgets. Repeated-fingerprint circuit breaking and repair settlement are wired; supervisor fixed the pause decision so repaired roots are excluded and only unresolved lineages plus blocked dependants remain. Automatic read-authority widening and a clean no-manual-recovery replay remain open. Negative scope: no repository-wide discovery, broad automatic write grant, repeated identical retry or prompt nesting drift; `receipt=GR-2026-08-04-FAZ4A-S4-01`; 2026-08-04 FAZ4A-S4 settlement: fix-phase-map 10/10 (9 kırıktan) — FIX-authority sözleşmeleri artık gerçek diskten pinli: budget-policy-missing → typed DECKENT_E077 (sessiz yutma yok), reddedilen repair köke projekte edilmez (repair-rejected withhold), fix-of-a-fix dispatch'i owner-policy budget zenginleştirmesiyle gider, orphan fix root-yetkisiz dispatch edilmez; kök neden test-taraflı bayat izolasyondu (fs-mock + post-485 export taşımayan constants mock'u), üretim koduna dokunulmadı",
+      "updated": "2026-08-04"
     },
     {
       "order": 3197,
@@ -13506,10 +13518,12 @@
         "PRODUCTION-WIRING-AUTHORITY-001",
         "ROUTING-V3-CUTOVER-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-04-FAZ4A-S4-01"
+      ],
       "acceptance": "Every repair derives required operations and canonical consumer closure before route admission; write tasks cannot reach read-only personas; fresh-eyes rotation selects only capability-compatible candidates; scope widening is minimal, reviewed and digest-bound; unavailable capability yields typed HOLD rather than guaranteed NO_GO",
-      "evidence": "Sprint-488 001-xfix and 010-xfix were write repairs routed to read-only `code-reviewer`. Direct FIX selection has an implementer fallback, while XFIX used the rotated agent directly and bypassed that guard; 010 repair scope also omitted its real production consumer",
-      "updated": "2026-08-01"
+      "evidence": "Sprint-488 001-xfix and 010-xfix were write repairs routed to read-only `code-reviewer`. Direct FIX selection has an implementer fallback, while XFIX used the rotated agent directly and bypassed that guard; 010 repair scope also omitted its real production consumer; `receipt=GR-2026-08-04-FAZ4A-S4-01`; 2026-08-04 FAZ4A-S4 settlement: runsprint-debt-integration 13/13 (13 kırıktan, full-runSprint'i gerçek-fs üstünde yeşil koşturan İLK suite) + avgcoverage-repair 8/8 — pinlenen üretim gerçekleri: NO_GO'da FIX worker spawn edilemezse sprint dürüstçe PAUSED/FIX park eder (sahte COMPLETE yok), terminal handoff process-ömürlü digest-ledger'la duplicate-publication'ı HOLD'lar, fix-for-itself lineage settle edilemez; typed not (490-akrabası): 8d2 stats-sync bloğu terminal-receipt kapısından ÖNCE yazıyor (sprint-finalizer.ts 2712-2790 vs 3043) — sahibi RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001 sınıfı, bu dilimde pinlenmedi; üretim koduna dokunulmadı",
+      "updated": "2026-08-04"
     },
     {
       "order": 3289,
@@ -18234,6 +18248,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "1d8b3ced0b2a04e72560d0b89bf1dff7a9e55709b14131df9174cc995dec9b5d"
+    "value": "dffa5e26ff872c530f5b8b487435ad75442f2d64eacd837bed48cbc28dd7741a"
   }
 }

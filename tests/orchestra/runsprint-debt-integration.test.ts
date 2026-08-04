@@ -3,49 +3,33 @@
  * runSprint Phase 4 debt resolution integration tests.
  *
  * Verifies that after DONE / GO_WITH_TECH_DEBT evaluation in Phase 4,
- * resolveDebt() is invoked and DEBT.md is updated with resolved=true and
- * the correct resolvedInSprintId.
+ * resolveDebt() is invoked and the debt entry is updated with
+ * status='resolved' and the correct resolvedInSprintId.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import { DebtPriority } from '../../src/core/types.js';
 import type { DebtItem, ResolvedConfig } from '../../src/core/types.js';
 import { DEBT_TABLE_HEADER } from '../../src/core/constants.js';
 
 // ─── Module Mocks ───────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
-  renameSync: vi.fn(),
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
-  appendFileSync: vi.fn(),
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
-
-// sprint-planner.ts imports { writeFile } from 'node:fs/promises' (separate module)
-vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn(async () => ''),
-  writeFile: vi.fn(async () => undefined),
-  mkdir: vi.fn(async () => undefined),
-  appendFile: vi.fn(async () => undefined),
-  access: vi.fn(async () => undefined),
-  stat: vi.fn(async () => ({ size: 0 })),
-}));
+// ─── REAL FILESYSTEM (FAZ4A-S4) ─────────────────────────────────────
+// The node:fs / node:fs/promises mocks are deliberately GONE. runSprint's
+// PLAN phase ends in publishCanonicalRunStatusReadModel — an atomic
+// publication ring (write temp → renameSync → read back → digest compare)
+// that verifies its own writes; a mocked fs cannot carry that round-trip
+// (RunStatusReadModelError PERSIST_FAILED). Same root cause + fix as
+// FAZ4A-S2/S3 (finalize-sprint / sprint-finalizer / pause-resume). Every
+// assertion in this file targets the mocked MemoryStore (upsert calls) or
+// the returned Sprint object — no fs call-recording is asserted anywhere,
+// so FULL removal (not the hybrid useRealFileSystem passthrough) applies.
+// Each test gets a real scratch project root under tmpdir.
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
+  // Real fs, mocked processes: git/tsc probes must not escape the sandbox. A
+  // bare vi.fn() would return undefined and crash callers reading `.status`.
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -257,20 +241,19 @@ vi.mock('../../src/core/memory-store.js', () => ({
 }));
 
 
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import {
+  mkdtempSync, rmSync, mkdirSync, writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { runSprint } from '../../src/orchestra/brain.js';
 import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 
-const mockedReadFileSync = vi.mocked(readFileSync);
-const mockedWriteFileSync = vi.mocked(writeFileSync);
-const mockedExistsSync = vi.mocked(existsSync);
-const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedSpawnSync = vi.mocked(spawnSync);
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const ROOT = '/project';
 const DEBT_SEPARATOR = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
 
 // planSprint creates sprint-001 (no sprint files exist → maxNumber=0 → sprintNumber=1)
@@ -278,6 +261,27 @@ const DEBT_SEPARATOR = '|----|-------------|------|--------|----------|------|--
 const EXPECTED_SPRINT_ID = 'sprint-001';
 const EXPECTED_TASK_ID = '001-001';
 const EXPECTED_DEBT_ID = `debt-${EXPECTED_TASK_ID}`;
+
+// ─── Real project root (fresh per test) ─────────────────────────────
+
+let PROJECT_ROOT = '';
+let attemptNonce = 0;
+function freshProjectRoot(): string {
+  attemptNonce += 1;
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-rsd-'));
+  mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+  mkdirSync(join(PROJECT_ROOT, '.deckent', 'pids'), { recursive: true });
+  // memory.db must EXIST so debt-manager's getMemoryStore() opens the (mocked)
+  // MemoryStore — the DB-first path all upsert assertions in this file target.
+  mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
+  writeFileSync(join(PROJECT_ROOT, '.brain', 'memory.db'), '', 'utf-8');
+  return PROJECT_ROOT;
+}
+
+afterAll(() => {
+  if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
+});
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -302,7 +306,7 @@ function makeDebtTable(items: Array<Partial<DebtItem>>): string {
 function makeConfig(): ResolvedConfig {
   return {
     mode: 'pro_plan',
-    projectRoot: ROOT,
+    projectRoot: PROJECT_ROOT,
     projectName: 'test',
     language: 'tr',
     version: '0.1.0',
@@ -328,9 +332,20 @@ function makeTaskResult(opts: {
   testsPassed?: boolean;
   coverage?: number;
 }): string {
+  const taskId = opts.taskId ?? EXPECTED_TASK_ID;
+  // Host-authored claim-time attribution is part of the terminal-evidence data
+  // contract (projectAttributedTaskWork): without a VERIFIED attemptId the
+  // finalizer correctly refuses to settle (TERMINAL_EVIDENCE_HOLD). Shape
+  // mirrors finalize-sprint.test.ts (FAZ4A-S2 fixture). The attemptId carries a
+  // per-test nonce: the controller's once-ledger for terminal publications
+  // (commitSprintTerminalHandoff) is module-global and keyed by the
+  // logicalSettlementDigest — a byte-identical fixture across tests would be a
+  // replay of the SAME settled authority and correctly HOLD as
+  // DUPLICATE_PUBLICATION. A fresh attempt per test is the honest model.
+  const attemptId = `attempt-${taskId}-${attemptNonce}`;
   return JSON.stringify({
-    taskId: opts.taskId ?? EXPECTED_TASK_ID,
-    workerId: `w-${opts.taskId ?? EXPECTED_TASK_ID}`,
+    taskId,
+    workerId: `w-${taskId}`,
     filesChanged: ['src/foo.ts'],
     linesAdded: 10,
     linesRemoved: 0,
@@ -338,6 +353,12 @@ function makeTaskResult(opts: {
     coverage: opts.coverage ?? (opts.selfAssessment === 'NO_GO' ? 0 : 95),
     selfAssessment: opts.selfAssessment,
     notes: 'Integration test result',
+    workAttribution: {
+      state: 'VERIFIED',
+      attemptId,
+      baselineRef: `baseline:${attemptId}`,
+      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+    },
   });
 }
 
@@ -366,13 +387,14 @@ function seedDebtStore(items: Array<Partial<DebtItem>>): void {
 }
 
 /**
- * Set up mocks for a full runSprint run.
- * @param debtTableContent  - content returned for any DEBT.md read (legacy, used for readFileSync fallback)
- * @param resultJsonByTask  - map of taskId → result JSON (undefined = file missing)
+ * Materialize a full runSprint fixture on the REAL project root.
+ * @param debtTableContent  - content written to DEBT.md (legacy fallback read path)
+ * @param resultJsonByTask  - map of taskId → result JSON, pre-written as real
+ *                            `.tasks/task-<id>.result` files (missing = timeout path)
  * @param directives        - DIRECTIVES.md content (drives how many tasks planSprint creates)
  * @param debtItems         - debt items to seed in the mock MemoryStore
  */
-function setupMocks(
+function setupProject(
   debtTableContent: string,
   resultJsonByTask: Map<string, string>,
   directives = 'Build the system',
@@ -395,36 +417,14 @@ function setupMocks(
     } as never;
   });
 
-  mockedExistsSync.mockImplementation((path: unknown) => {
-    const p = String(path);
-    // Result files present only for tasks listed in resultJsonByTask
-    if (p.endsWith('.result')) {
-      for (const taskId of resultJsonByTask.keys()) {
-        if (p.includes(`task-${taskId}.result`)) return true;
-      }
-      return false;
-    }
-    // Tasks directory exists for planSprint to write into
-    if (p.includes('.tasks')) return true;
-    // Memory DB file must exist so getMemoryStore() returns the mock store
-    if (p.includes('memory.db')) return true;
-    // Brain dir does NOT exist → countBrainLines returns 0 → decay is a no-op
-    return false;
-  });
+  writeFileSync(join(PROJECT_ROOT, 'DIRECTIVES.md'), directives, 'utf-8');
+  writeFileSync(join(PROJECT_ROOT, 'DEBT.md'), debtTableContent, 'utf-8');
 
-  // Return empty arrays everywhere → sprint number = 1, no pre-existing tasks/fix-tasks
-  mockedReaddirSync.mockReturnValue([] as never);
-
-  mockedReadFileSync.mockImplementation((path: unknown) => {
-    const p = String(path);
-    if (p.includes('DIRECTIVES')) return directives;
-    if (p.includes('DEBT.md')) return debtTableContent;
-    // Return result JSON for the matching task
-    for (const [taskId, json] of resultJsonByTask.entries()) {
-      if (p.includes(`task-${taskId}.result`)) return json;
-    }
-    return '';
-  });
+  // Pre-written real result files: the EXECUTE collector finds them
+  // immediately (worker spawn is a mocked no-op backend).
+  for (const [taskId, json] of resultJsonByTask.entries()) {
+    writeFileSync(join(PROJECT_ROOT, '.tasks', `task-${taskId}.result`), json, 'utf-8');
+  }
 }
 
 /** Returns true if mockMemStore.upsert was called with status='resolved' and matching sprintId */
@@ -442,6 +442,7 @@ function debtWasResolved(sprintId = EXPECTED_SPRINT_ID): boolean {
 describe('runSprint Phase 4 — debt resolution integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    freshProjectRoot();
     vi.mocked(SpawnBackendFactory.create).mockReturnValue({
       name: 'test-measured',
       liveUsageBudgetSupport: 'measured-stream',
@@ -465,9 +466,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(debtWasResolved()).toBe(true);
   });
@@ -479,9 +480,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     // Verify upsert was called with correct resolved status and sprintId
     const upsertCalls = mockMemStore.upsert.mock.calls;
@@ -503,9 +504,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'GO_WITH_TECH_DEBT' }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(debtWasResolved()).toBe(true);
   });
@@ -517,9 +518,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'GO_WITH_TECH_DEBT' }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     const upsertCalls = mockMemStore.upsert.mock.calls;
     const resolvedCall = upsertCalls.find((args: unknown[]) => {
@@ -548,9 +549,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
     ]]);
 
-    setupMocks(debtTable, results, '', debtItems);
+    setupProject(debtTable, results, '', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     // resolveDebt should have been called for 'debt-999-001'
     const upsertCalls = mockMemStore.upsert.mock.calls;
@@ -567,10 +568,14 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
     // A skip-class debt has NO follow-up code work: injectCriticalDebtTasks skips
     // it (no fix task), and the planner now resolves it so it stops re-injecting
     // every sprint. A normal CRITICAL debt rides alongside to produce the one
-    // dispatched fix task (001-001) the harness expects.
+    // dispatched fix task (001-001) the harness expects. Its originTaskId must
+    // be a FOREIGN task (like the sibling fixForTaskId test): the old fixture's
+    // originTaskId=001-001 made the injected fix task a fix-for-ITSELF
+    // (fixForTaskId === own id), a lineage the finalizer honestly refuses to
+    // settle (TERMINAL_EVIDENCE_HOLD) — production truth, stale fixture.
     const vnrDebtId = 'debt-vnr-001';
     const debtItems = [
-      { id: `debt-${EXPECTED_TASK_ID}`, originTaskId: EXPECTED_TASK_ID, priority: DebtPriority.CRITICAL, resolved: false },
+      { id: 'debt-998-001', originTaskId: '998-001', priority: DebtPriority.CRITICAL, resolved: false },
       { id: vnrDebtId, originTaskId: 'vnr-001', priority: DebtPriority.CRITICAL, resolved: false, class: 'verified-no-result' as const },
     ];
     const results = new Map([[
@@ -578,9 +583,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
     ]]);
 
-    setupMocks(makeDebtTable(debtItems), results, '', debtItems);
+    setupProject(makeDebtTable(debtItems), results, '', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     const vnrResolved = mockMemStore.upsert.mock.calls.some((args: unknown[]) => {
       const input = args[0] as Record<string, unknown>;
@@ -598,11 +603,14 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    const sprint = await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(debtWasResolved()).toBe(false);
+    // Honest lifecycle (455-003): a NO_GO with no live FIX worker parks the
+    // sprint as PAUSED in FIX — never a false COMPLETE.
+    expect(sprint.status).toBe('PAUSED');
   });
 
   it('does NOT write resolved status for NO_GO evaluation', async () => {
@@ -612,9 +620,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'NO_GO', testsPassed: false, coverage: 0 }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     // None of the upsert calls should mark our debt as resolved
     const hasResolvedWrite = mockMemStore.upsert.mock.calls.some((args: unknown[]) => {
@@ -631,16 +639,22 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     const debtItems = [{ id: EXPECTED_DEBT_ID, resolved: false }];
     const debtTable = makeDebtTable(debtItems);
-    setupMocks(debtTable, new Map(), 'Build the system', debtItems);
+    setupProject(debtTable, new Map(), 'Build the system', debtItems);
 
-    const sprintPromise = runSprint(ROOT, makeConfig());
-
-    await vi.advanceTimersByTimeAsync(31 * 60 * 1000);
-
+    // Advance fake time in minute steps until the sprint promise settles: the
+    // no-result path chains several independent timer budgets (execute timeout,
+    // runtime-extension poll, 60s liveness grace-poll, FIX-phase waits), so a
+    // single 31-minute jump leaves later waits pending forever.
+    let settled = false;
+    const sprintPromise = runSprint(PROJECT_ROOT, makeConfig()).finally(() => { settled = true; });
+    for (let i = 0; i < 240 && !settled; i++) {
+      await vi.advanceTimersByTimeAsync(60_000);
+    }
+    expect(settled).toBe(true);
     await sprintPromise;
 
     expect(debtWasResolved()).toBe(false);
-  }, 30_000);
+  }, 60_000);
 
   // ── Sprint ID correctness ────────────────────────────────────────
 
@@ -651,9 +665,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    const sprint = await runSprint(ROOT, makeConfig());
+    const sprint = await runSprint(PROJECT_ROOT, makeConfig());
 
     // The resolvedInSprintId in the upsert metadata must match the actual sprint
     const upsertCalls = mockMemStore.upsert.mock.calls;
@@ -675,9 +689,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    const sprint = await runSprint(ROOT, makeConfig());
+    const sprint = await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(sprint.status).toBe('COMPLETE');
     expect(sprint.phase).toBe('COMPLETE');
@@ -690,9 +704,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    const sprint = await runSprint(ROOT, makeConfig());
+    const sprint = await runSprint(PROJECT_ROOT, makeConfig());
 
     expect(sprint.status).toBe('COMPLETE');
   });
@@ -709,9 +723,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       EXPECTED_TASK_ID,
       makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
     ]]);
-    setupMocks(debtTable, results, 'Build the system', debtItems);
+    setupProject(debtTable, results, 'Build the system', debtItems);
 
-    await runSprint(ROOT, makeConfig());
+    await runSprint(PROJECT_ROOT, makeConfig());
 
     // Only EXPECTED_DEBT_ID should be resolved, not debt-other-001
     const upsertCalls = mockMemStore.upsert.mock.calls;

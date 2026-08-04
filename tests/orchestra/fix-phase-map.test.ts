@@ -5,10 +5,24 @@
  * when fix tasks complete with different outcomes (DONE, GO_WITH_TECH_DEBT, NO_GO).
  *
  * Sprint 126 reported debt-126-001-fix: fix task success didn't update original
- * task evaluation in the Map. Sprint 127 applied the fix (lines 510-512 in
- * sprint-phases.ts). These tests verify the fix is correct and prevents regression.
+ * task evaluation in the Map. Sprint 127 applied the fix (sprint-phases.ts).
+ * These tests verify the fix is correct and prevents regression.
+ *
+ * ─── REAL FILESYSTEM (FAZ4A-S4) ─────────────────────────────────────
+ * The node:fs / constants / utils mocks are deliberately GONE. runFixPhase's
+ * entry (`persistPhaseTransition` → `publishCanonicalRunStatusReadModel`) is an
+ * atomic write→rename→readback→digest publication chain that an in-memory fs
+ * mock cannot carry (RunStatusReadModelError PERSIST_FAILED — RECORDED-FAILED
+ * approach, do not retry). Each test gets a fresh real scratch project root
+ * under tmpdir; fix-task discovery goes through REAL `.tasks/task-*.json`
+ * files and the real readJsonSafe, exactly like production.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   TaskEvaluation, TaskStatus, SprintPhase, SprintStatus,
 } from '../../src/core/types.js';
@@ -16,38 +30,31 @@ import type { Task, TaskResult, Sprint, ResolvedConfig, EvaluationResult } from 
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-// Mock node:fs — runFixPhase uses existsSync, readdirSync, writeFileSync, readFileSync
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => true),
-  readdirSync: vi.fn(() => [] as string[]),
-  writeFileSync: vi.fn(),
-  readFileSync: vi.fn(() => ''),
-  // Sprint 139 async I/O migration: sprint-finalizer and other modules use
-  // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
-  // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
+// Real fs, mocked processes: git/tsc probes must not escape the sandbox. A bare
+// vi.fn() would return undefined and crash callers reading `.status`.
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
+  execSync: vi.fn(() => ''),
+  execFileSync: vi.fn(() => ''),
+  spawn: vi.fn(),
+  exec: vi.fn(),
 }));
 
-// Mock core/utils — readJsonSafe reads fix task JSON files
-vi.mock('../../src/core/utils.js', () => ({
-  readJsonSafe: vi.fn(() => null),
-  parseDebtTable: vi.fn(() => []),
-  debugLog: vi.fn(),
-}));
-
-// Mock result-evaluator — evaluateWithRubric grades fix results
-vi.mock('../../src/orchestra/result-evaluator.js', () => ({
-  evaluateWithRubric: vi.fn(),
-  // R8/ADR-087: spurious recovery moved to this async helper — passthrough here.
-  reconcileEvaluationSpuriousNoGo: vi.fn((evaluation) => evaluation),
-}));
+// Mock result-evaluator — HYBRID (importOriginal spread): only the rubric
+// grader + spurious-NO_GO reconcile are stubbed; every other export
+// (classifyFixPhaseTasks, classifyExitWithoutResult, reconstructFromDurable-
+// Evidence, …) stays REAL so runFixPhase's non-rubric branches run production
+// code. NOTE: pass impls directly to vi.fn(...) so vi.clearAllMocks preserves
+// the passthrough (mockImplementation set later would be wiped).
+vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/result-evaluator.js')>();
+  return {
+    ...actual,
+    evaluateWithRubric: vi.fn(),
+    // R8/ADR-087: spurious recovery moved to this async helper — passthrough here.
+    reconcileEvaluationSpuriousNoGo: vi.fn(async (evaluation: EvaluationResult) => evaluation),
+  };
+});
 
 // Mock sprint-controller — spawnWorkers, waitForResults, etc.
 vi.mock('../../src/orchestra/sprint-controller.js', () => ({
@@ -79,7 +86,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
   runScanCycle: vi.fn(),
 }));
 
-// Mock agent-pool, skill-pool, stack-detector (used in V2 reroute path)
+// Mock agent-pool, skill-pool, stack-detector (used in V3 reroute path)
 vi.mock('../../src/core/agent-pool.js', () => ({
   AgentPoolManager: vi.fn().mockImplementation(() => ({ loadAgents: () => [] })),
 }));
@@ -123,40 +130,19 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
 // Mock splash
 vi.mock('../../src/cli/helpers/splash.js', () => ({
   showSplash: vi.fn(() => ''),
-}));
-
-// Mock constants
-// DECKENT_DIR is referenced by event-stream.getCurrentSprintId, which sprint-phases
-// imports at module-init; an unmocked export here throws inside the runFixPhase try
-// and silently aborts the evaluations.set assignments below — keep this list in
-// sync with src/core/constants.ts when adding new transitive deps.
-vi.mock('../../src/core/constants.js', () => ({
-  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-  BRAIN_DIR: '.brain',
-  TASKS_DIR: '.tasks',
-  DEBT_FILE: 'DEBT.md',
-  DECKENT_VERSION: '0.4.0-test',
-  DECKENT_DIR: '.deckent',
-  // born-630 (406-002): permission-store→approval-allowscope zinciri artık
-  // SETTINGS_DIR'i modül-yüklemede okuyor — factory-mock'a eksik export eklendi.
-  SETTINGS_DIR: '.deckent/settings',
-  // R4-SPRINTID (Sprint 318): event-stream.getCurrentSprintId (transitive dep of
-  // runFixPhase) now reads these from constants — omitting them returns undefined,
-  // throws in join()/existsSync, and silently aborts the evaluations.set below.
-  SPRINT_STATE_FILE: '.deckent/sprint-state.json',
-  SPRINT_ACTIVE_FILE: '.deckent/sprint-active.json',
+  showSplashIfEnabled: vi.fn(() => ''),
 }));
 
 // ─── Imports (after mocks) ──────────────────────────────────────────
 
 import { runFixPhase } from '../../src/orchestra/sprint-phases.js';
-import { existsSync, readdirSync } from 'node:fs';
-import { readJsonSafe } from '../../src/core/utils.js';
 import { evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
 import { spawnWorkers, waitForResults } from '../../src/orchestra/sprint-controller.js';
 import { handleEvaluation } from '../../src/orchestra/debt-manager.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
+
+let root: string;
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -219,7 +205,7 @@ function makeConfig(): ResolvedConfig {
     modes: {},
     language: 'en',
     projectName: 'test',
-    projectRoot: '/tmp/test-project',
+    projectRoot: root,
     version: '0.4.0',
     worker_provider: 'claude',
     execution_budget: {
@@ -242,11 +228,34 @@ function makeEvalResult(decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'): Evalu
   };
 }
 
+/** Persist a task JSON into the scratch root's real `.tasks/` directory. */
+function writeTaskFile(projectRoot: string, task: Task): void {
+  writeFileSync(
+    join(projectRoot, '.tasks', `task-${task.id}.json`),
+    JSON.stringify(task, null, 2),
+    'utf-8',
+  );
+}
+
+function readTaskFile(projectRoot: string, taskId: string): Task {
+  return JSON.parse(
+    readFileSync(join(projectRoot, '.tasks', `task-${taskId}.json`), 'utf-8'),
+  ) as Task;
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe('FIX Phase — evaluations Map mutation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    root = mkdtempSync(join(tmpdir(), 'deckent-fpm-'));
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'runtime'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
   });
 
   it('re-authorizes a dynamic Codex FIX task from owner policy before dispatch', async () => {
@@ -257,11 +266,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
       forceModel: 'gpt-5.6-sol',
       provider: 'codex',
     });
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue(
-      [`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>,
-    );
-    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+    writeTaskFile(root, fixTask);
     vi.mocked(waitForResults).mockResolvedValue([]);
 
     const config = {
@@ -283,7 +288,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
     } as ResolvedConfig;
 
     await runFixPhase(
-      '/tmp/test-project',
+      root,
       makeSprint([originalTask]),
       new Map([['129-budget-origin', TaskEvaluation.NO_GO]]),
       [],
@@ -293,8 +298,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
       undefined,
     );
 
-    const dispatchedSprint = vi.mocked(spawnWorkers).mock.calls[0]?.[1];
-    expect(dispatchedSprint?.tasks[0]).toMatchObject({
+    const expectedAuthority = {
       id: fixTask.id,
       budget: { maxCacheReadTokens: 5_000_000, maxTurns: 48 },
       budgetPolicy: {
@@ -306,7 +310,12 @@ describe('FIX Phase — evaluations Map mutation', () => {
           profileRef: 'execution_budget.final_only_usage',
         },
       },
-    });
+    };
+    const dispatchedSprint = vi.mocked(spawnWorkers).mock.calls[0]?.[1];
+    expect(dispatchedSprint?.tasks[0]).toMatchObject(expectedAuthority);
+    // Real-file proof: the exact policy snapshot is persisted back to the
+    // fix task's JSON before dispatch (owner-policy re-authorization audit).
+    expect(readTaskFile(root, fixTask.id)).toMatchObject(expectedAuthority);
   });
 
   it('returns a typed FIX failure instead of swallowing missing budget authority', async () => {
@@ -319,15 +328,11 @@ describe('FIX Phase — evaluations Map mutation', () => {
       model: 'gpt-5.6-sol',
       provider: 'codex',
     });
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue(
-      [`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>,
-    );
-    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+    writeTaskFile(root, fixTask);
 
     const config = { ...makeConfig(), execution_budget: undefined } as ResolvedConfig;
     const outcome = await runFixPhase(
-      '/tmp/test-project',
+      root,
       makeSprint([originalTask]),
       new Map([['129-hold-origin', TaskEvaluation.NO_GO]]),
       [],
@@ -361,18 +366,12 @@ describe('FIX Phase — evaluations Map mutation', () => {
       id: '128-foreign-fix',
       sprintId: 'sprint-128',
     });
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([
-      `task-${foreign.id}.json`,
-      `task-${current.id}.json`,
-    ] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockImplementation(path =>
-      String(path).includes(foreign.id) ? foreign : current,
-    );
+    writeTaskFile(root, foreign);
+    writeTaskFile(root, current);
     vi.mocked(waitForResults).mockResolvedValue([]);
 
     await runFixPhase(
-      '/tmp/test-project',
+      root,
       makeSprint([currentRoot]),
       new Map([['129-current', TaskEvaluation.NO_GO]]),
       [],
@@ -399,18 +398,12 @@ describe('FIX Phase — evaluations Map mutation', () => {
       id: 'legacy-missing-root-fix',
       sprintId: undefined,
     });
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([
-      `task-${orphan.id}.json`,
-      `task-${current.id}.json`,
-    ] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockImplementation(path =>
-      String(path).includes(orphan.id) ? orphan : current,
-    );
+    writeTaskFile(root, orphan);
+    writeTaskFile(root, current);
     vi.mocked(waitForResults).mockResolvedValue([]);
 
     await runFixPhase(
-      '/tmp/test-project',
+      root,
       makeSprint([currentRoot]),
       new Map([['129-current', TaskEvaluation.NO_GO]]),
       [],
@@ -432,10 +425,8 @@ describe('FIX Phase — evaluations Map mutation', () => {
     const evaluations = new Map<string, TaskEvaluation>();
     evaluations.set('129-001', TaskEvaluation.NO_GO); // original was NO_GO
 
-    // Mock: .tasks/ directory contains the fix task JSON
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+    // Real `.tasks/` directory contains the fix task JSON
+    writeTaskFile(root, fixTask);
 
     // Mock: fix worker returns a successful result
     const fixResult = makeResult(fixTask.id, { testsPassed: true, selfAssessment: 'DONE' });
@@ -445,7 +436,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     // Act
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     // Assert — original task's evaluation should be updated to DONE
     expect(evaluations.get('129-001')).toBe(TaskEvaluation.DONE);
@@ -461,20 +452,21 @@ describe('FIX Phase — evaluations Map mutation', () => {
     const evaluations = new Map<string, TaskEvaluation>();
     evaluations.set('129-002', TaskEvaluation.NO_GO);
 
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+    writeTaskFile(root, fixTask);
 
     const fixResult = makeResult(fixTask.id, { testsPassed: true, selfAssessment: 'GO_WITH_TECH_DEBT' });
     vi.mocked(waitForResults).mockResolvedValue([fixResult]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('GO_WITH_TECH_DEBT'));
 
     // Act
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     // Assert — original task evaluation should now be GO_WITH_TECH_DEBT
     expect(evaluations.get('129-002')).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
     expect(evaluations.get(fixTask.id)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    // Real-file proof: an accepted repair settles the logical root — the
+    // original task's DONE status reaches disk (persistTaskStatus).
+    expect(readTaskFile(root, originalTask.id).status).toBe(TaskStatus.DONE);
   });
 
   it('fix task NO_GO → original task evaluation remains unchanged (still NO_GO)', async () => {
@@ -485,21 +477,27 @@ describe('FIX Phase — evaluations Map mutation', () => {
     const evaluations = new Map<string, TaskEvaluation>();
     evaluations.set('129-003', TaskEvaluation.NO_GO);
 
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+    writeTaskFile(root, fixTask);
 
     const fixResult = makeResult(fixTask.id, { testsPassed: false, selfAssessment: 'NO_GO' });
     vi.mocked(waitForResults).mockResolvedValue([fixResult]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('NO_GO'));
 
     // Act
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
-    // Assert — original task evaluation must NOT change (line 511: fixEval !== NO_GO guard)
+    // Assert — original task evaluation must NOT change (rejected repair never projects onto root)
     expect(evaluations.get('129-003')).toBe(TaskEvaluation.NO_GO);
     // Fix task's own evaluation is recorded as NO_GO
     expect(evaluations.get(fixTask.id)).toBe(TaskEvaluation.NO_GO);
+    // Rejected repair consumes retry budget through handleEvaluation with FIX-minting authority
+    expect(handleEvaluation).toHaveBeenCalledWith(
+      root,
+      expect.objectContaining({ id: fixTask.id }),
+      TaskEvaluation.NO_GO,
+      expect.objectContaining({ taskId: fixTask.id }),
+      { allowPriorityFixCreation: true },
+    );
   });
 
   it('fixForTaskId undefined → orphan is ignored without crashing', async () => {
@@ -508,9 +506,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
     const sprint = makeSprint([]);
     const evaluations = new Map<string, TaskEvaluation>();
 
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+    writeTaskFile(root, fixTask);
 
     const fixResult = makeResult(fixTask.id, { testsPassed: true, selfAssessment: 'DONE' });
     vi.mocked(waitForResults).mockResolvedValue([fixResult]);
@@ -518,7 +514,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
 
     // Act — should not throw even though fixForTaskId is undefined
     await expect(
-      runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined),
+      runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined),
     ).resolves.not.toThrow();
 
     // An orphan has no current-sprint root authority and must not dispatch.
@@ -535,16 +531,14 @@ describe('FIX Phase — evaluations Map mutation', () => {
     const evaluations = new Map<string, TaskEvaluation>();
     // Note: original task '129-005' is NOT in the Map (empty start)
 
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+    writeTaskFile(root, fixTask);
 
     const fixResult = makeResult(fixTask.id, { testsPassed: true, selfAssessment: 'DONE' });
     vi.mocked(waitForResults).mockResolvedValue([fixResult]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     // Act
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     // Assert — fix task itself is recorded
     expect(evaluations.get(fixTask.id)).toBe(TaskEvaluation.DONE);
@@ -567,22 +561,19 @@ describe('FIX Phase — evaluations Map mutation', () => {
     const evaluations = new Map([[originalTask.id, TaskEvaluation.NO_GO]]);
     const results: TaskResult[] = [];
 
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockImplementation(() => (
-      vi.mocked(handleEvaluation).mock.calls.length === 0
-        ? [`task-${firstFix.id}.json`]
-        : [
-            `task-${firstFix.id}.json`,
-            `task-${secondFix.id}.json`,
-          ]
-    ) as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readJsonSafe).mockImplementation(path =>
-      String(path).includes(secondFix.id) ? secondFix : firstFix,
-    );
-    vi.mocked(handleEvaluation).mockImplementation((_root, task, evaluation) => {
+    // Round 1 discovers only the first fix on disk. The mocked handleEvaluation
+    // mirrors production debt-manager authority: it persists the settled status
+    // AND — on a NO_GO with FIX-minting authority — writes the `-fix` child
+    // JSON, which round 2's real readdir/readJsonSafe scan then picks up.
+    writeTaskFile(root, firstFix);
+    vi.mocked(handleEvaluation).mockImplementation((projectRoot, task, evaluation) => {
       task.status = evaluation === TaskEvaluation.NO_GO
         ? TaskStatus.NO_GO
         : TaskStatus.DONE;
+      writeTaskFile(projectRoot, task);
+      if (task.id === firstFix.id && evaluation === TaskEvaluation.NO_GO) {
+        writeTaskFile(projectRoot, secondFix);
+      }
       return undefined as never;
     });
     vi.mocked(waitForResults)
@@ -597,7 +588,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
       .mockReturnValueOnce(makeEvalResult('DONE'));
 
     await runFixPhase(
-      '/tmp/test-project',
+      root,
       makeSprint([originalTask]),
       evaluations,
       results,
@@ -612,18 +603,21 @@ describe('FIX Phase — evaluations Map mutation', () => {
       .toEqual([firstFix.id]);
     expect(vi.mocked(spawnWorkers).mock.calls[1]?.[1].tasks.map(task => task.id))
       .toEqual([secondFix.id]);
+    // Owner-policy re-authorization enriches disk-read FIX tasks (budget/
+    // budgetPolicy) before settle, so match on identity fields, not the
+    // pristine fixture object.
     expect(handleEvaluation).toHaveBeenNthCalledWith(
       1,
-      '/tmp/test-project',
-      firstFix,
+      root,
+      expect.objectContaining({ id: firstFix.id, fixForTaskId: originalTask.id }),
       TaskEvaluation.NO_GO,
       expect.objectContaining({ taskId: firstFix.id }),
       { allowPriorityFixCreation: true },
     );
     expect(handleEvaluation).toHaveBeenNthCalledWith(
       2,
-      '/tmp/test-project',
-      secondFix,
+      root,
+      expect.objectContaining({ id: secondFix.id, fixForTaskId: firstFix.id }),
       TaskEvaluation.DONE,
       expect.objectContaining({ taskId: secondFix.id }),
       { allowPriorityFixCreation: false },
@@ -632,5 +626,10 @@ describe('FIX Phase — evaluations Map mutation', () => {
     expect(evaluations.get(firstFix.id)).toBe(TaskEvaluation.NO_GO);
     expect(evaluations.get(secondFix.id)).toBe(TaskEvaluation.DONE);
     expect(results.map(result => result.taskId)).toEqual([firstFix.id, secondFix.id]);
+    // Real-file proof: the settled chain reaches disk — root flipped DONE,
+    // intermediate NO_GO attempt keeps its honest verdict.
+    expect(readTaskFile(root, originalTask.id).status).toBe(TaskStatus.DONE);
+    expect(readTaskFile(root, firstFix.id).status).toBe(TaskStatus.NO_GO);
+    expect(existsSync(join(root, '.tasks', `task-${secondFix.id}.json`))).toBe(true);
   });
 });
