@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e29a390e5af642e6105a680c57faab77177c0c7208db5294bab944bec668d365"
+    "value": "217ee02a51c41b89c7b7a9e0e763323ba12ba6ce75c07955bb3bb9b1ec3f27e6"
   },
   "summary": {
     "total": 343,
@@ -11,11 +11,11 @@
     "terminal": 7,
     "receipts": 37,
     "byState": {
-      "OPEN": 237,
+      "OPEN": 236,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 32,
+      "VERIFY": 33,
       "DONE": 7,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2775,10 +2775,10 @@
       "id": "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-04",
       "definitionDigest": "f9ab28fc85c4e3bf7ac71af21ad0e58838e6994bb34651f6c7e7499a8ee8edcd",
-      "progressDigest": "7f7076182fa208172eb9f50550b2c50ce23789a0f82a41d636e6e509b5bd66ba",
+      "progressDigest": "dd83e75c03e7c89181706cf91ff4b3d2a0f7327eef50f5ef9f89c74fb14ab669",
       "terminalClosureDigest": null
     },
     {
@@ -4204,8 +4204,8 @@
       "authorityDigest": "42506a0069c0b2e513e4c966bef6271ca4a90b336ad1589587ac22a1fc98d5de",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-04T20:20:43Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14396,12 +14396,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -14409,9 +14409,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-04-BIN-ID-LAZY-01"
+      ],
       "acceptance": "resolveWorktreeBinaryAuthority'de projectSourceTreeIdentity hesabı lazy olur (yalnız deckent-checkout + dist yolunda) veya E_BUILD_SOURCE_TREE_MISSING typed karara düşürülür; src'siz kullanıcı-projesi replay'i fail-closed regresyon testi olur; unit suite'in tüm fixture'ları src/ içerdiği için bugünkü kör nokta kapanır",
-      "evidence": "Açılış 2026-08-04: FAZ4B-B3a typed blocker — src/cli/worktree-binary-authority.ts:326-328 ternary'si buildSourceTreeIdentity'yi user-project-allow kararından ÖNCE eager çağırıyor; E_BUILD_SOURCE_TREE_MISSING yakalanmıyor. Dual-Lens: son-kullanıcı ürün yüzeyinde gerçek (her src'siz projede çökme); dogfood'da maskeli (checkout hep src'li). Kanıt: B3a gerçek-binary koşuları — 3 test dosyasının 12 kırığının kökü buydu, fixture'lara src/ eklenerek test tarafı kapandı, üretim fix'i bu satırın işi",
+      "evidence": "Açılış 2026-08-04: FAZ4B-B3a typed blocker — src/cli/worktree-binary-authority.ts:326-328 ternary'si buildSourceTreeIdentity'yi user-project-allow kararından ÖNCE eager çağırıyor; E_BUILD_SOURCE_TREE_MISSING yakalanmıyor. Dual-Lens: son-kullanıcı ürün yüzeyinde gerçek (her src'siz projede çökme); dogfood'da maskeli (checkout hep src'li). Kanıt: B3a gerçek-binary koşuları — 3 test dosyasının 12 kırığının kökü buydu, fixture'lara src/ eklenerek test tarafı kapandı; `receipt=GR-2026-08-04-BIN-ID-LAZY-01`; 2026-08-04 SETTLEMENT: eager ternary kaldırıldı — evaluate'in kendi lazy fallback'i (user-project-allow ve root-mismatch kapılarından SONRA) tek hesap yolu oldu; `proof=srcless-user-project-regression-fail-closed-then-green`: yeni regresyon (dist-runtime + valid-identity + src'siz kullanıcı projesi) fix'siz üretimde DÜŞTÜ, fix'le 'user-project' allow; authority suite 25/25 + live 5/5 + cli-bin 9/9, tsc temiz",
       "updated": "2026-08-04"
     },
     {
@@ -18475,6 +18477,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0303da95d22963374b0dda5b100281983ddb0f1492d6b6f3378888a40ca6e356"
+    "value": "9028d4a0a17d7c15daba7ec8ea01085e7ec50d787cc84983dc4adec6f0b25c27"
   }
 }

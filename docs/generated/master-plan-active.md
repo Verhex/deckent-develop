@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):e29a390e5af642e6105a680c57faab77177c0c7208db5294bab944bec668d365`
+**Source digest:** `sha256(normalized-lf-utf8):217ee02a51c41b89c7b7a9e0e763323ba12ba6ce75c07955bb3bb9b1ec3f27e6`
 
 **Rows:** 343 total · 336 active · 7 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 237 |
+| OPEN | 236 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 32 |
+| VERIFY | 33 |
 | DONE | 7 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -266,7 +266,7 @@
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |
 | 3330 | `PROD-SPRINT-PREFIX-PAD-001` | VERIFY | P1 | KERNEL | — | — | sprint-lifecycle sprintTaskPrefix padding uyumsuzluğu: sprint numarası <100 iken sprint-sonu task-dosya temizliği hiç çalışmıyor |
-| 3335 | `PROD-BINARY-IDENTITY-EAGER-CRASH-001` | OPEN | P1 | KERNEL | — | — | worktree-binary-authority kaynak-ağaç hash'i eager: src/ dizini olmayan kullanıcı projesinde her non-diagnostic deckent komutu typed HOLD yerine ham stack'le çöküyor |
+| 3335 | `PROD-BINARY-IDENTITY-EAGER-CRASH-001` | VERIFY | P1 | KERNEL | — | — | worktree-binary-authority kaynak-ağaç hash'i eager: src/ dizini olmayan kullanıcı projesinde her non-diagnostic deckent komutu typed HOLD yerine ham stack'le çöküyor |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |

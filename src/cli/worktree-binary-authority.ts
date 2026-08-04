@@ -323,8 +323,10 @@ export function resolveWorktreeBinaryAuthority(
     ...(build.state ? { buildIdentityState: build.state } : {}),
     override: options.env?.[CROSS_CHECKOUT_BINARY_OVERRIDE_ENV] === '1',
     platform: options.platform,
-    projectSourceTreeIdentity: runtimeKind === 'dist' && build.identity
-      ? buildSourceTreeIdentity(projectRoot)
-      : undefined,
+    // projectSourceTreeIdentity deliberately NOT precomputed here: evaluate resolves it
+    // lazily AFTER the user-project allow and root-mismatch gates. An eager
+    // buildSourceTreeIdentity() call crashed every non-diagnostic command with a raw
+    // E_BUILD_SOURCE_TREE_MISSING in any src-less user project
+    // (PROD-BINARY-IDENTITY-EAGER-CRASH-001).
   });
 }
