@@ -100,18 +100,21 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-04 (build-free, EXEC-AUTH-REG mikro-fix): count unchanged, digest moved —
-  // command-registry.ts gained the execution-authority entry (graph edge content).
-  // Prior refresh: FAZ4B-B2 (count 12442).
-  count: 12443,
-  digest: 'ca14449d0ae15c5e04f6ac50e8da46cf3d8aeac4221f343c136938eb7352e4bc',
+  // 2026-08-05 (build-free, FAZ4B-B5 test-repair dalgası): +5 —
+  // task-execution-fence.test.ts simulateExecutionAuthorityRemount artık parent-dir
+  // root-binding kopyasını da yazıyor (+1, production byte-eşitlik post-validate'ine
+  // sadakat); eşzamanlı FAZ4B onarımı dashboard-data-parity/endpoints (+4);
+  // resume-race/lifecycle callsite pozisyon-kaymaları digest'i taşıdı.
+  // Prior refresh: EXEC-AUTH-REG (count 12443).
+  count: 12448,
+  digest: '09e147463bcf3d3184f3bff6abc53d80e74dbedc1c03364609dff2006ad140a6',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-04 (EXEC-AUTH-REG): count unchanged, digest moved — command-registry.ts
   // gained the execution-authority entry. Prior: PREFIX-PAD prefix derivation.
   count: 1196,
-  digest: '6a0518d984eebf41b701a32790104d31ab6113a9b304dcf8d93c36fc3c8b6873',
+  digest: '20bf99c56de7a3f685a252cb33c356f9ab69aac749e472d238ee5702c2a7899c',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
