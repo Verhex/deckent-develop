@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import {
   BUILD_IDENTITY_SCHEMA_VERSION,
@@ -8,6 +9,7 @@ import {
   buildSourceTreeIdentity,
   evaluateWorktreeBinaryAuthority,
   parseBuildIdentity,
+  resolveWorktreeBinaryAuthority,
   shouldCheckWorktreeBinaryAuthority,
   type DeckentBuildIdentity,
 } from '../../src/cli/worktree-binary-authority.js';
@@ -74,6 +76,36 @@ describe('worktree binary authority', () => {
       runtimeKind: 'dist',
       buildIdentity: undefined,
       override: false,
+    })).toEqual({ status: 'allow', reason: 'user-project' });
+  });
+
+  // PROD-BINARY-IDENTITY-EAGER-CRASH-001 regression: the resolver used to precompute
+  // buildSourceTreeIdentity(projectRoot) BEFORE evaluate's user-project gate, so any
+  // src-less user project crashed every non-diagnostic command with a raw
+  // E_BUILD_SOURCE_TREE_MISSING instead of the honest 'user-project' allow.
+  it('resolves a src-less user project to allow instead of crashing on eager identity', () => {
+    const projectRoot = makeRoot('deckent-srcless-user-project');
+    writeFileSync(
+      join(projectRoot, 'package.json'),
+      `${JSON.stringify({ name: 'customer-app' })}\n`,
+      'utf-8',
+    );
+    // Runtime is a real dist-shaped install WITH a valid build identity — the exact
+    // precondition that armed the eager crash path.
+    const runtimeRoot = makeRoot('deckent-dist-install');
+    const identity = identityFor(runtimeRoot);
+    mkdirSync(join(runtimeRoot, 'dist', 'cli'), { recursive: true });
+    writeFileSync(join(runtimeRoot, 'dist', 'cli', 'entry.js'), '// built\n', 'utf-8');
+    writeFileSync(
+      join(runtimeRoot, 'dist', 'build-identity.json'),
+      `${JSON.stringify(identity)}\n`,
+      'utf-8',
+    );
+
+    expect(resolveWorktreeBinaryAuthority({
+      argv: ['node', 'entry.js', 'status'],
+      runtimeModuleUrl: pathToFileURL(join(runtimeRoot, 'dist', 'cli', 'entry.js')).href,
+      projectRoot,
     })).toEqual({ status: 'allow', reason: 'user-project' });
   });
 

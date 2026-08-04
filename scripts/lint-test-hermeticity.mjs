@@ -104,14 +104,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // command-registry.ts gained the execution-authority entry (graph edge content).
   // Prior refresh: FAZ4B-B2 (count 12442).
   count: 12442,
-  digest: 'e4d256c8624ef67f531e79d02f7c7bd90efc9356c1bdff1a23e2e727d326b8d9',
+  digest: '38540a9979993a7923600a5da3a63a0094b02ae2b04a857530895781084b2b74',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-04 (EXEC-AUTH-REG): count unchanged, digest moved — command-registry.ts
   // gained the execution-authority entry. Prior: PREFIX-PAD prefix derivation.
   count: 1196,
-  digest: '19565ea0cb16091f1125406ed7ed3c3abf10f078de677808b6784a467988cfd8',
+  digest: '6a0518d984eebf41b701a32790104d31ab6113a9b304dcf8d93c36fc3c8b6873',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
