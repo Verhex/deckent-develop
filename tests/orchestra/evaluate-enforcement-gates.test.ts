@@ -292,8 +292,10 @@ describe('A14 — verify-delta downgrade gate', () => {
     const outcome = await runOneTask(root, task, result, makeConfig({ verify_delta_downgrade: true }));
 
     expect(outcome).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    // handleEvaluation artik 5. arg olarak dispatch-policy tasir
+    // ({ allowPriorityFixCreation }) — pin'in odagi downgrade verdict'i.
     expect(vi.mocked(handleEvaluation)).toHaveBeenCalledWith(
-      root, task, TaskEvaluation.GO_WITH_TECH_DEBT, expect.anything(),
+      root, task, TaskEvaluation.GO_WITH_TECH_DEBT, expect.anything(), expect.anything(),
     );
   });
 

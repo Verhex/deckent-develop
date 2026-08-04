@@ -86,6 +86,47 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+// FAZ4B: settlement authority artık write→readback→sha/equals zinciri koşuyor
+// (writeTaskResultSettlementWorkAttributionBaselineAtomic → readFileSync Buffer
+// bekler); in-memory string-fs mock'u bu zinciri taşıyamaz (RECORDED-FAILED
+// pattern). worker-auth-isolation ile aynı paylaşılan stub seam'i kullanılır —
+// gerçek host-authority persistence tmpdir-backed settlement suite'lerinde test edilir.
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
+// FAZ4B: heartbeat-authority store publishExclusive fd-tabanlı yazım + hard-link
+// zinciri kullanıyor; in-memory fs mock'unda identity.json boş kalır ("Unexpected
+// end of JSON input"). Heartbeat authority bu suite'in assert yüzeyi değil —
+// no-op store stub'ı (gerçek persistence kendi tmpdir-backed suite'inde).
+vi.mock('../../src/core/worker-heartbeat-authority-store.js', () => ({
+  WorkerHeartbeatAuthorityStore: class {
+    initialize() {
+      return { state: 'READY', authority: { holds: [], latest: null } };
+    }
+
+    read() {
+      return null;
+    }
+
+    observe() {
+      return { state: 'ACCEPTED', authority: { holds: [], latest: { hostSequence: 1 } } };
+    }
+  },
+}));
+
+// FAZ4B: prepareDockerExecutionLanding GERÇEK kalır (fail-closed "canonical
+// task kind" guard'ı bu suite'in assert yüzeyi). Yalnız alt katmandaki context
+// üretim/persist adımları stub'lanır: settlement stub'ının sabit sha'sı ('a'×64)
+// gerçek landing-context authority'siyle eşleşemez ve atomic write chain'i
+// in-memory fs mock'unda taşınamaz (RECORDED-FAILED pattern).
+vi.mock('../../src/core/execution-landing-context.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/core/execution-landing-context.js')>()),
+  createExecutionLandingContext: vi.fn(() => ({ schemaVersion: 1, state: 'test-stub' })),
+  writeExecutionLandingContextAtomic: vi.fn(),
+}));
+
 import { spawnSync } from 'node:child_process';
 import {
   DockerSpawnBackend,

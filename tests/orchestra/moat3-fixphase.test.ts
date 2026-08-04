@@ -12,71 +12,35 @@
 // skipFix guard's NO_GO-only classification stays uncontaminated by
 // NOT_DISPATCHED entries.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   TaskEvaluation, TaskStatus, SprintPhase, SprintStatus,
 } from '../../src/core/types.js';
 import type { Task, TaskResult, Sprint, ResolvedConfig, EvaluationResult } from '../../src/core/types.js';
 
-// ─── Hoisted stateful fake filesystem ────────────────────────────────────
-// A real disk marker (`.tasks/task-{id}.redispatch-attempted`) is how the
-// 1-round cap survives a resumed/re-entrant FIX phase — so the fake-fs must
-// be STATEFUL (a plain `vi.fn(() => true)` cannot prove "written once, seen
-// on the next call"). vi.hoisted keeps this state reachable from the
-// vi.mock('node:fs', ...) factory below, which vitest hoists above imports.
-const fakeFs = vi.hoisted(() => {
-  const markers = new Set<string>();
-  const hb = new Set<string>();
-  const log = new Set<string>();
-  const result = new Set<string>();
-
-  function extractId(path: string, suffix: string): string {
-    const m = path.match(new RegExp(`task-(.+)\\.${suffix}$`));
-    return m ? m[1] : '';
-  }
-
-  function existsSyncImpl(path: string): boolean {
-    const p = String(path);
-    if (p.endsWith('.redispatch-attempted')) return markers.has(extractId(p, 'redispatch-attempted'));
-    if (p.endsWith('.hb')) return hb.has(extractId(p, 'hb'));
-    if (p.endsWith('.log')) return log.has(extractId(p, 'log'));
-    if (p.endsWith('.result')) return result.has(extractId(p, 'result'));
-    return true; // tasksPath dir existence check, etc. — default present
-  }
-
-  function writeFileSyncImpl(path: string): void {
-    const p = String(path);
-    if (p.endsWith('.redispatch-attempted')) markers.add(extractId(p, 'redispatch-attempted'));
-  }
-
-  return {
-    markers, hb, log, result,
-    reset() { markers.clear(); hb.clear(); log.clear(); result.clear(); },
-    existsSyncImpl, writeFileSyncImpl,
-  };
-});
-
 // ─── Mocks (pattern mirrors tests/orchestra/fix-phase-map.test.ts) ───────
+//
+// REAL FILESYSTEM (FAZ4B): runFixPhase's entry (`persistPhaseTransition` →
+// `publishCanonicalRunStatusReadModel`) is an atomic write→rename→readback→
+// digest publication chain that an in-memory fs mock cannot carry
+// (RunStatusReadModelError PERSIST_FAILED — RECORDED-FAILED approach, do not
+// retry). Each test gets a fresh real scratch project root under tmpdir; the
+// 1-round re-dispatch marker, .hb dispatch-trace evidence and fix-task
+// discovery all go through the REAL disk, exactly like production.
 
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn((p: string) => fakeFs.existsSyncImpl(p)),
-  readdirSync: vi.fn(() => [] as string[]),
-  writeFileSync: vi.fn((p: string, c: unknown) => fakeFs.writeFileSyncImpl(p)),
-  readFileSync: vi.fn(() => ''),
-  promises: {
-    readFile: vi.fn(async () => ''),
-    writeFile: vi.fn(async () => undefined),
-    mkdir: vi.fn(async () => undefined),
-    appendFile: vi.fn(async () => undefined),
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 0 })),
-  },
-}));
-
-vi.mock('../../src/core/utils.js', () => ({
-  readJsonSafe: vi.fn(() => null),
-  parseDebtTable: vi.fn(() => []),
-  debugLog: vi.fn(),
+// Real fs, mocked processes: git/tsc probes must not escape the sandbox. A bare
+// vi.fn() would return undefined and crash callers reading `.status`.
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
+  execSync: vi.fn(() => ''),
+  execFileSync: vi.fn(() => ''),
+  spawn: vi.fn(),
+  exec: vi.fn(),
 }));
 
 // Partial mock: keep the REAL pure classifiers (classifyFixPhaseTasks,
@@ -88,7 +52,8 @@ vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {
   return {
     ...actual,
     evaluateWithRubric: vi.fn(),
-    reconcileEvaluationSpuriousNoGo: vi.fn((evaluation) => evaluation),
+    // R8/ADR-087: spurious recovery is async now — async passthrough.
+    reconcileEvaluationSpuriousNoGo: vi.fn(async (evaluation: EvaluationResult) => evaluation),
   };
 });
 
@@ -160,19 +125,10 @@ vi.mock('../../src/cli/helpers/splash.js', () => ({
   showSplash: vi.fn(() => ''),
 }));
 
-vi.mock('../../src/core/constants.js', () => ({
-  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-  BRAIN_DIR: '.brain',
-  TASKS_DIR: '.tasks',
-  DEBT_FILE: 'DEBT.md',
-  DECKENT_VERSION: '0.4.0-test',
-  DECKENT_DIR: '.deckent',
-  // born-630 (406-002): permission-store→approval-allowscope zinciri artık
-  // SETTINGS_DIR'i modül-yüklemede okuyor — factory-mock'a eksik export eklendi.
-  SETTINGS_DIR: '.deckent/settings',
-  SPRINT_STATE_FILE: '.deckent/sprint-state.json',
-  SPRINT_ACTIVE_FILE: '.deckent/sprint-active.json',
-}));
+// core/constants.js is REAL — a factory-mock here went stale twice (fix-phase-map
+// dersi: post-485 export'u eksik eski constants mock'u 9 testi öldürdü). Real fs
+// + real constants means new module-load-time constant reads can never break
+// this suite silently.
 
 // event-stream.js is mocked (unlike fix-phase-map.test.ts) so this suite can
 // assert on the RE_DISPATCH_RESULT summary-counter payload directly, instead
@@ -190,9 +146,14 @@ import { runFixPhase } from '../../src/orchestra/sprint-phases.js';
 import { spawnWorkers, waitForResults } from '../../src/orchestra/sprint-controller.js';
 import { evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
 import { writeEvent } from '../../src/orchestra/event-stream.js';
-import { writeFileSync } from 'node:fs';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+let root: string;
+
+function markerPath(taskId: string): string {
+  return join(root, '.tasks', `task-${taskId}.redispatch-attempted`);
+}
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -244,8 +205,17 @@ function makeConfig(): ResolvedConfig {
     modes: {},
     language: 'en',
     projectName: 'test',
-    projectRoot: '/tmp/test-project',
+    projectRoot: root,
     version: '0.4.0',
+    worker_provider: 'claude',
+    execution_budget: {
+      roles: {
+        worker: {
+          default: { maxCacheReadTokens: 5_000_000, maxTurns: 48 },
+        },
+      },
+      landing: { reserve_ratio: 0.25 },
+    },
   } as ResolvedConfig;
 }
 
@@ -268,7 +238,14 @@ function reDispatchResultEvent(): Record<string, unknown> | undefined {
 describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fakeFs.reset();
+    root = mkdtempSync(join(tmpdir(), 'deckent-moat3-'));
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'runtime'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
   });
 
   it('re-dispatches a NOT_DISPATCHED task via the same spawn/wait seam as the fix pipeline', async () => {
@@ -279,7 +256,7 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
     vi.mocked(waitForResults).mockResolvedValue([makeResult('354-777')]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     // Re-dispatched through the real spawn seam, task status reset to PENDING
     expect(spawnWorkers).toHaveBeenCalledTimes(1);
@@ -291,8 +268,8 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
     // Honest outcome: real DONE, not a synthetic result
     expect(evaluations.get('354-777')).toBe(TaskEvaluation.DONE);
 
-    // Marker written — the one round is now spent
-    expect(vi.mocked(writeFileSync).mock.calls.some(c => String(c[0]).endsWith('task-354-777.redispatch-attempted'))).toBe(true);
+    // Marker written to the REAL disk — the one round is now spent
+    expect(existsSync(markerPath('354-777'))).toBe(true);
 
     // Separate summary counter (goCriteria)
     expect(reDispatchResultEvent()).toMatchObject({ attempted: 1, succeeded: 1, failed: 0, stillNotDispatched: 0, exhausted: 0 });
@@ -305,13 +282,13 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
 
     vi.mocked(waitForResults).mockResolvedValue([]); // second dispatch also produced nothing
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     expect(spawnWorkers).toHaveBeenCalledTimes(1);
     expect(evaluations.get('354-778')).toBe(TaskEvaluation.NOT_DISPATCHED);
     expect(reDispatchResultEvent()).toMatchObject({ attempted: 1, succeeded: 0, failed: 0, stillNotDispatched: 1 });
     // Retry budget is spent even though the round failed to dispatch again
-    expect(fakeFs.markers.has('354-778')).toBe(true);
+    expect(existsSync(markerPath('354-778'))).toBe(true);
   });
 
   it('second attempt with no result but a disk trace (.hb) is a real NO_GO, not a dispatch gap', async () => {
@@ -321,23 +298,24 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
 
     vi.mocked(waitForResults).mockImplementation(async () => {
       // Simulate a worker that started (left a .hb) then crashed before writing .result
-      fakeFs.hb.add('354-779');
+      writeFileSync(join(root, '.tasks', 'task-354-779.hb'), new Date().toISOString(), 'utf-8');
       return [];
     });
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     expect(evaluations.get('354-779')).toBe(TaskEvaluation.NO_GO);
     expect(reDispatchResultEvent()).toMatchObject({ attempted: 1, succeeded: 0, failed: 1, stillNotDispatched: 0 });
   });
 
   it('a task whose marker already exists is excluded — no second re-dispatch round (max-1 cap)', async () => {
-    fakeFs.markers.add('354-780'); // simulates a prior FIX-phase round already spent
+    // simulates a prior FIX-phase round already spent — real marker on disk
+    writeFileSync(markerPath('354-780'), new Date().toISOString(), 'utf-8');
     const task = makeTask({ id: '354-780' });
     const sprint = makeSprint([task]);
     const evaluations = new Map<string, TaskEvaluation>([['354-780', TaskEvaluation.NOT_DISPATCHED]]);
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
 
     expect(spawnWorkers).not.toHaveBeenCalled();
     expect(waitForResults).not.toHaveBeenCalled();
@@ -354,7 +332,7 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
     vi.mocked(waitForResults).mockResolvedValue([]); // never produces a result, either round
 
     // Round 1 — dispatch is attempted, marker gets written, stays NOT_DISPATCHED
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
     expect(spawnWorkers).toHaveBeenCalledTimes(1);
     expect(evaluations.get('354-781')).toBe(TaskEvaluation.NOT_DISPATCHED);
 
@@ -363,7 +341,7 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
 
     // Round 2 — sprint controller re-enters FIX for the same still-NOT_DISPATCHED
     // task (e.g. a resumed sprint). The marker from round 1 must block a retry.
-    await runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
     expect(spawnWorkers).not.toHaveBeenCalled();
     expect(waitForResults).not.toHaveBeenCalled();
     expect(evaluations.get('354-781')).toBe(TaskEvaluation.NOT_DISPATCHED);
@@ -398,7 +376,7 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
       }),
     ];
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, results, makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, results, makeConfig(), undefined, 'v1', undefined);
 
     // Provider-limit guard fired and returned BEFORE the re-dispatch block ever ran.
     expect(spawnWorkers).not.toHaveBeenCalled();
@@ -429,7 +407,7 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
     vi.mocked(waitForResults).mockResolvedValue([makeResult('354-788')]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
-    await runFixPhase('/tmp/test-project', sprint, evaluations, results, makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, results, makeConfig(), undefined, 'v1', undefined);
 
     // Re-dispatch ran, and only touched the NOT_DISPATCHED task
     expect(spawnWorkers).toHaveBeenCalledTimes(1);

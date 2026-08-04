@@ -14,6 +14,17 @@ import { TaskEvaluation, TaskStatus, SprintPhase, SprintStatus } from '../../src
 import type { Sprint, Task, TaskResult } from '../../src/core/types.js';
 import { ProviderExecutionObservationStore } from '../../src/core/provider-execution-observation-store.js';
 import { readProviderConcurrencyRuntime } from '../../src/core/provider-concurrency-runtime-reader.js';
+import {
+  publishCanonicalRunStatusReadModel,
+  readCanonicalRunStatusReadModel,
+} from '../../src/core/run-status-read-model.js';
+import {
+  claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlementRef,
+  writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementDispatchAtomic,
+  writeTaskResultSettlementPreparedAtomic,
+} from '../../src/core/task-result-settlement.js';
 import { projectTerminalPublicationStatus as projectMcpTerminalPublication } from '../../src/mcp/tools/status.js';
 import { captureShadowSchedulerSnapshot } from '../../src/orchestra/scheduler-driver.js';
 import { reduceSchedulerTick } from '../../src/orchestra/scheduler-reducer.js';
@@ -114,10 +125,19 @@ describe('canonical production-wiring closure canary', () => {
       kind: 'SpawnTask', taskId: independent.id, reason: 'pending-slot-fill',
     });
 
+    // The concurrency runtime only counts intervals owned by a CURRENTLY
+    // dispatched host attempt — mint the exact settlement authority for the
+    // repaired task and bind the observation to its attemptId (same producer
+    // chain as the docker spawn path).
+    const settlementRef = createTaskResultSettlementRef(root, repaired.id);
+    writeTaskResultSettlementAttemptAtomic(settlementRef);
+    claimTaskResultSettlementAttemptAtomic(settlementRef);
+    writeTaskResultSettlementPreparedAtomic(settlementRef, repaired.model);
+    writeTaskResultSettlementDispatchAtomic(settlementRef, 'f'.repeat(64));
     const observations = new ProviderExecutionObservationStore(root);
     observations.put({ source: 'provider-runtime', observation: {
-      type: 'start', executionId: 'exec-canary', taskId: repaired.id,
-      attemptId: 'attempt-canary', providerPrincipalDigest: 'principal-canary',
+      type: 'start', executionId: 'exec-canary', runId: 'run-canary', taskId: repaired.id,
+      attemptId: settlementRef.attemptId, providerPrincipalDigest: 'principal-canary',
       fence: 'fence-canary', sequence: 1, observedAt: '2026-07-31T12:00:00.000Z',
     } });
     observations.close();
@@ -142,13 +162,20 @@ describe('canonical production-wiring closure canary', () => {
     }));
     expect(truth.logicalProgress).toMatchObject({ done: 1, total: 1, attemptCount: 2 });
 
+    // Status surfaces now consume the PERSISTED run-status read model (the
+    // canonical publisher the finalizer runs) — publish it exactly like
+    // production does after the terminal receipt lands.
+    publishCanonicalRunStatusReadModel(root);
+    expect(readCanonicalRunStatusReadModel(root)?.logicalProgress).toMatchObject({
+      done: 1, active: 0, blocked: 0, total: 1, attemptCount: 2,
+    });
+
     const status = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {
       providerConcurrencyRuntime: readProviderConcurrencyRuntime,
     });
     expect(status).toMatchObject({
       active: false,
       lifecycle: 'COMPLETE',
-      progress: { done: 1, active: 0, blocked: 0, total: 1, attemptCount: 2 },
       terminalPublication: { state: 'receipt-observed' },
       providerConcurrency: [{
         providerPrincipalDigest: 'principal-canary', admission: 'HOLD',

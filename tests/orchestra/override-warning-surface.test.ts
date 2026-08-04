@@ -51,6 +51,84 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   cleanupDraftTasks: vi.fn(),
 }));
 
+// FAZ4B: `deckent plan` (non-dry-run) artık planSprint'i doğrudan değil,
+// durable exact-plan flow service (planRunFlow → flowId/revision/planDigest,
+// sonra decideRunFlowPlan approve) üzerinden çağırıyor. Bu seam mock'lanmadan
+// gerçek planRunFlow mock ortamında düşüyor ve komut hiçbir şey print etmeden
+// printError'a gidiyordu (4 test kırmızısının kökü). tests/cli/commands/
+// plan.test.ts'teki kanıtlı seam birebir aynalanır; topology bilinçli olarak
+// verilmez ki bu suite'in print-yüzeyi assert'leri (override bloğu) sade kalsın.
+vi.mock('../../src/orchestra/run-flow-plan-service.js', () => {
+  class RunFlowPlanServiceError extends Error {
+    readonly code: string;
+    readonly details: Record<string, unknown>;
+    constructor(code: string, details: Record<string, unknown> = {}) {
+      super(code);
+      this.code = code;
+      this.details = details;
+    }
+  }
+  return {
+    RunFlowPlanServiceError,
+    decideRunFlowPlan: vi.fn(),
+    planRunFlow: vi.fn(async (input: {
+      projectRoot: string;
+      config: unknown;
+      recommendation?: unknown;
+      proposal?: { flowId?: string; revision?: number };
+      source?: { brainContext?: unknown };
+      previewOptions?: { mode?: string };
+    }) => {
+      const { planSprint: planSprintMock } = await import('../../src/orchestra/brain.js');
+      const sprint = await planSprintMock(
+        input.projectRoot,
+        input.config as never,
+        input.source?.brainContext as never,
+        input.recommendation as never,
+        { mode: input.previewOptions?.mode } as never,
+      );
+      const { createHash } = await import('node:crypto');
+      const tasks: Array<{ id: string }> = (sprint as { tasks?: Array<{ id: string }> })?.tasks ?? [];
+      return {
+        flowId: input.proposal?.flowId ?? 'flow-test',
+        revision: input.proposal?.revision ?? 1,
+        approval: 'awaiting',
+        reusedDurablePlan: false,
+        sprint,
+        preview: {
+          scopeGateResult: 'skipped',
+          topologyGateResult: 'pass',
+          planDigestVersion: 2,
+        },
+        planDigest: createHash('sha256')
+          .update(JSON.stringify(tasks.map(t => t.id)))
+          .digest('hex'),
+      };
+    }),
+  };
+});
+
+// FAZ4B: approved-plan task-file publish gerçek dosya sistemine dokunur —
+// plan.test.ts'teki gibi tüm boundary mock'lanır (error sınıfları `instanceof`
+// daraltması için gerçek class olmalı).
+vi.mock('../../src/orchestra/task-artifact-projection.js', () => {
+  class TaskArtifactProjectionError extends Error {
+    readonly code: string;
+    readonly details: Record<string, unknown>;
+    constructor(code: string, details: Record<string, unknown> = {}) {
+      super(code);
+      this.code = code;
+      this.details = details;
+    }
+  }
+  return {
+    TaskArtifactProjectionError,
+    inspectTaskArtifactsNoClobber: vi.fn(),
+    publishTaskArtifactsNoClobber: vi.fn(),
+    inspectStructuredCriteriaProjectionAdoption: vi.fn(),
+  };
+});
+
 vi.mock('../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
@@ -275,13 +353,16 @@ describe('deckent plan — override-warning surface (born-595 / 395-005)', () =>
     await runCommand(['plan', '--no-confirm']);
 
     const lines = printedLines();
-    // Baseline shape: sprint_planned header, table, then approval prompt path
-    // (no-confirm means asDraft=false, so no approval print). No blank-line +
+    // Baseline shape: sprint_planned header, table, then the durable
+    // exact-plan approval receipt (--no-confirm artık flow-service üzerinden
+    // immediate-approve olur ve flowId/revision/planDigest JSON satırı basar —
+    // FAZ4B: baseline güncel üretim davranışına hizalandı). No blank-line +
     // override-header pair should appear anywhere.
     expect(lines.some(l => l.includes('Override'))).toBe(false);
     expect(lines).toEqual([
       expect.stringContaining('Run 395 (sprint) (sprint-395) planned with 1 tasks:'),
       expect.stringContaining('395-017'),
+      expect.stringContaining('planDigest'),
     ]);
   });
 });

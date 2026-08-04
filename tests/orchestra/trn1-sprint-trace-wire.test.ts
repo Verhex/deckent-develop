@@ -195,9 +195,15 @@ describe('born-614 call-site composition pin (yarim-wire sinifina karsi)', () =>
     const calls = src.split('await runEvaluatePhase(').slice(1);
     expect(calls.length).toBeGreaterThanOrEqual(2);
     for (const c of calls) {
-      const argsHead = c.slice(0, 400);
-      // 6. arg config olmali - "config, undefined, deferredTaskIds" deseni
-      expect(argsHead).toContain('config, undefined, deferredTaskIds');
+      // Yorumlari ve whitespace'i normalize et — cagri-siteleri artik multiline
+      // (incremental streaming call-site dahil) ve 8. arg farklilasabiliyor
+      // (deferredTaskIds | undefined). Degismez olan sey: 6. pozisyonel arg
+      // CONFIG'tir, undefined DEGILDIR.
+      const argsHead = c.slice(0, 700)
+        .replace(/\/\/[^\n]*/g, '')
+        .replace(/\s+/g, ' ');
+      // 5. arg coverage-floor'dan hemen sonra 6. arg config gelmeli:
+      expect(argsHead).toMatch(/, config, undefined,/);
     }
   });
 });

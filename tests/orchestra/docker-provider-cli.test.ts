@@ -108,6 +108,24 @@ import {
 const mockSpawnSync = vi.mocked(spawnSync);
 const mockReadFileSync = vi.mocked(readFileSync);
 
+// Heartbeat-authority identity readbacks must surface ENOENT: the full node:fs
+// mock cannot carry the WorkerHeartbeatAuthorityStore write→readback chain, and
+// the generic fixture fallback would trip the store's schema guard
+// (E_UNSUPPORTED_WORKER_HEARTBEAT_AUTHORITY_IDENTITY). ENOENT routes the store
+// onto its honest uninitialized-attempt path (read → null, observe → typed
+// HOLD); real persistence is proven in tests/core/worker-heartbeat-authority-store.test.ts.
+function budgetedTaskRead(model?: string): typeof readFileSync {
+  return ((path: unknown) => {
+    const p = String(path);
+    if (p.includes('worker-heartbeat-authority')) {
+      const error = new Error(`ENOENT: no such file or directory, open '${p}'`) as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      throw error;
+    }
+    return budgetedDockerTaskJson(path, model === undefined ? {} : { model });
+  }) as typeof readFileSync;
+}
+
 // ─── Spawn-seam router ───────────────────────────────────────────────────────
 
 interface SpawnSyncOutcome {
@@ -170,7 +188,7 @@ async function workerScriptFor(taskId: string): Promise<string> {
 
 function spawnExpectMessage(backend: DockerSpawnBackend, taskId: string, model: string): string {
   try {
-    mockReadFileSync.mockImplementation(path => budgetedDockerTaskJson(path, { model }));
+    mockReadFileSync.mockImplementation(budgetedTaskRead(model));
     backend.spawn(taskId, model as ModelType, 'prompt-body', TEST_DOCKER_EXECUTION_OPTIONS);
     return '';
   } catch (err) {
@@ -188,9 +206,7 @@ describe('DockerSpawnBackend: provider→cmd table (shared PROVIDER_COMMAND_SPEC
 
   it('claude worker script is built from PROVIDER_COMMAND_SPECS.claude (string-assert)', async () => {
     const spec = getProviderCommandSpec('claude')!;
-    mockReadFileSync.mockImplementation(
-      path => budgetedDockerTaskJson(path, { model: 'claude-sonnet-5' }),
-    );
+    mockReadFileSync.mockImplementation(budgetedTaskRead('claude-sonnet-5'));
     new DockerSpawnBackend('/test/project').spawn(
       'cli-table-claude',
       'claude-sonnet-5' as ModelType,
@@ -207,9 +223,7 @@ describe('DockerSpawnBackend: provider→cmd table (shared PROVIDER_COMMAND_SPEC
   });
 
   it('forwards Docker PID1 SIGTERM to the tracked provider supervisor', async () => {
-    mockReadFileSync.mockImplementation(
-      path => budgetedDockerTaskJson(path, { model: 'claude-sonnet-5' }),
-    );
+    mockReadFileSync.mockImplementation(budgetedTaskRead('claude-sonnet-5'));
     new DockerSpawnBackend('/test/project').spawn(
       'cli-table-term-forward',
       'claude-sonnet-5' as ModelType,
@@ -227,9 +241,7 @@ describe('DockerSpawnBackend: provider→cmd table (shared PROVIDER_COMMAND_SPEC
   });
 
   it('threads the finite verifier tool/context profile into the real Docker worker script', async () => {
-    mockReadFileSync.mockImplementation(
-      path => budgetedDockerTaskJson(path, { model: 'claude-fable-5' }),
-    );
+    mockReadFileSync.mockImplementation(budgetedTaskRead('claude-fable-5'));
     new DockerSpawnBackend('/test/project').spawn(
       'finite-xverify',
       'claude-fable-5' as ModelType,

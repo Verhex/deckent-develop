@@ -197,7 +197,11 @@ describe('S7C full-chain composition — legacy-fifo: blocked-head + next-eligib
 
     const deps: SchedulerDriverDeps = {
       sprint,
-      config: { dependency_pipeline_enabled: true } as ResolvedConfig,
+      // fix_phase_enabled:false = no FIX budget → the reducer preserves
+      // TERMINAL cascade semantics (deferTerminalDependencyFailure=false).
+      // With a FIX budget the driver now DEFERS the cascade so the lineage
+      // stays repairable — this fixture pins the terminal (no-budget) path.
+      config: { dependency_pipeline_enabled: true, fix_phase_enabled: false } as ResolvedConfig,
       remainingQueue,
       assignedTaskIds: new Set(),
       collectedIds: new Set(),
@@ -261,7 +265,8 @@ describe('S7C full-chain composition — continuous: blocked-head + next-eligibl
 
     const deps: SchedulerDriverDeps = {
       sprint,
-      config: { dependency_pipeline_enabled: true } as ResolvedConfig,
+      // fix_phase_enabled:false — terminal cascade semantics (see fixture 1).
+      config: { dependency_pipeline_enabled: true, fix_phase_enabled: false } as ResolvedConfig,
       remainingQueue,
       assignedTaskIds: new Set(),
       collectedIds: new Set(),
@@ -401,7 +406,8 @@ describe('S7C two-engine comparison — legacy (planDispatch) vs reducer (real d
     const remainingQueue: Task[] = [];
     const deps: SchedulerDriverDeps = {
       sprint: makeSprint(reducerFixture.tasks),
-      config: { dependency_pipeline_enabled: true } as ResolvedConfig,
+      // fix_phase_enabled:false — terminal cascade semantics (see fixture 1).
+      config: { dependency_pipeline_enabled: true, fix_phase_enabled: false } as ResolvedConfig,
       remainingQueue,
       assignedTaskIds: new Set(),
       collectedIds: new Set(),

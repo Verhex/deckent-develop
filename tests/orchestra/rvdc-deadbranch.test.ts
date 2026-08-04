@@ -101,6 +101,12 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
 }
 
 function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskResult {
+  // FAZ4A terminal-evidence contract (projectAttributedTaskWork): a result
+  // without a VERIFIED work attribution is an unattributable work claim → the
+  // finalizer records a HOLD and refuses to settle (TERMINAL_EVIDENCE_HOLD).
+  // Host-authored claim-time attribution is therefore part of the honest
+  // fixture shape (mirrors tests/cli/finalize-refinalize.test.ts).
+  const attemptId = `attempt-${taskId}`;
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -111,6 +117,12 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
     coverage: 90,
     selfAssessment: 'DONE',
     notes: 'ok',
+    workAttribution: {
+      state: 'VERIFIED' as const,
+      attemptId,
+      baselineRef: `baseline:${attemptId}`,
+      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+    },
     ...overrides,
   } as TaskResult;
 }

@@ -27,7 +27,12 @@ vi.mock('node:child_process', () => ({
 vi.mock('node:fs', () => ({
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   chmodSync: vi.fn(),
-  existsSync: vi.fn((path: string) => path.endsWith('/.claude/.credentials.json')),
+  // FAZ4B: spawn artık credential'ı tmpdir broker kopyasından
+  // (deckent-provider-auth) okuyup principal-digest üretiyor; broker yolu da
+  // "var" sayılmazsa resolveDockerProviderPrincipalDigest fail-closed throw ediyordu.
+  existsSync: vi.fn((path: string) =>
+    path.endsWith('/.claude/.credentials.json')
+    || path.includes('deckent-provider-auth')),
   readFileSync: vi.fn((path: string) => budgetedDockerTaskJson(path, {
     model: path.includes('opus') ? 'claude-opus-4-8' : 'claude-sonnet-5',
   })),
@@ -67,6 +72,25 @@ vi.mock('../../src/core/task-result-settlement.js', () => {
 vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
   ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
   prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
+// FAZ4B: heartbeat-authority store publishExclusive fd+hardlink zinciri
+// in-memory fs mock'unda taşınamaz (RECORDED-FAILED pattern); heartbeat
+// authority bu suite'in assert yüzeyi değil — no-op store stub'ı.
+vi.mock('../../src/core/worker-heartbeat-authority-store.js', () => ({
+  WorkerHeartbeatAuthorityStore: class {
+    initialize() {
+      return { state: 'READY', authority: { holds: [], latest: null } };
+    }
+
+    read() {
+      return null;
+    }
+
+    observe() {
+      return { state: 'ACCEPTED', authority: { holds: [], latest: { hostSequence: 1 } } };
+    }
+  },
 }));
 
 import { spawnSync } from 'node:child_process';

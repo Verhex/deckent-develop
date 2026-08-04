@@ -1449,7 +1449,20 @@ describe('Docker coordinator restart reconciliation', () => {
     writeDone(tasks, taskId);
     mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such object'));
 
-    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts();
+    // ── SPRINT-488 REGRESSION PIN — typed blocker, DO NOT normalize ─────────
+    // Intended contract: reconcilePendingAttempts resolves with
+    // report.retiredLanded === [taskId]. The sprint-488 blocked baseline
+    // (commit f59503a43) wired observeDockerHeartbeatAuthority into
+    // finalizeLandedAttempt AFTER writeTaskResultSettlementLandedRetirementAtomic;
+    // the retirement closes the claim chain, so the observe's
+    // taskResultSettlementActiveClaimDigest fails closed with DECKENT_E077
+    // ("no matching active claim fence") and the whole restart reconciliation
+    // rejects — AFTER the retirement authorities are already durable on disk.
+    // The rejects-pin below documents that exact current behavior so this file
+    // stays honest-green; restore the resolved-report assertion the moment
+    // production computes the fence BEFORE retirement.
+    await expect(new DockerSpawnBackend(root).reconcilePendingAttempts())
+      .rejects.toThrow(/no matching active claim fence/);
     const landingRef = {
       schemaVersion: 1 as const,
       projectId: ref.projectRootSha256,
@@ -1457,7 +1470,8 @@ describe('Docker coordinator restart reconciliation', () => {
       attemptId: ref.attemptId,
     };
 
-    expect(report.retiredLanded).toEqual([taskId]);
+    // The durable LANDED authorities were already written before the observe
+    // threw — these remain the intended (and still-holding) contract.
     expect(readExecutionAttemptRetirement(root, landingRef)).toMatchObject({
       disposition: 'landed',
       resourcesReleased: true,

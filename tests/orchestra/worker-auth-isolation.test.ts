@@ -63,7 +63,29 @@ vi.mock('node:fs', () => ({
   renameSync: vi.fn(),
   rmdirSync: vi.fn(),
   chmodSync: vi.fn(),
-  statSync: vi.fn(() => ({ mtimeMs: 1 })),
+  // FAZ4B: principal-digest yolu statSync(path).isFile() çağırıyor — eksik
+  // metod TypeError üretmesin diye dosya-benzeri stat şekli tamamlandı.
+  statSync: vi.fn(() => ({ mtimeMs: 1, isFile: () => true, isDirectory: () => false })),
+}));
+
+// FAZ4B: heartbeat-authority store publishExclusive fd+hardlink zinciri
+// in-memory fs mock'unda taşınamaz (RECORDED-FAILED pattern); readFileSync '{}'
+// döndürünce store E_UNSUPPORTED_..._IDENTITY fırlatıyordu. Heartbeat authority
+// bu suite'in assert yüzeyi değil — no-op store stub'ı.
+vi.mock('../../src/core/worker-heartbeat-authority-store.js', () => ({
+  WorkerHeartbeatAuthorityStore: class {
+    initialize() {
+      return { state: 'READY', authority: { holds: [], latest: null } };
+    }
+
+    read() {
+      return null;
+    }
+
+    observe() {
+      return { state: 'ACCEPTED', authority: { holds: [], latest: { hostSequence: 1 } } };
+    }
+  },
 }));
 
 vi.mock('../../src/core/utils.js', () => ({
@@ -179,7 +201,12 @@ function stubTaskEnvelope(
     p.endsWith(`task-${taskId}.json`)
     || (model.startsWith('claude-')
       && authMode === 'subscription'
-      && p.endsWith('/.claude/.credentials.json'));
+      // FAZ4B: spawn artık credential'ı tmpdir broker kopyasından
+      // (deckent-provider-auth) okuyup principal-digest üretiyor; broker yolu
+      // da "var" sayılmazsa resolveDockerProviderPrincipalDigest material
+      // bulamayıp fail-closed throw ediyordu.
+      && (p.endsWith('/.claude/.credentials.json')
+        || p.includes('deckent-provider-auth')));
   fsState.readFileSyncImpl = (p: string) => {
     if (p.endsWith(`task-${taskId}.json`)) {
       return budgetedDockerTaskJson(p, { authMode, model });

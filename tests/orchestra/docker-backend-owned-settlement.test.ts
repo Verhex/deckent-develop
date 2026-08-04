@@ -139,6 +139,10 @@ describe('Docker backend-owned settlement authority', () => {
 
     mockSpawnSync.mockImplementation((command, args) => {
       const argv = (args ?? []) as string[];
+      // 455-003 attribution baseline: the host captures a `git hash-object`
+      // content manifest of every scoped file before the container starts, and
+      // an empty stdout here would fail the mandatory baseline capture.
+      if (command === 'git' && argv[0] === 'hash-object') return spawnResult(0, `${'f'.repeat(40)}\n`);
       if (command === 'docker' && argv[0] === 'info') return spawnResult(0, 'ok');
       if (command === 'docker' && argv[0] === 'images') return spawnResult(0, 'image-id');
       if (command === 'claude' && argv[0] === 'auth') {
@@ -187,6 +191,10 @@ describe('Docker backend-owned settlement authority', () => {
 
     mockSpawnSync.mockImplementation((command, args) => {
       const argv = (args ?? []) as string[];
+      // 455-003 attribution baseline: the host captures a `git hash-object`
+      // content manifest of every scoped file before the container starts, and
+      // an empty stdout here would fail the mandatory baseline capture.
+      if (command === 'git' && argv[0] === 'hash-object') return spawnResult(0, `${'f'.repeat(40)}\n`);
       if (command === 'docker' && argv[0] === 'info') return spawnResult(0, 'ok');
       if (command === 'docker' && argv[0] === 'images') return spawnResult(0, 'image-id');
       if (command === 'claude' && argv[0] === 'auth') {
@@ -230,6 +238,10 @@ describe('Docker backend-owned settlement authority', () => {
 
     mockSpawnSync.mockImplementation((command, args) => {
       const argv = (args ?? []) as string[];
+      // 455-003 attribution baseline: the host captures a `git hash-object`
+      // content manifest of every scoped file before the container starts, and
+      // an empty stdout here would fail the mandatory baseline capture.
+      if (command === 'git' && argv[0] === 'hash-object') return spawnResult(0, `${'f'.repeat(40)}\n`);
       if (command === 'docker' && argv[0] === 'info') return spawnResult(0, 'ok');
       if (command === 'docker' && argv[0] === 'images') return spawnResult(0, 'image-id');
       if (command === 'claude' && argv[0] === 'auth') {

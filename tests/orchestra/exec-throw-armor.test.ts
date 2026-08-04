@@ -156,6 +156,11 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     projectRoot: '/tmp/test',
     version: '0.1.0',
     dependency_pipeline_enabled: false,
+    // FAZ4B: run-cost budget artık effective billing-mode ile değerlendiriliyor
+    // ve auth_mode yokken billingMode=undefined "fails closed" → runBudgetHold
+    // dispatch'i parkediyordu (b hiç spawn edilemiyor, retry testi 0 çağrı).
+    // Subscription auth ile billing 'subscription' → quota-scope, within-budget.
+    auth_mode: 'subscription',
     ...overrides,
   } as ResolvedConfig;
 }

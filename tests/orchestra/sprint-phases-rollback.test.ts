@@ -19,6 +19,16 @@ vi.mock('node:fs', async () => {
   };
 });
 
+// persistPhaseTransition artik fail-closed olarak canonical run-status read
+// modelini yayinlar (gercek tmp-write + rename + readback zinciri). Bu dosyanin
+// mocked-fs kurgusu o zinciri tasiyamaz (RECORDED-FAILED sinifi); rollback
+// davranisiyla da ilgisi yok — publisher'i hibrit importOriginal-spread ile
+// no-op'lariz, geri kalan modul gercek kalir.
+vi.mock('../../src/core/run-status-read-model.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/run-status-read-model.js')>();
+  return { ...actual, publishCanonicalRunStatusReadModel: vi.fn() };
+});
+
 vi.mock('../../src/core/utils.js', () => ({
   readJsonSafe: vi.fn(),
   parseDebtTable: vi.fn().mockReturnValue([]),

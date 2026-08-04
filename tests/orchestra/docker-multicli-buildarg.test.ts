@@ -257,9 +257,20 @@ describe('DockerSpawnBackend: claude worker uses the default image unchanged (F1
   });
 
   it('image present → claude worker runs the default image with NO `--build-arg` and NO docker build', () => {
-    mockReadFileSync.mockImplementation(
-      path => budgetedDockerTaskJson(path, { model: 'claude-sonnet-5' }),
-    );
+    // Heartbeat-authority identity readbacks must surface ENOENT: the full
+    // node:fs mock cannot carry the WorkerHeartbeatAuthorityStore
+    // write→readback chain, and the '{}' fallback would trip the store's
+    // schema guard (E_UNSUPPORTED_WORKER_HEARTBEAT_AUTHORITY_IDENTITY).
+    // ENOENT routes the store onto its honest uninitialized-attempt path;
+    // real persistence is proven in tests/core/worker-heartbeat-authority-store.test.ts.
+    mockReadFileSync.mockImplementation(((path: unknown) => {
+      if (String(path).includes('worker-heartbeat-authority')) {
+        const error = new Error(`ENOENT: no such file or directory, open '${String(path)}'`) as NodeJS.ErrnoException;
+        error.code = 'ENOENT';
+        throw error;
+      }
+      return budgetedDockerTaskJson(path, { model: 'claude-sonnet-5' });
+    }) as typeof readFileSync);
     new DockerSpawnBackend('/test/project').spawn(
       'mc-claude-ok',
       'claude-sonnet-5' as never,
