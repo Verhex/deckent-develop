@@ -114,16 +114,18 @@ describe('API auth with token', () => {
     if (api) await api.close();
   });
 
-  it('POST /api/start with valid bearer token returns 202', async () => {
+  it('POST /api/start with valid bearer token passes auth and reaches the retired-route contract (410)', async () => {
     api = createHttpServer(PROJECT_ROOT, 0, undefined, TOKEN);
     await new Promise<void>((r) => api.server.once('listening', r));
 
     const res = await request(api, '/api/start', 'POST', { autoApprove: true }, {
       'Authorization': `Bearer ${TOKEN}`,
     });
-    expect(res.status).toBe(202);
+    // FAZ4B: token kabul edildi (401 DEĞİL) → emekli /api/start route'u
+    // 410 LEGACY_START_RETIRED kontratıyla cevap verir; sprint başlatılmaz.
+    expect(res.status).toBe(410);
     const body = JSON.parse(res.body);
-    expect(body.status).toBe('started');
+    expect(body.code).toBe('LEGACY_START_RETIRED');
   });
 
   it('POST /api/start without token returns 401 when auth is configured', async () => {

@@ -44,7 +44,11 @@ vi.mock('../../src/core/config.js', () => ({
 const { mockConnector } = vi.hoisted(() => ({
   mockConnector: { getAvailableProviders: vi.fn().mockReturnValue(['claude', 'codex']) },
 }));
-vi.mock('../../src/core/provider.js', () => ({
+// FAZ4B: hybrid importOriginal-spread — bayat factory mock yeni export'ları
+// (örn. ProviderError, task-router import zinciri) taşımıyordu; gerçek modülü
+// spread edip yalnız bootstrapProviders override ediliyor.
+vi.mock('../../src/core/provider.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/provider.js')>()),
   bootstrapProviders: vi.fn().mockResolvedValue({ connector: mockConnector }),
 }));
 

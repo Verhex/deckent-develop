@@ -696,14 +696,16 @@ describe('Sprint mini-cycle integration', () => {
   });
 
   it('cleanup removes task artifacts', () => {
-    // Create some artifacts
-    const task = makeTestTask('c01', { assignedWorker: 'w-c01' });
+    // FAZ4B: cleanup artık sprint-scoped prefix (`task-<sprint-segment>-`) ile
+    // siler (PROD-SPRINT-PREFIX-PAD-001) — fixture, production adlandırmasıyla
+    // hizalandı: sprint-099 → task-099-c01.* artefaktları.
+    const task = makeTestTask('099-c01', { assignedWorker: 'w-c01' });
     writeTaskFile(root, task);
-    writeHeartbeat(root, createHeartbeat('w-c01', 'c01', AgentStatus.DONE, 'done'));
-    acquireLock(root, 'src/cleanup.ts', 'w-c01', 'c01');
+    writeHeartbeat(root, createHeartbeat('w-c01', '099-c01', AgentStatus.DONE, 'done'));
+    acquireLock(root, 'src/cleanup.ts', 'w-c01', '099-c01');
 
     const sprint: Sprint = {
-      id: 'sprint-cleanup', number: 99, status: SprintStatus.COMPLETE,
+      id: 'sprint-099', number: 99, status: SprintStatus.COMPLETE,
       phase: SprintPhase.COMPLETE, tasks: [task], workers: ['w-c01'],
     };
 

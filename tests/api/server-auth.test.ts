@@ -280,11 +280,13 @@ describe('Bearer Token Authentication', () => {
       const res = await request(api, '/api/start', 'POST', {});
       expect(res.status).toBe(401);
 
-      // POST with correct token → proceeds (202 for start)
+      // POST with correct token → auth kapısı geçilir; FAZ4B'de /api/start
+      // emekli olduğundan route 410 LEGACY_START_RETIRED döner (401 DEĞİL).
       const res2 = await request(api, '/api/start', 'POST', {}, {
         'Authorization': `Bearer ${TEST_TOKEN}`,
       });
-      expect(res2.status).toBe(202);
+      expect(res2.status).toBe(410);
+      expect(JSON.parse(res2.body).code).toBe('LEGACY_START_RETIRED');
       stderrSpy.mockRestore();
     });
 

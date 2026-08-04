@@ -101,6 +101,10 @@ describe('scanHeartbeats — edge cases', () => {
       const path = String(p);
       if (path.includes('.brain')) return false;
       if (path.endsWith('.result')) return false;
+      // FAZ4B: authority-first — worker-heartbeat-authority runtime kökü var
+      // sayılırsa readHeartbeatAuthoritySnapshots identity.json okumaları
+      // readFileSync once-kuyruğunu kaydırır; fixture'da fence yayınlanmadı.
+      if (path.includes('worker-heartbeat-authority')) return false;
       return true;
     });
     mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
@@ -177,6 +181,9 @@ describe('scanHeartbeats — edge cases', () => {
     mockedExistsSync.mockImplementation((p: unknown) => {
       const path = String(p);
       if (path.endsWith('.result')) return false;
+      // FAZ4B: fence yayınlanmamış fixture — authority kökü yok sayılmalı,
+      // yoksa identity.json okumaları readFileSync once-kuyruğunu kaydırır.
+      if (path.includes('worker-heartbeat-authority')) return false;
       return true;
     });
     mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);

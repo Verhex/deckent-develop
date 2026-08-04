@@ -360,42 +360,28 @@ describe('Server Security Hardening', () => {
     });
   });
 
-  // ─── H) Multi-Sprint Job Tracking ─────────────────────────
+  // ─── H) Legacy start job tracking (retired — FAZ4B) ───────
+  // /api/start kalıcı 410 LEGACY_START_RETIRED: job takibi run-flow
+  // start (detached admission) yüzeyine taşındı. Güvenlik pini: emekli
+  // ingress hiçbir detached süreç başlatmaz, hiçbir job kaydı sızdırmaz.
   describe('multi-sprint job tracking', () => {
-    it('tracks multiple completed jobs', async () => {
-      vi.mocked(startSprintDetached).mockImplementation((_root, _opts, onExit) => {
-        const jobId = `job-${Date.now()}`;
-        setTimeout(() => onExit?.(0), 10);
-        return { jobId };
-      });
-
+    it('legacy start never spawns or tracks jobs — 410 on every call, job lookups 404', async () => {
       api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 0 });
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      // Start first job
       const res1 = await request(api, '/api/start', 'POST', {});
-      expect(res1.status).toBe(202);
-      const { jobId: jobId1 } = JSON.parse(res1.body);
+      expect(res1.status).toBe(410);
+      expect(JSON.parse(res1.body).code).toBe('LEGACY_START_RETIRED');
+      expect(JSON.parse(res1.body).jobId).toBeUndefined();
 
-      // Wait for completion (detached process exit callback fires)
-      await new Promise((r) => setTimeout(r, 50));
-
-      // Start second job (first is done, so not blocked)
       const res2 = await request(api, '/api/start', 'POST', {});
-      expect(res2.status).toBe(202);
-      const { jobId: jobId2 } = JSON.parse(res2.body);
-      expect(jobId2).not.toBe(jobId1);
+      expect(res2.status).toBe(410);
 
-      await new Promise((r) => setTimeout(r, 50));
+      expect(vi.mocked(startSprintDetached)).not.toHaveBeenCalled();
 
-      // Both jobs accessible
-      const j1 = await request(api, `/api/job/${jobId1}`);
-      expect(j1.status).toBe(200);
-      expect(JSON.parse(j1.body).status).toBe('completed');
-
-      const j2 = await request(api, `/api/job/${jobId2}`);
-      expect(j2.status).toBe(200);
-      expect(JSON.parse(j2.body).status).toBe('completed');
+      const lookup = await request(api, '/api/job/job-anything');
+      expect(lookup.status).toBe(404);
+      expect(JSON.parse(lookup.body)).toEqual({ error: 'Job not found' });
     });
   });
 });
