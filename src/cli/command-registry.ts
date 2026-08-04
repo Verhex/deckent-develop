@@ -134,6 +134,8 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('limits', 'Core', 'Oku', 'core', ['cli']),          // 361-002 subscription limit-probe
   entry('openrouter-probe', 'Core', 'Oku', 'core', ['cli']), // 366-003 canlı-probe (key'siz dürüst-unavailable)
   entry('provider-authority', 'Enterprise', 'Değiştir', 'providers', ['cli']),
+  entry('execution-authority', 'Enterprise', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_execution_authority']), // mount-adopt: yerel execution-lock authority mutasyonu
+
   entry('xverify', 'Core', 'Oku', 'orchestra', ['cli', 'mcp'], ['deckent_xverify']), // XVERIFY-TOOL host-adjudicated cross-provider hakem
   entry('kpi', 'Core', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_kpi']),
   entry('image', 'Core', 'Değiştir', 'core', ['cli']),
