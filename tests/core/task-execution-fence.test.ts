@@ -15,7 +15,7 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 import {
   afterEach,
@@ -81,11 +81,26 @@ function simulateExecutionAuthorityRemount(root: string): {
   };
   const originalMountId = anchor.project.mountId;
   const simulatedMountId = String(BigInt(originalMountId) + 1n);
-  writeFileSync(anchorPath, JSON.stringify({
+  const remounted = JSON.stringify({
     ...anchor,
     project: { ...anchor.project, mountId: simulatedMountId },
     locks: { ...anchor.locks, mountId: simulatedMountId },
-  }), 'utf8');
+  });
+  writeFileSync(anchorPath, remounted, 'utf8');
+  // FAZ4B: production artık parent-dizinde byte-eşdeğer bir root-binding
+  // kopyası tutuyor (executionLockRootBindingPath) ve mutation-sonu doğrulama
+  // binding.raw === anchor.raw şartı koşuyor. Gerçek bir remount'ta iki kayıt
+  // da aynı (eski) mount id'yi taşır — simülasyon iki dosyayı birlikte yazar.
+  const bindingKey = createHash('sha256')
+    .update(basename(root), 'utf8')
+    .digest('hex');
+  const bindingPath = join(
+    dirname(root),
+    `.deckent-execution-lock-root-binding.${bindingKey}.json`,
+  );
+  if (existsSync(bindingPath)) {
+    writeFileSync(bindingPath, remounted, 'utf8');
+  }
   return { originalMountId, simulatedMountId };
 }
 

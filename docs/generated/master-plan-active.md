@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):3cccb35d8417fa9c1570d2eca7785230876237698414e9112def9636669c2e2c`
+**Source digest:** `sha256(normalized-lf-utf8):fd55a27eeaa39c868bb3bd5420cda3e32fc644912eca4695f7f0ee5abd56b6f4`
 
-**Rows:** 346 total · 339 active · 7 terminal
+**Rows:** 352 total · 345 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 239 |
+| OPEN | 245 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -268,6 +268,8 @@
 | 3330 | `PROD-SPRINT-PREFIX-PAD-001` | VERIFY | P1 | KERNEL | — | — | sprint-lifecycle sprintTaskPrefix padding uyumsuzluğu: sprint numarası <100 iken sprint-sonu task-dosya temizliği hiç çalışmıyor |
 | 3335 | `PROD-BINARY-IDENTITY-EAGER-CRASH-001` | VERIFY | P1 | KERNEL | — | — | worktree-binary-authority kaynak-ağaç hash'i eager: src/ dizini olmayan kullanıcı projesinde her non-diagnostic deckent komutu typed HOLD yerine ham stack'le çöküyor |
 | 3340 | `PROD-LANDED-FENCE-ORDER-001` | OPEN | P0 | KERNEL | — | — | Sprint-488 regresyonu (f59503a43): finalizeLandedAttempt heartbeat-observe'u retirement claim'i kapattıktan SONRA çağırıyor — LANDED heartbeat kaydı ve continuation dispatch monitor yolunda sessizce kayboluyor, restart-reconcile LANDED attempt'i reddediyor |
+| 3342 | `PROD-SSE-ONEVENT-WIRE-001` | OPEN | P1 | KERNEL | — | — | Run-flow koordinatörünün SSE onEvent teli yalnız ilk getRunFlowCoordinator çağrısında bağlanıyor: ilk istek propose/plan yolundan gelirse (run-flow-plan-service koordinatörü onEvent'siz yaratır) o root'un CANLI SSE yayını sessizce ölü doğuyor |
+| 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
@@ -288,6 +290,7 @@
 | 4150 | `ALP-RUNTIME-001` | OPEN | P1 | AUTHORITY | `OPERATION-001`, `APPROVAL-001` | — | Alp Discipline decision anchor in runtime agents and planners |
 | 4160 | `MCP-LEASE-001` | VERIFY | P1 | AUTHORITY | `PRINCIPAL-001`, `OPERATION-001` | — | Multi-window MCP writer lease and authority-safe read/write split |
 | 4170 | `APPROVAL-QOL-001` | BLOCKED | P1 | AUTHORITY | `APPROVAL-001`, `MCP-LEASE-001` | `DEPENDENCY_UNSATISFIED` | Approval classifier, cross-process expiry and notification dedupe closure |
+| 4180 | `TRUST-HANDOFF-001` | OPEN | P1 | AUTHORITY | `TOOL-AUTHORITY-001`, `AUDIT-001` | — | Agent-çıktısından host-etkisine güven-aktarım zinciri: out-of-band telemetry, monitoring-loss=authority-suspension, egress gateway, Docker-socket default-deny, agent-üretimi dosya provenance'ı ve execution-capable config-mutation admission'ı |
 | 5000 | `TERMINAL-001` | BLOCKED | P0 | TERMINAL | `KERNEL-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Terminal as canonical management and usage surface |
 | 5010 | `TERMINAL-TOOLS-001` | OPEN | P0 | TERMINAL | `TOOL-AUTHORITY-001`, `SURFACE-CUTOVER-001` | — | Role-model tool surface and progressive disclosure |
 | 5020 | `TERMINAL-DEV-001` | OPEN | P0 | TERMINAL | `DO-CUTOVER-001`, `TERMINAL-TOOLS-001` | — | Full codebase development loop inside Deckent terminal |
@@ -320,6 +323,7 @@
 | 6160 | `SURFACE-ADAPTER-001` | OPEN | P1 | PRODUCT | `APP-SERVICE-001`, `SURFACE-CONTRACT-001`, `CAPABILITY-001` | — | Web, mobile, voice, chat, IDE, CI and ERP thin-adapter expansion |
 | 6165 | `DESKTOP-CUSTOMIZE-001` | OPEN | P1 | DESKTOP | `DESKTOP-REBORN-001` | — | User-facing interface personalization: theme/watch, font set and accent selection in the Desktop settings scene |
 | 6170 | `DESIGN-SYSTEM-001` | OPEN | P1 | PRODUCT | — | — | Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity |
+| 6180 | `ERP-AGENT-CONTRACT-001` | OPEN | P2 | CONNECTOR | — | — | Enterprise Application Agent Contract: ERP/iş-uygulaması agent'larına (Oracle AI Agent Studio, Fusion/NetSuite sınıfı) karşı discover_capabilities / invoke / stream_status / request_approval / commit_transaction / cancel / compensate_or_rollback / collect_audit sözleşmesi |
 | 7000 | `ECOSYSTEM-001` | OPEN | P0 | ECOSYSTEM | `P02-647`, `SURFACE-CUTOVER-001`, `CAPABILITY-001`, `AUDIT-001` | — | Governed agent, skill, plugin, tool, MCP and extension ecosystem |
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
 | 7020 | `SUPPLY-CHAIN-001` | OPEN | P0 | SECURITY | `AGENT-SKILL-001`, `P02-650` | — | Signed agent, skill and plugin provenance |
@@ -333,6 +337,7 @@
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
 | 7120 | `SKILLMD-INGEST-001` | OPEN | P1 | ECOSYSTEM | — | — | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
+| 7130 | `AGENT-RUNTIME-ADAPTER-001` | OPEN | P2 | PROVIDER | `COMPOSITE-WORKER-001` | — | Harici agent-runtime adapter ailesi değerlendirmesi: generic ACP worker adapter + Hermes/OpenClaw/Codex-remote/ADK sınıfı runtime'ların governed composite worker olarak admission'ı |
 | 8000 | `EVERY-ENV-001` | OPEN | P0 | XPLAT | `SSOT-003`, `TEST-PLATFORM-001` | — | Every-environment architecture and release parent |
 | 8010 | `ENV-ADAPTER-001` | OPEN | P0 | XPLAT | `KERNEL-001`, `AUTHORITY-001` | — | PlatformAdapter contracts for process, paths, locks, IPC, credentials, terminal and services |
 | 8020 | `INSTALL-SCOPE-001` | OPEN | P0 | ONBOARDING | `ENV-ADAPTER-001`, `MEMORY-AUTHORITY-001` | — | Global install plus project-scoped state and learning |
@@ -346,6 +351,7 @@
 | 8091 | `NPM-CHANNEL-001` | OPEN | P0 | RELEASE | — | — | npm name reservation and beta dist-tag channel under owner-manual publish |
 | 8092 | `DOCS-TRUTH-PASS-001` | OPEN | P0 | DOCS | — | — | Beta-scope public README and top-level docs reality pass from current code truth |
 | 8093 | `LAUNCH-COMMS-001` | OPEN | P1 | PRODUCT | `RELEASE-BETA-001` | — | Launch communications, demo assets and recurring social cadence |
+| 8095 | `DOCS-VISION-002` | OPEN | P1 | DOCS | — | — | 2026-08 rekabet-sentezi vision amendment: hyperscaler control-plane tavanı, provider+runtime bağımsızlığı, recursive delegasyon cümlesi ve iki yeni non-goal (identity provider değil; başka bir agent runtime değil), en+tr paritesiyle |
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |

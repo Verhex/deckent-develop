@@ -56,6 +56,14 @@ vi.mock('../../src/api/sprint-job-runner.js', () => ({
   startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
 }));
 
+// FAZ4B: POST /api/plan artık planSprint'i doğrudan değil, canonical
+// run-flow plan authority'sini (planRunFlow) çağırır — seam burada mock'lanır.
+vi.mock('../../src/orchestra/run-flow-plan-service.js', () => ({
+  planRunFlow: vi.fn(),
+  decideRunFlowPlan: vi.fn(),
+  RunFlowPlanServiceError: class RunFlowPlanServiceError extends Error {},
+}));
+
 import { readFileSync, existsSync, readdirSync, writeFileSync, watch } from 'node:fs';
 import { createHttpServer, parseBody, _resetActiveJob, type HttpApi } from '../../src/api/server.js';
 import { watchDashboard } from '../../src/api/watcher.js';
@@ -66,6 +74,7 @@ import { readJsonSafe } from '../../src/core/utils.js';
 import { runSprint, cleanup } from '../../src/orchestra/brain.js';
 import { validatePartialConfig, deepMerge } from '../../src/core/config.js';
 import { startSprintDetached } from '../../src/api/sprint-job-runner.js';
+import { planRunFlow } from '../../src/orchestra/run-flow-plan-service.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
@@ -80,6 +89,29 @@ const mockStartSprintDetached = vi.mocked(startSprintDetached);
 const mockReadJsonSafe = vi.mocked(readJsonSafe);
 const mockValidatePartialConfig = vi.mocked(validatePartialConfig);
 const mockDeepMerge = vi.mocked(deepMerge);
+const mockPlanRunFlow = vi.mocked(planRunFlow);
+
+/** Varsayılan planRunFlow davranışı — route'un `{...sprint, runFlow, preview}`
+ *  cevabını üretebilmesi için canonical PlanRunFlowResult iskeleti. */
+function armDefaultPlanRunFlow(): void {
+  mockPlanRunFlow.mockImplementation((async (input: { proposal: { flowId: string } }) => ({
+    flowId: input.proposal.flowId,
+    revision: 1,
+    planDigest: 'f'.repeat(64),
+    approval: null,
+    sprint: {
+      id: 'sprint-001',
+      number: 1,
+      tasks: [{ id: '001-001', title: 'Test task' }],
+    },
+    preview: {
+      flowId: input.proposal.flowId,
+      revision: 1,
+      planDigest: 'f'.repeat(64),
+      taskSummaries: [{ id: '001-001', title: 'Test task' }],
+    },
+  })) as never);
+}
 
 // ─── Helpers ────────────────────────────────────────────────────
 const PROJECT_ROOT = '/tmp/test-project';
@@ -151,6 +183,7 @@ describe('createHttpServer', () => {
     _resetActiveJob();
     mockExistsSync.mockReturnValue(false);
     mockReadJsonSafe.mockReturnValue(null);
+    armDefaultPlanRunFlow();
     // Auth bypass for non-auth-focused tests
     process.env['DECKENT_API_AUTH_DISABLED'] = '1';
     stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
@@ -453,36 +486,44 @@ describe('createHttpServer', () => {
     });
   });
 
-  describe('POST /api/start', () => {
-    it('returns 202 and starts sprint', async () => {
+  // FAZ4B: legacy /api/start kalıcı olarak emekli — canonical akış
+  // plan → decision → run-flow start. Route şema-geçerli her gövdeye
+  // 410 LEGACY_START_RETIRED döner ve asla sprint/job başlatmaz.
+  describe('POST /api/start (retired ingress)', () => {
+    it('returns 410 LEGACY_START_RETIRED with the canonical run-flow path', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/start', 'POST', { autoApprove: true });
-      expect(res.status).toBe(202);
+      expect(res.status).toBe(410);
       const body = JSON.parse(res.body);
-      expect(body.status).toBe('started');
-      expect(body.jobId).toMatch(/^job-/);
+      expect(body.code).toBe('LEGACY_START_RETIRED');
+      expect(body.canonicalFlow).toEqual([
+        'POST /api/plan',
+        'POST /api/run-flow/:flowId/decision',
+        'POST /api/run-flow/:flowId/start',
+      ]);
+      expect(mockRunSprint).not.toHaveBeenCalled();
+      expect(mockStartSprintDetached).not.toHaveBeenCalled();
     });
 
-    it('returns 409 when sprint already running', async () => {
-      // Make runSprint hang so the job stays in 'running' state
-      mockRunSprint.mockImplementation(() => new Promise(() => {}) as never);
-
+    it('repeated starts stay 410 — no sprint or job state accumulates', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res1 = await request(api, '/api/start', 'POST', {});
-      expect(res1.status).toBe(202);
+      expect(res1.status).toBe(410);
 
       const res2 = await request(api, '/api/start', 'POST', {});
-      expect(res2.status).toBe(409);
-      expect(JSON.parse(res2.body)).toEqual({ error: 'Sprint already running' });
+      expect(res2.status).toBe(410);
+      expect(JSON.parse(res2.body).code).toBe('LEGACY_START_RETIRED');
+      expect(mockRunSprint).not.toHaveBeenCalled();
+      expect(mockStartSprintDetached).not.toHaveBeenCalled();
     });
   });
 
   describe('POST /api/plan', () => {
-    it('returns plan JSON', async () => {
+    it('returns plan JSON with the runFlow authority surface', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
@@ -491,26 +532,36 @@ describe('createHttpServer', () => {
       const body = JSON.parse(res.body);
       expect(body.id).toBe('sprint-001');
       expect(body.tasks).toHaveLength(1);
+      // FAZ4B: exact-plan akışı — cevap flowId+revision+planDigest taşır.
+      expect(typeof body.runFlow.flowId).toBe('string');
+      expect(body.runFlow.revision).toBe(1);
+      expect(typeof body.runFlow.planDigest).toBe('string');
     });
 
-    it('passes mode param to planSprint', async () => {
-      const { planSprint: mockPlanSprint } = await import('../../src/orchestra/brain.js');
+    it('passes mode param to planRunFlow previewOptions', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       await request(api, '/api/plan', 'POST', { mode: 'structured' });
-      expect(vi.mocked(mockPlanSprint)).toHaveBeenCalledWith(
-        expect.any(String), expect.anything(), expect.anything(), expect.anything(),
-        expect.objectContaining({ mode: 'structured' }),
-      );
+      expect(mockPlanRunFlow).toHaveBeenCalledWith(expect.objectContaining({
+        projectRoot: expect.any(String),
+        previewOptions: expect.objectContaining({ mode: 'structured' }),
+        source: expect.objectContaining({ sourceKind: 'directives' }),
+      }));
     });
 
     it('response includes reasoning when present', async () => {
-      const { planSprint: mockPlanSprint } = await import('../../src/orchestra/brain.js');
-      vi.mocked(mockPlanSprint).mockReturnValue({
-        id: 'sprint-001', number: 1, tasks: [{ id: '001-001', title: 'T' }],
-        reasoning: 'AI reasoning', planningMode: 'ai',
-      } as never);
+      mockPlanRunFlow.mockImplementationOnce((async (input: { proposal: { flowId: string } }) => ({
+        flowId: input.proposal.flowId,
+        revision: 1,
+        planDigest: 'f'.repeat(64),
+        approval: null,
+        sprint: {
+          id: 'sprint-001', number: 1, tasks: [{ id: '001-001', title: 'T' }],
+          reasoning: 'AI reasoning', planningMode: 'ai',
+        },
+        preview: { flowId: input.proposal.flowId, revision: 1, planDigest: 'f'.repeat(64), taskSummaries: [] },
+      })) as never);
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
@@ -922,64 +973,30 @@ describe('createHttpServer', () => {
       expect(JSON.parse(res.body)).toEqual({ error: 'Job not found' });
     });
 
-    it('returns job status after start', async () => {
-      // Make runSprint hang so the job stays in 'running' state
-      mockRunSprint.mockImplementation(() => new Promise(() => {}) as never);
-
+    // FAZ4B: legacy /api/start hiçbir job üretmez (410) — job takibi artık
+    // run-flow start (detached admission) tarafında yaşar. Bu pinler,
+    // emekli ingress'in job state sızdırmadığını kanıtlar.
+    it('legacy start mints no jobId — response carries only the retirement contract', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const startRes = await request(api, '/api/start', 'POST', {});
-      const { jobId } = JSON.parse(startRes.body) as { jobId: string };
-
-      const res = await request(api, `/api/job/${jobId}`);
-      expect(res.status).toBe(200);
-      const body = JSON.parse(res.body);
-      expect(body.id).toBe(jobId);
-      expect(body.status).toBe('running');
+      expect(startRes.status).toBe(410);
+      const body = JSON.parse(startRes.body) as { jobId?: string; code: string };
+      expect(body.jobId).toBeUndefined();
+      expect(body.code).toBe('LEGACY_START_RETIRED');
+      expect(mockStartSprintDetached).not.toHaveBeenCalled();
+      expect(mockRunSprint).not.toHaveBeenCalled();
     });
 
-    it('returns completed job after sprint finishes', async () => {
-      mockStartSprintDetached.mockImplementation((_root, _opts, onExit) => {
-        const jobId = `job-${Date.now()}`;
-        setTimeout(() => onExit?.(0), 10);
-        return { jobId };
-      });
-
+    it('job lookups after a retired start remain 404 (no phantom job records)', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      const startRes = await request(api, '/api/start', 'POST', {});
-      const { jobId } = JSON.parse(startRes.body) as { jobId: string };
-
-      // Wait for the detached process exit callback
-      await new Promise((r) => setTimeout(r, 50));
-
-      const res = await request(api, `/api/job/${jobId}`);
-      expect(res.status).toBe(200);
-      const body = JSON.parse(res.body);
-      expect(body.status).toBe('completed');
-    });
-
-    it('returns failed job when sprint errors', async () => {
-      mockStartSprintDetached.mockImplementation((_root, _opts, onExit) => {
-        const jobId = `job-${Date.now()}`;
-        setTimeout(() => onExit?.(1), 10);
-        return { jobId };
-      });
-
-      api = createHttpServer(PROJECT_ROOT, 0);
-      await new Promise<void>((r) => api.server.once('listening', r));
-
-      const startRes = await request(api, '/api/start', 'POST', {});
-      const { jobId } = JSON.parse(startRes.body) as { jobId: string };
-
-      await new Promise((r) => setTimeout(r, 50));
-
-      const res = await request(api, `/api/job/${jobId}`);
-      expect(res.status).toBe(200);
-      const body = JSON.parse(res.body);
-      expect(body.status).toBe('failed');
+      await request(api, '/api/start', 'POST', {});
+      const res = await request(api, '/api/job/job-12345');
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Job not found' });
     });
   });
 
@@ -1629,8 +1646,9 @@ describe('Bearer token timing-safe auth (checkAuth)', () => {
     await new Promise<void>((r) => api.server.once('listening', r));
 
     const res = await requestWithAuth(api, 'Bearer correct-token-abc');
-    // 202 = accepted, sprint started
-    expect(res.status).toBe(202);
+    // FAZ4B: auth kapısı geçildi → istek route'a ulaşır; emekli /api/start
+    // 410 LEGACY_START_RETIRED döner (401 DEĞİL — token kabul edildi).
+    expect(res.status).toBe(410);
   });
 
   it('rejects wrong token', async () => {

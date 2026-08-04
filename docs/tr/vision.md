@@ -20,7 +20,7 @@ Sorunu tanımlayan üç tavan var.
 
 **Agent çıktısı iddia edilir, kanıtlanmaz.** Agentic araçların çoğu "model bitirdiğini söyledi" noktasında durur. Yeşil test kanıt değildir, self-report kanıt değildir, makul görünen bir diff çalışan sistem değildir. Kanıt zinciri olmadan otonomi, ölçekle birlikte büyüyen bir risktir.
 
-**Sektör vendor etrafında konsolide oluyor.** Model seçimi, yürütme ortamı, memory ve audit giderek tek provider'ın bulutunda paketleniyor. Bu, öyle olmadığı güne kadar konforludur — kesinti, fiyat değişimi, politika değişimi ya da host'tan asla çıkmaması gereken bir iş yükü.
+**Sektör vendor etrafında konsolide oluyor.** Model seçimi, yürütme ortamı, memory ve audit giderek tek provider'ın bulutunda paketleniyor. Bu, öyle olmadığı güne kadar konforludur — kesinti, fiyat değişimi, politika değişimi ya da host'tan asla çıkmaması gereken bir iş yükü. Konsolidasyon artık modelleri aşıyor: hyperscaler'lar control plane'in kendisini — yönetişim, registry, değerlendirme ve audit — kendi bulut sınırlarının içinde paketliyor. Bu sınırların üzerinde çalışan bağımsız bir execution düzlemi, hiçbir vendor'ın inşa etmeyeceği tek parçadır.
 
 Deckent'in üçüne de cevabı aynıdır: yürütmeyi bir sohbet değil, yönetişimli, denetlenebilir ve provider-neutral bir sistem yapmak.
 
@@ -62,6 +62,8 @@ Her halkanın tanımı, kaynağı ve açık soruları [Glossary](./glossary.md) 
 
 Zincir, sistemdeki her etkinin yukarı doğru bir niyete, aşağı doğru bir aksiyona izlenebilir olması için vardır. Audit, recovery, maliyet atfı ve öğrenmenin aynı anda ve aynı kayıtlardan mümkün olmasını sağlayan şey budur. Bu zincire sahip olmayan agentic bir sistem ne yaptığını raporlayabilir; ama neden, kimin yetkisiyle, hangi maliyetle yaptığını ve tekrar yapıp yapamayacağını kanıtlayamaz.
 
+Zincir ayrıca özyinelemeli (recursive) birleşir: delege edilen bir takım veya harici bir runtime, yetkisini üst halkasından bir authority tavanı ve bütçe tavanı olarak alır — asla taze bir yetki olarak değil. Delegasyon yetkiyi daraltır; asla genişletmez.
+
 ## Altı yürütme bağlamı
 
 "Her yerde" ifadesi somuttur. Altı bağlam demektir; her birinin kullanıcı biçimi farklı, döngüsü aynıdır — iste, kabul et, yönlendir, yürüt, doğrula, hatırla.
@@ -95,11 +97,13 @@ Bunların hiçbiri tek başına eşsiz değildir. Tek, kurulabilir, provider-neu
 
 Bu bir faz değil, kalıcı bir taahhüttür. Yüzeyler ürünün ömrü boyunca çoğalır; ikisi birden state sahibi olduğu an sistem, audit'in, recovery'nin ve öğrenmenin dayandığı tek doğruluğu kaybeder.
 
-## Provider bağımsızlığı ve local-first
+## Provider ve runtime bağımsızlığı ve local-first
 
 **Hiçbir provider Deckent'in kimliğinin parçası değildir.** Provider ve model seçimi effective config, runtime model registry ve canlı authority evidence üzerinden çözülür. [Kanıt: `.deckent/workspace/IDENTITY.md:10`]
 
 Bağımsızlık, maliyet özelliği olmadan önce bir doğruluk özelliğidir: derin planlama daha güçlü bir tier alabilirken rutin iş daha ucuzunu alır, yerel modeller host'tan çıkmaması gereken işi yürütür, bağımsız doğrulama çıktıyı üretenden farklı bir provider talep edebilir, kesinti veya kota duvarı ise durma değil bir routing kararı haline gelir.
+
+Bağımsızlık bir seviye yukarıya, agent runtime'larının kendisine de uzanır. Harici agent runtime'ları control plane'in rakibi değil, execution kaynağıdır: yerel bir worker, bir bulut modeli ve üçüncü-taraf bir agent runtime aynı kontrat altında kabul edilir, scope'lanır, bütçelenir ve kanıta bağlanır. Runtime'lar yürütür; Deckent karar verir, sınırlar, bütçeler ve kanıtlar.
 
 Local-first, veri için aynı anlama gelir. Proje durumu, memory, kanıtlar ve task artifact'ları projeyle birlikte yaşar. Deckent'in çalışması için bir Deckent bulutunun var olması gerekmez.
 
@@ -122,6 +126,8 @@ Deckent'in ne olmadığını adlandırmak, vizyonu aşınmaya karşı korur.
 - **Kılık değiştirmiş TypeScript-only araç değildir.** İş, fiilen içinde bulunduğu stack'e göre değerlendirilir. Bir Go projesi TypeScript build'iyle yargılanmaz; doküman test coverage'ıyla yargılanmaz.
 - **Varsayılan olarak tek-provider değildir.** Doğru model kullanımı; provider, model, tier ve akıl-yürütme derinliğinin açıkça karar edilmesidir — config ve registry'den çözülür, asla hardcode isimlerden değil.
 - **Kontrolsüz otonomi değildir.** Sistem nerede kendi başına hareket ederse etsin, yetki kullanıcıda kalır. Müdahalesiz uçtan uca yürütme bugün sertifikalı değildir; süregelen HOLD ve sertifikasyon merdiveni [Güncel sürtünmeler](./operations/current-frictions.md) dosyasındadır. Scope, onay kapıları, bütçeler ve audit trail bu otonominin bedelidir; önündeki engel değil.
+- **Identity provider değildir.** Bir agent'ın kim olduğunun otoritesi enterprise identity, PAM ve non-human-identity sistemlerinde kalır. Deckent onlarla entegre olur ve kimliği; task-scoped, süresi dolan ve kanıta bağlı execution yetkisine çevirir.
+- **Başka bir agent runtime değildir.** Deckent agent runtime'larıyla session, UI numarası veya execution özelliği yarışına girmez. Kendi yüzeyleri — Terminal, Desktop, dashboard, API — yönetişimli yürütmeyi kontrol etmek, bağlamak ve gözlemlemek için vardır; yeni bir runtime veya yüzeyin bağlanması daima kolay kalmalıdır. Amaç birinin agent'ını ondan iyi çalıştırmak değil, her agent'ı yönetebilmektir.
 - **Metrik vitrini değildir.** Agent, tool ve komut sayıları üretilmiş durum bilgisidir, kimlik değil. Bu dokümanda yer almazlar.
 
 ## Bu vizyonu ne yanlışlar

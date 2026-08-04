@@ -97,6 +97,7 @@ vi.mock('../../../src/core/constants.js', () => ({
   DECISIONS_FILE: 'DECISIONS.md',
   DIRECTIVES_FILE: 'DIRECTIVES.md',
   LOCKS_DIR: '.locks',
+  TASKS_DIR: '.tasks',  // FAZ4B: spawn-backend-docker.ts import zinciri modül-yüklemede okur
   LOCK_STALE_THRESHOLD_MS: 300000,
   DEBT_TABLE_HEADER: '| ID',
   PROJECT_CONFIG_PATH: '.deckent/config.json',

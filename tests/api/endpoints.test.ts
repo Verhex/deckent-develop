@@ -15,6 +15,8 @@
  * SSE consumer, auth gate, rate-limit gate.
  */
 import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   startTestServer,
   call,
@@ -23,6 +25,7 @@ import {
   buildSprintMarkdown,
   type TestServerHandle,
 } from './test-server-helper.js';
+import { publishCanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
 
 describe('E2E /api endpoint surface', () => {
   let handle: TestServerHandle;
@@ -77,8 +80,21 @@ describe('E2E /api endpoint surface', () => {
           // Sprint 282: reconcileStatusResponse requires a non-terminal sprint-state
           // to pass dashboard data through; without it the idle fallback zeros all counts.
           sprintState: { status: 'ACTIVE', phase: 'EXECUTE', sprintId: 'sprint-001' },
+          // FAZ4B: progress artık .tasks lineage'larından projekte edilir
+          // (logicalProgress) — 3 DONE + 1 EXECUTING = done 3 / total 4.
+          tasks: Array.from({ length: 4 }, (_, i) => {
+            const id = `001-${String(i + 1).padStart(3, '0')}`;
+            const status = i < 3 ? 'DONE' : 'EXECUTING';
+            return { id, json: { id, title: `Task ${id}`, status, sprintId: 'sprint-001' } };
+          }),
         },
       });
+      // FAZ4B: authority-first /api/status — ACTIVE projeksiyon için canlı
+      // koordinatör PID'i + authority'yle eşleşen persisted read-model şart.
+      const pidsDir = join(handle.projectRoot, '.deckent', 'pids');
+      mkdirSync(pidsDir, { recursive: true });
+      writeFileSync(join(pidsDir, 'sprint-001.pid'), JSON.stringify({ pid: process.pid }), 'utf-8');
+      publishCanonicalRunStatusReadModel(handle.projectRoot);
       const res = await call(handle, '/api/status');
       expect(res.status).toBe(200);
       const body = res.json<{

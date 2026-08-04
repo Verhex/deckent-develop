@@ -587,16 +587,17 @@ describe('AUTOGEN extends Project Status (Sprint 191 Task 191-009 contract)', ()
     const inside = identityContent.slice(startIdx + startMarker.length, endIdx);
     const outsideAfter = identityContent.slice(endIdx + endMarker.length);
 
+    // FAZ4B: satır-listesi generator authority'sine hizalandı —
+    // scripts/update-readme-stats.mjs:renderIdentityStatus artık `| Sprint |`
+    // ve `| Providers |` satırlarını üretmiyor; kontratın kaynağı generator'dır.
     const requiredRows = [
       '| Version |',
-      '| Sprint |',
       '| MCP Tools |',
       '| MCP Resources |',
       '| CLI Commands |',
       '| Dashboard Pages |',
       '| Agents |',
       '| Skills |',
-      '| Providers |',
     ];
     for (const row of requiredRows) {
       expect(inside).toContain(row);

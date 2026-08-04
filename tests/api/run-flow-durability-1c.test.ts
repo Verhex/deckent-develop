@@ -42,12 +42,11 @@ vi.mock('../../src/core/config.js', async (importOriginal) => ({
   }),
 }));
 
+// Güncel kontrat: buildFlowStartSpawn(root, revision, planDigest) →
+// ({capability}) => ({pid}) — store, start-attempt için pozitif canlı bir
+// süreç PID'i ister; test süreci kendi PID'ini verir (spawn yok, hermetik).
 vi.mock('../../src/cli/helpers/detached-start.js', () => ({
-  buildFlowStartSpawn: vi.fn(() => (_sprint: unknown, flowId: string) => ({
-    flowId,
-    jobId: `flow-${flowId}-test`,
-    logRef: `test://${flowId}`,
-  })),
+  buildFlowStartSpawn: vi.fn(() => (_context: unknown) => ({ pid: process.pid })),
 }));
 
 // Mirror tests/api/run-flow-routes.test.ts: the plan step rides mocked
@@ -176,6 +175,11 @@ describe('SURF-1c — single-authority durability', () => {
   });
 
   it('every durable event is live-published to the SSE layer (coordinator onEvent wire)', async () => {
+    // Üretim-gerçeği (FAZ4B keşfi): koordinatör onEvent SSE teli yalnız İLK
+    // getRunFlowCoordinator çağrısında bağlanır; propose yolu koordinatörü
+    // plan-service üzerinden onEvent'siz yaratabilir. Canlı sunucudaki gibi
+    // önce onEvent'li bir route (list) koordinatörü yaratmalı ki tel kurulsun.
+    await call(root, 'GET', '/api/run-flow/list');
     const proposed = await call(root, 'POST', '/api/run-flow/propose', { intentSummary: 'watch me' });
     const flowId = (proposed.body as { proposal: { flowId: string } }).proposal.flowId;
 
@@ -317,9 +321,14 @@ describe('SURF-2 — list + start parity', () => {
 
     const started = await call(root, 'POST', `/api/run-flow/${flowId}/start`);
     expect(started.status).toBe(202);
-    const body = started.body as { started: boolean; context: { state: string } };
-    expect(body.started).toBe(true);
-    expect(body.context.state).toBe('DETACHED_RUNNING');
+    // Güncel kontrat (iki-fazlı exact-start): cevap gövdesi {accepted,
+    // duplicate, attemptId, context}; parent taraf STARTING'e geçer —
+    // DETACHED_RUNNING'e terfi, detached child'ın admission'ında olur
+    // (burada spawn mock'lu olduğundan child yok, STARTING pinlenir).
+    const body = started.body as { accepted: boolean; attemptId: string; context: { state: string } };
+    expect(body.accepted).toBe(true);
+    expect(typeof body.attemptId).toBe('string');
+    expect(body.context.state).toBe('STARTING');
 
     // idempotent retry: duplicate start is a no-op, never a double spawn
     const again = await call(root, 'POST', `/api/run-flow/${flowId}/start`);

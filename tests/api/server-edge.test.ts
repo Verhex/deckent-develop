@@ -48,6 +48,21 @@ vi.mock('../../src/api/sprint-job-runner.js', () => ({
   startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
 }));
 
+// FAZ4B: POST /api/plan canonical run-flow plan authority'sine (planRunFlow)
+// delege eder; hata-yolu testleri bu seam üzerinden sürülür.
+vi.mock('../../src/orchestra/run-flow-plan-service.js', () => ({
+  planRunFlow: vi.fn(async (input: { proposal: { flowId: string } }) => ({
+    flowId: input.proposal.flowId,
+    revision: 1,
+    planDigest: 'f'.repeat(64),
+    approval: null,
+    sprint: { id: 'sprint-001', number: 1, tasks: [{ id: '001-001', title: 'Test task' }] },
+    preview: { flowId: input.proposal.flowId, revision: 1, planDigest: 'f'.repeat(64), taskSummaries: [] },
+  })),
+  decideRunFlowPlan: vi.fn(),
+  RunFlowPlanServiceError: class RunFlowPlanServiceError extends Error {},
+}));
+
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   createHttpServer, parseBody, generateApiToken, _resetActiveJob,
@@ -216,7 +231,10 @@ describe('checkAuth edge cases', () => {
       method: 'POST', body: {},
       headers: { Authorization: 'Bearer correct-token' },
     });
-    expect(res.status).toBe(202);
+    // FAZ4B: auth kapısı geçildi (401 değil) → emekli /api/start route'u
+    // 410 LEGACY_START_RETIRED kontratıyla cevap verir.
+    expect(res.status).toBe(410);
+    expect(JSON.parse(res.body).code).toBe('LEGACY_START_RETIRED');
   });
 
   it('GET routes require auth when token is set', async () => {
@@ -603,8 +621,9 @@ describe('Error response edge cases', () => {
   });
 
   it('returns 500 when plan throws an error', async () => {
-    const { planSprint } = await import('../../src/orchestra/brain.js');
-    vi.mocked(planSprint).mockImplementation(() => { throw new Error('AI planner failed'); });
+    // FAZ4B: /api/plan hata-yolu artık planRunFlow seam'inden sürülür.
+    const { planRunFlow } = await import('../../src/orchestra/run-flow-plan-service.js');
+    vi.mocked(planRunFlow).mockRejectedValueOnce(new Error('AI planner failed'));
 
     api = await startServer();
     const res = await makeRequest(api, '/api/plan', { method: 'POST', body: {} });

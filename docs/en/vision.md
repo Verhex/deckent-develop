@@ -20,7 +20,7 @@ Three ceilings define the problem.
 
 **Agent output is asserted, not proven.** Most agentic tooling ends at "the model said it finished." A green test run is not proof, a self-report is not evidence, and a plausible diff is not a working system. Without an evidence chain, autonomy is a liability that grows with scale.
 
-**The industry is consolidating around vendors.** Model choice, execution environment, memory, and audit are increasingly bundled into one provider's cloud. That is convenient until the day it is not — outage, price change, policy change, or a workload that must never leave the host.
+**The industry is consolidating around vendors.** Model choice, execution environment, memory, and audit are increasingly bundled into one provider's cloud. That is convenient until the day it is not — outage, price change, policy change, or a workload that must never leave the host. The consolidation now reaches past models: hyperscalers are bundling the control plane itself — governance, registry, evaluation, and audit — inside their own cloud boundary. An independent execution plane that works across those boundaries is the one part no vendor will build.
 
 Deckent's answer to all three is the same: make execution a governed, inspectable, provider-neutral system rather than a conversation.
 
@@ -62,6 +62,8 @@ Each link is defined, with its source and its open questions, in the [Glossary](
 
 The chain exists so every effect in the system is traceable upward to an intent and downward to an action. It is what makes audit, recovery, cost attribution, and learning possible at the same time, from the same records. An agentic system without this chain can report what it did; it cannot prove why, under whose authority, at what cost, or whether it may do it again.
 
+The chain also composes recursively: a delegated team or an external runtime receives an authority ceiling and a budget ceiling from its parent link, never a fresh grant — delegation narrows authority; it never widens it.
+
 ## Six execution contexts
 
 "Everywhere" is concrete. It means six contexts, each with a different user shape and the same loop — request, admit, route, execute, verify, remember.
@@ -95,11 +97,13 @@ The **Terminal** is the primary control surface: tool-driven, progressively disc
 
 This is a durable commitment, not a phase. Surfaces multiply over a product's life; the moment two of them own state, the system loses the single truth that audit, recovery, and learning depend on.
 
-## Provider neutrality and local-first
+## Provider and runtime neutrality and local-first
 
 **No provider is part of Deckent's identity.** Provider and model selection resolves from effective configuration, the runtime model registry, and live authority evidence. [Evidence: `.deckent/workspace/IDENTITY.md:10`]
 
 Neutrality is a correctness property before it is a cost property: deep planning can take a stronger tier while routine work takes a cheaper one, local models can handle work that must not leave the host, independent verification can require a different provider than the one that produced the output, and an outage or quota wall becomes a routing decision instead of a stoppage.
+
+Neutrality extends one level up, to agent runtimes themselves. External agent runtimes are execution resources, not competitors for the control plane: a local worker, a cloud model, and a third-party agent runtime are admitted, scoped, budgeted, and evidenced under the same contract. Runtimes execute; Deckent decides, constrains, budgets, and proves.
 
 Local-first means the same thing for data. Project state, memory, evidence, and task artifacts live with the project. Deckent does not require a Deckent cloud to exist in order to run.
 
@@ -122,6 +126,8 @@ Naming what Deckent is not protects the vision from erosion.
 - **Not a TypeScript-only tool in disguise.** Work is evaluated against the stack it is actually in. A Go project is not judged by a TypeScript build; documentation is not judged by test coverage.
 - **Not single-provider by default.** Correct model use means explicit provider, model, tier, and reasoning-depth decisions — resolved from configuration and registry, never from hardcoded names.
 - **Not autonomy without control.** Wherever the system acts on its own, the user stays in authority. Unattended end-to-end execution is not certified today; [Current frictions](./operations/current-frictions.md) carries the standing HOLD and the certification ladder. Scope, approval gates, budgets, and audit trails are the price of that autonomy, not an obstacle to it.
+- **Not an identity provider.** Enterprise identity, PAM, and non-human-identity systems remain the authority on who an agent is. Deckent integrates with them and converts identity into task-scoped, expiring execution authority bound to evidence.
+- **Not another agent runtime.** Deckent does not race agent runtimes on sessions, UI tricks, or execution features. Its own surfaces — Terminal, Desktop, dashboard, API — exist to control, connect, and observe governed execution, and connecting a new runtime or surface must stay easy. Running someone's agent better than they do is not the goal; governing every agent is.
 - **Not a metrics showcase.** Counts of agents, tools, and commands are generated status, not identity. They do not appear in this document.
 
 ## What would falsify this vision

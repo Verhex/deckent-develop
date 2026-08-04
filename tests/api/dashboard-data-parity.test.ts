@@ -15,6 +15,18 @@ import {
   buildDashboardSeed,
   type TestServerHandle,
 } from './test-server-helper.js';
+import { publishCanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
+
+/** FAZ4B: /api/status authority-first — ACTIVE için canlı koordinatör PID'i
+ *  (.deckent/pids/<sprintId>.pid) + authority'yle eşleşen persisted canonical
+ *  read-model gerekir; progress dashboard snapshot'ından değil, .tasks
+ *  lineage'larından (logicalProgress) projekte edilir. */
+function armActiveRunAuthority(projectRoot: string, sprintId: string): void {
+  const pidsDir = join(projectRoot, '.deckent', 'pids');
+  mkdirSync(pidsDir, { recursive: true });
+  writeFileSync(join(pidsDir, `${sprintId}.pid`), JSON.stringify({ pid: process.pid }), 'utf-8');
+  publishCanonicalRunStatusReadModel(projectRoot);
+}
 
 describe('Dashboard data-parity — live endpoint suite', () => {
   let handle: TestServerHandle;
@@ -29,6 +41,13 @@ describe('Dashboard data-parity — live endpoint suite', () => {
   // ─── Sprint endpoint ─────────────────────────────────────────────────────
 
   it('GET /api/status returns sprint shape with phase and progress', async () => {
+    // Progress artık .tasks lineage'larından projekte edilir: 5 DONE + 3
+    // EXECUTING (active) + 6 PENDING (blocked sayılır) = total 14.
+    const taskSeed = Array.from({ length: 14 }, (_, i) => {
+      const id = `209-${String(i + 1).padStart(3, '0')}`;
+      const status = i < 5 ? 'DONE' : i < 8 ? 'EXECUTING' : 'PENDING';
+      return { id, json: { id, title: `Task ${id}`, status, sprintId: 'sprint-209' } };
+    });
     handle = await startTestServer({
       disableAuth: true,
       seed: {
@@ -39,8 +58,10 @@ describe('Dashboard data-parity — live endpoint suite', () => {
         // Sprint 282: reconcileStatusResponse requires a non-terminal sprint-state
         // to pass dashboard data through; without it the idle fallback zeros all counts.
         sprintState: { status: 'ACTIVE', phase: 'EXECUTE', sprintId: 'sprint-209' },
+        tasks: taskSeed,
       },
     });
+    armActiveRunAuthority(handle.projectRoot, 'sprint-209');
 
     const res = await call(handle, '/api/status');
     expect(res.status).toBe(200);

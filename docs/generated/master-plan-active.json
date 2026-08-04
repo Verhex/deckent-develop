@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3cccb35d8417fa9c1570d2eca7785230876237698414e9112def9636669c2e2c"
+    "value": "fd55a27eeaa39c868bb3bd5420cda3e32fc644912eca4695f7f0ee5abd56b6f4"
   },
   "summary": {
-    "total": 346,
-    "active": 339,
+    "total": 352,
+    "active": 345,
     "terminal": 7,
-    "receipts": 39,
+    "receipts": 41,
     "byState": {
-      "OPEN": 239,
+      "OPEN": 245,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,26 +22,26 @@
     },
     "byPriority": {
       "P0": 248,
-      "P1": 81,
-      "P2": 17
+      "P1": 85,
+      "P2": 19
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 14,
-      "AUTHORITY": 24,
+      "AUTHORITY": 25,
       "CODEX": 44,
-      "CONNECTOR": 1,
+      "CONNECTOR": 2,
       "COST": 4,
       "DASHBOARD": 1,
       "DATA": 1,
       "DESKTOP": 6,
-      "DOCS": 3,
+      "DOCS": 4,
       "DURABILITY": 1,
       "ECOSYSTEM": 5,
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 85,
+      "KERNEL": 87,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
@@ -49,7 +49,7 @@
       "PAEP": 35,
       "PRODUCT": 8,
       "PROMPT": 2,
-      "PROVIDER": 2,
+      "PROVIDER": 3,
       "RELEASE": 4,
       "REPO": 1,
       "RESILIENCE": 1,
@@ -127,7 +127,7 @@
       "state": "BLOCKED",
       "updated": "2026-08-04",
       "definitionDigest": "2069ad6e437766f5bfa67ed3806ccbc6c42f7245047a37f19dd82f5e4154e780",
-      "progressDigest": "90445f1e808c2089a1c3a3fb2a455d90a3ee6a6b5741c6e62d32c454732f59df",
+      "progressDigest": "75376b5963976dc448cccc9b6f351d4d1619fd139d6c6f0697b9600038f0f42c",
       "terminalClosureDigest": null
     },
     {
@@ -1610,9 +1610,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-28",
+      "updated": "2026-08-04",
       "definitionDigest": "04147d0d2a7650f4f91b4ed7d9edf5f971f1a02e004e011b9b474d5096f7b276",
-      "progressDigest": "041345b012f552f85d6e59e4c62ac25576e8c5a86116211d31b56f1a2cbf14da",
+      "progressDigest": "c3352e2270a5116e2322cf2f4b122a5e96917a2795356511796c4de8ba5f5fa2",
       "terminalClosureDigest": null
     },
     {
@@ -2793,6 +2793,28 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3342,
+      "id": "PROD-SSE-ONEVENT-WIRE-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "c55b537f62fe50b9379986f697cfbe1dd9d0e501f8224ea922a5af2c79cac3b7",
+      "progressDigest": "08f417c44045133659bde8ae97127675bb3ed267590c5b9f0d28ccc4f06c7101",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3345,
+      "id": "COMPOSITE-WORKER-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "a1c5ff84fd0aa5c953ffa0ade3d06259c48e6fb7882b2b61bca7cf3710460ad2",
+      "progressDigest": "66861aed9ef564a858f74e142d4ee038b5368d91eadd9cbb27315c7e58fefea5",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "program": "AUTHORITY",
@@ -2985,9 +3007,9 @@
       "program": "AUTHORITY",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-04",
       "definitionDigest": "14359b36eb63fcf87078fb7d5397160f5fc4ac816483f760486e4189b9973285",
-      "progressDigest": "63a14f9dfe12bfdd3d160b173cc1eb8fc773f70d775ff1495cd55764f8ff0c0f",
+      "progressDigest": "3868f516369c5fa8da26c69ebc554dad03d3943eab04e06af3e808ef6308002d",
       "terminalClosureDigest": null
     },
     {
@@ -3010,6 +3032,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "8f312d50261905decd3b557a82112666fdb46548b826a17f187ba1d460a324a3",
       "progressDigest": "61c03ca454c110c4b52ac48ee4c21a05fe7d8d0ec341d25358aa6395c76949db",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4180,
+      "id": "TRUST-HANDOFF-001",
+      "program": "AUTHORITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "5f9c6237eef34cf0156c56c28d3db303240b365fc41c9ec7619b49d13c6adeb9",
+      "progressDigest": "80fdfbfc3ddc5f3ac026a98f48a6f5c4f197692cd66327fe62b081e21b876c41",
       "terminalClosureDigest": null
     },
     {
@@ -3365,6 +3398,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 6180,
+      "id": "ERP-AGENT-CONTRACT-001",
+      "program": "CONNECTOR",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "e95fd9482bb6376a681f7690a94dc8bebbacf733bd0c0dc21ee9f4e058c031ed",
+      "progressDigest": "2ac57d8fa30e65f2cfb4725db361ba69d95f631144154dbe47b0d657c05be790",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 7000,
       "id": "ECOSYSTEM-001",
       "program": "ECOSYSTEM",
@@ -3493,7 +3537,7 @@
       "state": "OPEN",
       "updated": "2026-08-04",
       "definitionDigest": "fe481488f31d7e6a25bc93d431bad90403df0d161b8de9860b65442bd88c55e7",
-      "progressDigest": "6708123325db3cc976e8d9756a3d0063a3eced3e8f4346d38d8c9abe00e44879",
+      "progressDigest": "3d9678d87540514c3843f99a24351e060618408d1e04c163ac561e1a0adb1dd0",
       "terminalClosureDigest": null
     },
     {
@@ -3504,7 +3548,18 @@
       "state": "OPEN",
       "updated": "2026-08-04",
       "definitionDigest": "eedc087101877777fe25273e08c31ea74725b976bc5a9eb59c843e405f689865",
-      "progressDigest": "b48e8c6163c79744eb3c90f6b669e10a9c341e4f4e84a5ef8be2bd4fba953037",
+      "progressDigest": "965c976cab212368073403a34c27cd13fc8b8f3c30465d28b9e4abf8edbfadc8",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7130,
+      "id": "AGENT-RUNTIME-ADAPTER-001",
+      "program": "PROVIDER",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "7150eb4e747f29c7508218b5ebab78ab188f0668448bba1b47fd038180fdf545",
+      "progressDigest": "e5a7d615e06aa9c2c252c39c3b4d76a91f7ea76047e8a70b2407f3a9ff411f3a",
       "terminalClosureDigest": null
     },
     {
@@ -3660,6 +3715,17 @@
       "definitionDigest": "4985c86178dbbf9aa8af57dfc95099a10559110c4944350a58bc989efe3fc492",
       "progressDigest": "e766ae03a39c4e8dda104b4ed9faa269d49d574fd1d70de9e6df98d9bf3202c2",
       "terminalClosureDigest": "d6f533945bb85ca252b239e7ded2888adc5c99c319152bb852ed18fba1564385"
+    },
+    {
+      "order": 8095,
+      "id": "DOCS-VISION-002",
+      "program": "DOCS",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-04",
+      "definitionDigest": "c155d16950b2cd4403e463453885a0fcbdf7764d8aa17db14acb082dbfd42476",
+      "progressDigest": "d0c39236837e94518c150e7672450b6b4627e2437835056cca6d59f39f8304d8",
+      "terminalClosureDigest": null
     },
     {
       "order": 9000,
@@ -4261,6 +4327,26 @@
         "transitionAt": "2026-08-04T21:26:03Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-04-FAZ4B-B5-01",
+      "authorityDigest": "435b7f70828b189e6c5348ba3d3674012dc72bc49ed5982565e89a4870a301a2",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-04T22:36:24Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-04-MOUNT-BINDING-01",
+      "authorityDigest": "a7a34808e0f8c3f41873523d65d89eda4ac742e0c1c7a89a17078c9e90b43f2f",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-04T22:36:24Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -4435,7 +4521,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Hermetic suite, build artifacts stable, binary proofs ayrı provenance ile kaydedilir",
-      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; 2026-08-04 FAZ4A-S3 ratchet düşüşü: 476/111 → 381/108 (−95; brain-pause-resume + pause-resume + sprint-controller kümeleri sıfırlandı, birleşik 236/236) — S3 pre-work admission rejimiyle koştu (receipt implementasyondan önce kendi commit'inde, parent 718c27f80); kritik yolda sıradaki: S4/S5/S6 (§10.1 slot bütçesiyle paralellenebilir), S7 en son; 2026-08-04 FAZ4A-S4 ratchet düşüşü: 381/108 → 354/105 (−27; runsprint-debt-integration + fix-phase-map + avgcoverage-repair sıfırlandı, birleşik 31/31) ve ÖLÇÜM-KAPANIŞI: S6 skill kümesi + S4 evaluator yarısı zaten settle (212/212, 7 suite) — S1 emsali, iş uydurulmadı; kalan: S5 brain dörtlüsü (35) sonra S7; 2026-08-04 FAZ4A-S5 ratchet düşüşü: 354/105 → 319/101 (−35; brain + brain-rollback + brain-ipc + brain-provider sıfırlandı, birleşik 262/262) — brain.test hibrit useRealFileSystem, rollback/ipc tam dönüşüm; S5a gerçek üretim bug'ı buldu (PROD-SPRINT-PREFIX-PAD-001 satırı); kalan tek dilim: S7 (refill/heartbeat); 2026-08-04 FAZ4A-S7 ratchet düşüşü + FAZ4A KAPANIŞI: 319/101 → 300/98 (−19; wrapper-hb + fix-dispatch-continuation + postfix-pending-scan sıfırlandı, birleşik 35/35) — FAZ4A yedi diliminin tamamı settle: S1+S6+evaluator ölçümle (iş uydurulmadı), S2-S5+S7 gerçek-tmpdir dönüşümüyle; kümülatif 539/113 → 300/98 (−239 kırık, −15 dosya), üretim koduna sıfır dokunuş, 1 gerçek üretim bug'ı kayda girdi (PROD-SPRINT-PREFIX-PAD-001); kalan borç FAZ4B+ işi: orchestra dağınık (~60: docker ~16 · auth-isolation ~12 · moat3 6 · memory-limit 7 · diğer) + CLI 116 + MCP 96 sınıflarının güncel karşılıkları; 2026-08-04 FAZ4B-B1 ratchet düşüşü: 300/98 → 231/86 (−69; MCP SINIFININ TAMAMI SIFIRLANDI — tests/mcp 1031/1031, 12 dosya) — kök nedenler: eşzamanlı-import deadlock'u + 5 bayat mock'ta 7 eksik export (annotations), ADR-G-037 final-only-usage owner-grant'ının fixture'larda olmaması, deckent_plan'ın planRunFlow seam'ine geçişi, authority-first status (yanlış-derinlik mock path'leri sessiz ölüydü), lifecycle metninde CLEANUP fazının kaldırılması; hepsi test-taraflı drift, üretim bug'ı yok; kalan: B2 CLI çekirdeği (~60) → B3 CLI smoke (~20) → B4 api+orchestra dağınık (~136); 2026-08-04 FAZ4B-B2 ratchet düşüşü: 231/86 → 169/75 (−62; CLI çekirdeğinin 12 dosyası sıfırlandı — tam-sınıf koşu 7477 testte 29 kırık kaldı: B3 smoke 12 + command-registry 2 GERÇEK-POZİTİF + 15 tekli, 2 tekli kendiliğinden iyileşti); üretim bug'ı yok, 1 gerçek üretim drift'i typed bulgu olarak CLI-VOCAB-001'e taşındı (execution-authority registry satırı eksik); kalan: B3 CLI smoke+tekliler (~31) → B4 api+orchestra (~136); 2026-08-04 FAZ4B-B3 ratchet düşüşü: 167/74 → 140/56 (−27; CLI sınıfı MCP gibi TAMAMEN sıfır — 7477/7477) — B3a yeni gerçek üretim-bug adayı kayda geçirdi (PROD-BINARY-IDENTITY-EAGER-CRASH-001, satır 3335: src'siz kullanıcı projesinde ham-stack çökme); kalan borç yalnız: orchestra 107/37 + api 22/9 + süpürme 7/5 + eski-baseline artıkları; 2026-08-04 FAZ4B-B4 ratchet düşüşü: 140/56 → 33/19 (−107; ORCHESTRA SINIFI TAMAMEN SIFIR — tests/orchestra 8770/8770, 37 dosya + PREFIX-PAD fixture yan-etkisi ek-receipt'le) — B4a P0 üretim regresyonu kayda geçirdi (PROD-LANDED-FENCE-ORDER-001, satır 3340: LANDED heartbeat+continuation sessiz kaybı) ve iki testte bilinçli REGRESSION-PIN bıraktı; pinlenen yeni gerçekler: worker prose asla scope authority olamaz, FIX-budget'lı koşuda NO_GO dependant'ı deferTerminalDependencyFailure ile PENDING bekler, auth broker-kopyalı principal-digest zinciri, billingMode fail-closed→runBudgetHold; kalan: B5 api (22/9) + B6 süpürme (7/5) + eski-baseline artıkları (~4)",
+      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; 2026-08-04 FAZ4A-S3 ratchet düşüşü: 476/111 → 381/108 (−95; brain-pause-resume + pause-resume + sprint-controller kümeleri sıfırlandı, birleşik 236/236) — S3 pre-work admission rejimiyle koştu (receipt implementasyondan önce kendi commit'inde, parent 718c27f80); kritik yolda sıradaki: S4/S5/S6 (§10.1 slot bütçesiyle paralellenebilir), S7 en son; 2026-08-04 FAZ4A-S4 ratchet düşüşü: 381/108 → 354/105 (−27; runsprint-debt-integration + fix-phase-map + avgcoverage-repair sıfırlandı, birleşik 31/31) ve ÖLÇÜM-KAPANIŞI: S6 skill kümesi + S4 evaluator yarısı zaten settle (212/212, 7 suite) — S1 emsali, iş uydurulmadı; kalan: S5 brain dörtlüsü (35) sonra S7; 2026-08-04 FAZ4A-S5 ratchet düşüşü: 354/105 → 319/101 (−35; brain + brain-rollback + brain-ipc + brain-provider sıfırlandı, birleşik 262/262) — brain.test hibrit useRealFileSystem, rollback/ipc tam dönüşüm; S5a gerçek üretim bug'ı buldu (PROD-SPRINT-PREFIX-PAD-001 satırı); kalan tek dilim: S7 (refill/heartbeat); 2026-08-04 FAZ4A-S7 ratchet düşüşü + FAZ4A KAPANIŞI: 319/101 → 300/98 (−19; wrapper-hb + fix-dispatch-continuation + postfix-pending-scan sıfırlandı, birleşik 35/35) — FAZ4A yedi diliminin tamamı settle: S1+S6+evaluator ölçümle (iş uydurulmadı), S2-S5+S7 gerçek-tmpdir dönüşümüyle; kümülatif 539/113 → 300/98 (−239 kırık, −15 dosya), üretim koduna sıfır dokunuş, 1 gerçek üretim bug'ı kayda girdi (PROD-SPRINT-PREFIX-PAD-001); kalan borç FAZ4B+ işi: orchestra dağınık (~60: docker ~16 · auth-isolation ~12 · moat3 6 · memory-limit 7 · diğer) + CLI 116 + MCP 96 sınıflarının güncel karşılıkları; 2026-08-04 FAZ4B-B1 ratchet düşüşü: 300/98 → 231/86 (−69; MCP SINIFININ TAMAMI SIFIRLANDI — tests/mcp 1031/1031, 12 dosya) — kök nedenler: eşzamanlı-import deadlock'u + 5 bayat mock'ta 7 eksik export (annotations), ADR-G-037 final-only-usage owner-grant'ının fixture'larda olmaması, deckent_plan'ın planRunFlow seam'ine geçişi, authority-first status (yanlış-derinlik mock path'leri sessiz ölüydü), lifecycle metninde CLEANUP fazının kaldırılması; hepsi test-taraflı drift, üretim bug'ı yok; kalan: B2 CLI çekirdeği (~60) → B3 CLI smoke (~20) → B4 api+orchestra dağınık (~136); 2026-08-04 FAZ4B-B2 ratchet düşüşü: 231/86 → 169/75 (−62; CLI çekirdeğinin 12 dosyası sıfırlandı — tam-sınıf koşu 7477 testte 29 kırık kaldı: B3 smoke 12 + command-registry 2 GERÇEK-POZİTİF + 15 tekli, 2 tekli kendiliğinden iyileşti); üretim bug'ı yok, 1 gerçek üretim drift'i typed bulgu olarak CLI-VOCAB-001'e taşındı (execution-authority registry satırı eksik); kalan: B3 CLI smoke+tekliler (~31) → B4 api+orchestra (~136); 2026-08-04 FAZ4B-B3 ratchet düşüşü: 167/74 → 140/56 (−27; CLI sınıfı MCP gibi TAMAMEN sıfır — 7477/7477) — B3a yeni gerçek üretim-bug adayı kayda geçirdi (PROD-BINARY-IDENTITY-EAGER-CRASH-001, satır 3335: src'siz kullanıcı projesinde ham-stack çökme); kalan borç yalnız: orchestra 107/37 + api 22/9 + süpürme 7/5 + eski-baseline artıkları; 2026-08-04 FAZ4B-B4 ratchet düşüşü: 140/56 → 33/19 (−107; ORCHESTRA SINIFI TAMAMEN SIFIR — tests/orchestra 8770/8770, 37 dosya + PREFIX-PAD fixture yan-etkisi ek-receipt'le) — B4a P0 üretim regresyonu kayda geçirdi (PROD-LANDED-FENCE-ORDER-001, satır 3340: LANDED heartbeat+continuation sessiz kaybı) ve iki testte bilinçli REGRESSION-PIN bıraktı; pinlenen yeni gerçekler: worker prose asla scope authority olamaz, FIX-budget'lı koşuda NO_GO dependant'ı deferTerminalDependencyFailure ile PENDING bekler, auth broker-kopyalı principal-digest zinciri, billingMode fail-closed→runBudgetHold; kalan: B5 api (22/9) + B6 süpürme (7/5) + eski-baseline artıkları (~4); 2026-08-04 FAZ4B-B5 SON SÜPÜRME + SIFIR KİLOMETRE TAŞI: 33/19 → 0/0 — api sınıfı 251/251, tekliler 411/412→tam yeşil (fence'in dürüst kırmızısı MOUNT-BINDING üretim fix'iyle kapandı), bayat-sanılan 4 CLI girdisi gerçekte collect-fail çıktı ve onarıldı; FINAL DOĞRULAMA sınıf-sınıf: core+agents 10121/10121 · orchestra 8770/8770 · cli 7477/7477 · mcp+api+kalan 5720'de yalnız 2 dilim-durumu meta-testi (settlement'la söner); scripts/test-failure-baseline.json BOŞALDI → lint:test-baseline artık borç-defteri değil GERÇEK her-kırık-FAIL kapısıdır (Type-Check-maskesi sınıfı yapısal olarak kapandı); toplam yay: 539/113 → 0/0, üretime 4 gerçek-bug fix'i (PREFIX-PAD, exec-authority registry, binary-identity eager, mount-binding) + 2 açık P0/P1 kayıt (LANDED-fence, SSE-onEvent)",
       "updated": "2026-08-04"
     },
     {
@@ -10043,7 +10129,9 @@
         "PROD-SPAWNSYNC-ASYNC-001",
         "PROD-SPRINT-PREFIX-PAD-001",
         "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
-        "PROD-LANDED-FENCE-ORDER-001"
+        "PROD-LANDED-FENCE-ORDER-001",
+        "PROD-SSE-ONEVENT-WIRE-001",
+        "COMPOSITE-WORKER-001"
       ],
       "gates": [
         "G2",
@@ -10100,7 +10188,9 @@
         "PROD-SPAWNSYNC-ASYNC-001",
         "PROD-SPRINT-PREFIX-PAD-001",
         "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
-        "PROD-LANDED-FENCE-ORDER-001"
+        "PROD-LANDED-FENCE-ORDER-001",
+        "PROD-SSE-ONEVENT-WIRE-001",
+        "COMPOSITE-WORKER-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
@@ -10194,11 +10284,12 @@
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-FILE-LOCK-01",
-        "GR-2026-07-28-EXECUTION-AUTHORITY-01"
+        "GR-2026-07-28-EXECUTION-AUTHORITY-01",
+        "GR-2026-08-04-MOUNT-BINDING-01"
       ],
       "acceptance": "CAS, transactions, schema migration, bounded reconciliation and no file RMW race",
-      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; execution-lock v3 uses project/lock-directory generation anchors, SQLite `BEGIN IMMEDIATE`, monotonic fencing, exact projection compensation/reconciliation, atomic v2 quarantine migration and 256-row keyset pages for active, migration, live quarantine and audit scans; persistent anchor authority now binds stable `dev+ino` generations because Linux mount IDs are namespace-local, while exact mount-ID checks remain on every in-process pinned descriptor/path validation; optional dry-run-first CLI/MCP metadata reconciliation never changes authority or epoch and writes a redacted immutable audit only under operator+justification apply authority; targeted core/CLI/MCP proof passes 59/59, integrated clean/fence proof passes 102/102 and the real build passes; this proves the Linux/WSL execution-lock and clean slice only—Goal-v2, RunFlow, CLI/REPL, sprint and ScheduledFlow remain competing authorities, native macOS/Windows adapters and live/HA scale evidence remain open; fresh cross-provider verification was not executed in this provider-free recovery and is not claimed",
-      "updated": "2026-07-28"
+      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; execution-lock v3 uses project/lock-directory generation anchors, SQLite `BEGIN IMMEDIATE`, monotonic fencing, exact projection compensation/reconciliation, atomic v2 quarantine migration and 256-row keyset pages for active, migration, live quarantine and audit scans; persistent anchor authority now binds stable `dev+ino` generations because Linux mount IDs are namespace-local, while exact mount-ID checks remain on every in-process pinned descriptor/path validation; optional dry-run-first CLI/MCP metadata reconciliation never changes authority or epoch and writes a redacted immutable audit only under operator+justification apply authority; targeted core/CLI/MCP proof passes 59/59, integrated clean/fence proof passes 102/102 and the real build passes; this proves the Linux/WSL execution-lock and clean slice only—Goal-v2, RunFlow, CLI/REPL, sprint and ScheduledFlow remain competing authorities, native macOS/Windows adapters and live/HA scale evidence remain open; fresh cross-provider verification was not executed in this provider-free recovery and is not claimed; `receipt=GR-2026-08-04-MOUNT-BINDING-01`; 2026-08-04 MOUNT-BINDING settlement: B6 guard'ının TRUE-POSITIVE yakalayışı üretimde düzeltildi — adoptExecutionLockAuthorityMount(apply) artık parent-dizin root-binding kopyasını da aynı adoptedAnchorRaw ile atomik yeniler (62aafff34'ten beri eksikti; mount-adoption uçtan uca kırıktı, sonraki her acquire byte-eşitlikte kalıcı fail-closed oluyordu); fence suite 51/51, fix'siz kırmızı fix'le yeşil; ayrıca simulateExecutionAuthorityRemount fixture'ı gerçek-remount sadakatine (anchor+binding birlikte) çekildi",
+      "updated": "2026-08-04"
     },
     {
       "order": 3021,
@@ -10262,6 +10353,7 @@
       ],
       "dependents": [
         "CODEX-C7",
+        "COMPOSITE-WORKER-001",
         "GOAL-CRASH-001",
         "HA-001",
         "KERNEL-SETTLEMENT-001",
@@ -14503,6 +14595,74 @@
       "updated": "2026-08-04"
     },
     {
+      "order": 3342,
+      "id": "PROD-SSE-ONEVENT-WIRE-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "Run-flow koordinatörünün SSE onEvent teli yalnız ilk getRunFlowCoordinator çağrısında bağlanıyor: ilk istek propose/plan yolundan gelirse (run-flow-plan-service koordinatörü onEvent'siz yaratır) o root'un CANLI SSE yayını sessizce ölü doğuyor",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Koordinatör hangi ingress'ten yaratılırsa yaratılsın SSE publisher'a bağlanır (registry'ye sonradan onEvent iliştirme veya plan-service'in publisher'la yaratması); ilk-istek-propose replay'inde canlı SSE aboneliği event alır; durable log/replay davranışı değişmez",
+      "evidence": "Açılış 2026-08-04: FAZ4B-B5 api-onarımı keşfi — tests/api/server.test.ts'te canlı-sunucu davranışı önce onEvent'li route ile tel kurularak pinlendi ve boşluk test-içi yorumla belgelendi; durable log etkilenmiyor, yalnız canlı yayın; wiring-fix bu satırın işi",
+      "updated": "2026-08-04"
+    },
+    {
+      "order": 3345,
+      "id": "COMPOSITE-WORKER-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree",
+      "priority": "P1",
+      "dependsOn": [
+        "KERNEL-ATTEMPT-001"
+      ],
+      "dependents": [
+        "AGENT-RUNTIME-ADAPTER-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-ATTEMPT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Owner G2 tasarım kararı: delegated objective + authority_ceiling + budget_ceiling + allowed_runtimes + completion_contract + failure_policy + evidence_requirement alanları tiplenir; delegasyon yetkiyi yalnız daraltır, asla genişletmez; recursive bütçe/authority çift-harcaması imkânsız olur; dış orchestrator'lar (AutoGen nested Team, AG2 network sınıfı) bu kontratın altında composite worker olarak modellenir",
+      "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07-30 rekabet günlüğü — AutoGen nested Teams (Team içinde Team) ve AG2 v1 network yapıları \"runner içinde runner\" modelini standartlaştırıyor; ledger'da recursive delegasyon kontratı karşılığı yok (KERNEL-ATTEMPT-001 tek-seviye claim/lease/fencing taşıyor; GRACEFUL-BUDGET-LANDING→BUDGET-CONTINUATION-001 landing'i kapsıyor, delegasyonu kapsamıyor)",
+      "updated": "2026-08-04"
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "parent": "P04",
@@ -14539,7 +14699,8 @@
         "ENTERPRISE-AUTH-001",
         "ALP-RUNTIME-001",
         "MCP-LEASE-001",
-        "APPROVAL-QOL-001"
+        "APPROVAL-QOL-001",
+        "TRUST-HANDOFF-001"
       ],
       "gates": [
         "G2",
@@ -14575,7 +14736,8 @@
         "ENTERPRISE-AUTH-001",
         "ALP-RUNTIME-001",
         "MCP-LEASE-001",
-        "APPROVAL-QOL-001"
+        "APPROVAL-QOL-001",
+        "TRUST-HANDOFF-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Every operation binds principal, tenant, capability, approval, budget, receipt and audit",
@@ -14876,7 +15038,8 @@
         "P02-640",
         "PLUGIN-SANDBOX-001",
         "TERMINAL-TOOLS-001",
-        "TOOL-COMPUTER-001"
+        "TOOL-COMPUTER-001",
+        "TRUST-HANDOFF-001"
       ],
       "children": [],
       "gates": [
@@ -15195,7 +15358,8 @@
         "LEARNING-001",
         "OPERATIONS-PACK-001",
         "SLO-001",
-        "TERMINAL-COLLAB-001"
+        "TERMINAL-COLLAB-001",
+        "TRUST-HANDOFF-001"
       ],
       "children": [],
       "gates": [
@@ -15347,8 +15511,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Negative-space, authority stop and counterproposal are enforced and evidence-bearing",
-      "evidence": "ESSENCE and memory exist; runtime wire absent",
-      "updated": "2026-07-26"
+      "evidence": "ESSENCE and memory exist; runtime wire absent. 2026-08-04 owner direktifi (Alperen): alp-discipline geliştirilecek ve deckent'te effective-config'ten çözülen on-off enablement ayarı olacak — kullanıcı-görünür toggle, policy-bağlı; discipline kaynağı `alp-discipline/` (ESSENCE.md v1.0.3, tek AI-yüzeyi olarak bütün verilir)",
+      "updated": "2026-08-04"
     },
     {
       "order": 4160,
@@ -15425,6 +15589,43 @@
       "acceptance": "Requests classify risk/action, expired decisions terminate loops across processes, notifications dedupe durably",
       "evidence": "Residual from historical closed 523",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 4180,
+      "id": "TRUST-HANDOFF-001",
+      "parent": "AUTHORITY-001",
+      "program": "AUTHORITY",
+      "outcome": "Agent-çıktısından host-etkisine güven-aktarım zinciri: out-of-band telemetry, monitoring-loss=authority-suspension, egress gateway, Docker-socket default-deny, agent-üretimi dosya provenance'ı ve execution-capable config-mutation admission'ı",
+      "priority": "P1",
+      "dependsOn": [
+        "TOOL-AUTHORITY-001",
+        "AUDIT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TOOL-AUTHORITY-001",
+        "AUDIT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Owner G2 kapsam kararı: agent'ın görebildiği/kapatabildiği monitoring güvenlik kontrolü sayılmaz — worker-bağımsız heartbeat + append-only dış ledger; sandbox-dışı privileged yardımcılar (git helper/hook, IDE extension, daemon) Brain policy kapsamına alınır; yüksek-riskli config mutation'ları (workspace-trust sınıfı) admission gate'ten geçer; enforcement modu (advisory/enforce) tiplenir; karar kapsam daraltmaya da çıkabilir",
+      "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07-23 coding-agent sandbox güvenlik sınıfı raporu (Cursor/Codex/Gemini CLI ortak hata sınıfları: denylist sandbox, komut-adına güven, Docker socket, config-üzerinden-executable davranış) + RepoComplianceBench (agent'lar repo policy'sini kendiliğinden okumuyor; stop/handoff davranışı güvenilmez). İlke: agent'ın güvenlik sınırı, agent prosesinin sınırı değildir. PLUGIN-SANDBOX-001 plugin/skill sandbox'ını, bu satır sandbox-sonrası host-etki zincirini kapsar",
+      "updated": "2026-08-04"
     },
     {
       "order": 5000,
@@ -16667,7 +16868,9 @@
         "CAPABILITY-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "ERP-AGENT-CONTRACT-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -16687,7 +16890,8 @@
       "closureBlockedBy": [
         "APP-SERVICE-001",
         "SURFACE-CONTRACT-001",
-        "CAPABILITY-001"
+        "CAPABILITY-001",
+        "ERP-AGENT-CONTRACT-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Each adapter is capability-declared, identity-bound, accessible and contains no alternate core",
@@ -16763,6 +16967,37 @@
       "updated": "2026-08-03"
     },
     {
+      "order": 6180,
+      "id": "ERP-AGENT-CONTRACT-001",
+      "parent": "SURFACE-ADAPTER-001",
+      "program": "CONNECTOR",
+      "outcome": "Enterprise Application Agent Contract: ERP/iş-uygulaması agent'larına (Oracle AI Agent Studio, Fusion/NetSuite sınıfı) karşı discover_capabilities / invoke / stream_status / request_approval / commit_transaction / cancel / compensate_or_rollback / collect_audit sözleşmesi",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Owner G2 değerlendirmesi: transaction-ID korelasyonu, enterprise-user effective authority ve result digest dahil kontrat tiplenir; deckent tek-ERP süreçlerini değil ERP + coding-runtime + custom sistemler arası uçtan uca süreci yönetir; karar redde de çıkabilir",
+      "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-08-03 Oracle+Gemini sinyali — agent orchestration doğrudan ERP işlem bağlamına iniyor; SURFACE-ADAPTER-001 ERP'yi thin-adapter olarak sayıyor, işlem-seviyesi (commit/compensate/audit) kontrat karşılığı ledger'da yok",
+      "updated": "2026-08-04"
+    },
+    {
       "order": 7000,
       "id": "ECOSYSTEM-001",
       "parent": "P07",
@@ -16787,7 +17022,8 @@
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
-        "A2A-INTEROP-001"
+        "A2A-INTEROP-001",
+        "AGENT-RUNTIME-ADAPTER-001"
       ],
       "gates": [
         "G2",
@@ -16820,7 +17056,8 @@
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
-        "A2A-INTEROP-001"
+        "A2A-INTEROP-001",
+        "AGENT-RUNTIME-ADAPTER-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Provenance, install, permissions, sandbox, update, revoke and quarantine are one trust plane",
@@ -17245,7 +17482,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Owner G2 kararı yönü tipler (inbound/outbound/ikisi), binding seçimi ve ADR sınırı (\"execution identity hiçbir zaman A2A task/context ID'sinden türetilmez\") kayda girer; implementation admission MCPV2 P3 HTTP-transport kararıyla koordine edilir; taslak iş paketleri A0-A3 `a2aplan.md` içindedir",
-      "evidence": "Açılış: Alperen 2026-08-04 talebi (\"iş planımıza alalım\"). Kaynak: a2a-protocol.org spec v1.0.0; Linux Foundation 2026-04 bir-yıl raporu 150+ kuruluş + Google/Microsoft/AWS platform entegrasyonu + production kullanım; 2026-08-04 rekabet günlüğü Hermes v0.20 çift-yönlü A2A sinyali. Mevcut kodda A2A yok — greenfield, kırılma riski yok",
+      "evidence": "Açılış: Alperen 2026-08-04 talebi (\"iş planımıza alalım\"). Kaynak: a2a-protocol.org spec v1.0.0; Linux Foundation 2026-04 bir-yıl raporu 150+ kuruluş + Google/Microsoft/AWS platform entegrasyonu + production kullanım; 2026-08-04 rekabet günlüğü Hermes v0.20 çift-yönlü A2A sinyali. Mevcut kodda A2A yok — greenfield, kırılma riski yok. Owner G2 yön kararı 2026-08-04: İKİSİ (inbound + outbound) onaylandı; binding seçimi ve ADR sınırı A0 kapsamında açık",
       "updated": "2026-08-04"
     },
     {
@@ -17277,7 +17514,42 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Owner scope kararı sonrası: converter CLI ingest hattında (`src/cli/commands/skill.ts` + yeni `src/core/skill-md-adapter.ts`); `fm.name→id` eşlemesi (deckent `name`=display title, SKILL.md `name`=identifier — semantik çakışma); activation köprüsü `migrateV1SkillToActivation` üzerinden (aksi halde skill yüklenir ama asla route edilmez); `skill-types.ts`e typed `source` alanı; `lint-manifests.mjs` uyumu; `native_skills_passthrough` ile çift-enjeksiyon reconciliation'ı; CLI zod şeması ↔ `validateSkillDefinition` diverjansının kapatılması; referenced-files (`scripts/`,`data/` yardımcı dosyaları) desteği ayrı scope kararıdır",
-      "evidence": "Açılış: Alperen 2026-08-04 kararı (\"skill.md formatına dönelim, kabul\"). 2026-08-04 repo analizi: hazır gerçek korpus mevcut (`.claude/skills` 10 + `.codex/skills` 7 dizin, en zor iki vaka dahil: quoted uzun description + nested metadata map); `parseMarkdownTitleAndLead` frontmatter'ı bugün parse etmeden atıyor ve doğrudan unit testi yok; YAML dependency yok — ADR-D-005 kapsamında el-yazımı parser sertleştirme (~40 satır) vs dependency kararı owner'dadır",
+      "evidence": "Açılış: Alperen 2026-08-04 kararı (\"skill.md formatına dönelim, kabul\"). 2026-08-04 repo analizi: hazır gerçek korpus mevcut (`.claude/skills` 10 + `.codex/skills` 7 dizin, en zor iki vaka dahil: quoted uzun description + nested metadata map); `parseMarkdownTitleAndLead` frontmatter'ı bugün parse etmeden atıyor ve doğrudan unit testi yok; YAML dependency yok — ADR-D-005 kapsamında el-yazımı parser sertleştirme (~40 satır) vs dependency kararı owner'dadır. Owner onayı 2026-08-04: scope kabul, referenced-files desteği DAHİL",
+      "updated": "2026-08-04"
+    },
+    {
+      "order": 7130,
+      "id": "AGENT-RUNTIME-ADAPTER-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "PROVIDER",
+      "outcome": "Harici agent-runtime adapter ailesi değerlendirmesi: generic ACP worker adapter + Hermes/OpenClaw/Codex-remote/ADK sınıfı runtime'ların governed composite worker olarak admission'ı",
+      "priority": "P2",
+      "dependsOn": [
+        "COMPOSITE-WORKER-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "COMPOSITE-WORKER-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Owner G2 kararı: hangi runtime ailelerinin adapter alacağı, ACP (agent session/runtime transport) ile MCP (capability erişimi) rol ayrımı, version-pin + adapter conformance + canary-pool disiplini ve XVERIFY-PROVIDER-SEPARATION'ın dış-runtime çıktısına uygulanışı tiplenir; PAEP (P02) model-provider düzlemini, bu satır agent-runtime düzlemini kapsar",
+      "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07/08 rekabet günlüğü — OpenClaw `agent exec` headless one-shot runner (CLI agent koşturmak metalaşıyor), AG2 ACP+MCP session-scoped capability injection, Hermes v0.20 çift-yönlü A2A + plugin SDK; ledger'da dış agent-runtime adapter karşılığı yok; A2A-INTEROP-001 outbound yönü bu ailenin A2A üyesidir",
       "updated": "2026-08-04"
     },
     {
@@ -17305,7 +17577,8 @@
         "NPM-CHANNEL-001",
         "DOCS-TRUTH-PASS-001",
         "LAUNCH-COMMS-001",
-        "DOCS-VISION-001"
+        "DOCS-VISION-001",
+        "DOCS-VISION-002"
       ],
       "gates": [
         "G2",
@@ -17337,7 +17610,8 @@
         "RELEASE-BETA-001",
         "NPM-CHANNEL-001",
         "DOCS-TRUTH-PASS-001",
-        "LAUNCH-COMMS-001"
+        "LAUNCH-COMMS-001",
+        "DOCS-VISION-002"
       ],
       "evidenceReceipts": [],
       "acceptance": "Supported/degraded/unsupported matrix for every declared component and surface",
@@ -17817,6 +18091,37 @@
       "acceptance": "Demo asset (terminal recording), Show HN and X/LinkedIn drafts on verifiable-orchestration positioning, comparison page, weekly cadence plan; every outbound post owner-approved before publication",
       "evidence": "Competitor scan 2026-07-31: category consolidating (Terragon, vibe-kanban, Roo Code shut down), Ruflo owns distribution while its orchestration claims are audit-refuted — deckent counter-position is evidence-backed settlement",
       "updated": "2026-07-31"
+    },
+    {
+      "order": 8095,
+      "id": "DOCS-VISION-002",
+      "parent": "EVERY-ENV-001",
+      "program": "DOCS",
+      "outcome": "2026-08 rekabet-sentezi vision amendment: hyperscaler control-plane tavanı, provider+runtime bağımsızlığı, recursive delegasyon cümlesi ve iki yeni non-goal (identity provider değil; başka bir agent runtime değil), en+tr paritesiyle",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "-",
+        "H": "?",
+        "L": "-",
+        "X": "-",
+        "S": "-"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Onaylı dört edit (E1 hyperscaler tavanı, E2 runtime-neutrality bölümü+başlığı, E4 recursive delegasyon, E5 iki non-goal) `docs/en/vision.md` + `docs/tr/vision.md`'ye 13-heading paritesi korunarak uygulanır; E3 (policy-enforcement metni) ALP-RUNTIME-001 ürünleşmesine yönlendirildi, E6 (runtime-neutrality falsifier'ı) owner kararı almadı — ikisi de vision-metni olarak HOLD",
+      "evidence": "Owner canlı onayı 2026-08-04: E1, E2, E4 aynen; E5 şu kayıtla — dashboard + desktop app yapılacak ve kolayca bağlanılabilir olacak (CLI mevcut), non-goal metni bu kaydı içerir. Edit'ler aynı oturumda working tree'ye uygulandı; docs build/parity koşusu ve commit provenance açık",
+      "updated": "2026-08-04"
     },
     {
       "order": 9000,
@@ -18631,6 +18936,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "8df8225324d0e7a72516601377eaffcb25ffbafb8d971bcdd75128d17a008f4a"
+    "value": "6ced17f23620702cd402d1ef664371a698046513b2d65e6cd00cfb44ff3ad695"
   }
 }

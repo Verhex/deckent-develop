@@ -149,14 +149,17 @@ function expectHold(
 }
 
 describe('HTTP Brain provider-authority front door', () => {
-  it('HOLDs direct start and plan before job creation, context read, planner, or detached spawn', async () => {
+  it('retires direct start (410) and HOLDs plan before context read, planner, or detached spawn', async () => {
     const h = await boot();
 
+    // FAZ4B: /api/start emekli — provider-authority kapısına dahi gelmeden
+    // 410 LEGACY_START_RETIRED döner; hiçbir provider işi mümkün değildir.
     const startResponse = await call(h, '/api/start', {
       method: 'POST',
       body: JSON.stringify({ autoApprove: true }),
     });
-    expectHold(startResponse, 'api-start-');
+    expect(startResponse.status).toBe(410);
+    expect(startResponse.json()).toMatchObject({ code: 'LEGACY_START_RETIRED' });
 
     const planResponse = await call(h, '/api/plan', {
       method: 'POST',
@@ -232,7 +235,10 @@ describe('HTTP Brain provider-authority front door', () => {
 
   it('writes one exact unattended Brain HOLD event per rejected ingress', async () => {
     const h = await boot();
-    await call(h, '/api/start', {
+    // FAZ4B: /api/start emekli (410, authority-preflight çalışmaz, event
+    // yazmaz) — HOLD-kanıt zinciri artık canlı Brain ingress'i /api/plan
+    // üzerinden sürülür.
+    await call(h, '/api/plan', {
       method: 'POST',
       body: JSON.stringify({}),
     });

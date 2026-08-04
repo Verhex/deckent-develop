@@ -44,6 +44,21 @@ vi.mock('../../src/api/sprint-job-runner.js', () => ({
   startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
 }));
 
+// FAZ4B: POST /api/plan canonical run-flow plan authority'sine (planRunFlow)
+// delege eder; şema-validasyon testleri için seam burada mock'lanır.
+vi.mock('../../src/orchestra/run-flow-plan-service.js', () => ({
+  planRunFlow: vi.fn(async (input: { proposal: { flowId: string } }) => ({
+    flowId: input.proposal.flowId,
+    revision: 1,
+    planDigest: 'f'.repeat(64),
+    approval: null,
+    sprint: { id: 'sprint-001', number: 1, tasks: [] },
+    preview: { flowId: input.proposal.flowId, revision: 1, planDigest: 'f'.repeat(64), taskSummaries: [] },
+  })),
+  decideRunFlowPlan: vi.fn(),
+  RunFlowPlanServiceError: class RunFlowPlanServiceError extends Error {},
+}));
+
 import {
   parseBody,
   createHttpServer,
@@ -121,11 +136,14 @@ describe('POST /api/start — body validation', () => {
     expect(body.error).toContain('autoApprove');
   });
 
-  it('returns 202 for valid empty body', async () => {
+  it('valid empty body passes the schema and reaches the retired-route contract (410)', async () => {
     api = createHttpServer(PROJECT_ROOT, 0);
     await new Promise<void>((r) => api.server.once('listening', r));
     const res = await request(api, '/api/start', 'POST', {});
-    expect(res.status).toBe(202);
+    // FAZ4B: /api/start emekli — şema-geçerli gövde 400 DEĞİL,
+    // 410 LEGACY_START_RETIRED (canonical akış: plan → decision → start) alır.
+    expect(res.status).toBe(410);
+    expect(JSON.parse(res.body).code).toBe('LEGACY_START_RETIRED');
   });
 });
 
