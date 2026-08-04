@@ -1256,7 +1256,11 @@ export function loadFinalizerAttemptTasks(
 ): readonly Task[] {
   const byId = new Map(sprint.tasks.map(task => [task.id, task]));
   const tasksDir = join(projectRoot, TASKS_DIR);
-  const prefix = `task-${sprint.number}-`;
+  // Task ids/files carry the sprint ID's padded segment (`001-001`); the numeric
+  // `sprint.number` (`1`) never matches for sprints < 100, which silently blinded
+  // attempt-task discovery on fresh installs (PROD-SPRINT-PREFIX-PAD-001).
+  const sprintIdSegment = sprint.id.replace(/^sprint-/, '');
+  const prefix = `task-${sprintIdSegment}-`;
   if (!existsSync(tasksDir)) return [...byId.values()];
   try {
     for (const file of readdirSync(tasksDir)) {
@@ -1265,7 +1269,7 @@ export function loadFinalizerAttemptTasks(
       if (
         !candidate
         || typeof candidate.id !== 'string'
-        || !candidate.id.startsWith(`${sprint.number}-`)
+        || !candidate.id.startsWith(`${sprintIdSegment}-`)
         || (candidate.sprintId !== undefined && candidate.sprintId !== sprint.id)
       ) continue;
       byId.set(candidate.id, candidate);

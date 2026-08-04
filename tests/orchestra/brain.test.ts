@@ -1673,11 +1673,9 @@ describe('cleanup', () => {
 
   it('deletes ALL task extensions (.json, .plan, .hb, .result, .paused, .log)', () => {
     mockedExistsSync.mockReturnValue(true);
-    // Sprint-end unlink is scoped to the sprint's OWN files via the
-    // `task-${sprint.number}-` prefix (sprint-lifecycle.ts sprintTaskPrefix) —
+    // Sprint-end unlink is scoped to the sprint's OWN files via the padded
+    // sprint-id segment prefix (sprint-lifecycle.ts sprintTaskPrefix) —
     // a shared-workspace safety so cleanup never wipes another run's tasks.
-    // Fixture uses sprint 101 so the unpadded prefix ('task-101-') and the
-    // padStart(3) task-id file naming ('task-101-001.*') agree.
     const taskFiles = [
       'task-101-001.json', 'task-101-001.plan', 'task-101-001.hb',
       'task-101-001.result', 'task-101-001.paused', 'task-101-001.log',
@@ -1689,6 +1687,24 @@ describe('cleanup', () => {
     // statSync returns recent file so stale pass doesn't re-delete
     mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
     cleanup(ROOT, makeSprint({ id: 'sprint-101', number: 101 }));
+    for (const file of taskFiles) {
+      expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining(file));
+    }
+  });
+
+  // PROD-SPRINT-PREFIX-PAD-001 regression: task files carry the sprint ID's PADDED
+  // segment ('task-007-001.json') while sprint.number is numeric (7). The old
+  // number-derived prefix ('task-7-') never matched, so sprint-end cleanup was a
+  // silent no-op for every sprint below 100.
+  it('deletes task files for sprints below 100 (padded-prefix authority)', () => {
+    mockedExistsSync.mockReturnValue(true);
+    const taskFiles = ['task-007-001.json', 'task-007-001.result'];
+    mockedReaddirSync.mockImplementation((p: unknown) => {
+      if (String(p).includes('.tasks')) return taskFiles as never;
+      return [] as never;
+    });
+    mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
+    cleanup(ROOT, makeSprint({ id: 'sprint-007', number: 7 }));
     for (const file of taskFiles) {
       expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining(file));
     }
@@ -1714,7 +1730,7 @@ describe('cleanup', () => {
   it('handles stale files older than 24h', () => {
     mockedExistsSync.mockReturnValue(true);
     // Both the main sprint-end pass and the stale sweep are scoped to the
-    // sprint's own `task-${sprint.number}-` prefix (sprint-lifecycle.ts) —
+    // sprint's own padded-id-segment prefix (sprint-lifecycle.ts) —
     // the stale fixture file must belong to the cleaned sprint to be swept.
     mockedReaddirSync.mockImplementation((p: unknown) => {
       if (String(p).includes('.tasks')) {

@@ -397,7 +397,11 @@ export function cleanup(
   }
 
   const tasksDir = join(projectRoot, TASKS_DIR);
-  const sprintTaskPrefix = `task-${sprint.number}-`;
+  // Task files are named from the sprint ID's padded segment (`task-001-001.json`,
+  // see task-builder createTask); `sprint.number` is numeric and unpadded, so a
+  // number-derived prefix (`task-1-`) never matches for sprints < 100 and cleanup
+  // silently no-ops (PROD-SPRINT-PREFIX-PAD-001).
+  const sprintTaskPrefix = `task-${sprint.id.replace(/^sprint-/, '')}-`;
   // Sprint 156 Task 4 follow-up (Sprint 157 hot fix, 2026-05-12):
   // TASK_FILE_EXTENSIONS unlink is now gated by cleanupPhase. On 'spawn-fail'
   // the task .json/.plan/.hb/.result files are PRESERVED for post-mortem
@@ -470,7 +474,9 @@ export function cleanup(
   // own archivePromptFiles() call, leaving the archive directory empty.
   if (cleanupPhase === 'sprint-end' && existsSync(tasksDir)) {
     try {
-      archivePromptFiles(tasksDir, sprint.id, 5, `${sprint.number}-`);
+      // Prompt tmpfiles embed the task id (`.prompt-001-001-<hash>.txt`), whose sprint
+      // segment is the padded ID string — same authority as sprintTaskPrefix above.
+      archivePromptFiles(tasksDir, sprint.id, 5, `${sprint.id.replace(/^sprint-/, '')}-`);
     } catch (e) { debugLog('cleanup:archivePromptFiles', e); }
   }
 
