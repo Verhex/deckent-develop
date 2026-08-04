@@ -47,20 +47,12 @@
       "failed": 1
     },
     {
-      "file": "tests/cli/cleanup-log-archive.test.ts",
-      "failed": 4
-    },
-    {
       "file": "tests/cli/cli-bin-invocation.test.ts",
       "failed": 1
     },
     {
       "file": "tests/cli/command-registry.test.ts",
       "failed": 2
-    },
-    {
-      "file": "tests/cli/commands.test.ts",
-      "failed": 14
     },
     {
       "file": "tests/cli/commands/dashboard-overhaul.test.ts",
@@ -71,24 +63,8 @@
       "failed": 1
     },
     {
-      "file": "tests/cli/commands/i18n-integration.test.ts",
-      "failed": 3
-    },
-    {
-      "file": "tests/cli/commands/plan.test.ts",
-      "failed": 12
-    },
-    {
       "file": "tests/cli/commands/review-finalize-onboard-upgrade-plugin-archive-debt-improvements.test.ts",
       "failed": 1
-    },
-    {
-      "file": "tests/cli/commands/review-finalize-overhaul.test.ts",
-      "failed": 5
-    },
-    {
-      "file": "tests/cli/commands/spawn.test.ts",
-      "failed": 2
     },
     {
       "file": "tests/cli/commands/status-agents.test.ts",
@@ -105,14 +81,6 @@
     {
       "file": "tests/cli/dashboard.test.ts",
       "failed": 1
-    },
-    {
-      "file": "tests/cli/finalize-refinalize.test.ts",
-      "failed": 6
-    },
-    {
-      "file": "tests/cli/finalize-rule-regen.test.ts",
-      "failed": 2
     },
     {
       "file": "tests/cli/helpers/process-runtime-provider-threading.test.ts",
@@ -139,24 +107,12 @@
       "failed": 7
     },
     {
-      "file": "tests/cli/spawn-multiprovider.test.ts",
-      "failed": 4
-    },
-    {
-      "file": "tests/cli/start-snapshot-branch.test.ts",
-      "failed": 7
-    },
-    {
       "file": "tests/cli/status-read-model-wire.test.ts",
       "failed": 1
     },
     {
       "file": "tests/cli/status-terminal-publication-race.test.ts",
       "failed": 1
-    },
-    {
-      "file": "tests/cli/status-terminal-receipt.test.ts",
-      "failed": 3
     },
     {
       "file": "tests/cli/sync-eisdir.test.ts",
