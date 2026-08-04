@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6458d60ae1bbfa4641ecbc6df0839be32e655869522febc2ec023c8a0ec79ee4"
+    "value": "e6afd54c8627a2e1d4654929ed608ac0063666039b2ccd0bc68359e0403dfce0"
   },
   "summary": {
     "total": 341,
     "active": 334,
     "terminal": 7,
-    "receipts": 31,
+    "receipts": 32,
     "byState": {
-      "OPEN": 236,
+      "OPEN": 235,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 31,
+      "VERIFY": 32,
       "DONE": 7,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2764,10 +2764,10 @@
       "id": "PROD-SPRINT-PREFIX-PAD-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-04",
       "definitionDigest": "63641d3fefbfef8e21fa2b476f15b3ec0472de3cc95e4b8b592796844b29573c",
-      "progressDigest": "d036845d3983226f9f074a3fbe03dba304229afa65a1842baf839d6dc4907fd7",
+      "progressDigest": "35e4177bf71f7667b810b8d084c5caf9bb083780aac55adbe5dfdf10b6c4f0dd",
       "terminalClosureDigest": null
     },
     {
@@ -4124,6 +4124,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-04T11:25:07Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-04-PREFIX-PAD-01",
+      "authorityDigest": "f85385c1ce63038a2db12c31534784a595c1ed16395de9707b7055defdd1d42a",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-04T12:32:39Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14273,12 +14283,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -14286,9 +14296,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-04-PREFIX-PAD-01"
+      ],
       "acceptance": "`sprintTaskPrefix` üretimi task-dosya adlandırmasıyla (padStart(3)) aynı authority'den türetilir; sprint<100 replay'inde sprint-end unlink + stale sweep gerçekten siler; regresyon testi 2-haneli sprint numarasıyla fail-closed",
-      "evidence": "Açılış 2026-08-04: FAZ4A-S5a typed blocker — src/orchestra/sprint-lifecycle.ts `task-${'{'}sprint.number{'}'}-` padding'siz, dosyalar `task-001-…` padStart(3) ile yazılıyor; prefix sprint<100'de asla eşleşmez, silme sessizce no-op. Dogfood sprint'leri >100 olduğundan canlıda maskeli; taze kurulumda gerçek. Test fixture'ları bug'ı kodlamamak için 3-haneli sprint (101) kullanıyor — fix bu satırın işi",
+      "evidence": "Açılış 2026-08-04: FAZ4A-S5a typed blocker — src/orchestra/sprint-lifecycle.ts `task-${'{'}sprint.number{'}'}-` padding'siz, dosyalar `task-001-…` padStart(3) ile yazılıyor; prefix sprint<100'de asla eşleşmez, silme sessizce no-op. Dogfood sprint'leri >100 olduğundan canlıda maskeli; taze kurulumda gerçek. Test fixture'ları bug'ı kodlamamak için 3-haneli sprint (101) kullanıyor; `receipt=GR-2026-08-04-PREFIX-PAD-01`; 2026-08-04 SETTLEMENT: kapsam keşifte büyüdü — aynı sınıftan 4 site bulundu ve DÖRDÜ birden düzeltildi: lifecycle sprintTaskPrefix + prompt-arşiv prefix'i, finalizer loadFinalizerAttemptTasks dosya-prefix + id-prefix (İKİNCİSİ DAHA AĞIR: sprint<100'de finalize diskteki runtime-born FIX çocuklarını hiç keşfedemiyordu); hepsi canonical `sprint.id.replace(/^sprint-/,'')` türetmesine (run-status-authority deseni) çekildi; `proof=prefix-pad-regressions-fail-closed-then-green`: 2 regresyon testi (sprint-007) fix'siz üretimde DÜŞTÜ, fix'le geçti; brain 204/204 + finalize-sprint 26/26 + komşu finalizer/controller 228/228, tsc temiz",
       "updated": "2026-08-04"
     },
     {
@@ -18318,6 +18330,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "85223c1b057d6d4d3caec9a30fd23ac3b20d20afe4c16aade0ed1591ebfa3459"
+    "value": "f1630d4f6a0c22c354f51c4c52313a8c15be4c65364de38b896651ec9b6a50a7"
   }
 }

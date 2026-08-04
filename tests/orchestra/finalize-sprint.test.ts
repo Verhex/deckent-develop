@@ -723,3 +723,40 @@ describe('finalizeSprint — F5 prompt-version stats wire (B11)', () => {
     expect(recordVersionUseSpy).not.toHaveBeenCalled();
   });
 });
+
+// PROD-SPRINT-PREFIX-PAD-001 regression: task ids/files carry the sprint ID's PADDED
+// segment ('007-001', 'task-007-001.json') while sprint.number is numeric (7). The old
+// `task-${sprint.number}-` prefix never matched below sprint 100, silently blinding
+// finalizer attempt-task discovery (runtime-born FIX children invisible on fresh installs).
+describe('loadFinalizerAttemptTasks padded-prefix authority', () => {
+  it('discovers disk-born FIX tasks for sprints below 100', async () => {
+    const { loadFinalizerAttemptTasks } = await import('../../src/orchestra/sprint-finalizer.js');
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    const root = mkdtempSync(join(tmpdir(), 'deckent-prefix-pad-'));
+    try {
+      mkdirSync(join(root, '.tasks'), { recursive: true });
+      const fixTask = {
+        id: '007-001-fix',
+        title: 'fix',
+        description: 'runtime-born fix',
+        status: 'PENDING',
+        sprintId: 'sprint-007',
+        fixForTaskId: '007-001',
+      };
+      writeFileSync(join(root, '.tasks', 'task-007-001-fix.json'), JSON.stringify(fixTask), 'utf-8');
+
+      const attempts = loadFinalizerAttemptTasks(root, {
+        id: 'sprint-007',
+        number: 7,
+        status: 'ACTIVE',
+        phase: 'FIX',
+        tasks: [{ id: '007-001', title: 'root', status: 'DONE' }],
+        workers: [],
+      } as never);
+
+      expect(attempts.map(candidate => candidate.id)).toEqual(['007-001', '007-001-fix']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

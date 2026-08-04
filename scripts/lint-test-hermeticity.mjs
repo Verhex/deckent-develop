@@ -108,11 +108,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-03 (TRUST-ANCHOR-002): count unchanged, digest moved — the anchor resolver in
-  // scripts/lint-master-plan.mjs gained fail-closed modes (shallow/merge/history-unresolved)
-  // and the three-state blob reader (OQ-XVE-05).
+  // 2026-08-04 (PROD-SPRINT-PREFIX-PAD-001): count unchanged, digest moved —
+  // sprint-lifecycle.ts + sprint-finalizer.ts prefix derivation switched to the
+  // canonical padded sprint-id segment.
   count: 1196,
-  digest: 'cf17650d2684762da5d0b40f9280a166c58800caf14b27cb996431b192e7e08c',
+  digest: 'e30beb32e5d00da682eb2162fd0d2edfa580a76f7406dfd05e8a82a8ac1f045d',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
