@@ -1,7 +1,7 @@
 # FAZ 4a + P1 — Dilim Planı ve Admission Şablonu
 
 > Yazan: Claude (Fable 5) · 2026-08-03 · Onay: Alperen ("öneri kabul edildi")
-> Statü: **execution-hazır plan** — implementasyon taze oturumda başlar. Bu dosya MASTER'ın
+> Statü: **KAPANDI 2026-08-04** — yedi dilimin tamamı settle (S1+S6+evaluator ölçümle; S2-S5+S7 gerçek-tmpdir dönüşümüyle; kümülatif ratchet 539/113 → 300/98). Tarihsel plan artifact'ı olarak korunur. Bu dosya MASTER'ın
 > `TRUTH-BASELINE-001` evidence'ından referanslanan versioned plan artifact'ıdır; iş-takibi
 > authority'si MASTER'dadır, bu dosya sıra/scope/receipt şablonu taşır.
 > Kaynak kararlar: canonical kritik yol `P6✓→P1→P3+P4→P2` (OQ-XV-06) · "P1, FAZ-4a'nın kendi
@@ -35,12 +35,12 @@ receipt'ini mint+consume eder. Yeni rejim: her receipt **parent-anchor'a tabi** 
 | # | Alt-dilim | MASTER sahipleri | Üretim scope | Test scope (≈kırık) | Kanıt ölçütü |
 |---|---|---|---|---|---|
 | S1 | ~~Atomik result yazımı + malformed-recovery~~ **ÖLÇÜMLE KAPANDI 2026-08-03**: halka zaten settle (27/27, baseline'da 0); borç S2/S3 içindeymiş, ham replay artifact'ı yok → L kapanışı 4b-basamak-4'te | `RESULT-RECONCILIATION-001` · `RESULT-INGEST-001` | — | — | 3 malformed-`.result` vakası (475-017/032, 491-005-fix) replay'de collector'ı kilitleyemez; temp→rename→geri-okuma turu gerçek tmpdir testiyle |
-| S2 | Finalizer terminal-evidence zinciri | `RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001` · `RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001` | sprint-finalizer | sprint-finalizer + finalize-sprint (63) | Held receipt asla COMPLETE yayımlamaz; finalize yalnız canonical task keşfeder; 63 kırığın kümesi ratchet'ten düşer |
-| S3 | Collect→evaluate→status transactionality + pause/resume | `RECOVERY-BORN-488-STATUS-PROJECTION-001` · `RECOVERY-RESUME-001` | sprint-controller | controller + pause-resume kümeleri (95+) | Valid result toplanmışken task EXECUTING'de kalamaz; pause→resume lease-safe; en büyük tek küme burada düşer |
-| S4 | Criteria isolation | `RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001` · `RECOVERY-BORN-488-VERIFICATION-ISOLATION-001` · `RECOVERY-BORN-488-EVALUATION-TRUTH-001` | result-evaluator | evaluator + runsprint-debt (~25) | Bir taskın scoped kriterine başka taskın ambient `tsc` hatası sızamaz (491-001 replay'i fail-closed) |
-| S5 | Repair scope augmentation + FIX authority | `RECOVERY-BORN-485-FIX-AUTHORITY-001` · `RECOVERY-BORN-488-REPAIR-CAPABILITY-001` | brain FIX üretimi | brain + fix-phase-map (~30) | NO_GO teşhisindeki eksik dosyalar FIX scope'una girer; aynı imkânsız scope FIX'e kopyalanamaz (491-005/006 replay) |
-| S6 | Generated skill durability | `SKILL-DURABILITY-001` (P0) | brain PLAN/FIX skill taşıma, skill-pool | skill kümeleri (~5) | PLAN'da üretilen skill FIX lineage'ında aynı içerikle worker prompt'una ulaşır; `FORCED_SKILL_UNAVAILABLE` regresyonu fail-closed |
-| S7 | Continuous slot refill + heartbeat-authority | `RECOVERY-BORN-488-CONTINUOUS-REFILL-001` · `RECOVERY-BORN-480-HEARTBEAT-001` | sprint-controller slot döngüsü, worker heartbeat | wrapper-hb + kalan controller (~20) | EXECUTE bitmeden FIX doğar ve boş slot dolar; heartbeat monotonik kanıtı geriletemez |
+| S2 ✅(2026-08-04, PR #32) | Finalizer terminal-evidence zinciri | `RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001` · `RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001` | sprint-finalizer | sprint-finalizer + finalize-sprint (63) | Held receipt asla COMPLETE yayımlamaz; finalize yalnız canonical task keşfeder; 63 kırığın kümesi ratchet'ten düşer |
+| S3 ✅(2026-08-04, PR #34) | Collect→evaluate→status transactionality + pause/resume | `RECOVERY-BORN-488-STATUS-PROJECTION-001` · `RECOVERY-RESUME-001` | sprint-controller | controller + pause-resume kümeleri (95+) | Valid result toplanmışken task EXECUTING'de kalamaz; pause→resume lease-safe; en büyük tek küme burada düşer |
+| S4 ✅(2026-08-04, PR #35 — evaluator yarısı ölçümle kapalı 212/212, debt/FIX üçlüsü dönüşümle) | Criteria isolation | `RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001` · `RECOVERY-BORN-488-VERIFICATION-ISOLATION-001` · `RECOVERY-BORN-488-EVALUATION-TRUTH-001` | result-evaluator | evaluator + runsprint-debt (~25) | Bir taskın scoped kriterine başka taskın ambient `tsc` hatası sızamaz (491-001 replay'i fail-closed) |
+| S5 ✅(2026-08-04, PR #36 — brain dörtlüsü; PROD-SPRINT-PREFIX-PAD-001 bug'ı kayda girdi) | Repair scope augmentation + FIX authority | `RECOVERY-BORN-485-FIX-AUTHORITY-001` · `RECOVERY-BORN-488-REPAIR-CAPABILITY-001` | brain FIX üretimi | brain + fix-phase-map (~30) | NO_GO teşhisindeki eksik dosyalar FIX scope'una girer; aynı imkânsız scope FIX'e kopyalanamaz (491-005/006 replay) |
+| S6 ✅(2026-08-04, ÖLÇÜMLE KAPALI — skill kümeleri 0 kırık, 212/212 doğrulama koşumu) | Generated skill durability | `SKILL-DURABILITY-001` (P0) | brain PLAN/FIX skill taşıma, skill-pool | skill kümeleri (~5) | PLAN'da üretilen skill FIX lineage'ında aynı içerikle worker prompt'una ulaşır; `FORCED_SKILL_UNAVAILABLE` regresyonu fail-closed |
+| S7 ✅(2026-08-04, kapanış PR'ı) | Continuous slot refill + heartbeat-authority | `RECOVERY-BORN-488-CONTINUOUS-REFILL-001` · `RECOVERY-BORN-480-HEARTBEAT-001` | sprint-controller slot döngüsü, worker heartbeat | wrapper-hb + kalan controller (~20) | EXECUTE bitmeden FIX doğar ve boş slot dolar; heartbeat monotonik kanıtı geriletemez |
 
 Sıra önerisi **S1→S2→S3** zorunlu ardışık (aynı dosyalara iniyorlar: collector→finalizer→controller
 zinciri); S4/S5/S6 bağımsız ve §10.1 runtime-slot bütçesine (2) göre paralellenebilir; S7 en son

@@ -311,10 +311,6 @@
       "failed": 6
     },
     {
-      "file": "tests/orchestra/fix-dispatch-continuation.test.ts",
-      "failed": 7
-    },
-    {
       "file": "tests/orchestra/fix-retry-circuit-breaker.test.ts",
       "failed": 2
     },
@@ -332,10 +328,6 @@
     },
     {
       "file": "tests/orchestra/override-warning-surface.test.ts",
-      "failed": 4
-    },
-    {
-      "file": "tests/orchestra/postfix-pending-scan.test.ts",
       "failed": 4
     },
     {
@@ -393,10 +385,6 @@
     {
       "file": "tests/orchestra/worker-auth-isolation.test.ts",
       "failed": 4
-    },
-    {
-      "file": "tests/orchestra/wrapper-hb-allowlist.test.ts",
-      "failed": 8
     },
     {
       "file": "tests/scripts/test-containment-inventory-ratchet.test.ts",
