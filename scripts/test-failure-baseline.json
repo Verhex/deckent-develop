@@ -39,18 +39,6 @@
       "failed": 9
     },
     {
-      "file": "tests/cli/autonomous-v1-provider-authority.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/chat-nervous-bridge.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/cli-bin-invocation.test.ts",
-      "failed": 1
-    },
-    {
       "file": "tests/cli/commands/dashboard-overhaul.test.ts",
       "failed": 1
     },
@@ -59,72 +47,12 @@
       "failed": 1
     },
     {
-      "file": "tests/cli/commands/review-finalize-onboard-upgrade-plugin-archive-debt-improvements.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/commands/status-agents.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/commands/status-mode.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/commands/sync-onboard-upgrade-overhaul.test.ts",
-      "failed": 1
-    },
-    {
       "file": "tests/cli/dashboard.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/helpers/process-runtime-provider-threading.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/index-runflow-wiring.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/mcp-client-gate.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/repl-nervous-wire.test.ts",
       "failed": 1
     },
     {
       "file": "tests/cli/resume-race.test.ts",
       "failed": 1
-    },
-    {
-      "file": "tests/cli/run-rename-smoke.test.ts",
-      "failed": 7
-    },
-    {
-      "file": "tests/cli/status-read-model-wire.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/status-terminal-publication-race.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/sync-eisdir.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/term-flow-composition.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/term-slice-541-544-e2e.test.ts",
-      "failed": 1
-    },
-    {
-      "file": "tests/cli/worktree-binary-authority-live.test.ts",
-      "failed": 4
     },
     {
       "file": "tests/core/identity-generator.test.ts",
