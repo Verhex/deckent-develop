@@ -4,9 +4,18 @@
 // Reads from real sources (vitest test count, package.json version, src/mcp/* register calls,
 // docs/adr/* filenames, .deckent/agents+skills directories, src/dashboard/src/pages/*).
 //
+// Hermeticity contract (MASTER-PLAN 521, CI-STATS-HERMETIC-001): --check and --write are pure
+// functions of TRACKED files only, so every machine (CI included) computes the same output.
+// Volatile inputs that only exist on a dev machine (sprint count from .brain/, coverage from a
+// local coverage artifact) are read from the tracked snapshot file
+// .deckent/workspace/stats-snapshot.json and updated only deliberately via --refresh-snapshot.
+//
 // Modes:
-//   --check  → exit 1 if any AUTOGEN block drifts from generated content (CI gate)
-//   --write  → overwrite blocks in place
+//   --check             → exit 1 if any AUTOGEN block drifts from generated content (CI gate)
+//   --write             → overwrite blocks in place
+//   --refresh-snapshot  → deliberately re-derive the tracked snapshot from live local sources
+//                         (sprint is monotonic; coverage only with --with-coverage). Combine
+//                         with --write to regenerate targets in the same invocation.
 // Exit codes: 0 = ok / in-sync, 1 = drift detected (check) or write error, 2 = bad args
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
@@ -177,7 +186,8 @@ export function countCliCommands(cliDir) {
   return count;
 }
 
-// Coverage: optional read from coverage/coverage-summary.json (vitest --coverage)
+// Coverage: optional read from coverage/coverage-summary.json (vitest --coverage).
+// LIVE source — only consulted by --refresh-snapshot, never by --check/--write.
 export function readCoverage(root) {
   const summary = join(root, 'coverage/coverage-summary.json');
   if (!existsSync(summary)) return null;
@@ -186,30 +196,73 @@ export function readCoverage(root) {
   return typeof pct === 'number' ? pct : null;
 }
 
+// ─── tracked volatile-stat snapshot ──────────────────────────────────────────
+
+export const STATS_SNAPSHOT_RELATIVE_PATH = '.deckent/workspace/stats-snapshot.json';
+
+// The ONLY volatile-stat source --check/--write may consult. Invalid or missing
+// snapshot degrades to nulls: the affected badges are then omitted from the
+// generated content, so a README still carrying them reports honest drift.
+export function readStatsSnapshot(root) {
+  const data = safeReadJson(join(root, STATS_SNAPSHOT_RELATIVE_PATH));
+  const sprint = typeof data?.sprint === 'number' && data.sprint > 0 ? data.sprint : null;
+  const coverage = typeof data?.coverage === 'number' && data.coverage > 0 ? data.coverage : null;
+  return { sprint, coverage };
+}
+
+// Deliberate snapshot update from live local sources. Sprint is monotonic (a machine
+// without .brain/ history can never rewind the badge); coverage is captured from the
+// local artifact only when explicitly requested, because a partial-class coverage run
+// would misreport the repo-wide number.
+export function refreshStatsSnapshot({ root = DEFAULT_ROOT, withCoverage = false } = {}) {
+  const existing = readStatsSnapshot(root);
+  const liveSprint = detectActiveSprint(root);
+  const sprint = Math.max(liveSprint ?? 0, existing.sprint ?? 0) || null;
+  const coverage = withCoverage ? (readCoverage(root) ?? existing.coverage) : existing.coverage;
+  const snapshot = {
+    $comment:
+      'Deliberately-updated volatile stat snapshot (MASTER-PLAN 521, CI-STATS-HERMETIC-001). ' +
+      'Single hermetic source for badge inputs not derivable from tracked files. ' +
+      'Refresh: node scripts/update-readme-stats.mjs --refresh-snapshot [--with-coverage] --write',
+    sprint,
+    coverage,
+    refreshedAt: new Date().toISOString(),
+  };
+  writeFileSync(
+    join(root, STATS_SNAPSHOT_RELATIVE_PATH),
+    JSON.stringify(snapshot, null, 2) + '\n',
+  );
+  return snapshot;
+}
+
 // ─── collectStats (top-level entry) ──────────────────────────────────────────
 
 export function collectStats({ root = DEFAULT_ROOT, coverage } = {}) {
   const pkg = safeReadJson(join(root, 'package.json')) ?? {};
-  const agents = listAgentDirs(join(root, '.deckent/agents'));
+  // temp-* agents are machine-local runtime artifacts (untracked): a hermetic stat
+  // set must not count them — they do not exist on a clean checkout, so any count
+  // that includes them makes the committed README drift against CI.
+  const agents = listAgentDirs(join(root, '.deckent/agents')).filter(
+    (id) => !id.startsWith('temp-'),
+  );
   const skills = listSkillDirs(join(root, '.deckent/skills'));
-  // Built-in agents = agents not prefixed with `temp-`; total includes temp.
-  const builtInAgents = agents.filter((id) => !id.startsWith('temp-'));
-  const tempAgents = agents.filter((id) => id.startsWith('temp-'));
 
-  const cov = coverage ?? readCoverage(root);
+  // Volatile stats come from the tracked snapshot only (hermeticity contract above).
+  const snapshot = readStatsSnapshot(root);
+  const cov = coverage ?? snapshot.coverage;
 
   return {
     version: pkg.version ?? '0.0.0',
     tests: countTestDescriptors(join(root, 'tests')),
     dashboardTests: countTestDescriptors(join(root, 'src/dashboard/src')),
     coverage: cov,
-    sprint: detectActiveSprint(root),
+    sprint: snapshot.sprint,
     mcpTools: countMcpRegistrations(join(root, 'src/mcp/tools'), TOOL_REGISTER_RE),
     mcpResources: countMcpRegistrations(join(root, 'src/mcp/resources'), RESOURCE_REGISTER_RE),
     adrs: countAdrFiles(join(root, 'docs/adr')),
-    agents: builtInAgents.length,
+    agents: agents.length,
     agentsTotal: agents.length,
-    agentsCustom: tempAgents.length,
+    agentsCustom: 0,
     skills: skills.length,
     dashboardPages: countDashboardPages(join(root, 'src/dashboard/src/pages')),
     cliCommands: countCliCommands(join(root, 'src/cli/commands')),
@@ -442,20 +495,33 @@ export function main(argv = process.argv.slice(2), opts = {}) {
   const args = new Set(argv);
   const check = args.has('--check');
   const write = args.has('--write');
+  const refresh = args.has('--refresh-snapshot');
+  const withCoverage = args.has('--with-coverage');
   if (args.has('-h') || args.has('--help')) {
     process.stdout.write(
       'update-readme-stats.mjs — keep stat badges/counts in README/IDENTITY in sync\n\n' +
         'Usage:\n' +
-        '  node scripts/update-readme-stats.mjs --check   # CI gate (exit 1 on drift)\n' +
-        '  node scripts/update-readme-stats.mjs --write   # rewrite target files in place\n',
+        '  node scripts/update-readme-stats.mjs --check              # CI gate (exit 1 on drift)\n' +
+        '  node scripts/update-readme-stats.mjs --write              # rewrite target files in place\n' +
+        '  node scripts/update-readme-stats.mjs --refresh-snapshot \\\n' +
+        '      [--with-coverage] [--write]                           # deliberate volatile-stat refresh\n',
     );
     return 0;
   }
-  if (!check && !write) {
-    process.stderr.write('error: must pass --check or --write\n');
+  if (!check && !write && !refresh) {
+    process.stderr.write('error: must pass --check, --write or --refresh-snapshot\n');
     return 2;
   }
   const root = opts.root ?? DEFAULT_ROOT;
+
+  if (refresh) {
+    const snapshot = refreshStatsSnapshot({ root, withCoverage });
+    process.stdout.write(
+      `  ✎ ${STATS_SNAPSHOT_RELATIVE_PATH} (sprint=${snapshot.sprint ?? 'null'},` +
+        ` coverage=${snapshot.coverage ?? 'null'})\n`,
+    );
+    if (!check && !write) return 0;
+  }
   const gens = collectGenerations({ root, coverage: opts.coverage });
 
   if (write) {

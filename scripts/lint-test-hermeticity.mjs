@@ -100,16 +100,18 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, W3-PR-B1): ops-v2 twin callsites (file-lock +
-  // clean.mjs) and parity-test extension. Prior: CI-ORCH-518.
-  count: 12473,
-  digest: 'b7f7e02f83c8c549191bc84315512e3a5170263fd89e67beb8f05c966addf722',
+  // 2026-08-05 (build-free, CI-STATS-HERMETIC-001/521): +6 from the new
+  // snapshot/refresh/temp-agent tests in update-readme-stats.test.ts —
+  // parent worktree re-measured at exactly the prior 12473. Prior: W3-PR-B1.
+  count: 12479,
+  digest: 'a2a428b57d1f26dd4b2347b63ca487501bf073afd87f89b7e60a47b7f3fef2c9',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (hotfix lazy-flags): file-lock module-eval laziness restored.
+  // 2026-08-05 (CI-STATS-HERMETIC-001/521): update-readme-stats.mjs snapshot
+  // redesign — same 1197 count, content digest only. Prior: hotfix lazy-flags.
   count: 1197,
-  digest: '25f13bb7878193f21b9ab64426883c7e48b4e3a3fb05f48523163b331e8d3aca',
+  digest: '2095c587ebec3995b112d1cb40920d28bd4d23abe92f0f3ff66b394ae1212666',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

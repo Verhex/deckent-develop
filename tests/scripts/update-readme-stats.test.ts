@@ -12,6 +12,9 @@ import {
   injectAutogenBlock,
   collectGenerations,
   main,
+  readStatsSnapshot,
+  refreshStatsSnapshot,
+  STATS_SNAPSHOT_RELATIVE_PATH,
   // @ts-expect-error — .mjs script lacks .d.ts; import works at runtime via vitest's esm loader
 } from '../../scripts/update-readme-stats.mjs';
 
@@ -77,12 +80,13 @@ function seedMinimalProject(root: string): void {
   mkdirSync(join(root, 'src/dashboard/src/pages'), { recursive: true });
   writeFileSync(join(root, 'src/dashboard/src/pages/StatusPage.tsx'), '');
   writeFileSync(join(root, 'src/dashboard/src/pages/HistoryPage.tsx'), '');
-  // sprint markers
-  mkdirSync(join(root, '.brain/archive'), { recursive: true });
-  writeFileSync(join(root, '.brain/archive/sprint-170.md'), '');
-  writeFileSync(join(root, '.brain/archive/sprint-171.md'), '');
-  // Active sprint is sourced from DIRECTIVES.md (preferred over archive+1 fallback).
-  writeFileSync(root + '/DIRECTIVES.md', `# DIRECTIVES — Sprint 172: Test Sprint\n`);
+  // Volatile stats (sprint/coverage) come ONLY from the tracked snapshot file —
+  // live .brain/DIRECTIVES/coverage sources are refresh-time inputs, not check/write inputs.
+  mkdirSync(join(root, '.deckent/workspace'), { recursive: true });
+  writeFileSync(
+    join(root, STATS_SNAPSHOT_RELATIVE_PATH),
+    JSON.stringify({ sprint: 172, coverage: null, refreshedAt: '2026-08-06T00:00:00.000Z' }),
+  );
 }
 
 // ─── collectStats ────────────────────────────────────────────────────────────
@@ -131,7 +135,7 @@ describe('collectStats', () => {
     expect(stats.dashboardPages).toBe(2);
   });
 
-  it('derives latest sprint number from .brain/archive/sprint-*.md', () => {
+  it('reads sprint from the tracked stats snapshot', () => {
     seedMinimalProject(tmpRoot);
     const stats = collectStats({ root: tmpRoot });
     expect(stats.sprint).toBe(172);
@@ -141,6 +145,106 @@ describe('collectStats', () => {
     seedMinimalProject(tmpRoot);
     const stats = collectStats({ root: tmpRoot });
     expect(stats.coverage === null || typeof stats.coverage === 'number').toBe(true);
+  });
+
+  it('HERMETICITY: ignores live .brain sprint archive and local coverage artifact', () => {
+    seedMinimalProject(tmpRoot);
+    // Volatile machine-local state that only exists on a dev machine — a hermetic
+    // collectStats must not let any of it leak into check/write output.
+    mkdirSync(join(tmpRoot, '.brain/archive/sprints'), { recursive: true });
+    writeFileSync(join(tmpRoot, '.brain/archive/sprints/sprint-998.md'), '');
+    writeFileSync(join(tmpRoot, 'DIRECTIVES.md'), `# DIRECTIVES — Sprint 999: Local Only\n`);
+    mkdirSync(join(tmpRoot, 'coverage'), { recursive: true });
+    writeFileSync(
+      join(tmpRoot, 'coverage/coverage-summary.json'),
+      JSON.stringify({ total: { lines: { pct: 77.7 } } }),
+    );
+    const stats = collectStats({ root: tmpRoot });
+    expect(stats.sprint).toBe(172); // snapshot value, not 999
+    expect(stats.coverage).toBeNull(); // snapshot value, not 77.7
+  });
+
+  it('HERMETICITY: excludes machine-local temp-* agents from every agent count', () => {
+    seedMinimalProject(tmpRoot);
+    // temp-* agent dirs are untracked runtime artifacts — absent on a clean checkout.
+    mkdirSync(join(tmpRoot, '.deckent/agents/temp-local-only'), { recursive: true });
+    writeFileSync(
+      join(tmpRoot, '.deckent/agents/temp-local-only/agent.json'),
+      JSON.stringify({ id: 'temp-local-only' }),
+    );
+    const stats = collectStats({ root: tmpRoot });
+    expect(stats.agents).toBe(1);
+    expect(stats.agentsTotal).toBe(1); // no "+N custom" note can ever drift
+    expect(stats.agentsCustom).toBe(0);
+  });
+
+  it('degrades to null volatile stats when the snapshot file is missing (honest drift)', () => {
+    seedMinimalProject(tmpRoot);
+    rmSync(join(tmpRoot, STATS_SNAPSHOT_RELATIVE_PATH));
+    const stats = collectStats({ root: tmpRoot });
+    expect(stats.sprint).toBeNull();
+    expect(stats.coverage).toBeNull();
+  });
+});
+
+// ─── stats snapshot (tracked volatile-stat source) ───────────────────────────
+
+describe('readStatsSnapshot / refreshStatsSnapshot', () => {
+  it('reads sprint/coverage from the snapshot and rejects non-numeric values', () => {
+    seedMinimalProject(tmpRoot);
+    writeFileSync(
+      join(tmpRoot, STATS_SNAPSHOT_RELATIVE_PATH),
+      JSON.stringify({ sprint: '492', coverage: 80.1 }),
+    );
+    const snap = readStatsSnapshot(tmpRoot);
+    expect(snap.sprint).toBeNull(); // string is invalid
+    expect(snap.coverage).toBe(80.1);
+  });
+
+  it('refresh derives sprint from live sources (DIRECTIVES header)', () => {
+    seedMinimalProject(tmpRoot);
+    rmSync(join(tmpRoot, STATS_SNAPSHOT_RELATIVE_PATH));
+    writeFileSync(join(tmpRoot, 'DIRECTIVES.md'), `# DIRECTIVES — Sprint 200: X\n`);
+    const snap = refreshStatsSnapshot({ root: tmpRoot });
+    expect(snap.sprint).toBe(200);
+    expect(readStatsSnapshot(tmpRoot).sprint).toBe(200);
+  });
+
+  it('refresh is monotonic — a machine without .brain history never rewinds the sprint', () => {
+    seedMinimalProject(tmpRoot);
+    writeFileSync(
+      join(tmpRoot, STATS_SNAPSHOT_RELATIVE_PATH),
+      JSON.stringify({ sprint: 500, coverage: null }),
+    );
+    writeFileSync(join(tmpRoot, 'DIRECTIVES.md'), `# DIRECTIVES — Sprint 14: Renumbered\n`);
+    const snap = refreshStatsSnapshot({ root: tmpRoot });
+    expect(snap.sprint).toBe(500);
+  });
+
+  it('refresh captures coverage only with withCoverage and preserves it otherwise', () => {
+    seedMinimalProject(tmpRoot);
+    writeFileSync(
+      join(tmpRoot, STATS_SNAPSHOT_RELATIVE_PATH),
+      JSON.stringify({ sprint: 172, coverage: 85.5 }),
+    );
+    mkdirSync(join(tmpRoot, 'coverage'), { recursive: true });
+    writeFileSync(
+      join(tmpRoot, 'coverage/coverage-summary.json'),
+      JSON.stringify({ total: { lines: { pct: 90.2 } } }),
+    );
+    // Default: local artifact is NOT consulted — previous deliberate value survives.
+    expect(refreshStatsSnapshot({ root: tmpRoot }).coverage).toBe(85.5);
+    // Explicit opt-in captures the artifact value.
+    expect(refreshStatsSnapshot({ root: tmpRoot, withCoverage: true }).coverage).toBe(90.2);
+  });
+
+  it('main --refresh-snapshot writes the snapshot and exits 0', () => {
+    seedMinimalProject(tmpRoot);
+    rmSync(join(tmpRoot, STATS_SNAPSHOT_RELATIVE_PATH));
+    writeFileSync(join(tmpRoot, 'DIRECTIVES.md'), `# DIRECTIVES — Sprint 300: Y\n`);
+    const exit = main(['--refresh-snapshot'], { root: tmpRoot });
+    expect(exit).toBe(0);
+    expect(readStatsSnapshot(tmpRoot).sprint).toBe(300);
   });
 });
 
