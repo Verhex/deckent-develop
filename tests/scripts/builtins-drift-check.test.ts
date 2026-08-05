@@ -397,10 +397,17 @@ describe('live two-tree scan (real repo, read-only)', () => {
     }
   });
 
-  it('excludes .deckent/skills/docs (a memory-export dir, not a real skill manifest)', () => {
-    const report = scanAll(CATEGORIES);
-    expect(report.skills.excluded).toContain('docs');
-  });
+  // 527 (CI-BUILTINS-DRIFT-HERMETIC-001): `.deckent/skills/docs` is a
+  // machine-local memory-export dir, untracked since 62aafff34 — a clean CI
+  // checkout does not have it, so this live-scan pin only holds where the dir
+  // actually exists. When present, the exclusion behavior stays pinned exactly.
+  it.runIf(existsSync(fileURLToPath(new URL('../../.deckent/skills/docs', import.meta.url))))(
+    'excludes .deckent/skills/docs (a memory-export dir, not a real skill manifest)',
+    () => {
+      const report = scanAll(CATEGORIES);
+      expect(report.skills.excluded).toContain('docs');
+    },
+  );
 
   it('secure-coding manifest drift is CLOSED — the two trees agree (Alperen karar-turu merge, 2026-07-11)', () => {
     // Bu test eskiden canlı-drift'i (builtins'te eksik `entrypoint`) RED-önce kanıtı olarak

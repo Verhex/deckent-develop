@@ -26,7 +26,11 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
-const MAX_SCAN_WALL_MS = 60_000;
+// 523 (CI-HERMETIC-SCAN-BUDGET-001): measured recalibration. A local build-free
+// full scan is ~18s, but a saturated 2-core CI runner blew the old 60s per-phase
+// wall twice (run 31053488358: writer-analysis 60000.8ms; run 31050457808:
+// analysis-context) — 180s keeps the ~3x runner multiplier used by 519/522.
+const MAX_SCAN_WALL_MS = 180_000;
 const NODE_BUILTIN_MODULES = new Set(
   builtinModules.flatMap(name => [
     name,
@@ -38,8 +42,12 @@ export function createScanBudget(
   startedAt = performance.now(),
   maxMs = MAX_SCAN_WALL_MS,
   {
-    maxRssBytes = 1024 * 1024 * 1024,
-    maxHeapBytes = 1024 * 1024 * 1024,
+    // 523: measured peaks are 576-615MiB rss / ~350MiB heap; the old 1GiB caps
+    // left so little GC slack that V8's lazy collection tripped them on healthy
+    // runs (the documented --max-old-space-size=640 workaround). 2GiB still
+    // catches runaway growth while eliminating that flake class.
+    maxRssBytes = 2 * 1024 * 1024 * 1024,
+    maxHeapBytes = 2 * 1024 * 1024 * 1024,
     memorySampler = () => process.memoryUsage(),
     clock = () => performance.now(),
   } = {},
@@ -100,17 +108,17 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, W3-PR-B2): +2 from the darwin ops-v2 parity and
-  // fdPath native-suite additions. Prior: CI-STATS-HERMETIC-001/521 (12479).
+  // 2026-08-05 (build-free, 527): builtins-drift live-scan pin gained its
+  // existence guard — same 12481 count, digest only. Prior: W3-PR-B2.
   count: 12481,
-  digest: '9ffe45a04d287fdab02cf9d0105a7952f30925c7e569dbbb2a50a0f10347bd86',
+  digest: '62fe79e9458e3c57cd7b05f1b92657cf2be80edb84495dfa91b3e3e796c9c0c7',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (W3-PR-B2): file-lock darwin ops-v2 addition — same 1197
-  // count, content digest only. Prior: CI-STATS-HERMETIC-001/521.
+  // 2026-08-05 (523): vendored alp-discipline v1.0.4 sync — same 1197 count,
+  // content digest only. Prior: W3-PR-B2.
   count: 1197,
-  digest: '0fa08c5397e39890a1d14adab5c3c30fc151400848ee23fca5864a77762c9f9d',
+  digest: 'b8504faac9f175a0077cb67003ceb31f813a4e8eb6ded19b8af7814f85159aa9',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
