@@ -100,11 +100,11 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, EXEC-AUTH-W3A): +7 — the new native primitive
-  // suite's fixture writes (tests/native/exec-authority-native.test.ts);
-  // identity-diff vs W1 snapshot shows no drift elsewhere.
+  // 2026-08-05 (build-free, CI-ORCH-518): count unchanged, digest moved —
+  // owned-settlement suite's hermetic home-fixture writes + node:os hybrid
+  // mock shifted callsites in one file. Prior: EXEC-AUTH-W3A (+7).
   count: 12473,
-  digest: 'a7d75722754cb536755ee77ed5736218e959d00acc4cfdd2385d123adecfdf97',
+  digest: '71fa6ba61a591cc1b35b9ec06fb68851283df2e7b752e2bba4e27f82c72ddd6b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
