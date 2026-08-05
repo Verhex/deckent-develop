@@ -56,6 +56,28 @@ Status remains `⚠️ partial`, not certified. Every adapter plan deliberately 
 
 [Evidence: `src/core/work-model.ts:30-52`; `.deckent/workspace/IDENTITY.md:15`; `src/api/server.ts:1914-1995`]
 
+## Execution-authority platform boundary (2026-08-05)
+
+The identity-stable execution-authority core (secure directory open, mount pinning,
+TOCTOU-safe identity-stable delete) is implemented on the Linux `/proc` facility and is
+therefore **Linux/WSL-only** today. On macOS and Windows the boundary is honest and typed,
+never silent:
+
+- `npm run clean` on a checkout with **no `dist/`** completes as an observe-only
+  `removed:0 ALLOW` (root-identity check, maintenance lock and admission scans still run).
+- Any operation that would need the identity-stable **delete** capability (a `dist/`
+  rebuild) or execution-lock **secure-open** fails closed with a typed code
+  (`E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED`, `E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED`,
+  `secure-open-unsupported`).
+- Host/boot identity and PID liveness already degrade gracefully cross-platform
+  (process-local identity, `kill(0)` probe).
+
+Native macOS/Windows adapters are an approved work package (owner decisions D1–D3,
+2026-08-05): a prebuilt N-API capability module behind one platform-adapter interface,
+proven per platform with real-binary evidence before any capability is granted.
+[Evidence: `src/core/file-lock.ts:1446-1487`; `scripts/clean.mjs:4025-4062,7203-7208`;
+`docs/analysis/platform-execution-authority-adapters-2026-08-05.md`]
+
 ## Dogfood / repository reality
 
 - ✅ Auth, OIDC, CORS, tenant, RBAC, rate, scope, lock, plugin, and Docker authority modules exist and are wired into their named surfaces.

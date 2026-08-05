@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9a5599d579c4ff643350af6f07293f0c9dd64f39041f6dffcab8d01d6809e1c6"
+    "value": "7978e78a96190ddbe2ee334acc4da689a4fdfd65299023ba81bb6dd47aa58c0e"
   },
   "summary": {
-    "total": 362,
-    "active": 341,
+    "total": 364,
+    "active": 343,
     "terminal": 21,
     "receipts": 46,
     "byState": {
-      "OPEN": 251,
+      "OPEN": 253,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 248,
-      "P1": 87,
+      "P1": 89,
       "P2": 27
     },
     "byProgram": {
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 91,
+      "KERNEL": 93,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
@@ -2866,7 +2866,18 @@
       "state": "OPEN",
       "updated": "2026-08-05",
       "definitionDigest": "377b68bf72f3c05a5f3ee4e710ea0cbb9440fb38fa026b26174f158e2df66afc",
-      "progressDigest": "7726ad1c3356cbd58aa094546e7a3bb2ba9473d727bdb69e3fa2a6f80bc5edac",
+      "progressDigest": "0e873e1e97d43a7174a45dded05eada85f7ce7497794ea3435f41e9116b51bd5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3344,
+      "id": "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "b5e46bc9464bdf52e4a2167e0ffe098ec54e1c4d7913e7329a6cc97dfb350f32",
+      "progressDigest": "5f51865c26ad7edb8ee39f670d6af60f24eb3fab9d837739a89c4e21bf473cac",
       "terminalClosureDigest": null
     },
     {
@@ -2878,6 +2889,17 @@
       "updated": "2026-08-04",
       "definitionDigest": "a1c5ff84fd0aa5c953ffa0ade3d06259c48e6fb7882b2b61bca7cf3710460ad2",
       "progressDigest": "66861aed9ef564a858f74e142d4ee038b5368d91eadd9cbb27315c7e58fefea5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3346,
+      "id": "PLATFORM-EXEC-AUTH-W2-PROBE-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "7ae236158fa399af25429a8b2be9a0d5c9b0aa6a825f1c59ccb6b8f127ec5bc0",
+      "progressDigest": "9aea042ff3ed3be708d1eac5e18951bd4a62ecb4ebafacedbd53d283d578f25a",
       "terminalClosureDigest": null
     },
     {
@@ -10128,7 +10150,9 @@
         "PROD-LANDED-FENCE-ORDER-001",
         "PROD-SSE-ONEVENT-WIRE-001",
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
-        "COMPOSITE-WORKER-001"
+        "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
+        "COMPOSITE-WORKER-001",
+        "PLATFORM-EXEC-AUTH-W2-PROBE-001"
       ],
       "gates": [
         "G2",
@@ -10184,7 +10208,9 @@
         "SKILL-DURABILITY-001",
         "PROD-SPAWNSYNC-ASYNC-001",
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
-        "COMPOSITE-WORKER-001"
+        "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
+        "COMPOSITE-WORKER-001",
+        "PLATFORM-EXEC-AUTH-W2-PROBE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
@@ -14579,7 +14605,38 @@
         "GR-2026-08-05-CLEAN-OBSERVE-01"
       ],
       "acceptance": "Darwin adapter'ı (/dev/fd + mnt_id'siz mount-boundary eşdeğeri) ve Windows adapter'ı (handle-tabanlı identity pin veya typed policy-kararı) ayrı tasarımla gelir; her platform kendi real-binary clean kanıtıyla kapanır; o zamana dek HOLD dürüst kalır, sessiz bypass yok",
-      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla; 2026-08-05 CANLI-KOŞU DÜZELTMESİ (PR #51 job 92224891165): observe-dilimi ilk kapıyı geçirdi ama beklenen macos/windows yeşili GELMEDİ — HOLD bir sonraki mimari katmana taşındı (E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED: cleanExecutionAuthorityPlatformAdapter /proc-tabanlı, clean.mjs:4025); gerçek kalan kapsam execution-authority non-Linux adapter PAKETİdir (KERNEL-STATE-001'in bilinen 'native macOS/Windows adapters open' açığıyla aynı aile); katman-katman PR soymak yerine paket-tasarımı owner-kararı bekler; 2026-08-05 TASARIM-ÖNERİSİ: docs/analysis/platform-execution-authority-adapters-2026-08-05.md — 4-yetenek ayrıştırması (fd-traversal/mount-pin/host-boot-id/liveness), Darwin+Windows adapter tasarımları, tek native N-API capability modülü + W1-W4 faz planı; Alperen karar noktaları D1 (native-addon admission, ADR-D-005) · D2 (Windows Win10-1607/NTFS tabanı) · D3 (adapter'a dek fail-closed korunumu — önerilen)",
+      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla; 2026-08-05 CANLI-KOŞU DÜZELTMESİ (PR #51 job 92224891165): observe-dilimi ilk kapıyı geçirdi ama beklenen macos/windows yeşili GELMEDİ — HOLD bir sonraki mimari katmana taşındı (E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED: cleanExecutionAuthorityPlatformAdapter /proc-tabanlı, clean.mjs:4025); gerçek kalan kapsam execution-authority non-Linux adapter PAKETİdir (KERNEL-STATE-001'in bilinen 'native macOS/Windows adapters open' açığıyla aynı aile); katman-katman PR soymak yerine paket-tasarımı owner-kararı bekler; 2026-08-05 TASARIM-ÖNERİSİ: docs/analysis/platform-execution-authority-adapters-2026-08-05.md — 4-yetenek ayrıştırması (fd-traversal/mount-pin/host-boot-id/liveness), Darwin+Windows adapter tasarımları, tek native N-API capability modülü + W1-W4 faz planı; Alperen karar noktaları D1 (native-addon admission, ADR-D-005) · D2 (Windows Win10-1607/NTFS tabanı) · D3 (adapter'a dek fail-closed korunumu — önerilen); 2026-08-05 KARAR: D1+D2+D3 ONAYLANDI (Alperen) — native N-API capability modülü admission'lı, Windows tabanı Win10-1607+/NTFS, adapter'lara dek non-Linux fail-closed korunur; uygulama W1 (adapter-arayüz çıkarımı) + W2 (mac/win capability-probe CI) satırlarıyla başlar",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 3344,
+      "id": "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "ExecutionAuthorityPlatformAdapter arayüz-çıkarımı: file-lock.ts Linux impl'i davranış-değişimsiz adapter arkasına, clean.mjs ikiz-parite kontrat testi, cross-verify-evidence-broker /proc taraması",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Linux yolu bayt-eşdeğer davranışta kalır (mevcut lock+clean suite'leri yeşil); adapter arayüzü 4-yetenek ayrıştırmasını (fd-traversal/mount-pin/host-boot-id/liveness) tipler; clean.mjs ikizi parite-testiyle sabitlenir",
+      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W1",
       "updated": "2026-08-05"
     },
     {
@@ -14618,6 +14675,37 @@
       "acceptance": "Owner G2 tasarım kararı: delegated objective + authority_ceiling + budget_ceiling + allowed_runtimes + completion_contract + failure_policy + evidence_requirement alanları tiplenir; delegasyon yetkiyi yalnız daraltır, asla genişletmez; recursive bütçe/authority çift-harcaması imkânsız olur; dış orchestrator'lar (AutoGen nested Team, AG2 network sınıfı) bu kontratın altında composite worker olarak modellenir",
       "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07-30 rekabet günlüğü — AutoGen nested Teams (Team içinde Team) ve AG2 v1 network yapıları \"runner içinde runner\" modelini standartlaştırıyor; ledger'da recursive delegasyon kontratı karşılığı yok (KERNEL-ATTEMPT-001 tek-seviye claim/lease/fencing taşıyor; GRACEFUL-BUDGET-LANDING→BUDGET-CONTINUATION-001 landing'i kapsıyor, delegasyonu kapsamıyor)",
       "updated": "2026-08-04"
+    },
+    {
+      "order": 3346,
+      "id": "PLATFORM-EXEC-AUTH-W2-PROBE-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "macOS+Windows capability-probe CI job'ı: /dev/fd dizin-traversal semantiği, POSIX-delete uygunluğu, FileIndex/VolumeSerial kararlılığı gerçek runner'da ölçülür ve evidence-artifact olarak yayımlanır",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Probe job'ı required-değildir ve ürün davranışını değiştirmez; her platform için ölçüm JSON artifact'ı üretir; W3/W4 tasarım kilidi bu kanıtla atılır",
+      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2",
+      "updated": "2026-08-05"
     },
     {
       "order": 4000,
@@ -18925,6 +19013,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f2ae1d161a52f368feb8b0c6a607fa7df12d23859cddcc2fa6199d4f1f0cab0b"
+    "value": "5831772fe1492296e3c8c8663abbaac3a4394c2f93764c6f43d3c46248a780ad"
   }
 }

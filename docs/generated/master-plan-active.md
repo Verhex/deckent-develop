@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):9a5599d579c4ff643350af6f07293f0c9dd64f39041f6dffcab8d01d6809e1c6`
+**Source digest:** `sha256(normalized-lf-utf8):7978e78a96190ddbe2ee334acc4da689a4fdfd65299023ba81bb6dd47aa58c0e`
 
-**Rows:** 362 total · 341 active · 21 terminal
+**Rows:** 364 total · 343 active · 21 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 251 |
+| OPEN | 253 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -264,7 +264,9 @@
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
+| 3344 | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001` | OPEN | P1 | KERNEL | — | — | ExecutionAuthorityPlatformAdapter arayüz-çıkarımı: file-lock.ts Linux impl'i davranış-değişimsiz adapter arkasına, clean.mjs ikiz-parite kontrat testi, cross-verify-evidence-broker /proc taraması |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
+| 3346 | `PLATFORM-EXEC-AUTH-W2-PROBE-001` | OPEN | P1 | KERNEL | — | — | macOS+Windows capability-probe CI job'ı: /dev/fd dizin-traversal semantiği, POSIX-delete uygunluğu, FileIndex/VolumeSerial kararlılığı gerçek runner'da ölçülür ve evidence-artifact olarak yayımlanır |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |

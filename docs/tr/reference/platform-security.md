@@ -56,6 +56,27 @@ Durum yine `⚠️ kısmi`dır, certified değildir. Her adapter plan bilerek `p
 
 [Kanıt: `src/core/work-model.ts:30-52`; `.deckent/workspace/IDENTITY.md:15`; `src/api/server.ts:1914-1995`]
 
+## Execution-authority platform sınırı (2026-08-05)
+
+Identity-stable execution-authority çekirdeği (güvenli dizin açılışı, mount pinning,
+TOCTOU-güvenli identity-stable delete) Linux `/proc` mekanizması üzerine kuruludur ve bugün
+**yalnız Linux/WSL**'dedir. macOS ve Windows'ta sınır dürüst ve tiplidir, asla sessiz değildir:
+
+- `dist/` OLMAYAN bir checkout'ta `npm run clean` observe-only `removed:0 ALLOW` ile
+  tamamlanır (root-kimlik kontrolü, maintenance lock ve admission taramaları yine koşar).
+- Identity-stable **delete** yeteneği (dist'li rebuild) veya execution-lock **secure-open**
+  gerektiren her işlem tipli kodla fail-closed olur
+  (`E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED`, `E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED`,
+  `secure-open-unsupported`).
+- Host/boot kimliği ve PID liveness zaten cross-platform zarif düşer (process-local
+  identity, `kill(0)` probe'u).
+
+Native macOS/Windows adapter'ları onaylı iş paketidir (owner kararları D1–D3, 2026-08-05):
+tek platform-adapter arayüzü arkasında prebuilt N-API capability modülü; hiçbir yetenek
+platformunda real-binary kanıt olmadan açılmaz.
+[Kanıt: `src/core/file-lock.ts:1446-1487`; `scripts/clean.mjs:4025-4062,7203-7208`;
+`docs/analysis/platform-execution-authority-adapters-2026-08-05.md`]
+
 ## Dogfood / repository gerçeği
 
 - ✅ Auth, OIDC, CORS, tenant, RBAC, rate, scope, lock, plugin ve Docker authority module'ları vardır ve named surface'lere wired'dır.
