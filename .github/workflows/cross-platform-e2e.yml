@@ -301,3 +301,47 @@ jobs:
           name: exec-auth-probe-${{ matrix.os }}
           path: probe-artifacts/exec-auth-probe-*.json
           retention-days: 30
+
+  # W3-PR-A (PLATFORM-EXEC-AUTH-W3-DARWIN-001): compile the in-repo N-API
+  # capability module and run its primitive suite on the two POSIX targets.
+  # Non-required; the addon's ABSENCE is the product's fail-closed contract,
+  # so this job proves buildability+behavior, it does not gate admission.
+  exec-auth-native-build:
+    name: Exec-Authority Native Build — ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: npm ci (bounded retry)
+        shell: bash
+        run: |
+          set -uo pipefail
+          max_attempts=2
+          attempt=1
+          until npm ci; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::npm ci failed after ${max_attempts} attempt(s)" >&2
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep 30
+          done
+
+      - name: Build native addon
+        run: npx node-gyp rebuild
+        working-directory: native/exec-authority
+
+      - name: Run native primitive suite
+        run: npx vitest run tests/native/exec-authority-native.test.ts
+        env:
+          VITEST_MAX_FORKS: '2'

@@ -258,3 +258,6 @@ examples/voice-wrapper/
 .analysis/
 docs/archive/
 docs/analysis/
+
+# W3: in-repo native addon build output (compiled per-host, never committed)
+native/exec-authority/build/
