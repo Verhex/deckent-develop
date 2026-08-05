@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "096040292e5f78ebc7e2a390ab0d5a77b8a8160c01c0efad7e31988b9d7b5d15"
+    "value": "6969941ad66a89751d87787d028ff2f01398e054fdd4d6d2e7debacc1da2f5f1"
   },
   "summary": {
-    "total": 373,
-    "active": 350,
+    "total": 377,
+    "active": 354,
     "terminal": 23,
-    "receipts": 56,
+    "receipts": 57,
     "byState": {
-      "OPEN": 256,
-      "READY": 0,
+      "OPEN": 259,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 27,
@@ -22,8 +22,8 @@
     },
     "byPriority": {
       "P0": 249,
-      "P1": 96,
-      "P2": 28
+      "P1": 97,
+      "P2": 31
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 61,
+      "TRUTH": 65,
       "XPLAT": 3
     }
   },
@@ -293,6 +293,17 @@
       "updated": "2026-08-03",
       "definitionDigest": "39d0385059ed837188b89bcd2248ef0ad9f1953bf3589d91be25ad9c4f58cbb7",
       "progressDigest": "d63a0a72286070df396338ee0abaafb83c4a09839e1810f2b78e16fb6e31dae1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 171,
+      "id": "DOCS-DEPS-HOME-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "002f9b638b3c4aeab513c1b919f8d33a6a851b0771a6f769ea9a0c8757164453",
+      "progressDigest": "93e24e54fe639c33b46e0626d49cebe9c173a6a28394994309371dd3a5cea2f1",
       "terminalClosureDigest": null
     },
     {
@@ -755,6 +766,39 @@
       "updated": "2026-08-05",
       "definitionDigest": "3b4763c618e1776efd241bb37c089e47b5feb777a387d6230da8133a4973f825",
       "progressDigest": "8062045152afaed3c2b09305f70cb5809fbdcbec4672cb8f1ec27a7fbd3ae7be",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 522,
+      "id": "CI-DOCS-SCRIPTS-STEP-TIMEOUT-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "ec3061a0345ca0fdcc8b5351d07695db3f6ef508c27bdde1bb45e6901bc6f285",
+      "progressDigest": "25535172c7d79bbd0916a2536b74df8f94fef80bbbe9f8f5d2f30429e35337ce",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 523,
+      "id": "CI-HERMETIC-SCAN-BUDGET-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "2544e1a74056fe5b57303f44f1584b318e85a9a69369c46e2e647b1dd5e3fb1d",
+      "progressDigest": "755aa966e17c273cf5939fbc5a74d9daed6f0614e14fb6e5f0282c92c5c47712",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 524,
+      "id": "VERIFY-HISTORICAL-CLOSURE-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "b4b6f24fe13a29db5511b6ec28e9e0628d14f9cbc3426ec6a968d992f39a46cb",
+      "progressDigest": "802fe31cb0f74968b7393c294987baa8b0602166e77d1a0572098cd57e757b54",
       "terminalClosureDigest": null
     },
     {
@@ -4728,6 +4772,16 @@
         "transitionAt": "2026-08-05T22:09:14Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-CI-STEP-TIMEOUT-522-01",
+      "authorityDigest": "acf616fc07de2724dea0738bb6d7d7b16de478b63093c5a1131e09531a7d60aa",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -5420,6 +5474,37 @@
       "acceptance": "One generator registry; CI and release gate enforce exact counts/links",
       "evidence": "Cleanup plan and legacy 489,495,507; 2026-08-03 PAZARTESI FAZ-5 kuralının transkripsiyonu: doc-drift bir daha birikmesin — üretilen bölümleri managed-docs (src/orchestra/managed-docs/) sahiplenir, elle yazılan core set sınırlı kalır; bu satır o sahiplik sözleşmesinin gate tarafıdır",
       "updated": "2026-08-03"
+    },
+    {
+      "order": 171,
+      "id": "DOCS-DEPS-HOME-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Dependency-doku ile gerçek kurulum-ağacının (HOME/global adapterlar dahil) tek-kaynak hizası: docs/reference/dependencies.md kayıtları ile package.json/override gerçeği arasındaki drift sınıfı kapatılır",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Dependency-doku kayıtları package.json+override gerçeğiyle mekanik karşılaştırılır (lint veya üreteç); ADR-D-005 merit-kayıt şablonuna bağlanır; drift CI'da görünür olur",
+      "evidence": "Açılış 2026-08-06: tasarım-doku §9 açık-iş notunun (DOCS-DEPS-HOME) satırlaşması — Alperen seçimi (karar-turu: küçük işler)",
+      "updated": "2026-08-05"
     },
     {
       "order": 180,
@@ -6766,6 +6851,101 @@
       ],
       "acceptance": "Volatil rozet girdileri (sprint, coverage) izlenen snapshot dosyasından okunur; check/write yalnız izlenen dosyaların fonksiyonu olur (temiz checkout deterministik — CI ile lokal aynı sonucu üretir); bilinçli güncelleme refresh-snapshot moduyla (sprint monotonik, coverage yalnız açık bayrakla); main-push Tests—Docs+Scripts yeşile döner",
       "evidence": "Açılış 2026-08-05: stats-stale üçüncü tekrarında kök TASARIMSAL bulundu, bandajlama durduruldu, öneri Alperen'e taşındı; 2026-08-05 KARAR: 'öneri kabul edildi' (Alperen) — izlenen-snapshot tasarımı onaylı; `receipt=GR-2026-08-05-STATS-HERM-521-01`; 2026-08-05 SETTLEMENT (8d0726dcd): üreteç snapshot-tabanlı hermetik — sprint+coverage izlenen .deckent/workspace/stats-snapshot.json'dan (bilinçli refresh-snapshot modu, npm docs:stats:refresh; sprint monotonik, coverage yalnız açık with-coverage bayrağıyla) ve temp-* agent'lar tüm sayımlardan dışlandı (ikinci volatil girdi; temiz-worktree collectStats diff kanıtı agentsTotal 23≠21); `proof=clean-worktree-check-green-write-idempotent`; temiz detached-worktree'de (CI-şekli: .brain-arşivsiz, coverage'sız, dist'siz) check yeşil VE write bayt-stabil (0 değişiklik), suite 36/36, tsc temiz, hermetic baseline'lar build-free tazelendi (parent-worktree 12473 birebir parite); kapanış kanıtı merge sonrası main-push Tests—Docs+Scripts yeşili",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 522,
+      "id": "CI-DOCS-SCRIPTS-STEP-TIMEOUT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Tests—Docs+Scripts'in YENİ kırmızı kökü: step-düzeyi timeout-minutes 5 duvarı — suite büyüdü (307.86s ölçüldü), duvar SIGKILL×2 + builtins-drift boş-çıktı + hermetic analysis-context 60s iç-bütçe aşımı ikincil kırıklarını üretti; 521 stats-kapısı TEMİZ geçti",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-CI-STEP-TIMEOUT-522-01"
+      ],
+      "acceptance": "Step-timeout ölçüm-temelli tavana çekilir (5→15dk, ×3 headroom 519 deseni); main-push Tests—Docs+Scripts yeşile döner; 517/518/519/521 + W3B2 main-yeşil kapanış kanıtları bu koşuyla üretilir",
+      "evidence": "Açılış 2026-08-05: run 31050457808 log-izolasyonu (521 merge sonrası ilk main koşusu); 519'un step-katmanı ikizi; `receipt=GR-2026-08-05-CI-STEP-TIMEOUT-522-01`; 2026-08-05 KARAR: Alperen 'hemen tek-PR' (karar-turu)",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 523,
+      "id": "CI-HERMETIC-SCAN-BUDGET-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Hermetic-lint iç kaynak bütçeleri yavaş/doymuş CI runner'ında gerçekçi değil: analysis-context 60000ms bütçesi fork-doygunluğunda aşılıyor (run 31050457808: 22.4M op'ta duvar; lokal 18s/35M op), 1GiB rss bütçesi lokalde GC-slack flake'i üretiyor (--max-old-space-size=640 workaround'u kayıtlı)",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "İç bütçeler ölçüm-temelli ve ortam-farkındalıklı (runner-çarpanı veya env-scale) yeniden kalibre edilir; 522 sonrası main koşusu hâlâ bütçe-aşımı üretirse bu satır acilleşir; workaround'suz lokal koşu yeşil",
+      "evidence": "Açılış 2026-08-06: 522 log-izolasyonunun ikincil bulgusu + dünkü 1GiB GC-slack kaydı — Alperen seçimi (karar-turu: küçük işler)",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 524,
+      "id": "VERIFY-HISTORICAL-CLOSURE-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Historical-only VERIFY satırlarının (10 adet) receipt-gated kapanış dilimi: her satır için kanıt-durumu tiplenir (yeniden-doğrulanabilir / historical-yeterli / eksik-kanıt) ve kapanış turu Alperen onayıyla koşulur",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "10 satırın envanteri kanıt-sınıfıyla çıkarılır; yeniden-doğrulanabilirler koşulur, historical-yeterliler tek onay-turunda DONE'a taşınır, eksik-kanıtlılar typed successor alır; hiçbir satır sessiz flip edilmez",
+      "evidence": "Açılış 2026-08-06: bekleyen owner-kalemi listesinin satırlaşması — Alperen seçimi (karar-turu: küçük işler)",
       "updated": "2026-08-05"
     },
     {
@@ -19459,6 +19639,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "dc570ce2bc30ca179c24648ed738e8d7356995ba32d162e96be7750adcca0ed4"
+    "value": "4a786f3fc2c2edfacf93971b38ad7c2d41a293472f197cf7ff4404c2269dfeca"
   }
 }

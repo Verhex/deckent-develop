@@ -5,16 +5,16 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):096040292e5f78ebc7e2a390ab0d5a77b8a8160c01c0efad7e31988b9d7b5d15`
+**Source digest:** `sha256(normalized-lf-utf8):6969941ad66a89751d87787d028ff2f01398e054fdd4d6d2e7debacc1da2f5f1`
 
-**Rows:** 373 total · 350 active · 23 terminal
+**Rows:** 377 total · 354 active · 23 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 256 |
-| READY | 0 |
+| OPEN | 259 |
+| READY | 1 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
 | VERIFY | 27 |
@@ -44,6 +44,7 @@
 | 150 | `DOCS-ARCHIVE-001` | BLOCKED | P2 | TRUTH | `DOCS-TOPOLOGY-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Approved exact archive/git-mv manifestini uygulayıp links ve writers'ı güncelle |
 | 160 | `DOCS-ADR-SYNC-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Accepted ADR DB↔filesystem full-content/digest parity gate |
 | 170 | `DOCS-RELEASE-TRUTH-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `SSOT-003` | — | Generated stats, references and release-doc truth authority |
+| 171 | `DOCS-DEPS-HOME-001` | OPEN | P2 | TRUTH | — | — | Dependency-doku ile gerçek kurulum-ağacının (HOME/global adapterlar dahil) tek-kaynak hizası: docs/reference/dependencies.md kayıtları ile package.json/override gerçeği arasındaki drift sınıfı kapatılır |
 | 180 | `DOCS-I18N-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `DOCS-RELEASE-TRUTH-001` | — | Documentation i18n contract for en, tr, zh-Hans, es, ja and hi |
 | 190 | `MEMORY-AUTHORITY-001` | OPEN | P0 | TRUTH | `SSOT-002` | — | Repo-local provider-neutral canonical memory; provider HOME surfaces projections only |
 | 200 | `MEMORY-TRUTH-001` | BLOCKED | P1 | TRUTH | `MEMORY-AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Memory index count, stale watch, task-capacity and phantom ledger drift'lerini hükme bağla |
@@ -82,6 +83,9 @@
 | 519 | `CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001` | VERIFY | P2 | TRUTH | — | — | Tests—Docs+Scripts'in kalan kırmızı kökü: containment-inventory-ratchet testi 60s sınırında timeout-flake'i (lokal build-free 48.9s ölçüldü — yavaş CI runner'da sınırı aşıyor) |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 521 | `CI-STATS-HERMETIC-001` | VERIFY | P1 | TRUTH | — | — | update-readme-stats üreteci hermetik değil: sprint rozeti lokal .brain arşivinden, coverage rozeti lokal coverage-artifact varlığından türüyor — iki makine aynı çıktıyı üretemiyor, main-push Tests—Docs+Scripts stats-stale kalıcı kırmızı (3 bandaj sonrası mimari kök) |
+| 522 | `CI-DOCS-SCRIPTS-STEP-TIMEOUT-001` | READY | P1 | TRUTH | — | — | Tests—Docs+Scripts'in YENİ kırmızı kökü: step-düzeyi timeout-minutes 5 duvarı — suite büyüdü (307.86s ölçüldü), duvar SIGKILL×2 + builtins-drift boş-çıktı + hermetic analysis-context 60s iç-bütçe aşımı ikincil kırıklarını üretti; 521 stats-kapısı TEMİZ geçti |
+| 523 | `CI-HERMETIC-SCAN-BUDGET-001` | OPEN | P2 | TRUTH | — | — | Hermetic-lint iç kaynak bütçeleri yavaş/doymuş CI runner'ında gerçekçi değil: analysis-context 60000ms bütçesi fork-doygunluğunda aşılıyor (run 31050457808: 22.4M op'ta duvar; lokal 18s/35M op), 1GiB rss bütçesi lokalde GC-slack flake'i üretiyor (--max-old-space-size=640 workaround'u kayıtlı) |
+| 524 | `VERIFY-HISTORICAL-CLOSURE-001` | OPEN | P2 | TRUTH | — | — | Historical-only VERIFY satırlarının (10 adet) receipt-gated kapanış dilimi: her satır için kanıt-durumu tiplenir (yeniden-doğrulanabilir / historical-yeterli / eksik-kanıt) ve kapanış turu Alperen onayıyla koşulur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
