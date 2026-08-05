@@ -3,32 +3,32 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3971732d6dbc37b882a592159179bbc8a09b65c1ff198f9e04e85df53f90acd6"
+    "value": "5791d91f7e8f67b145e415ac1865d55c9476d8229b5aae22523f1a405f4472b5"
   },
   "summary": {
-    "total": 354,
+    "total": 362,
     "active": 341,
-    "terminal": 13,
+    "terminal": 21,
     "receipts": 46,
     "byState": {
-      "OPEN": 243,
+      "OPEN": 251,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 31,
-      "DONE": 13,
+      "VERIFY": 23,
+      "DONE": 21,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 248,
       "P1": 87,
-      "P2": 19
+      "P2": 27
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 14,
-      "AUTHORITY": 25,
+      "AUTHORITY": 27,
       "CODEX": 44,
       "CONNECTOR": 2,
       "COST": 4,
@@ -41,25 +41,25 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 88,
+      "KERNEL": 91,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
       "PRODUCT": 8,
-      "PROMPT": 2,
+      "PROMPT": 3,
       "PROVIDER": 3,
       "RELEASE": 4,
       "REPO": 1,
       "RESILIENCE": 1,
-      "ROUTING": 2,
+      "ROUTING": 3,
       "SCALE": 1,
       "SECURITY": 4,
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 56,
+      "TRUTH": 57,
       "XPLAT": 3
     }
   },
@@ -80,10 +80,21 @@
       "id": "SSOT-002",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-08-03",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "022d3fa2bf4d2b59ea7919c574a1d95f0c3cdf7cd11b4040e1520841d251156f",
-      "progressDigest": "f806af1680dae2bb529491ca0de41b4aa91d8770710f551edb08ca646a262882",
+      "progressDigest": "7caefa343058129a53e771ac4fec7229e7526c8c1ce9e35c85512d41c0491a3b",
+      "terminalClosureDigest": "3f9d3ac85a1a1182e01187281e69a2c8060a1314b2a6eab991b3edc0a59dd2e9"
+    },
+    {
+      "order": 25,
+      "id": "LEDGER-ISOLATED-COMMIT-PROOF-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "08115792eaa7bcd76a4559377d0d6a704f895137223ebb9bb46c75befd2dfc1c",
+      "progressDigest": "86a8186037a1c3be90631a47f1f98f7ff3a894e7e304a30d803329e62f032d0c",
       "terminalClosureDigest": null
     },
     {
@@ -498,11 +509,11 @@
       "id": "LEGACY-RESIDUAL-AUDIT-001",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-07-26",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "5ad1235f9b2f154da9ea8f2603c4b67b915e05dd732bb04ac615e04575aab8ba",
-      "progressDigest": "6645fb7e033e8fd56e684c7a3f3626ffba480ab85a5bc35eadf84b378b382e12",
-      "terminalClosureDigest": null
+      "progressDigest": "a180e4bc03fa69cd394d889f1c69f38402d8d580e492ddae70781a646daf0ae4",
+      "terminalClosureDigest": "10821c62b6484826a940565850b5dcf43cff8456ddb7f5eed2ce910c23ffd72b"
     },
     {
       "order": 370,
@@ -531,11 +542,11 @@
       "id": "SOURCE-MANIFEST-001",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-07-26",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "b77cc07c784cd73ad4430a266f62d3868c81373190c5a613e75883df85192f90",
-      "progressDigest": "61356aa6eb2e69b56dff9913b33de75835d053769d7b644c44a7169b00e47722",
-      "terminalClosureDigest": null
+      "progressDigest": "1f3c7caa2a18af0412517f1dd25b241a62fb72253c13bb00fc138cd257760fe2",
+      "terminalClosureDigest": "c60c1c65ac0d7067aa77d1a33caf853faaae2ac450277e79656bfc87c7a9b587"
     },
     {
       "order": 400,
@@ -707,11 +718,11 @@
       "id": "TRUST-ANCHOR-002",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-08-04",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "e482051b747fa13c88a5d36badb0f91de0bc9aeadfb01d5b6b4e4aeb98bc2628",
-      "progressDigest": "36d6b0e3d0406bb4db9e6b60d4a6c5e322b5d92a461fab9d0a88ed7aa00436d3",
-      "terminalClosureDigest": null
+      "progressDigest": "968d80ca192a21e55fc2159bb5e7f102fbff2bb100b19a68a507036a47c49695",
+      "terminalClosureDigest": "9ee1cf68b6b8883b0900b653596449cb11f476b7dffe6cd2f8ee2f715614d37f"
     },
     {
       "order": 526,
@@ -2302,10 +2313,21 @@
       "id": "TEST-DISCOVERY-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-07-30",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "91c6c44d0602c7b894aac354473919cc70d705d3dde71e9ed09bbf67221bc360",
-      "progressDigest": "34575f7e14a0ef69a9d67f5234f7821639b56dd0f19fbdd215598f0ce1b1db27",
+      "progressDigest": "47009fa487a13703d75a782b7966d6e1d1b35fc61edb400dbb7d9ae38adea194",
+      "terminalClosureDigest": "2ac77ece827ba075315f6682c5655a69e91593d7b1e1fbbfad04fcc4118d1ab4"
+    },
+    {
+      "order": 3252,
+      "id": "WORKER-DISCOVERY-ADAPTERS-001",
+      "program": "KERNEL",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "256f83272d2899467b6e43b82a030b2603180145bed536f7c737f4cf30cb6f75",
+      "progressDigest": "ccc9a20acbad64f8c21bfc263c59c3e5200b9aa7b8c149fc11cf43f6dcb38976",
       "terminalClosureDigest": null
     },
     {
@@ -2347,9 +2369,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-03",
+      "updated": "2026-08-05",
       "definitionDigest": "dc5ffb283b50ecb2d21b46c9b01a6a86f91844b108c72a100df7c2d575bb39b7",
-      "progressDigest": "778da220618b03681502f5c6ce1560828d5b26a4eab0e5472c24ff07369da9c8",
+      "progressDigest": "b74aec2bd65f0aa36cd4ea5acd08896f1b007feaa9012b90c6048331393c2ebe",
       "terminalClosureDigest": null
     },
     {
@@ -2479,9 +2501,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-01",
+      "updated": "2026-08-05",
       "definitionDigest": "a1619703d97974b5f69374624fd6f4d15fb9d874aeae2f3add45ab90aa606a60",
-      "progressDigest": "0d5234c8bd11776d7719b3286e09b177ebf36a385bebd1c878d054d01eb3daf4",
+      "progressDigest": "c3909a49d75d1590798b5094f50ed51b25548ae0be9e3abc21dd3615d6c8b3e3",
       "terminalClosureDigest": null
     },
     {
@@ -2556,9 +2578,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-01",
+      "updated": "2026-08-05",
       "definitionDigest": "9351804a3b66fabb554218fecf5477069a9c17705d17d7ad3fe1f4fdf3ba6051",
-      "progressDigest": "6c36c1dd729442cd63cdb822a55d7ef48af8be6cc3ef8131f6f2fbfe24d91165",
+      "progressDigest": "a407ced644e55bed46ae4f7809c04e6e6bd16aaf4de11035b0e7db94fbcbf2f3",
       "terminalClosureDigest": null
     },
     {
@@ -2567,9 +2589,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-04",
+      "updated": "2026-08-05",
       "definitionDigest": "c8b06bda4afa2814f5de7b3c6d6bb4140b880860262ecfb44c30ae70fd7b34af",
-      "progressDigest": "6a9c151c2250629042f0ce636b46cb4b7862ada4410d87fc59ee3b31fb8c36dc",
+      "progressDigest": "68c1c9498deaec5b9e6a2348e44fd86c453e2bd4b523326f8b2599dd95c67db8",
       "terminalClosureDigest": null
     },
     {
@@ -2724,6 +2746,28 @@
       "updated": "2026-08-03",
       "definitionDigest": "b7962ee26001db1c89dec587f1605fd52e7220864e8dde4ff4af551e769e4709",
       "progressDigest": "2fe92f1ba250be11db6380e05443bff5303b970d720adea6663c2c66ebd9d57d",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3306,
+      "id": "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
+      "program": "KERNEL",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "f876d0a84373ad9f10a720c66ec0fabb85e3cb5dfa7836bb665f01f02eb6c624",
+      "progressDigest": "5019889ef2b37732763edc04d7bc4695e3cfbc681f117237156659aef3d68988",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3307,
+      "id": "RECOVERY-LIVE-CONTINUATION-PROOF-001",
+      "program": "KERNEL",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "9aa2b9863c3cbc36bc53b6d30ff58fbd8068688fb5aa4681ef6f2698bfc3aa7a",
+      "progressDigest": "26f243d3e420279598c3134eb47cb618f9c0bda7b3415e244ceed1f266875844",
       "terminalClosureDigest": null
     },
     {
@@ -2907,10 +2951,21 @@
       "id": "APPROVAL-READ-PURITY-001",
       "program": "AUTHORITY",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-07-30",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "444dca9f1f8a214afedbd510133cd33d6fe1d89ed1ba55b625031c479fda891a",
-      "progressDigest": "51b15c76e85f7da4dca837b107a1f77124a6412830a60befe96501e1246ae6db",
+      "progressDigest": "adf4fe0807b644953db6263626ad6856a668177597b59f827a2b200bb996b408",
+      "terminalClosureDigest": "e0109d7a22c4928a6b5ab39b9b1372586da23f61b1059d0917390adec5071578"
+    },
+    {
+      "order": 4052,
+      "id": "APPROVAL-READ-CROSSPLATFORM-PROOF-001",
+      "program": "AUTHORITY",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "2e72a3ee407faa443ebde0e5c9e8a91c11a53a3bf02a35e9d1483f4257f7fc90",
+      "progressDigest": "05a6c8340d2d9103c6396efc2ec4de33401bca4a8b373db889f1183f654d281f",
       "terminalClosureDigest": null
     },
     {
@@ -2974,9 +3029,20 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-07-30",
+      "updated": "2026-08-05",
       "definitionDigest": "2d7006f54b89502c85f40e6be491b4725df5be0f39203846e548fcf8d6bbc2a9",
-      "progressDigest": "190b22a988b3d55acc89279d1e6b61019cb9416fcf8b775d19604c5b01c0cd3d",
+      "progressDigest": "ffaeb29376a60aee37140ee531e74270b8b2f94de8aaf81cadc2fcee4e0180b0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4102,
+      "id": "PROVIDER-HOLD-LIVE-PROOF-001",
+      "program": "AUTHORITY",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "88a85093beada3013557099bf17d1b71a12e1797ca7db2fe859e69ca44c3b5ae",
+      "progressDigest": "2026d026be588efcbe92cc9ac16be452670edae27090097c4da8fed42c45e35c",
       "terminalClosureDigest": null
     },
     {
@@ -3787,10 +3853,21 @@
       "id": "PROMPT-V3-001",
       "program": "PROMPT",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-07-30",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "ce1276a029fdc86a6394627cb0a626ae39e0f6e7a14a0d0982232ff96e3e1be0",
-      "progressDigest": "6300b5b0266b529ede8a2e3963fcc43bfdaea84982b65d7b722f922bc1e2f731",
+      "progressDigest": "4fc6c3f46d6af7310d1ebf0f59110fa96f0d50709654a05558fac5078ef543d1",
+      "terminalClosureDigest": "70a7f7ff743d6f7528335f23b3c84253d10f5079a1d687bc5506c0e4830e48d7"
+    },
+    {
+      "order": 9022,
+      "id": "PROMPT-V3-GOLDEN-EVAL-001",
+      "program": "PROMPT",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "df554f6d25fefc7fe4c84a39479a55b8aad3fde54e4c932bbaec47acdd7b0dcd",
+      "progressDigest": "d2f5c8ec7ea20bcc6551a607afb36f971f1cf473c344ab80e901fbd55337168a",
       "terminalClosureDigest": null
     },
     {
@@ -3809,10 +3886,21 @@
       "id": "ROUTING-V3-CUTOVER-001",
       "program": "ROUTING",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-07-30",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "699729e6e1731c7d51ab3afb1a3085f5cdcea31e3bcfb2a9f224319cbdb3d977",
-      "progressDigest": "4c7ab3d565e3fef6b82396e76bd4f38dfac31e73767606b0470c73be3ce54ae6",
+      "progressDigest": "afb4e87985b8f4580204ad1885839ab62a6a5898f69dd4939ee3735f2ebd8597",
+      "terminalClosureDigest": "f937f6fb8100a1ae495c783e061cdcaeb66d21b95526d0f99d71b0861a77f195"
+    },
+    {
+      "order": 9032,
+      "id": "ROUTING-V3-LIVE-QUALITY-001",
+      "program": "ROUTING",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "60ee968558527bdafcdde95706834ee25b31a6686e10ced6745928d05c604caf",
+      "progressDigest": "53b8fb4d0f256fb67539593eae4ee09507273ddf92e92eaabc87449471c54242",
       "terminalClosureDigest": null
     },
     {
@@ -4423,50 +4511,35 @@
   ],
   "workItems": [
     {
-      "order": 20,
-      "id": "SSOT-002",
+      "order": 25,
+      "id": "LEDGER-ISOLATED-COMMIT-PROOF-001",
       "parent": "P00",
       "program": "TRUTH",
-      "outcome": "Tüm kaynakları canonical, atomik ve dependency'li ledger'a uzlaştır",
-      "priority": "P0",
-      "dependsOn": [
-        "SSOT-001",
-        "SOURCE-MANIFEST-001",
-        "LEGACY-RESIDUAL-AUDIT-001"
-      ],
-      "dependents": [
-        "DOCS-TOPOLOGY-001",
-        "MEMORY-AUTHORITY-001",
-        "REPO-CLEANUP-001",
-        "SCRIPT-LIFECYCLE-001",
-        "STATE-RETENTION-001"
-      ],
+      "outcome": "Canonical ledger uzlaştırmasının izole/fresh-clone commit kanıtı — SSOT-002 + SOURCE-MANIFEST-001 kapanışlarından taşınan canlı-kanıt boyutu",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
       "children": [],
       "gates": [
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "OPEN",
       "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
         "L": "0",
-        "X": "-",
-        "S": "-"
+        "X": "?",
+        "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SOURCE-MANIFEST-001",
-        "LEGACY-RESIDUAL-AUDIT-001"
-      ],
-      "evidenceReceipts": [
-        "GR-2026-07-26-MASTER-01"
-      ],
-      "acceptance": "File-level source catalog, 125 alias exactly-once total mapping, completed residual audit, supersession and finish contract complete",
-      "evidence": "`receipt=GR-2026-07-26-MASTER-01`; all reconciliation manifests present; isolated commit proof pending; 2026-08-03 (PAZARTESI P13): açık soru defteri docs/analysis/OPEN-QUESTIONS-2026-08.md'de 29 kayıt — 24 açık HOLD, 5 owner kararıyla çözülmüş. OQ-29 (coverage sınıf sayımı) bu turda RESOLVED: çelişki Tur-3 prompt'unun düz-metin aritmetiğindeydi, matris 31 tarihsel + 11 canlı ile doğru kapatıldı. 2026-08-03 (xverify OQ-XV-03/04 kapanışı, Alperen kararı \"referanslı kapanış\"): 24 açık HOLD'un HER BİRİ artık bir Work ID'ye veya owner-karar sahibine bağlıdır — eşleme authority'si RECONCILIATION-WP0.md EK-3 crosswalk'udur ve bu ledger onu versioned evidence artifact olarak referanslar (commit 1a30bf9e6; 4 boşluk kalemi 480-510 satırlarıyla kapatıldı). Önceki \"eşlenmedi\" cümlesi EK-3'ten önce yazılmıştı ve xverify B-ekseni çelişkiyi doğru yakaladı; çelişki bu güncellemeyle canonical tarafta kapandı. DOC-GAP dispozisyon kaydı da aynı sınıf versioned artifact'tır: docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md",
-      "updated": "2026-08-03"
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Fresh-clone/izole checkout üzerinde ledger + generated projeksiyon + manifest digest'leri komple doğrulanır ve kanıt commit'e bağlanır",
+      "evidence": "Açılış 2026-08-05: 24-satır DONE turunda residual-çıkarma (Alperen onaylı); kaynaklar: SSOT-002 'isolated commit proof pending' + SOURCE-MANIFEST-001 canlı-kanıt boyutu",
+      "updated": "2026-08-05"
     },
     {
       "order": 30,
@@ -4936,9 +5009,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-002"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Tenant-aware age/count/size policies; bounded readers; atomic rotation",
       "evidence": "2026-07-21 `.deckent` analysis; current files remeasured",
@@ -5011,9 +5082,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-002"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Code, tests, CI, runtime writers, site and inbound refs fully mapped",
       "evidence": "2026-07-21 docs analyses are revalidate sources; 2026-08-03 ölçüm (PAZARTESI P7 + P10): docs-reset sonrası 187 skip / 30 dosya DOC-GAP işaretiyle görünür bırakıldı — arşiv corpus'una çakılı, yeni dokümanda karşılığı olmayan iddialar; silinmedi ve yeni dokümana uydurulmadı. Owner kararı: toplu emekli edilmeyecek, her iddia tek tek gözden geçirilecek. P10 (OQ-18 VitePress) ayrı owner kararı: .github/workflows/docs.yml otomatik tetikleyicileri duraklatıldı, workflow_dispatch bırakıldı; 65 test describe.skip + OQ-18 referanslı; 2026-08-03 (xverify OQ-XV-05 kapanışı): 187-skip DOC-GAP kümesinin dispozisyonu Alperen onayıyla UYGULANDI — 184 iddia sınıflandı, ~106 süperseded iddia emekli (8 test dosyası silindi, içerik arşivde), ~48 REWRITE ve ~30 DECISION iddiası sahip Work ID anotasyonuyla duruyor; karar kaydı docs/analysis/DOC-GAP-DISPOSITION-2026-08-03.md (commit 6da6667a7). Bu satırın kendi topology kararı (docs/docs1/.analysis/generated sahipliği + OQ-18 VitePress) hâlâ AÇIK — P7 kapanışı onu kapatmaz",
@@ -5207,9 +5276,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-002"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Revision/hash conflict journal; no silent delete; Claude, Codex, Gemini parity",
       "evidence": "Stop hook single-target fix 2026-07-30; design `docs/superpowers/specs/2026-07-30-provider-agnostic-memory-projection-design.md` + analysis `docs/alperen-analysis/2026-07-30-memory-projection-rev3-yuzey-analizi.md`; Cursor+Copilot extension carried by MEMORY-SURFACE-PROJECTION-001",
@@ -5282,9 +5349,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-002"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Each repo path wire, retain, archive or delete; exact consumer graph, hash and recovery",
       "evidence": "Branch, HOME, DB and runtime state are separate authorities",
@@ -5539,9 +5604,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-002"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "gate, recurring proof, admin migration, one-shot and retired classes with owner/input/output/expiry",
       "evidence": "2026-07-21 scripts analysis",
@@ -5835,44 +5898,6 @@
       "updated": "2026-07-26"
     },
     {
-      "order": 360,
-      "id": "LEGACY-RESIDUAL-AUDIT-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Audit all 199 historical closed claims for hidden residual work",
-      "priority": "P0",
-      "dependsOn": [
-        "SSOT-001"
-      ],
-      "dependents": [
-        "SSOT-002"
-      ],
-      "children": [],
-      "gates": [
-        "G0",
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-26-MASTER-01"
-      ],
-      "acceptance": "Every legacy closed row has no residual or maps each residual to exact canonical Work ID with reason",
-      "evidence": "`receipt=GR-2026-07-26-MASTER-01`; §8.2 partitions 157+36+6 and promotes all six hidden residuals",
-      "updated": "2026-07-26"
-    },
-    {
       "order": 370,
       "id": "DOC-IMPACT-001",
       "parent": "P00",
@@ -5945,43 +5970,6 @@
       "evidenceReceipts": [],
       "acceptance": "Every debt has owner, severity, affected outcomes, acceptance, evidence and no silent closure; no fix-only endless loop",
       "evidence": "Finish contract requires zero unowned debt",
-      "updated": "2026-07-26"
-    },
-    {
-      "order": 390,
-      "id": "SOURCE-MANIFEST-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "File-level digest and disposition manifest for all reconciliation sources",
-      "priority": "P0",
-      "dependsOn": [
-        "SSOT-001"
-      ],
-      "dependents": [
-        "SSOT-002"
-      ],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-26-MASTER-01"
-      ],
-      "acceptance": "Handover, code audit, PAEP, archive, 12 alperen-analysis and 15 core-memory sources have digest, class and canonical owner; untracked source marked",
-      "evidence": "`receipt=GR-2026-07-26-MASTER-01`; §4 snapshot and manifests",
       "updated": "2026-07-26"
     },
     {
@@ -6425,39 +6413,6 @@
       ],
       "acceptance": "Aktif receipt baseline'ı working-tree byte'ına değil reviewed parent commit blob'una karşı doğrulanır (git parent-diff kontrolü validator'da veya required CI check'te); `owner=` metni tek başına authority sayılmaz — protected-branch + bağımsız review kanıtı zincire girer; branch protection durumu makine-okunur evidence olarak kayıtlıdır ve sahte-READY senaryosu (xverify E-ekseni 5-adım) regression testi olarak fail-closed kanıtlanır",
       "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur; `receipt=GR-2026-08-03-TRUST-ANCHOR-01`; `proof=trust-anchor-forgery-fail-closed-84cases`; 2026-08-03 SETTLEMENT: (a) validator'a reviewed-parent doğrulaması eklendi — aktif receipt'in anchor'ı receipt'i tanıtan commit'in PARENT'ıdır (`git log -S`), commit'lenmemiş receipt HEAD'e (son reviewed state) çıpalanır; baseline anchor blob'uyla eşleşmezse `RECEIPT_BASELINE_UNREVIEWED` + admission düşer; (b) degradasyon typed: git dışında `no-git/no-history/no-parent` modu stderr WARN üretir, sessiz geçiş yok — zorlama garantisi ruleset 20321963'ün required check'lerinde (validator-contract 3 bacak + Type Check) ve o bacaklara eklenen `fetch-depth: 0`'da; (c) ruleset kanıtı makine-okunur: docs/evidence/trust-anchor/ruleset-20321963-2026-08-03.json (active, deletion+non_fast_forward+required_status_checks, bypass_actors BOŞ, current_user_can_bypass=never); (d) KANIT: 11 yeni vaka — 6 hermetik anchor-çözümü (sahte git, process yok) + 4 gerçek-git senaryosu (meşru authoring GEÇER, working-tree sahteciliği DÜŞER, xverify 5-adım aynı-commit saldırısı DÜŞER, meşru iki-commit akışı GEÇER) + git yetenek beyanı; suite 84/84. DÜRÜST SINIR-1 (bootstrap): bu dilimin KENDİ receipt'i ile implementasyonu aynı patch'te iniyor — doğduğu commit'te kendini zorlayamazdı; eski rejim altında admitted son dilim budur ve bundan SONRAKİ her aktif receipt parent-anchor'a tabidir. DÜRÜST SINIR-2: `owner=` metni hâlâ kriptografik authenticate edilmiyor — ruleset PR-akışını zorunlu kılarak yazar-dışı görünürlük getirir, imzalı-commit/review katmanı RECEIPT-001 kapsamında açık. X `?`: 3-platform koşusu bir sonraki CI turunda; 2026-08-03 X KAPANDI: PR #27 required-check koşusu (run 30846122775) — Validator Contract ubuntu/macos/windows üçü de pass, trust-anchor kodu ve 84-case suite dahil; merge ancak bu 3 bacak + Type Check yeşilken mümkün oldu (ruleset'in kendisi kanıt zincirinin parçası: direct push fiilen reddedildi, akış PR'a döndü); 2026-08-04 XVERIFY-E TUR-2 SONUCU (codex-analysis/xverify-e-2026-08-03.md): REFUTED — özgün 5-adım saldırısı fail-closed DOĞRULANDI (84/84 bağımsız koşum) ama dört mekanik varyant kabul yolu üretti (merge-introduction `-S`'e görünmez, rename anchor'ı ileri taşır, shallow-clone Type Check bacağında WARN-geçiş, blob-okuma hatası ABSENT sanılır) ve iki yapısal sınır adlandı (parent≠reviewed varsayımı, required-check self-modification). Mekanik dörtlünün kapanışı TRUST-ANCHOR-002'dedir; yapısal ikili solo-hesap mitigasyon araştırması sonrası owner kararıyla typed sınır veya iş olarak hükme bağlanacak — bu satır o karara kadar VERIFY'da kalır ve kapanmış SAYILMAZ",
-      "updated": "2026-08-04"
-    },
-    {
-      "order": 525,
-      "id": "TRUST-ANCHOR-002",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Xverify-E tur-2'nin dört mekanik kabul yolu fail-closed kapatılır: merge-introduction, rename-drift, shallow-clone, blob-okuma-hatası",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-04-TRUST-ANCHOR-002-01"
-      ],
-      "acceptance": "Resolver'da: receipt HEAD blob'unda varken `-S` tarihte bulamıyorsa `history-unresolved` FAIL-CLOSED; `--follow` rename boyunca gerçek registration commit'ini bulur; shallow repository typed FAIL-CLOSED; multi-parent introduction FAIL-CLOSED; root-commit registration (`no-parent`) FAIL-CLOSED; blob okuma üç-durumlu (`ok/absent/error`) — error asla ABSENT'i karşılamaz (OQ-XVE-05); `ci.yml` Type Check `fetch-depth: 0` alır; Codex'in merge/rename/shallow saldırıları birebir gerçek-git regresyon testi olarak DÜŞER; degradasyon WARN'ı yalnız git-dışı/commit-siz ortama (hermetik fixture) daralır",
-      "evidence": "Açılış: Alperen 2026-08-04 kararı (\"TRUST-ANCHOR-002 önce\") — kaynak codex-analysis/xverify-e-2026-08-03.md A/B REFUTED mekanik bulguları. Pre-work admission receipt'i bu satırla AYNI commit'te ve implementasyondan ÖNCE kayıtlıdır — FAZ4A-SLICE-PLAN §3 revizyonunun (iki-adım rejim, OQ-XVE-06 cevabı) ilk gerçek uygulaması budur; `receipt=GR-2026-08-04-TRUST-ANCHOR-002-01`; 2026-08-04 SETTLEMENT: suite 92/92 (84'e +8: shallow/history-unresolved/merge-introduction hermetik + blob üç-durum + merge/rename/shallow gerçek-git saldırıları), gerçek repo lint:master-plan OK (yeni fail-closed modlar yanlış-pozitif üretmedi), tsc temiz, hermetic build-free tazelendi (12438 / inventory cf17650d); `proof=xverify-e-mechanical-quartet-fail-closed-92cases`; iki-adım rejimin dogfood kanıtı Git-tarihli: yeni validator × pre-work commit (8cae888dc, receipt aktif) = OK — anchor kontrolü aktif fazda GERÇEKTEN koştu; × implementasyon commit'i = RECEIPT_BASELINE_DRIFT ×3 + ADMISSION_RECEIPT_MISSING (bilinçli aktif-faz drift'i, fail-closed); settlement bu satırla consume eder. Kapsam dışı bırakılan: parent≠reviewed ve required-check self-modification yapısal sınırları TRUST-ANCHOR-001'de owner kararı bekler (solo-hesap mitigasyon araştırması: docs/analysis/github-solo-mitigations-2026-08-04.md — VerhexIO org + public repo → merge queue ve path-scoped required-reviewer FREE, GitHub-App ayrı-integration-ID required check FREE desen; karar-girdisi, policy üretmez)",
       "updated": "2026-08-04"
     },
     {
@@ -11418,6 +11373,8 @@
         "RECOVERY-BORN-490-COMPLETED-CHECKPOINT-001",
         "RECOVERY-BORN-490-TERMINALIZATION-EVENTS-001",
         "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
+        "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
+        "RECOVERY-LIVE-CONTINUATION-PROOF-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "gates": [
@@ -11478,6 +11435,8 @@
         "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
         "RECOVERY-BORN-488-STATUS-PROJECTION-001",
         "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
+        "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
+        "RECOVERY-LIVE-CONTINUATION-PROOF-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "evidenceReceipts": [
@@ -12611,8 +12570,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "EVALUATION-001",
-        "TEST-DISCOVERY-001"
+        "EVALUATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Brain binds every mandatory criterion to executed, non-skipped evidence and the exact production symbol/consumer declared by the task; green unrelated tests, fixture-local reimplementation and skipped suites cannot authorize DONE",
@@ -12687,8 +12645,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PROMPT-001",
-        "ROUTING-V3-CUTOVER-001"
+        "PROMPT-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Content-addressed exact prompt binds task plus applicable run-wide constraints; forceSkills survive routing and FIX rotation; lifecycle timestamp/heartbeat writers use injected current authority; generated goCriteria cannot contradict the approved test/build policy",
@@ -12953,8 +12910,7 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "PLANNER-001",
-        "EVALUATION-001",
-        "TEST-DISCOVERY-001"
+        "EVALUATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Every production-code task carries a digest-bound language-neutral wiring contract from changed producer through canonical consumer, affected ingresses and enablement authority to exact executed proof; planner blocks missing authority, worker reports structured evidence, Brain emits typed UNWIRED/HOLD for test-only or disconnected code, and language adapters fail honestly instead of fabricating parity",
@@ -12976,7 +12932,8 @@
         "RECOVERY-BORN-485-FIX-AUTHORITY-001"
       ],
       "children": [
-        "TEST-DISCOVERY-001"
+        "TEST-DISCOVERY-001",
+        "WORKER-DISCOVERY-ADAPTERS-001"
       ],
       "gates": [
         "G2",
@@ -12997,7 +12954,7 @@
       "closureBlockedBy": [
         "PLANNER-001",
         "PROMPT-001",
-        "TEST-DISCOVERY-001"
+        "WORKER-DISCOVERY-ADAPTERS-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Repo-wide scans require explicit scope; task-local discovery remains sufficient; violation evidence typed",
@@ -13005,41 +12962,37 @@
       "updated": "2026-07-26"
     },
     {
-      "order": 3251,
-      "id": "TEST-DISCOVERY-001",
+      "order": 3252,
+      "id": "WORKER-DISCOVERY-ADAPTERS-001",
       "parent": "WORKER-DISCOVERY-001",
       "program": "KERNEL",
-      "outcome": "Pre-dispatch test discovery contract for declared test paths",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "PRODUCTION-WIRING-AUTHORITY-001",
-        "RECOVERY-BORN-485-SEMANTIC-VERDICT-001",
-        "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
+      "outcome": "Vitest-dışı test-discovery adapter'ları (Jest, Pytest, diğer diller) + canlı heterojen-proje kanıtı",
+      "priority": "P2",
+      "dependsOn": [
+        "TEST-DISCOVERY-001"
       ],
+      "dependents": [],
       "children": [],
       "gates": [
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "OPEN",
       "truth": {
-        "C": "1",
-        "W": "~",
-        "E": "1",
-        "H": "1",
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
         "L": "0",
-        "X": "0",
+        "X": "?",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
-      ],
-      "acceptance": "A provable runner-include mismatch blocks before worker dispatch with typed evidence; dynamically undecidable discovery remains explicit and fail-open without a false pass claim",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=vitest-discovery-contract-targeted`; static Vitest include/exclude contract and task-builder integration tests pass; Jest, Pytest, other-language adapters and live heterogeneous-project proof remain open",
-      "updated": "2026-07-30"
+      "evidenceReceipts": [],
+      "acceptance": "Her yeni adapter kendi include/exclude kontratı + typed fail-open sınırıyla gelir; canlı heterojen projede discovery-mismatch bloklaması kanıtlanır",
+      "evidence": "Açılış 2026-08-05: TEST-DISCOVERY-001 DONE kapanışından residual-çıkarma (Alperen onaylı 24-satır turu)",
+      "updated": "2026-08-05"
     },
     {
       "order": 3260,
@@ -13196,8 +13149,8 @@
         "GR-2026-08-04-FAZ4A-S2-01"
       ],
       "acceptance": "Landing/temp/partial residue never enters task identity; external force-finalize proves generation-fenced coordinator death before terminal state/output, retains active state during grace, and clears PID authority only after verified settlement",
-      "evidence": "Finalize consumes the canonical task-artifact classifier and excludes foreign result-only evidence. The immutable COMPLETE wording applies to normal settled finalization; explicit force-finalize now publishes only a fenced ABORTED receipt and cannot promote unresolved work. Standalone built-binary proof creates a real owned coordinator, observes SIGTERM while state remains ACTIVE/EVALUATE, waits for exact death, then verifies fenced ABORTED receipt and PID removal. Linux proof passes; Windows native/macOS/namespace matrix remains open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=force-finalize-terminal-binary`; `receipt=GR-2026-08-04-FAZ4A-S2-01`; 2026-08-04 FAZ4A-S2 settlement: finalizer'ın iki test kümesi (63 kırık) fs-mock'tan gerçek-tmpdir'e taşındı ve 80/80 yeşil — fail-closed sözleşmeler artık test tarafında da pinli: değerlendirilmemiş/boş/NO_GO/DEFERRED lineage typed refusal, sıfır-task sprint archive edilemez, held receipt COMPLETE yayımlayamaz. Üç üretim-gerçeği keşfi kayda geçti: (a) KPI halkası memory.db'yi finalize sırasında YARATIYOR — triple-link kapısının false dalı ancak KPI yazımı düşünce erişilebilir, test o gerçek yola çevrildi; (b) code-verified reconciliation üretimde diagnostiğe indirilmiş ('verdict unchanged') — NO_GO→DONE çevirme + sentetik result yazma emekli, eski testler ölü sözleşmeyi pinliyordu; (c) log/retro projeksiyonları receipt gate'inden ÖNCE yazılıyor — sahibi RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001, bu dilimde pinlenmedi",
-      "updated": "2026-08-03"
+      "evidence": "Finalize consumes the canonical task-artifact classifier and excludes foreign result-only evidence. The immutable COMPLETE wording applies to normal settled finalization; explicit force-finalize now publishes only a fenced ABORTED receipt and cannot promote unresolved work. Standalone built-binary proof creates a real owned coordinator, observes SIGTERM while state remains ACTIVE/EVALUATE, waits for exact death, then verifies fenced ABORTED receipt and PID removal. Linux proof passes; Windows/macOS/namespace matrisi successor RECOVERY-NATIVE-PLATFORM-MATRIX-001'e taşındı; `proof=orchestra-class-8758-green-20260805`; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=force-finalize-terminal-binary`; `receipt=GR-2026-08-04-FAZ4A-S2-01`; 2026-08-04 FAZ4A-S2 settlement: finalizer'ın iki test kümesi (63 kırık) fs-mock'tan gerçek-tmpdir'e taşındı ve 80/80 yeşil — fail-closed sözleşmeler artık test tarafında da pinli: değerlendirilmemiş/boş/NO_GO/DEFERRED lineage typed refusal, sıfır-task sprint archive edilemez, held receipt COMPLETE yayımlayamaz. Üç üretim-gerçeği keşfi kayda geçti: (a) KPI halkası memory.db'yi finalize sırasında YARATIYOR — triple-link kapısının false dalı ancak KPI yazımı düşünce erişilebilir, test o gerçek yola çevrildi; (b) code-verified reconciliation üretimde diagnostiğe indirilmiş ('verdict unchanged') — NO_GO→DONE çevirme + sentetik result yazma emekli, eski testler ölü sözleşmeyi pinliyordu; (c) log/retro projeksiyonları receipt gate'inden ÖNCE yazılıyor — sahibi RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001, bu dilimde pinlenmedi; 2026-08-05 DONE-turu notu: dependency-DAG kuralı kapanışı blokladı (deps not DONE) — residual'lar successor satırlara taşındı, kanıt-tokenları geçerli, satır VERIFY'da bekler",
+      "updated": "2026-08-05"
     },
     {
       "order": 3272,
@@ -13306,7 +13259,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "TEST-DISCOVERY-001",
         "PRODUCTION-WIRING-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
@@ -13629,8 +13581,8 @@
         "GR-2026-08-01-LIFECYCLE-RECOVERY-01"
       ],
       "acceptance": "One versioned dependency read model resolves every logical prerequisite through its accepted lineage leaf; scheduler, prompt, handoff, Brain and recovery bind the same digest; a repaired dependency unblocks exactly once and no worker can receive stale original NO_GO evidence after aggregate admission",
-      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; task-builder and prompt template consume host-evaluated aggregate lineage state, generated FIX descendants inherit root dependency context/read grants, and focused aggregate tests pass. Sprint-490 then released 009/011/013/014 only through repaired logical lineages and completed 14/14. Shared versioned digest across every non-Sprint mode and every-environment proof remain open",
-      "updated": "2026-08-01"
+      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; task-builder and prompt template consume host-evaluated aggregate lineage state, generated FIX descendants inherit root dependency context/read grants, and focused aggregate tests pass. Sprint-490 then released 009/011/013/014 only through repaired logical lineages and completed 14/14. shared-digest non-Sprint modları + every-environment kanıtı successor RECOVERY-LIVE-CONTINUATION-PROOF-001'e taşındı; `proof=dependency-aggregate-8of8-20260805`; 2026-08-05 DONE-turu notu: dependency-DAG kuralı kapanışı blokladı (deps not DONE) — residual'lar successor satırlara taşındı, kanıt-tokenları geçerli, satır VERIFY'da bekler",
+      "updated": "2026-08-05"
     },
     {
       "order": 3284,
@@ -13829,8 +13781,7 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "RECOVERY-BORN-488-REPAIR-DISPATCH-001",
-        "PRODUCTION-WIRING-AUTHORITY-001",
-        "ROUTING-V3-CUTOVER-001"
+        "PRODUCTION-WIRING-AUTHORITY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-08-04-FAZ4A-S4-01"
@@ -13923,8 +13874,8 @@
         "GR-2026-08-01-LIFECYCLE-RECOVERY-01"
       ],
       "acceptance": "Resume returns a typed resumed-and-running, resumed-and-paused, completed, aborted or failed outcome with exact next authority; explicit force finalize never prints COMPLETE before receipt and can publish a fenced ABORTED settlement preserving unresolved/deferred lineages; cleanup admits only that exact terminal receipt and never deletes forensic evidence implicitly",
-      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; prior Sprint-488 ABORTED containment remains valid. Sprint-490 additionally exercised a completed-checkpoint terminalization-only recovery: persisted results/evaluations produced the missing fenced COMPLETE receipt without worker redispatch or evaluator replay, status observed the receipt, and exact cleanup converged to IDLE while retaining forensic terminal/event/gate/metric artifacts. Scoped recovery contracts pass; fresh genuinely PAUSED continuation, native platform matrix and non-Sprint adapters remain open",
-      "updated": "2026-08-01"
+      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; prior Sprint-488 ABORTED containment remains valid. Sprint-490 additionally exercised a completed-checkpoint terminalization-only recovery: persisted results/evaluations produced the missing fenced COMPLETE receipt without worker redispatch or evaluator replay, status observed the receipt, and exact cleanup converged to IDLE while retaining forensic terminal/event/gate/metric artifacts. Scoped recovery contracts pass; fresh-PAUSED continuation + non-Sprint adapter'ları successor RECOVERY-LIVE-CONTINUATION-PROOF-001'e, native matris RECOVERY-NATIVE-PLATFORM-MATRIX-001'e taşındı; `proof=orchestra-class-8758-green-20260805`; 2026-08-05 DONE-turu notu: dependency-DAG kuralı kapanışı blokladı (deps not DONE) — residual'lar successor satırlara taşındı, kanıt-tokenları geçerli, satır VERIFY'da bekler",
+      "updated": "2026-08-05"
     },
     {
       "order": 3291,
@@ -13973,8 +13924,8 @@
         "GR-2026-08-04-FAZ4A-S5-01"
       ],
       "acceptance": "CLI, MCP, Terminal, Desktop, dashboard, metrics, notification and finalizer consume one revisioned persisted snapshot with exact logical and attempt denominators; active/provider concurrency cannot remain non-zero after authority retirement; source/dist digest mismatch blocks dogfood admission and no adapter re-infers state",
-      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; terminal publication now orders COMPLETE dashboard before canonical read-model publication so the digest is not stale at birth. Sprint-490 status revision 51 projected receipt-backed COMPLETE with 14 logical DONE/20 attempts and active=0; sprint-scoped cleanup published revision 52 IDLE. Four historical provider observation intervals remain explicit HOLD evidence under RECOVERY-BORN-490-PROVIDER-OBSERVATION-001; Desktop/native/HA parity remains open; `receipt=GR-2026-08-04-FAZ4A-S3-01`; 2026-08-04 FAZ4A-S3 settlement: sprint-controller kümesi 166/166 (25 kırıktan) — read-model write→rename→readback→digest zinciri artık test tarafında da gerçek diskle pinli; 3 beklenti üretim-gerçeğine hizalandı: result/attempt kanıtı olmayan task settle EDİLEMEZ (TERMINAL_ HOLD), logicalEvaluations settled lineage'dan türetilir (caller Map'i aynen geçmez), gitDiff subprocess değil VERIFIED workAttribution projeksiyonudur; üretim koduna dokunulmadı; `receipt=GR-2026-08-04-FAZ4A-S5-01`; 2026-08-04 FAZ4A-S5 settlement: brain-ipc 16/16 + brain-provider 20/20 (+1 yeni regresyon-kalkanı) — pinlenen kontratlar: pauseSprint read-model publish hatasını yutmaz (PERSIST_FAILED rethrow), cleanup prompt-arşivleme sprint-sahipliği filtreli (yabancı run'ın promptları korunur, yeni testle sabit)",
-      "updated": "2026-08-04"
+      "evidence": "`receipt=GR-2026-08-01-LIFECYCLE-RECOVERY-01`; terminal publication now orders COMPLETE dashboard before canonical read-model publication so the digest is not stale at birth. Sprint-490 status revision 51 projected receipt-backed COMPLETE with 14 logical DONE/20 attempts and active=0; sprint-scoped cleanup published revision 52 IDLE. Four historical provider observation intervals remain explicit HOLD evidence under RECOVERY-BORN-490-PROVIDER-OBSERVATION-001; Desktop/native/HA parity successor RECOVERY-NATIVE-PLATFORM-MATRIX-001'e taşındı; `proof=orchestra-class-8758-green-20260805`; `receipt=GR-2026-08-04-FAZ4A-S3-01`; 2026-08-04 FAZ4A-S3 settlement: sprint-controller kümesi 166/166 (25 kırıktan) — read-model write→rename→readback→digest zinciri artık test tarafında da gerçek diskle pinli; 3 beklenti üretim-gerçeğine hizalandı: result/attempt kanıtı olmayan task settle EDİLEMEZ (TERMINAL_ HOLD), logicalEvaluations settled lineage'dan türetilir (caller Map'i aynen geçmez), gitDiff subprocess değil VERIFIED workAttribution projeksiyonudur; üretim koduna dokunulmadı; `receipt=GR-2026-08-04-FAZ4A-S5-01`; 2026-08-04 FAZ4A-S5 settlement: brain-ipc 16/16 + brain-provider 20/20 (+1 yeni regresyon-kalkanı) — pinlenen kontratlar: pauseSprint read-model publish hatasını yutmaz (PERSIST_FAILED rethrow), cleanup prompt-arşivleme sprint-sahipliği filtreli (yabancı run'ın promptları korunur, yeni testle sabit); 2026-08-05 DONE-turu notu: dependency-DAG kuralı kapanışı blokladı (deps not DONE) — residual'lar successor satırlara taşındı, kanıt-tokenları geçerli, satır VERIFY'da bekler",
+      "updated": "2026-08-05"
     },
     {
       "order": 3295,
@@ -14411,6 +14362,68 @@
       "acceptance": "`SprintPhase` enum, emitted transition, host guide ve read-model aynı phase kümesini taşır; CLEANUP çelişkisi kapanır",
       "evidence": "CODE-DOC-DIFF-2026-08 ARCH-01; codex-analysis 06: executable controller RETRO/DECAY sonrası gerçek CLEANUP koşuyor fakat enum'da CLEANUP yok ve emitted transition DECAY→COMPLETE kaydediyor",
       "updated": "2026-08-03"
+    },
+    {
+      "order": 3306,
+      "id": "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Force-finalize containment, terminal publication ve status projeksiyonu her hedef platformda real-binary kanıtla doğrulanır; Desktop/HA parity aynı read-model'den kanıtlanır",
+      "evidence": "Açılış 2026-08-05: 24-satır DONE turunda residual-çıkarma (Alperen onaylı); kaynaklar: RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001 (Win/mac/namespace), RECOVERY-BORN-488-RECOVERY-TERMINAL-001 (native matris), RECOVERY-BORN-488-STATUS-PROJECTION-001 (Desktop/native/HA)",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 3307,
+      "id": "RECOVERY-LIVE-CONTINUATION-PROOF-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Gerçek PAUSED run'dan continuation canlı kanıtlanır; dependency shared-digest non-Sprint modlarda (Run/Do/Flow) ve every-environment'ta aynı authority'den doğrulanır",
+      "evidence": "Açılış 2026-08-05: 24-satır DONE turunda residual-çıkarma (Alperen onaylı); kaynaklar: RECOVERY-BORN-488-RECOVERY-TERMINAL-001 (fresh-PAUSED + non-Sprint), RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001 (shared-digest modları + every-environment)",
+      "updated": "2026-08-05"
     },
     {
       "order": 3310,
@@ -14903,7 +14916,8 @@
         "TOOL-AUTHORITY-001"
       ],
       "children": [
-        "APPROVAL-READ-PURITY-001"
+        "APPROVAL-READ-PURITY-001",
+        "APPROVAL-READ-CROSSPLATFORM-PROOF-001"
       ],
       "gates": [
         "G2",
@@ -14926,7 +14940,7 @@
         "TENANT-001",
         "OPERATION-001",
         "CAPABILITY-001",
-        "APPROVAL-READ-PURITY-001"
+        "APPROVAL-READ-CROSSPLATFORM-PROOF-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "CLI, terminal, Desktop, API, connectors, Worker and Nervous share CAS, expiry, relay and audit",
@@ -14934,37 +14948,37 @@
       "updated": "2026-07-27"
     },
     {
-      "order": 4051,
-      "id": "APPROVAL-READ-PURITY-001",
+      "order": 4052,
+      "id": "APPROVAL-READ-CROSSPLATFORM-PROOF-001",
       "parent": "APPROVAL-001",
       "program": "AUTHORITY",
-      "outcome": "Approval status reads are filesystem-pure and virtual-filesystem safe",
-      "priority": "P1",
-      "dependsOn": [],
+      "outcome": "Approval read-purity'nin cross-platform real-binary kanıtı",
+      "priority": "P2",
+      "dependsOn": [
+        "APPROVAL-READ-PURITY-001"
+      ],
       "dependents": [],
       "children": [],
       "gates": [
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "OPEN",
       "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
         "L": "0",
-        "X": "0",
+        "X": "?",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
-      ],
-      "acceptance": "Read-only status and pending-approval queries do not create `.deckent/approvals`, mutate state or assume host-only filesystem behavior",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=approval-read-purity-targeted`; approval-store and pending-approval tests pass, including virtual filesystem cases; cross-platform real-binary proof remains open",
-      "updated": "2026-07-30"
+      "evidenceReceipts": [],
+      "acceptance": "Gerçek binary status/pending-approval okumaları hedef platform matrisinde .deckent/approvals yaratmadan doğrulanır",
+      "evidence": "Açılış 2026-08-05: APPROVAL-READ-PURITY-001 DONE kapanışından residual-çıkarma (Alperen onaylı 24-satır turu)",
+      "updated": "2026-08-05"
     },
     {
       "order": 4060,
@@ -15174,7 +15188,8 @@
         "XVERIFY-WIRE-001"
       ],
       "children": [
-        "PROVIDER-HOLD-001"
+        "PROVIDER-HOLD-001",
+        "PROVIDER-HOLD-LIVE-PROOF-001"
       ],
       "gates": [
         "G1"
@@ -15195,7 +15210,8 @@
         "RECEIPT-001",
         "REACHABILITY-001",
         "LIMIT-001",
-        "PROVIDER-HOLD-001"
+        "PROVIDER-HOLD-001",
+        "PROVIDER-HOLD-LIVE-PROOF-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Exact candidate, reservation, route lock, termination and receipt; no hold-only composition",
@@ -15213,6 +15229,7 @@
         "LIMIT-001"
       ],
       "dependents": [
+        "PROVIDER-HOLD-LIVE-PROOF-001",
         "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
         "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001"
       ],
@@ -15239,8 +15256,43 @@
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "Auth, usage and reachability failures create typed provider holds; unaffected providers retain admission and a matching recovered provider can continue without resetting unrelated budget or hold state",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=provider-hold-targeted`; provider-hold, result-collector and pause/resume tests pass; live Claude-login recovery, mixed-provider continuation, expiry and authoritative usage-source proof remain open",
-      "updated": "2026-07-30"
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=provider-hold-targeted`; provider-hold, result-collector and pause/resume tests pass; canlı login-recovery/mixed-provider/expiry/authoritative-usage-source kanıtı successor PROVIDER-HOLD-LIVE-PROOF-001'e taşındı (W'deki ~ kaynağı authoritative usage-source idi — successor'a devredildi); `proof=provider-execution-hold-5of5-20260805`; 2026-08-05 DONE-turu notu: dependency-DAG kuralı kapanışı blokladı (deps not DONE) — residual'lar successor satırlara taşındı, kanıt-tokenları geçerli, satır VERIFY'da bekler",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 4102,
+      "id": "PROVIDER-HOLD-LIVE-PROOF-001",
+      "parent": "PROVIDER-INGRESS-001",
+      "program": "AUTHORITY",
+      "outcome": "Provider-hold'un canlı kanıtları: login-recovery, mixed-provider continuation, expiry ve authoritative usage-source",
+      "priority": "P2",
+      "dependsOn": [
+        "PROVIDER-HOLD-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROVIDER-HOLD-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Canlı provider login-kaybı/dönüşü typed hold+release üretir; mixed-provider run devam eder; expiry ve authoritative usage-source tek kaynaktan kanıtlanır",
+      "evidence": "Açılış 2026-08-05: PROVIDER-HOLD-001 DONE kapanışından residual-çıkarma (Alperen onaylı 24-satır turu; W'deki ~ buraya devredildi)",
+      "updated": "2026-08-05"
     },
     {
       "order": 4110,
@@ -18180,7 +18232,8 @@
         "WORKER-DISCOVERY-001"
       ],
       "children": [
-        "PROMPT-V3-001"
+        "PROMPT-V3-001",
+        "PROMPT-V3-GOLDEN-EVAL-001"
       ],
       "gates": [
         "G2",
@@ -18201,7 +18254,7 @@
       "closureBlockedBy": [
         "KERNEL-ONTOLOGY-001",
         "ALP-RUNTIME-001",
-        "PROMPT-V3-001"
+        "PROMPT-V3-GOLDEN-EVAL-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Canonical acceptance, authority, context budget and role sections; no append-only contradiction; representative 10-task golden set",
@@ -18209,39 +18262,37 @@
       "updated": "2026-07-26"
     },
     {
-      "order": 9021,
-      "id": "PROMPT-V3-001",
+      "order": 9022,
+      "id": "PROMPT-V3-GOLDEN-EVAL-001",
       "parent": "PROMPT-001",
       "program": "PROMPT",
-      "outcome": "Effective-config-derived Routing V3 persona and task prompt slices",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "ROUTING-V3-CUTOVER-001"
+      "outcome": "Prompt V3 golden-eval: temsilî on-task değerlendirmesi, gerçek heterojen worker'lar, cost/quality eşikleri",
+      "priority": "P2",
+      "dependsOn": [
+        "PROMPT-V3-001"
       ],
+      "dependents": [],
       "children": [],
       "gates": [
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "OPEN",
       "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
         "L": "0",
-        "X": "0",
+        "X": "?",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
-      ],
-      "acceptance": "Worker prompt receives effective provider/model/role configuration and bounded persona sections without hardcoded provider identity or contradictory legacy routing instructions",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=prompt-v3-persona-targeted`; prompt persona, task-builder and config migration tests pass; representative ten-task golden evaluation, real heterogeneous workers and cost/quality thresholds remain open",
-      "updated": "2026-07-30"
+      "evidenceReceipts": [],
+      "acceptance": "On-task golden set gerçek heterojen worker'larla koşulur; cost/quality eşikleri ölçülüp kayda bağlanır",
+      "evidence": "Açılış 2026-08-05: PROMPT-V3-001 DONE kapanışından residual-çıkarma (Alperen onaylı 24-satır turu)",
+      "updated": "2026-08-05"
     },
     {
       "order": 9030,
@@ -18261,7 +18312,8 @@
         "RECOVERY-BORN-482-FIX-AUTHORITY-001"
       ],
       "children": [
-        "ROUTING-V3-CUTOVER-001"
+        "ROUTING-V3-CUTOVER-001",
+        "ROUTING-V3-LIVE-QUALITY-001"
       ],
       "gates": [
         "G2",
@@ -18283,7 +18335,7 @@
         "PROMPT-001",
         "AGENT-SKILL-001",
         "REACHABILITY-001",
-        "ROUTING-V3-CUTOVER-001"
+        "ROUTING-V3-LIVE-QUALITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Intent, role, skills, model, cost, capability and anti-collapse decisions measured; all fallback chains avoid role/tool mismatch; rollbackable",
@@ -18291,44 +18343,37 @@
       "updated": "2026-07-26"
     },
     {
-      "order": 9031,
-      "id": "ROUTING-V3-CUTOVER-001",
+      "order": 9032,
+      "id": "ROUTING-V3-LIVE-QUALITY-001",
       "parent": "ROUTING-001",
       "program": "ROUTING",
-      "outcome": "Routing V3 is the sole effective routing schema with explicit legacy migration",
-      "priority": "P0",
+      "outcome": "Routing V3 canlı kalite kanıtları: heterojen routing kalitesi, anti-collapse dağılım, rollback provası, cross-platform",
+      "priority": "P2",
       "dependsOn": [
-        "PROMPT-V3-001"
+        "ROUTING-V3-CUTOVER-001"
       ],
-      "dependents": [
-        "RECOVERY-BORN-485-PROMPT-POLICY-001",
-        "RECOVERY-BORN-488-REPAIR-CAPABILITY-001"
-      ],
+      "dependents": [],
       "children": [],
       "gates": [
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "OPEN",
       "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
         "L": "0",
-        "X": "0",
+        "X": "?",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "PROMPT-V3-001"
-      ],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
-      ],
-      "acceptance": "Config V1/V2 migrates deterministically to V3; runtime routing and finalizer learning consume V3 while legacy V2 DNA cannot contaminate V3 decisions",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=routing-v3-cutover-targeted`; config, migration, routing-plan, finalizer and prompt integration tests pass; live heterogeneous routing quality, anti-collapse distribution, rollback rehearsal and cross-platform evidence remain open",
-      "updated": "2026-07-30"
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Canlı heterojen run'larda routing dağılımı anti-collapse eşiklerini tutar; rollback provası ve cross-platform kanıt kayda bağlanır",
+      "evidence": "Açılış 2026-08-05: ROUTING-V3-CUTOVER-001 DONE kapanışından residual-çıkarma (Alperen onaylı 24-satır turu)",
+      "updated": "2026-08-05"
     },
     {
       "order": 9040,
@@ -18880,6 +18925,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e7db4f4f47fe7ccf92857c2bf0cc4e80c2f71069e3fa20ab4549c920bbb5794a"
+    "value": "5559d6c04a8677d9400f7d3b2bb9a6e0a8fd3e5f38fda9611815b87aa75e0606"
   }
 }

@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):3971732d6dbc37b882a592159179bbc8a09b65c1ff198f9e04e85df53f90acd6`
+**Source digest:** `sha256(normalized-lf-utf8):5791d91f7e8f67b145e415ac1865d55c9476d8229b5aae22523f1a405f4472b5`
 
-**Rows:** 354 total · 341 active · 13 terminal
+**Rows:** 362 total · 341 active · 21 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 243 |
+| OPEN | 251 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 31 |
-| DONE | 13 |
+| VERIFY | 23 |
+| DONE | 21 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -26,7 +26,7 @@
 
 | Order | ID | State | Priority | Program | DependsOn | Blocker | Outcome |
 |---:|---|---|---|---|---|---|---|
-| 20 | `SSOT-002` | VERIFY | P0 | TRUTH | `SSOT-001`, `SOURCE-MANIFEST-001`, `LEGACY-RESIDUAL-AUDIT-001` | — | Tüm kaynakları canonical, atomik ve dependency'li ledger'a uzlaştır |
+| 25 | `LEDGER-ISOLATED-COMMIT-PROOF-001` | OPEN | P2 | TRUTH | — | — | Canonical ledger uzlaştırmasının izole/fresh-clone commit kanıtı — SSOT-002 + SOURCE-MANIFEST-001 kapanışlarından taşınan canlı-kanıt boyutu |
 | 30 | `SSOT-003` | VERIFY | P0 | TRUTH | `SSOT-001` | — | MASTER schema validator ve generated active views |
 | 32 | `XPLAT-SKIP-GUARD-001` | OPEN | P1 | TRUTH | — | — | Cross-platform matriste kapsam-beklenen platformda symlink vakası atlanırsa bacak fail etsin: skip-görünürlüğü gate-invariant olsun |
 | 40 | `TRUTH-BASELINE-001` | BLOCKED | P0 | TRUTH | `TEST-675`, `TEST-676`, `TEST-HERMETIC-001` | `BASELINE_CONFLICT` | Current HEAD için tek reference test, build, binary ve environment baseline |
@@ -63,10 +63,8 @@
 | 330 | `OPS-RETIRE-001` | BLOCKED | P2 | TRUTH | `OPS-BRANCH-001` | `FRESH_REMOTE_APPROVAL_REQUIRED` | Approved branch and remote retirement |
 | 340 | `XVERIFY-UX-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Xverify optional evidence, bounded path/range/symbol targeting and actionable preflight |
 | 350 | `XVERIFY-TRUTH-001` | BLOCKED | P0 | TRUTH | `EVALUATION-001`, `RECEIPT-001` | `DEPENDENCY_UNSATISFIED` | Dispatch rejection, verifier abstention and semantic `UNCLEAR` remain distinct |
-| 360 | `LEGACY-RESIDUAL-AUDIT-001` | VERIFY | P0 | TRUTH | `SSOT-001` | — | Audit all 199 historical closed claims for hidden residual work |
 | 370 | `DOC-IMPACT-001` | BLOCKED | P1 | TRUTH | `KERNEL-SETTLEMENT-001`, `DOCS-RELEASE-TRUTH-001` | `DEPENDENCY_UNSATISFIED` | Finalization surfaces Worker `docImpact` as governed follow-up |
 | 380 | `DEBT-GOVERNANCE-001` | BLOCKED | P0 | TRUTH | `SSOT-003`, `KERNEL-SETTLEMENT-001` | `DEPENDENCY_UNSATISFIED` | Technical/product/operational debt ingestion, ownership and closure authority |
-| 390 | `SOURCE-MANIFEST-001` | VERIFY | P0 | TRUTH | `SSOT-001` | — | File-level digest and disposition manifest for all reconciliation sources |
 | 400 | `HOST-STATE-001` | BLOCKED | P2 | OPS | `MEMORY-AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Provider HOME cache/session/history retention manifest |
 | 410 | `HOST-STATE-APPLY-001` | BLOCKED | P2 | OPS | `HOST-STATE-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Apply approved recoverable HOME-state prune |
 | 420 | `GIT-MAINT-REPORT-001` | BLOCKED | P2 | OPS | `OPS-BRANCH-001` | `DEPENDENCY_UNSATISFIED` | Read-only git object and pack health report |
@@ -80,7 +78,6 @@
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
-| 525 | `TRUST-ANCHOR-002` | VERIFY | P0 | TRUTH | — | — | Xverify-E tur-2'nin dört mekanik kabul yolu fail-closed kapatılır: merge-introduction, rename-drift, shallow-clone, blob-okuma-hatası |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
@@ -225,7 +222,7 @@
 | 3240 | `SPRINT-HONESTY-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `WORKER-REGISTRY-001` | — | Sprint completion metrics, linger and partial-result truth |
 | 3241 | `PRODUCTION-WIRING-AUTHORITY-001` | VERIFY | P0 | KERNEL | `PLANNER-001`, `EVALUATION-001`, `TEST-DISCOVERY-001` | — | Production changes cannot settle without canonical consumer and enablement reachability |
 | 3250 | `WORKER-DISCOVERY-001` | OPEN | P1 | KERNEL | `PLANNER-001`, `PROMPT-001` | — | Bounded discovery and scope-aware Worker prompt contract |
-| 3251 | `TEST-DISCOVERY-001` | VERIFY | P0 | KERNEL | — | — | Pre-dispatch test discovery contract for declared test paths |
+| 3252 | `WORKER-DISCOVERY-ADAPTERS-001` | OPEN | P2 | KERNEL | `TEST-DISCOVERY-001` | — | Vitest-dışı test-discovery adapter'ları (Jest, Pytest, diğer diller) + canlı heterojen-proje kanıtı |
 | 3260 | `RESULT-INGEST-001` | BLOCKED | P0 | KERNEL | `KERNEL-SETTLEMENT-001` | `DEPENDENCY_UNSATISFIED` | Result identity normalization, quarantine and missing-trace root-cause closure |
 | 3261 | `RESULT-RECONCILIATION-001` | VERIFY | P0 | KERNEL | — | — | Terminal-only atomic result ingestion and malformed-result reconciliation |
 | 3270 | `RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001` | VERIFY | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `SCHEDULER-001`, `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | — | EXECUTE always yields to runnable work or FIX without a result-count deadlock |
@@ -260,6 +257,8 @@
 | 3303 | `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | — | Multi-provider smoke proves config-resolved routing, auth isolation and provider observation retirement |
 | 3304 | `RECOVERY-BORN-490-FULL-SUITE-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001`, `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001`, `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | — | One explicit full-suite run certifies the completed recovery train after all narrower gates |
 | 3305 | `LIFECYCLE-VOCAB-001` | OPEN | P1 | KERNEL | — | — | Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir |
+| 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |
+| 3307 | `RECOVERY-LIVE-CONTINUATION-PROOF-001` | OPEN | P2 | KERNEL | — | — | Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı |
 | 3310 | `SKILL-DURABILITY-001` | OPEN | P0 | KERNEL | — | — | PLAN'da üretilen skill FIX turlarında kaybolmaz: generated-skill durability |
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
@@ -272,13 +271,14 @@
 | 4030 | `OPERATION-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Versioned canonical operation catalog |
 | 4040 | `CAPABILITY-001` | OPEN | P0 | AUTHORITY | `OPERATION-001`, `PRINCIPAL-001` | — | Capability authority and progressive disclosure contract |
 | 4050 | `APPROVAL-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `OPERATION-001`, `CAPABILITY-001` | — | Runtime-wide durable ApprovalBroker |
-| 4051 | `APPROVAL-READ-PURITY-001` | VERIFY | P1 | AUTHORITY | — | — | Approval status reads are filesystem-pure and virtual-filesystem safe |
+| 4052 | `APPROVAL-READ-CROSSPLATFORM-PROOF-001` | OPEN | P2 | AUTHORITY | `APPROVAL-READ-PURITY-001` | — | Approval read-purity'nin cross-platform real-binary kanıtı |
 | 4060 | `TOOL-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
 | 4090 | `LIMIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001` | — | Unified provider/account/tenant/project budget and limit ledger |
 | 4100 | `PROVIDER-INGRESS-001` | BLOCKED | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001`, `LIMIT-001` | `PROVIDER_INGRESS_HOLD` | Provider authority composition for all production ingress |
 | 4101 | `PROVIDER-HOLD-001` | VERIFY | P0 | AUTHORITY | `LIMIT-001` | — | Provider-scoped execution holds are independent from task and USD budget exhaustion |
+| 4102 | `PROVIDER-HOLD-LIVE-PROOF-001` | OPEN | P2 | AUTHORITY | `PROVIDER-HOLD-001` | — | Provider-hold'un canlı kanıtları: login-recovery, mixed-provider continuation, expiry ve authoritative usage-source |
 | 4110 | `ATTENDED-STOP-001` | OPEN | P0 | AUTHORITY | `APPROVAL-001`, `LIMIT-001` | — | Exact attended hard-stop approval authority |
 | 4120 | `AUDIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `OPERATION-001` | — | Tamper-evident, tenant-scoped causal audit |
 | 4130 | `API-SECURITY-001` | BLOCKED | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `APPROVAL-001` | `DEPENDENCY_UNSATISFIED` | API authentication, authorization and config-secret containment |
@@ -351,9 +351,9 @@
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |
-| 9021 | `PROMPT-V3-001` | VERIFY | P0 | PROMPT | — | — | Effective-config-derived Routing V3 persona and task prompt slices |
+| 9022 | `PROMPT-V3-GOLDEN-EVAL-001` | OPEN | P2 | PROMPT | `PROMPT-V3-001` | — | Prompt V3 golden-eval: temsilî on-task değerlendirmesi, gerçek heterojen worker'lar, cost/quality eşikleri |
 | 9030 | `ROUTING-001` | OPEN | P0 | ROUTING | `PROMPT-001`, `AGENT-SKILL-001`, `REACHABILITY-001` | — | Routing V3 quality, diversity and evidence-driven adaptation |
-| 9031 | `ROUTING-V3-CUTOVER-001` | VERIFY | P0 | ROUTING | `PROMPT-V3-001` | — | Routing V3 is the sole effective routing schema with explicit legacy migration |
+| 9032 | `ROUTING-V3-LIVE-QUALITY-001` | OPEN | P2 | ROUTING | `ROUTING-V3-CUTOVER-001` | — | Routing V3 canlı kalite kanıtları: heterojen routing kalitesi, anti-collapse dağılım, rollback provası, cross-platform |
 | 9040 | `EVALUATION-001` | OPEN | P0 | EVAL | `KERNEL-SETTLEMENT-001`, `CM-04` | — | Canonical evaluator, adversarial verification and proof boundary |
 | 9050 | `PROMOTION-001` | OPEN | P0 | EVOLUTION | `TRAINING-TRACE-001`, `ROUTING-001`, `EVALUATION-001` | — | Outcome→routing→agent/skill/model promotion and rollback |
 | 9060 | `LEARNING-DOGFOOD-001` | OPEN | P1 | LEARNING | `PROMPT-001`, `ROUTING-001`, `KERNEL-001` | — | Historical dogfood findings atomized and regression-proofed |
