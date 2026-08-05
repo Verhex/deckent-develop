@@ -3398,6 +3398,13 @@ export function observeDockerHeartbeatAuthority(input: {
   readonly hostProcessOutcome: WorkerHeartbeatAuthorityWrite['hostProcessOutcome'];
   readonly workerTaskVerdict: WorkerHeartbeatAuthorityWrite['workerTaskVerdict'];
   readonly liveness: WorkerHeartbeatAuthorityWrite['liveness'];
+  /**
+   * PROD-LANDED-FENCE-ORDER-001: a caller that has already closed (or is about
+   * to close) the active claim chain must capture the fence while the claim is
+   * still active and pass it here — the default lookup fails closed once a
+   * LANDED retirement or closure is durable.
+   */
+  readonly activeClaimFence?: string;
 }): void {
   const { settlementRef } = input;
   const identity = {
@@ -3405,7 +3412,7 @@ export function observeDockerHeartbeatAuthority(input: {
     taskId: settlementRef.taskId,
     attemptId: settlementRef.attemptId,
     workerId: `docker-${settlementRef.taskId}`,
-    fence: taskResultSettlementActiveClaimDigest(settlementRef),
+    fence: input.activeClaimFence ?? taskResultSettlementActiveClaimDigest(settlementRef),
   };
   const store = new WorkerHeartbeatAuthorityStore(join(input.tasksDir, 'worker-heartbeat-authority'));
   const initialized = store.initialize(identity);
@@ -6511,6 +6518,14 @@ export class DockerSpawnBackend implements SpawnBackend {
         ],
       },
     );
+    // PROD-LANDED-FENCE-ORDER-001: the LANDED retirement below closes the
+    // active claim chain, after which taskResultSettlementActiveClaimDigest
+    // fails closed (DECKENT_E077 "no matching active claim fence"). Capture the
+    // heartbeat identity fence while the claim is still active and carry it
+    // into the observe — otherwise the landed heartbeat record and the
+    // continuation dispatch below are lost on the monitor path and the whole
+    // restart reconciliation rejects on the recovery path.
+    const activeClaimFence = taskResultSettlementActiveClaimDigest(input.settlementRef);
     writeTaskResultSettlementLandedRetirementAtomic(input.settlementRef);
     observeDockerHeartbeatAuthority({
       tasksDir: input.tasksDir,
@@ -6518,6 +6533,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       hostProcessOutcome: { state: 'exited', exitCode: input.exitCode },
       workerTaskVerdict: 'hold',
       liveness: 'not-alive',
+      activeClaimFence,
     });
     this.containers.delete(input.taskId);
     try {
