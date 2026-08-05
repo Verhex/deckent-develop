@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d2b68d768c3b2441abaf62736ac46a5f045bd3d0c7b566de08673c35140c5eaa"
+    "value": "26bc0b6dbd111c92cb91bfed28dfd7c82c573e81c54e3b6b488491aab5b54f74"
   },
   "summary": {
     "total": 377,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 259,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 27,
+      "VERIFY": 28,
       "DONE": 23,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -773,10 +773,10 @@
       "id": "CI-DOCS-SCRIPTS-STEP-TIMEOUT-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "ec3061a0345ca0fdcc8b5351d07695db3f6ef508c27bdde1bb45e6901bc6f285",
-      "progressDigest": "cae8ecd7277c2ca77a3f096ddbf4990d42508c84aa2225a415cc733a48315773",
+      "progressDigest": "16bc2c24b607f519d0e1b91f026eadee3ea90bfee6c2883135cfcd6bd660d3c8",
       "terminalClosureDigest": null
     },
     {
@@ -4778,8 +4778,8 @@
       "authorityDigest": "acf616fc07de2724dea0738bb6d7d7b16de478b63093c5a1131e09531a7d60aa",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T22:33:52Z"
       },
       "g7AttemptIdentity": null
     }
@@ -6866,12 +6866,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -6883,7 +6883,7 @@
         "GR-2026-08-05-CI-STEP-TIMEOUT-522-01"
       ],
       "acceptance": "Step-timeout ölçüm-temelli tavana çekilir (5→15dk, ×3 headroom 519 deseni); main-push Tests—Docs+Scripts yeşile döner; 517/518/519/521 + W3B2 main-yeşil kapanış kanıtları bu koşuyla üretilir",
-      "evidence": "Açılış 2026-08-05: run 31050457808 log-izolasyonu (521 merge sonrası ilk main koşusu); 519'un step-katmanı ikizi; `receipt=GR-2026-08-05-CI-STEP-TIMEOUT-522-01`; 2026-08-05 KARAR: Alperen 'hemen tek-PR' (karar-turu)",
+      "evidence": "Açılış 2026-08-05: run 31050457808 log-izolasyonu (521 merge sonrası ilk main koşusu); 519'un step-katmanı ikizi; `receipt=GR-2026-08-05-CI-STEP-TIMEOUT-522-01`; 2026-08-05 KARAR: Alperen 'hemen tek-PR' (karar-turu); 2026-08-05 SETTLEMENT: timeout-minutes 5→15 açıklayıcı yorumla; `proof=measured-307s-vs-5min-wall`; kapanış kanıtı merge sonrası main-push Tests—Docs+Scripts yeşili (517/518/519/521 + W3B2 kanıt koşusu aynı run)",
       "updated": "2026-08-05"
     },
     {
@@ -19639,6 +19639,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "33acd39de198c13eb9ed706284bd8e66835fec2b53f4bf13fb246aa78c04dece"
+    "value": "2b5309b7135d793ee8fb3b24cd5f9c3289fe8ef83ff2b33bf6cecee06df1cca0"
   }
 }
