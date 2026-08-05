@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "071ff33efa2a71b143eb07f13a4cf2b1bf3edc28e56dbcc617899c08d261f74d"
+    "value": "539a39782dff59a3ef2165af36062c2686738ca00e541fb0468010e0eafd30cb"
   },
   "summary": {
-    "total": 379,
-    "active": 356,
+    "total": 381,
+    "active": 358,
     "terminal": 23,
-    "receipts": 61,
+    "receipts": 63,
     "byState": {
       "OPEN": 258,
-      "READY": 0,
+      "READY": 2,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 31,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 249,
-      "P1": 98,
+      "P1": 100,
       "P2": 32
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 67,
+      "TRUTH": 69,
       "XPLAT": 3
     }
   },
@@ -843,6 +843,28 @@
       "updated": "2026-08-05",
       "definitionDigest": "6682ab7ac1af697cb93bfe0b8a9acbdb3af62e0b924c6e61a3f73f84623e7bfe",
       "progressDigest": "aa514e71750ec82fb4b77c6aa3a4f9bfc7a8682c54ae93f6e48bfbd89e9f0e71",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 529,
+      "id": "CI-SCRIPTS-TASKKILL-RACE-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "012ef92e2916038bc4490b1c5e79c37be529761f9c39f69c792d227cfbb8673a",
+      "progressDigest": "f4321cfdf618fa910f907dbebc808d06cb640a966c48be726a10b47474b1a198",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 530,
+      "id": "CI-COVERAGE-JOB-WALL-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "f281b3ca1b7c8df33b96faf4f42019b612fd3772e157d2d1db7cfe59445d37ec",
+      "progressDigest": "2789c203fee84a5e368f8898cb020affec679f0fe4dbe67088c57918f5e42d4e",
       "terminalClosureDigest": null
     },
     {
@@ -4844,6 +4866,26 @@
         "transitionAt": "2026-08-05T22:53:41Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-TASKKILL-RACE-529-01",
+      "authorityDigest": "07f540dd921d048b51558bad8f4bdb53af2acca964b301f536efcb3cbfca939b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-COVERAGE-WALL-530-01",
+      "authorityDigest": "68303c566739926f1036d6502566188b4d051e6add21692b7d03159dd2fdd3af",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -7108,6 +7150,72 @@
       ],
       "acceptance": "alp-discipline/ içeriği upstream v1.0.4 tag'iyle birebir (mekanik kopya, fark yalnız lokal-only .deckent+.gitignore); ESSENCE sürüm-başlığı v1.0.4",
       "evidence": "Açılış 2026-08-05: Alperen canlı talimatı 'repodan güncel haline çekelim, 1.0.4 versiyonu kullanalım'; `receipt=GR-2026-08-05-ALP-DISC-104-01`; 2026-08-05 SETTLEMENT: v1.0.4 (a810c42) birebir çekildi — 7 dosya + ACKNOWLEDGEMENTS.md upstream-kaldırımı aynalandı, lokal-only korundu; `proof=diff-r-upstream-birebir`; diff -r upstream tag'iyle sıfır fark",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 529,
+      "id": "CI-SCRIPTS-TASKKILL-RACE-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "scripts.test runScriptAsync taskkill it.each'inin 25ms bütçesi yavaş runner'da gerçek process-spawn süresinin altında — kill-eskalasyon aşama-yarışı flake'i (false-success senaryosu 'taskkill timeout'a düşüyor)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-TASKKILL-RACE-529-01"
+      ],
+      "acceptance": "Zaman-bütçeleri senaryo-bağımlı olur: taskkill-tamamlanma senaryoları geniş bütçe, hang-senaryosu deterministik küçük; üretim timeout-authority kontratı değişmez; main-push Tests—Docs+Scripts'in bu flake sınıfı kapanır",
+      "evidence": "Açılış 2026-08-05: run 31054702920 log-izolasyonu (523/527 fix'leri tuttuktan sonra kalan tek Docs+Scripts kırığı); `receipt=GR-2026-08-05-TASKKILL-RACE-529-01`",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 530,
+      "id": "CI-COVERAGE-JOB-WALL-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-COVERAGE-WALL-530-01"
+      ],
+      "acceptance": "Step-cap ölçüm-sonrası-kalibre tavana çekilir (20→45dk; ilk yeşil koşu gerçek süreyi ölçer, tavan gerekirse daraltılır); production-scale test açık 60s timeout alır; Coverage Report yeşile döner veya threshold-gate dürüst sinyal verir",
+      "evidence": "Açılış 2026-08-05: run 31054702920 + gün-içi 8 koşu tarihi; `receipt=GR-2026-08-05-COVERAGE-WALL-530-01`",
       "updated": "2026-08-05"
     },
     {
@@ -19770,6 +19878,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f6c86f743e5312779872fc0c0550d0fd1d86456c572f184858e514b4e2defd06"
+    "value": "2c204ec0cff80a3a2c66e56e482a834db3f7aaf87936a9d9b9058d74a8f5483c"
   }
 }
