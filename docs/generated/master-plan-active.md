@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):db8bc1d4d9ea1bf414bd76adc79bee20fd180e39bd456184436e1e6137b41048`
+**Source digest:** `sha256(normalized-lf-utf8):88849e92b3e8bc46a83cdb12e17a801ac96b23635ba9b8ec960a3d25002ee3f7`
 
 **Rows:** 371 total · 348 active · 23 terminal
 
@@ -15,9 +15,9 @@
 |---|---:|
 | OPEN | 256 |
 | READY | 0 |
-| IN_PROGRESS | 1 |
+| IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 24 |
+| VERIFY | 25 |
 | DONE | 23 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -78,7 +78,7 @@
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
 | 517 | `CI-DASHBOARD-TESTS-LIVE-SERVER-001` | VERIFY | P1 | TRUTH | — | — | Tests—Dashboard job'ı main'de kalıcı kırmızı: suite canlı :3000 sunucusu bekliyor (ECONNREFUSED), CI'da sunucu yok — kök-neden izole edilmedi |
-| 518 | `CI-ORCHESTRA-NODE26-001` | IN_PROGRESS | P1 | TRUTH | — | — | Tests—Orchestra (26.x) main'de kırmızı, 24.x aynı koşuda cancelled; 24.x lokal/PR koşuları 8758-yeşil — Node-26'ya özgü kırık izole edilmedi |
+| 518 | `CI-ORCHESTRA-NODE26-001` | VERIFY | P1 | TRUTH | — | — | Tests—Orchestra (26.x) main'de kırmızı, 24.x aynı koşuda cancelled; 24.x lokal/PR koşuları 8758-yeşil — Node-26'ya özgü kırık izole edilmedi |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
