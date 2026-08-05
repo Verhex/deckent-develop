@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):cd85948a89587c639513ee993cf443ef364cd80ee919736ec0fda7ecbf99cba0`
+**Source digest:** `sha256(normalized-lf-utf8):951cccfdfc6a282bf53ef73f47796dec40ff4a6f9f5ad3518a5646af5ab39ead`
 
 **Rows:** 354 total · 347 active · 7 terminal
 
@@ -14,8 +14,8 @@
 | State | Count |
 |---|---:|
 | OPEN | 243 |
-| READY | 2 |
-| IN_PROGRESS | 0 |
+| READY | 0 |
+| IN_PROGRESS | 2 |
 | BLOCKED | 67 |
 | VERIFY | 35 |
 | DONE | 7 |
@@ -79,8 +79,8 @@
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
-| 515 | `SEC-DEP-ADVISORY-001` | READY | P1 | TRUTH | — | — | Yeni upstream dependency advisory'leri (fast-uri GHSA-7p8r-x3mc-p8w7 · ip-address GHSA-mwp4-54f8-5fhr, ikisi de high) fail-closed Security Audit gate'ini repo-genelinde kırmızıya düşürdü — patch-bump veya SEC-05 signed-exception ile kapatılır |
-| 516 | `CI-PACKED-DASHBOARD-TOOLCHAIN-001` | READY | P1 | TRUTH | — | — | Packed Install job'ı build:all koşarken src/dashboard toolchain'i (typescript+vite) hiç kurulmuyor — build-dashboard.mjs tasarım gereği auto-install yapmaz (hardened digest doğrulaması), ubuntu Packed Install E_DASHBOARD_BUILD_TOOLCHAIN_MISSING ile düşüyor |
+| 515 | `SEC-DEP-ADVISORY-001` | IN_PROGRESS | P1 | TRUTH | — | — | Yeni upstream dependency advisory'leri (fast-uri GHSA-7p8r-x3mc-p8w7 · ip-address GHSA-mwp4-54f8-5fhr, ikisi de high) fail-closed Security Audit gate'ini repo-genelinde kırmızıya düşürdü — patch-bump veya SEC-05 signed-exception ile kapatılır |
+| 516 | `CI-PACKED-DASHBOARD-TOOLCHAIN-001` | IN_PROGRESS | P1 | TRUTH | — | — | Packed Install job'ı build:all koşarken src/dashboard toolchain'i (typescript+vite) hiç kurulmuyor — build-dashboard.mjs tasarım gereği auto-install yapmaz (hardened digest doğrulaması), ubuntu Packed Install E_DASHBOARD_BUILD_TOOLCHAIN_MISSING ile düşüyor |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 525 | `TRUST-ANCHOR-002` | VERIFY | P0 | TRUTH | — | — | Xverify-E tur-2'nin dört mekanik kabul yolu fail-closed kapatılır: merge-introduction, rename-drift, shallow-clone, blob-okuma-hatası |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
