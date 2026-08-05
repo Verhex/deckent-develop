@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d46a1b2ee95f818b42329f01b3049f9d4c83be53131709cd5f96325c1acf89bc"
+    "value": "efd5198a274767f6ab4ab9067f54dd2914c93a0519f13dc5e86727663ac1e115"
   },
   "summary": {
     "total": 371,
@@ -721,7 +721,7 @@
       "state": "OPEN",
       "updated": "2026-08-05",
       "definitionDigest": "727e63f48fe6707799bc845129098460b766e2e577dedb12a8d93b4cf56c4cda",
-      "progressDigest": "51e9cddcf392908f08dd3f557b9264b1f92ef5a6864ebbc11aa9e9fbaf728e25",
+      "progressDigest": "85d977f44a2a41657ef73c188c136448091a1593421cdabfdaeeb1227d340255",
       "terminalClosureDigest": null
     },
     {
@@ -6582,7 +6582,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "26.x kırığı test-adı düzeyinde izole edilir; Node-sürüm-matrisi politikası netleşir (26 desteklenecekse fix, değilse matristen tipli çıkarma); main-push Orchestra job'ları yeşil",
-      "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu; aynı kör-nokta sınıfı",
+      "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu; aynı kör-nokta sınıfı; 2026-08-05 İZOLASYON (run job 92292650755): kırık tests/orchestra/docker-backend-owned-settlement.test.ts'te 3 test — 'Required isolated claude credential file(s) unavailable: .credentials.json' (spawn-backend-docker.ts:5466 fail-closed kapısı); DİKKAT: test gerçek host-home'a güveniyor ve fixture credential kurmuyor — CI-24 aynı credential'sız runner'da GEÇİYOR, 26'da DÜŞÜYOR → Node-26'ya bağlı davranış sapması auth-isolation zincirinde (existsSync/homedir/broker-kopya adayları); bu üretim auth-kontratına dokunan kök-neden dilimi ister, yüzeysel test-fix'i değil; 24.x job'ının cancelled görünmesi 26.x fail'inin fail-fast iptali",
       "updated": "2026-08-05"
     },
     {
@@ -19306,6 +19306,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b75f02db29ab68d0e375c7d708c5e46619fa6ba0744afe03f0ee8a5ff14d52f5"
+    "value": "954d96713ef1fce9e48d3a789c813ca5872fb21e147e9489735fa7dc7d24087e"
   }
 }
