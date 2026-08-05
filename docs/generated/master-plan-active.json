@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "289ef30287c9ad3710439911f3a1a3bd98f13516f5399efb4b5f484cf6af744c"
+    "value": "3299343fec640bc73a170ee14d2b29519ae3ecf29b06a143155f71b5c72696ef"
   },
   "summary": {
     "total": 352,
@@ -12,8 +12,8 @@
     "receipts": 43,
     "byState": {
       "OPEN": 243,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 34,
       "DONE": 7,
@@ -2797,10 +2797,10 @@
       "id": "PROD-SSE-ONEVENT-WIRE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "c55b537f62fe50b9379986f697cfbe1dd9d0e501f8224ea922a5af2c79cac3b7",
-      "progressDigest": "a43e0c8bd1893720d08869d17e6ea3c49a74cd0ae9fba335bed09906aef1199d",
+      "progressDigest": "ff6d65d054aa162a6373a58f1d8d0f8e1fc1df6483a4db3829d549db022c3f8b",
       "terminalClosureDigest": null
     },
     {
@@ -14629,7 +14629,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -18958,6 +18958,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "915ef1f625d744b4fcf3d2677a3eae14b84941bd88375e220bf64d54347db774"
+    "value": "20efc3759a9b9f521d8a91efc917a87636e9efa9cd7d8df22d4759cf7ef8bab3"
   }
 }
