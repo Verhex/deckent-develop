@@ -7196,6 +7196,10 @@ function isPreservedEntry(physicalDist, entry) {
 }
 
 function identityStableDirectoryAdapterBase() {
+  // Strictness-only test seam (PLATFORM-CLEAN-IDENTITY-ADAPTER-001): forcing
+  // the no-adapter path can only REMOVE the delete capability, never grant
+  // one, so honoring it on any platform is safe by direction.
+  if (process.env.DECKENT_CLEAN_FORCE_NO_IDENTITY_ADAPTER === '1') return null;
   if (process.platform === 'linux') return '/proc/self/fd';
   // Node exposes no portable openat/unlinkat/rmdirat surface. `/dev/fd`
   // traversal and mutation semantics vary across Darwin/BSD hosts, so they
@@ -7482,6 +7486,16 @@ export function cleanDist(options = {}) {
     );
   }
 
+  // PLATFORM-CLEAN-IDENTITY-ADAPTER-001 (observe-portable slice): without an
+  // identity-stable delete adapter this platform may only OBSERVE. Destructive
+  // authority stays fail-closed behind the adapter — a present dist still
+  // HOLDs exactly as before — but a checkout with nothing to remove settles
+  // as an honest removed:0 ALLOW instead of holding on a capability the
+  // operation never needed.
+  if (identityStableDirectoryAdapterBase() === null) {
+    return cleanDistWithoutMutationAdapter(namedRoot);
+  }
+
   const pinnedRoot = pinIdentityStableDirectory(
     namedRoot,
     SOURCE_ROOT_IDENTITY,
@@ -7494,6 +7508,101 @@ export function cleanDist(options = {}) {
     operationError = error;
   }
   closePinnedDirectories([pinnedRoot], operationError);
+  return outcome;
+}
+
+/**
+ * Observe-only clean for platforms without an identity-stable delete adapter.
+ * Shares the maintenance-lock + admission authority with the pinned flow, but
+ * never acquires destructive capability: any dist presence is a typed
+ * fail-closed HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED), unchanged
+ * from the pre-slice contract. The Darwin/Windows delete adapters remain the
+ * open remainder of PLATFORM-CLEAN-IDENTITY-ADAPTER-001.
+ */
+function cleanDistWithoutMutationAdapter(namedRoot) {
+  let rootStats;
+  try {
+    rootStats = lstatSync(namedRoot, { bigint: true });
+  } catch (cause) {
+    const error = codedError('E_CLEAN_PROJECT_ROOT_IDENTITY_CHANGED', namedRoot);
+    error.cause = cause;
+    throw error;
+  }
+  if (rootStats.isSymbolicLink()
+    || !rootStats.isDirectory()
+    || !sameFileIdentity(rootStats, SOURCE_ROOT_IDENTITY)) {
+    throw codedError('E_CLEAN_PROJECT_ROOT_IDENTITY_CHANGED', namedRoot);
+  }
+  const distDir = join(namedRoot, 'dist');
+  if (!isWithin(distDir, namedRoot)) {
+    throw codedError('E_CLEAN_DIST_BOUNDARY', distDir);
+  }
+
+  let maintenance;
+  try {
+    maintenance = acquireCleanMaintenanceLock(namedRoot);
+  } catch (error) {
+    const report = maintenanceFailureReport(namedRoot, error);
+    throw codedError('E_CLEAN_ACTIVE_EXECUTION_HOLD', namedRoot, report);
+  }
+
+  let outcome;
+  let operationError;
+  try {
+    const admission = inspectActiveExecutionsInternal(namedRoot, {}, maintenance);
+    if (admission.decision !== 'ALLOW') {
+      throw codedError('E_CLEAN_ACTIVE_EXECUTION_HOLD', namedRoot, admission);
+    }
+    if (existsSync(distDir)) {
+      throw codedError(
+        'E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED',
+        distDir,
+      );
+    }
+    const finalAdmission = inspectActiveExecutionsInternal(
+      namedRoot,
+      {},
+      maintenance,
+    );
+    if (finalAdmission.decision !== 'ALLOW') {
+      throw codedError('E_CLEAN_ACTIVE_EXECUTION_HOLD', namedRoot, finalAdmission);
+    }
+    outcome = {
+      removed: 0,
+      preserved: [],
+      distDir: join(realpathSync.native(namedRoot), 'dist'),
+      admission: finalAdmission,
+    };
+  } catch (error) {
+    operationError = error;
+  }
+
+  // No irreversible boundary can exist on this path — release is the only
+  // maintenance-lock closure, mirroring the pinned flow's no-mutation exit.
+  let releaseError;
+  try {
+    const released = releaseCleanMaintenanceLock(namedRoot, maintenance);
+    if (!released) {
+      throw codedError(
+        'E_CLEAN_MAINTENANCE_AUTHORITY_OWNERSHIP_LOST',
+        namedRoot,
+      );
+    }
+  } catch (error) {
+    releaseError = error;
+  }
+  if (releaseError !== undefined) {
+    const report = maintenanceFailureReport(
+      namedRoot,
+      releaseError,
+      operationError && typeof operationError === 'object'
+        && 'report' in operationError
+        ? operationError.report
+        : undefined,
+    );
+    throw codedError('E_CLEAN_MAINTENANCE_RELEASE_UNCERTAIN', namedRoot, report);
+  }
+  if (operationError !== undefined) throw operationError;
   return outcome;
 }
 
