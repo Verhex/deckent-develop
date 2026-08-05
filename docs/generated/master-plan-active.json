@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "efd5198a274767f6ab4ab9067f54dd2914c93a0519f13dc5e86727663ac1e115"
+    "value": "51cfd8874ea9b5573c23d319fad3487bdc9e08e4fd85b9da7b7453355d0cb53a"
   },
   "summary": {
     "total": 371,
     "active": 348,
     "terminal": 23,
-    "receipts": 50,
+    "receipts": 51,
     "byState": {
-      "OPEN": 257,
-      "READY": 0,
+      "OPEN": 256,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 24,
@@ -718,10 +718,10 @@
       "id": "CI-ORCHESTRA-NODE26-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "READY",
       "updated": "2026-08-05",
       "definitionDigest": "727e63f48fe6707799bc845129098460b766e2e577dedb12a8d93b4cf56c4cda",
-      "progressDigest": "85d977f44a2a41657ef73c188c136448091a1593421cdabfdaeeb1227d340255",
+      "progressDigest": "ff319fb932f4632ffc39cd4522b954600939fbd35b734e13f5aaf7d84645fdd6",
       "terminalClosureDigest": null
     },
     {
@@ -4646,6 +4646,16 @@
         "transitionAt": "2026-08-05T11:27:52Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-CI-ORCH-518-01",
+      "authorityDigest": "1d706fd2a203337f81942965e8494412f90b332375c7b50ad6bb8b5c38fc6e1f",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6567,7 +6577,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -19306,6 +19316,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "954d96713ef1fce9e48d3a789c813ca5872fb21e147e9489735fa7dc7d24087e"
+    "value": "9d595967eeabaded614e2bba093d23a777e2e5879b6f3b9463635eea936c1460"
   }
 }
