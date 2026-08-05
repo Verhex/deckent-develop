@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):93e3a600b88b41710b6d04bd2fa7e0b32066049e5bd85d1c7cda373ca8a3ce65`
+**Source digest:** `sha256(normalized-lf-utf8):d30aaedf5da8e14b12ccc39524260b47dbe6e4bd45eff745985b1b00518ce642`
 
 **Rows:** 371 total · 348 active · 23 terminal
 
@@ -14,8 +14,8 @@
 | State | Count |
 |---|---:|
 | OPEN | 257 |
-| READY | 1 |
-| IN_PROGRESS | 0 |
+| READY | 0 |
+| IN_PROGRESS | 1 |
 | BLOCKED | 67 |
 | VERIFY | 23 |
 | DONE | 23 |
@@ -77,7 +77,7 @@
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
-| 517 | `CI-DASHBOARD-TESTS-LIVE-SERVER-001` | READY | P1 | TRUTH | — | — | Tests—Dashboard job'ı main'de kalıcı kırmızı: suite canlı :3000 sunucusu bekliyor (ECONNREFUSED), CI'da sunucu yok — kök-neden izole edilmedi |
+| 517 | `CI-DASHBOARD-TESTS-LIVE-SERVER-001` | IN_PROGRESS | P1 | TRUTH | — | — | Tests—Dashboard job'ı main'de kalıcı kırmızı: suite canlı :3000 sunucusu bekliyor (ECONNREFUSED), CI'da sunucu yok — kök-neden izole edilmedi |
 | 518 | `CI-ORCHESTRA-NODE26-001` | OPEN | P1 | TRUTH | — | — | Tests—Orchestra (26.x) main'de kırmızı, 24.x aynı koşuda cancelled; 24.x lokal/PR koşuları 8758-yeşil — Node-26'ya özgü kırık izole edilmedi |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |

@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "93e3a600b88b41710b6d04bd2fa7e0b32066049e5bd85d1c7cda373ca8a3ce65"
+    "value": "d30aaedf5da8e14b12ccc39524260b47dbe6e4bd45eff745985b1b00518ce642"
   },
   "summary": {
     "total": 371,
@@ -12,8 +12,8 @@
     "receipts": 50,
     "byState": {
       "OPEN": 257,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 23,
       "DONE": 23,
@@ -707,10 +707,10 @@
       "id": "CI-DASHBOARD-TESTS-LIVE-SERVER-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "2e217ff38e43caeed91371188d64b492f12eef0213cdbd9e3fef32a331944390",
-      "progressDigest": "943381a48caae640ed9152faaa9570408dceef83599dd997792a468281c85475",
+      "progressDigest": "ed00a132af1c56106acd23b69914c5067650ba0016668470e13750adf10bc082",
       "terminalClosureDigest": null
     },
     {
@@ -6534,7 +6534,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "0",
         "W": "0",
@@ -19304,6 +19304,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "4db70e589300ba3fea81b5769e3e2d18d4fd15f54ec498cb5e006c74c97e5a52"
+    "value": "3a42f5003282decd69f85e7c951cf41f1ea9714f0be4147a9ce701d2ff021685"
   }
 }
