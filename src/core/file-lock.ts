@@ -18,6 +18,8 @@ import {
   statSync, constants as fsConstants,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { LOCKS_DIR } from './constants.js';
 import { trace } from './observability.js';
@@ -1578,7 +1580,7 @@ export const linuxProcExecutionAuthorityAdapter: ExecutionAuthorityPlatformAdapt
  * Windows fills them with handle-relative NT primitives.
  */
 export interface ExecutionAuthorityOpsV2 {
-  classify(): 'linux' | 'wsl';
+  classify(): 'linux' | 'wsl' | 'darwin';
   /** Open a directory strictly relative to an already-pinned parent handle
    *  (or an absolute path when parentFd is null), O_NOFOLLOW at every step. */
   openDirAt(parentFd: number | null, name: string): number;
@@ -1623,6 +1625,138 @@ export const linuxProcExecutionAuthorityOpsV2: ExecutionAuthorityOpsV2 =
     identityOf: executionLockDirectoryIdentity,
     realPathOf: (fd: number): string => realpathSync(`/proc/self/fd/${fd}`),
   });
+
+/**
+ * W3-PR-B slice-2 (PLATFORM-EXEC-AUTH-W3-DARWIN-001, design §4.1/§10): the
+ * Darwin implementation of the op surface, filled entirely from the native
+ * addon (@deckent/exec-authority-native — openat family + F_GETPATH + f_fsid).
+ * Binding absence is the same typed fail-closed boundary as every missing
+ * capability (`secure-open-unsupported`, D3) — never a path-based fallback.
+ * Consumer wiring (pinExecutionLockDirectories, clean.mjs twin) and the
+ * real-Mac real-binary closure proof are slice-3 scope.
+ */
+interface ExecAuthorityNativeBinding {
+  openDirAt(parentFd: number | null, name: string): number;
+  closeFd(fd: number): void;
+  fstatIdentity(fd: number): { dev: string; ino: string; isDirectory: boolean };
+  readdirFd(fd: number): string[];
+  unlinkAt(fd: number, name: string, removeDir: boolean): void;
+  renameAt(fromFd: number, fromName: string, toFd: number, toName: string): void;
+  mountIdentity(fd: number): { available: boolean; fsid?: string };
+  fdPath(fd: number): string;
+}
+
+// Loaded lazily and memoized: module-eval stays side-effect-free (the same
+// contract that keeps fsConstants access lazy above), and repeated calls
+// never re-probe the filesystem. Resolution is module-relative so the same
+// candidates work from src/ (vitest) and dist/ (production build).
+let execAuthorityNativeState:
+  | { readonly available: true; readonly binding: ExecAuthorityNativeBinding }
+  | { readonly available: false; readonly reason: string }
+  | null = null;
+
+function loadExecAuthorityNativeBinding():
+  | { readonly available: true; readonly binding: ExecAuthorityNativeBinding }
+  | { readonly available: false; readonly reason: string } {
+  if (execAuthorityNativeState !== null) return execAuthorityNativeState;
+  const req = createRequire(import.meta.url);
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(moduleDir, '../../native/exec-authority/build/Release/exec_authority.node'),
+    join(moduleDir, '../../native/exec-authority/build/Debug/exec_authority.node'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      const binding = req(candidate) as ExecAuthorityNativeBinding;
+      execAuthorityNativeState = { available: true, binding };
+      return execAuthorityNativeState;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') continue;
+      execAuthorityNativeState = {
+        available: false,
+        reason: `binding-load-failed:${error instanceof Error ? error.message : String(error)}`,
+      };
+      return execAuthorityNativeState;
+    }
+  }
+  execAuthorityNativeState = { available: false, reason: 'binding-not-built' };
+  return execAuthorityNativeState;
+}
+
+function requireExecAuthorityNative(): ExecAuthorityNativeBinding {
+  const state = loadExecAuthorityNativeBinding();
+  if (!state.available) {
+    throw new ExecutionLockError(
+      `Execution authority native capability is unavailable (${state.reason})`,
+      'unknown',
+      'secure-open-unsupported',
+    );
+  }
+  return state.binding;
+}
+
+export const darwinNativeExecutionAuthorityOpsV2: ExecutionAuthorityOpsV2 =
+  Object.freeze({
+    classify: (): 'darwin' => {
+      if (process.platform !== 'darwin') {
+        throw new ExecutionLockError(
+          `Darwin execution authority is unsupported on ${process.platform}`,
+          'unknown',
+          'secure-open-unsupported',
+        );
+      }
+      requireExecAuthorityNative();
+      return 'darwin';
+    },
+    openDirAt: (parentFd: number | null, name: string): number =>
+      requireExecAuthorityNative().openDirAt(parentFd, name),
+    closeFd: (fd: number): void => requireExecAuthorityNative().closeFd(fd),
+    // The C primitive returns directory order; the op contract (twin parity)
+    // is sorted output.
+    readdirOf: (fd: number): string[] =>
+      [...requireExecAuthorityNative().readdirFd(fd)].sort(),
+    unlinkAt: (fd: number, name: string, removeDir: boolean): void =>
+      requireExecAuthorityNative().unlinkAt(fd, name, removeDir),
+    renameAt: (fromFd: number, fromName: string, toFd: number, toName: string): void =>
+      requireExecAuthorityNative().renameAt(fromFd, fromName, toFd, toName),
+    identityOf: (fd: number): ExecutionLockDirectoryIdentity => {
+      const native = requireExecAuthorityNative();
+      const identity = native.fstatIdentity(fd);
+      if (!identity.isDirectory) {
+        throw new ExecutionLockError(
+          'Execution authority directory identity is unsupported',
+          'unknown',
+          'secure-open-unsupported',
+        );
+      }
+      const mount = native.mountIdentity(fd);
+      if (!mount.available || !mount.fsid) {
+        throw new ExecutionLockError(
+          'Execution authority mount identity is unavailable',
+          'unknown',
+          'secure-open-unsupported',
+        );
+      }
+      return { dev: identity.dev, ino: identity.ino, mountId: mount.fsid };
+    },
+    realPathOf: (fd: number): string => requireExecAuthorityNative().fdPath(fd),
+  });
+
+/**
+ * Platform-resolved op surface. Linux/WSL keeps the /proc facility
+ * byte-for-byte; Darwin resolves to the native-addon implementation whose
+ * every op is fail-closed on binding absence. Anything else is a typed
+ * unsupported boundary — never a guess (Law 2).
+ */
+export function resolveExecutionAuthorityOpsV2(): ExecutionAuthorityOpsV2 {
+  if (process.platform === 'linux') return linuxProcExecutionAuthorityOpsV2;
+  if (process.platform === 'darwin') return darwinNativeExecutionAuthorityOpsV2;
+  throw new ExecutionLockError(
+    `Identity-stable execution authority is unsupported on ${process.platform}`,
+    'unknown',
+    'secure-open-unsupported',
+  );
+}
 
 function pinExecutionLockDirectories(
   projectRoot: string,

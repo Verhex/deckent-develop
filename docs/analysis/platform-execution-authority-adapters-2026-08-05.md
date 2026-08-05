@@ -144,3 +144,29 @@ akışlarının kademeli migrasyonudur:
 5. **Tahmin**: 2-3 PR (v2-arayüz+Linux-migrasyon → Darwin-impl+kanıt → temizlik);
    her biri kendi receipt'iyle. Windows (W4) aynı v2 arayüzünü handle-tabanlı
    NT-primitifleriyle doldurur — v2 tasarımı W4'ü de öndeler.
+
+### §10.1 Dilim-2 kaydı (2026-08-06, `GR-2026-08-05-EXEC-AUTH-W3B2-01`)
+
+Uygulanan kapsam — adım-1'in Darwin yarısı:
+
+- **Native**: tek yeni primitif `fdPath(fd)` — Darwin `fcntl(F_GETPATH)`, diğer
+  POSIX `/proc/self/fd` readlink (POSIX-portable: Linux CI aynı op yüzeyini
+  gerçek-koşuyla test eder). Dönen path handle'ın **CURRENT** path'idir (rename
+  sonrası bir sonraki çağrı yeni path'i verir — testle pinli).
+- **file-lock**: `darwinNativeExecutionAuthorityOpsV2` — ops-v2 yüzeyinin
+  addon-tabanlı Darwin impl'i. Binding lazy+memoized yüklenir (module-eval
+  side-effect-free kontratı korunur); yokluk typed `secure-open-unsupported`
+  (D3), asla path-fallback yok. `identityOf` mountId'yi `f_fsid` çiftinden
+  alır; Linux'ta f_fsid typed-absent olduğundan identityOf Linux'ta fail-closed
+  (negatif pin testli). `resolveExecutionAuthorityOpsV2()` platform-çözümlü tek
+  giriş: linux→/proc twin (bayt-eşdeğer), darwin→native, diğerleri typed throw.
+- **Kanıt**: ubuntu native CI job'ında binding-backed ops'un /proc twin'iyle
+  davranış paritesi; macos native job'ında gerçek-Darwin pinli-handle yaşam
+  döngüsü (classify/identity-fsid/realPathOf/readdir/rename/unlink).
+
+**Bilinçli dilim-3'e bırakılanlar**: `pinExecutionLockDirectories` + clean.mjs
+twin'inin resolver'a bağlanması (konsumer migrasyonu — Darwin'de mkdirAt/
+openFileAt/fsyncFd ek primitiflerini de ister), SQLite secure-open Darwin yolu
+(realPathOf + post-open fd-identity re-verify), addon'un ürün-kurulum yolunda
+derlenme stratejisi (macos E2E'nin gerçek-binary clean/lock yeşili buna bağlı)
+ve gerçek-Mac kapanış kanıtı.

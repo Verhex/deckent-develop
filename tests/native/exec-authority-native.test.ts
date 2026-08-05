@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, realpathSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -102,6 +102,24 @@ describe.runIf(loaded.available)('exec-authority native primitives', () => {
         expect(existsSync(join(root, 'from.txt'))).toBe(false);
       } finally {
         native.closeFd(rootFd);
+      }
+    });
+  });
+
+  it('resolves the kernel-verified CURRENT path of a handle (fdPath, W3-PR-B slice-2)', () => {
+    withTempTree(root => {
+      mkdirSync(join(root, 'inner'));
+      const fd = native.openDirAt(null, join(root, 'inner')) as number;
+      try {
+        // Darwin: F_GETPATH; other POSIX: /proc readlink — both must agree
+        // with the canonical filesystem view.
+        expect(native.fdPath(fd)).toBe(realpathSync(join(root, 'inner')));
+        // The path is CURRENT, not cached at open: a rename of the directory
+        // is reflected by the very next fdPath call on the same handle.
+        renameSync(join(root, 'inner'), join(root, 'renamed'));
+        expect(native.fdPath(fd)).toBe(realpathSync(join(root, 'renamed')));
+      } finally {
+        native.closeFd(fd);
       }
     });
   });

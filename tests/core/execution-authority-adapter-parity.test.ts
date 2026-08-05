@@ -3,15 +3,25 @@ import { closeSync, mkdtempSync, openSync, rmSync, constants as fsConstants } fr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { linuxProcExecutionAuthorityAdapter, linuxProcExecutionAuthorityOpsV2 } from '../../src/core/file-lock.js';
+import {
+  linuxProcExecutionAuthorityAdapter,
+  linuxProcExecutionAuthorityOpsV2,
+  darwinNativeExecutionAuthorityOpsV2,
+  resolveExecutionAuthorityOpsV2,
+} from '../../src/core/file-lock.js';
 // The build-time twin cannot be imported by production code (clean.mjs runs
 // before dist/ exists); this contract test is the ONLY sanctioned coupling
 // point between the two surfaces (PLATFORM-EXEC-AUTH-W1-INTERFACE-001).
 import { cleanExecutionAuthorityAdapter, cleanExecutionAuthorityOpsV2 } from '../../scripts/clean.mjs';
+// W3-PR-B slice-2: the native binding is built on demand (CI native job);
+// its absence keeps every binding-backed block skipped, never guessed.
+import { loadExecAuthorityNative } from '../../native/exec-authority/index.mjs';
 
 const ADAPTER_SURFACE = ['classify', 'stableFdPath', 'pinnedMountId', 'directoryIdentity'];
 
 const onLinux = process.platform === 'linux';
+const onDarwin = process.platform === 'darwin';
+const nativeAvailable = loadExecAuthorityNative().available;
 
 describe('PLATFORM-EXEC-AUTH-W1-INTERFACE-001 — twin adapter parity', () => {
   it('exposes the identical frozen four-capability surface on both twins', () => {
@@ -102,4 +112,104 @@ describe('W3-PR-B slice-1 — ops-v2 twin parity', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+});
+
+describe('W3-PR-B slice-2 — darwin native ops-v2', () => {
+  it('exposes the identical frozen op surface as both existing twins', () => {
+    expect(Object.keys(darwinNativeExecutionAuthorityOpsV2).sort())
+      .toEqual([...OPS_V2_SURFACE].sort());
+    expect(Object.isFrozen(darwinNativeExecutionAuthorityOpsV2)).toBe(true);
+  });
+
+  it.runIf(onLinux)('resolver returns the /proc twin on linux and darwin classify fails closed', () => {
+    expect(resolveExecutionAuthorityOpsV2()).toBe(linuxProcExecutionAuthorityOpsV2);
+    // The darwin implementation must never activate off-platform (D3).
+    expect(() => darwinNativeExecutionAuthorityOpsV2.classify())
+      .toThrowError(/unsupported/iu);
+  });
+
+  it.runIf(onDarwin)('resolver returns the native ops on darwin', () => {
+    expect(resolveExecutionAuthorityOpsV2()).toBe(darwinNativeExecutionAuthorityOpsV2);
+  });
+
+  it.runIf(onLinux && nativeAvailable)(
+    'binding-backed ops behave identically to the /proc twin on a real tree',
+    () => {
+      // The exact code path Darwin ships, exercised on Linux CI: every op the
+      // darwin surface fills from the binding must match the /proc facility.
+      const root = mkdtempSync(join(tmpdir(), 'ops-v2-native-parity-'));
+      try {
+        const procOps = linuxProcExecutionAuthorityOpsV2;
+        const nativeOps = darwinNativeExecutionAuthorityOpsV2;
+        const procFd = procOps.openDirAt(null, root);
+        const nativeFd = nativeOps.openDirAt(null, root);
+        try {
+          expect(nativeOps.realPathOf(nativeFd)).toBe(procOps.realPathOf(procFd));
+          const { mkdirSync: mk, writeFileSync: wf } = require('node:fs') as typeof import('node:fs');
+          mk(join(root, 'child'));
+          wf(join(root, 'child', 'x.txt'), 'x\n');
+          const childFd = nativeOps.openDirAt(nativeFd, 'child');
+          const procChildFd = procOps.openDirAt(procFd, 'child');
+          try {
+            expect(nativeOps.readdirOf(childFd)).toEqual(procOps.readdirOf(procChildFd));
+            nativeOps.renameAt(childFd, 'x.txt', childFd, 'y.txt');
+            expect(procOps.readdirOf(childFd)).toEqual(['y.txt']);
+            nativeOps.unlinkAt(childFd, 'y.txt', false);
+            expect(nativeOps.readdirOf(childFd)).toEqual([]);
+          } finally {
+            nativeOps.closeFd(childFd);
+            procOps.closeFd(procChildFd);
+          }
+          nativeOps.unlinkAt(nativeFd, 'child', true);
+          // identityOf needs a mount-identity source; on Linux the binding's
+          // f_fsid facility is typed-absent, so the darwin surface must fail
+          // CLOSED here rather than inventing a mountId (negative pin).
+          expect(() => nativeOps.identityOf(nativeFd)).toThrowError(/mount identity/iu);
+        } finally {
+          procOps.closeFd(procFd);
+          nativeOps.closeFd(nativeFd);
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.runIf(onDarwin && nativeAvailable)(
+    'performs the full pinned-handle lifecycle on real Darwin',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'ops-v2-darwin-'));
+      try {
+        const ops = darwinNativeExecutionAuthorityOpsV2;
+        expect(ops.classify()).toBe('darwin');
+        const rootFd = ops.openDirAt(null, root);
+        try {
+          const identity = ops.identityOf(rootFd);
+          expect(identity.dev).toMatch(/^\d+$/u);
+          expect(identity.ino).toMatch(/^\d+$/u);
+          expect(identity.mountId).toMatch(/^-?\d+:-?\d+$/u); // f_fsid pair
+          const { realpathSync: rp, mkdirSync: mk, writeFileSync: wf } =
+            require('node:fs') as typeof import('node:fs');
+          expect(ops.realPathOf(rootFd)).toBe(rp(root));
+          mk(join(root, 'child'));
+          wf(join(root, 'child', 'x.txt'), 'x\n');
+          const childFd = ops.openDirAt(rootFd, 'child');
+          try {
+            expect(ops.readdirOf(childFd)).toEqual(['x.txt']);
+            ops.renameAt(childFd, 'x.txt', childFd, 'y.txt');
+            expect(ops.readdirOf(childFd)).toEqual(['y.txt']);
+            ops.unlinkAt(childFd, 'y.txt', false);
+            expect(ops.readdirOf(childFd)).toEqual([]);
+          } finally {
+            ops.closeFd(childFd);
+          }
+          ops.unlinkAt(rootFd, 'child', true);
+        } finally {
+          ops.closeFd(rootFd);
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 });

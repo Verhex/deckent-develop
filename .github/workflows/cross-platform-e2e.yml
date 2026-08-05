@@ -345,3 +345,11 @@ jobs:
         run: npx vitest run tests/native/exec-authority-native.test.ts
         env:
           VITEST_MAX_FORKS: '2'
+
+      # W3-PR-B slice-2: with the binding built above, this exercises the
+      # binding-backed ops-v2 parity block on ubuntu and the real-Darwin
+      # pinned-handle lifecycle block on macos.
+      - name: Run execution-authority adapter parity suite
+        run: npx vitest run tests/core/execution-authority-adapter-parity.test.ts
+        env:
+          VITEST_MAX_FORKS: '2'

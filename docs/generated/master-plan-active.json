@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "80f01f6681bfee95e02a0f47eb04dd859856789233e632258254699732e0ea1a"
+    "value": "096040292e5f78ebc7e2a390ab0d5a77b8a8160c01c0efad7e31988b9d7b5d15"
   },
   "summary": {
     "total": 373,
     "active": 350,
     "terminal": 23,
-    "receipts": 54,
+    "receipts": 56,
     "byState": {
       "OPEN": 256,
       "READY": 0,
@@ -2954,7 +2954,7 @@
       "state": "OPEN",
       "updated": "2026-08-05",
       "definitionDigest": "f2b33b8cd8d8d5ea4ee7b1f93ca5774c3affb0cc84109ca7549b23f6bec412c5",
-      "progressDigest": "bd6e7bbd416d26ce15105934072945d00193752b8332f52f66e0c12ccbe0d8e7",
+      "progressDigest": "c0c6f6dd7bbdb44937734e0844f4b49c1d76262beaae6489f6d3a10c514f1e4b",
       "terminalClosureDigest": null
     },
     {
@@ -4706,6 +4706,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T21:45:51Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-EXEC-AUTH-W3B2-01",
+      "authorityDigest": "05c2e722518cba2ff5e6b723b7846960ec2492a437da76a3d7de082349406aab",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T22:09:14Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-W3B2-STATS-SUPP-01",
+      "authorityDigest": "c863267a3287bcba6c1b835f0015d90e9046e9ff67626efe240e5eabc41c0257",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T22:09:14Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14987,10 +15007,12 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-08-05-EXEC-AUTH-W3A-01",
-        "GR-2026-08-05-EXEC-AUTH-W3B1-01"
+        "GR-2026-08-05-EXEC-AUTH-W3B1-01",
+        "GR-2026-08-05-EXEC-AUTH-W3B2-01",
+        "GR-2026-08-05-W3B2-STATS-SUPP-01"
       ],
       "acceptance": "Addon yalnız probe-doğrulanmış primitifleri sunar; yokluğu fail-closed; darwin adapter'ı file-lock+clean ikizinde aynı kontratla; kapanış macos CI'da gerçek-binary clean (dist'li rebuild) + lock yaşam-döngüsü yeşiliyle",
-      "evidence": "Açılış 2026-08-05: W2 settlement kanıtı (run 30991850136) + D1-D3 onayı; tasarım §4.1/4.3/5-W3; `receipt=GR-2026-08-05-EXEC-AUTH-W3A-01`; 2026-08-05 PR-A ALT-DİLİM SETTLEMENT (ed86f6a86): in-repo N-API addon iskeleti (openat-ailesi + darwin-guarded kimlik) + fail-closed loader + Linux gerçek-koşu 6/6 (symlink-reddi dahil) + ubuntu+macos build+test CI job'ı + ADR-D-005 merit kaydı §9; `proof=native-primitive-suite-6of6-linux-real`; kalan: PR-B darwin adapter'ının file-lock+clean wiring'i + gerçek-Mac real-binary clean/lock kapanış kanıtı; satır alt-dilim kuralı gereği OPEN'a döner (IN_PROGRESS aktif-receipt ister); 2026-08-05 PR-A macOS KANITI (PR #58): addon gerçek Darwin'de derlendi + primitive suite 6/6; PR-B TASARIMI tasarım-doku §10'da — stableFdPath Linux-şekilli çıktı, op-tabanlı arayüz v2 + F_GETPATH secure-open deseni + 2-3 PR'lık kademeli migrasyon planı; W4 aynı v2'yi doldurur; `receipt=GR-2026-08-05-EXEC-AUTH-W3B1-01`; 2026-08-05 B1-DİLİM SETTLEMENT (ad1408985, tren-2026-08-05-a): ExecutionAuthorityOpsV2 + Linux impl + pin-open'ların op-migrasyonu (locks-fd pinli-root'a relative) + clean ops-v2 ikizi + parite 7/7; `proof=ops-v2-lock-clean-fence-199of199`; kalan: dilim-2 Darwin impl (addon+F_GETPATH) + dilim-3 gerçek-Mac clean/lock kanıtı; satır alt-dilim kuralıyla OPEN'a döner",
+      "evidence": "Açılış 2026-08-05: W2 settlement kanıtı (run 30991850136) + D1-D3 onayı; tasarım §4.1/4.3/5-W3; `receipt=GR-2026-08-05-EXEC-AUTH-W3A-01`; 2026-08-05 PR-A ALT-DİLİM SETTLEMENT (ed86f6a86): in-repo N-API addon iskeleti (openat-ailesi + darwin-guarded kimlik) + fail-closed loader + Linux gerçek-koşu 6/6 (symlink-reddi dahil) + ubuntu+macos build+test CI job'ı + ADR-D-005 merit kaydı §9; `proof=native-primitive-suite-6of6-linux-real`; kalan: PR-B darwin adapter'ının file-lock+clean wiring'i + gerçek-Mac real-binary clean/lock kapanış kanıtı; satır alt-dilim kuralı gereği OPEN'a döner (IN_PROGRESS aktif-receipt ister); 2026-08-05 PR-A macOS KANITI (PR #58): addon gerçek Darwin'de derlendi + primitive suite 6/6; PR-B TASARIMI tasarım-doku §10'da — stableFdPath Linux-şekilli çıktı, op-tabanlı arayüz v2 + F_GETPATH secure-open deseni + 2-3 PR'lık kademeli migrasyon planı; W4 aynı v2'yi doldurur; `receipt=GR-2026-08-05-EXEC-AUTH-W3B1-01`; 2026-08-05 B1-DİLİM SETTLEMENT (ad1408985, tren-2026-08-05-a): ExecutionAuthorityOpsV2 + Linux impl + pin-open'ların op-migrasyonu (locks-fd pinli-root'a relative) + clean ops-v2 ikizi + parite 7/7; `proof=ops-v2-lock-clean-fence-199of199`; kalan: dilim-2 Darwin impl (addon+F_GETPATH) + dilim-3 gerçek-Mac clean/lock kanıtı; satır alt-dilim kuralıyla OPEN'a döner; `receipt=GR-2026-08-05-EXEC-AUTH-W3B2-01`; dilim-2 admission 2026-08-05: Alperen direktifi 'darwin dilim-2 trenini başlat'; 2026-08-05 B2-DİLİM SETTLEMENT (c3bc7f1dd, tren-2026-08-06-b): darwinNativeExecutionAuthorityOpsV2 — ops-v2 yüzeyinin addon-tabanlı Darwin impl'i (fdPath/F_GETPATH primitifi POSIX-portable eklendi; binding lazy+memoized, yokluk typed secure-open-unsupported, identityOf f_fsid Linux'ta negatif-pinli fail-closed) + resolveExecutionAuthorityOpsV2 platform-çözümlü tek giriş (linux /proc bayt-eşdeğer); `proof=native-vs-proc-parity-linux-real-run`; Linux kanıt: native+parite 17 pass (binding-backed ops /proc twin'le birebir; rename-sonrası fdPath CURRENT-path pini), lock+clean+fence 7-dosya yeşil (176 pass), agent-pool 86/86 (module-eval pin), tsc temiz; macos kanıt tren PR'ının native job'unda (gerçek-Darwin yaşam-döngüsü bloğu); stats-regen ek-receipt kapsamında yapıldı (test-rozet 34180); `receipt=GR-2026-08-05-W3B2-STATS-SUPP-01`; dilim-3 kapsamı tasarım §10.1'de tiplendi (konsumer migrasyonu + ek primitifler + clean twin + addon ürün-kurulum stratejisi + gerçek-Mac real-binary kanıt); satır alt-dilim kuralıyla OPEN'a döner",
       "updated": "2026-08-05"
     },
     {
@@ -19437,6 +19459,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "152e8075200a8dae054776612a81649992e8227e45283d90738bd5363f82843c"
+    "value": "dc570ce2bc30ca179c24648ed738e8d7356995ba32d162e96be7750adcca0ed4"
   }
 }
