@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "901f1d4bfc78ce2fa232064474d5ba406adcbdb184c019f3f0c99e2e1655dee4"
+    "value": "8b858a0c5688bbc70f2b317962263a6f0a1bb265dcb2c311977b40ed54dab41e"
   },
   "summary": {
     "total": 352,
@@ -12,8 +12,8 @@
     "receipts": 42,
     "byState": {
       "OPEN": 244,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 33,
       "DONE": 7,
@@ -2786,10 +2786,10 @@
       "id": "PROD-LANDED-FENCE-ORDER-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "05c43f8200ec3e3112cef30baf61240d36dd04f8b861d25ac75dc06a67cf3598",
-      "progressDigest": "7312c80bf30c6b205e329f8ff5e6aa6a6161610288c492a0c4b7cbb3cc06215f",
+      "progressDigest": "3cd149e8a6860bae5460c6ff53f565d1938120a88d66af8f18f1fa6bfad9bb88",
       "terminalClosureDigest": null
     },
     {
@@ -14586,7 +14586,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -18946,6 +18946,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "4427e55b686e6e4d5997111e6817ed89da48f828707acbaee70abd64579cc2c7"
+    "value": "d2ee595debd4960cebf59b7128ebb3db09129de80c011081450548dbd3adadf0"
   }
 }
