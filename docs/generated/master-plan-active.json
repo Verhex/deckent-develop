@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "ade68855c975becb8b25576bee4afe8dc240ba1dcc987747db271e4ae19234c3"
+    "value": "870332f87c9ea81bf4379a868a01455ba8598cf4088fd5a20ef405ef65e7f53d"
   },
   "summary": {
     "total": 372,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 256,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 25,
+      "VERIFY": 26,
       "DONE": 23,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -729,10 +729,10 @@
       "id": "CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "992e6be01c385cb43bd9e23a59d24c14188de98bdce6d2f74a52ccfdc150759f",
-      "progressDigest": "c2edc55f06717ccf2c37095978fd1ef2c666e7bafe9c615a05bbdb2f360e286b",
+      "progressDigest": "274356d3117a297a889275d7458a18679f08f5eaacd402964e125275879ea347",
       "terminalClosureDigest": null
     },
     {
@@ -4673,8 +4673,8 @@
       "authorityDigest": "097bebbfc98c95c42c6fc9a2f68d37c0594299a6006396b8d1f3ec169268fc28",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T13:31:54Z"
       },
       "g7AttemptIdentity": null
     }
@@ -6631,12 +6631,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -6644,9 +6644,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-CI-RATCHET-519-01"
+      ],
       "acceptance": "Test-timeout gerçekçi tavana çekilir (ölçüm-temelli); main-push Tests—Docs+Scripts yeşile döner",
-      "evidence": "Açılış 2026-08-05: 517/518 kapanış-doğrulamasında izole edildi; tren-modeli ilk yolcusu",
+      "evidence": "Açılış 2026-08-05: 517/518 kapanış-doğrulamasında izole edildi; tren-modeli ilk yolcusu; `receipt=GR-2026-08-05-CI-RATCHET-519-01`; 2026-08-05 SETTLEMENT (64343a53e): timeout 60s→180s ölçüm-temelli (lokal build-free 48.9s ×~3 runner-çarpanı); `proof=build-free-48s9-measured-run`; kapanış kanıtı tren merge'ü sonrası main-push Tests—Docs+Scripts yeşili",
       "updated": "2026-08-05"
     },
     {
@@ -19370,6 +19372,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a44cc3a1eef8070660ee2e9d4ed8cbbe589680f3002fed1b225a0a077a7ce824"
+    "value": "6facc9d71f1b94e9e8821bb6866f46b2ae8f0d1b51c77248324ca0ca2359a3a7"
   }
 }
