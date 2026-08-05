@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2c608393b835e004a40f64311ff3e385cde30f0903ac4523736867dfb9426934"
+    "value": "be12e447ea1fc81f405d34c3ca3c4a7e26ed3c5d88f30446fcba861fb1c388dd"
   },
   "summary": {
     "total": 354,
@@ -12,8 +12,8 @@
     "receipts": 46,
     "byState": {
       "OPEN": 242,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 37,
       "DONE": 7,
@@ -2819,10 +2819,10 @@
       "id": "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "377b68bf72f3c05a5f3ee4e710ea0cbb9440fb38fa026b26174f158e2df66afc",
-      "progressDigest": "ea54b44981f0fafd5cce85820d5d52b98a137e9f7280e764f50e4a13bdf98118",
+      "progressDigest": "1f1805a7cf73ce81e40170dec25d3bd5e618787f8c2941a42300d9f4730e017d",
       "terminalClosureDigest": null
     },
     {
@@ -14751,7 +14751,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19080,6 +19080,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "2496f596775770d16dcbfc5c20ef63b6b2d3695470f7ed39d65e2a780bbd9ba3"
+    "value": "aabf901776c70218410f8a94b781555d5c4587853db9408148d6000f0ac06566"
   }
 }

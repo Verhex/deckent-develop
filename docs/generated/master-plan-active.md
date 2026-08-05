@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):2c608393b835e004a40f64311ff3e385cde30f0903ac4523736867dfb9426934`
+**Source digest:** `sha256(normalized-lf-utf8):be12e447ea1fc81f405d34c3ca3c4a7e26ed3c5d88f30446fcba861fb1c388dd`
 
 **Rows:** 354 total · 347 active · 7 terminal
 
@@ -14,8 +14,8 @@
 | State | Count |
 |---|---:|
 | OPEN | 242 |
-| READY | 1 |
-| IN_PROGRESS | 0 |
+| READY | 0 |
+| IN_PROGRESS | 1 |
 | BLOCKED | 67 |
 | VERIFY | 37 |
 | DONE | 7 |
@@ -270,7 +270,7 @@
 | 3335 | `PROD-BINARY-IDENTITY-EAGER-CRASH-001` | VERIFY | P1 | KERNEL | — | — | worktree-binary-authority kaynak-ağaç hash'i eager: src/ dizini olmayan kullanıcı projesinde her non-diagnostic deckent komutu typed HOLD yerine ham stack'le çöküyor |
 | 3340 | `PROD-LANDED-FENCE-ORDER-001` | VERIFY | P0 | KERNEL | — | — | Sprint-488 regresyonu (f59503a43): finalizeLandedAttempt heartbeat-observe'u retirement claim'i kapattıktan SONRA çağırıyor — LANDED heartbeat kaydı ve continuation dispatch monitor yolunda sessizce kayboluyor, restart-reconcile LANDED attempt'i reddediyor |
 | 3342 | `PROD-SSE-ONEVENT-WIRE-001` | VERIFY | P1 | KERNEL | — | — | Run-flow koordinatörünün SSE onEvent teli yalnız ilk getRunFlowCoordinator çağrısında bağlanıyor: ilk istek propose/plan yolundan gelirse (run-flow-plan-service koordinatörü onEvent'siz yaratır) o root'un CANLI SSE yayını sessizce ölü doğuyor |
-| 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | READY | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
+| 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | IN_PROGRESS | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
