@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6f141ead574423d485923d1b284794a433867bd99930c165d331327a7752a7d6"
+    "value": "7aeb1afe49b35ad6bafe6c76ca4c54a2a65d82bfea0a686fa0fec0c3d896d605"
   },
   "summary": {
     "total": 368,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 255,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 24,
+      "VERIFY": 25,
       "DONE": 21,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2896,10 +2896,10 @@
       "id": "PLATFORM-EXEC-AUTH-W2-PROBE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "7ae236158fa399af25429a8b2be9a0d5c9b0aa6a825f1c59ccb6b8f127ec5bc0",
-      "progressDigest": "5b07fcf6f6fbabd2b1ce5bb9d8685ea87f2492545d6877d48a818a7b6f7192cf",
+      "progressDigest": "82a0794790ef1d7df5949f964142bfa8dcabc0a806948601df03c52b7743ad0d",
       "terminalClosureDigest": null
     },
     {
@@ -4589,8 +4589,8 @@
       "authorityDigest": "49a4f9cdfd025be42bbb64489331a3f393ab6b36afdbc1697d2138da70dcae87",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T09:08:45Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14755,22 +14755,24 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "1",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-EXEC-AUTH-W2-01"
+      ],
       "acceptance": "Probe job'ı required-değildir ve ürün davranışını değiştirmez; her platform için ölçüm JSON artifact'ı üretir; W3/W4 tasarım kilidi bu kanıtla atılır",
-      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2",
+      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2; `receipt=GR-2026-08-05-EXEC-AUTH-W2-01`; 2026-08-05 SETTLEMENT (PR #57 run 30991850136, 3/3 probe pass): GERÇEK-RUNNER ÖLÇÜMLERİ — darwin-arm64 (`5566df23b8e1deb6…`): /dev/fd dizin-traversal ÇALIŞMIYOR (readdir ENOTDIR, child ENOENT, identity mismatch) → W3 Darwin için native openat-ailesi TEK yol, D1 ölçümle doğrulandı; POSIX-delete+dev/ino-kararlılık+O_NOFOLLOW/O_DIRECTORY+kern.uuid/boottime hepsi supported; win32-x64 (`0e988567fd93477f…`): POSIX-delete SUPPORTED (D2 tabanı doğrulandı), VolumeSerial+FileIndex rename/reopen kararlı ve non-zero, MachineGuid supported; O_NOFOLLOW/O_DIRECTORY Node-sabitleri 0 → W4 secure-open kontratı native handle-flag eşdeğerleriyle kurulacak; linux-x64 referans (`6f2ad5bf7de0f009…`): tam-destek beklendiği gibi; `proof=real-runner-capability-probe-3platforms-run30991850136`; artifact'lar 30 gün retention'lı, digest'ler tam-SHA256'nın ilk 16'sı — tam değerler run-artifact'larında",
       "updated": "2026-08-05"
     },
     {
@@ -19217,6 +19219,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "67eba345f5b48099cea644869b3305a994e0c5436db6ba34be08bbfa954e74a5"
+    "value": "34c438dd3e0130cc8298a7225e25cf3969c47db2504a85188526b7dfabc0c3d3"
   }
 }
