@@ -100,21 +100,20 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, FAZ4B-B5 test-repair dalgası): +5 —
-  // task-execution-fence.test.ts simulateExecutionAuthorityRemount artık parent-dir
-  // root-binding kopyasını da yazıyor (+1, production byte-eşitlik post-validate'ine
-  // sadakat); eşzamanlı FAZ4B onarımı dashboard-data-parity/endpoints (+4);
-  // resume-race/lifecycle callsite pozisyon-kaymaları digest'i taşıdı.
-  // Prior refresh: EXEC-AUTH-REG (count 12443).
+  // 2026-08-05 (build-free, PROD-LANDED-FENCE-ORDER-001): count unchanged, digest
+  // moved — the two SPRINT-488 regression-pin restorations shifted callsite
+  // positions in docker-settlement-monitor-wire/docker-restart-reconcile.
+  // Prior refresh: FAZ4B-B5 (count 12448, +5).
   count: 12448,
-  digest: '09e147463bcf3d3184f3bff6abc53d80e74dbedc1c03364609dff2006ad140a6',
+  digest: 'c7f52221dc7e3d20bc64e501c8f72ad3a4d900d5084f1ffbf867a0354fd53560',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-04 (EXEC-AUTH-REG): count unchanged, digest moved — command-registry.ts
-  // gained the execution-authority entry. Prior: PREFIX-PAD prefix derivation.
+  // 2026-08-05 (PROD-LANDED-FENCE-ORDER-001): count unchanged, digest moved —
+  // spawn-backend-docker.ts finalizeLandedAttempt now captures the observe fence
+  // before the LANDED retirement. Prior: EXEC-AUTH-REG command-registry entry.
   count: 1196,
-  digest: '20bf99c56de7a3f685a252cb33c356f9ab69aac749e472d238ee5702c2a7899c',
+  digest: 'bc4eadbedae86a4032e50fd07a10611a33aa6beb3521fc74510f2e908adaeddd',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

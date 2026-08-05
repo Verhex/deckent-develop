@@ -1155,22 +1155,13 @@ describe('Docker monitor settlement authority wiring', () => {
     expect(readTaskResultSettlement(ref)).toBeNull();
     expect(readTaskResultSettlementClosure(ref)).toBeNull();
     expect(existsSync(join(tasks, `task-${taskId}.result`))).toBe(false);
-    // ── SPRINT-488 REGRESSION PIN — typed blocker, DO NOT normalize ─────────
-    // born-468 retired the raw `.hb` shell writer; a LANDED retirement should
-    // be proven by the WorkerHeartbeatAuthorityStore exact-attempt record and
-    // the continuation MUST be dispatched (MASTER-PLAN 664: a held continuation
-    // may never stay silent and non-terminal). The sprint-488 blocked baseline
-    // (commit f59503a43) wired observeDockerHeartbeatAuthority into
-    // finalizeLandedAttempt AFTER writeTaskResultSettlementLandedRetirementAtomic;
-    // the retirement closes the claim chain, so the observe's
-    // taskResultSettlementActiveClaimDigest fails closed with DECKENT_E077
-    // ("no matching active claim fence"), the caller swallows it
-    // (docker-backend:landed-finalize), and BOTH the landed heartbeat record
-    // AND the continuation dispatch are lost. The assertions below pin that
-    // exact current behavior so this file stays honest-green; they MUST be
-    // restored to the intended contract (heartbeat latest = exited/hold/
-    // not-alive + continuationSpawn called once with the checkpoint-subtracted
-    // budget) the moment production computes the fence BEFORE retirement.
+    // PROD-LANDED-FENCE-ORDER-001: born-468 retired the raw `.hb` shell writer,
+    // so a LANDED retirement is proven by the WorkerHeartbeatAuthorityStore
+    // exact-attempt record, and the continuation MUST be dispatched
+    // (MASTER-PLAN 664: a held continuation may never stay silent and
+    // non-terminal). Production captures the observe fence BEFORE the
+    // retirement closes the active claim chain; the record is read back with
+    // the same pre-retirement fence captured at the top of this test.
     const landedHeartbeat = new WorkerHeartbeatAuthorityStore(
       join(tasks, 'worker-heartbeat-authority'),
     ).read({
@@ -1180,8 +1171,20 @@ describe('Docker monitor settlement authority wiring', () => {
       workerId: `docker-${taskId}`,
       fence: activeClaimFence,
     });
-    expect(landedHeartbeat).toBeNull();
-    expect(continuationSpawn).not.toHaveBeenCalled();
+    expect(landedHeartbeat?.latest).toMatchObject({
+      hostProcessOutcome: { state: 'exited', exitCode: 137 },
+      workerTaskVerdict: 'hold',
+      liveness: 'not-alive',
+    });
+    expect(continuationSpawn).toHaveBeenCalledTimes(1);
+    expect(continuationSpawn).toHaveBeenCalledWith(
+      taskId,
+      'claude-fable-5',
+      expect.any(String),
+      expect.objectContaining({
+        executionBudget: { maxCacheReadTokens: 250 },
+      }),
+    );
     expect(backend.executionLandingCapability).toBe('checkpoint-stop');
   });
 
