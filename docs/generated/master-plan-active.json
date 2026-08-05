@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f6ae27848b1f67b47fd1ba79786b0cce8d2d74140cde08621e13059211e5eb5a"
+    "value": "2c608393b835e004a40f64311ff3e385cde30f0903ac4523736867dfb9426934"
   },
   "summary": {
     "total": 354,
     "active": 347,
     "terminal": 7,
-    "receipts": 45,
+    "receipts": 46,
     "byState": {
-      "OPEN": 243,
-      "READY": 0,
+      "OPEN": 242,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 37,
@@ -2819,10 +2819,10 @@
       "id": "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "READY",
       "updated": "2026-08-05",
       "definitionDigest": "377b68bf72f3c05a5f3ee4e710ea0cbb9440fb38fa026b26174f158e2df66afc",
-      "progressDigest": "9c925ccdb33ffbaece8bfcf9ebd2213db85ddcbdf998bc27a821040339fc6676",
+      "progressDigest": "ea54b44981f0fafd5cce85820d5d52b98a137e9f7280e764f50e4a13bdf98118",
       "terminalClosureDigest": null
     },
     {
@@ -4407,6 +4407,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T05:43:46Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-CLEAN-OBSERVE-01",
+      "authorityDigest": "3a983932310521a87ee93f4d54cabfbe252ec0d216ef72147079238bf58f009f",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -14741,7 +14751,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19070,6 +19080,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e367f2b9332bc2c89af29bde2079c43a857872ffdf1cf2e220cfe3c7ba4cc96d"
+    "value": "2496f596775770d16dcbfc5c20ef63b6b2d3695470f7ed39d65e2a780bbd9ba3"
   }
 }
