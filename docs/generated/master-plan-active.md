@@ -5,19 +5,19 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):d8f74cccedc02d7afbf6b1c3d706c4e0c35621805e16d74aaafb5d429c2d9e52`
+**Source digest:** `sha256(normalized-lf-utf8):7aeb1afe49b35ad6bafe6c76ca4c54a2a65d82bfea0a686fa0fec0c3d896d605`
 
-**Rows:** 364 total · 343 active · 21 terminal
+**Rows:** 368 total · 347 active · 21 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 252 |
+| OPEN | 255 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 24 |
+| VERIFY | 25 |
 | DONE | 21 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -266,7 +266,7 @@
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3344 | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001` | VERIFY | P1 | KERNEL | — | — | ExecutionAuthorityPlatformAdapter arayüz-çıkarımı: file-lock.ts Linux impl'i davranış-değişimsiz adapter arkasına, clean.mjs ikiz-parite kontrat testi, cross-verify-evidence-broker /proc taraması |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
-| 3346 | `PLATFORM-EXEC-AUTH-W2-PROBE-001` | OPEN | P1 | KERNEL | — | — | macOS+Windows capability-probe CI job'ı: /dev/fd dizin-traversal semantiği, POSIX-delete uygunluğu, FileIndex/VolumeSerial kararlılığı gerçek runner'da ölçülür ve evidence-artifact olarak yayımlanır |
+| 3346 | `PLATFORM-EXEC-AUTH-W2-PROBE-001` | VERIFY | P1 | KERNEL | — | — | macOS+Windows capability-probe CI job'ı: /dev/fd dizin-traversal semantiği, POSIX-delete uygunluğu, FileIndex/VolumeSerial kararlılığı gerçek runner'da ölçülür ve evidence-artifact olarak yayımlanır |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
@@ -278,6 +278,7 @@
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
 | 4090 | `LIMIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001` | — | Unified provider/account/tenant/project budget and limit ledger |
+| 4091 | `LIMIT-SPEND-ENFORCE-001` | OPEN | P1 | AUTHORITY | — | — | Kümülatif günlük/aylık harcama tavanı gerçek enforcement'a bağlanır: `enforce_spend_gate` semantiği ya typed hard-block (`COST_GATE_EXCEEDED`) üretir ya key dürüst şekilde yeniden adlandırılır |
 | 4100 | `PROVIDER-INGRESS-001` | BLOCKED | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001`, `LIMIT-001` | `PROVIDER_INGRESS_HOLD` | Provider authority composition for all production ingress |
 | 4101 | `PROVIDER-HOLD-001` | VERIFY | P0 | AUTHORITY | `LIMIT-001` | — | Provider-scoped execution holds are independent from task and USD budget exhaustion |
 | 4102 | `PROVIDER-HOLD-LIVE-PROOF-001` | OPEN | P2 | AUTHORITY | `PROVIDER-HOLD-001` | — | Provider-hold'un canlı kanıtları: login-recovery, mixed-provider continuation, expiry ve authoritative usage-source |
@@ -289,6 +290,8 @@
 | 4160 | `MCP-LEASE-001` | VERIFY | P1 | AUTHORITY | `PRINCIPAL-001`, `OPERATION-001` | — | Multi-window MCP writer lease and authority-safe read/write split |
 | 4170 | `APPROVAL-QOL-001` | BLOCKED | P1 | AUTHORITY | `APPROVAL-001`, `MCP-LEASE-001` | `DEPENDENCY_UNSATISFIED` | Approval classifier, cross-process expiry and notification dedupe closure |
 | 4180 | `TRUST-HANDOFF-001` | OPEN | P1 | AUTHORITY | `TOOL-AUTHORITY-001`, `AUDIT-001` | — | Agent-çıktısından host-etkisine güven-aktarım zinciri: out-of-band telemetry, monitoring-loss=authority-suspension, egress gateway, Docker-socket default-deny, agent-üretimi dosya provenance'ı ve execution-capable config-mutation admission'ı |
+| 4190 | `SEC-OWASP-ASI-001` | OPEN | P1 | AUTHORITY | — | — | OWASP Agentic Top 10 (ASI01–ASI10, 2026) öz-değerlendirme baseline'ı: her ASI riski için mevcut mekanizma → enforcement sınıfı (ENFORCED/ADVISORY/CONFIG-GATED/UNWIRED) haritası, gap register ve ilgili ledger satırlarına kanıt-bağlaması |
+| 4200 | `SEC-ENFORCE-WIRE-001` | OPEN | P1 | AUTHORITY | — | — | Unwired/inert enforcement envanterinin tipli disposition'ı: yazılmış-ama-devrede-olmayan her güvenlik modülü wire-or-retire kararına bağlanır, sessiz-ölü enforcement kodu kalmaz |
 | 5000 | `TERMINAL-001` | BLOCKED | P0 | TERMINAL | `KERNEL-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Terminal as canonical management and usage surface |
 | 5010 | `TERMINAL-TOOLS-001` | OPEN | P0 | TERMINAL | `TOOL-AUTHORITY-001`, `SURFACE-CUTOVER-001` | — | Role-model tool surface and progressive disclosure |
 | 5020 | `TERMINAL-DEV-001` | OPEN | P0 | TERMINAL | `DO-CUTOVER-001`, `TERMINAL-TOOLS-001` | — | Full codebase development loop inside Deckent terminal |
@@ -326,6 +329,7 @@
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
 | 7020 | `SUPPLY-CHAIN-001` | OPEN | P0 | SECURITY | `AGENT-SKILL-001`, `P02-650` | — | Signed agent, skill and plugin provenance |
 | 7030 | `PLUGIN-SANDBOX-001` | OPEN | P0 | SECURITY | `SUPPLY-CHAIN-001`, `TOOL-AUTHORITY-001` | — | Plugin/skill runtime sandbox and capability enforcement |
+| 7031 | `PLUGIN-SANDBOX-WIRE-001` | OPEN | P0 | SECURITY | — | — | Sprint yolundaki plugin-hook güvenlik kablolaması: `validatePluginSecurity` 4-adım pipeline'ı (allowed-path containment + AST tarama + SHA-256 integrity + Ed25519 publisher imzası) production `loadPluginHooks` çağrısına bağlanır ve `PluginSecurityError` fail-closed olur |
 | 7040 | `MCP-TRUST-001` | OPEN | P0 | SECURITY | `PRINCIPAL-001`, `CAPABILITY-001`, `SUPPLY-CHAIN-001` | — | Outgoing MCP trust, identity and data-boundary authority |
 | 7050 | `HUB-001` | BLOCKED | P1 | ECOSYSTEM | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | `OWNER_DECISION_REQUIRED` | Production-ready Deckent Hub and signed distribution |
 | 7060 | `TOOL-COMPUTER-001` | OPEN | P2 | TOOL | `TOOL-AUTHORITY-001`, `PLUGIN-SANDBOX-001` | — | Optional computer-use/browser automation pack |

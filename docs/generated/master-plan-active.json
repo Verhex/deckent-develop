@@ -3,32 +3,32 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d8f74cccedc02d7afbf6b1c3d706c4e0c35621805e16d74aaafb5d429c2d9e52"
+    "value": "7aeb1afe49b35ad6bafe6c76ca4c54a2a65d82bfea0a686fa0fec0c3d896d605"
   },
   "summary": {
-    "total": 364,
-    "active": 343,
+    "total": 368,
+    "active": 347,
     "terminal": 21,
-    "receipts": 47,
+    "receipts": 48,
     "byState": {
-      "OPEN": 252,
+      "OPEN": 255,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 24,
+      "VERIFY": 25,
       "DONE": 21,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 248,
-      "P1": 89,
+      "P0": 249,
+      "P1": 92,
       "P2": 27
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 14,
-      "AUTHORITY": 27,
+      "AUTHORITY": 30,
       "CODEX": 44,
       "CONNECTOR": 2,
       "COST": 4,
@@ -55,7 +55,7 @@
       "RESILIENCE": 1,
       "ROUTING": 3,
       "SCALE": 1,
-      "SECURITY": 4,
+      "SECURITY": 5,
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
@@ -2896,10 +2896,10 @@
       "id": "PLATFORM-EXEC-AUTH-W2-PROBE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "7ae236158fa399af25429a8b2be9a0d5c9b0aa6a825f1c59ccb6b8f127ec5bc0",
-      "progressDigest": "9aea042ff3ed3be708d1eac5e18951bd4a62ecb4ebafacedbd53d283d578f25a",
+      "progressDigest": "82a0794790ef1d7df5949f964142bfa8dcabc0a806948601df03c52b7743ad0d",
       "terminalClosureDigest": null
     },
     {
@@ -2996,9 +2996,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-05",
       "definitionDigest": "668be8d7c8c8074b2e7c7e44ad88edf2762e34d88491fc732d8cac72a60f6c48",
-      "progressDigest": "e2e87f8e0f9cd38b9240365ae45b50159d9f37e9dc07c91635ad69b9beaf4d6b",
+      "progressDigest": "48acac533dbe4faf438b1381941aa51ce02abe1191f6288ef1cb2dfe4ded4d46",
       "terminalClosureDigest": null
     },
     {
@@ -3032,6 +3032,17 @@
       "updated": "2026-07-28",
       "definitionDigest": "6af689eda66f6b9b288a93b76a5bee756215b3bedfb17ad27fe918673ea03fcc",
       "progressDigest": "4d42436acf260ce36e463edb44fe691928b406cd735528f6c85e9ca4808d30d2",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4091,
+      "id": "LIMIT-SPEND-ENFORCE-001",
+      "program": "AUTHORITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "1d8f9fec4cc7e883b5d3fedcf416a3e616b5ec0accffcbc502c4325e61d51408",
+      "progressDigest": "cea9887ccbbf03d24287e5ba6cf7163846a925a2ba450685af246bf4d70144e9",
       "terminalClosureDigest": null
     },
     {
@@ -3084,9 +3095,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-05",
       "definitionDigest": "2cb6136b5bdec104b7c9947f80286e9aea2d9a4909f027986fe086aa2db70c3d",
-      "progressDigest": "60691b06666451587c553f71860ce48a93dafa6b50fafae9e1fec5a9d4da3d07",
+      "progressDigest": "1b1d27d13baf7e9e922fb522e9df0e34c7e41cb47d222c9c124dd51b19b19514",
       "terminalClosureDigest": null
     },
     {
@@ -3095,9 +3106,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-27",
+      "updated": "2026-08-05",
       "definitionDigest": "1c4e9939ebd9c9173d74783a52f31677c531ccd83dc6edec3b63be525ad8fb4d",
-      "progressDigest": "b31500ff5e0ba7def27758dda72025bf8c1906338d687c347cce3950bf8c5d21",
+      "progressDigest": "9ff1d9d1574093b9774da943284aa3648320fbc907e3f696bb8e4215ea0607f3",
       "terminalClosureDigest": null
     },
     {
@@ -3106,9 +3117,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-05",
       "definitionDigest": "9f9378627be03e17c90bdbad2050f6aa7cfb03adfc7947fa58685c396f05ab5f",
-      "progressDigest": "ed0549ccf4c77f83019238dfaf916893e015ecf37cff17ce53939fc913d45775",
+      "progressDigest": "942ccbf24ddd9d7a2c630d605acc6e7cab89d7d05465a65236174490f6f6cbe6",
       "terminalClosureDigest": null
     },
     {
@@ -3150,9 +3161,31 @@
       "program": "AUTHORITY",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-04",
+      "updated": "2026-08-05",
       "definitionDigest": "5f9c6237eef34cf0156c56c28d3db303240b365fc41c9ec7619b49d13c6adeb9",
-      "progressDigest": "80fdfbfc3ddc5f3ac026a98f48a6f5c4f197692cd66327fe62b081e21b876c41",
+      "progressDigest": "1ff1d2b4a787e78f575060bf9044fb3656a2db887561c7c2f43c716f43505d72",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4190,
+      "id": "SEC-OWASP-ASI-001",
+      "program": "AUTHORITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "653b022328da6daacd0392ded6904aaec57096c272ff760f61bc34e062d6c985",
+      "progressDigest": "bc702f42eeda00ba5bf2dbab336aa6837502b6a18cf7b5a253660532864a252c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4200,
+      "id": "SEC-ENFORCE-WIRE-001",
+      "program": "AUTHORITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "c47f411a09453605f21ed040145a31fe79f5cf9e17e511b36fea99b5e126ac2f",
+      "progressDigest": "16c72a1003907ed0aee9fc27b15599064caa6ba59660a48937a9f7f96fe2d924",
       "terminalClosureDigest": null
     },
     {
@@ -3557,9 +3590,20 @@
       "program": "SECURITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-05",
       "definitionDigest": "cad417b25f82606b94b0b9ac333adb3cc8b25e22b8f9f400f37e2803261bbda7",
-      "progressDigest": "14c39ebbcbde9c496e4fd1bba18d4726b3a21e6f6f62dcc2ef53ebc2ff8f71c4",
+      "progressDigest": "6c7ab110ba16d05b302dfb294a51f773306163f09db3aaeec1fb1592237c94a5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7031,
+      "id": "PLUGIN-SANDBOX-WIRE-001",
+      "program": "SECURITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "6bb9e4a3ddd7e55e4d30aa981f35ed2690db03dda10719a498c38b97442a7130",
+      "progressDigest": "6dc725b6dc5dd4c4d7ff155b7e90237e5ed0665da0bf7559908b9cc11606f56a",
       "terminalClosureDigest": null
     },
     {
@@ -3568,9 +3612,9 @@
       "program": "SECURITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-05",
       "definitionDigest": "19a8088ac5887b8af0757125a21a737802e64fe9326aee3d2ea9e32d5c3fb9f3",
-      "progressDigest": "ad885112a3d58cdda26362f20f53343b32a88f902445a3d7178b82c4657fb985",
+      "progressDigest": "424ba6f6f575148477d4b686e7f8689830fe4057c7bfe5ef009bae185c3b0c3e",
       "terminalClosureDigest": null
     },
     {
@@ -4537,6 +4581,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T08:52:00Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-EXEC-AUTH-W2-01",
+      "authorityDigest": "49a4f9cdfd025be42bbb64489331a3f393ab6b36afdbc1697d2138da70dcae87",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T09:08:45Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14701,22 +14755,24 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "1",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-EXEC-AUTH-W2-01"
+      ],
       "acceptance": "Probe job'ı required-değildir ve ürün davranışını değiştirmez; her platform için ölçüm JSON artifact'ı üretir; W3/W4 tasarım kilidi bu kanıtla atılır",
-      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2",
+      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2; `receipt=GR-2026-08-05-EXEC-AUTH-W2-01`; 2026-08-05 SETTLEMENT (PR #57 run 30991850136, 3/3 probe pass): GERÇEK-RUNNER ÖLÇÜMLERİ — darwin-arm64 (`5566df23b8e1deb6…`): /dev/fd dizin-traversal ÇALIŞMIYOR (readdir ENOTDIR, child ENOENT, identity mismatch) → W3 Darwin için native openat-ailesi TEK yol, D1 ölçümle doğrulandı; POSIX-delete+dev/ino-kararlılık+O_NOFOLLOW/O_DIRECTORY+kern.uuid/boottime hepsi supported; win32-x64 (`0e988567fd93477f…`): POSIX-delete SUPPORTED (D2 tabanı doğrulandı), VolumeSerial+FileIndex rename/reopen kararlı ve non-zero, MachineGuid supported; O_NOFOLLOW/O_DIRECTORY Node-sabitleri 0 → W4 secure-open kontratı native handle-flag eşdeğerleriyle kurulacak; linux-x64 referans (`6f2ad5bf7de0f009…`): tam-destek beklendiği gibi; `proof=real-runner-capability-probe-3platforms-run30991850136`; artifact'lar 30 gün retention'lı, digest'ler tam-SHA256'nın ilk 16'sı — tam değerler run-artifact'larında",
       "updated": "2026-08-05"
     },
     {
@@ -14757,7 +14813,9 @@
         "ALP-RUNTIME-001",
         "MCP-LEASE-001",
         "APPROVAL-QOL-001",
-        "TRUST-HANDOFF-001"
+        "TRUST-HANDOFF-001",
+        "SEC-OWASP-ASI-001",
+        "SEC-ENFORCE-WIRE-001"
       ],
       "gates": [
         "G2",
@@ -14794,7 +14852,9 @@
         "ALP-RUNTIME-001",
         "MCP-LEASE-001",
         "APPROVAL-QOL-001",
-        "TRUST-HANDOFF-001"
+        "TRUST-HANDOFF-001",
+        "SEC-OWASP-ASI-001",
+        "SEC-ENFORCE-WIRE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Every operation binds principal, tenant, capability, approval, budget, receipt and audit",
@@ -15121,8 +15181,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Least privilege, progressive disclosure, explicit escape hatch and no hidden full surface",
-      "evidence": "Legacy 559; terminal tool foundations",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 559; terminal tool foundations; 2026-08-05 kod-truth: runtime write-scope yalnız claude worker'da (`--allowedTools`), codex/gemini `allowedToolsFlag: null` (`provider-command-spec.ts:129,145`) ve üç provider da kendi guardrail'leri kapalı spawn ediliyor (`:113,128,143`); `tools.allowlist_enabled` açıkken bile allowlist yalnız prompt-metni üretiyor, gerçek grant değil (`task-builder.ts:2098`); claude'a verilen `Bash` grant'i `Write()` path-scoping'ini fiilen boşa düşürüyor",
+      "updated": "2026-08-05"
     },
     {
       "order": 4070,
@@ -15242,7 +15302,9 @@
         "RECOVERY-BORN-485-USAGE-BILLING-001",
         "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001"
       ],
-      "children": [],
+      "children": [
+        "LIMIT-SPEND-ENFORCE-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -15261,7 +15323,8 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "RECEIPT-001",
-        "REACHABILITY-001"
+        "REACHABILITY-001",
+        "LIMIT-SPEND-ENFORCE-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-COST-ADMISSION-01"
@@ -15269,6 +15332,38 @@
       "acceptance": "One host authority for admission, reservation, usage, landing and settlement",
       "evidence": "`receipt=GR-2026-07-28-COST-ADMISSION-01`; cost admission separates metered API price authority from registry-known zero-incremental-USD subscription/local/free-tier identity: real project config admits `gpt-5.6-sol` subscription with `unpricedModels=[]`, `$0` and quota `unknown`, while identical API work remains `COST_PRICING_UNKNOWN`; 2026-07-28 live read-only Claude subscription probe reports session 10%, week-all 6%, week-Fable 5% and `ok`, but legacy `limit_gate` is disabled and neither global nor project config contains `provider_limits`; global bootstrap is intentionally not authored because no owner numeric thresholds were supplied and the runtime currently registers only Claude host-subprocess subscription evidence, not Codex main-provider limit source authority—writing it would create a new fail-closed HOLD rather than safe enablement; reservation, settlement and Codex authority remain open",
       "updated": "2026-07-28"
+    },
+    {
+      "order": 4091,
+      "id": "LIMIT-SPEND-ENFORCE-001",
+      "parent": "LIMIT-001",
+      "program": "AUTHORITY",
+      "outcome": "Kümülatif günlük/aylık harcama tavanı gerçek enforcement'a bağlanır: `enforce_spend_gate` semantiği ya typed hard-block (`COST_GATE_EXCEEDED`) üretir ya key dürüst şekilde yeniden adlandırılır",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Pre-spawn'da kümülatif spend aşımı typed block üretir; aşım anındaki aktif sprint kesilmez — graceful-landing, yalnız yeni admission durur (owner ilkesi: akış-engellememe); default davranış değişimi flag-gated + owner-onaylı; config-key adı davranışla birebir örtüşür",
+      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `sprint-finalizer.ts:1886-1889` \"HARD spend gate ... NOT implemented\", `start.ts:951` TODO(post-beta); `cost_limits.enforce_spend_gate` bugün yalnız uyarı emisyonunu açıyor. Envanterdeki en büyük ad-davranış açığı",
+      "updated": "2026-08-05"
     },
     {
       "order": 4100,
@@ -15479,8 +15574,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Every decision/effect/settlement traceable; redaction schema and bounded retention",
-      "evidence": "Existing audit systems fragmented",
-      "updated": "2026-07-26"
+      "evidence": "Existing audit systems fragmented; 2026-08-05 kod-truth: `AUDIT_HMAC_SECRET` sabit string (`audit-writer.ts:35`) — ana zincir kaynak-sahibi adversary'ye karşı sahtelenebilir, terminal zincirindeki makine-lokal rastgele anahtar deseni (`api/terminal/audit-integrity.ts`, 0600) ana zincire taşınmalı; redaction sink-level chokepoint değil call-site-bazlı — worker `.log`/`.result` yakalaması ve genel `writeEvent` payload'ları kapsam dışı kalıyor",
+      "updated": "2026-08-05"
     },
     {
       "order": 4130,
@@ -15521,8 +15616,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No raw config disclosure, IDOR, query-token persistence or unscoped admin action",
-      "evidence": "2026-07-27 code-truth: autonomous strict-tenant option composition root'a geçmiyor; v1 approval API unknown ID doğrulamıyor; identity/tenancy/approval authority closure bekleniyor",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: autonomous strict-tenant option composition root'a geçmiyor; v1 approval API unknown ID doğrulamıyor; identity/tenancy/approval authority closure bekleniyor; 2026-08-05 kod-truth: loopback kombinasyonu — localhost auto-inject (`auth.ts:177-179,201-209`) + rate-limit `exemptLoopback` default-true (`server.ts:169,2015`) lokal caller'ı hem auth'suz hem throttle'sız bırakıyor; CORS `Origin: null` verbatim kabul (`server.ts:317`, sandboxed iframe/data: dokümanları da null gönderir); `DECKENT_API_AUTH_DISABLED=1` yalnız stderr uyarısıyla tam bypass (`auth.ts:181-188`)",
+      "updated": "2026-08-05"
     },
     {
       "order": 4140,
@@ -15566,8 +15661,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Advisory vs enforced is explicit; RBAC, least privilege and org freeze use same core",
-      "evidence": "Legacy 534,570,497",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 534,570,497; 2026-08-05 kod-truth: `enforce_rbac` default false ve permissive-default — actor.role boş/bilinmeyende her zaman allow (`authority-matrix.ts:326-333`), roller doldurulmadıkça RBAC no-op; `authority-enforcer.ts` tüm dönüşlerde hardcoded `mode:'soft'` (\":5-7 Sprint 140+: Hard enforcement (planned)\")",
+      "updated": "2026-08-05"
     },
     {
       "order": 4150,
@@ -15720,8 +15815,72 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Owner G2 kapsam kararı: agent'ın görebildiği/kapatabildiği monitoring güvenlik kontrolü sayılmaz — worker-bağımsız heartbeat + append-only dış ledger; sandbox-dışı privileged yardımcılar (git helper/hook, IDE extension, daemon) Brain policy kapsamına alınır; yüksek-riskli config mutation'ları (workspace-trust sınıfı) admission gate'ten geçer; enforcement modu (advisory/enforce) tiplenir; karar kapsam daraltmaya da çıkabilir",
-      "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07-23 coding-agent sandbox güvenlik sınıfı raporu (Cursor/Codex/Gemini CLI ortak hata sınıfları: denylist sandbox, komut-adına güven, Docker socket, config-üzerinden-executable davranış) + RepoComplianceBench (agent'lar repo policy'sini kendiliğinden okumuyor; stop/handoff davranışı güvenilmez). İlke: agent'ın güvenlik sınırı, agent prosesinin sınırı değildir. PLUGIN-SANDBOX-001 plugin/skill sandbox'ını, bu satır sandbox-sonrası host-etki zincirini kapsar",
-      "updated": "2026-08-04"
+      "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07-23 coding-agent sandbox güvenlik sınıfı raporu (Cursor/Codex/Gemini CLI ortak hata sınıfları: denylist sandbox, komut-adına güven, Docker socket, config-üzerinden-executable davranış) + RepoComplianceBench (agent'lar repo policy'sini kendiliğinden okumuyor; stop/handoff davranışı güvenilmez). İlke: agent'ın güvenlik sınırı, agent prosesinin sınırı değildir. PLUGIN-SANDBOX-001 plugin/skill sandbox'ını, bu satır sandbox-sonrası host-etki zincirini kapsar; 2026-08-05 kod-truth: BOUNDARY_VIOLATION honest-gate worker'ın kendi `filesChanged` beyanına güveniyor (`result-evaluator.ts:2380-2430`) — beyan-dışı dosya hiç yakalanmıyor; bağımsız auditor git-diff kontrolü alert-only + tüm dirty dosyaları tüm aktif worker'lara atfediyor + untracked yeni dosyaları kaçırıyor (`auditor.ts:752-791`); worker-bağımsız dosya-provenance bu satırın kapsamındadır",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 4190,
+      "id": "SEC-OWASP-ASI-001",
+      "parent": "AUTHORITY-001",
+      "program": "AUTHORITY",
+      "outcome": "OWASP Agentic Top 10 (ASI01–ASI10, 2026) öz-değerlendirme baseline'ı: her ASI riski için mevcut mekanizma → enforcement sınıfı (ENFORCED/ADVISORY/CONFIG-GATED/UNWIRED) haritası, gap register ve ilgili ledger satırlarına kanıt-bağlaması",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "10 ASI riskinin tamamı kod-referanslı (file:line) enforcement sınıfıyla haritalanır; her gap ya mevcut bir ledger satırına bağlanır ya yeni satır önerisi olur; sonuç ASSURANCE-PACK-001 evidence formatına uyumlu; advisory→enforce geçişleri flag-gated + akışı-bloklamayan rollout ilkesiyle tiplenir (owner ilkesi: katman açık ve kontrollü, doğruluk ve akış-engellememe önce gelir)",
+      "evidence": "Açılış: Alperen 2026-08-05 onayı (\"2 numaralı işi değerlendirelim\"). İlk kod-truth taraması 2026-08-05 tamamlandı: 14-alan envanter; kritik bulgular — plugin-hook security pipeline'ı sprint yolundan erişilemez (sprint-controller loadPluginHooks opsiyonsuz), spend-gate warn-only (enforce_spend_gate adı-enforce-davranışı-log), AUDIT_HMAC_SECRET sabit string, codex/gemini worker'larında runtime write-scope yok, 4 enforcement modülü unwired (tool-scope-gate, checkWorkerAuthority, enforceSelfModifyingTask, SkillSandbox.requireSafe). İş-1 (security-event egress adapter — dış SIEM/agent-security platformlarına webhook audit yayını) owner kararıyla talep-gelirse plana alınır; satır açılmadı",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 4200,
+      "id": "SEC-ENFORCE-WIRE-001",
+      "parent": "AUTHORITY-001",
+      "program": "AUTHORITY",
+      "outcome": "Unwired/inert enforcement envanterinin tipli disposition'ı: yazılmış-ama-devrede-olmayan her güvenlik modülü wire-or-retire kararına bağlanır, sessiz-ölü enforcement kodu kalmaz",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Kapsam ve tek tek settle edilecek maddeler: `tool-scope-gate` (`src/core/tool-scope-gate.ts`, 0 production caller, default advisory) · `checkWorkerAuthority(enforceRbac)` (`src/agents/worker.ts:795`, 0 caller) · `enforceSelfModifyingTask` (`self-modifying-detector.ts:203`, 0 caller; `self_mod_enforce` key config-types'ta tanımsız) · `SkillSandbox.requireSafe` (marketplace yolu report-only variant çağırıyor) · scope-gate git-failure fail-open (`sprint-controller.ts:1922`) · terminal command-guard loopback-inert (`command-guard.ts:54-55` + `session-manager.ts:13` host default localhost) · pre-commit/detect-secrets hook kurulu değil + `.secrets.baseline` ad uyumsuzluğu. Her madde için karar tiplenir: wire (hangi authority satırına bağlandığı) / retire (kod kaldırılır) / ratchet (advisory→enforce flag tanımı, default-off, akışı-bloklamayan rollout) — kanıtla settle olur",
+      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001, 14-alan envanter). İlke: production-wiring-closure (quality bar) — test-only import/unwired modül DONE sayılmaz",
+      "updated": "2026-08-05"
     },
     {
       "order": 5000,
@@ -17260,7 +17419,9 @@
         "HUB-001",
         "TOOL-COMPUTER-001"
       ],
-      "children": [],
+      "children": [
+        "PLUGIN-SANDBOX-WIRE-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -17279,12 +17440,45 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "SUPPLY-CHAIN-001",
-        "TOOL-AUTHORITY-001"
+        "TOOL-AUTHORITY-001",
+        "PLUGIN-SANDBOX-WIRE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Filesystem, network, secret, process and tenant permissions fail-closed across platforms",
-      "evidence": "Existing compile/audit controls insufficient",
-      "updated": "2026-07-26"
+      "evidence": "Existing compile/audit controls insufficient; 2026-08-05 kod-truth: gerçek izolasyon (vm/worker-thread/container) yok — plugin hook'ları ana process'e `await import()` ediliyor (`plugin-hooks.ts:140-150`); statik tarama tek savunma",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 7031,
+      "id": "PLUGIN-SANDBOX-WIRE-001",
+      "parent": "PLUGIN-SANDBOX-001",
+      "program": "SECURITY",
+      "outcome": "Sprint yolundaki plugin-hook güvenlik kablolaması: `validatePluginSecurity` 4-adım pipeline'ı (allowed-path containment + AST tarama + SHA-256 integrity + Ed25519 publisher imzası) production `loadPluginHooks` çağrısına bağlanır ve `PluginSecurityError` fail-closed olur",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "`sprint-controller` plugin yüklemesi securityConfig'siz çalışamaz; ihlal stderr'e düşürülmez — typed fail-closed (advisory→enforce ratchet'i flag-gated, default'u owner kararı; akışı-bloklamayan rollout); `plugin_require_signature` + `plugins.trusted_publisher_keys` production yolundan erişilebilir olur; negative test: imzasız/scope-dışı hook sprint'i bloklar",
+      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `src/orchestra/sprint-controller.ts:1654` opsiyonsuz `loadPluginHooks` → `securityConfig undefined` → pipeline production'dan hiç koşmuyor; `plugin-hooks.ts:225-238` PluginSecurityError'ı stderr'e düşürüyor (\"Non-fatal — log and continue\"). Envanterin 1 numaralı gerçek riski",
+      "updated": "2026-08-05"
     },
     {
       "order": 7040,
@@ -17323,8 +17517,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Server provenance, tool risk, user consent, egress policy, schema/version and revoke",
-      "evidence": "Code-truth audit P0",
-      "updated": "2026-07-26"
+      "evidence": "Code-truth audit P0; 2026-08-05 kod-truth: `includeProjectScope` default true (`mcp-client/config.ts:46,57`) — REPL-dışı her caller klonlanmış reponun git-tracked `.mcp.json`'ını güvenilir sayıp server spawn ediyor (opt-in yalnız REPL bridge'de); üçüncü-parti MCP server'lar için allowlist/imza/provenance/per-tool consent kaydı yok; env passthrough sınırsız (`broker.ts:169`)",
+      "updated": "2026-08-05"
     },
     {
       "order": 7050,
@@ -19025,6 +19219,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "3e76b5615d2a01ae328901e935bcf09dc288fb146fd418c060b6d9c8cbbc28dd"
+    "value": "34c438dd3e0130cc8298a7225e25cf3969c47db2504a85188526b7dfabc0c3d3"
   }
 }

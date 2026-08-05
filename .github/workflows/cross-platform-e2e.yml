@@ -265,3 +265,39 @@ jobs:
           path: xplat-diag/**
           if-no-files-found: ignore
           retention-days: 7
+
+  # W2 (PLATFORM-EXEC-AUTH-W2-PROBE-001): MEASUREMENT, NOT A GATE. Records the
+  # real-runner platform facts the W3/W4 native adapter designs depend on
+  # (docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2).
+  # Non-required by design; the probe exits 0 whenever it ran — every
+  # capability outcome is a recorded observation in the uploaded JSON artifact.
+  exec-auth-capability-probe:
+    name: Exec-Authority Capability Probe — ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Pure built-in Node — deliberately no npm ci; the probe must observe
+      # the raw platform, not the dependency tree.
+      - name: Run capability probe (measurement, not a gate)
+        shell: bash
+        run: |
+          mkdir -p probe-artifacts
+          PROBE_ARTIFACT_DIR=probe-artifacts node scripts/platform-probe/exec-authority-capability-probe.mjs
+
+      # born-695: upload-artifact v4 rejects paths outside the workspace —
+      # the artifact dir stays workspace-relative on purpose.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exec-auth-probe-${{ matrix.os }}
+          path: probe-artifacts/exec-auth-probe-*.json
+          retention-days: 30
