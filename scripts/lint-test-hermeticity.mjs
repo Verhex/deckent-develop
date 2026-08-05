@@ -100,24 +100,18 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, PLATFORM-CLEAN observe slice): +11 — clean.mjs
-  // cleanDistWithoutMutationAdapter callsites (+9) and dist-clean-guard's two
-  // new fixture writes (+2); verified by identity-diff against a parent-commit
-  // worktree scan, no drift elsewhere. A first attribution attempt ran the
-  // new-side scan with dist/ present and was discarded as contaminated —
-  // measure BOTH sides build-free. Prior refresh: SSE-ONEVENT (12453).
-  // 2026-08-05 (build-free, EXEC-AUTH-W1): +2 — clean.mjs twin adapter object
-  // callsites; parent-worktree identity-diff shows no drift elsewhere.
-  count: 12466,
-  digest: '01e74c39343eeffa754d278f500c188492effd98109389c2e29fdc8e5df52cf9',
+  // 2026-08-05 (build-free, EXEC-AUTH-W3A): +7 — the new native primitive
+  // suite's fixture writes (tests/native/exec-authority-native.test.ts);
+  // identity-diff vs W1 snapshot shows no drift elsewhere.
+  count: 12473,
+  digest: 'a7d75722754cb536755ee77ed5736218e959d00acc4cfdd2385d123adecfdf97',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (EXEC-AUTH-W1): count unchanged, digest moved — file-lock.ts
-  // adapter interface extraction + clean.mjs twin adapter.
-  // Prior: PLATFORM-CLEAN observe slice.
-  count: 1196,
-  digest: '9c5fb9f7a962a25c62d81d7d7aceaacf10740b1a4a297c3f353dd4f604b9471c',
+  // 2026-08-05 (EXEC-AUTH-W3A): 1196→1197 — native/exec-authority loader
+  // (index.mjs) joined the production inventory. Prior: EXEC-AUTH-W1.
+  count: 1197,
+  digest: '93b8a1c634da153598b1a5554e7cd0e112d773c3cf783c7597e8d99a1b3faaaa',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

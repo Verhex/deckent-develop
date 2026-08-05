@@ -101,3 +101,21 @@ salt-CI script'leri kapsam dışıdır; Docker backend'i Linux-container olduğu
 Bu satırların proof-tokenları ve residual-çıkarmaları 2026-08-05 turunda tamamlandı; tek
 eksikleri dependency-DAG kapanışıdır. Her dependency-kapanış merge'ünden sonra bu liste
 kontrol edilir (rapor sorumluluğu: aktif oturum).
+
+## 9. ADR-D-005 merit kaydı — @deckent/exec-authority-native (W3-PR-A, 2026-08-05)
+
+- **Yetenek**: openat-ailesi (openDirAt/unlinkAt/renameAt/fstatIdentity/readdirFd) +
+  Darwin kimlik kaynakları (fstatfs f_fsid, gethostuuid, kern.boottime). W2 ölçümü
+  Darwin'de `/dev/fd` traversal'ının çalışmadığını kanıtladı — native, alternatifi
+  olmayan gerçek yetenektir (D1 onayı, Alperen 2026-08-05).
+- **Biçim**: in-repo, private N-API modülü (`native/exec-authority/`); npm'e yayın ve
+  prebuild'ler W3 kapanış diliminin işidir. Yokluk her tüketicide typed fail-closed
+  (D3) — sessiz path-fallback yasak, loader kontratı `index.mjs`'te.
+- **Denetim**: tek C dosyası (~330 satır), yalnız POSIX syscall'ları + Darwin-guarded
+  kimlik; -Wall -Wextra -Werror; N-API 8. Linux'ta da derlenip test edilir
+  (CI: exec-auth-native-build, ubuntu+macos) — Darwin adapter'ı iki platformda
+  egzersiz görmüş kod tüketir.
+- **Sürüm pinleme**: in-repo olduğundan sürüm = repo commit'i; dış registry riski yok.
+- **Not**: ADR-D-005'in işaret ettiği `docs/reference/dependencies.md` docs-reset'te
+  arşive gitti; kalıcı bağımlılık-kataloğu evi ayrı açık iştir (DOCS-DEPS-HOME) —
+  o eve taşınana dek merit kaydı burada yaşar.
