@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "88849e92b3e8bc46a83cdb12e17a801ac96b23635ba9b8ec960a3d25002ee3f7"
+    "value": "a9501109056014194fab1e6d6cedd93ce787287262609f4b132eb8203d978633"
   },
   "summary": {
-    "total": 371,
-    "active": 348,
+    "total": 372,
+    "active": 349,
     "terminal": 23,
-    "receipts": 51,
+    "receipts": 52,
     "byState": {
       "OPEN": 256,
-      "READY": 0,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 25,
@@ -23,7 +23,7 @@
     "byPriority": {
       "P0": 249,
       "P1": 95,
-      "P2": 27
+      "P2": 28
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 59,
+      "TRUTH": 60,
       "XPLAT": 3
     }
   },
@@ -722,6 +722,17 @@
       "updated": "2026-08-05",
       "definitionDigest": "727e63f48fe6707799bc845129098460b766e2e577dedb12a8d93b4cf56c4cda",
       "progressDigest": "b3af6afc5e630c7b2fb7116e52952c9f1fbafae8e0b52f615d0b18f8e0d19667",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 519,
+      "id": "CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "992e6be01c385cb43bd9e23a59d24c14188de98bdce6d2f74a52ccfdc150759f",
+      "progressDigest": "2b13c2ef7e667e79f0249d9b7e988c9edc73d3739b6a37f514660d7ca53df791",
       "terminalClosureDigest": null
     },
     {
@@ -4656,6 +4667,16 @@
         "transitionAt": "2026-08-05T12:11:47Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-CI-RATCHET-519-01",
+      "authorityDigest": "097bebbfc98c95c42c6fc9a2f68d37c0594299a6006396b8d1f3ec169268fc28",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6595,6 +6616,37 @@
       ],
       "acceptance": "26.x kırığı test-adı düzeyinde izole edilir; Node-sürüm-matrisi politikası netleşir (26 desteklenecekse fix, değilse matristen tipli çıkarma); main-push Orchestra job'ları yeşil",
       "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu; aynı kör-nokta sınıfı; 2026-08-05 İZOLASYON (run job 92292650755): kırık tests/orchestra/docker-backend-owned-settlement.test.ts'te 3 test — 'Required isolated claude credential file(s) unavailable: .credentials.json' (spawn-backend-docker.ts:5466 fail-closed kapısı); DİKKAT: test gerçek host-home'a güveniyor ve fixture credential kurmuyor — CI-24 aynı credential'sız runner'da GEÇİYOR, 26'da DÜŞÜYOR → Node-26'ya bağlı davranış sapması auth-isolation zincirinde (existsSync/homedir/broker-kopya adayları); bu üretim auth-kontratına dokunan kök-neden dilimi ister, yüzeysel test-fix'i değil; 24.x job'ının cancelled görünmesi 26.x fail'inin fail-fast iptali; `receipt=GR-2026-08-05-CI-ORCH-518-01`; 2026-08-05 SETTLEMENT (cf06cdf94): ÇERÇEVE DÜZELTİLDİ — kök Node-26 değil HERMETİKLİK ihlali (test gerçek host ~/.claude'a bağımlıydı; boş-HOME'da 24 ve 26 birebir aynı 3 kırık — lokal çift-sürüm repro); fix test-taraflı hibrit node:os homedir mock'u + fixture-home credential'ı, üretim değişmedi; `proof=empty-home-dual-node-3of3-green`; kapanış kanıtı merge sonrası main-push Orchestra 24.x+26.x yeşili",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 519,
+      "id": "CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Tests—Docs+Scripts'in kalan kırmızı kökü: containment-inventory-ratchet testi 60s sınırında timeout-flake'i (lokal build-free 48.9s ölçüldü — yavaş CI runner'da sınırı aşıyor)",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Test-timeout gerçekçi tavana çekilir (ölçüm-temelli); main-push Tests—Docs+Scripts yeşile döner",
+      "evidence": "Açılış 2026-08-05: 517/518 kapanış-doğrulamasında izole edildi; tren-modeli ilk yolcusu",
       "updated": "2026-08-05"
     },
     {
@@ -19318,6 +19370,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7a8f8c5e9072b8c331775fff0873167e62424bb0bb66d793cc069437bf10ec01"
+    "value": "d08980513e7cb3531a60572b44f4ecb6dd28a73d4e40f6d47bc807a92b629cce"
   }
 }
