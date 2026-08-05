@@ -1612,7 +1612,10 @@ describe('scanTestDir — sandbox + allowlist', () => {
     }));
   });
 
-  it('merges production-scale unresolved edges without exceeding call argument limits', () => {
+  // 530 (CI-COVERAGE-JOB-WALL-001): under coverage instrumentation this
+  // production-scale merge measured 11.9s on a CI runner — the 10s default
+  // test timeout killed it. 60s = ~5x measured headroom.
+  it('merges production-scale unresolved edges without exceeding call argument limits', { timeout: 60_000 }, () => {
     mkdirSync(join(sandbox, 'tests'));
     mkdirSync(join(sandbox, 'src'));
     writeFileSync(
