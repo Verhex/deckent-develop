@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):6969941ad66a89751d87787d028ff2f01398e054fdd4d6d2e7debacc1da2f5f1`
+**Source digest:** `sha256(normalized-lf-utf8):d2b68d768c3b2441abaf62736ac46a5f045bd3d0c7b566de08673c35140c5eaa`
 
 **Rows:** 377 total · 354 active · 23 terminal
 
@@ -14,8 +14,8 @@
 | State | Count |
 |---|---:|
 | OPEN | 259 |
-| READY | 1 |
-| IN_PROGRESS | 0 |
+| READY | 0 |
+| IN_PROGRESS | 1 |
 | BLOCKED | 67 |
 | VERIFY | 27 |
 | DONE | 23 |
@@ -83,7 +83,7 @@
 | 519 | `CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001` | VERIFY | P2 | TRUTH | — | — | Tests—Docs+Scripts'in kalan kırmızı kökü: containment-inventory-ratchet testi 60s sınırında timeout-flake'i (lokal build-free 48.9s ölçüldü — yavaş CI runner'da sınırı aşıyor) |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 521 | `CI-STATS-HERMETIC-001` | VERIFY | P1 | TRUTH | — | — | update-readme-stats üreteci hermetik değil: sprint rozeti lokal .brain arşivinden, coverage rozeti lokal coverage-artifact varlığından türüyor — iki makine aynı çıktıyı üretemiyor, main-push Tests—Docs+Scripts stats-stale kalıcı kırmızı (3 bandaj sonrası mimari kök) |
-| 522 | `CI-DOCS-SCRIPTS-STEP-TIMEOUT-001` | READY | P1 | TRUTH | — | — | Tests—Docs+Scripts'in YENİ kırmızı kökü: step-düzeyi timeout-minutes 5 duvarı — suite büyüdü (307.86s ölçüldü), duvar SIGKILL×2 + builtins-drift boş-çıktı + hermetic analysis-context 60s iç-bütçe aşımı ikincil kırıklarını üretti; 521 stats-kapısı TEMİZ geçti |
+| 522 | `CI-DOCS-SCRIPTS-STEP-TIMEOUT-001` | IN_PROGRESS | P1 | TRUTH | — | — | Tests—Docs+Scripts'in YENİ kırmızı kökü: step-düzeyi timeout-minutes 5 duvarı — suite büyüdü (307.86s ölçüldü), duvar SIGKILL×2 + builtins-drift boş-çıktı + hermetic analysis-context 60s iç-bütçe aşımı ikincil kırıklarını üretti; 521 stats-kapısı TEMİZ geçti |
 | 523 | `CI-HERMETIC-SCAN-BUDGET-001` | OPEN | P2 | TRUTH | — | — | Hermetic-lint iç kaynak bütçeleri yavaş/doymuş CI runner'ında gerçekçi değil: analysis-context 60000ms bütçesi fork-doygunluğunda aşılıyor (run 31050457808: 22.4M op'ta duvar; lokal 18s/35M op), 1GiB rss bütçesi lokalde GC-slack flake'i üretiyor (--max-old-space-size=640 workaround'u kayıtlı) |
 | 524 | `VERIFY-HISTORICAL-CLOSURE-001` | OPEN | P2 | TRUTH | — | — | Historical-only VERIFY satırlarının (10 adet) receipt-gated kapanış dilimi: her satır için kanıt-durumu tiplenir (yeniden-doğrulanabilir / historical-yeterli / eksik-kanıt) ve kapanış turu Alperen onayıyla koşulur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |

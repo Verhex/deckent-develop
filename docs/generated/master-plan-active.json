@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6969941ad66a89751d87787d028ff2f01398e054fdd4d6d2e7debacc1da2f5f1"
+    "value": "d2b68d768c3b2441abaf62736ac46a5f045bd3d0c7b566de08673c35140c5eaa"
   },
   "summary": {
     "total": 377,
@@ -12,8 +12,8 @@
     "receipts": 57,
     "byState": {
       "OPEN": 259,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 27,
       "DONE": 23,
@@ -773,10 +773,10 @@
       "id": "CI-DOCS-SCRIPTS-STEP-TIMEOUT-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "ec3061a0345ca0fdcc8b5351d07695db3f6ef508c27bdde1bb45e6901bc6f285",
-      "progressDigest": "25535172c7d79bbd0916a2536b74df8f94fef80bbbe9f8f5d2f30429e35337ce",
+      "progressDigest": "cae8ecd7277c2ca77a3f096ddbf4990d42508c84aa2225a415cc733a48315773",
       "terminalClosureDigest": null
     },
     {
@@ -6866,7 +6866,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19639,6 +19639,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "4a786f3fc2c2edfacf93971b38ad7c2d41a293472f197cf7ff4404c2269dfeca"
+    "value": "33acd39de198c13eb9ed706284bd8e66835fec2b53f4bf13fb246aa78c04dece"
   }
 }
