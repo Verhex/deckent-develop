@@ -3,26 +3,26 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "7aeb1afe49b35ad6bafe6c76ca4c54a2a65d82bfea0a686fa0fec0c3d896d605"
+    "value": "61e5010ea2f526576a1dd83bf8ac07be8356a06ea06b20abfb7f3363bf920b39"
   },
   "summary": {
-    "total": 368,
-    "active": 347,
-    "terminal": 21,
-    "receipts": 48,
+    "total": 369,
+    "active": 346,
+    "terminal": 23,
+    "receipts": 49,
     "byState": {
       "OPEN": 255,
-      "READY": 0,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 25,
-      "DONE": 21,
+      "VERIFY": 23,
+      "DONE": 23,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 249,
-      "P1": 92,
+      "P1": 93,
       "P2": 27
     },
     "byProgram": {
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 93,
+      "KERNEL": 94,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
@@ -2874,11 +2874,11 @@
       "id": "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-05",
       "definitionDigest": "b5e46bc9464bdf52e4a2167e0ffe098ec54e1c4d7913e7329a6cc97dfb350f32",
-      "progressDigest": "99865b98a9ab77d2e571491b83abd75e1e6f3f4e434bf2199e89ff0e535c87ff",
-      "terminalClosureDigest": null
+      "progressDigest": "77b973e678ea98b23f0a3bc22c698c349b33aae32d46cae9ae9d4c798ec82ce7",
+      "terminalClosureDigest": "d9f331c2e257aa405633e117169f9cbbe0b447c0b1a58780f307e91780d5906b"
     },
     {
       "order": 3345,
@@ -2896,10 +2896,21 @@
       "id": "PLATFORM-EXEC-AUTH-W2-PROBE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-05",
       "definitionDigest": "7ae236158fa399af25429a8b2be9a0d5c9b0aa6a825f1c59ccb6b8f127ec5bc0",
-      "progressDigest": "82a0794790ef1d7df5949f964142bfa8dcabc0a806948601df03c52b7743ad0d",
+      "progressDigest": "c6554618df14e3b7de5f3bd631f7e5fd04493caef28720813e42651a5a6b8004",
+      "terminalClosureDigest": "3473236d58ba9163f515f26a09bb0b8d95942cde506334f06998cee8a4dcf41b"
+    },
+    {
+      "order": 3347,
+      "id": "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "f2b33b8cd8d8d5ea4ee7b1f93ca5774c3affb0cc84109ca7549b23f6bec412c5",
+      "progressDigest": "9908cf4f54b8bd99a9ef37671d749b44ea472910a55a4cbfe534561b69a9cbd1",
       "terminalClosureDigest": null
     },
     {
@@ -4591,6 +4602,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T09:08:45Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-EXEC-AUTH-W3A-01",
+      "authorityDigest": "bff5a8124d7306c81e4e91cd7787310afb030f849e19f38fea42be22926817e3",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -10216,7 +10237,8 @@
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
         "COMPOSITE-WORKER-001",
-        "PLATFORM-EXEC-AUTH-W2-PROBE-001"
+        "PLATFORM-EXEC-AUTH-W2-PROBE-001",
+        "PLATFORM-EXEC-AUTH-W3-DARWIN-001"
       ],
       "gates": [
         "G2",
@@ -10272,9 +10294,8 @@
         "SKILL-DURABILITY-001",
         "PROD-SPAWNSYNC-ASYNC-001",
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
-        "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
         "COMPOSITE-WORKER-001",
-        "PLATFORM-EXEC-AUTH-W2-PROBE-001"
+        "PLATFORM-EXEC-AUTH-W3-DARWIN-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
@@ -14673,39 +14694,6 @@
       "updated": "2026-08-05"
     },
     {
-      "order": 3344,
-      "id": "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "ExecutionAuthorityPlatformAdapter arayüz-çıkarımı: file-lock.ts Linux impl'i davranış-değişimsiz adapter arkasına, clean.mjs ikiz-parite kontrat testi, cross-verify-evidence-broker /proc taraması",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-EXEC-AUTH-W1-01"
-      ],
-      "acceptance": "Linux yolu bayt-eşdeğer davranışta kalır (mevcut lock+clean suite'leri yeşil); adapter arayüzü 4-yetenek ayrıştırmasını (fd-traversal/mount-pin/host-boot-id/liveness) tipler; clean.mjs ikizi parite-testiyle sabitlenir",
-      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W1; `receipt=GR-2026-08-05-EXEC-AUTH-W1-01`; 2026-08-05 SETTLEMENT (b7ed80cb1): tipli 4-yetenek arayüzü + linuxProcExecutionAuthorityAdapter (file-lock) + cleanExecutionAuthorityAdapter ikizi + ikiz-parite kontrat testi 5/5 (aynı gerçek fd için birebir dev+ino+mountId); stable-path literal'leri adapter üzerinden; broker taraması: cross-verify-evidence-broker zaten tipli UNSUPPORTED_PLATFORM kapılı, W3 üçüncü-tüketici adayı; `proof=lock-clean-parity-suites-205of206-green`; Linux bayt-eşdeğerlik: lock+clean+fence 205/206, tsc temiz, hermetic build-free",
-      "updated": "2026-08-05"
-    },
-    {
       "order": 3345,
       "id": "COMPOSITE-WORKER-001",
       "parent": "KERNEL-001",
@@ -14743,36 +14731,37 @@
       "updated": "2026-08-04"
     },
     {
-      "order": 3346,
-      "id": "PLATFORM-EXEC-AUTH-W2-PROBE-001",
+      "order": 3347,
+      "id": "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
       "parent": "KERNEL-001",
       "program": "KERNEL",
-      "outcome": "macOS+Windows capability-probe CI job'ı: /dev/fd dizin-traversal semantiği, POSIX-delete uygunluğu, FileIndex/VolumeSerial kararlılığı gerçek runner'da ölçülür ve evidence-artifact olarak yayımlanır",
+      "outcome": "Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol)",
       "priority": "P1",
-      "dependsOn": [],
+      "dependsOn": [
+        "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
+        "PLATFORM-EXEC-AUTH-W2-PROBE-001"
+      ],
       "dependents": [],
       "children": [],
       "gates": [
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "READY",
       "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "1",
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-EXEC-AUTH-W2-01"
-      ],
-      "acceptance": "Probe job'ı required-değildir ve ürün davranışını değiştirmez; her platform için ölçüm JSON artifact'ı üretir; W3/W4 tasarım kilidi bu kanıtla atılır",
-      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2; `receipt=GR-2026-08-05-EXEC-AUTH-W2-01`; 2026-08-05 SETTLEMENT (PR #57 run 30991850136, 3/3 probe pass): GERÇEK-RUNNER ÖLÇÜMLERİ — darwin-arm64 (`5566df23b8e1deb6…`): /dev/fd dizin-traversal ÇALIŞMIYOR (readdir ENOTDIR, child ENOENT, identity mismatch) → W3 Darwin için native openat-ailesi TEK yol, D1 ölçümle doğrulandı; POSIX-delete+dev/ino-kararlılık+O_NOFOLLOW/O_DIRECTORY+kern.uuid/boottime hepsi supported; win32-x64 (`0e988567fd93477f…`): POSIX-delete SUPPORTED (D2 tabanı doğrulandı), VolumeSerial+FileIndex rename/reopen kararlı ve non-zero, MachineGuid supported; O_NOFOLLOW/O_DIRECTORY Node-sabitleri 0 → W4 secure-open kontratı native handle-flag eşdeğerleriyle kurulacak; linux-x64 referans (`6f2ad5bf7de0f009…`): tam-destek beklendiği gibi; `proof=real-runner-capability-probe-3platforms-run30991850136`; artifact'lar 30 gün retention'lı, digest'ler tam-SHA256'nın ilk 16'sı — tam değerler run-artifact'larında",
+      "evidenceReceipts": [],
+      "acceptance": "Addon yalnız probe-doğrulanmış primitifleri sunar; yokluğu fail-closed; darwin adapter'ı file-lock+clean ikizinde aynı kontratla; kapanış macos CI'da gerçek-binary clean (dist'li rebuild) + lock yaşam-döngüsü yeşiliyle",
+      "evidence": "Açılış 2026-08-05: W2 settlement kanıtı (run 30991850136) + D1-D3 onayı; tasarım §4.1/4.3/5-W3",
       "updated": "2026-08-05"
     },
     {
@@ -19219,6 +19208,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "34c438dd3e0130cc8298a7225e25cf3969c47db2504a85188526b7dfabc0c3d3"
+    "value": "9c8c025e428a7f80340a0d81752751e20f480622fc3e9de12e09a3f70f0d2b02"
   }
 }
