@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "efd5198a274767f6ab4ab9067f54dd2914c93a0519f13dc5e86727663ac1e115"
+    "value": "88849e92b3e8bc46a83cdb12e17a801ac96b23635ba9b8ec960a3d25002ee3f7"
   },
   "summary": {
     "total": 371,
     "active": 348,
     "terminal": 23,
-    "receipts": 50,
+    "receipts": 51,
     "byState": {
-      "OPEN": 257,
+      "OPEN": 256,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 24,
+      "VERIFY": 25,
       "DONE": 23,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -718,10 +718,10 @@
       "id": "CI-ORCHESTRA-NODE26-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "727e63f48fe6707799bc845129098460b766e2e577dedb12a8d93b4cf56c4cda",
-      "progressDigest": "85d977f44a2a41657ef73c188c136448091a1593421cdabfdaeeb1227d340255",
+      "progressDigest": "b3af6afc5e630c7b2fb7116e52952c9f1fbafae8e0b52f615d0b18f8e0d19667",
       "terminalClosureDigest": null
     },
     {
@@ -4646,6 +4646,16 @@
         "transitionAt": "2026-08-05T11:27:52Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-CI-ORCH-518-01",
+      "authorityDigest": "1d706fd2a203337f81942965e8494412f90b332375c7b50ad6bb8b5c38fc6e1f",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T12:11:47Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6567,12 +6577,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -6580,9 +6590,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-CI-ORCH-518-01"
+      ],
       "acceptance": "26.x kırığı test-adı düzeyinde izole edilir; Node-sürüm-matrisi politikası netleşir (26 desteklenecekse fix, değilse matristen tipli çıkarma); main-push Orchestra job'ları yeşil",
-      "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu; aynı kör-nokta sınıfı; 2026-08-05 İZOLASYON (run job 92292650755): kırık tests/orchestra/docker-backend-owned-settlement.test.ts'te 3 test — 'Required isolated claude credential file(s) unavailable: .credentials.json' (spawn-backend-docker.ts:5466 fail-closed kapısı); DİKKAT: test gerçek host-home'a güveniyor ve fixture credential kurmuyor — CI-24 aynı credential'sız runner'da GEÇİYOR, 26'da DÜŞÜYOR → Node-26'ya bağlı davranış sapması auth-isolation zincirinde (existsSync/homedir/broker-kopya adayları); bu üretim auth-kontratına dokunan kök-neden dilimi ister, yüzeysel test-fix'i değil; 24.x job'ının cancelled görünmesi 26.x fail'inin fail-fast iptali",
+      "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu; aynı kör-nokta sınıfı; 2026-08-05 İZOLASYON (run job 92292650755): kırık tests/orchestra/docker-backend-owned-settlement.test.ts'te 3 test — 'Required isolated claude credential file(s) unavailable: .credentials.json' (spawn-backend-docker.ts:5466 fail-closed kapısı); DİKKAT: test gerçek host-home'a güveniyor ve fixture credential kurmuyor — CI-24 aynı credential'sız runner'da GEÇİYOR, 26'da DÜŞÜYOR → Node-26'ya bağlı davranış sapması auth-isolation zincirinde (existsSync/homedir/broker-kopya adayları); bu üretim auth-kontratına dokunan kök-neden dilimi ister, yüzeysel test-fix'i değil; 24.x job'ının cancelled görünmesi 26.x fail'inin fail-fast iptali; `receipt=GR-2026-08-05-CI-ORCH-518-01`; 2026-08-05 SETTLEMENT (cf06cdf94): ÇERÇEVE DÜZELTİLDİ — kök Node-26 değil HERMETİKLİK ihlali (test gerçek host ~/.claude'a bağımlıydı; boş-HOME'da 24 ve 26 birebir aynı 3 kırık — lokal çift-sürüm repro); fix test-taraflı hibrit node:os homedir mock'u + fixture-home credential'ı, üretim değişmedi; `proof=empty-home-dual-node-3of3-green`; kapanış kanıtı merge sonrası main-push Orchestra 24.x+26.x yeşili",
       "updated": "2026-08-05"
     },
     {
@@ -19306,6 +19318,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "954d96713ef1fce9e48d3a789c813ca5872fb21e147e9489735fa7dc7d24087e"
+    "value": "7a8f8c5e9072b8c331775fff0873167e62424bb0bb66d793cc069437bf10ec01"
   }
 }

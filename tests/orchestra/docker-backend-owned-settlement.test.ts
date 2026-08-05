@@ -6,6 +6,21 @@ import { PassThrough } from 'node:stream';
 import type { ChildProcess } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// CI-ORCHESTRA-NODE26-001 hermetic fix: the full spawn path resolves the
+// provider home via os.homedir(); relying on the REAL host ~/.claude made this
+// suite pass only on logged-in dev machines (empty-HOME fails identically on
+// Node 24 and 26 — the "Node-26" framing was a fail-fast cancellation artifact).
+// The hybrid mock keeps every other os export real and routes homedir to the
+// per-test fixture home provisioned in beforeEach.
+vi.mock('node:os', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:os')>();
+  return {
+    ...real,
+    homedir: () => process.env.DECKENT_TEST_FIXTURE_HOME ?? real.homedir(),
+    default: { ...real, homedir: () => process.env.DECKENT_TEST_FIXTURE_HOME ?? real.homedir() },
+  };
+});
+
 vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
   spawnSync: vi.fn(),
@@ -73,6 +88,10 @@ function fixture(taskId: string): { root: string; tasks: string } {
   const tasks = join(root, '.tasks');
   mkdirSync(tasks, { recursive: true });
   process.env.DECKENT_HOME = join(base, 'host-state');
+  const fixtureHome = join(base, 'fixture-home');
+  mkdirSync(join(fixtureHome, '.claude'), { recursive: true });
+  writeFileSync(join(fixtureHome, '.claude', '.credentials.json'), '{"fixture":true}\n');
+  process.env.DECKENT_TEST_FIXTURE_HOME = fixtureHome;
   writeFileSync(join(root, 'source.ts'), 'export const fixture = true;\n', 'utf-8');
   writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({
     id: taskId,
@@ -120,6 +139,7 @@ function rememberGitGuard(args: readonly string[]): void {
 }
 
 afterEach(() => {
+  delete process.env.DECKENT_TEST_FIXTURE_HOME;
   if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
   else process.env.DECKENT_HOME = originalDeckentHome;
   for (const path of guardDirs.splice(0)) rmSync(path, { recursive: true, force: true });
