@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "a9501109056014194fab1e6d6cedd93ce787287262609f4b132eb8203d978633"
+    "value": "ade68855c975becb8b25576bee4afe8dc240ba1dcc987747db271e4ae19234c3"
   },
   "summary": {
     "total": 372,
@@ -12,8 +12,8 @@
     "receipts": 52,
     "byState": {
       "OPEN": 256,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 25,
       "DONE": 23,
@@ -729,10 +729,10 @@
       "id": "CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "992e6be01c385cb43bd9e23a59d24c14188de98bdce6d2f74a52ccfdc150759f",
-      "progressDigest": "2b13c2ef7e667e79f0249d9b7e988c9edc73d3739b6a37f514660d7ca53df791",
+      "progressDigest": "c2edc55f06717ccf2c37095978fd1ef2c666e7bafe9c615a05bbdb2f360e286b",
       "terminalClosureDigest": null
     },
     {
@@ -6631,7 +6631,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "0",
         "W": "0",
@@ -19370,6 +19370,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d08980513e7cb3531a60572b44f4ecb6dd28a73d4e40f6d47bc807a92b629cce"
+    "value": "a44cc3a1eef8070660ee2e9d4ed8cbbe589680f3002fed1b225a0a077a7ce824"
   }
 }
