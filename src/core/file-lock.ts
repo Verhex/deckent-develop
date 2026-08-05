@@ -1442,6 +1442,29 @@ function fsyncExecutionLockDirectory(locksDir: string): void {
   }
 }
 
+/**
+ * PLATFORM-EXEC-AUTH-W1-INTERFACE-001: the typed four-capability platform
+ * surface of the identity-stable execution authority (design:
+ * docs/analysis/platform-execution-authority-adapters-2026-08-05.md §3-4).
+ * Exactly one implementation exists today — the Linux/WSL /proc adapter
+ * below. Darwin/Windows implementations arrive behind this interface
+ * (W3/W4, native capability module per approved D1-D3) and are granted only
+ * with per-platform real-binary proof; absence stays fail-closed
+ * (`secure-open-unsupported`), never a silent downgrade.
+ */
+export interface ExecutionAuthorityPlatformAdapter {
+  /** Typed platform classification; throws `secure-open-unsupported` when the
+   *  identity-stable capability set is absent on this host. */
+  classify(): 'linux' | 'wsl';
+  /** Stable path that resolves an open directory fd without re-walking the
+   *  caller-supplied path (fd-stable traversal capability). */
+  stableFdPath(fd: number): string;
+  /** Mount-identity pin for an open fd (bind-mount aliasing defense). */
+  pinnedMountId(fd: number): string;
+  /** dev+ino+mount directory identity for an open fd. */
+  directoryIdentity(fd: number): ExecutionLockDirectoryIdentity;
+}
+
 function executionLockPlatformAdapter(): 'linux' | 'wsl' {
   if (process.platform !== 'linux'
     || !existsSync('/proc/self/fd')
@@ -1536,10 +1559,19 @@ function executionLockStatsIdentity(
   };
 }
 
+/** The only granted implementation today (Linux/WSL /proc facility). */
+export const linuxProcExecutionAuthorityAdapter: ExecutionAuthorityPlatformAdapter =
+  Object.freeze({
+    classify: executionLockPlatformAdapter,
+    stableFdPath: (fd: number) => `/proc/self/fd/${fd}`,
+    pinnedMountId: executionLockPinnedMountId,
+    directoryIdentity: executionLockDirectoryIdentity,
+  });
+
 function pinExecutionLockDirectories(
   projectRoot: string,
 ): ExecutionLockPinnedDirectories {
-  const adapter = executionLockPlatformAdapter();
+  const adapter = linuxProcExecutionAuthorityAdapter.classify();
   let parentFd: number | undefined;
   let rootFd: number | undefined;
   let locksFd: number | undefined;
@@ -1557,8 +1589,8 @@ function pinExecutionLockDirectories(
         | fsConstants.O_DIRECTORY
         | fsConstants.O_NOFOLLOW,
     );
-    const stableRootPath = `/proc/self/fd/${rootFd}`;
-    const stableParentPath = `/proc/self/fd/${parentFd}`;
+    const stableRootPath = linuxProcExecutionAuthorityAdapter.stableFdPath(rootFd);
+    const stableParentPath = linuxProcExecutionAuthorityAdapter.stableFdPath(parentFd);
     const projectIdentity = executionLockDirectoryIdentity(rootFd);
     const inputIdentity = executionLockStatsIdentity(
       statSync(projectRoot, { bigint: true }) as unknown as ReturnType<typeof statSync>,
@@ -1602,7 +1634,7 @@ function pinExecutionLockDirectories(
         | fsConstants.O_DIRECTORY
         | fsConstants.O_NOFOLLOW,
     );
-    const stableLocksPath = `/proc/self/fd/${locksFd}`;
+    const stableLocksPath = linuxProcExecutionAuthorityAdapter.stableFdPath(locksFd);
     const locksIdentity = executionLockDirectoryIdentity(locksFd);
     if (locksIdentity.dev !== projectIdentity.dev
       || locksIdentity.mountId !== projectIdentity.mountId

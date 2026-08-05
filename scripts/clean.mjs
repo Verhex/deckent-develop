@@ -4101,8 +4101,23 @@ function cleanExecutionStableDirectoryIdentityEquals(left, right) {
   return left.dev === right.dev && left.ino === right.ino;
 }
 
+/**
+ * PLATFORM-EXEC-AUTH-W1-INTERFACE-001: build-time twin of file-lock.ts's
+ * `linuxProcExecutionAuthorityAdapter` (clean.mjs runs before `dist/` exists,
+ * so it cannot import the production module — the twin-parity contract test
+ * pins both surfaces to the same shape and behavior). The delete-side
+ * capability (`identityStableDirectoryAdapterBase`) is clean-specific and
+ * deliberately not part of this shared four-capability surface.
+ */
+export const cleanExecutionAuthorityAdapter = Object.freeze({
+  classify: cleanExecutionAuthorityPlatformAdapter,
+  stableFdPath: fd => `/proc/self/fd/${fd}`,
+  pinnedMountId: cleanExecutionPinnedMountId,
+  directoryIdentity: cleanExecutionDirectoryIdentity,
+});
+
 function pinCleanExecutionAuthorityDirectories(projectRoot) {
-  const adapter = cleanExecutionAuthorityPlatformAdapter();
+  const adapter = cleanExecutionAuthorityAdapter.classify();
   let rootFd;
   let locksFd;
   try {
@@ -4114,7 +4129,7 @@ function pinCleanExecutionAuthorityDirectories(projectRoot) {
         | fsConstants.O_DIRECTORY
         | fsConstants.O_NOFOLLOW,
     );
-    const stableRootPath = `/proc/self/fd/${rootFd}`;
+    const stableRootPath = cleanExecutionAuthorityAdapter.stableFdPath(rootFd);
     const projectIdentity = cleanExecutionDirectoryIdentity(rootFd);
     const inputIdentity = cleanExecutionStatsIdentity(
       statSync(inputProjectRoot, { bigint: true }),
@@ -4158,7 +4173,7 @@ function pinCleanExecutionAuthorityDirectories(projectRoot) {
         | fsConstants.O_DIRECTORY
         | fsConstants.O_NOFOLLOW,
     );
-    const stableLocksPath = `/proc/self/fd/${locksFd}`;
+    const stableLocksPath = cleanExecutionAuthorityAdapter.stableFdPath(locksFd);
     const locksIdentity = cleanExecutionDirectoryIdentity(locksFd);
     if (locksIdentity.dev !== projectIdentity.dev
       || locksIdentity.mountId !== projectIdentity.mountId

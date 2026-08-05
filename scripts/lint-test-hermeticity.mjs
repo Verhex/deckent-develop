@@ -106,17 +106,18 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // worktree scan, no drift elsewhere. A first attribution attempt ran the
   // new-side scan with dist/ present and was discarded as contaminated —
   // measure BOTH sides build-free. Prior refresh: SSE-ONEVENT (12453).
-  count: 12464,
-  digest: 'bf16f5cc52c2b7524ac924544f7915f73e8b0c4d98e6a37727add244f71e42bb',
+  // 2026-08-05 (build-free, EXEC-AUTH-W1): +2 — clean.mjs twin adapter object
+  // callsites; parent-worktree identity-diff shows no drift elsewhere.
+  count: 12466,
+  digest: '01e74c39343eeffa754d278f500c188492effd98109389c2e29fdc8e5df52cf9',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (PLATFORM-CLEAN observe slice): count unchanged, digest moved —
-  // clean.mjs gained the observe-only no-adapter path (mutation authority
-  // still exclusively behind the Linux fd adapter).
-  // Prior: SSE-ONEVENT coordinator-registry fan-out.
+  // 2026-08-05 (EXEC-AUTH-W1): count unchanged, digest moved — file-lock.ts
+  // adapter interface extraction + clean.mjs twin adapter.
+  // Prior: PLATFORM-CLEAN observe slice.
   count: 1196,
-  digest: '2bf5ef8add101d8dbe0ca53cd067de9ea5c638379a14a824d7668a72edf32315',
+  digest: '9c5fb9f7a962a25c62d81d7d7aceaacf10740b1a4a297c3f353dd4f604b9471c',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
