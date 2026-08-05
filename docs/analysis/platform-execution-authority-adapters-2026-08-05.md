@@ -119,3 +119,28 @@ kontrol edilir (rapor sorumluluğu: aktif oturum).
 - **Not**: ADR-D-005'in işaret ettiği `docs/reference/dependencies.md` docs-reset'te
   arşive gitti; kalıcı bağımlılık-kataloğu evi ayrı açık iştir (DOCS-DEPS-HOME) —
   o eve taşınana dek merit kaydı burada yaşar.
+
+## 10. W3-PR-B tasarımı — op-tabanlı arayüz v2 (2026-08-05, PR-A sonrası)
+
+PR-A'nın macOS kanıtı (PR #58: addon gerçek Darwin'de derlendi, primitive suite 6/6)
+sonrası kritik tasarım gerçeği: W1 arayüzünün `stableFdPath` yeteneği **Linux-şekillidir**
+— Darwin'de bir dizin-fd'sinin sabit path'i yoktur; tüm işlemler handle-üzerinden
+(at-ailesi) gitmek zorundadır. Dolayısıyla PR-B bir adapter-takması değil, tüketici
+akışlarının kademeli migrasyonudur:
+
+1. **Arayüz v2 (op-tabanlı)**: `openDirAt(parentHandle, name)`, `readdirOf(handle)`,
+   `unlinkAt(handle, name, removeDir)`, `renameAt(...)`, `identityOf(handle)`,
+   `mountIdentityOf(handle)`, `realPathOf(handle)` (Darwin: F_GETPATH — native'e
+   eklenecek tek yeni primitif). Linux impl'i mevcut /proc-path mekaniğini bu op'ların
+   arkasına koyar (davranış-değişimsiz); Darwin impl'i PR-A binding'ini kullanır.
+2. **Tüketici migrasyonu**: `pinExecutionLockDirectories` + clean'in pinli traversal'ı
+   path-kompozisyonundan op-çağrılarına geçer. Linux'ta bayt-eşdeğerlik mevcut
+   suite'lerle kanıtlanır (W1 deseni).
+3. **SQLite secure-open (Darwin)**: pinli locks-fd'den `realPathOf` → DB o path'te
+   açılır → açılış sonrası fd-identity yeniden doğrulanır (path-swap penceresi
+   fd-doğrulamasıyla kapanır); Linux'ta mevcut /proc yolu aynen.
+4. **Kapanış kanıtı**: macos CI'da real-binary `npm run clean` (dist'li rebuild) +
+   execution-lock yaşam-döngüsü yeşili; Linux regresyon: lock+clean+fence suite'leri.
+5. **Tahmin**: 2-3 PR (v2-arayüz+Linux-migrasyon → Darwin-impl+kanıt → temizlik);
+   her biri kendi receipt'iyle. Windows (W4) aynı v2 arayüzünü handle-tabanlı
+   NT-primitifleriyle doldurur — v2 tasarımı W4'ü de öndeler.
