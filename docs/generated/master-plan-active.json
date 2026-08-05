@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5791d91f7e8f67b145e415ac1865d55c9476d8229b5aae22523f1a405f4472b5"
+    "value": "9a5599d579c4ff643350af6f07293f0c9dd64f39041f6dffcab8d01d6809e1c6"
   },
   "summary": {
     "total": 362,
@@ -2866,7 +2866,7 @@
       "state": "OPEN",
       "updated": "2026-08-05",
       "definitionDigest": "377b68bf72f3c05a5f3ee4e710ea0cbb9440fb38fa026b26174f158e2df66afc",
-      "progressDigest": "29c0f9b36b31afe656c4487675eee98c85b7372986d78c327cc02fdd9c88e2e5",
+      "progressDigest": "7726ad1c3356cbd58aa094546e7a3bb2ba9473d727bdb69e3fa2a6f80bc5edac",
       "terminalClosureDigest": null
     },
     {
@@ -3414,9 +3414,9 @@
       "program": "PRODUCT",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-03",
+      "updated": "2026-08-05",
       "definitionDigest": "f600b19e95b3680622cbb6186f441fefd7ee9b583acb8e0590c190c93c21394b",
-      "progressDigest": "49246619d48a0f9ff0a2eea35c449e812877acfe1cd7ef5bdccfdc3c9c658408",
+      "progressDigest": "89f532fdea38c81b202fe888820d09aa2b2800dda0d196c4f7c1b41e0e92026d",
       "terminalClosureDigest": null
     },
     {
@@ -14579,7 +14579,7 @@
         "GR-2026-08-05-CLEAN-OBSERVE-01"
       ],
       "acceptance": "Darwin adapter'ı (/dev/fd + mnt_id'siz mount-boundary eşdeğeri) ve Windows adapter'ı (handle-tabanlı identity pin veya typed policy-kararı) ayrı tasarımla gelir; her platform kendi real-binary clean kanıtıyla kapanır; o zamana dek HOLD dürüst kalır, sessiz bypass yok",
-      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla; 2026-08-05 CANLI-KOŞU DÜZELTMESİ (PR #51 job 92224891165): observe-dilimi ilk kapıyı geçirdi ama beklenen macos/windows yeşili GELMEDİ — HOLD bir sonraki mimari katmana taşındı (E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED: cleanExecutionAuthorityPlatformAdapter /proc-tabanlı, clean.mjs:4025); gerçek kalan kapsam execution-authority non-Linux adapter PAKETİdir (KERNEL-STATE-001'in bilinen 'native macOS/Windows adapters open' açığıyla aynı aile); katman-katman PR soymak yerine paket-tasarımı owner-kararı bekler",
+      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla; 2026-08-05 CANLI-KOŞU DÜZELTMESİ (PR #51 job 92224891165): observe-dilimi ilk kapıyı geçirdi ama beklenen macos/windows yeşili GELMEDİ — HOLD bir sonraki mimari katmana taşındı (E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED: cleanExecutionAuthorityPlatformAdapter /proc-tabanlı, clean.mjs:4025); gerçek kalan kapsam execution-authority non-Linux adapter PAKETİdir (KERNEL-STATE-001'in bilinen 'native macOS/Windows adapters open' açığıyla aynı aile); katman-katman PR soymak yerine paket-tasarımı owner-kararı bekler; 2026-08-05 TASARIM-ÖNERİSİ: docs/analysis/platform-execution-authority-adapters-2026-08-05.md — 4-yetenek ayrıştırması (fd-traversal/mount-pin/host-boot-id/liveness), Darwin+Windows adapter tasarımları, tek native N-API capability modülü + W1-W4 faz planı; Alperen karar noktaları D1 (native-addon admission, ADR-D-005) · D2 (Windows Win10-1607/NTFS tabanı) · D3 (adapter'a dek fail-closed korunumu — önerilen)",
       "updated": "2026-08-05"
     },
     {
@@ -16728,8 +16728,8 @@
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "CLI text/JSON and MCP status expose equivalent state, resumability and pending recovery approval without either adapter inferring lifecycle independently",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED; 2026-08-03 ölçüm (PAZARTESI P4): MCP paketi 121 → 70 kırık. CLI ile AYNI kök: deckent_status tool'u canlı run authority ve canonical persisted read model olmadan zengin projeksiyon alanlarını üretmiyor, HOLD payload'u dönüyor (src/mcp/tools/status.ts:392-411). status-history 15 → 0, status-rich 14 → 3. Bu, CLI↔MCP'nin gerçekten aynı canonical projection'ı tükettiğinin kanıtıdır; 2026-08-03 P0→P1 indirimi 2026-08-03 xverify turunda GERİ ALINDI (Alperen onayı, codex-analysis/xverify-wp0-2026-08-03.md C-ekseni): indirim gerekçem \"dependents=0 → critical path değil\" idi ve YANLIŞTI — codex-analysis/14-critical-path-prioritization.md Gate-1 CLI/MCP drift closure'ı açıkça declared critical path'e koyar ve PAZARTESI P4'ü FAZ-4 öncesi kritik yolda tutar; graph-dependent sayısı declared release/admission path kararını çürütemez. P0 geri geldi",
-      "updated": "2026-08-03"
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED; 2026-08-03 ölçüm (PAZARTESI P4): MCP paketi 121 → 70 kırık. CLI ile AYNI kök: deckent_status tool'u canlı run authority ve canonical persisted read model olmadan zengin projeksiyon alanlarını üretmiyor, HOLD payload'u dönüyor (src/mcp/tools/status.ts:392-411). status-history 15 → 0, status-rich 14 → 3. Bu, CLI↔MCP'nin gerçekten aynı canonical projection'ı tükettiğinin kanıtıdır; 2026-08-03 P0→P1 indirimi 2026-08-03 xverify turunda GERİ ALINDI (Alperen onayı, codex-analysis/xverify-wp0-2026-08-03.md C-ekseni): indirim gerekçem \"dependents=0 → critical path değil\" idi ve YANLIŞTI — codex-analysis/14-critical-path-prioritization.md Gate-1 CLI/MCP drift closure'ı açıkça declared critical path'e koyar ve PAZARTESI P4'ü FAZ-4 öncesi kritik yolda tutar; graph-dependent sayısı declared release/admission path kararını çürütemez. P0 geri geldi; 2026-08-05 TAZE PARİTE ÖLÇÜMÜ: 08-03'teki 70-kırık MCP ölçümü FAZ4B-öncesi dünyaya aitti — MCP sınıfı FAZ4B-B1'de tamamen sıfırlandı (1031/1031); bugünkü hedefli parite-çekirdeği koşusu (cli status-json-contract + status-read-model-wire + commands/status + mcp status-failed-tasks + status-terminal-receipt) 55 pass / 8 skip YEŞİL; DONE'u bloklayan tek şey dependency-DAG kuralı (RUN-STATUS-AUTHORITY-001 OPEN) + API/Terminal/Desktop/connector residual'ları",
+      "updated": "2026-08-05"
     },
     {
       "order": 6130,
@@ -18925,6 +18925,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5559d6c04a8677d9400f7d3b2bb9a6e0a8fd3e5f38fda9611815b87aa75e0606"
+    "value": "f2ae1d161a52f368feb8b0c6a607fa7df12d23859cddcc2fa6199d4f1f0cab0b"
   }
 }
