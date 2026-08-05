@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "7978e78a96190ddbe2ee334acc4da689a4fdfd65299023ba81bb6dd47aa58c0e"
+    "value": "d8f74cccedc02d7afbf6b1c3d706c4e0c35621805e16d74aaafb5d429c2d9e52"
   },
   "summary": {
     "total": 364,
     "active": 343,
     "terminal": 21,
-    "receipts": 46,
+    "receipts": 47,
     "byState": {
-      "OPEN": 253,
+      "OPEN": 252,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 23,
+      "VERIFY": 24,
       "DONE": 21,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2874,10 +2874,10 @@
       "id": "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "b5e46bc9464bdf52e4a2167e0ffe098ec54e1c4d7913e7329a6cc97dfb350f32",
-      "progressDigest": "5f51865c26ad7edb8ee39f670d6af60f24eb3fab9d837739a89c4e21bf473cac",
+      "progressDigest": "99865b98a9ab77d2e571491b83abd75e1e6f3f4e434bf2199e89ff0e535c87ff",
       "terminalClosureDigest": null
     },
     {
@@ -4527,6 +4527,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T06:15:19Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-EXEC-AUTH-W1-01",
+      "authorityDigest": "447ea9d8ba66b1b72764e0637b8f42d32bcf87dba762efabd90be00c719c0b89",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T08:52:00Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14621,12 +14631,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -14634,9 +14644,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-EXEC-AUTH-W1-01"
+      ],
       "acceptance": "Linux yolu bayt-eşdeğer davranışta kalır (mevcut lock+clean suite'leri yeşil); adapter arayüzü 4-yetenek ayrıştırmasını (fd-traversal/mount-pin/host-boot-id/liveness) tipler; clean.mjs ikizi parite-testiyle sabitlenir",
-      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W1",
+      "evidence": "Açılış 2026-08-05: D1-D3 onayı (Alperen); tasarım: docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W1; `receipt=GR-2026-08-05-EXEC-AUTH-W1-01`; 2026-08-05 SETTLEMENT (b7ed80cb1): tipli 4-yetenek arayüzü + linuxProcExecutionAuthorityAdapter (file-lock) + cleanExecutionAuthorityAdapter ikizi + ikiz-parite kontrat testi 5/5 (aynı gerçek fd için birebir dev+ino+mountId); stable-path literal'leri adapter üzerinden; broker taraması: cross-verify-evidence-broker zaten tipli UNSUPPORTED_PLATFORM kapılı, W3 üçüncü-tüketici adayı; `proof=lock-clean-parity-suites-205of206-green`; Linux bayt-eşdeğerlik: lock+clean+fence 205/206, tsc temiz, hermetic build-free",
       "updated": "2026-08-05"
     },
     {
@@ -19013,6 +19025,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5831772fe1492296e3c8c8663abbaac3a4394c2f93764c6f43d3c46248a780ad"
+    "value": "3e76b5615d2a01ae328901e935bcf09dc288fb146fd418c060b6d9c8cbbc28dd"
   }
 }
