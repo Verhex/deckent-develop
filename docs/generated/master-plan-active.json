@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "26bc0b6dbd111c92cb91bfed28dfd7c82c573e81c54e3b6b488491aab5b54f74"
+    "value": "103023e4ef83b2d038ad3ea4ec41a35647524f4cf560e25f773361be0d2d7c04"
   },
   "summary": {
-    "total": 377,
-    "active": 354,
+    "total": 379,
+    "active": 356,
     "terminal": 23,
-    "receipts": 57,
+    "receipts": 60,
     "byState": {
-      "OPEN": 259,
-      "READY": 0,
+      "OPEN": 258,
+      "READY": 3,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 28,
@@ -22,8 +22,8 @@
     },
     "byPriority": {
       "P0": 249,
-      "P1": 97,
-      "P2": 31
+      "P1": 98,
+      "P2": 32
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 65,
+      "TRUTH": 67,
       "XPLAT": 3
     }
   },
@@ -784,10 +784,10 @@
       "id": "CI-HERMETIC-SCAN-BUDGET-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "OPEN",
+      "state": "READY",
       "updated": "2026-08-05",
       "definitionDigest": "2544e1a74056fe5b57303f44f1584b318e85a9a69369c46e2e647b1dd5e3fb1d",
-      "progressDigest": "755aa966e17c273cf5939fbc5a74d9daed6f0614e14fb6e5f0282c92c5c47712",
+      "progressDigest": "15a870b30695608dc7d8e5f83382fa08b81c14dfce7aff21983cc4827e5f1927",
       "terminalClosureDigest": null
     },
     {
@@ -821,6 +821,28 @@
       "updated": "2026-08-04",
       "definitionDigest": "ccd7524764315b11219b57c06c43449efc0f38d3b14f1c3914fb3a2942699a1b",
       "progressDigest": "0800d4a11c6476a93c0011f181918a5ffe5ae4f4b35029efdcf6a5dc4ba1e9f4",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 527,
+      "id": "CI-BUILTINS-DRIFT-HERMETIC-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "deb036486caaf5a9fd6e3300977a68354f59014b08cb7caf0c0c319be7d217b3",
+      "progressDigest": "ac88bbb41cc6a9873116045ede74e96d6ae5a635d88784883d4341b3808824fb",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 528,
+      "id": "DOCS-ALP-DISCIPLINE-SYNC-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "6682ab7ac1af697cb93bfe0b8a9acbdb3af62e0b924c6e61a3f73f84623e7bfe",
+      "progressDigest": "0d59a28f44913c0d7351ccfd3614543aa5ee5762af7a97f9340ad17f45c9e1d9",
       "terminalClosureDigest": null
     },
     {
@@ -4782,6 +4804,36 @@
         "transitionAt": "2026-08-05T22:33:52Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-HERM-BUDGET-523-01",
+      "authorityDigest": "05fe92518dcb5b088803a0b8c63b01add5298134a3e2c98041037126ce4147ea",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-BUILTINS-HERM-527-01",
+      "authorityDigest": "d2abe6686c27d548477d0975fc92125e40660ab4bece7568ac6d92b03c0f2294",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-ALP-DISC-104-01",
+      "authorityDigest": "47f9c3f6aab5090a138e410d7ab857ff12f3f087a7d75ba6f8f3c53cef65e20d",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6899,9 +6951,9 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
-        "C": "0",
+        "C": "1",
         "W": "0",
         "E": "0",
         "H": "?",
@@ -6912,9 +6964,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-HERM-BUDGET-523-01"
+      ],
       "acceptance": "İç bütçeler ölçüm-temelli ve ortam-farkındalıklı (runner-çarpanı veya env-scale) yeniden kalibre edilir; 522 sonrası main koşusu hâlâ bütçe-aşımı üretirse bu satır acilleşir; workaround'suz lokal koşu yeşil",
-      "evidence": "Açılış 2026-08-06: 522 log-izolasyonunun ikincil bulgusu + dünkü 1GiB GC-slack kaydı — Alperen seçimi (karar-turu: küçük işler)",
+      "evidence": "Açılış 2026-08-06: 522 log-izolasyonunun ikincil bulgusu + dünkü 1GiB GC-slack kaydı — Alperen seçimi (karar-turu: küçük işler); 2026-08-05 ACİLLEŞME: 522 sonrası ilk main koşusu (31053488358) writer-analysis 60000.8ms bütçe-aşımıyla düştü — öngörü doğrulandı; `receipt=GR-2026-08-05-HERM-BUDGET-523-01`",
       "updated": "2026-08-05"
     },
     {
@@ -6978,6 +7032,72 @@
       "acceptance": "Bot hesabı org üyesi + tek üyeli enforcement-reviewers team'i; `.github/workflows/**` + validator path'lerine required-reviewer rule; ruleset JSON'u her gece org-owner'ın YAZAMADIĞI append-only depoya snapshot'lanır; canonical validator check'i Actions'tan farklı integration-ID ile yazılır; GHEC trial'ı bu altyapı hazırken başlatılır ve require-workflows + ruleset-history değerlendirilir",
       "evidence": "Açılış: Alperen 2026-08-04 kararı (xverify-E yapısal ikili — parent≠reviewed + self-modifiable-check — TRUST-ANCHOR-001 DÜRÜST SINIR-3/4). Karar-girdisi: docs/analysis/github-solo-mitigations-2026-08-04.md (VerhexIO org + public → merge queue AÇILDI 2026-08-04, required-reviewer/App/snapshot FREE). Zamanlama: Team koltuk 1/1 dolu — bot üyeliği koltuk eklenince, Alperen beyanı ~2026-08-12; o güne kadar sınırlar TRUST-ANCHOR-001'de typed-açık olarak yaşar, kritik yol bundan bağımsız",
       "updated": "2026-08-04"
+    },
+    {
+      "order": 527,
+      "id": "CI-BUILTINS-DRIFT-HERMETIC-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "builtins-drift canlı-iki-ağaç testinin '.deckent/skills/docs dışlanır' pini makine-lokal untracked dizine bağımlı — temiz CI checkout'ta dizin yok, 'expected [] to include docs' kırmızısı (62aafff34 index-silme sonrası kör kalmış, stats-stale kırmızısı maskeliyordu)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-BUILTINS-HERM-527-01"
+      ],
+      "acceptance": "Pin varlık-koşullu olur (dizin mevcutken davranış aynen pinli, temiz checkout'ta atlanır); main-push Tests—Docs+Scripts'in bu kırık sınıfı kapanır",
+      "evidence": "Açılış 2026-08-05: run 31053488358 + 31050457808 log-izolasyonu; `receipt=GR-2026-08-05-BUILTINS-HERM-527-01`",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 528,
+      "id": "DOCS-ALP-DISCIPLINE-SYNC-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Vendored alp-discipline dokusunun upstream v1.0.4'e senkronu (karar-çapası ESSENCE/DISCIPLINE güncel kalsın)",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-ALP-DISC-104-01"
+      ],
+      "acceptance": "alp-discipline/ içeriği upstream v1.0.4 tag'iyle birebir (mekanik kopya, fark yalnız lokal-only .deckent+.gitignore); ESSENCE sürüm-başlığı v1.0.4",
+      "evidence": "Açılış 2026-08-05: Alperen canlı talimatı 'repodan güncel haline çekelim, 1.0.4 versiyonu kullanalım'; `receipt=GR-2026-08-05-ALP-DISC-104-01`",
+      "updated": "2026-08-05"
     },
     {
       "order": 1000,
@@ -19639,6 +19759,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "2b5309b7135d793ee8fb3b24cd5f9c3289fe8ef83ff2b33bf6cecee06df1cca0"
+    "value": "9958d928801572dac9c70dad8c6d0807d08f0ba3253ec563d5b0b40d12572d55"
   }
 }
