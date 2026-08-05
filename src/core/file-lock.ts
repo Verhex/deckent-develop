@@ -1593,7 +1593,11 @@ export interface ExecutionAuthorityOpsV2 {
   realPathOf(fd: number): string;
 }
 
-const EXECUTION_DIR_OPEN_FLAGS =
+// Computed lazily: file-lock's contract is that fsConstants is only touched
+// inside calls, never at module-eval — stale vi.mock('node:fs') fixtures
+// without a `constants` export import this module transitively and must not
+// explode at import time (the FAZ4 #1 root-cause class).
+const executionDirOpenFlags = (): number =>
   fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW;
 
 export const linuxProcExecutionAuthorityOpsV2: ExecutionAuthorityOpsV2 =
@@ -1601,8 +1605,8 @@ export const linuxProcExecutionAuthorityOpsV2: ExecutionAuthorityOpsV2 =
     classify: executionLockPlatformAdapter,
     openDirAt: (parentFd: number | null, name: string): number => (
       parentFd === null
-        ? openSync(name, EXECUTION_DIR_OPEN_FLAGS)
-        : openSync(join(`/proc/self/fd/${parentFd}`, name), EXECUTION_DIR_OPEN_FLAGS)
+        ? openSync(name, executionDirOpenFlags())
+        : openSync(join(`/proc/self/fd/${parentFd}`, name), executionDirOpenFlags())
     ),
     closeFd: (fd: number): void => closeSync(fd),
     readdirOf: (fd: number): string[] => readdirSync(`/proc/self/fd/${fd}`).sort(),
