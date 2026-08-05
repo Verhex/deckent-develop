@@ -19,12 +19,12 @@ SSOT: `docs/MASTER-PLAN.md` · core-memory: `.deckent/docs/core-memory/MEMORY.md
 <!-- AUTOGEN:START id="identity-tests" -->
 Tests: 34,170 descriptors (parsed from tests/**/*.test.ts(x))
 Dashboard Tests: 96 descriptors (parsed from src/dashboard/src/**/*.test.tsx)
-Coverage: 80.18%
+Coverage: N/A
 <!-- AUTOGEN:END id="identity-tests" -->
 <!-- AUTOGEN:START id="identity-summary" -->
 CLI Commands: 75+
 MCP: 49 tools, 8 resources
-Agents: 21 built-in + 2 custom
+Agents: 21 built-in
 Skills: 30 built-in
 <!-- AUTOGEN:END id="identity-summary" -->
 Core Capabilities: Deterministik lifecycle orchestration; durable execution/recovery; multi-provider routing and admission; runtime-wide approvals and governance; DB-first memory; evidence-backed evaluation; outcome-driven agent/skill evolution; training traces; multi-tenant security and audit; cross-platform worker backends; Terminal/Desktop/API/CLI/MCP/connector surfaces.
@@ -38,6 +38,6 @@ Core Capabilities: Deterministik lifecycle orchestration; durable execution/reco
 | MCP Resources | 8 |
 | CLI Commands | 75+ |
 | Dashboard Pages | 20 |
-| Agents | 21 built-in + 2 custom |
+| Agents | 21 built-in |
 | Skills | 30 built-in |
 <!-- AUTOGEN:END id="identity-status" -->
