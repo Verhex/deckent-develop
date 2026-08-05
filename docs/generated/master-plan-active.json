@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5e7bf721f86133120e2c6d9c4c37ad8d0067305647fa462d9561bc163f68165b"
+    "value": "e883e3b6b162a43506d07de3abb7ee32f7ed11b782c75625e53b0aace2006706"
   },
   "summary": {
     "total": 373,
@@ -12,8 +12,8 @@
     "receipts": 54,
     "byState": {
       "OPEN": 256,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 26,
       "DONE": 23,
@@ -751,10 +751,10 @@
       "id": "CI-STATS-HERMETIC-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "3b4763c618e1776efd241bb37c089e47b5feb777a387d6230da8133a4973f825",
-      "progressDigest": "943cf5170cdf1905f0a171d18fa5dafb2973e2bd48170ebf2e4cc6a1d437cfd4",
+      "progressDigest": "9f0bd76b413b8e853a440cf9c6bf01c4723544233f2d79d4997cf4d01fc353c7",
       "terminalClosureDigest": null
     },
     {
@@ -6728,7 +6728,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19437,6 +19437,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b69c0e7c3ea2df2a48d3e0e9b70bfccd3d6dfc1a6af5c25422a93a77e0ca4975"
+    "value": "3c960a29b746f505637a2784eef98e1d922000ad05d1648d9dcc53c15a35c609"
   }
 }
