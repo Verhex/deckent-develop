@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "bbb652dce7ab2c7d57ae8cc4ff4e0e3aa7185adca6fbb1c62f59a2168aaeed3a"
+    "value": "5e7bf721f86133120e2c6d9c4c37ad8d0067305647fa462d9561bc163f68165b"
   },
   "summary": {
-    "total": 372,
-    "active": 349,
+    "total": 373,
+    "active": 350,
     "terminal": 23,
-    "receipts": 53,
+    "receipts": 54,
     "byState": {
       "OPEN": 256,
-      "READY": 0,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 26,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 249,
-      "P1": 95,
+      "P1": 96,
       "P2": 28
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 60,
+      "TRUTH": 61,
       "XPLAT": 3
     }
   },
@@ -744,6 +744,17 @@
       "updated": "2026-08-04",
       "definitionDigest": "6dda7a49b043f6b3b9ec477c607703b7e0993438e4804eeb7b399d6d98e2deeb",
       "progressDigest": "9e037365176911c566bc188aa4896f89253895ec2733db4b7e8c3398791816b0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 521,
+      "id": "CI-STATS-HERMETIC-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "3b4763c618e1776efd241bb37c089e47b5feb777a387d6230da8133a4973f825",
+      "progressDigest": "943cf5170cdf1905f0a171d18fa5dafb2973e2bd48170ebf2e4cc6a1d437cfd4",
       "terminalClosureDigest": null
     },
     {
@@ -4687,6 +4698,16 @@
         "transitionAt": "2026-08-05T13:47:19Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-STATS-HERM-521-01",
+      "authorityDigest": "cf7fb81d3097c34502efec5a771b8ff2bd5e5a7fd8e71817832b1c16f34f1461",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6693,6 +6714,39 @@
       "acceptance": "Aktif receipt baseline'ı working-tree byte'ına değil reviewed parent commit blob'una karşı doğrulanır (git parent-diff kontrolü validator'da veya required CI check'te); `owner=` metni tek başına authority sayılmaz — protected-branch + bağımsız review kanıtı zincire girer; branch protection durumu makine-okunur evidence olarak kayıtlıdır ve sahte-READY senaryosu (xverify E-ekseni 5-adım) regression testi olarak fail-closed kanıtlanır",
       "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur; `receipt=GR-2026-08-03-TRUST-ANCHOR-01`; `proof=trust-anchor-forgery-fail-closed-84cases`; 2026-08-03 SETTLEMENT: (a) validator'a reviewed-parent doğrulaması eklendi — aktif receipt'in anchor'ı receipt'i tanıtan commit'in PARENT'ıdır (`git log -S`), commit'lenmemiş receipt HEAD'e (son reviewed state) çıpalanır; baseline anchor blob'uyla eşleşmezse `RECEIPT_BASELINE_UNREVIEWED` + admission düşer; (b) degradasyon typed: git dışında `no-git/no-history/no-parent` modu stderr WARN üretir, sessiz geçiş yok — zorlama garantisi ruleset 20321963'ün required check'lerinde (validator-contract 3 bacak + Type Check) ve o bacaklara eklenen `fetch-depth: 0`'da; (c) ruleset kanıtı makine-okunur: docs/evidence/trust-anchor/ruleset-20321963-2026-08-03.json (active, deletion+non_fast_forward+required_status_checks, bypass_actors BOŞ, current_user_can_bypass=never); (d) KANIT: 11 yeni vaka — 6 hermetik anchor-çözümü (sahte git, process yok) + 4 gerçek-git senaryosu (meşru authoring GEÇER, working-tree sahteciliği DÜŞER, xverify 5-adım aynı-commit saldırısı DÜŞER, meşru iki-commit akışı GEÇER) + git yetenek beyanı; suite 84/84. DÜRÜST SINIR-1 (bootstrap): bu dilimin KENDİ receipt'i ile implementasyonu aynı patch'te iniyor — doğduğu commit'te kendini zorlayamazdı; eski rejim altında admitted son dilim budur ve bundan SONRAKİ her aktif receipt parent-anchor'a tabidir. DÜRÜST SINIR-2: `owner=` metni hâlâ kriptografik authenticate edilmiyor — ruleset PR-akışını zorunlu kılarak yazar-dışı görünürlük getirir, imzalı-commit/review katmanı RECEIPT-001 kapsamında açık. X `?`: 3-platform koşusu bir sonraki CI turunda; 2026-08-03 X KAPANDI: PR #27 required-check koşusu (run 30846122775) — Validator Contract ubuntu/macos/windows üçü de pass, trust-anchor kodu ve 84-case suite dahil; merge ancak bu 3 bacak + Type Check yeşilken mümkün oldu (ruleset'in kendisi kanıt zincirinin parçası: direct push fiilen reddedildi, akış PR'a döndü); 2026-08-04 XVERIFY-E TUR-2 SONUCU (codex-analysis/xverify-e-2026-08-03.md): REFUTED — özgün 5-adım saldırısı fail-closed DOĞRULANDI (84/84 bağımsız koşum) ama dört mekanik varyant kabul yolu üretti (merge-introduction `-S`'e görünmez, rename anchor'ı ileri taşır, shallow-clone Type Check bacağında WARN-geçiş, blob-okuma hatası ABSENT sanılır) ve iki yapısal sınır adlandı (parent≠reviewed varsayımı, required-check self-modification). Mekanik dörtlünün kapanışı TRUST-ANCHOR-002'dedir; yapısal ikili solo-hesap mitigasyon araştırması sonrası owner kararıyla typed sınır veya iş olarak hükme bağlanacak — bu satır o karara kadar VERIFY'da kalır ve kapanmış SAYILMAZ",
       "updated": "2026-08-04"
+    },
+    {
+      "order": 521,
+      "id": "CI-STATS-HERMETIC-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "update-readme-stats üreteci hermetik değil: sprint rozeti lokal .brain arşivinden, coverage rozeti lokal coverage-artifact varlığından türüyor — iki makine aynı çıktıyı üretemiyor, main-push Tests—Docs+Scripts stats-stale kalıcı kırmızı (3 bandaj sonrası mimari kök)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-STATS-HERM-521-01"
+      ],
+      "acceptance": "Volatil rozet girdileri (sprint, coverage) izlenen snapshot dosyasından okunur; check/write yalnız izlenen dosyaların fonksiyonu olur (temiz checkout deterministik — CI ile lokal aynı sonucu üretir); bilinçli güncelleme refresh-snapshot moduyla (sprint monotonik, coverage yalnız açık bayrakla); main-push Tests—Docs+Scripts yeşile döner",
+      "evidence": "Açılış 2026-08-05: stats-stale üçüncü tekrarında kök TASARIMSAL bulundu, bandajlama durduruldu, öneri Alperen'e taşındı; 2026-08-05 KARAR: 'öneri kabul edildi' (Alperen) — izlenen-snapshot tasarımı onaylı; `receipt=GR-2026-08-05-STATS-HERM-521-01`",
+      "updated": "2026-08-05"
     },
     {
       "order": 526,
@@ -19383,6 +19437,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6c71133cba07ce1f7a811fa827e6a9b7f69e981048544725ca40b0828a01cd40"
+    "value": "b69c0e7c3ea2df2a48d3e0e9b70bfccd3d6dfc1a6af5c25422a93a77e0ca4975"
   }
 }
