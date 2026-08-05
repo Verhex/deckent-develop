@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6c8e9f2c38f2ab08cd5dca1c7b40de373e8eb3a72ac3631553b38891a3e65a0d"
+    "value": "004baaafdbcd8aa86ed8d74583dea6c8d42f45ec0470bc53a2843fe8fd1fafd0"
   },
   "summary": {
     "total": 352,
     "active": 345,
     "terminal": 7,
-    "receipts": 42,
+    "receipts": 43,
     "byState": {
-      "OPEN": 244,
+      "OPEN": 243,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 34,
+      "VERIFY": 35,
       "DONE": 7,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2797,10 +2797,10 @@
       "id": "PROD-SSE-ONEVENT-WIRE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-08-04",
+      "state": "VERIFY",
+      "updated": "2026-08-05",
       "definitionDigest": "c55b537f62fe50b9379986f697cfbe1dd9d0e501f8224ea922a5af2c79cac3b7",
-      "progressDigest": "08f417c44045133659bde8ae97127675bb3ed267590c5b9f0d28ccc4f06c7101",
+      "progressDigest": "21cd70f23de772bc8ff409d562eb9912e2fef84b50e38e69f8d5dba71890aa74",
       "terminalClosureDigest": null
     },
     {
@@ -4355,6 +4355,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T03:57:26Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-SSE-ONEVENT-01",
+      "authorityDigest": "b5de076f9923296c0e0922045bbc28f452c121e962b0e30cdceca691a4e9f0ae",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T05:17:50Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14619,12 +14629,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -14632,10 +14642,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-SSE-ONEVENT-01"
+      ],
       "acceptance": "Koordinatör hangi ingress'ten yaratılırsa yaratılsın SSE publisher'a bağlanır (registry'ye sonradan onEvent iliştirme veya plan-service'in publisher'la yaratması); ilk-istek-propose replay'inde canlı SSE aboneliği event alır; durable log/replay davranışı değişmez",
-      "evidence": "Açılış 2026-08-04: FAZ4B-B5 api-onarımı keşfi — tests/api/server.test.ts'te canlı-sunucu davranışı önce onEvent'li route ile tel kurularak pinlendi ve boşluk test-içi yorumla belgelendi; durable log etkilenmiyor, yalnız canlı yayın; wiring-fix bu satırın işi",
-      "updated": "2026-08-04"
+      "evidence": "Açılış 2026-08-04: FAZ4B-B5 api-onarımı keşfi — tests/api/server.test.ts'te canlı-sunucu davranışı önce onEvent'li route ile tel kurularak pinlendi ve boşluk test-içi yorumla belgelendi; durable log etkilenmiyor, yalnız canlı yayın; `receipt=GR-2026-08-05-SSE-ONEVENT-01`; 2026-08-05 SETTLEMENT: registry per-root mutable listener-set + sabit fan-out dispatcher'a geçti (12cafca98) — onEvent publisher'ı koordinatör hangi ingress'ten hangi sırayla yaratılmış olursa olsun idempotent iliştirilir (Set kimlik-dedupe, per-listener fail-soft), durable log/replay değişmedi; durability testindeki list-priming workaround'u kaldırıldı; `proof=sse-onevent-propose-first-fail-closed-then-green`: propose-ilk-istek testi fix'siz üretimde DÜŞTÜ, fix'le 17/17; konsumer sınıfları 112 dosya/1152 test yeşil, tsc temiz; hermetic +5 unresolved parent-commit worktree kimlik-diff'iyle registry'nin kendi callsite'larına atfedildi",
+      "updated": "2026-08-05"
     },
     {
       "order": 3345,
@@ -18948,6 +18960,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a5d5391c3993a742178a79f7820ba243bced6950882255697a62e020e0cd1369"
+    "value": "e32e39e27c8f507a4e824a33424fef249abcd098e150b7c22e59ab25c2f2faa8"
   }
 }

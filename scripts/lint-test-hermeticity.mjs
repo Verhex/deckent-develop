@@ -100,20 +100,21 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, PROD-LANDED-FENCE-ORDER-001): count unchanged, digest
-  // moved — the two SPRINT-488 regression-pin restorations shifted callsite
-  // positions in docker-settlement-monitor-wire/docker-restart-reconcile.
-  // Prior refresh: FAZ4B-B5 (count 12448, +5).
-  count: 12448,
-  digest: 'c7f52221dc7e3d20bc64e501c8f72ad3a4d900d5084f1ffbf867a0354fd53560',
+  // 2026-08-05 (build-free, PROD-SSE-ONEVENT-WIRE-001): +5, all attributed to
+  // run-flow-coordinator-registry.ts itself — the listener-set fan-out rewrite
+  // grew its own static callsite registry (old 4 entries → new 9; verified by
+  // identity-diff against a parent-commit worktree scan, no drift elsewhere).
+  // Prior refresh: LANDED-FENCE (count 12448, digest-only).
+  count: 12453,
+  digest: 'ef7fbf3963bc8a6c212ed268f868d4ae5f7b145c5415210ad90c9485d3d4399a',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (PROD-LANDED-FENCE-ORDER-001): count unchanged, digest moved —
-  // spawn-backend-docker.ts finalizeLandedAttempt now captures the observe fence
-  // before the LANDED retirement. Prior: EXEC-AUTH-REG command-registry entry.
+  // 2026-08-05 (PROD-SSE-ONEVENT-WIRE-001): count unchanged, digest moved —
+  // run-flow-coordinator-registry.ts content changed (listener-set fan-out).
+  // Prior: LANDED-FENCE finalizeLandedAttempt fence capture.
   count: 1196,
-  digest: 'bc4eadbedae86a4032e50fd07a10611a33aa6beb3521fc74510f2e908adaeddd',
+  digest: '843b244bd592dfff4f327beb8340a38ddc965e625cf6b980a9f71dac0e652c7f',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

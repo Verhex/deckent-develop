@@ -175,11 +175,12 @@ describe('SURF-1c — single-authority durability', () => {
   });
 
   it('every durable event is live-published to the SSE layer (coordinator onEvent wire)', async () => {
-    // Üretim-gerçeği (FAZ4B keşfi): koordinatör onEvent SSE teli yalnız İLK
-    // getRunFlowCoordinator çağrısında bağlanır; propose yolu koordinatörü
-    // plan-service üzerinden onEvent'siz yaratabilir. Canlı sunucudaki gibi
-    // önce onEvent'li bir route (list) koordinatörü yaratmalı ki tel kurulsun.
-    await call(root, 'GET', '/api/run-flow/list');
+    // PROD-SSE-ONEVENT-WIRE-001 regression: propose is deliberately the FIRST
+    // request this root ever sees, so plan-service creates the coordinator
+    // without an onEvent publisher. The registry must late-attach the SSE
+    // publisher when the decision route resolves the same coordinator —
+    // without that fan-out this root's live stream is born dead and the
+    // APPROVAL_GRANTED assertion below fails.
     const proposed = await call(root, 'POST', '/api/run-flow/propose', { intentSummary: 'watch me' });
     const flowId = (proposed.body as { proposal: { flowId: string } }).proposal.flowId;
 
