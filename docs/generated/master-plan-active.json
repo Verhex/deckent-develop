@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d8f74cccedc02d7afbf6b1c3d706c4e0c35621805e16d74aaafb5d429c2d9e52"
+    "value": "9e91169a093fdcf0b89164abec934dd2ca8e87e9306de092a2db955d403f9d0f"
   },
   "summary": {
-    "total": 364,
-    "active": 343,
+    "total": 365,
+    "active": 344,
     "terminal": 21,
-    "receipts": 47,
+    "receipts": 48,
     "byState": {
       "OPEN": 252,
-      "READY": 0,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 24,
@@ -22,13 +22,13 @@
     },
     "byPriority": {
       "P0": 248,
-      "P1": 89,
+      "P1": 90,
       "P2": 27
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 14,
-      "AUTHORITY": 27,
+      "AUTHORITY": 28,
       "CODEX": 44,
       "CONNECTOR": 2,
       "COST": 4,
@@ -2896,10 +2896,10 @@
       "id": "PLATFORM-EXEC-AUTH-W2-PROBE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "READY",
       "updated": "2026-08-05",
       "definitionDigest": "7ae236158fa399af25429a8b2be9a0d5c9b0aa6a825f1c59ccb6b8f127ec5bc0",
-      "progressDigest": "9aea042ff3ed3be708d1eac5e18951bd4a62ecb4ebafacedbd53d283d578f25a",
+      "progressDigest": "686c89512a68b6b2c55b2b4ff1806074d5b645f67fb6db1370c1f5597eb46753",
       "terminalClosureDigest": null
     },
     {
@@ -3032,6 +3032,17 @@
       "updated": "2026-07-28",
       "definitionDigest": "6af689eda66f6b9b288a93b76a5bee756215b3bedfb17ad27fe918673ea03fcc",
       "progressDigest": "4d42436acf260ce36e463edb44fe691928b406cd735528f6c85e9ca4808d30d2",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4091,
+      "id": "LIMIT-SPEND-ENFORCE-001",
+      "program": "AUTHORITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "1d8f9fec4cc7e883b5d3fedcf416a3e616b5ec0accffcbc502c4325e61d51408",
+      "progressDigest": "cea9887ccbbf03d24287e5ba6cf7163846a925a2ba450685af246bf4d70144e9",
       "terminalClosureDigest": null
     },
     {
@@ -4537,6 +4548,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T08:52:00Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-EXEC-AUTH-W2-01",
+      "authorityDigest": "49a4f9cdfd025be42bbb64489331a3f393ab6b36afdbc1697d2138da70dcae87",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -14701,7 +14722,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -15242,7 +15263,9 @@
         "RECOVERY-BORN-485-USAGE-BILLING-001",
         "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001"
       ],
-      "children": [],
+      "children": [
+        "LIMIT-SPEND-ENFORCE-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -15261,7 +15284,8 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "RECEIPT-001",
-        "REACHABILITY-001"
+        "REACHABILITY-001",
+        "LIMIT-SPEND-ENFORCE-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-COST-ADMISSION-01"
@@ -15269,6 +15293,38 @@
       "acceptance": "One host authority for admission, reservation, usage, landing and settlement",
       "evidence": "`receipt=GR-2026-07-28-COST-ADMISSION-01`; cost admission separates metered API price authority from registry-known zero-incremental-USD subscription/local/free-tier identity: real project config admits `gpt-5.6-sol` subscription with `unpricedModels=[]`, `$0` and quota `unknown`, while identical API work remains `COST_PRICING_UNKNOWN`; 2026-07-28 live read-only Claude subscription probe reports session 10%, week-all 6%, week-Fable 5% and `ok`, but legacy `limit_gate` is disabled and neither global nor project config contains `provider_limits`; global bootstrap is intentionally not authored because no owner numeric thresholds were supplied and the runtime currently registers only Claude host-subprocess subscription evidence, not Codex main-provider limit source authority—writing it would create a new fail-closed HOLD rather than safe enablement; reservation, settlement and Codex authority remain open",
       "updated": "2026-07-28"
+    },
+    {
+      "order": 4091,
+      "id": "LIMIT-SPEND-ENFORCE-001",
+      "parent": "LIMIT-001",
+      "program": "AUTHORITY",
+      "outcome": "Kümülatif günlük/aylık harcama tavanı gerçek enforcement'a bağlanır: `enforce_spend_gate` semantiği ya typed hard-block (`COST_GATE_EXCEEDED`) üretir ya key dürüst şekilde yeniden adlandırılır",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Pre-spawn'da kümülatif spend aşımı typed block üretir; aşım anındaki aktif sprint kesilmez — graceful-landing, yalnız yeni admission durur (owner ilkesi: akış-engellememe); default davranış değişimi flag-gated + owner-onaylı; config-key adı davranışla birebir örtüşür",
+      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `sprint-finalizer.ts:1886-1889` \"HARD spend gate ... NOT implemented\", `start.ts:951` TODO(post-beta); `cost_limits.enforce_spend_gate` bugün yalnız uyarı emisyonunu açıyor. Envanterdeki en büyük ad-davranış açığı",
+      "updated": "2026-08-05"
     },
     {
       "order": 4100,
@@ -19025,6 +19081,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "3e76b5615d2a01ae328901e935bcf09dc288fb146fd418c060b6d9c8cbbc28dd"
+    "value": "0eb41d3bfd53cc6c471020d3c4a0529dd654fe2dc701ba10f73229eebbea2829"
   }
 }

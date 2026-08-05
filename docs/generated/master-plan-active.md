@@ -5,16 +5,16 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):d8f74cccedc02d7afbf6b1c3d706c4e0c35621805e16d74aaafb5d429c2d9e52`
+**Source digest:** `sha256(normalized-lf-utf8):9e91169a093fdcf0b89164abec934dd2ca8e87e9306de092a2db955d403f9d0f`
 
-**Rows:** 364 total · 343 active · 21 terminal
+**Rows:** 365 total · 344 active · 21 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
 | OPEN | 252 |
-| READY | 0 |
+| READY | 1 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
 | VERIFY | 24 |
@@ -266,7 +266,7 @@
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3344 | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001` | VERIFY | P1 | KERNEL | — | — | ExecutionAuthorityPlatformAdapter arayüz-çıkarımı: file-lock.ts Linux impl'i davranış-değişimsiz adapter arkasına, clean.mjs ikiz-parite kontrat testi, cross-verify-evidence-broker /proc taraması |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
-| 3346 | `PLATFORM-EXEC-AUTH-W2-PROBE-001` | OPEN | P1 | KERNEL | — | — | macOS+Windows capability-probe CI job'ı: /dev/fd dizin-traversal semantiği, POSIX-delete uygunluğu, FileIndex/VolumeSerial kararlılığı gerçek runner'da ölçülür ve evidence-artifact olarak yayımlanır |
+| 3346 | `PLATFORM-EXEC-AUTH-W2-PROBE-001` | READY | P1 | KERNEL | — | — | macOS+Windows capability-probe CI job'ı: /dev/fd dizin-traversal semantiği, POSIX-delete uygunluğu, FileIndex/VolumeSerial kararlılığı gerçek runner'da ölçülür ve evidence-artifact olarak yayımlanır |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
@@ -278,6 +278,7 @@
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
 | 4090 | `LIMIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001` | — | Unified provider/account/tenant/project budget and limit ledger |
+| 4091 | `LIMIT-SPEND-ENFORCE-001` | OPEN | P1 | AUTHORITY | — | — | Kümülatif günlük/aylık harcama tavanı gerçek enforcement'a bağlanır: `enforce_spend_gate` semantiği ya typed hard-block (`COST_GATE_EXCEEDED`) üretir ya key dürüst şekilde yeniden adlandırılır |
 | 4100 | `PROVIDER-INGRESS-001` | BLOCKED | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001`, `LIMIT-001` | `PROVIDER_INGRESS_HOLD` | Provider authority composition for all production ingress |
 | 4101 | `PROVIDER-HOLD-001` | VERIFY | P0 | AUTHORITY | `LIMIT-001` | — | Provider-scoped execution holds are independent from task and USD budget exhaustion |
 | 4102 | `PROVIDER-HOLD-LIVE-PROOF-001` | OPEN | P2 | AUTHORITY | `PROVIDER-HOLD-001` | — | Provider-hold'un canlı kanıtları: login-recovery, mixed-provider continuation, expiry ve authoritative usage-source |
