@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f6ae27848b1f67b47fd1ba79786b0cce8d2d74140cde08621e13059211e5eb5a"
+    "value": "ace7f254941fa878a682c0adadbaa33d5f2531394743c7061ff4679da0adecfa"
   },
   "summary": {
     "total": 354,
     "active": 347,
     "terminal": 7,
-    "receipts": 45,
+    "receipts": 46,
     "byState": {
       "OPEN": 243,
       "READY": 0,
@@ -2822,7 +2822,7 @@
       "state": "OPEN",
       "updated": "2026-08-05",
       "definitionDigest": "377b68bf72f3c05a5f3ee4e710ea0cbb9440fb38fa026b26174f158e2df66afc",
-      "progressDigest": "9c925ccdb33ffbaece8bfcf9ebd2213db85ddcbdf998bc27a821040339fc6676",
+      "progressDigest": "75f4f68040b2707e00feef6872a20c49adc5341661f627ca309e76027c73204a",
       "terminalClosureDigest": null
     },
     {
@@ -4407,6 +4407,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T05:43:46Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-CLEAN-OBSERVE-01",
+      "authorityDigest": "3a983932310521a87ee93f4d54cabfbe252ec0d216ef72147079238bf58f009f",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T06:15:19Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14744,7 +14754,7 @@
       "state": "OPEN",
       "truth": {
         "C": "1",
-        "W": "0",
+        "W": "1",
         "E": "0",
         "H": "?",
         "L": "0",
@@ -14754,9 +14764,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-CLEAN-OBSERVE-01"
+      ],
       "acceptance": "Darwin adapter'ı (/dev/fd + mnt_id'siz mount-boundary eşdeğeri) ve Windows adapter'ı (handle-tabanlı identity pin veya typed policy-kararı) ayrı tasarımla gelir; her platform kendi real-binary clean kanıtıyla kapanır; o zamana dek HOLD dürüst kalır, sessiz bypass yok",
-      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; Alperen kararı: riskli dilim ayrıldı, toplu-merge dışında",
+      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla",
       "updated": "2026-08-05"
     },
     {
@@ -19070,6 +19082,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e367f2b9332bc2c89af29bde2079c43a857872ffdf1cf2e220cfe3c7ba4cc96d"
+    "value": "6678847c7f6229223c542b35120fdc4314c13110e806b9feb0810bb42fc8177f"
   }
 }

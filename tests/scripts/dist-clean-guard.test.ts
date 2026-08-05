@@ -306,3 +306,47 @@ describe('cleanDist hermetic boundary', () => {
     },
   );
 });
+
+describe('PLATFORM-CLEAN-IDENTITY-ADAPTER-001 — observe-portable slice (no identity adapter)', () => {
+  function runWithoutAdapter(
+    fixture: { root: string; scriptPath: string },
+  ): Promise<{ code: number | null; output: string }> {
+    return runNode([fixture.scriptPath], fixture.root, {
+      ...process.env,
+      DECKENT_TEST_HERMETICITY: '0',
+      VITEST: 'false',
+      // Strictness-only seam: forces the no-adapter path on any platform.
+      // It can only REMOVE the delete capability, never grant one.
+      DECKENT_CLEAN_FORCE_NO_IDENTITY_ADAPTER: '1',
+    });
+  }
+
+  it('keeps the typed fail-closed HOLD when dist exists without the adapter', async () => {
+    const fixture = cleanScriptFixture('deckent-clean-no-adapter-dist-');
+    mkdirSync(join(fixture.root, 'dist'), { recursive: true });
+    writeFileSync(join(fixture.root, 'dist', 'stale.js'), '// stale build output\n');
+
+    const result = await runWithoutAdapter(fixture);
+
+    expect(result.code).toBe(1);
+    expect(result.output).toContain('E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED');
+    // The mutation never happened: the stale entry must survive untouched.
+    expect(existsSync(join(fixture.root, 'dist', 'stale.js'))).toBe(true);
+  });
+
+  it('allows a no-dist clean as observe-only when the identity adapter is absent', async () => {
+    const fixture = cleanScriptFixture('deckent-clean-no-adapter-nodist-');
+
+    const result = await runWithoutAdapter(fixture);
+
+    expect(result.code).toBe(0);
+    const lines = result.output.trim().split('\n');
+    const payload = JSON.parse(lines[lines.length - 1]!) as {
+      decision: string; code: string; removed: number; admission: { decision: string };
+    };
+    expect(payload.decision).toBe('ALLOW');
+    expect(payload.code).toBe('CLEAN_COMPLETED');
+    expect(payload.removed).toBe(0);
+    expect(payload.admission.decision).toBe('ALLOW');
+  });
+});
