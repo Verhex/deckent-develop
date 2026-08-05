@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f1d38d2f3490ff9b9cf89947027f24946f541a23454af3275c50da3aed520806`
+**Source digest:** `sha256(normalized-lf-utf8):d8f74cccedc02d7afbf6b1c3d706c4e0c35621805e16d74aaafb5d429c2d9e52`
 
 **Rows:** 364 total · 343 active · 21 terminal
 
@@ -15,9 +15,9 @@
 |---|---:|
 | OPEN | 252 |
 | READY | 0 |
-| IN_PROGRESS | 1 |
+| IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 23 |
+| VERIFY | 24 |
 | DONE | 21 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -264,7 +264,7 @@
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
-| 3344 | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001` | IN_PROGRESS | P1 | KERNEL | — | — | ExecutionAuthorityPlatformAdapter arayüz-çıkarımı: file-lock.ts Linux impl'i davranış-değişimsiz adapter arkasına, clean.mjs ikiz-parite kontrat testi, cross-verify-evidence-broker /proc taraması |
+| 3344 | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001` | VERIFY | P1 | KERNEL | — | — | ExecutionAuthorityPlatformAdapter arayüz-çıkarımı: file-lock.ts Linux impl'i davranış-değişimsiz adapter arkasına, clean.mjs ikiz-parite kontrat testi, cross-verify-evidence-broker /proc taraması |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3346 | `PLATFORM-EXEC-AUTH-W2-PROBE-001` | OPEN | P1 | KERNEL | — | — | macOS+Windows capability-probe CI job'ı: /dev/fd dizin-traversal semantiği, POSIX-delete uygunluğu, FileIndex/VolumeSerial kararlılığı gerçek runner'da ölçülür ve evidence-artifact olarak yayımlanır |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
