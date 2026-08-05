@@ -181,7 +181,11 @@ jobs:
       - run: npm run ci:rebuild-native
       - name: Run docs and scripts tests
         run: npx vitest run tests/docs/ tests/scripts/ --pool=forks
-        timeout-minutes: 5
+        # 522 (CI-DOCS-SCRIPTS-STEP-TIMEOUT-001): the suite measured 307.86s on a
+        # saturated runner and the old 5-minute cap SIGKILLed it mid-flight
+        # (run 31050457808) — same slow-runner class as the 519 test-level raise,
+        # one layer up. 15 minutes = ~3x measured headroom (519 pattern).
+        timeout-minutes: 15
 
   test-dashboard:
     name: Tests — Dashboard
