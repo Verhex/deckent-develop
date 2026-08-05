@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):e5f4a0214b4b566579230d2cbd0bc963c9edf5c3d5ecf4f5e891655791dfde6f`
+**Source digest:** `sha256(normalized-lf-utf8):6f141ead574423d485923d1b284794a433867bd99930c165d331327a7752a7d6`
 
-**Rows:** 365 total · 344 active · 21 terminal
+**Rows:** 368 total · 347 active · 21 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 252 |
+| OPEN | 255 |
 | READY | 0 |
 | IN_PROGRESS | 1 |
 | BLOCKED | 67 |
@@ -290,6 +290,8 @@
 | 4160 | `MCP-LEASE-001` | VERIFY | P1 | AUTHORITY | `PRINCIPAL-001`, `OPERATION-001` | — | Multi-window MCP writer lease and authority-safe read/write split |
 | 4170 | `APPROVAL-QOL-001` | BLOCKED | P1 | AUTHORITY | `APPROVAL-001`, `MCP-LEASE-001` | `DEPENDENCY_UNSATISFIED` | Approval classifier, cross-process expiry and notification dedupe closure |
 | 4180 | `TRUST-HANDOFF-001` | OPEN | P1 | AUTHORITY | `TOOL-AUTHORITY-001`, `AUDIT-001` | — | Agent-çıktısından host-etkisine güven-aktarım zinciri: out-of-band telemetry, monitoring-loss=authority-suspension, egress gateway, Docker-socket default-deny, agent-üretimi dosya provenance'ı ve execution-capable config-mutation admission'ı |
+| 4190 | `SEC-OWASP-ASI-001` | OPEN | P1 | AUTHORITY | — | — | OWASP Agentic Top 10 (ASI01–ASI10, 2026) öz-değerlendirme baseline'ı: her ASI riski için mevcut mekanizma → enforcement sınıfı (ENFORCED/ADVISORY/CONFIG-GATED/UNWIRED) haritası, gap register ve ilgili ledger satırlarına kanıt-bağlaması |
+| 4200 | `SEC-ENFORCE-WIRE-001` | OPEN | P1 | AUTHORITY | — | — | Unwired/inert enforcement envanterinin tipli disposition'ı: yazılmış-ama-devrede-olmayan her güvenlik modülü wire-or-retire kararına bağlanır, sessiz-ölü enforcement kodu kalmaz |
 | 5000 | `TERMINAL-001` | BLOCKED | P0 | TERMINAL | `KERNEL-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Terminal as canonical management and usage surface |
 | 5010 | `TERMINAL-TOOLS-001` | OPEN | P0 | TERMINAL | `TOOL-AUTHORITY-001`, `SURFACE-CUTOVER-001` | — | Role-model tool surface and progressive disclosure |
 | 5020 | `TERMINAL-DEV-001` | OPEN | P0 | TERMINAL | `DO-CUTOVER-001`, `TERMINAL-TOOLS-001` | — | Full codebase development loop inside Deckent terminal |
@@ -327,6 +329,7 @@
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
 | 7020 | `SUPPLY-CHAIN-001` | OPEN | P0 | SECURITY | `AGENT-SKILL-001`, `P02-650` | — | Signed agent, skill and plugin provenance |
 | 7030 | `PLUGIN-SANDBOX-001` | OPEN | P0 | SECURITY | `SUPPLY-CHAIN-001`, `TOOL-AUTHORITY-001` | — | Plugin/skill runtime sandbox and capability enforcement |
+| 7031 | `PLUGIN-SANDBOX-WIRE-001` | OPEN | P0 | SECURITY | — | — | Sprint yolundaki plugin-hook güvenlik kablolaması: `validatePluginSecurity` 4-adım pipeline'ı (allowed-path containment + AST tarama + SHA-256 integrity + Ed25519 publisher imzası) production `loadPluginHooks` çağrısına bağlanır ve `PluginSecurityError` fail-closed olur |
 | 7040 | `MCP-TRUST-001` | OPEN | P0 | SECURITY | `PRINCIPAL-001`, `CAPABILITY-001`, `SUPPLY-CHAIN-001` | — | Outgoing MCP trust, identity and data-boundary authority |
 | 7050 | `HUB-001` | BLOCKED | P1 | ECOSYSTEM | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | `OWNER_DECISION_REQUIRED` | Production-ready Deckent Hub and signed distribution |
 | 7060 | `TOOL-COMPUTER-001` | OPEN | P2 | TOOL | `TOOL-AUTHORITY-001`, `PLUGIN-SANDBOX-001` | — | Optional computer-use/browser automation pack |
