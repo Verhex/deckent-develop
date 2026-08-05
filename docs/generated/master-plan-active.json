@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "ace7f254941fa878a682c0adadbaa33d5f2531394743c7061ff4679da0adecfa"
+    "value": "3971732d6dbc37b882a592159179bbc8a09b65c1ff198f9e04e85df53f90acd6"
   },
   "summary": {
     "total": 354,
-    "active": 347,
-    "terminal": 7,
+    "active": 341,
+    "terminal": 13,
     "receipts": 46,
     "byState": {
       "OPEN": 243,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 37,
-      "DONE": 7,
+      "VERIFY": 31,
+      "DONE": 13,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -674,22 +674,22 @@
       "id": "SEC-DEP-ADVISORY-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-05",
       "definitionDigest": "808654b11f47a434539d6341c9b503170878f5a8975ca71e156ef4caa2b1b45a",
-      "progressDigest": "4b54c9891416579533bd8cceef09b7a73e2b4dff8acbfadeee8f4c76f1468db1",
-      "terminalClosureDigest": null
+      "progressDigest": "ade799f7f69139c6ce078492215800680daf4381183821fc6f5cfc8073640981",
+      "terminalClosureDigest": "f1c403316abd12dfc753a8ef7fd575a7f5a2c12e72dbcdc9b4af82c0bf433c72"
     },
     {
       "order": 516,
       "id": "CI-PACKED-DASHBOARD-TOOLCHAIN-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-05",
       "definitionDigest": "6fbd1c2de0635dd3474d300dab33bfc0eed26e9506b8187f07c7fc282f542ff4",
-      "progressDigest": "a2103e71b9e1bc26bd4974ed827df3aa2ce38c9bdd376dfd86e009f37f1366b0",
-      "terminalClosureDigest": null
+      "progressDigest": "605b76f41cede53e9103a34bdc475a9631da5fc3c0dde00c41e993df9cd1be9f",
+      "terminalClosureDigest": "fdc34e72b3fb26f8d69e5688de1f27a39784276984b21b4c4245a4fd5123f845"
     },
     {
       "order": 520,
@@ -2775,44 +2775,44 @@
       "id": "PROD-SPRINT-PREFIX-PAD-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-04",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "63641d3fefbfef8e21fa2b476f15b3ec0472de3cc95e4b8b592796844b29573c",
-      "progressDigest": "35e4177bf71f7667b810b8d084c5caf9bb083780aac55adbe5dfdf10b6c4f0dd",
-      "terminalClosureDigest": null
+      "progressDigest": "078e273fde6ba6560e86778348b9f3fb1e332f2f6074887a26c4145bc1b18113",
+      "terminalClosureDigest": "f08557f23a15b060a73fad5c3d500b5010b7130e5c88a6472e15a449623c08fd"
     },
     {
       "order": 3335,
       "id": "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-04",
+      "state": "DONE",
+      "updated": "2026-08-05",
       "definitionDigest": "f9ab28fc85c4e3bf7ac71af21ad0e58838e6994bb34651f6c7e7499a8ee8edcd",
-      "progressDigest": "dd83e75c03e7c89181706cf91ff4b3d2a0f7327eef50f5ef9f89c74fb14ab669",
-      "terminalClosureDigest": null
+      "progressDigest": "830185fda219fc293b2d779ea48ec69115f95d426efa41a5d8f59d74d77cbf16",
+      "terminalClosureDigest": "02b965bd3af4fe82bc40929e55501e194e128d3c2f0165cbb7c271e9b920f1dd"
     },
     {
       "order": 3340,
       "id": "PROD-LANDED-FENCE-ORDER-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-05",
       "definitionDigest": "05c43f8200ec3e3112cef30baf61240d36dd04f8b861d25ac75dc06a67cf3598",
-      "progressDigest": "cdfdd09dd4c5d4d1c83e0d69d3ddfde75cf64ff2685c48eb29debfcaacc5d815",
-      "terminalClosureDigest": null
+      "progressDigest": "3438f6741d3a16488c91e9e0fb1747388f4e23b070ad85519dbc901ad9d540de",
+      "terminalClosureDigest": "988b6885772aa679f7de0f3a31a3f3dc52987e479c057da3d89593841463e712"
     },
     {
       "order": 3342,
       "id": "PROD-SSE-ONEVENT-WIRE-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-05",
       "definitionDigest": "c55b537f62fe50b9379986f697cfbe1dd9d0e501f8224ea922a5af2c79cac3b7",
-      "progressDigest": "21cd70f23de772bc8ff409d562eb9912e2fef84b50e38e69f8d5dba71890aa74",
-      "terminalClosureDigest": null
+      "progressDigest": "b8c042e9075acf9a199fc601a7c3a317de3e34cae2f635cc48a0ff359b5ae3c2",
+      "terminalClosureDigest": "4934c9cb9db930f0662893f21cdc3339c8a7896c480bd37ebf5654b1e5f7fabe"
     },
     {
       "order": 3343,
@@ -2822,7 +2822,7 @@
       "state": "OPEN",
       "updated": "2026-08-05",
       "definitionDigest": "377b68bf72f3c05a5f3ee4e710ea0cbb9440fb38fa026b26174f158e2df66afc",
-      "progressDigest": "75f4f68040b2707e00feef6872a20c49adc5341661f627ca309e76027c73204a",
+      "progressDigest": "29c0f9b36b31afe656c4487675eee98c85b7372986d78c327cc02fdd9c88e2e5",
       "terminalClosureDigest": null
     },
     {
@@ -6393,72 +6393,6 @@
       "acceptance": "`status --mode` için doğru-yazımlı canonical değerler + versioned deprecation alias'ları; `deckent run` one-shot ↔ `run start|status|retro|history` namespace çarpışması collision-free canonical UX'e ayrılır; `mode run`'ın diske `sprint` yazması tek public `run` vocabulary kararına bağlanır; config read yüzeyi (bare `config` ↔ var-olmayan `config read`/`config show` önerileri) tek operation adında normalize edilir; hepsi JSON contract testi taşır",
       "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk). Sahipsiz kalemler: CLI-03 · CLI-04 · CLI-05 · CLI-06 · CLI-11 · OQ-13 · OQ-14 · aday-17 · aday-18. Public contract işi: `explainatory`/`standart` kullanıcıya görünen yazım hataları ve düzeltme breaking-change kararı içerir (alias+deprecation vs rename) — karar acceptance'ın parçası; recovery mesajı bugün var olmayan `deckent config read` öneriyor (src/core/config.ts:1922-1925); `receipt=GR-2026-08-04-FAZ4B-B2-01`; 2026-08-04 FAZ4B-B2 kanıt-taşıma + YENİ TYPED BULGU: command-registry coverage guard'ı gerçek drift yakaladı — `execution-authority` komutu CLI'da register'lı (src/cli/commands/execution-authority.ts + index.ts), MCP tool'u var (deckent_execution_authority), i18n anahtarı yazılı (messages.ts:468 cmdCatalog.execution-authority.summary) ama src/cli/command-registry.ts COMMAND_REGISTRY'de satırı YOK; 2 test kırığı bu drift'in dürüst alarmı olarak ratchet'te bilinçli tutuluyor — fix tek registry satırı, kategori/risk etiketi owner-sözlük kararı — 2026-08-04 KAPANDI; `receipt=GR-2026-08-04-EXEC-AUTH-REG-01`; settlement: Enterprise/Değiştir/core + cli,mcp + deckent_execution_authority eşlemesiyle satır eklendi (provider-authority emsali, Alperen 'hallet' yetkisi), guard suite 20/20, ratchet 169→167; `receipt=GR-2026-08-04-FAZ4B-B3-01`; 2026-08-04 FAZ4B-B3 settlement: CLI SINIFI TAMAMEN SIFIRLANDI (7477/7477) — gerçek-binary smoke ailesi run-proven korunarak 22/22 (mock'a çevrim yok), drift teklileri 14 dosyada hizalandı; öne çıkan pinler: ⚡→» (ADR-G-010), --write-allowlist yetki flag'i, cursor-adapter EISDIR'ı artık iyileştirir, exact-plan start iki-fazlı (parent STARTING → child admission DETACHED_RUNNING), scope-gate FAIL dürüst GATE:FAIL+POLICY:DENY; typed docs bulgusu: mcp_client_enabled docs-reset sonrası yalnız arşivde belgeli — canlı docs/en+tr referansına taşınmalı (docs-reset kontrol-listesi kalemi); ayrıca B2 pinledi: cleanup honest-gate (authority-hold + terminal-receipt zorunluluğu), plan'ın durable exact-flow seam'i (DRAFT yaşam döngüsü CLI'dan çıktı), task-artifact dosya-adı↔record-id kimlik disiplini, DECKENT.md host-adapter-nötrlüğü, start --flow-id exact-child capability üçlüsü, finalize --force = forceAbortSprint fenced-ABORTED (öğrenme yan-etkisiz)",
       "updated": "2026-08-04"
-    },
-    {
-      "order": 515,
-      "id": "SEC-DEP-ADVISORY-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Yeni upstream dependency advisory'leri (fast-uri GHSA-7p8r-x3mc-p8w7 · ip-address GHSA-mwp4-54f8-5fhr, ikisi de high) fail-closed Security Audit gate'ini repo-genelinde kırmızıya düşürdü — patch-bump veya SEC-05 signed-exception ile kapatılır",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-SEC-DEP-01"
-      ],
-      "acceptance": "İki advisory ya güvenli sürüme bump edilir ya da SEC-05 allowlist'ine imzalı gerekçeyle işlenir; `dependency-audit` job'ı main'de yeşile döner; transitive zincir (`npm ls fast-uri ip-address`) evidence'a yazılır",
-      "evidence": "Açılış 2026-08-03: PR #32 CI koşusunda tespit (run 30856189200) — advisory 1130720 + 1130722; main'in aynı HEAD'i de aynı sebeple kırmızı, yani S2 kaynaklı değil upstream-yayın kaynaklı. Security Audit required-check DEĞİL (ruleset 4'lüsü dışında) ama Type-Check-maskesi dersinin aynısı burada da geçerli: kronik kırmızı gate gelecekteki gerçek bulguyu maskeler; `receipt=GR-2026-08-05-SEC-DEP-01`; 2026-08-05 SETTLEMENT: gerçek patch-bump (c8030a4f9) — fast-uri override 3.1.4→3.1.5 + ip-address override 10.3.1 (express-rate-limit ip-address'i 10.1.0 TAM-pin tuttuğu için override zorunlu); transitive zincir kanıtı: @modelcontextprotocol/sdk→ajv→fast-uri, @modelcontextprotocol/sdk→express-rate-limit→ip-address; `proof=dependency-audit-pass`: check-dependency-audit.mjs lokal 0 high/critical PASS, signed-exception kullanılmadı; mcp+api tüketici sınıfları 2065 test yeşil",
-      "updated": "2026-08-05"
-    },
-    {
-      "order": 516,
-      "id": "CI-PACKED-DASHBOARD-TOOLCHAIN-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Packed Install job'ı build:all koşarken src/dashboard toolchain'i (typescript+vite) hiç kurulmuyor — build-dashboard.mjs tasarım gereği auto-install yapmaz (hardened digest doğrulaması), ubuntu Packed Install E_DASHBOARD_BUILD_TOOLCHAIN_MISSING ile düşüyor",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-DASH-TOOLCHAIN-01"
-      ],
-      "acceptance": "cross-platform-e2e packed-install job'ı root npm ci'dan sonra src/dashboard'da bounded-retry npm ci koşar; ubuntu Packed Install PR check'i yeşile döner; build-dashboard.mjs değişmez",
-      "evidence": "Açılış 2026-08-05: PR #48 koşusunda tespit (job 92203369118 macos aynı aileden ama clean-HOLD'a takılıyor, bkz 517); ubuntu logu E_DASHBOARD_BUILD_TOOLCHAIN_MISSING kanıtı; `receipt=GR-2026-08-05-DASH-TOOLCHAIN-01`; 2026-08-05 SETTLEMENT: packed-install job'una bounded-retry `npm ci --prefix src/dashboard` adımı eklendi (c8030a4f9, install:all kalıbı); build-dashboard.mjs değişmedi; `proof=pr-ubuntu-packed-install-check`: kapanış kanıtı PR'ın ubuntu Packed Install check'inin yeşili",
-      "updated": "2026-08-05"
     },
     {
       "order": 520,
@@ -10294,10 +10228,6 @@
         "RESULT-INGEST-001",
         "SKILL-DURABILITY-001",
         "PROD-SPAWNSYNC-ASYNC-001",
-        "PROD-SPRINT-PREFIX-PAD-001",
-        "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
-        "PROD-LANDED-FENCE-ORDER-001",
-        "PROD-SSE-ONEVENT-WIRE-001",
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "COMPOSITE-WORKER-001"
       ],
@@ -14607,138 +14537,6 @@
       "updated": "2026-08-03"
     },
     {
-      "order": 3330,
-      "id": "PROD-SPRINT-PREFIX-PAD-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "sprint-lifecycle sprintTaskPrefix padding uyumsuzluğu: sprint numarası <100 iken sprint-sonu task-dosya temizliği hiç çalışmıyor",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-04-PREFIX-PAD-01"
-      ],
-      "acceptance": "`sprintTaskPrefix` üretimi task-dosya adlandırmasıyla (padStart(3)) aynı authority'den türetilir; sprint<100 replay'inde sprint-end unlink + stale sweep gerçekten siler; regresyon testi 2-haneli sprint numarasıyla fail-closed",
-      "evidence": "Açılış 2026-08-04: FAZ4A-S5a typed blocker — src/orchestra/sprint-lifecycle.ts `task-${'{'}sprint.number{'}'}-` padding'siz, dosyalar `task-001-…` padStart(3) ile yazılıyor; prefix sprint<100'de asla eşleşmez, silme sessizce no-op. Dogfood sprint'leri >100 olduğundan canlıda maskeli; taze kurulumda gerçek. Test fixture'ları bug'ı kodlamamak için 3-haneli sprint (101) kullanıyor; `receipt=GR-2026-08-04-PREFIX-PAD-01`; 2026-08-04 SETTLEMENT: kapsam keşifte büyüdü — aynı sınıftan 4 site bulundu ve DÖRDÜ birden düzeltildi: lifecycle sprintTaskPrefix + prompt-arşiv prefix'i, finalizer loadFinalizerAttemptTasks dosya-prefix + id-prefix (İKİNCİSİ DAHA AĞIR: sprint<100'de finalize diskteki runtime-born FIX çocuklarını hiç keşfedemiyordu); hepsi canonical `sprint.id.replace(/^sprint-/,'')` türetmesine (run-status-authority deseni) çekildi; `proof=prefix-pad-regressions-fail-closed-then-green`: 2 regresyon testi (sprint-007) fix'siz üretimde DÜŞTÜ, fix'le geçti; brain 204/204 + finalize-sprint 26/26 + komşu finalizer/controller 228/228, tsc temiz",
-      "updated": "2026-08-04"
-    },
-    {
-      "order": 3335,
-      "id": "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "worktree-binary-authority kaynak-ağaç hash'i eager: src/ dizini olmayan kullanıcı projesinde her non-diagnostic deckent komutu typed HOLD yerine ham stack'le çöküyor",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-04-BIN-ID-LAZY-01"
-      ],
-      "acceptance": "resolveWorktreeBinaryAuthority'de projectSourceTreeIdentity hesabı lazy olur (yalnız deckent-checkout + dist yolunda) veya E_BUILD_SOURCE_TREE_MISSING typed karara düşürülür; src'siz kullanıcı-projesi replay'i fail-closed regresyon testi olur; unit suite'in tüm fixture'ları src/ içerdiği için bugünkü kör nokta kapanır",
-      "evidence": "Açılış 2026-08-04: FAZ4B-B3a typed blocker — src/cli/worktree-binary-authority.ts:326-328 ternary'si buildSourceTreeIdentity'yi user-project-allow kararından ÖNCE eager çağırıyor; E_BUILD_SOURCE_TREE_MISSING yakalanmıyor. Dual-Lens: son-kullanıcı ürün yüzeyinde gerçek (her src'siz projede çökme); dogfood'da maskeli (checkout hep src'li). Kanıt: B3a gerçek-binary koşuları — 3 test dosyasının 12 kırığının kökü buydu, fixture'lara src/ eklenerek test tarafı kapandı; `receipt=GR-2026-08-04-BIN-ID-LAZY-01`; 2026-08-04 SETTLEMENT: eager ternary kaldırıldı — evaluate'in kendi lazy fallback'i (user-project-allow ve root-mismatch kapılarından SONRA) tek hesap yolu oldu; `proof=srcless-user-project-regression-fail-closed-then-green`: yeni regresyon (dist-runtime + valid-identity + src'siz kullanıcı projesi) fix'siz üretimde DÜŞTÜ, fix'le 'user-project' allow; authority suite 25/25 + live 5/5 + cli-bin 9/9, tsc temiz",
-      "updated": "2026-08-04"
-    },
-    {
-      "order": 3340,
-      "id": "PROD-LANDED-FENCE-ORDER-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "Sprint-488 regresyonu (f59503a43): finalizeLandedAttempt heartbeat-observe'u retirement claim'i kapattıktan SONRA çağırıyor — LANDED heartbeat kaydı ve continuation dispatch monitor yolunda sessizce kayboluyor, restart-reconcile LANDED attempt'i reddediyor",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-LANDED-FENCE-01"
-      ],
-      "acceptance": "observeDockerHeartbeatAuthority fence'i retirement'tan ÖNCE hesaplanıp taşınır (veya observe retirement-öncesi sıraya alınır); monitor yolunda LANDED heartbeat + continuation dispatch kaybolamaz; restart-reconcile checkpointed-LANDED'ı tamamlar; iki REGRESSION-PIN testi (docker-settlement-monitor-wire + docker-restart-reconcile) orijinal kontrata geri döner ve fix'siz üretimde DÜŞER",
-      "evidence": "Açılış 2026-08-04: FAZ4B-B4a typed blocker — src/orchestra/spawn-backend-docker.ts:6514-6521, taskResultSettlementActiveClaimDigest DECKENT_E077 'no matching active claim fence'; hata monitor yolunda docker-backend:landed-finalize catch'inde YUTULUYOR (MASTER-PLAN 664 ihlali: held continuation sessiz+non-terminal), restart yolunda yükseliyor. İki test bilinçli REGRESSION-PIN yorumuyla mevcut kırık davranışı pinliyor — üretim düzeltilince pinler kırmızıya döner ve dosyadaki yorumlarda yazılı orijinal kontrata geri alınmalıdır; `receipt=GR-2026-08-05-LANDED-FENCE-01`; 2026-08-05 SETTLEMENT: finalizeLandedAttempt observe-fence'ini writeTaskResultSettlementLandedRetirementAtomic'ten ÖNCE yakalayıp observeDockerHeartbeatAuthority'ye opsiyonel activeClaimFence parametresiyle taşır (fccec47ba); monitor yolunda LANDED heartbeat kaydı + continuation dispatch artık kaybolamaz, restart-reconcile checkpointed-LANDED'ı retiredLanded olarak tamamlar; iki SPRINT-488 REGRESSION-PIN testi dosyalardaki yorumlarda yazılı orijinal kontrata geri alındı; `proof=landed-fence-pins-fail-closed-then-green`: iki test fix'siz üretimde DÜŞTÜ (2 failed/47 passed), fix'le 49/49; orchestra sınıfı 650 dosya 8758 pass + 12 skip, tsc temiz",
-      "updated": "2026-08-05"
-    },
-    {
-      "order": 3342,
-      "id": "PROD-SSE-ONEVENT-WIRE-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "Run-flow koordinatörünün SSE onEvent teli yalnız ilk getRunFlowCoordinator çağrısında bağlanıyor: ilk istek propose/plan yolundan gelirse (run-flow-plan-service koordinatörü onEvent'siz yaratır) o root'un CANLI SSE yayını sessizce ölü doğuyor",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-SSE-ONEVENT-01"
-      ],
-      "acceptance": "Koordinatör hangi ingress'ten yaratılırsa yaratılsın SSE publisher'a bağlanır (registry'ye sonradan onEvent iliştirme veya plan-service'in publisher'la yaratması); ilk-istek-propose replay'inde canlı SSE aboneliği event alır; durable log/replay davranışı değişmez",
-      "evidence": "Açılış 2026-08-04: FAZ4B-B5 api-onarımı keşfi — tests/api/server.test.ts'te canlı-sunucu davranışı önce onEvent'li route ile tel kurularak pinlendi ve boşluk test-içi yorumla belgelendi; durable log etkilenmiyor, yalnız canlı yayın; `receipt=GR-2026-08-05-SSE-ONEVENT-01`; 2026-08-05 SETTLEMENT: registry per-root mutable listener-set + sabit fan-out dispatcher'a geçti (12cafca98) — onEvent publisher'ı koordinatör hangi ingress'ten hangi sırayla yaratılmış olursa olsun idempotent iliştirilir (Set kimlik-dedupe, per-listener fail-soft), durable log/replay değişmedi; durability testindeki list-priming workaround'u kaldırıldı; `proof=sse-onevent-propose-first-fail-closed-then-green`: propose-ilk-istek testi fix'siz üretimde DÜŞTÜ, fix'le 17/17; konsumer sınıfları 112 dosya/1152 test yeşil, tsc temiz; hermetic +5 unresolved parent-commit worktree kimlik-diff'iyle registry'nin kendi callsite'larına atfedildi",
-      "updated": "2026-08-05"
-    },
-    {
       "order": 3343,
       "id": "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
       "parent": "KERNEL-001",
@@ -14768,7 +14566,7 @@
         "GR-2026-08-05-CLEAN-OBSERVE-01"
       ],
       "acceptance": "Darwin adapter'ı (/dev/fd + mnt_id'siz mount-boundary eşdeğeri) ve Windows adapter'ı (handle-tabanlı identity pin veya typed policy-kararı) ayrı tasarımla gelir; her platform kendi real-binary clean kanıtıyla kapanır; o zamana dek HOLD dürüst kalır, sessiz bypass yok",
-      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla",
+      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla; 2026-08-05 CANLI-KOŞU DÜZELTMESİ (PR #51 job 92224891165): observe-dilimi ilk kapıyı geçirdi ama beklenen macos/windows yeşili GELMEDİ — HOLD bir sonraki mimari katmana taşındı (E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED: cleanExecutionAuthorityPlatformAdapter /proc-tabanlı, clean.mjs:4025); gerçek kalan kapsam execution-authority non-Linux adapter PAKETİdir (KERNEL-STATE-001'in bilinen 'native macOS/Windows adapters open' açığıyla aynı aile); katman-katman PR soymak yerine paket-tasarımı owner-kararı bekler",
       "updated": "2026-08-05"
     },
     {
@@ -19082,6 +18880,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6678847c7f6229223c542b35120fdc4314c13110e806b9feb0810bb42fc8177f"
+    "value": "e7db4f4f47fe7ccf92857c2bf0cc4e80c2f71069e3fa20ab4549c920bbb5794a"
   }
 }
