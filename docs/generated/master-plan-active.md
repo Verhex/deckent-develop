@@ -5,16 +5,16 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):004baaafdbcd8aa86ed8d74583dea6c8d42f45ec0470bc53a2843fe8fd1fafd0`
+**Source digest:** `sha256(normalized-lf-utf8):cd85948a89587c639513ee993cf443ef364cd80ee919736ec0fda7ecbf99cba0`
 
-**Rows:** 352 total · 345 active · 7 terminal
+**Rows:** 354 total · 347 active · 7 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
 | OPEN | 243 |
-| READY | 0 |
+| READY | 2 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
 | VERIFY | 35 |
@@ -79,7 +79,8 @@
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
-| 515 | `SEC-DEP-ADVISORY-001` | OPEN | P1 | TRUTH | — | — | Yeni upstream dependency advisory'leri (fast-uri GHSA-7p8r-x3mc-p8w7 · ip-address GHSA-mwp4-54f8-5fhr, ikisi de high) fail-closed Security Audit gate'ini repo-genelinde kırmızıya düşürdü — patch-bump veya SEC-05 signed-exception ile kapatılır |
+| 515 | `SEC-DEP-ADVISORY-001` | READY | P1 | TRUTH | — | — | Yeni upstream dependency advisory'leri (fast-uri GHSA-7p8r-x3mc-p8w7 · ip-address GHSA-mwp4-54f8-5fhr, ikisi de high) fail-closed Security Audit gate'ini repo-genelinde kırmızıya düşürdü — patch-bump veya SEC-05 signed-exception ile kapatılır |
+| 516 | `CI-PACKED-DASHBOARD-TOOLCHAIN-001` | READY | P1 | TRUTH | — | — | Packed Install job'ı build:all koşarken src/dashboard toolchain'i (typescript+vite) hiç kurulmuyor — build-dashboard.mjs tasarım gereği auto-install yapmaz (hardened digest doğrulaması), ubuntu Packed Install E_DASHBOARD_BUILD_TOOLCHAIN_MISSING ile düşüyor |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 525 | `TRUST-ANCHOR-002` | VERIFY | P0 | TRUTH | — | — | Xverify-E tur-2'nin dört mekanik kabul yolu fail-closed kapatılır: merge-introduction, rename-drift, shallow-clone, blob-okuma-hatası |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
@@ -269,6 +270,7 @@
 | 3335 | `PROD-BINARY-IDENTITY-EAGER-CRASH-001` | VERIFY | P1 | KERNEL | — | — | worktree-binary-authority kaynak-ağaç hash'i eager: src/ dizini olmayan kullanıcı projesinde her non-diagnostic deckent komutu typed HOLD yerine ham stack'le çöküyor |
 | 3340 | `PROD-LANDED-FENCE-ORDER-001` | VERIFY | P0 | KERNEL | — | — | Sprint-488 regresyonu (f59503a43): finalizeLandedAttempt heartbeat-observe'u retirement claim'i kapattıktan SONRA çağırıyor — LANDED heartbeat kaydı ve continuation dispatch monitor yolunda sessizce kayboluyor, restart-reconcile LANDED attempt'i reddediyor |
 | 3342 | `PROD-SSE-ONEVENT-WIRE-001` | VERIFY | P1 | KERNEL | — | — | Run-flow koordinatörünün SSE onEvent teli yalnız ilk getRunFlowCoordinator çağrısında bağlanıyor: ilk istek propose/plan yolundan gelirse (run-flow-plan-service koordinatörü onEvent'siz yaratır) o root'un CANLI SSE yayını sessizce ölü doğuyor |
+| 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |

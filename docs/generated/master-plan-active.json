@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "004baaafdbcd8aa86ed8d74583dea6c8d42f45ec0470bc53a2843fe8fd1fafd0"
+    "value": "cd85948a89587c639513ee993cf443ef364cd80ee919736ec0fda7ecbf99cba0"
   },
   "summary": {
-    "total": 352,
-    "active": 345,
+    "total": 354,
+    "active": 347,
     "terminal": 7,
-    "receipts": 43,
+    "receipts": 45,
     "byState": {
       "OPEN": 243,
-      "READY": 0,
+      "READY": 2,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 35,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 248,
-      "P1": 85,
+      "P1": 87,
       "P2": 19
     },
     "byProgram": {
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 87,
+      "KERNEL": 88,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 55,
+      "TRUTH": 56,
       "XPLAT": 3
     }
   },
@@ -674,10 +674,21 @@
       "id": "SEC-DEP-ADVISORY-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-08-03",
+      "state": "READY",
+      "updated": "2026-08-05",
       "definitionDigest": "808654b11f47a434539d6341c9b503170878f5a8975ca71e156ef4caa2b1b45a",
-      "progressDigest": "4a31b1bc24b698fbb3856cb3f0dc82ba5e51d655d056e9d9de5e7d87b2e9ba55",
+      "progressDigest": "fc01ff4ff743ef7ec5c6802e5470b3c735d9e9fab0efe5038b56ca797e7d486b",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 516,
+      "id": "CI-PACKED-DASHBOARD-TOOLCHAIN-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-05",
+      "definitionDigest": "6fbd1c2de0635dd3474d300dab33bfc0eed26e9506b8187f07c7fc282f542ff4",
+      "progressDigest": "39a600c6860af85fc721a8eb2b689959050f3e94dbea3312e9682a711ac5c503",
       "terminalClosureDigest": null
     },
     {
@@ -2804,6 +2815,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3343,
+      "id": "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "377b68bf72f3c05a5f3ee4e710ea0cbb9440fb38fa026b26174f158e2df66afc",
+      "progressDigest": "9c925ccdb33ffbaece8bfcf9ebd2213db85ddcbdf998bc27a821040339fc6676",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3345,
       "id": "COMPOSITE-WORKER-001",
       "program": "KERNEL",
@@ -4365,6 +4387,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T05:17:50Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-SEC-DEP-01",
+      "authorityDigest": "4809878aac9d2c94f35c6837672bb3b81fdcdba8b0cb533fd481e38ed72bdf2d",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-DASH-TOOLCHAIN-01",
+      "authorityDigest": "4d41e5156330b09b3e9cf3f7c1c000065186fece86ed17a565f4b41ba1ee79aa",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -6355,7 +6397,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "1",
         "W": "0",
@@ -6371,7 +6413,38 @@
       "evidenceReceipts": [],
       "acceptance": "İki advisory ya güvenli sürüme bump edilir ya da SEC-05 allowlist'ine imzalı gerekçeyle işlenir; `dependency-audit` job'ı main'de yeşile döner; transitive zincir (`npm ls fast-uri ip-address`) evidence'a yazılır",
       "evidence": "Açılış 2026-08-03: PR #32 CI koşusunda tespit (run 30856189200) — advisory 1130720 + 1130722; main'in aynı HEAD'i de aynı sebeple kırmızı, yani S2 kaynaklı değil upstream-yayın kaynaklı. Security Audit required-check DEĞİL (ruleset 4'lüsü dışında) ama Type-Check-maskesi dersinin aynısı burada da geçerli: kronik kırmızı gate gelecekteki gerçek bulguyu maskeler",
-      "updated": "2026-08-03"
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 516,
+      "id": "CI-PACKED-DASHBOARD-TOOLCHAIN-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Packed Install job'ı build:all koşarken src/dashboard toolchain'i (typescript+vite) hiç kurulmuyor — build-dashboard.mjs tasarım gereği auto-install yapmaz (hardened digest doğrulaması), ubuntu Packed Install E_DASHBOARD_BUILD_TOOLCHAIN_MISSING ile düşüyor",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "cross-platform-e2e packed-install job'ı root npm ci'dan sonra src/dashboard'da bounded-retry npm ci koşar; ubuntu Packed Install PR check'i yeşile döner; build-dashboard.mjs değişmez",
+      "evidence": "Açılış 2026-08-05: PR #48 koşusunda tespit (job 92203369118 macos aynı aileden ama clean-HOLD'a takılıyor, bkz 517); ubuntu logu E_DASHBOARD_BUILD_TOOLCHAIN_MISSING kanıtı",
+      "updated": "2026-08-05"
     },
     {
       "order": 520,
@@ -10151,6 +10224,7 @@
         "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
         "PROD-LANDED-FENCE-ORDER-001",
         "PROD-SSE-ONEVENT-WIRE-001",
+        "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "COMPOSITE-WORKER-001"
       ],
       "gates": [
@@ -10210,6 +10284,7 @@
         "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
         "PROD-LANDED-FENCE-ORDER-001",
         "PROD-SSE-ONEVENT-WIRE-001",
+        "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "COMPOSITE-WORKER-001"
       ],
       "evidenceReceipts": [],
@@ -14650,6 +14725,37 @@
       "updated": "2026-08-05"
     },
     {
+      "order": 3343,
+      "id": "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Darwin adapter'ı (/dev/fd + mnt_id'siz mount-boundary eşdeğeri) ve Windows adapter'ı (handle-tabanlı identity pin veya typed policy-kararı) ayrı tasarımla gelir; her platform kendi real-binary clean kanıtıyla kapanır; o zamana dek HOLD dürüst kalır, sessiz bypass yok",
+      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; Alperen kararı: riskli dilim ayrıldı, toplu-merge dışında",
+      "updated": "2026-08-05"
+    },
+    {
       "order": 3345,
       "id": "COMPOSITE-WORKER-001",
       "parent": "KERNEL-001",
@@ -18960,6 +19066,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e32e39e27c8f507a4e824a33424fef249abcd098e150b7c22e59ab25c2f2faa8"
+    "value": "0da81ec352ef11bc30de4cc0d3db5040e2ab3cf1a5d5255fe85050f2632e19ee"
   }
 }
