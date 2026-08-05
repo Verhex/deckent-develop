@@ -107,9 +107,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (W3-PR-B1): digest moved — file-lock ops-v2 + clean twin.
+  // 2026-08-05 (hotfix lazy-flags): file-lock module-eval laziness restored.
   count: 1197,
-  digest: 'd0ad6177259c1d596fb111fedb2509f76fd92a3c7a39eb7b5d14eef977157eb6',
+  digest: '25f13bb7878193f21b9ab64426883c7e48b4e3a3fb05f48523163b331e8d3aca',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
