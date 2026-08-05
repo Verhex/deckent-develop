@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "a14617fbc2daea843ae0ac9494b457a52b38b35635f8a1e5c580b95af53a3713"
+    "value": "81dfb97d5729d0465a3610257ad0c5493108b31760bea26b54c583bd8be7698e"
   },
   "summary": {
-    "total": 369,
-    "active": 346,
+    "total": 371,
+    "active": 348,
     "terminal": 23,
     "receipts": 49,
     "byState": {
-      "OPEN": 256,
+      "OPEN": 258,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 249,
-      "P1": 93,
+      "P1": 95,
       "P2": 27
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 57,
+      "TRUTH": 59,
       "XPLAT": 3
     }
   },
@@ -701,6 +701,28 @@
       "definitionDigest": "6fbd1c2de0635dd3474d300dab33bfc0eed26e9506b8187f07c7fc282f542ff4",
       "progressDigest": "605b76f41cede53e9103a34bdc475a9631da5fc3c0dde00c41e993df9cd1be9f",
       "terminalClosureDigest": "fdc34e72b3fb26f8d69e5688de1f27a39784276984b21b4c4245a4fd5123f845"
+    },
+    {
+      "order": 517,
+      "id": "CI-DASHBOARD-TESTS-LIVE-SERVER-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "2e217ff38e43caeed91371188d64b492f12eef0213cdbd9e3fef32a331944390",
+      "progressDigest": "7c0e0525444717e5f7e0f141a45b3c7d66aec643dd7212dede462e0963446baf",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 518,
+      "id": "CI-ORCHESTRA-NODE26-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "727e63f48fe6707799bc845129098460b766e2e577dedb12a8d93b4cf56c4cda",
+      "progressDigest": "51e9cddcf392908f08dd3f557b9264b1f92ef5a6864ebbc11aa9e9fbaf728e25",
+      "terminalClosureDigest": null
     },
     {
       "order": 520,
@@ -6488,6 +6510,68 @@
       "acceptance": "`status --mode` için doğru-yazımlı canonical değerler + versioned deprecation alias'ları; `deckent run` one-shot ↔ `run start|status|retro|history` namespace çarpışması collision-free canonical UX'e ayrılır; `mode run`'ın diske `sprint` yazması tek public `run` vocabulary kararına bağlanır; config read yüzeyi (bare `config` ↔ var-olmayan `config read`/`config show` önerileri) tek operation adında normalize edilir; hepsi JSON contract testi taşır",
       "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk). Sahipsiz kalemler: CLI-03 · CLI-04 · CLI-05 · CLI-06 · CLI-11 · OQ-13 · OQ-14 · aday-17 · aday-18. Public contract işi: `explainatory`/`standart` kullanıcıya görünen yazım hataları ve düzeltme breaking-change kararı içerir (alias+deprecation vs rename) — karar acceptance'ın parçası; recovery mesajı bugün var olmayan `deckent config read` öneriyor (src/core/config.ts:1922-1925); `receipt=GR-2026-08-04-FAZ4B-B2-01`; 2026-08-04 FAZ4B-B2 kanıt-taşıma + YENİ TYPED BULGU: command-registry coverage guard'ı gerçek drift yakaladı — `execution-authority` komutu CLI'da register'lı (src/cli/commands/execution-authority.ts + index.ts), MCP tool'u var (deckent_execution_authority), i18n anahtarı yazılı (messages.ts:468 cmdCatalog.execution-authority.summary) ama src/cli/command-registry.ts COMMAND_REGISTRY'de satırı YOK; 2 test kırığı bu drift'in dürüst alarmı olarak ratchet'te bilinçli tutuluyor — fix tek registry satırı, kategori/risk etiketi owner-sözlük kararı — 2026-08-04 KAPANDI; `receipt=GR-2026-08-04-EXEC-AUTH-REG-01`; settlement: Enterprise/Değiştir/core + cli,mcp + deckent_execution_authority eşlemesiyle satır eklendi (provider-authority emsali, Alperen 'hallet' yetkisi), guard suite 20/20, ratchet 169→167; `receipt=GR-2026-08-04-FAZ4B-B3-01`; 2026-08-04 FAZ4B-B3 settlement: CLI SINIFI TAMAMEN SIFIRLANDI (7477/7477) — gerçek-binary smoke ailesi run-proven korunarak 22/22 (mock'a çevrim yok), drift teklileri 14 dosyada hizalandı; öne çıkan pinler: ⚡→» (ADR-G-010), --write-allowlist yetki flag'i, cursor-adapter EISDIR'ı artık iyileştirir, exact-plan start iki-fazlı (parent STARTING → child admission DETACHED_RUNNING), scope-gate FAIL dürüst GATE:FAIL+POLICY:DENY; typed docs bulgusu: mcp_client_enabled docs-reset sonrası yalnız arşivde belgeli — canlı docs/en+tr referansına taşınmalı (docs-reset kontrol-listesi kalemi); ayrıca B2 pinledi: cleanup honest-gate (authority-hold + terminal-receipt zorunluluğu), plan'ın durable exact-flow seam'i (DRAFT yaşam döngüsü CLI'dan çıktı), task-artifact dosya-adı↔record-id kimlik disiplini, DECKENT.md host-adapter-nötrlüğü, start --flow-id exact-child capability üçlüsü, finalize --force = forceAbortSprint fenced-ABORTED (öğrenme yan-etkisiz)",
       "updated": "2026-08-04"
+    },
+    {
+      "order": 517,
+      "id": "CI-DASHBOARD-TESTS-LIVE-SERVER-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Tests—Dashboard job'ı main'de kalıcı kırmızı: suite canlı :3000 sunucusu bekliyor (ECONNREFUSED), CI'da sunucu yok — kök-neden izole edilmedi",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Kök-neden izole edilir (suite hermetik mi olmalı, job mu sunucu başlatmalı, yoksa suite konumu mu yanlış); fix sonrası main-push Tests—Dashboard yeşil; dilim-kapanış checklist'ine 'main-push CI job-level yeşil + docs:stats regen' maddesi bu satırın settlement'ında yazılı kanıt olur",
+      "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu — 04:06'dan beri her main koşusunda failure, PR-required sette olmadığı için operatör radarına girmemişti (kör-nokta itirafı raporda)",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 518,
+      "id": "CI-ORCHESTRA-NODE26-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Tests—Orchestra (26.x) main'de kırmızı, 24.x aynı koşuda cancelled; 24.x lokal/PR koşuları 8758-yeşil — Node-26'ya özgü kırık izole edilmedi",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "26.x kırığı test-adı düzeyinde izole edilir; Node-sürüm-matrisi politikası netleşir (26 desteklenecekse fix, değilse matristen tipli çıkarma); main-push Orchestra job'ları yeşil",
+      "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu; aynı kör-nokta sınıfı",
+      "updated": "2026-08-05"
     },
     {
       "order": 520,
@@ -19210,6 +19294,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "37bc8462498d3c7b67b82f284160567a5b5a41edca4bdcb7716f290c4d09f323"
+    "value": "2ae23f7661cb09f3963231e9472214566d0ad83e572483499f12bd3b771f64c9"
   }
 }
