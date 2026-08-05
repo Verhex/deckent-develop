@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "cc73919259ea696fbea26af03870e111eb6e68b49d4e7156f50bd1ff34f9e253"
+    "value": "f71d3d9c051c7a9efb01912bd4285f560c2c42f7090087d50313f180749301d3"
   },
   "summary": {
     "total": 373,
@@ -12,8 +12,8 @@
     "receipts": 55,
     "byState": {
       "OPEN": 255,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 27,
       "DONE": 23,
@@ -2951,10 +2951,10 @@
       "id": "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "f2b33b8cd8d8d5ea4ee7b1f93ca5774c3affb0cc84109ca7549b23f6bec412c5",
-      "progressDigest": "bf2aed1b2f73217c49de547e54874e5498253c7f1c0f822f0061f94130a6a701",
+      "progressDigest": "367e82f7b5b2eb986ebd8e698bb82cca1ef590b4bb2250521b8bc2475360b714",
       "terminalClosureDigest": null
     },
     {
@@ -14982,7 +14982,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19448,6 +19448,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "da39d392549f83eb5858ec253fa0da51a94367767a7fb335a19a788049281667"
+    "value": "288db96bd9b7341531bd45f7dea29b2a003e832f1fc814b322da7a14ab52e622"
   }
 }
