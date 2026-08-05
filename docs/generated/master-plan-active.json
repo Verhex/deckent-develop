@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "951cccfdfc6a282bf53ef73f47796dec40ff4a6f9f5ad3518a5646af5ab39ead"
+    "value": "f6ae27848b1f67b47fd1ba79786b0cce8d2d74140cde08621e13059211e5eb5a"
   },
   "summary": {
     "total": 354,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 243,
       "READY": 0,
-      "IN_PROGRESS": 2,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 35,
+      "VERIFY": 37,
       "DONE": 7,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -674,10 +674,10 @@
       "id": "SEC-DEP-ADVISORY-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "808654b11f47a434539d6341c9b503170878f5a8975ca71e156ef4caa2b1b45a",
-      "progressDigest": "8519fa3c3b03d4ee84e9ef02b3b65ba029c5d04297a045179087b3712e046313",
+      "progressDigest": "4b54c9891416579533bd8cceef09b7a73e2b4dff8acbfadeee8f4c76f1468db1",
       "terminalClosureDigest": null
     },
     {
@@ -685,10 +685,10 @@
       "id": "CI-PACKED-DASHBOARD-TOOLCHAIN-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "6fbd1c2de0635dd3474d300dab33bfc0eed26e9506b8187f07c7fc282f542ff4",
-      "progressDigest": "62fb3e5e003ab8050c826b6f17f1d6737120c95025096e6b6a77ba1971a11a3e",
+      "progressDigest": "a2103e71b9e1bc26bd4974ed827df3aa2ce38c9bdd376dfd86e009f37f1366b0",
       "terminalClosureDigest": null
     },
     {
@@ -4395,8 +4395,8 @@
       "authorityDigest": "4809878aac9d2c94f35c6837672bb3b81fdcdba8b0cb533fd481e38ed72bdf2d",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T05:43:46Z"
       },
       "g7AttemptIdentity": null
     },
@@ -4405,8 +4405,8 @@
       "authorityDigest": "4d41e5156330b09b3e9cf3f7c1c000065186fece86ed17a565f4b41ba1ee79aa",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T05:43:46Z"
       },
       "g7AttemptIdentity": null
     }
@@ -6397,12 +6397,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -6410,9 +6410,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-SEC-DEP-01"
+      ],
       "acceptance": "İki advisory ya güvenli sürüme bump edilir ya da SEC-05 allowlist'ine imzalı gerekçeyle işlenir; `dependency-audit` job'ı main'de yeşile döner; transitive zincir (`npm ls fast-uri ip-address`) evidence'a yazılır",
-      "evidence": "Açılış 2026-08-03: PR #32 CI koşusunda tespit (run 30856189200) — advisory 1130720 + 1130722; main'in aynı HEAD'i de aynı sebeple kırmızı, yani S2 kaynaklı değil upstream-yayın kaynaklı. Security Audit required-check DEĞİL (ruleset 4'lüsü dışında) ama Type-Check-maskesi dersinin aynısı burada da geçerli: kronik kırmızı gate gelecekteki gerçek bulguyu maskeler",
+      "evidence": "Açılış 2026-08-03: PR #32 CI koşusunda tespit (run 30856189200) — advisory 1130720 + 1130722; main'in aynı HEAD'i de aynı sebeple kırmızı, yani S2 kaynaklı değil upstream-yayın kaynaklı. Security Audit required-check DEĞİL (ruleset 4'lüsü dışında) ama Type-Check-maskesi dersinin aynısı burada da geçerli: kronik kırmızı gate gelecekteki gerçek bulguyu maskeler; `receipt=GR-2026-08-05-SEC-DEP-01`; 2026-08-05 SETTLEMENT: gerçek patch-bump (c8030a4f9) — fast-uri override 3.1.4→3.1.5 + ip-address override 10.3.1 (express-rate-limit ip-address'i 10.1.0 TAM-pin tuttuğu için override zorunlu); transitive zincir kanıtı: @modelcontextprotocol/sdk→ajv→fast-uri, @modelcontextprotocol/sdk→express-rate-limit→ip-address; `proof=dependency-audit-pass`: check-dependency-audit.mjs lokal 0 high/critical PASS, signed-exception kullanılmadı; mcp+api tüketici sınıfları 2065 test yeşil",
       "updated": "2026-08-05"
     },
     {
@@ -6428,12 +6430,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -6441,9 +6443,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-DASH-TOOLCHAIN-01"
+      ],
       "acceptance": "cross-platform-e2e packed-install job'ı root npm ci'dan sonra src/dashboard'da bounded-retry npm ci koşar; ubuntu Packed Install PR check'i yeşile döner; build-dashboard.mjs değişmez",
-      "evidence": "Açılış 2026-08-05: PR #48 koşusunda tespit (job 92203369118 macos aynı aileden ama clean-HOLD'a takılıyor, bkz 517); ubuntu logu E_DASHBOARD_BUILD_TOOLCHAIN_MISSING kanıtı",
+      "evidence": "Açılış 2026-08-05: PR #48 koşusunda tespit (job 92203369118 macos aynı aileden ama clean-HOLD'a takılıyor, bkz 517); ubuntu logu E_DASHBOARD_BUILD_TOOLCHAIN_MISSING kanıtı; `receipt=GR-2026-08-05-DASH-TOOLCHAIN-01`; 2026-08-05 SETTLEMENT: packed-install job'una bounded-retry `npm ci --prefix src/dashboard` adımı eklendi (c8030a4f9, install:all kalıbı); build-dashboard.mjs değişmedi; `proof=pr-ubuntu-packed-install-check`: kapanış kanıtı PR'ın ubuntu Packed Install check'inin yeşili",
       "updated": "2026-08-05"
     },
     {
@@ -19066,6 +19070,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e269d1d2c03067d69039c6d12c460269b14d6a3a4354fec38ab2989b83308411"
+    "value": "e367f2b9332bc2c89af29bde2079c43a857872ffdf1cf2e220cfe3c7ba4cc96d"
   }
 }
