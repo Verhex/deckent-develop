@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "539a39782dff59a3ef2165af36062c2686738ca00e541fb0468010e0eafd30cb"
+    "value": "9ea7bbeb7acd3464db1537230e89b07931de17b050016d3d841768b9e6547443"
   },
   "summary": {
     "total": 381,
@@ -12,8 +12,8 @@
     "receipts": 63,
     "byState": {
       "OPEN": 258,
-      "READY": 2,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 2,
       "BLOCKED": 67,
       "VERIFY": 31,
       "DONE": 23,
@@ -850,10 +850,10 @@
       "id": "CI-SCRIPTS-TASKKILL-RACE-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "012ef92e2916038bc4490b1c5e79c37be529761f9c39f69c792d227cfbb8673a",
-      "progressDigest": "f4321cfdf618fa910f907dbebc808d06cb640a966c48be726a10b47474b1a198",
+      "progressDigest": "9b1910121e944c4466372ec59bcc0b5e593f07229adcbc572c419602436a24ba",
       "terminalClosureDigest": null
     },
     {
@@ -861,10 +861,10 @@
       "id": "CI-COVERAGE-JOB-WALL-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "f281b3ca1b7c8df33b96faf4f42019b612fd3772e157d2d1db7cfe59445d37ec",
-      "progressDigest": "2789c203fee84a5e368f8898cb020affec679f0fe4dbe67088c57918f5e42d4e",
+      "progressDigest": "dfb591668e04b4d320067c00e9eae16164f00a1828784bd13d80348ebab00982",
       "terminalClosureDigest": null
     },
     {
@@ -7165,7 +7165,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -7198,7 +7198,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19878,6 +19878,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "2c204ec0cff80a3a2c66e56e482a834db3f7aaf87936a9d9b9058d74a8f5483c"
+    "value": "fa05146f003917439ef8dfe46c1500571ef7598b41ae219b32e5739fb631b1e8"
   }
 }

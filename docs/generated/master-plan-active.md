@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):539a39782dff59a3ef2165af36062c2686738ca00e541fb0468010e0eafd30cb`
+**Source digest:** `sha256(normalized-lf-utf8):9ea7bbeb7acd3464db1537230e89b07931de17b050016d3d841768b9e6547443`
 
 **Rows:** 381 total · 358 active · 23 terminal
 
@@ -14,8 +14,8 @@
 | State | Count |
 |---|---:|
 | OPEN | 258 |
-| READY | 2 |
-| IN_PROGRESS | 0 |
+| READY | 0 |
+| IN_PROGRESS | 2 |
 | BLOCKED | 67 |
 | VERIFY | 31 |
 | DONE | 23 |
@@ -89,8 +89,8 @@
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 527 | `CI-BUILTINS-DRIFT-HERMETIC-001` | VERIFY | P1 | TRUTH | — | — | builtins-drift canlı-iki-ağaç testinin '.deckent/skills/docs dışlanır' pini makine-lokal untracked dizine bağımlı — temiz CI checkout'ta dizin yok, 'expected [] to include docs' kırmızısı (62aafff34 index-silme sonrası kör kalmış, stats-stale kırmızısı maskeliyordu) |
 | 528 | `DOCS-ALP-DISCIPLINE-SYNC-001` | VERIFY | P2 | TRUTH | — | — | Vendored alp-discipline dokusunun upstream v1.0.4'e senkronu (karar-çapası ESSENCE/DISCIPLINE güncel kalsın) |
-| 529 | `CI-SCRIPTS-TASKKILL-RACE-001` | READY | P1 | TRUTH | — | — | scripts.test runScriptAsync taskkill it.each'inin 25ms bütçesi yavaş runner'da gerçek process-spawn süresinin altında — kill-eskalasyon aşama-yarışı flake'i (false-success senaryosu 'taskkill timeout'a düşüyor) |
-| 530 | `CI-COVERAGE-JOB-WALL-001` | READY | P1 | TRUTH | — | — | Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü) |
+| 529 | `CI-SCRIPTS-TASKKILL-RACE-001` | IN_PROGRESS | P1 | TRUTH | — | — | scripts.test runScriptAsync taskkill it.each'inin 25ms bütçesi yavaş runner'da gerçek process-spawn süresinin altında — kill-eskalasyon aşama-yarışı flake'i (false-success senaryosu 'taskkill timeout'a düşüyor) |
+| 530 | `CI-COVERAGE-JOB-WALL-001` | IN_PROGRESS | P1 | TRUTH | — | — | Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü) |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
