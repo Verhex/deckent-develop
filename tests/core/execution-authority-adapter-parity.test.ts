@@ -3,11 +3,11 @@ import { closeSync, mkdtempSync, openSync, rmSync, constants as fsConstants } fr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { linuxProcExecutionAuthorityAdapter } from '../../src/core/file-lock.js';
+import { linuxProcExecutionAuthorityAdapter, linuxProcExecutionAuthorityOpsV2 } from '../../src/core/file-lock.js';
 // The build-time twin cannot be imported by production code (clean.mjs runs
 // before dist/ exists); this contract test is the ONLY sanctioned coupling
 // point between the two surfaces (PLATFORM-EXEC-AUTH-W1-INTERFACE-001).
-import { cleanExecutionAuthorityAdapter } from '../../scripts/clean.mjs';
+import { cleanExecutionAuthorityAdapter, cleanExecutionAuthorityOpsV2 } from '../../scripts/clean.mjs';
 
 const ADAPTER_SURFACE = ['classify', 'stableFdPath', 'pinnedMountId', 'directoryIdentity'];
 
@@ -56,5 +56,50 @@ describe('PLATFORM-EXEC-AUTH-W1-INTERFACE-001 — twin adapter parity', () => {
       .toThrowError(/mount identity/iu);
     expect(() => cleanExecutionAuthorityAdapter.pinnedMountId(-1))
       .toThrowError(/E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED/u);
+  });
+});
+
+const OPS_V2_SURFACE = ['classify', 'openDirAt', 'closeFd', 'readdirOf', 'unlinkAt', 'renameAt', 'identityOf', 'realPathOf'];
+
+describe('W3-PR-B slice-1 — ops-v2 twin parity', () => {
+  it('exposes the identical frozen op surface on both twins', () => {
+    for (const ops of [linuxProcExecutionAuthorityOpsV2, cleanExecutionAuthorityOpsV2]) {
+      expect(Object.keys(ops).sort()).toEqual([...OPS_V2_SURFACE].sort());
+      expect(Object.isFrozen(ops)).toBe(true);
+    }
+  });
+
+  it.runIf(onLinux)('performs identical pinned-handle ops on a real tree', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ops-v2-parity-'));
+    try {
+      const a = linuxProcExecutionAuthorityOpsV2;
+      const b = cleanExecutionAuthorityOpsV2;
+      const fdA = a.openDirAt(null, root);
+      const fdB = b.openDirAt(null, root);
+      try {
+        expect(b.identityOf(fdB)).toEqual(a.identityOf(fdA));
+        expect(b.realPathOf(fdB)).toBe(a.realPathOf(fdA));
+        // child dir through the pinned handle, then readdir/rename/unlink parity
+        const { mkdirSync: mk, writeFileSync: wf } = require('node:fs') as typeof import('node:fs');
+        mk(join(root, 'child'));
+        wf(join(root, 'child', 'x.txt'), 'x\n');
+        const childA = a.openDirAt(fdA, 'child');
+        try {
+          expect(a.readdirOf(childA)).toEqual(['x.txt']);
+          a.renameAt(childA, 'x.txt', childA, 'y.txt');
+          expect(b.readdirOf(childA)).toEqual(['y.txt']);
+          a.unlinkAt(childA, 'y.txt', false);
+          expect(a.readdirOf(childA)).toEqual([]);
+        } finally {
+          a.closeFd(childA);
+        }
+        a.unlinkAt(fdA, 'child', true);
+      } finally {
+        a.closeFd(fdA);
+        b.closeFd(fdB);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

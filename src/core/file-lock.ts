@@ -13,7 +13,7 @@ import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import {
   readFileSync, writeFileSync, existsSync, unlinkSync, linkSync,
-  mkdirSync, readdirSync, openSync, closeSync, renameSync, lstatSync,
+  mkdirSync, readdirSync, openSync, closeSync, renameSync, rmdirSync, lstatSync,
   realpathSync, fstatSync, readSync, fsyncSync, readlinkSync,
   statSync, constants as fsConstants,
 } from 'node:fs';
@@ -1568,6 +1568,58 @@ export const linuxProcExecutionAuthorityAdapter: ExecutionAuthorityPlatformAdapt
     directoryIdentity: executionLockDirectoryIdentity,
   });
 
+/**
+ * W3-PR-B (PLATFORM-EXEC-AUTH-W3-DARWIN-001, design §10): the OP-BASED v2
+ * surface. v1's `stableFdPath` is Linux-shaped — Darwin has no stable fd path,
+ * so every capability consumers actually need is expressed as an operation on
+ * an open handle. The Linux implementation routes each op through the /proc
+ * facility (byte-equivalent to the pre-v2 path composition); the Darwin
+ * implementation (slice-2) fills the same ops from the native addon, and W4
+ * Windows fills them with handle-relative NT primitives.
+ */
+export interface ExecutionAuthorityOpsV2 {
+  classify(): 'linux' | 'wsl';
+  /** Open a directory strictly relative to an already-pinned parent handle
+   *  (or an absolute path when parentFd is null), O_NOFOLLOW at every step. */
+  openDirAt(parentFd: number | null, name: string): number;
+  closeFd(fd: number): void;
+  readdirOf(fd: number): string[];
+  unlinkAt(fd: number, name: string, removeDir: boolean): void;
+  renameAt(fromFd: number, fromName: string, toFd: number, toName: string): void;
+  identityOf(fd: number): ExecutionLockDirectoryIdentity;
+  /** Kernel-verified current path of the handle (Linux: /proc realpath;
+   *  Darwin slice-2: F_GETPATH). Consumers that must hand a PATH to a
+   *  path-only API (SQLite) use this + post-open identity re-verification. */
+  realPathOf(fd: number): string;
+}
+
+const EXECUTION_DIR_OPEN_FLAGS =
+  fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW;
+
+export const linuxProcExecutionAuthorityOpsV2: ExecutionAuthorityOpsV2 =
+  Object.freeze({
+    classify: executionLockPlatformAdapter,
+    openDirAt: (parentFd: number | null, name: string): number => (
+      parentFd === null
+        ? openSync(name, EXECUTION_DIR_OPEN_FLAGS)
+        : openSync(join(`/proc/self/fd/${parentFd}`, name), EXECUTION_DIR_OPEN_FLAGS)
+    ),
+    closeFd: (fd: number): void => closeSync(fd),
+    readdirOf: (fd: number): string[] => readdirSync(`/proc/self/fd/${fd}`).sort(),
+    unlinkAt: (fd: number, name: string, removeDir: boolean): void => {
+      const target = join(`/proc/self/fd/${fd}`, name);
+      if (removeDir) rmdirSync(target);
+      else unlinkSync(target);
+    },
+    renameAt: (fromFd: number, fromName: string, toFd: number, toName: string): void =>
+      renameSync(
+        join(`/proc/self/fd/${fromFd}`, fromName),
+        join(`/proc/self/fd/${toFd}`, toName),
+      ),
+    identityOf: executionLockDirectoryIdentity,
+    realPathOf: (fd: number): string => realpathSync(`/proc/self/fd/${fd}`),
+  });
+
 function pinExecutionLockDirectories(
   projectRoot: string,
 ): ExecutionLockPinnedDirectories {
@@ -1577,18 +1629,11 @@ function pinExecutionLockDirectories(
   let locksFd: number | undefined;
   try {
     const canonicalRoot = realpathSync(projectRoot);
-    parentFd = openSync(
-      dirname(canonicalRoot),
-      fsConstants.O_RDONLY
-        | fsConstants.O_DIRECTORY
-        | fsConstants.O_NOFOLLOW,
-    );
-    rootFd = openSync(
-      canonicalRoot,
-      fsConstants.O_RDONLY
-        | fsConstants.O_DIRECTORY
-        | fsConstants.O_NOFOLLOW,
-    );
+    // W3-PR-B slice-1: opens route through the op surface; behavior-identical
+    // on Linux, and the locks handle below now opens RELATIVE to the pinned
+    // root handle (no absolute re-walk) — the shape Darwin/Windows need.
+    parentFd = linuxProcExecutionAuthorityOpsV2.openDirAt(null, dirname(canonicalRoot));
+    rootFd = linuxProcExecutionAuthorityOpsV2.openDirAt(null, canonicalRoot);
     const stableRootPath = linuxProcExecutionAuthorityAdapter.stableFdPath(rootFd);
     const stableParentPath = linuxProcExecutionAuthorityAdapter.stableFdPath(parentFd);
     const projectIdentity = executionLockDirectoryIdentity(rootFd);
@@ -1628,12 +1673,7 @@ function pinExecutionLockDirectories(
         'malformed',
       );
     }
-    locksFd = openSync(
-      namedLocksPath,
-      fsConstants.O_RDONLY
-        | fsConstants.O_DIRECTORY
-        | fsConstants.O_NOFOLLOW,
-    );
+    locksFd = linuxProcExecutionAuthorityOpsV2.openDirAt(rootFd, LOCKS_DIR);
     const stableLocksPath = linuxProcExecutionAuthorityAdapter.stableFdPath(locksFd);
     const locksIdentity = executionLockDirectoryIdentity(locksFd);
     if (locksIdentity.dev !== projectIdentity.dev

@@ -100,18 +100,16 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, CI-ORCH-518): count unchanged, digest moved —
-  // owned-settlement suite's hermetic home-fixture writes + node:os hybrid
-  // mock shifted callsites in one file. Prior: EXEC-AUTH-W3A (+7).
+  // 2026-08-05 (build-free, W3-PR-B1): ops-v2 twin callsites (file-lock +
+  // clean.mjs) and parity-test extension. Prior: CI-ORCH-518.
   count: 12473,
-  digest: '71fa6ba61a591cc1b35b9ec06fb68851283df2e7b752e2bba4e27f82c72ddd6b',
+  digest: 'b7f7e02f83c8c549191bc84315512e3a5170263fd89e67beb8f05c966addf722',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (EXEC-AUTH-W3A): 1196→1197 — native/exec-authority loader
-  // (index.mjs) joined the production inventory. Prior: EXEC-AUTH-W1.
+  // 2026-08-05 (W3-PR-B1): digest moved — file-lock ops-v2 + clean twin.
   count: 1197,
-  digest: '93b8a1c634da153598b1a5554e7cd0e112d773c3cf783c7597e8d99a1b3faaaa',
+  digest: 'd0ad6177259c1d596fb111fedb2509f76fd92a3c7a39eb7b5d14eef977157eb6',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
