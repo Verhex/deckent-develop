@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "51cfd8874ea9b5573c23d319fad3487bdc9e08e4fd85b9da7b7453355d0cb53a"
+    "value": "db8bc1d4d9ea1bf414bd76adc79bee20fd180e39bd456184436e1e6137b41048"
   },
   "summary": {
     "total": 371,
@@ -12,8 +12,8 @@
     "receipts": 51,
     "byState": {
       "OPEN": 256,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 24,
       "DONE": 23,
@@ -718,10 +718,10 @@
       "id": "CI-ORCHESTRA-NODE26-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "727e63f48fe6707799bc845129098460b766e2e577dedb12a8d93b4cf56c4cda",
-      "progressDigest": "ff319fb932f4632ffc39cd4522b954600939fbd35b734e13f5aaf7d84645fdd6",
+      "progressDigest": "25c81b954463bd55fa61f5612c018261e566da5c95c70648b4650716a4a278e5",
       "terminalClosureDigest": null
     },
     {
@@ -6577,7 +6577,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "0",
         "W": "0",
@@ -19316,6 +19316,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9d595967eeabaded614e2bba093d23a777e2e5879b6f3b9463635eea936c1460"
+    "value": "7db0998ad5e11df8373f59f960216a878b732234ef5a253c40e680f281f409f2"
   }
 }
