@@ -40,7 +40,10 @@ const ZERO_UNRESOLVED_SCOPE = [
 
 describe('containment production-inventory ratchet', () => {
   it('binds every foundation module without accepting new unresolved effects', {
-    timeout: 60_000,
+    // CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001: measured 48.9s build-free on a fast
+    // dev host; slower CI runners exceeded the old 60s ceiling (timeout flake).
+    // 180s = measured baseline x ~3 runner factor, still a hard bound.
+    timeout: 180_000,
   }, () => {
     const result = scanConfiguredTestRoots(REPO_ROOT);
     const inventoryPaths = result.registry

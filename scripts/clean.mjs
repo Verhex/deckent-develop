@@ -4116,6 +4116,30 @@ export const cleanExecutionAuthorityAdapter = Object.freeze({
   directoryIdentity: cleanExecutionDirectoryIdentity,
 });
 
+/** W3-PR-B slice-1: op-based v2 twin of file-lock's
+ *  linuxProcExecutionAuthorityOpsV2 — same surface, same /proc mechanics;
+ *  the twin-parity contract test pins both. */
+export const cleanExecutionAuthorityOpsV2 = Object.freeze({
+  classify: cleanExecutionAuthorityPlatformAdapter,
+  openDirAt: (parentFd, name) => openSync(
+    parentFd === null ? name : join(`/proc/self/fd/${parentFd}`, name),
+    fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW,
+  ),
+  closeFd: fd => closeSync(fd),
+  readdirOf: fd => readdirSync(`/proc/self/fd/${fd}`).sort(),
+  unlinkAt: (fd, name, removeDir) => {
+    const target = join(`/proc/self/fd/${fd}`, name);
+    if (removeDir) rmdirSync(target);
+    else unlinkSync(target);
+  },
+  renameAt: (fromFd, fromName, toFd, toName) => renameSync(
+    join(`/proc/self/fd/${fromFd}`, fromName),
+    join(`/proc/self/fd/${toFd}`, toName),
+  ),
+  identityOf: cleanExecutionDirectoryIdentity,
+  realPathOf: fd => realpathSync.native(`/proc/self/fd/${fd}`),
+});
+
 function pinCleanExecutionAuthorityDirectories(projectRoot) {
   const adapter = cleanExecutionAuthorityAdapter.classify();
   let rootFd;

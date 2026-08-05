@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "88849e92b3e8bc46a83cdb12e17a801ac96b23635ba9b8ec960a3d25002ee3f7"
+    "value": "bbb652dce7ab2c7d57ae8cc4ff4e0e3aa7185adca6fbb1c62f59a2168aaeed3a"
   },
   "summary": {
-    "total": 371,
-    "active": 348,
+    "total": 372,
+    "active": 349,
     "terminal": 23,
-    "receipts": 51,
+    "receipts": 53,
     "byState": {
       "OPEN": 256,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 25,
+      "VERIFY": 26,
       "DONE": 23,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -23,7 +23,7 @@
     "byPriority": {
       "P0": 249,
       "P1": 95,
-      "P2": 27
+      "P2": 28
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 59,
+      "TRUTH": 60,
       "XPLAT": 3
     }
   },
@@ -722,6 +722,17 @@
       "updated": "2026-08-05",
       "definitionDigest": "727e63f48fe6707799bc845129098460b766e2e577dedb12a8d93b4cf56c4cda",
       "progressDigest": "b3af6afc5e630c7b2fb7116e52952c9f1fbafae8e0b52f615d0b18f8e0d19667",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 519,
+      "id": "CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "VERIFY",
+      "updated": "2026-08-05",
+      "definitionDigest": "992e6be01c385cb43bd9e23a59d24c14188de98bdce6d2f74a52ccfdc150759f",
+      "progressDigest": "274356d3117a297a889275d7458a18679f08f5eaacd402964e125275879ea347",
       "terminalClosureDigest": null
     },
     {
@@ -2932,7 +2943,7 @@
       "state": "OPEN",
       "updated": "2026-08-05",
       "definitionDigest": "f2b33b8cd8d8d5ea4ee7b1f93ca5774c3affb0cc84109ca7549b23f6bec412c5",
-      "progressDigest": "8b020dcb54745ceb94e2e638e8895e5251b4cae5684be55969c33f0088266bee",
+      "progressDigest": "bd6e7bbd416d26ce15105934072945d00193752b8332f52f66e0c12ccbe0d8e7",
       "terminalClosureDigest": null
     },
     {
@@ -4654,6 +4665,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-05T12:11:47Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-CI-RATCHET-519-01",
+      "authorityDigest": "097bebbfc98c95c42c6fc9a2f68d37c0594299a6006396b8d1f3ec169268fc28",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T13:31:54Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-EXEC-AUTH-W3B1-01",
+      "authorityDigest": "1e953d361c9c520f32c3904cc5b0c1f9228d1bb1ea69f1efe20cbff84e2c0f99",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T13:47:19Z"
       },
       "g7AttemptIdentity": null
     }
@@ -6595,6 +6626,39 @@
       ],
       "acceptance": "26.x kırığı test-adı düzeyinde izole edilir; Node-sürüm-matrisi politikası netleşir (26 desteklenecekse fix, değilse matristen tipli çıkarma); main-push Orchestra job'ları yeşil",
       "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu; aynı kör-nokta sınıfı; 2026-08-05 İZOLASYON (run job 92292650755): kırık tests/orchestra/docker-backend-owned-settlement.test.ts'te 3 test — 'Required isolated claude credential file(s) unavailable: .credentials.json' (spawn-backend-docker.ts:5466 fail-closed kapısı); DİKKAT: test gerçek host-home'a güveniyor ve fixture credential kurmuyor — CI-24 aynı credential'sız runner'da GEÇİYOR, 26'da DÜŞÜYOR → Node-26'ya bağlı davranış sapması auth-isolation zincirinde (existsSync/homedir/broker-kopya adayları); bu üretim auth-kontratına dokunan kök-neden dilimi ister, yüzeysel test-fix'i değil; 24.x job'ının cancelled görünmesi 26.x fail'inin fail-fast iptali; `receipt=GR-2026-08-05-CI-ORCH-518-01`; 2026-08-05 SETTLEMENT (cf06cdf94): ÇERÇEVE DÜZELTİLDİ — kök Node-26 değil HERMETİKLİK ihlali (test gerçek host ~/.claude'a bağımlıydı; boş-HOME'da 24 ve 26 birebir aynı 3 kırık — lokal çift-sürüm repro); fix test-taraflı hibrit node:os homedir mock'u + fixture-home credential'ı, üretim değişmedi; `proof=empty-home-dual-node-3of3-green`; kapanış kanıtı merge sonrası main-push Orchestra 24.x+26.x yeşili",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 519,
+      "id": "CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Tests—Docs+Scripts'in kalan kırmızı kökü: containment-inventory-ratchet testi 60s sınırında timeout-flake'i (lokal build-free 48.9s ölçüldü — yavaş CI runner'da sınırı aşıyor)",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-CI-RATCHET-519-01"
+      ],
+      "acceptance": "Test-timeout gerçekçi tavana çekilir (ölçüm-temelli); main-push Tests—Docs+Scripts yeşile döner",
+      "evidence": "Açılış 2026-08-05: 517/518 kapanış-doğrulamasında izole edildi; tren-modeli ilk yolcusu; `receipt=GR-2026-08-05-CI-RATCHET-519-01`; 2026-08-05 SETTLEMENT (64343a53e): timeout 60s→180s ölçüm-temelli (lokal build-free 48.9s ×~3 runner-çarpanı); `proof=build-free-48s9-measured-run`; kapanış kanıtı tren merge'ü sonrası main-push Tests—Docs+Scripts yeşili",
       "updated": "2026-08-05"
     },
     {
@@ -14868,10 +14932,11 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-05-EXEC-AUTH-W3A-01"
+        "GR-2026-08-05-EXEC-AUTH-W3A-01",
+        "GR-2026-08-05-EXEC-AUTH-W3B1-01"
       ],
       "acceptance": "Addon yalnız probe-doğrulanmış primitifleri sunar; yokluğu fail-closed; darwin adapter'ı file-lock+clean ikizinde aynı kontratla; kapanış macos CI'da gerçek-binary clean (dist'li rebuild) + lock yaşam-döngüsü yeşiliyle",
-      "evidence": "Açılış 2026-08-05: W2 settlement kanıtı (run 30991850136) + D1-D3 onayı; tasarım §4.1/4.3/5-W3; `receipt=GR-2026-08-05-EXEC-AUTH-W3A-01`; 2026-08-05 PR-A ALT-DİLİM SETTLEMENT (ed86f6a86): in-repo N-API addon iskeleti (openat-ailesi + darwin-guarded kimlik) + fail-closed loader + Linux gerçek-koşu 6/6 (symlink-reddi dahil) + ubuntu+macos build+test CI job'ı + ADR-D-005 merit kaydı §9; `proof=native-primitive-suite-6of6-linux-real`; kalan: PR-B darwin adapter'ının file-lock+clean wiring'i + gerçek-Mac real-binary clean/lock kapanış kanıtı; satır alt-dilim kuralı gereği OPEN'a döner (IN_PROGRESS aktif-receipt ister); 2026-08-05 PR-A macOS KANITI (PR #58): addon gerçek Darwin'de derlendi + primitive suite 6/6; PR-B TASARIMI tasarım-doku §10'da — stableFdPath Linux-şekilli çıktı, op-tabanlı arayüz v2 + F_GETPATH secure-open deseni + 2-3 PR'lık kademeli migrasyon planı; W4 aynı v2'yi doldurur",
+      "evidence": "Açılış 2026-08-05: W2 settlement kanıtı (run 30991850136) + D1-D3 onayı; tasarım §4.1/4.3/5-W3; `receipt=GR-2026-08-05-EXEC-AUTH-W3A-01`; 2026-08-05 PR-A ALT-DİLİM SETTLEMENT (ed86f6a86): in-repo N-API addon iskeleti (openat-ailesi + darwin-guarded kimlik) + fail-closed loader + Linux gerçek-koşu 6/6 (symlink-reddi dahil) + ubuntu+macos build+test CI job'ı + ADR-D-005 merit kaydı §9; `proof=native-primitive-suite-6of6-linux-real`; kalan: PR-B darwin adapter'ının file-lock+clean wiring'i + gerçek-Mac real-binary clean/lock kapanış kanıtı; satır alt-dilim kuralı gereği OPEN'a döner (IN_PROGRESS aktif-receipt ister); 2026-08-05 PR-A macOS KANITI (PR #58): addon gerçek Darwin'de derlendi + primitive suite 6/6; PR-B TASARIMI tasarım-doku §10'da — stableFdPath Linux-şekilli çıktı, op-tabanlı arayüz v2 + F_GETPATH secure-open deseni + 2-3 PR'lık kademeli migrasyon planı; W4 aynı v2'yi doldurur; `receipt=GR-2026-08-05-EXEC-AUTH-W3B1-01`; 2026-08-05 B1-DİLİM SETTLEMENT (ad1408985, tren-2026-08-05-a): ExecutionAuthorityOpsV2 + Linux impl + pin-open'ların op-migrasyonu (locks-fd pinli-root'a relative) + clean ops-v2 ikizi + parite 7/7; `proof=ops-v2-lock-clean-fence-199of199`; kalan: dilim-2 Darwin impl (addon+F_GETPATH) + dilim-3 gerçek-Mac clean/lock kanıtı; satır alt-dilim kuralıyla OPEN'a döner",
       "updated": "2026-08-05"
     },
     {
@@ -19318,6 +19383,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7a8f8c5e9072b8c331775fff0873167e62424bb0bb66d793cc069437bf10ec01"
+    "value": "6c71133cba07ce1f7a811fa827e6a9b7f69e981048544725ca40b0828a01cd40"
   }
 }

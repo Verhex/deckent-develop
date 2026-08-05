@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):88849e92b3e8bc46a83cdb12e17a801ac96b23635ba9b8ec960a3d25002ee3f7`
+**Source digest:** `sha256(normalized-lf-utf8):bbb652dce7ab2c7d57ae8cc4ff4e0e3aa7185adca6fbb1c62f59a2168aaeed3a`
 
-**Rows:** 371 total · 348 active · 23 terminal
+**Rows:** 372 total · 349 active · 23 terminal
 
 ## State summary
 
@@ -17,7 +17,7 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 25 |
+| VERIFY | 26 |
 | DONE | 23 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -79,6 +79,7 @@
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
 | 517 | `CI-DASHBOARD-TESTS-LIVE-SERVER-001` | VERIFY | P1 | TRUTH | — | — | Tests—Dashboard job'ı main'de kalıcı kırmızı: suite canlı :3000 sunucusu bekliyor (ECONNREFUSED), CI'da sunucu yok — kök-neden izole edilmedi |
 | 518 | `CI-ORCHESTRA-NODE26-001` | VERIFY | P1 | TRUTH | — | — | Tests—Orchestra (26.x) main'de kırmızı, 24.x aynı koşuda cancelled; 24.x lokal/PR koşuları 8758-yeşil — Node-26'ya özgü kırık izole edilmedi |
+| 519 | `CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001` | VERIFY | P2 | TRUTH | — | — | Tests—Docs+Scripts'in kalan kırmızı kökü: containment-inventory-ratchet testi 60s sınırında timeout-flake'i (lokal build-free 48.9s ölçüldü — yavaş CI runner'da sınırı aşıyor) |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
