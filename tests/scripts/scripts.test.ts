@@ -309,7 +309,14 @@ describe('runScriptAsync timeout authority', () => {
           {
             platform: 'win32',
             spawnCommand,
-            taskkillTimeoutMs: 25,
+            // 529 (CI-SCRIPTS-TASKKILL-RACE-001): scenarios that need the mock
+            // taskkill process to COMPLETE (false-success/nonzero/error) must
+            // budget for a real Node process spawn+exit, which takes well over
+            // 25ms on a saturated CI runner — too tight a budget flips them
+            // into the taskkill-timeout stage (observed: run 31054702920). The
+            // 'timeout' scenario keeps the small budget: its mock hangs
+            // forever, so the timeout stage fires deterministically either way.
+            taskkillTimeoutMs: taskkillOutcome === 'timeout' ? 25 : 5_000,
             childCloseTimeoutMs: 100,
           },
         );

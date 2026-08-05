@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):071ff33efa2a71b143eb07f13a4cf2b1bf3edc28e56dbcc617899c08d261f74d`
+**Source digest:** `sha256(normalized-lf-utf8):342e0d5a416bffc5beb4f190c9f68474d23234b31ec5a4d0619a6ec882b4f1c5`
 
-**Rows:** 379 total · 356 active · 23 terminal
+**Rows:** 381 total · 358 active · 23 terminal
 
 ## State summary
 
@@ -17,7 +17,7 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 31 |
+| VERIFY | 33 |
 | DONE | 23 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -89,6 +89,8 @@
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 527 | `CI-BUILTINS-DRIFT-HERMETIC-001` | VERIFY | P1 | TRUTH | — | — | builtins-drift canlı-iki-ağaç testinin '.deckent/skills/docs dışlanır' pini makine-lokal untracked dizine bağımlı — temiz CI checkout'ta dizin yok, 'expected [] to include docs' kırmızısı (62aafff34 index-silme sonrası kör kalmış, stats-stale kırmızısı maskeliyordu) |
 | 528 | `DOCS-ALP-DISCIPLINE-SYNC-001` | VERIFY | P2 | TRUTH | — | — | Vendored alp-discipline dokusunun upstream v1.0.4'e senkronu (karar-çapası ESSENCE/DISCIPLINE güncel kalsın) |
+| 529 | `CI-SCRIPTS-TASKKILL-RACE-001` | VERIFY | P1 | TRUTH | — | — | scripts.test runScriptAsync taskkill it.each'inin 25ms bütçesi yavaş runner'da gerçek process-spawn süresinin altında — kill-eskalasyon aşama-yarışı flake'i (false-success senaryosu 'taskkill timeout'a düşüyor) |
+| 530 | `CI-COVERAGE-JOB-WALL-001` | VERIFY | P1 | TRUTH | — | — | Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü) |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |

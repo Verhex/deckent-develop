@@ -255,8 +255,12 @@ jobs:
         run: npm run build:all
       - name: Run tests with coverage (threshold gate enforced)
         # Threshold violation = exit 1 = job FAIL = CI red.
+        # 530 (CI-COVERAGE-JOB-WALL-001): the old 20-minute cap killed every
+        # 2026-08-05 main run at ~21min — the instrumented full suite has no
+        # green datapoint under it. 45min is a measure-then-calibrate ceiling:
+        # the first green run records the real duration, then tighten if wide.
         run: npm run test:coverage
-        timeout-minutes: 20
+        timeout-minutes: 45
       - name: Upload coverage report
         # always() — eşik ihlali durumunda bile rapor artefakt olarak yüklensin
         # ki contributor coverage farkını görebilsin.
