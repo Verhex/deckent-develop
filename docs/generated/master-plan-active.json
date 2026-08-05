@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9ea7bbeb7acd3464db1537230e89b07931de17b050016d3d841768b9e6547443"
+    "value": "342e0d5a416bffc5beb4f190c9f68474d23234b31ec5a4d0619a6ec882b4f1c5"
   },
   "summary": {
     "total": 381,
     "active": 358,
     "terminal": 23,
-    "receipts": 63,
+    "receipts": 64,
     "byState": {
       "OPEN": 258,
       "READY": 0,
-      "IN_PROGRESS": 2,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 31,
+      "VERIFY": 33,
       "DONE": 23,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -850,10 +850,10 @@
       "id": "CI-SCRIPTS-TASKKILL-RACE-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "012ef92e2916038bc4490b1c5e79c37be529761f9c39f69c792d227cfbb8673a",
-      "progressDigest": "9b1910121e944c4466372ec59bcc0b5e593f07229adcbc572c419602436a24ba",
+      "progressDigest": "f980e0e0898a482a57eb563f8b4409324df9456abe2fc4d7e7c70a2d0d6699b0",
       "terminalClosureDigest": null
     },
     {
@@ -861,10 +861,10 @@
       "id": "CI-COVERAGE-JOB-WALL-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "f281b3ca1b7c8df33b96faf4f42019b612fd3772e157d2d1db7cfe59445d37ec",
-      "progressDigest": "dfb591668e04b4d320067c00e9eae16164f00a1828784bd13d80348ebab00982",
+      "progressDigest": "9b29ee61024c12637081405345499ce86fde513ff89a56d29b68d3090c55b917",
       "terminalClosureDigest": null
     },
     {
@@ -4872,8 +4872,8 @@
       "authorityDigest": "07f540dd921d048b51558bad8f4bdb53af2acca964b301f536efcb3cbfca939b",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T23:31:51Z"
       },
       "g7AttemptIdentity": null
     },
@@ -4882,8 +4882,18 @@
       "authorityDigest": "68303c566739926f1036d6502566188b4d051e6add21692b7d03159dd2fdd3af",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T23:31:51Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-TREN-E-BASELINE-SUPP-01",
+      "authorityDigest": "8dc722ce31844c6c8916092c610e14ab0d321060afd8ba32c78f771d7ffcbc5a",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-05T23:31:51Z"
       },
       "g7AttemptIdentity": null
     }
@@ -7165,12 +7175,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -7182,7 +7192,7 @@
         "GR-2026-08-05-TASKKILL-RACE-529-01"
       ],
       "acceptance": "Zaman-bütçeleri senaryo-bağımlı olur: taskkill-tamamlanma senaryoları geniş bütçe, hang-senaryosu deterministik küçük; üretim timeout-authority kontratı değişmez; main-push Tests—Docs+Scripts'in bu flake sınıfı kapanır",
-      "evidence": "Açılış 2026-08-05: run 31054702920 log-izolasyonu (523/527 fix'leri tuttuktan sonra kalan tek Docs+Scripts kırığı); `receipt=GR-2026-08-05-TASKKILL-RACE-529-01`",
+      "evidence": "Açılış 2026-08-05: run 31054702920 log-izolasyonu (523/527 fix'leri tuttuktan sonra kalan tek Docs+Scripts kırığı); `receipt=GR-2026-08-05-TASKKILL-RACE-529-01`; 2026-08-05 SETTLEMENT: taskkillTimeoutMs senaryo-bağımlı (tamamlanma-senaryoları 5s, hang 25ms deterministik); `proof=scripts-suite-173of173-local`; scripts+hermeticity suite 173/173, tsc temiz; kapanış kanıtı merge sonrası main-push Docs+Scripts yeşili",
       "updated": "2026-08-05"
     },
     {
@@ -7198,12 +7208,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -7212,10 +7222,11 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-05-COVERAGE-WALL-530-01"
+        "GR-2026-08-05-COVERAGE-WALL-530-01",
+        "GR-2026-08-05-TREN-E-BASELINE-SUPP-01"
       ],
       "acceptance": "Step-cap ölçüm-sonrası-kalibre tavana çekilir (20→45dk; ilk yeşil koşu gerçek süreyi ölçer, tavan gerekirse daraltılır); production-scale test açık 60s timeout alır; Coverage Report yeşile döner veya threshold-gate dürüst sinyal verir",
-      "evidence": "Açılış 2026-08-05: run 31054702920 + gün-içi 8 koşu tarihi; `receipt=GR-2026-08-05-COVERAGE-WALL-530-01`",
+      "evidence": "Açılış 2026-08-05: run 31054702920 + gün-içi 8 koşu tarihi; `receipt=GR-2026-08-05-COVERAGE-WALL-530-01`; 2026-08-05 SETTLEMENT: step-cap 20→45dk measure-then-calibrate + scanTestDir production-scale 60s açık timeout; baseline digest supp-receipt'le mekanik tazelendi; `receipt=GR-2026-08-05-TREN-E-BASELINE-SUPP-01`; `proof=peak-rss-996mib-validates-2gib-budget`; kapanış kanıtı merge sonrası main-push Coverage Report'un ilk yeşil (veya dürüst threshold-sinyalli) koşusu — gerçek süre o koşuda ölçülüp tavan gerekirse daraltılır",
       "updated": "2026-08-05"
     },
     {
@@ -19878,6 +19889,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "fa05146f003917439ef8dfe46c1500571ef7598b41ae219b32e5739fb631b1e8"
+    "value": "7c98f7f545851955e833cb5a74298971d54056bcb6e1c3cfb9a926e3cda8923d"
   }
 }
