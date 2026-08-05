@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "fd55a27eeaa39c868bb3bd5420cda3e32fc644912eca4695f7f0ee5abd56b6f4"
+    "value": "901f1d4bfc78ce2fa232064474d5ba406adcbdb184c019f3f0c99e2e1655dee4"
   },
   "summary": {
     "total": 352,
     "active": 345,
     "terminal": 7,
-    "receipts": 41,
+    "receipts": 42,
     "byState": {
-      "OPEN": 245,
-      "READY": 0,
+      "OPEN": 244,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 33,
@@ -2786,10 +2786,10 @@
       "id": "PROD-LANDED-FENCE-ORDER-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-04",
+      "state": "READY",
+      "updated": "2026-08-05",
       "definitionDigest": "05c43f8200ec3e3112cef30baf61240d36dd04f8b861d25ac75dc06a67cf3598",
-      "progressDigest": "8bf1a1a8f15032a1bfe4bbc51f4345d0a3621537fcbdaa4b01850d93657cbb9a",
+      "progressDigest": "7312c80bf30c6b205e329f8ff5e6aa6a6161610288c492a0c4b7cbb3cc06215f",
       "terminalClosureDigest": null
     },
     {
@@ -4345,6 +4345,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-04T22:36:24Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-05-LANDED-FENCE-01",
+      "authorityDigest": "0be0f53902e635a3fbebfd8977992f5c1a7561a75e65b2f5d65b5d248dd4e9f1",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -14576,7 +14586,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "1",
         "W": "0",
@@ -14592,7 +14602,7 @@
       "evidenceReceipts": [],
       "acceptance": "observeDockerHeartbeatAuthority fence'i retirement'tan ÖNCE hesaplanıp taşınır (veya observe retirement-öncesi sıraya alınır); monitor yolunda LANDED heartbeat + continuation dispatch kaybolamaz; restart-reconcile checkpointed-LANDED'ı tamamlar; iki REGRESSION-PIN testi (docker-settlement-monitor-wire + docker-restart-reconcile) orijinal kontrata geri döner ve fix'siz üretimde DÜŞER",
       "evidence": "Açılış 2026-08-04: FAZ4B-B4a typed blocker — src/orchestra/spawn-backend-docker.ts:6514-6521, taskResultSettlementActiveClaimDigest DECKENT_E077 'no matching active claim fence'; hata monitor yolunda docker-backend:landed-finalize catch'inde YUTULUYOR (MASTER-PLAN 664 ihlali: held continuation sessiz+non-terminal), restart yolunda yükseliyor. İki test bilinçli REGRESSION-PIN yorumuyla mevcut kırık davranışı pinliyor — üretim düzeltilince pinler kırmızıya döner ve dosyadaki yorumlarda yazılı orijinal kontrata geri alınmalıdır",
-      "updated": "2026-08-04"
+      "updated": "2026-08-05"
     },
     {
       "order": 3342,
@@ -18936,6 +18946,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6ced17f23620702cd402d1ef664371a698046513b2d65e6cd00cfb44ff3ad695"
+    "value": "4427e55b686e6e4d5997111e6817ed89da48f828707acbaee70abd64579cc2c7"
   }
 }
