@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):3299343fec640bc73a170ee14d2b29519ae3ecf29b06a143155f71b5c72696ef`
+**Source digest:** `sha256(normalized-lf-utf8):004baaafdbcd8aa86ed8d74583dea6c8d42f45ec0470bc53a2843fe8fd1fafd0`
 
 **Rows:** 352 total · 345 active · 7 terminal
 
@@ -15,9 +15,9 @@
 |---|---:|
 | OPEN | 243 |
 | READY | 0 |
-| IN_PROGRESS | 1 |
+| IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 34 |
+| VERIFY | 35 |
 | DONE | 7 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -268,7 +268,7 @@
 | 3330 | `PROD-SPRINT-PREFIX-PAD-001` | VERIFY | P1 | KERNEL | — | — | sprint-lifecycle sprintTaskPrefix padding uyumsuzluğu: sprint numarası <100 iken sprint-sonu task-dosya temizliği hiç çalışmıyor |
 | 3335 | `PROD-BINARY-IDENTITY-EAGER-CRASH-001` | VERIFY | P1 | KERNEL | — | — | worktree-binary-authority kaynak-ağaç hash'i eager: src/ dizini olmayan kullanıcı projesinde her non-diagnostic deckent komutu typed HOLD yerine ham stack'le çöküyor |
 | 3340 | `PROD-LANDED-FENCE-ORDER-001` | VERIFY | P0 | KERNEL | — | — | Sprint-488 regresyonu (f59503a43): finalizeLandedAttempt heartbeat-observe'u retirement claim'i kapattıktan SONRA çağırıyor — LANDED heartbeat kaydı ve continuation dispatch monitor yolunda sessizce kayboluyor, restart-reconcile LANDED attempt'i reddediyor |
-| 3342 | `PROD-SSE-ONEVENT-WIRE-001` | IN_PROGRESS | P1 | KERNEL | — | — | Run-flow koordinatörünün SSE onEvent teli yalnız ilk getRunFlowCoordinator çağrısında bağlanıyor: ilk istek propose/plan yolundan gelirse (run-flow-plan-service koordinatörü onEvent'siz yaratır) o root'un CANLI SSE yayını sessizce ölü doğuyor |
+| 3342 | `PROD-SSE-ONEVENT-WIRE-001` | VERIFY | P1 | KERNEL | — | — | Run-flow koordinatörünün SSE onEvent teli yalnız ilk getRunFlowCoordinator çağrısında bağlanıyor: ilk istek propose/plan yolundan gelirse (run-flow-plan-service koordinatörü onEvent'siz yaratır) o root'un CANLI SSE yayını sessizce ölü doğuyor |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
