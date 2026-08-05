@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e883e3b6b162a43506d07de3abb7ee32f7ed11b782c75625e53b0aace2006706"
+    "value": "80f01f6681bfee95e02a0f47eb04dd859856789233e632258254699732e0ea1a"
   },
   "summary": {
     "total": 373,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 256,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 26,
+      "VERIFY": 27,
       "DONE": 23,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -751,10 +751,10 @@
       "id": "CI-STATS-HERMETIC-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "3b4763c618e1776efd241bb37c089e47b5feb777a387d6230da8133a4973f825",
-      "progressDigest": "9f0bd76b413b8e853a440cf9c6bf01c4723544233f2d79d4997cf4d01fc353c7",
+      "progressDigest": "8062045152afaed3c2b09305f70cb5809fbdcbec4672cb8f1ec27a7fbd3ae7be",
       "terminalClosureDigest": null
     },
     {
@@ -4704,8 +4704,8 @@
       "authorityDigest": "cf7fb81d3097c34502efec5a771b8ff2bd5e5a7fd8e71817832b1c16f34f1461",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T21:45:51Z"
       },
       "g7AttemptIdentity": null
     }
@@ -6728,12 +6728,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -6745,7 +6745,7 @@
         "GR-2026-08-05-STATS-HERM-521-01"
       ],
       "acceptance": "Volatil rozet girdileri (sprint, coverage) izlenen snapshot dosyasından okunur; check/write yalnız izlenen dosyaların fonksiyonu olur (temiz checkout deterministik — CI ile lokal aynı sonucu üretir); bilinçli güncelleme refresh-snapshot moduyla (sprint monotonik, coverage yalnız açık bayrakla); main-push Tests—Docs+Scripts yeşile döner",
-      "evidence": "Açılış 2026-08-05: stats-stale üçüncü tekrarında kök TASARIMSAL bulundu, bandajlama durduruldu, öneri Alperen'e taşındı; 2026-08-05 KARAR: 'öneri kabul edildi' (Alperen) — izlenen-snapshot tasarımı onaylı; `receipt=GR-2026-08-05-STATS-HERM-521-01`",
+      "evidence": "Açılış 2026-08-05: stats-stale üçüncü tekrarında kök TASARIMSAL bulundu, bandajlama durduruldu, öneri Alperen'e taşındı; 2026-08-05 KARAR: 'öneri kabul edildi' (Alperen) — izlenen-snapshot tasarımı onaylı; `receipt=GR-2026-08-05-STATS-HERM-521-01`; 2026-08-05 SETTLEMENT (8d0726dcd): üreteç snapshot-tabanlı hermetik — sprint+coverage izlenen .deckent/workspace/stats-snapshot.json'dan (bilinçli refresh-snapshot modu, npm docs:stats:refresh; sprint monotonik, coverage yalnız açık with-coverage bayrağıyla) ve temp-* agent'lar tüm sayımlardan dışlandı (ikinci volatil girdi; temiz-worktree collectStats diff kanıtı agentsTotal 23≠21); `proof=clean-worktree-check-green-write-idempotent`; temiz detached-worktree'de (CI-şekli: .brain-arşivsiz, coverage'sız, dist'siz) check yeşil VE write bayt-stabil (0 değişiklik), suite 36/36, tsc temiz, hermetic baseline'lar build-free tazelendi (parent-worktree 12473 birebir parite); kapanış kanıtı merge sonrası main-push Tests—Docs+Scripts yeşili",
       "updated": "2026-08-05"
     },
     {
@@ -19437,6 +19437,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "3c960a29b746f505637a2784eef98e1d922000ad05d1648d9dcc53c15a35c609"
+    "value": "152e8075200a8dae054776612a81649992e8227e45283d90738bd5363f82843c"
   }
 }
