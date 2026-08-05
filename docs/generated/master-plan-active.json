@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8b858a0c5688bbc70f2b317962263a6f0a1bb265dcb2c311977b40ed54dab41e"
+    "value": "6c8e9f2c38f2ab08cd5dca1c7b40de373e8eb3a72ac3631553b38891a3e65a0d"
   },
   "summary": {
     "total": 352,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 244,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 33,
+      "VERIFY": 34,
       "DONE": 7,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2786,10 +2786,10 @@
       "id": "PROD-LANDED-FENCE-ORDER-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-05",
       "definitionDigest": "05c43f8200ec3e3112cef30baf61240d36dd04f8b861d25ac75dc06a67cf3598",
-      "progressDigest": "3cd149e8a6860bae5460c6ff53f565d1938120a88d66af8f18f1fa6bfad9bb88",
+      "progressDigest": "cdfdd09dd4c5d4d1c83e0d69d3ddfde75cf64ff2685c48eb29debfcaacc5d815",
       "terminalClosureDigest": null
     },
     {
@@ -4353,8 +4353,8 @@
       "authorityDigest": "0be0f53902e635a3fbebfd8977992f5c1a7561a75e65b2f5d65b5d248dd4e9f1",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T03:57:26Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14586,12 +14586,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -14599,9 +14599,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-LANDED-FENCE-01"
+      ],
       "acceptance": "observeDockerHeartbeatAuthority fence'i retirement'tan ÖNCE hesaplanıp taşınır (veya observe retirement-öncesi sıraya alınır); monitor yolunda LANDED heartbeat + continuation dispatch kaybolamaz; restart-reconcile checkpointed-LANDED'ı tamamlar; iki REGRESSION-PIN testi (docker-settlement-monitor-wire + docker-restart-reconcile) orijinal kontrata geri döner ve fix'siz üretimde DÜŞER",
-      "evidence": "Açılış 2026-08-04: FAZ4B-B4a typed blocker — src/orchestra/spawn-backend-docker.ts:6514-6521, taskResultSettlementActiveClaimDigest DECKENT_E077 'no matching active claim fence'; hata monitor yolunda docker-backend:landed-finalize catch'inde YUTULUYOR (MASTER-PLAN 664 ihlali: held continuation sessiz+non-terminal), restart yolunda yükseliyor. İki test bilinçli REGRESSION-PIN yorumuyla mevcut kırık davranışı pinliyor — üretim düzeltilince pinler kırmızıya döner ve dosyadaki yorumlarda yazılı orijinal kontrata geri alınmalıdır",
+      "evidence": "Açılış 2026-08-04: FAZ4B-B4a typed blocker — src/orchestra/spawn-backend-docker.ts:6514-6521, taskResultSettlementActiveClaimDigest DECKENT_E077 'no matching active claim fence'; hata monitor yolunda docker-backend:landed-finalize catch'inde YUTULUYOR (MASTER-PLAN 664 ihlali: held continuation sessiz+non-terminal), restart yolunda yükseliyor. İki test bilinçli REGRESSION-PIN yorumuyla mevcut kırık davranışı pinliyor — üretim düzeltilince pinler kırmızıya döner ve dosyadaki yorumlarda yazılı orijinal kontrata geri alınmalıdır; `receipt=GR-2026-08-05-LANDED-FENCE-01`; 2026-08-05 SETTLEMENT: finalizeLandedAttempt observe-fence'ini writeTaskResultSettlementLandedRetirementAtomic'ten ÖNCE yakalayıp observeDockerHeartbeatAuthority'ye opsiyonel activeClaimFence parametresiyle taşır (fccec47ba); monitor yolunda LANDED heartbeat kaydı + continuation dispatch artık kaybolamaz, restart-reconcile checkpointed-LANDED'ı retiredLanded olarak tamamlar; iki SPRINT-488 REGRESSION-PIN testi dosyalardaki yorumlarda yazılı orijinal kontrata geri alındı; `proof=landed-fence-pins-fail-closed-then-green`: iki test fix'siz üretimde DÜŞTÜ (2 failed/47 passed), fix'le 49/49; orchestra sınıfı 650 dosya 8758 pass + 12 skip, tsc temiz",
       "updated": "2026-08-05"
     },
     {
@@ -18946,6 +18948,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d2ee595debd4960cebf59b7128ebb3db09129de80c011081450548dbd3adadf0"
+    "value": "a5d5391c3993a742178a79f7820ba243bced6950882255697a62e020e0cd1369"
   }
 }
