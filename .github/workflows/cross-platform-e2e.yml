@@ -192,6 +192,26 @@ jobs:
 
       - run: npm run ci:rebuild-native
 
+      # CI-PACKED-DASHBOARD-TOOLCHAIN-001: build:all ends in build:dashboard,
+      # whose hardened script requires src/dashboard's own toolchain
+      # (typescript + vite) preinstalled — it never auto-installs. Same bounded
+      # retry as the root install; src/dashboard has its own package-lock.json.
+      - name: npm ci (dashboard toolchain, bounded retry)
+        shell: bash
+        run: |
+          set -uo pipefail
+          max_attempts=2
+          attempt=1
+          until npm ci --prefix src/dashboard; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::dashboard npm ci failed after ${max_attempts} attempt(s)" >&2
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            echo "dashboard npm ci failed — retrying (attempt ${attempt}/${max_attempts}) after 30s..." >&2
+            sleep 30
+          done
+
       - run: npm run build:all
 
       - name: Packed-install smoke — npm pack → isolated-prefix global install → deckent init --yes → deckent doctor (bounded retry)
