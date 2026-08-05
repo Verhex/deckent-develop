@@ -28,6 +28,7 @@
 
 #ifdef __APPLE__
 #include <sys/mount.h>
+#include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <uuid/uuid.h>
@@ -255,6 +256,38 @@ static napi_value MountIdentity(napi_env env, napi_callback_info info) {
   return result;
 }
 
+/* fdPath(fd) → kernel-verified CURRENT path of an open handle (W3-PR-B slice-2,
+ * design §10 step-3: the one primitive consumers need when a path-only API such
+ * as SQLite must be handed a path derived from a pinned handle). Darwin:
+ * fcntl(F_GETPATH) — the only kernel facility resolving a handle to its live
+ * path. Other POSIX: readlink(/proc/self/fd/N), so Linux CI exercises the same
+ * op surface the Darwin adapter ships. Never a cached or caller-supplied path. */
+static napi_value FdPath(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value argv[1];
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  int32_t fd;
+  if (argc < 1 || !get_fd_arg(env, argv[0], &fd)) return NULL;
+
+#ifdef __APPLE__
+  char path[MAXPATHLEN];
+  if (fcntl(fd, F_GETPATH, path) != 0) {
+    return throw_errno(env, "fcntl(F_GETPATH)", errno);
+  }
+#else
+  char link[64];
+  char path[MAX_NAME_BYTES];
+  snprintf(link, sizeof(link), "/proc/self/fd/%d", fd);
+  ssize_t len = readlink(link, path, sizeof(path) - 1);
+  if (len < 0) return throw_errno(env, "readlink(/proc/self/fd)", errno);
+  path[len] = '\0';
+#endif
+
+  napi_value result;
+  napi_create_string_utf8(env, path, NAPI_AUTO_LENGTH, &result);
+  return result;
+}
+
 /* hostBootIdentity() → { available, hostUuid?, bootTime? } (Darwin only). */
 static napi_value HostBootIdentity(napi_env env, napi_callback_info info) {
   (void)info;
@@ -298,6 +331,7 @@ static napi_value Init(napi_env env, napi_value exports) {
     { "unlinkAt", UnlinkAt },
     { "renameAt", RenameAt },
     { "mountIdentity", MountIdentity },
+    { "fdPath", FdPath },
     { "hostBootIdentity", HostBootIdentity },
   };
   for (size_t i = 0; i < sizeof(fns) / sizeof(fns[0]); i += 1) {

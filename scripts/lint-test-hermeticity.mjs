@@ -100,18 +100,17 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, CI-STATS-HERMETIC-001/521): +6 from the new
-  // snapshot/refresh/temp-agent tests in update-readme-stats.test.ts —
-  // parent worktree re-measured at exactly the prior 12473. Prior: W3-PR-B1.
-  count: 12479,
-  digest: 'a2a428b57d1f26dd4b2347b63ca487501bf073afd87f89b7e60a47b7f3fef2c9',
+  // 2026-08-05 (build-free, W3-PR-B2): +2 from the darwin ops-v2 parity and
+  // fdPath native-suite additions. Prior: CI-STATS-HERMETIC-001/521 (12479).
+  count: 12481,
+  digest: '9ffe45a04d287fdab02cf9d0105a7952f30925c7e569dbbb2a50a0f10347bd86',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (CI-STATS-HERMETIC-001/521): update-readme-stats.mjs snapshot
-  // redesign — same 1197 count, content digest only. Prior: hotfix lazy-flags.
+  // 2026-08-05 (W3-PR-B2): file-lock darwin ops-v2 addition — same 1197
+  // count, content digest only. Prior: CI-STATS-HERMETIC-001/521.
   count: 1197,
-  digest: '2095c587ebec3995b112d1cb40920d28bd4d23abe92f0f3ff66b394ae1212666',
+  digest: '0fa08c5397e39890a1d14adab5c3c30fc151400848ee23fca5864a77762c9f9d',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
