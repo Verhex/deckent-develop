@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "a7e8a1f28594389b8fab1af916c5c446a107e909e87c9212f63cd3d4935e95d9"
+    "value": "52279d2508dca2f50d855e617be44ee3780ebb10e4558ef2a97fce1ac8fa847d"
   },
   "summary": {
     "total": 369,
@@ -11,9 +11,9 @@
     "terminal": 23,
     "receipts": 49,
     "byState": {
-      "OPEN": 255,
+      "OPEN": 256,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 23,
       "DONE": 23,
@@ -2907,10 +2907,10 @@
       "id": "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "OPEN",
       "updated": "2026-08-05",
       "definitionDigest": "f2b33b8cd8d8d5ea4ee7b1f93ca5774c3affb0cc84109ca7549b23f6bec412c5",
-      "progressDigest": "bec7bd8ce8c6f98ef6223c5307cd36b566f84558e18a92bf4d61cbedbeef469c",
+      "progressDigest": "ebd5d816e236df1484dcaeb3960649ebcbae876949f074f5a1053741f6387186",
       "terminalClosureDigest": null
     },
     {
@@ -4610,8 +4610,8 @@
       "authorityDigest": "bff5a8124d7306c81e4e91cd7787310afb030f849e19f38fea42be22926817e3",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-05T10:40:14Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14746,9 +14746,9 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "OPEN",
       "truth": {
-        "C": "0",
+        "C": "1",
         "W": "0",
         "E": "0",
         "H": "?",
@@ -14759,9 +14759,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-05-EXEC-AUTH-W3A-01"
+      ],
       "acceptance": "Addon yalnız probe-doğrulanmış primitifleri sunar; yokluğu fail-closed; darwin adapter'ı file-lock+clean ikizinde aynı kontratla; kapanış macos CI'da gerçek-binary clean (dist'li rebuild) + lock yaşam-döngüsü yeşiliyle",
-      "evidence": "Açılış 2026-08-05: W2 settlement kanıtı (run 30991850136) + D1-D3 onayı; tasarım §4.1/4.3/5-W3",
+      "evidence": "Açılış 2026-08-05: W2 settlement kanıtı (run 30991850136) + D1-D3 onayı; tasarım §4.1/4.3/5-W3; `receipt=GR-2026-08-05-EXEC-AUTH-W3A-01`; 2026-08-05 PR-A ALT-DİLİM SETTLEMENT (ed86f6a86): in-repo N-API addon iskeleti (openat-ailesi + darwin-guarded kimlik) + fail-closed loader + Linux gerçek-koşu 6/6 (symlink-reddi dahil) + ubuntu+macos build+test CI job'ı + ADR-D-005 merit kaydı §9; `proof=native-primitive-suite-6of6-linux-real`; kalan: PR-B darwin adapter'ının file-lock+clean wiring'i + gerçek-Mac real-binary clean/lock kapanış kanıtı; satır alt-dilim kuralı gereği OPEN'a döner (IN_PROGRESS aktif-receipt ister)",
       "updated": "2026-08-05"
     },
     {
@@ -19208,6 +19210,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ccc355f0e93bf0521c27962edaa1a8237b3dbec2e37700aa62cbed21853e9206"
+    "value": "a4985a0568fdd8a2d8c4bfdd9ba586168c5aaeba77b87b09aaa80bcdb08bfec9"
   }
 }

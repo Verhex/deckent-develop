@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):a7e8a1f28594389b8fab1af916c5c446a107e909e87c9212f63cd3d4935e95d9`
+**Source digest:** `sha256(normalized-lf-utf8):52279d2508dca2f50d855e617be44ee3780ebb10e4558ef2a97fce1ac8fa847d`
 
 **Rows:** 369 total · 346 active · 23 terminal
 
@@ -13,9 +13,9 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 255 |
+| OPEN | 256 |
 | READY | 0 |
-| IN_PROGRESS | 1 |
+| IN_PROGRESS | 0 |
 | BLOCKED | 67 |
 | VERIFY | 23 |
 | DONE | 23 |
@@ -265,7 +265,7 @@
 | 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
-| 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | IN_PROGRESS | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
+| 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
