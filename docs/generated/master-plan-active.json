@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "103023e4ef83b2d038ad3ea4ec41a35647524f4cf560e25f773361be0d2d7c04"
+    "value": "c2219681ab64af0559c6988cb5953b7db70d18cdf17661d14df609a52c15114b"
   },
   "summary": {
     "total": 379,
@@ -12,8 +12,8 @@
     "receipts": 60,
     "byState": {
       "OPEN": 258,
-      "READY": 3,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 3,
       "BLOCKED": 67,
       "VERIFY": 28,
       "DONE": 23,
@@ -784,10 +784,10 @@
       "id": "CI-HERMETIC-SCAN-BUDGET-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "2544e1a74056fe5b57303f44f1584b318e85a9a69369c46e2e647b1dd5e3fb1d",
-      "progressDigest": "15a870b30695608dc7d8e5f83382fa08b81c14dfce7aff21983cc4827e5f1927",
+      "progressDigest": "0f23a33303dfe4462d2e55079d7536b25b76c8c8c326a814c41175b6d265d50c",
       "terminalClosureDigest": null
     },
     {
@@ -828,10 +828,10 @@
       "id": "CI-BUILTINS-DRIFT-HERMETIC-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "deb036486caaf5a9fd6e3300977a68354f59014b08cb7caf0c0c319be7d217b3",
-      "progressDigest": "ac88bbb41cc6a9873116045ede74e96d6ae5a635d88784883d4341b3808824fb",
+      "progressDigest": "d83bb1b591258f6ba47bb8e5f399cc0f5e721a9e9acf59c8363a9bae0580d232",
       "terminalClosureDigest": null
     },
     {
@@ -839,10 +839,10 @@
       "id": "DOCS-ALP-DISCIPLINE-SYNC-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-05",
       "definitionDigest": "6682ab7ac1af697cb93bfe0b8a9acbdb3af62e0b924c6e61a3f73f84623e7bfe",
-      "progressDigest": "0d59a28f44913c0d7351ccfd3614543aa5ee5762af7a97f9340ad17f45c9e1d9",
+      "progressDigest": "38c50cfe6e1f2c1715e2416481133a3c9046772f61102c3d3cdfdb2f6e3dfe1b",
       "terminalClosureDigest": null
     },
     {
@@ -6951,7 +6951,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -7046,7 +7046,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -7079,7 +7079,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19759,6 +19759,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9958d928801572dac9c70dad8c6d0807d08f0ba3253ec563d5b0b40d12572d55"
+    "value": "0b2b97c0aa144ca24226dc02e75507f0f2732a263e6a24d5150088ebc6de09ed"
   }
 }
