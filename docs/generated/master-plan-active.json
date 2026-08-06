@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "fca50105b4590ecce42474db17a54bdc501e2cd764b34da88ab9168a7ae31de4"
+    "value": "1d83cb72edd3d0c1df415ff4cb6859abb44269823eb48b3e9053a5a8f1b7c610"
   },
   "summary": {
     "total": 387,
@@ -752,9 +752,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-04",
+      "updated": "2026-08-06",
       "definitionDigest": "6dda7a49b043f6b3b9ec477c607703b7e0993438e4804eeb7b399d6d98e2deeb",
-      "progressDigest": "9e037365176911c566bc188aa4896f89253895ec2733db4b7e8c3398791816b0",
+      "progressDigest": "e214b28a348a44c8812e929df527f59017066d10e5c0d0d5e9fd5c38ff52eb83",
       "terminalClosureDigest": null
     },
     {
@@ -3150,9 +3150,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-06",
       "definitionDigest": "80cb5e3f81853ae422cae53f38582ab95f0be6ba938af204223f2a8e20124913",
-      "progressDigest": "2f8c8498924e15c054fcf7af8bbda2f9ddc408814a9fc0a1a1383a34026d23c4",
+      "progressDigest": "33dab642218048cf4319ac5fc6a130ad82d7c9aa538ee3d02995ac598c2fdab1",
       "terminalClosureDigest": null
     },
     {
@@ -5078,8 +5078,8 @@
       "authorityDigest": "322421d165e7eed006f0e58787cdf3d1aa04937ebff8b7e1cf2c705f61ffd3cc",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-06T06:56:12Z"
       },
       "g7AttemptIdentity": null
     }
@@ -6946,11 +6946,12 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-03-TRUST-ANCHOR-01"
+        "GR-2026-08-03-TRUST-ANCHOR-01",
+        "GR-2026-08-06-DESIGN-DOCS-01"
       ],
       "acceptance": "Aktif receipt baseline'ı working-tree byte'ına değil reviewed parent commit blob'una karşı doğrulanır (git parent-diff kontrolü validator'da veya required CI check'te); `owner=` metni tek başına authority sayılmaz — protected-branch + bağımsız review kanıtı zincire girer; branch protection durumu makine-okunur evidence olarak kayıtlıdır ve sahte-READY senaryosu (xverify E-ekseni 5-adım) regression testi olarak fail-closed kanıtlanır",
-      "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur; `receipt=GR-2026-08-03-TRUST-ANCHOR-01`; `proof=trust-anchor-forgery-fail-closed-84cases`; 2026-08-03 SETTLEMENT: (a) validator'a reviewed-parent doğrulaması eklendi — aktif receipt'in anchor'ı receipt'i tanıtan commit'in PARENT'ıdır (`git log -S`), commit'lenmemiş receipt HEAD'e (son reviewed state) çıpalanır; baseline anchor blob'uyla eşleşmezse `RECEIPT_BASELINE_UNREVIEWED` + admission düşer; (b) degradasyon typed: git dışında `no-git/no-history/no-parent` modu stderr WARN üretir, sessiz geçiş yok — zorlama garantisi ruleset 20321963'ün required check'lerinde (validator-contract 3 bacak + Type Check) ve o bacaklara eklenen `fetch-depth: 0`'da; (c) ruleset kanıtı makine-okunur: docs/evidence/trust-anchor/ruleset-20321963-2026-08-03.json (active, deletion+non_fast_forward+required_status_checks, bypass_actors BOŞ, current_user_can_bypass=never); (d) KANIT: 11 yeni vaka — 6 hermetik anchor-çözümü (sahte git, process yok) + 4 gerçek-git senaryosu (meşru authoring GEÇER, working-tree sahteciliği DÜŞER, xverify 5-adım aynı-commit saldırısı DÜŞER, meşru iki-commit akışı GEÇER) + git yetenek beyanı; suite 84/84. DÜRÜST SINIR-1 (bootstrap): bu dilimin KENDİ receipt'i ile implementasyonu aynı patch'te iniyor — doğduğu commit'te kendini zorlayamazdı; eski rejim altında admitted son dilim budur ve bundan SONRAKİ her aktif receipt parent-anchor'a tabidir. DÜRÜST SINIR-2: `owner=` metni hâlâ kriptografik authenticate edilmiyor — ruleset PR-akışını zorunlu kılarak yazar-dışı görünürlük getirir, imzalı-commit/review katmanı RECEIPT-001 kapsamında açık. X `?`: 3-platform koşusu bir sonraki CI turunda; 2026-08-03 X KAPANDI: PR #27 required-check koşusu (run 30846122775) — Validator Contract ubuntu/macos/windows üçü de pass, trust-anchor kodu ve 84-case suite dahil; merge ancak bu 3 bacak + Type Check yeşilken mümkün oldu (ruleset'in kendisi kanıt zincirinin parçası: direct push fiilen reddedildi, akış PR'a döndü); 2026-08-04 XVERIFY-E TUR-2 SONUCU (codex-analysis/xverify-e-2026-08-03.md): REFUTED — özgün 5-adım saldırısı fail-closed DOĞRULANDI (84/84 bağımsız koşum) ama dört mekanik varyant kabul yolu üretti (merge-introduction `-S`'e görünmez, rename anchor'ı ileri taşır, shallow-clone Type Check bacağında WARN-geçiş, blob-okuma hatası ABSENT sanılır) ve iki yapısal sınır adlandı (parent≠reviewed varsayımı, required-check self-modification). Mekanik dörtlünün kapanışı TRUST-ANCHOR-002'dedir; yapısal ikili solo-hesap mitigasyon araştırması sonrası owner kararıyla typed sınır veya iş olarak hükme bağlanacak — bu satır o karara kadar VERIFY'da kalır ve kapanmış SAYILMAZ",
-      "updated": "2026-08-04"
+      "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur; `receipt=GR-2026-08-03-TRUST-ANCHOR-01`; `proof=trust-anchor-forgery-fail-closed-84cases`; 2026-08-03 SETTLEMENT: (a) validator'a reviewed-parent doğrulaması eklendi — aktif receipt'in anchor'ı receipt'i tanıtan commit'in PARENT'ıdır (`git log -S`), commit'lenmemiş receipt HEAD'e (son reviewed state) çıpalanır; baseline anchor blob'uyla eşleşmezse `RECEIPT_BASELINE_UNREVIEWED` + admission düşer; (b) degradasyon typed: git dışında `no-git/no-history/no-parent` modu stderr WARN üretir, sessiz geçiş yok — zorlama garantisi ruleset 20321963'ün required check'lerinde (validator-contract 3 bacak + Type Check) ve o bacaklara eklenen `fetch-depth: 0`'da; (c) ruleset kanıtı makine-okunur: docs/evidence/trust-anchor/ruleset-20321963-2026-08-03.json (active, deletion+non_fast_forward+required_status_checks, bypass_actors BOŞ, current_user_can_bypass=never); (d) KANIT: 11 yeni vaka — 6 hermetik anchor-çözümü (sahte git, process yok) + 4 gerçek-git senaryosu (meşru authoring GEÇER, working-tree sahteciliği DÜŞER, xverify 5-adım aynı-commit saldırısı DÜŞER, meşru iki-commit akışı GEÇER) + git yetenek beyanı; suite 84/84. DÜRÜST SINIR-1 (bootstrap): bu dilimin KENDİ receipt'i ile implementasyonu aynı patch'te iniyor — doğduğu commit'te kendini zorlayamazdı; eski rejim altında admitted son dilim budur ve bundan SONRAKİ her aktif receipt parent-anchor'a tabidir. DÜRÜST SINIR-2: `owner=` metni hâlâ kriptografik authenticate edilmiyor — ruleset PR-akışını zorunlu kılarak yazar-dışı görünürlük getirir, imzalı-commit/review katmanı RECEIPT-001 kapsamında açık. X `?`: 3-platform koşusu bir sonraki CI turunda; 2026-08-03 X KAPANDI: PR #27 required-check koşusu (run 30846122775) — Validator Contract ubuntu/macos/windows üçü de pass, trust-anchor kodu ve 84-case suite dahil; merge ancak bu 3 bacak + Type Check yeşilken mümkün oldu (ruleset'in kendisi kanıt zincirinin parçası: direct push fiilen reddedildi, akış PR'a döndü); 2026-08-04 XVERIFY-E TUR-2 SONUCU (codex-analysis/xverify-e-2026-08-03.md): REFUTED — özgün 5-adım saldırısı fail-closed DOĞRULANDI (84/84 bağımsız koşum) ama dört mekanik varyant kabul yolu üretti (merge-introduction `-S`'e görünmez, rename anchor'ı ileri taşır, shallow-clone Type Check bacağında WARN-geçiş, blob-okuma hatası ABSENT sanılır) ve iki yapısal sınır adlandı (parent≠reviewed varsayımı, required-check self-modification). Mekanik dörtlünün kapanışı TRUST-ANCHOR-002'dedir; yapısal ikili solo-hesap mitigasyon araştırması sonrası owner kararıyla typed sınır veya iş olarak hükme bağlanacak — bu satır o karara kadar VERIFY'da kalır ve kapanmış SAYILMAZ; 2026-08-06 ARAŞTIRMA (Karar-3): docs/analysis/trust-anchor-solo-research-2026-08-06.md — güncel mitigasyon ölçümü + koltuk-bağımsız Rekor-snapshot önerisi + tamper-evidence dürüst sınırı; `receipt=GR-2026-08-06-DESIGN-DOCS-01`",
+      "updated": "2026-08-06"
     },
     {
       "order": 524,
@@ -15689,10 +15690,12 @@
       "closureBlockedBy": [
         "PRINCIPAL-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-DESIGN-DOCS-01"
+      ],
       "acceptance": "Every mutation/read/tool action maps to stable operation ID, risk and effect class",
-      "evidence": "Code-truth audit found no canonical catalog",
-      "updated": "2026-07-26"
+      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`",
+      "updated": "2026-08-06"
     },
     {
       "order": 4040,
@@ -19914,6 +19917,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "8ade3beeebe2c9f8f8fdf9e09cdac0d0f5ffe142b9b0cb83756f1b8638c0cfe0"
+    "value": "95967da5c2175234ccf50c24d67d7116fd39b96a6c4908c410f437032bbe6329"
   }
 }
