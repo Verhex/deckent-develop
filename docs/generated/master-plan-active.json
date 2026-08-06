@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "47fae8efcf016be128bcb34b7e3ae8f1694ed369f9c208e7dc0de65b8efc847b"
+    "value": "14b604f297d1986cd1e15a4dcdd43331e5690bafb293b2182a5cdfb149bd5e63"
   },
   "summary": {
     "total": 388,
@@ -2391,9 +2391,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-07-31",
+      "updated": "2026-08-06",
       "definitionDigest": "b4c7538863f5fd35cfc196c095153ebd6488022b7fdff79639864582c4a6e52f",
-      "progressDigest": "be946314bfcbbd5010b5969c6f4eaf3569004c814f35b5f107f7efcadff1dcf0",
+      "progressDigest": "6bdab9e00de5e828be2f462aa80337d210f4628f29dbeb03249c1f7247987a0c",
       "terminalClosureDigest": null
     },
     {
@@ -13387,8 +13387,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "One fenced terminal receipt atomically precedes archive/cleanup; CLI, MCP, dashboard and job remain monotonic COMPLETE with logical progress bounded to N/N; temp/residue files cannot become task identity",
-      "evidence": "Sprint-487 wired exact terminal evidence and one fenced receipt before every archive/cleanup edge, then moved CLI and MCP onto one core receipt projection. Supervisor canary exposed and repaired locale-dependent FIX-leaf selection, fail-open receipt publication, and landing-proposal archival. Real built CLI now passes exact coordinator death, receipt-before-archive, residue preservation and monotonic status. Dashboard/job adoption and every-environment replay remain open. Negative scope: no timer mask, dashboard lifecycle authority or evidence deletion; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-terminal-binary`",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-487 wired exact terminal evidence and one fenced receipt before every archive/cleanup edge, then moved CLI and MCP onto one core receipt projection. Supervisor canary exposed and repaired locale-dependent FIX-leaf selection, fail-open receipt publication, and landing-proposal archival. Real built CLI now passes exact coordinator death, receipt-before-archive, residue preservation and monotonic status. Dashboard/job adoption and every-environment replay remain open. Negative scope: no timer mask, dashboard lifecycle authority or evidence deletion; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-terminal-binary`; 2026-08-06 DİLİM-KEŞFİ (öne-alma onayı, karar-turu — 3021 aggregate-parent kilidinin çocuğu): kanonik projection projectTerminalPublicationStatus (sprint-terminal-publication-status.ts, sprintId-anahtarlı receipt @ .deckent/recently-works/<sprintId>-terminal-receipt.json); mevcut tüketiciler run-status-read-model + MCP status + CLI status/cleanup; AÇIK adoption: (a) dashboard-manager sprint-durumunu ham snapshot'tan türetiyor — receipt-observed'da monotonic-COMPLETE pini yok, (b) run-jobs-read job-dosyasının kendi status alanından türetiyor (surface-owned) ve receipt'le join'i flowId↔sprintId kimlik-eşlemesi tasarımı istiyor (receipt runId+sprintId taşıyor, closure flowId-anahtarlı — completionRecord alan envanteri çıkarılacak); dilim planı: 485a dashboard-adoption (sprint-anahtarlı, doğrudan) → 485b job-adoption (kimlik-join tasarım-notuyla) → L-kanıtı gerçek-binary cleanup-regression koşusu",
+      "updated": "2026-08-06"
     },
     {
       "order": 3196,
@@ -19993,6 +19993,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5a7f00ff674dbdd8c75df43fbaca4033eab45868d7bc28644f14472e269110d3"
+    "value": "16c0ec67d64b15003192cfa091164b722a856a510f3cd311a39d2540b7e4af24"
   }
 }
