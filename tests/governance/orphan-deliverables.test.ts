@@ -424,6 +424,19 @@ describe('findOrphanFiles — fixture determinism', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const KNOWN_ORPHANS = [
+  // 531 süpürme (2026-08-06): eight modules newly orphaned by the FAZ4-era
+  // refactor waves — the live scan pinned them loudly, exactly as designed.
+  // Four are RECOVERY-program modules (written-but-unwired recovery code);
+  // all eight are wire-or-retire candidates for the SEC-ENFORCE-WIRE-001 /
+  // dead-code disposition class and are recorded in MASTER 531 evidence.
+  'src/agents/worker-rollback.ts',
+  'src/api/sprint-job-runner.ts',
+  'src/core/cascade-detector.ts',
+  'src/core/production-wiring-typescript-adapter.ts',
+  'src/nervous/recovery-notification.ts',
+  'src/orchestra/cross-verify-admission-policy.ts',
+  'src/orchestra/recovery-adapters/run-flow-recovery-adapter.ts',
+  'src/orchestra/recovery-adapters/run-job-recovery-adapter.ts',
   // SURF-1b (sprint-439): the durable RunFlowCoordinator core landed but its
   // consumers (terminal controller + API routes) are the SURF-1c driver-
   // migration slice — deliberately frozen mid-train (Alperen, 2026-07-14:
@@ -535,7 +548,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(83);
+    expect(KNOWN_ORPHANS.length).toBe(91); // 531 süpürme (2026-08-06): +8 yeni orphan (yukarıdaki tarihli blok)
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

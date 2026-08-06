@@ -798,9 +798,12 @@ describe('live repo-wide pin — packed-install retry-hardening (task 434-001 co
     expect(analysis.unboundedLoop).toBe(false);
   });
 
-  it('npm install and npm pack/install-smoke are two SEPARATE bounded-retry flows (not one shared loop)', () => {
+  it('npm install, dashboard install and npm pack/install-smoke are SEPARATE bounded-retry flows (not one shared loop)', () => {
+    // 531 süpürme: the packed-install job gained a third receipted bounded-retry
+    // flow (dashboard `npm ci --prefix src/dashboard`, CI-PACKED-DASHBOARD-
+    // TOOLCHAIN-001) — the pin tracks the measured set, still all separate.
     const retrySteps = steps.filter((s) => analyzeBoundedRetryLoop(s.run).found);
-    expect(retrySteps.length).toBe(2);
+    expect(retrySteps.length).toBe(3);
   });
 
   it('job env carries bounded npm fetch-retry/timeout settings', () => {

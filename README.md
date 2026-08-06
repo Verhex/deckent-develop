@@ -4,7 +4,7 @@
 
 Deckent unifies an assistant, parallel workers, and a platform control plane around one authority chain: `Goal → Mission → Flow → Run → WorkItem → Attempt → Operation`. Terminal and Desktop are the primary operator surfaces; CLI, MCP, API, process/autonomous entry points, and connectors are adapters; Dashboard is an observability projection. [Evidence: `.deckent/workspace/IDENTITY.md:2-10,16-17`]
 
-[English documentation](docs/en/overview.md) · [Türkçe dokümantasyon](docs/tr/overview.md) · [Current truth gaps](docs/analysis/CODE-DOC-DIFF-2026-08.md)
+[English documentation](https://github.com/VerhexIO/deckent/blob/main/docs/en/overview.md) · [Türkçe dokümantasyon](https://github.com/VerhexIO/deckent/blob/main/docs/tr/overview.md) · [Current truth gaps](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md)
 
 ## Why it exists
 
@@ -71,25 +71,25 @@ Status labels in the detailed docs mean:
 
 The feature manifest currently lists 21 active, 4 lightly used, 9 dormant, and 1 dead entry. The live `truth --json` check reported five truth contracts: training trace was code/wired/enabled/proven; tool surface, worker approval gate, and routing journal lacked runtime proof; prompt-gate-block had no detected callsite and was the single half-wire candidate. [Evidence: `.deckent/settings/features-manifest.json`; real `node dist/cli/entry.js features --json` and `truth --json` outputs, 2026-08-01]
 
-The latest dogfood handoff does not certify unattended production reliability: its Codex audit records 0/31 intervention-free runs and documents settlement/gate contradictions that require the ordered certification ladder. These are not hidden behind product language; see [Current frictions](docs/en/operations/current-frictions.md) and the [difference report](docs/analysis/CODE-DOC-DIFF-2026-08.md). [Evidence: `docs/MASTER-PLAN.md` — RECOVERY-BORN-488 family, RECOVERY-BORN-490-REPLAY-CERTIFICATION-001 and CODEX-MAIN-001 decision line]
+The latest dogfood handoff does not certify unattended production reliability: its Codex audit records 0/31 intervention-free runs and documents settlement/gate contradictions that require the ordered certification ladder. These are not hidden behind product language; see [Current frictions](https://github.com/VerhexIO/deckent/blob/main/docs/en/operations/current-frictions.md) and the [difference report](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md). [Evidence: `docs/MASTER-PLAN.md` — RECOVERY-BORN-488 family, RECOVERY-BORN-490-REPLAY-CERTIFICATION-001 and CODEX-MAIN-001 decision line]
 
 ## Documentation map
 
-- [Getting started](docs/en/guide/getting-started.md)
-- [Run lifecycle](docs/en/guide/run-lifecycle.md)
-- [Execution modes](docs/en/guide/execution-modes.md)
-- [Interactive surfaces](docs/en/guide/interactive-surfaces.md)
-- [Feature catalog](docs/en/features/catalog.md)
-- [CLI reference](docs/en/cli.md)
-- [MCP reference](docs/en/mcp.md)
-- [Database reference](docs/en/db.md)
-- [Configuration](docs/en/configuration.md)
-- [Complete bilingual documentation index](docs/index.md)
-- [Code–documentation difference report](docs/analysis/CODE-DOC-DIFF-2026-08.md)
+- [Getting started](https://github.com/VerhexIO/deckent/blob/main/docs/en/guide/getting-started.md)
+- [Run lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/en/guide/run-lifecycle.md)
+- [Execution modes](https://github.com/VerhexIO/deckent/blob/main/docs/en/guide/execution-modes.md)
+- [Interactive surfaces](https://github.com/VerhexIO/deckent/blob/main/docs/en/guide/interactive-surfaces.md)
+- [Feature catalog](https://github.com/VerhexIO/deckent/blob/main/docs/en/features/catalog.md)
+- [CLI reference](https://github.com/VerhexIO/deckent/blob/main/docs/en/cli.md)
+- [MCP reference](https://github.com/VerhexIO/deckent/blob/main/docs/en/mcp.md)
+- [Database reference](https://github.com/VerhexIO/deckent/blob/main/docs/en/db.md)
+- [Configuration](https://github.com/VerhexIO/deckent/blob/main/docs/en/configuration.md)
+- [Complete bilingual documentation index](https://github.com/VerhexIO/deckent/blob/main/docs/index.md)
+- [Code–documentation difference report](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md)
 
 ## Constitutional constraints
 
-Deckent's three immutable laws are Dual Lens + Scale, Every Environment, and Never MVP. The complete governance interpretation is documented in [Immutable Laws](docs/en/governance/immutable-laws.md). [Evidence: `AGENTS.md:9-35`]
+Deckent's three immutable laws are Dual Lens + Scale, Every Environment, and Never MVP. The complete governance interpretation is documented in [Immutable Laws](https://github.com/VerhexIO/deckent/blob/main/docs/en/governance/immutable-laws.md). [Evidence: `AGENTS.md:9-35`]
 
 License: MIT. [Evidence: `package.json:90-91`; `LICENSE`]
 

@@ -108,18 +108,17 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-06 (build-free, COVDEBT-DOCKER-02): four superseded docker-era
-  // suites retired (owner decision, coverage mapped to the FAZ4B orchestra
-  // class) — 12481 → 12477. Prior: tren-e 529/530.
-  count: 12477,
-  digest: '603c3f30f88a55ec8ea050e4ac7b7ec061dfc8973c0073350e583c602728ead0',
+  // 2026-08-06 (build-free, COVDEBT-SWEEP): +1 from the nerv-w1 scheduler-
+  // fence task-file fixture writes. Prior: COVDEBT-DOCKER-02 (12477).
+  count: 12478,
+  digest: '78188b9e121e8a43d576dca1f9d03076b192e15844a3e38795590b9bee5e4c17',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  // 2026-08-05 (523): vendored alp-discipline v1.0.4 sync — same 1197 count,
-  // content digest only. Prior: W3-PR-B2.
+  // 2026-08-06 (COVDEBT-SWEEP): README docs-link absolutization + the scan-
+  // budget param — same 1197 count, content digest only. Prior: 523.
   count: 1197,
-  digest: 'b8504faac9f175a0077cb67003ceb31f813a4e8eb6ded19b8af7814f85159aa9',
+  digest: '0b25a75a91e0f679f039b417b7a6b96016ec1df03452cbe9d0a2cf9f32860995',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
@@ -7378,7 +7377,12 @@ export function scanTestDir(
   return { violations, registry, checked, skipped };
 }
 
-export function scanConfiguredTestRoots(rootDir = REPO_ROOT, allowlist = ALLOWLIST) {
+// 531 süpürme: the coverage job runs this scan IN-PROCESS under vitest
+// instrumentation, which multiplies the analysis cost past the normal
+// per-phase wall (measured: 180001ms trip at 29.8M ops on run 31056929295 vs
+// ~18s uninstrumented). Callers in instrumented contexts may pass their own
+// measured budget; every production/CLI caller keeps the default.
+export function scanConfiguredTestRoots(rootDir = REPO_ROOT, allowlist = ALLOWLIST, scanBudget = createScanBudget()) {
   const configuredRoots = [
     join(rootDir, 'tests'),
     join(rootDir, 'src', 'dashboard', 'src'),
@@ -7391,7 +7395,6 @@ export function scanConfiguredTestRoots(rootDir = REPO_ROOT, allowlist = ALLOWLI
     seenProductionInventory: new Set(),
     seenProductionEffects: new Set(),
   };
-  const scanBudget = createScanBudget();
   for (const testsDir of configuredRoots) {
     const result = scanTestDir(
       testsDir,

@@ -4,7 +4,7 @@
 
 Deckent; Assistant, parallel Worker'lar ve Platform control plane'i tek authority chain çevresinde birleştirir: `Goal → Mission → Flow → Run → WorkItem → Attempt → Operation`. Terminal ve Desktop primary operator surface'lerdir; CLI, MCP, API, process/autonomous girişleri ve connectors adapter'dır; Dashboard bir observability projection'dır. [Kanıt: `.deckent/workspace/IDENTITY.md:2-10,16-17`]
 
-[English documentation](docs/en/overview.md) · [Türkçe dokümantasyon](docs/tr/overview.md) · [Güncel gerçeklik farkları](docs/analysis/CODE-DOC-DIFF-2026-08.md)
+[English documentation](https://github.com/VerhexIO/deckent/blob/main/docs/en/overview.md) · [Türkçe dokümantasyon](https://github.com/VerhexIO/deckent/blob/main/docs/tr/overview.md) · [Güncel gerçeklik farkları](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md)
 
 ## Neden var?
 
@@ -71,25 +71,25 @@ Detaylı dokümanlardaki status label'ları:
 
 Feature manifest şu anda 21 active, 4 lightly used, 9 dormant ve 1 dead entry listeler. Canlı `truth --json` check beş truth contract bildirdi: training trace code/wired/enabled/proven; tool surface, worker approval gate ve routing journal runtime proof'suz; prompt-gate-block detected callsite olmadan tek half-wire candidate. [Kanıt: `.deckent/settings/features-manifest.json`; real `node dist/cli/entry.js features --json` ve `truth --json` output'ları, 2026-08-01]
 
-Son dogfood handoff unattended production reliability'yi certify etmez: Codex audit 0/31 intervention-free run kaydeder ve sıralı certification ladder isteyen settlement/gate contradiction'ları belgeler. Bunlar product language arkasına saklanmaz; [Güncel sürtünmeler](docs/tr/operations/current-frictions.md) ve [fark raporuna](docs/analysis/CODE-DOC-DIFF-2026-08.md) bakın. [Kanıt: `docs/MASTER-PLAN.md` — RECOVERY-BORN-488 ailesi, RECOVERY-BORN-490-REPLAY-CERTIFICATION-001 ve CODEX-MAIN-001 karar satırı]
+Son dogfood handoff unattended production reliability'yi certify etmez: Codex audit 0/31 intervention-free run kaydeder ve sıralı certification ladder isteyen settlement/gate contradiction'ları belgeler. Bunlar product language arkasına saklanmaz; [Güncel sürtünmeler](https://github.com/VerhexIO/deckent/blob/main/docs/tr/operations/current-frictions.md) ve [fark raporuna](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md) bakın. [Kanıt: `docs/MASTER-PLAN.md` — RECOVERY-BORN-488 ailesi, RECOVERY-BORN-490-REPLAY-CERTIFICATION-001 ve CODEX-MAIN-001 karar satırı]
 
 ## Dokümantasyon haritası
 
-- [Başlangıç](docs/tr/guide/getting-started.md)
-- [Run lifecycle](docs/tr/guide/run-lifecycle.md)
-- [Execution modes](docs/tr/guide/execution-modes.md)
-- [Interactive surfaces](docs/tr/guide/interactive-surfaces.md)
-- [Feature catalog](docs/tr/features/catalog.md)
-- [CLI reference](docs/tr/cli.md)
-- [MCP reference](docs/tr/mcp.md)
-- [Database reference](docs/tr/db.md)
-- [Configuration](docs/tr/configuration.md)
-- [Tam çift-dilli dokümantasyon index'i](docs/index.md)
-- [Code–documentation fark raporu](docs/analysis/CODE-DOC-DIFF-2026-08.md)
+- [Başlangıç](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/getting-started.md)
+- [Run lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/run-lifecycle.md)
+- [Execution modes](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/execution-modes.md)
+- [Interactive surfaces](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/interactive-surfaces.md)
+- [Feature catalog](https://github.com/VerhexIO/deckent/blob/main/docs/tr/features/catalog.md)
+- [CLI reference](https://github.com/VerhexIO/deckent/blob/main/docs/tr/cli.md)
+- [MCP reference](https://github.com/VerhexIO/deckent/blob/main/docs/tr/mcp.md)
+- [Database reference](https://github.com/VerhexIO/deckent/blob/main/docs/tr/db.md)
+- [Configuration](https://github.com/VerhexIO/deckent/blob/main/docs/tr/configuration.md)
+- [Tam çift-dilli dokümantasyon index'i](https://github.com/VerhexIO/deckent/blob/main/docs/index.md)
+- [Code–documentation fark raporu](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md)
 
 ## Constitutional constraints
 
-Deckent'in üç Immutable Law'u Dual Lens + Scale, Every Environment ve Never MVP'dir. Tam governance yorumu [Immutable Laws](docs/tr/governance/immutable-laws.md) içinde belgelenir. [Kanıt: `AGENTS.md:9-35`]
+Deckent'in üç Immutable Law'u Dual Lens + Scale, Every Environment ve Never MVP'dir. Tam governance yorumu [Immutable Laws](https://github.com/VerhexIO/deckent/blob/main/docs/tr/governance/immutable-laws.md) içinde belgelenir. [Kanıt: `AGENTS.md:9-35`]
 
 License: MIT. [Kanıt: `package.json:90-91`; `LICENSE`]
 

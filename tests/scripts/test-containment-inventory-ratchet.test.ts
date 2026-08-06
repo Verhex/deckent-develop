@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   PRODUCTION_INVENTORY_BASELINE,
   UNRESOLVED_BASELINE,
+  createScanBudget,
   productionInventoryFingerprint,
   scanConfiguredTestRoots,
   unresolvedRegistryFingerprint,
@@ -42,10 +43,18 @@ describe('containment production-inventory ratchet', () => {
   it('binds every foundation module without accepting new unresolved effects', {
     // CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001: measured 48.9s build-free on a fast
     // dev host; slower CI runners exceeded the old 60s ceiling (timeout flake).
-    // 180s = measured baseline x ~3 runner factor, still a hard bound.
-    timeout: 180_000,
+    // 531 süpürme: the coverage job runs this suite under vitest
+    // instrumentation, which multiplied the scan past BOTH 180s walls
+    // (measured 180001ms trip, run 31056929295) — test timeout and the
+    // explicit scan budget below move to 600s (~3x the instrumented trip
+    // point), still hard bounds. Uninstrumented runs stay ~18-49s.
+    timeout: 600_000,
   }, () => {
-    const result = scanConfiguredTestRoots(REPO_ROOT);
+    const result = scanConfiguredTestRoots(
+      REPO_ROOT,
+      undefined,
+      createScanBudget(undefined, 600_000),
+    );
     const inventoryPaths = result.registry
       .filter(entry => entry.classification === 'inventory')
       .map(entry => entry.file);
