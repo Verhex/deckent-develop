@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "882ca3049531629b8561d780936f957b6506f37b690dcca543a0f012ad8bbc4e"
+    "value": "2bdbb1401aeb1d13a2021fce33720f66f1982f3ceb3aa3adc325bd3572481ff0"
   },
   "summary": {
     "total": 387,
     "active": 354,
     "terminal": 33,
-    "receipts": 77,
+    "receipts": 78,
     "byState": {
-      "OPEN": 260,
-      "READY": 0,
+      "OPEN": 259,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 27,
@@ -3127,10 +3127,10 @@
       "id": "PRINCIPAL-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-27",
+      "state": "READY",
+      "updated": "2026-08-06",
       "definitionDigest": "fa879e7874c86d428bb4f508ad2284eb8e78ac0c663a8af384bbbcb836759b06",
-      "progressDigest": "22ded47daeb690c6b65c18957afd7cbb55d993fd5df612e75bdfac584a6200aa",
+      "progressDigest": "f06f18bea436f254830f5a11f39568337c94c53c8bd5b6cdc8c21d71c0c0f31e",
       "terminalClosureDigest": null
     },
     {
@@ -5090,6 +5090,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-06T06:59:03Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-PRINCIPAL-P1A-01",
+      "authorityDigest": "1805888b45c77980003c7bb961fab703fc409ba833106f86b103e58d337422c4",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -15600,7 +15610,7 @@
         "G2",
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "~",
         "W": "~",
@@ -15613,10 +15623,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-PRINCIPAL-P1A-01"
+      ],
       "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
-      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate)",
+      "updated": "2026-08-06"
     },
     {
       "order": 4020,
@@ -19928,6 +19940,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "793cc53c24596e101c4dd235f80339e4b10b6945420bc8c00338d6da96e1a90f"
+    "value": "923ba1b0159c5c83b05563f06cbd973d544a2f985e074c2d12bb15a47eab04a3"
   }
 }
