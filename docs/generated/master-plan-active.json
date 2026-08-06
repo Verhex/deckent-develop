@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "ec5931611e897d2082b82f5812ba96954a26177a55152c0a7d9866d64ce6b6ee"
+    "value": "d00b5031907930a42e6076a35e49273252024121256c7698c7399e553481731e"
   },
   "summary": {
     "total": 387,
@@ -12,8 +12,8 @@
     "receipts": 75,
     "byState": {
       "OPEN": 260,
-      "READY": 2,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 2,
       "BLOCKED": 67,
       "VERIFY": 25,
       "DONE": 33,
@@ -916,10 +916,10 @@
       "id": "CI-ACTIONS-ECONOMY-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-06",
       "definitionDigest": "4a5c83a4702307efc41649b52542d1f20bf5219d2dfb3c74f63ea0335428a9ce",
-      "progressDigest": "13d5076669db62563878df794797670b26cbbc8342d41153001ff3c66f21d94f",
+      "progressDigest": "31bc5a27a9efed7eb75410341379a6cc12c6e2f43ecfc17d938c0fced731a21d",
       "terminalClosureDigest": null
     },
     {
@@ -927,10 +927,10 @@
       "id": "ADR-BACKFILL-G039-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-06",
       "definitionDigest": "6927493682daeba6eefd5f54c27eb9cc252abef523a3f959cf6851dbf19f0e3f",
-      "progressDigest": "db33e1f512f0cfb2daf43b3563f50a1109a14f2e16c52ca62fa94d5368d498dd",
+      "progressDigest": "4e7baadcda336466f7c5907fb48276b9b86135947150e5b588f4e31d9ab64539",
       "terminalClosureDigest": null
     },
     {
@@ -7196,7 +7196,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -7230,7 +7230,7 @@
         "G4",
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19904,6 +19904,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e5b21f595ea7d3b5587b2551c152a6b315eef05f791de763c71c07af2b851be8"
+    "value": "06b612c2b4b84ae844cdba9b865d726f9ae8f5c5bda71f567da43ef795bfba67"
   }
 }
