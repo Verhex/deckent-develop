@@ -115,8 +115,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // build-free trees (the point of the fix).
   // 2026-08-06 (P1a): +7 principal contract tests and consumer-pin edits —
   // same 12478 count, digest only. Prior: 533 dist-blind.
+  // 2026-08-06 (XPLAT-SKIP-GUARD): +guard test — same 12478, digest only.
   count: 12478,
-  digest: 'd1c1c83eae1bdbb633c0e7e25b181b87a8db89a360c0596975c076c55d782f34',
+  digest: '13f79106afc7f34c263d56ad9656f5c2a68a5c6144a22019f90f596c16175016',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({

@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e06911d04881c02ae1f0539a39d86386c9cbc7452eee38c1e6782fc9cf964ec2"
+    "value": "4744452727d178b435f06a2518f8fc89337e2ee244fd55f2a5832c8c285af141"
   },
   "summary": {
     "total": 387,
     "active": 354,
     "terminal": 33,
-    "receipts": 79,
+    "receipts": 81,
     "byState": {
-      "OPEN": 259,
+      "OPEN": 258,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 28,
+      "VERIFY": 29,
       "DONE": 33,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -124,10 +124,10 @@
       "id": "XPLAT-SKIP-GUARD-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-08-03",
+      "state": "VERIFY",
+      "updated": "2026-08-06",
       "definitionDigest": "aa5660883aa89573b16a2d116fcf216e38bcd12041d3fc9e5b968bc1de329812",
-      "progressDigest": "987af78b304608fd2e78122e53a99b51baeedaf566a58674f8db5e96926c58c1",
+      "progressDigest": "5631600703f2521b67ffa1cae0472d79f77092a4e079761dc585d7414080823d",
       "terminalClosureDigest": null
     },
     {
@@ -5112,6 +5112,26 @@
         "transitionAt": "2026-08-06T08:06:43Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-XPLAT-GUARD-32-01",
+      "authorityDigest": "5ab14743550b1440e33ca96d2b0babad7afceb6bef20411669792698cc03912f",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T08:22:21Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-XPLAT-STATS-SUPP-01",
+      "authorityDigest": "e724330d424909db18dc310a8d28f14f1148688fc3d0717407bde61ea8a32fc3",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T08:22:21Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -5159,12 +5179,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -5172,10 +5192,13 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-XPLAT-GUARD-32-01",
+        "GR-2026-08-06-XPLAT-STATS-SUPP-01"
+      ],
       "acceptance": "validator-contract matrisinde symlink-yetenekli sayılan bir platformda symlink vakası atlanırsa o bacak fail eder; skip yalnız typed unsupported gerekçeyle ve görünür kayıtla kabul edilir; kural üç bacakta da CI'da fail-closed doğrulanır",
-      "evidence": "Açılış: Alperen 2026-08-03 onayı (soru-cevap kaydı). Gerekçe: MASTER-CLI-SYMLINK-FLAKE-001'in X=1 kanıtı 30832207675 ve 30833491791 koşumlarındaki sıfır-skip gözlemine dayanır; bu bir koşum kanıtıdır, gate'in dayattığı değişmez değildir — SeCreateSymbolicLinkPrivilege vermeyen gelecekteki bir windows-latest imajı symlink vakalarını yetenek probu üzerinden sessizce atlar ve bacak yine yeşil raporlar. Bu satır o sessiz gerilemeyi build hatasına çevirir. Kanıtlamadığı: hangi platformların kapsam-beklenen sayılacağı (ör. Developer Mode varsayımı) implementasyonda tiplenecek",
-      "updated": "2026-08-03"
+      "evidence": "Açılış: Alperen 2026-08-03 onayı (soru-cevap kaydı). Gerekçe: MASTER-CLI-SYMLINK-FLAKE-001'in X=1 kanıtı 30832207675 ve 30833491791 koşumlarındaki sıfır-skip gözlemine dayanır; bu bir koşum kanıtıdır, gate'in dayattığı değişmez değildir — SeCreateSymbolicLinkPrivilege vermeyen gelecekteki bir windows-latest imajı symlink vakalarını yetenek probu üzerinden sessizce atlar ve bacak yine yeşil raporlar. Bu satır o sessiz gerilemeyi build hatasına çevirir. Kanıtlamadığı: hangi platformların kapsam-beklenen sayılacağı (ör. Developer Mode varsayımı) implementasyonda tiplenecek; `receipt=GR-2026-08-06-XPLAT-GUARD-32-01`; Dalga-2 yolcu-3 admission 2026-08-06; 2026-08-06 SETTLEMENT (tren-n): gate-invariant guard validator-suite'e eklendi — POSIX'te probe-reddi bacak-FAIL, win32'de typed+görünür skip; `proof=guard-fails-closed-on-declared-capable-refusal`; kapanış kanıtı PR'ın Validator Contract 3-OS bacakları; `receipt=GR-2026-08-06-XPLAT-STATS-SUPP-01`",
+      "updated": "2026-08-06"
     },
     {
       "order": 40,
@@ -19950,6 +19973,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "4ee653f0deadbbd7900cdef9399a366034fc9510012d475c8004867b281dfaf9"
+    "value": "81a17a566f0bc582313289f52e67a5e664ae27b5a8f5f49de75b905f952d3eec"
   }
 }

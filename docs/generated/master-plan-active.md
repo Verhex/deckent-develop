@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):e06911d04881c02ae1f0539a39d86386c9cbc7452eee38c1e6782fc9cf964ec2`
+**Source digest:** `sha256(normalized-lf-utf8):4744452727d178b435f06a2518f8fc89337e2ee244fd55f2a5832c8c285af141`
 
 **Rows:** 387 total · 354 active · 33 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 259 |
+| OPEN | 258 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 28 |
+| VERIFY | 29 |
 | DONE | 33 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -27,7 +27,7 @@
 | Order | ID | State | Priority | Program | DependsOn | Blocker | Outcome |
 |---:|---|---|---|---|---|---|---|
 | 25 | `LEDGER-ISOLATED-COMMIT-PROOF-001` | OPEN | P2 | TRUTH | — | — | Canonical ledger uzlaştırmasının izole/fresh-clone commit kanıtı — SSOT-002 + SOURCE-MANIFEST-001 kapanışlarından taşınan canlı-kanıt boyutu |
-| 32 | `XPLAT-SKIP-GUARD-001` | OPEN | P1 | TRUTH | — | — | Cross-platform matriste kapsam-beklenen platformda symlink vakası atlanırsa bacak fail etsin: skip-görünürlüğü gate-invariant olsun |
+| 32 | `XPLAT-SKIP-GUARD-001` | VERIFY | P1 | TRUTH | — | — | Cross-platform matriste kapsam-beklenen platformda symlink vakası atlanırsa bacak fail etsin: skip-görünürlüğü gate-invariant olsun |
 | 40 | `TRUTH-BASELINE-001` | BLOCKED | P0 | TRUTH | `TEST-675`, `TEST-676`, `TEST-HERMETIC-001` | `BASELINE_CONFLICT` | Current HEAD için tek reference test, build, binary ve environment baseline |
 | 50 | `TEST-675` | OPEN | P0 | TRUTH | — | — | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur |
 | 60 | `TEST-676` | OPEN | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |
