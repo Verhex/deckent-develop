@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):a9747228563a5583000f7ec8f8cdabfa08a43119a0b6a6a6a802e8a6a5236960`
+**Source digest:** `sha256(normalized-lf-utf8):3b33164092c57246187a4a5f958eaca58a4444338ad0e47fd4481314f21c21a3`
 
-**Rows:** 388 total · 352 active · 36 terminal
+**Rows:** 388 total · 345 active · 43 terminal
 
 ## State summary
 
@@ -17,8 +17,8 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 28 |
-| DONE | 36 |
+| VERIFY | 21 |
+| DONE | 43 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -76,17 +76,11 @@
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
-| 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
 | 524 | `VERIFY-HISTORICAL-CLOSURE-001` | OPEN | P2 | TRUTH | — | — | Historical-only VERIFY satırlarının (10 adet) receipt-gated kapanış dilimi: her satır için kanıt-durumu tiplenir (yeniden-doğrulanabilir / historical-yeterli / eksik-kanıt) ve kapanış turu Alperen onayıyla koşulur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
-| 530 | `CI-COVERAGE-JOB-WALL-001` | VERIFY | P1 | TRUTH | — | — | Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü) |
 | 531 | `CI-COVERAGE-REVEALED-DEBT-001` | VERIFY | P1 | TRUTH | — | — | 530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık |
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
-| 533 | `CI-HERMETIC-SCAN-DIST-BLIND-001` | VERIFY | P1 | TRUTH | — | — | Hermetic-lint taraması build-duyarlı: built ağaçta import-takibi dist dosyalarına girip analyzer girdisi üretiyor (+71, dist/core/errors.js — run 31074633586 kesin ölçüm; script başlığındaki 'baselines BUILD-FREE ölçülür' operasyon-yükünün kökü) — Coverage job'u build:all yaptığından ratchet testi yalnız orada düşüyor |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
-| 535 | `CI-ACTIONS-ECONOMY-001` | VERIFY | P1 | TRUTH | — | — | CI kaynak-ekonomisi yapısal düzenleme: her tren 3 tam-koşu tetikliyor (PR+merge_group+main-push ×2 workflow; günde ~35+35 koşu ölçüldü), merge-queue TÜM ci.yml'i koşuyor, Coverage (21-40dk) her merge'de, macos-ağır xplat job'ları her PR'da — repo PUBLIC olduğundan maliyet dakika-faturası değil duvar-saat + eşzamanlılık-kuyruğu + sinyal-gürültüsü |
-| 536 | `ADR-BACKFILL-G039-001` | VERIFY | P2 | TRUTH | — | — | ADR-G-039 (2026-07-23 03:46, provider-authority key-custody) kaydının eksik Context bölümü ve 'To be backfilled' Sprint alanı — Coverage duvarı kalkınca decisions format-testi görünür kıldı (55-kırık envanterinin son kalemi) |
-| 537 | `DOCKER-WRAPPER-HYGIENE-001` | VERIFY | P2 | TRUTH | — | — | Wrapper şablonunda HB_PID hiçbir yerde set edilmeden 3 yerde kill ediliyor (no-op ölü satırlar) + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (531 docker-emekliliği typed gözlemi) |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -169,7 +163,6 @@
 | 3000 | `KERNEL-001` | BLOCKED | P0 | KERNEL | `SSOT-003`, `TEST-675`, `TEST-676`, `CODEX-C5`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `DEPENDENCY_UNSATISFIED` | Goal→Mission→Flow→Run→WorkItem→Attempt→Operation canonical kernel parent |
 | 3010 | `KERNEL-ONTOLOGY-001` | OPEN | P0 | KERNEL | `SSOT-003`, `OPERATION-001` | — | Canonical entity identities, ownership, transitions and invariants |
 | 3020 | `KERNEL-STATE-001` | OPEN | P0 | KERNEL | `KERNEL-ONTOLOGY-001` | — | Durable event, snapshot and projection authority |
-| 3021 | `RUN-STATUS-AUTHORITY-001` | VERIFY | P0 | KERNEL | — | — | Canonical sprint runtime status authority and stale-state reconciliation |
 | 3030 | `KERNEL-ATTEMPT-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `AUTHORITY-001` | — | Claim, lease, fencing, retry, cancellation and idempotency contract |
 | 3040 | `KERNEL-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RECEIPT-001` | — | Canonical result, evidence, acceptance and terminal settlement |
 | 3050 | `MISSION-KIND-001` | OPEN | P0 | KERNEL | `KERNEL-ONTOLOGY-001`, `KERNEL-ATTEMPT-001` | — | First-class task, sprint, capability and process runners |
