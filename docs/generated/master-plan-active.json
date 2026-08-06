@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b78b9c2f8b2ac276bed94f1248d802f5f27701e2bc65ac5d9300cd74202af119"
+    "value": "c18347c63aaa39f6ce84df5dca9ca6a6b71d77554b4ff8b6f67a1eb7455e8cd9"
   },
   "summary": {
     "total": 388,
     "active": 342,
     "terminal": 46,
-    "receipts": 88,
+    "receipts": 89,
     "byState": {
       "OPEN": 257,
       "READY": 0,
@@ -3141,7 +3141,7 @@
       "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "fa879e7874c86d428bb4f508ad2284eb8e78ac0c663a8af384bbbcb836759b06",
-      "progressDigest": "92789de61d26379195797cb29d8343261869af3e9ffe074de718f45228cff2a2",
+      "progressDigest": "ac1cb13f0c1e64eb00e6cec94e8c8fea28a37bd83bfbbce6a91bccac00a49a92",
       "terminalClosureDigest": null
     },
     {
@@ -5211,6 +5211,16 @@
         "mode": "ONE_SHOT",
         "status": "revoked",
         "transitionAt": "2026-08-06T13:38:08Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-PRINCIPAL-P1B-01",
+      "authorityDigest": "9500542c6c276a5114f5894bc45566271e57a29ff519573cc75701ee11401622",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -15318,10 +15328,11 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-06-PRINCIPAL-P1A-01"
+        "GR-2026-08-06-PRINCIPAL-P1A-01",
+        "GR-2026-08-06-PRINCIPAL-P1B-01"
       ],
       "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
-      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile; 2026-08-06 EVIDENCE-KONSOLİDASYONU (truth-hizası): P1a settlement'ında truth hücresi güncellenmemişti — ölçülmüş gerçek C=1 (src/core/principal.ts), W=1 (CLI/MCP/API ingress'leri + planRunFlow advisory seam'i wired), H=1 (principal 7/7 + api 105 dosya/1017 test), E=0 (enforce modu P1b'de config-gated gelecek, bugün advisory), L=0 (gerçek-binary kimlik smoke'u P1b kapsamında)",
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile; 2026-08-06 EVIDENCE-KONSOLİDASYONU (truth-hizası): P1a settlement'ında truth hücresi güncellenmemişti — ölçülmüş gerçek C=1 (src/core/principal.ts), W=1 (CLI/MCP/API ingress'leri + planRunFlow advisory seam'i wired), H=1 (principal 7/7 + api 105 dosya/1017 test), E=0 (enforce modu P1b'de config-gated gelecek, bugün advisory), L=0 (gerçek-binary kimlik smoke'u P1b kapsamında); `receipt=GR-2026-08-06-PRINCIPAL-P1B-01`; P1b admission 2026-08-06 (Dalga-3 kapısı)",
       "updated": "2026-08-06"
     },
     {
@@ -19596,6 +19607,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d15ae8846f71fb19486bda5a657814180d848688198a27e5541a8dce97357009"
+    "value": "1d460da0c0a8e0786d5b2c5fd7e46f549d86e1d26491117d71eb04fcf7cf277d"
   }
 }
