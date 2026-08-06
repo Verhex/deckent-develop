@@ -116,8 +116,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-06 (P1a): +7 principal contract tests and consumer-pin edits —
   // same 12478 count, digest only. Prior: 533 dist-blind.
   // 2026-08-06 (XPLAT-SKIP-GUARD): +guard test — same 12478, digest only.
-  count: 12478,
-  digest: '13f79106afc7f34c263d56ad9656f5c2a68a5c6144a22019f90f596c16175016',
+  // 2026-08-06 (487 yaprak-dilimi): +2 real-binary replay/fault-injection
+  // cases. Prior: XPLAT-SKIP-GUARD (12478).
+  count: 12480,
+  digest: 'f55896b22b28e520d365649bf0337fe28772119e56f3d998cef2d5bdfea35179',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
