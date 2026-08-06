@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "52e4948cc09a1cbb475ae9e0cb04b30df2213280aab79ce681c05f76ec2da6d1"
+    "value": "686c425bdad1613bf8db44c7a6970c981b111eb7014f8f20cd424672c97708d0"
   },
   "summary": {
     "total": 388,
@@ -3141,7 +3141,7 @@
       "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "fa879e7874c86d428bb4f508ad2284eb8e78ac0c663a8af384bbbcb836759b06",
-      "progressDigest": "f5052326a0139de2b5f62ef5cc8f92af9d4fe324bceacfe833ccf8c3f8ad0a04",
+      "progressDigest": "92789de61d26379195797cb29d8343261869af3e9ffe074de718f45228cff2a2",
       "terminalClosureDigest": null
     },
     {
@@ -15296,10 +15296,10 @@
       ],
       "state": "VERIFY",
       "truth": {
-        "C": "~",
-        "W": "~",
+        "C": "1",
+        "W": "1",
         "E": "0",
-        "H": "?",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -15311,7 +15311,7 @@
         "GR-2026-08-06-PRINCIPAL-P1A-01"
       ],
       "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
-      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile",
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile; 2026-08-06 EVIDENCE-KONSOLİDASYONU (truth-hizası): P1a settlement'ında truth hücresi güncellenmemişti — ölçülmüş gerçek C=1 (src/core/principal.ts), W=1 (CLI/MCP/API ingress'leri + planRunFlow advisory seam'i wired), H=1 (principal 7/7 + api 105 dosya/1017 test), E=0 (enforce modu P1b'de config-gated gelecek, bugün advisory), L=0 (gerçek-binary kimlik smoke'u P1b kapsamında)",
       "updated": "2026-08-06"
     },
     {
@@ -19586,6 +19586,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d031fbc19e87dc97c98adc70578330e20e672d52db8d5473c00e973b69738e20"
+    "value": "82271047bf4bd94e00bb8719c65e50193863398f8eb2c96cc955878acb8c361e"
   }
 }
