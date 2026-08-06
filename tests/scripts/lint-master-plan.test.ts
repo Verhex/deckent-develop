@@ -64,6 +64,40 @@ const symlinkCapability = (() => {
     rmSync(probeRoot, { recursive: true, force: true });
   }
 })();
+
+// ═══ XPLAT-SKIP-GUARD-001 (MASTER 32, Dalga-2) ═════════════════════════════
+// Skip-visibility is GATE-INVARIANT: the zero-skip observation on runs
+// 30832207675/30833491791 was RUN evidence, not a rule the gate imposed. A
+// future runner image that quietly refuses symlinks would have skipped the
+// cases while the leg stayed green — the exact silent-generalization Law 2
+// forbids. This block turns the invariant into a fail-closed rule on every
+// Validator Contract leg (the 3-OS REQUIRED matrix).
+describe('XPLAT-SKIP-GUARD-001 — symlink coverage may not silently vanish', () => {
+  // POSIX platforms ALWAYS support symlinks: a probe refusal there is an
+  // environment DEFECT, never an honest `unsupported`.
+  const EXPECTED_CAPABLE = new Set(['linux', 'darwin']);
+
+  it('declared-capable platforms run the symlink cases (no silent skip)', () => {
+    if (EXPECTED_CAPABLE.has(process.platform)) {
+      expect(
+        symlinkCapability.supported,
+        `symlink probe refused on declared-capable ${process.platform}: `
+          + `${symlinkCapability.reason} — environment defect, leg must fail`,
+      ).toBe(true);
+    } else {
+      // win32: a skip is legitimate ONLY as a typed, visible record.
+      expect(symlinkCapability.reason).toMatch(
+        /^symlink creation (permitted|refused \([A-Z0-9_]+\))$/,
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        `[xplat-skip-guard] ${process.platform}: symlink capability = `
+          + `${symlinkCapability.supported} (${symlinkCapability.reason})`,
+      );
+    }
+  });
+});
+
 const TEST_NOW_MS = Date.parse('2026-07-26T18:30:00+03:00');
 const execFileAsync = promisify(execFile);
 const LEDGER_HEADER = `| ${LEDGER_COLUMNS.join(' | ')} |`;
