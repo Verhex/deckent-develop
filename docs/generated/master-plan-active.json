@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d00b5031907930a42e6076a35e49273252024121256c7698c7399e553481731e"
+    "value": "eb2ffb99e072bb56b1704bcd1031eaffa31f22afaf8f6856e0d201ebcf868da1"
   },
   "summary": {
     "total": 387,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 260,
       "READY": 0,
-      "IN_PROGRESS": 2,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 25,
+      "VERIFY": 27,
       "DONE": 33,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -916,10 +916,10 @@
       "id": "CI-ACTIONS-ECONOMY-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "4a5c83a4702307efc41649b52542d1f20bf5219d2dfb3c74f63ea0335428a9ce",
-      "progressDigest": "31bc5a27a9efed7eb75410341379a6cc12c6e2f43ecfc17d938c0fced731a21d",
+      "progressDigest": "b300db022d43b1af76359565f77cc329454e4846184039a4649301d9f042ec58",
       "terminalClosureDigest": null
     },
     {
@@ -927,10 +927,10 @@
       "id": "ADR-BACKFILL-G039-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "6927493682daeba6eefd5f54c27eb9cc252abef523a3f959cf6851dbf19f0e3f",
-      "progressDigest": "4e7baadcda336466f7c5907fb48276b9b86135947150e5b588f4e31d9ab64539",
+      "progressDigest": "6bbde26ee25737117cea008cb82538ab6e7346fca7278fe9ee3ce4de6eee6d82",
       "terminalClosureDigest": null
     },
     {
@@ -5058,8 +5058,8 @@
       "authorityDigest": "7c745173387ff1393b97d11db11d23d21c56ae7b77bda5bb8a53aa47e0d77c1f",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-06T06:44:50Z"
       },
       "g7AttemptIdentity": null
     },
@@ -5068,8 +5068,8 @@
       "authorityDigest": "0aedd482c94b9a5e48efe699fd932851b7b4e2ef64551194929684e4fb62f8a2",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-06T06:44:50Z"
       },
       "g7AttemptIdentity": null
     }
@@ -7196,12 +7196,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -7213,7 +7213,7 @@
         "GR-2026-08-06-ACTIONS-ECON-535-01"
       ],
       "acceptance": "Coverage schedule+dispatch'e taşınır (release-gate korunur); merge_group yalnız required'ları koşar; macos-ağır job'lar main-push+dispatch'e alınır (tren-dalı kanıtı açık dispatch'le); workflow-pin testleri hizalanır; tren duvar-saati ölçülebilir düşer",
-      "evidence": "Açılış 2026-08-06: Alperen 'actions ekonomisi çok kritik' + 3-kalem paket onayı; ölçüm: son 3 gün koşu-sayıları + merge-queue tam-koşu tespiti; `receipt=GR-2026-08-06-ACTIONS-ECON-535-01`",
+      "evidence": "Açılış 2026-08-06: Alperen 'actions ekonomisi çok kritik' + 3-kalem paket onayı; ölçüm: son 3 gün koşu-sayıları + merge-queue tam-koşu tespiti; `receipt=GR-2026-08-06-ACTIONS-ECON-535-01`; 2026-08-06 SETTLEMENT: coverage.yml (schedule+dispatch) ayrıldı, merge_group required-daraltması (ci: Type Check; xplat: Validator Contract), macos-ağır job'lar main-push+dispatch'e; pin testleri 54/54 + governance 144/144 değişimsiz yeşil; `proof=pin-suites-green-post-restructure`; kapanış kanıtı ilk kuyruk-merge'ünün daralmış koşusu + gece coverage koşusu",
       "updated": "2026-08-06"
     },
     {
@@ -7230,13 +7230,13 @@
         "G4",
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
         "X": "?",
         "S": "?"
       },
@@ -7247,7 +7247,7 @@
         "GR-2026-08-06-ADR39-CTX-536-01"
       ],
       "acceptance": "Onaylı Context metni + Sprint backfill'i G4 prosedürüyle (backup-hash + transactional UPDATE + export regen) uygulanır; decisions format-testi yeşil; audit-hmac yeniden-hesaplanmama kararı typed kayıtlıdır",
-      "evidence": "Açılış 2026-08-06: karar-turu — Alperen Context metnini onayladı; provenance: memory.db entries kaydı 2026-07-23T03:46:30; `receipt=GR-2026-08-06-ADR39-CTX-536-01`",
+      "evidence": "Açılış 2026-08-06: karar-turu — Alperen Context metnini onayladı; provenance: memory.db entries kaydı 2026-07-23T03:46:30; `receipt=GR-2026-08-06-ADR39-CTX-536-01`; 2026-08-06 SETTLEMENT (G4): backup sha256=04b22406f296c59388e4f0164a2108c63f4c67ea4b25670fe6e2521e7bc59663 (.bak-manual-1785998594029, 1764 giriş) → tek-entry transactional UPDATE → export regen → decisions format-testi 12/12; `proof=decisions-format-suite-12of12-green`; 55-kırık envanterinin son kalemi kapandı; typed not: entry audit-hmac yeniden hesaplanmadı (AUDIT-001 unwired, 4200 disposition sınıfı kayıtlı)",
       "updated": "2026-08-06"
     },
     {
@@ -19904,6 +19904,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "06b612c2b4b84ae844cdba9b865d726f9ae8f5c5bda71f567da43ef795bfba67"
+    "value": "77e1614dd0a62b697b5f6c0496ade134b99aba76ea35e46012ea69aae87b1c48"
   }
 }

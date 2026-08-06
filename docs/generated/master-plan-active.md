@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):d00b5031907930a42e6076a35e49273252024121256c7698c7399e553481731e`
+**Source digest:** `sha256(normalized-lf-utf8):eb2ffb99e072bb56b1704bcd1031eaffa31f22afaf8f6856e0d201ebcf868da1`
 
 **Rows:** 387 total · 354 active · 33 terminal
 
@@ -15,9 +15,9 @@
 |---|---:|
 | OPEN | 260 |
 | READY | 0 |
-| IN_PROGRESS | 2 |
+| IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 25 |
+| VERIFY | 27 |
 | DONE | 33 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -85,8 +85,8 @@
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 533 | `CI-HERMETIC-SCAN-DIST-BLIND-001` | VERIFY | P1 | TRUTH | — | — | Hermetic-lint taraması build-duyarlı: built ağaçta import-takibi dist dosyalarına girip analyzer girdisi üretiyor (+71, dist/core/errors.js — run 31074633586 kesin ölçüm; script başlığındaki 'baselines BUILD-FREE ölçülür' operasyon-yükünün kökü) — Coverage job'u build:all yaptığından ratchet testi yalnız orada düşüyor |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
-| 535 | `CI-ACTIONS-ECONOMY-001` | IN_PROGRESS | P1 | TRUTH | — | — | CI kaynak-ekonomisi yapısal düzenleme: her tren 3 tam-koşu tetikliyor (PR+merge_group+main-push ×2 workflow; günde ~35+35 koşu ölçüldü), merge-queue TÜM ci.yml'i koşuyor, Coverage (21-40dk) her merge'de, macos-ağır xplat job'ları her PR'da — repo PUBLIC olduğundan maliyet dakika-faturası değil duvar-saat + eşzamanlılık-kuyruğu + sinyal-gürültüsü |
-| 536 | `ADR-BACKFILL-G039-001` | IN_PROGRESS | P2 | TRUTH | — | — | ADR-G-039 (2026-07-23 03:46, provider-authority key-custody) kaydının eksik Context bölümü ve 'To be backfilled' Sprint alanı — Coverage duvarı kalkınca decisions format-testi görünür kıldı (55-kırık envanterinin son kalemi) |
+| 535 | `CI-ACTIONS-ECONOMY-001` | VERIFY | P1 | TRUTH | — | — | CI kaynak-ekonomisi yapısal düzenleme: her tren 3 tam-koşu tetikliyor (PR+merge_group+main-push ×2 workflow; günde ~35+35 koşu ölçüldü), merge-queue TÜM ci.yml'i koşuyor, Coverage (21-40dk) her merge'de, macos-ağır xplat job'ları her PR'da — repo PUBLIC olduğundan maliyet dakika-faturası değil duvar-saat + eşzamanlılık-kuyruğu + sinyal-gürültüsü |
+| 536 | `ADR-BACKFILL-G039-001` | VERIFY | P2 | TRUTH | — | — | ADR-G-039 (2026-07-23 03:46, provider-authority key-custody) kaydının eksik Context bölümü ve 'To be backfilled' Sprint alanı — Coverage duvarı kalkınca decisions format-testi görünür kıldı (55-kırık envanterinin son kalemi) |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
