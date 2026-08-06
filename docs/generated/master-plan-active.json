@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "16230ce7375b0b0c21a23214bf61506f791f912fc5e1c03916c4e85bd5347046"
+    "value": "c88b5c1d4b956be2ba7a660b9b7230857a81d235725af50b203775dcc17f186c"
   },
   "summary": {
     "total": 383,
     "active": 351,
     "terminal": 32,
-    "receipts": 69,
+    "receipts": 70,
     "byState": {
-      "OPEN": 260,
-      "READY": 0,
+      "OPEN": 259,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 24,
@@ -872,10 +872,10 @@
       "id": "CI-COVERAGE-REVEALED-DEBT-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "READY",
       "updated": "2026-08-06",
       "definitionDigest": "4382b84e1cf52ef6f85aef6c1805ccbd36ac0a031c2557d3f96596ab72aeaa66",
-      "progressDigest": "2b53ff9e9dcea7d1a819e3497895dae0c3fd0b8c54e322f9dd6a27d817a80430",
+      "progressDigest": "1ea50c3716c76fbac37b48086e0a76eead0c3949f93d8313cf11b86d69e0db1f",
       "terminalClosureDigest": null
     },
     {
@@ -4968,6 +4968,16 @@
         "transitionAt": "2026-08-06T05:02:58Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-COVDEBT-SWEEP-01",
+      "authorityDigest": "7b57f54fdc30a12dab393ffbd318535bdd07c530cd2a14dab891697bcab11def",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -7016,7 +7026,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "1",
         "W": "0",
@@ -7033,10 +7043,11 @@
         "GR-2026-08-06-COVDEBT-E2E-01",
         "GR-2026-08-06-COVDEBT-AUDIT-01",
         "GR-2026-08-06-COVDEBT-DOCKER-01",
-        "GR-2026-08-06-DOCKER-STATS-SUPP-01"
+        "GR-2026-08-06-DOCKER-STATS-SUPP-01",
+        "GR-2026-08-06-COVDEBT-SWEEP-01"
       ],
       "acceptance": "Envanter dosya-aile bazında dilimlenir ve her aile kendi receipt'li treniyle kapanır: chain-safety.e2e 14 (kök İZOLE: fixture'lar literal 'sonnet' + registry'siz provider çözümü — ADR-G-036 kontrat sapması, lokal deterministik repro) · dead-code-decisions 12 · docker-exit-final 6 · sprint-lifecycle.e2e 5 · docker-exit-reproducer 4 · docker-hb 3 · nerv-w1-predicate 2 · sekiz tekli (governance×2, release, build, brain, workflows, docker-timeout, ratchet); her kökte bayat-kontrat/gerçek-bug sınıflandırması yapılır, gerçek-bug üretim-dilimi olur; uzun-vade karar adayı: bu sınıflara hızlı job kapsaması",
-      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et'); 2026-08-06 E2E-AİLE SETTLEMENT: chain-safety.e2e (14) + sprint-lifecycle (5) kırıkları kapandı — registry-öncesi suite'lere minimal default-ProviderAdapter fixture'ı (üretim çözüm-zinciri ve test pinleri değişmedi, model-literal yok); `proof=e2e-pair-27of27-local-deterministic-repro-fixed`; iki suite 27/27, tsc temiz, hermetic-baseline ve stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (14 aile-dosyası açık: dead-code-decisions 12 · docker ailesi 14 · sekiz tekli + nerv 2); `receipt=GR-2026-08-06-COVDEBT-AUDIT-01`; audits-aile admission 2026-08-06 (Alperen: 'dead-code-decisions treniyle devam et'); 2026-08-06 AUDITS-AİLE SETTLEMENT: dead-code-decisions 12 kırık kapandı — sprint-139 audit pinleri docs-reset'in arşiv konumuna hizalandı (içerik/şema pinleri aynen); `proof=audits-suite-18of18-local`; 18/18 + tsc temiz, baseline/stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (13 aile-dosyası açık: docker 14 · nerv 2 · governance 2 · altı tekli); `receipt=GR-2026-08-06-COVDEBT-DOCKER-01`; docker-aile admission 2026-08-06 (blok-plan onayı: 'onaylandı'); 2026-08-06 DOCKER-AİLE SETTLEMENT (fresh owner kararı, -01 revoked → -02): 14 kırık EMEKLİLİKLE kapandı — 4 sprint-144/149 dönemi suite süperseded (kapsama-haritası: stop/termination→budget-termination+restart-reconcile; corrupt-result→capture-truth+exit-marker; EXIT-trap/fsync→exit-marker+work-present-eval; TIMEOUT_WITH_WORK→exit-marker+spurious-nogo; HB→settlement-monitor-wire); `proof=modern-counterparts-62of62-spot-run`; `receipt=GR-2026-08-06-DOCKER-STATS-SUPP-01`; typed gözlem (üretim-dışı-kapsam, ayrı dilim adayı): wrapper şablonunda orphan kill HB_PID satırları + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (doc-drift); satır alt-dilim kuralıyla OPEN'a döner (9 aile-dosyası açık: nerv 2 · governance 2 · beş tekli)",
+      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et'); 2026-08-06 E2E-AİLE SETTLEMENT: chain-safety.e2e (14) + sprint-lifecycle (5) kırıkları kapandı — registry-öncesi suite'lere minimal default-ProviderAdapter fixture'ı (üretim çözüm-zinciri ve test pinleri değişmedi, model-literal yok); `proof=e2e-pair-27of27-local-deterministic-repro-fixed`; iki suite 27/27, tsc temiz, hermetic-baseline ve stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (14 aile-dosyası açık: dead-code-decisions 12 · docker ailesi 14 · sekiz tekli + nerv 2); `receipt=GR-2026-08-06-COVDEBT-AUDIT-01`; audits-aile admission 2026-08-06 (Alperen: 'dead-code-decisions treniyle devam et'); 2026-08-06 AUDITS-AİLE SETTLEMENT: dead-code-decisions 12 kırık kapandı — sprint-139 audit pinleri docs-reset'in arşiv konumuna hizalandı (içerik/şema pinleri aynen); `proof=audits-suite-18of18-local`; 18/18 + tsc temiz, baseline/stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (13 aile-dosyası açık: docker 14 · nerv 2 · governance 2 · altı tekli); `receipt=GR-2026-08-06-COVDEBT-DOCKER-01`; docker-aile admission 2026-08-06 (blok-plan onayı: 'onaylandı'); 2026-08-06 DOCKER-AİLE SETTLEMENT (fresh owner kararı, -01 revoked → -02): 14 kırık EMEKLİLİKLE kapandı — 4 sprint-144/149 dönemi suite süperseded (kapsama-haritası: stop/termination→budget-termination+restart-reconcile; corrupt-result→capture-truth+exit-marker; EXIT-trap/fsync→exit-marker+work-present-eval; TIMEOUT_WITH_WORK→exit-marker+spurious-nogo; HB→settlement-monitor-wire); `proof=modern-counterparts-62of62-spot-run`; `receipt=GR-2026-08-06-DOCKER-STATS-SUPP-01`; typed gözlem (üretim-dışı-kapsam, ayrı dilim adayı): wrapper şablonunda orphan kill HB_PID satırları + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (doc-drift); satır alt-dilim kuralıyla OPEN'a döner (9 aile-dosyası açık: nerv 2 · governance 2 · beş tekli); `receipt=GR-2026-08-06-COVDEBT-SWEEP-01`; süpürme admission 2026-08-06 (Alperen: '9 dosyayı tekte süpür')",
       "updated": "2026-08-06"
     },
     {
@@ -19730,6 +19741,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a12092343d56d329fd893a6231422569ccd2fe54b17db0cf46ced8e9fc815eeb"
+    "value": "a53c1d642a423c3d20999b10c94e134880708f73d37bb2aee243dc67b1f5f32d"
   }
 }
