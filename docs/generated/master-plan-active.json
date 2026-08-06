@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "c5fd795409b31a4709e2003cdcea3ce8b20d33d2d329441b86c69dfe91b3cc65"
+    "value": "943695f8e6a6a212a9cd21b55100f7c139336a13fab72237988cd4b7d57c8643"
   },
   "summary": {
     "total": 388,
@@ -12,8 +12,8 @@
     "receipts": 82,
     "byState": {
       "OPEN": 258,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 28,
       "DONE": 34,
@@ -938,10 +938,10 @@
       "id": "DOCKER-WRAPPER-HYGIENE-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-06",
       "definitionDigest": "e6230fc41345dabe30204030b8f4d0b39d82385e09b9b05099ae0167faf9d5bd",
-      "progressDigest": "f4ccb076055f75f121f2c22f88bff838d694bcd8493b499457fdf71950a8ed1d",
+      "progressDigest": "6bca8491955599677b6cb9382182220f4ca980b4d49e1846be0dfb6ba242323d",
       "terminalClosureDigest": null
     },
     {
@@ -7315,7 +7315,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19993,6 +19993,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "2cff191c639cfe319b6b96edf95540398e5a206e0ee063a14a4617017a79cdd4"
+    "value": "64fac2913bc49cc40d5bec9d0f1a6c59ed906d4e228eaba6f882ca923df621e1"
   }
 }
