@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f58f173e0f5c52bdd0cd7900571f23c9e81e21929ea3cb5062406a0b72200cfb"
+    "value": "a24cad8566b15dc4b78bff87540b6b7d68096a5f1d2618be0ba157e2b6edc4c6"
   },
   "summary": {
     "total": 387,
@@ -12,8 +12,8 @@
     "receipts": 80,
     "byState": {
       "OPEN": 258,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 28,
       "DONE": 33,
@@ -124,10 +124,10 @@
       "id": "XPLAT-SKIP-GUARD-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-06",
       "definitionDigest": "aa5660883aa89573b16a2d116fcf216e38bcd12041d3fc9e5b968bc1de329812",
-      "progressDigest": "f7074be25db600782e094dea601c8f11f39e2ad7dc6936ac033c548d9cb1f3d2",
+      "progressDigest": "6387006fff3044e9d942a68145149658441a79ade24e53b918e1dae8d9659827",
       "terminalClosureDigest": null
     },
     {
@@ -5169,7 +5169,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "0",
         "W": "0",
@@ -19962,6 +19962,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6e8a4e637895955882a8b230fedffa7fe1deea18b212495d92e8594399c38f98"
+    "value": "528adc6223f3ddebb2707436021eb399b8e7eed6a962c50a8a1bef4e631c06de"
   }
 }
