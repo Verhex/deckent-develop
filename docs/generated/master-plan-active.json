@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "33e7ea69dd6baba04aabcc5f9831347b24fe64a1a3ea10bdce32c48c2d4cd6eb"
+    "value": "52743376b759346aeea948b10705911a46557b447fcee00e8795fa8a8d3698e1"
   },
   "summary": {
-    "total": 383,
-    "active": 351,
+    "total": 384,
+    "active": 352,
     "terminal": 32,
-    "receipts": 70,
+    "receipts": 72,
     "byState": {
       "OPEN": 259,
-      "READY": 0,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 25,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 249,
-      "P1": 101,
+      "P1": 102,
       "P2": 33
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 71,
+      "TRUTH": 72,
       "XPLAT": 3
     }
   },
@@ -887,6 +887,17 @@
       "updated": "2026-08-05",
       "definitionDigest": "f78ac65f972bbf72a4be85fc234df165537deec3fbdfd3cf7ea3a58c606cb348",
       "progressDigest": "e0563991590283d5f31b373bef5eea13d6112ea6b3c26394a95b816fb80379b9",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 533,
+      "id": "CI-HERMETIC-SCAN-DIST-BLIND-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-06",
+      "definitionDigest": "4d34f99ceea1a95d1a2c067a2428b97e74726f65a0b5369a19fb3b00e1855b54",
+      "progressDigest": "88729be1ca815b714d0e6a7f7efb5537e99698de05063d33af1b938bfc9a5f25",
       "terminalClosureDigest": null
     },
     {
@@ -4978,6 +4989,26 @@
         "transitionAt": "2026-08-06T05:32:54Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-SCAN-DISTBLIND-533-01",
+      "authorityDigest": "6c52b279854f23e0d740a4d5696a8821c93fad9e7a8d22bb98c51fe442df35b0",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-COVDEBT-AUDIT-TO-01",
+      "authorityDigest": "e778aa3dfadec330854d8cb97fd6ec57810e9a6eeca3bd601362e3f8c795116e",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -7080,6 +7111,39 @@
       "acceptance": "Kök izole edilir (vitest sürüm/worker-lifecycle); fix veya typed mitigasyonla job-level exit-code test-sonucuyla tutarlı olur; continue-on-error maskesi kaldırılabilir hale gelir",
       "evidence": "Açılış 2026-08-05: Alperen karar-turu 'satır aç, sıraya koy' — 55-kırık (531) ve W3 dilim-3'ten sonra",
       "updated": "2026-08-05"
+    },
+    {
+      "order": 533,
+      "id": "CI-HERMETIC-SCAN-DIST-BLIND-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Hermetic-lint taraması build-duyarlı: built ağaçta import-takibi dist dosyalarına girip analyzer girdisi üretiyor (+71, dist/core/errors.js — run 31074633586 kesin ölçüm; script başlığındaki 'baselines BUILD-FREE ölçülür' operasyon-yükünün kökü) — Coverage job'u build:all yaptığından ratchet testi yalnız orada düşüyor",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-SCAN-DISTBLIND-533-01"
+      ],
+      "acceptance": "resolveLocalSupportImport build-output köklerini deterministik sınıflar (iki ağaçta birebir aynı registry); ratchet Coverage-job'unda da yeşil; baseline-tazeleme için dist-stash dansı gereksizleşir",
+      "evidence": "Açılış 2026-08-06: run 31074633586 log-izolasyonu + dist'li/dist'siz registry diff'i (kaynak kesin: dist/core/errors.js 71 + provider-packages 1); script başlık-notundaki açık MASTER-kalemi satırlaştı; `receipt=GR-2026-08-06-SCAN-DISTBLIND-533-01`",
+      "updated": "2026-08-06"
     },
     {
       "order": 1000,
@@ -19741,6 +19805,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "265bbd9a3dbbd04feffe5d560a688b268210a43956b6a7b031413a0ee573103f"
+    "value": "d4342ffbbb29324138e5f2585e7ebf4db649bfa210c34215290f146b9a203df0"
   }
 }
