@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "686c425bdad1613bf8db44c7a6970c981b111eb7014f8f20cd424672c97708d0"
+    "value": "b78b9c2f8b2ac276bed94f1248d802f5f27701e2bc65ac5d9300cd74202af119"
   },
   "summary": {
     "total": 388,
     "active": 342,
     "terminal": 46,
-    "receipts": 87,
+    "receipts": 88,
     "byState": {
       "OPEN": 257,
       "READY": 0,
@@ -3163,7 +3163,7 @@
       "state": "OPEN",
       "updated": "2026-08-06",
       "definitionDigest": "80cb5e3f81853ae422cae53f38582ab95f0be6ba938af204223f2a8e20124913",
-      "progressDigest": "33dab642218048cf4319ac5fc6a130ad82d7c9aa538ee3d02995ac598c2fdab1",
+      "progressDigest": "2f5ab667b275725d3974fdf0157675e322efa3dc7fc59aee609ae54f7696b95d",
       "terminalClosureDigest": null
     },
     {
@@ -5201,6 +5201,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-06T12:06:42Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-OPERATION-O1-01",
+      "authorityDigest": "79b18dad9facaa3b637f53c435291e3d5290ce0f2cf23042193c269592ed25d2",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "revoked",
+        "transitionAt": "2026-08-06T13:38:08Z"
       },
       "g7AttemptIdentity": null
     }
@@ -15401,7 +15411,7 @@
         "GR-2026-08-06-DESIGN-DOCS-01"
       ],
       "acceptance": "Every mutation/read/tool action maps to stable operation ID, risk and effect class",
-      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`",
+      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir",
       "updated": "2026-08-06"
     },
     {
@@ -19586,6 +19596,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "82271047bf4bd94e00bb8719c65e50193863398f8eb2c96cc955878acb8c361e"
+    "value": "d15ae8846f71fb19486bda5a657814180d848688198a27e5541a8dce97357009"
   }
 }
