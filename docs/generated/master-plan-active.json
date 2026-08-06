@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "01bf0b76aa367de7098265517fabdd9c874d8b1be6a06bc6fa43c2c3c9c3c2d6"
+    "value": "14efeb8dc74b336840d2cedb04fc9bbeae4b99bafcbbd56898c8ed42bb2f1c5a"
   },
   "summary": {
     "total": 383,
@@ -12,8 +12,8 @@
     "receipts": 65,
     "byState": {
       "OPEN": 259,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 24,
       "DONE": 32,
@@ -872,10 +872,10 @@
       "id": "CI-COVERAGE-REVEALED-DEBT-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-06",
       "definitionDigest": "4382b84e1cf52ef6f85aef6c1805ccbd36ac0a031c2557d3f96596ab72aeaa66",
-      "progressDigest": "fad0cc83408cc96f7f6ab14dc4ea02082f5ac68d0b90cbd3f1f4b45947a7ccd3",
+      "progressDigest": "35839c61d7a03423a96e567d3018c29a86aa35a92c76d0ea888397a1206eedad",
       "terminalClosureDigest": null
     },
     {
@@ -6976,7 +6976,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19687,6 +19687,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "8cc1760acf922ce1d0d311367e44e6adbe40cd0b46c1b3bf8b0b2968f5a3db6b"
+    "value": "12b21a1a334ac6169c9bc3d233f68509795f2ff6cb093b92e7a8e1172e6ba0b6"
   }
 }
