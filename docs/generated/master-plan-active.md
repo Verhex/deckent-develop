@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):8ad7460b7eaef2c5a6da5a6643b089aea82bfbccaba96c3f99dfa5eb996acbef`
+**Source digest:** `sha256(normalized-lf-utf8):a9747228563a5583000f7ec8f8cdabfa08a43119a0b6a6a6a802e8a6a5236960`
 
-**Rows:** 388 total · 353 active · 35 terminal
+**Rows:** 388 total · 352 active · 36 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 258 |
+| OPEN | 257 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
 | VERIFY | 28 |
-| DONE | 35 |
+| DONE | 36 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -169,7 +169,7 @@
 | 3000 | `KERNEL-001` | BLOCKED | P0 | KERNEL | `SSOT-003`, `TEST-675`, `TEST-676`, `CODEX-C5`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `DEPENDENCY_UNSATISFIED` | Goal→Mission→Flow→Run→WorkItem→Attempt→Operation canonical kernel parent |
 | 3010 | `KERNEL-ONTOLOGY-001` | OPEN | P0 | KERNEL | `SSOT-003`, `OPERATION-001` | — | Canonical entity identities, ownership, transitions and invariants |
 | 3020 | `KERNEL-STATE-001` | OPEN | P0 | KERNEL | `KERNEL-ONTOLOGY-001` | — | Durable event, snapshot and projection authority |
-| 3021 | `RUN-STATUS-AUTHORITY-001` | OPEN | P0 | KERNEL | — | — | Canonical sprint runtime status authority and stale-state reconciliation |
+| 3021 | `RUN-STATUS-AUTHORITY-001` | VERIFY | P0 | KERNEL | — | — | Canonical sprint runtime status authority and stale-state reconciliation |
 | 3030 | `KERNEL-ATTEMPT-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `AUTHORITY-001` | — | Claim, lease, fencing, retry, cancellation and idempotency contract |
 | 3040 | `KERNEL-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RECEIPT-001` | — | Canonical result, evidence, acceptance and terminal settlement |
 | 3050 | `MISSION-KIND-001` | OPEN | P0 | KERNEL | `KERNEL-ONTOLOGY-001`, `KERNEL-ATTEMPT-001` | — | First-class task, sprint, capability and process runners |
@@ -218,7 +218,6 @@
 | 3192 | `RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001` | OPEN | P0 | PROVIDER | `PROVIDER-INGRESS-001`, `LIMIT-001`, `RUNNER-PROTOCOL-001` | — | Advertised worker concurrency must equal attainable provider execution concurrency |
 | 3193 | `RECOVERY-BORN-483-XVERIFY-PAYLOAD-001` | OPEN | P0 | EVAL | `XVERIFY-WIRE-001`, `EVALUATION-001`, `RECEIPT-001` | — | Cross-provider XVerify receives complete digest-bound material evidence and gates promotion honestly |
 | 3194 | `RECOVERY-BORN-483-PROMPT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `RUNFLOW-001`, `PROMPT-001`, `AUTHORITY-001` | — | Exact RunFlow worker prompt cannot ingest a stale competing execution directive |
-| 3195 | `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001` | VERIFY | P0 | KERNEL | — | — | Terminal authority publishes before archive and status never regresses during cleanup |
 | 3196 | `RECOVERY-BORN-485-FIX-AUTHORITY-001` | OPEN | P0 | KERNEL | `WORKER-DISCOVERY-001`, `PLANNER-001` | — | FIX retries repair diagnosed read authority and refuse unchanged impossible contracts |
 | 3197 | `RECOVERY-BORN-485-SEMANTIC-VERDICT-001` | OPEN | P0 | EVAL | `EVALUATION-001`, `TEST-DISCOVERY-001` | — | Passing evidence must exercise the acceptance-bound production consumer |
 | 3198 | `RECOVERY-BORN-485-USAGE-BILLING-001` | OPEN | P0 | COST | `LIMIT-001`, `RECEIPT-001`, `SPRINT-HONESTY-001` | — | FIX lineage usage, billing and KPI projections resolve through logical task authority |

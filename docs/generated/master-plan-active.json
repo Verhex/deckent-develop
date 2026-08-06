@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8ad7460b7eaef2c5a6da5a6643b089aea82bfbccaba96c3f99dfa5eb996acbef"
+    "value": "a9747228563a5583000f7ec8f8cdabfa08a43119a0b6a6a6a802e8a6a5236960"
   },
   "summary": {
     "total": 388,
-    "active": 353,
-    "terminal": 35,
+    "active": 352,
+    "terminal": 36,
     "receipts": 87,
     "byState": {
-      "OPEN": 258,
+      "OPEN": 257,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 28,
-      "DONE": 35,
+      "DONE": 36,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -1851,10 +1851,10 @@
       "id": "RUN-STATUS-AUTHORITY-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "2db2c82e9653adf4b2261e847525e5cc4f676c8c2dccd3270786076c7066b63a",
-      "progressDigest": "ec0a9f4dc0dd4f56c78eac8b4dc68eb6b33277551fbad169e45b4471b1f30b57",
+      "progressDigest": "87fe2101279b070c4cbd20bfe07141d0f85922bc8019c4d6a5d5c38b75811c03",
       "terminalClosureDigest": null
     },
     {
@@ -2390,11 +2390,11 @@
       "id": "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "b4c7538863f5fd35cfc196c095153ebd6488022b7fdff79639864582c4a6e52f",
-      "progressDigest": "dd1e6e560cd8768542ce93a5b8d1d781f2617b423f5d38aabda8f171e080d049",
-      "terminalClosureDigest": null
+      "progressDigest": "a73a86805117df80657a5a8a1cb98649e19645efdd0e2878fd953b3aca788202",
+      "terminalClosureDigest": "58b950d0781fd8802a94a40706aa6f2ca02caad1aad315ff166a97b769d26aab"
     },
     {
       "order": 3196,
@@ -11250,26 +11250,24 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
         "E": "1",
         "H": "1",
         "L": "1",
-        "X": "0",
+        "X": "-",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "One resolver distinguishes IDLE, ACTIVE, PAUSED, ORPHANED, COMPLETE and ABORTED from durable PID, checkpoint, pause and terminal evidence without a surface-owned competing state machine",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=run-status-authority-targeted-and-binary`; Sprint-483 exposed a closure-window contradiction between canonical `FIX/FIXING` and presentation `RETRO/RETROSPECTIVE` plus impossible `4/3` progress. Recovery now projects human, JSON and watch status through one canonical authority snapshot, bounds every progress bucket by total and exposes normalization metadata while retaining raw mode as an explicit diagnostic. Source-process status contracts pass 8/8 with deterministic OS-backed stdio capture. Item remains OPEN for native macOS/Windows, multi-process contention, scale and a fresh live closure-window replay; 2026-08-06 MAKİNE-BULGUSU (DONE-flip denemesi validator-vetolu): satır AGGREGATE-PARENT — açık çocuğu RECOVERY-BORN-485-TERMINAL-PUBLICATION-001 kapanmadan DONE olamaz (X-yorumu tartışması ikincil; Alperen'in 'X typed-açık' hükmü çocuk kapanınca uygulanacak); 35-iş kaskadının gerçek kilidi 485-TERMINAL-PUBLICATION dilimidir",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=run-status-authority-targeted-and-binary`; Sprint-483 exposed a closure-window contradiction between canonical `FIX/FIXING` and presentation `RETRO/RETROSPECTIVE` plus impossible `4/3` progress. Recovery now projects human, JSON and watch status through one canonical authority snapshot, bounds every progress bucket by total and exposes normalization metadata while retaining raw mode as an explicit diagnostic. Source-process status contracts pass 8/8 with deterministic OS-backed stdio capture. Item remains OPEN for native macOS/Windows, multi-process contention, scale and a fresh live closure-window replay; 2026-08-06 MAKİNE-BULGUSU (DONE-flip denemesi validator-vetolu): satır AGGREGATE-PARENT — açık çocuğu RECOVERY-BORN-485-TERMINAL-PUBLICATION-001 kapanmadan DONE olamaz (X-yorumu tartışması ikincil; Alperen'in 'X typed-açık' hükmü çocuk kapanınca uygulanacak); 35-iş kaskadının gerçek kilidi 485-TERMINAL-PUBLICATION dilimidir; 2026-08-06 KASKAD-TURU: aggregate-çocuk 3195 kapandı ve veto düştü; satır OPEN→VERIFY'a alınır (OPEN→DONE makine-yasak — durum-makinesi ara-adım ister), DONE-onayı bir sonraki turda uygulanır; `proof=run-status-authority-targeted-and-binary`; X typed-açık (status-suite matrisi yalnız ubuntu'da declare edilmiş; W4 windows-matrisine bağlı) ve not-applicable kodlanır; 35-iş kaskadı ile 6121 STATUS-SURFACE-PARITY yolu açılır",
       "updated": "2026-08-06"
     },
     {
@@ -13403,44 +13401,6 @@
       "updated": "2026-07-31"
     },
     {
-      "order": 3195,
-      "id": "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
-      "parent": "RUN-STATUS-AUTHORITY-001",
-      "program": "KERNEL",
-      "outcome": "Terminal authority publishes before archive and status never regresses during cleanup",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
-      ],
-      "children": [
-        "RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001",
-        "RECOVERY-BORN-487-TERMINAL-LOGICAL-ID-001"
-      ],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "0",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-06-TERMPUB-485A-02"
-      ],
-      "acceptance": "One fenced terminal receipt atomically precedes archive/cleanup; CLI, MCP, dashboard and job remain monotonic COMPLETE with logical progress bounded to N/N; temp/residue files cannot become task identity",
-      "evidence": "Sprint-487 wired exact terminal evidence and one fenced receipt before every archive/cleanup edge, then moved CLI and MCP onto one core receipt projection. Supervisor canary exposed and repaired locale-dependent FIX-leaf selection, fail-open receipt publication, and landing-proposal archival. Real built CLI now passes exact coordinator death, receipt-before-archive, residue preservation and monotonic status. Dashboard/job adoption and every-environment replay remain open. Negative scope: no timer mask, dashboard lifecycle authority or evidence deletion; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-terminal-binary`; 2026-08-06 DİLİM-KEŞFİ (öne-alma onayı, karar-turu — 3021 aggregate-parent kilidinin çocuğu): kanonik projection projectTerminalPublicationStatus (sprint-terminal-publication-status.ts, sprintId-anahtarlı receipt @ .deckent/recently-works/<sprintId>-terminal-receipt.json); mevcut tüketiciler run-status-read-model + MCP status + CLI status/cleanup; AÇIK adoption: (a) dashboard-manager sprint-durumunu ham snapshot'tan türetiyor — receipt-observed'da monotonic-COMPLETE pini yok, (b) run-jobs-read job-dosyasının kendi status alanından türetiyor (surface-owned) ve receipt'le join'i flowId↔sprintId kimlik-eşlemesi tasarımı istiyor (receipt runId+sprintId taşıyor, closure flowId-anahtarlı — completionRecord alan envanteri çıkarılacak); dilim planı: 485a dashboard-adoption (sprint-anahtarlı, doğrudan) → 485b job-adoption (kimlik-join tasarım-notuyla) → L-kanıtı gerçek-binary cleanup-regression koşusu; 2026-08-06 MAKİNE-BULGUSU-2: 485a admission'ı da aggregate-parent vetolu — açık çocuk RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001; kaskadın GERÇEK YAPRAK kilidi 487'dir (zincir: 3021←3195←487); 485a receipt'i yaprak kapanınca yeniden aktive edilir; 2026-08-06 MAKİNE-BULGUSU-3 (kaskad-paketi kısmi uygulandı): yaprak 487 DONE oldu ve aggregate-veto düştü, ancak bu satırın kendi DONE'u scoped+consumed authority receipt'i istiyor (DONE_PROVENANCE) — mevcut evidence yalnız tarihsel yetki kaydı taşıyor; canlı kanıt zaten hazır (487'nin gerçek-binary receipt-before-archive ve monotonic-status koşusu), eksik olan kendi kanıt-dilimi receipt'idir; sıradaki tren 485a/485b adoption dilimiyle bunu kapatır ve ardından 3021 açılır; `receipt=GR-2026-08-06-TERMPUB-485A-02`; 485a admission 2026-08-06 (veto düştükten sonra); 2026-08-06 485A SETTLEMENT: dashboard-adoption tamam — kanonik terminal-receipt overlay'i status/phase'i monotonic terminal'e pinler, COMPLETE'te progress N/N'e sınırlanır, conflict typed fail-soft; ince readSprintTerminalReceiptSummary export'u mevcut durable okuyucuyu yeniden kullanır (ikinci state-machine yok); `proof=dashboard-overlay-fails-without-fix-then-32of32`; overlay kaldırılınca iki pin DÜŞTÜ, fix'le 32/32, monitor+core 534 dosya/9478 test yeşil; job-adoption (flowId-sprintId kimlik-join) 485b successor'ında typed-açık",
-      "updated": "2026-08-06"
-    },
-    {
       "order": 3196,
       "id": "RECOVERY-BORN-485-FIX-AUTHORITY-001",
       "parent": "RECOVERY-BORN-482-FIX-AUTHORITY-001",
@@ -14238,7 +14198,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
         "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
       ],
       "evidenceReceipts": [],
@@ -20009,6 +19968,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "1146444f06387a9f4df4bad0a9fdbdcec71d7976e286e51668050df07475ef04"
+    "value": "df7e7d07e2479e34963a9f70fe31d2eb9b26d8720eb53fa8209edb4a321701c3"
   }
 }
