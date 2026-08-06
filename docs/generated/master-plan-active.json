@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3b33164092c57246187a4a5f958eaca58a4444338ad0e47fd4481314f21c21a3"
+    "value": "4c59efe3bf6e2d152c1347898bb01fb11ab5b01ffff5c1d10a21b71c6d9e7af1"
   },
   "summary": {
     "total": 388,
-    "active": 345,
-    "terminal": 43,
+    "active": 344,
+    "terminal": 44,
     "receipts": 87,
     "byState": {
       "OPEN": 257,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 21,
-      "DONE": 43,
+      "VERIFY": 20,
+      "DONE": 44,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -3688,11 +3688,11 @@
       "id": "STATUS-SURFACE-PARITY-001",
       "program": "PRODUCT",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "f600b19e95b3680622cbb6186f441fefd7ee9b583acb8e0590c190c93c21394b",
-      "progressDigest": "89f532fdea38c81b202fe888820d09aa2b2800dda0d196c4f7c1b41e0e92026d",
-      "terminalClosureDigest": null
+      "progressDigest": "41e37d3e6eb7a39a624648b4f86b87cb18c4d9f0eee7ebd1bda3ca62fb4fd59f",
+      "terminalClosureDigest": "721c59e5a2d8ee5a8dccf13ec96e9c88bfe252dfb410257fb40598455c6f0188"
     },
     {
       "order": 6130,
@@ -17434,48 +17434,12 @@
         "DESKTOP-REBORN-001",
         "API-CONTRACT-001",
         "CONNECTOR-IDENTITY-001",
-        "DASHBOARD-OBS-001",
-        "STATUS-SURFACE-PARITY-001"
+        "DASHBOARD-OBS-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Each use case names canonical service, supported surfaces and reasoned exclusions",
       "evidence": "2026-07-27 code-truth: start/approve/cancel/status/review/finalize/cleanup/resume semantics CLI, MCP, API, Terminal ve Desktop arasında farklı; dashboard read-only intentional negative-space",
       "updated": "2026-07-27"
-    },
-    {
-      "order": 6121,
-      "id": "STATUS-SURFACE-PARITY-001",
-      "parent": "SURFACE-PARITY-001",
-      "program": "PRODUCT",
-      "outcome": "CLI and MCP consume the same canonical sprint status projection",
-      "priority": "P0",
-      "dependsOn": [
-        "RUN-STATUS-AUTHORITY-001"
-      ],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "0",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
-      ],
-      "acceptance": "CLI text/JSON and MCP status expose equivalent state, resumability and pending recovery approval without either adapter inferring lifecycle independently",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED; 2026-08-03 ölçüm (PAZARTESI P4): MCP paketi 121 → 70 kırık. CLI ile AYNI kök: deckent_status tool'u canlı run authority ve canonical persisted read model olmadan zengin projeksiyon alanlarını üretmiyor, HOLD payload'u dönüyor (src/mcp/tools/status.ts:392-411). status-history 15 → 0, status-rich 14 → 3. Bu, CLI↔MCP'nin gerçekten aynı canonical projection'ı tükettiğinin kanıtıdır; 2026-08-03 P0→P1 indirimi 2026-08-03 xverify turunda GERİ ALINDI (Alperen onayı, codex-analysis/xverify-wp0-2026-08-03.md C-ekseni): indirim gerekçem \"dependents=0 → critical path değil\" idi ve YANLIŞTI — codex-analysis/14-critical-path-prioritization.md Gate-1 CLI/MCP drift closure'ı açıkça declared critical path'e koyar ve PAZARTESI P4'ü FAZ-4 öncesi kritik yolda tutar; graph-dependent sayısı declared release/admission path kararını çürütemez. P0 geri geldi; 2026-08-05 TAZE PARİTE ÖLÇÜMÜ: 08-03'teki 70-kırık MCP ölçümü FAZ4B-öncesi dünyaya aitti — MCP sınıfı FAZ4B-B1'de tamamen sıfırlandı (1031/1031); bugünkü hedefli parite-çekirdeği koşusu (cli status-json-contract + status-read-model-wire + commands/status + mcp status-failed-tasks + status-terminal-receipt) 55 pass / 8 skip YEŞİL; DONE'u bloklayan tek şey dependency-DAG kuralı (RUN-STATUS-AUTHORITY-001 OPEN) + API/Terminal/Desktop/connector residual'ları",
-      "updated": "2026-08-05"
     },
     {
       "order": 6130,
@@ -19704,6 +19668,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "3addc9728cf0573aede1d6fa0507b787a1be6d54506bd4951776b7016f51a959"
+    "value": "7a29cf2c67431e18d2b66b620de3271ecde054b39ceaa4b3152d51f80a25b81c"
   }
 }

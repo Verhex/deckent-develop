@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):3b33164092c57246187a4a5f958eaca58a4444338ad0e47fd4481314f21c21a3`
+**Source digest:** `sha256(normalized-lf-utf8):4c59efe3bf6e2d152c1347898bb01fb11ab5b01ffff5c1d10a21b71c6d9e7af1`
 
-**Rows:** 388 total · 345 active · 43 terminal
+**Rows:** 388 total · 344 active · 44 terminal
 
 ## State summary
 
@@ -17,8 +17,8 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 21 |
-| DONE | 43 |
+| VERIFY | 20 |
+| DONE | 44 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -315,7 +315,6 @@
 | 6100 | `CONNECTOR-IDENTITY-001` | OPEN | P0 | CONNECTOR | `PRINCIPAL-001`, `APPROVAL-001`, `APP-SERVICE-001` | — | Gateway and connector session identity, pairing and approval authority |
 | 6110 | `DASHBOARD-OBS-001` | OPEN | P1 | DASHBOARD | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Dashboard as honest, read-oriented observability projection |
 | 6120 | `SURFACE-PARITY-001` | BLOCKED | P0 | PRODUCT | `DESKTOP-REBORN-001`, `API-CONTRACT-001`, `CONNECTOR-IDENTITY-001`, `DASHBOARD-OBS-001` | `DEPENDENCY_UNSATISFIED` | Capability-by-capability parity and intentional negative-space matrix |
-| 6121 | `STATUS-SURFACE-PARITY-001` | VERIFY | P0 | PRODUCT | `RUN-STATUS-AUTHORITY-001` | — | CLI and MCP consume the same canonical sprint status projection |
 | 6130 | `API-EVENT-001` | OPEN | P0 | API | `API-CONTRACT-001`, `KERNEL-SETTLEMENT-001`, `STORAGE-001` | — | Durable asynchronous jobs, event streams, webhooks and outbox delivery |
 | 6140 | `API-DEVELOPER-001` | OPEN | P1 | API | `API-CONTRACT-001`, `SURFACE-PARITY-001` | — | OpenAPI, generated SDKs, CLI/MCP parity and compatibility lifecycle |
 | 6150 | `API-OPERATIONS-001` | OPEN | P1 | API | `API-IDENTITY-001`, `LIMIT-001`, `API-EVENT-001` | — | Quotas, pagination, bulk operations, idempotency and regional operations |
