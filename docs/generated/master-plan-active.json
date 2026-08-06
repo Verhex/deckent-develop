@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "4c59efe3bf6e2d152c1347898bb01fb11ab5b01ffff5c1d10a21b71c6d9e7af1"
+    "value": "52e4948cc09a1cbb475ae9e0cb04b30df2213280aab79ce681c05f76ec2da6d1"
   },
   "summary": {
     "total": 388,
-    "active": 344,
-    "terminal": 44,
+    "active": 342,
+    "terminal": 46,
     "receipts": 87,
     "byState": {
       "OPEN": 257,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 20,
-      "DONE": 44,
+      "VERIFY": 18,
+      "DONE": 46,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -872,11 +872,11 @@
       "id": "CI-COVERAGE-REVEALED-DEBT-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "4382b84e1cf52ef6f85aef6c1805ccbd36ac0a031c2557d3f96596ab72aeaa66",
-      "progressDigest": "3efa5e463b9556d711976424a9f7b0aa4a2dbb7e73562a744d58488629d52fea",
-      "terminalClosureDigest": null
+      "progressDigest": "1b3120d58d455b48f275d18f69598c7b0846947c462e95ab05af8f85a68204ec",
+      "terminalClosureDigest": "83e1479a8a3f3d92da23843475d5a6c8a78cb2a521ec706ee8c08994a2c891bf"
     },
     {
       "order": 532,
@@ -2555,11 +2555,11 @@
       "id": "RESULT-RECONCILIATION-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "d4aa106c67d528313dd65022a92ca5fc9af77bafe996edbe4f3d3d9e7bf7f26b",
-      "progressDigest": "832c44380fe27d14bb6012fec6b5f2b5721ba6af8595ab9975117346783f0364",
-      "terminalClosureDigest": null
+      "progressDigest": "c37187e5a8f74f2b7dc603b04a2bcf5b899f7feca94c690e2b188b1fef06bd11",
+      "terminalClosureDigest": "284b535647171682bd31c24e5326d34d79141afd7647ef63c209620005cbf922"
     },
     {
       "order": 3270,
@@ -7070,44 +7070,6 @@
       "acceptance": "Bot hesabı org üyesi + tek üyeli enforcement-reviewers team'i; `.github/workflows/**` + validator path'lerine required-reviewer rule; ruleset JSON'u her gece org-owner'ın YAZAMADIĞI append-only depoya snapshot'lanır; canonical validator check'i Actions'tan farklı integration-ID ile yazılır; GHEC trial'ı bu altyapı hazırken başlatılır ve require-workflows + ruleset-history değerlendirilir",
       "evidence": "Açılış: Alperen 2026-08-04 kararı (xverify-E yapısal ikili — parent≠reviewed + self-modifiable-check — TRUST-ANCHOR-001 DÜRÜST SINIR-3/4). Karar-girdisi: docs/analysis/github-solo-mitigations-2026-08-04.md (VerhexIO org + public → merge queue AÇILDI 2026-08-04, required-reviewer/App/snapshot FREE). Zamanlama: Team koltuk 1/1 dolu — bot üyeliği koltuk eklenince, Alperen beyanı ~2026-08-12; o güne kadar sınırlar TRUST-ANCHOR-001'de typed-açık olarak yaşar, kritik yol bundan bağımsız",
       "updated": "2026-08-04"
-    },
-    {
-      "order": 531,
-      "id": "CI-COVERAGE-REVEALED-DEBT-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-06-COVDEBT-E2E-01",
-        "GR-2026-08-06-COVDEBT-AUDIT-01",
-        "GR-2026-08-06-COVDEBT-DOCKER-01",
-        "GR-2026-08-06-DOCKER-STATS-SUPP-01",
-        "GR-2026-08-06-COVDEBT-SWEEP-01",
-        "GR-2026-08-06-COVDEBT-AUDIT-TO-01"
-      ],
-      "acceptance": "Envanter dosya-aile bazında dilimlenir ve her aile kendi receipt'li treniyle kapanır: chain-safety.e2e 14 (kök İZOLE: fixture'lar literal 'sonnet' + registry'siz provider çözümü — ADR-G-036 kontrat sapması, lokal deterministik repro) · dead-code-decisions 12 · docker-exit-final 6 · sprint-lifecycle.e2e 5 · docker-exit-reproducer 4 · docker-hb 3 · nerv-w1-predicate 2 · sekiz tekli (governance×2, release, build, brain, workflows, docker-timeout, ratchet); her kökte bayat-kontrat/gerçek-bug sınıflandırması yapılır, gerçek-bug üretim-dilimi olur; uzun-vade karar adayı: bu sınıflara hızlı job kapsaması",
-      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et'); 2026-08-06 E2E-AİLE SETTLEMENT: chain-safety.e2e (14) + sprint-lifecycle (5) kırıkları kapandı — registry-öncesi suite'lere minimal default-ProviderAdapter fixture'ı (üretim çözüm-zinciri ve test pinleri değişmedi, model-literal yok); `proof=e2e-pair-27of27-local-deterministic-repro-fixed`; iki suite 27/27, tsc temiz, hermetic-baseline ve stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (14 aile-dosyası açık: dead-code-decisions 12 · docker ailesi 14 · sekiz tekli + nerv 2); `receipt=GR-2026-08-06-COVDEBT-AUDIT-01`; audits-aile admission 2026-08-06 (Alperen: 'dead-code-decisions treniyle devam et'); 2026-08-06 AUDITS-AİLE SETTLEMENT: dead-code-decisions 12 kırık kapandı — sprint-139 audit pinleri docs-reset'in arşiv konumuna hizalandı (içerik/şema pinleri aynen); `proof=audits-suite-18of18-local`; 18/18 + tsc temiz, baseline/stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (13 aile-dosyası açık: docker 14 · nerv 2 · governance 2 · altı tekli); `receipt=GR-2026-08-06-COVDEBT-DOCKER-01`; docker-aile admission 2026-08-06 (blok-plan onayı: 'onaylandı'); 2026-08-06 DOCKER-AİLE SETTLEMENT (fresh owner kararı, -01 revoked → -02): 14 kırık EMEKLİLİKLE kapandı — 4 sprint-144/149 dönemi suite süperseded (kapsama-haritası: stop/termination→budget-termination+restart-reconcile; corrupt-result→capture-truth+exit-marker; EXIT-trap/fsync→exit-marker+work-present-eval; TIMEOUT_WITH_WORK→exit-marker+spurious-nogo; HB→settlement-monitor-wire); `proof=modern-counterparts-62of62-spot-run`; `receipt=GR-2026-08-06-DOCKER-STATS-SUPP-01`; typed gözlem (üretim-dışı-kapsam, ayrı dilim adayı): wrapper şablonunda orphan kill HB_PID satırları + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (doc-drift); satır alt-dilim kuralıyla OPEN'a döner (9 aile-dosyası açık: nerv 2 · governance 2 · beş tekli); `receipt=GR-2026-08-06-COVDEBT-SWEEP-01`; süpürme admission 2026-08-06 (Alperen: '9 dosyayı tekte süpür'); 2026-08-06 SÜPÜRME SETTLEMENT: 9 dosyadan 8'i kapandı (10 kırık) — nerv-w1 fence-fixture'ları, KNOWN_ORPHANS canlı-hiza (+8 tarihli; dördü RECOVERY-modülü wire-or-retire adayı: worker-rollback, sprint-job-runner, cascade-detector, production-wiring-ts-adapter, recovery-notification, cross-verify-admission-policy, run-flow/run-job-recovery-adapter), yaml/xplat/release/readme/docker-backend pin-hizaları, ratchet enstrümante-bütçe (scanConfiguredTestRoots opsiyonel scanBudget, default aynen); `proof=sweep-suites-147-pass-build-free`; 8 suite + ratchet + master-plan-testi build-free yeşil, tsc temiz; typed-remaining TEK kalem: tests/brain/decisions.test.ts ADR-G-039 Context-alanı eksiği — ADR yan-session sahipliğinde, koordinasyonla kapanacak (55-kırık envanterinden geriye YALNIZ bu); satır VERIFY'a geçer — kapanış kanıtı merge sonrası main-push Coverage koşusu; 2026-08-06 EK-GÖRÜNÜM SETTLEMENT: dead-code-audit 3 kırığı (doymuş coverage-runner 120s subprocess duvarı) ölçümlü 360s/420s artışla kapandı; `receipt=GR-2026-08-06-COVDEBT-AUDIT-TO-01`; `proof=measured-runner-saturation-timeout-raise`; 2026-08-06 HASAT-BULGUSU: Alperen 9-satır onayında bu satır DONE'a alınamadı — çok-aile settlement'ı 5 ayrı proof token'ı biriktirdi (validator tek standalone proof ister) ve evidence'ta aile-envanteri dili çözülmemiş-dil sayılıyor; kapanış için evidence-konsolidasyon dilimi gerekir (tek kanonik proof + settle-edilmiş dil), satır VERIFY'da kalır",
-      "updated": "2026-08-06"
     },
     {
       "order": 532,
@@ -13668,51 +13630,12 @@
       "blockerCode": "DEPENDENCY_UNSATISFIED",
       "blockerRemedy": "exact ledger `DependsOn` IDs",
       "closureBlockedBy": [
-        "KERNEL-SETTLEMENT-001",
-        "RESULT-RECONCILIATION-001"
+        "KERNEL-SETTLEMENT-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Expected task ID normalized/validated; malformed result quarantined; third missing-trace cause proven and fixed",
       "evidence": "Residual from historical closed 550",
       "updated": "2026-07-26"
-    },
-    {
-      "order": 3261,
-      "id": "RESULT-RECONCILIATION-001",
-      "parent": "RESULT-INGEST-001",
-      "program": "KERNEL",
-      "outcome": "Terminal-only atomic result ingestion and malformed-result reconciliation",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
-        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
-        "RECOVERY-BORN-488-LANDING-CHECKPOINT-001",
-        "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001"
-      ],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
-      ],
-      "acceptance": "Temporary or partial result artifacts never become terminal truth; collector rereads the canonical result and emits typed malformed recovery without double settlement",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=result-reconciliation-targeted`; settlement-authority and result-collector tests pass against the observed sprint-475 artifact class; a fresh live sprint replay and every-filesystem atomicity matrix remain unproven; 2026-08-03 ölçüm (PAZARTESI P1): durable-yazım authority kümesi 211 kırık / 19 dosya. Üç halka aynı desende kırılıyor: atomik yazım (writeFileSync temp → renameSync → readFileSync geri-okuma doğrulaması), finalizer terminal-evidence/receipt cleanup-uygunluğu ve worker-heartbeat-authority identity şeması. İki yaklaşım denendi ve YETMEDİ: (a) eksik mock export'larını eklemek hata imzasını değiştirdi, sayıyı değiştirmedi; (b) sahte fs'e bellek katmanı (write→rename→read turu) sprint-finalizer'da 38 kırığı hiç azaltmadı ve geri alındı. Doğru yaklaşım muhtemelen mock değil gerçek tmpdir izolasyonu. Kanıtlamadığı: bu kapanış FAZ 4a ile AYNI dilimde yapılmalı, ayrı bir test-düzeltme işi değildir; 2026-08-03 FAZ4A-S1 ölçüm settlement'ı (Fable): S1 planlandığı şekliyle KOŞULMADI çünkü halka zaten kanıtlanabilir sınırına settle olmuş — result-collector suite 27/27 yeşil, result-ailesi test-failure-baseline'da SIFIR kayıt, malformed sınıfı gözlemlenen 475-artifact sınıfına karşı kapsanıyor. Planın ~15 kırık tahmini yanlıştı: atomik-yazım halkasının borcu ayrı bir collector kümesinde değil, S2/S3 kümelerinin (finalizer 63 · controller/pause-resume 95+) İÇİNDE yaşıyor — S2 ölçümü bunu doğruladı: 31 kırık fs-mock'unda renameSync yokluğundan (üretim atomik temp→rename yoluna geçmiş, test mock'u geride kalmış), 7'si TERMINAL_EVIDENCE_HOLD'dan (fixture'lar projectLogicalProgress veri sözleşmesini taşımıyor). Ham replay artifact'ı iddiası da düzeltildi: .tasks/archive/sprint-491 yalnız prompt+worker-script taşıyor, ham .result YOK — L boyutunun kapanış yeri gerçek koşu, yani 4b merdiveni basamak-4; S1 için iş uydurulmadı (negative-space). S1 receipt'i MINT EDİLMEDİ — mutation olmayan ölçüm turu admission istemez; 2026-08-06 HASAT-BULGUSU: Alperen 9-satır onayında bu satır DONE'a alınamadı — evidence'ta çözülmemiş-dil ve birden çok proof token'ı var; kapanış için evidence-konsolidasyon dilimi gerekir (tek kanonik proof + settle-edilmiş dil), satır VERIFY'da kalır",
-      "updated": "2026-08-06"
     },
     {
       "order": 3270,
@@ -13785,8 +13708,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RECOVERY-COMMAND-SERVICE-001",
-        "RESULT-RECONCILIATION-001"
+        "RECOVERY-COMMAND-SERVICE-001"
       ],
       "evidenceReceipts": [
         "GR-2026-08-04-FAZ4A-S2-01"
@@ -13981,8 +13903,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "BUDGET-CONTINUATION-001",
-        "RESULT-RECONCILIATION-001"
+        "BUDGET-CONTINUATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Every worker/runtime has one cross-platform structured writer that validates exact attempt schema before same-directory atomic rename; malformed proposal produces typed HOLD/diagnostic and cannot be treated as a valid checkpoint",
@@ -14267,8 +14188,7 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
-        "BUDGET-CONTINUATION-001",
-        "RESULT-RECONCILIATION-001"
+        "BUDGET-CONTINUATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Every runtime uses one schema-validated same-directory atomic writer owned by the worker lifecycle; sequence and content advance after each material disk mutation and before terminal result; stale, malformed or missing proposals produce typed execution HOLD with resumable attribution; provider prose and shell quoting are not checkpoint authority",
@@ -14637,9 +14557,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "RESULT-RECONCILIATION-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Controller tests use complete atomic-filesystem/provider-observation mocks and exact attempt attribution fixtures; pause/resume and finalizer assertions exercise current fail-closed authority without weakening production receipt or status publication",
       "evidence": "Changed-test batch passed 14/15 files and 314 assertions, while 25 cases in `sprint-controller.test.ts` failed on missing `renameSync`, absent temp DB directories, attribution-less terminal fixtures and a stale `appendRetroSection` mock. The exact changed routing-HOLD assertion passes in isolation. Negative scope: do not restore ambient/synthetic DONE or make status publication fail-open to satisfy legacy mocks",
@@ -19668,6 +19586,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7a29cf2c67431e18d2b66b620de3271ecde054b39ceaa4b3152d51f80a25b81c"
+    "value": "d031fbc19e87dc97c98adc70578330e20e672d52db8d5473c00e973b69738e20"
   }
 }
