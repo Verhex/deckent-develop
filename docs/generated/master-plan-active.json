@@ -3,27 +3,27 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "91f09d890a68ed2f08c8485d555700bbde6f0cd4e8beb4048d168578bd9f67fb"
+    "value": "ec5931611e897d2082b82f5812ba96954a26177a55152c0a7d9866d64ce6b6ee"
   },
   "summary": {
-    "total": 384,
-    "active": 352,
-    "terminal": 32,
-    "receipts": 72,
+    "total": 387,
+    "active": 354,
+    "terminal": 33,
+    "receipts": 75,
     "byState": {
-      "OPEN": 259,
-      "READY": 0,
+      "OPEN": 260,
+      "READY": 2,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 26,
-      "DONE": 32,
+      "VERIFY": 25,
+      "DONE": 33,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 249,
-      "P1": 102,
-      "P2": 33
+      "P0": 250,
+      "P1": 103,
+      "P2": 34
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 72,
+      "TRUTH": 75,
       "XPLAT": 3
     }
   },
@@ -102,11 +102,11 @@
       "id": "SSOT-003",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-07-26",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "f4571d810e206c7ff2a63e46433273e751c4bccfcc7b3b11bdf51adfe674ca38",
-      "progressDigest": "99153dc13c235241019d7d8d5b34796f05af3fa8e42e500d36e5fecf5ad9aadd",
-      "terminalClosureDigest": null
+      "progressDigest": "90fe22bbe4f6bb6800ffca0bbcce93915098f2b52993780ead67a121e4a56f17",
+      "terminalClosureDigest": "25284b4a1d6b9c9f840669fea14dbd5e1c7118f437629113527c9bb3d109423a"
     },
     {
       "order": 31,
@@ -898,6 +898,39 @@
       "updated": "2026-08-06",
       "definitionDigest": "4d34f99ceea1a95d1a2c067a2428b97e74726f65a0b5369a19fb3b00e1855b54",
       "progressDigest": "ea4d6f3abd1976194728f1f3306b029c25fd59875a7500bb410f2b689b837018",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 534,
+      "id": "SSOT-SETTLEMENT-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-06",
+      "definitionDigest": "3f7fe0a25137cdfd938a0873297c277b4cac3b5dae5e4e3751b3587739154da3",
+      "progressDigest": "632dcc159370960aa2af72e060dbd55ec1ef8b8e7d08099602e92bc04d31aff1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 535,
+      "id": "CI-ACTIONS-ECONOMY-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "READY",
+      "updated": "2026-08-06",
+      "definitionDigest": "4a5c83a4702307efc41649b52542d1f20bf5219d2dfb3c74f63ea0335428a9ce",
+      "progressDigest": "13d5076669db62563878df794797670b26cbbc8342d41153001ff3c66f21d94f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 536,
+      "id": "ADR-BACKFILL-G039-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "READY",
+      "updated": "2026-08-06",
+      "definitionDigest": "6927493682daeba6eefd5f54c27eb9cc252abef523a3f959cf6851dbf19f0e3f",
+      "progressDigest": "db33e1f512f0cfb2daf43b3563f50a1109a14f2e16c52ca62fa94d5368d498dd",
       "terminalClosureDigest": null
     },
     {
@@ -5009,6 +5042,36 @@
         "transitionAt": "2026-08-06T06:21:40Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-SSOT-SPLIT-01",
+      "authorityDigest": "8655f3372832a02d3fee263881072fa01bcb335908d42b91c051c574ca1bd3f5",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T06:38:58Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-ACTIONS-ECON-535-01",
+      "authorityDigest": "7c745173387ff1393b97d11db11d23d21c56ae7b77bda5bb8a53aa47e0d77c1f",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-ADR39-CTX-536-01",
+      "authorityDigest": "0aedd482c94b9a5e48efe699fd932851b7b4e2ef64551194929684e4fb62f8a2",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -5042,61 +5105,6 @@
       "acceptance": "Fresh-clone/izole checkout üzerinde ledger + generated projeksiyon + manifest digest'leri komple doğrulanır ve kanıt commit'e bağlanır",
       "evidence": "Açılış 2026-08-05: 24-satır DONE turunda residual-çıkarma (Alperen onaylı); kaynaklar: SSOT-002 'isolated commit proof pending' + SOURCE-MANIFEST-001 canlı-kanıt boyutu",
       "updated": "2026-08-05"
-    },
-    {
-      "order": 30,
-      "id": "SSOT-003",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "MASTER schema validator ve generated active views",
-      "priority": "P0",
-      "dependsOn": [
-        "SSOT-001"
-      ],
-      "dependents": [
-        "AUTHORITY-001",
-        "CM-01",
-        "CODEX-MAIN-001",
-        "CONFIG-TRUTH-001",
-        "DEBT-GOVERNANCE-001",
-        "DOCS-ADR-SYNC-001",
-        "DOCS-RELEASE-TRUTH-001",
-        "ERROR-REGISTRY-001",
-        "EVERY-ENV-001",
-        "KERNEL-001",
-        "KERNEL-ONTOLOGY-001",
-        "PRINCIPAL-001",
-        "RUNTIME-FLOOR-001",
-        "SCALE-001",
-        "TEST-PLATFORM-001",
-        "XVERIFY-UX-001"
-      ],
-      "children": [
-        "MASTER-CLI-SYMLINK-FLAKE-001"
-      ],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "?",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-26-SSOT-003-01",
-        "GR-2026-07-26-SSOT-003-02"
-      ],
-      "acceptance": "Column count, unique ID/order, enum, dependency and aggregate-parent closure integrity, gate receipts, blocker register, DONE evidence and pipe lint CI'da fail-closed",
-      "evidence": "`receipt=GR-2026-07-26-SSOT-003-01`; `receipt=GR-2026-07-26-SSOT-003-02`; dependency-free validator, deterministic Markdown/JSON projections, 67-case validator suite, 38-case VitePress boundary suite, hermetic matrix and real CLI check; public-docs exclusion is enforced; cross-platform CI, authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement and Git trust-anchor evidence pending under APPROVAL-001, RECEIPT-001, KERNEL-SETTLEMENT-001, AUDIT-001",
-      "updated": "2026-07-26"
     },
     {
       "order": 32,
@@ -5407,9 +5415,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-003"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Linux, macOS, Windows native ve WSL tags generated ve enforced",
       "evidence": "Stale `tests/PLATFORM.md` evidence; 2026-08-03 ölçüm (PAZARTESI P9): ortam-bağımlı kırıklar ~6 — Windows taskkill testleri Linux runner'da, CI'da bulunmayan .deckent/skills/docs dizini, 60 sn'de zaman aşan containment ratchet'i, dashboard'ın canlı-sunucu isteyen 2 dosyası. Bunlar ürün hatası değil platform-koşul eksikliğidir; platform registry'ye bağlanınca koşullu skip typed hale gelir",
@@ -5654,9 +5660,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-003"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "No missing, divergent or stale accepted ADR projection",
       "evidence": "2026-07-21 decision table",
@@ -5694,8 +5698,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "DOCS-TOPOLOGY-001",
-        "SSOT-003"
+        "DOCS-TOPOLOGY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One generator registry; CI and release gate enforce exact counts/links",
@@ -6385,9 +6388,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-003"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`--files` contract honest; empty evidence has remedy; large files target exact range/symbol without operator prompt hacks",
       "evidence": "Legacy 673 and 660(b)",
@@ -6497,7 +6498,6 @@
       "blockerCode": "DEPENDENCY_UNSATISFIED",
       "blockerRemedy": "exact ledger `DependsOn` IDs",
       "closureBlockedBy": [
-        "SSOT-003",
         "KERNEL-SETTLEMENT-001"
       ],
       "evidenceReceipts": [],
@@ -6707,9 +6707,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-003"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`doctor`, `package.json engines`, onboarding ve release gate tek kaynaktan aynı minimum Node sürümünü verir; drift CI'da fail-closed olur",
       "evidence": "CODE-DOC-DIFF-2026-08 CLI-12: `doctor --json` \"v24.15.0 (>=18 required)\" derken `package.json` `engines>=24` ister; 2026-08-02 gerçek binary çıktısıyla yeniden üretildi. Kanıtlamadığı: hangi floor'un canonical olacağı owner kararıdır",
@@ -6742,9 +6740,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-003"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Registry dışında emitted kod kalmaz; `lint:errors` fail-closed; error dokümanı generated",
       "evidence": "CODE-DOC-DIFF-2026-08 ERR-01. 2026-08-03: kayıtsız 46 raw throw tipli `DeckentError`'a çevrildi ve `lint:errors` YEŞİL (`0 new violation, 321 baseline occurrence`), 5 bayat baseline kaydı aynı değişiklikte ratchet'lendi. Kanıtlamadığı: registry-generated doküman ve message/remediation bütünlüğü henüz yok",
@@ -6777,9 +6773,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-003"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "164 config leaf için no-missing ve equality gate CI'da fail-closed; manifest default'u canonical config'ten türer",
       "evidence": "CODE-DOC-DIFF-2026-08 CFG-03, CFG-04",
@@ -7147,6 +7141,116 @@
       "updated": "2026-08-06"
     },
     {
+      "order": 534,
+      "id": "SSOT-SETTLEMENT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor",
+      "priority": "P0",
+      "dependsOn": [
+        "APPROVAL-001",
+        "RECEIPT-001",
+        "KERNEL-SETTLEMENT-001",
+        "AUDIT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "APPROVAL-001",
+        "RECEIPT-001",
+        "KERNEL-SETTLEMENT-001",
+        "AUDIT-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-08-06-SSOT-SPLIT-01"
+      ],
+      "acceptance": "Onay ve settlement kayıtları owner-approved immutable external ledger'a bağlanır; MASTER'daki receipt register'ı onun projection'ı olur; Git trust-anchor zinciri commit-bound doğrulanır",
+      "evidence": "Açılış 2026-08-06: SSOT-003 bölmesinden doğdu (MASTER §3.3 — residual child'a taşınır; Alperen G1 onayı, karar-turu); taşınan evidence-cümlesi bu satırın outcome'udur; `receipt=GR-2026-08-06-SSOT-SPLIT-01`",
+      "updated": "2026-08-06"
+    },
+    {
+      "order": 535,
+      "id": "CI-ACTIONS-ECONOMY-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "CI kaynak-ekonomisi yapısal düzenleme: her tren 3 tam-koşu tetikliyor (PR+merge_group+main-push ×2 workflow; günde ~35+35 koşu ölçüldü), merge-queue TÜM ci.yml'i koşuyor, Coverage (21-40dk) her merge'de, macos-ağır xplat job'ları her PR'da — repo PUBLIC olduğundan maliyet dakika-faturası değil duvar-saat + eşzamanlılık-kuyruğu + sinyal-gürültüsü",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-ACTIONS-ECON-535-01"
+      ],
+      "acceptance": "Coverage schedule+dispatch'e taşınır (release-gate korunur); merge_group yalnız required'ları koşar; macos-ağır job'lar main-push+dispatch'e alınır (tren-dalı kanıtı açık dispatch'le); workflow-pin testleri hizalanır; tren duvar-saati ölçülebilir düşer",
+      "evidence": "Açılış 2026-08-06: Alperen 'actions ekonomisi çok kritik' + 3-kalem paket onayı; ölçüm: son 3 gün koşu-sayıları + merge-queue tam-koşu tespiti; `receipt=GR-2026-08-06-ACTIONS-ECON-535-01`",
+      "updated": "2026-08-06"
+    },
+    {
+      "order": 536,
+      "id": "ADR-BACKFILL-G039-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "ADR-G-039 (2026-07-23 03:46, provider-authority key-custody) kaydının eksik Context bölümü ve 'To be backfilled' Sprint alanı — Coverage duvarı kalkınca decisions format-testi görünür kıldı (55-kırık envanterinin son kalemi)",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G4",
+        "G1"
+      ],
+      "state": "READY",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-ADR39-CTX-536-01"
+      ],
+      "acceptance": "Onaylı Context metni + Sprint backfill'i G4 prosedürüyle (backup-hash + transactional UPDATE + export regen) uygulanır; decisions format-testi yeşil; audit-hmac yeniden-hesaplanmama kararı typed kayıtlıdır",
+      "evidence": "Açılış 2026-08-06: karar-turu — Alperen Context metnini onayladı; provenance: memory.db entries kaydı 2026-07-23T03:46:30; `receipt=GR-2026-08-06-ADR39-CTX-536-01`",
+      "updated": "2026-08-06"
+    },
+    {
       "order": 1000,
       "id": "CODEX-MAIN-001",
       "parent": "P01",
@@ -7213,7 +7317,6 @@
       "blockerCode": "CONFIG_CUTOVER_INCOMPLETE",
       "blockerRemedy": "exact `DependsOn`; resolved all-ingress runtime truth",
       "closureBlockedBy": [
-        "SSOT-003",
         "TEST-675",
         "TEST-676",
         "APPROVAL-001",
@@ -7296,9 +7399,7 @@
       },
       "blockerCode": "CONFIG_CUTOVER_INCOMPLETE",
       "blockerRemedy": "exact `DependsOn`; resolved all-ingress runtime truth",
-      "closureBlockedBy": [
-        "SSOT-003"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Brain, Worker, Auditor, chat and native exact IDs; foreign Anthropic requirement removed; invalid provider typed HOLD",
       "evidence": "Config and `config.ts` audit",
@@ -10850,7 +10951,6 @@
       "blockerCode": "DEPENDENCY_UNSATISFIED",
       "blockerRemedy": "exact ledger `DependsOn` IDs",
       "closureBlockedBy": [
-        "SSOT-003",
         "TEST-675",
         "TEST-676",
         "CODEX-C5",
@@ -10933,7 +11033,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "SSOT-003",
         "OPERATION-001",
         "LIFECYCLE-VOCAB-001"
       ],
@@ -11125,6 +11224,7 @@
         "RESULT-INGEST-001",
         "RUNFLOW-001",
         "SPRINT-HONESTY-001",
+        "SSOT-SETTLEMENT-001",
         "TERMINAL-LIVE-001",
         "TRAINING-TRACE-001"
       ],
@@ -15421,7 +15521,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "SSOT-003",
         "PRINCIPAL-001",
         "TENANT-001",
         "OPERATION-001",
@@ -15491,9 +15590,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "SSOT-003"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
       "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık",
@@ -15659,6 +15756,7 @@
         "KERNEL-001",
         "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
         "RECOVERY-COMMAND-SERVICE-001",
+        "SSOT-SETTLEMENT-001",
         "TERMINAL-COLLAB-001",
         "TOOL-AUTHORITY-001"
       ],
@@ -15795,6 +15893,7 @@
         "REACHABILITY-001",
         "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
         "RECOVERY-BORN-485-USAGE-BILLING-001",
+        "SSOT-SETTLEMENT-001",
         "SURFACE-CONTRACT-001",
         "TRAINING-TRACE-001",
         "XVERIFY-TRUTH-001"
@@ -16136,6 +16235,7 @@
         "LEARNING-001",
         "OPERATIONS-PACK-001",
         "SLO-001",
+        "SSOT-SETTLEMENT-001",
         "TERMINAL-COLLAB-001",
         "TRUST-HANDOFF-001"
       ],
@@ -18474,7 +18574,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "SSOT-003",
         "TEST-PLATFORM-001",
         "ENV-ADAPTER-001",
         "INSTALL-SCOPE-001",
@@ -19461,7 +19560,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "SSOT-003",
         "TRUTH-BASELINE-001",
         "STORAGE-001",
         "DATA-GOV-001",
@@ -19806,6 +19904,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ee829abd2ac8a5a6545eaae30f72d55410057d155e2fab883bd81dbf7da2e5d9"
+    "value": "e5b21f595ea7d3b5587b2551c152a6b315eef05f791de763c71c07af2b851be8"
   }
 }
