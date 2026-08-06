@@ -269,7 +269,13 @@ describe('POST /api/run-flow/propose', () => {
     await boot();
     const { body } = await propose('Ship it', bearerHeaders({ sub: 'alice', tenant: 'acme', role: 'operator' }));
     expect(body.proposal?.tenant).toBe('acme');
-    expect(body.proposal?.actor).toEqual({ id: 'alice', role: 'operator' });
+    // PRINCIPAL-001 P1a: the actor now carries explicit provenance — the pin
+    // asserts identity AND that the parsed-but-unverified bearer is marked so.
+    expect(body.proposal?.actor).toEqual({
+      id: 'alice', role: 'operator',
+      tenantId: 'acme',
+      identityClass: 'oidc', assurance: 'token-parsed', provenance: 'api',
+    });
   });
 
   it('a planner failure surfaces as an honest 502, nothing persisted', async () => {
@@ -373,7 +379,10 @@ describe('POST /api/run-flow/:flowId/decision', () => {
     expect(body.state).toBe('APPROVED');
     expect(body.approvedSnapshot?.revision).toBe(proposed.preview!.revision);
     expect(body.approvedSnapshot?.planDigest).toBe(proposed.preview!.planDigest);
-    expect(body.approvedSnapshot?.approvedBy).toEqual({ id: 'alperen' });
+    expect(body.approvedSnapshot?.approvedBy).toEqual({
+      id: 'alperen', tenantId: 'acme',
+      identityClass: 'oidc', assurance: 'token-parsed', provenance: 'api',
+    });
 
     // approve() delegates to the SAME durable store startApproved() would
     // later read back from — never a second, hand-rolled persistence path.

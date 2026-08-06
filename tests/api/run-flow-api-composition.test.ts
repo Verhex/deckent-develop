@@ -263,7 +263,11 @@ describe('run-flow API composition — propose -> preview -> approve -> state (r
     const approved = decisionRes.json<RunFlowContext>();
     expect(approved.state).toBe('APPROVED');
     expect(approved.approvedSnapshot?.planDigest).toBe(preview.planDigest);
-    expect(approved.approvedSnapshot?.approvedBy).toEqual({ id: 'alperen', role: 'operator' });
+    expect(approved.approvedSnapshot?.approvedBy).toEqual({
+      id: 'alperen', role: 'operator',
+      tenantId: 'acme',
+      identityClass: 'oidc', assurance: 'token-parsed', provenance: 'api',
+    });
 
     // state (post-approve — the "state" step of the zincir)
     const finalStateRes = await call(h, `/api/run-flow/${flowId}`, { headers: actorHeaders });

@@ -406,11 +406,11 @@ describe('registerPlanTool', () => {
       expect(mockPlanRunFlow).toHaveBeenCalledWith(expect.objectContaining({
         lineage: expect.objectContaining({
           tenantId: 'local',
-          actor: { id: 'mcp-operator' },
+          actor: expect.objectContaining({ identityClass: 'local', assurance: 'os-user', provenance: 'mcp' }),
           origin: 'mcp',
         }),
         approval: expect.objectContaining({
-          actor: { id: 'mcp-operator' },
+          actor: expect.objectContaining({ identityClass: 'local', assurance: 'os-user', provenance: 'mcp' }),
           acknowledgeScopePaths: true,
         }),
       }));
