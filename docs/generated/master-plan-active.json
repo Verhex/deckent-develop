@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6474e1e4606e82b19e22a449f8d32dcbe579fcfda7f9cb96f32f98210e8d169a"
+    "value": "38dd34495adcfe5d6d21ed57acc4b1a94c7fa4931c7d1051041f618ac8dddd23"
   },
   "summary": {
     "total": 383,
     "active": 351,
     "terminal": 32,
-    "receipts": 65,
+    "receipts": 66,
     "byState": {
       "OPEN": 260,
       "READY": 0,
@@ -875,7 +875,7 @@
       "state": "OPEN",
       "updated": "2026-08-06",
       "definitionDigest": "4382b84e1cf52ef6f85aef6c1805ccbd36ac0a031c2557d3f96596ab72aeaa66",
-      "progressDigest": "80c05ad59723b50ac738fc73f64767117feb163df634ec6412c9419be9bebb27",
+      "progressDigest": "88445e615b2255236f0e0aa5216d229f3f42556ada76cf89a931795b667520ad",
       "terminalClosureDigest": null
     },
     {
@@ -4928,6 +4928,16 @@
         "transitionAt": "2026-08-06T04:20:02Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-COVDEBT-AUDIT-01",
+      "authorityDigest": "286d888ed27043c142f0ecb969604af28f78c53aaf8b6adede58dd2aa20de078",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T04:29:35Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6990,10 +7000,11 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-06-COVDEBT-E2E-01"
+        "GR-2026-08-06-COVDEBT-E2E-01",
+        "GR-2026-08-06-COVDEBT-AUDIT-01"
       ],
       "acceptance": "Envanter dosya-aile bazında dilimlenir ve her aile kendi receipt'li treniyle kapanır: chain-safety.e2e 14 (kök İZOLE: fixture'lar literal 'sonnet' + registry'siz provider çözümü — ADR-G-036 kontrat sapması, lokal deterministik repro) · dead-code-decisions 12 · docker-exit-final 6 · sprint-lifecycle.e2e 5 · docker-exit-reproducer 4 · docker-hb 3 · nerv-w1-predicate 2 · sekiz tekli (governance×2, release, build, brain, workflows, docker-timeout, ratchet); her kökte bayat-kontrat/gerçek-bug sınıflandırması yapılır, gerçek-bug üretim-dilimi olur; uzun-vade karar adayı: bu sınıflara hızlı job kapsaması",
-      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et'); 2026-08-06 E2E-AİLE SETTLEMENT: chain-safety.e2e (14) + sprint-lifecycle (5) kırıkları kapandı — registry-öncesi suite'lere minimal default-ProviderAdapter fixture'ı (üretim çözüm-zinciri ve test pinleri değişmedi, model-literal yok); `proof=e2e-pair-27of27-local-deterministic-repro-fixed`; iki suite 27/27, tsc temiz, hermetic-baseline ve stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (14 aile-dosyası açık: dead-code-decisions 12 · docker ailesi 14 · sekiz tekli + nerv 2)",
+      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et'); 2026-08-06 E2E-AİLE SETTLEMENT: chain-safety.e2e (14) + sprint-lifecycle (5) kırıkları kapandı — registry-öncesi suite'lere minimal default-ProviderAdapter fixture'ı (üretim çözüm-zinciri ve test pinleri değişmedi, model-literal yok); `proof=e2e-pair-27of27-local-deterministic-repro-fixed`; iki suite 27/27, tsc temiz, hermetic-baseline ve stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (14 aile-dosyası açık: dead-code-decisions 12 · docker ailesi 14 · sekiz tekli + nerv 2); `receipt=GR-2026-08-06-COVDEBT-AUDIT-01`; audits-aile admission 2026-08-06 (Alperen: 'dead-code-decisions treniyle devam et'); 2026-08-06 AUDITS-AİLE SETTLEMENT: dead-code-decisions 12 kırık kapandı — sprint-139 audit pinleri docs-reset'in arşiv konumuna hizalandı (içerik/şema pinleri aynen); `proof=audits-suite-18of18-local`; 18/18 + tsc temiz, baseline/stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (13 aile-dosyası açık: docker 14 · nerv 2 · governance 2 · altı tekli)",
       "updated": "2026-08-06"
     },
     {
@@ -19687,6 +19698,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "02b1797c25c4ce38e14e08b006788a0bd51837c44f86511cd639439e736b6273"
+    "value": "e7b4b83697bee309c2c606cb10a3493903220a0ce6eefb8e0af1fa314efafbdb"
   }
 }
