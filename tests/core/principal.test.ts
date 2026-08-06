@@ -6,6 +6,8 @@ import {
   principalToActor,
   assessActorAssurance,
   recordActorAssurance,
+  assertActorAssurance,
+  PrincipalAssuranceError,
 } from '../../src/core/principal.js';
 
 describe('resolveLocalOsPrincipal — real OS identity, never synthetic', () => {
@@ -65,5 +67,42 @@ describe('assessActorAssurance — the advisory authorization seam', () => {
   it('recordActorAssurance never throws and returns the finding (P1a contract)', () => {
     const finding = recordActorAssurance({ id: 'legacy' }, 'test-site');
     expect(finding.code).toBe('ACTOR_ASSURANCE_MISSING');
+  });
+});
+
+// ═══ P1b — config-gated enforcement (default-off) ═══════════════════════════
+describe('assertActorAssurance — enforcement is flag-gated, never blind', () => {
+  const legacyActor = { id: 'legacy-actor' };
+
+  it('flag OFF: an untrusted actor still passes (v1 behaviour byte-identical)', () => {
+    const finding = assertActorAssurance(legacyActor, 'planRunFlow', false);
+    expect(finding.ok).toBe(false);
+    expect(finding.code).toBe('ACTOR_ASSURANCE_MISSING');
+  });
+
+  it('flag ON: the same actor is refused with a typed error before admission', () => {
+    expect(() => assertActorAssurance(legacyActor, 'planRunFlow', true))
+      .toThrowError(PrincipalAssuranceError);
+    try {
+      assertActorAssurance(legacyActor, 'planRunFlow', true);
+    } catch (error) {
+      const err = error as PrincipalAssuranceError;
+      expect(err.code).toBe('ACTOR_ASSURANCE_MISSING');
+      expect(err.message).toContain('planRunFlow');
+    }
+  });
+
+  it('flag ON: an explicitly unverified identity is refused too (api-static class)', () => {
+    const unverified = {
+      id: 'api-static', identityClass: 'service' as const,
+      assurance: 'unverified' as const, provenance: 'api' as const,
+    };
+    expect(() => assertActorAssurance(unverified, 'planRunFlow', true))
+      .toThrowError(/unverified assurance/iu);
+  });
+
+  it('flag ON: a real OS identity passes (enforcement blocks only the untrusted)', () => {
+    const actor = principalToActor(resolveLocalOsPrincipal('cli'));
+    expect(assertActorAssurance(actor, 'planRunFlow', true).ok).toBe(true);
   });
 });

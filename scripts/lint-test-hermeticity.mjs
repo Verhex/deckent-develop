@@ -133,8 +133,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // template — same 1198 count, digest only. Prior: P1a (+principal module).
   // 2026-08-06 (485a): status-summary export + dashboard overlay — same 1198
   // count, digest only. Prior: 537 hygiene.
+  // 2026-08-06 (P1b): config key + enforcement seam + plan-service wiring —
+  // same 1198 count, digest only. Prior: 485a.
   count: 1198,
-  digest: 'ce55b913dbe306203090f5540d202c211875ec00f46bab170bfc03bc9ffdd979',
+  digest: '45729fc1ba5b63c6c98c9f6dc4832d58a3485704691e9cba59583f06c07ac518',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

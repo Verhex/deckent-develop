@@ -12,7 +12,7 @@
 // in this layer.
 
 import { spawn } from 'node:child_process';
-import { recordActorAssurance } from '../core/principal.js';
+import { assertActorAssurance } from '../core/principal.js';
 import { createHash } from 'node:crypto';
 
 import { canonicalJson } from '../core/audit-writer.js';
@@ -533,11 +533,16 @@ function ensureDurableEventChain(
  * either compiler or planner again. Any mismatch is a typed conflict.
  */
 export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowResult> {
-  // PRINCIPAL-001 P1a ADVISORY seam: every plan admission records whether the
-  // actor identity about to be trusted carries explicit provenance/assurance.
-  // Findings are typed and logged, never blocking in this slice — the
-  // config-gated enforce mode is the P1b slice (no blind default-on).
-  recordActorAssurance(input.proposal.actor, 'planRunFlow');
+  // PRINCIPAL-001 seam: every plan admission records whether the actor identity
+  // about to be trusted carries explicit provenance/assurance (P1a advisory).
+  // P1b: when the owner-approved `enforce_principal_assurance` flag is on, the
+  // same finding becomes a typed refusal BEFORE any work is admitted. The flag
+  // defaults to false, so v1 behaviour is byte-identical until it is flipped.
+  assertActorAssurance(
+    input.proposal.actor,
+    'planRunFlow',
+    (input.config as { enforce_principal_assurance?: boolean }).enforce_principal_assurance === true,
+  );
   if (
     input.lineage.tenantId.trim().length === 0
     || input.lineage.correlationId.trim().length === 0
