@@ -11,6 +11,22 @@ import { waitForResults } from '../../src/orchestra/result-collector.js';
 import { calculateMetrics } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, TaskStatus, SprintStatus, SprintPhase } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics } from '../../src/core/types.js';
+import { providerRegistry } from '../../src/core/provider.js';
+import type { ProviderAdapter } from '../../src/core/provider.js';
+
+// 531 e2e-aile dilimi (GR-2026-08-06-COVDEBT-E2E-01): registry-öncesi suite —
+// resolveTaskProvider'ın default-provider fallback'i için minimal stub kaydı;
+// üretim çözüm-zinciri ve lifecycle pinleri değişmez (model-literal yok).
+const e2eDefaultProviderStub: ProviderAdapter = {
+  name: 'e2e-default-stub',
+  supportedModels: [],
+  executionCostClass: 'local',
+  spawn: () => {},
+  kill: () => {},
+  listWorkers: () => [],
+  isAvailable: async () => true,
+  buildCommand: () => 'e2e-default-stub',
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -64,9 +80,14 @@ function evaluateResult(result: TaskResult): TaskEvaluation {
 beforeEach(() => {
   cleanup();
   fs.mkdirSync(TASKS_DIR, { recursive: true });
+  providerRegistry.clear();
+  providerRegistry.registerProvider(e2eDefaultProviderStub, true);
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  providerRegistry.clear();
+  cleanup();
+});
 
 // ─── Full Lifecycle ───────────────────────────────────────────────────────
 
