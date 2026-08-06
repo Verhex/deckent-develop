@@ -131,8 +131,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (VerifiedPrincipal authority). Prior: 533 dist-blind (1197).
   // 2026-08-06 (537 hygiene): dead HB_PID lines removed from the wrapper
   // template — same 1198 count, digest only. Prior: P1a (+principal module).
+  // 2026-08-06 (485a): status-summary export + dashboard overlay — same 1198
+  // count, digest only. Prior: 537 hygiene.
   count: 1198,
-  digest: 'afd2f7525c469316fe16b64929d5fdad02a6df9bbcd042079e69523b3cf4e940',
+  digest: 'ce55b913dbe306203090f5540d202c211875ec00f46bab170bfc03bc9ffdd979',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
