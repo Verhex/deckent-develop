@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "52743376b759346aeea948b10705911a46557b447fcee00e8795fa8a8d3698e1"
+    "value": "643e84bb072ac01f908117bd04671af3f0521b75164e955f8c2babe9c96b09a7"
   },
   "summary": {
     "total": 384,
@@ -12,8 +12,8 @@
     "receipts": 72,
     "byState": {
       "OPEN": 259,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 25,
       "DONE": 32,
@@ -894,10 +894,10 @@
       "id": "CI-HERMETIC-SCAN-DIST-BLIND-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-06",
       "definitionDigest": "4d34f99ceea1a95d1a2c067a2428b97e74726f65a0b5369a19fb3b00e1855b54",
-      "progressDigest": "88729be1ca815b714d0e6a7f7efb5537e99698de05063d33af1b938bfc9a5f25",
+      "progressDigest": "3370bc94faaee10229ba1f330e9756e9b3ec0c8ccd3cf8b239389aeb99365895",
       "terminalClosureDigest": null
     },
     {
@@ -7125,7 +7125,7 @@
       "gates": [
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19805,6 +19805,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d4342ffbbb29324138e5f2585e7ebf4db649bfa210c34215290f146b9a203df0"
+    "value": "b7c7b70c01ad158cc84e382ffe66cfa1d32871db1a91e5bd535de65da0656476"
   }
 }

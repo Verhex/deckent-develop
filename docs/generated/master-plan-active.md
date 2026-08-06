@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):52743376b759346aeea948b10705911a46557b447fcee00e8795fa8a8d3698e1`
+**Source digest:** `sha256(normalized-lf-utf8):643e84bb072ac01f908117bd04671af3f0521b75164e955f8c2babe9c96b09a7`
 
 **Rows:** 384 total · 352 active · 32 terminal
 
@@ -14,8 +14,8 @@
 | State | Count |
 |---|---:|
 | OPEN | 259 |
-| READY | 1 |
-| IN_PROGRESS | 0 |
+| READY | 0 |
+| IN_PROGRESS | 1 |
 | BLOCKED | 67 |
 | VERIFY | 25 |
 | DONE | 32 |
@@ -84,7 +84,7 @@
 | 530 | `CI-COVERAGE-JOB-WALL-001` | VERIFY | P1 | TRUTH | — | — | Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü) |
 | 531 | `CI-COVERAGE-REVEALED-DEBT-001` | VERIFY | P1 | TRUTH | — | — | 530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık |
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
-| 533 | `CI-HERMETIC-SCAN-DIST-BLIND-001` | READY | P1 | TRUTH | — | — | Hermetic-lint taraması build-duyarlı: built ağaçta import-takibi dist dosyalarına girip analyzer girdisi üretiyor (+71, dist/core/errors.js — run 31074633586 kesin ölçüm; script başlığındaki 'baselines BUILD-FREE ölçülür' operasyon-yükünün kökü) — Coverage job'u build:all yaptığından ratchet testi yalnız orada düşüyor |
+| 533 | `CI-HERMETIC-SCAN-DIST-BLIND-001` | IN_PROGRESS | P1 | TRUTH | — | — | Hermetic-lint taraması build-duyarlı: built ağaçta import-takibi dist dosyalarına girip analyzer girdisi üretiyor (+71, dist/core/errors.js — run 31074633586 kesin ölçüm; script başlığındaki 'baselines BUILD-FREE ölçülür' operasyon-yükünün kökü) — Coverage job'u build:all yaptığından ratchet testi yalnız orada düşüyor |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
