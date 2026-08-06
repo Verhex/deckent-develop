@@ -15,6 +15,7 @@ import { DASHBOARD_FILE } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import type { Alert, DashboardState } from '../core/monitoring-types.js';
 import { SprintPhase, SprintStatus } from '../core/sprint-types.js';
+import { readSprintTerminalReceiptSummary } from '../core/sprint-terminal-publication-status.js';
 
 /** Canonical empty dashboard state — used when creating or repairing. */
 export const DASHBOARD_INITIAL_STATE: DashboardState = {
@@ -254,7 +255,43 @@ export function readDashboardSafe(projectRoot: string): DashboardReadResult {
   // This handles partial/stale dashboard data gracefully without repairing on disk,
   // since auditor will overwrite with full state on next scan cycle.
   const state = mergeDashboardDefaults(data as Record<string, unknown>);
-  return { state, valid: true, repaired: false };
+  return { state: applyTerminalReceiptOverlay(projectRoot, state), valid: true, repaired: false };
+}
+
+/**
+ * RECOVERY-BORN-485-TERMINAL-PUBLICATION-001 (485a): the dashboard is a
+ * PROJECTION, never a competing state machine — but it used to derive sprint
+ * status straight from the raw snapshot, so a stale snapshot could show ACTIVE
+ * for a sprint whose durable terminal receipt already exists (status
+ * regression, the exact defect the row forbids). The canonical receipt now
+ * wins: once published, status/phase are pinned terminal and progress cannot
+ * exceed N/N. A malformed or mismatched receipt is typed and fail-soft — the
+ * raw projection survives and the conflict is visible in the debug channel.
+ */
+function applyTerminalReceiptOverlay(projectRoot: string, state: DashboardState): DashboardState {
+  const sprintId = state.sprint?.id;
+  if (!sprintId) return state;
+  const summary = readSprintTerminalReceiptSummary(projectRoot, sprintId);
+  if (summary.conflict) {
+    debugLog('dashboard-manager:terminalReceipt', `${sprintId}: ${summary.conflict}`);
+    return state;
+  }
+  if (!summary.receipt) return state;
+  const terminalStatus = summary.receipt.terminalOutcome === 'ABORTED'
+    ? SprintStatus.ABORTED
+    : SprintStatus.COMPLETE;
+  const progress = terminalStatus === SprintStatus.COMPLETE
+    ? {
+      ...state.progress,
+      done: Math.min(state.progress.done, state.progress.total),
+      active: 0,
+    }
+    : state.progress;
+  return {
+    ...state,
+    sprint: { ...state.sprint, status: terminalStatus, phase: SprintPhase.COMPLETE },
+    progress,
+  };
 }
 
 /** Maximum number of alerts stored in the dashboard. */

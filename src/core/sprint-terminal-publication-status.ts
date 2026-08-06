@@ -70,6 +70,22 @@ function readTerminalReceipt(
   }
 }
 
+/**
+ * 485a: thin, dependency-free receipt lookup for consumers that do NOT hold a
+ * CanonicalRunStatus (the dashboard read path). It reuses the exact same
+ * durable reader as the CLI/MCP projection — no second state machine, no
+ * re-inference; `conflict` stays typed so callers can fail soft and visibly.
+ */
+export function readSprintTerminalReceiptSummary(
+  root: string,
+  sprintId: string | null,
+): {
+  readonly receipt: SprintTerminalReceiptV1 | null;
+  readonly conflict?: TerminalPublicationStatus['conflict'];
+} {
+  return readTerminalReceipt(root, sprintId);
+}
+
 /** Shared CLI/MCP receipt projection; lifecycle and receipt are never re-inferred. */
 export function projectTerminalPublicationStatus(
   root: string,

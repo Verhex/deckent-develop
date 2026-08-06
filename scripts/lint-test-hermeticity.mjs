@@ -118,8 +118,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-06 (XPLAT-SKIP-GUARD): +guard test — same 12478, digest only.
   // 2026-08-06 (487 yaprak-dilimi): +2 real-binary replay/fault-injection
   // cases. Prior: XPLAT-SKIP-GUARD (12478).
+  // 2026-08-06 (485a): +4 dashboard overlay tests — same 12480, digest only.
   count: 12480,
-  digest: 'f55896b22b28e520d365649bf0337fe28772119e56f3d998cef2d5bdfea35179',
+  digest: '7ab6d83938d23807b2ee0865c012e6df3d0259d73610a0668a456e80884830d0',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -130,8 +131,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (VerifiedPrincipal authority). Prior: 533 dist-blind (1197).
   // 2026-08-06 (537 hygiene): dead HB_PID lines removed from the wrapper
   // template — same 1198 count, digest only. Prior: P1a (+principal module).
+  // 2026-08-06 (485a): status-summary export + dashboard overlay — same 1198
+  // count, digest only. Prior: 537 hygiene.
   count: 1198,
-  digest: 'afd2f7525c469316fe16b64929d5fdad02a6df9bbcd042079e69523b3cf4e940',
+  digest: 'ce55b913dbe306203090f5540d202c211875ec00f46bab170bfc03bc9ffdd979',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

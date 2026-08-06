@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -267,5 +267,82 @@ describe('dashboard-manager', () => {
       expect(state['customField']).toBe('preserved');
       expect(state['violations']).toBe(5);
     });
+  });
+});
+
+// ═══ 485a — terminal-receipt overlay (RECOVERY-BORN-485-TERMINAL-PUBLICATION) ═
+describe('readDashboardSafe — terminal receipt overlay (485a)', () => {
+  function seedDashboard(root: string, sprintId: string, status: string): void {
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, '.dashboard'), JSON.stringify({
+      sprint: { id: sprintId, number: 1, phase: 'EXECUTE', status },
+      agents: [], progress: { done: 2, active: 3, blocked: 0, total: 4 },
+      alerts: [], updatedAt: new Date().toISOString(),
+    }));
+  }
+  function seedReceipt(root: string, sprintId: string, outcome: string): void {
+    const dir = join(root, '.deckent', 'recently-works');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${sprintId}-terminal-receipt.json`), JSON.stringify({
+      receipt: {
+        version: 1, sprintId, runId: 'run-1', coordinatorGeneration: 1,
+        terminalOutcome: outcome, logicalSettlementDigest: 'd'.repeat(64),
+        priorAuthorityVersion: 0, authorityVersion: 1,
+      },
+    }));
+  }
+
+  it('pins COMPLETE even when the raw snapshot still says ACTIVE (no regression)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dash-termpub-'));
+    try {
+      seedDashboard(root, 'sprint-880', 'ACTIVE');
+      seedReceipt(root, 'sprint-880', 'COMPLETE');
+      const result = readDashboardSafe(root);
+      expect(result.valid).toBe(true);
+      expect(result.state.sprint.status).toBe('COMPLETE');
+      expect(result.state.sprint.phase).toBe('COMPLETE');
+      // progress cannot exceed N/N and nothing stays "active" after terminal
+      expect(result.state.progress.done).toBeLessThanOrEqual(result.state.progress.total);
+      expect(result.state.progress.active).toBe(0);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('projects ABORTED outcomes and leaves progress untouched', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dash-termpub-abort-'));
+    try {
+      seedDashboard(root, 'sprint-881', 'ACTIVE');
+      seedReceipt(root, 'sprint-881', 'ABORTED');
+      const result = readDashboardSafe(root);
+      expect(result.state.sprint.status).toBe('ABORTED');
+      expect(result.state.progress.active).toBe(3);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('fails soft on a malformed receipt — raw projection survives', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dash-termpub-bad-'));
+    try {
+      seedDashboard(root, 'sprint-882', 'ACTIVE');
+      const dir = join(root, '.deckent', 'recently-works');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'sprint-882-terminal-receipt.json'), '{ not json');
+      const result = readDashboardSafe(root);
+      expect(result.valid).toBe(true);
+      expect(result.state.sprint.status).toBe('ACTIVE');
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('ignores a receipt belonging to a different sprint (mismatch is fail-soft)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dash-termpub-mismatch-'));
+    try {
+      seedDashboard(root, 'sprint-883', 'ACTIVE');
+      seedReceipt(root, 'sprint-883', 'COMPLETE');
+      // rewrite the receipt body with a foreign sprintId
+      const p2 = join(root, '.deckent', 'recently-works', 'sprint-883-terminal-receipt.json');
+      const parsed = JSON.parse(readFileSync(p2, 'utf-8')) as { receipt: Record<string, unknown> };
+      parsed.receipt['sprintId'] = 'sprint-999';
+      writeFileSync(p2, JSON.stringify(parsed));
+      const result = readDashboardSafe(root);
+      expect(result.state.sprint.status).toBe('ACTIVE');
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });
