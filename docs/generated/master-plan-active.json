@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "a9747228563a5583000f7ec8f8cdabfa08a43119a0b6a6a6a802e8a6a5236960"
+    "value": "4c59efe3bf6e2d152c1347898bb01fb11ab5b01ffff5c1d10a21b71c6d9e7af1"
   },
   "summary": {
     "total": 388,
-    "active": 352,
-    "terminal": 36,
+    "active": 344,
+    "terminal": 44,
     "receipts": 87,
     "byState": {
       "OPEN": 257,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 28,
-      "DONE": 36,
+      "VERIFY": 20,
+      "DONE": 44,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -751,11 +751,11 @@
       "id": "TRUST-ANCHOR-001",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "6dda7a49b043f6b3b9ec477c607703b7e0993438e4804eeb7b399d6d98e2deeb",
-      "progressDigest": "e214b28a348a44c8812e929df527f59017066d10e5c0d0d5e9fd5c38ff52eb83",
-      "terminalClosureDigest": null
+      "progressDigest": "b2741c7cc59c0b593001073dffd30adda6a44c895e309ea9a8ef204ffb8de22b",
+      "terminalClosureDigest": "f8cf4b963a64e3a8b7dd488e8219ba18477fbd7c1e091e7ecec8f542afa82936"
     },
     {
       "order": 521,
@@ -861,11 +861,11 @@
       "id": "CI-COVERAGE-JOB-WALL-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "f281b3ca1b7c8df33b96faf4f42019b612fd3772e157d2d1db7cfe59445d37ec",
-      "progressDigest": "9b29ee61024c12637081405345499ce86fde513ff89a56d29b68d3090c55b917",
-      "terminalClosureDigest": null
+      "progressDigest": "197b1263b60dc223358bf4cee50265baf032515b4c039afdef248bf794fbc0f8",
+      "terminalClosureDigest": "8de3c47abe096d65985464b2ce515149c783c3394699a2c8307c99e9f9ff327f"
     },
     {
       "order": 531,
@@ -875,7 +875,7 @@
       "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "4382b84e1cf52ef6f85aef6c1805ccbd36ac0a031c2557d3f96596ab72aeaa66",
-      "progressDigest": "0f609b33b8477d3f596cb42d1522e46177a305a3da725522efc229d73d2f7863",
+      "progressDigest": "3efa5e463b9556d711976424a9f7b0aa4a2dbb7e73562a744d58488629d52fea",
       "terminalClosureDigest": null
     },
     {
@@ -894,11 +894,11 @@
       "id": "CI-HERMETIC-SCAN-DIST-BLIND-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "4d34f99ceea1a95d1a2c067a2428b97e74726f65a0b5369a19fb3b00e1855b54",
-      "progressDigest": "ea4d6f3abd1976194728f1f3306b029c25fd59875a7500bb410f2b689b837018",
-      "terminalClosureDigest": null
+      "progressDigest": "28fa9ac17663f86726cf83a20233d7b3c9f25500bb796859985c695481e33a08",
+      "terminalClosureDigest": "d1544e697e95030ef91637074ec3c829c17be1b4beca29e20a638f608e70392b"
     },
     {
       "order": 534,
@@ -916,33 +916,33 @@
       "id": "CI-ACTIONS-ECONOMY-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "4a5c83a4702307efc41649b52542d1f20bf5219d2dfb3c74f63ea0335428a9ce",
-      "progressDigest": "9ebfb01c39b45d65a25c69b7264aea73cdd4e3535a2c4d5eefbd6e0d58cb48d0",
-      "terminalClosureDigest": null
+      "progressDigest": "e109edc0ae0129d037869b800be12d66b811004e70f24deccb2319a74d8fc718",
+      "terminalClosureDigest": "9ff3da3e1e3feaac618ddc0c3b9f5be5c45b6e2010dad0e7f1808b751db129b2"
     },
     {
       "order": 536,
       "id": "ADR-BACKFILL-G039-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "6927493682daeba6eefd5f54c27eb9cc252abef523a3f959cf6851dbf19f0e3f",
-      "progressDigest": "6bbde26ee25737117cea008cb82538ab6e7346fca7278fe9ee3ce4de6eee6d82",
-      "terminalClosureDigest": null
+      "progressDigest": "d8c319143cd6a03e995c1fca6604359410bebcd2b187a84db3587eeccacd1d38",
+      "terminalClosureDigest": "fac277ce82bba72ef05db329eb827f74279ba85610ddb10d99972bbe6de5bbba"
     },
     {
       "order": 537,
       "id": "DOCKER-WRAPPER-HYGIENE-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "e6230fc41345dabe30204030b8f4d0b39d82385e09b9b05099ae0167faf9d5bd",
-      "progressDigest": "343cc86f8aab35ed7bf8f915a21653a3cf4c999d6517590c99045792ab18fd58",
-      "terminalClosureDigest": null
+      "progressDigest": "ff43ed2655e9a017523749417bf26fdf195a340f9b55b6240708bb87db814d94",
+      "terminalClosureDigest": "80b44ce9ba7777c3b09ad85e78a9c87a4b4478ee66c5109d1f2502b36ed695c2"
     },
     {
       "order": 1000,
@@ -1851,11 +1851,11 @@
       "id": "RUN-STATUS-AUTHORITY-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "2db2c82e9653adf4b2261e847525e5cc4f676c8c2dccd3270786076c7066b63a",
-      "progressDigest": "87fe2101279b070c4cbd20bfe07141d0f85922bc8019c4d6a5d5c38b75811c03",
-      "terminalClosureDigest": null
+      "progressDigest": "c7141265ad2c53b21333ff0bda590abd7dca6f6338513d0bcd57e1a6ff19416e",
+      "terminalClosureDigest": "4665a23e9459c6665dc811045dddd4e324ac9424fa43643dbca1ffa23bc6ee0e"
     },
     {
       "order": 3030,
@@ -2556,9 +2556,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-03",
+      "updated": "2026-08-06",
       "definitionDigest": "d4aa106c67d528313dd65022a92ca5fc9af77bafe996edbe4f3d3d9e7bf7f26b",
-      "progressDigest": "f4639610f9b6f3b4d5577e8e0f255a458614f0ba9f1c1ef3b3ca54a7725df9b1",
+      "progressDigest": "832c44380fe27d14bb6012fec6b5f2b5721ba6af8595ab9975117346783f0364",
       "terminalClosureDigest": null
     },
     {
@@ -3688,11 +3688,11 @@
       "id": "STATUS-SURFACE-PARITY-001",
       "program": "PRODUCT",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "f600b19e95b3680622cbb6186f441fefd7ee9b583acb8e0590c190c93c21394b",
-      "progressDigest": "89f532fdea38c81b202fe888820d09aa2b2800dda0d196c4f7c1b41e0e92026d",
-      "terminalClosureDigest": null
+      "progressDigest": "41e37d3e6eb7a39a624648b4f86b87cb18c4d9f0eee7ebd1bda3ca62fb4fd59f",
+      "terminalClosureDigest": "721c59e5a2d8ee5a8dccf13ec96e9c88bfe252dfb410257fb40598455c6f0188"
     },
     {
       "order": 6130,
@@ -7010,40 +7010,6 @@
       "updated": "2026-08-04"
     },
     {
-      "order": 520,
-      "id": "TRUST-ANCHOR-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "1",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-03-TRUST-ANCHOR-01",
-        "GR-2026-08-06-DESIGN-DOCS-01"
-      ],
-      "acceptance": "Aktif receipt baseline'ı working-tree byte'ına değil reviewed parent commit blob'una karşı doğrulanır (git parent-diff kontrolü validator'da veya required CI check'te); `owner=` metni tek başına authority sayılmaz — protected-branch + bağımsız review kanıtı zincire girer; branch protection durumu makine-okunur evidence olarak kayıtlıdır ve sahte-READY senaryosu (xverify E-ekseni 5-adım) regression testi olarak fail-closed kanıtlanır",
-      "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur; `receipt=GR-2026-08-03-TRUST-ANCHOR-01`; `proof=trust-anchor-forgery-fail-closed-84cases`; 2026-08-03 SETTLEMENT: (a) validator'a reviewed-parent doğrulaması eklendi — aktif receipt'in anchor'ı receipt'i tanıtan commit'in PARENT'ıdır (`git log -S`), commit'lenmemiş receipt HEAD'e (son reviewed state) çıpalanır; baseline anchor blob'uyla eşleşmezse `RECEIPT_BASELINE_UNREVIEWED` + admission düşer; (b) degradasyon typed: git dışında `no-git/no-history/no-parent` modu stderr WARN üretir, sessiz geçiş yok — zorlama garantisi ruleset 20321963'ün required check'lerinde (validator-contract 3 bacak + Type Check) ve o bacaklara eklenen `fetch-depth: 0`'da; (c) ruleset kanıtı makine-okunur: docs/evidence/trust-anchor/ruleset-20321963-2026-08-03.json (active, deletion+non_fast_forward+required_status_checks, bypass_actors BOŞ, current_user_can_bypass=never); (d) KANIT: 11 yeni vaka — 6 hermetik anchor-çözümü (sahte git, process yok) + 4 gerçek-git senaryosu (meşru authoring GEÇER, working-tree sahteciliği DÜŞER, xverify 5-adım aynı-commit saldırısı DÜŞER, meşru iki-commit akışı GEÇER) + git yetenek beyanı; suite 84/84. DÜRÜST SINIR-1 (bootstrap): bu dilimin KENDİ receipt'i ile implementasyonu aynı patch'te iniyor — doğduğu commit'te kendini zorlayamazdı; eski rejim altında admitted son dilim budur ve bundan SONRAKİ her aktif receipt parent-anchor'a tabidir. DÜRÜST SINIR-2: `owner=` metni hâlâ kriptografik authenticate edilmiyor — ruleset PR-akışını zorunlu kılarak yazar-dışı görünürlük getirir, imzalı-commit/review katmanı RECEIPT-001 kapsamında açık. X `?`: 3-platform koşusu bir sonraki CI turunda; 2026-08-03 X KAPANDI: PR #27 required-check koşusu (run 30846122775) — Validator Contract ubuntu/macos/windows üçü de pass, trust-anchor kodu ve 84-case suite dahil; merge ancak bu 3 bacak + Type Check yeşilken mümkün oldu (ruleset'in kendisi kanıt zincirinin parçası: direct push fiilen reddedildi, akış PR'a döndü); 2026-08-04 XVERIFY-E TUR-2 SONUCU (codex-analysis/xverify-e-2026-08-03.md): REFUTED — özgün 5-adım saldırısı fail-closed DOĞRULANDI (84/84 bağımsız koşum) ama dört mekanik varyant kabul yolu üretti (merge-introduction `-S`'e görünmez, rename anchor'ı ileri taşır, shallow-clone Type Check bacağında WARN-geçiş, blob-okuma hatası ABSENT sanılır) ve iki yapısal sınır adlandı (parent≠reviewed varsayımı, required-check self-modification). Mekanik dörtlünün kapanışı TRUST-ANCHOR-002'dedir; yapısal ikili solo-hesap mitigasyon araştırması sonrası owner kararıyla typed sınır veya iş olarak hükme bağlanacak — bu satır o karara kadar VERIFY'da kalır ve kapanmış SAYILMAZ; 2026-08-06 ARAŞTIRMA (Karar-3): docs/analysis/trust-anchor-solo-research-2026-08-06.md — güncel mitigasyon ölçümü + koltuk-bağımsız Rekor-snapshot önerisi + tamper-evidence dürüst sınırı; `receipt=GR-2026-08-06-DESIGN-DOCS-01`",
-      "updated": "2026-08-06"
-    },
-    {
       "order": 524,
       "id": "VERIFY-HISTORICAL-CLOSURE-001",
       "parent": "P00",
@@ -7106,40 +7072,6 @@
       "updated": "2026-08-04"
     },
     {
-      "order": 530,
-      "id": "CI-COVERAGE-JOB-WALL-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü)",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-COVERAGE-WALL-530-01",
-        "GR-2026-08-05-TREN-E-BASELINE-SUPP-01"
-      ],
-      "acceptance": "Step-cap ölçüm-sonrası-kalibre tavana çekilir (20→45dk; ilk yeşil koşu gerçek süreyi ölçer, tavan gerekirse daraltılır); production-scale test açık 60s timeout alır; Coverage Report yeşile döner veya threshold-gate dürüst sinyal verir",
-      "evidence": "Açılış 2026-08-05: run 31054702920 + gün-içi 8 koşu tarihi; `receipt=GR-2026-08-05-COVERAGE-WALL-530-01`; 2026-08-05 SETTLEMENT: step-cap 20→45dk measure-then-calibrate + scanTestDir production-scale 60s açık timeout; baseline digest supp-receipt'le mekanik tazelendi; `receipt=GR-2026-08-05-TREN-E-BASELINE-SUPP-01`; `proof=peak-rss-996mib-validates-2gib-budget`; kapanış kanıtı merge sonrası main-push Coverage Report'un ilk yeşil (veya dürüst threshold-sinyalli) koşusu — gerçek süre o koşuda ölçülüp tavan gerekirse daraltılır",
-      "updated": "2026-08-05"
-    },
-    {
       "order": 531,
       "id": "CI-COVERAGE-REVEALED-DEBT-001",
       "parent": "P00",
@@ -7158,9 +7090,9 @@
         "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
+        "L": "-",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
@@ -7174,7 +7106,7 @@
         "GR-2026-08-06-COVDEBT-AUDIT-TO-01"
       ],
       "acceptance": "Envanter dosya-aile bazında dilimlenir ve her aile kendi receipt'li treniyle kapanır: chain-safety.e2e 14 (kök İZOLE: fixture'lar literal 'sonnet' + registry'siz provider çözümü — ADR-G-036 kontrat sapması, lokal deterministik repro) · dead-code-decisions 12 · docker-exit-final 6 · sprint-lifecycle.e2e 5 · docker-exit-reproducer 4 · docker-hb 3 · nerv-w1-predicate 2 · sekiz tekli (governance×2, release, build, brain, workflows, docker-timeout, ratchet); her kökte bayat-kontrat/gerçek-bug sınıflandırması yapılır, gerçek-bug üretim-dilimi olur; uzun-vade karar adayı: bu sınıflara hızlı job kapsaması",
-      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et'); 2026-08-06 E2E-AİLE SETTLEMENT: chain-safety.e2e (14) + sprint-lifecycle (5) kırıkları kapandı — registry-öncesi suite'lere minimal default-ProviderAdapter fixture'ı (üretim çözüm-zinciri ve test pinleri değişmedi, model-literal yok); `proof=e2e-pair-27of27-local-deterministic-repro-fixed`; iki suite 27/27, tsc temiz, hermetic-baseline ve stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (14 aile-dosyası açık: dead-code-decisions 12 · docker ailesi 14 · sekiz tekli + nerv 2); `receipt=GR-2026-08-06-COVDEBT-AUDIT-01`; audits-aile admission 2026-08-06 (Alperen: 'dead-code-decisions treniyle devam et'); 2026-08-06 AUDITS-AİLE SETTLEMENT: dead-code-decisions 12 kırık kapandı — sprint-139 audit pinleri docs-reset'in arşiv konumuna hizalandı (içerik/şema pinleri aynen); `proof=audits-suite-18of18-local`; 18/18 + tsc temiz, baseline/stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (13 aile-dosyası açık: docker 14 · nerv 2 · governance 2 · altı tekli); `receipt=GR-2026-08-06-COVDEBT-DOCKER-01`; docker-aile admission 2026-08-06 (blok-plan onayı: 'onaylandı'); 2026-08-06 DOCKER-AİLE SETTLEMENT (fresh owner kararı, -01 revoked → -02): 14 kırık EMEKLİLİKLE kapandı — 4 sprint-144/149 dönemi suite süperseded (kapsama-haritası: stop/termination→budget-termination+restart-reconcile; corrupt-result→capture-truth+exit-marker; EXIT-trap/fsync→exit-marker+work-present-eval; TIMEOUT_WITH_WORK→exit-marker+spurious-nogo; HB→settlement-monitor-wire); `proof=modern-counterparts-62of62-spot-run`; `receipt=GR-2026-08-06-DOCKER-STATS-SUPP-01`; typed gözlem (üretim-dışı-kapsam, ayrı dilim adayı): wrapper şablonunda orphan kill HB_PID satırları + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (doc-drift); satır alt-dilim kuralıyla OPEN'a döner (9 aile-dosyası açık: nerv 2 · governance 2 · beş tekli); `receipt=GR-2026-08-06-COVDEBT-SWEEP-01`; süpürme admission 2026-08-06 (Alperen: '9 dosyayı tekte süpür'); 2026-08-06 SÜPÜRME SETTLEMENT: 9 dosyadan 8'i kapandı (10 kırık) — nerv-w1 fence-fixture'ları, KNOWN_ORPHANS canlı-hiza (+8 tarihli; dördü RECOVERY-modülü wire-or-retire adayı: worker-rollback, sprint-job-runner, cascade-detector, production-wiring-ts-adapter, recovery-notification, cross-verify-admission-policy, run-flow/run-job-recovery-adapter), yaml/xplat/release/readme/docker-backend pin-hizaları, ratchet enstrümante-bütçe (scanConfiguredTestRoots opsiyonel scanBudget, default aynen); `proof=sweep-suites-147-pass-build-free`; 8 suite + ratchet + master-plan-testi build-free yeşil, tsc temiz; typed-remaining TEK kalem: tests/brain/decisions.test.ts ADR-G-039 Context-alanı eksiği — ADR yan-session sahipliğinde, koordinasyonla kapanacak (55-kırık envanterinden geriye YALNIZ bu); satır VERIFY'a geçer — kapanış kanıtı merge sonrası main-push Coverage koşusu; 2026-08-06 EK-GÖRÜNÜM SETTLEMENT: dead-code-audit 3 kırığı (doymuş coverage-runner 120s subprocess duvarı) ölçümlü 360s/420s artışla kapandı; `receipt=GR-2026-08-06-COVDEBT-AUDIT-TO-01`; `proof=measured-runner-saturation-timeout-raise`",
+      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et'); 2026-08-06 E2E-AİLE SETTLEMENT: chain-safety.e2e (14) + sprint-lifecycle (5) kırıkları kapandı — registry-öncesi suite'lere minimal default-ProviderAdapter fixture'ı (üretim çözüm-zinciri ve test pinleri değişmedi, model-literal yok); `proof=e2e-pair-27of27-local-deterministic-repro-fixed`; iki suite 27/27, tsc temiz, hermetic-baseline ve stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (14 aile-dosyası açık: dead-code-decisions 12 · docker ailesi 14 · sekiz tekli + nerv 2); `receipt=GR-2026-08-06-COVDEBT-AUDIT-01`; audits-aile admission 2026-08-06 (Alperen: 'dead-code-decisions treniyle devam et'); 2026-08-06 AUDITS-AİLE SETTLEMENT: dead-code-decisions 12 kırık kapandı — sprint-139 audit pinleri docs-reset'in arşiv konumuna hizalandı (içerik/şema pinleri aynen); `proof=audits-suite-18of18-local`; 18/18 + tsc temiz, baseline/stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (13 aile-dosyası açık: docker 14 · nerv 2 · governance 2 · altı tekli); `receipt=GR-2026-08-06-COVDEBT-DOCKER-01`; docker-aile admission 2026-08-06 (blok-plan onayı: 'onaylandı'); 2026-08-06 DOCKER-AİLE SETTLEMENT (fresh owner kararı, -01 revoked → -02): 14 kırık EMEKLİLİKLE kapandı — 4 sprint-144/149 dönemi suite süperseded (kapsama-haritası: stop/termination→budget-termination+restart-reconcile; corrupt-result→capture-truth+exit-marker; EXIT-trap/fsync→exit-marker+work-present-eval; TIMEOUT_WITH_WORK→exit-marker+spurious-nogo; HB→settlement-monitor-wire); `proof=modern-counterparts-62of62-spot-run`; `receipt=GR-2026-08-06-DOCKER-STATS-SUPP-01`; typed gözlem (üretim-dışı-kapsam, ayrı dilim adayı): wrapper şablonunda orphan kill HB_PID satırları + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (doc-drift); satır alt-dilim kuralıyla OPEN'a döner (9 aile-dosyası açık: nerv 2 · governance 2 · beş tekli); `receipt=GR-2026-08-06-COVDEBT-SWEEP-01`; süpürme admission 2026-08-06 (Alperen: '9 dosyayı tekte süpür'); 2026-08-06 SÜPÜRME SETTLEMENT: 9 dosyadan 8'i kapandı (10 kırık) — nerv-w1 fence-fixture'ları, KNOWN_ORPHANS canlı-hiza (+8 tarihli; dördü RECOVERY-modülü wire-or-retire adayı: worker-rollback, sprint-job-runner, cascade-detector, production-wiring-ts-adapter, recovery-notification, cross-verify-admission-policy, run-flow/run-job-recovery-adapter), yaml/xplat/release/readme/docker-backend pin-hizaları, ratchet enstrümante-bütçe (scanConfiguredTestRoots opsiyonel scanBudget, default aynen); `proof=sweep-suites-147-pass-build-free`; 8 suite + ratchet + master-plan-testi build-free yeşil, tsc temiz; typed-remaining TEK kalem: tests/brain/decisions.test.ts ADR-G-039 Context-alanı eksiği — ADR yan-session sahipliğinde, koordinasyonla kapanacak (55-kırık envanterinden geriye YALNIZ bu); satır VERIFY'a geçer — kapanış kanıtı merge sonrası main-push Coverage koşusu; 2026-08-06 EK-GÖRÜNÜM SETTLEMENT: dead-code-audit 3 kırığı (doymuş coverage-runner 120s subprocess duvarı) ölçümlü 360s/420s artışla kapandı; `receipt=GR-2026-08-06-COVDEBT-AUDIT-TO-01`; `proof=measured-runner-saturation-timeout-raise`; 2026-08-06 HASAT-BULGUSU: Alperen 9-satır onayında bu satır DONE'a alınamadı — çok-aile settlement'ı 5 ayrı proof token'ı biriktirdi (validator tek standalone proof ister) ve evidence'ta aile-envanteri dili çözülmemiş-dil sayılıyor; kapanış için evidence-konsolidasyon dilimi gerekir (tek kanonik proof + settle-edilmiş dil), satır VERIFY'da kalır",
       "updated": "2026-08-06"
     },
     {
@@ -7207,39 +7139,6 @@
       "acceptance": "Kök izole edilir (vitest sürüm/worker-lifecycle); fix veya typed mitigasyonla job-level exit-code test-sonucuyla tutarlı olur; continue-on-error maskesi kaldırılabilir hale gelir",
       "evidence": "Açılış 2026-08-05: Alperen karar-turu 'satır aç, sıraya koy' — 55-kırık (531) ve W3 dilim-3'ten sonra",
       "updated": "2026-08-05"
-    },
-    {
-      "order": 533,
-      "id": "CI-HERMETIC-SCAN-DIST-BLIND-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Hermetic-lint taraması build-duyarlı: built ağaçta import-takibi dist dosyalarına girip analyzer girdisi üretiyor (+71, dist/core/errors.js — run 31074633586 kesin ölçüm; script başlığındaki 'baselines BUILD-FREE ölçülür' operasyon-yükünün kökü) — Coverage job'u build:all yaptığından ratchet testi yalnız orada düşüyor",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-06-SCAN-DISTBLIND-533-01"
-      ],
-      "acceptance": "resolveLocalSupportImport build-output köklerini deterministik sınıflar (iki ağaçta birebir aynı registry); ratchet Coverage-job'unda da yeşil; baseline-tazeleme için dist-stash dansı gereksizleşir",
-      "evidence": "Açılış 2026-08-06: run 31074633586 log-izolasyonu + dist'li/dist'siz registry diff'i (kaynak kesin: dist/core/errors.js 71 + provider-packages 1); script başlık-notundaki açık MASTER-kalemi satırlaştı; `receipt=GR-2026-08-06-SCAN-DISTBLIND-533-01`; 2026-08-06 SETTLEMENT: resolveLocalSupportImport build-output kökleri deterministik-dışlar; `proof=identical-baselines-built-and-buildfree-trees`; tam lint dist'li VE dist'siz aynı baseline'larla yeşil (12478+1197), ratchet+hermeticity suite'leri dist mevcutken 158/158, tsc temiz; stash-dansı gereksizleşti; kapanış kanıtı merge sonrası Coverage-job'unda ratchet yeşili",
-      "updated": "2026-08-06"
     },
     {
       "order": 534,
@@ -7282,107 +7181,6 @@
       ],
       "acceptance": "Onay ve settlement kayıtları owner-approved immutable external ledger'a bağlanır; MASTER'daki receipt register'ı onun projection'ı olur; Git trust-anchor zinciri commit-bound doğrulanır",
       "evidence": "Açılış 2026-08-06: SSOT-003 bölmesinden doğdu (MASTER §3.3 — residual child'a taşınır; Alperen G1 onayı, karar-turu); taşınan evidence-cümlesi bu satırın outcome'udur; `receipt=GR-2026-08-06-SSOT-SPLIT-01`",
-      "updated": "2026-08-06"
-    },
-    {
-      "order": 535,
-      "id": "CI-ACTIONS-ECONOMY-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "CI kaynak-ekonomisi yapısal düzenleme: her tren 3 tam-koşu tetikliyor (PR+merge_group+main-push ×2 workflow; günde ~35+35 koşu ölçüldü), merge-queue TÜM ci.yml'i koşuyor, Coverage (21-40dk) her merge'de, macos-ağır xplat job'ları her PR'da — repo PUBLIC olduğundan maliyet dakika-faturası değil duvar-saat + eşzamanlılık-kuyruğu + sinyal-gürültüsü",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-06-ACTIONS-ECON-535-01",
-        "GR-2026-08-06-CIWF-PIN-SUPP-01"
-      ],
-      "acceptance": "Coverage schedule+dispatch'e taşınır (release-gate korunur); merge_group yalnız required'ları koşar; macos-ağır job'lar main-push+dispatch'e alınır (tren-dalı kanıtı açık dispatch'le); workflow-pin testleri hizalanır; tren duvar-saati ölçülebilir düşer",
-      "evidence": "Açılış 2026-08-06: Alperen 'actions ekonomisi çok kritik' + 3-kalem paket onayı; ölçüm: son 3 gün koşu-sayıları + merge-queue tam-koşu tespiti; `receipt=GR-2026-08-06-ACTIONS-ECON-535-01`; 2026-08-06 SETTLEMENT: coverage.yml (schedule+dispatch) ayrıldı, merge_group required-daraltması (ci: Type Check; xplat: Validator Contract), macos-ağır job'lar main-push+dispatch'e; pin testleri 54/54 + governance 144/144 değişimsiz yeşil; `proof=pin-suites-green-post-restructure`; kapanış kanıtı ilk kuyruk-merge'ünün daralmış koşusu + gece coverage koşusu; 2026-08-06 EK-YOLCU: ci-workflow.test Coverage pinleri coverage.yml'e retarget (kaçan pin run 31078564928'de yakalandı; github sınıfı 163/163); `receipt=GR-2026-08-06-CIWF-PIN-SUPP-01`",
-      "updated": "2026-08-06"
-    },
-    {
-      "order": 536,
-      "id": "ADR-BACKFILL-G039-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "ADR-G-039 (2026-07-23 03:46, provider-authority key-custody) kaydının eksik Context bölümü ve 'To be backfilled' Sprint alanı — Coverage duvarı kalkınca decisions format-testi görünür kıldı (55-kırık envanterinin son kalemi)",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G4",
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-06-ADR39-CTX-536-01"
-      ],
-      "acceptance": "Onaylı Context metni + Sprint backfill'i G4 prosedürüyle (backup-hash + transactional UPDATE + export regen) uygulanır; decisions format-testi yeşil; audit-hmac yeniden-hesaplanmama kararı typed kayıtlıdır",
-      "evidence": "Açılış 2026-08-06: karar-turu — Alperen Context metnini onayladı; provenance: memory.db entries kaydı 2026-07-23T03:46:30; `receipt=GR-2026-08-06-ADR39-CTX-536-01`; 2026-08-06 SETTLEMENT (G4): backup sha256=04b22406f296c59388e4f0164a2108c63f4c67ea4b25670fe6e2521e7bc59663 (.bak-manual-1785998594029, 1764 giriş) → tek-entry transactional UPDATE → export regen → decisions format-testi 12/12; `proof=decisions-format-suite-12of12-green`; 55-kırık envanterinin son kalemi kapandı; typed not: entry audit-hmac yeniden hesaplanmadı (AUDIT-001 unwired, 4200 disposition sınıfı kayıtlı)",
-      "updated": "2026-08-06"
-    },
-    {
-      "order": 537,
-      "id": "DOCKER-WRAPPER-HYGIENE-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Wrapper şablonunda HB_PID hiçbir yerde set edilmeden 3 yerde kill ediliyor (no-op ölü satırlar) + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (531 docker-emekliliği typed gözlemi)",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-06-WRAPPER-HYG-537-01"
-      ],
-      "acceptance": "Ölü satırlar kalkar, docstring seam-gerçeğini anlatır; davranış-değişimsiz (allowlist pinleri + docker suite'leri yeşil)",
-      "evidence": "Açılış 2026-08-06: 531 DOCKER-AİLE settlement gözleminin satırlaşması; `receipt=GR-2026-08-06-WRAPPER-HYG-537-01`; 2026-08-06 SETTLEMENT: 3 ölü satır kalktı, docstring seam-gerçeğinde; `proof=allowlist-and-docker-suites-60of60`; davranış-değişimsiz",
       "updated": "2026-08-06"
     },
     {
@@ -11211,8 +11009,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "KERNEL-ONTOLOGY-001",
-        "RUN-STATUS-AUTHORITY-001"
+        "KERNEL-ONTOLOGY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-FILE-LOCK-01",
@@ -11222,53 +11019,6 @@
       "acceptance": "CAS, transactions, schema migration, bounded reconciliation and no file RMW race",
       "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; execution-lock v3 uses project/lock-directory generation anchors, SQLite `BEGIN IMMEDIATE`, monotonic fencing, exact projection compensation/reconciliation, atomic v2 quarantine migration and 256-row keyset pages for active, migration, live quarantine and audit scans; persistent anchor authority now binds stable `dev+ino` generations because Linux mount IDs are namespace-local, while exact mount-ID checks remain on every in-process pinned descriptor/path validation; optional dry-run-first CLI/MCP metadata reconciliation never changes authority or epoch and writes a redacted immutable audit only under operator+justification apply authority; targeted core/CLI/MCP proof passes 59/59, integrated clean/fence proof passes 102/102 and the real build passes; this proves the Linux/WSL execution-lock and clean slice only—Goal-v2, RunFlow, CLI/REPL, sprint and ScheduledFlow remain competing authorities, native macOS/Windows adapters and live/HA scale evidence remain open; fresh cross-provider verification was not executed in this provider-free recovery and is not claimed; `receipt=GR-2026-08-04-MOUNT-BINDING-01`; 2026-08-04 MOUNT-BINDING settlement: B6 guard'ının TRUE-POSITIVE yakalayışı üretimde düzeltildi — adoptExecutionLockAuthorityMount(apply) artık parent-dizin root-binding kopyasını da aynı adoptedAnchorRaw ile atomik yeniler (62aafff34'ten beri eksikti; mount-adoption uçtan uca kırıktı, sonraki her acquire byte-eşitlikte kalıcı fail-closed oluyordu); fence suite 51/51, fix'siz kırmızı fix'le yeşil; ayrıca simulateExecutionAuthorityRemount fixture'ı gerçek-remount sadakatine (anchor+binding birlikte) çekildi",
       "updated": "2026-08-04"
-    },
-    {
-      "order": 3021,
-      "id": "RUN-STATUS-AUTHORITY-001",
-      "parent": "KERNEL-STATE-001",
-      "program": "KERNEL",
-      "outcome": "Canonical sprint runtime status authority and stale-state reconciliation",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "PAUSED-FINALIZE-001",
-        "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
-        "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
-        "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001",
-        "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
-        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
-        "RECOVERY-BORN-488-STATUS-PROJECTION-001",
-        "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
-        "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001",
-        "RECOVERY-RESUME-001",
-        "STATUS-SURFACE-PARITY-001"
-      ],
-      "children": [
-        "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001"
-      ],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "-",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
-      ],
-      "acceptance": "One resolver distinguishes IDLE, ACTIVE, PAUSED, ORPHANED, COMPLETE and ABORTED from durable PID, checkpoint, pause and terminal evidence without a surface-owned competing state machine",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=run-status-authority-targeted-and-binary`; Sprint-483 exposed a closure-window contradiction between canonical `FIX/FIXING` and presentation `RETRO/RETROSPECTIVE` plus impossible `4/3` progress. Recovery now projects human, JSON and watch status through one canonical authority snapshot, bounds every progress bucket by total and exposes normalization metadata while retaining raw mode as an explicit diagnostic. Source-process status contracts pass 8/8 with deterministic OS-backed stdio capture. Item remains OPEN for native macOS/Windows, multi-process contention, scale and a fresh live closure-window replay; 2026-08-06 MAKİNE-BULGUSU (DONE-flip denemesi validator-vetolu): satır AGGREGATE-PARENT — açık çocuğu RECOVERY-BORN-485-TERMINAL-PUBLICATION-001 kapanmadan DONE olamaz (X-yorumu tartışması ikincil; Alperen'in 'X typed-açık' hükmü çocuk kapanınca uygulanacak); 35-iş kaskadının gerçek kilidi 485-TERMINAL-PUBLICATION dilimidir; 2026-08-06 KASKAD-TURU: aggregate-çocuk 3195 kapandı ve veto düştü; satır OPEN→VERIFY'a alınır (OPEN→DONE makine-yasak — durum-makinesi ara-adım ister), DONE-onayı bir sonraki turda uygulanır; `proof=run-status-authority-targeted-and-binary`; X typed-açık (status-suite matrisi yalnız ubuntu'da declare edilmiş; W4 windows-matrisine bağlı) ve not-applicable kodlanır; 35-iş kaskadı ile 6121 STATUS-SURFACE-PARITY yolu açılır",
-      "updated": "2026-08-06"
     },
     {
       "order": 3030,
@@ -11938,9 +11688,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "RUN-STATUS-AUTHORITY-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01",
         "GR-2026-08-04-FAZ4A-S3-01"
@@ -11980,9 +11728,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "RUN-STATUS-AUTHORITY-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-07-30-RECOVERY-RESIDUALS-01"
       ],
@@ -12889,7 +12635,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RUN-STATUS-AUTHORITY-001",
         "RECOVERY-STALE-PROJECTION-001",
         "RUNFLOW-001"
       ],
@@ -13955,9 +13700,9 @@
         "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
-        "X": "0",
-        "S": "?"
+        "L": "-",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
@@ -13966,8 +13711,8 @@
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "Temporary or partial result artifacts never become terminal truth; collector rereads the canonical result and emits typed malformed recovery without double settlement",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=result-reconciliation-targeted`; settlement-authority and result-collector tests pass against the observed sprint-475 artifact class; a fresh live sprint replay and every-filesystem atomicity matrix remain unproven; 2026-08-03 ölçüm (PAZARTESI P1): durable-yazım authority kümesi 211 kırık / 19 dosya. Üç halka aynı desende kırılıyor: atomik yazım (writeFileSync temp → renameSync → readFileSync geri-okuma doğrulaması), finalizer terminal-evidence/receipt cleanup-uygunluğu ve worker-heartbeat-authority identity şeması. İki yaklaşım denendi ve YETMEDİ: (a) eksik mock export'larını eklemek hata imzasını değiştirdi, sayıyı değiştirmedi; (b) sahte fs'e bellek katmanı (write→rename→read turu) sprint-finalizer'da 38 kırığı hiç azaltmadı ve geri alındı. Doğru yaklaşım muhtemelen mock değil gerçek tmpdir izolasyonu. Kanıtlamadığı: bu kapanış FAZ 4a ile AYNI dilimde yapılmalı, ayrı bir test-düzeltme işi değildir; 2026-08-03 FAZ4A-S1 ölçüm settlement'ı (Fable): S1 planlandığı şekliyle KOŞULMADI çünkü halka zaten kanıtlanabilir sınırına settle olmuş — result-collector suite 27/27 yeşil, result-ailesi test-failure-baseline'da SIFIR kayıt, malformed sınıfı gözlemlenen 475-artifact sınıfına karşı kapsanıyor. Planın ~15 kırık tahmini yanlıştı: atomik-yazım halkasının borcu ayrı bir collector kümesinde değil, S2/S3 kümelerinin (finalizer 63 · controller/pause-resume 95+) İÇİNDE yaşıyor — S2 ölçümü bunu doğruladı: 31 kırık fs-mock'unda renameSync yokluğundan (üretim atomik temp→rename yoluna geçmiş, test mock'u geride kalmış), 7'si TERMINAL_EVIDENCE_HOLD'dan (fixture'lar projectLogicalProgress veri sözleşmesini taşımıyor). Ham replay artifact'ı iddiası da düzeltildi: .tasks/archive/sprint-491 yalnız prompt+worker-script taşıyor, ham .result YOK — L boyutunun kapanış yeri gerçek koşu, yani 4b merdiveni basamak-4; S1 için iş uydurulmadı (negative-space). S1 receipt'i MINT EDİLMEDİ — mutation olmayan ölçüm turu admission istemez",
-      "updated": "2026-08-03"
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=result-reconciliation-targeted`; settlement-authority and result-collector tests pass against the observed sprint-475 artifact class; a fresh live sprint replay and every-filesystem atomicity matrix remain unproven; 2026-08-03 ölçüm (PAZARTESI P1): durable-yazım authority kümesi 211 kırık / 19 dosya. Üç halka aynı desende kırılıyor: atomik yazım (writeFileSync temp → renameSync → readFileSync geri-okuma doğrulaması), finalizer terminal-evidence/receipt cleanup-uygunluğu ve worker-heartbeat-authority identity şeması. İki yaklaşım denendi ve YETMEDİ: (a) eksik mock export'larını eklemek hata imzasını değiştirdi, sayıyı değiştirmedi; (b) sahte fs'e bellek katmanı (write→rename→read turu) sprint-finalizer'da 38 kırığı hiç azaltmadı ve geri alındı. Doğru yaklaşım muhtemelen mock değil gerçek tmpdir izolasyonu. Kanıtlamadığı: bu kapanış FAZ 4a ile AYNI dilimde yapılmalı, ayrı bir test-düzeltme işi değildir; 2026-08-03 FAZ4A-S1 ölçüm settlement'ı (Fable): S1 planlandığı şekliyle KOŞULMADI çünkü halka zaten kanıtlanabilir sınırına settle olmuş — result-collector suite 27/27 yeşil, result-ailesi test-failure-baseline'da SIFIR kayıt, malformed sınıfı gözlemlenen 475-artifact sınıfına karşı kapsanıyor. Planın ~15 kırık tahmini yanlıştı: atomik-yazım halkasının borcu ayrı bir collector kümesinde değil, S2/S3 kümelerinin (finalizer 63 · controller/pause-resume 95+) İÇİNDE yaşıyor — S2 ölçümü bunu doğruladı: 31 kırık fs-mock'unda renameSync yokluğundan (üretim atomik temp→rename yoluna geçmiş, test mock'u geride kalmış), 7'si TERMINAL_EVIDENCE_HOLD'dan (fixture'lar projectLogicalProgress veri sözleşmesini taşımıyor). Ham replay artifact'ı iddiası da düzeltildi: .tasks/archive/sprint-491 yalnız prompt+worker-script taşıyor, ham .result YOK — L boyutunun kapanış yeri gerçek koşu, yani 4b merdiveni basamak-4; S1 için iş uydurulmadı (negative-space). S1 receipt'i MINT EDİLMEDİ — mutation olmayan ölçüm turu admission istemez; 2026-08-06 HASAT-BULGUSU: Alperen 9-satır onayında bu satır DONE'a alınamadı — evidence'ta çözülmemiş-dil ve birden çok proof token'ı var; kapanış için evidence-konsolidasyon dilimi gerekir (tek kanonik proof + settle-edilmiş dil), satır VERIFY'da kalır",
+      "updated": "2026-08-06"
     },
     {
       "order": 3270,
@@ -14041,7 +13786,6 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "RECOVERY-COMMAND-SERVICE-001",
-        "RUN-STATUS-AUTHORITY-001",
         "RESULT-RECONCILIATION-001"
       ],
       "evidenceReceipts": [
@@ -14313,8 +14057,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
-        "RUN-STATUS-AUTHORITY-001"
+        "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "`npm run clean` returns a non-zero typed HOLD when active task/worker authority exists, so `npm run build` cannot terminate early with exit 0 while skipping TypeScript compilation and asset publication",
@@ -14350,8 +14093,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
-        "RUN-STATUS-AUTHORITY-001"
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Cleanup never routes landing proposals, partial results or temp residue as executable Task records; terminal cleanup removes only the settled sprint's process-suffixed residue and preserves foreign-run evidence",
@@ -14731,7 +14473,6 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "PAUSED-FINALIZE-001",
-        "RUN-STATUS-AUTHORITY-001",
         "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001"
       ],
       "evidenceReceipts": [
@@ -14775,7 +14516,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RUN-STATUS-AUTHORITY-001",
         "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
         "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
         "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
@@ -14860,8 +14600,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PROVIDER-HOLD-001",
-        "RUN-STATUS-AUTHORITY-001"
+        "PROVIDER-HOLD-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "COMPLETE and cleanup reconcile every interval owned by the exact run/attempt generation; foreign or historical intervals remain forensic but do not impose an admission HOLD on an unrelated IDLE/current run; reconciliation is idempotent and tenant/provider-principal fenced",
@@ -14899,8 +14638,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RESULT-RECONCILIATION-001",
-        "RUN-STATUS-AUTHORITY-001"
+        "RESULT-RECONCILIATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Controller tests use complete atomic-filesystem/provider-observation mocks and exact attempt attribution fixtures; pause/resume and finalizer assertions exercise current fail-closed authority without weakening production receipt or status publication",
@@ -17696,50 +17434,12 @@
         "DESKTOP-REBORN-001",
         "API-CONTRACT-001",
         "CONNECTOR-IDENTITY-001",
-        "DASHBOARD-OBS-001",
-        "STATUS-SURFACE-PARITY-001"
+        "DASHBOARD-OBS-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Each use case names canonical service, supported surfaces and reasoned exclusions",
       "evidence": "2026-07-27 code-truth: start/approve/cancel/status/review/finalize/cleanup/resume semantics CLI, MCP, API, Terminal ve Desktop arasında farklı; dashboard read-only intentional negative-space",
       "updated": "2026-07-27"
-    },
-    {
-      "order": 6121,
-      "id": "STATUS-SURFACE-PARITY-001",
-      "parent": "SURFACE-PARITY-001",
-      "program": "PRODUCT",
-      "outcome": "CLI and MCP consume the same canonical sprint status projection",
-      "priority": "P0",
-      "dependsOn": [
-        "RUN-STATUS-AUTHORITY-001"
-      ],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "0",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [
-        "RUN-STATUS-AUTHORITY-001"
-      ],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
-      ],
-      "acceptance": "CLI text/JSON and MCP status expose equivalent state, resumability and pending recovery approval without either adapter inferring lifecycle independently",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED; 2026-08-03 ölçüm (PAZARTESI P4): MCP paketi 121 → 70 kırık. CLI ile AYNI kök: deckent_status tool'u canlı run authority ve canonical persisted read model olmadan zengin projeksiyon alanlarını üretmiyor, HOLD payload'u dönüyor (src/mcp/tools/status.ts:392-411). status-history 15 → 0, status-rich 14 → 3. Bu, CLI↔MCP'nin gerçekten aynı canonical projection'ı tükettiğinin kanıtıdır; 2026-08-03 P0→P1 indirimi 2026-08-03 xverify turunda GERİ ALINDI (Alperen onayı, codex-analysis/xverify-wp0-2026-08-03.md C-ekseni): indirim gerekçem \"dependents=0 → critical path değil\" idi ve YANLIŞTI — codex-analysis/14-critical-path-prioritization.md Gate-1 CLI/MCP drift closure'ı açıkça declared critical path'e koyar ve PAZARTESI P4'ü FAZ-4 öncesi kritik yolda tutar; graph-dependent sayısı declared release/admission path kararını çürütemez. P0 geri geldi; 2026-08-05 TAZE PARİTE ÖLÇÜMÜ: 08-03'teki 70-kırık MCP ölçümü FAZ4B-öncesi dünyaya aitti — MCP sınıfı FAZ4B-B1'de tamamen sıfırlandı (1031/1031); bugünkü hedefli parite-çekirdeği koşusu (cli status-json-contract + status-read-model-wire + commands/status + mcp status-failed-tasks + status-terminal-receipt) 55 pass / 8 skip YEŞİL; DONE'u bloklayan tek şey dependency-DAG kuralı (RUN-STATUS-AUTHORITY-001 OPEN) + API/Terminal/Desktop/connector residual'ları",
-      "updated": "2026-08-05"
     },
     {
       "order": 6130,
@@ -19968,6 +19668,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "df7e7d07e2479e34963a9f70fe31d2eb9b26d8720eb53fa8209edb4a321701c3"
+    "value": "7a29cf2c67431e18d2b66b620de3271ecde054b39ceaa4b3152d51f80a25b81c"
   }
 }
