@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):90d97c7f733297ec81e6a7a39605b60bbe77d7eedeedb14fb2a57bac5a6f392c`
+**Source digest:** `sha256(normalized-lf-utf8):b6e28474fd57afa9f49cbd46dcbf03377b9ec889e5f8085287400e8ad63533e2`
 
-**Rows:** 388 total · 354 active · 34 terminal
+**Rows:** 388 total · 353 active · 35 terminal
 
 ## State summary
 
@@ -17,8 +17,8 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 29 |
-| DONE | 34 |
+| VERIFY | 28 |
+| DONE | 35 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -241,7 +241,6 @@
 | 3275 | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001`, `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001` | — | Built-binary verification is scheduled only after terminal settlement |
 | 3276 | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001` | OPEN | P1 | KERNEL | `BUDGET-CONTINUATION-001`, `RESULT-RECONCILIATION-001` | — | Worker landing proposals use a structured atomic writer and malformed evidence cannot pass silently |
 | 3277 | `RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001` | OPEN | P1 | ASSURANCE | `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001`, `PRODUCTION-WIRING-AUTHORITY-001` | — | Worker verification cannot judge unrelated concurrent partial writes |
-| 3278 | `RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001` | VERIFY | P0 | KERNEL | — | — | A held terminal receipt can never publish a successful job or COMPLETE authority |
 | 3279 | `RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RUN-STATUS-AUTHORITY-001` | — | Build cannot report success when clean is held by active execution authority |
 | 3280 | `RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001` | VERIFY | P0 | KERNEL | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001`, `RUN-STATUS-AUTHORITY-001` | — | Cleanup consumes canonical task identity and retires only owned temporary residue |
 | 3282 | `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001`, `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | — | Logical task lineage has one causal settlement authority across original, FIX and XFIX attempts |
