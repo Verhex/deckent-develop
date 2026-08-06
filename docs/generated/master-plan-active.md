@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):8c4fdbd1a00cdf82eca3a28464e9f991c2f0edb2a2122e9b1e1e00a4cb372e40`
+**Source digest:** `sha256(normalized-lf-utf8):01bf0b76aa367de7098265517fabdd9c874d8b1be6a06bc6fa43c2c3c9c3c2d6`
 
 **Rows:** 383 total · 351 active · 32 terminal
 
@@ -13,8 +13,8 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 260 |
-| READY | 0 |
+| OPEN | 259 |
+| READY | 1 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
 | VERIFY | 24 |
@@ -82,7 +82,7 @@
 | 524 | `VERIFY-HISTORICAL-CLOSURE-001` | OPEN | P2 | TRUTH | — | — | Historical-only VERIFY satırlarının (10 adet) receipt-gated kapanış dilimi: her satır için kanıt-durumu tiplenir (yeniden-doğrulanabilir / historical-yeterli / eksik-kanıt) ve kapanış turu Alperen onayıyla koşulur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 530 | `CI-COVERAGE-JOB-WALL-001` | VERIFY | P1 | TRUTH | — | — | Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü) |
-| 531 | `CI-COVERAGE-REVEALED-DEBT-001` | OPEN | P1 | TRUTH | — | — | 530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık |
+| 531 | `CI-COVERAGE-REVEALED-DEBT-001` | READY | P1 | TRUTH | — | — | 530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık |
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |

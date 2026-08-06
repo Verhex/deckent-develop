@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8c4fdbd1a00cdf82eca3a28464e9f991c2f0edb2a2122e9b1e1e00a4cb372e40"
+    "value": "01bf0b76aa367de7098265517fabdd9c874d8b1be6a06bc6fa43c2c3c9c3c2d6"
   },
   "summary": {
     "total": 383,
     "active": 351,
     "terminal": 32,
-    "receipts": 64,
+    "receipts": 65,
     "byState": {
-      "OPEN": 260,
-      "READY": 0,
+      "OPEN": 259,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 24,
@@ -872,10 +872,10 @@
       "id": "CI-COVERAGE-REVEALED-DEBT-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-08-05",
+      "state": "READY",
+      "updated": "2026-08-06",
       "definitionDigest": "4382b84e1cf52ef6f85aef6c1805ccbd36ac0a031c2557d3f96596ab72aeaa66",
-      "progressDigest": "b096fda4c48a1cdd1ead4333e8dadf243b450a401fb3c5f0e790af75a35cd304",
+      "progressDigest": "fad0cc83408cc96f7f6ab14dc4ea02082f5ac68d0b90cbd3f1f4b45947a7ccd3",
       "terminalClosureDigest": null
     },
     {
@@ -4918,6 +4918,16 @@
         "transitionAt": "2026-08-05T23:31:51Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-COVDEBT-E2E-01",
+      "authorityDigest": "06e881d9302895b981ad012c55fe8f50884779c395138a2d49a5c653d8e17bfd",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6966,7 +6976,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "1",
         "W": "0",
@@ -6979,10 +6989,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-COVDEBT-E2E-01"
+      ],
       "acceptance": "Envanter dosya-aile bazında dilimlenir ve her aile kendi receipt'li treniyle kapanır: chain-safety.e2e 14 (kök İZOLE: fixture'lar literal 'sonnet' + registry'siz provider çözümü — ADR-G-036 kontrat sapması, lokal deterministik repro) · dead-code-decisions 12 · docker-exit-final 6 · sprint-lifecycle.e2e 5 · docker-exit-reproducer 4 · docker-hb 3 · nerv-w1-predicate 2 · sekiz tekli (governance×2, release, build, brain, workflows, docker-timeout, ratchet); her kökte bayat-kontrat/gerçek-bug sınıflandırması yapılır, gerçek-bug üretim-dilimi olur; uzun-vade karar adayı: bu sınıflara hızlı job kapsaması",
-      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro)",
-      "updated": "2026-08-05"
+      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et')",
+      "updated": "2026-08-06"
     },
     {
       "order": 532,
@@ -19675,6 +19687,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "68a52288c33a4f961ba9108bfa3bb00787e7421c036f7201dd7b8c9b2bcc21ed"
+    "value": "8cc1760acf922ce1d0d311367e44e6adbe40cd0b46c1b3bf8b0b2968f5a3db6b"
   }
 }
