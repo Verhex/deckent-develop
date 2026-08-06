@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "943695f8e6a6a212a9cd21b55100f7c139336a13fab72237988cd4b7d57c8643"
+    "value": "47fae8efcf016be128bcb34b7e3ae8f1694ed369f9c208e7dc0de65b8efc847b"
   },
   "summary": {
     "total": 388,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 258,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 28,
+      "VERIFY": 29,
       "DONE": 34,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -938,10 +938,10 @@
       "id": "DOCKER-WRAPPER-HYGIENE-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "e6230fc41345dabe30204030b8f4d0b39d82385e09b9b05099ae0167faf9d5bd",
-      "progressDigest": "6bca8491955599677b6cb9382182220f4ca980b4d49e1846be0dfb6ba242323d",
+      "progressDigest": "343cc86f8aab35ed7bf8f915a21653a3cf4c999d6517590c99045792ab18fd58",
       "terminalClosureDigest": null
     },
     {
@@ -5149,8 +5149,8 @@
       "authorityDigest": "36ebb57d4b336a884e43145b76b6a656363efd3a374c7bdc7f1d5daa52614e7a",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-06T08:40:07Z"
       },
       "g7AttemptIdentity": null
     }
@@ -7315,12 +7315,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -7332,7 +7332,7 @@
         "GR-2026-08-06-WRAPPER-HYG-537-01"
       ],
       "acceptance": "Ölü satırlar kalkar, docstring seam-gerçeğini anlatır; davranış-değişimsiz (allowlist pinleri + docker suite'leri yeşil)",
-      "evidence": "Açılış 2026-08-06: 531 DOCKER-AİLE settlement gözleminin satırlaşması; `receipt=GR-2026-08-06-WRAPPER-HYG-537-01`",
+      "evidence": "Açılış 2026-08-06: 531 DOCKER-AİLE settlement gözleminin satırlaşması; `receipt=GR-2026-08-06-WRAPPER-HYG-537-01`; 2026-08-06 SETTLEMENT: 3 ölü satır kalktı, docstring seam-gerçeğinde; `proof=allowlist-and-docker-suites-60of60`; davranış-değişimsiz",
       "updated": "2026-08-06"
     },
     {
@@ -19993,6 +19993,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "64fac2913bc49cc40d5bec9d0f1a6c59ed906d4e228eaba6f882ca923df621e1"
+    "value": "5a7f00ff674dbdd8c75df43fbaca4033eab45868d7bc28644f14472e269110d3"
   }
 }
