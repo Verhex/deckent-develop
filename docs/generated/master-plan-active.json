@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "164553ac6431bca67114b47d87fff45a867e1fd435ab763ce7dd8d2e787dc3d0"
+    "value": "882ca3049531629b8561d780936f957b6506f37b690dcca543a0f012ad8bbc4e"
   },
   "summary": {
     "total": 387,
@@ -919,7 +919,7 @@
       "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "4a5c83a4702307efc41649b52542d1f20bf5219d2dfb3c74f63ea0335428a9ce",
-      "progressDigest": "b300db022d43b1af76359565f77cc329454e4846184039a4649301d9f042ec58",
+      "progressDigest": "9ebfb01c39b45d65a25c69b7264aea73cdd4e3535a2c4d5eefbd6e0d58cb48d0",
       "terminalClosureDigest": null
     },
     {
@@ -5088,8 +5088,8 @@
       "authorityDigest": "a4292dc5f6f0e8ad10150e39fa4aed990342f6652fb01a4e09d3057191ffdfe9",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-06T06:59:03Z"
       },
       "g7AttemptIdentity": null
     }
@@ -7231,10 +7231,11 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-06-ACTIONS-ECON-535-01"
+        "GR-2026-08-06-ACTIONS-ECON-535-01",
+        "GR-2026-08-06-CIWF-PIN-SUPP-01"
       ],
       "acceptance": "Coverage schedule+dispatch'e taşınır (release-gate korunur); merge_group yalnız required'ları koşar; macos-ağır job'lar main-push+dispatch'e alınır (tren-dalı kanıtı açık dispatch'le); workflow-pin testleri hizalanır; tren duvar-saati ölçülebilir düşer",
-      "evidence": "Açılış 2026-08-06: Alperen 'actions ekonomisi çok kritik' + 3-kalem paket onayı; ölçüm: son 3 gün koşu-sayıları + merge-queue tam-koşu tespiti; `receipt=GR-2026-08-06-ACTIONS-ECON-535-01`; 2026-08-06 SETTLEMENT: coverage.yml (schedule+dispatch) ayrıldı, merge_group required-daraltması (ci: Type Check; xplat: Validator Contract), macos-ağır job'lar main-push+dispatch'e; pin testleri 54/54 + governance 144/144 değişimsiz yeşil; `proof=pin-suites-green-post-restructure`; kapanış kanıtı ilk kuyruk-merge'ünün daralmış koşusu + gece coverage koşusu",
+      "evidence": "Açılış 2026-08-06: Alperen 'actions ekonomisi çok kritik' + 3-kalem paket onayı; ölçüm: son 3 gün koşu-sayıları + merge-queue tam-koşu tespiti; `receipt=GR-2026-08-06-ACTIONS-ECON-535-01`; 2026-08-06 SETTLEMENT: coverage.yml (schedule+dispatch) ayrıldı, merge_group required-daraltması (ci: Type Check; xplat: Validator Contract), macos-ağır job'lar main-push+dispatch'e; pin testleri 54/54 + governance 144/144 değişimsiz yeşil; `proof=pin-suites-green-post-restructure`; kapanış kanıtı ilk kuyruk-merge'ünün daralmış koşusu + gece coverage koşusu; 2026-08-06 EK-YOLCU: ci-workflow.test Coverage pinleri coverage.yml'e retarget (kaçan pin run 31078564928'de yakalandı; github sınıfı 163/163); `receipt=GR-2026-08-06-CIWF-PIN-SUPP-01`",
       "updated": "2026-08-06"
     },
     {
@@ -19927,6 +19928,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "23fb15d51c916793fe32d481b2c64b4d730969bcb665ccd5c207d0f1f3ce7b8b"
+    "value": "793cc53c24596e101c4dd235f80339e4b10b6945420bc8c00338d6da96e1a90f"
   }
 }
