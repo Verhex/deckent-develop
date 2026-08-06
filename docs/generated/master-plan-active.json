@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "4190037c7d5030d977278224860c971c7d47ccffcd0acaff1dd9204fb971d04e"
+    "value": "5d83f5f95efe010ce667aea74918b367dc8307602a2a6fb72e5ec75e29033f81"
   },
   "summary": {
     "total": 383,
     "active": 351,
     "terminal": 32,
-    "receipts": 67,
+    "receipts": 68,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -4942,6 +4942,16 @@
     {
       "id": "GR-2026-08-06-COVDEBT-DOCKER-01",
       "authorityDigest": "e14a79ec8a3b8e82d5cbc984d3596d48b1df90d8b89924e15a65575a8cb5d51c",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "revoked",
+        "transitionAt": "2026-08-06T05:00:04Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-COVDEBT-DOCKER-02",
+      "authorityDigest": "0b293bbdd28e61e0650254ccc8bbfa581ca26bfd25feeca8395e7b183305a830",
       "lifecycle": {
         "mode": "ONE_SHOT",
         "status": "active",
@@ -19709,6 +19719,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "55aeabd8dccb8144e1f7b052840b39446123233f66f4af72630f62e61edb9b6b"
+    "value": "fd9696a752ccd3b684e7e357f1dfd0988d456351bebabda52b8dd504d405db37"
   }
 }
