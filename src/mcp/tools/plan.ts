@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+// PRINCIPAL-001 P1a: MCP stdio runs as the real host OS user — record that
+// identity instead of the old synthetic 'mcp-operator' literal.
+import { principalToActor, resolveLocalOsPrincipal } from '../../core/principal.js';
 import { basename } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -89,14 +92,14 @@ export function registerPlanTool(server: McpServer): void {
           flowId,
           tenant: 'local',
           project: projectName,
-          actor: { id: 'mcp-operator' },
+          actor: principalToActor(resolveLocalOsPrincipal('mcp')),
           origin: 'mcp',
           revision,
           intentSummary: heading || projectName,
         },
         lineage: {
           tenantId: 'local',
-          actor: { id: 'mcp-operator' },
+          actor: principalToActor(resolveLocalOsPrincipal('mcp')),
           origin: 'mcp',
           correlationId: flowId,
           idempotencyKey: `plan:${flowId}:r${revision}`,
@@ -113,7 +116,7 @@ export function registerPlanTool(server: McpServer): void {
         ...(input.approve === true
           ? {
               approval: {
-                actor: { id: 'mcp-operator' },
+                actor: principalToActor(resolveLocalOsPrincipal('mcp')),
                 ...(input.acknowledgeScopePaths === true
                   ? { acknowledgeScopePaths: true }
                   : {}),

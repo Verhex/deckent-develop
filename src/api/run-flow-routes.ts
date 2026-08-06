@@ -85,6 +85,25 @@ import { deriveRequestPrincipal } from './auth-me-endpoint.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 import { preflightApiBrainProviderAuthority } from './provider-authority-ingress.js';
 
+// PRINCIPAL-001 P1a: the API principal's provenance rides into the actor —
+// authorization can now SEE whether it is trusting verified claims, merely
+// parsed claims, or the unauthenticated 'api-static' fallback.
+function apiPrincipalToActor(
+  principal: ReturnType<typeof deriveRequestPrincipal>,
+): import('../core/work-model.js').ActorContext {
+  return {
+    id: principal.id,
+    ...(principal.role ? { role: principal.role } : {}),
+    ...(principal.tenantId ? { tenantId: principal.tenantId } : {}),
+    identityClass: principal.id === 'api-static' ? 'service' : 'oidc',
+    assurance: principal.claimsVerified === true
+      ? 'token-verified'
+      : principal.id === 'api-static' ? 'unverified' : 'token-parsed',
+    provenance: 'api',
+  };
+}
+
+
 const RUN_FLOW_PREFIX = '/api/run-flow/';
 const RUN_FLOW_DISABLED_MESSAGE =
   'run-flow API is disabled — set terminal.run_flow_v2: true in .deckent/config.json to enable /api/run-flow/*';
@@ -236,7 +255,7 @@ async function handlePropose(
     flowId,
     tenant: principal.tenantId ?? 'local',
     project: basename(projectRoot),
-    actor: { id: principal.id, ...(principal.role ? { role: principal.role } : {}) },
+    actor: apiPrincipalToActor(principal),
     origin: 'api',
     revision,
     intentSummary: parsed.data.intentSummary.trim(),
@@ -330,7 +349,7 @@ function handleDecision(
     context = decideRunFlow(projectRoot, flowId, {
       decision: parsed.data.decision,
       ...(parsed.data.reason !== undefined ? { reason: parsed.data.reason } : {}),
-      actor: { id: principal.id, ...(principal.role ? { role: principal.role } : {}) },
+      actor: apiPrincipalToActor(principal),
     });
   } catch (err) {
     if (
@@ -406,10 +425,7 @@ function handleStart(
     // START_REQUESTED → spawn → RUN_STARTED lives in the shared decision
     // service; the argv shape comes from the ONE builder both surfaces use.
     const principal = deriveRequestPrincipal(req);
-    const actor = {
-      id: principal.id,
-      ...(principal.role ? { role: principal.role } : {}),
-    };
+    const actor = apiPrincipalToActor(principal);
     const result = startRunFlow(projectRoot, flowId, {
       lineage: {
         tenantId: existing.proposal?.tenant ?? 'local',

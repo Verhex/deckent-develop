@@ -103,6 +103,13 @@ export interface ActorContext {
   id: string;
   role?: string;
   tenantId?: string;
+  // PRINCIPAL-001 P1a: optional, backward-compatible provenance fields so
+  // authorization can SEE what identity it is trusting. Produced by
+  // principalToActor (src/core/principal.ts); absence marks a
+  // pre-PRINCIPAL-001 ingress and is surfaced by the advisory seam.
+  identityClass?: 'local' | 'oidc' | 'workload' | 'connector' | 'service';
+  assurance?: 'unverified' | 'os-user' | 'token-parsed' | 'token-verified';
+  provenance?: RequestOrigin;
 }
 
 /** How the work entered the system (provenance — audit + persona routing). */

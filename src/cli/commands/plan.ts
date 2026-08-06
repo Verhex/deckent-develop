@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { principalToActor, resolveLocalOsPrincipal } from '../../core/principal.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -545,7 +546,7 @@ export function registerPlan(program: Command): void {
           } else {
             decideRunFlowPlan(root, flowPlan.flowId, {
               decision: 'reject',
-              actor: { id: 'cli-operator' },
+              actor: principalToActor(resolveLocalOsPrincipal('cli')),
             });
             print(getMessage('plan.rejected', lang));
           }

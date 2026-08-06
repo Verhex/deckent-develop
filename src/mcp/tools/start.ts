@@ -1,4 +1,5 @@
 import { z } from 'zod/v4';
+import { principalToActor, resolveLocalOsPrincipal } from '../../core/principal.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { fork } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
@@ -313,7 +314,7 @@ export function registerStartTool(
           const result = startRunFlow(root, flowId!, {
             lineage: {
               tenantId: approvedSnapshot?.proposal?.tenant ?? 'local',
-              actor: { id: 'mcp-operator' },
+              actor: principalToActor(resolveLocalOsPrincipal('mcp')),
               origin: 'mcp',
               correlationId: flowId!,
               idempotencyKey: `start:${flowId}:r${revision}`,

@@ -113,16 +113,20 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 533 dist-blind: same 12478 count, digest reflects the deterministic
   // build-output edge classification — verified IDENTICAL on built and
   // build-free trees (the point of the fix).
+  // 2026-08-06 (P1a): +7 principal contract tests and consumer-pin edits —
+  // same 12478 count, digest only. Prior: 533 dist-blind.
   count: 12478,
-  digest: 'c63a21e5ae9fbf5ec26c3276466d98191323e21062fe35e5f2494359f95e0c2a',
+  digest: 'd1c1c83eae1bdbb633c0e7e25b181b87a8db89a360c0596975c076c55d782f34',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-06 (COVDEBT-SWEEP): README docs-link absolutization + the scan-
   // budget param — same 1197 count, content digest only. Prior: 523.
   // 533 dist-blind: same 1197 count, digest-only (deterministic classification).
-  count: 1197,
-  digest: 'aa7646b40e421a0de8c66326b32f7b25959e5edf7b4107bc33570d5ca9ee1910',
+  // 2026-08-06 (P1a): +1 REAL production module — src/core/principal.ts
+  // (VerifiedPrincipal authority). Prior: 533 dist-blind (1197).
+  count: 1198,
+  digest: '86adcd2a3310a00c38a9cd5125b365829fb8d02a4e12e6727ba3df99ae42167e',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

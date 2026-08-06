@@ -9,6 +9,7 @@
 // `--yes` it is a dry-run: report only, zero writes.
 
 import { join } from 'node:path';
+import { principalToActor, resolveLocalOsPrincipal } from '../../core/principal.js';
 import type { Command } from 'commander';
 import {
   collectInboxRows, buildInboxLines, buildInboxLabels,
@@ -61,7 +62,7 @@ export function executeInboxDecision(
   flowId: string,
   verb: InboxDecisionVerb,
   lang: string,
-  actor: { readonly id: string } = { id: 'repl-user' },
+  actor: { readonly id: string } = principalToActor(resolveLocalOsPrincipal('cli')),
 ): string {
   try {
     if (verb === 'reject') {
