@@ -9,6 +9,9 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-491-004 | Tech debt from 491-004: Implemented deterministic, idempotent lineage-scoped can | normal | sprint-491 | resolved |
+| debt-491-009 | Tech debt from 491-009: Run ownership is host-authored in the Docker producer bi | normal | sprint-491 | resolved |
+| debt-489-001 | Tech debt from 489-001: Exact two-line sentinel was read back and passed the pre | normal | sprint-489 | resolved |
 | debt-487-018 | Tech debt from 487-018: Production wiring: repair authority fingerprint -> handl | normal | sprint-487 | resolved |
 | debt-487-001 | Tech debt from 487-001: Producer buildFinalizerTerminalTruth is production-wired | normal | sprint-487 | resolved |
 | debt-487-002 | Tech debt from 487-002: Production wiring: publishFencedSprintTerminalReceipt is | normal | sprint-487 | resolved |

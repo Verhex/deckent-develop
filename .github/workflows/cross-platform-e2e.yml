@@ -8,6 +8,8 @@ on:
   # merge_group: main'de merge queue rule'u aktif (Alperen, 2026-08-04) — required
   # Validator Contract bacakları kuyruğun final merge result'ında da koşmak zorunda.
   merge_group:
+  # 535: tren-dalı platform-kanıtı için açık tetik (gh workflow run -r <branch>)
+  workflow_dispatch:
 
 concurrency:
   group: cross-platform-${{ github.ref }}
@@ -16,6 +18,11 @@ concurrency:
 jobs:
   e2e:
     name: E2E — ${{ matrix.os }} / ${{ matrix.backend }}
+    # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
+    # merge-queue entry. They now run on main-push and explicit dispatch — a
+    # train that needs platform proof triggers `gh workflow run -r <branch>`.
+    # Validator Contract (the required check) is untouched and runs everywhere.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -144,6 +151,11 @@ jobs:
   # This is a documented, deliberate gap — not a silent omission.
   packed-install:
     name: Packed Install — ${{ matrix.os }}
+    # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
+    # merge-queue entry. They now run on main-push and explicit dispatch — a
+    # train that needs platform proof triggers `gh workflow run -r <branch>`.
+    # Validator Contract (the required check) is untouched and runs everywhere.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -273,6 +285,11 @@ jobs:
   # capability outcome is a recorded observation in the uploaded JSON artifact.
   exec-auth-capability-probe:
     name: Exec-Authority Capability Probe — ${{ matrix.os }}
+    # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
+    # merge-queue entry. They now run on main-push and explicit dispatch — a
+    # train that needs platform proof triggers `gh workflow run -r <branch>`.
+    # Validator Contract (the required check) is untouched and runs everywhere.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -308,6 +325,11 @@ jobs:
   # so this job proves buildability+behavior, it does not gate admission.
   exec-auth-native-build:
     name: Exec-Authority Native Build — ${{ matrix.os }}
+    # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
+    # merge-queue entry. They now run on main-push and explicit dispatch — a
+    # train that needs platform proof triggers `gh workflow run -r <branch>`.
+    # Validator Contract (the required check) is untouched and runs everywhere.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:

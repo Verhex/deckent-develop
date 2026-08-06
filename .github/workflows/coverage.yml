@@ -1,0 +1,62 @@
+name: Coverage
+# 535 (CI-ACTIONS-ECONOMY-001): the full instrumented suite (21-45min) ran on
+# EVERY merge inside ci.yml — pure wall-clock and queue pressure with no
+# per-merge signal the fast jobs don't already give. It now runs nightly, on
+# demand (workflow_dispatch — release gate and closure-evidence runs), keeping
+# the exact same job content and threshold gate.
+
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    # Sprint 189 (WrongStack WS-Z1): coverage gate aktif.
+    # vitest.config.ts içindeki coverage.thresholds (lines/functions/branches/statements)
+    # ihlal edilirse vitest non-zero exit verir, npm run propagates, bu job FAIL olur,
+    # build kırılır (no continue-on-error). Floors mevcut baseline'dan -5%
+    # kalibre; sprint başına ~1% ratchet politikası (CONTRIBUTING.md).
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:rebuild-native
+      - name: Install dashboard dependencies (for build:all → dashboard bundle)
+        run: npm install --prefix src/dashboard --ignore-scripts 2>/dev/null || true
+      - name: Build dist + dashboard (required by dist-dependent e2e/smoke tests)
+        # The coverage job runs the FULL suite (vitest run --coverage over all
+        # tests/**), which includes dist-dependent e2e tests — npm-pack-smoke
+        # packs the tarball and asserts dist/cli/entry.js, dist/mcp/server.js AND
+        # dist/dashboard/index.html are present; cli-bin-invocation spawns the
+        # compiled binary. `build:all` (not `build`) is required so the dashboard
+        # bundle lands in dist/dashboard. Without it these fail (no dist) or skip.
+        # Coverage is instrumented from src/ via vitest transform, so a built
+        # dist/ does not change the measured numbers.
+        run: npm run build:all
+      - name: Run tests with coverage (threshold gate enforced)
+        # Threshold violation = exit 1 = job FAIL = CI red.
+        # 530 (CI-COVERAGE-JOB-WALL-001): the old 20-minute cap killed every
+        # 2026-08-05 main run at ~21min — the instrumented full suite has no
+        # green datapoint under it. 45min is a measure-then-calibrate ceiling:
+        # the first green run records the real duration, then tighten if wide.
+        run: npm run test:coverage
+        timeout-minutes: 45
+      - name: Upload coverage report
+        # always() — eşik ihlali durumunda bile rapor artefakt olarak yüklensin
+        # ki contributor coverage farkını görebilsin.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30

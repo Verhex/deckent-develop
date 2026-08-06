@@ -55,6 +55,10 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-490 Learnings** (sprint-490): ## Sprint sprint-490 Learnings
+- Build right branch: NO_GO — Dependency 490-001 is verified through .deckent/runtime/...
+- **Sprint sprint-488 Learnings** (sprint-488): ## Sprint sprint-488 Learnings
+- Cross-fix: Canonical logical-progress identity contract: NO_GO — Authority blocker: ...
 - **Sprint sprint-487 Learnings** (sprint-487): ## Sprint sprint-487 Learnings
 - Fix: Terminal publication real-binary contract: NO_GO — Verification: node scripts/t...
 - **Sprint sprint-486 Learnings** (sprint-486): ## Sprint sprint-486 Learnings
@@ -75,11 +79,6 @@ The mandated t...
 - **Sprint sprint-481 Learnings** (sprint-481): ## Sprint sprint-481 Learnings
 - **Sprint sprint-480 Learnings** (sprint-480): ## Sprint sprint-480 Learnings
 - RECOVERY-SURFACES — CLI and MCP shared recovery commands: NO_GO — Bounded scope bloc...
-- **Sprint sprint-479 Learnings** (sprint-479): ## Sprint sprint-479 Learnings
-- Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO — DECKENT_E091:coordinator-...
-- **Sprint sprint-478 Learnings** (sprint-478): ## Sprint sprint-478 Learnings
-- Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO
-- CHAIN-01-ROOT — controlle...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -90,4 +89,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1723 | Generated: 2026-07-31_
+_Total entries: 1764 | Generated: 2026-08-06_
