@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):4c59efe3bf6e2d152c1347898bb01fb11ab5b01ffff5c1d10a21b71c6d9e7af1`
+**Source digest:** `sha256(normalized-lf-utf8):52e4948cc09a1cbb475ae9e0cb04b30df2213280aab79ce681c05f76ec2da6d1`
 
-**Rows:** 388 total · 344 active · 44 terminal
+**Rows:** 388 total · 342 active · 46 terminal
 
 ## State summary
 
@@ -17,8 +17,8 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 20 |
-| DONE | 44 |
+| VERIFY | 18 |
+| DONE | 46 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -78,7 +78,6 @@
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
 | 524 | `VERIFY-HISTORICAL-CLOSURE-001` | OPEN | P2 | TRUTH | — | — | Historical-only VERIFY satırlarının (10 adet) receipt-gated kapanış dilimi: her satır için kanıt-durumu tiplenir (yeniden-doğrulanabilir / historical-yeterli / eksik-kanıt) ve kapanış turu Alperen onayıyla koşulur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
-| 531 | `CI-COVERAGE-REVEALED-DEBT-001` | VERIFY | P1 | TRUTH | — | — | 530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık |
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
@@ -224,7 +223,6 @@
 | 3250 | `WORKER-DISCOVERY-001` | OPEN | P1 | KERNEL | `PLANNER-001`, `PROMPT-001` | — | Bounded discovery and scope-aware Worker prompt contract |
 | 3252 | `WORKER-DISCOVERY-ADAPTERS-001` | OPEN | P2 | KERNEL | `TEST-DISCOVERY-001` | — | Vitest-dışı test-discovery adapter'ları (Jest, Pytest, diğer diller) + canlı heterojen-proje kanıtı |
 | 3260 | `RESULT-INGEST-001` | BLOCKED | P0 | KERNEL | `KERNEL-SETTLEMENT-001` | `DEPENDENCY_UNSATISFIED` | Result identity normalization, quarantine and missing-trace root-cause closure |
-| 3261 | `RESULT-RECONCILIATION-001` | VERIFY | P0 | KERNEL | — | — | Terminal-only atomic result ingestion and malformed-result reconciliation |
 | 3270 | `RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001` | VERIFY | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `SCHEDULER-001`, `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | — | EXECUTE always yields to runnable work or FIX without a result-count deadlock |
 | 3271 | `RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001` | VERIFY | P0 | KERNEL | `RECOVERY-COMMAND-SERVICE-001`, `RUN-STATUS-AUTHORITY-001`, `RESULT-RECONCILIATION-001` | — | Finalize discovers only canonical tasks and publishes COMPLETE only after exact coordinator containment |
 | 3272 | `RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001` | VERIFY | P0 | COST | `LIMIT-001`, `RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001` | — | Dogfood tuning cannot turn per-task subscription limits into a global dispatch stop |
