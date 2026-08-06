@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):342e0d5a416bffc5beb4f190c9f68474d23234b31ec5a4d0619a6ec882b4f1c5`
+**Source digest:** `sha256(normalized-lf-utf8):7617886dcf3be4f6f9a097a36c95cd65857aad78fcb36cab21c440424e1634e7`
 
-**Rows:** 381 total · 358 active · 23 terminal
+**Rows:** 383 total · 360 active · 23 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 258 |
+| OPEN | 260 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -91,6 +91,8 @@
 | 528 | `DOCS-ALP-DISCIPLINE-SYNC-001` | VERIFY | P2 | TRUTH | — | — | Vendored alp-discipline dokusunun upstream v1.0.4'e senkronu (karar-çapası ESSENCE/DISCIPLINE güncel kalsın) |
 | 529 | `CI-SCRIPTS-TASKKILL-RACE-001` | VERIFY | P1 | TRUTH | — | — | scripts.test runScriptAsync taskkill it.each'inin 25ms bütçesi yavaş runner'da gerçek process-spawn süresinin altında — kill-eskalasyon aşama-yarışı flake'i (false-success senaryosu 'taskkill timeout'a düşüyor) |
 | 530 | `CI-COVERAGE-JOB-WALL-001` | VERIFY | P1 | TRUTH | — | — | Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü) |
+| 531 | `CI-COVERAGE-REVEALED-DEBT-001` | OPEN | P1 | TRUTH | — | — | 530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık |
+| 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |

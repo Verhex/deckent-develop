@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "342e0d5a416bffc5beb4f190c9f68474d23234b31ec5a4d0619a6ec882b4f1c5"
+    "value": "7617886dcf3be4f6f9a097a36c95cd65857aad78fcb36cab21c440424e1634e7"
   },
   "summary": {
-    "total": 381,
-    "active": 358,
+    "total": 383,
+    "active": 360,
     "terminal": 23,
     "receipts": 64,
     "byState": {
-      "OPEN": 258,
+      "OPEN": 260,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,8 +22,8 @@
     },
     "byPriority": {
       "P0": 249,
-      "P1": 100,
-      "P2": 32
+      "P1": 101,
+      "P2": 33
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 69,
+      "TRUTH": 71,
       "XPLAT": 3
     }
   },
@@ -865,6 +865,28 @@
       "updated": "2026-08-05",
       "definitionDigest": "f281b3ca1b7c8df33b96faf4f42019b612fd3772e157d2d1db7cfe59445d37ec",
       "progressDigest": "9b29ee61024c12637081405345499ce86fde513ff89a56d29b68d3090c55b917",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 531,
+      "id": "CI-COVERAGE-REVEALED-DEBT-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "4382b84e1cf52ef6f85aef6c1805ccbd36ac0a031c2557d3f96596ab72aeaa66",
+      "progressDigest": "b096fda4c48a1cdd1ead4333e8dadf243b450a401fb3c5f0e790af75a35cd304",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 532,
+      "id": "CI-VITEST-WORKER-CRASH-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "f78ac65f972bbf72a4be85fc234df165537deec3fbdfd3cf7ea3a58c606cb348",
+      "progressDigest": "e0563991590283d5f31b373bef5eea13d6112ea6b3c26394a95b816fb80379b9",
       "terminalClosureDigest": null
     },
     {
@@ -7227,6 +7249,68 @@
       ],
       "acceptance": "Step-cap ölçüm-sonrası-kalibre tavana çekilir (20→45dk; ilk yeşil koşu gerçek süreyi ölçer, tavan gerekirse daraltılır); production-scale test açık 60s timeout alır; Coverage Report yeşile döner veya threshold-gate dürüst sinyal verir",
       "evidence": "Açılış 2026-08-05: run 31054702920 + gün-içi 8 koşu tarihi; `receipt=GR-2026-08-05-COVERAGE-WALL-530-01`; 2026-08-05 SETTLEMENT: step-cap 20→45dk measure-then-calibrate + scanTestDir production-scale 60s açık timeout; baseline digest supp-receipt'le mekanik tazelendi; `receipt=GR-2026-08-05-TREN-E-BASELINE-SUPP-01`; `proof=peak-rss-996mib-validates-2gib-budget`; kapanış kanıtı merge sonrası main-push Coverage Report'un ilk yeşil (veya dürüst threshold-sinyalli) koşusu — gerçek süre o koşuda ölçülüp tavan gerekirse daraltılır",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 531,
+      "id": "CI-COVERAGE-REVEALED-DEBT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Envanter dosya-aile bazında dilimlenir ve her aile kendi receipt'li treniyle kapanır: chain-safety.e2e 14 (kök İZOLE: fixture'lar literal 'sonnet' + registry'siz provider çözümü — ADR-G-036 kontrat sapması, lokal deterministik repro) · dead-code-decisions 12 · docker-exit-final 6 · sprint-lifecycle.e2e 5 · docker-exit-reproducer 4 · docker-hb 3 · nerv-w1-predicate 2 · sekiz tekli (governance×2, release, build, brain, workflows, docker-timeout, ratchet); her kökte bayat-kontrat/gerçek-bug sınıflandırması yapılır, gerçek-bug üretim-dilimi olur; uzun-vade karar adayı: bu sınıflara hızlı job kapsaması",
+      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro)",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 532,
+      "id": "CI-VITEST-WORKER-CRASH-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor)",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Kök izole edilir (vitest sürüm/worker-lifecycle); fix veya typed mitigasyonla job-level exit-code test-sonucuyla tutarlı olur; continue-on-error maskesi kaldırılabilir hale gelir",
+      "evidence": "Açılış 2026-08-05: Alperen karar-turu 'satır aç, sıraya koy' — 55-kırık (531) ve W3 dilim-3'ten sonra",
       "updated": "2026-08-05"
     },
     {
@@ -19889,6 +19973,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7c98f7f545851955e833cb5a74298971d54056bcb6e1c3cfb9a926e3cda8923d"
+    "value": "6f5467aef2beffb643f2d2940ef3ca92a29e6dafb53214a0f00e6e84715e41f3"
   }
 }
