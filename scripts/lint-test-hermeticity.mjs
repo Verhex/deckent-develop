@@ -135,8 +135,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // count, digest only. Prior: 537 hygiene.
   // 2026-08-06 (P1b): config key + enforcement seam + plan-service wiring —
   // same 1198 count, digest only. Prior: 485a.
+  // 2026-08-06 (P1c): CLI plan identity conversion — same 1198, digest only.
   count: 1198,
-  digest: '45729fc1ba5b63c6c98c9f6dc4832d58a3485704691e9cba59583f06c07ac518',
+  digest: '0bbf1c22f1968ca08b952d5781b9d3296da55b5b9eaf92bcc8cd077aed61cd1a',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
