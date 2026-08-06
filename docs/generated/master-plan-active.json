@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "1d83cb72edd3d0c1df415ff4cb6859abb44269823eb48b3e9053a5a8f1b7c610"
+    "value": "164553ac6431bca67114b47d87fff45a867e1fd435ab763ce7dd8d2e787dc3d0"
   },
   "summary": {
     "total": 387,
     "active": 354,
     "terminal": 33,
-    "receipts": 76,
+    "receipts": 77,
     "byState": {
       "OPEN": 260,
       "READY": 0,
@@ -5080,6 +5080,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-06T06:56:12Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-CIWF-PIN-SUPP-01",
+      "authorityDigest": "a4292dc5f6f0e8ad10150e39fa4aed990342f6652fb01a4e09d3057191ffdfe9",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -19917,6 +19927,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "95967da5c2175234ccf50c24d67d7116fd39b96a6c4908c410f437032bbe6329"
+    "value": "23fb15d51c916793fe32d481b2c64b4d730969bcb665ccd5c207d0f1f3ce7b8b"
   }
 }
