@@ -2314,7 +2314,6 @@ export function buildOnExitTrap(taskId: string, model: string, scopeFilesWrite?:
     '    fsync_file "$RFILE"',
     '    fsync_file "$HBFILE"',
     '    rm -f "$PRFILE" 2>/dev/null',
-    '    kill $HB_PID 2>/dev/null',
     '    return',
     '  fi',
     // Sprint 272 T-003: last-chance window — a clean exit-0 (usage-limit / stream
@@ -2329,7 +2328,6 @@ export function buildOnExitTrap(taskId: string, model: string, scopeFilesWrite?:
     '    fsync_file "$RFILE"',
     '    fsync_file "$HBFILE"',
     '    rm -f "$PRFILE" 2>/dev/null',
-    '    kill $HB_PID 2>/dev/null',
     '    return',
     '  fi',
     // Non-zero exit: check git diff for partial work
@@ -2424,7 +2422,6 @@ export function buildOnExitTrap(taskId: string, model: string, scopeFilesWrite?:
     '  fsync_file "$HBFILE"',
     // Sprint 151: Clean up .partial-result — EXIT trap wrote a proper .result
     '  rm -f "$PRFILE" 2>/dev/null',
-    '  kill $HB_PID 2>/dev/null',
     '}',
   ].join('\n');
 }
@@ -3379,9 +3376,12 @@ export function buildHeartbeatGateFn(taskId: string): string {
 }
 
 /**
- * Build the full wrapper heartbeat loop: the gate function above plus its
- * background 15s-interval driver. This is what actually goes into the
- * generated worker script.
+ * INERT compatibility seam (537 doc-drift fix): heartbeat authority moved
+ * host-primary to WorkerHeartbeatAuthorityStore — the wrapper NO LONGER runs
+ * any in-container heartbeat loop. This export stays only so historical
+ * callsites keep a stable, pinned no-op shape (see
+ * tests/orchestra/wrapper-hb-allowlist.test.ts); it must never regain a
+ * driver.
  */
 export function buildHeartbeatWrapperLoop(taskId: string): string {
   return buildHeartbeatGateFn(taskId);

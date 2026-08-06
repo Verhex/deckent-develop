@@ -126,8 +126,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 533 dist-blind: same 1197 count, digest-only (deterministic classification).
   // 2026-08-06 (P1a): +1 REAL production module — src/core/principal.ts
   // (VerifiedPrincipal authority). Prior: 533 dist-blind (1197).
+  // 2026-08-06 (537 hygiene): dead HB_PID lines removed from the wrapper
+  // template — same 1198 count, digest only. Prior: P1a (+principal module).
   count: 1198,
-  digest: '86adcd2a3310a00c38a9cd5125b365829fb8d02a4e12e6727ba3df99ae42167e',
+  digest: 'afd2f7525c469316fe16b64929d5fdad02a6df9bbcd042079e69523b3cf4e940',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
