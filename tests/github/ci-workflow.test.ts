@@ -4,10 +4,15 @@ import { resolve } from 'path';
 
 describe('CI Workflow (.github/workflows/ci.yml)', () => {
   const ciPath = resolve('.github/workflows/ci.yml');
+  // 535 (CI-ACTIONS-ECONOMY-001): the coverage job moved to its own scheduled
+  // workflow — coverage pins read coverage.yml, everything else stays on ci.yml.
+  const coveragePath = resolve('.github/workflows/coverage.yml');
   let content: string;
+  let coverageContent: string;
 
   beforeAll(() => {
     content = readFileSync(ciPath, 'utf-8');
+    coverageContent = readFileSync(coveragePath, 'utf-8');
   });
 
   it('should exist', () => {
@@ -35,33 +40,31 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
 
   describe('A) Coverage artifact upload', () => {
     it('should have a coverage job', () => {
-      expect(content).toContain('coverage:');
+      expect(coverageContent).toContain('coverage:');
     });
 
     it('should run test:coverage command', () => {
-      expect(content).toContain('npm run test:coverage');
+      expect(coverageContent).toContain('npm run test:coverage');
     });
 
     it('should upload coverage artifact', () => {
-      expect(content).toContain('actions/upload-artifact@v4');
-      expect(content).toContain('name: coverage-report');
+      expect(coverageContent).toContain('actions/upload-artifact@v4');
+      expect(coverageContent).toContain('name: coverage-report');
     });
 
     it('should set retention days for coverage artifact', () => {
-      expect(content).toContain('retention-days:');
+      expect(coverageContent).toContain('retention-days:');
     });
 
     it('should upload coverage/ directory', () => {
-      expect(content).toContain('path: coverage/');
+      expect(coverageContent).toContain('path: coverage/');
     });
 
-    it('coverage job should depend on test jobs', () => {
-      const coverageSection = content.substring(
-        content.indexOf('coverage:'),
-        content.indexOf('\n\n  build:')
-      );
-      expect(coverageSection).toContain('needs:');
-      expect(coverageSection).toMatch(/test-core|test-orchestra|test-cli/);
+    it('coverage workflow is scheduled + dispatchable (535: no per-merge run)', () => {
+      // The standalone workflow has no sibling test jobs to `needs` — its
+      // admission contract is the schedule/dispatch trigger pair instead.
+      expect(coverageContent).toContain('schedule:');
+      expect(coverageContent).toContain('workflow_dispatch:');
     });
   });
 
