@@ -3,27 +3,27 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "4744452727d178b435f06a2518f8fc89337e2ee244fd55f2a5832c8c285af141"
+    "value": "47fae8efcf016be128bcb34b7e3ae8f1694ed369f9c208e7dc0de65b8efc847b"
   },
   "summary": {
-    "total": 387,
+    "total": 388,
     "active": 354,
-    "terminal": 33,
-    "receipts": 81,
+    "terminal": 34,
+    "receipts": 82,
     "byState": {
       "OPEN": 258,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 29,
-      "DONE": 33,
+      "DONE": 34,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 250,
       "P1": 103,
-      "P2": 34
+      "P2": 35
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 75,
+      "TRUTH": 76,
       "XPLAT": 3
     }
   },
@@ -124,11 +124,11 @@
       "id": "XPLAT-SKIP-GUARD-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-06",
       "definitionDigest": "aa5660883aa89573b16a2d116fcf216e38bcd12041d3fc9e5b968bc1de329812",
-      "progressDigest": "5631600703f2521b67ffa1cae0472d79f77092a4e079761dc585d7414080823d",
-      "terminalClosureDigest": null
+      "progressDigest": "c014ae3a65cfcbc0843401eff7ab200200de88ef4f1e8c6792cc01ed72a13d18",
+      "terminalClosureDigest": "acfca347ed5dd7b61f896c7d1dc114272e0e35f49138d21bdcb1f55bfa7344a1"
     },
     {
       "order": 40,
@@ -931,6 +931,17 @@
       "updated": "2026-08-06",
       "definitionDigest": "6927493682daeba6eefd5f54c27eb9cc252abef523a3f959cf6851dbf19f0e3f",
       "progressDigest": "6bbde26ee25737117cea008cb82538ab6e7346fca7278fe9ee3ce4de6eee6d82",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 537,
+      "id": "DOCKER-WRAPPER-HYGIENE-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "VERIFY",
+      "updated": "2026-08-06",
+      "definitionDigest": "e6230fc41345dabe30204030b8f4d0b39d82385e09b9b05099ae0167faf9d5bd",
+      "progressDigest": "343cc86f8aab35ed7bf8f915a21653a3cf4c999d6517590c99045792ab18fd58",
       "terminalClosureDigest": null
     },
     {
@@ -1841,9 +1852,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-31",
+      "updated": "2026-08-06",
       "definitionDigest": "2db2c82e9653adf4b2261e847525e5cc4f676c8c2dccd3270786076c7066b63a",
-      "progressDigest": "0b1f649af1be046afa6a8ed904bb028cb7bc75bfad7cc3c98cae90045713202a",
+      "progressDigest": "ec0a9f4dc0dd4f56c78eac8b4dc68eb6b33277551fbad169e45b4471b1f30b57",
       "terminalClosureDigest": null
     },
     {
@@ -5132,6 +5143,16 @@
         "transitionAt": "2026-08-06T08:22:21Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-WRAPPER-HYG-537-01",
+      "authorityDigest": "36ebb57d4b336a884e43145b76b6a656363efd3a374c7bdc7f1d5daa52614e7a",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T08:40:07Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -5165,40 +5186,6 @@
       "acceptance": "Fresh-clone/izole checkout üzerinde ledger + generated projeksiyon + manifest digest'leri komple doğrulanır ve kanıt commit'e bağlanır",
       "evidence": "Açılış 2026-08-05: 24-satır DONE turunda residual-çıkarma (Alperen onaylı); kaynaklar: SSOT-002 'isolated commit proof pending' + SOURCE-MANIFEST-001 canlı-kanıt boyutu",
       "updated": "2026-08-05"
-    },
-    {
-      "order": 32,
-      "id": "XPLAT-SKIP-GUARD-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Cross-platform matriste kapsam-beklenen platformda symlink vakası atlanırsa bacak fail etsin: skip-görünürlüğü gate-invariant olsun",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-06-XPLAT-GUARD-32-01",
-        "GR-2026-08-06-XPLAT-STATS-SUPP-01"
-      ],
-      "acceptance": "validator-contract matrisinde symlink-yetenekli sayılan bir platformda symlink vakası atlanırsa o bacak fail eder; skip yalnız typed unsupported gerekçeyle ve görünür kayıtla kabul edilir; kural üç bacakta da CI'da fail-closed doğrulanır",
-      "evidence": "Açılış: Alperen 2026-08-03 onayı (soru-cevap kaydı). Gerekçe: MASTER-CLI-SYMLINK-FLAKE-001'in X=1 kanıtı 30832207675 ve 30833491791 koşumlarındaki sıfır-skip gözlemine dayanır; bu bir koşum kanıtıdır, gate'in dayattığı değişmez değildir — SeCreateSymbolicLinkPrivilege vermeyen gelecekteki bir windows-latest imajı symlink vakalarını yetenek probu üzerinden sessizce atlar ve bacak yine yeşil raporlar. Bu satır o sessiz gerilemeyi build hatasına çevirir. Kanıtlamadığı: hangi platformların kapsam-beklenen sayılacağı (ör. Developer Mode varsayımı) implementasyonda tiplenecek; `receipt=GR-2026-08-06-XPLAT-GUARD-32-01`; Dalga-2 yolcu-3 admission 2026-08-06; 2026-08-06 SETTLEMENT (tren-n): gate-invariant guard validator-suite'e eklendi — POSIX'te probe-reddi bacak-FAIL, win32'de typed+görünür skip; `proof=guard-fails-closed-on-declared-capable-refusal`; kapanış kanıtı PR'ın Validator Contract 3-OS bacakları; `receipt=GR-2026-08-06-XPLAT-STATS-SUPP-01`",
-      "updated": "2026-08-06"
     },
     {
       "order": 40,
@@ -7313,6 +7300,39 @@
       ],
       "acceptance": "Onaylı Context metni + Sprint backfill'i G4 prosedürüyle (backup-hash + transactional UPDATE + export regen) uygulanır; decisions format-testi yeşil; audit-hmac yeniden-hesaplanmama kararı typed kayıtlıdır",
       "evidence": "Açılış 2026-08-06: karar-turu — Alperen Context metnini onayladı; provenance: memory.db entries kaydı 2026-07-23T03:46:30; `receipt=GR-2026-08-06-ADR39-CTX-536-01`; 2026-08-06 SETTLEMENT (G4): backup sha256=04b22406f296c59388e4f0164a2108c63f4c67ea4b25670fe6e2521e7bc59663 (.bak-manual-1785998594029, 1764 giriş) → tek-entry transactional UPDATE → export regen → decisions format-testi 12/12; `proof=decisions-format-suite-12of12-green`; 55-kırık envanterinin son kalemi kapandı; typed not: entry audit-hmac yeniden hesaplanmadı (AUDIT-001 unwired, 4200 disposition sınıfı kayıtlı)",
+      "updated": "2026-08-06"
+    },
+    {
+      "order": 537,
+      "id": "DOCKER-WRAPPER-HYGIENE-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Wrapper şablonunda HB_PID hiçbir yerde set edilmeden 3 yerde kill ediliyor (no-op ölü satırlar) + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (531 docker-emekliliği typed gözlemi)",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-WRAPPER-HYG-537-01"
+      ],
+      "acceptance": "Ölü satırlar kalkar, docstring seam-gerçeğini anlatır; davranış-değişimsiz (allowlist pinleri + docker suite'leri yeşil)",
+      "evidence": "Açılış 2026-08-06: 531 DOCKER-AİLE settlement gözleminin satırlaşması; `receipt=GR-2026-08-06-WRAPPER-HYG-537-01`; 2026-08-06 SETTLEMENT: 3 ölü satır kalktı, docstring seam-gerçeğinde; `proof=allowlist-and-docker-suites-60of60`; davranış-değişimsiz",
       "updated": "2026-08-06"
     },
     {
@@ -11199,8 +11219,8 @@
         "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
       ],
       "acceptance": "One resolver distinguishes IDLE, ACTIVE, PAUSED, ORPHANED, COMPLETE and ABORTED from durable PID, checkpoint, pause and terminal evidence without a surface-owned competing state machine",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=run-status-authority-targeted-and-binary`; Sprint-483 exposed a closure-window contradiction between canonical `FIX/FIXING` and presentation `RETRO/RETROSPECTIVE` plus impossible `4/3` progress. Recovery now projects human, JSON and watch status through one canonical authority snapshot, bounds every progress bucket by total and exposes normalization metadata while retaining raw mode as an explicit diagnostic. Source-process status contracts pass 8/8 with deterministic OS-backed stdio capture. Item remains OPEN for native macOS/Windows, multi-process contention, scale and a fresh live closure-window replay",
-      "updated": "2026-07-31"
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=run-status-authority-targeted-and-binary`; Sprint-483 exposed a closure-window contradiction between canonical `FIX/FIXING` and presentation `RETRO/RETROSPECTIVE` plus impossible `4/3` progress. Recovery now projects human, JSON and watch status through one canonical authority snapshot, bounds every progress bucket by total and exposes normalization metadata while retaining raw mode as an explicit diagnostic. Source-process status contracts pass 8/8 with deterministic OS-backed stdio capture. Item remains OPEN for native macOS/Windows, multi-process contention, scale and a fresh live closure-window replay; 2026-08-06 MAKİNE-BULGUSU (DONE-flip denemesi validator-vetolu): satır AGGREGATE-PARENT — açık çocuğu RECOVERY-BORN-485-TERMINAL-PUBLICATION-001 kapanmadan DONE olamaz (X-yorumu tartışması ikincil; Alperen'in 'X typed-açık' hükmü çocuk kapanınca uygulanacak); 35-iş kaskadının gerçek kilidi 485-TERMINAL-PUBLICATION dilimidir",
+      "updated": "2026-08-06"
     },
     {
       "order": 3030,
@@ -19973,6 +19993,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "81a17a566f0bc582313289f52e67a5e664ae27b5a8f5f49de75b905f952d3eec"
+    "value": "5a7f00ff674dbdd8c75df43fbaca4033eab45868d7bc28644f14472e269110d3"
   }
 }

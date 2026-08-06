@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):4744452727d178b435f06a2518f8fc89337e2ee244fd55f2a5832c8c285af141`
+**Source digest:** `sha256(normalized-lf-utf8):47fae8efcf016be128bcb34b7e3ae8f1694ed369f9c208e7dc0de65b8efc847b`
 
-**Rows:** 387 total · 354 active · 33 terminal
+**Rows:** 388 total · 354 active · 34 terminal
 
 ## State summary
 
@@ -18,7 +18,7 @@
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
 | VERIFY | 29 |
-| DONE | 33 |
+| DONE | 34 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -27,7 +27,6 @@
 | Order | ID | State | Priority | Program | DependsOn | Blocker | Outcome |
 |---:|---|---|---|---|---|---|---|
 | 25 | `LEDGER-ISOLATED-COMMIT-PROOF-001` | OPEN | P2 | TRUTH | — | — | Canonical ledger uzlaştırmasının izole/fresh-clone commit kanıtı — SSOT-002 + SOURCE-MANIFEST-001 kapanışlarından taşınan canlı-kanıt boyutu |
-| 32 | `XPLAT-SKIP-GUARD-001` | VERIFY | P1 | TRUTH | — | — | Cross-platform matriste kapsam-beklenen platformda symlink vakası atlanırsa bacak fail etsin: skip-görünürlüğü gate-invariant olsun |
 | 40 | `TRUTH-BASELINE-001` | BLOCKED | P0 | TRUTH | `TEST-675`, `TEST-676`, `TEST-HERMETIC-001` | `BASELINE_CONFLICT` | Current HEAD için tek reference test, build, binary ve environment baseline |
 | 50 | `TEST-675` | OPEN | P0 | TRUTH | — | — | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur |
 | 60 | `TEST-676` | OPEN | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |
@@ -87,6 +86,7 @@
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
 | 535 | `CI-ACTIONS-ECONOMY-001` | VERIFY | P1 | TRUTH | — | — | CI kaynak-ekonomisi yapısal düzenleme: her tren 3 tam-koşu tetikliyor (PR+merge_group+main-push ×2 workflow; günde ~35+35 koşu ölçüldü), merge-queue TÜM ci.yml'i koşuyor, Coverage (21-40dk) her merge'de, macos-ağır xplat job'ları her PR'da — repo PUBLIC olduğundan maliyet dakika-faturası değil duvar-saat + eşzamanlılık-kuyruğu + sinyal-gürültüsü |
 | 536 | `ADR-BACKFILL-G039-001` | VERIFY | P2 | TRUTH | — | — | ADR-G-039 (2026-07-23 03:46, provider-authority key-custody) kaydının eksik Context bölümü ve 'To be backfilled' Sprint alanı — Coverage duvarı kalkınca decisions format-testi görünür kıldı (55-kırık envanterinin son kalemi) |
+| 537 | `DOCKER-WRAPPER-HYGIENE-001` | VERIFY | P2 | TRUTH | — | — | Wrapper şablonunda HB_PID hiçbir yerde set edilmeden 3 yerde kill ediliyor (no-op ölü satırlar) + buildHeartbeatWrapperLoop docstring'i INERT-seam gerçeğiyle çelişiyor (531 docker-emekliliği typed gözlemi) |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
