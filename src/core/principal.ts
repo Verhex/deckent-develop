@@ -140,3 +140,28 @@ export function recordActorAssurance(actor: ActorContext, site: string): ActorAs
   }
   return finding;
 }
+
+/** Typed failure raised when enforcement is enabled and the actor cannot be trusted. */
+export class PrincipalAssuranceError extends Error {
+  readonly code: ActorAssuranceFinding['code'];
+  constructor(finding: ActorAssuranceFinding, site: string) {
+    super(`principal assurance denied at ${site}: ${finding.detail}`);
+    this.name = 'PrincipalAssuranceError';
+    this.code = finding.code;
+  }
+}
+
+/**
+ * P1b: the enforcement seam. Always records the advisory finding; throws only
+ * when the owner-approved flag is on. Callers pass the resolved config value —
+ * this module stays config-loader-free (no hidden policy read).
+ */
+export function assertActorAssurance(
+  actor: ActorContext,
+  site: string,
+  enforce: boolean,
+): ActorAssuranceFinding {
+  const finding = recordActorAssurance(actor, site);
+  if (enforce && !finding.ok) throw new PrincipalAssuranceError(finding, site);
+  return finding;
+}

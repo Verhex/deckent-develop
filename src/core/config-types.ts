@@ -1688,6 +1688,15 @@ export interface ResolvedConfig {
    *  permissive default keeps v1 allow-all for role-less requests.
    *  @see checkWorkerAuthority (src/nervous/authority-matrix.ts) */
   enforce_rbac?: boolean;
+  /** PRINCIPAL-001 P1b — identity-assurance hard-gate (default: false).
+   *  When false: an actor with missing or `unverified` assurance reaches
+   *  authorization and only produces the advisory finding (P1a behaviour,
+   *  byte-identical to v1). When true: the same finding becomes a typed
+   *  `PrincipalAssuranceError` BEFORE the work is admitted — no synthetic or
+   *  header-derived identity can authorize anything. Flag-gated and
+   *  default-off on purpose: enforcement flips only after an owner-approved
+   *  rollout, never blind (quality bar). @see assertActorAssurance */
+  enforce_principal_assurance?: boolean;
   /** F8-003 — capability least-privilege hard-flip (default: false).
    *  When false: capability invocations proceed regardless of actor role (permissive v1-default).
    *  When true: sets `CapabilityRegistry.leastPrivilegeEnabled = true` — every invocation
