@@ -1,5 +1,46 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-490 Learnings
+- Sprint sprint-490 Learnings: ## Sprint sprint-490 Learnings
+- Build right branch: NO_GO — Dependency 490-001 is verified through .deckent/runtime/lifecycle-canary/alpha.txt. Dependency 490-009 is still pending
+- Fix: Exercise intentional repair lineage: NO_GO — Refusing to spawn without every explicitly forced skill active. forceSkills declared [project-conventions] but SKILL.md
+- Fix: Validate right branch: NO_GO — Dependency 490-011 has durable selfAssessment NO_GO and brainEvaluation NO_GO. Original task defines dependency mismatch
+
+## Gains
+- 490-001 — Publish alpha root artifact — Created the authorized alpha artifact and verified exact content with the supplied Node command.
+- 490-002 — Publish beta root artifact — Created beta artifact with exact required bytes.
+- 490-003 — Publish gamma root artifact — Baseline: gamma.txt was absent.
+- 490-004 — Publish delta root artifact — Baseline: target file was absent.
+- 490-005 — Publish epsilon root artifact — Created the scoped epsilon artifact and verified exact bytes using the supplied Node command.
+- 490-006 — Exercise intentional repair lineage — intentional-repair-canary: original attempt verified .deckent/runtime/lifecycle-canary/repair.txt...
+- 490-007 — Join alpha and beta — Verified alpha and beta exact root payloads and completed dependency records.
+- 490-008 — Join gamma and delta — Baseline: join-b.txt was absent.
+- …and 8 more delivered
+
+## Sprint sprint-488 Learnings
+- Sprint sprint-488 Learnings: ## Sprint sprint-488 Learnings
+- Cross-fix: Canonical logical-progress identity contract: NO_GO — Authority blocker: the assigned code-reviewer persona is explicitly read-only and prohibits creating or modifying source
+- Finalizer canonical logical-ID producer: NO_GO — Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from th
+- Logical-ID cross-surface consumers: NO_GO — Blocked before source mutation: dependency 488-002 is NO_GO. Its supplied result records that no valid immutable checkpo
+- Structured landing-proposal schema and atomic writer: NO_GO — Implemented LandingProposalV2, strict fail-closed validation, and a same-directory fsync+rename atomic writer with symli
+- Docker landing writer integration: NO_GO — Implemented host-side Docker landing publication through writeExecutionLandingProposal: the coordinator validates bounde
+- Host worker landing writer parity: NO_GO — Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from th
+- Fix: Cross-fix: Worker verification consumer: NO_GO — Production-wiring closure is unavailable in the permitted source chain. Bounded reference tracing shows src/agents/worke
+- Cross-fix: Worker verification consumer: NO_GO — NO_GO: Verification evidence passed (`npx tsc --noEmit` exit 0; exact targeted command exit 0), but source inspection sh
+- Evaluator and FIX-budget isolation semantics: NO_GO — Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from th
+- Planner projection for post-settlement proof: NO_GO — Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from th
+
+## Gains
+- 488-001 — Canonical logical-progress identity contract — Implemented explicit required canonical logicalTaskId authority, opaque attempt IDs, stable repai...
+- 488-002-fix — Fix: Finalizer canonical logical-ID producer — Investigated the prior NO_GO (attempt a2b7e46a, SIGKILLed with exit 137, checkpoint predated the ...
+- 488-004-fix — Fix: Structured landing-proposal schema and atomic writer — Fixed platform-dependent path validation: Windows-style traversal and NUL-bearing task identities...
+- 488-008 — Verification isolation authority contract — Created src/core/verification-isolation-authority.ts: a language-neutral verification isolation a...
+- 488-009 — TypeScript scoped verification adapter — Implemented a shell-free TypeScript scoped verification adapter over non-HOLD isolation grants.
+- 488-010 — Worker verification consumer — Admitted TypeScript worker verification is production-wired through the shell-free orchestration ...
+- 488-011-fix — Fix: Evaluator and FIX-budget isolation semantics — Investigated the prior SIGKILLed attempt (attemptId=2523ff7d, exit 137) and found its on-disk wor...
+- 488-012 — Concurrent verification two-writer canary — Added a hermetic two-writer verification canary using separate tmpdir snapshots and real shell-fr...
+- …and 3 more delivered
+
 ## Sprint sprint-487 Learnings
 - Sprint sprint-487 Learnings: ## Sprint sprint-487 Learnings
 - Fix: Terminal publication real-binary contract: NO_GO — Verification: node scripts/test-binary-contracts.mjs failed with `finalize: terminal receipt was not published before ar

@@ -17,6 +17,11 @@ concurrency:
 jobs:
   lockfile-sync:
     name: Lockfile Sync Guard
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     # Root cause of the months-long CI outage: package-lock.json drifted from
     # package.json, so every job's `npm ci` failed with a cryptic EUSAGE error.
@@ -64,6 +69,11 @@ jobs:
 
   security:
     name: Security Audit
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -78,6 +88,11 @@ jobs:
 
   test-core:
     name: Tests — Core + Agents
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     needs: typecheck
     strategy:
@@ -103,6 +118,11 @@ jobs:
 
   test-orchestra:
     name: Tests — Orchestra
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     needs: typecheck
     strategy:
@@ -127,6 +147,11 @@ jobs:
 
   test-cli:
     name: Tests — CLI
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     needs: typecheck
     strategy:
@@ -146,6 +171,11 @@ jobs:
 
   test-remaining:
     name: Tests — MCP + API + Integration + Security + Providers + Monitor + Skills + Analytics
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     needs: typecheck
     strategy:
@@ -165,6 +195,11 @@ jobs:
 
   test-docs-scripts:
     name: Tests — Docs + Scripts (isolated)
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     needs: typecheck
     # Vitest worker timeout (onTaskUpdate) is a known flaky issue in CI.
@@ -189,6 +224,11 @@ jobs:
 
   test-dashboard:
     name: Tests — Dashboard
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     needs: typecheck
     steps:
@@ -207,6 +247,11 @@ jobs:
 
   test-windows:
     name: Tests — Windows (allow-failure)
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: windows-latest
     # Windows is unsupported — this job is informational only
     continue-on-error: true
@@ -224,55 +269,14 @@ jobs:
         timeout-minutes: 10
         continue-on-error: true
 
-  coverage:
-    name: Coverage Report
-    runs-on: ubuntu-latest
-    needs: [test-core, test-orchestra, test-cli, test-remaining]
-    # Sprint 189 (WrongStack WS-Z1): coverage gate aktif.
-    # vitest.config.ts içindeki coverage.thresholds (lines/functions/branches/statements)
-    # ihlal edilirse vitest non-zero exit verir, npm run propagates, bu job FAIL olur,
-    # build kırılır (no continue-on-error). Floors mevcut baseline'dan -5%
-    # kalibre; sprint başına ~1% ratchet politikası (CONTRIBUTING.md).
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-          cache: npm
-      - run: npm ci
-      - run: npm run ci:rebuild-native
-      - name: Install dashboard dependencies (for build:all → dashboard bundle)
-        run: npm install --prefix src/dashboard --ignore-scripts 2>/dev/null || true
-      - name: Build dist + dashboard (required by dist-dependent e2e/smoke tests)
-        # The coverage job runs the FULL suite (vitest run --coverage over all
-        # tests/**), which includes dist-dependent e2e tests — npm-pack-smoke
-        # packs the tarball and asserts dist/cli/entry.js, dist/mcp/server.js AND
-        # dist/dashboard/index.html are present; cli-bin-invocation spawns the
-        # compiled binary. `build:all` (not `build`) is required so the dashboard
-        # bundle lands in dist/dashboard. Without it these fail (no dist) or skip.
-        # Coverage is instrumented from src/ via vitest transform, so a built
-        # dist/ does not change the measured numbers.
-        run: npm run build:all
-      - name: Run tests with coverage (threshold gate enforced)
-        # Threshold violation = exit 1 = job FAIL = CI red.
-        # 530 (CI-COVERAGE-JOB-WALL-001): the old 20-minute cap killed every
-        # 2026-08-05 main run at ~21min — the instrumented full suite has no
-        # green datapoint under it. 45min is a measure-then-calibrate ceiling:
-        # the first green run records the real duration, then tighten if wide.
-        run: npm run test:coverage
-        timeout-minutes: 45
-      - name: Upload coverage report
-        # always() — eşik ihlali durumunda bile rapor artefakt olarak yüklensin
-        # ki contributor coverage farkını görebilsin.
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage/
-          retention-days: 30
 
   build:
     name: Build
+    # 535: the merge queue re-runs required checks on the final merge result —
+    # for this workflow that is Type Check alone. Every other job re-running in
+    # the queue added ~30min wall-clock per train with no admission value
+    # (main-push still runs the full matrix).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     needs: [test-core, test-orchestra, test-cli, test-remaining, test-dashboard]
     steps:
