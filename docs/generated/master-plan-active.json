@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "99d3f14d6858d4949b1f1528e5cc5b5f6d04d3bcb6f719892c74e2d1f889b108"
+    "value": "8e378c5dd97c7480c8f45605c3e30732dc8780b0956a7073644c1848ecca1215"
   },
   "summary": {
     "total": 388,
     "active": 342,
     "terminal": 46,
-    "receipts": 90,
+    "receipts": 91,
     "byState": {
       "OPEN": 257,
       "READY": 0,
@@ -3141,7 +3141,7 @@
       "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "fa879e7874c86d428bb4f508ad2284eb8e78ac0c663a8af384bbbcb836759b06",
-      "progressDigest": "df13f31804f15618ec7d9f29917b6e6e6d4554cad2c8a7bf9fa97f1396c27787",
+      "progressDigest": "a6869198ef6515ed9cb1bdce6c2c690f619f06d2c259ee6cd1529d27a85942b2",
       "terminalClosureDigest": null
     },
     {
@@ -5231,6 +5231,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-06T13:48:37Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-PRINCIPAL-P1C-01",
+      "authorityDigest": "8e5c8f07d36dbed5ae057d210a28eaf0152bfcb14cd989e208c204ea39b4bbff",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -15339,10 +15349,11 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-08-06-PRINCIPAL-P1A-01",
-        "GR-2026-08-06-PRINCIPAL-P1B-01"
+        "GR-2026-08-06-PRINCIPAL-P1B-01",
+        "GR-2026-08-06-PRINCIPAL-P1C-01"
       ],
       "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
-      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile; 2026-08-06 EVIDENCE-KONSOLİDASYONU (truth-hizası): P1a settlement'ında truth hücresi güncellenmemişti — ölçülmüş gerçek C=1 (src/core/principal.ts), W=1 (CLI/MCP/API ingress'leri + planRunFlow advisory seam'i wired), H=1 (principal 7/7 + api 105 dosya/1017 test), E=0 (enforce modu P1b'de config-gated gelecek, bugün advisory), L=0 (gerçek-binary kimlik smoke'u P1b kapsamında); `receipt=GR-2026-08-06-PRINCIPAL-P1B-01`; P1b admission 2026-08-06 (Dalga-3 kapısı); 2026-08-06 P1B SETTLEMENT: enforce_principal_assurance config anahtarı (default kapalı) + assertActorAssurance typed enforcement + planRunFlow ingress bağlantısı; `proof=principal-enforce-both-modes-11of11`; principal 11/11 her iki modu pinler (kapalı=v1 aynen, açık=admission öncesi typed red, gerçek OS kimliği açıkken geçer), orchestra+api+mcp 835 dosya/10805 test yeşil, tsc temiz; E boyutu policy-enablement ile kapandı (1); L için gerçek-binary enforce koşusu P1c kapsamındadır",
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile; 2026-08-06 EVIDENCE-KONSOLİDASYONU (truth-hizası): P1a settlement'ında truth hücresi güncellenmemişti — ölçülmüş gerçek C=1 (src/core/principal.ts), W=1 (CLI/MCP/API ingress'leri + planRunFlow advisory seam'i wired), H=1 (principal 7/7 + api 105 dosya/1017 test), E=0 (enforce modu P1b'de config-gated gelecek, bugün advisory), L=0 (gerçek-binary kimlik smoke'u P1b kapsamında); `receipt=GR-2026-08-06-PRINCIPAL-P1B-01`; P1b admission 2026-08-06 (Dalga-3 kapısı); 2026-08-06 P1B SETTLEMENT: enforce_principal_assurance config anahtarı (default kapalı) + assertActorAssurance typed enforcement + planRunFlow ingress bağlantısı; `proof=principal-enforce-both-modes-11of11`; principal 11/11 her iki modu pinler (kapalı=v1 aynen, açık=admission öncesi typed red, gerçek OS kimliği açıkken geçer), orchestra+api+mcp 835 dosya/10805 test yeşil, tsc temiz; E boyutu policy-enablement ile kapandı (1); L için gerçek-binary enforce koşusu P1c kapsamındadır; `receipt=GR-2026-08-06-PRINCIPAL-P1C-01`; P1c admission 2026-08-06",
       "updated": "2026-08-06"
     },
     {
@@ -19617,6 +19628,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "444bd6f189a9aaf7f8096d4db99293ca58f64b7b170319a2ca06316955d391de"
+    "value": "dab6e99233395c224d394a0bd98817ea565029e99a3fcfd9a853aa34a1cfafcc"
   }
 }
