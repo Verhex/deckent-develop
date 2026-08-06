@@ -3,27 +3,27 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "342e0d5a416bffc5beb4f190c9f68474d23234b31ec5a4d0619a6ec882b4f1c5"
+    "value": "6474e1e4606e82b19e22a449f8d32dcbe579fcfda7f9cb96f32f98210e8d169a"
   },
   "summary": {
-    "total": 381,
-    "active": 358,
-    "terminal": 23,
-    "receipts": 64,
+    "total": 383,
+    "active": 351,
+    "terminal": 32,
+    "receipts": 65,
     "byState": {
-      "OPEN": 258,
+      "OPEN": 260,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 33,
-      "DONE": 23,
+      "VERIFY": 24,
+      "DONE": 32,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 249,
-      "P1": 100,
-      "P2": 32
+      "P1": 101,
+      "P2": 33
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 69,
+      "TRUTH": 71,
       "XPLAT": 3
     }
   },
@@ -718,33 +718,33 @@
       "id": "CI-DASHBOARD-TESTS-LIVE-SERVER-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "2e217ff38e43caeed91371188d64b492f12eef0213cdbd9e3fef32a331944390",
-      "progressDigest": "ceda0a2d8311eee0099e93c5f13c485492efe66c34507bcd36049562c5fae08d",
-      "terminalClosureDigest": null
+      "progressDigest": "3ba39040ebe1d39666a3a1c5ecade1fe6fe6d7fbfa979343591a06cf0c887926",
+      "terminalClosureDigest": "66628d4b341f48aeea9dcdced58a483e6924c5a5e34d01f1ddf6b497014e5f5c"
     },
     {
       "order": 518,
       "id": "CI-ORCHESTRA-NODE26-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "727e63f48fe6707799bc845129098460b766e2e577dedb12a8d93b4cf56c4cda",
-      "progressDigest": "b3af6afc5e630c7b2fb7116e52952c9f1fbafae8e0b52f615d0b18f8e0d19667",
-      "terminalClosureDigest": null
+      "progressDigest": "d029937d8f5d5aa4ce06e3350b272ccdb549d980bc78a15bbc3fd58fb03b40db",
+      "terminalClosureDigest": "1ae16ef2761ed4c28f07f0c2c6d0897f98418da970dfb0938472182e7419be92"
     },
     {
       "order": 519,
       "id": "CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "992e6be01c385cb43bd9e23a59d24c14188de98bdce6d2f74a52ccfdc150759f",
-      "progressDigest": "274356d3117a297a889275d7458a18679f08f5eaacd402964e125275879ea347",
-      "terminalClosureDigest": null
+      "progressDigest": "9d9e8dbe23a12a03d327946816c0a166f14c8a9382d84ed1c211b8d36b45ef59",
+      "terminalClosureDigest": "bf7a9443edcdffd70ee23412e98c5c2fe03a52a082708aa602d165bd0d2be448"
     },
     {
       "order": 520,
@@ -762,33 +762,33 @@
       "id": "CI-STATS-HERMETIC-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "3b4763c618e1776efd241bb37c089e47b5feb777a387d6230da8133a4973f825",
-      "progressDigest": "8062045152afaed3c2b09305f70cb5809fbdcbec4672cb8f1ec27a7fbd3ae7be",
-      "terminalClosureDigest": null
+      "progressDigest": "38070f34a04b80739283c5fc1e6f5e781ed098a580f7b6c5590b925d714d855c",
+      "terminalClosureDigest": "98b04068407f500d9702d4b21229cc8c037f32170d43529986c86e2b9919e624"
     },
     {
       "order": 522,
       "id": "CI-DOCS-SCRIPTS-STEP-TIMEOUT-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "ec3061a0345ca0fdcc8b5351d07695db3f6ef508c27bdde1bb45e6901bc6f285",
-      "progressDigest": "16bc2c24b607f519d0e1b91f026eadee3ea90bfee6c2883135cfcd6bd660d3c8",
-      "terminalClosureDigest": null
+      "progressDigest": "bf3f00fce3c066b98f708cb2788ec7603d622cf82b4693371b1130aa3ab8e514",
+      "terminalClosureDigest": "4d9df0ec3b80a5cfe312ab2d4815fbb8769bb676f79297325f425fb089d24a39"
     },
     {
       "order": 523,
       "id": "CI-HERMETIC-SCAN-BUDGET-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "2544e1a74056fe5b57303f44f1584b318e85a9a69369c46e2e647b1dd5e3fb1d",
-      "progressDigest": "89bf16e1c74823926910aadda44acfe15ed3d7b259cc906f7eb7cf4006658d61",
-      "terminalClosureDigest": null
+      "progressDigest": "4ea1e827cb404e398035702569aadde2846d81789621f2f034fde0377de6fb02",
+      "terminalClosureDigest": "5673c3d87e8cd26bb428143e62513f6daf091b9bed9c3ebe55e6bd0343992b82"
     },
     {
       "order": 524,
@@ -828,33 +828,33 @@
       "id": "CI-BUILTINS-DRIFT-HERMETIC-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "deb036486caaf5a9fd6e3300977a68354f59014b08cb7caf0c0c319be7d217b3",
-      "progressDigest": "235c14fd98e0f28d319ca381fb5117e4322c571ba899c257089a80d2f631f60d",
-      "terminalClosureDigest": null
+      "progressDigest": "b9879d4355c5031156e244648997d436f0476cec0353e6ed5358acfe92b4adfb",
+      "terminalClosureDigest": "ba19fc4863bb386ce144660383ebebe286f87020065bd541f1b7757f42eb6e8e"
     },
     {
       "order": 528,
       "id": "DOCS-ALP-DISCIPLINE-SYNC-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "6682ab7ac1af697cb93bfe0b8a9acbdb3af62e0b924c6e61a3f73f84623e7bfe",
-      "progressDigest": "aa514e71750ec82fb4b77c6aa3a4f9bfc7a8682c54ae93f6e48bfbd89e9f0e71",
-      "terminalClosureDigest": null
+      "progressDigest": "25bd963f5bcedd1e45aa925b9e47865091ed37eb5fff75b776dc5df608e887d1",
+      "terminalClosureDigest": "3cc4b42358bfe714bc849bf7ae7795a0a1f5c95b9afc68f5008089ffb0b5dec0"
     },
     {
       "order": 529,
       "id": "CI-SCRIPTS-TASKKILL-RACE-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-05",
+      "state": "DONE",
+      "updated": "2026-08-06",
       "definitionDigest": "012ef92e2916038bc4490b1c5e79c37be529761f9c39f69c792d227cfbb8673a",
-      "progressDigest": "f980e0e0898a482a57eb563f8b4409324df9456abe2fc4d7e7c70a2d0d6699b0",
-      "terminalClosureDigest": null
+      "progressDigest": "6f469dd83c3880bdb82137a1ed96f41d80a5c318698bec584b641fbf318e819a",
+      "terminalClosureDigest": "562c5cbf27c3c93bd6430b73d5aab6f89b27f5a99dc664a39b60e3fdea2a3553"
     },
     {
       "order": 530,
@@ -865,6 +865,28 @@
       "updated": "2026-08-05",
       "definitionDigest": "f281b3ca1b7c8df33b96faf4f42019b612fd3772e157d2d1db7cfe59445d37ec",
       "progressDigest": "9b29ee61024c12637081405345499ce86fde513ff89a56d29b68d3090c55b917",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 531,
+      "id": "CI-COVERAGE-REVEALED-DEBT-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-06",
+      "definitionDigest": "4382b84e1cf52ef6f85aef6c1805ccbd36ac0a031c2557d3f96596ab72aeaa66",
+      "progressDigest": "80c05ad59723b50ac738fc73f64767117feb163df634ec6412c9419be9bebb27",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 532,
+      "id": "CI-VITEST-WORKER-CRASH-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-05",
+      "definitionDigest": "f78ac65f972bbf72a4be85fc234df165537deec3fbdfd3cf7ea3a58c606cb348",
+      "progressDigest": "e0563991590283d5f31b373bef5eea13d6112ea6b3c26394a95b816fb80379b9",
       "terminalClosureDigest": null
     },
     {
@@ -4896,6 +4918,16 @@
         "transitionAt": "2026-08-05T23:31:51Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-COVDEBT-E2E-01",
+      "authorityDigest": "06e881d9302895b981ad012c55fe8f50884779c395138a2d49a5c653d8e17bfd",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T04:20:02Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6803,105 +6835,6 @@
       "updated": "2026-08-04"
     },
     {
-      "order": 517,
-      "id": "CI-DASHBOARD-TESTS-LIVE-SERVER-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Tests—Dashboard job'ı main'de kalıcı kırmızı: suite canlı :3000 sunucusu bekliyor (ECONNREFUSED), CI'da sunucu yok — kök-neden izole edilmedi",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-CI-DASH-517-01"
-      ],
-      "acceptance": "Kök-neden izole edilir (suite hermetik mi olmalı, job mu sunucu başlatmalı, yoksa suite konumu mu yanlış); fix sonrası main-push Tests—Dashboard yeşil; dilim-kapanış checklist'ine 'main-push CI job-level yeşil + docs:stats regen' maddesi bu satırın settlement'ında yazılı kanıt olur",
-      "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu — 04:06'dan beri her main koşusunda failure, PR-required sette olmadığı için operatör radarına girmemişti (kör-nokta itirafı raporda); `receipt=GR-2026-08-05-CI-DASH-517-01`; 2026-08-05 SETTLEMENT (c133a3c39): kök-neden :3000 DEĞİL — iki i18n-no-literal-labels dosyası 'path'i userland shim'e çözüyordu (util.isString TypeError, suite dosya-düzeyi FAIL); node:path fix'iyle suite 94/94 dosya 1177/1177 test yeşil; ECONNREFUSED:3000 geçen testin stderr gürültüsü (kırmızı-ringa, ayrı hijyen-adayı); `proof=dashboard-suite-94files-1177tests-green`; kapanış kanıtı merge sonrası main-push Tests—Dashboard yeşili",
-      "updated": "2026-08-05"
-    },
-    {
-      "order": 518,
-      "id": "CI-ORCHESTRA-NODE26-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Tests—Orchestra (26.x) main'de kırmızı, 24.x aynı koşuda cancelled; 24.x lokal/PR koşuları 8758-yeşil — Node-26'ya özgü kırık izole edilmedi",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-CI-ORCH-518-01"
-      ],
-      "acceptance": "26.x kırığı test-adı düzeyinde izole edilir; Node-sürüm-matrisi politikası netleşir (26 desteklenecekse fix, değilse matristen tipli çıkarma); main-push Orchestra job'ları yeşil",
-      "evidence": "Açılış 2026-08-05: Alperen CI-kırmızı sorgusu; aynı kör-nokta sınıfı; 2026-08-05 İZOLASYON (run job 92292650755): kırık tests/orchestra/docker-backend-owned-settlement.test.ts'te 3 test — 'Required isolated claude credential file(s) unavailable: .credentials.json' (spawn-backend-docker.ts:5466 fail-closed kapısı); DİKKAT: test gerçek host-home'a güveniyor ve fixture credential kurmuyor — CI-24 aynı credential'sız runner'da GEÇİYOR, 26'da DÜŞÜYOR → Node-26'ya bağlı davranış sapması auth-isolation zincirinde (existsSync/homedir/broker-kopya adayları); bu üretim auth-kontratına dokunan kök-neden dilimi ister, yüzeysel test-fix'i değil; 24.x job'ının cancelled görünmesi 26.x fail'inin fail-fast iptali; `receipt=GR-2026-08-05-CI-ORCH-518-01`; 2026-08-05 SETTLEMENT (cf06cdf94): ÇERÇEVE DÜZELTİLDİ — kök Node-26 değil HERMETİKLİK ihlali (test gerçek host ~/.claude'a bağımlıydı; boş-HOME'da 24 ve 26 birebir aynı 3 kırık — lokal çift-sürüm repro); fix test-taraflı hibrit node:os homedir mock'u + fixture-home credential'ı, üretim değişmedi; `proof=empty-home-dual-node-3of3-green`; kapanış kanıtı merge sonrası main-push Orchestra 24.x+26.x yeşili",
-      "updated": "2026-08-05"
-    },
-    {
-      "order": 519,
-      "id": "CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Tests—Docs+Scripts'in kalan kırmızı kökü: containment-inventory-ratchet testi 60s sınırında timeout-flake'i (lokal build-free 48.9s ölçüldü — yavaş CI runner'da sınırı aşıyor)",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-CI-RATCHET-519-01"
-      ],
-      "acceptance": "Test-timeout gerçekçi tavana çekilir (ölçüm-temelli); main-push Tests—Docs+Scripts yeşile döner",
-      "evidence": "Açılış 2026-08-05: 517/518 kapanış-doğrulamasında izole edildi; tren-modeli ilk yolcusu; `receipt=GR-2026-08-05-CI-RATCHET-519-01`; 2026-08-05 SETTLEMENT (64343a53e): timeout 60s→180s ölçüm-temelli (lokal build-free 48.9s ×~3 runner-çarpanı); `proof=build-free-48s9-measured-run`; kapanış kanıtı tren merge'ü sonrası main-push Tests—Docs+Scripts yeşili",
-      "updated": "2026-08-05"
-    },
-    {
       "order": 520,
       "id": "TRUST-ANCHOR-001",
       "parent": "P00",
@@ -6933,105 +6866,6 @@
       "acceptance": "Aktif receipt baseline'ı working-tree byte'ına değil reviewed parent commit blob'una karşı doğrulanır (git parent-diff kontrolü validator'da veya required CI check'te); `owner=` metni tek başına authority sayılmaz — protected-branch + bağımsız review kanıtı zincire girer; branch protection durumu makine-okunur evidence olarak kayıtlıdır ve sahte-READY senaryosu (xverify E-ekseni 5-adım) regression testi olarak fail-closed kanıtlanır",
       "evidence": "Açılış: Alperen 2026-08-03 onayı (xverify E-ekseni kapanış kararı: satır aç + branch protection aç). Kaynak: codex-analysis/xverify-wp0-2026-08-03.md E — validator `SELF_REFERENTIAL_RECEIPT_PATHS` dışındaki receipt'lerde current working-tree hash'ini kabul ediyor ve `owner=Alperen` string'ini authenticate etmiyor; MASTER+source'u aynı patch'te değiştirebilen yazar sahte READY admission üretebilir. ÖLÇÜLMÜŞ mevcut durum (2026-08-03, gh api): main branch KORUMASIZ (`Branch not protected`, HTTP 404) ve repo PUBLIC — yani Codex'in güvenlik varsayımlarının hiçbiri bugün dışarıdan sağlanmıyor; açık canlıdır. Bu satır OQ-XV-02'nin de sahibidir. Branch protection'ı açmak GitHub repo ayarıdır ve Alperen tarafında; validator/CI tarafı bu satırın implementasyonudur; `receipt=GR-2026-08-03-TRUST-ANCHOR-01`; `proof=trust-anchor-forgery-fail-closed-84cases`; 2026-08-03 SETTLEMENT: (a) validator'a reviewed-parent doğrulaması eklendi — aktif receipt'in anchor'ı receipt'i tanıtan commit'in PARENT'ıdır (`git log -S`), commit'lenmemiş receipt HEAD'e (son reviewed state) çıpalanır; baseline anchor blob'uyla eşleşmezse `RECEIPT_BASELINE_UNREVIEWED` + admission düşer; (b) degradasyon typed: git dışında `no-git/no-history/no-parent` modu stderr WARN üretir, sessiz geçiş yok — zorlama garantisi ruleset 20321963'ün required check'lerinde (validator-contract 3 bacak + Type Check) ve o bacaklara eklenen `fetch-depth: 0`'da; (c) ruleset kanıtı makine-okunur: docs/evidence/trust-anchor/ruleset-20321963-2026-08-03.json (active, deletion+non_fast_forward+required_status_checks, bypass_actors BOŞ, current_user_can_bypass=never); (d) KANIT: 11 yeni vaka — 6 hermetik anchor-çözümü (sahte git, process yok) + 4 gerçek-git senaryosu (meşru authoring GEÇER, working-tree sahteciliği DÜŞER, xverify 5-adım aynı-commit saldırısı DÜŞER, meşru iki-commit akışı GEÇER) + git yetenek beyanı; suite 84/84. DÜRÜST SINIR-1 (bootstrap): bu dilimin KENDİ receipt'i ile implementasyonu aynı patch'te iniyor — doğduğu commit'te kendini zorlayamazdı; eski rejim altında admitted son dilim budur ve bundan SONRAKİ her aktif receipt parent-anchor'a tabidir. DÜRÜST SINIR-2: `owner=` metni hâlâ kriptografik authenticate edilmiyor — ruleset PR-akışını zorunlu kılarak yazar-dışı görünürlük getirir, imzalı-commit/review katmanı RECEIPT-001 kapsamında açık. X `?`: 3-platform koşusu bir sonraki CI turunda; 2026-08-03 X KAPANDI: PR #27 required-check koşusu (run 30846122775) — Validator Contract ubuntu/macos/windows üçü de pass, trust-anchor kodu ve 84-case suite dahil; merge ancak bu 3 bacak + Type Check yeşilken mümkün oldu (ruleset'in kendisi kanıt zincirinin parçası: direct push fiilen reddedildi, akış PR'a döndü); 2026-08-04 XVERIFY-E TUR-2 SONUCU (codex-analysis/xverify-e-2026-08-03.md): REFUTED — özgün 5-adım saldırısı fail-closed DOĞRULANDI (84/84 bağımsız koşum) ama dört mekanik varyant kabul yolu üretti (merge-introduction `-S`'e görünmez, rename anchor'ı ileri taşır, shallow-clone Type Check bacağında WARN-geçiş, blob-okuma hatası ABSENT sanılır) ve iki yapısal sınır adlandı (parent≠reviewed varsayımı, required-check self-modification). Mekanik dörtlünün kapanışı TRUST-ANCHOR-002'dedir; yapısal ikili solo-hesap mitigasyon araştırması sonrası owner kararıyla typed sınır veya iş olarak hükme bağlanacak — bu satır o karara kadar VERIFY'da kalır ve kapanmış SAYILMAZ",
       "updated": "2026-08-04"
-    },
-    {
-      "order": 521,
-      "id": "CI-STATS-HERMETIC-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "update-readme-stats üreteci hermetik değil: sprint rozeti lokal .brain arşivinden, coverage rozeti lokal coverage-artifact varlığından türüyor — iki makine aynı çıktıyı üretemiyor, main-push Tests—Docs+Scripts stats-stale kalıcı kırmızı (3 bandaj sonrası mimari kök)",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-STATS-HERM-521-01"
-      ],
-      "acceptance": "Volatil rozet girdileri (sprint, coverage) izlenen snapshot dosyasından okunur; check/write yalnız izlenen dosyaların fonksiyonu olur (temiz checkout deterministik — CI ile lokal aynı sonucu üretir); bilinçli güncelleme refresh-snapshot moduyla (sprint monotonik, coverage yalnız açık bayrakla); main-push Tests—Docs+Scripts yeşile döner",
-      "evidence": "Açılış 2026-08-05: stats-stale üçüncü tekrarında kök TASARIMSAL bulundu, bandajlama durduruldu, öneri Alperen'e taşındı; 2026-08-05 KARAR: 'öneri kabul edildi' (Alperen) — izlenen-snapshot tasarımı onaylı; `receipt=GR-2026-08-05-STATS-HERM-521-01`; 2026-08-05 SETTLEMENT (8d0726dcd): üreteç snapshot-tabanlı hermetik — sprint+coverage izlenen .deckent/workspace/stats-snapshot.json'dan (bilinçli refresh-snapshot modu, npm docs:stats:refresh; sprint monotonik, coverage yalnız açık with-coverage bayrağıyla) ve temp-* agent'lar tüm sayımlardan dışlandı (ikinci volatil girdi; temiz-worktree collectStats diff kanıtı agentsTotal 23≠21); `proof=clean-worktree-check-green-write-idempotent`; temiz detached-worktree'de (CI-şekli: .brain-arşivsiz, coverage'sız, dist'siz) check yeşil VE write bayt-stabil (0 değişiklik), suite 36/36, tsc temiz, hermetic baseline'lar build-free tazelendi (parent-worktree 12473 birebir parite); kapanış kanıtı merge sonrası main-push Tests—Docs+Scripts yeşili",
-      "updated": "2026-08-05"
-    },
-    {
-      "order": 522,
-      "id": "CI-DOCS-SCRIPTS-STEP-TIMEOUT-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Tests—Docs+Scripts'in YENİ kırmızı kökü: step-düzeyi timeout-minutes 5 duvarı — suite büyüdü (307.86s ölçüldü), duvar SIGKILL×2 + builtins-drift boş-çıktı + hermetic analysis-context 60s iç-bütçe aşımı ikincil kırıklarını üretti; 521 stats-kapısı TEMİZ geçti",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-CI-STEP-TIMEOUT-522-01"
-      ],
-      "acceptance": "Step-timeout ölçüm-temelli tavana çekilir (5→15dk, ×3 headroom 519 deseni); main-push Tests—Docs+Scripts yeşile döner; 517/518/519/521 + W3B2 main-yeşil kapanış kanıtları bu koşuyla üretilir",
-      "evidence": "Açılış 2026-08-05: run 31050457808 log-izolasyonu (521 merge sonrası ilk main koşusu); 519'un step-katmanı ikizi; `receipt=GR-2026-08-05-CI-STEP-TIMEOUT-522-01`; 2026-08-05 KARAR: Alperen 'hemen tek-PR' (karar-turu); 2026-08-05 SETTLEMENT: timeout-minutes 5→15 açıklayıcı yorumla; `proof=measured-307s-vs-5min-wall`; kapanış kanıtı merge sonrası main-push Tests—Docs+Scripts yeşili (517/518/519/521 + W3B2 kanıt koşusu aynı run)",
-      "updated": "2026-08-05"
-    },
-    {
-      "order": 523,
-      "id": "CI-HERMETIC-SCAN-BUDGET-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Hermetic-lint iç kaynak bütçeleri yavaş/doymuş CI runner'ında gerçekçi değil: analysis-context 60000ms bütçesi fork-doygunluğunda aşılıyor (run 31050457808: 22.4M op'ta duvar; lokal 18s/35M op), 1GiB rss bütçesi lokalde GC-slack flake'i üretiyor (--max-old-space-size=640 workaround'u kayıtlı)",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-HERM-BUDGET-523-01"
-      ],
-      "acceptance": "İç bütçeler ölçüm-temelli ve ortam-farkındalıklı (runner-çarpanı veya env-scale) yeniden kalibre edilir; 522 sonrası main koşusu hâlâ bütçe-aşımı üretirse bu satır acilleşir; workaround'suz lokal koşu yeşil",
-      "evidence": "Açılış 2026-08-06: 522 log-izolasyonunun ikincil bulgusu + dünkü 1GiB GC-slack kaydı — Alperen seçimi (karar-turu: küçük işler); 2026-08-05 ACİLLEŞME: 522 sonrası ilk main koşusu (31053488358) writer-analysis 60000.8ms bütçe-aşımıyla düştü — öngörü doğrulandı; `receipt=GR-2026-08-05-HERM-BUDGET-523-01`; 2026-08-05 SETTLEMENT: MAX_SCAN_WALL_MS 60s→180s + rss/heap 1GiB→2GiB ölçüm-yorumlu; `proof=workaroundsuz-buildfree-17s8-567mib-green`; lokal build-free koşu eski --max-old-space-size=640 workaround'u OLMADAN yeşil; kapanış kanıtı merge sonrası main-push Tests—Docs+Scripts yeşili",
-      "updated": "2026-08-05"
     },
     {
       "order": 524,
@@ -7096,106 +6930,6 @@
       "updated": "2026-08-04"
     },
     {
-      "order": 527,
-      "id": "CI-BUILTINS-DRIFT-HERMETIC-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "builtins-drift canlı-iki-ağaç testinin '.deckent/skills/docs dışlanır' pini makine-lokal untracked dizine bağımlı — temiz CI checkout'ta dizin yok, 'expected [] to include docs' kırmızısı (62aafff34 index-silme sonrası kör kalmış, stats-stale kırmızısı maskeliyordu)",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-BUILTINS-HERM-527-01",
-        "GR-2026-08-05-TREND-STATS-SUPP-01"
-      ],
-      "acceptance": "Pin varlık-koşullu olur (dizin mevcutken davranış aynen pinli, temiz checkout'ta atlanır); main-push Tests—Docs+Scripts'in bu kırık sınıfı kapanır",
-      "evidence": "Açılış 2026-08-05: run 31053488358 + 31050457808 log-izolasyonu; `receipt=GR-2026-08-05-BUILTINS-HERM-527-01`; 2026-08-05 SETTLEMENT: pin it.runIf varlık-koşuluna alındı (dizin mevcutken davranış birebir pinli); `proof=builtins-suite-30of30-local-dir-present`; test-sayaç deltası mekanik regen ek-receipt'iyle kapatıldı; `receipt=GR-2026-08-05-TREND-STATS-SUPP-01`; kapanış kanıtı merge sonrası main-push Tests—Docs+Scripts yeşili",
-      "updated": "2026-08-05"
-    },
-    {
-      "order": 528,
-      "id": "DOCS-ALP-DISCIPLINE-SYNC-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Vendored alp-discipline dokusunun upstream v1.0.4'e senkronu (karar-çapası ESSENCE/DISCIPLINE güncel kalsın)",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-ALP-DISC-104-01"
-      ],
-      "acceptance": "alp-discipline/ içeriği upstream v1.0.4 tag'iyle birebir (mekanik kopya, fark yalnız lokal-only .deckent+.gitignore); ESSENCE sürüm-başlığı v1.0.4",
-      "evidence": "Açılış 2026-08-05: Alperen canlı talimatı 'repodan güncel haline çekelim, 1.0.4 versiyonu kullanalım'; `receipt=GR-2026-08-05-ALP-DISC-104-01`; 2026-08-05 SETTLEMENT: v1.0.4 (a810c42) birebir çekildi — 7 dosya + ACKNOWLEDGEMENTS.md upstream-kaldırımı aynalandı, lokal-only korundu; `proof=diff-r-upstream-birebir`; diff -r upstream tag'iyle sıfır fark",
-      "updated": "2026-08-05"
-    },
-    {
-      "order": 529,
-      "id": "CI-SCRIPTS-TASKKILL-RACE-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "scripts.test runScriptAsync taskkill it.each'inin 25ms bütçesi yavaş runner'da gerçek process-spawn süresinin altında — kill-eskalasyon aşama-yarışı flake'i (false-success senaryosu 'taskkill timeout'a düşüyor)",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-05-TASKKILL-RACE-529-01"
-      ],
-      "acceptance": "Zaman-bütçeleri senaryo-bağımlı olur: taskkill-tamamlanma senaryoları geniş bütçe, hang-senaryosu deterministik küçük; üretim timeout-authority kontratı değişmez; main-push Tests—Docs+Scripts'in bu flake sınıfı kapanır",
-      "evidence": "Açılış 2026-08-05: run 31054702920 log-izolasyonu (523/527 fix'leri tuttuktan sonra kalan tek Docs+Scripts kırığı); `receipt=GR-2026-08-05-TASKKILL-RACE-529-01`; 2026-08-05 SETTLEMENT: taskkillTimeoutMs senaryo-bağımlı (tamamlanma-senaryoları 5s, hang 25ms deterministik); `proof=scripts-suite-173of173-local`; scripts+hermeticity suite 173/173, tsc temiz; kapanış kanıtı merge sonrası main-push Docs+Scripts yeşili",
-      "updated": "2026-08-05"
-    },
-    {
       "order": 530,
       "id": "CI-COVERAGE-JOB-WALL-001",
       "parent": "P00",
@@ -7227,6 +6961,70 @@
       ],
       "acceptance": "Step-cap ölçüm-sonrası-kalibre tavana çekilir (20→45dk; ilk yeşil koşu gerçek süreyi ölçer, tavan gerekirse daraltılır); production-scale test açık 60s timeout alır; Coverage Report yeşile döner veya threshold-gate dürüst sinyal verir",
       "evidence": "Açılış 2026-08-05: run 31054702920 + gün-içi 8 koşu tarihi; `receipt=GR-2026-08-05-COVERAGE-WALL-530-01`; 2026-08-05 SETTLEMENT: step-cap 20→45dk measure-then-calibrate + scanTestDir production-scale 60s açık timeout; baseline digest supp-receipt'le mekanik tazelendi; `receipt=GR-2026-08-05-TREN-E-BASELINE-SUPP-01`; `proof=peak-rss-996mib-validates-2gib-budget`; kapanış kanıtı merge sonrası main-push Coverage Report'un ilk yeşil (veya dürüst threshold-sinyalli) koşusu — gerçek süre o koşuda ölçülüp tavan gerekirse daraltılır",
+      "updated": "2026-08-05"
+    },
+    {
+      "order": 531,
+      "id": "CI-COVERAGE-REVEALED-DEBT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-COVDEBT-E2E-01"
+      ],
+      "acceptance": "Envanter dosya-aile bazında dilimlenir ve her aile kendi receipt'li treniyle kapanır: chain-safety.e2e 14 (kök İZOLE: fixture'lar literal 'sonnet' + registry'siz provider çözümü — ADR-G-036 kontrat sapması, lokal deterministik repro) · dead-code-decisions 12 · docker-exit-final 6 · sprint-lifecycle.e2e 5 · docker-exit-reproducer 4 · docker-hb 3 · nerv-w1-predicate 2 · sekiz tekli (governance×2, release, build, brain, workflows, docker-timeout, ratchet); her kökte bayat-kontrat/gerçek-bug sınıflandırması yapılır, gerçek-bug üretim-dilimi olur; uzun-vade karar adayı: bu sınıflara hızlı job kapsaması",
+      "evidence": "Açılış 2026-08-05: run 31056929295 tam-suite ilk koşusu; Alperen karar-turu 'sınıf-sınıf trenler'; chain-safety kökü aynı gece izole edildi (sprint-utils resolveTaskProvider ProviderError, lokal 15/16 kırık repro); `receipt=GR-2026-08-06-COVDEBT-E2E-01`; e2e-aile admission 2026-08-06 (Alperen: 'chain-safety treniyle devam et'); 2026-08-06 E2E-AİLE SETTLEMENT: chain-safety.e2e (14) + sprint-lifecycle (5) kırıkları kapandı — registry-öncesi suite'lere minimal default-ProviderAdapter fixture'ı (üretim çözüm-zinciri ve test pinleri değişmedi, model-literal yok); `proof=e2e-pair-27of27-local-deterministic-repro-fixed`; iki suite 27/27, tsc temiz, hermetic-baseline ve stats oynamadı; satır alt-dilim kuralıyla OPEN'a döner (14 aile-dosyası açık: dead-code-decisions 12 · docker ailesi 14 · sekiz tekli + nerv 2)",
+      "updated": "2026-08-06"
+    },
+    {
+      "order": 532,
+      "id": "CI-VITEST-WORKER-CRASH-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor)",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Kök izole edilir (vitest sürüm/worker-lifecycle); fix veya typed mitigasyonla job-level exit-code test-sonucuyla tutarlı olur; continue-on-error maskesi kaldırılabilir hale gelir",
+      "evidence": "Açılış 2026-08-05: Alperen karar-turu 'satır aç, sıraya koy' — 55-kırık (531) ve W3 dilim-3'ten sonra",
       "updated": "2026-08-05"
     },
     {
@@ -19889,6 +19687,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7c98f7f545851955e833cb5a74298971d54056bcb6e1c3cfb9a926e3cda8923d"
+    "value": "02b1797c25c4ce38e14e08b006788a0bd51837c44f86511cd639439e736b6273"
   }
 }

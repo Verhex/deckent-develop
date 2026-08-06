@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):342e0d5a416bffc5beb4f190c9f68474d23234b31ec5a4d0619a6ec882b4f1c5`
+**Source digest:** `sha256(normalized-lf-utf8):6474e1e4606e82b19e22a449f8d32dcbe579fcfda7f9cb96f32f98210e8d169a`
 
-**Rows:** 381 total · 358 active · 23 terminal
+**Rows:** 383 total · 351 active · 32 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 258 |
+| OPEN | 260 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 33 |
-| DONE | 23 |
+| VERIFY | 24 |
+| DONE | 32 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -78,19 +78,12 @@
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
-| 517 | `CI-DASHBOARD-TESTS-LIVE-SERVER-001` | VERIFY | P1 | TRUTH | — | — | Tests—Dashboard job'ı main'de kalıcı kırmızı: suite canlı :3000 sunucusu bekliyor (ECONNREFUSED), CI'da sunucu yok — kök-neden izole edilmedi |
-| 518 | `CI-ORCHESTRA-NODE26-001` | VERIFY | P1 | TRUTH | — | — | Tests—Orchestra (26.x) main'de kırmızı, 24.x aynı koşuda cancelled; 24.x lokal/PR koşuları 8758-yeşil — Node-26'ya özgü kırık izole edilmedi |
-| 519 | `CI-DOCS-SCRIPTS-RATCHET-TIMEOUT-001` | VERIFY | P2 | TRUTH | — | — | Tests—Docs+Scripts'in kalan kırmızı kökü: containment-inventory-ratchet testi 60s sınırında timeout-flake'i (lokal build-free 48.9s ölçüldü — yavaş CI runner'da sınırı aşıyor) |
 | 520 | `TRUST-ANCHOR-001` | VERIFY | P0 | TRUTH | — | — | Validator admission trust anchor'ı gerçekten enforce edilir: receipt baseline'ı parent-diff'e karşı doğrulanır, owner authority authenticated olur |
-| 521 | `CI-STATS-HERMETIC-001` | VERIFY | P1 | TRUTH | — | — | update-readme-stats üreteci hermetik değil: sprint rozeti lokal .brain arşivinden, coverage rozeti lokal coverage-artifact varlığından türüyor — iki makine aynı çıktıyı üretemiyor, main-push Tests—Docs+Scripts stats-stale kalıcı kırmızı (3 bandaj sonrası mimari kök) |
-| 522 | `CI-DOCS-SCRIPTS-STEP-TIMEOUT-001` | VERIFY | P1 | TRUTH | — | — | Tests—Docs+Scripts'in YENİ kırmızı kökü: step-düzeyi timeout-minutes 5 duvarı — suite büyüdü (307.86s ölçüldü), duvar SIGKILL×2 + builtins-drift boş-çıktı + hermetic analysis-context 60s iç-bütçe aşımı ikincil kırıklarını üretti; 521 stats-kapısı TEMİZ geçti |
-| 523 | `CI-HERMETIC-SCAN-BUDGET-001` | VERIFY | P2 | TRUTH | — | — | Hermetic-lint iç kaynak bütçeleri yavaş/doymuş CI runner'ında gerçekçi değil: analysis-context 60000ms bütçesi fork-doygunluğunda aşılıyor (run 31050457808: 22.4M op'ta duvar; lokal 18s/35M op), 1GiB rss bütçesi lokalde GC-slack flake'i üretiyor (--max-old-space-size=640 workaround'u kayıtlı) |
 | 524 | `VERIFY-HISTORICAL-CLOSURE-001` | OPEN | P2 | TRUTH | — | — | Historical-only VERIFY satırlarının (10 adet) receipt-gated kapanış dilimi: her satır için kanıt-durumu tiplenir (yeniden-doğrulanabilir / historical-yeterli / eksik-kanıt) ve kapanış turu Alperen onayıyla koşulur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
-| 527 | `CI-BUILTINS-DRIFT-HERMETIC-001` | VERIFY | P1 | TRUTH | — | — | builtins-drift canlı-iki-ağaç testinin '.deckent/skills/docs dışlanır' pini makine-lokal untracked dizine bağımlı — temiz CI checkout'ta dizin yok, 'expected [] to include docs' kırmızısı (62aafff34 index-silme sonrası kör kalmış, stats-stale kırmızısı maskeliyordu) |
-| 528 | `DOCS-ALP-DISCIPLINE-SYNC-001` | VERIFY | P2 | TRUTH | — | — | Vendored alp-discipline dokusunun upstream v1.0.4'e senkronu (karar-çapası ESSENCE/DISCIPLINE güncel kalsın) |
-| 529 | `CI-SCRIPTS-TASKKILL-RACE-001` | VERIFY | P1 | TRUTH | — | — | scripts.test runScriptAsync taskkill it.each'inin 25ms bütçesi yavaş runner'da gerçek process-spawn süresinin altında — kill-eskalasyon aşama-yarışı flake'i (false-success senaryosu 'taskkill timeout'a düşüyor) |
 | 530 | `CI-COVERAGE-JOB-WALL-001` | VERIFY | P1 | TRUTH | — | — | Coverage Report kronik kırmızı: enstrümante tam-suite 20dk step-cap duvarına çarpıyor (bugünün TÜM main koşularında ~21dk'da kill; yeşil veri noktası yok) + scanTestDir production-scale testi enstrümantasyon-yükünde 10s default test-timeout'una çarpıyor (11.9s ölçüldü) |
+| 531 | `CI-COVERAGE-REVEALED-DEBT-001` | OPEN | P1 | TRUTH | — | — | 530 duvar-kaldırımının açığa çıkardığı görünmez borç: yalnız-Coverage'da koşan test sınıfları (e2e/audits/backends/docker/nervous/governance/release/build/brain/workflows — hiçbir hızlı CI job'unda yoklar) 20-dk duvarı ardında haftalardır kör; ilk tam koşu (run 31056929295, 35179 test) 16 dosyada 55 gerçek kırık |
+| 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |

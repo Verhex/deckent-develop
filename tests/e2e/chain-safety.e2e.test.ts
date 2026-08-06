@@ -21,6 +21,25 @@ import { waitForResults } from '../../src/orchestra/result-collector.js';
 import { calculateMetrics } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, TaskStatus, SprintStatus, SprintPhase } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics } from '../../src/core/types.js';
+import { providerRegistry } from '../../src/core/provider.js';
+import type { ProviderAdapter } from '../../src/core/provider.js';
+
+// 531 e2e-aile dilimi (GR-2026-08-06-COVDEBT-E2E-01): this suite predates the
+// provider registry and registered nothing, so resolveTaskProvider's contract
+// (explicit provider → model registry → DEFAULT provider) died at resolution
+// before any gate logic ran. A minimal default adapter restores the real
+// production fallback path without coupling the fixtures to any model
+// identity; the gate/lifecycle pins under test are unchanged.
+const e2eDefaultProviderStub: ProviderAdapter = {
+  name: 'e2e-default-stub',
+  supportedModels: [],
+  executionCostClass: 'local',
+  spawn: () => {},
+  kill: () => {},
+  listWorkers: () => [],
+  isAvailable: async () => true,
+  buildCommand: () => 'e2e-default-stub',
+};
 
 // ─── Chain Safety Gate ───────────────────────────────────────────────────
 
@@ -187,9 +206,14 @@ async function runMiniSprint(
 beforeEach(() => {
   cleanup();
   fs.mkdirSync(TASKS_DIR, { recursive: true });
+  providerRegistry.clear();
+  providerRegistry.registerProvider(e2eDefaultProviderStub, true);
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  providerRegistry.clear();
+  cleanup();
+});
 
 // ─── Chain Safety Gate Tests ─────────────────────────────────────────────
 
