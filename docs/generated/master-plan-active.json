@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d4c7a300837097ace1f7b18be31272d972b65573fb9e5ebce10bfc5a35308058"
+    "value": "e06911d04881c02ae1f0539a39d86386c9cbc7452eee38c1e6782fc9cf964ec2"
   },
   "summary": {
     "total": 387,
     "active": 354,
     "terminal": 33,
-    "receipts": 78,
+    "receipts": 79,
     "byState": {
       "OPEN": 259,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 27,
+      "VERIFY": 28,
       "DONE": 33,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3127,10 +3127,10 @@
       "id": "PRINCIPAL-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "fa879e7874c86d428bb4f508ad2284eb8e78ac0c663a8af384bbbcb836759b06",
-      "progressDigest": "4f2d1a1cea544c29acf4acb4c1d85ac36b40226e9a10e5a2fbbf39ee2993046f",
+      "progressDigest": "f5052326a0139de2b5f62ef5cc8f92af9d4fe324bceacfe833ccf8c3f8ad0a04",
       "terminalClosureDigest": null
     },
     {
@@ -5098,8 +5098,18 @@
       "authorityDigest": "1805888b45c77980003c7bb961fab703fc409ba833106f86b103e58d337422c4",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-06T08:06:43Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-P1A-CONSUMER-SUPP-01",
+      "authorityDigest": "5981cf3532fb5146587219b47a176811665cbfd97c9cc07a7203ab8c4b368e3b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T08:06:43Z"
       },
       "g7AttemptIdentity": null
     }
@@ -15610,7 +15620,7 @@
         "G2",
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "~",
         "W": "~",
@@ -15627,7 +15637,7 @@
         "GR-2026-08-06-PRINCIPAL-P1A-01"
       ],
       "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
-      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate)",
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile",
       "updated": "2026-08-06"
     },
     {
@@ -19940,6 +19950,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "14a42b62f33060ecef111b064125f87b9d76ef8584505098cbb8776a3d63566f"
+    "value": "4ee653f0deadbbd7900cdef9399a366034fc9510012d475c8004867b281dfaf9"
   }
 }
