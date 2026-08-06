@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "eff34534bd09bafa60ee47e328355fedcc97924b97575091a1f31481397c2065"
+    "value": "90d97c7f733297ec81e6a7a39605b60bbe77d7eedeedb14fb2a57bac5a6f392c"
   },
   "summary": {
     "total": 388,
@@ -2657,7 +2657,7 @@
       "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "b924cce604d3bd3b1f92f1c4adcabfe02158204e872f04420199417abfcbe07b",
-      "progressDigest": "c096d8add90c6321e9ce9a4c58e4d8cb208c6bb4cd12dc3afc3159e3b8ed11a4",
+      "progressDigest": "d167d852f3490f4ff2c05ec1d99f7192f59a97cfe06f13d47247869e60c5d848",
       "terminalClosureDigest": null
     },
     {
@@ -5169,8 +5169,8 @@
       "authorityDigest": "ebd74d01b8b6c9e2488dea039c5c2a03f4c107181756ff72a10ae2cafe3cf5ac",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-06T11:23:32Z"
       },
       "g7AttemptIdentity": null
     }
@@ -14317,7 +14317,7 @@
         "E": "1",
         "H": "1",
         "L": "1",
-        "X": "0",
+        "X": "~",
         "S": "?"
       },
       "blockerCode": null,
@@ -14327,7 +14327,7 @@
         "GR-2026-08-06-FINALIZER-487-01"
       ],
       "acceptance": "Receipt publication failure or non-cleanup-eligible terminal evidence throws a typed terminal-evidence error before archive, job summary, notification, dashboard or COMPLETE state; CLI exits non-zero and artifacts remain recoverable",
-      "evidence": "Sprint-487 force-finalize exposed a false COMPLETE with no terminal receipt because finalizer swallowed `TERMINAL_EVIDENCE_HOLD`. Finalizer now fails closed at the receipt boundary and the focused source-order contract passes; the repaired 32/32 logical settlement subsequently permits the real built-binary receipt path. Fresh paused-run CLI replay and every-environment fault injection remain open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-finalizer-receipt-hold`; `receipt=GR-2026-08-06-FINALIZER-487-01`; 487 yaprak-dilimi admission 2026-08-06 (kaskadın gerçek yaprağı — karar-turu)",
+      "evidence": "Sprint-487 force-finalize exposed a false COMPLETE with no terminal receipt because finalizer swallowed `TERMINAL_EVIDENCE_HOLD`. Finalizer now fails closed at the receipt boundary and the focused source-order contract passes; the repaired 32/32 logical settlement subsequently permits the real built-binary receipt path. Fresh paused-run CLI replay and every-environment fault injection remain open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-finalizer-receipt-hold`; `receipt=GR-2026-08-06-FINALIZER-487-01`; 487 yaprak-dilimi admission 2026-08-06 (kaskadın gerçek yaprağı — karar-turu); 2026-08-06 YAPRAK-DİLİM SETTLEMENT: iki açık boyut gerçek-binary kanıtla kapandı — taze paused-run replay (receipt durable + monotonic terminal state) ve fault-injection (yazılamaz receipt dizini → EACCES fail-closed: receipt yok, sahte COMPLETE yok, task artifact'ları kurtarılabilir; elle probe'la bağımsız doğrulandı); `proof=real-binary-replay-and-faultinjection-4of4`; üretim kodu değişmedi; X boyutu typed-açık kalır (harness linux-gated; her-ortam fault-injection W4 windows-matris işine bağlı)",
       "updated": "2026-08-06"
     },
     {
@@ -20015,6 +20015,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5546b3b47bf8175efcb0587a0977d2a29f7deeb581c4f0403d620f03034c538d"
+    "value": "159a1eff5ebe511d289ecc7a47b0799288b6f28636588f3b659a6b176af9b2a7"
   }
 }
