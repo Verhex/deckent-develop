@@ -108,10 +108,11 @@ export function createScanBudget(
 // Root cause of the long-running CI red (chronic since at least 2026-08-01): baselines
 // were being refreshed on built trees. Making the scan dist-blind is a MASTER-PLAN item.
 export const UNRESOLVED_BASELINE = Object.freeze({
-  // 2026-08-05 (build-free, tren-e 529/530): taskkill scenario budgets and
-  // the instrumented-scan timeout — same 12481 count, digest only. Prior: 527.
-  count: 12481,
-  digest: '2a34048e517b9ee9dc4a0f35bca95f0ac88cf21a78b4009b1a5b726a8b082bff',
+  // 2026-08-06 (build-free, COVDEBT-DOCKER-02): four superseded docker-era
+  // suites retired (owner decision, coverage mapped to the FAZ4B orchestra
+  // class) — 12481 → 12477. Prior: tren-e 529/530.
+  count: 12477,
+  digest: '603c3f30f88a55ec8ea050e4ac7b7ec061dfc8973c0073350e583c602728ead0',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
