@@ -110,15 +110,19 @@ export function createScanBudget(
 export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-06 (build-free, COVDEBT-SWEEP): +1 from the nerv-w1 scheduler-
   // fence task-file fixture writes. Prior: COVDEBT-DOCKER-02 (12477).
+  // 533 dist-blind: same 12478 count, digest reflects the deterministic
+  // build-output edge classification — verified IDENTICAL on built and
+  // build-free trees (the point of the fix).
   count: 12478,
-  digest: '78188b9e121e8a43d576dca1f9d03076b192e15844a3e38795590b9bee5e4c17',
+  digest: 'c63a21e5ae9fbf5ec26c3276466d98191323e21062fe35e5f2494359f95e0c2a',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-06 (COVDEBT-SWEEP): README docs-link absolutization + the scan-
   // budget param — same 1197 count, content digest only. Prior: 523.
+  // 533 dist-blind: same 1197 count, digest-only (deterministic classification).
   count: 1197,
-  digest: '0b25a75a91e0f679f039b417b7a6b96016ec1df03452cbe9d0a2cf9f32860995',
+  digest: 'aa7646b40e421a0de8c66326b32f7b25959e5edf7b4107bc33570d5ca9ee1910',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
@@ -4212,6 +4216,22 @@ function resolveLocalSupportImport(fromFile, specifier, realRoot) {
     return LOCAL_SUPPORT_IMPORT_CACHE.get(cacheKey);
   }
   const raw = resolve(fromFile, '..', specifier);
+  // 533 (CI-HERMETIC-SCAN-DIST-BLIND-001): never resolve into build output.
+  // On a BUILT tree this walk otherwise ANALYZES dist files a clean checkout
+  // cannot even see (+71 analyzer entries from dist/core/errors.js, measured
+  // on run 31074633586), while a build-free tree records the same import as
+  // an unresolved edge. Returning undefined here makes both trees classify
+  // the import identically, so build-free baselines hold everywhere and the
+  // "measure only on a build-free tree" operational dance is gone.
+  const buildOutputRoots = [
+    join(realRoot, 'dist'),
+    join(realRoot, 'src', 'dashboard', 'dist'),
+    join(realRoot, 'src', 'desktop', 'dist'),
+  ];
+  if (buildOutputRoots.some(root => raw === root || raw.startsWith(root + sep))) {
+    LOCAL_SUPPORT_IMPORT_CACHE.set(cacheKey, undefined);
+    return undefined;
+  }
   const extension = TEST_SUPPORT_EXTENSIONS.find(candidate => raw.endsWith(candidate));
   const stem = extension ? raw.slice(0, -extension.length) : raw;
   const candidates = [

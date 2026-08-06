@@ -23,7 +23,10 @@ function runAuditScript(extraArgs: string[] = []): Promise<{ status: number; std
     let stdout = '';
     child.stdout.setEncoding('utf-8');
     child.stdout.on('data', (d: string) => { stdout += d; });
-    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('audit script timeout (120s)')); }, 120_000);
+    // 531 (Coverage-koşusu doygunluğu, run 31074633586): the saturated coverage
+    // runner starves this uninstrumented subprocess past the old 120s wall —
+    // 360s keeps the ~3x slow-runner multiplier used across this class.
+    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('audit script timeout (360s)')); }, 360_000);
     // Resolve only once BOTH the process has exited AND its stdout stream has
     // fully drained ('end'). For large output (the audit prints thousands of
     // lines) 'close' can fire while the final pipe chunk — which carries the
@@ -199,7 +202,7 @@ describe('dead-code-audit.mjs script execution', () => {
     const result = await runAuditScript(['--no-report']);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Audit complete');
-  }, 150_000);
+  }, 420_000); // 531: 360s cocuk-timeout + tampon (doymus coverage-runner olcumu)
 
   it('produces JSON output with --json flag', async () => {
     const result = await runAuditScript(['--json', '--no-report']);
@@ -207,7 +210,7 @@ describe('dead-code-audit.mjs script execution', () => {
     // JSON output should contain suspectResults
     expect(result.stdout).toContain('"suspectResults"');
     expect(result.stdout).toContain('"summary"');
-  }, 150_000);
+  }, 420_000); // 531: 360s cocuk-timeout + tampon (doymus coverage-runner olcumu)
 
   it('writes the report to a --report-dir without touching the real docs tree', async () => {
     const outDir = mkdtempSync(join(tmpdir(), 'deckent-deadcode-'));
@@ -218,5 +221,5 @@ describe('dead-code-audit.mjs script execution', () => {
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }
-  }, 150_000);
+  }, 420_000); // 531: 360s cocuk-timeout + tampon (doymus coverage-runner olcumu)
 });
