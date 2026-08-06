@@ -296,9 +296,20 @@ export function registerPlan(program: Command): void {
                 ].join('\0')).digest('hex').slice(0, 32)}`
               : randomUUID();
             const revision = 1;
+            // PRINCIPAL-001 P1c: the non-adoption path fabricated a
+            // 'cli-operator' literal (missed in the P1a sweep). A local CLI
+            // invocation genuinely IS the host OS user. The adoption path keeps
+            // the owner-supplied actor id but marks it honestly — a user-typed
+            // string is NOT a verified identity, which is exactly what the
+            // enforce flag must be able to refuse.
             const planActor = adoptionRequested
-              ? { id: opts.adoptionActor! }
-              : { id: 'cli-operator' };
+              ? {
+                id: opts.adoptionActor!,
+                identityClass: 'local' as const,
+                assurance: 'unverified' as const,
+                provenance: 'cli' as const,
+              }
+              : principalToActor(resolveLocalOsPrincipal('cli'));
             flowPlan = await planRunFlow({
               projectRoot: root,
               config,
@@ -517,7 +528,7 @@ export function registerPlan(program: Command): void {
         const approve = (): void => {
           decideRunFlowPlan(root, flowPlan.flowId, {
             decision: 'approve',
-            actor: flowPlan.projectionAdoption?.authorizedBy ?? { id: 'cli-operator' },
+            actor: flowPlan.projectionAdoption?.authorizedBy ?? principalToActor(resolveLocalOsPrincipal('cli')),
             acknowledgePromptGate: opts.forcePromptGate === true,
             acknowledgeScopePaths: opts.forceScope === true,
           });
