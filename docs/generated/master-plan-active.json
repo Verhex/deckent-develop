@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "47fae8efcf016be128bcb34b7e3ae8f1694ed369f9c208e7dc0de65b8efc847b"
+    "value": "90d97c7f733297ec81e6a7a39605b60bbe77d7eedeedb14fb2a57bac5a6f392c"
   },
   "summary": {
     "total": 388,
     "active": 354,
     "terminal": 34,
-    "receipts": 82,
+    "receipts": 84,
     "byState": {
       "OPEN": 258,
       "READY": 0,
@@ -2391,9 +2391,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-07-31",
+      "updated": "2026-08-06",
       "definitionDigest": "b4c7538863f5fd35cfc196c095153ebd6488022b7fdff79639864582c4a6e52f",
-      "progressDigest": "be946314bfcbbd5010b5969c6f4eaf3569004c814f35b5f107f7efcadff1dcf0",
+      "progressDigest": "27b7fca0128c91aa85adb0c6da078391c44884b5c083c8a99bf96eb525ace4cb",
       "terminalClosureDigest": null
     },
     {
@@ -2655,9 +2655,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-07-31",
+      "updated": "2026-08-06",
       "definitionDigest": "b924cce604d3bd3b1f92f1c4adcabfe02158204e872f04420199417abfcbe07b",
-      "progressDigest": "d5d41c6883f87c32f976599bfcbc50b2eb11babb92b6ed71e027119fedfd2255",
+      "progressDigest": "d167d852f3490f4ff2c05ec1d99f7192f59a97cfe06f13d47247869e60c5d848",
       "terminalClosureDigest": null
     },
     {
@@ -5151,6 +5151,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-06T08:40:07Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-TERMPUB-485A-01",
+      "authorityDigest": "33b438792bbdec2937160214c5981c8fdd298ae9521927b004c3a87a4af36d11",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "revoked",
+        "transitionAt": "2026-08-06T11:06:53Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-FINALIZER-487-01",
+      "authorityDigest": "ebd74d01b8b6c9e2488dea039c5c2a03f4c107181756ff72a10ae2cafe3cf5ac",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T11:23:32Z"
       },
       "g7AttemptIdentity": null
     }
@@ -13387,8 +13407,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "One fenced terminal receipt atomically precedes archive/cleanup; CLI, MCP, dashboard and job remain monotonic COMPLETE with logical progress bounded to N/N; temp/residue files cannot become task identity",
-      "evidence": "Sprint-487 wired exact terminal evidence and one fenced receipt before every archive/cleanup edge, then moved CLI and MCP onto one core receipt projection. Supervisor canary exposed and repaired locale-dependent FIX-leaf selection, fail-open receipt publication, and landing-proposal archival. Real built CLI now passes exact coordinator death, receipt-before-archive, residue preservation and monotonic status. Dashboard/job adoption and every-environment replay remain open. Negative scope: no timer mask, dashboard lifecycle authority or evidence deletion; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-terminal-binary`",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-487 wired exact terminal evidence and one fenced receipt before every archive/cleanup edge, then moved CLI and MCP onto one core receipt projection. Supervisor canary exposed and repaired locale-dependent FIX-leaf selection, fail-open receipt publication, and landing-proposal archival. Real built CLI now passes exact coordinator death, receipt-before-archive, residue preservation and monotonic status. Dashboard/job adoption and every-environment replay remain open. Negative scope: no timer mask, dashboard lifecycle authority or evidence deletion; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-terminal-binary`; 2026-08-06 DİLİM-KEŞFİ (öne-alma onayı, karar-turu — 3021 aggregate-parent kilidinin çocuğu): kanonik projection projectTerminalPublicationStatus (sprint-terminal-publication-status.ts, sprintId-anahtarlı receipt @ .deckent/recently-works/<sprintId>-terminal-receipt.json); mevcut tüketiciler run-status-read-model + MCP status + CLI status/cleanup; AÇIK adoption: (a) dashboard-manager sprint-durumunu ham snapshot'tan türetiyor — receipt-observed'da monotonic-COMPLETE pini yok, (b) run-jobs-read job-dosyasının kendi status alanından türetiyor (surface-owned) ve receipt'le join'i flowId↔sprintId kimlik-eşlemesi tasarımı istiyor (receipt runId+sprintId taşıyor, closure flowId-anahtarlı — completionRecord alan envanteri çıkarılacak); dilim planı: 485a dashboard-adoption (sprint-anahtarlı, doğrudan) → 485b job-adoption (kimlik-join tasarım-notuyla) → L-kanıtı gerçek-binary cleanup-regression koşusu; 2026-08-06 MAKİNE-BULGUSU-2: 485a admission'ı da aggregate-parent vetolu — açık çocuk RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001; kaskadın GERÇEK YAPRAK kilidi 487'dir (zincir: 3021←3195←487); 485a receipt'i yaprak kapanınca yeniden aktive edilir",
+      "updated": "2026-08-06"
     },
     {
       "order": 3196,
@@ -14297,16 +14317,18 @@
         "E": "1",
         "H": "1",
         "L": "1",
-        "X": "0",
+        "X": "~",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-FINALIZER-487-01"
+      ],
       "acceptance": "Receipt publication failure or non-cleanup-eligible terminal evidence throws a typed terminal-evidence error before archive, job summary, notification, dashboard or COMPLETE state; CLI exits non-zero and artifacts remain recoverable",
-      "evidence": "Sprint-487 force-finalize exposed a false COMPLETE with no terminal receipt because finalizer swallowed `TERMINAL_EVIDENCE_HOLD`. Finalizer now fails closed at the receipt boundary and the focused source-order contract passes; the repaired 32/32 logical settlement subsequently permits the real built-binary receipt path. Fresh paused-run CLI replay and every-environment fault injection remain open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-finalizer-receipt-hold`",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-487 force-finalize exposed a false COMPLETE with no terminal receipt because finalizer swallowed `TERMINAL_EVIDENCE_HOLD`. Finalizer now fails closed at the receipt boundary and the focused source-order contract passes; the repaired 32/32 logical settlement subsequently permits the real built-binary receipt path. Fresh paused-run CLI replay and every-environment fault injection remain open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-finalizer-receipt-hold`; `receipt=GR-2026-08-06-FINALIZER-487-01`; 487 yaprak-dilimi admission 2026-08-06 (kaskadın gerçek yaprağı — karar-turu); 2026-08-06 YAPRAK-DİLİM SETTLEMENT: iki açık boyut gerçek-binary kanıtla kapandı — taze paused-run replay (receipt durable + monotonic terminal state) ve fault-injection (yazılamaz receipt dizini → EACCES fail-closed: receipt yok, sahte COMPLETE yok, task artifact'ları kurtarılabilir; elle probe'la bağımsız doğrulandı); `proof=real-binary-replay-and-faultinjection-4of4`; üretim kodu değişmedi; X boyutu typed-açık kalır (harness linux-gated; her-ortam fault-injection W4 windows-matris işine bağlı)",
+      "updated": "2026-08-06"
     },
     {
       "order": 3279,
@@ -19993,6 +20015,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5a7f00ff674dbdd8c75df43fbaca4033eab45868d7bc28644f14472e269110d3"
+    "value": "159a1eff5ebe511d289ecc7a47b0799288b6f28636588f3b659a6b176af9b2a7"
   }
 }

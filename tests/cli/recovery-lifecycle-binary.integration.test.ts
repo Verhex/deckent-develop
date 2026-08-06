@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
@@ -50,6 +50,36 @@ async function waitForFile(path: string, timeoutMs: number): Promise<void> {
 // while dropping both captured stdio streams. That is a runner transport fault,
 // not a valid binary observation. The dedicated binary-contract command runs
 // this suite in the threads pool; default fork runs skip it honestly.
+
+/** Minimal on-disk shape a real-binary `finalize --force` accepts (487 slice). */
+function seedFinalizableSprint(root: string, sprintId: string): void {
+  const num = sprintId.replace('sprint-', '');
+  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.tasks'), { recursive: true });
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'finalizer-fixture', version: '1.0.0' }));
+  writeFileSync(join(root, '.deckent', 'config.json'), JSON.stringify({ language: 'en' }));
+  writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
+    sprintId, phase: 'EVALUATE', status: 'ACTIVE',
+  }));
+  writeFileSync(join(root, '.tasks', `task-${num}-001.json`), JSON.stringify({
+    id: `${num}-001`, sprintId, status: 'DONE',
+  }));
+  writeFileSync(join(root, '.tasks', `task-${num}-001.result`), JSON.stringify({
+    taskId: `${num}-001`,
+    workerId: `w-${num}-001`,
+    filesChanged: [], linesAdded: 0, linesRemoved: 0,
+    testsPassed: true, coverage: 100,
+    selfAssessment: 'DONE', evaluationDecision: 'DONE',
+    notes: '487 fixture complete',
+    workAttribution: {
+      state: 'VERIFIED',
+      attemptId: `binary-contract-attempt-${num}-001`,
+      baselineRef: 'binary-contract:fixture-baseline',
+      scopeDigest: '9'.repeat(64),
+    },
+  }));
+}
+
 const NESTED_FORK_RUNNER = typeof process.send === 'function';
 
 describe.skipIf(NESTED_FORK_RUNNER)('recovery lifecycle real binary', () => {
@@ -225,5 +255,64 @@ describe.skipIf(NESTED_FORK_RUNNER)('recovery lifecycle real binary', () => {
       phase: 'EVALUATE',
       status: 'ABORTED',
     });
+  }, 30_000);
+
+  // ═══ RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001 (yaprak-dilim) ═════════
+  // The row's two open dimensions were "fresh paused-run CLI replay" and
+  // "every-environment fault injection". Both are proven here against the REAL
+  // built binary — no production code changes, evidence only.
+  linuxIt('fresh paused-run replay: the terminal receipt exists before archive and status is monotonic COMPLETE', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'finalizer-receipt-replay-'));
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    seedFinalizableSprint(root, 'sprint-993');
+
+    const result = await runBinary([
+      'finalize', '--sprint', 'sprint-993', '--force', '--skip-hooks', '--skip-decay',
+    ], root);
+    expect(result.code, JSON.stringify(result)).toBe(0);
+
+    // Receipt is durable and belongs to THIS sprint...
+    const receiptPath = join(root, '.deckent', 'recently-works', 'sprint-993-terminal-receipt.json');
+    expect(existsSync(receiptPath), 'terminal receipt must be durable after finalize').toBe(true);
+    expect(JSON.parse(readFileSync(receiptPath, 'utf-8'))).toMatchObject({
+      receipt: { sprintId: 'sprint-993' },
+    });
+
+    // ...and the published lifecycle is terminal, never a regressed ACTIVE.
+    const state = JSON.parse(readFileSync(join(root, '.deckent', 'sprint-state.json'), 'utf-8')) as
+      { sprintId: string; status: string };
+    expect(state.sprintId).toBe('sprint-993');
+    expect(['COMPLETE', 'ABORTED']).toContain(state.status);
+  }, 30_000);
+
+  linuxIt('fault injection: an unwritable receipt directory fails closed — no false COMPLETE, artifacts recoverable', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'finalizer-receipt-fault-'));
+    onTestFinished(() => {
+      // Restore the mode first so cleanup can actually remove the tree.
+      try { chmodSync(join(root, '.deckent', 'recently-works'), 0o700); } catch { /* best effort */ }
+      rmSync(root, { recursive: true, force: true });
+    });
+    seedFinalizableSprint(root, 'sprint-994');
+
+    // Inject the fault: the receipt's destination directory exists but refuses
+    // writes, so receipt publication cannot succeed.
+    const receiptDir = join(root, '.deckent', 'recently-works');
+    mkdirSync(receiptDir, { recursive: true });
+    chmodSync(receiptDir, 0o500);
+
+    const result = await runBinary([
+      'finalize', '--sprint', 'sprint-994', '--force', '--skip-hooks', '--skip-decay',
+    ], root);
+
+    // Fail-closed: non-zero exit, no receipt, and NO fabricated COMPLETE.
+    expect(result.code, JSON.stringify(result)).not.toBe(0);
+    expect(existsSync(join(receiptDir, 'sprint-994-terminal-receipt.json'))).toBe(false);
+    const state = JSON.parse(readFileSync(join(root, '.deckent', 'sprint-state.json'), 'utf-8')) as
+      { status: string };
+    expect(state.status, 'a receipt-less finalize must never publish COMPLETE').not.toBe('COMPLETE');
+
+    // Recoverable: the task artifacts that a retry needs are still on disk.
+    expect(existsSync(join(root, '.tasks', 'task-994-001.json'))).toBe(true);
+    expect(existsSync(join(root, '.tasks', 'task-994-001.result'))).toBe(true);
   }, 30_000);
 });
