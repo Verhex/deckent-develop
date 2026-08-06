@@ -8,7 +8,7 @@
 //   Suite 2 — Executor predicate integration (3 tests)
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -49,9 +49,35 @@ function makeNotification(id: string, actionOverrides: Partial<NotificationActio
     severity: 'warning',
     createdAt: '2026-06-19T00:00:00.000Z',
     detectorId: 'scope-collision',
+    // 531 süpürme: scheduler fencing (executor.fenceScopeCollisionReorder)
+    // re-validates the EXACT sprint/task/file identity against live .tasks/
+    // state before any auto-proceed — a fenceless notification never reaches
+    // the canAutoApply predicate at all. These fixtures satisfy the fence.
+    sprintId: FENCE_SPRINT_ID,
     actions: [action],
     timeoutMs: null,
   };
+}
+
+const FENCE_SPRINT_ID = 'sprint-303';
+const FENCE_COLLISION_FILE = 'src/foo.ts';
+const FENCE_TASK_IDS = ['303-001', '303-002'] as const;
+
+/** Live .tasks/ state the scheduler fence validates against (see above). */
+function seedCollisionTasks(root: string): void {
+  const tasksDir = join(root, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
+  for (const taskId of FENCE_TASK_IDS) {
+    writeFileSync(
+      join(tasksDir, `task-${taskId}.json`),
+      JSON.stringify({
+        id: taskId,
+        sprintId: FENCE_SPRINT_ID,
+        status: 'EXECUTING',
+        scope: { filesWrite: [FENCE_COLLISION_FILE] },
+      }),
+    );
+  }
 }
 
 // ─── Suite 1: ScopeCollisionMonitor.canAutoApply unit tests ──────────────────
@@ -101,6 +127,7 @@ describe('Executor canAutoApply predicate integration (approve timeout)', () => 
   beforeEach(() => {
     testRoot = join(tmpdir(), `deckent-nerv-w1-${process.pid}-${Date.now()}`);
     mkdirSync(testRoot, { recursive: true });
+    seedCollisionTasks(testRoot);
     vi.useFakeTimers();
   });
 
@@ -216,7 +243,9 @@ describe('Executor canAutoApply predicate integration (approve timeout)', () => 
     // No canAutoApplyMap → 5th param only, 6th param absent (undefined)
     const executor = new Executor(history, handler, undefined, testRoot, SHORT_TIMEOUT_MS);
 
-    const notification = makeNotification('notif-no-pred');
+    const notification = makeNotification('notif-no-pred', {
+      payload: {collisions: [{file: FENCE_COLLISION_FILE, taskIds: [...FENCE_TASK_IDS]}]},
+    });
 
     const handlePromise = executor.handle(notification);
 

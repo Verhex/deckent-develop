@@ -34,7 +34,7 @@ const PROJECT_ROOT = join(__dirname, '../../');
 const RELEASE_PREPARE_PATH = join(PROJECT_ROOT, 'scripts', 'release-prepare.mjs');
 const BUMP_VERSION_PATH = join(PROJECT_ROOT, 'scripts', 'bump-version.sh');
 const ROOT_CHANGELOG_PATH = join(PROJECT_ROOT, 'CHANGELOG.md');
-const DOCS_CHANGELOG_PATH = join(PROJECT_ROOT, 'docs', 'CHANGELOG.md');
+const DOCS_CHANGELOG_PATH = join(PROJECT_ROOT, 'docs', 'archive', 'docs-pre-reset-2026-08-03', 'CHANGELOG.md');
 
 const tmpDirs: string[] = [];
 

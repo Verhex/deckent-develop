@@ -1484,20 +1484,21 @@ describe('Docker Backend Parity — Heartbeat Cache Invalidation', () => {
   beforeEach(() => { root = makeTmpRoot(); });
   afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
 
-  it('T17a: Docker HB loop increments sequence to prevent false-stale detection', () => {
-    // Arrange — verify the heartbeat loop in worker script increments SEQ
+  it('T17a: heartbeat sequencing is host-authority-owned; wrapper writes fixed spawn/exit markers', () => {
+    // 531 süpürme: the in-container SEQ shell loop is the OLD world — heartbeat
+    // authority moved host-primary (WorkerHeartbeatAuthorityStore owns monotonic
+    // sequencing via expectedHostSequence; the wrapper loop is an INERT seam,
+    // pinned by wrapper-hb-allowlist). The wrapper now emits exactly the fixed
+    // spawn (1) and exit (2) observation markers.
     const src = fs.readFileSync(
       path.join(process.cwd(), 'src/orchestra/spawn-backend-docker.ts'),
       'utf-8',
     );
 
-    // Assert — worker script has incremental SEQ counter
-    // The script generates: {"sequence":$SEQ,...} where SEQ is a shell variable
-    expect(src).toContain('SEQ=2');
-    expect(src).toContain('SEQ=$((SEQ+1))');
-    // The heartbeat echo includes both "sequence" field name and $SEQ variable
-    expect(src).toContain('sequence');
-    expect(src).toContain('$SEQ');
+    expect(src).toContain('"sequence":1');
+    expect(src).toContain('"sequence":2');
+    expect(src).toContain('expectedHostSequence');
+    expect(src).not.toContain('SEQ=$((SEQ+1))');
   });
 
   it('T17b: heartbeat sequence field increases monotonically across writes', () => {

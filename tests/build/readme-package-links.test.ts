@@ -52,7 +52,10 @@ function extractDocsRefs(content: string): Array<{ raw: string; isAbsolute: bool
   const seen = new Set<string>();
 
   // Markdown links: [text](url) — capture the url part when it touches docs/
-  const mdLinkRe = /\]\(([^)]+docs\/[^)]*)\)/g;
+  // 531 süpürme: `](docs/...)` — the CURRENT README links docs/ with no path
+  // prefix; the old `[^)]+` required at least one leading char and silently
+  // matched nothing (guard assertion caught exactly this).
+  const mdLinkRe = /\]\(([^)]*docs\/[^)]*)\)/g;
   let m: RegExpExecArray | null;
   while ((m = mdLinkRe.exec(stripped)) !== null) {
     const url = m[1].trim();

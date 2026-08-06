@@ -62,8 +62,15 @@ describe('.github/workflows/cross-platform-e2e.yml', () => {
     });
 
     it('has zero continue-on-error or allow-failure anywhere in the file (both jobs required)', () => {
-      expect(workflowContent).not.toContain('continue-on-error');
-      expect(workflowContent.toLowerCase()).not.toContain('allow-failure');
+      // 531 süpürme: the raw substring pin tripped on a COMMENT documenting the
+      // Windows-gating decision ("No `continue-on-error` here by design") —
+      // strip comment lines so only real YAML keys can violate the pin.
+      const yamlWithoutComments = workflowContent
+        .split('\n')
+        .filter((line) => !line.trimStart().startsWith('#'))
+        .join('\n');
+      expect(yamlWithoutComments).not.toContain('continue-on-error');
+      expect(yamlWithoutComments.toLowerCase()).not.toContain('allow-failure');
     });
 
     it('does not exclude any OS from the packed-install matrix', () => {
