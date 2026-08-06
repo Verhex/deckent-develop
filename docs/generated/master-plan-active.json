@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b6e28474fd57afa9f49cbd46dcbf03377b9ec889e5f8085287400e8ad63533e2"
+    "value": "cb4e2c9dd117aa81e7f52b4e03f0b5357a5d795e47393277481b4b29176cc978"
   },
   "summary": {
     "total": 388,
     "active": 353,
     "terminal": 35,
-    "receipts": 84,
+    "receipts": 85,
     "byState": {
       "OPEN": 258,
       "READY": 0,
@@ -2393,7 +2393,7 @@
       "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "b4c7538863f5fd35cfc196c095153ebd6488022b7fdff79639864582c4a6e52f",
-      "progressDigest": "73d17b4aea10087cf5c070d6dbe82d23032c8603a3d530c5aaf0345ad9346bf2",
+      "progressDigest": "6f0c8acdfcd1ecf5ae97b563a1e79d0f0a3400719331f365ca44401fcc050f55",
       "terminalClosureDigest": null
     },
     {
@@ -5171,6 +5171,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-06T11:23:32Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-TERMPUB-485A-02",
+      "authorityDigest": "9a10be0c3cc33c0180c23f37c16f36c49e0539ec5bd0e1fccc6b5c85726feac7",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -13403,9 +13413,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-TERMPUB-485A-02"
+      ],
       "acceptance": "One fenced terminal receipt atomically precedes archive/cleanup; CLI, MCP, dashboard and job remain monotonic COMPLETE with logical progress bounded to N/N; temp/residue files cannot become task identity",
-      "evidence": "Sprint-487 wired exact terminal evidence and one fenced receipt before every archive/cleanup edge, then moved CLI and MCP onto one core receipt projection. Supervisor canary exposed and repaired locale-dependent FIX-leaf selection, fail-open receipt publication, and landing-proposal archival. Real built CLI now passes exact coordinator death, receipt-before-archive, residue preservation and monotonic status. Dashboard/job adoption and every-environment replay remain open. Negative scope: no timer mask, dashboard lifecycle authority or evidence deletion; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-terminal-binary`; 2026-08-06 DİLİM-KEŞFİ (öne-alma onayı, karar-turu — 3021 aggregate-parent kilidinin çocuğu): kanonik projection projectTerminalPublicationStatus (sprint-terminal-publication-status.ts, sprintId-anahtarlı receipt @ .deckent/recently-works/<sprintId>-terminal-receipt.json); mevcut tüketiciler run-status-read-model + MCP status + CLI status/cleanup; AÇIK adoption: (a) dashboard-manager sprint-durumunu ham snapshot'tan türetiyor — receipt-observed'da monotonic-COMPLETE pini yok, (b) run-jobs-read job-dosyasının kendi status alanından türetiyor (surface-owned) ve receipt'le join'i flowId↔sprintId kimlik-eşlemesi tasarımı istiyor (receipt runId+sprintId taşıyor, closure flowId-anahtarlı — completionRecord alan envanteri çıkarılacak); dilim planı: 485a dashboard-adoption (sprint-anahtarlı, doğrudan) → 485b job-adoption (kimlik-join tasarım-notuyla) → L-kanıtı gerçek-binary cleanup-regression koşusu; 2026-08-06 MAKİNE-BULGUSU-2: 485a admission'ı da aggregate-parent vetolu — açık çocuk RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001; kaskadın GERÇEK YAPRAK kilidi 487'dir (zincir: 3021←3195←487); 485a receipt'i yaprak kapanınca yeniden aktive edilir; 2026-08-06 MAKİNE-BULGUSU-3 (kaskad-paketi kısmi uygulandı): yaprak 487 DONE oldu ve aggregate-veto düştü, ancak bu satırın kendi DONE'u scoped+consumed authority receipt'i istiyor (DONE_PROVENANCE) — mevcut evidence yalnız tarihsel yetki kaydı taşıyor; canlı kanıt zaten hazır (487'nin gerçek-binary receipt-before-archive ve monotonic-status koşusu), eksik olan kendi kanıt-dilimi receipt'idir; sıradaki tren 485a/485b adoption dilimiyle bunu kapatır ve ardından 3021 açılır",
+      "evidence": "Sprint-487 wired exact terminal evidence and one fenced receipt before every archive/cleanup edge, then moved CLI and MCP onto one core receipt projection. Supervisor canary exposed and repaired locale-dependent FIX-leaf selection, fail-open receipt publication, and landing-proposal archival. Real built CLI now passes exact coordinator death, receipt-before-archive, residue preservation and monotonic status. Dashboard/job adoption and every-environment replay remain open. Negative scope: no timer mask, dashboard lifecycle authority or evidence deletion; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-terminal-binary`; 2026-08-06 DİLİM-KEŞFİ (öne-alma onayı, karar-turu — 3021 aggregate-parent kilidinin çocuğu): kanonik projection projectTerminalPublicationStatus (sprint-terminal-publication-status.ts, sprintId-anahtarlı receipt @ .deckent/recently-works/<sprintId>-terminal-receipt.json); mevcut tüketiciler run-status-read-model + MCP status + CLI status/cleanup; AÇIK adoption: (a) dashboard-manager sprint-durumunu ham snapshot'tan türetiyor — receipt-observed'da monotonic-COMPLETE pini yok, (b) run-jobs-read job-dosyasının kendi status alanından türetiyor (surface-owned) ve receipt'le join'i flowId↔sprintId kimlik-eşlemesi tasarımı istiyor (receipt runId+sprintId taşıyor, closure flowId-anahtarlı — completionRecord alan envanteri çıkarılacak); dilim planı: 485a dashboard-adoption (sprint-anahtarlı, doğrudan) → 485b job-adoption (kimlik-join tasarım-notuyla) → L-kanıtı gerçek-binary cleanup-regression koşusu; 2026-08-06 MAKİNE-BULGUSU-2: 485a admission'ı da aggregate-parent vetolu — açık çocuk RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001; kaskadın GERÇEK YAPRAK kilidi 487'dir (zincir: 3021←3195←487); 485a receipt'i yaprak kapanınca yeniden aktive edilir; 2026-08-06 MAKİNE-BULGUSU-3 (kaskad-paketi kısmi uygulandı): yaprak 487 DONE oldu ve aggregate-veto düştü, ancak bu satırın kendi DONE'u scoped+consumed authority receipt'i istiyor (DONE_PROVENANCE) — mevcut evidence yalnız tarihsel yetki kaydı taşıyor; canlı kanıt zaten hazır (487'nin gerçek-binary receipt-before-archive ve monotonic-status koşusu), eksik olan kendi kanıt-dilimi receipt'idir; sıradaki tren 485a/485b adoption dilimiyle bunu kapatır ve ardından 3021 açılır; `receipt=GR-2026-08-06-TERMPUB-485A-02`; 485a admission 2026-08-06 (veto düştükten sonra)",
       "updated": "2026-08-06"
     },
     {
@@ -19977,6 +19989,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d20d78018b541dc381a2cf9ef9cb7f3ccccd64b0ecf2d84282786ad2e54e0338"
+    "value": "598d92019158b673d199dcaa7e9adde4246e43e13a8f8df2a8d213e84c2d7a42"
   }
 }
