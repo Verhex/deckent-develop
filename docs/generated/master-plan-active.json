@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2a7aec105e9e41eb9b81fea604ab5a59ae3697649139e81dc719aa6bc3560659"
+    "value": "eff34534bd09bafa60ee47e328355fedcc97924b97575091a1f31481397c2065"
   },
   "summary": {
     "total": 388,
     "active": 354,
     "terminal": 34,
-    "receipts": 83,
+    "receipts": 84,
     "byState": {
       "OPEN": 258,
       "READY": 0,
@@ -2655,9 +2655,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-07-31",
+      "updated": "2026-08-06",
       "definitionDigest": "b924cce604d3bd3b1f92f1c4adcabfe02158204e872f04420199417abfcbe07b",
-      "progressDigest": "d5d41c6883f87c32f976599bfcbc50b2eb11babb92b6ed71e027119fedfd2255",
+      "progressDigest": "c096d8add90c6321e9ce9a4c58e4d8cb208c6bb4cd12dc3afc3159e3b8ed11a4",
       "terminalClosureDigest": null
     },
     {
@@ -5161,6 +5161,16 @@
         "mode": "ONE_SHOT",
         "status": "revoked",
         "transitionAt": "2026-08-06T11:06:53Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-FINALIZER-487-01",
+      "authorityDigest": "ebd74d01b8b6c9e2488dea039c5c2a03f4c107181756ff72a10ae2cafe3cf5ac",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -14313,10 +14323,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-06-FINALIZER-487-01"
+      ],
       "acceptance": "Receipt publication failure or non-cleanup-eligible terminal evidence throws a typed terminal-evidence error before archive, job summary, notification, dashboard or COMPLETE state; CLI exits non-zero and artifacts remain recoverable",
-      "evidence": "Sprint-487 force-finalize exposed a false COMPLETE with no terminal receipt because finalizer swallowed `TERMINAL_EVIDENCE_HOLD`. Finalizer now fails closed at the receipt boundary and the focused source-order contract passes; the repaired 32/32 logical settlement subsequently permits the real built-binary receipt path. Fresh paused-run CLI replay and every-environment fault injection remain open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-finalizer-receipt-hold`",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-487 force-finalize exposed a false COMPLETE with no terminal receipt because finalizer swallowed `TERMINAL_EVIDENCE_HOLD`. Finalizer now fails closed at the receipt boundary and the focused source-order contract passes; the repaired 32/32 logical settlement subsequently permits the real built-binary receipt path. Fresh paused-run CLI replay and every-environment fault injection remain open; `historical-authority=owner-prompt-sprint487-verify-finalize-cleanup-2026-07-31;historical-gates=G1;proof=sprint-487-finalizer-receipt-hold`; `receipt=GR-2026-08-06-FINALIZER-487-01`; 487 yaprak-dilimi admission 2026-08-06 (kaskadın gerçek yaprağı — karar-turu)",
+      "updated": "2026-08-06"
     },
     {
       "order": 3279,
@@ -20003,6 +20015,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9f958b8ae0602b936c76fe7ef0ceb01720ddf6fc62267c8236f52f642c5f54d8"
+    "value": "5546b3b47bf8175efcb0587a0977d2a29f7deeb581c4f0403d620f03034c538d"
   }
 }
