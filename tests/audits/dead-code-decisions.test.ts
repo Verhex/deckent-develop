@@ -6,8 +6,12 @@ const projectRoot = resolve(import.meta.dirname, '..', '..');
 
 // ─── Decision Matrix Document Schema ─────────────────────────────────────
 
+// 531 audits-aile dilimi (GR-2026-08-06-COVDEBT-AUDIT-01): the sprint-139 audit
+// corpus moved under docs/archive/docs-pre-reset-2026-08-03/ in the docs reset
+// (97b91e69f); these pins validate the ARCHIVED document's schema at its real
+// location — content and schema expectations are unchanged.
 describe('dead-code-decisions.md schema', () => {
-  const decisionPath = join(projectRoot, 'docs', 'audits', 'sprint-139', 'dead-code-decisions.md');
+  const decisionPath = join(projectRoot, 'docs', 'archive', 'docs-pre-reset-2026-08-03', 'audits', 'sprint-139', 'dead-code-decisions.md');
 
   it('decision matrix document exists', () => {
     expect(existsSync(decisionPath)).toBe(true);
@@ -169,7 +173,7 @@ describe('ADR-038 dead-code policy — absorbed into adr-d-006', () => {
 // ─── Rationale Completeness ──────────────────────────────────────────────
 
 describe('decision rationale completeness', () => {
-  const decisionPath = join(projectRoot, 'docs', 'audits', 'sprint-139', 'dead-code-decisions.md');
+  const decisionPath = join(projectRoot, 'docs', 'archive', 'docs-pre-reset-2026-08-03', 'audits', 'sprint-139', 'dead-code-decisions.md');
 
   it('every Remove decision has LoC count', () => {
     const content = readFileSync(decisionPath, 'utf-8');
