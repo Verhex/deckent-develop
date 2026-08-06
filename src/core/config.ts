@@ -2146,6 +2146,12 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Strict multi-tenant isolation (Sprint 261 ENT-2: default FALSE — backward-compat
     // permissive mode includes NULL-tenant rows). Set true to close NULL-tenant leak.
     strict_tenant_isolation: config.strict_tenant_isolation ?? false,
+    // PRINCIPAL-001 P1d — identity-assurance hard-gate carry (default FALSE).
+    // resolveConfig carries fields EXPLICITLY: a key that only exists in
+    // config-types never reaches runtime. P1b added the type and the seam but
+    // not this line, so the enforce branch was unreachable in every real run
+    // (measured: loadConfig dropped the key). Default-off keeps v1 behaviour.
+    enforce_principal_assurance: config.enforce_principal_assurance ?? false,
     // AI planner timeout
     ai_planner_timeout: config.ai_planner_timeout,
     // Sprint checkpoint interval
