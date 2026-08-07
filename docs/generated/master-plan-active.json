@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "94799c57ade399079341ff73fa85bbb298e75bf080564ae9859d2ef2d3d35d93"
+    "value": "31e3f7f67dc3e29e5d43519f39b707f4fa5c80c5486b922ab38fd576a0afe451"
   },
   "summary": {
     "total": 388,
     "active": 341,
     "terminal": 47,
-    "receipts": 101,
+    "receipts": 102,
     "byState": {
-      "OPEN": 257,
-      "READY": 0,
+      "OPEN": 256,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 17,
@@ -3160,10 +3160,10 @@
       "id": "OPERATION-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-06",
+      "state": "READY",
+      "updated": "2026-08-07",
       "definitionDigest": "80cb5e3f81853ae422cae53f38582ab95f0be6ba938af204223f2a8e20124913",
-      "progressDigest": "2f5ab667b275725d3974fdf0157675e322efa3dc7fc59aee609ae54f7696b95d",
+      "progressDigest": "04b7f53b7c7396cd58415ecd844d86685b777af9550ad5a6612db9309c14027b",
       "terminalClosureDigest": null
     },
     {
@@ -5341,6 +5341,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-07T08:23:42Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-OPERATION-O1-01",
+      "authorityDigest": "caba1415af249d650b58683e60ed0bada577455c28c53dd5817edb387e8dbfe0",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -15467,7 +15477,7 @@
         "G2",
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -15481,11 +15491,12 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-06-DESIGN-DOCS-01"
+        "GR-2026-08-06-DESIGN-DOCS-01",
+        "GR-2026-08-07-OPERATION-O1-01"
       ],
       "acceptance": "Every mutation/read/tool action maps to stable operation ID, risk and effect class",
-      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir",
-      "updated": "2026-08-06"
+      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir; `receipt=GR-2026-08-07-OPERATION-O1-01`; O1 admission 2026-08-07 (Dalga-3 başlangıcı — PRINCIPAL DONE ile dependency-veto düştü)",
+      "updated": "2026-08-07"
     },
     {
       "order": 4040,
@@ -19658,6 +19669,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "eeab353370d9c80664bb56475fd048a0be72f0773de46a016568372416152cbf"
+    "value": "c77a6406326adb46aec30df1b7829b1f57be1315b4a37ac608ae95ae5f87eeae"
   }
 }
