@@ -45,7 +45,7 @@ interface Setup {
 }
 
 /** Boot a gateway; optionally inject a fake client cert on accepted sockets. */
-async function setup(auth: AuthProvider, certRaw?: Buffer): Promise<Setup> {
+async function setup(auth: AuthProvider, certRaw?: Buffer, strictTenantIsolation?: boolean): Promise<Setup> {
   const backend = new FakeBackend();
   const mgr = new PtySessionManager(backend, { scrollbackBytes: 65536, idleTimeoutMs: 0 });
   const audit = { record: vi.fn() };
@@ -55,7 +55,12 @@ async function setup(auth: AuthProvider, certRaw?: Buffer): Promise<Setup> {
       (socket as unknown as { getPeerCertificate: () => { raw: Buffer } }).getPeerCertificate = () => ({ raw: certRaw });
     });
   }
-  attachTerminalGateway(server, { manager: mgr, auth, audit });
+  attachTerminalGateway(server, {
+    manager: mgr,
+    auth,
+    audit,
+    ...(strictTenantIsolation === undefined ? {} : { strictTenantIsolation }),
+  });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   const port = (server.address() as { port: number }).port;
   return { server, mgr, audit, port };
@@ -160,5 +165,91 @@ describe('WS gateway — real tenant propagation (AUDIT-TENANT)', () => {
     expect(guardEvents[0].tenantId).toBe('tenant-beta');
     expect(detachEvents).toHaveLength(1);
     expect(detachEvents[0].tenantId).toBe('tenant-beta');
+  });
+});
+
+// ═══ TENANT-001 T4a — the WS upgrade honours strict tenant isolation ════════
+// The upgrade listener is attached to the HTTP server directly, so it never
+// reaches the request handler where the /api/terminal/* HTTP routes were gated
+// in T3. That left the real shell pipe open: a caller refused with 403 over
+// HTTP could still open a PTY over WebSocket. Token-only auth carries no tenant
+// claim (only the mTLS seam resolves one this early), so under strict isolation
+// such a caller is now refused at the upgrade with a typed close code — the WS
+// mirror of HTTP 403. Strict off stays byte-identical to v1.
+const APP_CLOSE_TENANT_SCOPE = 4403;
+
+describe('WS gateway — strict tenant isolation at the upgrade (T4a)', () => {
+  it('strict ON: a token-only caller (no resolvable tenant) is refused, no bridge', async () => {
+    const s = await setup(new LocalTokenAuthProvider('good'), undefined, true);
+    ctx.server = s.server;
+
+    const ws = new WebSocket(`ws://127.0.0.1:${s.port}/api/terminal/ws`, ['deckent.good']);
+    const code = await new Promise<number>((res) => {
+      ws.on('close', (c) => res(c));
+      ws.on('error', () => res(-1));
+    });
+
+    expect(code).toBe(APP_CLOSE_TENANT_SCOPE);
+    // The refusal is a tenant-scope deny, recorded as such — not an auth failure
+    // and not a silent drop.
+    const denyEvents = eventsOf(s.audit, 'auth.deny');
+    expect(denyEvents).toHaveLength(1);
+    expect(JSON.stringify(denyEvents[0])).toMatch(/strict tenant isolation/u);
+    // Nothing was accepted: no auth.ok, so bridge() was never reached.
+    expect(eventsOf(s.audit, 'auth.ok')).toHaveLength(0);
+  });
+
+  it('strict ON: an mTLS-resolved tenant still connects (the claim IS resolvable)', async () => {
+    const auth: AuthProvider = {
+      verify: () => true,
+      verifyClientCert: async (): Promise<TenantId | null> => 'tenant-acme',
+    };
+    const s = await setup(auth, Buffer.from('good-cert'), true);
+    ctx.server = s.server;
+
+    const ws = new WebSocket(`ws://127.0.0.1:${s.port}/api/terminal/ws`, ['deckent.tok']);
+    await new Promise<void>((res, rej) => {
+      ws.on('open', () => res());
+      ws.on('error', (e) => rej(e));
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    ws.close();
+
+    const okEvents = eventsOf(s.audit, 'auth.ok');
+    expect(okEvents).toHaveLength(1);
+    expect(okEvents[0].tenantId).toBe('tenant-acme');
+  });
+
+  it('strict OFF (default): the same token-only caller still connects — v1 unchanged', async () => {
+    const s = await setup(new LocalTokenAuthProvider('good'), undefined, false);
+    ctx.server = s.server;
+
+    const ws = new WebSocket(`ws://127.0.0.1:${s.port}/api/terminal/ws`, ['deckent.good']);
+    await new Promise<void>((res, rej) => {
+      ws.on('open', () => res());
+      ws.on('error', (e) => rej(e));
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    ws.close();
+
+    const okEvents = eventsOf(s.audit, 'auth.ok');
+    expect(okEvents).toHaveLength(1);
+    expect(okEvents[0].tenantId).toBe('local');
+  });
+
+  it('strict ON: an INVALID token still fails as auth, not as tenant scope', async () => {
+    // Ordering matters — the auth deny must win so a bad token is never
+    // misreported as a tenant-scope problem.
+    const s = await setup(new LocalTokenAuthProvider('good'), undefined, true);
+    ctx.server = s.server;
+
+    const ws = new WebSocket(`ws://127.0.0.1:${s.port}/api/terminal/ws`, ['deckent.bad']);
+    const code = await new Promise<number>((res) => {
+      ws.on('close', (c) => res(c));
+      ws.on('error', () => res(-1));
+    });
+
+    expect(code).toBe(4401);
+    expect(JSON.stringify(eventsOf(s.audit, 'auth.deny')[0])).toMatch(/rejected/u);
   });
 });

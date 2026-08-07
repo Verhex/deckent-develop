@@ -22,12 +22,21 @@ export interface GatewayDeps {
    * existing tests keep passing.
    */
   limiter?: OutboundLimiter;
+  /**
+   * Effective `strict_tenant_isolation` (TENANT-001 T4a). When true, an upgrade
+   * whose caller carries no resolvable tenant is refused with
+   * {@link APP_CLOSE_TENANT_SCOPE} instead of being folded into `'local'`.
+   * Omitted / false → the v1 permissive behaviour, byte for byte.
+   */
+  strictTenantIsolation?: boolean;
 }
 
 const PREFIX = 'deckent.';
 const PATH = '/api/terminal/ws';
 const BACKPRESSURE_LIMIT_BYTES = 1_000_000;
 const APP_CLOSE_UNAUTHORIZED = 4401;
+/** Tenant scope unresolved under strict isolation — the WS mirror of HTTP 403. */
+const APP_CLOSE_TENANT_SCOPE = 4403;
 const APP_CLOSE_OUTBOUND_QUOTA = 4429;
 
 /**
@@ -89,6 +98,12 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
         // (token-only auth carries no tenant claim) — honest 'local' fallback
         // otherwise, mirroring the tenantOf() pattern used inside bridge().
         let authTenant: TenantId = 'local';
+        // Whether a tenant was actually RESOLVED, as opposed to falling back to
+        // 'local'. Kept separate from `authTenant` so the strict-mode refusal
+        // below can tell "this caller is tenant 'local'" apart from "this
+        // caller carries no tenant at all" — the same distinction the HTTP
+        // ingresses make via resolveApiCallerTenant.
+        let tenantResolved = false;
         if (deps.auth.verifyAsync) {
           ws.pause();
           try {
@@ -118,7 +133,10 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
           }
           ws.resume();
           if (certTenant === null) authorized = false;
-          else authTenant = certTenant;
+          else {
+            authTenant = certTenant;
+            tenantResolved = true;
+          }
         }
         if (!authorized) {
           deps.audit.record({
@@ -128,6 +146,26 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
             at: new Date().toISOString(),
           });
           ws.close(APP_CLOSE_UNAUTHORIZED, 'unauthorized');
+          return;
+        }
+        // TENANT-001 T4a — strict-mode tenant refusal on the WS upgrade.
+        //
+        // The upgrade listener is attached to the HTTP server directly, so it
+        // never passes through the request handler where the /api/terminal/*
+        // HTTP routes are tenant-gated. Without this branch a caller refused
+        // with 403 on HTTP could still open a SHELL over WebSocket — the WS
+        // path is the actual PTY pipe, not the HTTP routes. Under strict
+        // isolation a caller whose tenant cannot be resolved (token-only auth
+        // carries no tenant claim; only the mTLS seam resolves one this early)
+        // is therefore refused here too. Strict off → byte-identical to v1.
+        if (deps.strictTenantIsolation === true && !tenantResolved) {
+          deps.audit.record({
+            action: 'auth.deny',
+            tenantId: authTenant,
+            detail: 'ws upgrade refused: strict tenant isolation, caller carries no tenant claim',
+            at: new Date().toISOString(),
+          });
+          ws.close(APP_CLOSE_TENANT_SCOPE, 'tenant scope unresolved');
           return;
         }
         deps.audit.record({

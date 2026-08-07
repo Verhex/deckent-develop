@@ -1,5 +1,5 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
-import { resolveApiCallerTenant } from './tenant-scope.js';
+import { resolveApiCallerTenant, readStrictTenantIsolation } from './tenant-scope.js';
 import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync, renameSync, unlinkSync, chmodSync } from 'node:fs';
 import { basename, join, extname, resolve } from 'node:path';
 import { platform as osPlatform } from 'node:os';
@@ -2757,6 +2757,10 @@ export function createHttpServer(
       auth: terminalAuth,
       audit: terminalAudit,
       limiter: terminalLimiter,
+      // TENANT-001 T4a: the upgrade listener bypasses the HTTP request handler,
+      // so the tenant decision has to be carried in here explicitly — otherwise
+      // the WS shell stays open to callers the HTTP routes already refuse.
+      strictTenantIsolation: readStrictTenantIsolation(projectRoot),
     });
     // Idle reaper — sweeps stale non-deckent sessions every 30s.
     // unref() so the timer does not keep the event loop alive in tests.

@@ -502,6 +502,12 @@ describe('TENANT-001 T3 — shared tenant resolver contract', () => {
 
     const strictRoot = mk(jn(td(), 'tenant-strict-'));
     const permissiveRoot = mk(jn(td(), 'tenant-permissive-'));
+    // T4a: the reader now walks defaults → global → project, so the global
+    // layer has to be isolated or this pin would read the HOST's config and
+    // stop being hermetic. DECKENT_HOME is the resolver's own override.
+    const emptyGlobal = mk(jn(td(), 'tenant-global-empty-'));
+    const priorHome = process.env['DECKENT_HOME'];
+    process.env['DECKENT_HOME'] = emptyGlobal;
     try {
       md(jn(strictRoot, '.deckent'), { recursive: true });
       wf(jn(strictRoot, '.deckent', 'config.json'), JSON.stringify({ strict_tenant_isolation: true }));
@@ -514,8 +520,11 @@ describe('TENANT-001 T3 — shared tenant resolver contract', () => {
       expect(resolveApiCallerTenant(tenantless, permissiveRoot).tenant).toBe('local');
       expect(resolveApiCallerTenant({ id: 'alice', tenantId: 'acme' }, strictRoot).tenant).toBe('acme');
     } finally {
+      if (priorHome === undefined) delete process.env['DECKENT_HOME'];
+      else process.env['DECKENT_HOME'] = priorHome;
       rm(strictRoot, { recursive: true, force: true });
       rm(permissiveRoot, { recursive: true, force: true });
+      rm(emptyGlobal, { recursive: true, force: true });
     }
   });
 
@@ -525,12 +534,103 @@ describe('TENANT-001 T3 — shared tenant resolver contract', () => {
     const { tmpdir: td } = await import('node:os');
     const { join: jn } = await import('node:path');
     const root = mk(jn(td(), 'tenant-broken-'));
+    const emptyGlobal = mk(jn(td(), 'tenant-global-empty2-'));
+    const priorHome = process.env['DECKENT_HOME'];
+    process.env['DECKENT_HOME'] = emptyGlobal;
     try {
       md(jn(root, '.deckent'), { recursive: true });
       wf(jn(root, '.deckent', 'config.json'), '{ not json');
       expect(readStrictTenantIsolation(root)).toBe(false);
     } finally {
+      if (priorHome === undefined) delete process.env['DECKENT_HOME'];
+      else process.env['DECKENT_HOME'] = priorHome;
       rm(root, { recursive: true, force: true });
+      rm(emptyGlobal, { recursive: true, force: true });
+    }
+  });
+});
+
+// ═══ TENANT-001 T4a — the reader sees the EFFECTIVE flag, not just the project
+// The first version of the sync reader looked only at the project config while
+// loadConfig merges defaults → global → project. An operator who turned strict
+// isolation on in the global (fleet/host) config therefore got an API layer
+// that reported the control as enabled and gated nothing — the third instance
+// of the same "reported-but-not-enforcing control" class already closed for the
+// principal-assurance carry and for this very flag's compliance-report-only
+// read. These pins hold the layer chain and its precedence.
+describe('TENANT-001 T4a — effective strict_tenant_isolation across config layers', () => {
+  it('honours the GLOBAL layer when the project says nothing', async () => {
+    const { readStrictTenantIsolation } = await import('../../src/api/tenant-scope.js');
+    const { mkdtempSync: mk, writeFileSync: wf, rmSync: rm } = await import('node:fs');
+    const { tmpdir: td } = await import('node:os');
+    const { join: jn } = await import('node:path');
+
+    const globalRoot = mk(jn(td(), 'tenant-global-strict-'));
+    const projectRoot = mk(jn(td(), 'tenant-proj-silent-')); // no .deckent at all
+    const priorHome = process.env['DECKENT_HOME'];
+    process.env['DECKENT_HOME'] = globalRoot;
+    try {
+      wf(jn(globalRoot, 'config.json'), JSON.stringify({ strict_tenant_isolation: true }));
+      // Before T4a this returned false — the control reported on and gated nothing.
+      expect(readStrictTenantIsolation(projectRoot)).toBe(true);
+    } finally {
+      if (priorHome === undefined) delete process.env['DECKENT_HOME'];
+      else process.env['DECKENT_HOME'] = priorHome;
+      rm(globalRoot, { recursive: true, force: true });
+      rm(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('the PROJECT layer wins over the global one, in both directions', async () => {
+    const { readStrictTenantIsolation } = await import('../../src/api/tenant-scope.js');
+    const { mkdtempSync: mk, mkdirSync: md, writeFileSync: wf, rmSync: rm } = await import('node:fs');
+    const { tmpdir: td } = await import('node:os');
+    const { join: jn } = await import('node:path');
+
+    const globalRoot = mk(jn(td(), 'tenant-global-'));
+    const optIn = mk(jn(td(), 'tenant-proj-on-'));
+    const optOut = mk(jn(td(), 'tenant-proj-off-'));
+    const priorHome = process.env['DECKENT_HOME'];
+    process.env['DECKENT_HOME'] = globalRoot;
+    try {
+      wf(jn(globalRoot, 'config.json'), JSON.stringify({ strict_tenant_isolation: false }));
+      md(jn(optIn, '.deckent'), { recursive: true });
+      wf(jn(optIn, '.deckent', 'config.json'), JSON.stringify({ strict_tenant_isolation: true }));
+      expect(readStrictTenantIsolation(optIn)).toBe(true); // project tightens
+
+      wf(jn(globalRoot, 'config.json'), JSON.stringify({ strict_tenant_isolation: true }));
+      md(jn(optOut, '.deckent'), { recursive: true });
+      wf(jn(optOut, '.deckent', 'config.json'), JSON.stringify({ strict_tenant_isolation: false }));
+      expect(readStrictTenantIsolation(optOut)).toBe(false); // and project relaxes
+    } finally {
+      if (priorHome === undefined) delete process.env['DECKENT_HOME'];
+      else process.env['DECKENT_HOME'] = priorHome;
+      for (const d of [globalRoot, optIn, optOut]) rm(d, { recursive: true, force: true });
+    }
+  });
+
+  it('a malformed layer says NOTHING — the next layer decides, no silent flip', async () => {
+    const { readStrictTenantIsolation } = await import('../../src/api/tenant-scope.js');
+    const { mkdtempSync: mk, mkdirSync: md, writeFileSync: wf, rmSync: rm } = await import('node:fs');
+    const { tmpdir: td } = await import('node:os');
+    const { join: jn } = await import('node:path');
+
+    const globalRoot = mk(jn(td(), 'tenant-global-on-'));
+    const brokenProject = mk(jn(td(), 'tenant-proj-broken-'));
+    const priorHome = process.env['DECKENT_HOME'];
+    process.env['DECKENT_HOME'] = globalRoot;
+    try {
+      wf(jn(globalRoot, 'config.json'), JSON.stringify({ strict_tenant_isolation: true }));
+      md(jn(brokenProject, '.deckent'), { recursive: true });
+      wf(jn(brokenProject, '.deckent', 'config.json'), '{ not json');
+      // A corrupt project file must not silently DROP the operator's global
+      // hardening — it is "no opinion", so the global layer still decides.
+      expect(readStrictTenantIsolation(brokenProject)).toBe(true);
+    } finally {
+      if (priorHome === undefined) delete process.env['DECKENT_HOME'];
+      else process.env['DECKENT_HOME'] = priorHome;
+      rm(globalRoot, { recursive: true, force: true });
+      rm(brokenProject, { recursive: true, force: true });
     }
   });
 });
