@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e4b408afb2d4ec318f41052baf093936c09aba6ecd569c758c02fd574f6d5c45"
+    "value": "90f2280c7e66ab136738bdb89ed0ef8ed25e110b3e565984d2753cb30f86b7e6"
   },
   "summary": {
     "total": 388,
@@ -2204,9 +2204,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-31",
+      "updated": "2026-08-07",
       "definitionDigest": "eb3c4e7d495fd76e57ba08766033a3377e6e5c28d132a2dd38fa62fd2051c273",
-      "progressDigest": "cde1ecd53c17edf2c35fcfbe816edbf9dab0c0366b12c6ef5a91bc918e4151de",
+      "progressDigest": "3161013fe10e552487d99329c40316ea56f1d1bf5bdd3d0bdec16de9325842fa",
       "terminalClosureDigest": null
     },
     {
@@ -12721,8 +12721,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "One bounded provider-neutral recovery slice is proposed, previewed, approved, executed and settled through `deckent do`; Sol supervision captures authority, prompt, usage, diff, Nervous and receipt evidence; any finding is born-first; no direct Sprint start fallback unless typed recovery is required",
-      "evidence": "Canonical Do validation completed as flow `5c6c8fc3-ba9e-4c27-9d5b-a7ea016b0fcc`, sprint-483, revision 1, plan digest `47e62d2c90cb34d4179956bc583fa8ffd338af9647f7a4c8063fe705e506d6d8`: durable preview was approved and started unchanged, wave 1 settled 483-001/002 before dependent 483-003 dispatch, usage and attempt-scoped diffs were captured, and terminal state reached `COMPLETE` with coordinator absent. The journey is not accepted as fully successful: 483-003's mandatory MASTER integration failed before mutation, yet Brain promoted explicit `NO_GO` to `GO_WITH_TECH_DEBT` and emitted `RUN_COMPLETED`; XVerify was cross-provider but `UNCLEAR` because Description was host-truncated; exact workers also ingested a stale root `DIRECTIVES.md`; no sprint-specific Nervous notification/decision receipt was produced, only a live heartbeat. Canonical residuals are RECOVERY-BORN-483-EVALUATION-HONESTY-001, RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001, RECOVERY-BORN-483-XVERIFY-PAYLOAD-001 and RECOVERY-BORN-483-PROMPT-AUTHORITY-001; status projection conflict remains under RUN-STATUS-AUTHORITY-001. Autonomous widening remains blocked until these authority gaps are repaired and replayed",
-      "updated": "2026-07-31"
+      "evidence": "Canonical Do validation completed as flow `5c6c8fc3-ba9e-4c27-9d5b-a7ea016b0fcc`, sprint-483, revision 1, plan digest `47e62d2c90cb34d4179956bc583fa8ffd338af9647f7a4c8063fe705e506d6d8`: durable preview was approved and started unchanged, wave 1 settled 483-001/002 before dependent 483-003 dispatch, usage and attempt-scoped diffs were captured, and terminal state reached `COMPLETE` with coordinator absent. The journey is not accepted as fully successful: 483-003's mandatory MASTER integration failed before mutation, yet Brain promoted explicit `NO_GO` to `GO_WITH_TECH_DEBT` and emitted `RUN_COMPLETED`; XVerify was cross-provider but `UNCLEAR` because Description was host-truncated; exact workers also ingested a stale root `DIRECTIVES.md`; no sprint-specific Nervous notification/decision receipt was produced, only a live heartbeat. Canonical residuals are RECOVERY-BORN-483-EVALUATION-HONESTY-001, RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001, RECOVERY-BORN-483-XVERIFY-PAYLOAD-001 and RECOVERY-BORN-483-PROMPT-AUTHORITY-001; status projection conflict remains under RUN-STATUS-AUTHORITY-001. Autonomous widening remains blocked until these authority gaps are repaired and replayed; 2026-08-07 SOĞUK-START SMOKE (owner-onaylı build, gerçek binary, izole DECKENT_HOME, atılabilir proje — tam rapor docs/audits/smoke-cold-start-2026-08-07.md): API/authority katmanı binary'ye kadar sağlam; kırılma EXECUTE/spawn bölgesinde ölçüldü. B1 onaylı plan soğuk startta yürütülemiyor — çıplak start APPROVAL_GRANTED flow'u yok sayıp AI ile yeniden planlıyor, CAS'lı --flow-id yolu ise detached-child-capability hatasıyla düşüyor (çare metni yok); B2 EXECUTE içi boş — 8 planSprint döngüsü, sıfır worker-spawn, task'lar PENDING kalırken banner Complete basıyor, terminal authority TERMINAL_EVIDENCE_HOLD ile yakalayıp exit=1 veriyor (governance tuttu, yürütme kırık, banner yanlış); B3 iki-store-layout uyumsuzluğu canlıda yakalandı — terk edilmiş planın bayat task dosyaları sonraki sprint'e sızıyor; B4 cost-gate bütçesi ile spawn ExecutionBudget'ı bağlantısız (raporlar-ama-taşınmaz 4. örnek, live-execution-budget.ts:267, hint metni yanıltıcı); B5 git-olmayan projede scope gate mesajsız FAIL + init git kurmuyor; B6 init-READY/doctor-NOT-READY çelişkisi; B7 CLI-sonrası 15dk yaşayan artık süreç. Bu satırın açılış koşulu artık netleşti: B1+B2 kapanmadan canonical do journey koşulamaz",
+      "updated": "2026-08-07"
     },
     {
       "order": 3179,
@@ -19805,6 +19805,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "997ff2b6cc792512c03bd5f1768ba43120c39bc15f8da7ec51e0d9fa264e1472"
+    "value": "5409e3386ecb84f49d25ad549deabb6adca684cf939c2d7409cccabf1c0f22ef"
   }
 }
