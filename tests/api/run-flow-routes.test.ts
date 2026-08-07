@@ -486,3 +486,51 @@ describe('TENANT-001 T1 — strict_tenant_isolation', () => {
     expect(res.body.proposal?.tenant).toBe('local');
   });
 });
+
+// ═══ TENANT-001 T3 — tenant scope reaches the plan + terminal ingresses ═════
+// The API's own `/api/plan` and `/api/terminal/*` surfaces still folded a
+// tenant-less caller into `local`. The terminal one carries shell access, so it
+// is the most sensitive tenant boundary in the product. These pins assert the
+// SHARED resolver behaves identically wherever it is wired.
+describe('TENANT-001 T3 — shared tenant resolver contract', () => {
+  it('strict ON refuses a tenant-less caller, strict OFF keeps local (resolver level)', async () => {
+    const { resolveApiCallerTenant, readStrictTenantIsolation } =
+      await import('../../src/api/tenant-scope.js');
+    const { mkdtempSync: mk, mkdirSync: md, writeFileSync: wf, rmSync: rm } = await import('node:fs');
+    const { tmpdir: td } = await import('node:os');
+    const { join: jn } = await import('node:path');
+
+    const strictRoot = mk(jn(td(), 'tenant-strict-'));
+    const permissiveRoot = mk(jn(td(), 'tenant-permissive-'));
+    try {
+      md(jn(strictRoot, '.deckent'), { recursive: true });
+      wf(jn(strictRoot, '.deckent', 'config.json'), JSON.stringify({ strict_tenant_isolation: true }));
+
+      expect(readStrictTenantIsolation(strictRoot)).toBe(true);
+      expect(readStrictTenantIsolation(permissiveRoot)).toBe(false); // absent config → v1 default
+
+      const tenantless = { id: 'api-static' };
+      expect(resolveApiCallerTenant(tenantless, strictRoot).tenant).toBeNull();
+      expect(resolveApiCallerTenant(tenantless, permissiveRoot).tenant).toBe('local');
+      expect(resolveApiCallerTenant({ id: 'alice', tenantId: 'acme' }, strictRoot).tenant).toBe('acme');
+    } finally {
+      rm(strictRoot, { recursive: true, force: true });
+      rm(permissiveRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('a malformed config fails SOFT to the permissive default (never a silent hard-deny)', async () => {
+    const { readStrictTenantIsolation } = await import('../../src/api/tenant-scope.js');
+    const { mkdtempSync: mk, mkdirSync: md, writeFileSync: wf, rmSync: rm } = await import('node:fs');
+    const { tmpdir: td } = await import('node:os');
+    const { join: jn } = await import('node:path');
+    const root = mk(jn(td(), 'tenant-broken-'));
+    try {
+      md(jn(root, '.deckent'), { recursive: true });
+      wf(jn(root, '.deckent', 'config.json'), '{ not json');
+      expect(readStrictTenantIsolation(root)).toBe(false);
+    } finally {
+      rm(root, { recursive: true, force: true });
+    }
+  });
+});
