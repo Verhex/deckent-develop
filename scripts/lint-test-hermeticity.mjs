@@ -120,8 +120,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // cases. Prior: XPLAT-SKIP-GUARD (12478).
   // 2026-08-06 (485a): +4 dashboard overlay tests — same 12480, digest only.
   // 2026-08-06 (P1d): +1 config-carry fixture test. Prior: 485a (12480).
+  // 2026-08-07 (P1e): +2 end-to-end denial pins. Prior: P1d (12481).
   count: 12481,
-  digest: '0ea8cb95ce6ab6c7261f2c58052addb1b4b366f275a275c09f895a6921549430',
+  digest: '68bbf411471fe56e5ec1ded8ee19a52733166bb975fe0ebe83b436829e66aa8f',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
