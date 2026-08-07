@@ -105,7 +105,7 @@ function bearerHeaders(claims: Record<string, unknown>): Record<string, string> 
 
 // ─── Test project root + mini server (route not yet wired into server.ts) ──
 
-function makeProjectRoot(opts: { runFlowV2?: boolean; enforcePrincipal?: boolean } = {}): string {
+function makeProjectRoot(opts: { runFlowV2?: boolean; enforcePrincipal?: boolean; strictTenant?: boolean } = {}): string {
   const root = mkdtempSync(join(tmpdir(), 'run-flow-routes-'));
   mkdirSync(join(root, '.deckent'), { recursive: true });
   writeFileSync(
@@ -114,6 +114,8 @@ function makeProjectRoot(opts: { runFlowV2?: boolean; enforcePrincipal?: boolean
       terminal: { run_flow_v2: opts.runFlowV2 ?? true },
       // PRINCIPAL-001 P1e: identity-assurance hard-gate, default off.
       ...(opts.enforcePrincipal === true ? { enforce_principal_assurance: true } : {}),
+      // TENANT-001 T1: strict tenant isolation, default off.
+      ...(opts.strictTenant === true ? { strict_tenant_isolation: true } : {}),
     }),
     'utf-8',
   );
@@ -192,7 +194,7 @@ afterEach(async () => {
   baseUrl = undefined as unknown as string;
 });
 
-async function boot(opts: { runFlowV2?: boolean; enforcePrincipal?: boolean } = {}): Promise<void> {
+async function boot(opts: { runFlowV2?: boolean; enforcePrincipal?: boolean; strictTenant?: boolean } = {}): Promise<void> {
   projectRoot = makeProjectRoot(opts);
   const started = await startServer(projectRoot);
   server = started.server;
@@ -454,5 +456,33 @@ describe('PRINCIPAL-001 P1e — enforce_principal_assurance end-to-end', () => {
     const res = await propose('probe');
     expect(res.status).toBe(201);
     expect(res.body.state).toBe('AWAITING_APPROVAL');
+  });
+});
+
+// ═══ TENANT-001 T1 — strict tenant isolation actually GATES ════════════════
+// The flag existed since ENT-2 but only ever reached the compliance report:
+// a caller with no tenant claim was silently folded into `local`, which is the
+// NULL-tenant hole the flag was introduced to close. These pins prove the gate
+// now decides, and that the permissive default is unchanged.
+describe('TENANT-001 T1 — strict_tenant_isolation', () => {
+  it('strict ON: a tenant-less caller is refused with 403, no flow created', async () => {
+    await boot({ strictTenant: true });
+    const res = await propose('probe', bearerHeaders({ sub: 'alice' })); // no tenant claim
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(res.body)).toMatch(/tenant scope unresolved/u);
+  });
+
+  it('strict ON: a caller WITH a tenant claim proceeds normally', async () => {
+    await boot({ strictTenant: true });
+    const res = await propose('probe', bearerHeaders({ sub: 'alice', tenant: 'acme' }));
+    expect(res.status).toBe(201);
+    expect(res.body.proposal?.tenant).toBe('acme');
+  });
+
+  it('strict OFF (default): the tenant-less caller still lands in local (v1 behaviour)', async () => {
+    await boot();
+    const res = await propose('probe', bearerHeaders({ sub: 'alice' }));
+    expect(res.status).toBe(201);
+    expect(res.body.proposal?.tenant).toBe('local');
   });
 });

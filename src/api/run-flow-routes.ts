@@ -82,6 +82,7 @@ import type { RunProposalPlanner } from '../orchestra/run-proposal-compiler.js';
 import { planRunFlow } from '../orchestra/run-flow-plan-service.js';
 import { readContext } from '../orchestra/brain.js';
 import { deriveRequestPrincipal } from './auth-me-endpoint.js';
+import { resolveCallerTenant, TenantScopeError } from '../core/principal.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 import { preflightApiBrainProviderAuthority } from './provider-authority-ingress.js';
 
@@ -185,7 +186,7 @@ function defaultRecommendation(config: ResolvedConfig): SprintSizeRecommendation
  *  contract as missions-route.ts's findApprovalEntry-adjacent checks):
  *  a caller outside the flow's tenant (and not role==='admin') gets
  *  `undefined`, indistinguishable from a genuinely unknown flowId. */
-function lookupFlow(flowId: string, req: IncomingMessage, projectRoot: string): RunFlowContext | undefined {
+function lookupFlow(flowId: string, req: IncomingMessage, projectRoot: string, strictTenant = false): RunFlowContext | undefined {
   let context: RunFlowContext;
   try {
     context = coordinatorFor(projectRoot).getFlow(flowId);
@@ -194,7 +195,10 @@ function lookupFlow(flowId: string, req: IncomingMessage, projectRoot: string): 
     throw err;
   }
   const principal = deriveRequestPrincipal(req);
-  const callerTenant = principal.tenantId ?? 'local';
+  // TENANT-001 T1: strict mode refuses a tenant-less caller instead of folding
+  // it into `local` (the NULL-tenant hole the flag was meant to close but never
+  // gated — it only ever reached the compliance report).
+  const callerTenant = resolveCallerTenant(principal, strictTenant);
   const isAdmin = principal.role === 'admin';
   const flowTenant = context.proposal?.tenant ?? 'local';
   if (!isAdmin && flowTenant !== callerTenant) return undefined;
@@ -236,6 +240,23 @@ async function handlePropose(
     return true;
   }
 
+  // TENANT-001 T1: strict mode refuses a tenant-less caller instead of folding
+  // it into `local` — the NULL-tenant hole `strict_tenant_isolation` was
+  // introduced to close but never gated (it only reached the compliance
+  // report). An unresolved tenant is an AUTHORIZATION refusal (403), answered
+  // here rather than thrown, so the request never hangs. Default-off keeps v1
+  // behaviour byte-identical.
+  let callerTenant: string;
+  try {
+    callerTenant = resolveCallerTenant(deriveRequestPrincipal(req), config.strict_tenant_isolation === true);
+  } catch (err) {
+    if (err instanceof TenantScopeError) {
+      sendError(res, 403, err.message);
+      return true;
+    }
+    throw err;
+  }
+
   // Identity is ALWAYS derived server-side from the verified bearer — never
   // from the request body (anti-spoofing, matches process-endpoint.ts).
   const principal = deriveRequestPrincipal(req);
@@ -253,7 +274,7 @@ async function handlePropose(
   const revision = 1;
   const proposal: RunProposal = {
     flowId,
-    tenant: principal.tenantId ?? 'local',
+    tenant: callerTenant,
     project: basename(projectRoot),
     actor: apiPrincipalToActor(principal),
     origin: 'api',
