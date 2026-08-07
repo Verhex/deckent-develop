@@ -1,0 +1,72 @@
+{
+  "$comment": "OPERATION-001 O1 — canonical operation catalog (schema v1). Owner-approved D1: eight fields; D3: JSON source + generated constants. Entries are IMMUTABLE: a behavioural change means version++ and the prior version is retired, never edited in place. Every id is stable and never reused.",
+  "schemaVersion": 1,
+  "operations": [
+    {
+      "id": "op.fs.read",
+      "version": 1,
+      "title": { "en": "Read a file", "tr": "Dosya oku" },
+      "effect": "READ",
+      "gate": "G0",
+      "risk": "LOW",
+      "capabilities": ["fs-read"],
+      "idempotency": "NATURAL",
+      "auditEvent": "fs.read.v1"
+    },
+    {
+      "id": "op.fs.write",
+      "version": 1,
+      "title": { "en": "Write a file", "tr": "Dosya yaz" },
+      "effect": "MUTATE_LOCAL",
+      "gate": "G1",
+      "risk": "MEDIUM",
+      "capabilities": ["fs-write"],
+      "idempotency": "KEYED",
+      "auditEvent": "fs.write.v1"
+    },
+    {
+      "id": "op.fs.delete",
+      "version": 1,
+      "title": { "en": "Delete a file or directory", "tr": "Dosya veya dizin sil" },
+      "effect": "DESTRUCTIVE",
+      "gate": "G3",
+      "risk": "HIGH",
+      "capabilities": ["fs-write"],
+      "idempotency": "NATURAL",
+      "auditEvent": "fs.delete.v1"
+    },
+    {
+      "id": "op.memory.read",
+      "version": 1,
+      "title": { "en": "Query project memory", "tr": "Proje belleğini sorgula" },
+      "effect": "READ",
+      "gate": "G0",
+      "risk": "LOW",
+      "capabilities": ["db-query"],
+      "idempotency": "NATURAL",
+      "auditEvent": "memory.read.v1"
+    },
+    {
+      "id": "op.memory.write",
+      "version": 1,
+      "title": { "en": "Write a memory entry", "tr": "Bellek kaydı yaz" },
+      "effect": "DB",
+      "gate": "G4",
+      "risk": "HIGH",
+      "capabilities": ["db-write"],
+      "idempotency": "KEYED",
+      "auditEvent": "memory.write.v1"
+    },
+    {
+      "id": "op.memory.export",
+      "version": 1,
+      "title": { "en": "Export memory to tracked files", "tr": "Belleği izlenen dosyalara aktar" },
+      "effect": "MUTATE_LOCAL",
+      "gate": "G1",
+      "risk": "MEDIUM",
+      "capabilities": ["db-query", "fs-write"],
+      "idempotency": "NATURAL",
+      "auditEvent": "memory.export.v1"
+    }
+  ]
+}
