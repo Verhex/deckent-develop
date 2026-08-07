@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "303d50e9cfc6cdefee58fb421695070207b0048ce7f84c110362816477b8c4ec"
+    "value": "50db6378ccb58143c77f490fbcf13553add54aad0a904ea30e53dfda62fda631"
   },
   "summary": {
     "total": 388,
     "active": 341,
     "terminal": 47,
-    "receipts": 107,
+    "receipts": 108,
     "byState": {
       "OPEN": 255,
       "READY": 0,
@@ -3152,7 +3152,7 @@
       "state": "VERIFY",
       "updated": "2026-08-07",
       "definitionDigest": "7ade16473831b4aeaf6ba4c3c2e23e0278504413a8cbccad5832065e28c1673d",
-      "progressDigest": "74c65cdf29380dc86f39e14b4f99dde161d147722c1ffa2e3e1711a2ea53c5ca",
+      "progressDigest": "262939d5937a00b5749b233d7259654b0b70d0ea41ece141c68c09bb693fe7cb",
       "terminalClosureDigest": null
     },
     {
@@ -5401,6 +5401,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-07T09:36:47Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-TENANT-T2-01",
+      "authorityDigest": "2538ce25438a058b2aa59126098dcd9dfc24cc5fee942a1d1cd7dacc8f6d1e61",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -15499,10 +15509,11 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-07-TENANT-T1-01"
+        "GR-2026-08-07-TENANT-T1-01",
+        "GR-2026-08-07-TENANT-T2-01"
       ],
       "acceptance": "Read, write, event, memory, run, flow and admin paths share fail-closed scope; IDOR tests",
-      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu); 2026-08-07 T1 SETTLEMENT: strict_tenant_isolation artık gerçekten kapıyor — core'a resolveCallerTenant + typed TenantScopeError, API propose ingress'inde erken kapı (strict AÇIK: tenant-claim'siz çağıran 403 ile reddedilir ve akış oluşmaz; strict KAPALI: local varsayılanı bayt-değişmez); bulgu P1d ile aynı sınıftı — bayrak yalnız compliance-report'ta okunuyordu, hiçbir kararı etkilemiyordu; ayrıca dilim sırasında bir gerçek hata yakalandı ve düzeltildi: red throw'u try bloğunun dışında kalınca istek askıda kalıyordu (20s timeout), 403 erken yanıta çevrildi; `proof=tenant-strict-mode-3pins-api-106files-1036-green`; kalan kapsam (memory/run/event/admin yolları + IDOR matrisinin tamamı) T2 successor'ıdır",
+      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu); 2026-08-07 T1 SETTLEMENT: strict_tenant_isolation artık gerçekten kapıyor — core'a resolveCallerTenant + typed TenantScopeError, API propose ingress'inde erken kapı (strict AÇIK: tenant-claim'siz çağıran 403 ile reddedilir ve akış oluşmaz; strict KAPALI: local varsayılanı bayt-değişmez); bulgu P1d ile aynı sınıftı — bayrak yalnız compliance-report'ta okunuyordu, hiçbir kararı etkilemiyordu; ayrıca dilim sırasında bir gerçek hata yakalandı ve düzeltildi: red throw'u try bloğunun dışında kalınca istek askıda kalıyordu (20s timeout), 403 erken yanıta çevrildi; `proof=tenant-strict-mode-3pins-api-106files-1036-green`; kalan kapsam (memory/run/event/admin yolları + IDOR matrisinin tamamı) T2 successor'ıdır; `receipt=GR-2026-08-07-TENANT-T2-01`; T2 admission 2026-08-07",
       "updated": "2026-08-07"
     },
     {
@@ -19721,6 +19732,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9e52b6f9c73d46ec8e2d7bbb1105a442f238ddf19547b116f8d9623fb2968495"
+    "value": "4608d0a637882e24f096194bead85350df3599a7c9272a94c086286a1591b60e"
   }
 }
