@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "31e3f7f67dc3e29e5d43519f39b707f4fa5c80c5486b922ab38fd576a0afe451"
+    "value": "6585ecd002fc373222f1ab71520e60a8848aa406584b72c9bfd57dfcdce425f5"
   },
   "summary": {
     "total": 388,
@@ -12,8 +12,8 @@
     "receipts": 102,
     "byState": {
       "OPEN": 256,
-      "READY": 1,
-      "IN_PROGRESS": 0,
+      "READY": 0,
+      "IN_PROGRESS": 1,
       "BLOCKED": 67,
       "VERIFY": 17,
       "DONE": 47,
@@ -3160,10 +3160,10 @@
       "id": "OPERATION-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "updated": "2026-08-07",
       "definitionDigest": "80cb5e3f81853ae422cae53f38582ab95f0be6ba938af204223f2a8e20124913",
-      "progressDigest": "04b7f53b7c7396cd58415ecd844d86685b777af9550ad5a6612db9309c14027b",
+      "progressDigest": "6ef4e6d9ac6f251dc1c0daac1c8fa241c673d479fcfca9f5374d35bbf0723ded",
       "terminalClosureDigest": null
     },
     {
@@ -15477,7 +15477,7 @@
         "G2",
         "G1"
       ],
-      "state": "READY",
+      "state": "IN_PROGRESS",
       "truth": {
         "C": "0",
         "W": "0",
@@ -19669,6 +19669,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "c77a6406326adb46aec30df1b7829b1f57be1315b4a37ac608ae95ae5f87eeae"
+    "value": "dcfb692a9d0239061614fd73a986ab6b667691caf2c8064ab7fa46d26fbc92a6"
   }
 }
