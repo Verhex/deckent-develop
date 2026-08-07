@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5de8269abc6e53e8f47cd3d40ca063237e755a0118af707fa9bb975ee45b7012"
+    "value": "a4fb508fec4114315a1777acd6f283e8a00163d5d06439a6a26d14a7b35746b7"
   },
   "summary": {
     "total": 388,
@@ -5339,8 +5339,8 @@
       "authorityDigest": "2ce1e1388d8d20f233d5e57215eb7de3a2476b3391ac8a372250a77cf102662c",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-07T08:23:42Z"
       },
       "g7AttemptIdentity": null
     }
@@ -19731,6 +19731,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "38c7e59a20abe77c5520534f42d1686cea7f01578a6399aefe78f07353cdc26a"
+    "value": "53e1c3bb299a957ffc1ce3ee415c1182490f29228de81d19c59f9d24ead21f08"
   }
 }
