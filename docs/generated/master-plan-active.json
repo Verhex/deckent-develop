@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6585ecd002fc373222f1ab71520e60a8848aa406584b72c9bfd57dfcdce425f5"
+    "value": "3bf0aedfd066aa49f942f9cf8e134df8d4830ac8f1f301843e2a9540dd91d083"
   },
   "summary": {
     "total": 388,
     "active": 341,
     "terminal": 47,
-    "receipts": 102,
+    "receipts": 103,
     "byState": {
       "OPEN": 256,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 17,
+      "VERIFY": 18,
       "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3160,10 +3160,10 @@
       "id": "OPERATION-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-07",
       "definitionDigest": "80cb5e3f81853ae422cae53f38582ab95f0be6ba938af204223f2a8e20124913",
-      "progressDigest": "6ef4e6d9ac6f251dc1c0daac1c8fa241c673d479fcfca9f5374d35bbf0723ded",
+      "progressDigest": "6735b2d62ca4e16b88a09db009af6c64934b1295281430ce7ede0474686cc22a",
       "terminalClosureDigest": null
     },
     {
@@ -5347,6 +5347,16 @@
     {
       "id": "GR-2026-08-07-OPERATION-O1-01",
       "authorityDigest": "caba1415af249d650b58683e60ed0bada577455c28c53dd5817edb387e8dbfe0",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T09:11:56Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-O1-BASELINE-SUPP-01",
+      "authorityDigest": "5f16ed2b0f58dcb766188b33bb1fbab03378745d69d18a9273d73e8755281db8",
       "lifecycle": {
         "mode": "ONE_SHOT",
         "status": "active",
@@ -15477,12 +15487,12 @@
         "G2",
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -15495,7 +15505,7 @@
         "GR-2026-08-07-OPERATION-O1-01"
       ],
       "acceptance": "Every mutation/read/tool action maps to stable operation ID, risk and effect class",
-      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir; `receipt=GR-2026-08-07-OPERATION-O1-01`; O1 admission 2026-08-07 (Dalga-3 başlangıcı — PRINCIPAL DONE ile dependency-veto düştü)",
+      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir; `receipt=GR-2026-08-07-OPERATION-O1-01`; O1 admission 2026-08-07 (Dalga-3 başlangıcı — PRINCIPAL DONE ile dependency-veto düştü); 2026-08-07 O1 SETTLEMENT: kanonik katalog kuruldu — sekiz alanlı şema izlenen catalog.v1.json'da (ilk aile fs+memory, 6 operasyon), typed okuyucu + Op.* üretilen sabitleri (0-hardcode), yeni lint-operation-catalog fail-closed doğrular (benzersiz dot-hiyerarşik id, enum üyelikleri, effect→gate MİNİMUM matrisi, capabilities'in work-model sözlüğünde varlığı, i18n tamlığı, sabit-katalog birebir örtüşmesi) ve lint:gates zincirine eklendi; bilinmeyen op id'si typed UnknownOperationError ile fail-closed; `proof=operation-catalog-suite-9of9-and-lint-green`; katalog suite 9/9, lint yeşil, tsc temiz; ingress-kapsam zorlaması (sayaç-ratchet) O3, capability/tool-scope tüketimi O4 dilimidir",
       "updated": "2026-08-07"
     },
     {
@@ -19669,6 +19679,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "dcfb692a9d0239061614fd73a986ab6b667691caf2c8064ab7fa46d26fbc92a6"
+    "value": "35ab59c44fa304858edb8929c6f67f9eb4f74765a64ef5c65dc87b3bd1fb9680"
   }
 }
