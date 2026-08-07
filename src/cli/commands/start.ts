@@ -32,7 +32,8 @@ import { isSprintLocked } from '../../core/multi-ide.js';
 import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
-import { loadApprovedSnapshot, loadStartAttempt } from '../../core/run-flow-store.js';
+import { loadApprovedSnapshot, loadStartAttempt, listFlowIds, loadRunHandle } from '../../core/run-flow-store.js';
+import { debugLog } from '../../core/utils.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import {
   startApprovedRun,
@@ -248,6 +249,8 @@ interface StartCommandOpts {
   force?: boolean;
   forceScope?: boolean;
   forcePromptGate?: boolean;
+  /** B1a: consciously bypass the approved-flow guard and plan fresh. */
+  forceReplan?: boolean;
   watch?: boolean;
   timeout?: string;
   forceDirectives?: boolean;
@@ -338,6 +341,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
     .option('--force', 'Skip doctor pre-flight checks')
     .option('--force-scope', 'Bypass the pre-spawn scope gate (allow write paths that do not exist / look like typos)')
     .option('--force-prompt-gate', 'Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch)')
+    .option('--force-replan', 'Consciously bypass the approved-flow guard: plan fresh even though an approved, not-yet-executed RunFlow snapshot exists')
     .option('--watch', 'Automatically open watch mode after sprint spawns workers')
     .option('--timeout <ms>', 'Sprint timeout in milliseconds (default: 30 minutes)')
     .option('--force-directives', 'Override existing DIRECTIVES.md in zero-config mode')
@@ -765,6 +769,62 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           sandboxState,
         })) {
           return;
+        }
+
+        // ─── B1a: approved-flow guard (smoke 2026-08-07, B1) ─────────────
+        // Bare start used to replan silently — with REAL provider cost (AI
+        // planner and/or routing tie-judge calls) — while an approved,
+        // unconsumed RunFlow snapshot sat in the store, executing a DIFFERENT
+        // plan from the one the owner approved. That is a governance bypass,
+        // not a convenience. Refuse with typed guidance instead; --force-replan
+        // is the conscious override. A flow counts as consumed once a run
+        // handle exists for it (a run actually started); an approved snapshot
+        // with no handle is an approval still awaiting execution.
+        // With no approved flow in the store this block changes nothing.
+        {
+          // Read-only advisory scan — fail-SOFT. An unreadable/corrupt store
+          // must not brick bare start (that would invert the guard into a new
+          // availability failure); it only reverts to the pre-guard behaviour,
+          // logged for the auditor. The hard authority over approved plans
+          // remains the coordinator's CAS-verified exact path.
+          let approvedUnconsumed: ReturnType<typeof loadApprovedSnapshot>[] = [];
+          try {
+            approvedUnconsumed = listFlowIds(root)
+              .map((id) => loadApprovedSnapshot(root, id))
+              .filter((snap): snap is NonNullable<typeof snap> => snap !== undefined)
+              .filter((snap) => loadRunHandle(root, snap.flowId) === undefined)
+              .sort((a, b) => ((a?.approvedAt ?? '') < (b?.approvedAt ?? '') ? 1 : -1));
+          } catch (e) {
+            debugLog('start:approvedFlowGuard:storeRead', e);
+            approvedUnconsumed = [];
+          }
+          if (approvedUnconsumed.length > 0) {
+            if (opts.forceReplan === true) {
+              print(getMessage('start.approved_flow_guard.overridden', lang));
+            } else {
+              const SHOWN = 3;
+              print(getMessage('start.approved_flow_guard.header', lang, {
+                count: String(approvedUnconsumed.length),
+              }));
+              for (const snap of approvedUnconsumed.slice(0, SHOWN)) {
+                if (!snap) continue;
+                print(getMessage('start.approved_flow_guard.flow_line', lang, {
+                  flowId: snap.flowId,
+                  revision: String(snap.revision),
+                  planDigest: snap.planDigest.slice(0, 16),
+                  approvedAt: snap.approvedAt,
+                }));
+              }
+              if (approvedUnconsumed.length > SHOWN) {
+                print(getMessage('start.approved_flow_guard.more', lang, {
+                  count: String(approvedUnconsumed.length - SHOWN),
+                }));
+              }
+              print(getMessage('start.approved_flow_guard.remedy', lang));
+              process.exitCode = 1;
+              return;
+            }
+          }
         }
 
         // WIRE-002 (MASTER-PLAN §4G): wire DECKENT→USER:NOTIFY to this terminal.
