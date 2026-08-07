@@ -69,8 +69,31 @@ const MESSAGES: MessageMap = {
     tr: 'Ön kontrolleri atlamak için --force kullanın.',
   },
   'start.exact_capability_required': {
-    en: 'Exact approved-plan execution requires a complete detached-child capability.',
-    tr: 'Exact onaylı-plan yürütmesi eksiksiz detached-child capability gerektirir.',
+    en: 'Exact approved-plan execution requires a complete detached-child capability. The --exact-* flags are supplied by the run-flow coordinator, not by hand — execute an approved flow through the canonical journey (`deckent do` / the REPL run-flow surface), which spawns this command with the full capability itself.',
+    tr: 'Exact onaylı-plan yürütmesi eksiksiz detached-child capability gerektirir. --exact-* bayrakları elle değil run-flow koordinatörü tarafından sağlanır — onaylı bir flow\'u kanonik yolculukla (`deckent do` / REPL run-flow yüzeyi) yürütün; bu komutu tam capability ile kendisi başlatır.',
+  },
+  // B1a (smoke 2026-08-07, GR-2026-08-07-DOGFOOD-B1A-01): bare `start` used to
+  // replan silently — with REAL provider cost — while an approved, unconsumed
+  // RunFlow snapshot sat in the store. These messages carry the typed refusal.
+  'start.approved_flow_guard.header': {
+    en: 'An approved, not-yet-executed plan already exists — refusing to silently replan ({count} flow(s)):',
+    tr: 'Onaylı ve henüz yürütülmemiş bir plan zaten var — sessizce yeniden planlama reddediliyor ({count} flow):',
+  },
+  'start.approved_flow_guard.flow_line': {
+    en: '  • flow {flowId} · revision {revision} · planDigest {planDigest} · approved {approvedAt}',
+    tr: '  • flow {flowId} · revizyon {revision} · planDigest {planDigest} · onay {approvedAt}',
+  },
+  'start.approved_flow_guard.more': {
+    en: '  … and {count} more approved flow(s).',
+    tr: '  … ve {count} onaylı flow daha.',
+  },
+  'start.approved_flow_guard.remedy': {
+    en: 'Execute the approved plan through the canonical journey (`deckent do` / the REPL run-flow surface). To consciously discard it and plan fresh anyway, re-run with --force-replan.',
+    tr: 'Onaylı planı kanonik yolculukla yürütün (`deckent do` / REPL run-flow yüzeyi). Bilinçli olarak vazgeçip yine de sıfırdan planlamak için --force-replan ile tekrar çalıştırın.',
+  },
+  'start.approved_flow_guard.overridden': {
+    en: 'Approved-flow guard overridden via --force-replan — planning fresh; the approved snapshot stays in the store untouched.',
+    tr: 'Onaylı-flow koruması --force-replan ile bilinçli geçildi — sıfırdan planlanıyor; onaylı snapshot store\'da dokunulmadan duruyor.',
   },
   'start.exact_attempt_mismatch': {
     en: 'Exact start attempt does not match the approved plan or detached-child capability.',

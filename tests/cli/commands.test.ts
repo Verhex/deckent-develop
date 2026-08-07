@@ -142,6 +142,19 @@ vi.mock('../../src/orchestra/brain.js', () => ({
 // `deckent plan` no longer plans through brain.planSprint — the production seam
 // is the durable run-flow plan service (planRunFlow → decideRunFlowPlan).
 // Hybrid mock: keep the real error classes, stub only the seam functions.
+// B1a hermeticity: the approved-flow guard in `start` reads the run-flow
+// store at the resolved project root. This suite does not mock the root, so
+// those reads would land on the REAL dev repo's runtime store (gitignored —
+// empty in CI, populated locally), making outcomes depend on local state.
+// Pin the store readers to an empty store; the guard's real-store behaviour
+// is covered by tests/cli/start-approved-flow-guard.test.ts in a tmpdir.
+vi.mock('../../src/core/run-flow-store.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/run-flow-store.js')>()),
+  listFlowIds: vi.fn().mockReturnValue([]),
+  loadApprovedSnapshot: vi.fn().mockReturnValue(undefined),
+  loadRunHandle: vi.fn().mockReturnValue(undefined),
+}));
+
 vi.mock('../../src/orchestra/run-flow-plan-service.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/orchestra/run-flow-plan-service.js')>()),
   planRunFlow: vi.fn(),
