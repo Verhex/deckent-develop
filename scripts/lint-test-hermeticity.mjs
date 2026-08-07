@@ -119,8 +119,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-06 (487 yaprak-dilimi): +2 real-binary replay/fault-injection
   // cases. Prior: XPLAT-SKIP-GUARD (12478).
   // 2026-08-06 (485a): +4 dashboard overlay tests — same 12480, digest only.
-  count: 12480,
-  digest: '7ab6d83938d23807b2ee0865c012e6df3d0259d73610a0668a456e80884830d0',
+  // 2026-08-06 (P1d): +1 config-carry fixture test. Prior: 485a (12480).
+  count: 12481,
+  digest: '0ea8cb95ce6ab6c7261f2c58052addb1b4b366f275a275c09f895a6921549430',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -136,8 +137,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-06 (P1b): config key + enforcement seam + plan-service wiring —
   // same 1198 count, digest only. Prior: 485a.
   // 2026-08-06 (P1c): CLI plan identity conversion — same 1198, digest only.
+  // 2026-08-06 (P1d): config carry line + type decls — same 1198, digest only.
   count: 1198,
-  digest: '0bbf1c22f1968ca08b952d5781b9d3296da55b5b9eaf92bcc8cd077aed61cd1a',
+  digest: '8d45c733e140d105bbe0af0d5c615e09310723ac69e62026f6d7c392296f974d',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

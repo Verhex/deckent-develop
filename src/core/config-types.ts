@@ -854,6 +854,13 @@ export interface DeckentConfig {
    *  tenant sees ONLY its own rows — closes the NULL-tenant leak for strict
    *  multi-tenant deployments. */
   strict_tenant_isolation?: boolean;
+  /** PRINCIPAL-001 P1b/P1d — identity-assurance hard-gate (default: false).
+   *  When false: an actor with missing or `unverified` assurance reaches
+   *  authorization and only produces the advisory finding (v1 behaviour).
+   *  When true: the finding becomes a typed `PrincipalAssuranceError` BEFORE
+   *  admission — no synthetic or header-derived identity can authorize work.
+   *  Carried explicitly by resolveConfig (config.ts). @see assertActorAssurance */
+  enforce_principal_assurance?: boolean;
   /** F8-003 — capability least-privilege hard-flip (default: false).
    *  When true, capability invocations auto-derive grants from `ROLE_CAPABILITY_MAP[actor.role]`
    *  and hard-deny missing capabilities with a `capability.denied` audit event.

@@ -1,6 +1,8 @@
 // ═══ PRINCIPAL-001 P1a — VerifiedPrincipal contract tests ══════════════════
 import { describe, it, expect } from 'vitest';
-import { userInfo, hostname } from 'node:os';
+import { userInfo, hostname, tmpdir } from 'node:os';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   resolveLocalOsPrincipal,
   principalToActor,
@@ -104,5 +106,45 @@ describe('assertActorAssurance — enforcement is flag-gated, never blind', () =
   it('flag ON: a real OS identity passes (enforcement blocks only the untrusted)', () => {
     const actor = principalToActor(resolveLocalOsPrincipal('cli'));
     expect(assertActorAssurance(actor, 'planRunFlow', true).ok).toBe(true);
+  });
+});
+
+// ═══ P1d — the enforce key must actually REACH runtime (config carry) ═══════
+// Root cause this pins: loadConfig builds the resolved object by carrying
+// fields EXPLICITLY, so a key that exists only in config-types never reaches a
+// real run. P1b added the type and the seam but not the carry line, which made
+// the enforce branch unreachable in every real invocation (measured on the
+// built binary before this fix).
+describe('enforce_principal_assurance — config carry (P1d)', () => {
+  function withFixture<T>(configJson: string | null, fn: (root: string) => Promise<T>): Promise<T> {
+    const root = mkdtempSync(join(tmpdir(), 'principal-config-'));
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'fx', version: '1.0.0' }));
+    if (configJson !== null) writeFileSync(join(root, '.deckent', 'config.json'), configJson);
+    return fn(root).finally(() => rmSync(root, { recursive: true, force: true }));
+  }
+
+  it('an explicit true reaches the resolved runtime config', async () => {
+    const { loadConfig } = await import('../../src/core/config.js');
+    await withFixture('{"language":"en","enforce_principal_assurance":true}', async (root) => {
+      const resolved = await loadConfig(root, { force: true });
+      expect(resolved.enforce_principal_assurance).toBe(true);
+    });
+  });
+
+  it('an explicit false reaches the resolved runtime config', async () => {
+    const { loadConfig } = await import('../../src/core/config.js');
+    await withFixture('{"language":"en","enforce_principal_assurance":false}', async (root) => {
+      const resolved = await loadConfig(root, { force: true });
+      expect(resolved.enforce_principal_assurance).toBe(false);
+    });
+  });
+
+  it('an absent key defaults to false — v1 behaviour, never blind-on', async () => {
+    const { loadConfig } = await import('../../src/core/config.js');
+    await withFixture('{"language":"en"}', async (root) => {
+      const resolved = await loadConfig(root, { force: true });
+      expect(resolved.enforce_principal_assurance).toBe(false);
+    });
   });
 });

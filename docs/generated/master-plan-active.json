@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "41cd41d49f5ca310b42a5cf055ca8c4e5412db6c9d34bc9969a70c1da40511c8"
+    "value": "a4071835804d90d284e1c583c77258d9e298f72bb5879ef75856b38e059121d8"
   },
   "summary": {
     "total": 388,
     "active": 342,
     "terminal": 46,
-    "receipts": 93,
+    "receipts": 98,
     "byState": {
       "OPEN": 257,
       "READY": 0,
@@ -3141,7 +3141,7 @@
       "state": "VERIFY",
       "updated": "2026-08-06",
       "definitionDigest": "fa879e7874c86d428bb4f508ad2284eb8e78ac0c663a8af384bbbcb836759b06",
-      "progressDigest": "a1e4da47f1a509644b7b7a33bbe273147fc98a7494ef637ac24d4b66189f8544",
+      "progressDigest": "e98f9816cbd9df183434b74f65cb1cfd9bb70c13e6a20fa3cf7ecd41216d1609",
       "terminalClosureDigest": null
     },
     {
@@ -5261,6 +5261,56 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-06T14:16:34Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-PRINCIPAL-P1D-01",
+      "authorityDigest": "42621c8ae7303b62d2aa690a21d07258c1cf179f182864f6c8557f70366e266f",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "revoked",
+        "transitionAt": "2026-08-06T15:15:13Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-PRINCIPAL-P1D-02",
+      "authorityDigest": "98274735196d714d0e8657814ac56dbc18e350458902786546ab2e35efa56468",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T15:56:24Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-P1D-BASELINE-SUPP-01",
+      "authorityDigest": "c53286a16bd6f101b5bc901293e831e41830b24c12c6df22ec88c407ddf17183",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "revoked",
+        "transitionAt": "2026-08-06T15:59:55Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-P1D-BASELINE-SUPP-02",
+      "authorityDigest": "d730b9b664fa84d21383118baf7aa218a75ce2dd3f8c66058b2e38cbffcabed0",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T16:02:29Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-06-P1D-STATS-SUPP-01",
+      "authorityDigest": "26da834cd84e2003ece18c249d2afadcbc089d919173991775d9227299e1f728",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-06T16:04:34Z"
       },
       "g7AttemptIdentity": null
     }
@@ -15370,10 +15420,12 @@
       "evidenceReceipts": [
         "GR-2026-08-06-PRINCIPAL-P1A-01",
         "GR-2026-08-06-PRINCIPAL-P1B-01",
-        "GR-2026-08-06-PRINCIPAL-P1C-01"
+        "GR-2026-08-06-PRINCIPAL-P1C-01",
+        "GR-2026-08-06-PRINCIPAL-P1D-01",
+        "GR-2026-08-06-PRINCIPAL-P1D-02"
       ],
       "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
-      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile; 2026-08-06 EVIDENCE-KONSOLİDASYONU (truth-hizası): P1a settlement'ında truth hücresi güncellenmemişti — ölçülmüş gerçek C=1 (src/core/principal.ts), W=1 (CLI/MCP/API ingress'leri + planRunFlow advisory seam'i wired), H=1 (principal 7/7 + api 105 dosya/1017 test), E=0 (enforce modu P1b'de config-gated gelecek, bugün advisory), L=0 (gerçek-binary kimlik smoke'u P1b kapsamında); `receipt=GR-2026-08-06-PRINCIPAL-P1B-01`; P1b admission 2026-08-06 (Dalga-3 kapısı); 2026-08-06 P1B SETTLEMENT: enforce_principal_assurance config anahtarı (default kapalı) + assertActorAssurance typed enforcement + planRunFlow ingress bağlantısı; `proof=principal-enforce-both-modes-11of11`; principal 11/11 her iki modu pinler (kapalı=v1 aynen, açık=admission öncesi typed red, gerçek OS kimliği açıkken geçer), orchestra+api+mcp 835 dosya/10805 test yeşil, tsc temiz; E boyutu policy-enablement ile kapandı (1); L için gerçek-binary enforce koşusu P1c kapsamındadır; `receipt=GR-2026-08-06-PRINCIPAL-P1C-01`; P1c admission 2026-08-06; 2026-08-06 P1C SETTLEMENT (kısmi — dürüst kayıt): plan komutunda P1a taramasında kaçan İKİ sentetik kimlik sitesi daha gerçek OS kimliğine çevrildi ve adoption yolu unverified olarak dürüstçe işaretlendi; `proof=cli-class-528files-7691-green`; CLI sınıfı 528 dosya/7691 test yeşil, tsc temiz, lint:gates tam zincir yeşil. L boyutu bu turda KAPANMADI: gerçek-binary enforce probu planlama yolunun daha erken bir durable-publication HOLD'una takıldı ve enforce kararına ulaşamadı — L için plan-flow fixture'lı ayrı gerçek-binary dilimi (P1d) gerekir; PRINCIPAL DONE'u ve Dalga-3 kapısı (OPERATION-001/TENANT-001 admission'ı) P1d'ye bağlıdır; 2026-08-06 P1C SETTLEMENT (kısmi — dürüst kayıt): plan komutunda P1a taramasında kaçan İKİ sentetik kimlik sitesi daha gerçek OS kimliğine çevrildi, adoption yolu unverified işaretlendi; `proof=cli-class-528files-7691-green`; CLI 528 dosya/7691 test yeşil, tsc temiz, lint:gates tam zincir yeşil. L bu turda KAPANMADI: gerçek-binary enforce probu planlama yolunun daha erken durable-publication HOLD'una takıldı ve enforce kararına ulaşamadı — L için plan-flow fixture'lı gerçek-binary dilimi (P1d) gerekir; PRINCIPAL DONE'u ve Dalga-3 kapısı (OPERATION-001/TENANT-001) P1d'ye bağlıdır",
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile; 2026-08-06 EVIDENCE-KONSOLİDASYONU (truth-hizası): P1a settlement'ında truth hücresi güncellenmemişti — ölçülmüş gerçek C=1 (src/core/principal.ts), W=1 (CLI/MCP/API ingress'leri + planRunFlow advisory seam'i wired), H=1 (principal 7/7 + api 105 dosya/1017 test), E=0 (enforce modu P1b'de config-gated gelecek, bugün advisory), L=0 (gerçek-binary kimlik smoke'u P1b kapsamında); `receipt=GR-2026-08-06-PRINCIPAL-P1B-01`; P1b admission 2026-08-06 (Dalga-3 kapısı); 2026-08-06 P1B SETTLEMENT: enforce_principal_assurance config anahtarı (default kapalı) + assertActorAssurance typed enforcement + planRunFlow ingress bağlantısı; `proof=principal-enforce-both-modes-11of11`; principal 11/11 her iki modu pinler (kapalı=v1 aynen, açık=admission öncesi typed red, gerçek OS kimliği açıkken geçer), orchestra+api+mcp 835 dosya/10805 test yeşil, tsc temiz; E boyutu policy-enablement ile kapandı (1); L için gerçek-binary enforce koşusu P1c kapsamındadır; `receipt=GR-2026-08-06-PRINCIPAL-P1C-01`; P1c admission 2026-08-06; 2026-08-06 P1C SETTLEMENT (kısmi — dürüst kayıt): plan komutunda P1a taramasında kaçan İKİ sentetik kimlik sitesi daha gerçek OS kimliğine çevrildi ve adoption yolu unverified olarak dürüstçe işaretlendi; `proof=cli-class-528files-7691-green`; CLI sınıfı 528 dosya/7691 test yeşil, tsc temiz, lint:gates tam zincir yeşil. L boyutu bu turda KAPANMADI: gerçek-binary enforce probu planlama yolunun daha erken bir durable-publication HOLD'una takıldı ve enforce kararına ulaşamadı — L için plan-flow fixture'lı ayrı gerçek-binary dilimi (P1d) gerekir; PRINCIPAL DONE'u ve Dalga-3 kapısı (OPERATION-001/TENANT-001 admission'ı) P1d'ye bağlıdır; 2026-08-06 P1C SETTLEMENT (kısmi — dürüst kayıt): plan komutunda P1a taramasında kaçan İKİ sentetik kimlik sitesi daha gerçek OS kimliğine çevrildi, adoption yolu unverified işaretlendi; `proof=cli-class-528files-7691-green`; CLI 528 dosya/7691 test yeşil, tsc temiz, lint:gates tam zincir yeşil. L bu turda KAPANMADI: gerçek-binary enforce probu planlama yolunun daha erken durable-publication HOLD'una takıldı ve enforce kararına ulaşamadı — L için plan-flow fixture'lı gerçek-binary dilimi (P1d) gerekir; PRINCIPAL DONE'u ve Dalga-3 kapısı (OPERATION-001/TENANT-001) P1d'ye bağlıdır; `receipt=GR-2026-08-06-PRINCIPAL-P1D-01`; P1d admission 2026-08-06; 2026-08-06 P1D DURUŞU (kayıpta-dur, dürüst kayıt): restrictive-only kimlik seam'i eklenip gerçek-binary enforce kanıtı denendi ve ÜÇ farklı CLI yolu enforce kararına ULAŞAMADI — dry-run preview yolu planRunFlow'u hiç çağırmıyor, adoption yolu daha erken projection-HOLD veriyor, normal yol ise scope-gate FAIL'inde duruyor (--force-scope dahil). Seam geri alındı (test'siz seam ölü-koddur), receipt revoked. L için doğru dilim: ya scope-gate'i sağlayan gerçek fixture'lı plan-flow harness'ı ya da API ingress'i üzerinden gerçek-sunucu kanıtı — bu, P1d'nin yeniden tasarımını gerektirir ve PRINCIPAL DONE'u ile Dalga-3 kapısı ona bağlıdır; `receipt=GR-2026-08-06-PRINCIPAL-P1D-02`; P1d-v2 admission 2026-08-06 (yeniden tasarım; kök-neden config-carry boşluğu, ölçümle doğrulandı)",
       "updated": "2026-08-06"
     },
     {
@@ -19648,6 +19700,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "1f35f98ef92bb263fa9ffb7aeb9059c8ab0d7b57fafa4bc9cbe683cc1b0f82d8"
+    "value": "4427ad64a27ac9c78a2891134a54047f7dd386883ec64be4065daa1c882c7b3a"
   }
 }
