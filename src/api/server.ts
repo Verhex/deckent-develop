@@ -1,4 +1,5 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
+import { resolveApiCallerTenant, readStrictTenantIsolation } from './tenant-scope.js';
 import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync, renameSync, unlinkSync, chmodSync } from 'node:fs';
 import { basename, join, extname, resolve } from 'node:path';
 import { platform as osPlatform } from 'node:os';
@@ -1432,7 +1433,14 @@ async function handleRequest(
           return;
         }
         const principal = deriveRequestPrincipal(req);
-        const tenantId = principal.tenantId ?? 'local';
+        // TENANT-001 T3: strict mode refuses a tenant-less caller instead of
+        // folding it into `local` (the NULL-tenant hole). Default-off keeps v1.
+        const startTenantScope = resolveApiCallerTenant(principal, projectRoot);
+        if (startTenantScope.tenant === null) {
+          sendJson(res, { error: startTenantScope.reason }, 403);
+          return;
+        }
+        const tenantId = startTenantScope.tenant;
         const actor = {
           id: principal.id,
           ...(principal.role ? { role: principal.role } : {}),
@@ -2612,7 +2620,14 @@ export function createHttpServer(
         const tok = authHeader.replace(/^Bearer\s+/i, '');
         // Derive principal from request bearer (claims read from JWT; unverified before auth gate).
         const terminalPrincipal = deriveRequestPrincipal(req);
-        const terminalTenantId: string = terminalPrincipal.tenantId ?? 'local';
+        // TENANT-001 T3: the terminal surface carries shell access, so a
+        // tenant-less caller must not inherit `local` here either.
+        const terminalTenantScope = resolveApiCallerTenant(terminalPrincipal, projectRoot);
+        if (terminalTenantScope.tenant === null) {
+          sendJson(res, { error: terminalTenantScope.reason }, 403);
+          return;
+        }
+        const terminalTenantId: string = terminalTenantScope.tenant;
         // Async seam (Sprint 268): prefer verifyAsync when the provider defines
         // it (JWKS key resolution) — the handler is already async. Sync-only
         // providers (LocalToken) keep the exact previous code path.
@@ -2742,6 +2757,10 @@ export function createHttpServer(
       auth: terminalAuth,
       audit: terminalAudit,
       limiter: terminalLimiter,
+      // TENANT-001 T4a: the upgrade listener bypasses the HTTP request handler,
+      // so the tenant decision has to be carried in here explicitly — otherwise
+      // the WS shell stays open to callers the HTTP routes already refuse.
+      strictTenantIsolation: readStrictTenantIsolation(projectRoot),
     });
     // Idle reaper — sweeps stale non-deckent sessions every 30s.
     // unref() so the timer does not keep the event loop alive in tests.

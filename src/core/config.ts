@@ -1,6 +1,6 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { existsSync, statSync, writeFileSync, renameSync, readFileSync, copyFileSync } from 'node:fs';
-import { dirname, join, posix, win32, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import {
   PROJECT_CONFIG_PATH,
@@ -21,8 +21,12 @@ import { loadApprovalRules } from './approval-rules-load.js';
 // function bodies (routing3's top-level code builds zod schemas only), never at
 // module-initialization time.
 import { resolveRoutingV3Config } from './routing/config.js';
-import { normalizeGlobalScopePlatform, resolveGlobalScopePaths } from './global-scope-resolver.js';
-import type { GlobalScopeEnv } from './global-scope-resolver.js';
+// T4a: the global-config PATH resolution moved down to global-scope-resolver.ts
+// (a pure path module) so a caller that only needs the path — e.g. the API's
+// sync tenant-flag reader — does not have to import this heavyweight, widely
+// vi.mock'ed module. Re-exported here so every existing importer is unchanged.
+export { resolveGlobalConfigPaths, resolveGlobalConfigReadPath } from './global-scope-resolver.js';
+import { resolveGlobalConfigReadPath } from './global-scope-resolver.js';
 import type {
   AutoDocsConfig,
   BrainPlanningMode,
@@ -1800,66 +1804,6 @@ export function getDefaultModes(): Record<string, PlanModeConfig> {
   return structuredClone(DEFAULT_MODES);
 }
 
-/**
- * Global config PATH candidates for the current (or injected) platform —
- * Sprint 363 Task 363-004 ONB-GLOBAL-PRECEDENCE, migration phase M1
- * (docs/design/onb-global-install.md §7.1 "Dual-read, legacy-write").
- *
- * `platformPath` is the platform-correct location computed by
- * {@link resolveGlobalScopePaths} (Sprint 361 Task 361-008): XDG on
- * linux/wsl, Application Support on darwin, `%APPDATA%` on win32 — including
- * the `DECKENT_HOME` override, which flows through untouched since the
- * resolver already implements it. `legacyPath` is today's sole candidate —
- * the flat `~/.deckent/config.json` — kept as the read fallback so an
- * existing install with a config file ONLY at the legacy location keeps
- * working unchanged.
- *
- * Resolution never throws: an unsupported platform or an unresolvable home
- * (the resolver's two failure modes — e.g. `HOME` unset but the OS passwd
- * db still resolves a home for `os.homedir()`) collapses both candidates
- * onto `GLOBAL_CONFIG_PATH`, which is strictly more permissive than the
- * resolver's pure-env home lookup — so the fallback can only activate in
- * cases the resolver itself would fail on, never in cases the constant
- * already handled (zero regression risk).
- *
- * `env`/`nodePlatform` are call-time parameters (not module-load-time
- * constants, unlike `GLOBAL_CONFIG_PATH`) so callers and tests can inject
- * an environment without needing a fresh module evaluation.
- */
-export function resolveGlobalConfigPaths(
-  env: GlobalScopeEnv = process.env,
-  nodePlatform: string = process.platform,
-): { platformPath: string; legacyPath: string } {
-  try {
-    const platform = normalizeGlobalScopePlatform(nodePlatform, env);
-    const scopePaths = resolveGlobalScopePaths(platform, env);
-    // Backend selected by the INJECTED platform, not the host OS — mirrors
-    // resolveGlobalScopePaths' own rule so resolving win32 paths on a
-    // non-Windows CI host stays deterministic (no mixed separators).
-    const pathApi = platform === 'win32' ? win32 : posix;
-    return {
-      platformPath: pathApi.join(scopePaths.configDir, 'config.json'),
-      legacyPath: scopePaths.legacyDir !== null ? pathApi.join(scopePaths.legacyDir, 'config.json') : GLOBAL_CONFIG_PATH,
-    };
-  } catch {
-    return { platformPath: GLOBAL_CONFIG_PATH, legacyPath: GLOBAL_CONFIG_PATH };
-  }
-}
-
-/**
- * Resolve the effective global config file to READ (dual-read, M1):
- * `platformPath` when a file already exists there, else `legacyPath` —
- * today's behavior, preserved as the fallback. Writes are unaffected:
- * {@link saveGlobalConfig} keeps targeting `GLOBAL_CONFIG_PATH` per the M1
- * design ("writes still go to legacy").
- */
-export function resolveGlobalConfigReadPath(
-  env: GlobalScopeEnv = process.env,
-  nodePlatform: string = process.platform,
-): string {
-  const { platformPath, legacyPath } = resolveGlobalConfigPaths(env, nodePlatform);
-  return existsSync(platformPath) ? platformPath : legacyPath;
-}
 
 /**
  * Load and resolve the full configuration by merging defaults, global config,

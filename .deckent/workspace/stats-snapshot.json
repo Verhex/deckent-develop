@@ -2,5 +2,5 @@
   "$comment": "Deliberately-updated volatile stat snapshot (MASTER-PLAN 521, CI-STATS-HERMETIC-001). Single hermetic source for badge inputs not derivable from tracked files. Refresh: node scripts/update-readme-stats.mjs --refresh-snapshot [--with-coverage] --write",
   "sprint": 492,
   "coverage": null,
-  "refreshedAt": "2026-08-05T21:28:58.653Z"
+  "refreshedAt": "2026-08-07T11:06:19.141Z"
 }

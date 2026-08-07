@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e2af682f03ba8b2fc1828b3a6c46f7e02f1aef49165011e4f884e1bf7e659815"
+    "value": "9059986c2b3dbe31f1ffe7e38ebfc40c1b917fddbb122da0e0e78ced560f46f3"
   },
   "summary": {
     "total": 388,
     "active": 341,
     "terminal": 47,
-    "receipts": 109,
+    "receipts": 115,
     "byState": {
       "OPEN": 255,
       "READY": 0,
@@ -3152,7 +3152,7 @@
       "state": "VERIFY",
       "updated": "2026-08-07",
       "definitionDigest": "7ade16473831b4aeaf6ba4c3c2e23e0278504413a8cbccad5832065e28c1673d",
-      "progressDigest": "3f4007ecc2f702ee3348cee1aa6214897514b398915484dca5e98dd29b3483c2",
+      "progressDigest": "ffc3575442099032ac8ec060a8eb94865fd708464423d2c9c0ee7dc334ce8ae6",
       "terminalClosureDigest": null
     },
     {
@@ -5421,6 +5421,66 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-07T10:53:44Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-TENANT-T3-01",
+      "authorityDigest": "688bc1c6e5bff569cf79c56fb5889201caed95548c1c96de11809807ee61d77d",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T11:00:57Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-T3-SUPP-01",
+      "authorityDigest": "20e8e927c325db4be7b6f4a5d4bfcfde0f6b38e9da48af6ea4dd509dd37b36d4",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T11:06:19Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-TENANT-T4A-01",
+      "authorityDigest": "9d0688dec6fdb9d285b6136ad2c6761c794a87f2f61b2d38d03b3520d91b922b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T11:32:34Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-T4A-SUPP-01",
+      "authorityDigest": "a04ccb2ba2c9afd0e73e345886a14f08892649dd61114b894a3ec4a4b0d739d5",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T11:32:34Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-T4A-SUPP-02",
+      "authorityDigest": "a8f9333f8df9c36e13a4469ba8b1089cbbd125d3aa77eaa175ee929c2cfbb5a6",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T11:37:17Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-T4A-SUPP-03",
+      "authorityDigest": "cff7587734b7b9664c72d177f701aeba101f6d11a4cef057769ecc6af3092e76",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T11:38:17Z"
       },
       "g7AttemptIdentity": null
     }
@@ -15520,10 +15580,13 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-08-07-TENANT-T1-01",
-        "GR-2026-08-07-TENANT-T2-01"
+        "GR-2026-08-07-TENANT-T2-01",
+        "GR-2026-08-07-TENANT-T3-01",
+        "GR-2026-08-07-TENANT-T4A-01",
+        "GR-2026-08-07-T4A-SUPP-01"
       ],
       "acceptance": "Read, write, event, memory, run, flow and admin paths share fail-closed scope; IDOR tests",
-      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu); 2026-08-07 T1 SETTLEMENT: strict_tenant_isolation artık gerçekten kapıyor — core'a resolveCallerTenant + typed TenantScopeError, API propose ingress'inde erken kapı (strict AÇIK: tenant-claim'siz çağıran 403 ile reddedilir ve akış oluşmaz; strict KAPALI: local varsayılanı bayt-değişmez); bulgu P1d ile aynı sınıftı — bayrak yalnız compliance-report'ta okunuyordu, hiçbir kararı etkilemiyordu; ayrıca dilim sırasında bir gerçek hata yakalandı ve düzeltildi: red throw'u try bloğunun dışında kalınca istek askıda kalıyordu (20s timeout), 403 erken yanıta çevrildi; `proof=tenant-strict-mode-3pins-api-106files-1036-green`; kalan kapsam (memory/run/event/admin yolları + IDOR matrisinin tamamı) T2 successor'ıdır; `receipt=GR-2026-08-07-TENANT-T2-01`; T2 admission 2026-08-07; 2026-08-07 T2 SETTLEMENT: tenant-scope kararı missions (liste+tekil) ve autonomous (chain okuma+mutation) ingress'lerine yayıldı — dört callsite tek karara bağlandı; yeni src/api/tenant-scope.ts fail-soft sync bayrak okuyucu + resolveApiCallerTenant (core resolveCallerTenant'ını kullanır; core config-loader-free kalır — P1b kontratı, route'lar senkron olduğundan okuma API katmanında); strict AÇIK tenant-claim'siz çağıranı 403 ile reddeder, strict KAPALI v1 bayt-değişmez, bozuk config sessizce sertleştirmez; `proof=tenant-t2-idor-pins-api-105files-1025-green`; 3 yeni IDOR pini + api sınıfı yeşil; kalan kapsam (memory/run/event/admin CLI+MCP yüzeyleri ve tam IDOR matrisi) T3 successor'ıdır",
+      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu); 2026-08-07 T1 SETTLEMENT: strict_tenant_isolation artık gerçekten kapıyor — core'a resolveCallerTenant + typed TenantScopeError, API propose ingress'inde erken kapı (strict AÇIK: tenant-claim'siz çağıran 403 ile reddedilir ve akış oluşmaz; strict KAPALI: local varsayılanı bayt-değişmez); bulgu P1d ile aynı sınıftı — bayrak yalnız compliance-report'ta okunuyordu, hiçbir kararı etkilemiyordu; ayrıca dilim sırasında bir gerçek hata yakalandı ve düzeltildi: red throw'u try bloğunun dışında kalınca istek askıda kalıyordu (20s timeout), 403 erken yanıta çevrildi; `proof=tenant-strict-mode-3pins-api-106files-1036-green`; kalan kapsam (memory/run/event/admin yolları + IDOR matrisinin tamamı) T2 successor'ıdır; `receipt=GR-2026-08-07-TENANT-T2-01`; T2 admission 2026-08-07; 2026-08-07 T2 SETTLEMENT: tenant-scope kararı missions (liste+tekil) ve autonomous (chain okuma+mutation) ingress'lerine yayıldı — dört callsite tek karara bağlandı; yeni src/api/tenant-scope.ts fail-soft sync bayrak okuyucu + resolveApiCallerTenant (core resolveCallerTenant'ını kullanır; core config-loader-free kalır — P1b kontratı, route'lar senkron olduğundan okuma API katmanında); strict AÇIK tenant-claim'siz çağıranı 403 ile reddeder, strict KAPALI v1 bayt-değişmez, bozuk config sessizce sertleştirmez; `proof=tenant-t2-idor-pins-api-105files-1025-green`; 3 yeni IDOR pini + api sınıfı yeşil; kalan kapsam (memory/run/event/admin CLI+MCP yüzeyleri ve tam IDOR matrisi) T3 successor'ıdır; `receipt=GR-2026-08-07-TENANT-T3-01`; T3 admission 2026-08-07; 2026-08-07 T3 SETTLEMENT: kalan iki merkezi NULL-tenant sitesi kapatıldı — /api/plan ingress'i ve /api/terminal/* (kabuk erişimi taşıdığından tenant sınırının en duyarlı yüzeyi); ikisi de T2'nin paylaşılan resolveApiCallerTenant kararına bağlandı (strict AÇIK 403, strict KAPALI v1 bayt-değişmez); doğrulama notu: patch'lenen ilk site 410 ile emekli /api/start DEĞİL canlı /api/plan uçudur — ölü koda kablo çekilmediği kontrol edildi; `proof=tenant-t3-resolver-contract-pins-api-green`; 2 yeni resolver-kontrat pini (strict/permissive/tenant'lı + bozuk-config fail-soft), api sınıfı yeşil, tsc temiz; KAPSAM DÜZELTMESİ (T4 ön-kontrolünde bulundu, aynı gün): T3'ün kapattığı `/api/terminal/*` **HTTP rotalarıdır**; asıl kabuk borusu olan WebSocket upgrade (`attachTerminalGateway`, `src/api/terminal/ws-gateway.ts`) HTTP handler'ından GEÇMEZ ve token-only auth'ta `authTenant='local'` ile kabul edilir — yani HTTP'de 403 alan çağıran WS üzerinden kabuk alabilir; ayrıca T2/T3'ün dayandığı senkron `readStrictTenantIsolation` yalnız proje config'ini okur, `loadConfig`'in global katmanını (`resolveGlobalConfigReadPath`) görmez — global'de strict açan operatörde API katmanı sessizce permissive kalır (bu, daha önce iki kez kapatılan 'raporlar-ama-kapatmaz kontrol' sınıfının üçüncü örneği); ikisi de T4a diliminde kapatılacak, T4b kalan ingress (memory-search, process read+write, enterprise), T4c CLI+MCP 0-hardcode host-tenant çözümü; `receipt=GR-2026-08-07-TENANT-T4A-01`; T4a admission 2026-08-07; 2026-08-07 T4a SETTLEMENT: yukarıdaki kapsam-düzeltmesinin iki maddesi de kapatıldı. (1) Efektif bayrak — senkron okuyucu artık `loadConfig`'in katman zincirini yürüyor (defaults→global→project, yakın katman kazanır); bozuk bir katman 'görüş bildirmedi' sayılır, sessizce ne sertleştirir ne gevşetir; global-config yol çözümü saf yol-modülüne indirilip eski yerinden yeniden export edildi, böylece API katmanı toptan mock'lanan ağır config modülünü import etmiyor (davranış ve mevcut importer'lar aynı). Bu düzeltme T2/T3'ün bağladığı altı siteyi de gerçekten kapatır. (2) WS kabuk borusu — strict modda tenant'ı çözülemeyen çağıran upgrade'de typed 4403 ile reddedilir (HTTP 403'ün WS karşılığı) ve `bridge()`'e hiç ulaşılmaz; strict kapalıyken her iki yol da bayt-değişmez. Tier-1 kanıtı gerçek-sunucu koşusudur: `createHttpServer` + gerçek PTY backend + gerçek ws istemcisi, mock yok — strict AÇIK 4403 kapanışı, strict KAPALI açık kalan soket. Harness'ın ilk sürümü yanlış negatif verdi (gateway el-sıkışmayı tamamlayıp sonra kapatıyor, mevcut 4401 yolu da öyle); prob 'open' ile 'sunucu kapattı mı' ayrımına çevrildi. `proof=tenant-t4a-real-server-ws-4403-plus-layer-chain-pins`; 4 birim + 3 katman-öncelik + 2 gerçek-sunucu pini, api+core 622 dosya / 10176 test yeşil, tsc temiz, lint:gates tam zincir yeşil. KANIT SIKILAŞTIRMA (aynı gün, supp-02): gerçek-sunucu pini yalnız '4403 ile kapatıldı'yı doğruluyordu; el-sıkışma tamamlandığından bu, soketin kısa süre köprülenip sonra kapandığı bir dünyayla da uyumluydu — kabuk borusunda 'geç reddetme' ile 'hiç köprülememe' farklı güvenlik özellikleridir. Pin artık reddedilen upgrade'den sonra HİÇ oturum yaratılmadığını ve el-sıkışma biter bitmez gönderilen create çerçevesine HİÇ yanıt dönmediğini de doğruluyor — yeşil, yani reddetme geç değil. AÇIK BIRAKILAN (typed): paketlenmiş-binary (`deckent serve`) teyidi alınmadı çünkü build adımı host guard'ı tarafından reddedildi (atlanmadı — bloklandı; owner'ın build yetkilendirmesi bu maddeyi kapatır). Kanıt kaynak-üstü gerçek sunucudur, binary iddiası yoktur. T4b ŞİDDET NOTU (ölçümle doğrulandı): memory-search'te iddiasız çağıran için tenant yüklemi hiç kurulmuyor — sorgu etiketsiz havuzu değil TÜM kiracıları döndürür, yani T4b'nin en geniş sızıntısı odur ve önce o kapatılır. Kalan kapsam: T4b (memory-search tenant yüklemi hiç kurulmuyor, process read+write, enterprise scope + audit damgaları), T4c (CLI+MCP host-tenant 0-hardcode çözümü); `receipt=GR-2026-08-07-T4A-SUPP-01`",
       "updated": "2026-08-07"
     },
     {
@@ -19742,6 +19805,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "4137a09da3ffadb5da5fc44da46647e8bae0a55a6d16dca7ebf79d56e106bd66"
+    "value": "d6aa2fc19e07823fdacd0520aa07bf312eb42a2b56e82f845f9adaa2cef8c11c"
   }
 }
