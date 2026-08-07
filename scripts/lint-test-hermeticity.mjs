@@ -122,7 +122,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-06 (P1d): +1 config-carry fixture test. Prior: 485a (12480).
   // 2026-08-07 (P1e): +2 end-to-end denial pins. Prior: P1d (12481).
   count: 12485,
-  digest: '5846414109753c6d3e208b48e46bda6b328baafaf791c13f6a6bf4c47ddfe514',
+  digest: '1b1236e57234706bc52615eb5dbdedbd66c0a353f68b898244f8aca2c56f8bde',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({

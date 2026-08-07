@@ -32,9 +32,15 @@ interface Booted {
   close: () => Promise<void>;
   port: number;
   terminalToken: string | undefined;
+  /** Live session count — 'was a PTY ever wired?' rather than 'was it closed?'. */
+  sessionCount: () => number;
 }
 
-const live: { api?: { close: () => Promise<void> }; root?: string; home?: string | undefined } = {};
+interface LiveApi {
+  close: () => Promise<void>;
+  terminalManager?: { list(): Array<{ id: string }>; kill(id: string): void };
+}
+const live: { api?: LiveApi; root?: string } = {};
 
 /** Boot the real server over a real project dir with the given flag value. */
 async function boot(strict: boolean): Promise<Booted> {
@@ -52,7 +58,7 @@ async function boot(strict: boolean): Promise<Booted> {
     apiToken: 't4a-api-token',
     terminalBackend: new LocalPtyBackend(),
   });
-  live.api = api;
+  live.api = api as unknown as LiveApi;
   await new Promise<void>((resolve) => {
     if ((api.server.address() as { port: number } | null)?.port) return resolve();
     api.server.once('listening', () => resolve());
@@ -61,6 +67,7 @@ async function boot(strict: boolean): Promise<Booted> {
   return {
     port: address?.port ?? 0,
     terminalToken: api.terminalToken,
+    sessionCount: () => api.terminalManager?.list().length ?? 0,
     close: () => api.close(),
   };
 }
@@ -74,14 +81,29 @@ async function boot(strict: boolean): Promise<Booted> {
  * question is not "did open fire" but "did the server close it, and with which
  * code". This helper reports both.
  */
-async function upgrade(port: number, token: string): Promise<{ opened: boolean; closeCode: number | null }> {
+async function upgrade(
+  port: number,
+  token: string,
+): Promise<{ opened: boolean; closeCode: number | null; framesSeen: number }> {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/api/terminal/ws`, [`deckent.${token}`]);
   let opened = false;
-  const settled = await new Promise<{ opened: boolean; closeCode: number | null }>((resolve) => {
-    const timer = setTimeout(() => resolve({ opened, closeCode: null }), 750);
-    ws.on('open', () => { opened = true; });
-    ws.on('close', (code) => { clearTimeout(timer); resolve({ opened, closeCode: code }); });
-    ws.on('error', () => { clearTimeout(timer); resolve({ opened, closeCode: -1 }); });
+  let framesSeen = 0;
+  const settled = await new Promise<{ opened: boolean; closeCode: number | null; framesSeen: number }>((resolve) => {
+    const timer = setTimeout(() => resolve({ opened, closeCode: null, framesSeen }), 750);
+    ws.on('open', () => {
+      opened = true;
+      // Push the gateway as hard as a real client would the instant it can:
+      // ask for a session. If the refusal were too late, this is what would
+      // slip through.
+      try {
+        ws.send(JSON.stringify({ t: 'create', kind: 'shell' }));
+      } catch {
+        // socket already gone — that is the expected strict-mode outcome
+      }
+    });
+    ws.on('message', () => { framesSeen += 1; });
+    ws.on('close', (code) => { clearTimeout(timer); resolve({ opened, closeCode: code, framesSeen }); });
+    ws.on('error', () => { clearTimeout(timer); resolve({ opened, closeCode: -1, framesSeen }); });
   });
   try {
     ws.close();
@@ -93,6 +115,12 @@ async function upgrade(port: number, token: string): Promise<{ opened: boolean; 
 
 afterEach(async () => {
   if (live.api) {
+    // The permissive case really does spawn a PTY (that is the point of it),
+    // so tear the shells down explicitly — close() only reaps IDLE sessions
+    // and a leaked shell would outlive the test run.
+    for (const sess of live.api.terminalManager?.list() ?? []) {
+      live.api.terminalManager?.kill(sess.id);
+    }
     await live.api.close();
     live.api = undefined;
   }
@@ -111,6 +139,14 @@ describe('TENANT-001 T4a — real server, real WebSocket, strict tenant isolatio
     // A VALID terminal token — the refusal is about tenant scope, not auth.
     // The server tore the socket down itself, with the tenant-scope code.
     expect(outcome.closeCode).toBe(APP_CLOSE_TENANT_SCOPE);
+
+    // The close code alone would still be satisfied by a socket that briefly
+    // bridged and was then torn down. On a shell pipe "refused late" and
+    // "never wired" are different security properties, so pin the stronger
+    // one: no PTY session exists at all, and an attach attempt sent the
+    // instant the handshake completed produced no output frame.
+    expect(s.sessionCount()).toBe(0);
+    expect(outcome.framesSeen).toBe(0);
   }, 20_000);
 
   it('strict OFF: the same valid token opens the shell — v1 behaviour intact', async () => {
