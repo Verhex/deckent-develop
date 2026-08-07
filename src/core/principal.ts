@@ -165,3 +165,34 @@ export function assertActorAssurance(
   if (enforce && !finding.ok) throw new PrincipalAssuranceError(finding, site);
   return finding;
 }
+
+// ═══ Tenant scope (TENANT-001 T1) ══════════════════════════════════════════
+
+/** Typed refusal when a caller carries no tenant and strict isolation is on. */
+export class TenantScopeError extends Error {
+  readonly code = 'TENANT_SCOPE_UNRESOLVED' as const;
+  constructor(principalId: string) {
+    super(`tenant scope unresolved for principal '${principalId}': strict tenant isolation is enabled and the caller carries no tenant claim`);
+    this.name = 'TenantScopeError';
+  }
+}
+
+/**
+ * Resolve the tenant a caller acts within.
+ *
+ * The permissive default (`'local'`) is what every surface has always used, and
+ * it is exactly the NULL-tenant hole `strict_tenant_isolation` was introduced to
+ * close — except that flag only ever reached the compliance REPORT, never a
+ * decision, so the control reported itself as present while gating nothing.
+ * With strict mode on, a tenant-less caller is refused instead of being silently
+ * folded into `local`. Default-off keeps v1 behaviour byte-identical.
+ */
+export function resolveCallerTenant(
+  principal: { readonly id: string; readonly tenantId?: string },
+  strict: boolean,
+): string {
+  const tenant = principal.tenantId?.trim();
+  if (tenant) return tenant;
+  if (strict) throw new TenantScopeError(principal.id);
+  return 'local';
+}

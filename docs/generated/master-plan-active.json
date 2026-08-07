@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "298f1a31f8434a330ac6426352f6e4538fe6ea58bb2c4d6778b59f630f9b204a"
+    "value": "303d50e9cfc6cdefee58fb421695070207b0048ce7f84c110362816477b8c4ec"
   },
   "summary": {
     "total": 388,
     "active": 341,
     "terminal": 47,
-    "receipts": 104,
+    "receipts": 107,
     "byState": {
-      "OPEN": 256,
+      "OPEN": 255,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 18,
+      "VERIFY": 19,
       "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3149,10 +3149,10 @@
       "id": "TENANT-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-27",
+      "state": "VERIFY",
+      "updated": "2026-08-07",
       "definitionDigest": "7ade16473831b4aeaf6ba4c3c2e23e0278504413a8cbccad5832065e28c1673d",
-      "progressDigest": "e2db2aeab535744733acb5373266eba4c282556ac7b3db00f02b73cf18177ef9",
+      "progressDigest": "74c65cdf29380dc86f39e14b4f99dde161d147722c1ffa2e3e1711a2ea53c5ca",
       "terminalClosureDigest": null
     },
     {
@@ -5371,6 +5371,36 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-07T09:18:05Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-TENANT-T1-01",
+      "authorityDigest": "350f0c4bf481ccc05ce2262eb11cb3a75aa118e5d71bd30c7a7aabdda492fbe8",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T09:32:39Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-T1-BASELINE-SUPP-01",
+      "authorityDigest": "631facfa281df8fb26f0828a5c504c3f7f6d726df1da315c49bb740af8c43280",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T09:35:37Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-T1-STATS-SUPP-01",
+      "authorityDigest": "e4b31d5a5d2c1d27c5bb3888d0d80663acaaad5f656107856354267d4a6372ac",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-07T09:36:47Z"
       },
       "g7AttemptIdentity": null
     }
@@ -15455,12 +15485,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "~",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -15468,10 +15498,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-07-TENANT-T1-01"
+      ],
       "acceptance": "Read, write, event, memory, run, flow and admin paths share fail-closed scope; IDOR tests",
-      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu); 2026-08-07 T1 SETTLEMENT: strict_tenant_isolation artık gerçekten kapıyor — core'a resolveCallerTenant + typed TenantScopeError, API propose ingress'inde erken kapı (strict AÇIK: tenant-claim'siz çağıran 403 ile reddedilir ve akış oluşmaz; strict KAPALI: local varsayılanı bayt-değişmez); bulgu P1d ile aynı sınıftı — bayrak yalnız compliance-report'ta okunuyordu, hiçbir kararı etkilemiyordu; ayrıca dilim sırasında bir gerçek hata yakalandı ve düzeltildi: red throw'u try bloğunun dışında kalınca istek askıda kalıyordu (20s timeout), 403 erken yanıta çevrildi; `proof=tenant-strict-mode-3pins-api-106files-1036-green`; kalan kapsam (memory/run/event/admin yolları + IDOR matrisinin tamamı) T2 successor'ıdır",
+      "updated": "2026-08-07"
     },
     {
       "order": 4030,
@@ -19689,6 +19721,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "749f412afb2ae640e2325e0727cf12fe9151b05f1950f043c681b95416a6114e"
+    "value": "9e52b6f9c73d46ec8e2d7bbb1105a442f238ddf19547b116f8d9623fb2968495"
   }
 }
