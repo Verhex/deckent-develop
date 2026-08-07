@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "842d2760f12b74947e1078adaf03b1fa2ffcd348af3b14d49c584e4025c11fba"
+    "value": "8491a6f1c3ebe5ae20895b9ea2f1669083c6a8ce39d8ebd70ee05ed1e85d51ef"
   },
   "summary": {
     "total": 388,
@@ -13,9 +13,9 @@
     "byState": {
       "OPEN": 255,
       "READY": 0,
-      "IN_PROGRESS": 1,
+      "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 18,
+      "VERIFY": 19,
       "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3149,10 +3149,10 @@
       "id": "TENANT-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "updated": "2026-08-07",
       "definitionDigest": "7ade16473831b4aeaf6ba4c3c2e23e0278504413a8cbccad5832065e28c1673d",
-      "progressDigest": "4b34fa0f6f301f1c9c0af768892117e7050a4ece79a9b623c67da7b8c54506c9",
+      "progressDigest": "74c65cdf29380dc86f39e14b4f99dde161d147722c1ffa2e3e1711a2ea53c5ca",
       "terminalClosureDigest": null
     },
     {
@@ -5379,8 +5379,8 @@
       "authorityDigest": "350f0c4bf481ccc05ce2262eb11cb3a75aa118e5d71bd30c7a7aabdda492fbe8",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-07T09:32:39Z"
       },
       "g7AttemptIdentity": null
     }
@@ -15465,12 +15465,12 @@
       "gates": [
         "G1"
       ],
-      "state": "IN_PROGRESS",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "~",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -15482,7 +15482,7 @@
         "GR-2026-08-07-TENANT-T1-01"
       ],
       "acceptance": "Read, write, event, memory, run, flow and admin paths share fail-closed scope; IDOR tests",
-      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu)",
+      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu); 2026-08-07 T1 SETTLEMENT: strict_tenant_isolation artık gerçekten kapıyor — core'a resolveCallerTenant + typed TenantScopeError, API propose ingress'inde erken kapı (strict AÇIK: tenant-claim'siz çağıran 403 ile reddedilir ve akış oluşmaz; strict KAPALI: local varsayılanı bayt-değişmez); bulgu P1d ile aynı sınıftı — bayrak yalnız compliance-report'ta okunuyordu, hiçbir kararı etkilemiyordu; ayrıca dilim sırasında bir gerçek hata yakalandı ve düzeltildi: red throw'u try bloğunun dışında kalınca istek askıda kalıyordu (20s timeout), 403 erken yanıta çevrildi; `proof=tenant-strict-mode-3pins-api-106files-1036-green`; kalan kapsam (memory/run/event/admin yolları + IDOR matrisinin tamamı) T2 successor'ıdır",
       "updated": "2026-08-07"
     },
     {
@@ -19701,6 +19701,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e976629bf1d97fd3c5db70a15dd265259a3eb8f849474a30db270feab90ea665"
+    "value": "09d912c625798708982d5c6c17087454798d758514ef88e93a02bf007b1f102a"
   }
 }
