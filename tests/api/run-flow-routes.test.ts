@@ -105,12 +105,16 @@ function bearerHeaders(claims: Record<string, unknown>): Record<string, string> 
 
 // ─── Test project root + mini server (route not yet wired into server.ts) ──
 
-function makeProjectRoot(opts: { runFlowV2?: boolean } = {}): string {
+function makeProjectRoot(opts: { runFlowV2?: boolean; enforcePrincipal?: boolean } = {}): string {
   const root = mkdtempSync(join(tmpdir(), 'run-flow-routes-'));
   mkdirSync(join(root, '.deckent'), { recursive: true });
   writeFileSync(
     join(root, '.deckent', 'config.json'),
-    JSON.stringify({ terminal: { run_flow_v2: opts.runFlowV2 ?? true } }),
+    JSON.stringify({
+      terminal: { run_flow_v2: opts.runFlowV2 ?? true },
+      // PRINCIPAL-001 P1e: identity-assurance hard-gate, default off.
+      ...(opts.enforcePrincipal === true ? { enforce_principal_assurance: true } : {}),
+    }),
     'utf-8',
   );
   return root;
@@ -188,7 +192,7 @@ afterEach(async () => {
   baseUrl = undefined as unknown as string;
 });
 
-async function boot(opts: { runFlowV2?: boolean } = {}): Promise<void> {
+async function boot(opts: { runFlowV2?: boolean; enforcePrincipal?: boolean } = {}): Promise<void> {
   projectRoot = makeProjectRoot(opts);
   const started = await startServer(projectRoot);
   server = started.server;
@@ -426,5 +430,29 @@ describe('POST /api/run-flow/:flowId/decision', () => {
       body: JSON.stringify({ decision: 'approve' }),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+// ═══ PRINCIPAL-001 P1e — end-to-end identity refusal ════════════════════════
+// Measured first on the REAL built binary (`deckent serve` + a real HTTP POST):
+// with the gate ON an authenticated-but-UNVERIFIED principal (`api-static`,
+// i.e. a static API token rather than verified OIDC claims) was refused with
+// HTTP 502 and the typed message below, while the same call with the gate OFF
+// produced HTTP 201 and a live flow. These two cases pin that behaviour so a
+// regression cannot silently re-open the door.
+describe('PRINCIPAL-001 P1e — enforce_principal_assurance end-to-end', () => {
+  it('gate ON: an unverified principal is refused BEFORE the flow is created', async () => {
+    await boot({ enforcePrincipal: true });
+    const res = await propose('probe');
+    expect(res.status).not.toBe(201);
+    expect(JSON.stringify(res.body)).toMatch(/principal assurance denied at planRunFlow/u);
+    expect(JSON.stringify(res.body)).toMatch(/unverified assurance/u);
+  });
+
+  it('gate OFF (default): the same unverified principal still creates the flow (v1 behaviour)', async () => {
+    await boot();
+    const res = await propose('probe');
+    expect(res.status).toBe(201);
+    expect(res.body.state).toBe('AWAITING_APPROVAL');
   });
 });
