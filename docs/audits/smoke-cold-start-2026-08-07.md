@@ -87,3 +87,42 @@ Typed spawn admission (provider-işi-ÖNCESİ blok) · terminal evidence hold ·
 cost gate + subscription-quota dürüstlüğü ("USD $0 is not a quota-availability
 verdict") · MODEL-GUARD tier yükseltmesi · scope gate (git'li) · CAS digest
 zinciri · keyring fail-closed. Patlama senaryosunu bunlar engelliyor.
+
+---
+
+## Ek: Temiz-oda kök-neden koşusu (aynı gün, ~15:32)
+
+Enstrüman: taze proje + `DECKENT_OFFLINE=1` + 2sn'lik süreç-ağacı izleyici + 4dk sınır.
+
+### Ölçülen kök nedenler
+
+**KN1 — Routing tie-judge gizli AI çağrısı (B2'nin "boşluk" gizemi).**
+Süreç-ağacı suçüstü: `claude -p "You are a routing tie-judge…"`. Routing V3, soğuk
+projede sinyal kümesi BOŞ (`over []`) olduğundan adayları hep @1.00 eşitliyor ve
+her task için gerçek bir AI tie-judge çağrısı yapıyor (~60-90sn + provider parası).
+`brain_planning=structured` planner-AI'ı atlıyor ama routing-AI'ı atlamıyor.
+Smoke'taki "8 döngü" = 2 planSprint (bare start önce cost-estimate için, sonra
+runSprint içinde İKİNCİ kez planlıyor) × ~3'er tie-judge çağrısı.
+
+**KN2 — Executor çözümü + bütçe kopukluğu (B2 = B4).**
+Temiz odada sandbox'sız spawn executor'ı "docker"a çözüldü → remote sınıf →
+`ExecutionBudget` şart (`task.budget` üzerinden gelir; kimse effective config'in
+`cost_limits`'inden türetmiyor) → `assertExecutionBudgetShape` fail-closed →
+`Spawn phase failed after retry` typed hata. Soğuk startta spawn HİÇBİR yoldan
+başarılı olamıyor.
+
+**KN3 — Bayat projeksiyon = boş "Complete" (B3'ün mekanizması).**
+Smoke'taki sprint-3'te bayat 2-task dosyaları spawn'ı boş-başarıya çevirdi →
+EXECUTE worker'sız aktı → "All tasks complete" banner'ı → terminal authority
+hold. Temiz odada (bayat dosya yok) aynı koşu KN2'nin typed hatasını bastı —
+mekanizma doğrulandı.
+
+### Düzeltmeler (rapor dürüstlüğü)
+
+- **B7 GERİ ÇEKİLDİ:** "CLI-sonrası 15dk yaşayan süreç" bulgusu iki ölçüm
+  hatamın bileşimiydi: ERRORS.md okumalarım `head` pencereleriydi ve 15:09+
+  kayıtlarının yazarı benim CAS dry-run probumdu (invocations.db birincil
+  kanıt). Smoke projesi paylaşılan mutable alan — problarım forensiği kirletti;
+  temiz-oda koşusunun varlık sebebi bu.
+- **Banner süresi:** "Sprint #1 Complete 2m 35s" gerçek ~7-18dk koşuları
+  raporluyor — süre ölçümü ayrı küçük bulgu.
