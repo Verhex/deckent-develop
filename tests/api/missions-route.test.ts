@@ -4,7 +4,7 @@
  * Tier-1: all assertions use real served JSON over real HTTP — no mock-only.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
@@ -303,5 +303,64 @@ describe('server.ts dispatch — /api/missions is wired (integration)', () => {
       await api.close();
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+// ═══ TENANT-001 T2 — strict isolation reaches the missions ingress ══════════
+// T1 closed the run-flow propose path; the same NULL-tenant default still sat
+// here, so a caller with no tenant claim was folded into `local` and could read
+// `local` missions. These pins prove the gate now decides on this surface too.
+describe('TENANT-001 T2 — missions ingress under strict tenant isolation', () => {
+  function seedStrictRoot(): string {
+    const root = mkdtempSync(join(tmpdir(), 'missions-strict-'));
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(
+      join(root, '.deckent', 'config.json'),
+      JSON.stringify({ strict_tenant_isolation: true }),
+    );
+    const store = new SqliteMissionStore(root);
+    store.migrate();
+    store.close();
+    return root;
+  }
+
+  it('strict ON: a tenant-less caller is refused with 403', async () => {
+    projectRoot = seedStrictRoot();
+    const started = await startServer(projectRoot);
+    server = started.server;
+    baseUrl = started.baseUrl;
+
+    const res = await fetch(`${baseUrl}/api/missions`, {
+      headers: bearerHeaders({ sub: 'alice' }), // no tenant claim
+    });
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(await res.json())).toMatch(/tenant scope unresolved/u);
+  });
+
+  it('strict ON: a caller WITH a tenant claim is served normally', async () => {
+    projectRoot = seedStrictRoot();
+    const started = await startServer(projectRoot);
+    server = started.server;
+    baseUrl = started.baseUrl;
+
+    const res = await fetch(`${baseUrl}/api/missions`, {
+      headers: bearerHeaders({ sub: 'alice', tenant: 'acme' }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('strict OFF (default): the tenant-less caller is served as before (v1)', async () => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'missions-permissive-'));
+    const store = new SqliteMissionStore(projectRoot);
+    store.migrate();
+    store.close();
+    const started = await startServer(projectRoot);
+    server = started.server;
+    baseUrl = started.baseUrl;
+
+    const res = await fetch(`${baseUrl}/api/missions`, {
+      headers: bearerHeaders({ sub: 'alice' }),
+    });
+    expect(res.status).toBe(200);
   });
 });
