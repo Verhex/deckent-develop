@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "a4fb508fec4114315a1777acd6f283e8a00163d5d06439a6a26d14a7b35746b7"
+    "value": "94799c57ade399079341ff73fa85bbb298e75bf080564ae9859d2ef2d3d35d93"
   },
   "summary": {
     "total": 388,
-    "active": 342,
-    "terminal": 46,
+    "active": 341,
+    "terminal": 47,
     "receipts": 101,
     "byState": {
       "OPEN": 257,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 18,
-      "DONE": 46,
+      "VERIFY": 17,
+      "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -3138,11 +3138,11 @@
       "id": "PRINCIPAL-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-07",
       "definitionDigest": "fa879e7874c86d428bb4f508ad2284eb8e78ac0c663a8af384bbbcb836759b06",
-      "progressDigest": "f07f4824567ddee94d6a46cf3baa10653c5d72ba14ca1efc2d4252d6d43b3a3e",
-      "terminalClosureDigest": null
+      "progressDigest": "8354a07d2aaeed8b5d202028bfc7d6001ffaf9de36008b502fff6948c8cad46c",
+      "terminalClosureDigest": "b1ae1fb100afd798cc24c0d6564270f9fb2f0724f1593de077a6e8acca91e068"
     },
     {
       "order": 4020,
@@ -13568,8 +13568,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "KERNEL-ATTEMPT-001",
-        "PRINCIPAL-001"
+        "KERNEL-ATTEMPT-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Single authoritative worker/attempt state; no file-only split brain; recovery and tenancy proof",
@@ -15377,7 +15376,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "TENANT-001",
         "OPERATION-001",
         "CAPABILITY-001",
@@ -15402,62 +15400,6 @@
       "acceptance": "Every operation binds principal, tenant, capability, approval, budget, receipt and audit",
       "evidence": "Code-truth audit",
       "updated": "2026-07-26"
-    },
-    {
-      "order": 4010,
-      "id": "PRINCIPAL-001",
-      "parent": "AUTHORITY-001",
-      "program": "AUTHORITY",
-      "outcome": "VerifiedPrincipal across local, OIDC, workload and connector identities",
-      "priority": "P0",
-      "dependsOn": [
-        "SSOT-003"
-      ],
-      "dependents": [
-        "API-IDENTITY-001",
-        "API-SECURITY-001",
-        "APPROVAL-001",
-        "CAPABILITY-001",
-        "CONNECTOR-IDENTITY-001",
-        "DESKTOP-SECURITY-001",
-        "MCP-LEASE-001",
-        "MCP-TRUST-001",
-        "OPERATION-001",
-        "RECEIPT-001",
-        "TENANT-001",
-        "TERMINAL-CONTEXT-001",
-        "TERMINAL-ONBOARD-001",
-        "WORKER-REGISTRY-001"
-      ],
-      "children": [],
-      "gates": [
-        "G2",
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-06-PRINCIPAL-P1A-01",
-        "GR-2026-08-06-PRINCIPAL-P1B-01",
-        "GR-2026-08-06-PRINCIPAL-P1C-01",
-        "GR-2026-08-06-PRINCIPAL-P1D-01",
-        "GR-2026-08-06-PRINCIPAL-P1D-02",
-        "GR-2026-08-07-PRINCIPAL-P1E-01"
-      ],
-      "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
-      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık; `receipt=GR-2026-08-06-PRINCIPAL-P1A-01`; Dalga-2 P1a admission 2026-08-06 (Alperen 'tam kompozisyon' start-gate); 2026-08-06 P1A SETTLEMENT (tren-m): VerifiedPrincipal tipi + resolveLocalOsPrincipal + principalToActor + assessActorAssurance advisory-seam'i; sentetik-literal envanteri kapandı (mcp-operator ×4 / cli-operator / repl-user → gerçek os-user; API üç sitesi tek helper'da, claimsVerified→token-verified ve api-static→unverified AÇIK işaretli); planRunFlow her admission'da typed assurance-kaydı üretir; `proof=api-actor-fence-409-then-105files-1017-green`; gerçek bulgu: start/cancel route'ları approve'dan farklı çıplak-actor kuruyordu — eşitlik-fence enriched dünyada 409'la yakaladı, birleşik-helper'la kapandı; principal 7/7, api 105/1017, mcp+cli plan suite'leri yeşil, tsc temiz, inventory +1 gerçek modül; enforce-modu P1b dilimi (config-gated) ile; 2026-08-06 EVIDENCE-KONSOLİDASYONU (truth-hizası): P1a settlement'ında truth hücresi güncellenmemişti — ölçülmüş gerçek C=1 (src/core/principal.ts), W=1 (CLI/MCP/API ingress'leri + planRunFlow advisory seam'i wired), H=1 (principal 7/7 + api 105 dosya/1017 test), E=0 (enforce modu P1b'de config-gated gelecek, bugün advisory), L=0 (gerçek-binary kimlik smoke'u P1b kapsamında); `receipt=GR-2026-08-06-PRINCIPAL-P1B-01`; P1b admission 2026-08-06 (Dalga-3 kapısı); 2026-08-06 P1B SETTLEMENT: enforce_principal_assurance config anahtarı (default kapalı) + assertActorAssurance typed enforcement + planRunFlow ingress bağlantısı; `proof=principal-enforce-both-modes-11of11`; principal 11/11 her iki modu pinler (kapalı=v1 aynen, açık=admission öncesi typed red, gerçek OS kimliği açıkken geçer), orchestra+api+mcp 835 dosya/10805 test yeşil, tsc temiz; E boyutu policy-enablement ile kapandı (1); L için gerçek-binary enforce koşusu P1c kapsamındadır; `receipt=GR-2026-08-06-PRINCIPAL-P1C-01`; P1c admission 2026-08-06; 2026-08-06 P1C SETTLEMENT (kısmi — dürüst kayıt): plan komutunda P1a taramasında kaçan İKİ sentetik kimlik sitesi daha gerçek OS kimliğine çevrildi ve adoption yolu unverified olarak dürüstçe işaretlendi; `proof=cli-class-528files-7691-green`; CLI sınıfı 528 dosya/7691 test yeşil, tsc temiz, lint:gates tam zincir yeşil. L boyutu bu turda KAPANMADI: gerçek-binary enforce probu planlama yolunun daha erken bir durable-publication HOLD'una takıldı ve enforce kararına ulaşamadı — L için plan-flow fixture'lı ayrı gerçek-binary dilimi (P1d) gerekir; PRINCIPAL DONE'u ve Dalga-3 kapısı (OPERATION-001/TENANT-001 admission'ı) P1d'ye bağlıdır; 2026-08-06 P1C SETTLEMENT (kısmi — dürüst kayıt): plan komutunda P1a taramasında kaçan İKİ sentetik kimlik sitesi daha gerçek OS kimliğine çevrildi, adoption yolu unverified işaretlendi; `proof=cli-class-528files-7691-green`; CLI 528 dosya/7691 test yeşil, tsc temiz, lint:gates tam zincir yeşil. L bu turda KAPANMADI: gerçek-binary enforce probu planlama yolunun daha erken durable-publication HOLD'una takıldı ve enforce kararına ulaşamadı — L için plan-flow fixture'lı gerçek-binary dilimi (P1d) gerekir; PRINCIPAL DONE'u ve Dalga-3 kapısı (OPERATION-001/TENANT-001) P1d'ye bağlıdır; `receipt=GR-2026-08-06-PRINCIPAL-P1D-01`; P1d admission 2026-08-06; 2026-08-06 P1D DURUŞU (kayıpta-dur, dürüst kayıt): restrictive-only kimlik seam'i eklenip gerçek-binary enforce kanıtı denendi ve ÜÇ farklı CLI yolu enforce kararına ULAŞAMADI — dry-run preview yolu planRunFlow'u hiç çağırmıyor, adoption yolu daha erken projection-HOLD veriyor, normal yol ise scope-gate FAIL'inde duruyor (--force-scope dahil). Seam geri alındı (test'siz seam ölü-koddur), receipt revoked. L için doğru dilim: ya scope-gate'i sağlayan gerçek fixture'lı plan-flow harness'ı ya da API ingress'i üzerinden gerçek-sunucu kanıtı — bu, P1d'nin yeniden tasarımını gerektirir ve PRINCIPAL DONE'u ile Dalga-3 kapısı ona bağlıdır; `receipt=GR-2026-08-06-PRINCIPAL-P1D-02`; P1d-v2 admission 2026-08-06 (yeniden tasarım; kök-neden config-carry boşluğu, ölçümle doğrulandı); `receipt=GR-2026-08-07-PRINCIPAL-P1E-01`; P1e admission 2026-08-07 (uçtan-uca red kanıtı — Alperen kararı); 2026-08-07 P1E SETTLEMENT: uçtan-uca red GERÇEK BİNARY + GERÇEK HTTP sunucusuyla kanıtlandı — deckent serve altında kimlik-doğrulamalı ama unverified principal (api-static) ile POST /api/run-flow/propose çağrısı gate AÇIKken HTTP 502 ve typed 'principal assurance denied at planRunFlow: actor api-static carries explicit unverified assurance (provenance=api)' ile akış oluşmadan reddedildi; gate KAPALIyken aynı çağrı HTTP 201 ve canlı flow üretti; davranış route suite'ine iki yönlü regresyon-pini olarak eklendi (api sınıfı 105 dosya/1019 test yeşil, tsc temiz); `proof=e2e-real-server-denial-502-vs-201`",
-      "updated": "2026-08-07"
     },
     {
       "order": 4020,
@@ -15495,9 +15437,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "PRINCIPAL-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Read, write, event, memory, run, flow and admin paths share fail-closed scope; IDOR tests",
       "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired",
@@ -15539,9 +15479,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "PRINCIPAL-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-08-06-DESIGN-DOCS-01"
       ],
@@ -15588,8 +15526,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "OPERATION-001",
-        "PRINCIPAL-001"
+        "OPERATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Principal, tenant, operation, resource and environment resolve one scoped capability decision",
@@ -15646,7 +15583,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "TENANT-001",
         "OPERATION-001",
         "CAPABILITY-001",
@@ -15780,7 +15716,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "TENANT-001"
       ],
       "evidenceReceipts": [],
@@ -16162,7 +16097,6 @@
       "blockerCode": "DEPENDENCY_UNSATISFIED",
       "blockerRemedy": "exact ledger `DependsOn` IDs",
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "TENANT-001",
         "APPROVAL-001"
       ],
@@ -16288,7 +16222,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "OPERATION-001"
       ],
       "evidenceReceipts": [],
@@ -16718,8 +16651,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "CM-01",
-        "PRINCIPAL-001"
+        "CM-01"
       ],
       "evidenceReceipts": [],
       "acceptance": "Safe enablement, auth status, global/project scope, honest unsupported states",
@@ -16873,7 +16805,6 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "TERMINAL-REPL-001",
-        "PRINCIPAL-001",
         "TENANT-001"
       ],
       "evidenceReceipts": [],
@@ -17200,7 +17131,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "API-SECURITY-001"
       ],
       "evidenceReceipts": [],
@@ -17366,7 +17296,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "TENANT-001",
         "API-SECURITY-001"
       ],
@@ -17408,7 +17337,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "APPROVAL-001",
         "APP-SERVICE-001"
       ],
@@ -18025,7 +17953,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "PRINCIPAL-001",
         "CAPABILITY-001",
         "SUPPLY-CHAIN-001"
       ],
@@ -19731,6 +19658,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "53e1c3bb299a957ffc1ce3ee415c1182490f29228de81d19c59f9d24ead21f08"
+    "value": "eeab353370d9c80664bb56475fd048a0be72f0773de46a016568372416152cbf"
   }
 }
