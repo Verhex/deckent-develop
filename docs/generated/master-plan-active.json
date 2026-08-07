@@ -3,16 +3,16 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "298f1a31f8434a330ac6426352f6e4538fe6ea58bb2c4d6778b59f630f9b204a"
+    "value": "48d913a48c1c39ec0a89190091296cc7c8e7b1b35af3c7ade4a8251fbe98a2f5"
   },
   "summary": {
     "total": 388,
     "active": 341,
     "terminal": 47,
-    "receipts": 104,
+    "receipts": 105,
     "byState": {
-      "OPEN": 256,
-      "READY": 0,
+      "OPEN": 255,
+      "READY": 1,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
       "VERIFY": 18,
@@ -3149,10 +3149,10 @@
       "id": "TENANT-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-27",
+      "state": "READY",
+      "updated": "2026-08-07",
       "definitionDigest": "7ade16473831b4aeaf6ba4c3c2e23e0278504413a8cbccad5832065e28c1673d",
-      "progressDigest": "e2db2aeab535744733acb5373266eba4c282556ac7b3db00f02b73cf18177ef9",
+      "progressDigest": "3ad916ae41e3e7c677c9d24c8a39c017c94577b993a5102c14f94af83468e629",
       "terminalClosureDigest": null
     },
     {
@@ -5371,6 +5371,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-07T09:18:05Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-07-TENANT-T1-01",
+      "authorityDigest": "350f0c4bf481ccc05ce2262eb11cb3a75aa118e5d71bd30c7a7aabdda492fbe8",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -15455,7 +15465,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "READY",
       "truth": {
         "C": "1",
         "W": "~",
@@ -15468,10 +15478,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-07-TENANT-T1-01"
+      ],
       "acceptance": "Read, write, event, memory, run, flow and admin paths share fail-closed scope; IDOR tests",
-      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu)",
+      "updated": "2026-08-07"
     },
     {
       "order": 4030,
@@ -19689,6 +19701,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "749f412afb2ae640e2325e0727cf12fe9151b05f1950f043c681b95416a6114e"
+    "value": "344437845f210a0e6419c21b57b6ec160bfc82dee2cf34a490c63015a6a02a86"
   }
 }
