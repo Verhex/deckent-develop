@@ -5,6 +5,7 @@
 // Fail-safe: missing or inaccessible autonomous.db degrades to empty list, never 500.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { resolveApiCallerTenant } from './tenant-scope.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { DECKENT_DIR } from '../core/constants.js';
@@ -64,7 +65,14 @@ export function registerMissionsRoute(
       // Effective-tenant fail-closed: callerTenant defaults to 'local' when no
       // tenantId claim (static/opaque bearer). Only missions whose tenant matches
       // callerTenant (or 'local' for untagged missions) are visible. Admin sees all.
-      const callerTenant = principal.tenantId ?? 'local';
+      const tenantScope = resolveApiCallerTenant(principal, projectRoot);
+      if (tenantScope.tenant === null) {
+        // TENANT-001 T2: strict mode refuses a tenant-less caller instead of
+        // folding it into `local` (the NULL-tenant hole). Default-off keeps v1.
+        sendJson(res, { error: tenantScope.reason }, 403);
+        return true;
+      }
+      const callerTenant = tenantScope.tenant;
       const isAdmin = principal.role === 'admin';
       const visible = missions.filter((m) => isAdmin || (m.tenant ?? 'local') === callerTenant);
       const views: MissionView[] = visible
@@ -80,7 +88,14 @@ export function registerMissionsRoute(
       if (!id) return false;
       const mission = store.getMission(id);
       // Effective-tenant fail-closed: 404, not 403 — no existence leak.
-      const callerTenant = principal.tenantId ?? 'local';
+      const tenantScope = resolveApiCallerTenant(principal, projectRoot);
+      if (tenantScope.tenant === null) {
+        // TENANT-001 T2: strict mode refuses a tenant-less caller instead of
+        // folding it into `local` (the NULL-tenant hole). Default-off keeps v1.
+        sendJson(res, { error: tenantScope.reason }, 403);
+        return true;
+      }
+      const callerTenant = tenantScope.tenant;
       const isAdmin = principal.role === 'admin';
       const allowed = isAdmin || (!!mission && (mission.tenant ?? 'local') === callerTenant);
       if (!mission || !allowed) {

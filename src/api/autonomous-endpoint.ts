@@ -15,6 +15,7 @@
 // bearer via deriveRequestPrincipal — never from client-supplied fields).
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { resolveApiCallerTenant } from './tenant-scope.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
@@ -129,7 +130,14 @@ export function registerAutonomousRoutes(
     // granted cross-tenant visibility. Empty result (200) leaks no existence.
     if (req) {
       const principal = deriveRequestPrincipal(req);
-      const callerTenant = principal.tenantId ?? 'local';
+      const tenantScope = resolveApiCallerTenant(principal, projectRoot);
+      if (tenantScope.tenant === null) {
+        // TENANT-001 T2: strict mode refuses a tenant-less caller instead of
+        // folding it into `local` (the NULL-tenant hole). Default-off keeps v1.
+        sendJson(res, { error: tenantScope.reason }, 403);
+        return true;
+      }
+      const callerTenant = tenantScope.tenant;
       const isAdmin = principal.role === 'admin';
       const scoped = isAdmin ? chain : chain.filter((e) => (e.tenantId ?? 'local') === callerTenant);
       sendJson(res, { correlationId, events: scoped, totalEvents: scoped.length });
@@ -158,7 +166,14 @@ export function registerAutonomousRoutes(
     // ENT-2 tenant isolation: filter when req is available and strict mode is on.
     if (req && opts?.strictTenantIsolation) {
       const principal = deriveRequestPrincipal(req);
-      const callerTenant = principal.tenantId ?? 'local';
+      const tenantScope = resolveApiCallerTenant(principal, projectRoot);
+      if (tenantScope.tenant === null) {
+        // TENANT-001 T2: strict mode refuses a tenant-less caller instead of
+        // folding it into `local` (the NULL-tenant hole). Default-off keeps v1.
+        sendJson(res, { error: tenantScope.reason }, 403);
+        return true;
+      }
+      const callerTenant = tenantScope.tenant;
       const isAdmin = principal.role === 'admin';
       if (!isAdmin) {
         entries = entries.filter((e) => (e.tenant ?? 'local') === callerTenant);
