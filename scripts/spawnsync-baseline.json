@@ -263,6 +263,10 @@
     },
     {
       "file": "src/orchestra/spawn-backend.ts",
+      "code": "const r = spawnSync('docker', ['info'], { timeout: 2_000, stdio: 'ignore' });"
+    },
+    {
+      "file": "src/orchestra/spawn-backend.ts",
       "code": "const result = spawnSync('tmux', ['-V'], {"
     },
     {
@@ -280,10 +284,6 @@
     {
       "file": "src/orchestra/sprint-finalizer.ts",
       "code": ": spawnSync('npx', ['vitest', 'run', '--reporter=basic'], {"
-    },
-    {
-      "file": "src/orchestra/sprint-finalizer.ts",
-      "code": "const gitDiff = spawnSync('git', ['diff', '--stat', 'HEAD~1'], { encoding: 'utf-8', cwd: projectRoot }).stdout;"
     },
     {
       "file": "src/orchestra/sprint-finalizer.ts",
@@ -331,15 +331,15 @@
     },
     {
       "file": "src/providers/codex.ts",
+      "code": "const result = spawnSync('codex', [...CODEX_AUTH_STATUS_ARGS], {"
+    },
+    {
+      "file": "src/providers/codex.ts",
       "code": "const result = spawnSync('codex', ['--version'], {"
     },
     {
       "file": "src/providers/codex.ts",
       "code": "const result = spawnSync('codex', ['--version'], { encoding: 'utf-8', timeout: 5_000 });"
-    },
-    {
-      "file": "src/providers/codex.ts",
-      "code": "const result = spawnSync('codex', [...CODEX_AUTH_STATUS_ARGS], {"
     },
     {
       "file": "src/providers/codex.ts",
