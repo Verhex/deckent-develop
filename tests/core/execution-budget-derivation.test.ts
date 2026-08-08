@@ -38,7 +38,7 @@ describe('buildTaskCostInput — config-resolved estimator defaults', () => {
 });
 
 describe('deriveRequestedExecutionBudget', () => {
-  it('scales token ceilings by retry × headroom and sums maxTokens', () => {
+  it('scales input/output ceilings by retry × headroom — and NEVER derives aggregate maxTokens', () => {
     const b = deriveRequestedExecutionBudget({
       estimatedInputTokens: 1_000,
       estimatedOutputTokens: 500,
@@ -47,7 +47,10 @@ describe('deriveRequestedExecutionBudget', () => {
     });
     expect(b.maxInputTokens).toBe(Math.ceil(1_000 * 1.2 * 2));
     expect(b.maxOutputTokens).toBe(Math.ceil(500 * 1.2 * 2));
-    expect(b.maxTokens).toBe(b.maxInputTokens! + b.maxOutputTokens!);
+    // KN5: maxTokens counts AGGREGATE usage (cache reads included) — a
+    // cache-blind estimate must not manufacture that ceiling. Measured: an
+    // honest worker was killed at 15,120 while consuming 42,126 aggregate.
+    expect(b.maxTokens).toBeUndefined();
   });
 
   it('subscription-billed (USD 0 / absent) derives NO maxUsd — a 0-ceiling would block the task it contains', () => {
@@ -56,7 +59,7 @@ describe('deriveRequestedExecutionBudget', () => {
       estimatedCostUsd: 0, headroomFactor: 3,
     });
     expect(zero.maxUsd).toBeUndefined();
-    expect(zero.maxTokens).toBeGreaterThan(0); // containment still present
+    expect(zero.maxInputTokens).toBeGreaterThan(0); // containment still present (unit-correct ceilings)
   });
 
   it('API-billed derives maxUsd, hard-capped by the sprint budget', () => {

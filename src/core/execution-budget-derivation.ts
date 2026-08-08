@@ -66,10 +66,17 @@ export function deriveRequestedExecutionBudget(input: DeriveExecutionBudgetInput
 
   const maxInputTokens = scale(Math.max(input.estimatedInputTokens, 1));
   const maxOutputTokens = scale(Math.max(input.estimatedOutputTokens, 1));
+  // KN5 (measured in the 2026-08-08 re-smoke): NO aggregate `maxTokens` leg in
+  // the request. `maxTokens` counts AGGREGATE usage — prompt-cache reads and
+  // writes included — while the estimator's numbers model billable input/output
+  // only. Deriving the aggregate ceiling from cache-blind estimates killed an
+  // honest worker at 15,120 while it legitimately consumed 42,126 aggregate
+  // tokens (mostly cache reads). Input/output ceilings are unit-correct
+  // (usage.input_tokens excludes cache reads); the aggregate ceiling stays the
+  // policy AUTHORITY's call, which narrowBudget already applies field-wise.
   const budget: ExecutionBudget = {
     maxInputTokens,
     maxOutputTokens,
-    maxTokens: maxInputTokens + maxOutputTokens,
   };
 
   if (typeof input.estimatedCostUsd === 'number' && input.estimatedCostUsd > 0) {
