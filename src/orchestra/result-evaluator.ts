@@ -16,7 +16,7 @@ import { createProductionWiringPlanEvidence } from '../core/task-types.js';
 import type { ProductionWiringResultSettlementDecision } from '../core/task-result-settlement.js';
 import { resolveProductionWiringContract } from '../core/production-wiring-contract.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
-import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
+import { reconcileSpuriousNoGo, reconcileRubricNoGo, reconcileNoChangeSatisfied } from './mid-sprint-adapter.js';
 import {
   getRubric,
   coverageOptional,
@@ -1471,6 +1471,26 @@ export async function reconcileEvaluationSpuriousNoGo(
     );
     return {
       decision: 'GO_WITH_TECH_DEBT',
+      totalScore: evaluation.totalScore,
+      rubricScores: evaluation.rubricScores,
+      retryCount: evaluation.retryCount,
+    };
+  }
+
+  // EVAL-NOCHANGE (GR-2026-08-08-EVAL-NOCHANGE-01): the spurious path above only
+  // recovers a NO_GO that DID work. The measured gap is the INVERSE — a NO_GO
+  // that did NO work because the goal was already satisfied on disk (a prior
+  // fix attempt produced it). reconcileNoChangeSatisfied proves the goal state
+  // with the STRICT probe (tests ran AND all passed) and never reads the
+  // worker's claim; HOLD attribution and any unproven state stay NO_GO.
+  const noChange = await reconcileNoChangeSatisfied(result, task, projectRoot);
+  if (noChange.reconciled && noChange.decision === 'DONE') {
+    debugLog(
+      'evaluateWithRubric:no-change-reconcile',
+      `Task ${task.id}: zero-work NO_GO reconciled → DONE (strict goal-state probe green)`,
+    );
+    return {
+      decision: 'DONE',
       totalScore: evaluation.totalScore,
       rubricScores: evaluation.rubricScores,
       retryCount: evaluation.retryCount,
