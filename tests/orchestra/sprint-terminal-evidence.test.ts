@@ -480,6 +480,38 @@ describe('RCPT-1 — resolution-aware attribution exclusions', () => {
     expect(evidence.cleanupEligibility.reasons).toContain('ATTRIBUTION_EXCLUDED');
   });
 
+  // CR6's exact shape: the excluded attempt wrote a file no later DIFF ever
+  // touched again ("already correct, nothing to write") — but the file's
+  // OWNING lineage completed, and its resolver's write scope attests it.
+  it('a claimed path covered only by a COMPLETED resolver WRITE-SCOPE demotes the exclusion (CR6 shape)', () => {
+    const held = heldAttempt({
+      identity: A1,
+      logicalTaskId: 'logical-485-001',
+      claimedPaths: ['src/orchestra/example.ts', 'tests/other.test.ts'],
+    });
+    const resolver = completedAttempt({
+      identity: A2, verdict: 'DONE', marker: 'fixed', supersedes: A1,
+    });
+    const otherOwner: ExactAttemptEvidence<ResultPayload> = {
+      ...completedAttempt({
+        identity: { taskId: '485-002', attemptId: 'attempt-3' },
+        verdict: 'DONE', marker: 'owns-test-file',
+        logicalTaskId: 'logical-485-002',
+      }),
+      // verified DIFF empty (nothing written) — the SCOPE is the attestation
+      attribution: {
+        state: 'VERIFIED', evidenceRef: 'attribution:attempt-3',
+        filesChanged: [], linesAdded: 0, linesRemoved: 0,
+      },
+      writeScope: ['tests/other.test.ts'],
+    };
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held, resolver, otherOwner], coordinatorEvidence: [],
+    });
+    expect(evidence.attributionExclusions[0]!.supersededByVerifiedResolution).toBe(true);
+    expect(evidence.cleanupEligibility.candidate).toBe(true);
+  });
+
   it('an UNRESOLVED lineage keeps its exclusion blocking (no verified resolution exists)', () => {
     const held = heldAttempt({
       identity: A1,

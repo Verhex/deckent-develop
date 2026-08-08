@@ -1438,6 +1438,12 @@ function terminalAttemptEvidence(
       authority,
       result: resultEvidence,
       attribution,
+      // RCPT-1 supp: the declared write scope joins terminal evidence so a
+      // COMPLETED lineage's resolver can attest its paths (see the coverage
+      // union in sprint-terminal-evidence.ts).
+      ...(task?.scope?.filesWrite !== undefined
+        ? { writeScope: [...task.scope.filesWrite] }
+        : {}),
     };
   });
 }

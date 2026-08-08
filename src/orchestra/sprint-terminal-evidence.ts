@@ -87,6 +87,10 @@ export type WorkAttributionEvidence =
 export interface ExactAttemptEvidence<TResult = unknown> {
   readonly logicalTaskId: string;
   readonly identity: ExactAttemptIdentity;
+  /** RCPT-1 supp: the attempt's declared write scope (exact file paths). A
+   *  COMPLETED lineage's RESOLVING attempt attests the final state of its
+   *  scope, so these paths join the accountability union for exclusions. */
+  readonly writeScope?: readonly string[];
   /** The exact predecessor. Null/undefined identifies a lineage root. */
   readonly supersedes?: ExactAttemptIdentity | null;
   readonly authority: AttemptTerminalAuthority;
@@ -736,6 +740,21 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
   for (const done of mutable.completed) {
     for (const attribution of done.verifiedAttribution) {
       for (const path of attribution.filesChanged) verifiedPathUnion.add(path);
+    }
+  }
+  // RCPT-1 supp (CR6 ölçümü): a file can reach its verified final state
+  // WITHOUT any later diff touching it (a worker honestly reports "already
+  // correct, nothing to write"). The COMPLETED lineage's RESOLVING attempt
+  // still attests its declared write scope — its DONE verdict is the
+  // accountability for those exact paths — so resolver write-scopes join the
+  // union. Non-resolving or non-completed scopes never do.
+  const resolverKeys = new Set(mutable.logicalTasks
+    .filter(item => item.state === 'COMPLETED' && item.resolvingAttempt !== null)
+    .map(item => identityKey(item.resolvingAttempt!)));
+  for (const [, lineage] of groups) {
+    for (const attempt of lineage) {
+      if (!resolverKeys.has(identityKey(attempt.identity))) continue;
+      for (const path of attempt.writeScope ?? []) verifiedPathUnion.add(path);
     }
   }
   mutable.exclusions = mutable.exclusions.map(exclusion => {
