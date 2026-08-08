@@ -170,3 +170,61 @@ describe('resolveToolScopeEnforcement — runtime tool-scope truth', () => {
     expect(resolveToolScopeEnforcement('nope', ['src/x.ts']).reasonCode).toBe('UNKNOWN_PROVIDER');
   });
 });
+
+import { resolveWriteScopeShellEscape } from '../../src/core/provider-command-spec.js';
+
+describe('resolveWriteScopeShellEscape — Bash-defeats-Write escape (filesystem-write-guard)', () => {
+  // The ACTUAL production grant string buildDockerAllowedTools / sprint-spawner
+  // emit: path-scoped Write/Edit alongside an UNCONDITIONAL unscoped Bash.
+  const DOCKER_GRANT = 'Read,Write(.tasks/,src/greet.ts),Edit(.tasks/,src/greet.ts),Bash,Glob,Grep';
+
+  it('production grant (scoped Write + unscoped Bash) → DEFEATED_BY_SHELL', () => {
+    const r = resolveWriteScopeShellEscape(DOCKER_GRANT, ['src/greet.ts']);
+    expect(r.escaped).toBe(true);
+    expect(r.reasonCode).toBe('WRITE_SCOPE_DEFEATED_BY_SHELL');
+    expect(r.shellTools).toEqual(['Bash']);
+    expect(r.declaredScope).toBe(true);
+  });
+
+  it('paren-aware: commas INSIDE Write(a,b,c) do not split the token', () => {
+    const r = resolveWriteScopeShellEscape(
+      'Read,Write(.tasks/,src/a.ts,src/b.ts),Edit(.tasks/,src/a.ts,src/b.ts),Bash,Glob,Grep',
+      ['src/a.ts', 'src/b.ts'],
+    );
+    // If the tokenizer split on the inner commas, `src/a.ts` etc. would appear as
+    // bare tokens and the write detection would misfire — this pins it does not.
+    expect(r.reasonCode).toBe('WRITE_SCOPE_DEFEATED_BY_SHELL');
+    expect(r.shellTools).toEqual(['Bash']);
+  });
+
+  it('path-scoped Write with NO shell grant → TOOL_BOUND (scope holds)', () => {
+    const r = resolveWriteScopeShellEscape('Read,Write(.tasks/,src/x.ts),Edit(.tasks/,src/x.ts),Glob,Grep', ['src/x.ts']);
+    expect(r.escaped).toBe(false);
+    expect(r.reasonCode).toBe('WRITE_SCOPE_TOOL_BOUND');
+    expect(r.shellTools).toEqual([]);
+  });
+
+  it('bare unscoped Write/Edit → WRITE_GRANT_UNSCOPED (nothing narrower to defeat)', () => {
+    const r = resolveWriteScopeShellEscape('Read,Write,Edit,Bash,Glob,Grep', []);
+    expect(r.escaped).toBe(false);
+    expect(r.reasonCode).toBe('WRITE_GRANT_UNSCOPED');
+    expect(r.declaredScope).toBe(false);
+  });
+
+  it('no write authority at all → NO_WRITE_GRANT (even with Bash present)', () => {
+    const r = resolveWriteScopeShellEscape('Read,Bash,Glob,Grep', ['src/x.ts']);
+    expect(r.escaped).toBe(false);
+    expect(r.reasonCode).toBe('NO_WRITE_GRANT');
+  });
+
+  it('declaredScope reflects the task filesWrite, independent of the verdict', () => {
+    expect(resolveWriteScopeShellEscape(DOCKER_GRANT, []).declaredScope).toBe(false);
+    expect(resolveWriteScopeShellEscape(DOCKER_GRANT, ['  ']).declaredScope).toBe(false);
+    expect(resolveWriteScopeShellEscape(DOCKER_GRANT, ['src/x.ts']).declaredScope).toBe(true);
+  });
+
+  it('empty/undefined allowedTools → NO_WRITE_GRANT (no grant, nothing to escape)', () => {
+    expect(resolveWriteScopeShellEscape(undefined, ['src/x.ts']).reasonCode).toBe('NO_WRITE_GRANT');
+    expect(resolveWriteScopeShellEscape('', ['src/x.ts']).reasonCode).toBe('NO_WRITE_GRANT');
+  });
+});

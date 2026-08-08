@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6b83a9ba89d8dbcf1bd61757aac95cfcb76ec061731951ae54eba4a2b3cc3805"
+    "value": "c7c6023ada30f7b5c0e55d43f3a27d7e4bf69ec03f7505c89d719cb9e052b386"
   },
   "summary": {
     "total": 397,
     "active": 350,
     "terminal": 47,
-    "receipts": 138,
+    "receipts": 140,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -3262,7 +3262,7 @@
       "state": "VERIFY",
       "updated": "2026-08-08",
       "definitionDigest": "668be8d7c8c8074b2e7c7e44ad88edf2762e34d88491fc732d8cac72a60f6c48",
-      "progressDigest": "71c31b90cef9dad3c03add4bef1512579a913ab0e9f736fce5a121cbe21beaaa",
+      "progressDigest": "05c31dc2a467da3569e204ea6b4f9d139f61e123887e6140e0676f78b711e540",
       "terminalClosureDigest": null
     },
     {
@@ -5810,6 +5810,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-08T12:51:14Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-08-TOOLAUTH-WRITEGUARD-01",
+      "authorityDigest": "ea0b8807b6f25e11b09551207583ef744c1339c943f3adf9dcb0f28478ff634c",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-08T21:52:36Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-08-TOOLAUTH-WRITEGUARD-SUPP-01",
+      "authorityDigest": "01d60d78e811e00634e2d060ee28bca6aa9674c62848642f0d326ba7d8c64e57",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-08T21:52:36Z"
       },
       "g7AttemptIdentity": null
     }
@@ -16315,10 +16335,12 @@
         "APPROVAL-001"
       ],
       "evidenceReceipts": [
-        "GR-2026-08-08-TOOLAUTH-T1-01"
+        "GR-2026-08-08-TOOLAUTH-T1-01",
+        "GR-2026-08-08-TOOLAUTH-WRITEGUARD-01",
+        "GR-2026-08-08-TOOLAUTH-WRITEGUARD-SUPP-01"
       ],
       "acceptance": "Least privilege, progressive disclosure, explicit escape hatch and no hidden full surface",
-      "evidence": "Legacy 559; terminal tool foundations; 2026-08-05 kod-truth: runtime write-scope yalnız claude worker'da (`--allowedTools`), codex/gemini `allowedToolsFlag: null` (`provider-command-spec.ts:129,145`) ve üç provider da kendi guardrail'leri kapalı spawn ediliyor (`:113,128,143`); `tools.allowlist_enabled` açıkken bile allowlist yalnız prompt-metni üretiyor, gerçek grant değil (`task-builder.ts:2098`); claude'a verilen `Bash` grant'i `Write()` path-scoping'ini fiilen boşa düşürüyor; `receipt=GR-2026-08-08-TOOLAUTH-T1-01`; T1 SETTLEMENT 2026-08-08: silent-full-surface açığı typed+auditable yapıldı — resolveToolScopeEnforcement predicate (write-scope var VE allowedToolsFlag null ise RUNTIME_TOOL_SCOPE_UNENFORCED), spawn'da TASK_ASSIGN payload'una toolScope eklenir (Auditor+watch zaten tüketiyor, wired-by-construction), advisory-only fail-closed değil; `proof=toolauth-t1-5predicate-plus-2wiring-pins-core-orchestra-1170files-17944-green`; 7 pin. AÇIK typed-residual satır VERIFY: Bash-escape Write-scoping'i advisory'ye düşürür (filesystem-write-guard ayrı tasarım), flag-seviye enforcement + real-grant tam kapanış CAPABILITY-001+APPROVAL-001 bağımlı — bu dilim yalnız no-hidden-full-surface clause'unu kapatır",
+      "evidence": "Legacy 559; terminal tool foundations; 2026-08-05 kod-truth: runtime write-scope yalnız claude worker'da (`--allowedTools`), codex/gemini `allowedToolsFlag: null` (`provider-command-spec.ts:129,145`) ve üç provider da kendi guardrail'leri kapalı spawn ediliyor (`:113,128,143`); `tools.allowlist_enabled` açıkken bile allowlist yalnız prompt-metni üretiyor, gerçek grant değil (`task-builder.ts:2098`); claude'a verilen `Bash` grant'i `Write()` path-scoping'ini fiilen boşa düşürüyor; `receipt=GR-2026-08-08-TOOLAUTH-T1-01`; T1 SETTLEMENT 2026-08-08: silent-full-surface açığı typed+auditable yapıldı — resolveToolScopeEnforcement predicate (write-scope var VE allowedToolsFlag null ise RUNTIME_TOOL_SCOPE_UNENFORCED), spawn'da TASK_ASSIGN payload'una toolScope eklenir (Auditor+watch zaten tüketiyor, wired-by-construction), advisory-only fail-closed değil; `proof=toolauth-t1-5predicate-plus-2wiring-pins-core-orchestra-1170files-17944-green`; 7 pin. AÇIK typed-residual satır VERIFY: Bash-escape Write-scoping'i advisory'ye düşürür (filesystem-write-guard ayrı tasarım), flag-seviye enforcement + real-grant tam kapanış CAPABILITY-001+APPROVAL-001 bağımlı — bu dilim yalnız no-hidden-full-surface clause'unu kapatır; `receipt=GR-2026-08-08-TOOLAUTH-WRITEGUARD-01`; `receipt=GR-2026-08-08-TOOLAUTH-WRITEGUARD-SUPP-01`; WRITE-GUARD SETTLEMENT 2026-08-08: T1'in named Bash-defeats-Write residual'ı typed+surfaced yapıldı — worker allowlist path-scoped Write/Edit'in yanına KOŞULSUZ unscoped Bash veriyor (shell scope dışına yazar, ADR-G-020 write-scope fiilen advisory); resolveWriteScopeShellEscape predicate grant string'ini paren-aware ayrıştırır (WRITE_SCOPE_DEFEATED_BY_SHELL / WRITE_GRANT_UNSCOPED / WRITE_SCOPE_TOOL_BOUND / NO_WRITE_GRANT), TASK_ASSIGN payload'una writeScopeShellEscape T1 toolScope yanına eklenir advisory debugLog, verdict derivation-robust (spawner+docker koşulsuz unscoped Bash). `proof=writeguard-escape-predicate-plus-taskassign-wiring-41-green`; 8 pin artı 1 mekanik-baseline-supp. AÇIK typed-residual advisory-only kalır: gerçek enforcement (Bash grant kaldırma veya command-scope veya container fs-guard), docker last-hop write-target divergence artı non-docker backend surface, tam kapanış CAPABILITY-001 bağımlı",
       "updated": "2026-08-08"
     },
     {
@@ -20500,6 +20522,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0abfdd6f60dfa3134e6c9fa7d2bf7f2c4db2a036f184f683353937f3e16638ec"
+    "value": "0b773377c34ca79611e79ff6791331fd105b3385e1fb456580faac73a3a8ed29"
   }
 }

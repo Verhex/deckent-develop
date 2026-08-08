@@ -128,7 +128,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // the park↔read producer→consumer pin; same 12499 count, content digest only.
   // Prior: P1e (a2be3787).
   count: 12499,
-  digest: '2dffb40fb12ddff17911ae9dfaa1c5b19507efe86e940f3d43913bbc997be6fa',
+  // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
+  // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
+  // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
+  digest: '536279e319796211957ca9c5827688a4ed7de73c3b1d85cefdbe101d4e34a7e0',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -152,7 +155,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // one resolver remains. Edits to already-inventoried modules only — same 1203
   // count, content digest only.
   count: 1203,
-  digest: 'b09c4afedcdd7dba2388fd016b5f4ea043a5c46932ab3aa5f17dee8f7325a9d2',
+  // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
+  // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
+  // (both already-inventoried); same 1203 count, content digest only.
+  digest: '9a5752f6cdb5710f6b764023397d5af8f69a1fe0c06619543ea2c66ec36cea79',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

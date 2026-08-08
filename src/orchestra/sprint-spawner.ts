@@ -31,7 +31,7 @@ import {
   hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
-import { getProviderCommandSpec, resolveToolScopeEnforcement } from '../core/provider-command-spec.js';
+import { getProviderCommandSpec, resolveToolScopeEnforcement, resolveWriteScopeShellEscape } from '../core/provider-command-spec.js';
 import {
   attendedExecutionProjectId,
   type AttendedExecutionApprovalAuthority,
@@ -995,6 +995,16 @@ export async function spawnWorkers(
           taskProvider,
           freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],
         ),
+        // TOOL-AUTHORITY-001 filesystem-write-guard: even when Write()/Edit()
+        // are path-scoped, the worker allowlist UNCONDITIONALLY co-grants an
+        // unscoped `Bash` that can write outside the scope via shell. Carry that
+        // escape TRUTH typed + auditable on the assignment event so ADR-G-020's
+        // write-scope is not silently advisory. Advisory only (ADR-G-020); real
+        // shell-scope enforcement is a named residual on TOOL-AUTHORITY-001.
+        writeScopeShellEscape: resolveWriteScopeShellEscape(
+          allowedTools,
+          freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],
+        ),
       },
     );
     {
@@ -1006,6 +1016,16 @@ export async function spawnWorkers(
         debugLog(
           'spawn:tool-scope-advisory',
           `task ${task.id} provider ${taskProvider}: write-scope present but the provider carries no runtime tool-scope flag — full surface is advisory-only (TOOL-AUTHORITY-001 T1)`,
+        );
+      }
+      const writeEscape = resolveWriteScopeShellEscape(
+        allowedTools,
+        freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],
+      );
+      if (writeEscape.reasonCode === 'WRITE_SCOPE_DEFEATED_BY_SHELL') {
+        debugLog(
+          'spawn:write-scope-shell-escape',
+          `task ${task.id}: path-scoped Write/Edit co-granted with unscoped ${writeEscape.shellTools.join(',')} — the write-scope is escapable via shell and enforced only advisorily (TOOL-AUTHORITY-001 filesystem-write-guard)`,
         );
       }
     }
