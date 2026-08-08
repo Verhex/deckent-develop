@@ -3,23 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-<<<<<<< HEAD
-    "value": "241fb303fa86065feac7efd0251d85639a43e680ada1e9e288cce1ac43b91b24"
-=======
-    "value": "667aed9a451c4a429f8e625aae1746a75495060cf3cf74b269d084fa1c858257"
->>>>>>> 67e28c33f (docs(master): RECOVERY-PAUSE-STATUS admission — PAUSE sonrası status recover çaresini bassın)
+    "value": "10488ea559d80301104330aa46d5e29a27765ae81c912a5ea239b7bd1feeb0b0"
   },
   "summary": {
     "total": 396,
     "active": 349,
     "terminal": 47,
-    "receipts": 131,
+    "receipts": 132,
     "byState": {
-      "OPEN": 262,
+      "OPEN": 261,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 20,
+      "VERIFY": 21,
       "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2460,10 +2456,10 @@
       "id": "RECOVERY-PAUSE-STATUS-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-08",
       "definitionDigest": "a352f02a35e76c50d01f9f5eda8fdd3605d9eec1560f26c7af3e2347aa449b4c",
-      "progressDigest": "1f8c714a22c5ba0831e42cbc2e53e802cf56640b99691f876210c02b5a54abab",
+      "progressDigest": "1be2eb0895f8e7306bc9d970667cce0d41dffdc1e39d3568a600cc6c28e3a822",
       "terminalClosureDigest": null
     },
     {
@@ -5727,21 +5723,22 @@
       "g7AttemptIdentity": null
     },
     {
-<<<<<<< HEAD
       "id": "GR-2026-08-08-TENANT-T4B-01",
       "authorityDigest": "8feccc05da1b767cf21f9489683af0ebf13cc8bba8472f172dc82ac06d64a036",
       "lifecycle": {
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-08T09:56:27Z"
-=======
+      },
+      "g7AttemptIdentity": null
+    },
+    {
       "id": "GR-2026-08-08-PAUSE-STATUS-01",
       "authorityDigest": "95b29ce9f66e08671f4c1209e3b258fef2e604b6acd86ccb70be87f0d6f25c92",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
->>>>>>> 67e28c33f (docs(master): RECOVERY-PAUSE-STATUS admission — PAUSE sonrası status recover çaresini bassın)
+        "status": "consumed",
+        "transitionAt": "2026-08-08T10:21:15Z"
       },
       "g7AttemptIdentity": null
     }
@@ -13877,22 +13874,24 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "0",
-        "L": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-08-PAUSE-STATUS-01"
+      ],
       "acceptance": "`deckent status` after a typed PAUSE renders the paused state and the recover remedy instead of RUN_STATUS_READ_MODEL_UNAVAILABLE",
-      "evidence": "2026-08-07 smoke gözlemi (audit Ek-2): PAUSE sonrası read-model republish edilmiyor, durum görünmez; temiz-oda-3'te ölçüldü",
+      "evidence": "2026-08-07 smoke gözlemi (audit Ek-2): PAUSE sonrası read-model republish edilmiyor, durum görünmez; temiz-oda-3'te ölçüldü; `receipt=GR-2026-08-08-PAUSE-STATUS-01`; PAUSE-STATUS admission+VERIFY 2026-08-08: typed PAUSE sonrası deckent status artık duraklamış-durumu ve recover komutunu basar. Kök neden PAUSED authority requiresPersistedRunStatusReadModel true yapıyordu ama pause read-model'i republish etmiyordu, oysa authority zaten recoveryCommand taşıyor. İki parça: gate'ten PAUSED çıkarıldı (ACTIVE+ORPHANED korundu, ORPHANED contested born-688 güvenliği orada durur) + insan render'ında action başına PAUSED guard (dashboard/task dallanmasından önce, .dashboard yokken de banner). `proof=pause-status-5pins-plus-real-binary-human-and-json-recover-command`; Tier-1 gerçek-binary: gerçek pause-state fixture'ına karşı dist status insan 'deckent recover sprint-001 --resume' (exit=0) ve JSON lifecycle PAUSED+recoveryCommand+error yok; cli 530 dosya/7704 test yeşil",
       "updated": "2026-08-08"
     },
     {
@@ -20389,10 +20388,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-<<<<<<< HEAD
-    "value": "c0490d63c34b20c68a8cebb54c28ff7c74a5553752ed9ca5235ac9bfdf135ada"
-=======
-    "value": "35bc85d3f64d97ddaa56c6f62c6096cd979b9e0ae1892af4b409fee147de65ea"
->>>>>>> 67e28c33f (docs(master): RECOVERY-PAUSE-STATUS admission — PAUSE sonrası status recover çaresini bassın)
+    "value": "b6635ee5d844b9c515f3149d7fea1770cf052bd6a7363a63f718cc9af6042712"
   }
 }

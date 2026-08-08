@@ -5,11 +5,7 @@
 
 **Schema:** 3
 
-<<<<<<< HEAD
-**Source digest:** `sha256(normalized-lf-utf8):241fb303fa86065feac7efd0251d85639a43e680ada1e9e288cce1ac43b91b24`
-=======
-**Source digest:** `sha256(normalized-lf-utf8):667aed9a451c4a429f8e625aae1746a75495060cf3cf74b269d084fa1c858257`
->>>>>>> 67e28c33f (docs(master): RECOVERY-PAUSE-STATUS admission — PAUSE sonrası status recover çaresini bassın)
+**Source digest:** `sha256(normalized-lf-utf8):10488ea559d80301104330aa46d5e29a27765ae81c912a5ea239b7bd1feeb0b0`
 
 **Rows:** 396 total · 349 active · 47 terminal
 
@@ -17,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 262 |
+| OPEN | 261 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 20 |
+| VERIFY | 21 |
 | DONE | 47 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -219,7 +215,7 @@
 | 3198 | `RECOVERY-BORN-485-USAGE-BILLING-001` | OPEN | P0 | COST | `LIMIT-001`, `RECEIPT-001`, `SPRINT-HONESTY-001` | — | FIX lineage usage, billing and KPI projections resolve through logical task authority |
 | 3199 | `RECOVERY-BORN-485-PROMPT-POLICY-001` | OPEN | P0 | AUTHORITY | `PROMPT-001`, `ROUTING-V3-CUTOVER-001` | — | Exact worker prompt preserves global run policy, forced skills and monotonic lifecycle instructions |
 | 3200 | `PROCESS-CUTOVER-001` | OPEN | P1 | KERNEL | `MISSION-KIND-001`, `RECOVERY-001` | — | Process mode through canonical WorkItem and Attempt authority |
-| 3201 | `RECOVERY-PAUSE-STATUS-001` | OPEN | P1 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Paused run publishes a readable canonical status read model |
+| 3201 | `RECOVERY-PAUSE-STATUS-001` | VERIFY | P1 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Paused run publishes a readable canonical status read model |
 | 3202 | `EVAL-NOCHANGE-VERDICT-001` | VERIFY | P1 | KERNEL | `EVALUATION-001` | — | No-change-needed honest worker result evaluates deterministically by goCriteria |
 | 3203 | `WORKER-ENV-TMPFS-001` | OPEN | P2 | KERNEL | `TOOL-AUTHORITY-001` | — | Worker containment HOME sizing and cache routing policy |
 | 3210 | `SURFACE-CUTOVER-001` | BLOCKED | P0 | KERNEL | `DO-CUTOVER-001`, `AUTONOMY-CUTOVER-001`, `PROCESS-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | CLI, MCP, API, terminal, Desktop and connector adapters share use cases |
