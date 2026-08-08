@@ -697,6 +697,8 @@ export interface SpawnBackendFactoryOptions {
    * default DEFAULT_WORKER_MEMORY_LIMIT ('4g').
    */
   dockerMemoryLimit?: string;
+  /** WORKER-ENV-TMPFS-001: config-driven worker HOME tmpfs size. */
+  dockerHomeTmpfsSize?: string;
 
   /**
    * Per-worker Docker swap ceiling (docker `--memory-swap`). Wired from
@@ -748,6 +750,7 @@ export class SpawnBackendFactory {
         // fell back to a fixed constant and per-kind limits were never passed.
         memorySwap: opts.dockerMemorySwap,
         kindMemoryLimits: opts.dockerKindMemoryLimits,
+        homeTmpfsSize: opts.dockerHomeTmpfsSize, // WORKER-ENV-TMPFS-001: config-driven HOME tmpfs
       });
     }
 

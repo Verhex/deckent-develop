@@ -1021,6 +1021,7 @@ export async function spawnWorkers(
             dockerImage: config.docker_image,
             dockerTimeoutSeconds: config.docker_timeout,
             dockerMemoryLimit: config.worker_memory_limit,
+            dockerHomeTmpfsSize: config.worker_home_tmpfs_size, // WORKER-ENV-TMPFS-001
             dockerMemorySwap: config.worker_memory_swap,
             dockerKindMemoryLimits: config.worker_memory_limit_by_kind,
           })

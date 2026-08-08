@@ -1800,6 +1800,10 @@ export const WRAPPER_HB_STALE_THRESHOLD_SECONDS = 40;
  * cycle. Cross-checked with `.deckent/config.json` worker_memory_limit/swap.
  */
 export const DEFAULT_WORKER_MEMORY_LIMIT = '4g';
+/** WORKER-ENV-TMPFS-001: default writable HOME tmpfs size for docker workers.
+ *  A named default (config overrides it), mirroring DEFAULT_WORKER_MEMORY_LIMIT.
+ *  100m was the historical hardcode that the 2026-08-08 smoke measured ENOSPC on. */
+export const DEFAULT_WORKER_HOME_TMPFS_SIZE = '100m';
 export const DEFAULT_WORKER_MEMORY_SWAP = '6g';
 
 /**
@@ -3752,6 +3756,8 @@ export interface DockerSpawnBackendConstructionOptions {
   readonly memoryLimit?: string;
   readonly memorySwap?: string;
   readonly kindMemoryLimits?: Record<string, string>;
+  /** WORKER-ENV-TMPFS-001: writable HOME tmpfs size (e.g. '256m'). */
+  readonly homeTmpfsSize?: string;
   readonly verifyProviderCliInImage?: boolean;
   readonly crossVerifyRuntimeCommandRunner?: DockerCrossVerifyRuntimeCommandRunner;
 }
@@ -4036,6 +4042,7 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly memoryLimit: string;
   private readonly memorySwap: string;
   private readonly kindMemoryLimits: Record<string, string>;
+  private readonly homeTmpfsSize: string;
   private readonly verifyProviderCliInImage: boolean;
   private readonly crossVerifyRuntimeCommandRunner: DockerCrossVerifyRuntimeCommandRunner;
   private readonly containers = new Map<string, {
@@ -4048,11 +4055,13 @@ export class DockerSpawnBackend implements SpawnBackend {
   }>(); // taskId → effective execution context
 
   constructor(projectDir: string, opts?: DockerSpawnBackendConstructionOptions) {
+    // WORKER-ENV-TMPFS-001: config-resolved HOME tmpfs size; default preserves 100m.
     this.projectDir = resolve(projectDir);
     this.image = opts?.image ?? DEFAULT_IMAGE;
     this.timeoutSeconds = opts?.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
     this.gracefulTimeoutSeconds = opts?.gracefulTimeoutSeconds ?? DEFAULT_GRACEFUL_TIMEOUT_SECONDS;
     this.memoryLimit = opts?.memoryLimit ?? DEFAULT_WORKER_MEMORY_LIMIT;
+    this.homeTmpfsSize = opts?.homeTmpfsSize ?? DEFAULT_WORKER_HOME_TMPFS_SIZE;
     // MASTER-PLAN 666: swap must follow the limit, not a fixed constant. The
     // documented rule (and the 4g/6g default pair) is limit × 1.5; pinning the
     // constant meant raising `worker_memory_limit` to 6g silently produced
@@ -5657,7 +5666,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       '--memory', effectiveMemory,
       '--memory-swap', effectiveSwap,
       // Writable HOME via tmpfs — Claude CLI needs to write config/cache here
-      '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
+      '--tmpfs', `${containerHome}:size=${this.homeTmpfsSize},uid=${uid},gid=${gid}`,
       // Typed xverify receives an empty ephemeral workspace; implementation
       // workers retain the project read-write mount.
       ...(exactV2

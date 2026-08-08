@@ -24,6 +24,9 @@ vi.mock('../../src/orchestra/spawn-backend-docker.js', () => ({
     isAvailable: vi.fn().mockResolvedValue(false),
   })),
   isDockerAvailable: vi.fn().mockReturnValue(false),
+  // WORKER-ENV-TMPFS-001: the mock must re-export the default so the carry
+  // pins can assert it without unmocking the heavy docker module.
+  DEFAULT_WORKER_HOME_TMPFS_SIZE: '100m',
 }));
 
 import { spawnSync } from 'node:child_process';
@@ -369,5 +372,60 @@ describe('SpawnBackend swappability', () => {
     tmuxMissing();
     const b2 = SpawnBackendFactory.create({ projectDir: '/proj' });
     expect(b2.name).toBe('docker');
+  });
+});
+
+// ═══ WORKER-ENV-TMPFS-001 (GR-2026-08-08-WORKER-TMPFS-01) ══════════════════
+// Cold-start smoke (2026-08-08): the docker worker HOME was a hardcoded 100m
+// tmpfs; a toolchain fetch (npx vitest) hit ENOSPC. These pins hold the default
+// AND the config→runtime carry (the "reported-but-not-carried" bug class this
+// project keeps closing — a config key that never reaches the resolved config).
+import { DEFAULT_WORKER_HOME_TMPFS_SIZE } from '../../src/orchestra/spawn-backend-docker.js';
+import { loadConfig } from '../../src/core/config.js';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir as osTmpdir } from 'node:os';
+import { join as pathJoin } from 'node:path';
+
+describe('WORKER-ENV-TMPFS — HOME tmpfs sizing', () => {
+  it('the default preserves the historical 100m (no silent behaviour change)', () => {
+    expect(DEFAULT_WORKER_HOME_TMPFS_SIZE).toBe('100m');
+  });
+
+  it('worker_home_tmpfs_size CARRIES from config.json to the resolved runtime config', async () => {
+    // The whole point: setting it in config must REACH runtime, not sit inert
+    // (the "reported-but-not-carried" class this project keeps closing).
+    const root = mkdtempSync(pathJoin(osTmpdir(), 'wtmpfs-'));
+    const home = mkdtempSync(pathJoin(osTmpdir(), 'wtmpfs-home-'));
+    const prevHome = process.env['DECKENT_HOME'];
+    process.env['DECKENT_HOME'] = home;
+    try {
+      mkdirSync(pathJoin(root, '.deckent'), { recursive: true });
+      writeFileSync(pathJoin(root, '.deckent', 'config.json'), JSON.stringify({ worker_home_tmpfs_size: '512m' }));
+      const resolved = await loadConfig(root, { force: true });
+      expect((resolved as { worker_home_tmpfs_size?: string }).worker_home_tmpfs_size).toBe('512m');
+    } finally {
+      if (prevHome === undefined) delete process.env['DECKENT_HOME'];
+      else process.env['DECKENT_HOME'] = prevHome;
+      rmSync(root, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('absent from config → undefined resolved (backend falls back to the default)', async () => {
+    const root = mkdtempSync(pathJoin(osTmpdir(), 'wtmpfs2-'));
+    const home = mkdtempSync(pathJoin(osTmpdir(), 'wtmpfs2-home-'));
+    const prevHome = process.env['DECKENT_HOME'];
+    process.env['DECKENT_HOME'] = home;
+    try {
+      mkdirSync(pathJoin(root, '.deckent'), { recursive: true });
+      writeFileSync(pathJoin(root, '.deckent', 'config.json'), JSON.stringify({}));
+      const resolved = await loadConfig(root, { force: true });
+      expect((resolved as { worker_home_tmpfs_size?: string }).worker_home_tmpfs_size).toBeUndefined();
+    } finally {
+      if (prevHome === undefined) delete process.env['DECKENT_HOME'];
+      else process.env['DECKENT_HOME'] = prevHome;
+      rmSync(root, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });

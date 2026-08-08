@@ -2041,6 +2041,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     docker_timeout: config.docker_timeout,
     worker_memory_limit_by_kind: config.worker_memory_limit_by_kind,
     worker_memory_limit: config.worker_memory_limit,
+    worker_home_tmpfs_size: config.worker_home_tmpfs_size, // WORKER-ENV-TMPFS-001 carry
     worker_memory_swap: config.worker_memory_swap,
     skills: config.skills,
     brain_provider: config.brain_provider,
