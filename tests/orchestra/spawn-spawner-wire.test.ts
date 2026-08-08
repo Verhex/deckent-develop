@@ -357,6 +357,54 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     expect(payload.scope.filesWrite).not.toContain('src/solo.ts');
   });
 
+  // TOOL-AUTHORITY-001 T1 (GR-2026-08-08-TOOLAUTH-T1-01): the assignment event
+  // carries the runtime tool-scope enforcement TRUTH — the wiring proof that a
+  // codex/gemini write-scope with no allowedToolsFlag is typed + auditable,
+  // never a silent full surface.
+  it('TASK_ASSIGN carries toolScope enforcement truth (codex write-scope → UNENFORCED)', async () => {
+    const codexTask = { ...createTask('168-W25-TS', ['src/scoped.ts']), provider: 'codex' } as Task;
+    persistTasks([codexTask]);
+    const sprint = makeSprint('sprint-168', [codexTask]);
+    const backend = makeMockBackend();
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      // codex is a host-adapter provider; its downstream budget admission may
+      // throw, but TASK_ASSIGN is emitted BEFORE any spawn attempt — the event
+      // is durable regardless (a stronger proof: the truth is recorded even on
+      // a spawn that never proceeds).
+      await spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend }).catch(() => undefined);
+    } finally {
+      process.chdir(origCwd);
+    }
+    const assign = readEvents(testRoot, 'sprint-168')
+      .filter(e => e.channel === CHANNELS.TASK_ASSIGN);
+    expect(assign.length).toBe(1);
+    const payload = assign[0]!.payload as { toolScope?: { flagEnforced: boolean; reasonCode: string } };
+    expect(payload.toolScope).toBeDefined();
+    expect(payload.toolScope!.flagEnforced).toBe(false);
+    expect(payload.toolScope!.reasonCode).toBe('RUNTIME_TOOL_SCOPE_UNENFORCED');
+  });
+
+  it('TASK_ASSIGN toolScope for a claude write-scope is flag-enforced', async () => {
+    const claudeTask = createTask('168-W25-TC', ['src/claude-scoped.ts']);
+    persistTasks([claudeTask]);
+    const sprint = makeSprint('sprint-168', [claudeTask]);
+    const backend = makeMockBackend();
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend });
+    } finally {
+      process.chdir(origCwd);
+    }
+    const assign = readEvents(testRoot, 'sprint-168')
+      .filter(e => e.channel === CHANNELS.TASK_ASSIGN);
+    const payload = assign[0]!.payload as { toolScope?: { flagEnforced: boolean; reasonCode: string } };
+    expect(payload.toolScope!.flagEnforced).toBe(true);
+    expect(payload.toolScope!.reasonCode).toBe('ENFORCED_FLAG_PRESENT');
+  });
+
   it('non-colliding tasks proceed normally after a collision blocks others', async () => {
     const colliderA = createTask('168-W25-F', ['src/collide.ts']);
     const colliderB = createTask('168-W25-G', ['src/collide.ts']);

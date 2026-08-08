@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):2d2d9c205cb83b16dcda809552059353cfc81a26be2c87a15d3fe1b0d4aa19cb`
+**Source digest:** `sha256(normalized-lf-utf8):6ad891792acfd5b136643b41aaf0deb519bf797cac04ce3b3f06f7d7102f5b28`
 
 **Rows:** 396 total · 349 active · 47 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 260 |
+| OPEN | 259 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 22 |
+| VERIFY | 23 |
 | DONE | 47 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -272,7 +272,7 @@
 | 4040 | `CAPABILITY-001` | OPEN | P0 | AUTHORITY | `OPERATION-001`, `PRINCIPAL-001` | — | Capability authority and progressive disclosure contract |
 | 4050 | `APPROVAL-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `OPERATION-001`, `CAPABILITY-001` | — | Runtime-wide durable ApprovalBroker |
 | 4052 | `APPROVAL-READ-CROSSPLATFORM-PROOF-001` | OPEN | P2 | AUTHORITY | `APPROVAL-READ-PURITY-001` | — | Approval read-purity'nin cross-platform real-binary kanıtı |
-| 4060 | `TOOL-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
+| 4060 | `TOOL-AUTHORITY-001` | VERIFY | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
 | 4090 | `LIMIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001` | — | Unified provider/account/tenant/project budget and limit ledger |
