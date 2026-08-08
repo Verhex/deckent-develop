@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f325add9c98236fc3fbb8aa9c9e60942ee836030da55971c233bf5e9b2bdd5a0"
+    "value": "d6a2d4acc51f58c29444bd900f212b91a0c5ffd6633ff3d1acddfcfe6f1798b8"
   },
   "summary": {
     "total": 388,
     "active": 341,
     "terminal": 47,
-    "receipts": 128,
+    "receipts": 129,
     "byState": {
       "OPEN": 255,
       "READY": 0,
@@ -5611,6 +5611,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-08T07:56:58Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-08-DOGFOOD-B1B-01",
+      "authorityDigest": "a56fd305ed699f0af005d26b98a2874e98811f9dcad04b8574945d752b59a2b3",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -19949,6 +19959,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0778d77b62f996c877b38bcc1d701da8acaefbb6791462bd930336e48ec3e5ce"
+    "value": "7e2c820ebccb1a0e987ca6cb6627559ddff21b5f3af20b1b7733a334b3af31a0"
   }
 }
