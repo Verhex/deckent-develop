@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):8dfae8bc38439f7b2d6eec90dbd1a07cd48521b5ff88d24b4fca70a591f01122`
+**Source digest:** `sha256(normalized-lf-utf8):6b83a9ba89d8dbcf1bd61757aac95cfcb76ec061731951ae54eba4a2b3cc3805`
 
-**Rows:** 396 total · 349 active · 47 terminal
+**Rows:** 397 total · 350 active · 47 terminal
 
 ## State summary
 
@@ -17,7 +17,7 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 23 |
+| VERIFY | 24 |
 | DONE | 47 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -272,6 +272,7 @@
 | 4040 | `CAPABILITY-001` | OPEN | P0 | AUTHORITY | `OPERATION-001`, `PRINCIPAL-001` | — | Capability authority and progressive disclosure contract |
 | 4050 | `APPROVAL-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `OPERATION-001`, `CAPABILITY-001` | — | Runtime-wide durable ApprovalBroker |
 | 4052 | `APPROVAL-READ-CROSSPLATFORM-PROOF-001` | OPEN | P2 | AUTHORITY | `APPROVAL-READ-PURITY-001` | — | Approval read-purity'nin cross-platform real-binary kanıtı |
+| 4053 | `APPROVAL-INGRESS-UNKNOWN-ID-001` | VERIFY | P0 | AUTHORITY | — | — | Unknown/forged approval id fail-closed at the API and MCP ingress |
 | 4060 | `TOOL-AUTHORITY-001` | VERIFY | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
