@@ -19,6 +19,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NERVOUS_PENDING_FILE } from '../core/constants.js';
+import { autonomousPendingPath } from '../core/constants.js';
 import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
 import { NervousIpcQueue } from '../nervous/ipc-queue.js';
 import { getMessage } from '../cli/helpers/messages.js';
@@ -83,7 +84,7 @@ export function makeCommandResolver(
   return async (id: string, action: ApprovalAction): Promise<ResolveOutcome> => {
     // 1. Autonomous gate — durable decisions.json (sibling of pending.json).
     const gate = makeApprovalGate({
-      pendingPath: join(root, '.deckent', 'autonomous', 'pending.json'),
+      pendingPath: autonomousPendingPath(root),
     });
     const owned = gate.pending().find((p) => p.triggerId === id || p.triggerId.startsWith(id));
     if (owned) {

@@ -7,6 +7,7 @@ import {
   type ApprovalGateAdapter,
 } from '../../src/orchestra/autonomous/approval-adapter.js';
 import type { AutonomousTrigger } from '../../src/orchestra/autonomous-runtime.js';
+import { readAuditEvents } from '../../src/core/audit-query.js';
 
 function makeTrigger(overrides: Partial<AutonomousTrigger> = {}): AutonomousTrigger {
   return {
@@ -132,17 +133,84 @@ describe('makeApprovalGate — persistence + hydration (224-008 compat shape)', 
 });
 
 describe('makeApprovalGate — nervous Executor delegation', () => {
-  it('accept and reject also call executor.resolveApproval', () => {
+  it('accept and reject also call executor.resolveApproval', async () => {
     const resolveApproval = vi.fn();
     const gate: ApprovalGateAdapter = makeApprovalGate({
       executor: { resolveApproval },
     });
 
+    // APPROVAL-001 T1: a decision may only resolve a trigger that was parked
+    // first, so enqueue both before deciding (the realistic loop → human flow).
+    await gate.request(makeTrigger({ id: 't-1' }));
+    await gate.request(makeTrigger({ id: 't-2' }));
     gate.accept('t-1');
     gate.reject('t-2');
 
     expect(resolveApproval).toHaveBeenCalledWith('t-1', 'accepted');
     expect(resolveApproval).toHaveBeenCalledWith('t-2', 'rejected');
     expect(resolveApproval).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ═══ APPROVAL-001 T1 — fail-closed on unknown/forged trigger ════════════════
+// Root cause: accept()/reject() recorded a decision for ANY triggerId, so a
+// forged/stale id from the dashboard or MCP minted an `approved` outcome for a
+// request that was never parked. The gate now refuses an id it cannot tie to a
+// live pending request (in-memory OR fresh on-disk), persists NO decision, and
+// writes the refused attempt to the durable audit trail.
+describe('makeApprovalGate — unknown-ID fail-closed guard (APPROVAL-001 T1)', () => {
+  it('accept() on an unparked trigger throws APR_UNKNOWN_REQUEST and persists no decision', () => {
+    const decisionsPath = join(workDir, 'decisions.json');
+    const resolveApproval = vi.fn();
+    const gate = makeApprovalGate({
+      pendingPath,
+      decisionsPath,
+      projectRoot: workDir,
+      executor: { resolveApproval },
+    });
+
+    expect(() => gate.accept('forged-id')).toThrowError(/not a known pending request/u);
+    try {
+      gate.accept('forged-id');
+    } catch (err) {
+      expect((err as { code?: string }).code).toBe('APR_UNKNOWN_REQUEST');
+    }
+
+    // No decision was minted, and the nervous executor was never told to resolve.
+    expect(existsSync(decisionsPath)).toBe(false);
+    expect(resolveApproval).not.toHaveBeenCalled();
+  });
+
+  it('reject() on an unparked trigger is refused the same way', () => {
+    const gate = makeApprovalGate({ pendingPath, projectRoot: workDir });
+    expect(() => gate.reject('never-seen')).toThrowError(/not a known pending request/u);
+  });
+
+  it('writes a durable audit record for the refused attempt', async () => {
+    const gate = makeApprovalGate({ pendingPath, projectRoot: workDir });
+    expect(() => gate.accept('forged-id')).toThrow();
+
+    const events = readAuditEvents(workDir, 'autonomous');
+    const refusal = events.find((e) => e.action === 'approval.unknown_request_rejected');
+    expect(refusal).toBeDefined();
+    expect(refusal?.target).toBe('forged-id');
+  });
+
+  it('a genuinely parked trigger still accepts (guard does not block the real flow)', async () => {
+    const gate = makeApprovalGate({ pendingPath, projectRoot: workDir });
+    await gate.request(makeTrigger({ id: 't-real' }));
+
+    expect(() => gate.accept('t-real', 'ok')).not.toThrow();
+    const second = await gate.request(makeTrigger({ id: 't-real' }));
+    expect(second.outcome).toBe('approved');
+  });
+
+  it('a separate gate instance accepts an id parked on shared disk (cross-process, no false refusal)', async () => {
+    const loop = makeApprovalGate({ pendingPath, projectRoot: workDir });
+    await loop.request(makeTrigger({ id: 't-xproc' }));
+
+    // Fresh instance (the CLI/API process) hydrates the parked id from disk.
+    const cli = makeApprovalGate({ pendingPath, projectRoot: workDir });
+    expect(() => cli.accept('t-xproc')).not.toThrow();
   });
 });

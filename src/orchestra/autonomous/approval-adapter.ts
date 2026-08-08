@@ -22,6 +22,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { Executor } from '../../nervous/executor.js';
 import type {
   ApprovalDecision,
@@ -61,9 +62,27 @@ export interface ApprovalGateAdapter extends ApprovalGate {
   takeResolved(): AutonomousTrigger | null;
 }
 
+/**
+ * APPROVAL-001 T1: a decision was submitted for a request the gate has never
+ * seen pending. A valid flow never produces this — it is a forged/stale
+ * approval, so it is refused fail-closed (no decision is persisted) and the
+ * attempt is written to the durable audit trail.
+ */
+export class UnknownApprovalRequestError extends Error {
+  readonly code = 'APR_UNKNOWN_REQUEST' as const;
+  constructor(public readonly triggerId: string) {
+    super(`approval refused: trigger '${triggerId}' is not a known pending request (forged/stale decision rejected)`);
+    this.name = 'UnknownApprovalRequestError';
+  }
+}
+
 export interface ApprovalGateOptions {
   /** Optional file path for persisting the pending queue (224-008 shape). */
   pendingPath?: string;
+  /** APPROVAL-001 T1: project root for the durable audit trail of refused
+   *  unknown-ID decisions. When absent, the refusal still fails closed but
+   *  the audit record is skipped (fail-soft on audit, never on the guard). */
+  projectRoot?: string;
   /**
    * Optional file path for persisting cross-process decisions. Defaults to a
    * `decisions.json` sibling of pendingPath. This is the channel that lets a
@@ -144,6 +163,45 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
     }
   }
 
+  /** APPROVAL-001 T1: the authoritative known-pending set is the on-disk
+   *  pending.json (a separate approve/reject PROCESS wrote it), unioned with the
+   *  in-memory pendingMap for the same-process case. Re-read fresh so a request
+   *  added after construction is honoured. */
+  function isKnownPending(triggerId: string): boolean {
+    if (pendingMap.has(triggerId)) return true;
+    if (opts.pendingPath && existsSync(opts.pendingPath)) {
+      try {
+        const data = JSON.parse(readFileSync(opts.pendingPath, 'utf-8'));
+        if (Array.isArray(data)) {
+          return (data as PendingApproval[]).some((item) => item?.triggerId === triggerId);
+        }
+      } catch {
+        // Corrupt pending file must not weaken the guard — treat as no match.
+      }
+    }
+    return false;
+  }
+
+  /** Fail closed on an unknown/forged trigger: persist NO decision and write the
+   *  refused attempt to the durable audit trail (fail-soft on the audit itself). */
+  function guardKnownPending(triggerId: string): void {
+    if (isKnownPending(triggerId)) return;
+    if (opts.projectRoot) {
+      try {
+        writeAuditEvent(opts.projectRoot, 'autonomous', {
+          tenantId: 'local',
+          actor: 'approval-ingress',
+          action: 'approval.unknown_request_rejected',
+          target: triggerId,
+          metadata: { reason: 'trigger is not a known pending request; forged/stale decision refused' },
+        });
+      } catch {
+        // Audit is best-effort; the guard's refusal below is the hard authority.
+      }
+    }
+    throw new UnknownApprovalRequestError(triggerId);
+  }
+
   function persist(): void {
     if (!opts.pendingPath) return;
     const dir = dirname(opts.pendingPath);
@@ -189,6 +247,7 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
     },
 
     accept(triggerId: string, reason?: string): void {
+      guardKnownPending(triggerId);
       const decision: ApprovalDecision = {
         outcome: 'approved',
         reason: reason ?? 'user accepted',
@@ -199,6 +258,7 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
     },
 
     reject(triggerId: string, reason?: string): void {
+      guardKnownPending(triggerId);
       const decision: ApprovalDecision = {
         outcome: 'rejected',
         reason: reason ?? 'user rejected',

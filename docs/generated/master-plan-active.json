@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "12dc785b9ada8c176d97e61b8542087263245231827b74b1b626413b16a83e23"
+    "value": "8dfae8bc38439f7b2d6eec90dbd1a07cd48521b5ff88d24b4fca70a591f01122"
   },
   "summary": {
     "total": 396,
     "active": 349,
     "terminal": 47,
-    "receipts": 136,
+    "receipts": 138,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -3216,9 +3216,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-08-08",
       "definitionDigest": "47995548a67a5d0109cc1a6ccbf61173d100e77e97fe5997ecda1d0873b21481",
-      "progressDigest": "8be424c97bd2c18a156d65cbd2298a97aa3a924877f084e614e51be18141fdb2",
+      "progressDigest": "f84b17ab0ed1ba1092521dd5105d5120a2abbaeede20006088d86320660dcff4",
       "terminalClosureDigest": null
     },
     {
@@ -5779,6 +5779,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-08T11:25:12Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-08-APPROVAL-T1-01",
+      "authorityDigest": "9fe754323a38217960c7227b3e978a58a992f37141afcf712946d2845ddbf4f1",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-08T12:51:14Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-08-APPROVAL-T1-SUPP-01",
+      "authorityDigest": "b2efefe6599b15bcbecf530e0aa5a0a453cae5b0fb4c159dc22569c0de5e672e",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-08T12:51:14Z"
       },
       "g7AttemptIdentity": null
     }
@@ -16169,10 +16189,13 @@
         "CAPABILITY-001",
         "APPROVAL-READ-CROSSPLATFORM-PROOF-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-08-APPROVAL-T1-01",
+        "GR-2026-08-08-APPROVAL-T1-SUPP-01"
+      ],
       "acceptance": "CLI, terminal, Desktop, API, connectors, Worker and Nervous share CAS, expiry, relay and audit",
-      "evidence": "2026-07-27 code-truth: v2 request actor eksikliğinde park; v1 adapter unknown ID decision yazabiliyor ve API/MCP ingress bunu validate etmiyor; DO gate/revision semantics yüzeyler arasında drift",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: v2 request actor eksikliğinde park; v1 adapter unknown ID decision yazabiliyor ve API/MCP ingress bunu validate etmiyor; DO gate/revision semantics yüzeyler arasında drift; `receipt=GR-2026-08-08-APPROVAL-T1-01`; `receipt=GR-2026-08-08-APPROVAL-T1-SUPP-01`; T1 SETTLEMENT 2026-08-08: forgeable-approval kapandı — autonomous approval-adapter accept/reject unknown-ID guard'ı fail-closed (taze disk pending.json artı in-memory pending'de yoksa karar YAZILMAZ, typed APR_UNKNOWN_REQUEST fırlar, red durable audit'e writeAuditEvent ile yazılır), API ingress tipli 403, MCP ingress tipli fail; guard tek noktada (adapter) olduğundan iki yüzey birlikte kapanır, fail-closed güvenli çünkü geçerli hiçbir akış unknown-ID decision üretmez. advisor-hardening: guard okuma-yolunu load-bearing yaptığından park==read zorunlu oldu — yedi ingress'in pendingPath kopyası tek canonical autonomousPendingPath resolver'a (core constants leaf modül, NERVOUS_PENDING_FILE kardeşi) indirildi, park-read producer-consumer pin eklendi, hermeticity baseline digest-only tazelendi; `proof=approval-t1-guard-plus-typed-403-plus-parkread-pin-97-green`; 13 dosya 3-core-artı-10-supp-hardening. T1 dilimi kaydedildi ama satır OPEN kalır (runtime-wide ApprovalBroker G2-design + 7-yüzey kapsamı bu API+MCP diliminde kapanmaz; tek receipt her mutation gate'i kapatmadığından governance VERIFY'ı bloklar). AÇIK typed-residual: decision-overwrite still-pending (accept sonra reject last-writer-wins) onaylı scope dışı; CLI gate projectRoot'suz kurulur, CLI reddi audit yazmaz (API+MCP onaylı yüzeydi); refusal recentAudit dashboard'da görünmez (audit-chain'de durable ama status yüzeyi autonomous-events.jsonl ayrı dosyayı okur); real-binary Tier-1 smoke koşulmadı (startTestServer gerçek in-process HTTP pipeline'ı çalıştırır ama dist binary değil); connectors/nervous yüzeyleri, v2 request-actor, DO gate/revision drift, tam broker birleştirme CAPABILITY-001 bağımlı",
+      "updated": "2026-08-08"
     },
     {
       "order": 4052,
@@ -20433,6 +20456,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a1983e33687d6e211f96406184e41115e43d57a8da0cdb42582b0bf0e2e629ad"
+    "value": "a92450e36ed28d6003fd3a6430757cf0da3b146116c8034ad936d220dc3e506f"
   }
 }

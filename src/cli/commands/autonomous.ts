@@ -28,6 +28,7 @@ import {
 } from '../../orchestra/autonomous/approval-adapter.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { notifyAsync } from '../../core/notify.js';
+import { autonomousPendingPath } from '../../core/constants.js';
 import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
 import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '../../connectors/kpi-summary-dispatch.js';
 import { nextRun } from '../../core/scheduled-flow.js';
@@ -231,9 +232,6 @@ function autonomousDir(root: string): string {
   return join(root, '.deckent', 'autonomous');
 }
 
-function pendingPath(root: string): string {
-  return join(autonomousDir(root), 'pending.json');
-}
 
 function stopMarkerPath(root: string): string {
   return join(autonomousDir(root), 'stop');
@@ -1201,7 +1199,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     flows,
     policy,
     generateWork,
-    pendingPath: pendingPath(root),
+    pendingPath: autonomousPendingPath(root),
     runTask: (ctx) => runTaskMode({
       description: ctx.description,
       model: ctx.model as ModelType | undefined,
@@ -1421,7 +1419,7 @@ export function handleStatus(opts: AutonomousStatusOptions): void {
   const root = opts.root ?? resolveProjectRoot();
 
   let pendingCount = 0;
-  const pf = pendingPath(root);
+  const pf = autonomousPendingPath(root);
   if (existsSync(pf)) {
     try {
       const data = JSON.parse(readFileSync(pf, 'utf-8'));
@@ -1632,7 +1630,7 @@ export function makeAutonomousFlowReporter(
 
 /** Build a gate bound to this project's pending queue (decisions.json sibling). */
 function approvalGateFor(root: string): ApprovalGateAdapter {
-  return makeApprovalGate({ pendingPath: pendingPath(root) });
+  return makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
 }
 
 export interface AutonomousResolveOptions {

@@ -8,7 +8,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DECKENT_DIR, NERVOUS_PENDING_FILE } from './constants.js';
+import { DECKENT_DIR, NERVOUS_PENDING_FILE, autonomousPendingPath } from './constants.js';
 import { ApprovalStore } from './approval-store.js';
 import { readCanonicalRunStatus } from './run-status-authority.js';
 
@@ -58,7 +58,7 @@ function readNervous(projectRoot: string): PendingApproval[] {
  *  operator resolves these with `deckent autonomous approve/reject <triggerId>`
  *  (note: `approve`, not `accept` — the autonomous CLI verb differs from nervous). */
 function readAutonomous(projectRoot: string): PendingApproval[] {
-  const path = join(projectRoot, '.deckent', 'autonomous', 'pending.json');
+  const path = autonomousPendingPath(projectRoot);
   if (!existsSync(path)) return [];
   try {
     const data: unknown = JSON.parse(readFileSync(path, 'utf-8'));
