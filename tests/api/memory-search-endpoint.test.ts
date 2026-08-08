@@ -118,3 +118,79 @@ describe('GET /api/memory/search', () => {
     expect(body).toHaveLength(0);
   });
 });
+
+// ═══ TENANT-001 T4b (GR-2026-08-08-TENANT-T4B-01) — memory-search tenant scope ═
+// Measured 2026-08-08: the widest tenant leak in the product. server.ts called
+// registerMemorySearch WITHOUT `req`, so the principal was never derived and
+// even a tenant-claimed caller saw ALL tenants; a tenant-less caller omitted the
+// predicate and read across every tenant. These pins run the REAL server with a
+// real bearer + real strict config over a real seeded memory.db.
+function fakeJwt(claims: Record<string, unknown>): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  return `${header}.${payload}.fakesig`;
+}
+function bearer(claims: Record<string, unknown>): Record<string, string> {
+  return { Authorization: `Bearer ${fakeJwt(claims)}` };
+}
+
+describe('GET /api/memory/search — TENANT-001 T4b tenant scope', () => {
+  let handle: TestServerHandle;
+  afterEach(async () => {
+    if (handle) { await handle.close(); handle = undefined as unknown as TestServerHandle; }
+  });
+
+  // OIDC bearer path needs auth ON (a verified principal), so mint an explicit
+  // token and additionally carry the tenant claim via the fake JWT.
+  async function bootStrict(strict: boolean): Promise<TestServerHandle> {
+    // disableAuth so the auth-gate does not reject our fake OIDC bearer; the
+    // principal (incl. tenant claim) is still derived from the bearer by
+    // deriveRequestPrincipal (signature-agnostic by contract). The tenant
+    // DECISION is what strict_tenant_isolation gates, independent of auth.
+    return startTestServer({
+      disableAuth: true,
+      seed: { config: { strict_tenant_isolation: strict } },
+    });
+  }
+
+  it('strict ON: a tenant-less caller is refused with 403 (no all-tenant read)', async () => {
+    handle = await bootStrict(true);
+    seedMemory(handle.projectRoot, [{ title: 'ADR-001', content: 'TypeScript everywhere' }]);
+    const res = await call(handle, '/api/memory/search?q=TypeScript', {
+      headers: bearer({ sub: 'alice' }), // no tenant claim
+    });
+    expect(res.status).toBe(403);
+    expect(res.text).toMatch(/tenant scope unresolved/u);
+  });
+
+  it('strict ON: a tenant-claimed caller only sees its own tenant rows', async () => {
+    handle = await bootStrict(true);
+    // Seed rows under two tenants directly in the store.
+    const dbPath = join(handle.projectRoot, '.brain', 'memory.db');
+    mkdirSync(join(handle.projectRoot, '.brain'), { recursive: true });
+    const store = new MemoryStore(dbPath);
+    store.insert({ id: 'acme-1', type: 'memory', source: 'user', title: 'ACME secret', content: 'TypeScript acme plan', tenant_id: 'acme' } as Parameters<typeof store.insert>[0]);
+    store.insert({ id: 'globex-1', type: 'memory', source: 'user', title: 'GLOBEX secret', content: 'TypeScript globex plan', tenant_id: 'globex' } as Parameters<typeof store.insert>[0]);
+    store.close();
+
+    const res = await call(handle, '/api/memory/search?q=TypeScript', {
+      headers: bearer({ sub: 'bob', tenant: 'acme' }),
+    });
+    expect(res.status).toBe(200);
+    const body = res.json<Array<{ entry: { title: string } }>>();
+    const titles = body.map(r => r.entry.title);
+    expect(titles.some(t => t.includes('ACME'))).toBe(true);
+    expect(titles.some(t => t.includes('GLOBEX'))).toBe(false); // cross-tenant leak closed
+  });
+
+  it('strict OFF: a tenant-less caller keeps the v1 unfiltered read (operator parity)', async () => {
+    handle = await bootStrict(false);
+    seedMemory(handle.projectRoot, [{ title: 'ADR-001', content: 'TypeScript everywhere' }]);
+    const res = await call(handle, '/api/memory/search?q=TypeScript', {
+      headers: bearer({ sub: 'alice' }), // no tenant claim, strict off
+    });
+    expect(res.status).toBe(200);
+    const body = res.json<unknown[]>();
+    expect(body.length).toBeGreaterThanOrEqual(1);
+  });
+});
