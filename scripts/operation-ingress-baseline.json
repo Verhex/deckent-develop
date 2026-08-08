@@ -1,0 +1,955 @@
+{
+  "schemaVersion": 1,
+  "family": "fs-write+delete",
+  "verbs": [
+    "writeFile",
+    "writeFileSync",
+    "appendFile",
+    "appendFileSync",
+    "unlink",
+    "unlinkSync",
+    "rm",
+    "rmSync",
+    "rmdir",
+    "rmdirSync"
+  ],
+  "total": 673,
+  "mediated": 0,
+  "unmediated": 673,
+  "fileCount": 233,
+  "byFile": {
+    "src/agent/permission-store.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agent/trace-recorder.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/agents/agent-genealogy.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agents/agent-retirement.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/agents/agentic-worker-entry.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/agents/agentic-worker-runner.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agents/http-agentic-worker.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/agents/permission-guard.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agents/prompt-analytics.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agents/prompt-evolution.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agents/prompt-rollback.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agents/prompt-version.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/agents/shared-context.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/agents/worker-lifecycle.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/agents/worker-log.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agents/worker-verify.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agents/worker.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/api/enterprise-endpoint.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/api/nervous-endpoint.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/api/serve-daemon-meta.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/api/server.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/api/terminal/audit-integrity.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/agent.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/cli/commands/audit.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/cli/commands/autonomous.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/cli/commands/chat-nervous-bridge.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/chat-permissions.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/chat-tool-exec.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/commands/checkpoint.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/cleanup.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/config-nervous.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/config.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/cost.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/do.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/doctor.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/flow.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/gateway.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/init-steps.ts": {
+      "count": 12,
+      "mediated": false
+    },
+    "src/cli/commands/init.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/kill.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/mcp.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/mode.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/nervous.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/plan-nl.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/plan.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/quick-start.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/commands/resume.ts": {
+      "count": 8,
+      "mediated": false
+    },
+    "src/cli/commands/review.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/cli/commands/run.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/commands/set-directives.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/skill-marketplace.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/skill.ts": {
+      "count": 18,
+      "mediated": false
+    },
+    "src/cli/commands/spawn.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/commands/start.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/commands/sync.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/test-run.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/commands/trace-extract.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/commands/truth.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/commands/xverify.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/helpers/codex-config.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/helpers/cursor-config.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/cli/helpers/error-handler.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/helpers/gemini-config.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/helpers/onboarding-apply.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/helpers/session-registry.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/cli/repl/input-history.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/connectors/bot-action-store.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/connectors/bot-daemon.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/connectors/capabilities/artifacts.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/connectors/capabilities/builtin/screenshot.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/connectors/capabilities/execute.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/connectors/gateway/gateway-access.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/connectors/gateway/project-registry.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/connectors/gateway/session-registry.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/agent-manifest-sync.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/agent-pool.ts": {
+      "count": 9,
+      "mediated": false
+    },
+    "src/core/agent-prompt-sync.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/analyzer.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/approval-allowscope.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/approval-broker.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/approval-file-cas.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/approval-masking.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/approval-notify-dedup.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/approval-store.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/core/ci-learning.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/computer-use-exec.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/core/config-migration.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/config.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/cost-config-loader.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/credential-decision-audit.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/credential-encryption.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/credentials-per-project.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/credentials.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/deck-file.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/doc-tracking/scanner.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/event-stream.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/event-trigger.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/execution-landing-checkpoint.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/execution-landing-context.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/execution-landing-proposal.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/file-lock.ts": {
+      "count": 30,
+      "mediated": false
+    },
+    "src/core/flow-registry.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/global-config.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/global-store.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/identity-generator.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/core/log-event.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/marketplace/marketplace-auth.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/marketplace/rating-system.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/memory-export.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/core/model-auto-detect.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/model-catalog.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/multi-ide.ts": {
+      "count": 8,
+      "mediated": false
+    },
+    "src/core/notification-providers/webhook.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/notify-adapters/cli-adapter.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/notify-adapters/file-adapter.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/observability-rotation.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/core/observability.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/openrouter-models.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/orphan-cleaner.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/core/output-collector.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/panic-guard.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/pending-approvals.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/plugin-hooks.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/plugin.ts": {
+      "count": 9,
+      "mediated": false
+    },
+    "src/core/pricing-updater.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/recovery-resume-outcome.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/routing/journal.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/routing/learning-cells.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/routing/vocabulary-bootstrap.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/rule-generator.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/run-flow-store.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/run-status-read-model.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/scheduler-shadow-retention.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/signature.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/skill-pool.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/skill-registry.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/sprint-file-retention.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/core/stack-detector.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/subscription.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/task-result-settlement.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/tool-availability.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/core/trace-schema.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/utils.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/core/verifier-entitlement-memory.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/worker-heartbeat-authority-store.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/desktop/src/main/connection-profile-store.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/desktop/src/main/preferences-store.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/mcp/tools/audit.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/mcp/tools/autonomous.ts": {
+      "count": 6,
+      "mediated": false
+    },
+    "src/mcp/tools/checkpoint.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/mcp/tools/cleanup.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/mcp/tools/config.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/mcp/tools/directives.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/mcp/tools/init.ts": {
+      "count": 10,
+      "mediated": false
+    },
+    "src/mcp/tools/job-runner.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/mcp/tools/kill.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/mcp/tools/nervous.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/mcp/tools/run.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/mcp/tools/start.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/mcp/writer-lease.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/monitor/auditor.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/monitor/dashboard-manager.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/monitor/finding-ledger.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/nervous/action-handlers.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/nervous/bootstrap.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/nervous/decision-memory.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/nervous/dispatcher.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/nervous/history.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/nervous/ipc-queue.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/nervous/maintenance-ops.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/nervous/observer.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/nervous/recommendation-log.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/nervous/respawn-request.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/autonomous/approval-adapter.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/autonomous/backlog.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/autonomous/mission-store/mission-events.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/autonomous/reactive/webhook-reactive-source.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/baseline-tracker.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/container-path-sanitizer.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/cross-verify-production-ingress-authority.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/debt-manager.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/dependency-scheduler.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/doc-updaters/changelog.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/doc-updaters/health-check.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/doc-updaters/metrics-updater.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/doc-updaters/readme-metrics.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/doc-updaters/sprint-log.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/ecosystem-intelligence.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/evaluation-audit-trail.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/git-worker-guard.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/handoff-protocol.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/orchestra/heartbeat-daemon.ts": {
+      "count": 7,
+      "mediated": false
+    },
+    "src/orchestra/ipc-registry.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/orchestra/managed-docs/doc-cache.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/managed-docs/docs-config.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/managed-docs/managed-doc-runner.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/outcome-tracker.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/orchestra/pattern-recorder.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/promotion-pipeline.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/orchestra/resource-monitor.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/result-collector.ts": {
+      "count": 6,
+      "mediated": false
+    },
+    "src/orchestra/result-evaluator.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/rollback.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/rule-evolver.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/runtime-budget-monitor.ts": {
+      "count": 6,
+      "mediated": false
+    },
+    "src/orchestra/scheduler-effects.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/orchestra/scheduler-journal.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/shared-memory.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/spawn-backend-docker.ts": {
+      "count": 26,
+      "mediated": false
+    },
+    "src/orchestra/spawn-backend-mock.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/orchestra/sprint-checkpoint.ts": {
+      "count": 16,
+      "mediated": false
+    },
+    "src/orchestra/sprint-controller.ts": {
+      "count": 6,
+      "mediated": false
+    },
+    "src/orchestra/sprint-docs-updater.ts": {
+      "count": 8,
+      "mediated": false
+    },
+    "src/orchestra/sprint-finalizer.ts": {
+      "count": 10,
+      "mediated": false
+    },
+    "src/orchestra/sprint-lifecycle.ts": {
+      "count": 21,
+      "mediated": false
+    },
+    "src/orchestra/sprint-phases.ts": {
+      "count": 13,
+      "mediated": false
+    },
+    "src/orchestra/sprint-pid-manager.ts": {
+      "count": 9,
+      "mediated": false
+    },
+    "src/orchestra/sprint-planner.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/orchestra/sprint-runner-entry.ts": {
+      "count": 6,
+      "mediated": false
+    },
+    "src/orchestra/sprint-spawner.ts": {
+      "count": 9,
+      "mediated": false
+    },
+    "src/orchestra/sprint-utils.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/task-artifact-projection.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/orchestra/task-builder.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/orchestra/task-mode-runner.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/orchestra/task-restoration.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/temp-agent-generator.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/tmux.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/providers/codex.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/providers/gemini.ts": {
+      "count": 2,
+      "mediated": false
+    },
+    "src/providers/ollama.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/providers/openai-compatible.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/providers/openrouter.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/providers/subprocess.ts": {
+      "count": 2,
+      "mediated": false
+    }
+  },
+  "digest": "f70e22733e555f42ab2e050a5d050a44d3bf789774b46b9415b8247849efc211"
+}
