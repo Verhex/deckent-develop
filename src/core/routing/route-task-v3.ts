@@ -264,7 +264,29 @@ export async function routeTaskV3(
   // asla karışmaz (K2 kararı: kalan belirsizlik content-doygunluk dilimine).
   let judgedTop = top;
   let judgedProvenance = provenance;
-  if (
+  // KN1 (GR-2026-08-08-DOGFOOD-KN1-01): a tie over a ZERO-signal requirement —
+  // no domains, no surfaces, no deliverables (the cold-start smoke's
+  // "Escalated to Brain (tie) … over []") — gives the judge nothing to
+  // discriminate on: its pick is noise at real provider cost (~60-90s + money
+  // PER TASK, even in structured planning). Skip the judge and keep the
+  // deterministic top-1; the tie escalation stays in the journal (the K3
+  // "tie gerçeği silinmez" contract) and informed ties are byte-identical.
+  // "Signal" here means information that can PARTITION the tie-set: domains and
+  // surfaces genuinely differ across agents, while a SINGLE deliverable entry
+  // merely restates the workType (a build task delivers code — a tautology
+  // shared by every tied build agent; measured on the smoke's exact task shape:
+  // domains [], surfaces [], deliverables [code-src@1.0], six agents @1.000).
+  // Two or more deliverable types are a real mix the judge could weigh.
+  const hasPositionalSignal =
+    requirement.positional.domains.length > 0
+    || requirement.positional.surfaces.length > 0
+    || requirement.positional.deliverables.length > 1;
+  if (escalation?.reason === 'tie' && !hasPositionalSignal && options.tieJudge) {
+    debugLog(
+      'routeTaskV3:tieJudge',
+      `zero-signal tie (${ordered.length} candidates, no domains/surfaces/deliverables) — deterministic top-1 kept, AI judge skipped (KN1)`,
+    );
+  } else if (
     escalation?.reason === 'tie' &&
     config.governanceMode === 'ai' &&
     options.tieJudge &&
