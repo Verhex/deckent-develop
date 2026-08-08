@@ -31,7 +31,7 @@ import {
   hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
-import { getProviderCommandSpec } from '../core/provider-command-spec.js';
+import { getProviderCommandSpec, resolveToolScopeEnforcement } from '../core/provider-command-spec.js';
 import {
   attendedExecutionProjectId,
   type AttendedExecutionApprovalAuthority,
@@ -987,8 +987,28 @@ export async function spawnWorkers(
           filesWrite: freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],
         },
         provider: resolveTaskProvider(task),
+        // TOOL-AUTHORITY-001 T1: carry the runtime tool-scope enforcement TRUTH
+        // on the assignment event so a silent full surface (codex/gemini with a
+        // write-scope but no allowedToolsFlag) is typed + auditable, not hidden.
+        // Advisory only — the spawn is not blocked (ADR-G-020 advisory-mode).
+        toolScope: resolveToolScopeEnforcement(
+          taskProvider,
+          freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],
+        ),
       },
     );
+    {
+      const toolScope = resolveToolScopeEnforcement(
+        taskProvider,
+        freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],
+      );
+      if (toolScope.reasonCode === 'RUNTIME_TOOL_SCOPE_UNENFORCED') {
+        debugLog(
+          'spawn:tool-scope-advisory',
+          `task ${task.id} provider ${taskProvider}: write-scope present but the provider carries no runtime tool-scope flag — full surface is advisory-only (TOOL-AUTHORITY-001 T1)`,
+        );
+      }
+    }
 
     // Single spawn path — NEVER spawn the same task twice.
     //

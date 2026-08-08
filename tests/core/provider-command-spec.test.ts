@@ -139,3 +139,34 @@ describe('getProviderCommandSpec', () => {
     expect(getProviderCommandSpec('nope')).toBeNull();
   });
 });
+
+// ═══ TOOL-AUTHORITY-001 T1 (GR-2026-08-08-TOOLAUTH-T1-01) ═══════════════════
+import { resolveToolScopeEnforcement } from '../../src/core/provider-command-spec.js';
+
+describe('resolveToolScopeEnforcement — runtime tool-scope truth', () => {
+  it('claude (allowedToolsFlag present) + write scope → flag-enforced', () => {
+    const r = resolveToolScopeEnforcement('claude', ['src/greet.ts']);
+    expect(r.flagEnforced).toBe(true);
+    expect(r.reasonCode).toBe('ENFORCED_FLAG_PRESENT');
+  });
+
+  it('codex (allowedToolsFlag null) + write scope → UNENFORCED (the silent full surface)', () => {
+    const r = resolveToolScopeEnforcement('codex', ['src/greet.ts']);
+    expect(r.flagEnforced).toBe(false);
+    expect(r.reasonCode).toBe('RUNTIME_TOOL_SCOPE_UNENFORCED');
+  });
+
+  it('gemini (allowedToolsFlag null) + write scope → UNENFORCED', () => {
+    expect(resolveToolScopeEnforcement('gemini', ['src/x.ts']).reasonCode)
+      .toBe('RUNTIME_TOOL_SCOPE_UNENFORCED');
+  });
+
+  it('no write scope → nothing to enforce (NO_WRITE_SCOPE), even for codex', () => {
+    expect(resolveToolScopeEnforcement('codex', []).reasonCode).toBe('NO_WRITE_SCOPE');
+    expect(resolveToolScopeEnforcement('codex', ['   ']).reasonCode).toBe('NO_WRITE_SCOPE');
+  });
+
+  it('unknown provider + write scope → UNKNOWN_PROVIDER (fail-visible, not silent)', () => {
+    expect(resolveToolScopeEnforcement('nope', ['src/x.ts']).reasonCode).toBe('UNKNOWN_PROVIDER');
+  });
+});

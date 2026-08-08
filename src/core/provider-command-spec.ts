@@ -213,3 +213,50 @@ export function buildProviderCommand(
 export function getProviderCommandSpec(provider: string): ProviderCommandSpec | null {
   return PROVIDER_COMMAND_SPECS[provider] ?? null;
 }
+
+// ═══ TOOL-AUTHORITY-001 T1 — runtime tool-scope enforcement truth ═══════════
+// The code-truth (2026-08-05): codex/gemini carry `allowedToolsFlag: null`, so
+// a task with a real write-scope spawns with NO runtime tool restriction — and
+// nothing said so. That silent full surface is the same "reported-but-not-
+// enforcing" class already closed three times over; here enforcement is not
+// merely weaker than it looks, it is ABSENT. This predicate makes the truth
+// typed so it can ride the TASK_ASSIGN event and become auditable, instead of
+// hidden. It is DELIBERATELY advisory (ADR-G-020 advisory-mode) — a bounded
+// honesty fix, not fail-closed enforcement (that needs CAPABILITY-001 +
+// APPROVAL-001, and the Bash-defeats-Write escape needs a filesystem write
+// guard — both are named residuals on TOOL-AUTHORITY-001, not this slice).
+
+export type ToolScopeEnforcementReason =
+  | 'ENFORCED_FLAG_PRESENT'
+  | 'NO_WRITE_SCOPE'
+  | 'UNKNOWN_PROVIDER'
+  | 'RUNTIME_TOOL_SCOPE_UNENFORCED';
+
+export interface ToolScopeEnforcement {
+  /** True only when the provider CLI can carry a runtime tool-scope flag AND
+   *  the task actually declares a write scope to constrain. Flag-level only —
+   *  it does NOT assert the scope is unescapable (the Bash escape is residual). */
+  readonly flagEnforced: boolean;
+  readonly reasonCode: ToolScopeEnforcementReason;
+}
+
+/**
+ * Resolve whether a task's write-scope is carried to the provider at runtime as
+ * a real tool-scope flag. A task with no write scope has nothing to enforce
+ * (NO_WRITE_SCOPE); an unknown provider or a provider whose spec has a null
+ * `allowedToolsFlag` (codex/gemini today) cannot carry the scope at all
+ * (RUNTIME_TOOL_SCOPE_UNENFORCED — the silent-full-surface case).
+ */
+export function resolveToolScopeEnforcement(
+  provider: string,
+  writeScope: readonly string[] | undefined,
+): ToolScopeEnforcement {
+  const hasWriteScope = (writeScope ?? []).some((p) => typeof p === 'string' && p.trim().length > 0);
+  if (!hasWriteScope) return { flagEnforced: false, reasonCode: 'NO_WRITE_SCOPE' };
+  const spec = getProviderCommandSpec(provider);
+  if (!spec) return { flagEnforced: false, reasonCode: 'UNKNOWN_PROVIDER' };
+  if (spec.allowedToolsFlag === null) {
+    return { flagEnforced: false, reasonCode: 'RUNTIME_TOOL_SCOPE_UNENFORCED' };
+  }
+  return { flagEnforced: true, reasonCode: 'ENFORCED_FLAG_PRESENT' };
+}
