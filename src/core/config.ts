@@ -1623,8 +1623,36 @@ export function createDefaultConfig(): DeckentConfig {
     provider_overrides: undefined,
     cost_optimization: false,
     // claude_backend removed (Sprint 150 Decision 3 — use spawn_backend instead)
-    // Sprint 177: default changed from undefined/tmux to 'docker' (ADR-027, Sprint 176 evidence)
-    spawn_backend: 'docker',
+    // Sprint 177: default changed from undefined/tmux to 'docker' (ADR-027, Sprint 176 evidence).
+    // KN2 (2026-08-08): 'docker' → 'auto'. The 2026-08-07 cold-start smoke measured
+    // that a docker-less host got the docker backend anyway and every spawn died.
+    // 'auto' is now capability-probed at resolve time (docker when the daemon is
+    // reachable, else subprocess with a one-time typed log); a user who writes
+    // 'docker' explicitly keeps the honest hard failure.
+    spawn_backend: 'auto',
+    // KN2 (GR-2026-08-08-DOGFOOD-KN2-01): default worker execution-budget POLICY.
+    // The budget authority (resolveExecutionBudgetPolicy) is deliberately
+    // owner-authored with no runtime default — absence is a typed `hold`, which
+    // is exactly what the cold-start smoke measured: no policy, so no spawn
+    // could ever be admitted. Authoring the default HERE keeps that philosophy
+    // intact: init writes this block into the project's own config.json where
+    // the owner can see and edit it — it is explicit config, not a hidden
+    // runtime fallback. Ceilings are the outer authority only; the planner
+    // stamps per-task estimate-anchored REQUESTED budgets that narrowBudget
+    // reduces to the field-wise minimum. Final-only-usage providers
+    // (codex/gemini) still fail closed without an owner grant — claude reports
+    // incremental usage, so the default provider path runs.
+    execution_budget: {
+      roles: {
+        worker: {
+          default: {
+            maxTurns: 40,
+            maxTokens: 4_000_000,
+          },
+        },
+      },
+      landing: { reserve_ratio: 0.25 },
+    },
     auth_mode: 'subscription',
     // Human Checkpoints (empty = fully autonomous)
     human_checkpoints: [],

@@ -52,11 +52,14 @@ function makeTieCatalog(): { catalog: RouteCatalog; a: string; b: string } {
   return { catalog, a, b };
 }
 
+// KN1: the harness task must carry a REAL positional signal (api domain via
+// the src/api/** path pattern + 'endpoint' alias) — a zero-signal tie now
+// deliberately skips the judge, and these pins cover the INFORMED arm.
 const task = (): RoutableTask => ({
   id: 'tie-1',
-  title: 'Build the widget',
-  description: 'Implement the widget module.',
-  scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/widget.ts'] },
+  title: 'Build the widget endpoint',
+  description: 'Implement the REST endpoint for the widget module.',
+  scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/widget-endpoint.ts'] },
 } as RoutableTask);
 
 const CONFIG = DEFAULT_ROUTING_V3_CONFIG;
@@ -122,6 +125,51 @@ describe('K3 tie-judge — engine integration', () => {
     });
     expect(called).toBe(0);
     expect(d.agentId).toBe(a);
+  });
+});
+
+describe('KN1 — zero-signal tie skips the judge (GR-2026-08-08-DOGFOOD-KN1-01)', () => {
+  // The EXACT task shape the 2026-08-07 cold-start smoke measured: domains [],
+  // surfaces [], deliverables [code-src@1.0] — six agents tied @1.000 and the
+  // judge burned a real provider call per task with nothing to discriminate on.
+  const zeroSignalTask = (): RoutableTask => ({
+    id: '001-002',
+    title: 'Add `greetLoud(name)` to src/greet.js returning the uppercase greeting.',
+    description: 'Add `greetLoud(name)` to src/greet.js returning the uppercase greeting.',
+    scope: { directories: [], filesRead: ['src/greet.js'], filesWrite: ['src/greet.js'] },
+  } as RoutableTask);
+
+  it('judge is NOT called; deterministic top-1 stays; tie escalation stays journaled', async () => {
+    const real = loadRealCatalog();
+    let judgeCalls = 0;
+    const judge: TieJudgeFn = async (_r, tieSet) => {
+      judgeCalls += 1;
+      return { agentId: tieSet[tieSet.length - 1]!.agentId, rationale: 'noise' };
+    };
+    const d = await routeTaskV3(zeroSignalTask(), real, { config: CONFIG, tieJudge: judge });
+    expect(judgeCalls).toBe(0);
+    expect(d.provenance).toBe('deterministic');
+    // The tie FACT is not erased — K3's journal contract survives the skip.
+    expect(d.escalation?.reason).toBe('tie');
+  });
+
+  it('the same tie WITH a domain signal still consults the judge (informed arm intact)', async () => {
+    const { catalog } = makeTieCatalog();
+    let judgeCalls = 0;
+    const judge: TieJudgeFn = async () => { judgeCalls += 1; return null; };
+    await routeTaskV3(task(), catalog, { config: CONFIG, tieJudge: judge });
+    expect(judgeCalls).toBe(1);
+  });
+
+  it('a single code-src deliverable alone is NOT a discriminating signal (tautology rule)', async () => {
+    // Same zero-signal shape but through the cloned-tie catalog, proving the
+    // skip is driven by the requirement, not by which agents happen to tie.
+    const { catalog } = makeTieCatalog();
+    let judgeCalls = 0;
+    const judge: TieJudgeFn = async () => { judgeCalls += 1; return null; };
+    const d = await routeTaskV3(zeroSignalTask(), catalog, { config: CONFIG, tieJudge: judge });
+    expect(judgeCalls).toBe(0);
+    expect(d.provenance).toBe('deterministic');
   });
 });
 

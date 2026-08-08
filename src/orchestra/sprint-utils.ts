@@ -393,6 +393,24 @@ export function buildSpawnRetryHint(error: unknown, sprint: Sprint): string {
   const msg = error instanceof Error ? error.message : String(error);
   const hints: string[] = [];
 
+  if (msg.includes('landing scope')) {
+    // KN4: an empty landing scope means a task carries no file scope at all —
+    // usually a narrative line that was mis-parsed as a task, or DIRECTIVES
+    // missing Files:/Scope: directives. The generic credentials hint was wrong.
+    hints.push(
+      'A task has an EMPTY file scope, so execution-landing admission refused it — '
+      + 'check DIRECTIVES: every task needs real Files:/Scope: paths (narrative/goal lines are not tasks); re-plan after fixing',
+    );
+  }
+  if (msg.includes('execution budget') || msg.includes('budget-policy') || msg.includes('Spawn blocked before provider work')) {
+    // KN2: the budget-admission refusal used to fall through to the generic
+    // "check provider credentials" hint — the WRONG remedy for a budget gap.
+    hints.push(
+      'Execution-budget admission refused the spawn — the task carries no budget/policy snapshot. '
+      + 'Check `execution_budget` in .deckent/config.json (init authors a default worker policy) and '
+      + 'the `estimator` block in .deckent/cost-config.json; re-plan so tasks are stamped, or see docs/MASTER-PLAN.md KN2',
+    );
+  }
   if (msg.includes('rate') || msg.includes('limit') || msg.includes('429')) {
     hints.push('Rate limit hit — consider downgrading task models (opus→sonnet, sonnet→haiku)');
   }

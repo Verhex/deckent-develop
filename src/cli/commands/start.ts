@@ -34,6 +34,7 @@ import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
 import { loadApprovedSnapshot, loadStartAttempt, listFlowIds, loadRunHandle } from '../../core/run-flow-store.js';
 import { debugLog } from '../../core/utils.js';
+import { buildTaskCostInput } from '../../core/execution-budget-derivation.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import {
   startApprovedRun,
@@ -561,11 +562,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             const costConfig = loadCostConfig(root);
             const cfgAuthMode = await readAuthMode(root);
             const costTasks: TaskCostInput[] = exactSprint.tasks.map((t) => ({
-              id: t.id,
-              model: t.model,
-              estimatedInputTokens: t.estimatedTokens ?? 2700,
-              estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
-              effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+              ...buildTaskCostInput(t, costConfig.estimator),
               billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
             }));
             const gate = evaluateCostGate({
@@ -934,12 +931,11 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             initCostConfig(root);
             const costConfig = loadCostConfig(root);
             const cfgAuthMode = await readAuthMode(root);
+            // KN2 + ADR-G-036: estimator numbers are config-resolved (baseline
+            // data → cost config); this table and the planner's budget stamping
+            // share the same builder so the two can never drift.
             const costTasks: TaskCostInput[] = sprint.tasks.map((t) => ({
-              id: t.id,
-              model: t.model,
-              estimatedInputTokens: t.estimatedTokens ?? 2700,
-              estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
-              effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+              ...buildTaskCostInput(t, costConfig.estimator),
               // F1-CB: billing follows effective auth — subscription/local tasks cost $0
               billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
             }));
@@ -977,11 +973,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             });
             const cfgAuthMode = await readAuthMode(root);
             const costTasks: TaskCostInput[] = planForCost.tasks.map((t) => ({
-              id: t.id,
-              model: t.model,
-              estimatedInputTokens: t.estimatedTokens ?? 2700,
-              estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
-              effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+              ...buildTaskCostInput(t, costConfig.estimator),
               // F1-CB: billing follows effective auth — subscription/local tasks cost $0
               billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
             }));

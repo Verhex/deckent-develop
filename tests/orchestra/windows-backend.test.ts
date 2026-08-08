@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { resolveBackend, resetTmuxDeprecationWarning } from '../../src/orchestra/spawn-backend.js';
+import { resolveBackend, resetTmuxDeprecationWarning, _resetDockerProbeForTests } from '../../src/orchestra/spawn-backend.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,6 +11,7 @@ const projectRoot = join(__dirname, '..', '..');
 afterEach(() => {
   vi.restoreAllMocks();
   resetTmuxDeprecationWarning();
+  _resetDockerProbeForTests();
 });
 
 describe('resolveBackend — platform-aware auto resolution', () => {
@@ -19,14 +20,35 @@ describe('resolveBackend — platform-aware auto resolution', () => {
     expect(resolveBackend('auto')).toBe('subprocess');
   });
 
-  it('resolves auto → docker on linux', () => {
+  // KN2 (GR-2026-08-08-DOGFOOD-KN2-01): 'auto' is capability-probed on
+  // non-win32 — docker only when the daemon is reachable, subprocess otherwise
+  // (the 2026-08-07 cold-start smoke measured a docker-less host getting the
+  // docker backend and every spawn dying before provider work).
+  it('resolves auto → docker on linux when the docker daemon is reachable', () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+    _resetDockerProbeForTests(true);
     expect(resolveBackend('auto')).toBe('docker');
   });
 
-  it('resolves auto → docker on darwin', () => {
+  it('resolves auto → docker on darwin when the docker daemon is reachable', () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
+    _resetDockerProbeForTests(true);
     expect(resolveBackend('auto')).toBe('docker');
+  });
+
+  it('resolves auto → subprocess with a one-time typed notice when docker is unreachable', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+    _resetDockerProbeForTests(false);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(resolveBackend('auto')).toBe('subprocess');
+    expect(resolveBackend('auto')).toBe('subprocess');
+    const notices = warn.mock.calls.filter((c) => String(c[0]).includes('docker daemon is not reachable'));
+    expect(notices).toHaveLength(1); // one-time, never a silent fallback
+  });
+
+  it('explicit docker stays docker even when the daemon is unreachable (honest hard failure downstream)', () => {
+    _resetDockerProbeForTests(false);
+    expect(resolveBackend('docker')).toBe('docker');
   });
 
   it('passes through explicit subprocess unchanged', () => {

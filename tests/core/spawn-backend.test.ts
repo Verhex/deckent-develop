@@ -4,6 +4,7 @@ import {
   SubprocessBackend,
   SpawnBackendFactory,
   SpawnBackendError,
+  _resetDockerProbeForTests,
 } from '../../src/orchestra/spawn-backend.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
 
@@ -249,6 +250,10 @@ describe('SpawnBackendFactory', () => {
   // (tmux deprecated; subprocess remains as Windows fallback via explicit selection).
   // resolveBackend('auto') → 'docker' regardless of tmux availability.
   describe('create() with auto mode', () => {
+    // KN2: auto is capability-probed — these pins hold the daemon-reachable arm.
+    beforeEach(() => { _resetDockerProbeForTests(true); });
+    afterEach(() => { _resetDockerProbeForTests(); });
+
     it('selects DockerBackend when auto and tmux is available', () => {
       tmuxOk();
       const backend = SpawnBackendFactory.create({ projectDir: '/proj' });

@@ -16,6 +16,9 @@ vi.mock('../../src/core/cost-config-loader.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/core/cost-config-loader.js')>()),
   initCostConfig: vi.fn(),
   loadCostConfig: vi.fn(() => ({
+    // KN2 contract: a LOADED cost config always carries `estimator` (resolved
+    // from the bundled baseline by the real loader) — mocks must honor it.
+    estimator: { default_input_tokens: 2700, output_tokens_by_effort: { low: 500, normal: 1500, high: 4000 }, budget_headroom_factor: 3 },
     _version: '1.0',
     providers: {
       anthropic: {

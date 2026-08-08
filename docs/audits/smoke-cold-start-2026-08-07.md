@@ -126,3 +126,33 @@ mekanizma doğrulandı.
   temiz-oda koşusunun varlık sebebi bu.
 - **Banner süresi:** "Sprint #1 Complete 2m 35s" gerçek ~7-18dk koşuları
   raporluyor — süre ölçümü ayrı küçük bulgu.
+
+---
+
+## Ek-2: Fix-dalgası yeniden-smoke'ları (2026-08-08)
+
+Dört dilim (KN2 bütçe zinciri · KN1 tie-judge · KN3 parite · KN4 goal-anlatısı
+· KN5 aggregate-birim) sonrası üç temiz-oda turu:
+
+**Tur 2 (KN2-4'lü binary):** B1a guard binary'de doğrulandı (typed red +
+--force-replan) · KN1 doğrulandı (0 tie-judge çocuğu, plan alt-adımları aynı
+saniyede) · bütçe duvarı GEÇİLDİ → yeni katman: goal-anlatısı task'ı
+landing-scope red'i (→KN4) → worker'lar KOŞTU, devre kesici 15.120 tavanında
+kesti (42.126 aggregate; →KN5 birim hatası) → NO_GO → FIX reroute →
+**sınırlı FIX bütçesi typed PAUSE** ("unbounded repair cascade" engellendi,
+`deckent recover --resume` çaresiyle). Governance her katmanda tuttu.
+
+**Tur 3 (KN5'li binary): TAM GEÇİŞ — 2/2 DONE.** Gerçek docker worker'lar
+`greetLoud`'u yazdı, test dosyasını doğruladı; vitest 2/2; **bağımsız
+disk-verify koşumda da 2/2**. Sprint 7m22s: 2 done / 0 debt / 0 no-go.
+Bu, kurtarma çalışmasının ilk uçtan-uca başarılı soğuk-start dogfood'u.
+
+**Soyulan bir-sonraki katman (yeni dalganın konusu):** FINALIZE'da
+`TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE` typed hold — yürütme+değerlendirme
+tam; terminal settlement/receipt katmanı RECEIPT/APPROVAL dalgasını bekliyor.
+
+**Yan gözlemler:** PAUSE sonrası `status` → `RUN_STATUS_READ_MODEL_UNAVAILABLE`
+(read-model pause'ta republish edilmiyor — durum görünmez) · worker HOME
+tmpfs'i (100M) ENOSPC doldu, worker'lar dürüstçe raporlayıp cache'i
+yönlendirdi (containment-env boyutlandırma) · `Sprint Complete` süre raporu
+artık doğru görünüyor (7m22s ölçülen koşuyla uyumlu).

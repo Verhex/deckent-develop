@@ -103,6 +103,17 @@ export interface CostConfig {
   providers: Record<string, ProviderConfig>;
   cost_limits: CostLimits;
   update_config: UpdateConfig;
+  /** KN2 — estimation & budget-derivation flow values (ADR-G-036 parametric-only).
+   *  Optional on DISK (older project files predate it); ALWAYS present on the
+   *  loaded config — loadCostConfig resolves an absent block from the bundled
+   *  baseline, so consumers never re-declare these numbers in code paths. */
+  estimator: EstimatorDefaults;
+}
+
+export interface EstimatorDefaults {
+  default_input_tokens: number;
+  output_tokens_by_effort: { low: number; normal: number; high: number };
+  budget_headroom_factor: number;
 }
 
 // ─── Paths ──────────────────────────────────────────────────────────────────
@@ -239,6 +250,25 @@ export function validateCostConfig(config: unknown): CostConfig {
     }
   }
 
+  // KN2 — estimator block (may be absent on raw disk input; loadCostConfig
+  // resolves it from the bundled baseline BEFORE validation, so a loaded
+  // config always carries it).
+  if (c.estimator !== undefined) {
+    const est = c.estimator as Record<string, unknown>;
+    if (typeof est.default_input_tokens !== 'number' || est.default_input_tokens < 1) {
+      throw new CostConfigError('estimator.default_input_tokens must be a number >= 1');
+    }
+    const byEffort = est.output_tokens_by_effort as Record<string, unknown> | undefined;
+    for (const level of ['low', 'normal', 'high'] as const) {
+      if (typeof byEffort?.[level] !== 'number' || (byEffort[level] as number) < 1) {
+        throw new CostConfigError(`estimator.output_tokens_by_effort.${level} must be a number >= 1`);
+      }
+    }
+    if (typeof est.budget_headroom_factor !== 'number' || est.budget_headroom_factor < 1) {
+      throw new CostConfigError('estimator.budget_headroom_factor must be a number >= 1');
+    }
+  }
+
   return c as unknown as CostConfig;
 }
 
@@ -286,6 +316,24 @@ export function loadCostConfig(projectRoot: string, options?: { forceReload?: bo
     const content = readFileSync(baselinePath, 'utf-8');
     rawConfig = JSON.parse(content);
     cachedMtime = now;
+  }
+
+  // KN2: an older project file may predate the `estimator` block. The bundled
+  // baseline is the single DATA source for those defaults — resolve from it
+  // rather than re-declaring any number here (ADR-G-036 parametric-only).
+  const rawRecord = rawConfig as Record<string, unknown>;
+  if (rawRecord['estimator'] === undefined) {
+    const baselinePath = getBundledBaselinePath();
+    if (!existsSync(baselinePath)) {
+      throw new CostConfigError(
+        `cost config has no estimator block and the bundled baseline (${baselinePath}) is missing. Deckent installation broken?`,
+      );
+    }
+    const baseline = JSON.parse(readFileSync(baselinePath, 'utf-8')) as Record<string, unknown>;
+    if (baseline['estimator'] === undefined) {
+      throw new CostConfigError('bundled baseline carries no estimator block — build/packaging defect');
+    }
+    rawRecord['estimator'] = baseline['estimator'];
   }
 
   const config = validateCostConfig(rawConfig);
