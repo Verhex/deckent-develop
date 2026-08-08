@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "187c898db13650ef3b44c42cdef5b8d041cecd8ce8331390f67d207f0414191a"
+    "value": "f325add9c98236fc3fbb8aa9c9e60942ee836030da55971c233bf5e9b2bdd5a0"
   },
   "summary": {
     "total": 388,
@@ -2206,7 +2206,7 @@
       "state": "OPEN",
       "updated": "2026-08-08",
       "definitionDigest": "eb3c4e7d495fd76e57ba08766033a3377e6e5c28d132a2dd38fa62fd2051c273",
-      "progressDigest": "7372ae3810ea6b87da024782695b77334e45f040b06a9a822542e82813008e5b",
+      "progressDigest": "91786e85120760b90576c5f5f784f821f175bbbb01aa4e0e404ef1072083ed6f",
       "terminalClosureDigest": null
     },
     {
@@ -5609,8 +5609,8 @@
       "authorityDigest": "42de3f5f70b47e5916c0cf042d046f72e23cd3f18fda6c07fcf881545f988a15",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-08T07:56:58Z"
       },
       "g7AttemptIdentity": null
     }
@@ -12861,10 +12861,11 @@
         "GR-2026-08-08-DOGFOOD-KN5-01",
         "GR-2026-08-08-DOGFOOD-RCPT1-01",
         "GR-2026-08-08-DOGFOOD-RCPT2-01",
-        "GR-2026-08-08-DOGFOOD-RCPT3-01"
+        "GR-2026-08-08-DOGFOOD-RCPT3-01",
+        "GR-2026-08-08-RCPT1-SUPP-01"
       ],
       "acceptance": "One bounded provider-neutral recovery slice is proposed, previewed, approved, executed and settled through `deckent do`; Sol supervision captures authority, prompt, usage, diff, Nervous and receipt evidence; any finding is born-first; no direct Sprint start fallback unless typed recovery is required",
-      "evidence": "2026-08-07/08 kurtarma kampanyası — TAM ANLATIM + tüm ölçümler docs/audits/smoke-cold-start-2026-08-07.md (soğuk-start smoke B1-B7 → temiz-oda kök-nedenleri → fix dalgaları → temiz-oda-4 İLK uçtan-uca TAM GEÇİŞ 2/2 DONE disk-verified → CR5/CR6 varyans ölçümleri). Kapanan dilimler: B1a approved-flow guard (binary-kanıtlı) · KN2 bütçe zinciri + problu auto backend + ADR-G-036 veri-kaynağı · KN1 sıfır-sinyal tie-judge · KN3 projeksiyon-parite · KN4 goal-anlatısı · KN5 aggregate-birim · RCPT-1 çözüm-farkındalı cleanup + receipt detayı · RCPT-2 force-terfisi kaldırma · RCPT-3 output kalibrasyonu (CR6: 2/2 DONE, 5m29s, 4 attempt, receipt claimedPaths canlı); `receipt=GR-2026-08-07-DOGFOOD-B1A-01`; `receipt=GR-2026-08-07-B1A-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN2-01`; `receipt=GR-2026-08-08-KN2-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN1-01`; `receipt=GR-2026-08-08-DOGFOOD-KN3-01`; `receipt=GR-2026-08-08-KN3-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN4-01`; `receipt=GR-2026-08-08-DOGFOOD-KN5-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT1-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT2-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT3-01`; hepsi consumed — settlement anlatıları audit dosyası + makbuz registerinde; `proof=recovery-campaign-first-e2e-full-pass-plus-cr6-2of2`; AÇIK: çözücü-write-scope kapsama rafinesi supp diliminde (CR6 kilidi) · değişiklik-gerekmedi DONE/NO_GO worker-varyansı evaluator dilimi · B1b kanonik tüketim sıradaki tren · PAUSE sonrası status read-model · worker-HOME tmpfs boyutlandırma",
+      "evidence": "2026-08-07/08 kurtarma kampanyası — TAM ANLATIM + tüm ölçümler docs/audits/smoke-cold-start-2026-08-07.md (soğuk-start smoke B1-B7 → temiz-oda kök-nedenleri → fix dalgaları → temiz-oda-4 İLK uçtan-uca TAM GEÇİŞ 2/2 DONE disk-verified → CR5/CR6 varyans ölçümleri). Kapanan dilimler: B1a approved-flow guard (binary-kanıtlı) · KN2 bütçe zinciri + problu auto backend + ADR-G-036 veri-kaynağı · KN1 sıfır-sinyal tie-judge · KN3 projeksiyon-parite · KN4 goal-anlatısı · KN5 aggregate-birim · RCPT-1 çözüm-farkındalı cleanup + receipt detayı · RCPT-2 force-terfisi kaldırma · RCPT-3 output kalibrasyonu (CR6: 2/2 DONE, 5m29s, 4 attempt, receipt claimedPaths canlı); `receipt=GR-2026-08-07-DOGFOOD-B1A-01`; `receipt=GR-2026-08-07-B1A-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN2-01`; `receipt=GR-2026-08-08-KN2-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN1-01`; `receipt=GR-2026-08-08-DOGFOOD-KN3-01`; `receipt=GR-2026-08-08-KN3-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN4-01`; `receipt=GR-2026-08-08-DOGFOOD-KN5-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT1-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT2-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT3-01`; hepsi consumed — settlement anlatıları audit dosyası + makbuz registerinde; `proof=recovery-campaign-first-e2e-full-pass-plus-cr6-2of2`; `receipt=GR-2026-08-08-RCPT1-SUPP-01`; supp settlement: çözücü-write-scope kapsama kaynağı eklendi (CR6-şekli pin'li) ve TEMİZ-ODA-7 İLK exit=0 TAM-SETTLE'ı verdi — 1m59s, 1 DONE + 1 dürüst tech-debt, 0 no-go, receipt CANDIDATE/boş-reasons, arşiv dahil yaşam döngüsü temiz (`proof=cr7-first-exit0-full-settle-receipt-candidate`); AÇIK: değişiklik-gerekmedi DONE/NO_GO worker-varyansı evaluator dilimi · B1b kanonik tüketim sıradaki tren · PAUSE sonrası status read-model · worker-HOME tmpfs boyutlandırma",
       "updated": "2026-08-08"
     },
     {
@@ -19948,6 +19949,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b12ed75d29ea499026ce09f306d8f981de68e53ef013b5c831def31bba65601e"
+    "value": "0778d77b62f996c877b38bcc1d701da8acaefbb6791462bd930336e48ec3e5ce"
   }
 }

@@ -156,3 +156,32 @@ tam; terminal settlement/receipt katmanı RECEIPT/APPROVAL dalgasını bekliyor.
 tmpfs'i (100M) ENOSPC doldu, worker'lar dürüstçe raporlayıp cache'i
 yönlendirdi (containment-env boyutlandırma) · `Sprint Complete` süre raporu
 artık doğru görünüyor (7m22s ölçülen koşuyla uyumlu).
+
+---
+
+## Ek-3: RCPT dalgası — İLK exit=0 TAM-SETTLE (2026-08-08)
+
+FINALIZE kilidi (`TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE`) üç dilimde köke indi:
+
+- **RCPT-1** çözüm-farkındalı cleanup: dışlama yalnız dört fail-closed koşuldan
+  biri bozulunca kilitler; FIX'le aşılan ihlal receipt'te işaretli kanıt kalır.
+  Receipt artık sınırlı dışlama DETAYI yayınlar (CR6'da canlı doğrulandı —
+  claimedPaths görünür, arkeoloji bitti).
+- **RCPT-2** fix-task force-terfisi kaldırıldı (auto-skill operatör-sözleşmesi
+  katılığı taşıyamaz) — CR6'da skill-reddi ölümleri bitti (6→4 attempt).
+- **RCPT-3** output verisi ölçüme kalibre edildi (1500→4000 normal; ölçülen
+  6120/13906 artık kesilmiyor).
+- **RCPT-1 supp** (CR6 ölçümü): kapsanma birliğine ikinci hesap-verebilirlik
+  kaynağı — tamamlanmış lineage'ın ÇÖZÜCÜ write-scope'u ("dosya zaten doğru,
+  yazmadım" dürüstlüğü artık cezalandırılmıyor); CR6'nın birebir şekli pin'li.
+
+**Temiz-oda-7: `start exit=0` — kurtarma kampanyasının hedefi.** 1m59s,
+1 DONE + 1 dürüst GO_WITH_TECH_DEBT, 0 no-go, fix kaskadı hiç gerekmedi;
+finalizer receipt'i CANDIDATE/reasons:[] ile yayınladı, arşiv dahil tam
+yaşam döngüsü temiz kapandı. Bağımsız disk-verify: vitest 2/2.
+
+Yol haritası notu: CR7'de hiç dışlama oluşmadı (worker'lar scope'a uydu) —
+supp kuralının binary kanıtı CR6-şekilli unit pin'inde; tam yaşam döngüsü
+kanıtı CR7'de. Açık kalanlar: değişiklik-gerekmedi DONE/NO_GO
+worker-varyansı (evaluator dilimi) · B1b kanonik tüketim (sıradaki tren) ·
+PAUSE-sonrası status read-model · worker-HOME tmpfs boyutlandırma.
