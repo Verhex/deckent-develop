@@ -566,13 +566,33 @@ export async function planSprint(
     const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api'; backend?: 'docker' | 'tmux' | 'subprocess'; modelEffort?: string; smoke?: { command: string; expect: string }; postSettlementProjection?: import('../core/task-types.js').PostSettlementPlanProjection }> =
       structuredTasks.length > 0
         ? structuredTasks
-        : context.directives
-            .split('\n')
-            .map(l => l.trim())
-            .filter(l => l && !l.startsWith('#'))
-            .map(l => l.replace(/^-\s+/, ''))
-            .filter(Boolean)
-            .map(line => ({ title: line, description: line, scope: extractScopeFromDirective(line) }));
+        : (() => {
+            // KN4 (GR-2026-08-08-DOGFOOD-KN4-01): the last-resort line splitter
+            // used to turn EVERY non-heading line into a task — including the
+            // narrative under `# Goal`, which became a scopeless task and died
+            // at execution-landing admission ("landing scope must contain at
+            // least one path"). The goal is CONTEXT, not work: track the
+            // current heading and skip narrative lines inside a Goal/Amaç
+            // section. Pattern-matched directives (Task headings / numbered
+            // bullets) never reach this fallback and stay byte-identical.
+            const out: Array<{ title: string; description: string; scope: TaskScope }> = [];
+            let inGoalSection = false;
+            for (const raw of context.directives.split('\n')) {
+              const l = raw.trim();
+              if (l.startsWith('#')) {
+                inGoalSection = /^#+\s*(goal|ama[çc])\b/iu.test(l);
+                continue;
+              }
+              if (!l) continue;
+              const isBullet = /^[-*]\s+/u.test(l);
+              // Inside a Goal section only BULLETS count as work — prose stays context.
+              if (inGoalSection && !isBullet) continue;
+              const line = l.replace(/^[-*]\s+/u, '');
+              if (!line) continue;
+              out.push({ title: line, description: line, scope: extractScopeFromDirective(line) });
+            }
+            return out;
+          })();
 
     // Parse and deduplicate patterns from context for model selection
     const patternsRaw = typeof context.patterns === 'string' ? context.patterns : '';
