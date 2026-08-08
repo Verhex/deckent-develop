@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5a23135cfed2008c3e6f9d4d9495a06c168356eaa31ccb872775beec12aa0792"
+    "value": "a042357ba2ec4c1026d66c6abbe41fda29decbc6db3abdd0102249e4e95f70a1"
   },
   "summary": {
     "total": 388,
@@ -2204,9 +2204,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-07",
+      "updated": "2026-08-08",
       "definitionDigest": "eb3c4e7d495fd76e57ba08766033a3377e6e5c28d132a2dd38fa62fd2051c273",
-      "progressDigest": "29bdbbac89b1266d694b2a4cd4decd6ee8742b55476eb47f1295f40b192a650b",
+      "progressDigest": "a54d285d0d2bb012e637f5476214ba1bdac2964716d9155ab786a19f699181e4",
       "terminalClosureDigest": null
     },
     {
@@ -5509,8 +5509,8 @@
       "authorityDigest": "b1b85dbaadaf036d687fef0f1856403a829cd7b720b2bf1a1bfbb771c7dc998f",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-08T05:11:44Z"
       },
       "g7AttemptIdentity": null
     },
@@ -5519,8 +5519,8 @@
       "authorityDigest": "9d15dc95a8cd99442d0bc1e728740304ac0f48fb76f2e6dd25afad824c4f6e9e",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-08T05:11:44Z"
       },
       "g7AttemptIdentity": null
     }
@@ -12761,11 +12761,13 @@
       ],
       "evidenceReceipts": [
         "GR-2026-08-07-DOGFOOD-B1A-01",
-        "GR-2026-08-07-B1A-SUPP-01"
+        "GR-2026-08-07-B1A-SUPP-01",
+        "GR-2026-08-08-DOGFOOD-KN2-01",
+        "GR-2026-08-08-KN2-SUPP-01"
       ],
       "acceptance": "One bounded provider-neutral recovery slice is proposed, previewed, approved, executed and settled through `deckent do`; Sol supervision captures authority, prompt, usage, diff, Nervous and receipt evidence; any finding is born-first; no direct Sprint start fallback unless typed recovery is required",
-      "evidence": "Canonical Do validation completed as flow `5c6c8fc3-ba9e-4c27-9d5b-a7ea016b0fcc`, sprint-483, revision 1, plan digest `47e62d2c90cb34d4179956bc583fa8ffd338af9647f7a4c8063fe705e506d6d8`: durable preview was approved and started unchanged, wave 1 settled 483-001/002 before dependent 483-003 dispatch, usage and attempt-scoped diffs were captured, and terminal state reached `COMPLETE` with coordinator absent. The journey is not accepted as fully successful: 483-003's mandatory MASTER integration failed before mutation, yet Brain promoted explicit `NO_GO` to `GO_WITH_TECH_DEBT` and emitted `RUN_COMPLETED`; XVerify was cross-provider but `UNCLEAR` because Description was host-truncated; exact workers also ingested a stale root `DIRECTIVES.md`; no sprint-specific Nervous notification/decision receipt was produced, only a live heartbeat. Canonical residuals are RECOVERY-BORN-483-EVALUATION-HONESTY-001, RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001, RECOVERY-BORN-483-XVERIFY-PAYLOAD-001 and RECOVERY-BORN-483-PROMPT-AUTHORITY-001; status projection conflict remains under RUN-STATUS-AUTHORITY-001. Autonomous widening remains blocked until these authority gaps are repaired and replayed; 2026-08-07 SOĞUK-START SMOKE (owner-onaylı build, gerçek binary, izole DECKENT_HOME, atılabilir proje — tam rapor docs/audits/smoke-cold-start-2026-08-07.md): API/authority katmanı binary'ye kadar sağlam; kırılma EXECUTE/spawn bölgesinde ölçüldü. B1 onaylı plan soğuk startta yürütülemiyor — çıplak start APPROVAL_GRANTED flow'u yok sayıp AI ile yeniden planlıyor, CAS'lı --flow-id yolu ise detached-child-capability hatasıyla düşüyor (çare metni yok); B2 EXECUTE içi boş — 8 planSprint döngüsü, sıfır worker-spawn, task'lar PENDING kalırken banner Complete basıyor, terminal authority TERMINAL_EVIDENCE_HOLD ile yakalayıp exit=1 veriyor (governance tuttu, yürütme kırık, banner yanlış); B3 iki-store-layout uyumsuzluğu canlıda yakalandı — terk edilmiş planın bayat task dosyaları sonraki sprint'e sızıyor; B4 cost-gate bütçesi ile spawn ExecutionBudget'ı bağlantısız (raporlar-ama-taşınmaz 4. örnek, live-execution-budget.ts:267, hint metni yanıltıcı); B5 git-olmayan projede scope gate mesajsız FAIL + init git kurmuyor; B6 init-READY/doctor-NOT-READY çelişkisi; B7 CLI-sonrası 15dk yaşayan artık süreç. Bu satırın açılış koşulu artık netleşti: B1+B2 kapanmadan canonical do journey koşulamaz; 2026-08-07 TEMİZ-ODA KÖK-NEDEN (süreç-ağacı enstrümanlı, DECKENT_OFFLINE=1): KN1 routing tie-judge soğuk projede boş sinyal kümesiyle her task için gizli gerçek-AI çağrısı yapıyor (claude -p tie-judge süreç-ağacında yakalandı; structured mod planner-AI'ı atlıyor ama routing-AI'ı atlamıyor; bare start üstelik iki kez planlıyor — cost-estimate + runSprint); KN2 executor docker/claude-sandbox'a çözülünce remote-sınıf ExecutionBudget şart ama kimse task.budget'ı effective cost_limits'ten türetmiyor — soğuk startta spawn hiçbir yoldan geçemez (B2=B4 aynı kök); KN3 bayat task-projeksiyon spawn'ı boş-başarıya çevirip worker'sız Complete banner'ı üretiyor, terminal authority hold yakalıyor; B7 bulgusu geri çekildi (ölçüm-penceresi + kendi-prob kirliliği — invocations.db birincil kanıt); banner süre raporu da hatalı (2m35s vs gerçek 7-18dk); `receipt=GR-2026-08-07-DOGFOOD-B1A-01`; B1a admission 2026-08-07; 2026-08-07 B1a SETTLEMENT: çıplak start artık onaylı-tüketilmemiş RunFlow snapshot'ı varken sessizce yeniden planlayamaz — plan öncesi typed rehberli reddetme (flow kimliği + digest + kanonik yolculuk + bilinçli --force-replan bayrağı), onaylı flow yokken her yol bayt-değişmez; guard salt-okunur ve fail-soft (store okunamazsa pre-guard davranışa döner ve loglanır — sert otorite koordinatörün CAS'lı exact yolunda); exact-capability hata metni çare gösterir hale geldi; tüm metinler i18n en+tr; `proof=b1a-approved-flow-guard-4pins-cli-528files-7693-green`; gerçek-store tmpdir suite'inde 4 pin + cli sınıfı yeşil + tsc temiz; guard'ın ifşa ettiği commands.test lokal-durum-bağımlılığı da hermetikleştirildi; `receipt=GR-2026-08-07-B1A-SUPP-01`; kalan kapsam B1b (çıplak start'ın onaylı flow'u exact-plan-start-service üzerinden fiilen tüketmesi) ve KN1/KN2 fix dilimleri — owner onayı bekliyor",
-      "updated": "2026-08-07"
+      "evidence": "Canonical Do validation completed as flow `5c6c8fc3-ba9e-4c27-9d5b-a7ea016b0fcc`, sprint-483, revision 1, plan digest `47e62d2c90cb34d4179956bc583fa8ffd338af9647f7a4c8063fe705e506d6d8`: durable preview was approved and started unchanged, wave 1 settled 483-001/002 before dependent 483-003 dispatch, usage and attempt-scoped diffs were captured, and terminal state reached `COMPLETE` with coordinator absent. The journey is not accepted as fully successful: 483-003's mandatory MASTER integration failed before mutation, yet Brain promoted explicit `NO_GO` to `GO_WITH_TECH_DEBT` and emitted `RUN_COMPLETED`; XVerify was cross-provider but `UNCLEAR` because Description was host-truncated; exact workers also ingested a stale root `DIRECTIVES.md`; no sprint-specific Nervous notification/decision receipt was produced, only a live heartbeat. Canonical residuals are RECOVERY-BORN-483-EVALUATION-HONESTY-001, RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001, RECOVERY-BORN-483-XVERIFY-PAYLOAD-001 and RECOVERY-BORN-483-PROMPT-AUTHORITY-001; status projection conflict remains under RUN-STATUS-AUTHORITY-001. Autonomous widening remains blocked until these authority gaps are repaired and replayed; 2026-08-07 SOĞUK-START SMOKE (owner-onaylı build, gerçek binary, izole DECKENT_HOME, atılabilir proje — tam rapor docs/audits/smoke-cold-start-2026-08-07.md): API/authority katmanı binary'ye kadar sağlam; kırılma EXECUTE/spawn bölgesinde ölçüldü. B1 onaylı plan soğuk startta yürütülemiyor — çıplak start APPROVAL_GRANTED flow'u yok sayıp AI ile yeniden planlıyor, CAS'lı --flow-id yolu ise detached-child-capability hatasıyla düşüyor (çare metni yok); B2 EXECUTE içi boş — 8 planSprint döngüsü, sıfır worker-spawn, task'lar PENDING kalırken banner Complete basıyor, terminal authority TERMINAL_EVIDENCE_HOLD ile yakalayıp exit=1 veriyor (governance tuttu, yürütme kırık, banner yanlış); B3 iki-store-layout uyumsuzluğu canlıda yakalandı — terk edilmiş planın bayat task dosyaları sonraki sprint'e sızıyor; B4 cost-gate bütçesi ile spawn ExecutionBudget'ı bağlantısız (raporlar-ama-taşınmaz 4. örnek, live-execution-budget.ts:267, hint metni yanıltıcı); B5 git-olmayan projede scope gate mesajsız FAIL + init git kurmuyor; B6 init-READY/doctor-NOT-READY çelişkisi; B7 CLI-sonrası 15dk yaşayan artık süreç. Bu satırın açılış koşulu artık netleşti: B1+B2 kapanmadan canonical do journey koşulamaz; 2026-08-07 TEMİZ-ODA KÖK-NEDEN (süreç-ağacı enstrümanlı, DECKENT_OFFLINE=1): KN1 routing tie-judge soğuk projede boş sinyal kümesiyle her task için gizli gerçek-AI çağrısı yapıyor (claude -p tie-judge süreç-ağacında yakalandı; structured mod planner-AI'ı atlıyor ama routing-AI'ı atlamıyor; bare start üstelik iki kez planlıyor — cost-estimate + runSprint); KN2 executor docker/claude-sandbox'a çözülünce remote-sınıf ExecutionBudget şart ama kimse task.budget'ı effective cost_limits'ten türetmiyor — soğuk startta spawn hiçbir yoldan geçemez (B2=B4 aynı kök); KN3 bayat task-projeksiyon spawn'ı boş-başarıya çevirip worker'sız Complete banner'ı üretiyor, terminal authority hold yakalıyor; B7 bulgusu geri çekildi (ölçüm-penceresi + kendi-prob kirliliği — invocations.db birincil kanıt); banner süre raporu da hatalı (2m35s vs gerçek 7-18dk); `receipt=GR-2026-08-07-DOGFOOD-B1A-01`; B1a admission 2026-08-07; 2026-08-07 B1a SETTLEMENT: çıplak start artık onaylı-tüketilmemiş RunFlow snapshot'ı varken sessizce yeniden planlayamaz — plan öncesi typed rehberli reddetme (flow kimliği + digest + kanonik yolculuk + bilinçli --force-replan bayrağı), onaylı flow yokken her yol bayt-değişmez; guard salt-okunur ve fail-soft (store okunamazsa pre-guard davranışa döner ve loglanır — sert otorite koordinatörün CAS'lı exact yolunda); exact-capability hata metni çare gösterir hale geldi; tüm metinler i18n en+tr; `proof=b1a-approved-flow-guard-4pins-cli-528files-7693-green`; gerçek-store tmpdir suite'inde 4 pin + cli sınıfı yeşil + tsc temiz; guard'ın ifşa ettiği commands.test lokal-durum-bağımlılığı da hermetikleştirildi; `receipt=GR-2026-08-07-B1A-SUPP-01`; kalan kapsam B1b (çıplak start'ın onaylı flow'u exact-plan-start-service üzerinden fiilen tüketmesi) ve KN1/KN2 fix dilimleri — owner onayı bekliyor; `receipt=GR-2026-08-08-DOGFOOD-KN2-01`; KN2 admission 2026-08-08; 2026-08-08 KN2 SETTLEMENT: bütçe zinciri soğuk startta kapandı — (1) default config görünür-düzenlenebilir worker execution_budget policy bloğu yazar (final-only sağlayıcılar grant'sız fail-closed; claude incremental olduğundan default yol çalışır); (2) planner estimate-çapalı requested bütçe damgalar, narrowBudget otorite∧istek min'ini alır, tavanlar plan+digest'in parçası; (3) ADR-G-036 canlı-talimat uygulaması: estimator/türetme akış-değerleri tek VERİ kaynağında (bundled pricing-baseline), loader eksik bloğu baseline'dan çözer, kod-yolunda sayı yok — start'taki üç literal-kopyası site tek config-çözümlü builder'a bağlandı; (4) spawn_backend auto yetenek-problu (docker daemon yoksa subprocess + tek-seferlik typed log; explicit docker dürüst hata); (5) spawner backstop bayat task'ı aynı applier'dan geçirir; (6) bütçe-reddi hint'i çareli; `proof=kn2-budget-chain-3classes-1695files-25601-green`; sekiz mock-suite kontrata uyduruldu + iki tasarım-pini owner-onaylı yeni tasarıma güncellendi; `receipt=GR-2026-08-08-KN2-SUPP-01`; gerçek-binary yeniden-smoke bilinçli KN1+KN3 sonrasında tek koşuda; kalan: KN1 tie-judge, KN3 bayat-projeksiyon, B1b",
+      "updated": "2026-08-08"
     },
     {
       "order": 3179,
@@ -19848,6 +19850,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "be45f18e2c2cbf533cc1644d874241b87ccf19ed7335a6bcd26dcb88b805e1a6"
+    "value": "8b43b632caf39954a6b622954188372f064f6b680a137d919009dd2e6e7d3aba"
   }
 }
