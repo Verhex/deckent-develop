@@ -891,6 +891,8 @@ export interface DeckentConfig {
    * (B-WORKERMEM): wired into the spawn factory — was previously display-only.
    */
   worker_memory_limit?: string;
+  /** WORKER-ENV-TMPFS-001: docker worker HOME tmpfs size (e.g. '256m'). Default 100m. */
+  worker_home_tmpfs_size?: string;
   /**
    * Per-worker Docker swap ceiling (docker `--memory-swap`). Unset → derived
    * from `worker_memory_limit` at × 1.5 (the documented ratio). Must be at or
@@ -1728,6 +1730,8 @@ export interface ResolvedConfig {
   worker_memory_limit_by_kind?: Record<string, string>;
   /** Default per-worker Docker memory limit (docker `--memory`), e.g. "2g". Default '4g'. */
   worker_memory_limit?: string;
+  /** WORKER-ENV-TMPFS-001: docker worker HOME tmpfs size (e.g. '256m'). Default 100m. */
+  worker_home_tmpfs_size?: string;
   worker_memory_swap?: string;
   /** Skill system configuration */
   skills?: SkillConfig;

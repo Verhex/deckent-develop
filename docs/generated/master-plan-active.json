@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "10488ea559d80301104330aa46d5e29a27765ae81c912a5ea239b7bd1feeb0b0"
+    "value": "2d2d9c205cb83b16dcda809552059353cfc81a26be2c87a15d3fe1b0d4aa19cb"
   },
   "summary": {
     "total": 396,
     "active": 349,
     "terminal": 47,
-    "receipts": 132,
+    "receipts": 133,
     "byState": {
-      "OPEN": 261,
+      "OPEN": 260,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 21,
+      "VERIFY": 22,
       "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2478,10 +2478,10 @@
       "id": "WORKER-ENV-TMPFS-001",
       "program": "KERNEL",
       "priority": "P2",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-08",
       "definitionDigest": "af6ba2fbe30ead48de8f417766f49c0f1738fca6838d7ad2496568c786e3235f",
-      "progressDigest": "2f265cfd5ed107f14245574e41ad68f62f6f6a0890a50e437ec21ccee5c8a09c",
+      "progressDigest": "8ee158ec38589d7ef2a911004320888284986fc815f72abfd19c459d2643105b",
       "terminalClosureDigest": null
     },
     {
@@ -5739,6 +5739,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-08T10:21:15Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-08-WORKER-TMPFS-01",
+      "authorityDigest": "2975face2df500a37b92ae558fade66b916225bd0395e32f3190430ce9b5b347",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-08T10:43:07Z"
       },
       "g7AttemptIdentity": null
     }
@@ -13946,12 +13956,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "0",
         "S": "?"
@@ -13961,9 +13971,11 @@
       "closureBlockedBy": [
         "TOOL-AUTHORITY-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-08-WORKER-TMPFS-01"
+      ],
       "acceptance": "Worker containment env yeterli yazılabilir HOME (veya yönlendirilmiş npm cache) sağlar ki toolchain fetch'leri ENOSPC olmasın; boyut config-çözümlü",
-      "evidence": "2026-08-08 ölçümü: 100M tmpfs HOME doldu (ENOSPC), worker'lar dürüstçe raporlayıp cache'i elle yönlendirdi",
+      "evidence": "2026-08-08 ölçümü: 100M tmpfs HOME doldu (ENOSPC), worker'lar dürüstçe raporlayıp cache'i elle yönlendirdi; `receipt=GR-2026-08-08-WORKER-TMPFS-01`; WORKER-TMPFS admission+VERIFY 2026-08-08: docker worker HOME tmpfs config-çözümlü (worker_memory_limit deseni), DEFAULT 100m korunur, worker_home_tmpfs_size loadConfig ile runtime'a taşınır, 3 factory threading, kod-yolunda literal yok; `proof=worker-tmpfs-3pins-default-plus-real-loadconfig-carry`; en kritik pin config→runtime CARRY (gerçek loadConfig+tmpdir); core+orchestra 1170 dosya/17937 yeşil; canlı ENOSPC-yok teyidi container gerektirir, birim carry kanıtı yeterli",
       "updated": "2026-08-08"
     },
     {
@@ -20388,6 +20400,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b6635ee5d844b9c515f3149d7fea1770cf052bd6a7363a63f718cc9af6042712"
+    "value": "074df1ea8143463e44780b4aaf2932903d25dbab008daedb12577756c65da031"
   }
 }
