@@ -580,12 +580,12 @@
     "cache_duration_hours": 24
   },
   "estimator": {
-    "_comment": "KN2 (GR-2026-08-08-DOGFOOD-KN2-01) — single data source for task-size estimation and budget derivation flow values (ADR-G-036 parametric-only). Consumed by cost estimation (CLI tables) and the planner's estimate-anchored requested-budget stamping.",
+    "_comment": "KN2 (GR-2026-08-08-DOGFOOD-KN2-01) — single data source for task-size estimation and budget derivation flow values (ADR-G-036 parametric-only). 2026-08-08 RCPT-3 calibration: output values raised to measured real-worker usage (observed 6120 and 13906 output tokens vs the old normal ceiling 5400). Consumed by cost estimation (CLI tables) and the planner's estimate-anchored requested-budget stamping.",
     "default_input_tokens": 2700,
     "output_tokens_by_effort": {
-      "low": 500,
-      "normal": 1500,
-      "high": 4000
+      "low": 1000,
+      "normal": 4000,
+      "high": 8000
     },
     "budget_headroom_factor": 3
   }
