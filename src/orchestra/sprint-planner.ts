@@ -38,6 +38,12 @@ import { MemoryStore } from '../core/memory-store.js';
 // ─── Core — utils ─────────────────────────────────────────────────
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
 import { readAuthMode, resolveBrainPlanningMode } from '../core/config.js';
+import { estimateSprintCost } from '../core/cost-calculator.js';
+import { initCostConfig, loadCostConfig } from '../core/cost-config-loader.js';
+import {
+  buildTaskCostInput,
+  deriveRequestedExecutionBudget,
+} from '../core/execution-budget-derivation.js';
 import { createGoNoGoCriterionItem } from '../core/task-types.js';
 import { isUnconditionalRule } from './rule-evolver.js';
 import { resolveDebt } from './debt-manager.js';
@@ -977,6 +983,42 @@ export async function planSprint(
       `ROUTING-V3 admission unavailable: ${poolErr instanceof Error ? poolErr.message : String(poolErr)}`,
       SprintPhase.PLAN,
     );
+  }
+
+  // KN2 — estimate-anchored REQUESTED budgets (owner karar-turu 2026-08-08).
+  // Each task's request derives from its own estimator numbers × headroom; the
+  // applier below narrows it against the owner-authored policy authority
+  // (field-wise minimum), so a request can only tighten, never widen. Fail-SOFT:
+  // an unloadable cost config only drops the USD leg (token ceilings still
+  // derive — subscription-billed work needs containment too), and a task that
+  // already carries a budget is an explicit request we must not overwrite.
+  // ADR-G-036: every number below is config-resolved (cost config; its default
+  // data source is the bundled pricing baseline). No literal fallback exists —
+  // an unloadable cost config skips the stamping entirely (typed log) and the
+  // policy AUTHORITY ceilings from the applier below still contain the task.
+  try {
+    initCostConfig(projectRoot);
+    const costConfig = loadCostConfig(projectRoot);
+    const estimator = costConfig.estimator;
+    const estimate = estimateSprintCost(
+      tasks.map((t) => buildTaskCostInput(t, estimator)),
+      costConfig,
+    );
+    const perTaskUsd = new Map((estimate.taskDetails ?? []).map((d) => [d.id, d.costUsd]));
+    for (const task of tasks) {
+      if (task.budget !== undefined) continue;
+      const costInput = buildTaskCostInput(task, estimator);
+      task.budget = deriveRequestedExecutionBudget({
+        estimatedInputTokens: costInput.estimatedInputTokens,
+        estimatedOutputTokens: costInput.estimatedOutputTokens,
+        ...(perTaskUsd.has(task.id) ? { estimatedCostUsd: perTaskUsd.get(task.id) } : {}),
+        retryMultiplier: estimate.retryMultiplier,
+        sprintMaxUsd: costConfig.cost_limits.sprint_max_usd,
+        headroomFactor: estimator.budget_headroom_factor,
+      });
+    }
+  } catch (e) {
+    debugLog('planSprint:budget-derivation:cost-config', e);
   }
 
   // Owner-policy budget snapshot: run at the shared dry-run/persist boundary so

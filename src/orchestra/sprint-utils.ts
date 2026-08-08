@@ -393,6 +393,15 @@ export function buildSpawnRetryHint(error: unknown, sprint: Sprint): string {
   const msg = error instanceof Error ? error.message : String(error);
   const hints: string[] = [];
 
+  if (msg.includes('execution budget') || msg.includes('budget-policy') || msg.includes('Spawn blocked before provider work')) {
+    // KN2: the budget-admission refusal used to fall through to the generic
+    // "check provider credentials" hint — the WRONG remedy for a budget gap.
+    hints.push(
+      'Execution-budget admission refused the spawn — the task carries no budget/policy snapshot. '
+      + 'Check `execution_budget` in .deckent/config.json (init authors a default worker policy) and '
+      + 'the `estimator` block in .deckent/cost-config.json; re-plan so tasks are stamped, or see docs/MASTER-PLAN.md KN2',
+    );
+  }
   if (msg.includes('rate') || msg.includes('limit') || msg.includes('429')) {
     hints.push('Rate limit hit — consider downgrading task models (opus→sonnet, sonnet→haiku)');
   }

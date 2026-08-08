@@ -239,6 +239,9 @@ function mergeConfigs(
     providers: {},
     cost_limits: existing.cost_limits,
     update_config: existing.update_config,
+    // KN2: estimator flow values are owner/baseline-authored, never sourced
+    // from a pricing feed — carry the existing block through unchanged.
+    estimator: existing.estimator,
   };
 
   const delta: UpdateResult['deltaReport'] = [];

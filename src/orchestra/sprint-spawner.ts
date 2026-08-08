@@ -29,6 +29,7 @@ import {
   assertLiveUsageBudgetSupport,
   hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
+import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
 import { getProviderCommandSpec } from '../core/provider-command-spec.js';
 import {
   attendedExecutionProjectId,
@@ -1428,6 +1429,22 @@ export async function respawnEligibleTasks(
     if (spawnedThisWave > 0 && throttleFloorMs > 0) {
       const delayMs = nextDelayMs(null, 0, throttleFloorMs);
       await sleep(delayMs);
+    }
+
+    // KN2 backstop (GR-2026-08-08-DOGFOOD-KN2-01): a task file that predates
+    // the plan-time budget stamping (stale/legacy projection) reaches spawn
+    // with NO budget-policy snapshot, which the remote-class admission below
+    // refuses with a message that used to be unactionable. Run the SAME
+    // policy applier the planner uses — single decision source, typed log; the
+    // outcome (allow-with-ceilings or typed hold) is the policy's own verdict,
+    // never a bypass. Values all come from effective config (ADR-G-036).
+    if (task.budgetPolicy === undefined) {
+      try {
+        applyWorkerExecutionBudgetPolicy([task], config.execution_budget, config.worker_provider);
+        debugLog('spawn:budget-backstop', `stamped policy snapshot for stale/legacy task ${task.id}`);
+      } catch (e) {
+        debugLog('spawn:budget-backstop', e);
+      }
     }
 
     // Sprint 156 Task 012 — observability for fresh-eyes rotation on fix tasks.

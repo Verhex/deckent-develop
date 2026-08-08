@@ -603,9 +603,48 @@ export function resetTmuxDeprecationWarning(): void {
  * @param backend  Requested backend type ('auto' | 'docker' | 'tmux' | 'subprocess')
  * @returns        Resolved backend type to actually instantiate
  */
+let _dockerProbe: boolean | null = null;
+let _autoFallbackWarned = false;
+
+/** Probe once per process whether a docker daemon is actually reachable.
+ *  `docker info` exits 0 only when the CLI exists AND the daemon answers —
+ *  a bounded sync call (same spawnSync(binary,[args]) security pattern as the
+ *  rest of the codebase), memoized so 'auto' resolution stays cheap. */
+export function isDockerDaemonReachable(): boolean {
+  if (_dockerProbe !== null) return _dockerProbe;
+  try {
+    const r = spawnSync('docker', ['info'], { timeout: 2_000, stdio: 'ignore' });
+    _dockerProbe = r.status === 0;
+  } catch {
+    _dockerProbe = false;
+  }
+  return _dockerProbe;
+}
+
+/** Test-only: reset the memoized docker probe. */
+export function _resetDockerProbeForTests(value?: boolean | null): void {
+  _dockerProbe = value ?? null;
+  _autoFallbackWarned = false;
+}
+
 export function resolveBackend(backend: string): string {
   if (backend === 'auto') {
-    return process.platform === 'win32' ? 'subprocess' : 'docker';
+    if (process.platform === 'win32') return 'subprocess';
+    // KN2 (GR-2026-08-08-DOGFOOD-KN2-01): 'auto' is capability-probed. The
+    // 2026-08-07 cold-start smoke measured a docker-less host getting the
+    // docker backend anyway, so every spawn died before provider work. An
+    // unreachable daemon now resolves to subprocess with a ONE-TIME typed log
+    // (explicit adaptation, never silent — Yasa 2); a user who writes
+    // 'docker' explicitly keeps the honest hard failure.
+    if (isDockerDaemonReachable()) return 'docker';
+    if (!_autoFallbackWarned) {
+      _autoFallbackWarned = true;
+      console.warn(
+        '[deckent] spawn_backend=auto: docker daemon is not reachable — using the subprocess backend for this process. '
+        + 'Install/start docker for container isolation, or set spawn_backend explicitly to silence this notice.',
+      );
+    }
+    return 'subprocess';
   }
 
   if (backend === 'tmux') {
