@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):dea035def9362fe6d022793ee39898d3dcc70678f701fb01ec93368a8fbdb439`
+**Source digest:** `sha256(normalized-lf-utf8):77fdf725a6f14ba49c8d158d70482cd33aaf4553156f27ae3b422ea0035ddc26`
 
 **Rows:** 396 total · 349 active · 47 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 263 |
+| OPEN | 262 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 19 |
+| VERIFY | 20 |
 | DONE | 47 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -216,7 +216,7 @@
 | 3199 | `RECOVERY-BORN-485-PROMPT-POLICY-001` | OPEN | P0 | AUTHORITY | `PROMPT-001`, `ROUTING-V3-CUTOVER-001` | — | Exact worker prompt preserves global run policy, forced skills and monotonic lifecycle instructions |
 | 3200 | `PROCESS-CUTOVER-001` | OPEN | P1 | KERNEL | `MISSION-KIND-001`, `RECOVERY-001` | — | Process mode through canonical WorkItem and Attempt authority |
 | 3201 | `RECOVERY-PAUSE-STATUS-001` | OPEN | P1 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Paused run publishes a readable canonical status read model |
-| 3202 | `EVAL-NOCHANGE-VERDICT-001` | OPEN | P1 | KERNEL | `EVALUATION-001` | — | No-change-needed honest worker result evaluates deterministically by goCriteria |
+| 3202 | `EVAL-NOCHANGE-VERDICT-001` | VERIFY | P1 | KERNEL | `EVALUATION-001` | — | No-change-needed honest worker result evaluates deterministically by goCriteria |
 | 3203 | `WORKER-ENV-TMPFS-001` | OPEN | P2 | KERNEL | `TOOL-AUTHORITY-001` | — | Worker containment HOME sizing and cache routing policy |
 | 3210 | `SURFACE-CUTOVER-001` | BLOCKED | P0 | KERNEL | `DO-CUTOVER-001`, `AUTONOMY-CUTOVER-001`, `PROCESS-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | CLI, MCP, API, terminal, Desktop and connector adapters share use cases |
 | 3220 | `PLANNER-001` | BLOCKED | P0 | KERNEL | `KERNEL-ONTOLOGY-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Canonical planner authority and fail-loud structured parsing |

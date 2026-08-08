@@ -107,3 +107,90 @@ describe('MidSprintAdapter (V3 reroute lane)', () => {
     expect(r).toBeNull();
   });
 });
+
+// ═══ EVAL-NOCHANGE (GR-2026-08-08-EVAL-NOCHANGE-01) — zero-work goal-state ═══
+import { reconcileNoChangeSatisfied, runStrictGoalStateProbe } from '../../src/orchestra/mid-sprint-adapter.js';
+
+describe('EVAL-NOCHANGE — reconcileNoChangeSatisfied', () => {
+  const task = () => ({
+    id: '001-002-fix-fix',
+    scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/greet.js'] },
+  } as unknown as Task);
+  // The exact CR5 shape: honest no-change NO_GO, no work, no HOLD.
+  const noChangeResult = () => ({ taskId: '001-002-fix-fix', selfAssessment: 'NO_GO' } as unknown as TaskResult);
+
+  const zeroDiff = () => ({ getGitDiffStats: () => ({ linesChanged: 0, filesChanged: [] as string[] }) });
+
+  it('zero diff + strict probe GREEN (ran & all passed) → DONE', async () => {
+    const r = await reconcileNoChangeSatisfied(noChangeResult(), task(), '/proj', {
+      ...zeroDiff(),
+      runStrictGoalStateProbe: () => ({ ran: true, allPassed: true }),
+    });
+    expect(r.decision).toBe('DONE');
+    expect(r.reconciled).toBe(true);
+  });
+
+  it('zero diff + probe ran but NOT all passed → NO_GO stands (fail-closed)', async () => {
+    const r = await reconcileNoChangeSatisfied(noChangeResult(), task(), '/proj', {
+      ...zeroDiff(),
+      runStrictGoalStateProbe: () => ({ ran: true, allPassed: false }),
+    });
+    expect(r.decision).toBe('NO_GO');
+    expect(r.reconciled).toBe(false);
+  });
+
+  it('zero diff + NO tests actually ran → NO_GO stands (empty-match is not proof)', async () => {
+    const r = await reconcileNoChangeSatisfied(noChangeResult(), task(), '/proj', {
+      ...zeroDiff(),
+      runStrictGoalStateProbe: () => ({ ran: false, allPassed: false }),
+    });
+    expect(r.decision).toBe('NO_GO');
+  });
+
+  it('HOLD attribution is NEVER routed around — stays NO_GO even with a green probe', async () => {
+    const held = { taskId: '001-002-fix-fix', selfAssessment: 'NO_GO', workAttribution: { state: 'HOLD', reasonCode: 'CLAIM_OUTSIDE_WRITE_SCOPE' } } as unknown as TaskResult;
+    const r = await reconcileNoChangeSatisfied(held, task(), '/proj', {
+      ...zeroDiff(),
+      runStrictGoalStateProbe: () => ({ ran: true, allPassed: true }),
+    });
+    expect(r.decision).toBe('NO_GO');
+    expect(r.notes).toMatch(/HOLD/u);
+  });
+
+  it('NON-zero diff is not a no-change case — the probe is never consulted', async () => {
+    let probeCalls = 0;
+    const r = await reconcileNoChangeSatisfied(noChangeResult(), task(), '/proj', {
+      getGitDiffStats: () => ({ linesChanged: 12, filesChanged: ['src/greet.js'] }),
+      runStrictGoalStateProbe: () => { probeCalls += 1; return { ran: true, allPassed: true }; },
+    });
+    expect(r.decision).toBe('NO_GO');
+    expect(probeCalls).toBe(0);
+  });
+});
+
+describe('EVAL-NOCHANGE — runStrictGoalStateProbe (empty-match discipline)', () => {
+  it('no scoped test surface → ran:false (never a silent pass, unlike the lenient probe)', async () => {
+    const r = await runStrictGoalStateProbe('/proj', ['docs/']); // no src/ or tests/
+    expect(r.ran).toBe(false);
+    expect(r.allPassed).toBe(false);
+  });
+
+  it('all tests green + exit 0 → ran:true, allPassed:true', async () => {
+    const runner = async () => ({ status: 0, stdout: JSON.stringify({ numPassedTests: 2, numTotalTests: 2 }), stderr: '', error: undefined });
+    const r = await runStrictGoalStateProbe('/proj', ['tests/'], runner as never);
+    expect(r).toMatchObject({ ran: true, allPassed: true, total: 2, passed: 2 });
+  });
+
+  it('partial pass → ran:true but allPassed:false (50% is not proof)', async () => {
+    const runner = async () => ({ status: 1, stdout: JSON.stringify({ numPassedTests: 1, numTotalTests: 2 }), stderr: '', error: undefined });
+    const r = await runStrictGoalStateProbe('/proj', ['tests/'], runner as never);
+    expect(r.ran).toBe(true);
+    expect(r.allPassed).toBe(false);
+  });
+
+  it('zero total tests → ran:false (an empty run is not proof)', async () => {
+    const runner = async () => ({ status: 0, stdout: JSON.stringify({ numPassedTests: 0, numTotalTests: 0 }), stderr: '', error: undefined });
+    const r = await runStrictGoalStateProbe('/proj', ['tests/'], runner as never);
+    expect(r.ran).toBe(false);
+  });
+});

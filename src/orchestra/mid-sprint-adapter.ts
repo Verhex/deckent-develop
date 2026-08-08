@@ -309,8 +309,10 @@ function arraysEqual(a: string[], b: string[]): boolean {
 
 /** Result of the reconciliation attempt */
 export interface ReconciliationResult {
-  /** Final decision after reconciliation */
-  decision: 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  /** Final decision after reconciliation. EVAL-NOCHANGE adds 'DONE' — a
+   *  zero-work no-change result whose goal state is strictly proven has no
+   *  debt to record, so it settles clean rather than as tech-debt. */
+  decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   /** Whether the original NO_GO/TIMEOUT_WITH_WORK was reconciled */
   reconciled: boolean;
   /** Human-readable explanation of the reconciliation outcome */
@@ -344,6 +346,8 @@ export interface ReconciliationDeps {
   runTscCheck?: (projectRoot: string) => boolean | Promise<boolean>;
   /** Override for vitest scope check */
   runVitestScopeCheck?: (projectRoot: string, scopeDirs: string[]) => { passRatio: number; passed: boolean } | Promise<{ passRatio: number; passed: boolean }>;
+  /** EVAL-NOCHANGE: override for the STRICT zero-work goal-state probe. */
+  runStrictGoalStateProbe?: (projectRoot: string, scopeDirs: string[]) => { ran: boolean; allPassed: boolean } | Promise<{ ran: boolean; allPassed: boolean }>;
 }
 
 /** Captured result of an async subprocess run (mirrors the spawnSync fields these readers consult). */
@@ -481,6 +485,51 @@ export async function defaultRunVitestScopeCheck(
   } catch {
     // vitest exits with non-zero on test failures — try to parse output
     return { passRatio: 0, passed: false };
+  }
+}
+
+/**
+ * EVAL-NOCHANGE (GR-2026-08-08-EVAL-NOCHANGE-01) — STRICT goal-state probe.
+ *
+ * The zero-work reconciliation must NOT reuse {@link defaultRunVitestScopeCheck}:
+ * that reader is calibrated for "there IS work, grade it leniently" — it returns
+ * `passed:true` at a 50% pass ratio AND returns `{passRatio:1, passed:true}` when
+ * NO test file matches the scope (an empty-match "skip"). For a zero-change
+ * result those are both false positives: a 60%-passing suite does not prove the
+ * goal holds, and "no tests ran" is not proof of anything.
+ *
+ * This probe reports whether tests ACTUALLY ran and whether they ALL passed, as
+ * separate facts, so the caller can require both. Absence of a JSON envelope,
+ * zero total tests, or any failure → `{ ran:false }` or `{ ran:true,
+ * allPassed:false }`, never a silent pass.
+ */
+export async function runStrictGoalStateProbe(
+  projectRoot: string,
+  scopeDirs: string[],
+  runner: SubprocessRunner = defaultSubprocessRunner,
+): Promise<{ ran: boolean; allPassed: boolean; total: number; passed: number }> {
+  const testPatterns = scopeDirs
+    .filter(d => d.startsWith('src/') || d.startsWith('tests/'))
+    .map(d => d.startsWith('tests/') ? d : d.replace(/^src\//, 'tests/'));
+  if (testPatterns.length === 0) {
+    // No scoped test surface → the goal state cannot be proven here. Fail closed.
+    return { ran: false, allPassed: false, total: 0, passed: 0 };
+  }
+  try {
+    const res = await runner('npx', ['vitest', 'run', '--reporter=json', ...testPatterns], { cwd: projectRoot, timeoutMs: 120_000 });
+    if (typeof res.stdout !== 'string') return { ran: false, allPassed: false, total: 0, passed: 0 };
+    const jsonMatch = res.stdout.match(/\{[\s\S]*"numPassedTests"[\s\S]*\}/);
+    if (!jsonMatch) return { ran: false, allPassed: false, total: 0, passed: 0 };
+    const parsed = JSON.parse(jsonMatch[0]) as { numPassedTests: number; numTotalTests: number };
+    const total = parsed.numTotalTests ?? 0;
+    const passed = parsed.numPassedTests ?? 0;
+    // "ran" requires a real, non-zero test population; "allPassed" requires the
+    // whole population green AND the process to have exited 0.
+    const ran = total > 0;
+    const allPassed = ran && passed === total && res.status === 0;
+    return { ran, allPassed, total, passed };
+  } catch {
+    return { ran: false, allPassed: false, total: 0, passed: 0 };
   }
 }
 
@@ -645,6 +694,70 @@ export async function reconcileSpuriousNoGo(
 // run inline inside evaluateWithRubric for every NO_GO without cost.
 
 /** Reasons we may keep or override a NO_GO decision after rubric evaluation. */
+
+/**
+ * EVAL-NOCHANGE (GR-2026-08-08-EVAL-NOCHANGE-01) — zero-work goal-state reconcile.
+ *
+ * The INVERSE of {@link reconcileSpuriousNoGo}: that one recovers a NO_GO that
+ * DID work; this one adjudicates a NO_GO that did NO work but the goal may
+ * already be satisfied on disk (a prior attempt produced it, or it was always
+ * true). The 2026-08-07 cold-start smoke measured the failure: a worker
+ * honestly reporting "already correct, nothing to write" self-assessed NO_GO
+ * and the verdict stuck — pure worker-mood variance (DONE in one run, NO_GO in
+ * the next for the identical end-state).
+ *
+ * Discipline (owner + advisor karar-turu 2026-08-08):
+ *  - TRIGGER is purely structural: caller passes a confirmed zero-diff NO_GO.
+ *    The worker's claim/notes are NEVER read — no mood in, no mood out.
+ *  - The host PROVES the goal state with the STRICT probe: tests must actually
+ *    run (total > 0) AND all pass. The lenient scope probe is deliberately not
+ *    reused (it green-lights empty matches and 50% pass ratios).
+ *  - Fail-closed: no verifiable green goal state → NO_GO stands.
+ *  - This is goal-STATE-probe-anchored, not full prose-goCriteria semantics
+ *    (that is a separate, larger design — EVAL-NOCHANGE-VERDICT-001 residual).
+ */
+export async function reconcileNoChangeSatisfied(
+  result: TaskResult,
+  task: Task,
+  projectRoot: string,
+  deps?: ReconciliationDeps,
+): Promise<ReconciliationResult> {
+  const failClosed = (notes: string): ReconciliationResult => ({
+    decision: 'NO_GO', reconciled: false, notes,
+    linesChanged: 0, filesChanged: [], tscPassed: false, vitestPassRatio: null, scopeCompliant: true,
+  });
+
+  // A held attribution (e.g. CLAIM_OUTSIDE_WRITE_SCOPE) must NOT be routed
+  // around: zero-work + HOLD stays NO_GO. Only absent/clean attribution reaches
+  // the probe (there is genuinely no new work to attribute in the no-change case).
+  if (result.workAttribution?.state === 'HOLD') {
+    return failClosed('Attribution HOLD — zero-work no-change reconcile refused (held claim stays NO_GO)');
+  }
+
+  const getGitDiff = deps?.getGitDiffStats ?? defaultGetGitDiffStats;
+  const diffStats = await getGitDiff(projectRoot, task.scope);
+  if (diffStats.linesChanged !== 0 || diffStats.filesChanged.length !== 0) {
+    // There IS work — not our case; leave it for reconcileSpuriousNoGo.
+    return failClosed('Non-zero diff — not a no-change case');
+  }
+
+  const probe = deps?.runStrictGoalStateProbe ?? runStrictGoalStateProbe;
+  const scopeDirs = task.scope?.directories ?? [];
+  const state = await probe(projectRoot, scopeDirs);
+  if (state.ran && state.allPassed) {
+    return {
+      decision: 'DONE', reconciled: true,
+      notes: 'No-change reconcile: zero diff, strict goal-state probe green (all scoped tests ran and passed) — goal already satisfied on disk',
+      linesChanged: 0, filesChanged: [], tscPassed: true, vitestPassRatio: 1, scopeCompliant: true,
+    };
+  }
+  return failClosed(
+    state.ran
+      ? 'No-change reconcile refused: scoped tests ran but not all passed — goal state unproven, NO_GO stands'
+      : 'No-change reconcile refused: no scoped tests actually ran — goal state unproven, NO_GO stands',
+  );
+}
+
 export type RubricReconciliationReason =
   | 'not_no_go'
   | 'worker_self_no_go'
