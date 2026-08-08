@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { enrichResponse } from '../helpers/enrich.js';
 import { backlogAdd, backlogList, backlogRemove } from '../../cli/commands/autonomous.js';
 import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js';
+import { autonomousPendingPath } from '../../core/constants.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 
@@ -25,9 +26,6 @@ function autonomousDir(root: string): string {
   return join(root, '.deckent', 'autonomous');
 }
 
-function pendingPath(root: string): string {
-  return join(autonomousDir(root), 'pending.json');
-}
 
 function stopMarkerPath(root: string): string {
   return join(autonomousDir(root), 'stop');
@@ -187,7 +185,7 @@ export function registerAutonomousTool(server: McpServer): void {
       try {
         // ── status ───────────────────────────────────────────────────────────
         if (action === 'status') {
-          const pf = pendingPath(root);
+          const pf = autonomousPendingPath(root);
           let pendingCount = 0;
           if (existsSync(pf)) {
             try {
@@ -372,7 +370,7 @@ export function registerAutonomousTool(server: McpServer): void {
 
         // ── pending ───────────────────────────────────────────────────────────
         if (action === 'pending') {
-          const gate = makeApprovalGate({ pendingPath: pendingPath(root) });
+          const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
           const items = gate.pending();
           const enriched = enrichResponse('autonomous', {
             action: 'pending',
@@ -386,7 +384,7 @@ export function registerAutonomousTool(server: McpServer): void {
         if (action === 'approve') {
           const tid = triggerId ?? id;
           if (!tid) throw new Error('triggerId (or id) is required for approve');
-          const gate = makeApprovalGate({ pendingPath: pendingPath(root) });
+          const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
           gate.accept(tid, reason);
           const enriched = enrichResponse('autonomous', {
             action: 'approve',
@@ -400,7 +398,7 @@ export function registerAutonomousTool(server: McpServer): void {
         if (action === 'reject') {
           const tid = triggerId ?? id;
           if (!tid) throw new Error('triggerId (or id) is required for reject');
-          const gate = makeApprovalGate({ pendingPath: pendingPath(root) });
+          const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
           gate.reject(tid, reason);
           const enriched = enrichResponse('autonomous', {
             action: 'reject',

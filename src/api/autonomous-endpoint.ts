@@ -18,7 +18,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { resolveApiCallerTenant } from './tenant-scope.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
+import { makeApprovalGate, UnknownApprovalRequestError } from '../orchestra/autonomous/approval-adapter.js';
+import { autonomousPendingPath } from '../core/constants.js';
 import { loadBacklog } from '../orchestra/autonomous/backlog.js';
 import type { BacklogEntry } from '../orchestra/autonomous/backlog-types.js';
 import { deriveRequestPrincipal } from './auth-me-endpoint.js';
@@ -39,9 +40,6 @@ function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   res.end(JSON.stringify(data));
 }
 
-function pendingPath(root: string): string {
-  return join(root, '.deckent', 'autonomous', 'pending.json');
-}
 function backlogPath(root: string): string {
   return join(root, '.deckent', 'autonomous', 'backlog.json');
 }
@@ -147,7 +145,7 @@ export function registerAutonomousRoutes(
     return true;
   }
 
-  const gate = makeApprovalGate({ pendingPath: pendingPath(projectRoot) });
+  const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(projectRoot), projectRoot });
 
   // GET /api/autonomous/pending
   if (method === 'GET' && path === '/api/autonomous/pending') {
@@ -205,7 +203,17 @@ export function registerAutonomousRoutes(
   // POST /api/autonomous/approve/<triggerId>
   if (method === 'POST' && path.startsWith('/api/autonomous/approve/')) {
     const triggerId = decodeURIComponent(path.slice('/api/autonomous/approve/'.length));
-    gate.accept(triggerId, 'approved via dashboard');
+    try {
+      gate.accept(triggerId, 'approved via dashboard');
+    } catch (err) {
+      if (err instanceof UnknownApprovalRequestError) {
+        // APPROVAL-001 T1: never silent-success a decision the gate cannot tie
+        // to a real pending request — that is a forged/stale approval.
+        sendJson(res, { error: err.message, code: err.code, triggerId }, 403);
+        return true;
+      }
+      throw err;
+    }
     sendJson(res, { approved: triggerId });
     return true;
   }
@@ -213,7 +221,15 @@ export function registerAutonomousRoutes(
   // POST /api/autonomous/reject/<triggerId>
   if (method === 'POST' && path.startsWith('/api/autonomous/reject/')) {
     const triggerId = decodeURIComponent(path.slice('/api/autonomous/reject/'.length));
-    gate.reject(triggerId, 'rejected via dashboard');
+    try {
+      gate.reject(triggerId, 'rejected via dashboard');
+    } catch (err) {
+      if (err instanceof UnknownApprovalRequestError) {
+        sendJson(res, { error: err.message, code: err.code, triggerId }, 403);
+        return true;
+      }
+      throw err;
+    }
     sendJson(res, { rejected: triggerId });
     return true;
   }

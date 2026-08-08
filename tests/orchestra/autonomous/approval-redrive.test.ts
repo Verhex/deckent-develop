@@ -11,11 +11,13 @@
 // Hermetic: pending.json + decisions.json under os.tmpdir().
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeApprovalGate } from '../../../src/orchestra/autonomous/approval-adapter.js';
 import { makeTriggerSource } from '../../../src/orchestra/autonomous/trigger-adapter.js';
+import { autonomousPendingPath } from '../../../src/core/constants.js';
+import { readPendingApprovals } from '../../../src/core/pending-approvals.js';
 import {
   buildAutonomousRuntime,
   runAutonomousLoop,
@@ -157,6 +159,40 @@ describe('APPROVE-006 — run-on-approve re-drive', () => {
       // Next cycles: re-drive → request consumes the decision → execute.
       await runAutonomousLoop({}, deps, { intervalMs: 0, maxIterations: 2, sleep: noSleep });
       expect(executed).toEqual(['t1']);
+    });
+  });
+
+  // ═══ APPROVAL-001 T1 — park↔read path contract (producer→consumer) ══════════
+  // The guard made the read path load-bearing: an id absent from the on-disk
+  // queue is refused fail-closed. That is only safe if the loop PARKS at the
+  // exact path the API/MCP/CLI/dashboard READ. This pins that contract end to
+  // end through real I/O — the runtime's own gate is the producer, the shared
+  // canonical resolver is the location, and readPendingApprovals (the hub every
+  // read surface consumes) is the consumer. If either side drifts off the one
+  // autonomousPendingPath resolver, this fails instead of silently 403-ing every
+  // real approval in production.
+  describe('park↔read contract via the canonical resolver', () => {
+    it('the runtime gate parks at autonomousPendingPath, and the read hub finds it there', async () => {
+      const bundle = buildAutonomousRuntime({
+        projectRoot: dir,
+        flows: [],
+        policy,
+        actionHandlers: new Map(),
+        // Production feeds the resolver here (buildEngineRuntime → this builder).
+        pendingPath: autonomousPendingPath(dir),
+      });
+
+      // Producer: the loop's own gate parks a needs_approval trigger.
+      const parked = await bundle.approvalGate.request(trig('park-1'));
+      expect(parked.outcome).toBe('pending');
+
+      // The file materialized at EXACTLY the shared resolver location…
+      expect(existsSync(autonomousPendingPath(dir))).toBe(true);
+
+      // …and the consumer hub (dashboard/status/MCP read through this) sees it
+      // by reading the SAME resolver — no private path copy in between.
+      const seen = readPendingApprovals(dir);
+      expect(seen.some((p) => p.kind === 'autonomous' && p.id === 'park-1')).toBe(true);
     });
   });
 });

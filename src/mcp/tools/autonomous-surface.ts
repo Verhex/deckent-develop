@@ -24,6 +24,7 @@ import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import { loadBacklog, validateBacklogEntry } from '../../orchestra/autonomous/backlog.js';
 import type { BacklogEntry, BacklogStatus } from '../../orchestra/autonomous/backlog-types.js';
 import { nextRun } from '../../core/scheduled-flow.js';
+import { autonomousPendingPath } from '../../core/constants.js';
 
 // ─── Filesystem layout (mirrors autonomous.ts / cli/commands/autonomous.ts) ──
 
@@ -39,9 +40,6 @@ function stopMarkerPath(root: string): string {
   return join(autonomousDir(root), 'stop');
 }
 
-function pendingPath(root: string): string {
-  return join(autonomousDir(root), 'pending.json');
-}
 
 // ─── Shared response helpers (mirrors catalog-parity.ts) ────────────────────
 
@@ -195,7 +193,7 @@ export function registerAutonomousStatusTool(server: McpServer): void {
         }
 
         let pendingApprovals = 0;
-        const pf = pendingPath(root);
+        const pf = autonomousPendingPath(root);
         if (existsSync(pf)) {
           try {
             const raw = JSON.parse(readFileSync(pf, 'utf-8'));

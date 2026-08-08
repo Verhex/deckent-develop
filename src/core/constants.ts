@@ -43,6 +43,25 @@ export const NERVOUS_HISTORY_FILE = join(NERVOUS_DIR, 'nervous-history.jsonl');
 export const NERVOUS_PENDING_FILE = join(NERVOUS_DIR, 'nervous-pending.json');
 export const NERVOUS_IPC_DIR = join(NERVOUS_DIR, 'nervous-ipc');
 export const PANIC_IPC_DIR = join(NERVOUS_DIR, 'panic-ipc');
+// ─── Autonomous engine files (sibling family of the nervous constants above) ──
+export const AUTONOMOUS_DIR = join(DECKENT_DIR, 'autonomous');
+/** Project-relative location of the autonomous approval queue. Joined with the
+ *  project root by {@link autonomousPendingPath}. */
+export const AUTONOMOUS_PENDING_FILE = join(AUTONOMOUS_DIR, 'pending.json');
+/**
+ * Canonical absolute path of the autonomous approval queue for `projectRoot`.
+ * This is the ONE resolver every surface must share: the autonomous loop parks
+ * triggers here, and the API / MCP / CLI accept-reject ingresses read from here.
+ * APPROVAL-001 T1 made that read path load-bearing (an id absent from this file
+ * is refused fail-closed), so a private per-file copy of the path that drifted
+ * by one segment would silently 403 every real approval and park the loop
+ * forever. Import this; never re-inline it. Lives in this leaf constants module
+ * (no ApprovalStore/run-status import chain) so the MCP and connector surfaces
+ * that resolve it stay free of that transitive load.
+ */
+export function autonomousPendingPath(projectRoot: string): string {
+  return join(projectRoot, AUTONOMOUS_PENDING_FILE);
+}
 // ─── Sprint identity files (single source of truth for getCurrentSprintId) ──
 // Resolution order in core/event-stream.getCurrentSprintId: SPRINT_ACTIVE_FILE
 // (explicit override, if present + parseable) → SPRINT_STATE_FILE (written by

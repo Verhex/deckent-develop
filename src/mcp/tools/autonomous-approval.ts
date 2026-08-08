@@ -27,14 +27,11 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod/v4';
-import { join } from 'node:path';
 import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js';
+import { autonomousPendingPath } from '../../core/constants.js';
 
 // ─── Filesystem layout (mirrors autonomous.ts / autonomous-surface.ts) ──────
 
-function pendingPath(root: string): string {
-  return join(root, '.deckent', 'autonomous', 'pending.json');
-}
 
 // ─── Shared response helpers (mirrors autonomous-surface.ts) ────────────────
 
@@ -79,7 +76,7 @@ export function registerAutonomousApproveTool(server: McpServer): void {
       if (!tid) return fail('triggerId (or id) is required for approve.');
 
       try {
-        const gate = makeApprovalGate({ pendingPath: pendingPath(root) });
+        const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root), projectRoot: root });
         const wasPending = gate.pending().some((p) => p.triggerId === tid);
         gate.accept(tid, reason);
         return ok({ triggerId: tid, approved: true, wasPending });
@@ -120,7 +117,7 @@ export function registerAutonomousRejectTool(server: McpServer): void {
       if (!tid) return fail('triggerId (or id) is required for reject.');
 
       try {
-        const gate = makeApprovalGate({ pendingPath: pendingPath(root) });
+        const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root), projectRoot: root });
         const wasPending = gate.pending().some((p) => p.triggerId === tid);
         gate.reject(tid, reason);
         return ok({ triggerId: tid, rejected: true, wasPending });

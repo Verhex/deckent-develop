@@ -121,8 +121,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-06 (485a): +4 dashboard overlay tests — same 12480, digest only.
   // 2026-08-06 (P1d): +1 config-carry fixture test. Prior: 485a (12480).
   // 2026-08-07 (P1e): +2 end-to-end denial pins. Prior: P1d (12481).
+  // 2026-08-08 (APPROVAL-001 T1): unknown-ID fail-closed guard + one canonical
+  // autonomousPendingPath resolver (core/constants) shared by every autonomous
+  // surface. Already-tracked approval test files gained fail-closed pins, the
+  // endpoint test parks through the shared resolver, and approval-redrive gained
+  // the park↔read producer→consumer pin; same 12499 count, content digest only.
+  // Prior: P1e (a2be3787).
   count: 12499,
-  digest: 'a2be3787f2e9ef9b9ed658c82064b1f62cb4e057f6667734a612e8762e57b285',
+  digest: '2dffb40fb12ddff17911ae9dfaa1c5b19507efe86e940f3d43913bbc997be6fa',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -139,8 +145,14 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // same 1198 count, digest only. Prior: 485a.
   // 2026-08-06 (P1c): CLI plan identity conversion — same 1198, digest only.
   // 2026-08-06 (P1d): config carry line + type decls — same 1198, digest only.
+  // 2026-08-08 (APPROVAL-001 T1): unknown-ID fail-closed guard + a single
+  // canonical autonomousPendingPath resolver (core/constants, sibling of
+  // NERVOUS_PENDING_FILE) that the approval-adapter and api/mcp/cli/connectors
+  // autonomous ingresses all import — every local pendingPath helper deleted so
+  // one resolver remains. Edits to already-inventoried modules only — same 1203
+  // count, content digest only.
   count: 1203,
-  digest: '792dfbe8ca6c83b274bb4c45a209d51367ac7da1cbc4905fbadcf261959d56f2',
+  digest: 'b09c4afedcdd7dba2388fd016b5f4ea043a5c46932ab3aa5f17dee8f7325a9d2',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
