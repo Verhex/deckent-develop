@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d6a2d4acc51f58c29444bd900f212b91a0c5ffd6633ff3d1acddfcfe6f1798b8"
+    "value": "dea035def9362fe6d022793ee39898d3dcc70678f701fb01ec93368a8fbdb439"
   },
   "summary": {
-    "total": 388,
-    "active": 341,
+    "total": 396,
+    "active": 349,
     "terminal": 47,
     "receipts": 129,
     "byState": {
-      "OPEN": 255,
+      "OPEN": 263,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
@@ -22,13 +22,13 @@
     },
     "byPriority": {
       "P0": 250,
-      "P1": 103,
-      "P2": 35
+      "P1": 109,
+      "P2": 37
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 14,
-      "AUTHORITY": 30,
+      "AUTHORITY": 31,
       "CODEX": 44,
       "CONNECTOR": 2,
       "COST": 4,
@@ -41,13 +41,13 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 1,
-      "KERNEL": 94,
+      "KERNEL": 97,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
-      "PRODUCT": 8,
+      "PRODUCT": 12,
       "PROMPT": 3,
       "PROVIDER": 3,
       "RELEASE": 4,
@@ -2452,6 +2452,39 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3201,
+      "id": "RECOVERY-PAUSE-STATUS-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-08",
+      "definitionDigest": "a352f02a35e76c50d01f9f5eda8fdd3605d9eec1560f26c7af3e2347aa449b4c",
+      "progressDigest": "1f8c714a22c5ba0831e42cbc2e53e802cf56640b99691f876210c02b5a54abab",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3202,
+      "id": "EVAL-NOCHANGE-VERDICT-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-08",
+      "definitionDigest": "4a7dd0ec90ee6aa439d3f2fd3fa96777e08c0ae173cb8f19450c04ff5894d97b",
+      "progressDigest": "b4f258c94a6c61570b7c32358a4d49bca3246679522122da1f31dd6365038fc2",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3203,
+      "id": "WORKER-ENV-TMPFS-001",
+      "program": "KERNEL",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-08",
+      "definitionDigest": "af6ba2fbe30ead48de8f417766f49c0f1738fca6838d7ad2496568c786e3235f",
+      "progressDigest": "2f265cfd5ed107f14245574e41ad68f62f6f6a0890a50e437ec21ccee5c8a09c",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3210,
       "id": "SURFACE-CUTOVER-001",
       "program": "KERNEL",
@@ -3321,6 +3354,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 4125,
+      "id": "PROVENANCE-CONTEXT-001",
+      "program": "AUTHORITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-08",
+      "definitionDigest": "b12d4d83c668092d979d31ffa7026ea0d49d129b7562d34893755808ea9903a9",
+      "progressDigest": "6ce06d3598415619d4a12ba33c7faf7ae775d4ecde1577ac1621252a4b578acb",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 4130,
       "id": "API-SECURITY-001",
       "program": "AUTHORITY",
@@ -4099,6 +4143,50 @@
       "updated": "2026-08-04",
       "definitionDigest": "c155d16950b2cd4403e463453885a0fcbdf7764d8aa17db14acb082dbfd42476",
       "progressDigest": "d0c39236837e94518c150e7672450b6b4627e2437835056cca6d59f39f8304d8",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8096,
+      "id": "NAIVE-COOPETITION-001",
+      "program": "PRODUCT",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-08",
+      "definitionDigest": "dcd4a838892a1d21c5cc521165bc0ed6d8bae27f463e92f679d95bac442c52b0",
+      "progressDigest": "d32c7947ff25b3b5ed1f15ffe05bb46611ecd07e3c654a0d809529ea42eafc4a",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8097,
+      "id": "METRICS-NORTHSTAR-001",
+      "program": "PRODUCT",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-08",
+      "definitionDigest": "5a39ffa875c10cd8c08fdfbc21637b94da56f4533f2e92f2e9ddbc8fd48bdca9",
+      "progressDigest": "a9d44164c1813a200343d1c7566d0dc3ec3277ba4c910991d01f2ce8e31d3310",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8098,
+      "id": "FLAGSHIP-PROOF-001",
+      "program": "PRODUCT",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-08",
+      "definitionDigest": "b66ccfc8d800663c895d4b9a89acd56a20e2bcbb4277cfe605fb03af53986eae",
+      "progressDigest": "daf077e56aebe3d997afdbeaaa27bd9b80eae71b422d70e5ad317540e6f927a1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8099,
+      "id": "COMPETITIVE-INTEL-001",
+      "program": "PRODUCT",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-08",
+      "definitionDigest": "1e188212532953030474164132aa2121d9645219fa62bc0749908fb008e70022",
+      "progressDigest": "2fe6bedbd42505482f54ede2d93dac7e2210865c05f6374c37febdba71f93bfd",
       "terminalClosureDigest": null
     },
     {
@@ -5619,8 +5707,8 @@
       "authorityDigest": "a56fd305ed699f0af005d26b98a2874e98811f9dcad04b8574945d752b59a2b3",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-08T08:28:01Z"
       },
       "g7AttemptIdentity": null
     }
@@ -7899,6 +7987,7 @@
       ],
       "dependents": [
         "CODEX-C5",
+        "FLAGSHIP-PROOF-001",
         "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001"
       ],
       "children": [],
@@ -11476,6 +11565,7 @@
         "DOC-IMPACT-001",
         "EVALUATION-001",
         "GOAL-ACCEPTANCE-001",
+        "METRICS-NORTHSTAR-001",
         "RECOVERY-BORN-480-ATTRIBUTION-001",
         "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
         "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
@@ -12837,7 +12927,11 @@
         "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "RECOVERY-PAUSE-STATUS-001",
+        "EVAL-NOCHANGE-VERDICT-001",
+        "WORKER-ENV-TMPFS-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -12857,7 +12951,10 @@
       "closureBlockedBy": [
         "RECOVERY-COMMAND-SERVICE-001",
         "DO-CUTOVER-001",
-        "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001"
+        "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
+        "RECOVERY-PAUSE-STATUS-001",
+        "EVAL-NOCHANGE-VERDICT-001",
+        "WORKER-ENV-TMPFS-001"
       ],
       "evidenceReceipts": [
         "GR-2026-08-07-DOGFOOD-B1A-01",
@@ -13731,6 +13828,109 @@
       "acceptance": "Sequential, parallel, rollback and compensation semantics explicit; all surfaces parity",
       "evidence": "Legacy process mode is partial",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 3201,
+      "id": "RECOVERY-PAUSE-STATUS-001",
+      "parent": "RECOVERY-DO-DOGFOOD-001",
+      "program": "KERNEL",
+      "outcome": "Paused run publishes a readable canonical status read model",
+      "priority": "P1",
+      "dependsOn": [
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "`deckent status` after a typed PAUSE renders the paused state and the recover remedy instead of RUN_STATUS_READ_MODEL_UNAVAILABLE",
+      "evidence": "2026-08-07 smoke gözlemi (audit Ek-2): PAUSE sonrası read-model republish edilmiyor, durum görünmez; temiz-oda-3'te ölçüldü",
+      "updated": "2026-08-08"
+    },
+    {
+      "order": 3202,
+      "id": "EVAL-NOCHANGE-VERDICT-001",
+      "parent": "RECOVERY-DO-DOGFOOD-001",
+      "program": "KERNEL",
+      "outcome": "No-change-needed honest worker result evaluates deterministically by goCriteria",
+      "priority": "P1",
+      "dependsOn": [
+        "EVALUATION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "EVALUATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Goal zaten sağlanmış diye dürüstçe düzenleme yapmayan worker host-tarafı goCriteria-çapalı verdict alır, worker-ruh-hali DONE/NO_GO varyansı değil",
+      "evidence": "2026-08-08 ölçümü: CR4'te aynı içerik DONE, CR5'te NO_GO değerlendirildi (worker self-assessment varyansı)",
+      "updated": "2026-08-08"
+    },
+    {
+      "order": 3203,
+      "id": "WORKER-ENV-TMPFS-001",
+      "parent": "RECOVERY-DO-DOGFOOD-001",
+      "program": "KERNEL",
+      "outcome": "Worker containment HOME sizing and cache routing policy",
+      "priority": "P2",
+      "dependsOn": [
+        "TOOL-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TOOL-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Worker containment env yeterli yazılabilir HOME (veya yönlendirilmiş npm cache) sağlar ki toolchain fetch'leri ENOSPC olmasın; boyut config-çözümlü",
+      "evidence": "2026-08-08 ölçümü: 100M tmpfs HOME doldu (ENOSPC), worker'lar dürüstçe raporlayıp cache'i elle yönlendirdi",
+      "updated": "2026-08-08"
     },
     {
       "order": 3210,
@@ -15760,6 +15960,7 @@
         "CAPABILITY-001",
         "KERNEL-ONTOLOGY-001",
         "MCP-LEASE-001",
+        "NAIVE-COOPETITION-001",
         "P02-639"
       ],
       "children": [],
@@ -15857,6 +16058,7 @@
         "ENTERPRISE-AUTH-001",
         "GOAL-POLICY-001",
         "KERNEL-001",
+        "NAIVE-COOPETITION-001",
         "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
         "RECOVERY-COMMAND-SERVICE-001",
         "SSOT-SETTLEMENT-001",
@@ -15944,7 +16146,8 @@
         "PLUGIN-SANDBOX-001",
         "TERMINAL-TOOLS-001",
         "TOOL-COMPUTER-001",
-        "TRUST-HANDOFF-001"
+        "TRUST-HANDOFF-001",
+        "WORKER-ENV-TMPFS-001"
       ],
       "children": [],
       "gates": [
@@ -15991,6 +16194,7 @@
         "KERNEL-SETTLEMENT-001",
         "LIMIT-001",
         "P02-638",
+        "PROVENANCE-CONTEXT-001",
         "PROVIDER-INGRESS-001",
         "REACHABILITY-001",
         "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
@@ -16340,7 +16544,9 @@
         "TERMINAL-COLLAB-001",
         "TRUST-HANDOFF-001"
       ],
-      "children": [],
+      "children": [
+        "PROVENANCE-CONTEXT-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -16358,12 +16564,48 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "RECEIPT-001",
-        "OPERATION-001"
+        "OPERATION-001",
+        "PROVENANCE-CONTEXT-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Every decision/effect/settlement traceable; redaction schema and bounded retention",
       "evidence": "Existing audit systems fragmented; 2026-08-05 kod-truth: `AUDIT_HMAC_SECRET` sabit string (`audit-writer.ts:35`) — ana zincir kaynak-sahibi adversary'ye karşı sahtelenebilir, terminal zincirindeki makine-lokal rastgele anahtar deseni (`api/terminal/audit-integrity.ts`, 0600) ana zincire taşınmalı; redaction sink-level chokepoint değil call-site-bazlı — worker `.log`/`.result` yakalaması ve genel `writeEvent` payload'ları kapsam dışı kalıyor",
       "updated": "2026-08-05"
+    },
+    {
+      "order": 4125,
+      "id": "PROVENANCE-CONTEXT-001",
+      "parent": "AUDIT-001",
+      "program": "AUTHORITY",
+      "outcome": "Content provenance and context integrity authority wiring",
+      "priority": "P1",
+      "dependsOn": [
+        "RECEIPT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECEIPT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "docs/audits/content-provenance-context-integrity-authority-design-2026-08-06.md onaylı tasarımı üretim zincirine bağlanır: goal-hijack/memory-poisoning karşı koruması + instruction authority isolation",
+      "evidence": "2026-08-08 envanter: onaylı tasarım dokümanı ORPHAN'dı, hiçbir ledger satırı referans vermiyordu — SSOT kuralı gereği açıldı",
+      "updated": "2026-08-08"
     },
     {
       "order": 4130,
@@ -19099,7 +19341,12 @@
         "RELEASE-BETA-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "NAIVE-COOPETITION-001",
+        "METRICS-NORTHSTAR-001",
+        "FLAGSHIP-PROOF-001",
+        "COMPETITIVE-INTEL-001"
+      ],
       "gates": [
         "G2"
       ],
@@ -19116,7 +19363,11 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RELEASE-BETA-001"
+        "RELEASE-BETA-001",
+        "NAIVE-COOPETITION-001",
+        "METRICS-NORTHSTAR-001",
+        "FLAGSHIP-PROOF-001",
+        "COMPETITIVE-INTEL-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Demo asset (terminal recording), Show HN and X/LinkedIn drafts on verifiable-orchestration positioning, comparison page, weekly cadence plan; every outbound post owner-approved before publication",
@@ -19153,6 +19404,148 @@
       "acceptance": "Onaylı dört edit (E1 hyperscaler tavanı, E2 runtime-neutrality bölümü+başlığı, E4 recursive delegasyon, E5 iki non-goal) `docs/en/vision.md` + `docs/tr/vision.md`'ye 13-heading paritesi korunarak uygulanır; E3 (policy-enforcement metni) ALP-RUNTIME-001 ürünleşmesine yönlendirildi, E6 (runtime-neutrality falsifier'ı) owner kararı almadı — ikisi de vision-metni olarak HOLD",
       "evidence": "Owner canlı onayı 2026-08-04: E1, E2, E4 aynen; E5 şu kayıtla — dashboard + desktop app yapılacak ve kolayca bağlanılabilir olacak (CLI mevcut), non-goal metni bu kaydı içerir. Edit'ler aynı oturumda working tree'ye uygulandı; docs build/parity koşusu ve commit provenance açık",
       "updated": "2026-08-04"
+    },
+    {
+      "order": 8096,
+      "id": "NAIVE-COOPETITION-001",
+      "parent": "LAUNCH-COMMS-001",
+      "program": "PRODUCT",
+      "outcome": "Naive coopetition integration contract",
+      "priority": "P1",
+      "dependsOn": [
+        "OPERATION-001",
+        "APPROVAL-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-001",
+        "APPROVAL-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Identity mapping, her Naive action Operation Catalog'da versioned external operation, dual-approval-queue deadlock first-class typed state, external-evidence-incomplete typed field, projected-but-separate budget ledger, capability-manifest carve-out; Naive'in cards/KYC/LLC secrets asla Deckent'e çekilmez",
+      "evidence": "2026-08-08 rekabet analizi: Naive 8,1/10 en yakın direct-core rakip (competition-2026-08-07/01) fakat ledger'da iz yoktu; kaynak 03-strategic-recommendations 124-140",
+      "updated": "2026-08-08"
+    },
+    {
+      "order": 8097,
+      "id": "METRICS-NORTHSTAR-001",
+      "parent": "LAUNCH-COMMS-001",
+      "program": "PRODUCT",
+      "outcome": "North-star KPI and guardrail metric framework",
+      "priority": "P1",
+      "dependsOn": [
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "dependents": [
+        "FLAGSHIP-PROOF-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "'Verified Accepted Outcomes per operator-hour' north-star + guardrail seti (claim-vs-host-verdict disagreement, evidence completeness, unreported-file detection, duplicate-effect=0, MTTR, approval-latency, promotion-rollback, surface-state-divergence=0, audit-reconciliation-gap=0) tanımlı, ölçülür, raporlanır",
+      "evidence": "2026-08-08 rekabet analizi: metrik çerçevesi MISSING — Wave kapanışları bunsuz kanıtlanabilir/pazarlanabilir değil; kaynak 03-strategic-recommendations 265-295",
+      "updated": "2026-08-08"
+    },
+    {
+      "order": 8098,
+      "id": "FLAGSHIP-PROOF-001",
+      "parent": "LAUNCH-COMMS-001",
+      "program": "PRODUCT",
+      "outcome": "Eight-scenario flagship competitive acceptance suite on the production binary",
+      "priority": "P1",
+      "dependsOn": [
+        "METRICS-NORTHSTAR-001",
+        "XVERIFY-WIRE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "METRICS-NORTHSTAR-001",
+        "XVERIFY-WIRE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "2-provider goal, cross-surface approval, scope-violation catch, honest NO_GO, FIX fresh-eyes, crash reconcile, approval-race, promotion-provenance senaryoları gerçek binary üzerinde koşan buyer-visible tek suite",
+      "evidence": "2026-08-08 rekabet analizi: MISSING — mimari üstünlüğü buyer-visible kanıta çeviren tek somut adım; kaynak 03-strategic-recommendations 51-63",
+      "updated": "2026-08-08"
+    },
+    {
+      "order": 8099,
+      "id": "COMPETITIVE-INTEL-001",
+      "parent": "LAUNCH-COMMS-001",
+      "program": "PRODUCT",
+      "outcome": "Recurring competitive telemetry scorecard and trigger-based re-analysis",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Aylık scorecard + Naive/Ruflo/Orca/Cline/GitHub/Codex/Paperclip adlandırılmış-olay tetikleyicileriyle yeniden-analiz kaydı; her tur codex-analysis benzeri artefakt üretir",
+      "evidence": "2026-08-08: ilk örnek codex-analysis/competition-2026-08-07; süreç satırı olarak açıldı",
+      "updated": "2026-08-08"
     },
     {
       "order": 9000,
@@ -19422,6 +19815,7 @@
         "CM-04"
       ],
       "dependents": [
+        "EVAL-NOCHANGE-VERDICT-001",
         "PRODUCTION-WIRING-AUTHORITY-001",
         "PROMOTION-001",
         "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
@@ -19959,6 +20353,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7e2c820ebccb1a0e987ca6cb6627559ddff21b5f3af20b1b7733a334b3af31a0"
+    "value": "482e3629d75b164df43d4460e827de3c11d58158954cc6f4aa80cc5296f58988"
   }
 }
