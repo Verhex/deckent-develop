@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e851ee1a3d3509fbfd0610cd1412cdd0ecd72e69da20078f8cbf8f5443f051f1"
+    "value": "6ad891792acfd5b136643b41aaf0deb519bf797cac04ce3b3f06f7d7102f5b28"
   },
   "summary": {
     "total": 396,
@@ -11,11 +11,11 @@
     "terminal": 47,
     "receipts": 134,
     "byState": {
-      "OPEN": 260,
+      "OPEN": 259,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 22,
+      "VERIFY": 23,
       "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3248,10 +3248,10 @@
       "id": "TOOL-AUTHORITY-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-05",
+      "state": "VERIFY",
+      "updated": "2026-08-08",
       "definitionDigest": "668be8d7c8c8074b2e7c7e44ad88edf2762e34d88491fc732d8cac72a60f6c48",
-      "progressDigest": "48acac533dbe4faf438b1381941aa51ce02abe1191f6288ef1cb2dfe4ded4d46",
+      "progressDigest": "71c31b90cef9dad3c03add4bef1512579a913ab0e9f736fce5a121cbe21beaaa",
       "terminalClosureDigest": null
     },
     {
@@ -5757,8 +5757,8 @@
       "authorityDigest": "f860a969bd19675407cdd395be16cc8d97fd7d4051ab5afc1c465099f3cab85c",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-08T11:00:41Z"
       },
       "g7AttemptIdentity": null
     }
@@ -16210,14 +16210,14 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
-        "W": "~",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
-        "X": "?",
+        "X": "0",
         "S": "?"
       },
       "blockerCode": null,
@@ -16226,10 +16226,12 @@
         "CAPABILITY-001",
         "APPROVAL-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-08-TOOLAUTH-T1-01"
+      ],
       "acceptance": "Least privilege, progressive disclosure, explicit escape hatch and no hidden full surface",
-      "evidence": "Legacy 559; terminal tool foundations; 2026-08-05 kod-truth: runtime write-scope yalnız claude worker'da (`--allowedTools`), codex/gemini `allowedToolsFlag: null` (`provider-command-spec.ts:129,145`) ve üç provider da kendi guardrail'leri kapalı spawn ediliyor (`:113,128,143`); `tools.allowlist_enabled` açıkken bile allowlist yalnız prompt-metni üretiyor, gerçek grant değil (`task-builder.ts:2098`); claude'a verilen `Bash` grant'i `Write()` path-scoping'ini fiilen boşa düşürüyor",
-      "updated": "2026-08-05"
+      "evidence": "Legacy 559; terminal tool foundations; 2026-08-05 kod-truth: runtime write-scope yalnız claude worker'da (`--allowedTools`), codex/gemini `allowedToolsFlag: null` (`provider-command-spec.ts:129,145`) ve üç provider da kendi guardrail'leri kapalı spawn ediliyor (`:113,128,143`); `tools.allowlist_enabled` açıkken bile allowlist yalnız prompt-metni üretiyor, gerçek grant değil (`task-builder.ts:2098`); claude'a verilen `Bash` grant'i `Write()` path-scoping'ini fiilen boşa düşürüyor; `receipt=GR-2026-08-08-TOOLAUTH-T1-01`; T1 SETTLEMENT 2026-08-08: silent-full-surface açığı typed+auditable yapıldı — resolveToolScopeEnforcement predicate (write-scope var VE allowedToolsFlag null ise RUNTIME_TOOL_SCOPE_UNENFORCED), spawn'da TASK_ASSIGN payload'una toolScope eklenir (Auditor+watch zaten tüketiyor, wired-by-construction), advisory-only fail-closed değil; `proof=toolauth-t1-5predicate-plus-2wiring-pins-core-orchestra-1170files-17944-green`; 7 pin. AÇIK typed-residual satır VERIFY: Bash-escape Write-scoping'i advisory'ye düşürür (filesystem-write-guard ayrı tasarım), flag-seviye enforcement + real-grant tam kapanış CAPABILITY-001+APPROVAL-001 bağımlı — bu dilim yalnız no-hidden-full-surface clause'unu kapatır",
+      "updated": "2026-08-08"
     },
     {
       "order": 4070,
@@ -20410,6 +20412,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9372dfcb46a5489b9780aad0306f3aa80f68fd64345d00c065a620a120a8f261"
+    "value": "4893e118e2e658d2b3daa71d9e2f52adcf6043c8aee6e4d71e3ec0016fb95e63"
   }
 }
