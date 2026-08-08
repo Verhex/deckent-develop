@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f325add9c98236fc3fbb8aa9c9e60942ee836030da55971c233bf5e9b2bdd5a0`
+**Source digest:** `sha256(normalized-lf-utf8):dea035def9362fe6d022793ee39898d3dcc70678f701fb01ec93368a8fbdb439`
 
-**Rows:** 388 total · 341 active · 47 terminal
+**Rows:** 396 total · 349 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 255 |
+| OPEN | 263 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
@@ -215,6 +215,9 @@
 | 3198 | `RECOVERY-BORN-485-USAGE-BILLING-001` | OPEN | P0 | COST | `LIMIT-001`, `RECEIPT-001`, `SPRINT-HONESTY-001` | — | FIX lineage usage, billing and KPI projections resolve through logical task authority |
 | 3199 | `RECOVERY-BORN-485-PROMPT-POLICY-001` | OPEN | P0 | AUTHORITY | `PROMPT-001`, `ROUTING-V3-CUTOVER-001` | — | Exact worker prompt preserves global run policy, forced skills and monotonic lifecycle instructions |
 | 3200 | `PROCESS-CUTOVER-001` | OPEN | P1 | KERNEL | `MISSION-KIND-001`, `RECOVERY-001` | — | Process mode through canonical WorkItem and Attempt authority |
+| 3201 | `RECOVERY-PAUSE-STATUS-001` | OPEN | P1 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Paused run publishes a readable canonical status read model |
+| 3202 | `EVAL-NOCHANGE-VERDICT-001` | OPEN | P1 | KERNEL | `EVALUATION-001` | — | No-change-needed honest worker result evaluates deterministically by goCriteria |
+| 3203 | `WORKER-ENV-TMPFS-001` | OPEN | P2 | KERNEL | `TOOL-AUTHORITY-001` | — | Worker containment HOME sizing and cache routing policy |
 | 3210 | `SURFACE-CUTOVER-001` | BLOCKED | P0 | KERNEL | `DO-CUTOVER-001`, `AUTONOMY-CUTOVER-001`, `PROCESS-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | CLI, MCP, API, terminal, Desktop and connector adapters share use cases |
 | 3220 | `PLANNER-001` | BLOCKED | P0 | KERNEL | `KERNEL-ONTOLOGY-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Canonical planner authority and fail-loud structured parsing |
 | 3230 | `WORKER-REGISTRY-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `PRINCIPAL-001` | — | Durable Worker identity, claim, heartbeat, capability and settlement registry |
@@ -279,6 +282,7 @@
 | 4102 | `PROVIDER-HOLD-LIVE-PROOF-001` | OPEN | P2 | AUTHORITY | `PROVIDER-HOLD-001` | — | Provider-hold'un canlı kanıtları: login-recovery, mixed-provider continuation, expiry ve authoritative usage-source |
 | 4110 | `ATTENDED-STOP-001` | OPEN | P0 | AUTHORITY | `APPROVAL-001`, `LIMIT-001` | — | Exact attended hard-stop approval authority |
 | 4120 | `AUDIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `OPERATION-001` | — | Tamper-evident, tenant-scoped causal audit |
+| 4125 | `PROVENANCE-CONTEXT-001` | OPEN | P1 | AUTHORITY | `RECEIPT-001` | — | Content provenance and context integrity authority wiring |
 | 4130 | `API-SECURITY-001` | BLOCKED | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `APPROVAL-001` | `DEPENDENCY_UNSATISFIED` | API authentication, authorization and config-secret containment |
 | 4140 | `ENTERPRISE-AUTH-001` | OPEN | P0 | AUTHORITY | `TENANT-001`, `CAPABILITY-001`, `APPROVAL-001`, `AUDIT-001` | — | Community-safe and enterprise fail-closed profiles |
 | 4150 | `ALP-RUNTIME-001` | OPEN | P1 | AUTHORITY | `OPERATION-001`, `APPROVAL-001` | — | Alp Discipline decision anchor in runtime agents and planners |
@@ -348,6 +352,10 @@
 | 8092 | `DOCS-TRUTH-PASS-001` | OPEN | P0 | DOCS | — | — | Beta-scope public README and top-level docs reality pass from current code truth |
 | 8093 | `LAUNCH-COMMS-001` | OPEN | P1 | PRODUCT | `RELEASE-BETA-001` | — | Launch communications, demo assets and recurring social cadence |
 | 8095 | `DOCS-VISION-002` | OPEN | P1 | DOCS | — | — | 2026-08 rekabet-sentezi vision amendment: hyperscaler control-plane tavanı, provider+runtime bağımsızlığı, recursive delegasyon cümlesi ve iki yeni non-goal (identity provider değil; başka bir agent runtime değil), en+tr paritesiyle |
+| 8096 | `NAIVE-COOPETITION-001` | OPEN | P1 | PRODUCT | `OPERATION-001`, `APPROVAL-001` | — | Naive coopetition integration contract |
+| 8097 | `METRICS-NORTHSTAR-001` | OPEN | P1 | PRODUCT | `KERNEL-SETTLEMENT-001` | — | North-star KPI and guardrail metric framework |
+| 8098 | `FLAGSHIP-PROOF-001` | OPEN | P1 | PRODUCT | `METRICS-NORTHSTAR-001`, `XVERIFY-WIRE-001` | — | Eight-scenario flagship competitive acceptance suite on the production binary |
+| 8099 | `COMPETITIVE-INTEL-001` | OPEN | P2 | PRODUCT | — | — | Recurring competitive telemetry scorecard and trigger-based re-analysis |
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |

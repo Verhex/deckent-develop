@@ -70,10 +70,25 @@ vi.mock('../../src/cli/commands/quick-start.js', () => ({
   cleanupZeroConfig: vi.fn(),
 }));
 
+// B1b: the canonical consumption seam — asserted, never actually spawning.
+vi.mock('../../src/orchestra/run-flow-decision-service.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/run-flow-decision-service.js')>()),
+  startRunFlow: vi.fn(() => ({
+    status: 'accepted',
+    context: {},
+    attempt: { state: 'PROCESS_SPAWNED' },
+  })),
+}));
+vi.mock('../../src/cli/helpers/detached-start.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/cli/helpers/detached-start.js')>()),
+  buildFlowStartSpawn: vi.fn(() => vi.fn()),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import { runSprint, readContext, planSprint } from '../../src/orchestra/brain.js';
 import { print } from '../../src/cli/helpers/output.js';
 import { registerStart } from '../../src/cli/commands/start.js';
+import { startRunFlow } from '../../src/orchestra/run-flow-decision-service.js';
 import {
   saveApprovedSnapshot,
   saveRunHandle,
@@ -184,6 +199,63 @@ describe('deckent start — approved-flow guard (B1a)', () => {
     expect(process.exitCode).not.toBe(1);
     expect(runSprint).toHaveBeenCalledTimes(1);
     expect(printedText()).not.toMatch(/refusing to silently replan/u);
+  });
+
+  // ═══ B1b (GR-2026-08-08-DOGFOOD-B1B-01) — canonical consumption ═══════════
+  it('run_flow_v2 ON + single approved flow: bare start CONSUMES it canonically (no replan)', async () => {
+    seedApprovedSnapshot(projectRoot, 'flow-approved-1');
+    vi.mocked(loadConfig).mockResolvedValue({
+      ...makeConfig(), terminal: { run_flow_v2: true },
+    } as never);
+
+    await runStart();
+
+    expect(startRunFlow).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(startRunFlow).mock.calls[0]![1]).toBe('flow-approved-1');
+    const options = vi.mocked(startRunFlow).mock.calls[0]![2] as { lineage: { authorization: { kind: string }; idempotencyKey: string } };
+    expect(options.lineage.authorization).toEqual({ kind: 'approved-actor' });
+    expect(options.lineage.idempotencyKey).toBe('start:flow-approved-1:r1');
+    expect(runSprint).not.toHaveBeenCalled(); // no replan, the child owns the run
+    expect(process.exitCode).not.toBe(1);
+    expect(printedText()).toMatch(/Consuming the approved plan/u);
+  });
+
+  it('run_flow_v2 ON + MULTIPLE approved flows: typed list + --consume-approved yönlendirmesi', async () => {
+    seedApprovedSnapshot(projectRoot, 'flow-a');
+    seedApprovedSnapshot(projectRoot, 'flow-b');
+    vi.mocked(loadConfig).mockResolvedValue({
+      ...makeConfig(), terminal: { run_flow_v2: true },
+    } as never);
+
+    await runStart();
+
+    expect(startRunFlow).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    expect(printedText()).toMatch(/--consume-approved/u);
+  });
+
+  it('run_flow_v2 ON + --consume-approved picks the named flow among several', async () => {
+    seedApprovedSnapshot(projectRoot, 'flow-a');
+    seedApprovedSnapshot(projectRoot, 'flow-b');
+    vi.mocked(loadConfig).mockResolvedValue({
+      ...makeConfig(), terminal: { run_flow_v2: true },
+    } as never);
+
+    await runStart('--consume-approved', 'flow-b');
+
+    expect(startRunFlow).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(startRunFlow).mock.calls[0]![1]).toBe('flow-b');
+  });
+
+  it('run_flow_v2 OFF: the B1a refusal stands and now names the enable path', async () => {
+    seedApprovedSnapshot(projectRoot, 'flow-approved-1');
+
+    await runStart();
+
+    expect(startRunFlow).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    expect(printedText()).toMatch(/refusing to silently replan/u);
+    expect(printedText()).toMatch(/run_flow_v2/u);
   });
 
   it('an empty store leaves bare start byte-identical (baseline)', async () => {
