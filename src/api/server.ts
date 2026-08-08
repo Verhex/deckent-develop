@@ -1183,7 +1183,9 @@ async function handleRequest(
     }
 
     // Memory FTS5 search: /api/memory/search?q= (216-012)
-    if (registerMemorySearch(url, res, projectRoot)) return;
+    // T4b: `req` MUST be threaded — without it the caller principal is never
+    // derived and tenant scoping is a no-op (every caller saw all tenants).
+    if (registerMemorySearch(url, res, projectRoot, req)) return;
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
     if (registerAutonomousRoutes(url, method, res, projectRoot, req)) return;
     if (registerMissionsRoute(url, method, res, projectRoot, req)) return;
