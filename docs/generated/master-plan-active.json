@@ -3,7 +3,11 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
+<<<<<<< HEAD
     "value": "241fb303fa86065feac7efd0251d85639a43e680ada1e9e288cce1ac43b91b24"
+=======
+    "value": "667aed9a451c4a429f8e625aae1746a75495060cf3cf74b269d084fa1c858257"
+>>>>>>> 67e28c33f (docs(master): RECOVERY-PAUSE-STATUS admission — PAUSE sonrası status recover çaresini bassın)
   },
   "summary": {
     "total": 396,
@@ -5723,12 +5727,21 @@
       "g7AttemptIdentity": null
     },
     {
+<<<<<<< HEAD
       "id": "GR-2026-08-08-TENANT-T4B-01",
       "authorityDigest": "8feccc05da1b767cf21f9489683af0ebf13cc8bba8472f172dc82ac06d64a036",
       "lifecycle": {
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-08T09:56:27Z"
+=======
+      "id": "GR-2026-08-08-PAUSE-STATUS-01",
+      "authorityDigest": "95b29ce9f66e08671f4c1209e3b258fef2e604b6acd86ccb70be87f0d6f25c92",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
+>>>>>>> 67e28c33f (docs(master): RECOVERY-PAUSE-STATUS admission — PAUSE sonrası status recover çaresini bassın)
       },
       "g7AttemptIdentity": null
     }
@@ -20376,6 +20389,10 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
+<<<<<<< HEAD
     "value": "c0490d63c34b20c68a8cebb54c28ff7c74a5553752ed9ca5235ac9bfdf135ada"
+=======
+    "value": "35bc85d3f64d97ddaa56c6f62c6096cd979b9e0ae1892af4b409fee147de65ea"
+>>>>>>> 67e28c33f (docs(master): RECOVERY-PAUSE-STATUS admission — PAUSE sonrası status recover çaresini bassın)
   }
 }
