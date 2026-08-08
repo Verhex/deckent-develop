@@ -91,6 +91,22 @@ const MESSAGES: MessageMap = {
     en: 'Execute the approved plan through the canonical journey (`deckent do` / the REPL run-flow surface). To consciously discard it and plan fresh anyway, re-run with --force-replan.',
     tr: 'Onaylı planı kanonik yolculukla yürütün (`deckent do` / REPL run-flow yüzeyi). Bilinçli olarak vazgeçip yine de sıfırdan planlamak için --force-replan ile tekrar çalıştırın.',
   },
+  'start.approved_flow_guard.consuming': {
+    en: 'Consuming the approved plan through the canonical run-flow machinery: flow {flowId} · revision {revision} · planDigest {planDigest}. A detached run child executes it; follow with `deckent status` / `deckent watch`.',
+    tr: 'Onaylı plan kanonik run-flow makinesiyle tüketiliyor: flow {flowId} · revizyon {revision} · planDigest {planDigest}. Detached run child yürütüyor; `deckent status` / `deckent watch` ile izleyin.',
+  },
+  'start.approved_flow_guard.consumed_duplicate': {
+    en: 'This approved flow already has a start attempt (state: {state}) — nothing new was started. Follow with `deckent status`.',
+    tr: 'Bu onaylı flow için zaten bir start attempt var (durum: {state}) — yeni bir şey başlatılmadı. `deckent status` ile izleyin.',
+  },
+  'start.approved_flow_guard.multiple': {
+    en: 'Multiple approved, not-yet-executed flows exist — choose one with --consume-approved <flowId>, or discard them consciously with --force-replan.',
+    tr: 'Birden çok onaylı ve yürütülmemiş flow var — --consume-approved <flowId> ile birini seçin ya da --force-replan ile bilinçli vazgeçin.',
+  },
+  'start.approved_flow_guard.v2_required': {
+    en: 'Canonical consumption requires config.terminal.run_flow_v2 = true; enable it and re-run, or use --force-replan to consciously plan fresh.',
+    tr: 'Kanonik tüketim için config.terminal.run_flow_v2 = true gerekir; etkinleştirip yeniden deneyin ya da --force-replan ile bilinçli sıfırdan planlayın.',
+  },
   'start.approved_flow_guard.overridden': {
     en: 'Approved-flow guard overridden via --force-replan — planning fresh; the approved snapshot stays in the store untouched.',
     tr: 'Onaylı-flow koruması --force-replan ile bilinçli geçildi — sıfırdan planlanıyor; onaylı snapshot store\'da dokunulmadan duruyor.',

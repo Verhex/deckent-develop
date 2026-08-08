@@ -34,6 +34,8 @@ import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
 import { loadApprovedSnapshot, loadStartAttempt, listFlowIds, loadRunHandle } from '../../core/run-flow-store.js';
 import { debugLog } from '../../core/utils.js';
+import { startRunFlow, RunFlowDecisionError } from '../../orchestra/run-flow-decision-service.js';
+import { buildFlowStartSpawn } from '../helpers/detached-start.js';
 import { buildTaskCostInput } from '../../core/execution-budget-derivation.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import {
@@ -252,6 +254,8 @@ interface StartCommandOpts {
   forcePromptGate?: boolean;
   /** B1a: consciously bypass the approved-flow guard and plan fresh. */
   forceReplan?: boolean;
+  /** B1b: pick one of several approved flows for canonical consumption. */
+  consumeApproved?: string;
   watch?: boolean;
   timeout?: string;
   forceDirectives?: boolean;
@@ -343,6 +347,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
     .option('--force-scope', 'Bypass the pre-spawn scope gate (allow write paths that do not exist / look like typos)')
     .option('--force-prompt-gate', 'Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch)')
     .option('--force-replan', 'Consciously bypass the approved-flow guard: plan fresh even though an approved, not-yet-executed RunFlow snapshot exists')
+    .option('--consume-approved <flowId>', 'B1b: consume a specific approved, not-yet-executed RunFlow snapshot through the canonical run-flow machinery (needed only when several approved flows exist)')
     .option('--watch', 'Automatically open watch mode after sprint spawns workers')
     .option('--timeout <ms>', 'Sprint timeout in milliseconds (default: 30 minutes)')
     .option('--force-directives', 'Override existing DIRECTIVES.md in zero-config mode')
@@ -798,6 +803,70 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           if (approvedUnconsumed.length > 0) {
             if (opts.forceReplan === true) {
               print(getMessage('start.approved_flow_guard.overridden', lang));
+            } else if (config.terminal?.run_flow_v2 === true
+              && (approvedUnconsumed.length === 1 || opts.consumeApproved !== undefined)) {
+              // ─── B1b: canonical consumption (owner cümlesi: "onu tüketsin") ──
+              // The SINGLE approved flow (or the one picked via
+              // --consume-approved) is executed through the SAME machinery the
+              // REPL/do journey uses — startRunFlow → detached exact child with
+              // full CAS capability. No replan, no twin code path.
+              const picked = opts.consumeApproved !== undefined
+                ? approvedUnconsumed.find((snap) => snap?.flowId === opts.consumeApproved)
+                : approvedUnconsumed[0];
+              if (!picked) {
+                printError(new Error(getMessage('start.approved_flow_guard.multiple', lang)));
+                process.exitCode = 1;
+                return;
+              }
+              print(getMessage('start.approved_flow_guard.consuming', lang, {
+                flowId: picked.flowId,
+                revision: String(picked.revision),
+                planDigest: picked.planDigest.slice(0, 16),
+              }));
+              try {
+                const started = startRunFlow(root, picked.flowId, {
+                  lineage: {
+                    tenantId: picked.proposal?.tenant ?? 'local',
+                    actor: picked.approvedBy,
+                    origin: 'cli',
+                    correlationId: picked.flowId,
+                    idempotencyKey: `start:${picked.flowId}:r${picked.revision}`,
+                    sourceId: 'cli:start-consume',
+                    authorization: { kind: 'approved-actor' },
+                  },
+                  spawnStart: buildFlowStartSpawn(root, picked.revision, picked.planDigest),
+                });
+                if (started.status === 'noop-duplicate') {
+                  print(getMessage('start.approved_flow_guard.consumed_duplicate', lang, {
+                    state: started.attempt.state,
+                  }));
+                }
+              } catch (err) {
+                if (err instanceof RunFlowDecisionError) {
+                  printError(err);
+                  process.exitCode = 1;
+                  return;
+                }
+                throw err;
+              }
+              return;
+            } else if (config.terminal?.run_flow_v2 === true && approvedUnconsumed.length > 1) {
+              const SHOWN = 3;
+              print(getMessage('start.approved_flow_guard.header', lang, {
+                count: String(approvedUnconsumed.length),
+              }));
+              for (const snap of approvedUnconsumed.slice(0, SHOWN)) {
+                if (!snap) continue;
+                print(getMessage('start.approved_flow_guard.flow_line', lang, {
+                  flowId: snap.flowId,
+                  revision: String(snap.revision),
+                  planDigest: snap.planDigest.slice(0, 16),
+                  approvedAt: snap.approvedAt,
+                }));
+              }
+              print(getMessage('start.approved_flow_guard.multiple', lang));
+              process.exitCode = 1;
+              return;
             } else {
               const SHOWN = 3;
               print(getMessage('start.approved_flow_guard.header', lang, {
@@ -818,6 +887,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                 }));
               }
               print(getMessage('start.approved_flow_guard.remedy', lang));
+              print(getMessage('start.approved_flow_guard.v2_required', lang));
               process.exitCode = 1;
               return;
             }
