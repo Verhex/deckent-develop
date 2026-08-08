@@ -121,8 +121,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-06 (485a): +4 dashboard overlay tests — same 12480, digest only.
   // 2026-08-06 (P1d): +1 config-carry fixture test. Prior: 485a (12480).
   // 2026-08-07 (P1e): +2 end-to-end denial pins. Prior: P1d (12481).
-  count: 12493,
-  digest: 'c7ff5a4810297b67328eb67d56351c826ea55de8cb17d7c80d7d00e2e4b238b9',
+  count: 12495,
+  digest: '1b55eb98642e0e0b73ce9dafca7058aae0b767971c1eca647d78135ba5d556fd',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -140,7 +140,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-06 (P1c): CLI plan identity conversion — same 1198, digest only.
   // 2026-08-06 (P1d): config carry line + type decls — same 1198, digest only.
   count: 1202,
-  digest: 'c59f7d55d851a65f34f9da23b06880a62a0d0b0c895597dcf5642830b5dc88b6',
+  digest: 'f76ecb4ca0762026a43f9a98123c3b1653c287cefd91bb745ff45ab7690e1c71',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
