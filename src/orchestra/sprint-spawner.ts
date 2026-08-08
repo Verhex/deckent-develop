@@ -4,13 +4,14 @@
 //   routeSprintTasks()
 
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
 // ─── Core (value imports — enums used at runtime) ──────────────────
 import {
-  TaskStatus, AgentStatus,
+  TaskStatus, AgentStatus, SprintPhase,
 } from '../core/types.js';
+import { BrainError } from './sprint-lifecycle.js';
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
@@ -604,6 +605,7 @@ export async function spawnWorkers(
   if (spawnOpts?.exactPlanAuthority) {
     assertExactPlanDependencies(sprint.tasks);
   }
+
   const depNorm = spawnOpts?.exactPlanAuthority
     ? { resolvedCount: 0, dropped: [] }
     : normalizePlannerDependencies(sprint.tasks);
@@ -2373,3 +2375,58 @@ export type {
   CascadeTransitionEvent,
   CascadeEventCallback,
 } from './dependency-scheduler.js';
+
+
+// ═══ KN3 — task projection parity (GR-2026-08-08-DOGFOOD-KN3-01) ════════════
+
+export class TaskProjectionParityError extends BrainError {
+  constructor(sprintId: string, missingOnDisk: string[], strayOnDisk: string[]) {
+    const parts: string[] = [
+      `Task projection diverged for ${sprintId}: the in-memory plan and the on-disk .tasks/ files do not agree.`,
+    ];
+    if (missingOnDisk.length > 0) parts.push(`planned but MISSING on disk: [${missingOnDisk.join(', ')}]`);
+    if (strayOnDisk.length > 0) parts.push(`on disk but NOT in this plan: [${strayOnDisk.join(', ')}]`);
+    parts.push(
+      'Remedy: re-plan through deckent (`deckent plan` → approval) so the projection is rewritten atomically. '
+      + 'Do NOT hand-delete task files.',
+    );
+    super(parts.join(' '), SprintPhase.SPAWN);
+    this.name = 'TaskProjectionParityError';
+  }
+}
+
+/**
+ * Compare the planned task-id set against the on-disk task files. Both
+ * directions are integrity failures: a planned id with no file means workers
+ * have nothing to claim (the vacuous-spawn hollow sprint); a file sharing a
+ * planned id's sprint-segment but absent from the plan means an abandoned
+ * projection would leak into this run. The sprint segment is derived from the
+ * PLANNED ids themselves (the leading `NNN-` segment), never from the sprint
+ * id string — sprint ids are free-form. Cross-sprint files are ignored (same
+ * rule as the planner's orphan cleanup).
+ */
+export function assertTaskProjectionParity(projectRoot: string, sprint: Sprint): void {
+  const tasksPath = join(projectRoot, TASKS_DIR);
+  const plannedIds = new Set(sprint.tasks.map((t) => t.id));
+  if (plannedIds.size === 0) return; // nothing planned — nothing to compare
+
+  const missingOnDisk = [...plannedIds]
+    .filter((id) => !existsSync(join(tasksPath, `task-${id}.json`)))
+    .sort();
+
+  // Stray scan: only files whose leading segment matches a PLANNED id's
+  // leading segment (this sprint's namespace) participate.
+  const segments = new Set([...plannedIds].map((id) => id.split('-')[0]));
+  let strayOnDisk: string[] = [];
+  if (existsSync(tasksPath)) {
+    strayOnDisk = readdirSync(tasksPath)
+      .filter((f) => f.startsWith('task-') && f.endsWith('.json'))
+      .map((f) => f.slice('task-'.length, -'.json'.length))
+      .filter((id) => segments.has(id.split('-')[0]!) && !plannedIds.has(id))
+      .sort();
+  }
+
+  if (missingOnDisk.length > 0 || strayOnDisk.length > 0) {
+    throw new TaskProjectionParityError(sprint.id, missingOnDisk, strayOnDisk);
+  }
+}

@@ -185,7 +185,7 @@ import {
 // applyCascadeToSprint + applyUnblockToSprint were exported from
 // sprint-spawner but had no runtime caller. Wired here so NO_GO →
 // dependents PAUSED and DONE → dependents PENDING actually fire.
-import { applyCascadeToSprint, applyUnblockToSprint, respawnEligibleTasks } from './sprint-spawner.js';
+import { applyCascadeToSprint, applyUnblockToSprint, respawnEligibleTasks, assertTaskProjectionParity } from './sprint-spawner.js';
 import { writeEvent, getCurrentSprintId, readEvents, SCOPE_INSUFFICIENT_CHANNEL } from './event-stream.js';
 import { verifyProofOfFunction } from './proof-of-function.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
@@ -1186,6 +1186,17 @@ export async function runSpawnPhase(
       // before workers are spawned. Status remains whatever planSprint
       // emitted (PLANNING) until ACTIVE flips after a successful spawn.
       persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, sprint.status);
+      // KN3 (GR-2026-08-08-DOGFOOD-KN3-01): projection-parity guard at the
+      // canonical SPAWN entry. The 2026-08-07 smoke measured the in-memory
+      // plan diverging from on-disk task files (an abandoned plan's files
+      // survived): spawn "succeeded" vacuously, EXECUTE ran hollow and the
+      // summary printed "All tasks complete" — only the terminal evidence
+      // hold stopped the false settle. Task FILES are the claim surface
+      // workers operate on, so divergence is an integrity failure. Both
+      // production plan paths (planSprint task-write; exact-plan artifact
+      // projection) write files BEFORE this point; parity keeps behaviour
+      // byte-identical. FIX/re-dispatch respawns are typed remaining scope.
+      assertTaskProjectionParity(projectRoot, sprint);
       taskQueue = await spawnWorkers(projectRoot, sprint, config, {
         autoApprove: opts?.autoApprove,
         spawnBackend,
