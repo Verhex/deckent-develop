@@ -78,6 +78,10 @@ export type WorkAttributionEvidence =
       readonly state: 'HOLD' | 'UNAVAILABLE';
       readonly evidenceRef?: string | null;
       readonly reasonCode: string;
+      /** RCPT-1: paths the attempt CLAIMED to touch (e.g. out-of-scope claim
+       *  list). Enables resolution-aware cleanup eligibility; absence means
+       *  the claims are unknown and eligibility fails closed. */
+      readonly claimedPaths?: readonly string[];
     };
 
 export interface ExactAttemptEvidence<TResult = unknown> {
@@ -170,6 +174,12 @@ export interface AttributionExclusion {
   readonly reasonCode: string;
   readonly evidenceRef: string | null;
   readonly resultPayloadExcluded: boolean;
+  /** RCPT-1: the attempt's claimed paths, when its attribution carried them. */
+  readonly claimedPaths?: readonly string[];
+  /** RCPT-1 (owner karar-turu 2026-08-08): true when a later VERIFIED
+   *  resolution superseded this exclusion — it stays journaled as evidence
+   *  but no longer blocks cleanup eligibility. */
+  readonly supersededByVerifiedResolution?: boolean;
 }
 
 export interface VerifiedAttributionProjection {
@@ -573,6 +583,9 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
           reasonCode: attempt.attribution.reasonCode,
           evidenceRef: attempt.attribution.evidenceRef ?? null,
           resultPayloadExcluded: attempt.result.state !== 'ABSENT',
+          ...(attempt.attribution.claimedPaths !== undefined
+            ? { claimedPaths: [...attempt.attribution.claimedPaths].sort() }
+            : {}),
         });
       }
     }
@@ -705,6 +718,38 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
       || left.code.localeCompare(right.code)
       || (left.evidenceId ?? '').localeCompare(right.evidenceId ?? ''));
 
+  // ─── RCPT-1 (owner karar-turu 2026-08-08): resolution-aware exclusions ──
+  // An attribution exclusion used to block cleanup FOREVER — which meant no
+  // FIX-recovered sprint could ever settle (measured on the first full-pass
+  // run: one mid-lineage CLAIM_OUTSIDE_WRITE_SCOPE hold kept a 2/2-DONE
+  // sprint at exit=1). An exclusion is now DEMOTED to journaled evidence —
+  // it stays in the receipt, flagged — when ALL of the following hold:
+  //   1. its logical task COMPLETED (a verified resolution exists),
+  //   2. the excluded attempt is NOT the resolving attempt itself,
+  //   3. its claimed paths are KNOWN (unknown claims fail closed), and
+  //   4. every claimed path is covered by the sprint's union of VERIFIED
+  //      attributions (someone accountable owns that path's final state).
+  const completedByTask = new Map(mutable.logicalTasks
+    .filter(item => item.state === 'COMPLETED')
+    .map(item => [item.logicalTaskId, item]));
+  const verifiedPathUnion = new Set<string>();
+  for (const done of mutable.completed) {
+    for (const attribution of done.verifiedAttribution) {
+      for (const path of attribution.filesChanged) verifiedPathUnion.add(path);
+    }
+  }
+  mutable.exclusions = mutable.exclusions.map(exclusion => {
+    const lineage = completedByTask.get(exclusion.logicalTaskId);
+    if (!lineage || lineage.resolvingAttempt === null) return exclusion;
+    if (identityKey(lineage.resolvingAttempt) === identityKey(exclusion.identity)) return exclusion;
+    if (exclusion.claimedPaths === undefined) return exclusion;
+    const covered = exclusion.claimedPaths.every(path => verifiedPathUnion.has(path));
+    if (!covered) return exclusion;
+    return { ...exclusion, supersededByVerifiedResolution: true };
+  });
+  const blockingExclusions = mutable.exclusions
+    .filter(exclusion => exclusion.supersededByVerifiedResolution !== true);
+
   const cleanupReasons = new Set<CleanupBlockReason>();
   if (groups.size === 0) cleanupReasons.add('NO_LOGICAL_TASKS');
   if (mutable.logicalTasks.some(item => item.state !== 'COMPLETED')) {
@@ -712,7 +757,7 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
   }
   if (mutable.unsettled.length > 0) cleanupReasons.add('ACTIVE_OR_UNSETTLED_ATTEMPT');
   if (mutable.partial.length > 0) cleanupReasons.add('PARTIAL_RESULT');
-  if (mutable.exclusions.length > 0) cleanupReasons.add('ATTRIBUTION_EXCLUDED');
+  if (blockingExclusions.length > 0) cleanupReasons.add('ATTRIBUTION_EXCLUDED');
   if (coordinatorEvidence.some(item => item.requiredForCleanup && item.state !== 'VERIFIED')) {
     cleanupReasons.add('COORDINATOR_EVIDENCE_INCOMPLETE');
   }

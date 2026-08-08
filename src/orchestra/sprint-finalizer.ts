@@ -1197,6 +1197,10 @@ export interface TestModeSprintTerminalSettlement {
   readonly terminalTruth: FinalizerTerminalTruth;
 }
 
+/** RCPT-1: receipt detail bound — enough for any real fix cascade while
+ *  keeping the artifact small; the full list stays in terminal evidence. */
+const RECEIPT_EXCLUSION_DETAIL_LIMIT = 20;
+
 interface PersistedSprintTerminalReceipt {
   readonly version: 1;
   readonly terminalOutcome: SprintTerminalOutcome;
@@ -1204,7 +1208,7 @@ interface PersistedSprintTerminalReceipt {
   readonly receipt: SprintTerminalReceiptV1;
   readonly terminalEvidence: Pick<
     SprintTerminalEvidence<TaskResult>,
-    'version' | 'summary' | 'cleanupEligibility' | 'holds'
+    'version' | 'summary' | 'cleanupEligibility' | 'holds' | 'attributionExclusions'
   >;
   readonly logicalProgress: LogicalProgressProjection;
   readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
@@ -1408,6 +1412,21 @@ function terminalAttemptEvidence(
       : {
           state: work.state,
           reasonCode: work.reasonCode ?? 'ATTRIBUTION_AUTHORITY_UNAVAILABLE',
+          // RCPT-1: carry the attempt's KNOWN claims so resolution-aware
+          // cleanup eligibility can decide; a held attribution's claim set is
+          // the out-of-scope list (the honest-gate's own evidence) unioned
+          // with whatever the result itself claims to have changed. Unknown
+          // claims (no result / no lists) stay absent → eligibility fails
+          // closed for that exclusion.
+          ...(result?.workAttribution?.claimedOutsideScope !== undefined
+            || (result?.filesChanged?.length ?? 0) > 0
+            ? {
+                claimedPaths: [...new Set([
+                  ...(result?.workAttribution?.claimedOutsideScope ?? []),
+                  ...(result?.filesChanged ?? []),
+                ].filter(Boolean))].sort(),
+              }
+            : {}),
         };
 
     return {
@@ -1672,6 +1691,11 @@ function publishFencedTerminalReceipt(
       summary: terminalEvidence.summary,
       cleanupEligibility: terminalEvidence.cleanupEligibility,
       holds: terminalEvidence.holds,
+      // RCPT-1: bounded exclusion DETAIL — the receipt used to carry only a
+      // count, so diagnosing a cleanup block meant task-file archaeology.
+      // Each record names the attempt, the reason, the claimed paths and
+      // whether a verified resolution superseded it.
+      attributionExclusions: terminalEvidence.attributionExclusions.slice(0, RECEIPT_EXCLUSION_DETAIL_LIMIT),
     },
     logicalProgress: input.truth.logicalProgress,
     lineageUsage: input.truth.lineageUsage,

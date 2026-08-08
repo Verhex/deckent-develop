@@ -398,3 +398,98 @@ describe('assembleSprintTerminalEvidence', () => {
     expect(forward.coordinatorEvidence.map(item => item.evidenceId)).toEqual(['a-first', 'z-last']);
   });
 });
+
+// ═══ RCPT-1 (GR-2026-08-08-DOGFOOD-RCPT1-01) — resolution-aware exclusions ══
+// Measured on the first full-pass cold-start run: a mid-lineage
+// CLAIM_OUTSIDE_WRITE_SCOPE hold kept a 2/2-DONE sprint permanently
+// cleanup-ineligible — no FIX-recovered sprint could ever settle. An exclusion
+// now demotes to journaled evidence when the lineage completed, the excluded
+// attempt is not the resolver, and every claimed path is covered by the
+// sprint's union of VERIFIED attributions. Everything else stays fail-closed.
+describe('RCPT-1 — resolution-aware attribution exclusions', () => {
+  const heldAttempt = (input: {
+    identity: ExactAttemptIdentity;
+    logicalTaskId: string;
+    claimedPaths?: readonly string[];
+  }): ExactAttemptEvidence<ResultPayload> => ({
+    logicalTaskId: input.logicalTaskId,
+    identity: input.identity,
+    authority: {
+      state: 'TERMINAL',
+      verdict: 'NO_GO',
+      evidenceRef: `settlement:${input.identity.attemptId}`,
+    },
+    result: {
+      state: 'COMPLETE',
+      verdict: 'NO_GO',
+      evidenceRef: `result:${input.identity.attemptId}`,
+      payload: { marker: 'held' },
+    },
+    attribution: {
+      state: 'HOLD',
+      reasonCode: 'CLAIM_OUTSIDE_WRITE_SCOPE',
+      ...(input.claimedPaths !== undefined ? { claimedPaths: input.claimedPaths } : {}),
+    },
+  });
+
+  // The full-pass run's exact shape: first attempt held out-of-scope, the
+  // fix resolves the lineage, and the claimed path is verified elsewhere.
+  it('demotes a superseded, path-covered exclusion — sprint becomes cleanup-eligible', () => {
+    const held = heldAttempt({
+      identity: A1,
+      logicalTaskId: 'logical-485-001',
+      claimedPaths: ['src/orchestra/example.ts'], // covered by the fix's verified attribution
+    });
+    const resolver = completedAttempt({
+      identity: A2, verdict: 'DONE', marker: 'fixed', supersedes: A1,
+    });
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held, resolver], coordinatorEvidence: [],
+    });
+    expect(evidence.attributionExclusions).toHaveLength(1);
+    expect(evidence.attributionExclusions[0]!.supersededByVerifiedResolution).toBe(true);
+    expect(evidence.cleanupEligibility.reasons).not.toContain('ATTRIBUTION_EXCLUDED');
+    expect(evidence.cleanupEligibility.candidate).toBe(true);
+  });
+
+  it('UNKNOWN claims fail closed — no claimedPaths means the exclusion still blocks', () => {
+    const held = heldAttempt({ identity: A1, logicalTaskId: 'logical-485-001' });
+    const resolver = completedAttempt({
+      identity: A2, verdict: 'DONE', marker: 'fixed', supersedes: A1,
+    });
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held, resolver], coordinatorEvidence: [],
+    });
+    expect(evidence.attributionExclusions[0]!.supersededByVerifiedResolution).not.toBe(true);
+    expect(evidence.cleanupEligibility.reasons).toContain('ATTRIBUTION_EXCLUDED');
+    expect(evidence.cleanupEligibility.candidate).toBe(false);
+  });
+
+  it('an UNCOVERED claimed path still blocks — nobody accountable owns it', () => {
+    const held = heldAttempt({
+      identity: A1,
+      logicalTaskId: 'logical-485-001',
+      claimedPaths: ['src/somewhere/never-verified.ts'],
+    });
+    const resolver = completedAttempt({
+      identity: A2, verdict: 'DONE', marker: 'fixed', supersedes: A1,
+    });
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held, resolver], coordinatorEvidence: [],
+    });
+    expect(evidence.cleanupEligibility.reasons).toContain('ATTRIBUTION_EXCLUDED');
+  });
+
+  it('an UNRESOLVED lineage keeps its exclusion blocking (no verified resolution exists)', () => {
+    const held = heldAttempt({
+      identity: A1,
+      logicalTaskId: 'logical-485-001',
+      claimedPaths: ['src/orchestra/example.ts'],
+    });
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held], coordinatorEvidence: [],
+    });
+    expect(evidence.attributionExclusions[0]!.supersededByVerifiedResolution).not.toBe(true);
+    expect(evidence.cleanupEligibility.candidate).toBe(false);
+  });
+});
