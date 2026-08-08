@@ -140,7 +140,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-06 (P1c): CLI plan identity conversion — same 1198, digest only.
   // 2026-08-06 (P1d): config carry line + type decls — same 1198, digest only.
   count: 1202,
-  digest: 'd319b5d097e20eb79fd9132d5b801b0b3b51ab3425ea5745e67bc57fee4dac97',
+  digest: 'f6472cc13c4306b997298e3f2bbbe38f4fbce2b02e19c04ede1caa72d82e5522',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
