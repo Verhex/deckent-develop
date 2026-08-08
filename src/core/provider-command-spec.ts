@@ -260,3 +260,96 @@ export function resolveToolScopeEnforcement(
   }
   return { flagEnforced: true, reasonCode: 'ENFORCED_FLAG_PRESENT' };
 }
+
+// ═══ TOOL-AUTHORITY-001 filesystem-write-guard — Bash-defeats-Write escape ═══
+// T1 (above) surfaces whether a write-scope reaches the CLI as a tool flag at
+// all. This sibling surfaces the COMPLEMENTARY axis: even when the flag IS
+// present and Write()/Edit() are dutifully path-scoped, buildDockerAllowedTools
+// (spawn-backend-docker.ts) and sprint-spawner.ts UNCONDITIONALLY co-grant a
+// bare, unscoped `Bash` — and a shell can `echo > f`, `tee`, `rm`, `mv` anywhere,
+// so the path-scope is defeated at the filesystem level (ADR-G-020 write-scope
+// is advisory in practice). This predicate makes that escape typed + auditable
+// on the TASK_ASSIGN event. It is DELIBERATELY advisory (ADR-G-020 advisory-mode,
+// same class as T1): real enforcement — dropping or command-scoping the shell
+// grant, or a container fs-guard — is a named residual on TOOL-AUTHORITY-001,
+// not this slice. The verdict is derivation-robust: BOTH the docker and
+// sprint-spawner derivations co-grant unscoped Bash alongside scoped Write, so
+// the escape holds regardless of which one produced the string (their only
+// divergence is write-TARGET content, not the shell co-grant).
+
+/** Tool identifiers that grant an UNSCOPED, filesystem-write-capable shell.
+ *  A bare `Bash` grant defeats Write()/Edit() path-scoping; a hypothetical
+ *  command-scoped `Bash(<allowlist>)` grant is a different axis and is NOT
+ *  treated as an unscoped escape here. */
+const UNSCOPED_SHELL_WRITE_TOOLS = ['Bash'] as const;
+
+export type WriteScopeShellEscapeReason =
+  | 'NO_WRITE_GRANT'
+  | 'WRITE_GRANT_UNSCOPED'
+  | 'WRITE_SCOPE_TOOL_BOUND'
+  | 'WRITE_SCOPE_DEFEATED_BY_SHELL';
+
+export interface WriteScopeShellEscape {
+  /** True ONLY for WRITE_SCOPE_DEFEATED_BY_SHELL — a path-scoped write authority
+   *  coexists with an unscoped shell that can write outside it. */
+  readonly escaped: boolean;
+  readonly reasonCode: WriteScopeShellEscapeReason;
+  /** The unscoped shell tool(s) granted, for the audit trail. */
+  readonly shellTools: readonly string[];
+  /** Whether the task declared a real filesWrite scope (vs only the default
+   *  `.tasks/` heartbeat target) — audit context, does not change the verdict. */
+  readonly declaredScope: boolean;
+}
+
+/** Split a `--allowedTools` string into top-level tool tokens, respecting the
+ *  parentheses of a scoped grant so the commas INSIDE `Write(a,b)` do not split
+ *  the token. */
+function splitAllowedToolTokens(allowedTools: string): string[] {
+  const tokens: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < allowedTools.length; i += 1) {
+    const ch = allowedTools[i];
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (ch === ',' && depth === 0) {
+      tokens.push(allowedTools.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  tokens.push(allowedTools.slice(start).trim());
+  return tokens.filter((t) => t.length > 0);
+}
+
+/**
+ * Resolve whether a worker's granted tool surface lets it escape its declared
+ * write-scope through an unscoped shell. Parses the ACTUAL `--allowedTools`
+ * grant string (the bytes the provider CLI receives): a path-scoped
+ * `Write(...)`/`Edit(...)` co-granted with a bare unscoped shell is escapable
+ * (WRITE_SCOPE_DEFEATED_BY_SHELL); a bare `Write`/`Edit` is itself unscoped so
+ * there is nothing narrower to defeat (WRITE_GRANT_UNSCOPED); a path-scoped
+ * write with no shell holds at the tool level (WRITE_SCOPE_TOOL_BOUND); no write
+ * authority at all is NO_WRITE_GRANT. Pure — exported for unit tests.
+ */
+export function resolveWriteScopeShellEscape(
+  allowedTools: string | undefined,
+  writeScope: readonly string[] | undefined,
+): WriteScopeShellEscape {
+  const declaredScope = (writeScope ?? []).some((p) => typeof p === 'string' && p.trim().length > 0);
+  const tokens = splitAllowedToolTokens(allowedTools ?? '');
+  const shellTools = UNSCOPED_SHELL_WRITE_TOOLS.filter((shell) => tokens.includes(shell));
+  const writeTokens = tokens.filter((t) => /^(?:Write|Edit)\b/.test(t));
+  if (writeTokens.length === 0) {
+    return { escaped: false, reasonCode: 'NO_WRITE_GRANT', shellTools, declaredScope };
+  }
+  // A write token is path-scoped iff it carries a non-empty parenthesized arg.
+  const hasScopedWrite = writeTokens.some((t) => /^(?:Write|Edit)\(\s*[^)]/.test(t));
+  const hasUnscopedWrite = writeTokens.some((t) => /^(?:Write|Edit)$/.test(t));
+  if (hasUnscopedWrite && !hasScopedWrite) {
+    return { escaped: false, reasonCode: 'WRITE_GRANT_UNSCOPED', shellTools, declaredScope };
+  }
+  if (shellTools.length > 0) {
+    return { escaped: true, reasonCode: 'WRITE_SCOPE_DEFEATED_BY_SHELL', shellTools, declaredScope };
+  }
+  return { escaped: false, reasonCode: 'WRITE_SCOPE_TOOL_BOUND', shellTools, declaredScope };
+}

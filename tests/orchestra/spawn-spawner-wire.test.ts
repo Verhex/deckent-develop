@@ -405,6 +405,33 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     expect(payload.toolScope!.reasonCode).toBe('ENFORCED_FLAG_PRESENT');
   });
 
+  // TOOL-AUTHORITY-001 filesystem-write-guard: a write-scoped worker's grant
+  // path-scopes Write/Edit but co-grants unscoped Bash — TASK_ASSIGN carries
+  // that escape truth so ADR-G-020's write-scope is not silently advisory.
+  it('TASK_ASSIGN carries writeScopeShellEscape (scoped Write + unscoped Bash → DEFEATED_BY_SHELL)', async () => {
+    const scopedTask = createTask('168-W25-WG', ['src/guarded.ts']);
+    persistTasks([scopedTask]);
+    const sprint = makeSprint('sprint-168', [scopedTask]);
+    const backend = makeMockBackend();
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend });
+    } finally {
+      process.chdir(origCwd);
+    }
+    const assign = readEvents(testRoot, 'sprint-168')
+      .filter(e => e.channel === CHANNELS.TASK_ASSIGN);
+    const payload = assign[0]!.payload as {
+      writeScopeShellEscape?: { escaped: boolean; reasonCode: string; shellTools: string[]; declaredScope: boolean };
+    };
+    expect(payload.writeScopeShellEscape).toBeDefined();
+    expect(payload.writeScopeShellEscape!.escaped).toBe(true);
+    expect(payload.writeScopeShellEscape!.reasonCode).toBe('WRITE_SCOPE_DEFEATED_BY_SHELL');
+    expect(payload.writeScopeShellEscape!.shellTools).toEqual(['Bash']);
+    expect(payload.writeScopeShellEscape!.declaredScope).toBe(true);
+  });
+
   it('non-colliding tasks proceed normally after a collision blocks others', async () => {
     const colliderA = createTask('168-W25-F', ['src/collide.ts']);
     const colliderB = createTask('168-W25-G', ['src/collide.ts']);
