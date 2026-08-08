@@ -236,11 +236,35 @@ function runStatusReadModelSurface(
     : { state: 'unavailable-or-stale' };
 }
 
-function requiresPersistedRunStatusReadModel(authority: CanonicalRunStatus): boolean {
+export function requiresPersistedRunStatusReadModel(authority: CanonicalRunStatus): boolean {
+  // RECOVERY-PAUSE-STATUS-001 (smoke 2026-08-07): PAUSED is intentionally NOT
+  // here. A typed-PAUSED authority is a RECONCILED state that already carries
+  // lifecycle/reason/recoveryCommand — requiring a republished read-model only
+  // produced RUN_STATUS_READ_MODEL_UNAVAILABLE and hid the recover remedy. The
+  // JSON fall-through renders the authority (with recoveryCommand); the human
+  // paths short-circuit to a paused banner (below). ORPHANED stays — it is a
+  // CONTESTED state (the authority emits conflicts[]) where the born-688
+  // read-model safety still earns its keep.
   return authority.active
     || authority.resumable
-    || authority.lifecycle === 'PAUSED'
     || authority.lifecycle === 'ORPHANED';
+}
+
+/**
+ * RECOVERY-PAUSE-STATUS-001: the run-level paused banner for the human status
+ * surface. formatHumanStatus only renders paused TASKS; a typed PAUSE also
+ * needs the run-level reason + the exact recover command, sourced from the
+ * authority (never guessed). Mirrors start.ts's renderPausedRun contract.
+ */
+export function formatPausedRunBanner(authority: CanonicalRunStatus, lang: string): string {
+  const sprintId = authority.sprintId ?? '';
+  const title = getMessage('pause.notification_title', lang, { sprintId });
+  const summary = getMessage('pause.notification_summary', lang, {
+    reason: authority.reason ?? authority.status ?? '',
+    command: authority.recoveryCommand ?? `deckent recover ${sprintId} --resume`,
+  });
+  return `${title}
+${summary}`;
 }
 
 function isQuiescentRunAuthority(authority: CanonicalRunStatus): boolean {
@@ -1044,6 +1068,23 @@ export function registerStatus(
       const lang = getLangFromRoot(root);
       const resolvedMode = opts.mode ? resolveOutputMode(opts.mode) : undefined;
       const jsonMode = opts.json === true || resolvedMode === 'json';
+
+      // RECOVERY-PAUSE-STATUS-001: a typed-PAUSED run is rendered from the
+      // authority BEFORE any dashboard/task-file branching. Earlier the
+      // no-dashboard path printed "No active run" and swallowed the paused
+      // state + recover command entirely (measured: pause-state.json present,
+      // no .dashboard). The human banner carries the run-level remedy
+      // formatHumanStatus does not; the JSON path already renders the paused
+      // authority (recoveryCommand included) via buildStatusJsonSnapshot below.
+      if (!jsonMode && !opts.watch && !opts.follow && !opts.graph && !opts.raw) {
+        const pausedAuthority = readCanonicalRunStatus(root);
+        if (pausedAuthority.lifecycle === 'PAUSED') {
+          print(formatPausedRunBanner(pausedAuthority, lang));
+          const pendingPaused = buildPendingApprovalsSection(root, lang);
+          if (pendingPaused) print(pendingPaused);
+          return;
+        }
+      }
 
       if (opts.graph && jsonMode) {
         const sprintId = getCurrentSprintId(root);
