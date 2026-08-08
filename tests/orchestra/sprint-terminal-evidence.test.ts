@@ -398,3 +398,130 @@ describe('assembleSprintTerminalEvidence', () => {
     expect(forward.coordinatorEvidence.map(item => item.evidenceId)).toEqual(['a-first', 'z-last']);
   });
 });
+
+// ═══ RCPT-1 (GR-2026-08-08-DOGFOOD-RCPT1-01) — resolution-aware exclusions ══
+// Measured on the first full-pass cold-start run: a mid-lineage
+// CLAIM_OUTSIDE_WRITE_SCOPE hold kept a 2/2-DONE sprint permanently
+// cleanup-ineligible — no FIX-recovered sprint could ever settle. An exclusion
+// now demotes to journaled evidence when the lineage completed, the excluded
+// attempt is not the resolver, and every claimed path is covered by the
+// sprint's union of VERIFIED attributions. Everything else stays fail-closed.
+describe('RCPT-1 — resolution-aware attribution exclusions', () => {
+  const heldAttempt = (input: {
+    identity: ExactAttemptIdentity;
+    logicalTaskId: string;
+    claimedPaths?: readonly string[];
+  }): ExactAttemptEvidence<ResultPayload> => ({
+    logicalTaskId: input.logicalTaskId,
+    identity: input.identity,
+    authority: {
+      state: 'TERMINAL',
+      verdict: 'NO_GO',
+      evidenceRef: `settlement:${input.identity.attemptId}`,
+    },
+    result: {
+      state: 'COMPLETE',
+      verdict: 'NO_GO',
+      evidenceRef: `result:${input.identity.attemptId}`,
+      payload: { marker: 'held' },
+    },
+    attribution: {
+      state: 'HOLD',
+      reasonCode: 'CLAIM_OUTSIDE_WRITE_SCOPE',
+      ...(input.claimedPaths !== undefined ? { claimedPaths: input.claimedPaths } : {}),
+    },
+  });
+
+  // The full-pass run's exact shape: first attempt held out-of-scope, the
+  // fix resolves the lineage, and the claimed path is verified elsewhere.
+  it('demotes a superseded, path-covered exclusion — sprint becomes cleanup-eligible', () => {
+    const held = heldAttempt({
+      identity: A1,
+      logicalTaskId: 'logical-485-001',
+      claimedPaths: ['src/orchestra/example.ts'], // covered by the fix's verified attribution
+    });
+    const resolver = completedAttempt({
+      identity: A2, verdict: 'DONE', marker: 'fixed', supersedes: A1,
+    });
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held, resolver], coordinatorEvidence: [],
+    });
+    expect(evidence.attributionExclusions).toHaveLength(1);
+    expect(evidence.attributionExclusions[0]!.supersededByVerifiedResolution).toBe(true);
+    expect(evidence.cleanupEligibility.reasons).not.toContain('ATTRIBUTION_EXCLUDED');
+    expect(evidence.cleanupEligibility.candidate).toBe(true);
+  });
+
+  it('UNKNOWN claims fail closed — no claimedPaths means the exclusion still blocks', () => {
+    const held = heldAttempt({ identity: A1, logicalTaskId: 'logical-485-001' });
+    const resolver = completedAttempt({
+      identity: A2, verdict: 'DONE', marker: 'fixed', supersedes: A1,
+    });
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held, resolver], coordinatorEvidence: [],
+    });
+    expect(evidence.attributionExclusions[0]!.supersededByVerifiedResolution).not.toBe(true);
+    expect(evidence.cleanupEligibility.reasons).toContain('ATTRIBUTION_EXCLUDED');
+    expect(evidence.cleanupEligibility.candidate).toBe(false);
+  });
+
+  it('an UNCOVERED claimed path still blocks — nobody accountable owns it', () => {
+    const held = heldAttempt({
+      identity: A1,
+      logicalTaskId: 'logical-485-001',
+      claimedPaths: ['src/somewhere/never-verified.ts'],
+    });
+    const resolver = completedAttempt({
+      identity: A2, verdict: 'DONE', marker: 'fixed', supersedes: A1,
+    });
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held, resolver], coordinatorEvidence: [],
+    });
+    expect(evidence.cleanupEligibility.reasons).toContain('ATTRIBUTION_EXCLUDED');
+  });
+
+  // CR6's exact shape: the excluded attempt wrote a file no later DIFF ever
+  // touched again ("already correct, nothing to write") — but the file's
+  // OWNING lineage completed, and its resolver's write scope attests it.
+  it('a claimed path covered only by a COMPLETED resolver WRITE-SCOPE demotes the exclusion (CR6 shape)', () => {
+    const held = heldAttempt({
+      identity: A1,
+      logicalTaskId: 'logical-485-001',
+      claimedPaths: ['src/orchestra/example.ts', 'tests/other.test.ts'],
+    });
+    const resolver = completedAttempt({
+      identity: A2, verdict: 'DONE', marker: 'fixed', supersedes: A1,
+    });
+    const otherOwner: ExactAttemptEvidence<ResultPayload> = {
+      ...completedAttempt({
+        identity: { taskId: '485-002', attemptId: 'attempt-3' },
+        verdict: 'DONE', marker: 'owns-test-file',
+        logicalTaskId: 'logical-485-002',
+      }),
+      // verified DIFF empty (nothing written) — the SCOPE is the attestation
+      attribution: {
+        state: 'VERIFIED', evidenceRef: 'attribution:attempt-3',
+        filesChanged: [], linesAdded: 0, linesRemoved: 0,
+      },
+      writeScope: ['tests/other.test.ts'],
+    };
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held, resolver, otherOwner], coordinatorEvidence: [],
+    });
+    expect(evidence.attributionExclusions[0]!.supersededByVerifiedResolution).toBe(true);
+    expect(evidence.cleanupEligibility.candidate).toBe(true);
+  });
+
+  it('an UNRESOLVED lineage keeps its exclusion blocking (no verified resolution exists)', () => {
+    const held = heldAttempt({
+      identity: A1,
+      logicalTaskId: 'logical-485-001',
+      claimedPaths: ['src/orchestra/example.ts'],
+    });
+    const evidence = assembleSprintTerminalEvidence<ResultPayload>({
+      attempts: [held], coordinatorEvidence: [],
+    });
+    expect(evidence.attributionExclusions[0]!.supersededByVerifiedResolution).not.toBe(true);
+    expect(evidence.cleanupEligibility.candidate).toBe(false);
+  });
+});

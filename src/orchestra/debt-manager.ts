@@ -683,7 +683,16 @@ export function handleEvaluation(
     assignedAgent: fixAgent,
     forceAgent: fixAgent,
     assignedSkills: rotatedSkills,
-    forceSkills: rotatedSkills.length > 0 ? rotatedSkills : undefined,
+    // RCPT-2 (temiz-oda-5 ölçümü): do NOT promote auto-assigned skills to
+    // forceSkills. The forced-skill guard treats forceSkills as an OPERATOR
+    // directive and refuses (fail-closed) when a skill's SKILL.md cannot be
+    // resolved — a temp/auto skill inherited that severity and burned the FIX
+    // budget. Only the parent's genuine forceSkills carry the operator
+    // contract; an unresolvable auto skill falls back to the documented
+    // silent-drop.
+    ...(task.forceSkills !== undefined && task.forceSkills.length > 0
+      ? { forceSkills: [...task.forceSkills] }
+      : {}),
     createdAt: now(),
   };
 
@@ -799,7 +808,10 @@ export function handleCrossDependencies(
           assignedAgent: rotationStrategy.rotatedAgent,
           forceAgent: rotationStrategy.rotatedAgent,
           assignedSkills: rotatedSkills,
-          forceSkills: rotatedSkills.length > 0 ? rotatedSkills : undefined,
+          // RCPT-2: same rule as the primary fix-task site above — no auto→force promotion.
+          ...(depTask.forceSkills !== undefined && depTask.forceSkills.length > 0
+            ? { forceSkills: [...depTask.forceSkills] }
+            : {}),
           createdAt: now(),
         };
         fixTasks.push(fixTask);
