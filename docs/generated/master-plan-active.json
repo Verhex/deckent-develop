@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5a46c8818b4f31c1d93ed5a01651c51533592970d1657cff1259a8503eff0766"
+    "value": "77fdf725a6f14ba49c8d158d70482cd33aaf4553156f27ae3b422ea0035ddc26"
   },
   "summary": {
     "total": 396,
@@ -11,11 +11,11 @@
     "terminal": 47,
     "receipts": 130,
     "byState": {
-      "OPEN": 263,
+      "OPEN": 262,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 19,
+      "VERIFY": 20,
       "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2467,10 +2467,10 @@
       "id": "EVAL-NOCHANGE-VERDICT-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-08",
       "definitionDigest": "4a7dd0ec90ee6aa439d3f2fd3fa96777e08c0ae173cb8f19450c04ff5894d97b",
-      "progressDigest": "b4f258c94a6c61570b7c32358a4d49bca3246679522122da1f31dd6365038fc2",
+      "progressDigest": "330d3d426e8fd2691fac73031086d35598c5e243cf02f10790bcdc48e5d3fcf0",
       "terminalClosureDigest": null
     },
     {
@@ -5717,8 +5717,8 @@
       "authorityDigest": "412809e75bc5902d7b87cd9b493a38b802cc5eddf795e72fdb7d60ec82cb0422",
       "lifecycle": {
         "mode": "ONE_SHOT",
-        "status": "active",
-        "transitionAt": null
+        "status": "consumed",
+        "transitionAt": "2026-08-08T09:19:01Z"
       },
       "g7AttemptIdentity": null
     }
@@ -13887,12 +13887,12 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "0",
         "S": "?"
@@ -13902,9 +13902,11 @@
       "closureBlockedBy": [
         "EVALUATION-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-08-EVAL-NOCHANGE-01"
+      ],
       "acceptance": "Goal zaten sağlanmış diye dürüstçe düzenleme yapmayan worker host-tarafı goCriteria-çapalı verdict alır, worker-ruh-hali DONE/NO_GO varyansı değil",
-      "evidence": "2026-08-08 ölçümü: CR4'te aynı içerik DONE, CR5'te NO_GO değerlendirildi (worker self-assessment varyansı)",
+      "evidence": "2026-08-08 ölçümü: CR4'te aynı içerik DONE, CR5'te NO_GO değerlendirildi (worker self-assessment varyansı); `receipt=GR-2026-08-08-EVAL-NOCHANGE-01`; EVAL-NOCHANGE admission+VERIFY 2026-08-08: reconcileNoChangeSatisfied — zero-work NO_GO'yu host SIKI goal-state probe'uyla değerlendirir (testler gerçekten koşup hepsi geçince DONE, aksi halde fail-closed NO_GO); trigger yalnız yapısal (NO_GO ve zero-diff), worker iddiası okunmaz; HOLD attribution etrafından yol açılmaz; yeni SIKI probe lenient boş-eşleşme/50%-pass yanlış-pozitiflerini eler (advisor yakaladı). `proof=eval-nochange-10pins-orchestra-653files-8783-green`; temiz-oda-8 REGRESYON kontrolü geçti (exit=0, 2/2 DONE, receipt CANDIDATE/reasons boş, RCPT-1 supp demote'u hâlâ doğru); canlı no-change-branch bu koşuda tetiklenmedi (worker'lar gerçek iş yaptı) — branch otoritesi birim-pinleri, temiz-oda no-regression kanıtı. AÇIK typed-residual: prose-goCriteria makine-doğrulaması (acceptance immutable, tam kapsam ayrı büyük tasarım) — satır bu yüzden VERIFY, DONE değil",
       "updated": "2026-08-08"
     },
     {
@@ -20363,6 +20365,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "dcbf6741031ed23c7f1ca39772ff2a3d754ecc84ad759109eb2c951983b060ad"
+    "value": "c65ef7e4976dc01bb94dc92ffd1dd3a1867494add5b744402def380d7e403579"
   }
 }
