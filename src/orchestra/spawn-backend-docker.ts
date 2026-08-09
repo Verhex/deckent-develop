@@ -5051,16 +5051,52 @@ export class DockerSpawnBackend implements SpawnBackend {
           this.name,
         );
       }
-      if (
-        task.id !== taskId
-        || task.model !== model
-        || JSON.stringify(task.budget) !== JSON.stringify(executionBudget)
-        || JSON.stringify(task.budgetPolicy?.landingPolicy) !== JSON.stringify(opts.executionLandingPolicy)
-        || task.budgetPolicy?.admissionMode !== (opts.executionAdmissionMode ?? 'unattended')
-        || (task.budgetPolicy?.approvalEvidenceRef ?? undefined) !== opts.executionApprovalEvidenceRef
-      ) {
+      // RECOVERY-DO-DOGFOOD diagnosability: this gate compared six fields and
+      // reported one opaque sentence, so an operator could not tell WHICH leg
+      // disagreed — measured 2026-08-09, it killed spawn attempt 1 on three
+      // consecutive dogfood runs and source reading could not resolve it.
+      // Same class as the exact-plan drift diagnosis: the decision is unchanged,
+      // it only becomes explainable. Values are truncated — this rides an
+      // operator message, it is not a data channel.
+      const envelopeMismatches = ([
+        ['id', task.id, taskId],
+        ['model', task.model, model],
+        // Compared canonically (sorted keys), NOT with raw JSON.stringify.
+        // Measured 2026-08-09: the persisted artifact and the host envelope held
+        // byte-equal budget VALUES in a different key order
+        // (maxCacheReadTokens 2nd on disk, 4th on host), and the order-sensitive
+        // string compare rejected two semantically identical envelopes — killing
+        // spawn attempt 1 on every dogfood run. Identity here is the value set,
+        // never the serialization order; a genuinely different budget still fails.
+        ['budget', canonicalJson(task.budget), canonicalJson(executionBudget)],
+        [
+          'budgetPolicy.landingPolicy',
+          canonicalJson(task.budgetPolicy?.landingPolicy),
+          canonicalJson(opts.executionLandingPolicy),
+        ],
+        [
+          'budgetPolicy.admissionMode',
+          task.budgetPolicy?.admissionMode,
+          opts.executionAdmissionMode ?? 'unattended',
+        ],
+        [
+          'budgetPolicy.approvalEvidenceRef',
+          task.budgetPolicy?.approvalEvidenceRef ?? undefined,
+          opts.executionApprovalEvidenceRef,
+        ],
+      ] as const)
+        .filter(([, disk, host]) => disk !== host)
+        .map(([field, disk, host]) => {
+          const render = (value: unknown): string => {
+            const text = value === undefined ? '(absent)' : String(value);
+            return text.length > 160 ? `${text.slice(0, 160)}…` : text;
+          };
+          return `${field}: disk=${render(disk)} host=${render(host)}`;
+        });
+      if (envelopeMismatches.length > 0) {
         throw new SpawnBackendError(
-          `Budget landing context for task ${taskId} does not match the host admission envelope`,
+          `Budget landing context for task ${taskId} does not match the host admission envelope`
+          + ` — ${envelopeMismatches.length} field(s): ${envelopeMismatches.join('; ')}`,
           this.name,
         );
       }
