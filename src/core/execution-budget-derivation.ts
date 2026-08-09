@@ -64,18 +64,35 @@ export function deriveRequestedExecutionBudget(input: DeriveExecutionBudgetInput
     : 1;
   const scale = (n: number): number => Math.ceil(n * retry * input.headroomFactor);
 
-  const maxInputTokens = scale(Math.max(input.estimatedInputTokens, 1));
   const maxOutputTokens = scale(Math.max(input.estimatedOutputTokens, 1));
   // KN5 (measured in the 2026-08-08 re-smoke): NO aggregate `maxTokens` leg in
   // the request. `maxTokens` counts AGGREGATE usage — prompt-cache reads and
   // writes included — while the estimator's numbers model billable input/output
   // only. Deriving the aggregate ceiling from cache-blind estimates killed an
   // honest worker at 15,120 while it legitimately consumed 42,126 aggregate
-  // tokens (mostly cache reads). Input/output ceilings are unit-correct
-  // (usage.input_tokens excludes cache reads); the aggregate ceiling stays the
-  // policy AUTHORITY's call, which narrowBudget already applies field-wise.
+  // tokens (mostly cache reads).
+  //
+  // 2026-08-09 (sprint-496, first live worker): NO `maxInputTokens` leg either,
+  // for the same unit reason one level down. KN5 assumed the input ceiling was
+  // unit-correct because `usage.input_tokens` excludes cache reads — the live
+  // record disproves both halves. A single `turn.completed` reported
+  // `input_tokens: 101,859` WITH `cached_input_tokens: 66,560` nested inside it,
+  // against a derived ceiling of 9,720, and the breaker killed the worker
+  // (exitCode 137). Two things are wrong with deriving that ceiling at all:
+  //   1. Wrong aggregation level. The estimate measures ONE assembled prompt
+  //      (3,201 tokens here); the reported usage sums EVERY model call in the
+  //      turn, because an agent loop resends the whole transcript each call.
+  //      That was 32x here and grows with tool-call count — no headroom factor
+  //      is safe.
+  //   2. Cache is double-counted with an inverted incentive. The same tokens
+  //      land inside `input_tokens` AND against the separate 10M
+  //      `maxCacheReadTokens` leg, so a BETTER cache hit rate blows the input
+  //      ceiling sooner. Containment must not punish the reuse it wants.
+  // Output stays derived: it is per-turn generation, RCPT-3-calibrated, and the
+  // same run produced 3,604 against a 14,400 ceiling. Input containment belongs
+  // to turn count, tool-call count and wall-clock, plus whatever ceiling the
+  // policy AUTHORITY sets — narrowBudget already applies that field-wise.
   const budget: ExecutionBudget = {
-    maxInputTokens,
     maxOutputTokens,
   };
 
