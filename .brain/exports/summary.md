@@ -55,6 +55,14 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-498 Learnings** (sprint-498): ## Sprint sprint-498 Learnings
+
+## Gains
+- 498-001 — Document the run-flow inbox surface — Created docs/reference/run...
+- **Sprint sprint-497 Learnings** (sprint-497): ## Sprint sprint-497 Learnings
+
+## Gains
+- 497-001 — Document the owner-managed model activation surface — Declared v...
 - **Sprint sprint-490 Learnings** (sprint-490): ## Sprint sprint-490 Learnings
 - Build right branch: NO_GO — Dependency 490-001 is verified through .deckent/runtime/...
 - **Sprint sprint-488 Learnings** (sprint-488): ## Sprint sprint-488 Learnings
@@ -76,9 +84,6 @@
 - **Sprint sprint-482 Learnings** (sprint-482): ## Sprint sprint-482 Learnings
 - Unify finalize and recover adapters: NO_GO — npx tsc --noEmit passed.
 The mandated t...
-- **Sprint sprint-481 Learnings** (sprint-481): ## Sprint sprint-481 Learnings
-- **Sprint sprint-480 Learnings** (sprint-480): ## Sprint sprint-480 Learnings
-- RECOVERY-SURFACES — CLI and MCP shared recovery commands: NO_GO — Bounded scope bloc...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -89,4 +94,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1764 | Generated: 2026-08-06_
+_Total entries: 1780 | Generated: 2026-08-09_

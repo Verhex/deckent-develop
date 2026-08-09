@@ -1,10 +1,11 @@
-# DIRECTIVES — Dogfood smoke: single documentation task
+# DIRECTIVES — Dogfood verification run 2: single documentation task
 
 ## Goal
 
-Prove the run lifecycle end to end with the smallest possible safe payload: one worker, one new
-documentation file, zero edits to any existing file. This run exists to demonstrate that a worker
-is born, claims its task, produces a real artifact and settles honestly.
+Second consecutive measurement of the run lifecycle with a payload of the same
+shape as the previous run: one worker, one new documentation file, zero edits to
+any existing file. This run exists to confirm that the previous success was
+repeatable and to produce a comparable token profile.
 
 This is a documentation sprint only. Provider, model, effort and effective concurrency are resolved
 exclusively from effective config, registry, role policy, auth/reachability evidence, usage/limit
@@ -23,25 +24,24 @@ authority and host admission. No instruction-level provider or model override ex
 
 ---
 
-## Task 1: Document the owner-managed model activation surface
+## Task 1: Document the run-flow inbox surface
 
-- Files: docs/reference/model-activation.md
-- Scope: docs/reference/
+- Files: docs/reference/run-flow-inbox.md
+- Scope: docs/reference/, src/cli/commands/runs.ts
 - Dependencies: none
 
-Create a new reference page describing the owner-managed model activation surface that ships in
-this repository. Read the actual command registration and the activation store before writing, and
-describe only what the code really does.
+Create a new reference page describing the run-flow inbox that `deckent runs` exposes. Read the
+actual command registration and option wiring in src/cli/commands/runs.ts before writing, and
+describe only what the code really does. That source path is inside your read scope.
 
-The page must cover: what the activation layer is for (the detected pool is what a provider OFFERS,
-activation is what the owner ALLOWS), the exact registered subcommands for listing, activating and
-deactivating, what happens when a model has no recorded decision (existing behaviour is preserved),
-and where the decisions are stored. Keep it to roughly one screen, use the heading and tone style of
-the neighbouring pages in the same directory, and include one short worked example of deactivating a
-model and confirming the result.
+The page must cover: what the inbox lists and what a run-flow is in lifecycle terms, how a run is
+targeted (list position versus flow-id prefix), each decide option that is actually registered
+including what it does and what it requires, and the stale-classification option together with its
+dry-run-by-default behaviour and the flag that makes it durable. Keep it to roughly one screen and
+include one short worked example of inspecting the inbox and then acting on a single run.
 
 **Test:** `npx vitest run tests/docs/config-reference.test.ts`
 
-**NO-GO:** The file edits or deletes anything outside the single new page, names a subcommand or
-flag that does not exist in the source, states behaviour that contradicts the activation store
-implementation, or omits the no-recorded-decision case.
+**NO-GO:** The file edits or deletes anything outside the single new page, names an option that is
+not registered in the source, describes the stale-classification default incorrectly, or omits how a
+run is targeted.

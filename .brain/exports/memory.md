@@ -1,5 +1,17 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-498 Learnings
+- Sprint sprint-498 Learnings: ## Sprint sprint-498 Learnings
+
+## Gains
+- 498-001 — Document the run-flow inbox surface — Created docs/reference/run-flow-inbox.md only.
+
+## Sprint sprint-497 Learnings
+- Sprint sprint-497 Learnings: ## Sprint sprint-497 Learnings
+
+## Gains
+- 497-001 — Document the owner-managed model activation surface — Declared verification passed: npx vitest run tests/docs/config-reference.test.ts.
+
 ## Sprint sprint-490 Learnings
 - Sprint sprint-490 Learnings: ## Sprint sprint-490 Learnings
 - Build right branch: NO_GO — Dependency 490-001 is verified through .deckent/runtime/lifecycle-canary/alpha.txt. Dependency 490-009 is still pending
