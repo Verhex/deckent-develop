@@ -144,17 +144,18 @@ describe('deckent_autonomous_approve', () => {
     expect(decisions['t-ignored']).toBeUndefined();
   });
 
-  it('approving an id absent from pending.json still succeeds, with wasPending=false (no-validation contract)', async () => {
+  // APPROVAL-001 T1 (2026-08-09): an id the gate never saw pending is a forged or
+  // stale decision, so it is refused fail-closed and NO decision is persisted.
+  // This suite previously encoded the pre-T1 "no-validation" contract, where the
+  // same call manufactured an `approved` outcome for an unknown id — exactly the
+  // hole T1 closed. The MCP surface must expose that refusal as a tool error.
+  it('refuses to approve an id absent from pending.json and persists no decision', async () => {
     const handler = getHandler();
     const result = await handler({ id: 'ghost', root: tmpDir });
-    const parsed = parseResult(result);
 
-    expect(result.isError).toBeUndefined();
-    expect(parsed.approved).toBe(true);
-    expect(parsed.wasPending).toBe(false);
-
-    const decisions = JSON.parse(readFileSync(decisionsFilePath(tmpDir), 'utf-8'));
-    expect(decisions.ghost).toEqual({ outcome: 'approved', reason: 'user accepted' });
+    expect(result.isError).toBe(true);
+    expect(parseResult(result).message).toContain('not a known pending request');
+    expect(existsSync(decisionsFilePath(tmpDir))).toBe(false);
   });
 
   it('returns an error when neither id nor triggerId is supplied', async () => {
@@ -207,14 +208,15 @@ describe('deckent_autonomous_reject', () => {
     expect(decisions['t-4']).toEqual({ outcome: 'rejected', reason: 'too risky' });
   });
 
-  it('rejecting an id absent from pending.json still succeeds, with wasPending=false', async () => {
+  // APPROVAL-001 T1: the reject path is fenced by the same authority — a decision
+  // for a request the gate never parked is refused, not silently recorded.
+  it('refuses to reject an id absent from pending.json and persists no decision', async () => {
     const handler = getHandler();
     const result = await handler({ id: 'ghost-2', root: tmpDir });
-    const parsed = parseResult(result);
 
-    expect(result.isError).toBeUndefined();
-    expect(parsed.rejected).toBe(true);
-    expect(parsed.wasPending).toBe(false);
+    expect(result.isError).toBe(true);
+    expect(parseResult(result).message).toContain('not a known pending request');
+    expect(existsSync(decisionsFilePath(tmpDir))).toBe(false);
   });
 
   it('returns an error when neither id nor triggerId is supplied', async () => {

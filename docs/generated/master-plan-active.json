@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "1c79def288bfb246c4207d2abc1f44d77a2e52d07613aa780dd992a903a7ae9b"
+    "value": "d843b6f090e7fdee3f2a1bd1b8f4a0cb0abf3c9d309b3301b48c0898569cf7ae"
   },
   "summary": {
     "total": 398,
     "active": 351,
     "terminal": 47,
-    "receipts": 159,
+    "receipts": 160,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -6031,6 +6031,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-09T22:00:26Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-APPROVAL-MCP-TEST-CONTRACT-01",
+      "authorityDigest": "47a7626e694cf56fcdc4fdd51dd88c0b9cabd4c52173d4fea6e6d7a16945cb6b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T22:30:59Z"
       },
       "g7AttemptIdentity": null
     }
@@ -20774,6 +20784,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "00583d706f0259e706509ecb02ddf2e7dd0dbbe127c0b34b747a66caae82bcb3"
+    "value": "110d6ed84689789b296de33515faf3080056e947bce75b4c3b9e42b062119ec6"
   }
 }
