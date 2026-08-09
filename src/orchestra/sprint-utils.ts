@@ -385,6 +385,46 @@ export function detectOrphanWorkers(projectRoot: string): string[] {
   }
 }
 
+// ─── Spawn attempt-history diagnosability (RECOVERY-DO-DOGFOOD visibility) ──
+// runSpawnPhase retries spawn twice, and only the LAST error ever reached the
+// operator — the first attempt's error was swallowed by the catch. Measured cost
+// (2026-08-09): attempt 2 failed with EXACT_PLAN_TASK_ARTIFACT_DRIFT, which was
+// itself a retry artifact (buildWorkerPrompt mutates the approved task in place
+// during attempt 1), so the reported error MASKED the real first-attempt spawn
+// failure — and it was absent from the detached child log too, leaving the root
+// cause unrecoverable from artifacts for a whole session. Same class as the #112
+// drift diagnosis: the detail rides the terminal Error MESSAGE, so every run
+// surface (start / run / runs / do / goal / process) inherits it by construction.
+// Behaviour-neutral: attempt count, retry decision and gate outcome are unchanged.
+
+/** Keep one attempt line readable in a terminal; a full stack would bury it. */
+const SPAWN_ATTEMPT_MESSAGE_MAX_CHARS = 300;
+
+function describeSpawnAttemptError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = error instanceof Error && 'code' in error
+    ? String((error as { code?: unknown }).code)
+    : undefined;
+  const rendered = code ? `${code}: ${message}` : message;
+  return rendered.length > SPAWN_ATTEMPT_MESSAGE_MAX_CHARS
+    ? `${rendered.slice(0, SPAWN_ATTEMPT_MESSAGE_MAX_CHARS)}…`
+    : rendered;
+}
+
+/**
+ * Render the per-attempt failure history for a spawn phase that retried.
+ *
+ * Returns `''` for zero or one recorded attempt — with a single failure nothing
+ * was ever hidden, and the caller already reports that error verbatim. Pure;
+ * exported for unit tests and for any surface wanting the composed history.
+ */
+export function summarizeSpawnAttemptFailures(errors: readonly unknown[]): string {
+  if (errors.length < 2) return '';
+  return errors
+    .map((error, index) => `attempt ${index + 1}: ${describeSpawnAttemptError(error)}`)
+    .join(' | ');
+}
+
 /**
  * Build a retry recommendation message after spawn failure.
  * Suggests model downgrade or scope simplification based on error analysis.

@@ -18,7 +18,7 @@ import {
   readSpawnTaskAuthority,
   routeSprintTasksForExecution,
 } from '../../src/orchestra/sprint-spawner.js';
-import { buildSpawnRetryHint } from '../../src/orchestra/sprint-utils.js';
+import { buildSpawnRetryHint, summarizeSpawnAttemptFailures } from '../../src/orchestra/sprint-utils.js';
 
 const roots: string[] = [];
 
@@ -245,5 +245,46 @@ describe('buildSpawnRetryHint — exact-plan refusals are not credential faults'
   it('a genuinely unknown spawn error still falls back to the generic hint', () => {
     expect(buildSpawnRetryHint(new Error('socket hang up'), sprint))
       .toMatch(/check provider credentials/u);
+  });
+});
+
+// RECOVERY-DO-DOGFOOD retry-error visibility (measured 2026-08-09): runSpawnPhase
+// retries spawn twice and its catch swallowed the FIRST attempt's error entirely —
+// only the second reached the operator. The cost was measured: attempt 2 reported
+// EXACT_PLAN_TASK_ARTIFACT_DRIFT, which was itself a retry artifact (buildWorkerPrompt
+// mutated the approved task during attempt 1), so the reported error MASKED the real
+// first-attempt spawn failure. It was absent from the detached child log too, making
+// the root cause unrecoverable from artifacts. Same diagnosability class as #112.
+describe('summarizeSpawnAttemptFailures — every attempt stays visible', () => {
+  it('names each attempt and its error in order', () => {
+    const summary = summarizeSpawnAttemptFailures([
+      new Error('worker spawn refused: docker daemon unreachable'),
+      new Error('EXACT_PLAN_TASK_ARTIFACT_DRIFT (task 493-001)'),
+    ]);
+    expect(summary).toMatch(/attempt 1/u);
+    expect(summary).toMatch(/docker daemon unreachable/u);
+    expect(summary).toMatch(/attempt 2/u);
+    expect(summary).toMatch(/EXACT_PLAN_TASK_ARTIFACT_DRIFT/u);
+    // Attempt 1 must precede attempt 2 so the ORIGINAL failure reads first.
+    expect(summary.indexOf('attempt 1')).toBeLessThan(summary.indexOf('attempt 2'));
+  });
+
+  it('is empty for a single attempt — nothing was hidden, so nothing is added', () => {
+    expect(summarizeSpawnAttemptFailures([new Error('only failure')])).toBe('');
+  });
+
+  it('is empty when there are no recorded attempts', () => {
+    expect(summarizeSpawnAttemptFailures([])).toBe('');
+  });
+
+  it('carries a non-Error rejection without throwing', () => {
+    const summary = summarizeSpawnAttemptFailures(['string rejection', new Error('second')]);
+    expect(summary).toMatch(/string rejection/u);
+    expect(summary).toMatch(/second/u);
+  });
+
+  it('preserves the error code when one is present', () => {
+    const coded = Object.assign(new Error('provider ingress hold'), { code: 'E_INGRESS_HOLD' });
+    expect(summarizeSpawnAttemptFailures([coded, new Error('second')])).toMatch(/E_INGRESS_HOLD/u);
   });
 });

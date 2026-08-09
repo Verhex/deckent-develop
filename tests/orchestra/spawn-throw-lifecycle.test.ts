@@ -373,6 +373,16 @@ describe('runSprint — SPAWN-THROW-LIFECYCLE (born-435, sprint-356 Task 4)', ()
     await expect(runSprint(ROOT, makeConfig())).rejects.toThrow(/Spawn phase failed after retry/);
   });
 
+  // RECOVERY-DO-DOGFOOD wire proof: this harness drives BOTH spawn attempts to
+  // failure, so the terminal message must name each one. Before the attempt-history
+  // wire only the LAST error reached the operator, which let a retry artifact mask
+  // the real first-attempt failure (measured 2026-08-09, sprint-493).
+  it('names every failed spawn attempt in the terminal message, not just the last', async () => {
+    await expect(runSprint(ROOT, makeConfig())).rejects.toThrow(
+      /Attempts: attempt 1: [\s\S]*\| attempt 2: /u,
+    );
+  });
+
   it('clears the periodic-snapshot interval via the finally fail-safe, even though the happy-path clearInterval line is never reached', async () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
     const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
