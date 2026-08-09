@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "bf87564a1f988d1ea7c69200556922b24ec375e124ece02ecc8c8e80627b8f20"
+    "value": "21982a53897bb78912eb8c9e7adbb81baec0ad54259048250bebc30e2174ab3f"
   },
   "summary": {
     "total": 397,
     "active": 350,
     "terminal": 47,
-    "receipts": 144,
+    "receipts": 146,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -2206,7 +2206,7 @@
       "state": "OPEN",
       "updated": "2026-08-09",
       "definitionDigest": "eb3c4e7d495fd76e57ba08766033a3377e6e5c28d132a2dd38fa62fd2051c273",
-      "progressDigest": "4e8b08874e3a976c009a55186615aade2195f41611d5d266b5570ab901bcb445",
+      "progressDigest": "a70b2a31bbacc52671e1d3c97e5b53ea50f4167f775a4940ab69285cb4ea1d13",
       "terminalClosureDigest": null
     },
     {
@@ -5870,6 +5870,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-09T10:46:08Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-STALE-SPRINT-LOCK-01",
+      "authorityDigest": "c7921133923e1665586ed52beb15224d28038510b61ec741c002040d14640b93",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T12:47:18Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-STALE-SPRINT-LOCK-SUPP-01",
+      "authorityDigest": "295e44dd42c34c8bcca242840972f8b28986bf3352fd2b91e8e6ded1f2aaa3d1",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T12:47:18Z"
       },
       "g7AttemptIdentity": null
     }
@@ -13132,10 +13152,12 @@
         "GR-2026-08-08-DOGFOOD-RCPT3-01",
         "GR-2026-08-08-RCPT1-SUPP-01",
         "GR-2026-08-09-DRIFT-VISIBILITY-01",
-        "GR-2026-08-09-DRIFT-VISIBILITY-SUPP-01"
+        "GR-2026-08-09-DRIFT-VISIBILITY-SUPP-01",
+        "GR-2026-08-09-STALE-SPRINT-LOCK-01",
+        "GR-2026-08-09-STALE-SPRINT-LOCK-SUPP-01"
       ],
       "acceptance": "One bounded provider-neutral recovery slice is proposed, previewed, approved, executed and settled through `deckent do`; Sol supervision captures authority, prompt, usage, diff, Nervous and receipt evidence; any finding is born-first; no direct Sprint start fallback unless typed recovery is required",
-      "evidence": "2026-08-07/08 kurtarma kampanyası — TAM ANLATIM + tüm ölçümler docs/audits/smoke-cold-start-2026-08-07.md (soğuk-start smoke B1-B7 → temiz-oda kök-nedenleri → fix dalgaları → temiz-oda-4 İLK uçtan-uca TAM GEÇİŞ 2/2 DONE disk-verified → CR5/CR6 varyans ölçümleri). Kapanan dilimler: B1a approved-flow guard (binary-kanıtlı) · KN2 bütçe zinciri + problu auto backend + ADR-G-036 veri-kaynağı · KN1 sıfır-sinyal tie-judge · KN3 projeksiyon-parite · KN4 goal-anlatısı · KN5 aggregate-birim · RCPT-1 çözüm-farkındalı cleanup + receipt detayı · RCPT-2 force-terfisi kaldırma · RCPT-3 output kalibrasyonu (CR6: 2/2 DONE, 5m29s, 4 attempt, receipt claimedPaths canlı); `receipt=GR-2026-08-07-DOGFOOD-B1A-01`; `receipt=GR-2026-08-07-B1A-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN2-01`; `receipt=GR-2026-08-08-KN2-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN1-01`; `receipt=GR-2026-08-08-DOGFOOD-KN3-01`; `receipt=GR-2026-08-08-KN3-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN4-01`; `receipt=GR-2026-08-08-DOGFOOD-KN5-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT1-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT2-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT3-01`; hepsi consumed — settlement anlatıları audit dosyası + makbuz registerinde; `proof=recovery-campaign-first-e2e-full-pass-plus-cr6-2of2`; `receipt=GR-2026-08-08-RCPT1-SUPP-01`; supp settlement: çözücü-write-scope kapsama kaynağı eklendi (CR6-şekli pin'li) ve TEMİZ-ODA-7 İLK exit=0 TAM-SETTLE'ı verdi — 1m59s, 1 DONE + 1 dürüst tech-debt, 0 no-go, receipt CANDIDATE/boş-reasons, arşiv dahil yaşam döngüsü temiz (`proof=cr7-first-exit0-full-settle-receipt-candidate`); AÇIK: değişiklik-gerekmedi DONE/NO_GO worker-varyansı evaluator dilimi · B1b kanonik tüketim sıradaki tren · PAUSE sonrası status read-model · worker-HOME tmpfs boyutlandırma ; `receipt=GR-2026-08-09-DRIFT-VISIBILITY-01`; `receipt=GR-2026-08-09-DRIFT-VISIBILITY-SUPP-01`; İLK GERÇEK DOGFOOD KOŞUSU 2026-08-09 (satır OPEN kalır — acceptance'ın istediği uçtan-uca `do` dilimi henüz tamamlanmadı): binary-identity guard bayat dist'i reddetti (elle-kodlanan her dilim binary'yi geçersiz kılıyor), build sonrası plan üretildi (3 mikro-task, gerekçeli tier routing, makine-okunur goNogo), scope-gate var-olmayan yazma-yolunu fail-closed reddetti ve çaresini söyledi, `--force-scope` ile plan geçti, ama spawn fazı EXACT_PLAN_TASK_ARTIFACT_DRIFT ile öldü ve HİÇBİR worker doğmadı. Teşhis kör kaldı çünkü hata hangi task'ta hangi alanın saptığını söylemiyordu ve spawn-retry ipucu generic dala düşüp provider-credential/kaynak kontrolü öneriyordu (KN4 ve KN2'de tespit edilen aynı yanlış-çare sınıfı). Bu dilim teşhisi kurar: computeExactPlanDrift alan-düzeyi kanonik fark üretir (bir seviye iner, değerler kısaltılır), authority hatası task kimliği artı sapan alanları mesaja taşır (kod ilk token kalır, geri-uyum), spawn-retry ipucu typed artifact-identity çaresini basar; faz hatasını tüm koşu yüzeyleri (start run runs do goal process) render ettiğinden görünürlük wired-by-construction hepsine yayılır. Davranış-nötr. `proof=drift-visibility-15-pins-plus-244-orchestra-green`; 3 pin artı 1 mekanik-baseline-supp. AÇIK typed-residual: drift'in kök-nedeni (aynı sprint numarası ve task kimliklerinin başarısız koşudan sonra yeniden kullanılması şüphesi) bir sonraki koşuda teşhis edilip ayrı dilimde kapatılacak; uçtan-uca `do` dilimi ve L-facet kanıtı hâlâ açık",
+      "evidence": "2026-08-07/08 kurtarma kampanyası — TAM ANLATIM + tüm ölçümler docs/audits/smoke-cold-start-2026-08-07.md (soğuk-start smoke B1-B7 → temiz-oda kök-nedenleri → fix dalgaları → temiz-oda-4 İLK uçtan-uca TAM GEÇİŞ 2/2 DONE disk-verified → CR5/CR6 varyans ölçümleri). Kapanan dilimler: B1a approved-flow guard (binary-kanıtlı) · KN2 bütçe zinciri + problu auto backend + ADR-G-036 veri-kaynağı · KN1 sıfır-sinyal tie-judge · KN3 projeksiyon-parite · KN4 goal-anlatısı · KN5 aggregate-birim · RCPT-1 çözüm-farkındalı cleanup + receipt detayı · RCPT-2 force-terfisi kaldırma · RCPT-3 output kalibrasyonu (CR6: 2/2 DONE, 5m29s, 4 attempt, receipt claimedPaths canlı); `receipt=GR-2026-08-07-DOGFOOD-B1A-01`; `receipt=GR-2026-08-07-B1A-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN2-01`; `receipt=GR-2026-08-08-KN2-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN1-01`; `receipt=GR-2026-08-08-DOGFOOD-KN3-01`; `receipt=GR-2026-08-08-KN3-SUPP-01`; `receipt=GR-2026-08-08-DOGFOOD-KN4-01`; `receipt=GR-2026-08-08-DOGFOOD-KN5-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT1-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT2-01`; `receipt=GR-2026-08-08-DOGFOOD-RCPT3-01`; hepsi consumed — settlement anlatıları audit dosyası + makbuz registerinde; `proof=recovery-campaign-first-e2e-full-pass-plus-cr6-2of2`; `receipt=GR-2026-08-08-RCPT1-SUPP-01`; supp settlement: çözücü-write-scope kapsama kaynağı eklendi (CR6-şekli pin'li) ve TEMİZ-ODA-7 İLK exit=0 TAM-SETTLE'ı verdi — 1m59s, 1 DONE + 1 dürüst tech-debt, 0 no-go, receipt CANDIDATE/boş-reasons, arşiv dahil yaşam döngüsü temiz (`proof=cr7-first-exit0-full-settle-receipt-candidate`); AÇIK: değişiklik-gerekmedi DONE/NO_GO worker-varyansı evaluator dilimi · B1b kanonik tüketim sıradaki tren · PAUSE sonrası status read-model · worker-HOME tmpfs boyutlandırma ; `receipt=GR-2026-08-09-DRIFT-VISIBILITY-01`; `receipt=GR-2026-08-09-DRIFT-VISIBILITY-SUPP-01`; İLK GERÇEK DOGFOOD KOŞUSU 2026-08-09 (satır OPEN kalır — acceptance'ın istediği uçtan-uca `do` dilimi henüz tamamlanmadı): binary-identity guard bayat dist'i reddetti (elle-kodlanan her dilim binary'yi geçersiz kılıyor), build sonrası plan üretildi (3 mikro-task, gerekçeli tier routing, makine-okunur goNogo), scope-gate var-olmayan yazma-yolunu fail-closed reddetti ve çaresini söyledi, `--force-scope` ile plan geçti, ama spawn fazı EXACT_PLAN_TASK_ARTIFACT_DRIFT ile öldü ve HİÇBİR worker doğmadı. Teşhis kör kaldı çünkü hata hangi task'ta hangi alanın saptığını söylemiyordu ve spawn-retry ipucu generic dala düşüp provider-credential/kaynak kontrolü öneriyordu (KN4 ve KN2'de tespit edilen aynı yanlış-çare sınıfı). Bu dilim teşhisi kurar: computeExactPlanDrift alan-düzeyi kanonik fark üretir (bir seviye iner, değerler kısaltılır), authority hatası task kimliği artı sapan alanları mesaja taşır (kod ilk token kalır, geri-uyum), spawn-retry ipucu typed artifact-identity çaresini basar; faz hatasını tüm koşu yüzeyleri (start run runs do goal process) render ettiğinden görünürlük wired-by-construction hepsine yayılır. Davranış-nötr. `proof=drift-visibility-15-pins-plus-244-orchestra-green`; 3 pin artı 1 mekanik-baseline-supp. AÇIK typed-residual: drift'in kök-nedeni (aynı sprint numarası ve task kimliklerinin başarısız koşudan sonra yeniden kullanılması şüphesi) bir sonraki koşuda teşhis edilip ayrı dilimde kapatılacak; uçtan-uca `do` dilimi ve L-facet kanıtı hâlâ açık ; `receipt=GR-2026-08-09-STALE-SPRINT-LOCK-01`; `receipt=GR-2026-08-09-STALE-SPRINT-LOCK-SUPP-01`; KİLİT-KIRMA 2026-08-09 (A-B-C, owner canlı onayı): ölçülen kapalı döngü — başarısız spawn sprint-state'i PLANNING:SPAWN pid:null bıraktı, clean-authority bunu AKTİF sayıp build'i reddetti, kurtarma CLI'ı ise binary-identity guard'a takıldı çünkü dist bayattı ve dist'i tazeleyecek build zaten bloke idi; yani bir başarısız koşu artı bir kaynak düzenlemesi her iki kurtarma yolunu da kapatıyordu. A: clean'siz tsc build ile CLI açıldı. B: finalize --force sprint'i dürüstçe ABORTED kapattı (3 logical task'ın 0'ı tamam, 3 unresolved, hiçbir lineage COMPLETE'e yükseltilmedi) ve cleanup artefaktları arşivledi; sonra npm run build ALLOW döndü. C kalıcı dilim: clean sprint yüzeyi artık run-flow yüzeyindeki processProbe otoritesini kullanıyor — canlı sprint hâlâ HOLD, doğrulanamayan pid typed LIVENESS_UNVERIFIABLE ile HOLD, yalnız kanıtsız ölü sprint STALE_DEAD projeksiyonuna düşüyor; pid JSON'dan number/null/absent gelebildiği için parsePid'e verilmeden normalize ediliyor. `proof=stale-sprint-liveness-6-pins-plus-59-guard-green`; 2 pin artı 1 mekanik supp. AÇIK typed-residual: binary-identity guard'ın kurtarma komutlarını da kilitlemesi ayrı dilim; EXACT_PLAN_TASK_ARTIFACT_DRIFT kök-nedeni bir sonraki koşuda teşhis edilecek; uçtan-uca `do` dilimi ve L-facet kanıtı hâlâ açık",
       "updated": "2026-08-09"
     },
     {
@@ -20567,6 +20589,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "77a435a55d76db8eefc6199938711e7e14bee082f18258a9487570d7aee26304"
+    "value": "8bfc317ed63756395a3990e8c76720ef4f07d43afc75428a0f2ac527645903ad"
   }
 }
