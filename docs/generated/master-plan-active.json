@@ -3,26 +3,26 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "21982a53897bb78912eb8c9e7adbb81baec0ad54259048250bebc30e2174ab3f"
+    "value": "ee2f529f8f9f45605f7cca65e12664d903338e6a2df3df9d276e2dcdb5c40127"
   },
   "summary": {
-    "total": 397,
-    "active": 350,
+    "total": 398,
+    "active": 351,
     "terminal": 47,
-    "receipts": 146,
+    "receipts": 148,
     "byState": {
       "OPEN": 259,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 67,
-      "VERIFY": 24,
+      "VERIFY": 25,
       "DONE": 47,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 251,
-      "P1": 109,
+      "P1": 110,
       "P2": 37
     },
     "byProgram": {
@@ -49,7 +49,7 @@
       "PAEP": 35,
       "PRODUCT": 12,
       "PROMPT": 3,
-      "PROVIDER": 3,
+      "PROVIDER": 4,
       "RELEASE": 4,
       "REPO": 1,
       "RESILIENCE": 1,
@@ -3926,6 +3926,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 7075,
+      "id": "MODEL-ACTIVATION-001",
+      "program": "PROVIDER",
+      "priority": "P1",
+      "state": "VERIFY",
+      "updated": "2026-08-09",
+      "definitionDigest": "c71612dea49f09b12bc2f171efafb362999df95ec8af8d9be07b7185e7dfe7c0",
+      "progressDigest": "d267c01d80072610256b0be908fa998e701078ad00462dde75e8be90e5d7e531",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 7080,
       "id": "IDE-ADAPTER-001",
       "program": "SURFACE",
@@ -5890,6 +5901,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-09T12:47:18Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-MODEL-ACTIVATION-01",
+      "authorityDigest": "85191c898227109c1aaec3937605c2cd318143b4d4f7c9235d395abd2ef7a697",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T15:41:31Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-MODEL-ACTIVATION-SUPP-01",
+      "authorityDigest": "615b55c232600bc539ba146957edfc10558230805ce3a775ca2c0a2586f37c2c",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T15:41:31Z"
       },
       "g7AttemptIdentity": null
     }
@@ -18495,6 +18526,7 @@
         "HUB-001",
         "TOOL-COMPUTER-001",
         "PROVIDER-EXTENSION-001",
+        "MODEL-ACTIVATION-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -18529,6 +18561,7 @@
         "HUB-001",
         "TOOL-COMPUTER-001",
         "PROVIDER-EXTENSION-001",
+        "MODEL-ACTIVATION-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -18855,6 +18888,40 @@
       "acceptance": "No bespoke bypass; exact model/reachability/usage/policy conformance",
       "evidence": "Legacy 477",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 7075,
+      "id": "MODEL-ACTIVATION-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "PROVIDER",
+      "outcome": "Owner-managed model activation over the auto-detected pool",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "0"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-09-MODEL-ACTIVATION-01",
+        "GR-2026-08-09-MODEL-ACTIVATION-SUPP-01"
+      ],
+      "acceptance": "Owner can activate or deactivate any detected model per provider from a first-class surface without editing files; only active models reach the routing pool; an absent record preserves current behaviour; brain-only models never enter the worker pool",
+      "evidence": "Açılış 2026-08-09: Alperen Q&A kararı (çift-mercek — ürün kullanıcısı model/provider yönetimini kolayca yapabilmeli, dogfood aynı store'u kullanır; store yeri owner seçimi `.deckent/models.db` proje-kapsamlı). Kod-truth: `model-auto-detect.ts` provider artı authMode başına gerçekten sunulan modelleri tespit edip registry'ye kaydeder ve cache'ler, fakat AKTİFLİK kavramı yoktur — tespit edilen her model havuza girer. Ölçüm 2026-08-09: codex oturumunda `o3` `gpt-5.5` `gpt-4.1` `o4-mini` `gpt-5-mini` `gpt-4.1-mini` eski nesilleri `gpt-5.6` ailesiyle yan yana duruyor ve AI-planner ilk dogfood koşusunda economy görevine `gpt-5-mini` atadı. İlişkili iki kusur da ölçüldü ve ayrı residual'dır: `min_tier` config alanı `model-selector.ts` içinde HİÇ okunmuyor (yalnız `haiku_allowed` türetiliyor, oysa şema tersini vaat ediyor) ve tier tabanı planner'ın atamasına uygulanmıyor; `currentGeneration` bayrağı doğru nesilleri işaret etse de planner onu bypass ediyor ; `receipt=GR-2026-08-09-MODEL-ACTIVATION-01`; `receipt=GR-2026-08-09-MODEL-ACTIVATION-SUPP-01`; SETTLEMENT 2026-08-09: aktiflik katmani tespit-havuzunun ustune kuruldu — ModelActivationStore (.deckent/models.db, owner secimi) provider arti model basina owner karari tutar, kaydi olmayan model AKTIF kalir yani kurulum hicbir projede sessiz daralma yapmaz. Enforcement tek kayit otoritesinde: deaktif model executable registry'den UNREGISTER edilir, yalnizca kesif listesini filtrelemek yetmezdi cunku cloud modeller bundled katalogdan zaten kayitliydi ve planner yine secebilirdi. Kullanici yuzeyi deckent models activate/deactivate/activation — dosya duzenlemeden yonetim (KANUN 1 cift-mercek, ayni store dogfood'u da yonetir). Brain modeli ayri kalir worker havuzuna girmez. Gercek-binary kosumu ile owner listesi uygulandi: codex o3 gpt-5.5 gpt-4.1 o4-mini gpt-5-mini gpt-4.1-mini ve claude opus-4-8 kapatildi, aktif havuz gpt-5.6 ailesi arti claude opus-5 sonnet-5 haiku-4-5 olarak kaldi. `proof=model-activation-12-pins-plus-42-green-plus-real-binary-7-decisions`; 4 pin arti 1 mekanik supp. ACIK typed-residual: planner atamasinin aktif kumeye karsi dogrulanmasi, min_tier alaninin model-selector'da olu olmasi, ve cross-platform arti olcek kanitlari ayri dilimlerdir",
+      "updated": "2026-08-09"
     },
     {
       "order": 7080,
@@ -20589,6 +20656,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "8bfc317ed63756395a3990e8c76720ef4f07d43afc75428a0f2ac527645903ad"
+    "value": "893f95178c252b26fbd9c80325f8e1209880d78fe6cf5d53c166ddd5ae47c50c"
   }
 }
