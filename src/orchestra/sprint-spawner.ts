@@ -155,6 +155,93 @@ export interface ExactPlanSpawnAuthority {
   readonly sourceAuthority?: RunFlowPlanSourceAuthority;
 }
 
+// ─── Exact-plan drift diagnosability (RECOVERY-DO-DOGFOOD visibility) ───────
+// Measured on the first real dogfood run (2026-08-09): the spawn phase died with
+// a bare `EXACT_PLAN_TASK_ARTIFACT_DRIFT` — no task id in the operator output, no
+// indication of WHICH field drifted — and `buildSpawnRetryHint` fell through to
+// its generic branch, telling the operator to "check provider credentials and
+// system resources" for what is actually an artifact-identity refusal. Diagnosis
+// then required reading source. The same class was already fixed twice
+// (KN4 landing-scope, KN2 execution-budget: "the generic credentials hint was
+// wrong"); this is the third. The detail rides the Error MESSAGE, so every run
+// surface (start / run / runs / do / goal / process) inherits it by construction
+// — they all render the same phase error. Behaviour-neutral: the gate decision is
+// unchanged, it only becomes explainable.
+
+/** One field whose canonical value differs between the approved plan task and the
+ *  materialized on-disk artifact. Values are truncated — this rides an operator
+ *  message, it is not a data channel. */
+export interface ExactPlanDriftField {
+  readonly path: string;
+  readonly planValue: string;
+  readonly diskValue: string;
+}
+
+/** Keep a drift message readable in a terminal; a whole task blob would bury it. */
+const DRIFT_VALUE_MAX_CHARS = 120;
+
+function driftValue(value: unknown): string {
+  if (value === undefined) return '(absent)';
+  const json = canonicalJson(value);
+  return json.length > DRIFT_VALUE_MAX_CHARS
+    ? `${json.slice(0, DRIFT_VALUE_MAX_CHARS)}…`
+    : json;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Field-level canonical diff between the approved plan task and the on-disk
+ * artifact. Recurses ONE level into plain objects so the report names
+ * `scope.filesWrite` rather than dumping the whole `scope` blob. Pure — exported
+ * for unit tests and for any surface that wants the structured form.
+ */
+export function computeExactPlanDrift(
+  planTask: unknown,
+  diskTask: unknown,
+): ExactPlanDriftField[] {
+  const drift: ExactPlanDriftField[] = [];
+  const plan = isPlainObject(planTask) ? planTask : {};
+  const disk = isPlainObject(diskTask) ? diskTask : {};
+  for (const key of [...new Set([...Object.keys(plan), ...Object.keys(disk)])].sort()) {
+    const planValue = plan[key];
+    const diskValue = disk[key];
+    if (canonicalJson(planValue) === canonicalJson(diskValue)) continue;
+    if (isPlainObject(planValue) && isPlainObject(diskValue)) {
+      for (const nested of computeExactPlanDrift(planValue, diskValue)) {
+        drift.push({ ...nested, path: `${key}.${nested.path}` });
+      }
+      continue;
+    }
+    drift.push({
+      path: key,
+      planValue: driftValue(planValue),
+      diskValue: driftValue(diskValue),
+    });
+  }
+  return drift;
+}
+
+/** Compose the operator-facing message. The code stays the FIRST token so every
+ *  existing `message.includes('EXACT_PLAN_…')` consumer keeps matching. */
+function buildExactPlanAuthorityMessage(
+  code: ExactPlanSpawnAuthorityError['code'],
+  taskId?: string,
+  driftFields?: readonly ExactPlanDriftField[],
+): string {
+  let message = code;
+  if (taskId) message += ` (task ${taskId})`;
+  if (driftFields && driftFields.length > 0) {
+    const rendered = driftFields
+      .map((f) => `${f.path}: plan=${f.planValue} disk=${f.diskValue}`)
+      .join('; ');
+    message += ` — ${driftFields.length} field(s) drifted: ${rendered}`;
+  }
+  return message;
+}
+
 export class ExactPlanSpawnAuthorityError extends Error {
   readonly code:
     | 'EXACT_PLAN_DEPENDENCY_DRIFT'
@@ -162,15 +249,19 @@ export class ExactPlanSpawnAuthorityError extends Error {
     | 'EXACT_PLAN_TASK_ARTIFACT_DRIFT'
     | 'EXACT_PLAN_RUNTIME_ROUTE_DRIFT';
   readonly taskId?: string;
+  /** Field-level drift, present for artifact-drift refusals. */
+  readonly driftFields?: readonly ExactPlanDriftField[];
 
   constructor(
     code: ExactPlanSpawnAuthorityError['code'],
     taskId?: string,
+    driftFields?: readonly ExactPlanDriftField[],
   ) {
-    super(code);
+    super(buildExactPlanAuthorityMessage(code, taskId, driftFields));
     this.name = 'ExactPlanSpawnAuthorityError';
     this.code = code;
     this.taskId = taskId;
+    if (driftFields && driftFields.length > 0) this.driftFields = driftFields;
   }
 }
 
@@ -201,6 +292,7 @@ export function readSpawnTaskAuthority(
       throw new ExactPlanSpawnAuthorityError(
         'EXACT_PLAN_TASK_ARTIFACT_DRIFT',
         task.id,
+        computeExactPlanDrift(task, diskTask),
       );
     }
     return diskTask;
