@@ -89,6 +89,19 @@ export interface CapabilityEnforcement {
  * `(options, config)` — the SAME inputs `createAuditedCapabilityRegistry` reads.
  * Pure — exported for unit tests and for the eventual fail-closed consumer.
  */
+/** The advisory below reports a STEADY-STATE posture, not an event: it is true on
+ *  every construction for as long as the gate stays off. `debugLog` always appends
+ *  to `.brain/ERRORS.md` (a 600-line rolling window), so emitting per construction
+ *  would crowd real errors out with a condition that never changes. Emit once per
+ *  process instead — enough to surface the truth, never a flood. (Same
+ *  reset-for-tests shape as `_resetChainHead` in audit-writer.) */
+let capabilityEnforcementAdvisoryEmitted = false;
+
+/** Test-only: re-arm the once-per-process advisory. */
+export function _resetCapabilityEnforcementAdvisoryForTests(): void {
+  capabilityEnforcementAdvisoryEmitted = false;
+}
+
 export function resolveCapabilityEnforcement(
   options: CapabilityRuntimeOptions | undefined,
   config: { enforce_least_privilege?: boolean } | undefined,
@@ -182,7 +195,8 @@ export function createAuditedCapabilityRegistry(
   // that advisory truth visible instead of silent. Advisory only (ADR-G-020);
   // real fail-closed enforcement is a named residual (see the design artifact).
   const enforcement = resolveCapabilityEnforcement(options, config);
-  if (!enforcement.enforced) {
+  if (!enforcement.enforced && !capabilityEnforcementAdvisoryEmitted) {
+    capabilityEnforcementAdvisoryEmitted = true;
     debugLog(
       'capability:enforcement-advisory',
       'capability registry created with the least-privilege gate DISABLED '

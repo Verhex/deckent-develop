@@ -11,6 +11,7 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => ({
 import {
   createAuditedCapabilityRegistry,
   resolveCapabilityEnforcement,
+  _resetCapabilityEnforcementAdvisoryForTests,
 } from '../../src/core/capability-runtime.js';
 import { debugLog } from '../../src/core/utils.js';
 import type { CapabilityAuditRecord } from '../../src/core/capability-audit-bridge.js';
@@ -133,11 +134,17 @@ describe('resolveCapabilityEnforcement — the dead-by-default authority truth',
 });
 
 describe('createAuditedCapabilityRegistry — surfaces the disabled gate (advisory)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetCapabilityEnforcementAdvisoryForTests();
+  });
+
+  const advisoryCalls = (): unknown[][] =>
+    vi.mocked(debugLog).mock.calls.filter((c) => c[0] === 'capability:enforcement-advisory');
 
   it('production default (no config) → advisory debugLog fires with the dead-gate truth', () => {
     createAuditedCapabilityRegistry();
-    const calls = vi.mocked(debugLog).mock.calls.filter((c) => c[0] === 'capability:enforcement-advisory');
+    const calls = advisoryCalls();
     expect(calls).toHaveLength(1);
     expect(String(calls[0]![1])).toMatch(/least-privilege gate DISABLED/u);
     expect(String(calls[0]![1])).toMatch(/CAPABILITY_DENIED is also unaudited/u);
@@ -145,7 +152,14 @@ describe('createAuditedCapabilityRegistry — surfaces the disabled gate (adviso
 
   it('gate armed (enforce_least_privilege) → NO advisory (the gate is real)', () => {
     createAuditedCapabilityRegistry(undefined, {}, { enforce_least_privilege: true });
-    const calls = vi.mocked(debugLog).mock.calls.filter((c) => c[0] === 'capability:enforcement-advisory');
-    expect(calls).toHaveLength(0);
+    expect(advisoryCalls()).toHaveLength(0);
+  });
+
+  // The posture is steady-state, not an event: debugLog always appends to the
+  // 600-line .brain/ERRORS.md window, so a per-construction advisory would crowd
+  // out real errors with a condition that never changes.
+  it('emits at most ONCE per process even across many gate-off constructions', () => {
+    for (let i = 0; i < 5; i += 1) createAuditedCapabilityRegistry();
+    expect(advisoryCalls()).toHaveLength(1);
   });
 });

@@ -115,7 +115,7 @@ Bu, §1.3'teki 10 decider'ı **tek fonksiyona** collapse eder: broker gate (#1),
 ### 3.2 Kararlar
 - **Kanonik set = `{viewer, developer, operator, admin}`** (broker). Sebep: Capability union'a map edilmiş tek set; net privilege ladder.
 - **`engineer` → `developer` (alias).** Worker-matrix `engineer`'ı developer'a migrate eder. İkisi de "iş yürütür/yazar, yönetmez" kademesi. **Karar: iki isim tek role, kanonik ad `developer`.**
-- **RBAC'a `developer` eklenir.** RBAC bugün developer'ı atlıyor (developer'lar operator gibi muamele görüyor — fazla yetki). `developer` = viewer üstü + operator altı bir `PERMISSION_MATRIX` satırı (read + execute, ama sprint:* ve write-admin yok).
+- **RBAC'a `developer` eklenir.** RBAC'ın rol seti `{admin, operator, viewer}`; `developer` **tanınmıyor**. `can()` (`rbac.ts`) `isValidRole` başarısızsa **false** döner — yani bir developer principal'i RBAC yolunda over-permitted değil, **tamamen DENIED** olur (fail-closed, ama yanlış kademede: developer'ın meşru read+execute işleri de bloklanır). Bu, kanonik sette developer varken RBAC'ta yokluğunun somut sonucudur. `developer` = viewer üstü + operator altı bir `PERMISSION_MATRIX` satırı olarak eklenir (read + execute; sprint:* ve write-admin yok).
 - **Connector token'ları role-map'ten türer.** `identity/role-map.ts` zaten operator=read+write, viewer=read veriyor; developer=read+execute eklenir, admin=`*`.
 - **Absent/unknown role → deny (fail-closed).** Worker-matrix'in bugünkü "unknown → allow-all" (`authority-matrix.ts:322-334`) permissive default'u kanonik gate'te **deny**'a çevrilir (fail-closed migration, flag arkasında).
 

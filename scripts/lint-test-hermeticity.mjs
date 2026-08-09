@@ -161,7 +161,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-08 (CAPABILITY-001 design+G1): resolveCapabilityEnforcement predicate +
   // advisory debugLog surface in capability-runtime (already-inventoried); same 1203
   // count, content digest only.
-  digest: '437a7ea00f77415e61a040d82d1c529b6be39caee5cba3ab70803daa7beb2de1',
+  digest: '6abfa9851e4ead7151eb9fc8bdea17199f6eb3858f0d25848d0dd97bb555c800',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
