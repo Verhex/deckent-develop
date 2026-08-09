@@ -176,7 +176,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-09 (MODEL-ACTIVATION-001): +1 REAL production module —
   // src/core/model-activation-store.ts (owner model-activation authority), plus
   // the auto-detect enforcement and CLI edits. Prior: STALE-SPRINT-LOCK (1203).
-  digest: '6c362e7494b4cafed0af7618b686053af8da2daea8626f24706002e77fd3b9d7',
+  digest: '2a4d8f341eea028c9c37420cefff6760c68cded5d229a3b8f1e84a5f794e6358',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

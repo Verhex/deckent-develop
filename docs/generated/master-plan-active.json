@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8ba8078d56260f2c2dfb8277a8048cdb85c74483281febcc18d7140a65c44873"
+    "value": "1c79def288bfb246c4207d2abc1f44d77a2e52d07613aa780dd992a903a7ae9b"
   },
   "summary": {
     "total": 398,
     "active": 351,
     "terminal": 47,
-    "receipts": 157,
+    "receipts": 159,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -6011,6 +6011,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-09T21:16:57Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-INPUT-CEILING-DROP-01",
+      "authorityDigest": "317d7cdd3924c59afd07cfed13e1428f4714df6f9e5abd433415f91bf67b1abc",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T22:00:26Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-INPUT-CEILING-HERMETIC-SUPP-01",
+      "authorityDigest": "32e6f16dea5102caa971a8030188aab69bd28d49bf6d5b302b523aa0cd2b2458",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T22:00:26Z"
       },
       "g7AttemptIdentity": null
     }
@@ -20754,6 +20774,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ae316dd96e71977f65404d927db2939b75fb22af29fa96c5fa999f8e2daeeea2"
+    "value": "00583d706f0259e706509ecb02ddf2e7dd0dbbe127c0b34b747a66caae82bcb3"
   }
 }
