@@ -68,11 +68,26 @@ export interface ExtractedStructuredGoNogo extends ExtractedGoNogo {
 //
 // parseStructuredDirectives scans directive-label lines (Model:/Files:/etc.) and
 // `## Task N:` headings ANYWHERE in a task block, not just where this builder
-// intends them. Free-text fields (title/desc/goCriteria/nogo items) that happen
-// to contain one of those patterns would silently corrupt parsing — a stray
-// `## Task 2:` line would fracture the block split; a stray `Model:` line would
-// override the task's actual model. Reject such input outright rather than
+// intends them. A free-text field that both contains one of those patterns AND is
+// emitted so the pattern can BEGIN A PHYSICAL LINE would silently corrupt parsing —
+// a stray `## Task 2:` line would fracture the block split; a stray `Model:` line
+// would override the task's actual model. Reject that input outright rather than
 // emit a directive that *looks* well-formed but parses wrong.
+//
+// The guard therefore follows the EMISSION CHANNEL, not the field's free-text-ness:
+//   - `title` → interpolated into `## Task N: <title>`; `desc` → pushed raw as its
+//     own multi-line block. Content here CAN start a line ⇒ guarded.
+//   - `goCriteria`/`nogo` → joined by escapeListItem onto ONE line; `criteriaItems`
+//     → JSON.stringify onto ONE line. Both escape `\n`/`\r`, so no item content can
+//     ever begin a line ⇒ NOT guarded, and it round-trips losslessly.
+// RECOVERY-DO-DOGFOOD (measured 2026-08-09): guarding the single-line channels was a
+// false-positive fail-closed that killed whole runs at plan-compile — the AI planner
+// wrote the ordinary evidence phrase "file:line citation of …" and `Files?` matched
+// it. Nine everyday English/Turkish phrasings hit the same wall. Same lesson as
+// born-677 below: NL-authored text must round-trip, not be rejected.
+// Open residual: JSON.stringify does not escape U+2028/U+2029, which JS regex treats
+// as line terminators under /m — today that yields a typed malformed-projection
+// refusal (fail-closed, never silent corruption); escaping them is a separate slice.
 
 const RESERVED_LABEL_RE =
   /^\s*-?\s*(?:Model|Effort|Provider|Agent|Skills|Dependencies|Priority|Auth|Backend|ModelEffort|Test|Smoke|Files?|Dosya|Scope|Kapsam)\s*:/i;
@@ -192,15 +207,14 @@ function validateTask(task: DirectiveBuildTask): void {
   if (task.goCriteria.length === 0) throw new DeckentError('DECKENT_E074', 'directives-builder: "goCriteria" must contain at least one entry');
   if (task.nogo.length === 0) throw new DeckentError('DECKENT_E074', 'directives-builder: "nogo" must contain at least one entry');
 
+  // Only the raw-emitted fields carry the collision guard — see the channel rule
+  // above. `title` lands inside the `## Task N:` heading and `desc` is pushed as
+  // its own unescaped, multi-line block, so content there really can start a
+  // physical line. goCriteria/nogo/criteriaItems are single-line encoded and are
+  // deliberately NOT guarded: rejecting them broke real runs (RECOVERY-DO-DOGFOOD).
   assertSafeField('title', task.title);
   assertSafeField('desc', task.desc);
-  for (const item of task.goCriteria) assertSafeField('goCriteria item', item);
-  for (const item of task.nogo) assertSafeField('nogo item', item);
   for (const item of task.criteriaItems ?? []) {
-    assertSafeField('criteriaItems statement', item.statement);
-    for (const requirement of item.evidenceRequirements) {
-      assertSafeField('criteriaItems evidence requirement', requirement);
-    }
     const canonical = createGoNoGoCriterionItem(item);
     if (canonical.id !== item.id) {
       throw new DeckentError(

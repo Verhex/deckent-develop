@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   buildDirectives,
   extractGoNogo,
+  extractStructuredGoNogo,
   reconstructBuildTask,
   type DirectiveBuildIntent,
 } from '../../src/orchestra/directives-builder.js';
 import { parseStructuredDirectives } from '../../src/orchestra/task-builder.js';
+import { createGoNoGoCriterionItem } from '../../src/core/task-types.js';
 
 // born-677 (.analysis/born-backlog.json born_id 677): buildDirectives hard-errored
 // ("contains the \";\" join delimiter — would not round-trip") whenever a goCriteria/
@@ -112,5 +114,95 @@ describe('directives-builder delimiter safety (born-677)', () => {
       goCriteria: NL_TARGET_TRIPLE,
       nogo: ['baseline nogo'],
     });
+  });
+});
+
+// RECOVERY-DO-DOGFOOD plan-compile wall (measured 2026-08-09): the first re-run of
+// dogfood never reached SPAWN — it died in PLAN-compile because the AI planner wrote
+// an ordinary evidence phrase, "file:line citation of the subcommand registration in
+// <a source path>", and RESERVED_LABEL_RE matched it against the `Files?` label. The
+// guard was applied to the wrong channel: goCriteria/nogo items are emitted through
+// escapeListItem onto ONE line (`- goCriteria: a; b`) and criteriaItems through
+// JSON.stringify onto ONE line, so no item content can ever begin a physical line and
+// none of it can be mis-parsed as a directive. Only `title` and `desc` are emitted raw
+// (desc across multiple lines), so those keep the guard. Same shape as born-677 above:
+// NL-authored free text must round-trip, not be rejected.
+const RESERVED_LABEL_PHRASES = [
+  'file:line citation of the subcommand registration',
+  'test: unit coverage report',
+  'Scope: files touched by the diff',
+  'agent: reviewer sign-off',
+  'smoke: CLI output line',
+  'Dosya: degisiklik listesi',
+  'priority: high-risk paths first',
+  'Model: which model actually ran',
+];
+
+describe('directives-builder reserved-label safety on single-line encoded fields', () => {
+  it('does not reject a goCriteria item that opens with a reserved directive label', () => {
+    for (const phrase of RESERVED_LABEL_PHRASES) {
+      expect(() => buildDirectives(makeIntent([phrase], ['baseline nogo']))).not.toThrow();
+    }
+  });
+
+  it('does not reject a nogo item that opens with a reserved directive label', () => {
+    for (const phrase of RESERVED_LABEL_PHRASES) {
+      expect(() => buildDirectives(makeIntent(['baseline goCriteria'], [phrase]))).not.toThrow();
+    }
+  });
+
+  it('round-trips reserved-label goCriteria items losslessly (proof they cannot be mis-parsed)', () => {
+    const { reconstructed, text } = roundTrip(makeIntent(RESERVED_LABEL_PHRASES, ['baseline nogo']));
+    expect(reconstructed.goCriteria).toEqual(RESERVED_LABEL_PHRASES);
+    // Every phrase stays inside the single goCriteria line — none starts a line of its own.
+    expect(text.split('\n').filter(l => l.trimStart().startsWith('- goCriteria:'))).toHaveLength(1);
+  });
+
+  it('does not reject a criteriaItems evidence requirement that opens with a reserved label', () => {
+    for (const phrase of RESERVED_LABEL_PHRASES) {
+      const intent = makeIntent(['baseline goCriteria'], ['baseline nogo']);
+      intent.tasks[0]!.criteriaItems = [createGoNoGoCriterionItem({
+        polarity: 'go',
+        statement: 'The registration is cited',
+        evidenceRequirements: [phrase],
+      })];
+      expect(() => buildDirectives(intent)).not.toThrow();
+    }
+  });
+
+  it('does not reject a criteriaItems statement that opens with a reserved label', () => {
+    const intent = makeIntent(['baseline goCriteria'], ['baseline nogo']);
+    intent.tasks[0]!.criteriaItems = [createGoNoGoCriterionItem({
+      polarity: 'go',
+      statement: 'Files: the diff shows the new subcommand',
+      evidenceRequirements: ['the diff'],
+    })];
+    expect(() => buildDirectives(intent)).not.toThrow();
+  });
+
+  it('round-trips a reserved-label evidence requirement losslessly through the JSON channel', () => {
+    const requirement = RESERVED_LABEL_PHRASES[0]!;
+    const intent = makeIntent(['baseline goCriteria'], ['baseline nogo']);
+    intent.tasks[0]!.criteriaItems = [createGoNoGoCriterionItem({
+      polarity: 'go',
+      statement: 'The registration is cited',
+      evidenceRequirements: [requirement],
+    })];
+    const text = buildDirectives(intent);
+    const criteriaLines = text.split('\n').filter(l => l.trimStart().startsWith('- criteriaItems:'));
+    expect(criteriaLines).toHaveLength(1);
+    expect(extractStructuredGoNogo(text).items[0]!.evidenceRequirements).toEqual([requirement]);
+  });
+
+  it('still rejects a reserved directive label in desc — that field is emitted raw', () => {
+    const intent = makeIntent(['baseline goCriteria'], ['baseline nogo']);
+    intent.tasks[0]!.desc = 'Normal text\nModel: haiku\nmore text';
+    expect(() => buildDirectives(intent)).toThrow(/reserved directive-label/);
+  });
+
+  it('still rejects a "## Task N:" heading smuggled into desc', () => {
+    const intent = makeIntent(['baseline goCriteria'], ['baseline nogo']);
+    intent.tasks[0]!.desc = 'Normal text\n## Task 2: hijacked\nmore text';
+    expect(() => buildDirectives(intent)).toThrow(/heading/);
   });
 });
