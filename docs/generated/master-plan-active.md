@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):21982a53897bb78912eb8c9e7adbb81baec0ad54259048250bebc30e2174ab3f`
+**Source digest:** `sha256(normalized-lf-utf8):ee2f529f8f9f45605f7cca65e12664d903338e6a2df3df9d276e2dcdb5c40127`
 
-**Rows:** 397 total · 350 active · 47 terminal
+**Rows:** 398 total · 351 active · 47 terminal
 
 ## State summary
 
@@ -17,7 +17,7 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 67 |
-| VERIFY | 24 |
+| VERIFY | 25 |
 | DONE | 47 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -333,6 +333,7 @@
 | 7050 | `HUB-001` | BLOCKED | P1 | ECOSYSTEM | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | `OWNER_DECISION_REQUIRED` | Production-ready Deckent Hub and signed distribution |
 | 7060 | `TOOL-COMPUTER-001` | OPEN | P2 | TOOL | `TOOL-AUTHORITY-001`, `PLUGIN-SANDBOX-001` | — | Optional computer-use/browser automation pack |
 | 7070 | `PROVIDER-EXTENSION-001` | OPEN | P1 | PROVIDER | `P02-637`, `P02-646`, `P02-647` | — | OpenRouter and future provider extensions through PAEP |
+| 7075 | `MODEL-ACTIVATION-001` | VERIFY | P1 | PROVIDER | — | — | Owner-managed model activation over the auto-detected pool |
 | 7080 | `IDE-ADAPTER-001` | OPEN | P2 | SURFACE | `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | VS Code, JetBrains and future IDE adapters as non-canonical clients |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |

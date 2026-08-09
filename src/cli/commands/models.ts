@@ -10,6 +10,8 @@ import {
 } from '../../core/model-catalog.js';
 import type { ModelDefinition } from '../../core/model-registry.js';
 import { print, printError, color } from '../helpers/output.js';
+import { ModelActivationStore } from '../../core/model-activation-store.js';
+import { resolveProjectRoot } from '../helpers/process.js';
 
 // ─── Tier Display ──────────────────────────────────────────────────────────
 
@@ -130,6 +132,72 @@ export function registerModels(program: Command): void {
           for (const w of result.warnings) {
             print(color('\x1b[33m', `  ⚠ ${w}`));
           }
+        }
+        print('');
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  // ── deckent models activate|deactivate|activation ────────────────────────
+  // MODEL-ACTIVATION-001: detection says what a provider OFFERS; these say what
+  // the owner ALLOWS. First-class surface so model/provider management never
+  // requires editing a file (dual-lens: the same store governs dogfood runs).
+  // A model with NO record is active, so an untouched project is unchanged.
+  function withStore<T>(fn: (store: ModelActivationStore) => T): T {
+    const store = new ModelActivationStore(resolveProjectRoot());
+    try {
+      return fn(store);
+    } finally {
+      store.close();
+    }
+  }
+
+  models
+    .command('activate <model>')
+    .description('Allow a detected model to enter the routing pool')
+    .requiredOption('--provider <name>', 'Provider that serves this model')
+    .action((model: string, opts: { provider: string }) => {
+      try {
+        withStore((store) => store.setActivation(opts.provider, model, true));
+        print(`  ${color('\x1b[32m', '✓')} ${opts.provider}/${model} activated`);
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  models
+    .command('deactivate <model>')
+    .description('Remove a model from the routing pool (detection still sees it)')
+    .requiredOption('--provider <name>', 'Provider that serves this model')
+    .action((model: string, opts: { provider: string }) => {
+      try {
+        withStore((store) => store.setActivation(opts.provider, model, false));
+        print(`  ${color('\x1b[33m', '✓')} ${opts.provider}/${model} deactivated — it will not be routed`);
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  models
+    .command('activation')
+    .description('Show recorded model activation decisions (unrecorded = active)')
+    .action(() => {
+      try {
+        const records = withStore((store) => store.list());
+        if (records.length === 0) {
+          print('\n  No activation decisions recorded — every detected model is active.\n');
+          return;
+        }
+        print(`\n  ${color('\x1b[1m', 'Model Activation')}  ${records.length} decision(s)\n`);
+        for (const r of records) {
+          const mark = r.active
+            ? color('\x1b[32m', 'active  ')
+            : color('\x1b[31m', 'inactive');
+          print(`  ${mark}  ${r.provider}/${r.modelId}  ${color('\x1b[2m', `(${r.actor}, ${r.updatedAt})`)}`);
         }
         print('');
       } catch (err) {
