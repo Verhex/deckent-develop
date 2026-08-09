@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "bf87564a1f988d1ea7c69200556922b24ec375e124ece02ecc8c8e80627b8f20"
+    "value": "5cc438900a97090dd4066b173204456c42b569faf5e1f606e92a381b94507c23"
   },
   "summary": {
     "total": 397,
     "active": 350,
     "terminal": 47,
-    "receipts": 144,
+    "receipts": 145,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -5870,6 +5870,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-09T10:46:08Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-STALE-SPRINT-LOCK-01",
+      "authorityDigest": "c7921133923e1665586ed52beb15224d28038510b61ec741c002040d14640b93",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "active",
+        "transitionAt": null
       },
       "g7AttemptIdentity": null
     }
@@ -20567,6 +20577,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "77a435a55d76db8eefc6199938711e7e14bee082f18258a9487570d7aee26304"
+    "value": "451c65d01f6983e016e0a03370174cf79544d6ba1a33028977bee2b2cedd7aa0"
   }
 }

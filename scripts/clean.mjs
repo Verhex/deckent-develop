@@ -650,13 +650,54 @@ function inspectSprintState(report, projectRoot, processProbe) {
       }
       stateRecord = state;
       if (ACTIVE_SPRINT_STATUSES.has(state.status)) {
-        addReason(report, {
-          code: 'E_CLEAN_SPRINT_ACTIVE',
-          surface: 'sprint',
-          subject: state.sprintId,
-          observedStatus: `${state.status}:${state.phase}`,
-          evidenceRefs: [evidencePath(projectRoot, statePath)],
-        });
+        // Liveness-aware classification (dogfood 2026-08-09). Status ALONE used to
+        // decide this, which produced a self-locking wedge: a spawn that died left
+        // `PLANNING:SPAWN` with `pid: null` behind, clean refused the build as
+        // "sprint active", and the recovery CLI was itself refused by the
+        // binary-identity guard until a build ran — so a failed run plus a source
+        // edit closed BOTH recovery paths. The run-flow surface in this same report
+        // already resolves this correctly via `processProbe` (alive → blocking
+        // reason, dead → non-blocking STALE_DEAD projection, unknown → typed
+        // blocking); this applies that established authority to the sprint surface.
+        // Conservative by construction: a genuinely live sprint still blocks, an
+        // unverifiable one still blocks as typed-unknown, and only a sprint with NO
+        // liveness evidence at all degrades to a projection.
+        // `pid` in sprint-state.json is JSON: a number when a process was
+        // recorded, `null`/absent when the run died before one existed (the wedge
+        // case). `parsePid` takes text, so normalize both shapes here rather than
+        // handing it a non-string.
+        const rawPid = state.pid;
+        const recordedPid = typeof rawPid === 'number'
+          ? (Number.isSafeInteger(rawPid) && rawPid > 0 ? rawPid : null)
+          : typeof rawPid === 'string' ? parsePid(rawPid) : null;
+        const liveness = recordedPid === null ? 'no-pid' : processProbe(recordedPid);
+        if (liveness === 'alive') {
+          addReason(report, {
+            code: 'E_CLEAN_SPRINT_ACTIVE',
+            surface: 'sprint',
+            subject: state.sprintId,
+            observedStatus: `${state.status}:${state.phase}`,
+            evidenceRefs: [evidencePath(projectRoot, statePath)],
+          });
+        } else if (liveness === 'dead' || liveness === 'no-pid') {
+          report.projections.push({
+            surface: 'sprint',
+            id: state.sprintId,
+            rawStatus: `${state.status}:${state.phase}`,
+            effectiveStatus: 'STALE_DEAD',
+            authority: 'process-liveness',
+            evidenceRefs: [evidencePath(projectRoot, statePath)],
+          });
+        } else {
+          addReason(report, {
+            code: 'E_CLEAN_SPRINT_STATE_UNKNOWN',
+            surface: 'sprint',
+            subject: state.sprintId,
+            observedStatus: `${state.status}:${state.phase}`,
+            detailCode: 'LIVENESS_UNVERIFIABLE',
+            evidenceRefs: [evidencePath(projectRoot, statePath)],
+          });
+        }
       } else if (!TERMINAL_SPRINT_STATUSES.has(state.status)
         || (state.status === 'COMPLETE' && state.phase !== 'COMPLETE')) {
         addReason(report, {

@@ -127,13 +127,17 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // endpoint test parks through the shared resolver, and approval-redrive gained
   // the park↔read producer→consumer pin; same 12499 count, content digest only.
   // Prior: P1e (a2be3787).
-  count: 12499,
+  // 2026-08-09 (STALE-SPRINT-LOCK): +10 — six new stale-sprint liveness fixtures
+  // in clean-active-execution-guard.test, each writing a sprint-state.json into a
+  // tmpdir fixtureRoot (the same helper the file's existing cases use); the scan
+  // counts each write site. Prior: DRIFT-VISIBILITY (12499).
+  count: 12509,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: 'f412912066934147d2cae9a7fa4287265f01452d8e9fb3620f8ff1a6142d6787',
+  digest: '9879fa244467491ef365c1fc19c48b3593ea533b3d74490535c8cbcaf0652c57',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -166,7 +170,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-09 (DRIFT-VISIBILITY): computeExactPlanDrift + enriched authority
   // error in sprint-spawner, typed exact-plan branch in sprint-utils (both
   // already-inventoried); same 1203 count, content digest only.
-  digest: 'd79a4f8614425d4dfb9ff0298e7b39539b04384306658919bf0bf35f10601798',
+  // 2026-08-09 (STALE-SPRINT-LOCK): liveness-aware sprint classification in the
+  // clean active-execution authority (already-inventoried); same 1203 count,
+  // content digest only.
+  digest: '55047869c9dae3cd966abe7b32afb37ba867e0b36aaa61569e946fdb1006808b',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

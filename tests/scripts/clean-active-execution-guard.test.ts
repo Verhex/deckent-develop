@@ -4043,3 +4043,76 @@ describe('clean active-execution admission', () => {
     expect(readFileSync(sentinel, 'utf-8')).toBe('must-survive');
   });
 });
+
+// ═══ Liveness-aware sprint classification (dogfood 2026-08-09) ═══════════════
+// A spawn that died left `PLANNING:SPAWN` with `pid: null` behind. Deciding from
+// status ALONE made clean call that "active", which refused the build — while the
+// recovery CLI was itself refused by the binary-identity guard until a build ran.
+// A failed run plus a source edit therefore closed BOTH recovery paths. The
+// run-flow surface already resolves this with processProbe; these pins hold the
+// same authority on the sprint surface, and hold the fail-closed sides in place.
+describe('clean active-execution admission — stale sprint liveness', () => {
+  function withSprintState(status: string, phase: string, pid: unknown): string {
+    const root = fixtureRoot();
+    const state: Record<string, unknown> = { sprintId: 'sprint-492', status, phase };
+    if (pid !== undefined) state.pid = pid;
+    writeJson(join(root, '.deckent', 'sprint-state.json'), state);
+    return root;
+  }
+
+  it('an active-status sprint with NO recorded pid degrades to a STALE_DEAD projection, not a hold', () => {
+    const root = withSprintState('PLANNING', 'SPAWN', null);
+    const report = inspectActiveExecutions(root, { processProbe: () => 'dead' });
+
+    expect(report.reasons.some((r) => r.code === 'E_CLEAN_SPRINT_ACTIVE')).toBe(false);
+    const projection = report.projections.find((p) => p.surface === 'sprint');
+    expect(projection).toMatchObject({
+      id: 'sprint-492',
+      rawStatus: 'PLANNING:SPAWN',
+      effectiveStatus: 'STALE_DEAD',
+      authority: 'process-liveness',
+    });
+    expect(report.decision).toBe('ALLOW');
+  });
+
+  it('an absent pid field behaves the same as an explicit null (the wedge shape)', () => {
+    const report = inspectActiveExecutions(withSprintState('ACTIVE', 'EXECUTE', undefined), {
+      processProbe: () => 'dead',
+    });
+    expect(report.reasons.some((r) => r.code === 'E_CLEAN_SPRINT_ACTIVE')).toBe(false);
+    expect(report.projections.some((p) => p.surface === 'sprint')).toBe(true);
+  });
+
+  it('a GENUINELY LIVE sprint still holds the build (no weakening)', () => {
+    const report = inspectActiveExecutions(withSprintState('ACTIVE', 'EXECUTE', 4242), {
+      processProbe: () => 'alive',
+    });
+    expect(report.reasons.some((r) => r.code === 'E_CLEAN_SPRINT_ACTIVE')).toBe(true);
+    expect(report.decision).toBe('HOLD');
+  });
+
+  it('a recorded-but-dead pid degrades to a projection', () => {
+    const report = inspectActiveExecutions(withSprintState('FIXING', 'FIX', 4242), {
+      processProbe: () => 'dead',
+    });
+    expect(report.reasons.some((r) => r.code === 'E_CLEAN_SPRINT_ACTIVE')).toBe(false);
+    expect(report.projections.some((p) => p.surface === 'sprint')).toBe(true);
+  });
+
+  it('an UNVERIFIABLE pid fails closed as typed-unknown, never as silently-clean', () => {
+    const report = inspectActiveExecutions(withSprintState('ACTIVE', 'EXECUTE', 4242), {
+      processProbe: () => 'unknown',
+    });
+    const reason = report.reasons.find((r) => r.code === 'E_CLEAN_SPRINT_STATE_UNKNOWN');
+    expect(reason).toMatchObject({ subject: 'sprint-492', detailCode: 'LIVENESS_UNVERIFIABLE' });
+    expect(report.decision).toBe('HOLD');
+  });
+
+  it('a terminal sprint is untouched by the liveness path', () => {
+    const report = inspectActiveExecutions(withSprintState('ABORTED', 'SPAWN', null), {
+      processProbe: () => 'dead',
+    });
+    expect(report.projections.some((p) => p.surface === 'sprint')).toBe(false);
+    expect(report.decision).toBe('ALLOW');
+  });
+});
