@@ -411,6 +411,19 @@ export function buildSpawnRetryHint(error: unknown, sprint: Sprint): string {
       + 'the `estimator` block in .deckent/cost-config.json; re-plan so tasks are stamped, or see docs/MASTER-PLAN.md KN2',
     );
   }
+  if (msg.includes('EXACT_PLAN_')) {
+    // Dogfood 2026-08-09: the first real run died on EXACT_PLAN_TASK_ARTIFACT_DRIFT
+    // and fell through to the generic "check provider credentials" hint — the WRONG
+    // remedy again (same class as KN4/KN2 above). This is an artifact-identity
+    // refusal: the approved exact plan and the materialized task files disagree.
+    // The error message itself now names the task and the drifting field(s).
+    hints.push(
+      'The approved exact plan and the materialized task artifacts DISAGREE — an artifact-identity refusal, '
+      + 'not a credential/resource fault. The message above names the task and the drifting field(s). '
+      + 'Re-plan so the artifacts are rewritten from the approved plan, or clear stale `.tasks/task-*.json` '
+      + 'left by an earlier failed run that reused the same sprint id',
+    );
+  }
   if (msg.includes('rate') || msg.includes('limit') || msg.includes('429')) {
     hints.push('Rate limit hit — consider downgrading task models (opus→sonnet, sonnet→haiku)');
   }

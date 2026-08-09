@@ -131,7 +131,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
-  digest: '536279e319796211957ca9c5827688a4ed7de73c3b1d85cefdbe101d4e34a7e0',
+  // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
+  // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
+  digest: 'f412912066934147d2cae9a7fa4287265f01452d8e9fb3620f8ff1a6142d6787',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -161,7 +163,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-08 (CAPABILITY-001 design+G1): resolveCapabilityEnforcement predicate +
   // advisory debugLog surface in capability-runtime (already-inventoried); same 1203
   // count, content digest only.
-  digest: '6abfa9851e4ead7151eb9fc8bdea17199f6eb3858f0d25848d0dd97bb555c800',
+  // 2026-08-09 (DRIFT-VISIBILITY): computeExactPlanDrift + enriched authority
+  // error in sprint-spawner, typed exact-plan branch in sprint-utils (both
+  // already-inventoried); same 1203 count, content digest only.
+  digest: 'd79a4f8614425d4dfb9ff0298e7b39539b04384306658919bf0bf35f10601798',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

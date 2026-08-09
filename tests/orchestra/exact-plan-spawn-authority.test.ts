@@ -13,10 +13,12 @@ import {
   assertExactPlanDependencies,
   assertExactPlanTaskUnchanged,
   captureExactPlanTaskAuthority,
+  computeExactPlanDrift,
   ExactPlanSpawnAuthorityError,
   readSpawnTaskAuthority,
   routeSprintTasksForExecution,
 } from '../../src/orchestra/sprint-spawner.js';
+import { buildSpawnRetryHint } from '../../src/orchestra/sprint-utils.js';
 
 const roots: string[] = [];
 
@@ -155,5 +157,93 @@ describe('exact plan spawn authority', () => {
 
     expect(JSON.stringify(approved)).toBe(before);
     expect(approved.provider).toBeUndefined();
+  });
+});
+
+// ═══ Drift diagnosability (RECOVERY-DO-DOGFOOD visibility, 2026-08-09) ═══════
+// The first real dogfood run died on a bare EXACT_PLAN_TASK_ARTIFACT_DRIFT: no
+// task id in the operator output, no drifting field, and the spawn-retry hint
+// blamed provider credentials. These pins hold the diagnosis in place.
+describe('computeExactPlanDrift — field-level diagnosis', () => {
+  it('reports nothing when the plan task and the disk artifact agree', () => {
+    const t = { id: '1', model: 'm', scope: { filesWrite: ['a.ts'] } };
+    expect(computeExactPlanDrift(t, { ...t })).toEqual([]);
+  });
+
+  it('names the exact top-level field, with both sides', () => {
+    const drift = computeExactPlanDrift(
+      { id: '1', model: 'plan-model' },
+      { id: '1', model: 'disk-model' },
+    );
+    expect(drift).toHaveLength(1);
+    expect(drift[0]!.path).toBe('model');
+    expect(drift[0]!.planValue).toContain('plan-model');
+    expect(drift[0]!.diskValue).toContain('disk-model');
+  });
+
+  it('recurses one level so a nested scope drift is named scope.filesWrite', () => {
+    const drift = computeExactPlanDrift(
+      { scope: { filesWrite: ['a.ts'], filesRead: ['r.ts'] } },
+      { scope: { filesWrite: ['b.ts'], filesRead: ['r.ts'] } },
+    );
+    expect(drift.map((d) => d.path)).toEqual(['scope.filesWrite']);
+  });
+
+  it('marks a field missing on one side as (absent) rather than silently skipping', () => {
+    const drift = computeExactPlanDrift({ id: '1' }, { id: '1', extra: 'x' });
+    expect(drift).toHaveLength(1);
+    expect(drift[0]!.path).toBe('extra');
+    expect(drift[0]!.planValue).toBe('(absent)');
+  });
+
+  it('truncates a huge value so the operator message stays readable', () => {
+    const drift = computeExactPlanDrift({ big: 'x'.repeat(500) }, { big: 'y' });
+    expect(drift[0]!.planValue.length).toBeLessThan(200);
+    expect(drift[0]!.planValue.endsWith('…')).toBe(true);
+  });
+});
+
+describe('ExactPlanSpawnAuthorityError — operator-facing message', () => {
+  it('keeps the code as the first token so message.includes(code) consumers still match', () => {
+    const err = new ExactPlanSpawnAuthorityError('EXACT_PLAN_TASK_ARTIFACT_DRIFT', 't-1', [
+      { path: 'model', planValue: '"a"', diskValue: '"b"' },
+    ]);
+    expect(err.message.startsWith('EXACT_PLAN_TASK_ARTIFACT_DRIFT')).toBe(true);
+    expect(err.message).toContain('t-1');
+    expect(err.message).toContain('model');
+    expect(err.message).toContain('"b"');
+    expect(err.driftFields).toHaveLength(1);
+  });
+
+  it('stays a bare code when there is nothing extra to say (back-compat)', () => {
+    expect(new ExactPlanSpawnAuthorityError('EXACT_PLAN_DEPENDENCY_DRIFT').message)
+      .toBe('EXACT_PLAN_DEPENDENCY_DRIFT');
+  });
+});
+
+// The hint is the CROSS-SURFACE half: start / run / runs / do / goal / process all
+// render the same spawn-phase error, so fixing the remedy here fixes it everywhere.
+describe('buildSpawnRetryHint — exact-plan refusals are not credential faults', () => {
+  const sprint = { tasks: [{ id: '1' }] } as unknown as Parameters<typeof buildSpawnRetryHint>[1];
+
+  it('EXACT_PLAN drift gets the artifact-identity remedy, NOT "check provider credentials"', () => {
+    const hint = buildSpawnRetryHint(
+      new Error('EXACT_PLAN_TASK_ARTIFACT_DRIFT (task 492-001) — 1 field(s) drifted: model: plan="a" disk="b"'),
+      sprint,
+    );
+    expect(hint).toMatch(/artifact-identity refusal/u);
+    expect(hint).toMatch(/stale `\.tasks\/task-\*\.json`/u);
+    expect(hint).not.toMatch(/check provider credentials/u);
+  });
+
+  it('applies to every exact-plan code, including the missing-artifact case', () => {
+    const hint = buildSpawnRetryHint(new Error('EXACT_PLAN_TASK_ARTIFACT_MISSING (task 1)'), sprint);
+    expect(hint).toMatch(/artifact-identity refusal/u);
+    expect(hint).not.toMatch(/check provider credentials/u);
+  });
+
+  it('a genuinely unknown spawn error still falls back to the generic hint', () => {
+    expect(buildSpawnRetryHint(new Error('socket hang up'), sprint))
+      .toMatch(/check provider credentials/u);
   });
 });
