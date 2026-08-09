@@ -48,7 +48,7 @@ export type WorktreeBinaryAuthorityDecision =
         | 'matching-build-identity';
     }
   | {
-      readonly status: 'hold' | 'override';
+      readonly status: 'hold' | 'override' | 'warn';
       readonly issue: WorktreeBinaryIssue;
       readonly projectRoot: string;
       readonly runtimePackageRoot: string;
@@ -221,14 +221,39 @@ export function shouldCheckWorktreeBinaryAuthority(argv: readonly string[]): boo
   return !argv.slice(2).some((token) => DIAGNOSTIC_TOKENS.has(token));
 }
 
+/**
+ * Issues where the running binary provably belongs to ANOTHER checkout — the
+ * hazard this authority exists for. These stay fail-closed.
+ */
+const CROSS_CHECKOUT_ISSUES: ReadonlySet<WorktreeBinaryIssue> = new Set([
+  'runtime-root-mismatch',
+  'build-root-mismatch',
+]);
+
 function decisionForIssue(
   issue: WorktreeBinaryIssue,
   options: EvaluateWorktreeBinaryAuthorityOptions,
 ): WorktreeBinaryAuthorityDecision {
-  const crossCheckoutOverrideEligible = issue === 'runtime-root-mismatch'
-    || issue === 'build-root-mismatch';
+  // Same-checkout drift (stale/missing/invalid dist for THIS root) is advisory,
+  // not a hold. Deckent is a self-modifying agent runtime: a worker writing to
+  // `src/` during a run makes `dist/` stale by construction, so holding here
+  // locked the operator out of the very commands needed to observe or rescue
+  // that run (`status`, `watch`, `recover`, `finalize`) — measured three times
+  // on 2026-08-09, each time producing a closed loop that only a clean-less
+  // `tsc` could break. A missing/invalid `dist` is the same class: it happens
+  // when a build is interrupted, which is exactly when recovery is needed.
+  // The genuine hazard — running a build that belongs to a DIFFERENT checkout —
+  // remains fail-closed below.
+  if (!CROSS_CHECKOUT_ISSUES.has(issue)) {
+    return {
+      status: 'warn',
+      issue,
+      projectRoot: options.projectRoot,
+      runtimePackageRoot: options.runtimePackageRoot,
+    };
+  }
   return {
-    status: options.override && crossCheckoutOverrideEligible ? 'override' : 'hold',
+    status: options.override ? 'override' : 'hold',
     issue,
     projectRoot: options.projectRoot,
     runtimePackageRoot: options.runtimePackageRoot,

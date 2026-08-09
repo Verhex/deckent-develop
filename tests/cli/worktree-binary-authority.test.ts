@@ -122,7 +122,14 @@ describe('worktree binary authority', () => {
     })).toEqual({ status: 'allow', reason: 'matching-build-identity' });
   });
 
-  it('holds a same-root dist runtime when a build input changes after the manifest was minted', () => {
+  // Same-checkout drift is ADVISORY (owner decision 2026-08-09). Deckent is a
+  // self-modifying runtime: a worker writing to `src/` during a run makes
+  // `dist/` stale by construction, and holding here locked the operator out of
+  // `status`/`watch`/`recover`/`finalize` — the exact commands needed to observe
+  // or rescue that run. Measured three times on 2026-08-09; each occurrence
+  // produced a closed loop escapable only by a clean-less `tsc`. The drift is
+  // still surfaced, just not fatal. Cross-checkout stays fail-closed below.
+  it('warns instead of holding when a same-root build input changes after the manifest was minted', () => {
     const root = makeRoot('deckent-source-drift');
     makeDeckentCheckout(root);
     const buildIdentity = identityFor(root);
@@ -134,10 +141,10 @@ describe('worktree binary authority', () => {
       runtimeKind: 'dist',
       buildIdentity,
       override: false,
-    })).toMatchObject({ status: 'hold', issue: 'build-source-mismatch' });
+    })).toMatchObject({ status: 'warn', issue: 'build-source-mismatch' });
   });
 
-  it('never lets the cross-checkout diagnostic override bypass same-root source drift', () => {
+  it('reports same-root source drift as warn with or without the diagnostic override', () => {
     const root = makeRoot('deckent-source-drift-override');
     makeDeckentCheckout(root);
     const buildIdentity = identityFor(root);
@@ -149,7 +156,7 @@ describe('worktree binary authority', () => {
       runtimeKind: 'dist',
       buildIdentity,
       override: true,
-    })).toMatchObject({ status: 'hold', issue: 'build-source-mismatch' });
+    })).toMatchObject({ status: 'warn', issue: 'build-source-mismatch' });
   });
 
   it('holds when a Deckent checkout is driven by another worktree runtime', () => {
@@ -166,10 +173,19 @@ describe('worktree binary authority', () => {
     })).toMatchObject({ status: 'hold', issue: 'runtime-root-mismatch' });
   });
 
+  // A missing/invalid manifest is the same self-modification class: it is what
+  // an interrupted build leaves behind, which is precisely when the recovery
+  // commands must stay reachable. A foreign root digest is NOT — that binary
+  // provably belongs to another checkout, so it stays fail-closed.
   it.each([
-    ['missing', undefined, 'build-identity-missing'],
-    ['stale root digest', { ...foreignIdentity() }, 'build-root-mismatch'],
-  ] as const)('holds a same-root dist runtime with %s identity', (_label, buildIdentity, issue) => {
+    ['missing', undefined, 'build-identity-missing', 'warn'],
+    ['stale root digest', { ...foreignIdentity() }, 'build-root-mismatch', 'hold'],
+  ] as const)('classifies a same-root dist runtime with %s identity as %s', (
+    _label,
+    buildIdentity,
+    issue,
+    status,
+  ) => {
     const root = makeRoot('deckent-same-root');
     makeDeckentCheckout(root);
 
@@ -179,7 +195,7 @@ describe('worktree binary authority', () => {
       runtimeKind: 'dist',
       buildIdentity,
       override: false,
-    })).toMatchObject({ status: 'hold', issue });
+    })).toMatchObject({ status, issue });
   });
 
   it('allows direct same-root source execution without manufacturing a dist identity', () => {
