@@ -17,6 +17,7 @@ import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { BUILTIN_MODELS } from './model-registry.js';
 import type { ModelRegistry, ModelDefinition, RegistryProviderName } from './model-registry.js';
+import { activationKey, readInactiveModels } from './model-activation-store.js';
 import { buildParametricModel, inferProviderFromId } from './model-registry.js';
 import { killProcessGroupWithEscalation } from './process-tree-termination.js';
 
@@ -64,6 +65,16 @@ export interface DetectAndRegisterOptions extends ProbeOptions {
   ttlMs?: number;
   /** Now provider for deterministic tests. */
   now?: () => number;
+  /**
+   * Project root used to resolve the owner's model-activation decisions
+   * (MODEL-ACTIVATION-001). Detection discovers what a provider OFFERS; the
+   * activation store records what the owner ALLOWS. Absent → no activation
+   * filtering at all (every detected model stays eligible), so callers that
+   * predate the store behave exactly as before.
+   */
+  projectRoot?: string;
+  /** Override the activation lookup (tests). */
+  inactiveModels?: ReadonlySet<string>;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -327,6 +338,10 @@ export async function detectAndRegisterModels(
   const cacheDir = opts.cacheDir ?? AUTO_DETECT_CACHE_DIR;
   const ttl = opts.ttlMs ?? AUTO_DETECT_TTL_MS;
   const now = opts.now ?? (() => Date.now());
+  // Resolved ONCE per sweep: the owner's deactivation set. Fail-safe — an absent
+  // or unreadable store yields an empty set, so discovery never breaks on it.
+  const inactiveModels = opts.inactiveModels
+    ?? (opts.projectRoot ? readInactiveModels(opts.projectRoot) : new Set<string>());
 
   const results: DetectResult[] = [];
 
@@ -374,6 +389,21 @@ export async function detectAndRegisterModels(
 
       discovered = reconcileModels(inventoryIds, catalogIds, builtinIds);
       if (source === 'empty' && discovered.length > 0) source = 'catalog';
+    }
+
+    // MODEL-ACTIVATION-001: detection says what the provider OFFERS; the owner's
+    // activation store says what may actually be USED. Apply that decision at
+    // this single registration authority, so every downstream consumer (routing,
+    // planner, tier equivalence) sees only the allowed pool. A model with no
+    // record is active, so a project without decisions is unchanged.
+    const deactivated = discovered.filter(
+      (id) => inactiveModels.has(activationKey(provider, id)),
+    );
+    if (deactivated.length > 0) {
+      discovered = discovered.filter((id) => !deactivated.includes(id));
+      // Already-registered catalog models must LEAVE the executable registry —
+      // filtering the discovery list alone would still leave them selectable.
+      for (const id of deactivated) registry.unregister(id);
     }
 
     // A CLI discovery is reachability evidence, not pricing/catalog authority.

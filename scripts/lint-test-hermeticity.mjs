@@ -160,7 +160,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // autonomous ingresses all import — every local pendingPath helper deleted so
   // one resolver remains. Edits to already-inventoried modules only — same 1203
   // count, content digest only.
-  count: 1203,
+  count: 1204,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
@@ -173,7 +173,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-09 (STALE-SPRINT-LOCK): liveness-aware sprint classification in the
   // clean active-execution authority (already-inventoried); same 1203 count,
   // content digest only.
-  digest: '55047869c9dae3cd966abe7b32afb37ba867e0b36aaa61569e946fdb1006808b',
+  // 2026-08-09 (MODEL-ACTIVATION-001): +1 REAL production module —
+  // src/core/model-activation-store.ts (owner model-activation authority), plus
+  // the auto-detect enforcement and CLI edits. Prior: STALE-SPRINT-LOCK (1203).
+  digest: '59e9ed31c8606db48b1bf50e42637763a3de176febad8ba0bc760a146a73b0f9',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
