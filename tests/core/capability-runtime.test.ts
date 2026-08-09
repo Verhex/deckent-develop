@@ -1,8 +1,19 @@
 // tests/core/capability-runtime.test.ts
 // Composition root for the F8 capability cluster: default + extended + data
 // handlers in one registry, every handler wrapped with the audit bridge.
-import { describe, it, expect } from 'vitest';
-import { createAuditedCapabilityRegistry } from '../../src/core/capability-runtime.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+// CAPABILITY-001: partial-mock `debugLog` so the enforcement-advisory surface is
+// assertable and no test appends to the real .brain/ERRORS.md (hermetic).
+vi.mock('../../src/core/utils.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/utils.js')>()),
+  debugLog: vi.fn(),
+}));
+import {
+  createAuditedCapabilityRegistry,
+  resolveCapabilityEnforcement,
+  _resetCapabilityEnforcementAdvisoryForTests,
+} from '../../src/core/capability-runtime.js';
+import { debugLog } from '../../src/core/utils.js';
 import type { CapabilityAuditRecord } from '../../src/core/capability-audit-bridge.js';
 import { createInMemoryErpDriver } from '../../src/core/erp/handler.js';
 import { createErpConnector, type ErpConnector, type ErpResultSet } from '../../src/core/erp/connector.js';
@@ -93,5 +104,62 @@ describe('createAuditedCapabilityRegistry — erp wiring (Sprint 265)', () => {
     expect(records).toHaveLength(1);
     expect(records[0]!.capability).toBe('erp.read');
     expect(records[0]!.outcome).toBe('success');
+  });
+});
+
+// ═══ CAPABILITY-001 — capability-enforcement truth (advisory) ═══════════════
+describe('resolveCapabilityEnforcement — the dead-by-default authority truth', () => {
+  it('gate DISABLED by default (no config) → ADVISORY_GATE_DISABLED, not enforced', () => {
+    const r = resolveCapabilityEnforcement(undefined, undefined);
+    expect(r.enforced).toBe(false);
+    expect(r.reasonCode).toBe('ADVISORY_GATE_DISABLED');
+    expect(r.denialAudited).toBe(false);
+  });
+
+  it('config.enforce_least_privilege:false → still ADVISORY_GATE_DISABLED', () => {
+    expect(resolveCapabilityEnforcement({}, { enforce_least_privilege: false }).reasonCode)
+      .toBe('ADVISORY_GATE_DISABLED');
+  });
+
+  it('config.enforce_least_privilege:true → ENFORCED_LEAST_PRIVILEGE, enforced', () => {
+    const r = resolveCapabilityEnforcement({}, { enforce_least_privilege: true });
+    expect(r.enforced).toBe(true);
+    expect(r.reasonCode).toBe('ENFORCED_LEAST_PRIVILEGE');
+  });
+
+  it('denialAudited reflects options.denialAudit presence, independent of the gate', () => {
+    expect(resolveCapabilityEnforcement({ denialAudit: { projectRoot: '/x' } }, undefined).denialAudited).toBe(true);
+    expect(resolveCapabilityEnforcement({}, { enforce_least_privilege: true }).denialAudited).toBe(false);
+  });
+});
+
+describe('createAuditedCapabilityRegistry — surfaces the disabled gate (advisory)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetCapabilityEnforcementAdvisoryForTests();
+  });
+
+  const advisoryCalls = (): unknown[][] =>
+    vi.mocked(debugLog).mock.calls.filter((c) => c[0] === 'capability:enforcement-advisory');
+
+  it('production default (no config) → advisory debugLog fires with the dead-gate truth', () => {
+    createAuditedCapabilityRegistry();
+    const calls = advisoryCalls();
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]![1])).toMatch(/least-privilege gate DISABLED/u);
+    expect(String(calls[0]![1])).toMatch(/CAPABILITY_DENIED is also unaudited/u);
+  });
+
+  it('gate armed (enforce_least_privilege) → NO advisory (the gate is real)', () => {
+    createAuditedCapabilityRegistry(undefined, {}, { enforce_least_privilege: true });
+    expect(advisoryCalls()).toHaveLength(0);
+  });
+
+  // The posture is steady-state, not an event: debugLog always appends to the
+  // 600-line .brain/ERRORS.md window, so a per-construction advisory would crowd
+  // out real errors with a condition that never changes.
+  it('emits at most ONCE per process even across many gate-off constructions', () => {
+    for (let i = 0; i < 5; i += 1) createAuditedCapabilityRegistry();
+    expect(advisoryCalls()).toHaveLength(1);
   });
 });

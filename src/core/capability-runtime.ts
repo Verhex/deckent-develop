@@ -31,6 +31,7 @@ import {
   type CapabilityAuditRecord,
 } from './capability-audit-bridge.js';
 import { writeAuditEvent } from './audit-writer.js';
+import { debugLog } from './utils.js';
 
 /** Handler options forwarded to the underlying install* functions. */
 export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
@@ -50,6 +51,66 @@ export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
     sprintId?: string;
     /** Tenant identifier for audit event (default: 'local'). */
     tenantId?: string;
+  };
+}
+
+// ═══ CAPABILITY-001 — capability-enforcement truth (advisory) ═══════════════
+// Code-truth (2026-08-08 map): the capability broker is wired for DISPATCH but
+// dead-by-default for AUTHORITY. `createAuditedCapabilityRegistry` arms the only
+// least-privilege gate (`registry.leastPrivilegeEnabled`) solely when
+// `config.enforce_least_privilege` is passed, and wires denial audit solely when
+// `options.denialAudit` is passed — and neither production callsite
+// (runtime-loop.ts, process-runtime.ts) passes either. So in production the
+// registry resolves a verb→handler and invokes it, gating nothing. This predicate
+// makes that enforcement posture typed + surfaceable instead of silent. It is a
+// DELIBERATELY advisory bounded slice (ADR-G-020 advisory-mode, same class as the
+// TOOL-AUTHORITY tool-scope / write-guard slices): the design artifact defines the
+// unified five-input decision and the migration to real fail-closed enforcement;
+// this slice only surfaces that the gate is off. See
+// docs/analysis/capability-authority-design-2026-08-08.md.
+
+export type CapabilityEnforcementReason =
+  | 'ENFORCED_LEAST_PRIVILEGE'
+  | 'ADVISORY_GATE_DISABLED';
+
+export interface CapabilityEnforcement {
+  /** True ONLY when the least-privilege gate is actually armed at creation
+   *  (`config.enforce_least_privilege`). False → the registry gates nothing. */
+  readonly enforced: boolean;
+  readonly reasonCode: CapabilityEnforcementReason;
+  /** Whether CAPABILITY_DENIED results are wired to the durable audit trail
+   *  (`options.denialAudit`). A disabled gate never denies, so an unaudited
+   *  denial path is doubly inert — carried for the audit trail. */
+  readonly denialAudited: boolean;
+}
+
+/**
+ * Resolve the enforcement posture a capability registry will have for the given
+ * `(options, config)` — the SAME inputs `createAuditedCapabilityRegistry` reads.
+ * Pure — exported for unit tests and for the eventual fail-closed consumer.
+ */
+/** The advisory below reports a STEADY-STATE posture, not an event: it is true on
+ *  every construction for as long as the gate stays off. `debugLog` always appends
+ *  to `.brain/ERRORS.md` (a 600-line rolling window), so emitting per construction
+ *  would crowd real errors out with a condition that never changes. Emit once per
+ *  process instead — enough to surface the truth, never a flood. (Same
+ *  reset-for-tests shape as `_resetChainHead` in audit-writer.) */
+let capabilityEnforcementAdvisoryEmitted = false;
+
+/** Test-only: re-arm the once-per-process advisory. */
+export function _resetCapabilityEnforcementAdvisoryForTests(): void {
+  capabilityEnforcementAdvisoryEmitted = false;
+}
+
+export function resolveCapabilityEnforcement(
+  options: CapabilityRuntimeOptions | undefined,
+  config: { enforce_least_privilege?: boolean } | undefined,
+): CapabilityEnforcement {
+  const enforced = config?.enforce_least_privilege === true;
+  return {
+    enforced,
+    reasonCode: enforced ? 'ENFORCED_LEAST_PRIVILEGE' : 'ADVISORY_GATE_DISABLED',
+    denialAudited: options?.denialAudit != null,
   };
 }
 
@@ -127,6 +188,22 @@ export function createAuditedCapabilityRegistry(
         // fail-safe: a broken audit sink never breaks the invocation
       }
     };
+  }
+
+  // CAPABILITY-001: surface the enforcement posture. When the least-privilege
+  // gate is DISABLED (the production default), the registry gates nothing — make
+  // that advisory truth visible instead of silent. Advisory only (ADR-G-020);
+  // real fail-closed enforcement is a named residual (see the design artifact).
+  const enforcement = resolveCapabilityEnforcement(options, config);
+  if (!enforcement.enforced && !capabilityEnforcementAdvisoryEmitted) {
+    capabilityEnforcementAdvisoryEmitted = true;
+    debugLog(
+      'capability:enforcement-advisory',
+      'capability registry created with the least-privilege gate DISABLED '
+        + '(no enforce_least_privilege) — verb→handler resolves and invokes, gating '
+        + `nothing; capability authority is advisory-only (CAPABILITY-001)${
+          enforcement.denialAudited ? '' : '; CAPABILITY_DENIED is also unaudited'}`,
+    );
   }
 
   return registry;

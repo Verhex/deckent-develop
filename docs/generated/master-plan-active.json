@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "c7c6023ada30f7b5c0e55d43f3a27d7e4bf69ec03f7505c89d719cb9e052b386"
+    "value": "d1b6c23f9fc693235cec2676562de9dee4b717dfc4c2698a660bd31e2e46882c"
   },
   "summary": {
     "total": 397,
     "active": 350,
     "terminal": 47,
-    "receipts": 140,
+    "receipts": 142,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -3205,9 +3205,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-09",
       "definitionDigest": "0867ff7c16856c6db497929e25eee6926cca597f5b8f3136bf4b25b1699d8759",
-      "progressDigest": "d8855681123b5673724f3cdfc59a2d94e97614588deed5fc7d0dd8aa4614d86f",
+      "progressDigest": "b1185112edc40170efda382e657a42d88923a4fe21dfb3f130a89f9893bc2e27",
       "terminalClosureDigest": null
     },
     {
@@ -5830,6 +5830,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-08T21:52:36Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-08-CAPABILITY-DESIGN-G1-01",
+      "authorityDigest": "c0c8bee2d309c05dee9f24c54bf3fb5926a808d082517d0fcadac141e1aa13d5",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T08:26:53Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-CAPABILITY-DESIGN-G1-SUPP-01",
+      "authorityDigest": "be161422c7a34a5cb122a3cfa1864100a195adc9116830abf002cd86dafdf303",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T08:26:53Z"
       },
       "g7AttemptIdentity": null
     }
@@ -16159,10 +16179,13 @@
       "closureBlockedBy": [
         "OPERATION-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-08-CAPABILITY-DESIGN-G1-01",
+        "GR-2026-08-09-CAPABILITY-DESIGN-G1-SUPP-01"
+      ],
       "acceptance": "Principal, tenant, operation, resource and environment resolve one scoped capability decision",
-      "evidence": "Existing catalogs are fragmented",
-      "updated": "2026-07-26"
+      "evidence": "Existing catalogs are fragmented; `receipt=GR-2026-08-08-CAPABILITY-DESIGN-G1-01`; `receipt=GR-2026-08-09-CAPABILITY-DESIGN-G1-SUPP-01`; DESIGN+G1 DİLİMİ 2026-08-09 (satır OPEN kalır — acceptance'ın kendisi residual): kod-truth capability broker dispatch için wired ama authority için DEAD-BY-DEFAULT — tek least-privilege gate yalnız enforce_least_privilege veya denialAudit geçilince armed olur, iki üretim callsite'ı (runtime-loop, process-runtime) hiçbirini geçmez ve dispatch grantedCapabilities de geçmez, yani verb-handler çözülüp çağrılır ve hiçbir şey gate'lenmez. Beş girdiden (principal tenant operation resource environment) yalnız principal-role artı tenant kısmi (gate kapalı olduğu için atıl), operation resource environment hiç girmez; ~10 parçalı decider, 4 rol seti, 3 permission sözlüğü (broker developer ile worker-matrix engineer somut çelişkisi). G2 artifact birleşik beş-girdi karar kontratını, KARAR-verici rol reconciliation'ı (kanonik viewer-developer-operator-admin; engineer eşittir developer alias; RBAC'a developer satırı çünkü can() tanınmayan rolü DENY eder; unknown rol deny) ve advisory-first'ten fail-closed'a migration merdivenini (önce rol sözlüğü çöker, sonra operation-capability köprüsü, sonra tenant-resource-environment threading, en son enforce_least_privilege default-off'tan default-on'a) tanımlar. G1 resolveCapabilityEnforcement predicate gate posture'ını tipler ve dead-gate gerçeğini process-başına-bir advisory ile surface eder (debugLog ERRORS.md 600-satır penceresine yazdığından steady-state uyarı her construction'da basılmaz). `proof=capability-design-artifact-plus-dead-gate-advisory-80-green`; 3 pin artı 1 mekanik-baseline-supp. AÇIK typed-residual: beş girdinin uçtan uca tek resolveCapability kararına çözümü, rol-unification implementasyonu, grantedCapabilities'in dispatch'e threading'i, gerçek fail-closed grant artı default-on flip — her biri ayrı owner-onaylı dilim",
+      "updated": "2026-08-09"
     },
     {
       "order": 4050,
@@ -20522,6 +20545,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0b773377c34ca79611e79ff6791331fd105b3385e1fb456580faac73a3a8ed29"
+    "value": "c8565ebced5ed1b1784cc89400339661a7bc77e5cda56025c90816c9f288f5a6"
   }
 }

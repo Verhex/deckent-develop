@@ -158,7 +158,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
-  digest: '9a5752f6cdb5710f6b764023397d5af8f69a1fe0c06619543ea2c66ec36cea79',
+  // 2026-08-08 (CAPABILITY-001 design+G1): resolveCapabilityEnforcement predicate +
+  // advisory debugLog surface in capability-runtime (already-inventoried); same 1203
+  // count, content digest only.
+  digest: '6abfa9851e4ead7151eb9fc8bdea17199f6eb3858f0d25848d0dd97bb555c800',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
