@@ -119,6 +119,41 @@ describe('classifyFixFailure', () => {
     expect(c.allowsFixTask).toBe(true);
   });
 
+  // Repetition is the proof, and it is host-measured. sprint-496 and sprint-502
+  // each burned three rounds on a definition that produced no changed line, while
+  // the workers correctly reported the task could not be satisfied. Counting the
+  // lineage's own outcomes needs no trust in that prose — and gives no worker a
+  // lever for declining work by asserting impossibility.
+  it('escalates once the lineage has proven re-running changes nothing', () => {
+    const c = classifyFixFailure({
+      result: makeResult({ notes: 'the requirement lies outside the permitted scope' }),
+      priorZeroDiffAttempts: 2,
+    });
+    expect(c.disposition).toBe('escalateReplan');
+    expect(c.code).toBe('REPEATED_ZERO_DIFF_NO_GO');
+    expect(c.allowsFixTask).toBe(false);
+  });
+
+  it('still allows a fix while the lineage is below the futility threshold', () => {
+    const c = classifyFixFailure({
+      result: makeResult({ notes: 'first honest miss' }),
+      priorZeroDiffAttempts: 1,
+    });
+    expect(c.disposition).toBe('retrySame');
+    expect(c.allowsFixTask).toBe(true);
+  });
+
+  it('does not call repetition futile when the latest attempt actually changed code', () => {
+    // Real work landing means the definition is workable; the remaining gap is a
+    // narrow correction, not an impossible task.
+    const c = classifyFixFailure({
+      result: makeResult({ filesChanged: ['src/a.ts'], linesAdded: 12, testsPassed: false }),
+      priorZeroDiffAttempts: 3,
+    });
+    expect(c.disposition).toBe('narrowCorrection');
+    expect(c.allowsFixTask).toBe(true);
+  });
+
   it('escalates a missing result — absence is unmeasurable, not a retryable blip', () => {
     const c = classifyFixFailure({ result: null });
     expect(c.disposition).toBe('escalateReplan');

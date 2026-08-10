@@ -104,7 +104,27 @@ export interface ClassifyFixFailureInput {
    * caller derives this from evaluation evidence; absent means "not established".
    */
   readonly taskDefinitionUnsatisfiable?: boolean;
+  /**
+   * How many attempts in THIS logical lineage already ended as a NO_GO that
+   * changed nothing. Structural, host-measured evidence — never worker prose.
+   *
+   * Repetition is the proof. A worker saying "this task cannot be done" is a
+   * claim; a lineage that has produced consecutive zero-diff NO_GOs has already
+   * demonstrated that re-running does not work, whatever anyone says about why.
+   * Measured twice — sprint-496 and sprint-502 each burned three rounds this way.
+   * A typed worker flag would instead hand every worker a lever for declining
+   * work; counting outcomes cannot be talked into anything.
+   */
+  readonly priorZeroDiffAttempts?: number;
 }
+
+/**
+ * Consecutive zero-diff NO_GOs that make re-running provably futile. Two — the
+ * original attempt plus one fix — is enough: the same definition has by then
+ * failed to produce a single changed line twice, and each further round spends a
+ * whole worker to re-learn what is already in hand.
+ */
+export const ZERO_DIFF_FUTILITY_THRESHOLD = 2;
 
 /**
  * Decide how a NO_GO should be handled. Never throws: an unreadable or absent
@@ -137,12 +157,22 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
   }
 
   // 3. The task cannot succeed as written — no worker can repair its definition.
-  if (input.taskDefinitionUnsatisfiable === true) {
+  //    Either the caller established that directly, or the lineage has already
+  //    proven it by producing repeated NO_GOs that changed nothing.
+  const futileRepetition = (input.priorZeroDiffAttempts ?? 0) >= ZERO_DIFF_FUTILITY_THRESHOLD
+    && (result?.filesChanged?.length ?? 0) === 0
+    && (result?.linesAdded ?? 0) === 0;
+  if (input.taskDefinitionUnsatisfiable === true || futileRepetition) {
     return {
       disposition: 'escalateReplan',
-      code: 'TASK_DEFINITION_UNSATISFIABLE',
-      reason: 'the task cannot be satisfied as written, so it is escalated for re-planning '
-        + 'instead of being re-run against the same definition',
+      code: input.taskDefinitionUnsatisfiable === true
+        ? 'TASK_DEFINITION_UNSATISFIABLE'
+        : 'REPEATED_ZERO_DIFF_NO_GO',
+      reason: input.taskDefinitionUnsatisfiable === true
+        ? 'the task cannot be satisfied as written, so it is escalated for re-planning '
+          + 'instead of being re-run against the same definition'
+        : `${input.priorZeroDiffAttempts} prior attempts in this lineage changed nothing, so `
+          + 're-running the same definition is provably futile and it is escalated instead',
       allowsFixTask: false,
     };
   }
