@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f00d56f32665a8e211826d3293692cace97909d446d4c6ec2558d81dc89d405a"
+    "value": "718a77f256f50d4121056000fe987d2524b900baa2a4d0d8e797a7fd9762b512"
   },
   "summary": {
-    "total": 413,
-    "active": 366,
+    "total": 420,
+    "active": 373,
     "terminal": 47,
     "receipts": 181,
     "byState": {
-      "OPEN": 273,
+      "OPEN": 280,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,27 +21,27 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 263,
-      "P1": 113,
+      "P0": 269,
+      "P1": 114,
       "P2": 37
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 14,
-      "AUTHORITY": 32,
+      "AUTHORITY": 34,
       "CODEX": 44,
       "CONNECTOR": 2,
       "COST": 4,
-      "DASHBOARD": 1,
+      "DASHBOARD": 2,
       "DATA": 1,
       "DESKTOP": 6,
       "DOCS": 6,
-      "DURABILITY": 1,
+      "DURABILITY": 2,
       "ECOSYSTEM": 9,
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 4,
-      "KERNEL": 97,
+      "KERNEL": 99,
       "LEARNING": 4,
       "OBS": 3,
       "ONBOARDING": 1,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 76,
+      "TRUTH": 77,
       "XPLAT": 3
     }
   },
@@ -235,9 +235,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-10",
       "definitionDigest": "e16b6c95a5c04fd2c27a8c2e77dacd96df6e2da1d3aed400545feec6bc2c6b00",
-      "progressDigest": "982ca40a8073f246b879bc7965c29daf7cda53542876dda05d2ccc066e5b1a7b",
+      "progressDigest": "8058ca17ffe982c760ffd5ea9c7e3cbf84868e4d897dea4d6494236935134650",
       "terminalClosureDigest": null
     },
     {
@@ -246,9 +246,9 @@
       "program": "TRUTH",
       "priority": "P2",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-10",
       "definitionDigest": "439e39e13d53cdd6a2d60d286c48c741a1b2a0b10826489b0646d435bb88f667",
-      "progressDigest": "fb0d9530b37068fddc1dcced88e8d63ba069174c3880c05218fcb8295791173d",
+      "progressDigest": "76060dafd645638bcee1e95d77656e2bb5f187ffc99dc5943302b70369f16391",
       "terminalClosureDigest": null
     },
     {
@@ -455,9 +455,20 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-10",
       "definitionDigest": "171f71df42def08983b63582142f44124d78c9405ab2f9131d9cd65f1c039ebb",
-      "progressDigest": "475c845763eefc020e9d0d8707ff35619d61481225c12a05acd2a3133a1921fa",
+      "progressDigest": "f70d9210e6f91515b56521f7d77ba45250ecb5874a36bccb81770f271710913f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 305,
+      "id": "STATE-ARCHIVE-RESTORE-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "4171048871ae812f8f1a1440c6193f2370d477bc0d688777a1ae8dc1519d7da2",
+      "progressDigest": "54ee5d2338e04a873a02aa3470440f6e588f105fdc2f072224b4730a44281818",
       "terminalClosureDigest": null
     },
     {
@@ -1907,9 +1918,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-08-10",
       "definitionDigest": "d821d2f9a0148fba24cce05da2a7644127402a4862ffa14f266ae3c7baca9536",
-      "progressDigest": "7d599d9d9f9c20af3eefbfd1013919b6e2b70b75b8be54676e0cdffb59679a02",
+      "progressDigest": "ae79ac65cc989dca095983fe330bee7184908a56bfef0545c382d54aa33ca1fb",
       "terminalClosureDigest": null
     },
     {
@@ -1951,9 +1962,20 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-08-10",
       "definitionDigest": "7bc89c617b58557f9f8c3a57ae05826a9e76f5afc8727477faf66f31f87f83d5",
-      "progressDigest": "033fec9b3c04dca5bb71d64c01080d8e52add4a9a5f485eb531cee9dd9c8d408",
+      "progressDigest": "368387ac5538177b7fe8228240f364c551ac6a5f466e0b90d06f1ea27b162b4b",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3111,
+      "id": "AUTONOMOUS-CONTROL-PLANE-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "02c706eee71ca51c07893fe331c978bd4abd56836211f79cf408601de79ffe95",
+      "progressDigest": "1bcb2de5eca7f2e35b36d9094704db98524279b5a7feed50bf4fef406734b881",
       "terminalClosureDigest": null
     },
     {
@@ -2336,9 +2358,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-27",
+      "updated": "2026-08-10",
       "definitionDigest": "d04ed5b942844867e9adff1e1d6abaffccb4c33b3cfe1b270d09081f4cf40bd4",
-      "progressDigest": "e245c188ca3732bd0b8dfbb04c94f8c91d3288327eee9df58120355ab3940b15",
+      "progressDigest": "e9a361f203d8291600305cedea3bef868ea4ef724fd35fc52cf734a5c25ec13e",
       "terminalClosureDigest": null
     },
     {
@@ -2424,9 +2446,9 @@
       "program": "COST",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-31",
+      "updated": "2026-08-10",
       "definitionDigest": "79a1284aa8cd0aa4cd730aabaa88ebf5c4d585a42085dff12621c3e797857ab1",
-      "progressDigest": "5c3be03d42020151d8a7facaeead7fa26561fcb452d8424cec56d0f5ba3970fa",
+      "progressDigest": "8a673e8e74c4fcd7a166df099ffab99ff47e293e58b6e5d1cb507cdd32e1926f",
       "terminalClosureDigest": null
     },
     {
@@ -3156,6 +3178,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3348,
+      "id": "AUTONOMOUS-SCHEDULER-FAIRNESS-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "e4d1fafa3beb58b7ceb369c3bd9732e4e3d09897dd2eb22d9ed7467e0ce5030c",
+      "progressDigest": "228fc9da1fccd859a9504b07ee3b03666095e74c63380b09377f0305233856e7",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "program": "AUTHORITY",
@@ -3186,6 +3219,17 @@
       "updated": "2026-08-08",
       "definitionDigest": "7ade16473831b4aeaf6ba4c3c2e23e0278504413a8cbccad5832065e28c1673d",
       "progressDigest": "f094b080683bece63674ab7d15c7a7bfacc8d89b07245d9bd0237f907efb229f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4021,
+      "id": "AUTONOMOUS-TENANT-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "a1562373b3154b7a5fcbdf77ee1869f103f44e055af3d41b4108594bfd0cefab",
+      "progressDigest": "85f65a74328ad60219da5e902ad74f9b4944da6526c14565585f559617ab0cda",
       "terminalClosureDigest": null
     },
     {
@@ -3252,6 +3296,17 @@
       "updated": "2026-08-08",
       "definitionDigest": "9f1889561d84a710a34806cc3eaaab84a54f9817a594ad749c948c9fb04a7494",
       "progressDigest": "840e57b8cdd02c7d54c614842d68af881e0a4afffd9fa654cca33ae0dabc1792",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4054,
+      "id": "APPROVAL-DECISION-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "412205acc26fabe503260a9b6f292fb7d9dd17c96b5f4156b7d05dbc9533ed36",
+      "progressDigest": "0e03d26223fa65fc3a1dc839a45916448dc8d9a4197b9ef272068b1889989d11",
       "terminalClosureDigest": null
     },
     {
@@ -3359,9 +3414,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-05",
+      "updated": "2026-08-10",
       "definitionDigest": "2cb6136b5bdec104b7c9947f80286e9aea2d9a4909f027986fe086aa2db70c3d",
-      "progressDigest": "1b1d27d13baf7e9e922fb522e9df0e34c7e41cb47d222c9c124dd51b19b19514",
+      "progressDigest": "764ca2029101d997562ef1d8e5c03ec3e31c1354e62c5513277a84e8a61994b6",
       "terminalClosureDigest": null
     },
     {
@@ -3381,9 +3436,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-08-05",
+      "updated": "2026-08-10",
       "definitionDigest": "1c4e9939ebd9c9173d74783a52f31677c531ccd83dc6edec3b63be525ad8fb4d",
-      "progressDigest": "9ff1d9d1574093b9774da943284aa3648320fbc907e3f696bb8e4215ea0607f3",
+      "progressDigest": "7e9b331398728808104b851e3327f9785893123c4729ad362aff5253b96c9ba4",
       "terminalClosureDigest": null
     },
     {
@@ -3612,9 +3667,9 @@
       "program": "PRODUCT",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-08-10",
       "definitionDigest": "28f6a81929ece822bef8cb9b6ac87c3e681c2955d467d5f4cfd03e816a023d6d",
-      "progressDigest": "dde09872974a5a5c51c7126c5ebdfdad4b28ed3d1e0897d8756eb9ecc111802d",
+      "progressDigest": "085aad1637afd83dee9984c726f2f90c168ac2abb3c13e30c1c4b708e5a53679",
       "terminalClosureDigest": null
     },
     {
@@ -3744,9 +3799,20 @@
       "program": "DASHBOARD",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-10",
       "definitionDigest": "7536d694516a2c56fc1c6f969787a7759a55adefdd7270753c0eafdad039b3bb",
-      "progressDigest": "52454adf8f77d4123ff9696b30a44b81ec18e24cdb1abb1c4fa610e3d07f042c",
+      "progressDigest": "de68d416c3e482a931974063846467149884b8061c8db747268a5b66f4a6c50a",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 6111,
+      "id": "AUTONOMOUS-OBSERVABILITY-001",
+      "program": "DASHBOARD",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "6f58a0884a4fc4c4ed19d4b0ac01d718cfe7db9f0e08702a34b3076ae60b25b0",
+      "progressDigest": "e941704d7463c9d723218287fff97508452d74983a7e348b5c10d63a70a14346",
       "terminalClosureDigest": null
     },
     {
@@ -4525,9 +4591,20 @@
       "program": "DURABILITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-10",
       "definitionDigest": "7a1b26c8edccf2941b92a6a6499abae4c125cc6ff180f306ca2b6af74ada49b9",
-      "progressDigest": "106831a333294fc4f6a658247e5f651b47e6b08465addd0fc3eb9a0e32333acd",
+      "progressDigest": "045c14a10b1d8d865a920fdc5c697f5e1951b9be54df84b4abd032e6b6983b26",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 10011,
+      "id": "AUTONOMOUS-STATE-AUTHORITY-001",
+      "program": "DURABILITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "e246f2ef2b8ae9f1872621ac325b49e7f060d8685eb1a2d7680be9d4ac5c37ce",
+      "progressDigest": "c64bc6bd53c7512f971999ebe693350e243ae27910447c1ac1d9d533c8ed5b0e",
       "terminalClosureDigest": null
     },
     {
@@ -6815,15 +6892,17 @@
         "STATE-PRUNE-001",
         "TASK-RETENTION-001"
       ],
-      "children": [],
+      "children": [
+        "STATE-ARCHIVE-RESTORE-001"
+      ],
       "gates": [
         "G2",
         "G1"
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
+        "C": "1",
+        "W": "~",
         "E": "0",
         "H": "?",
         "L": "0",
@@ -6832,11 +6911,13 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "STATE-ARCHIVE-RESTORE-001"
+      ],
       "evidenceReceipts": [],
       "acceptance": "Tenant-aware age/count/size policies; bounded readers; atomic rotation",
-      "evidence": "2026-07-21 `.deckent` analysis; current files remeasured",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-21 `.deckent` analysis; current files remeasured; 2026-08-10 disk/code truth: `.deckent/archive` 2,849 dosya ve 98.2 MiB; sprint ve scheduler archive için archive-side retention yok; dizinler 0755 ve 2,814 dosya 0644; metrics `maxSizeMB` productionda tüketilmiyor, lexicographic generation sırası digit-width değişiminde bozuluyor ve same-sprint rotate overwrite riski taşıyor; expanded closure STATE-ARCHIVE-RESTORE-001 childındadır",
+      "updated": "2026-08-10"
     },
     {
       "order": 130,
@@ -6870,8 +6951,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Fresh manifest hash, no active sprint, backup/receipt; only approved targets",
-      "evidence": "Historical cleanup approval expired by drift",
-      "updated": "2026-07-26"
+      "evidence": "Historical cleanup approval expired by drift; 2026-08-10 archive analysis confirms no deletion is safe before STATE-ARCHIVE-RESTORE-001 cold-archive authority closure",
+      "updated": "2026-08-10"
     },
     {
       "order": 140,
@@ -6887,7 +6968,8 @@
         "DOCS-ARCHIVE-001",
         "DOCS-I18N-001",
         "DOCS-RELEASE-TRUTH-001",
-        "REPO-MIGRATION-001"
+        "REPO-MIGRATION-001",
+        "STATE-ARCHIVE-RESTORE-001"
       ],
       "children": [],
       "gates": [
@@ -7568,8 +7650,48 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Numeric/nonnumeric tasks, patch, evidence, cleanup and active-run exclusions covered",
-      "evidence": "`.deckent` analysis",
-      "updated": "2026-07-26"
+      "evidence": "`.deckent` analysis; 2026-08-10 code/disk truth: finalizer computes active classification but `archiveOrphanTasks` still archives all matching task artifacts; 613 historical task JSON currently classify active; four prompt artifacts are provably stored under a different sprint; terminal receipts cannot move until every status consumer has canonical-location plus backward-compatible fallback; lossless closure STATE-ARCHIVE-RESTORE-001 childındadır",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 305,
+      "id": "STATE-ARCHIVE-RESTORE-001",
+      "parent": "STATE-RETENTION-001",
+      "program": "TRUTH",
+      "outcome": "Warm ve cold archive için lossless restore, lineage-reader ve integrity authority",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "DOCS-TOPOLOGY-001"
+      ],
+      "dependents": [
+        "AUTONOMOUS-STATE-AUTHORITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "DOCS-TOPOLOGY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Versioned manifest/schema registry every archived artifactı tenant/project/run identity, producer, retention class, digest and restore target ile binds; restore hem `recently-works` hem cold archiveı path-safe, hash-verified, no-clobber ve crash-recoverable okur; usage/lineage canonical `.brain/archive` authoritysini tüketir; terminal receipt canonical-location migrationı fallback ile monotonic kalır; confidentiality, legal hold, failure injection ve Linux/macOS/Windows-native/WSL proofs pass",
+      "evidence": "2026-08-10 disk/code truth: 311 tar+sha pair checksum/gzip/path-safe olsa da `restoreFromSnapshot` yalnız `recently-works` okuduğundan cold archive restore dokümanı fiilen yanlış; `usage --lineage` `.deckent/archive` altında mevcut olmayan direct task JSON/result arıyor, gerçek task authority `.brain/archive/sprints/*-tasks`; 448 JSON içinde sprint-168 sonucu invalid; archive 0755/0644; iki ignored analysis corpusunda 662 doküman topology disposition bekliyor",
+      "updated": "2026-08-10"
     },
     {
       "order": 310,
@@ -12167,6 +12289,7 @@
         "KERNEL-ONTOLOGY-001"
       ],
       "dependents": [
+        "AUTONOMOUS-STATE-AUTHORITY-001",
         "GOAL-DAG-001",
         "KERNEL-ATTEMPT-001",
         "RUNFLOW-001",
@@ -12333,6 +12456,7 @@
         "KERNEL-ATTEMPT-001"
       ],
       "dependents": [
+        "AUTONOMOUS-CONTROL-PLANE-001",
         "GOAL-CUTOVER-001",
         "PROCESS-CUTOVER-001",
         "RECOVERY-MODE-ADAPTERS-001"
@@ -12375,6 +12499,7 @@
         "KERNEL-STATE-001"
       ],
       "dependents": [
+        "AUTONOMOUS-SCHEDULER-FAIRNESS-001",
         "GOAL-CUTOVER-001",
         "GOAL-POLICY-001"
       ],
@@ -12439,8 +12564,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Exactly-once request/decision, hydrate on restart, denial propagates",
-      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmediğinden riskli v2 mission approval request fail-closed park eder; v1 API/MCP unknown decision ID'yi doğrulamadan yazabilir",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmediğinden riskli v2 mission approval request fail-closed park eder; 2026-08-10 CURRENT CORRECTION: v1 API/MCP unknown-ID write açığı APPROVAL-INGRESS-UNKNOWN-ID-001 ile fail-closed kapandı, fakat v1 pending/decision tenant binding'i, overwrite/CAS ve verified-human authority hâlâ açık ve AUTONOMOUS-TENANT-AUTHORITY-001 + APPROVAL-DECISION-AUTHORITY-001 kapsamındadır",
+      "updated": "2026-08-10"
     },
     {
       "order": 3080,
@@ -12571,7 +12696,9 @@
       "dependents": [
         "GOAL-CANARY-001"
       ],
-      "children": [],
+      "children": [
+        "AUTONOMOUS-CONTROL-PLANE-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -12590,12 +12717,58 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "GOAL-DAG-001",
-        "MISSION-KIND-001"
+        "MISSION-KIND-001",
+        "AUTONOMOUS-CONTROL-PLANE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Transactional enqueue, explicit migration, no stranded mission or dual-write",
-      "evidence": "2026-07-27 code-truth: engine v2 config açıkken CLI/MCP/API status, backlog ve approval v1 store'u yönetiyor; explicit migration/retirement yok",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: engine v2 config açıkken CLI/MCP/API status, backlog ve approval v1 store'u yönetiyor; explicit migration/retirement yok; 2026-08-10 RCA: `process submit` CLI/API/MCP de configured legacy backlog'a yazıyor, v2 import source digest'i sonradan değişirse boot `MISSION_MIGRATION_CONFLICT` ile duruyor; `engine`, `per_tenant_pool_size` ve `result_timeout_ms` off-type/unvalidated; exact closure AUTONOMOUS-CONTROL-PLANE-001 childına ayrıldı",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 3111,
+      "id": "AUTONOMOUS-CONTROL-PLANE-001",
+      "parent": "GOAL-CUTOVER-001",
+      "program": "KERNEL",
+      "outcome": "Canonical autonomous v2 control plane ve lossless legacy retirement",
+      "priority": "P0",
+      "dependsOn": [
+        "MISSION-KIND-001",
+        "AUTONOMOUS-STATE-AUTHORITY-001",
+        "AUTONOMOUS-TENANT-AUTHORITY-001",
+        "APPROVAL-DECISION-AUTHORITY-001"
+      ],
+      "dependents": [
+        "AUTONOMOUS-OBSERVABILITY-001",
+        "AUTONOMOUS-SCHEDULER-FAIRNESS-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "MISSION-KIND-001",
+        "AUTONOMOUS-STATE-AUTHORITY-001",
+        "AUTONOMOUS-TENANT-AUTHORITY-001",
+        "APPROVAL-DECISION-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "`autonomous.engine`, tenant pool, timeout ve bütün state path'leri typed/validated/documented effective config olur; CLI, MCP, API, Terminal, connectors, Dashboard ve Process aynı v2 application service/read modelini tüketir; legacy backlog/pending/decisions tek seferlik digest-bound, transactional, resumable ve rollback-safe migration receipt'iyle taşınır; cutover sonrası hiçbir v1 writer kalmaz ve eski dosyalar ancak owner-approved disposition manifestiyle archive/delete edilir",
+      "evidence": "2026-08-10 code/disk truth: config `engine=v2` olduğu halde yalnız start v2'ye route ediyor; CLI status/backlog/approval, API `/api/autonomous/*`, üç MCP ailesi, Dashboard AutonomousPage ve Process legacy JSON authoritysini kullanıyor; real binary status v2 DB yerine 3 done+2 failed legacy entry gösterdi; DB'de `legacy` mission yok ve mevcut backlog bir sonraki başarılı v2 bootta import adayıdır",
+      "updated": "2026-08-10"
     },
     {
       "order": 3120,
@@ -13022,7 +13195,8 @@
         "RECOVERY-BORN-480-SCOPE-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
         "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
-        "RECOVERY-DO-DOGFOOD-001"
+        "RECOVERY-DO-DOGFOOD-001",
+        "STATE-ARCHIVE-RESTORE-001"
       ],
       "children": [],
       "gates": [
@@ -14165,7 +14339,9 @@
       "dependents": [
         "SURFACE-CUTOVER-001"
       ],
-      "children": [],
+      "children": [
+        "AUTONOMOUS-SCHEDULER-FAIRNESS-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -14184,12 +14360,13 @@
       "blockerRemedy": "exact ledger `DependsOn` IDs",
       "closureBlockedBy": [
         "GOAL-CANARY-001",
-        "RECOVERY-001"
+        "RECOVERY-001",
+        "AUTONOMOUS-SCHEDULER-FAIRNESS-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Triggers create governed missions; no alternate backlog/effect engine; bounded safety canary",
-      "evidence": "2026-07-27 code/live truth: config `enabled=true, engine=v2`; v2 executor/provider authority HOLD, loop fiilen yok; CLI/MCP/API v1 control plane ve Flow bridge yalnız disabled v1 yolunda",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code/live truth: config `enabled=true, engine=v2`; v2 executor/provider authority HOLD, loop fiilen yok; CLI/MCP/API v1 control plane ve Flow bridge yalnız disabled v1 yolunda; 2026-08-10 disk RCA: legacy ilk-pending seçimi approval bekleyen kaydı parked yapmadığı için source head-of-line kilitleniyor, scheduled/reactive/generator kaynakları starvation yaşıyor ve tek trigger 56,881 kez pending audit üretti; fairness/backpressure closure AUTONOMOUS-SCHEDULER-FAIRNESS-001 childındadır",
+      "updated": "2026-08-10"
     },
     {
       "order": 3191,
@@ -14473,8 +14650,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Every original/FIX/FIX-FIX attempt retains tokens and reference cost; subscription/local billed USD stays zero; job, KPI, usage and cost surfaces consume the same lineage-aware aggregate and expose attempt versus logical denominators",
-      "evidence": "Sprint-486 wired `lineage-usage-authority` into CLI usage, MCP usage, sprint reporter and finalizer; subscription/local/free-tier billing remains reference-only while attempt tokens remain visible. Focused lineage and surface tests pass. A fresh mixed original/FIX live replay, API/Terminal/Desktop parity and scale evidence remain open. Negative scope: no dropped FIX usage, catalog-as-invoice or hidden attempts",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-486 wired `lineage-usage-authority` into CLI usage, MCP usage, sprint reporter and finalizer; subscription/local/free-tier billing remains reference-only while attempt tokens remain visible. Focused lineage and surface tests pass. 2026-08-10 code/disk truth: CLI `usage --lineage` cold reader `.deckent/archive/sprints/<sprint>/` altında direct task JSON/result bekliyor fakat disk layoutta bunlardan sıfır var; canonical historical task producer/finalizer `.brain/archive/sprints/<sprint>-tasks` kullanıyor. Bu yanlış consumer STATE-ARCHIVE-RESTORE-001 ile kapanmadan historical parity kanıtlanmış sayılmaz. A fresh mixed original/FIX live replay, API/Terminal/Desktop parity and scale evidence remain open. Negative scope: no dropped FIX usage, catalog-as-invoice or hidden attempts",
+      "updated": "2026-08-10"
     },
     {
       "order": 3199,
@@ -16543,6 +16720,46 @@
       "updated": "2026-08-05"
     },
     {
+      "order": 3348,
+      "id": "AUTONOMOUS-SCHEDULER-FAIRNESS-001",
+      "parent": "AUTONOMY-CUTOVER-001",
+      "program": "KERNEL",
+      "outcome": "Tenant-fair autonomous scheduling, parked-approval progress ve bounded backpressure",
+      "priority": "P0",
+      "dependsOn": [
+        "AUTONOMOUS-CONTROL-PLANE-001",
+        "GOAL-DAG-001"
+      ],
+      "dependents": [
+        "AUTONOMOUS-OBSERVABILITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "AUTONOMOUS-CONTROL-PLANE-001",
+        "GOAL-DAG-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Approval bekleyen work atomik `parked` state'e geçer ve bağımsız due work'ü bloke etmez; backlog, scheduled, reactive ve generator kaynakları starvation-free tenant-fair scheduling kullanır; audit yalnız state transition/heartbeat policy'sine göre dedupe edilir; due/admission/dependency queries keyset-paginated ve budget-bound olur; queue, per-tenant cap, retry/dead-letter, cancellation, crash replay ve noisy-neighbor davranışı solo→million-scale load/chaos kanıtlarıyla doğrulanır",
+      "evidence": "2026-08-10 disk/code proof: `.deckent/recently-works/autonomous-events.jsonl` 19.3 MiB ve 56,920 valid event; 56,884 pending/awaiting-approval, tek `backlog-dash-ux-6-api` triggerı 56,881 tekrar; v1 `due[0]` + fixed source priority aynı kaydı her tick yeniden seçiyor. v2 per-tenant cap yolu bütün due FIFO'yu scansız sınır olmadan okuyor; legacy dependency/runtime reconciliation aktif seti toplu tarıyor",
+      "updated": "2026-08-10"
+    },
+    {
       "order": 4000,
       "id": "AUTHORITY-001",
       "parent": "P04",
@@ -16640,13 +16857,17 @@
         "API-IDENTITY-001",
         "API-SECURITY-001",
         "APPROVAL-001",
+        "APPROVAL-DECISION-AUTHORITY-001",
+        "AUTONOMOUS-STATE-AUTHORITY-001",
         "DATA-GOV-001",
         "ENTERPRISE-AUTH-001",
         "RECEIPT-001",
         "STORAGE-001",
         "TERMINAL-CONTEXT-001"
       ],
-      "children": [],
+      "children": [
+        "AUTONOMOUS-TENANT-AUTHORITY-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -16662,7 +16883,9 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "AUTONOMOUS-TENANT-AUTHORITY-001"
+      ],
       "evidenceReceipts": [
         "GR-2026-08-07-TENANT-T1-01",
         "GR-2026-08-07-TENANT-T2-01",
@@ -16674,6 +16897,41 @@
       "acceptance": "Read, write, event, memory, run, flow and admin paths share fail-closed scope; IDOR tests",
       "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired; `receipt=GR-2026-08-07-TENANT-T1-01`; T1 admission 2026-08-07 (Dalga-3 ikinci yolcu); 2026-08-07 T1 SETTLEMENT: strict_tenant_isolation artık gerçekten kapıyor — core'a resolveCallerTenant + typed TenantScopeError, API propose ingress'inde erken kapı (strict AÇIK: tenant-claim'siz çağıran 403 ile reddedilir ve akış oluşmaz; strict KAPALI: local varsayılanı bayt-değişmez); bulgu P1d ile aynı sınıftı — bayrak yalnız compliance-report'ta okunuyordu, hiçbir kararı etkilemiyordu; ayrıca dilim sırasında bir gerçek hata yakalandı ve düzeltildi: red throw'u try bloğunun dışında kalınca istek askıda kalıyordu (20s timeout), 403 erken yanıta çevrildi; `proof=tenant-strict-mode-3pins-api-106files-1036-green`; kalan kapsam (memory/run/event/admin yolları + IDOR matrisinin tamamı) T2 successor'ıdır; `receipt=GR-2026-08-07-TENANT-T2-01`; T2 admission 2026-08-07; 2026-08-07 T2 SETTLEMENT: tenant-scope kararı missions (liste+tekil) ve autonomous (chain okuma+mutation) ingress'lerine yayıldı — dört callsite tek karara bağlandı; yeni src/api/tenant-scope.ts fail-soft sync bayrak okuyucu + resolveApiCallerTenant (core resolveCallerTenant'ını kullanır; core config-loader-free kalır — P1b kontratı, route'lar senkron olduğundan okuma API katmanında); strict AÇIK tenant-claim'siz çağıranı 403 ile reddeder, strict KAPALI v1 bayt-değişmez, bozuk config sessizce sertleştirmez; `proof=tenant-t2-idor-pins-api-105files-1025-green`; 3 yeni IDOR pini + api sınıfı yeşil; kalan kapsam (memory/run/event/admin CLI+MCP yüzeyleri ve tam IDOR matrisi) T3 successor'ıdır; `receipt=GR-2026-08-07-TENANT-T3-01`; T3 admission 2026-08-07; 2026-08-07 T3 SETTLEMENT: kalan iki merkezi NULL-tenant sitesi kapatıldı — /api/plan ingress'i ve /api/terminal/* (kabuk erişimi taşıdığından tenant sınırının en duyarlı yüzeyi); ikisi de T2'nin paylaşılan resolveApiCallerTenant kararına bağlandı (strict AÇIK 403, strict KAPALI v1 bayt-değişmez); doğrulama notu: patch'lenen ilk site 410 ile emekli /api/start DEĞİL canlı /api/plan uçudur — ölü koda kablo çekilmediği kontrol edildi; `proof=tenant-t3-resolver-contract-pins-api-green`; 2 yeni resolver-kontrat pini (strict/permissive/tenant'lı + bozuk-config fail-soft), api sınıfı yeşil, tsc temiz; KAPSAM DÜZELTMESİ (T4 ön-kontrolünde bulundu, aynı gün): T3'ün kapattığı `/api/terminal/*` **HTTP rotalarıdır**; asıl kabuk borusu olan WebSocket upgrade (`attachTerminalGateway`, `src/api/terminal/ws-gateway.ts`) HTTP handler'ından GEÇMEZ ve token-only auth'ta `authTenant='local'` ile kabul edilir — yani HTTP'de 403 alan çağıran WS üzerinden kabuk alabilir; ayrıca T2/T3'ün dayandığı senkron `readStrictTenantIsolation` yalnız proje config'ini okur, `loadConfig`'in global katmanını (`resolveGlobalConfigReadPath`) görmez — global'de strict açan operatörde API katmanı sessizce permissive kalır (bu, daha önce iki kez kapatılan 'raporlar-ama-kapatmaz kontrol' sınıfının üçüncü örneği); ikisi de T4a diliminde kapatılacak, T4b kalan ingress (memory-search, process read+write, enterprise), T4c CLI+MCP 0-hardcode host-tenant çözümü; `receipt=GR-2026-08-07-TENANT-T4A-01`; T4a admission 2026-08-07; 2026-08-07 T4a SETTLEMENT: yukarıdaki kapsam-düzeltmesinin iki maddesi de kapatıldı. (1) Efektif bayrak — senkron okuyucu artık `loadConfig`'in katman zincirini yürüyor (defaults→global→project, yakın katman kazanır); bozuk bir katman 'görüş bildirmedi' sayılır, sessizce ne sertleştirir ne gevşetir; global-config yol çözümü saf yol-modülüne indirilip eski yerinden yeniden export edildi, böylece API katmanı toptan mock'lanan ağır config modülünü import etmiyor (davranış ve mevcut importer'lar aynı). Bu düzeltme T2/T3'ün bağladığı altı siteyi de gerçekten kapatır. (2) WS kabuk borusu — strict modda tenant'ı çözülemeyen çağıran upgrade'de typed 4403 ile reddedilir (HTTP 403'ün WS karşılığı) ve `bridge()`'e hiç ulaşılmaz; strict kapalıyken her iki yol da bayt-değişmez. Tier-1 kanıtı gerçek-sunucu koşusudur: `createHttpServer` + gerçek PTY backend + gerçek ws istemcisi, mock yok — strict AÇIK 4403 kapanışı, strict KAPALI açık kalan soket. Harness'ın ilk sürümü yanlış negatif verdi (gateway el-sıkışmayı tamamlayıp sonra kapatıyor, mevcut 4401 yolu da öyle); prob 'open' ile 'sunucu kapattı mı' ayrımına çevrildi. `proof=tenant-t4a-real-server-ws-4403-plus-layer-chain-pins`; 4 birim + 3 katman-öncelik + 2 gerçek-sunucu pini, api+core 622 dosya / 10176 test yeşil, tsc temiz, lint:gates tam zincir yeşil. KANIT SIKILAŞTIRMA (aynı gün, supp-02): gerçek-sunucu pini yalnız '4403 ile kapatıldı'yı doğruluyordu; el-sıkışma tamamlandığından bu, soketin kısa süre köprülenip sonra kapandığı bir dünyayla da uyumluydu — kabuk borusunda 'geç reddetme' ile 'hiç köprülememe' farklı güvenlik özellikleridir. Pin artık reddedilen upgrade'den sonra HİÇ oturum yaratılmadığını ve el-sıkışma biter bitmez gönderilen create çerçevesine HİÇ yanıt dönmediğini de doğruluyor — yeşil, yani reddetme geç değil. BINARY KANITI (2026-08-07, owner build onayıyla KAPANDI): `npm run build` sonrası paketlenmiş `dist/cli/entry.js serve` atılabilir projede koşturuldu, gerçek ws istemcisiyle problandı — strict AÇIK: sunucu 4403 ile kapattı, 0 çerçeve (hiç köprülenmedi); strict KAPALI: soket açık kaldı; Bearer'lı /api/status=200. Kaynak-üstü e2e ile birebir aynı davranış — typed açık madde kapandı. T4b ŞİDDET NOTU (ölçümle doğrulandı): memory-search'te iddiasız çağıran için tenant yüklemi hiç kurulmuyor — sorgu etiketsiz havuzu değil TÜM kiracıları döndürür, yani T4b'nin en geniş sızıntısı odur ve önce o kapatılır. Kalan kapsam: T4b (memory-search tenant yüklemi hiç kurulmuyor, process read+write, enterprise scope + audit damgaları), T4c (CLI+MCP host-tenant 0-hardcode çözümü); `receipt=GR-2026-08-07-T4A-SUPP-01`; `receipt=GR-2026-08-08-TENANT-T4B-01`; T4b SETTLEMENT 2026-08-08: memory-search'teki en geniş tenant sızıntısı kapatıldı — server.ts req'i geçmiyordu (principal türetilmiyordu) ve endpoint iddiasızda predicate kurmuyordu, ikisi de düzeltildi (resolveApiCallerTenant deseni, strict AÇIK 403, tenant'lı kendi kiracısı, strict KAPALI bayt-değişmez); `proof=tenant-t4b-3pins-cross-tenant-leak-closed-api-106files-1039-green`; en kritik pin cross-tenant sızıntının kapandığı gerçek-sunucu koşusu; kalan MCP memory-resource (T4c)",
       "updated": "2026-08-08"
+    },
+    {
+      "order": 4021,
+      "id": "AUTONOMOUS-TENANT-AUTHORITY-001",
+      "parent": "TENANT-001",
+      "program": "AUTHORITY",
+      "outcome": "Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority",
+      "priority": "P0",
+      "dependsOn": [
+        "PRINCIPAL-001"
+      ],
+      "dependents": [
+        "AUTONOMOUS-CONTROL-PLANE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "v1/v2 status, backlog, mission, pending, approve/reject, process ve reactive ingress verified principal'dan tek tenant/project scope çözer; non-admin foreign veya tenant-less strict caller hiçbir metadata, existence veya mutation authority elde etmez; approval request/decision exact tenant+principal+revision'a bind edilir; IDs ve store constraints tenant-composite veya eşdeğer collision-proof olur; CLI/MCP/API/Dashboard/connectors için cross-tenant IDOR ve confused-deputy matrisi gerçek composition root üzerinden pass eder",
+      "evidence": "2026-08-10 CURRENT CORRECTION to TENANT-001 T2 settlement: production server `req` geçiriyor fakat `AutonomousRouteOptions.strictTenantIsolation` geçirmiyor, bu nedenle backlog filter branch unreachable; pending/status tenant filter yapmıyor, approve/reject request tenant'ını pending owner'a bağlamıyor; webhook principal/tenant provenance taşımıyor. Önceki T2 kanıtı yalnız direct route/unit ve lineage/missions kapsamını kapattı, autonomous mutation ailesini kapatmış sayılmaz",
+      "updated": "2026-08-10"
     },
     {
       "order": 4030,
@@ -16736,6 +16994,7 @@
       "dependents": [
         "AGENT-SKILL-001",
         "APPROVAL-001",
+        "APPROVAL-DECISION-AUTHORITY-001",
         "ECOSYSTEM-001",
         "ENTERPRISE-AUTH-001",
         "MCP-TRUST-001",
@@ -16804,7 +17063,8 @@
       "children": [
         "APPROVAL-READ-PURITY-001",
         "APPROVAL-READ-CROSSPLATFORM-PROOF-001",
-        "APPROVAL-INGRESS-UNKNOWN-ID-001"
+        "APPROVAL-INGRESS-UNKNOWN-ID-001",
+        "APPROVAL-DECISION-AUTHORITY-001"
       ],
       "gates": [
         "G2",
@@ -16827,7 +17087,8 @@
         "OPERATION-001",
         "CAPABILITY-001",
         "APPROVAL-READ-CROSSPLATFORM-PROOF-001",
-        "APPROVAL-INGRESS-UNKNOWN-ID-001"
+        "APPROVAL-INGRESS-UNKNOWN-ID-001",
+        "APPROVAL-DECISION-AUTHORITY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-08-08-APPROVAL-T1-01",
@@ -16900,6 +17161,47 @@
       "acceptance": "An approval id absent from the durable pending queue is refused fail-closed at BOTH the API and MCP ingress — no decision is persisted, a typed APR_UNKNOWN_REQUEST is returned and the refusal is written to the durable audit trail; the loop park path and every read surface resolve one canonical pending-queue path",
       "evidence": "`historical-authority=commit-b98c526b7;historical-gates=G1;proof=approval-t1-guard-typed403-parkread-pin-97-green`; APPROVAL-001'in API+MCP unknown-ID ingress dilimi burada VERIFY-able olarak carve edildi (owner 2026-08-08 kararı) — parent broker satırı G2-design + 7-yüzey kapsamıyla OPEN kalır, bu child yalnız G1 ingress'i kapsar. T1 dilimi PR 108 ile main'e girdi (merge commit b98c526b7 yukarıda pinlendi). Kapsam autonomous approval-adapter accept/reject fail-closed guard (taze disk pending.json artı in-memory yoksa karar YAZILMAZ, typed hata, red durable audit'e writeAuditEvent ile yazılır), API tipli 403, MCP tipli fail; advisor-hardening ile yedi ingress tek canonical autonomousPendingPath resolver'a indirildi ve park-read producer-consumer pin eklendi. `proof=approval-t1-97-tests-green-plus-lint-gates`. AÇIK typed-residual (bu G1 ingress diliminin dışında, parent OPEN'da izlenir): decision-overwrite still-pending, CLI reddi audit yazmaz, refusal recentAudit dashboard'da görünmez, real-binary Tier-1 smoke koşulmadı",
       "updated": "2026-08-08"
+    },
+    {
+      "order": 4054,
+      "id": "APPROVAL-DECISION-AUTHORITY-001",
+      "parent": "APPROVAL-001",
+      "program": "AUTHORITY",
+      "outcome": "Protected approval decisionları için worker-dışı, zorunlu ve doğrulanmış human authority chain",
+      "priority": "P0",
+      "dependsOn": [
+        "PRINCIPAL-001",
+        "TENANT-001",
+        "CAPABILITY-001"
+      ],
+      "dependents": [
+        "AUTONOMOUS-CONTROL-PLANE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TENANT-001",
+        "CAPABILITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Protected effect için `authorization` mandatory ve cryptographically verified olur; decision store worker-write boundary dışında host-owned custody taşır; terminal, RPC, API, Desktop, connectors, Worker ve Nervous tek verified ingress/policy tüketir; unsigned legacy kayıt hiçbir effect authorize etmez; principal, tenant, operation, request revision, expiry ve one-shot nonce bind edilir; tamper, replay, overwrite, CAS race, crash recovery ve Linux/macOS/Windows-native/WSL kanıtları pass",
+      "evidence": "2026-08-10 code-truth RCA: Docker implementation worker project rootu read-write görür ve `.deckent/approvals` yazabilir; `ApprovalDecision.authorization` optionaldır; broker external decisionı schema/request/filename ile kabul eder; worker gate `decision=allow` değerini authority doğrulamadan effecte geçirir. API `api_decide=true` kolu OIDC+MAC ile daha güçlü, fakat terminal/RPC/direct-broker yolları unsigneddır. APPROVAL-INGRESS-UNKNOWN-ID-001 yalnız olmayan IDyi kapatır ve bu authority açığını kapatmış sayılmaz. Cross-audit G11a/G24 bu exact child altında settlementa bağlanır",
+      "updated": "2026-08-10"
     },
     {
       "order": 4060,
@@ -17310,6 +17612,7 @@
         "OPERATION-001"
       ],
       "dependents": [
+        "AUTONOMOUS-OBSERVABILITY-001",
         "DASHBOARD-OBS-001",
         "ECOSYSTEM-001",
         "ENTERPRISE-AUTH-001",
@@ -17345,8 +17648,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Every decision/effect/settlement traceable; redaction schema and bounded retention",
-      "evidence": "Existing audit systems fragmented; 2026-08-05 kod-truth: `AUDIT_HMAC_SECRET` sabit string (`audit-writer.ts:35`) — ana zincir kaynak-sahibi adversary'ye karşı sahtelenebilir, terminal zincirindeki makine-lokal rastgele anahtar deseni (`api/terminal/audit-integrity.ts`, 0600) ana zincire taşınmalı; redaction sink-level chokepoint değil call-site-bazlı — worker `.log`/`.result` yakalaması ve genel `writeEvent` payload'ları kapsam dışı kalıyor",
-      "updated": "2026-08-05"
+      "evidence": "Existing audit systems fragmented; 2026-08-05 kod-truth: `AUDIT_HMAC_SECRET` sabit string (`audit-writer.ts:35`) — ana zincir kaynak-sahibi adversary'ye karşı sahtelenebilir, terminal zincirindeki makine-lokal rastgele anahtar deseni (`api/terminal/audit-integrity.ts`, 0600) ana zincire taşınmalı; redaction sink-level chokepoint değil call-site-bazlı — worker `.log`/`.result` yakalaması ve genel `writeEvent` payload'ları kapsam dışı kalıyor; 2026-08-10 autonomous RCA: writer canonical `recently-works/autonomous-events.jsonl` kullanırken API ve broad MCP mevcut olmayan `.deckent/autonomous-events.jsonl` okuyor; 10 MiB rotation `.1`i overwrite ediyor ve readers rotated partitionı okumadığından history/HMAC continuity kaybolabiliyor; exact read-model/retention closure AUTONOMOUS-OBSERVABILITY-001 childındadır",
+      "updated": "2026-08-10"
     },
     {
       "order": 4125,
@@ -17421,8 +17724,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No raw config disclosure, IDOR, query-token persistence or unscoped admin action",
-      "evidence": "2026-07-27 code-truth: autonomous strict-tenant option composition root'a geçmiyor; v1 approval API unknown ID doğrulamıyor; identity/tenancy/approval authority closure bekleniyor; 2026-08-05 kod-truth: loopback kombinasyonu — localhost auto-inject (`auth.ts:177-179,201-209`) + rate-limit `exemptLoopback` default-true (`server.ts:169,2015`) lokal caller'ı hem auth'suz hem throttle'sız bırakıyor; CORS `Origin: null` verbatim kabul (`server.ts:317`, sandboxed iframe/data: dokümanları da null gönderir); `DECKENT_API_AUTH_DISABLED=1` yalnız stderr uyarısıyla tam bypass (`auth.ts:181-188`)",
-      "updated": "2026-08-05"
+      "evidence": "2026-07-27 code-truth: autonomous strict-tenant option composition root'a geçmiyor; 2026-08-10 CURRENT CORRECTION: v1 approval unknown-ID guard 2026-08-08'de fail-closed kapandı, fakat production autonomous composition hâlâ strict option geçirmiyor ve pending/status/approve/reject tenant-scope uygulamıyor; exact IDOR closure AUTONOMOUS-TENANT-AUTHORITY-001 kapsamındadır; 2026-08-05 kod-truth: loopback kombinasyonu — localhost auto-inject (`auth.ts:177-179,201-209`) + rate-limit `exemptLoopback` default-true (`server.ts:169,2015`) lokal caller'ı hem auth'suz hem throttle'sız bırakıyor; CORS `Origin: null` verbatim kabul (`server.ts:317`, sandboxed iframe/data: dokümanları da null gönderir); `DECKENT_API_AUTH_DISABLED=1` yalnız stderr uyarısıyla tam bypass (`auth.ts:181-188`)",
+      "updated": "2026-08-10"
     },
     {
       "order": 4140,
@@ -18282,8 +18585,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Propose, approve, start, cancel, inspect and settle use cases independent of transport/UI",
-      "evidence": "2026-07-27 code-truth: CLI/REPL RunFlow controller, API coordinator, autonomous v1/v2 control ve Flow queue ayrı services; cancel/settle/status canonical use case değil",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: CLI/REPL RunFlow controller, API coordinator, autonomous v1/v2 control ve Flow queue ayrı services; cancel/settle/status canonical use case değil; 2026-08-10 autonomous RCA: broad MCP CLI helper import ediyor, dedicated MCP aynı backlog işlemlerini farklı schema/annotation ile yeniden implemente ediyor, Dashboard v1 AutonomousPage ve v2 MissionsPage olarak iki read model sunuyor, Process ayrıca v1 JSON writerı; canonical closure AUTONOMOUS-CONTROL-PLANE-001",
+      "updated": "2026-08-10"
     },
     {
       "order": 6011,
@@ -18642,6 +18945,7 @@
       "dependents": [
         "API-DEVELOPER-001",
         "API-EVENT-001",
+        "AUTONOMOUS-OBSERVABILITY-001",
         "SURFACE-PARITY-001"
       ],
       "children": [],
@@ -18766,7 +19070,9 @@
       "dependents": [
         "SURFACE-PARITY-001"
       ],
-      "children": [],
+      "children": [
+        "AUTONOMOUS-OBSERVABILITY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -18785,12 +19091,55 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "SURFACE-CONTRACT-001",
-        "AUDIT-001"
+        "AUDIT-001",
+        "AUTONOMOUS-OBSERVABILITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "No fake/proxy metrics or second execution engine; freshness, empty/error states and tenant scope",
-      "evidence": "2026-06 delivered items preserved; residuals revalidate; 2026-08-03 ölçüm (PAZARTESI P8): dashboard suite 1165 test geçiyor; 2 dosya canlı sunucu (127.0.0.1:3000) gerektirdiği için kırık. Harness kararı bekliyor: sunucu ayağa kaldırılsın mı, koşullu skip mi",
-      "updated": "2026-08-03"
+      "evidence": "2026-06 delivered items preserved; residuals revalidate; 2026-08-03 ölçüm (PAZARTESI P8): dashboard suite 1165 test geçiyor; 2 dosya canlı sunucu (127.0.0.1:3000) gerektirdiği için kırık. Harness kararı bekliyor: sunucu ayağa kaldırılsın mı, koşullu skip mi; 2026-08-10 autonomous RCA: v1 AutonomousPage ile v2 MissionsPage aynı capabilityyi iki farklı truth gibi gösteriyor, v1 status current engine liveness göstermiyor ve recentAudit yanlış path nedeniyle boş; exact closure AUTONOMOUS-OBSERVABILITY-001 childındadır",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 6111,
+      "id": "AUTONOMOUS-OBSERVABILITY-001",
+      "parent": "DASHBOARD-OBS-001",
+      "program": "DASHBOARD",
+      "outcome": "Current-engine autonomous status, causal audit ve documentation truth projection",
+      "priority": "P1",
+      "dependsOn": [
+        "AUTONOMOUS-CONTROL-PLANE-001",
+        "AUTONOMOUS-SCHEDULER-FAIRNESS-001",
+        "AUDIT-001",
+        "API-CONTRACT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "AUTONOMOUS-CONTROL-PLANE-001",
+        "AUTONOMOUS-SCHEDULER-FAIRNESS-001",
+        "AUDIT-001",
+        "API-CONTRACT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "CLI/MCP/API/Dashboard tek versioned read modelden engine version, lease/liveness, queue/approval/mission state, freshness revision ve typed unavailable/error okur; event/audit readers canonical current+rotated partitionsı tenant-scoped cursor pagination ile doğrular ve HMAC continuity/legal hold korur; Autonomous/Missions UX tek kavramsal yüzeye uzlaşır, bütün user-facing stringler EN/TR i18n authorityden gelir; config, DB, CLI, MCP ve execution-mode dokümanları generated code-truth checks ile drift edemez",
+      "evidence": "2026-08-10 code/doc proof: API ve broad MCP `.deckent/autonomous-events.jsonl` okuyor, writer `.deckent/recently-works/autonomous-events.jsonl` yazıyor; current file 19.3 MiB/56,920 event, reader `.1` rotationı görmüyor; `/api/missions` unbounded list + per-mission listItems N+1; DB docs 14 table derken gerçek schema 13, feature/execution docs CLI-only/no-MCP diyor fakat üç MCP autonomous ailesi registered; MissionsPage hardcoded English literal taşıyor",
+      "updated": "2026-08-10"
     },
     {
       "order": 6120,
@@ -21536,6 +21885,50 @@
         "ENTERPRISE-MODULARITY-001",
         "HA-001"
       ],
+      "children": [
+        "AUTONOMOUS-STATE-AUTHORITY-001"
+      ],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-STATE-001",
+        "TENANT-001",
+        "AUTONOMOUS-STATE-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "SQLite single-node and enterprise distributed adapter boundaries; no unsafe full-file RMW",
+      "evidence": "Code-truth audit persistence P0; 2026-08-10 autonomous state RCA exact closure AUTONOMOUS-STATE-AUTHORITY-001 childına ayrıldı",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 10011,
+      "id": "AUTONOMOUS-STATE-AUTHORITY-001",
+      "parent": "STORAGE-001",
+      "program": "DURABILITY",
+      "outcome": "Autonomous state catalog, pure readers ve versioned transactional migration authority",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-STATE-001",
+        "TENANT-001",
+        "STATE-ARCHIVE-RESTORE-001"
+      ],
+      "dependents": [
+        "AUTONOMOUS-CONTROL-PLANE-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -21555,12 +21948,13 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "KERNEL-STATE-001",
-        "TENANT-001"
+        "TENANT-001",
+        "STATE-ARCHIVE-RESTORE-001"
       ],
       "evidenceReceipts": [],
-      "acceptance": "SQLite single-node and enterprise distributed adapter boundaries; no unsafe full-file RMW",
-      "evidence": "Code-truth audit persistence P0",
-      "updated": "2026-07-26"
+      "acceptance": "Her autonomous artifact typed owner, lifecycle, retention, confidentiality ve restore class taşır; read-only API/CLI/MCP hiçbir directory/DB/WAL/SHM/schema oluşturmaz veya migrate etmez; writable open versioned, crash-atomic, checksum/backup-bound migration registry kullanır; tenant/project identity store constraints'a bind edilir; state path'leri non-empty relative realpath containment ile çözülür; permissions/ACL/key custody Linux, macOS, Windows-native ve WSL adapterlarıyla enforce edilir; tracked seed ile local runtime state ayrılır ve delete yalnız no-live-handle + owner manifest + restore receipt ile yapılır",
+      "evidence": "2026-08-10 disk/code proof: tracked `autonomous.db` 188,416 byte, 13 table/4 mission/5 item ve `user_version=0`; constructor mkdir+RW open+WAL yapıyor, GET `/api/missions` ve CLI list `migrate()` çağırıyor; migration explicit version registry/tek reviewed transaction taşımıyor; DB/JSON 0644, directory 0755; tracked empty decisions runtime write'ta worktreeyi dirty eder; `backlog_path`/`map_path` string-only validate ve root containment yok; ignored orphan `dash-ux-6-task.md` consumer'sız fakat cutover/disposition receipt'i olmadan silinemez",
+      "updated": "2026-08-10"
     },
     {
       "order": 10020,
@@ -21848,6 +22242,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "bb9fe7495aca8b095d5e800b4e947203af36de3f63736c36a708a7c9943bbde5"
+    "value": "ddfb64e1daf128e473e982a52ef58435b2ec46806cfadeea9bfe50f464b60e8a"
   }
 }

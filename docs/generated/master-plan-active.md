@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f00d56f32665a8e211826d3293692cace97909d446d4c6ec2558d81dc89d405a`
+**Source digest:** `sha256(normalized-lf-utf8):718a77f256f50d4121056000fe987d2524b900baa2a4d0d8e797a7fd9762b512`
 
-**Rows:** 413 total · 366 active · 47 terminal
+**Rows:** 420 total · 373 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 273 |
+| OPEN | 280 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -57,6 +57,7 @@
 | 280 | `SCRIPT-RETIRE-001` | BLOCKED | P2 | TRUTH | `SCRIPT-LIFECYCLE-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Exact replacement-proven script/test retirement |
 | 290 | `TEST-ORPHAN-001` | BLOCKED | P2 | TRUTH | `TEST-HERMETIC-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Orphan benchmark, skips and test naming disposition |
 | 300 | `TASK-RETENTION-001` | OPEN | P1 | TRUTH | `STATE-RETENTION-001` | — | Task artifacts and archive retention coverage |
+| 305 | `STATE-ARCHIVE-RESTORE-001` | OPEN | P0 | TRUTH | `RECOVERY-COMMAND-SERVICE-001`, `DOCS-TOPOLOGY-001` | — | Warm ve cold archive için lossless restore, lineage-reader ve integrity authority |
 | 310 | `ERROR-SEVERITY-001` | OPEN | P2 | TRUTH | `STATE-RETENTION-001` | — | Operational breadcrumb and error forensic severity truth |
 | 320 | `OPS-BRANCH-001` | OPEN | P1 | TRUTH | `SSOT-001` | — | Branch, worktree, remote and unpushed-commit authority inventory |
 | 330 | `OPS-RETIRE-001` | BLOCKED | P2 | TRUTH | `OPS-BRANCH-001` | `FRESH_REMOTE_APPROVAL_REQUIRED` | Approved branch and remote retirement |
@@ -171,6 +172,7 @@
 | 3090 | `GOAL-PROVIDER-001` | OPEN | P0 | KERNEL | `CM-05`, `RECEIPT-001`, `LIMIT-001` | — | Model, reachability, budget and receipt authority in Goal paths |
 | 3100 | `GOAL-CRASH-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001` | — | Goal claim/effect/settlement crash idempotency |
 | 3110 | `GOAL-CUTOVER-001` | OPEN | P0 | KERNEL | `GOAL-DAG-001`, `MISSION-KIND-001` | — | Autonomous plan and legacy backlog migration into canonical missions |
+| 3111 | `AUTONOMOUS-CONTROL-PLANE-001` | OPEN | P0 | KERNEL | `MISSION-KIND-001`, `AUTONOMOUS-STATE-AUTHORITY-001`, `AUTONOMOUS-TENANT-AUTHORITY-001`, `APPROVAL-DECISION-AUTHORITY-001` | — | Canonical autonomous v2 control plane ve lossless legacy retirement |
 | 3120 | `GOAL-CANARY-001` | BLOCKED | P0 | KERNEL | `GOAL-POLICY-001`, `GOAL-ACCEPTANCE-001`, `GOAL-PROVIDER-001`, `GOAL-CRASH-001`, `GOAL-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Goal-v2 approval, dependency, receipt and recovery canaries |
 | 3130 | `RUNFLOW-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `KERNEL-SETTLEMENT-001` | — | Durable RunFlow coordinator as sole proposal/approval/run authority |
 | 3140 | `SCHEDULER-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001` | — | Pure reducer and typed effect executor scheduler cutover |
@@ -266,13 +268,16 @@
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
+| 3348 | `AUTONOMOUS-SCHEDULER-FAIRNESS-001` | OPEN | P0 | KERNEL | `AUTONOMOUS-CONTROL-PLANE-001`, `GOAL-DAG-001` | — | Tenant-fair autonomous scheduling, parked-approval progress ve bounded backpressure |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
+| 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |
 | 4030 | `OPERATION-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Versioned canonical operation catalog |
 | 4040 | `CAPABILITY-001` | OPEN | P0 | AUTHORITY | `OPERATION-001`, `PRINCIPAL-001` | — | Capability authority and progressive disclosure contract |
 | 4050 | `APPROVAL-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `OPERATION-001`, `CAPABILITY-001` | — | Runtime-wide durable ApprovalBroker |
 | 4052 | `APPROVAL-READ-CROSSPLATFORM-PROOF-001` | OPEN | P2 | AUTHORITY | `APPROVAL-READ-PURITY-001` | — | Approval read-purity'nin cross-platform real-binary kanıtı |
 | 4053 | `APPROVAL-INGRESS-UNKNOWN-ID-001` | VERIFY | P0 | AUTHORITY | — | — | Unknown/forged approval id fail-closed at the API and MCP ingress |
+| 4054 | `APPROVAL-DECISION-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `CAPABILITY-001` | — | Protected approval decisionları için worker-dışı, zorunlu ve doğrulanmış human authority chain |
 | 4060 | `TOOL-AUTHORITY-001` | VERIFY | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
@@ -318,6 +323,7 @@
 | 6090 | `API-IDENTITY-001` | OPEN | P0 | API | `PRINCIPAL-001`, `TENANT-001`, `API-SECURITY-001` | — | OIDC, workload identity, tenant authorization and rate enforcement |
 | 6100 | `CONNECTOR-IDENTITY-001` | OPEN | P0 | CONNECTOR | `PRINCIPAL-001`, `APPROVAL-001`, `APP-SERVICE-001` | — | Gateway and connector session identity, pairing and approval authority |
 | 6110 | `DASHBOARD-OBS-001` | OPEN | P1 | DASHBOARD | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Dashboard as honest, read-oriented observability projection |
+| 6111 | `AUTONOMOUS-OBSERVABILITY-001` | OPEN | P1 | DASHBOARD | `AUTONOMOUS-CONTROL-PLANE-001`, `AUTONOMOUS-SCHEDULER-FAIRNESS-001`, `AUDIT-001`, `API-CONTRACT-001` | — | Current-engine autonomous status, causal audit ve documentation truth projection |
 | 6120 | `SURFACE-PARITY-001` | BLOCKED | P0 | PRODUCT | `DESKTOP-REBORN-001`, `API-CONTRACT-001`, `CONNECTOR-IDENTITY-001`, `DASHBOARD-OBS-001` | `DEPENDENCY_UNSATISFIED` | Capability-by-capability parity and intentional negative-space matrix |
 | 6130 | `API-EVENT-001` | OPEN | P0 | API | `API-CONTRACT-001`, `KERNEL-SETTLEMENT-001`, `STORAGE-001` | — | Durable asynchronous jobs, event streams, webhooks and outbox delivery |
 | 6140 | `API-DEVELOPER-001` | OPEN | P1 | API | `API-CONTRACT-001`, `SURFACE-PARITY-001` | — | OpenAPI, generated SDKs, CLI/MCP parity and compatibility lifecycle |
@@ -385,6 +391,7 @@
 | 9070 | `FINE-TUNE-001` | OPEN | P2 | LEARNING | `TRAINING-TRACE-001`, `PROMOTION-001`, `DATA-GOV-001` | — | Deckent-core fine-tune only after trace/data/governance readiness |
 | 10000 | `SCALE-001` | OPEN | P0 | SCALE | `SSOT-003`, `TRUTH-BASELINE-001` | — | Million-scale assurance parent |
 | 10010 | `STORAGE-001` | OPEN | P0 | DURABILITY | `KERNEL-STATE-001`, `TENANT-001` | — | Transactional durable state backend and migration strategy |
+| 10011 | `AUTONOMOUS-STATE-AUTHORITY-001` | OPEN | P0 | DURABILITY | `KERNEL-STATE-001`, `TENANT-001`, `STATE-ARCHIVE-RESTORE-001` | — | Autonomous state catalog, pure readers ve versioned transactional migration authority |
 | 10020 | `DATA-GOV-001` | OPEN | P0 | DATA | `TENANT-001`, `STORAGE-001`, `STATE-RETENTION-001` | — | Tenant data lifecycle, retention, encryption, residency and deletion authority |
 | 10030 | `HA-001` | OPEN | P0 | RESILIENCE | `STORAGE-001`, `KERNEL-ATTEMPT-001` | — | Multi-node coordination, HA, failover and disaster recovery |
 | 10040 | `SLO-001` | OPEN | P0 | OBS | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Product and platform SLI/SLO/error-budget contract |
