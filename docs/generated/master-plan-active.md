@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f00d56f32665a8e211826d3293692cace97909d446d4c6ec2558d81dc89d405a`
+**Source digest:** `sha256(normalized-lf-utf8):5d6a80d79462a7f48cde0d46a928541548a062f826f07d54478a190e74e30716`
 
-**Rows:** 413 total · 366 active · 47 terminal
+**Rows:** 430 total · 383 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 273 |
+| OPEN | 290 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -37,12 +37,15 @@
 | 100 | `REPO-DECK-001` | OPEN | P0 | TRUTH | — | — | `.deck` secret'ını Docker context ve image layers'dan dışla |
 | 110 | `HEARTBEAT-001` | OPEN | P1 | TRUTH | — | — | Default heartbeat template ile metachar guard çelişkisini gider |
 | 120 | `STATE-RETENTION-001` | OPEN | P1 | TRUTH | `SSOT-002` | — | Runtime state/log retention, rotation, legal hold ve crash recovery contract |
+| 121 | `CRASH-FORENSICS-AUTHORITY-001` | OPEN | P1 | TRUTH | — | — | Crash artifact schema, privacy, collision-free retention, typed classification ve support/recovery consumption authority |
+| 122 | `NERVOUS-STATE-LIFECYCLE-001` | OPEN | P1 | TRUTH | `AUDIT-001`, `APPROVAL-001` | — | Nervous durable state, proposal, history ve IPC artefaktları için tenant-aware lifecycle, privacy ve recovery authority |
 | 130 | `STATE-PRUNE-001` | BLOCKED | P2 | TRUTH | `STATE-RETENTION-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Exact dry-run state prune manifest ve recoverable apply flow |
 | 140 | `DOCS-TOPOLOGY-001` | OPEN | P1 | TRUTH | `SSOT-002` | — | `docs`, `docs1`, `.analysis` ve generated-doc topology kararını current consumer graph ile yeniden ver |
 | 150 | `DOCS-ARCHIVE-001` | BLOCKED | P2 | TRUTH | `DOCS-TOPOLOGY-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Approved exact archive/git-mv manifestini uygulayıp links ve writers'ı güncelle |
 | 160 | `DOCS-ADR-SYNC-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Accepted ADR DB↔filesystem full-content/digest parity gate |
 | 170 | `DOCS-RELEASE-TRUTH-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `SSOT-003` | — | Generated stats, references and release-doc truth authority |
 | 171 | `DOCS-DEPS-HOME-001` | OPEN | P2 | TRUTH | — | — | Dependency-doku ile gerçek kurulum-ağacının (HOME/global adapterlar dahil) tek-kaynak hizası: docs/reference/dependencies.md kayıtları ile package.json/override gerçeği arasındaki drift sınıfı kapatılır |
+| 172 | `MANAGED-DOC-CACHE-TRUTH-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `STATE-RETENTION-001` | — | Managed-doc config target, generator eligibility, cache lifecycle ve invalidation outcome tek truthful contractta uzlaşır |
 | 180 | `DOCS-I18N-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `DOCS-RELEASE-TRUTH-001` | — | Documentation i18n contract for en, tr, zh-Hans, es, ja and hi |
 | 190 | `MEMORY-AUTHORITY-001` | OPEN | P0 | TRUTH | `SSOT-002` | — | Repo-local provider-neutral canonical memory; provider HOME surfaces projections only |
 | 200 | `MEMORY-TRUTH-001` | BLOCKED | P1 | TRUTH | `MEMORY-AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Memory index count, stale watch, task-capacity and phantom ledger drift'lerini hükme bağla |
@@ -57,6 +60,7 @@
 | 280 | `SCRIPT-RETIRE-001` | BLOCKED | P2 | TRUTH | `SCRIPT-LIFECYCLE-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Exact replacement-proven script/test retirement |
 | 290 | `TEST-ORPHAN-001` | BLOCKED | P2 | TRUTH | `TEST-HERMETIC-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Orphan benchmark, skips and test naming disposition |
 | 300 | `TASK-RETENTION-001` | OPEN | P1 | TRUTH | `STATE-RETENTION-001` | — | Task artifacts and archive retention coverage |
+| 305 | `STATE-ARCHIVE-RESTORE-001` | OPEN | P0 | TRUTH | `RECOVERY-COMMAND-SERVICE-001`, `DOCS-TOPOLOGY-001` | — | Warm ve cold archive için lossless restore, lineage-reader ve integrity authority |
 | 310 | `ERROR-SEVERITY-001` | OPEN | P2 | TRUTH | `STATE-RETENTION-001` | — | Operational breadcrumb and error forensic severity truth |
 | 320 | `OPS-BRANCH-001` | OPEN | P1 | TRUTH | `SSOT-001` | — | Branch, worktree, remote and unpushed-commit authority inventory |
 | 330 | `OPS-RETIRE-001` | BLOCKED | P2 | TRUTH | `OPS-BRANCH-001` | `FRESH_REMOTE_APPROVAL_REQUIRED` | Approved branch and remote retirement |
@@ -72,9 +76,11 @@
 | 450 | `RUNTIME-FLOOR-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Tek runtime minimum sürüm contractı: package engines, doctor, onboarding ve release gate aynı floor'u ilan ve test eder |
 | 460 | `ERROR-REGISTRY-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Emitted her typed error kodu tek registry'de message ve remediation ile kayıtlı; kullanıcıya görünen doküman aynı kaynaktan üretilir |
 | 470 | `CONFIG-TRUTH-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Config leaf metadata ve default üretimi tek canonical kaynaktan; manifest backend default'u aynı kaynağı tüketir |
+| 475 | `NERVOUS-CONFIG-EXECUTION-TRUTH-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `AUDIT-001` | — | Nervous config, detector/action capability registry, host ownership ve status/docs projectionı tek execution truth üretir |
 | 480 | `PROVIDER-OBS-MIGRATION-001` | OPEN | P1 | TRUTH | — | — | Provider-execution-observation DB'sinin owner-controlled v1→v2 migration'ı: backup, migrate, adoption proof |
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
+| 505 | `I18N-CATALOG-AUTHORITY-001` | OPEN | P1 | TRUTH | `PACKAGING-001`, `DOCS-RELEASE-TRUTH-001` | — | Runtime locale catalog, typed key projection, init/package dağıtımı ve project override için tek versioned authority |
 | 510 | `CLI-VOCAB-001` | OPEN | P1 | TRUTH | — | — | Public CLI contract onarımı: yazım-hatalı enum'lar, run/sprint namespace çarpışması ve config read yüzeyi tek karara bağlanır |
 | 524 | `VERIFY-HISTORICAL-CLOSURE-001` | OPEN | P2 | TRUTH | — | — | Historical-only VERIFY satırlarının (10 adet) receipt-gated kapanış dilimi: her satır için kanıt-durumu tiplenir (yeniden-doğrulanabilir / historical-yeterli / eksik-kanıt) ve kapanış turu Alperen onayıyla koşulur |
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
@@ -171,6 +177,7 @@
 | 3090 | `GOAL-PROVIDER-001` | OPEN | P0 | KERNEL | `CM-05`, `RECEIPT-001`, `LIMIT-001` | — | Model, reachability, budget and receipt authority in Goal paths |
 | 3100 | `GOAL-CRASH-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001` | — | Goal claim/effect/settlement crash idempotency |
 | 3110 | `GOAL-CUTOVER-001` | OPEN | P0 | KERNEL | `GOAL-DAG-001`, `MISSION-KIND-001` | — | Autonomous plan and legacy backlog migration into canonical missions |
+| 3111 | `AUTONOMOUS-CONTROL-PLANE-001` | OPEN | P0 | KERNEL | `MISSION-KIND-001`, `AUTONOMOUS-STATE-AUTHORITY-001`, `AUTONOMOUS-TENANT-AUTHORITY-001`, `APPROVAL-DECISION-AUTHORITY-001` | — | Canonical autonomous v2 control plane ve lossless legacy retirement |
 | 3120 | `GOAL-CANARY-001` | BLOCKED | P0 | KERNEL | `GOAL-POLICY-001`, `GOAL-ACCEPTANCE-001`, `GOAL-PROVIDER-001`, `GOAL-CRASH-001`, `GOAL-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Goal-v2 approval, dependency, receipt and recovery canaries |
 | 3130 | `RUNFLOW-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `KERNEL-SETTLEMENT-001` | — | Durable RunFlow coordinator as sole proposal/approval/run authority |
 | 3140 | `SCHEDULER-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001` | — | Pure reducer and typed effect executor scheduler cutover |
@@ -266,13 +273,17 @@
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
+| 3348 | `AUTONOMOUS-SCHEDULER-FAIRNESS-001` | OPEN | P0 | KERNEL | `AUTONOMOUS-CONTROL-PLANE-001`, `GOAL-DAG-001` | — | Tenant-fair autonomous scheduling, parked-approval progress ve bounded backpressure |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
+| 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |
 | 4030 | `OPERATION-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Versioned canonical operation catalog |
 | 4040 | `CAPABILITY-001` | OPEN | P0 | AUTHORITY | `OPERATION-001`, `PRINCIPAL-001` | — | Capability authority and progressive disclosure contract |
 | 4050 | `APPROVAL-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `OPERATION-001`, `CAPABILITY-001` | — | Runtime-wide durable ApprovalBroker |
 | 4052 | `APPROVAL-READ-CROSSPLATFORM-PROOF-001` | OPEN | P2 | AUTHORITY | `APPROVAL-READ-PURITY-001` | — | Approval read-purity'nin cross-platform real-binary kanıtı |
 | 4053 | `APPROVAL-INGRESS-UNKNOWN-ID-001` | VERIFY | P0 | AUTHORITY | — | — | Unknown/forged approval id fail-closed at the API and MCP ingress |
+| 4054 | `APPROVAL-DECISION-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `CAPABILITY-001` | — | Protected approval decisionları için worker-dışı, zorunlu ve doğrulanmış human authority chain |
+| 4055 | `NERVOUS-APPROVAL-SETTLEMENT-001` | OPEN | P0 | AUTHORITY | `APPROVAL-DECISION-AUTHORITY-001`, `PRINCIPAL-001`, `TENANT-001` | — | Nervous proposal, approval ve effect için tek runtime-wide first-writer-wins settlement authority |
 | 4060 | `TOOL-AUTHORITY-001` | VERIFY | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
@@ -283,6 +294,7 @@
 | 4102 | `PROVIDER-HOLD-LIVE-PROOF-001` | OPEN | P2 | AUTHORITY | `PROVIDER-HOLD-001` | — | Provider-hold'un canlı kanıtları: login-recovery, mixed-provider continuation, expiry ve authoritative usage-source |
 | 4110 | `ATTENDED-STOP-001` | OPEN | P0 | AUTHORITY | `APPROVAL-001`, `LIMIT-001` | — | Exact attended hard-stop approval authority |
 | 4120 | `AUDIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `OPERATION-001` | — | Tamper-evident, tenant-scoped causal audit |
+| 4121 | `NERVOUS-EFFECT-OUTCOME-TRUTH-001` | OPEN | P0 | AUTHORITY | `NERVOUS-APPROVAL-SETTLEMENT-001`, `RECEIPT-001` | — | Nervous finding→proposal→decision→effect→settlement ve compensation outcome'ları için causal audit truth |
 | 4125 | `PROVENANCE-CONTEXT-001` | OPEN | P1 | AUTHORITY | `RECEIPT-001` | — | Content provenance and context integrity authority wiring |
 | 4130 | `API-SECURITY-001` | BLOCKED | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `APPROVAL-001` | `DEPENDENCY_UNSATISFIED` | API authentication, authorization and config-secret containment |
 | 4140 | `ENTERPRISE-AUTH-001` | OPEN | P0 | AUTHORITY | `TENANT-001`, `CAPABILITY-001`, `APPROVAL-001`, `AUDIT-001` | — | Community-safe and enterprise fail-closed profiles |
@@ -318,6 +330,7 @@
 | 6090 | `API-IDENTITY-001` | OPEN | P0 | API | `PRINCIPAL-001`, `TENANT-001`, `API-SECURITY-001` | — | OIDC, workload identity, tenant authorization and rate enforcement |
 | 6100 | `CONNECTOR-IDENTITY-001` | OPEN | P0 | CONNECTOR | `PRINCIPAL-001`, `APPROVAL-001`, `APP-SERVICE-001` | — | Gateway and connector session identity, pairing and approval authority |
 | 6110 | `DASHBOARD-OBS-001` | OPEN | P1 | DASHBOARD | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Dashboard as honest, read-oriented observability projection |
+| 6111 | `AUTONOMOUS-OBSERVABILITY-001` | OPEN | P1 | DASHBOARD | `AUTONOMOUS-CONTROL-PLANE-001`, `AUTONOMOUS-SCHEDULER-FAIRNESS-001`, `AUDIT-001`, `API-CONTRACT-001` | — | Current-engine autonomous status, causal audit ve documentation truth projection |
 | 6120 | `SURFACE-PARITY-001` | BLOCKED | P0 | PRODUCT | `DESKTOP-REBORN-001`, `API-CONTRACT-001`, `CONNECTOR-IDENTITY-001`, `DASHBOARD-OBS-001` | `DEPENDENCY_UNSATISFIED` | Capability-by-capability parity and intentional negative-space matrix |
 | 6130 | `API-EVENT-001` | OPEN | P0 | API | `API-CONTRACT-001`, `KERNEL-SETTLEMENT-001`, `STORAGE-001` | — | Durable asynchronous jobs, event streams, webhooks and outbox delivery |
 | 6140 | `API-DEVELOPER-001` | OPEN | P1 | API | `API-CONTRACT-001`, `SURFACE-PARITY-001` | — | OpenAPI, generated SDKs, CLI/MCP parity and compatibility lifecycle |
@@ -335,6 +348,8 @@
 | 7021 | `SKILL-SUPPLY-CHAIN-INGRESS-001` | OPEN | P0 | SECURITY | `SKILL-CATALOG-AUTHORITY-001`, `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | — | Skill create/import/install/update ingress'i path containment, complete-package provenance, concurrency isolation ve rollback ile fail-closed olur |
 | 7030 | `PLUGIN-SANDBOX-001` | OPEN | P0 | SECURITY | `SUPPLY-CHAIN-001`, `TOOL-AUTHORITY-001` | — | Plugin/skill runtime sandbox and capability enforcement |
 | 7031 | `PLUGIN-SANDBOX-WIRE-001` | OPEN | P0 | SECURITY | — | — | Sprint yolundaki plugin-hook güvenlik kablolaması: `validatePluginSecurity` 4-adım pipeline'ı (allowed-path containment + AST tarama + SHA-256 integrity + Ed25519 publisher imzası) production `loadPluginHooks` çağrısına bağlanır ve `PluginSecurityError` fail-closed olur |
+| 7032 | `PLUGIN-SUPPLY-CHAIN-INGRESS-001` | OPEN | P0 | SECURITY | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-WIRE-001` | — | Plugin create/install/update/enable/disable/remove ingress'i path-safe, provenance-bound, transactional ve recoverable tek authority olur |
+| 7033 | `PLUGIN-PACKAGE-RUNTIME-TRUTH-001` | OPEN | P0 | ECOSYSTEM | `PLUGIN-SUPPLY-CHAIN-INGRESS-001`, `PLUGIN-SANDBOX-WIRE-001` | — | Plugin manifest, complete package, capability runtimeı ve bütün kullanıcı/AI yüzeyleri tek canonical truth üretir |
 | 7040 | `MCP-TRUST-001` | OPEN | P0 | SECURITY | `PRINCIPAL-001`, `CAPABILITY-001`, `SUPPLY-CHAIN-001` | — | Outgoing MCP trust, identity and data-boundary authority |
 | 7050 | `HUB-001` | BLOCKED | P1 | ECOSYSTEM | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | `OWNER_DECISION_REQUIRED` | Production-ready Deckent Hub and signed distribution |
 | 7060 | `TOOL-COMPUTER-001` | OPEN | P2 | TOOL | `TOOL-AUTHORITY-001`, `PLUGIN-SANDBOX-001` | — | Optional computer-use/browser automation pack |
@@ -369,6 +384,7 @@
 | 8099 | `COMPETITIVE-INTEL-001` | OPEN | P2 | PRODUCT | — | — | Recurring competitive telemetry scorecard and trigger-based re-analysis |
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
+| 9011 | `PROMPT-INJECTION-TRACE-001` | OPEN | P0 | LEARNING | `PROMPT-001`, `AUDIT-001`, `STATE-RETENTION-001` | — | Prompt/ADR injection kararları için project-root-bound, versioned, privacy-safe ve outcome-linked causal trace authority |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |
 | 9022 | `PROMPT-V3-GOLDEN-EVAL-001` | OPEN | P2 | PROMPT | `PROMPT-V3-001` | — | Prompt V3 golden-eval: temsilî on-task değerlendirmesi, gerçek heterojen worker'lar, cost/quality eşikleri |
 | 9023 | `AGENT-PROMPT-SYNC-001` | OPEN | P1 | PROMPT | `AGENT-CATALOG-AUTHORITY-001` | — | Built-in ve project agent prompt/manifest sync canonicalitysi dogfood ile shipped productta aynı effective persona üretir |
@@ -385,6 +401,7 @@
 | 9070 | `FINE-TUNE-001` | OPEN | P2 | LEARNING | `TRAINING-TRACE-001`, `PROMOTION-001`, `DATA-GOV-001` | — | Deckent-core fine-tune only after trace/data/governance readiness |
 | 10000 | `SCALE-001` | OPEN | P0 | SCALE | `SSOT-003`, `TRUTH-BASELINE-001` | — | Million-scale assurance parent |
 | 10010 | `STORAGE-001` | OPEN | P0 | DURABILITY | `KERNEL-STATE-001`, `TENANT-001` | — | Transactional durable state backend and migration strategy |
+| 10011 | `AUTONOMOUS-STATE-AUTHORITY-001` | OPEN | P0 | DURABILITY | `KERNEL-STATE-001`, `TENANT-001`, `STATE-ARCHIVE-RESTORE-001` | — | Autonomous state catalog, pure readers ve versioned transactional migration authority |
 | 10020 | `DATA-GOV-001` | OPEN | P0 | DATA | `TENANT-001`, `STORAGE-001`, `STATE-RETENTION-001` | — | Tenant data lifecycle, retention, encryption, residency and deletion authority |
 | 10030 | `HA-001` | OPEN | P0 | RESILIENCE | `STORAGE-001`, `KERNEL-ATTEMPT-001` | — | Multi-node coordination, HA, failover and disaster recovery |
 | 10040 | `SLO-001` | OPEN | P0 | OBS | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Product and platform SLI/SLO/error-budget contract |
