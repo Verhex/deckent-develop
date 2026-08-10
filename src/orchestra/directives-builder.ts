@@ -257,7 +257,10 @@ function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
   lines.push(`- goCriteria: ${task.goCriteria.map(item => escapeListItem(item, ';')).join('; ')}`);
   lines.push(`- nogo: ${task.nogo.map(item => escapeListItem(item, ';')).join('; ')}`);
   if (task.criteriaItems && task.criteriaItems.length > 0) {
-    lines.push(`- criteriaItems: ${JSON.stringify(task.criteriaItems)}`);
+    const criteriaItems = JSON.stringify(task.criteriaItems)
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
+    lines.push(`- criteriaItems: ${criteriaItems}`);
   }
   return lines;
 }

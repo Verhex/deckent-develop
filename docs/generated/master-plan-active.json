@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d843b6f090e7fdee3f2a1bd1b8f4a0cb0abf3c9d309b3301b48c0898569cf7ae"
+    "value": "6dca967e97d40e01e849c4c3062d2e6eda58b0c947debb8fe5c533d096b1d22b"
   },
   "summary": {
     "total": 398,
     "active": 351,
     "terminal": 47,
-    "receipts": 160,
+    "receipts": 162,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -6041,6 +6041,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-09T22:30:59Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-DOGFOOD-IMPL-SPRINT-499-01",
+      "authorityDigest": "e89310f6b2847dd0c05a80e77eddfde2eaef5dced54698f69fc681ba53429573",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T23:11:54Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-09-IMPL-SPRINT-HERMETIC-SUPP-01",
+      "authorityDigest": "91b38d468ad9d84a178c914e492b6e2172da5f4d0177bd828a1603d1a37a4f68",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-09T23:11:54Z"
       },
       "g7AttemptIdentity": null
     }
@@ -20784,6 +20804,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "110d6ed84689789b296de33515faf3080056e947bce75b4c3b9e42b062119ec6"
+    "value": "73f4a283459d89a54d4895c7b603a3a84222d53b1b89e537bead5e3f4d6556d3"
   }
 }
