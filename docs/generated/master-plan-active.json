@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "718a77f256f50d4121056000fe987d2524b900baa2a4d0d8e797a7fd9762b512"
+    "value": "e08a49b7ebd17e849410dc89c285d9cc1e2facd89af66226f50680e9c6d09a00"
   },
   "summary": {
-    "total": 420,
-    "active": 373,
+    "total": 423,
+    "active": 376,
     "terminal": 47,
     "receipts": 181,
     "byState": {
-      "OPEN": 280,
+      "OPEN": 283,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 269,
-      "P1": 114,
+      "P1": 117,
       "P2": 37
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 77,
+      "TRUTH": 80,
       "XPLAT": 3
     }
   },
@@ -237,7 +237,18 @@
       "state": "OPEN",
       "updated": "2026-08-10",
       "definitionDigest": "e16b6c95a5c04fd2c27a8c2e77dacd96df6e2da1d3aed400545feec6bc2c6b00",
-      "progressDigest": "8058ca17ffe982c760ffd5ea9c7e3cbf84868e4d897dea4d6494236935134650",
+      "progressDigest": "9eea82da5dcd32c30771314d7298ef94c6dcd4cc70599e3da81c2fddf8ca541e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 121,
+      "id": "CRASH-FORENSICS-AUTHORITY-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "216f26a4fa8cdd8b7de1e229a38152b57b76aae25ecb09ef0a6f2a4abaabf0e9",
+      "progressDigest": "24909ab836ba0a008949d1c679cae793648123f6f7a469a3249787479ffff21e",
       "terminalClosureDigest": null
     },
     {
@@ -279,9 +290,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-10",
       "definitionDigest": "0298b8de5edc8ba4dc8a17b6475b6d4a9d8673e6f2d76d913f00455509a11c17",
-      "progressDigest": "229b6680787865671823c43548ab8c68384f426746e2b3d952faf7f31072f696",
+      "progressDigest": "61c5ec3fe422ff741e9824397e2d00d70fb0aab58eaa1279dc2e4cef94225cdd",
       "terminalClosureDigest": null
     },
     {
@@ -290,9 +301,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-10",
       "definitionDigest": "39d0385059ed837188b89bcd2248ef0ad9f1953bf3589d91be25ad9c4f58cbb7",
-      "progressDigest": "d63a0a72286070df396338ee0abaafb83c4a09839e1810f2b78e16fb6e31dae1",
+      "progressDigest": "f5052adb4bba11c34c2c168b486c580f82f74cc716e564ccb757f59d936da9b7",
       "terminalClosureDigest": null
     },
     {
@@ -304,6 +315,17 @@
       "updated": "2026-08-05",
       "definitionDigest": "002f9b638b3c4aeab513c1b919f8d33a6a851b0771a6f769ea9a0c8757164453",
       "progressDigest": "93e24e54fe639c33b46e0626d49cebe9c173a6a28394994309371dd3a5cea2f1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 172,
+      "id": "MANAGED-DOC-CACHE-TRUTH-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "3403134ca5eb3c8b6a2235ab4eacad2433d0c9c71c6b143d80ac735e2fde095e",
+      "progressDigest": "9ad0704641ba9dc1cedfd9b85c98dab49c0b2179887969afd880720f939558f0",
       "terminalClosureDigest": null
     },
     {
@@ -477,9 +499,9 @@
       "program": "TRUTH",
       "priority": "P2",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-10",
       "definitionDigest": "28c4e0ba9f0de9179cd5ff0b05a147980f956b81e3eae74f2f93f02317e7e194",
-      "progressDigest": "27a2bf256a3023a7811cb0927c89a1664463562e0b1014e879c5ade47c06f50e",
+      "progressDigest": "03145219519de6f06dfdcc2ed2ef0f9f0977b1f2f81f968ed2dc3016575b4caf",
       "terminalClosureDigest": null
     },
     {
@@ -686,9 +708,20 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-10",
       "definitionDigest": "1fe6e4deb8b56f506bb194b2a29f7edb1d904fed2d237b100fed55537b73c774",
-      "progressDigest": "8991569e1b016bdfe6b6145a22b85303e2b873e7d709fa0d441e83cdfad33e04",
+      "progressDigest": "9d98c4bb06698a0650650748d22530d5f80caacbc3f70fc76934474ade9965ab",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 505,
+      "id": "I18N-CATALOG-AUTHORITY-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "e3f39839801e1418b121bb5c7523fbafee92d01de64a75067db56a4f46f45331",
+      "progressDigest": "9c8a215bd0920c82154c2d84b280f1962cca2838aa653b7daa07570d5537f266",
       "terminalClosureDigest": null
     },
     {
@@ -6888,11 +6921,13 @@
       "dependents": [
         "DATA-GOV-001",
         "ERROR-SEVERITY-001",
+        "MANAGED-DOC-CACHE-TRUTH-001",
         "OPERATIONS-PACK-001",
         "STATE-PRUNE-001",
         "TASK-RETENTION-001"
       ],
       "children": [
+        "CRASH-FORENSICS-AUTHORITY-001",
         "STATE-ARCHIVE-RESTORE-001"
       ],
       "gates": [
@@ -6912,11 +6947,44 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
+        "CRASH-FORENSICS-AUTHORITY-001",
         "STATE-ARCHIVE-RESTORE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Tenant-aware age/count/size policies; bounded readers; atomic rotation",
-      "evidence": "2026-07-21 `.deckent` analysis; current files remeasured; 2026-08-10 disk/code truth: `.deckent/archive` 2,849 dosya ve 98.2 MiB; sprint ve scheduler archive için archive-side retention yok; dizinler 0755 ve 2,814 dosya 0644; metrics `maxSizeMB` productionda tüketilmiyor, lexicographic generation sırası digit-width değişiminde bozuluyor ve same-sprint rotate overwrite riski taşıyor; expanded closure STATE-ARCHIVE-RESTORE-001 childındadır",
+      "evidence": "2026-07-21 `.deckent` analysis; current files remeasured; 2026-08-10 disk/code truth: `.deckent/archive` 2,849 dosya ve 98.2 MiB; sprint ve scheduler archive için archive-side retention yok; dizinler 0755 ve 2,814 dosya 0644; metrics `maxSizeMB` productionda tüketilmiyor, lexicographic generation sırası digit-width değişiminde bozuluyor ve same-sprint rotate overwrite riski taşıyor; expanded closure STATE-ARCHIVE-RESTORE-001 childındadır. 2026-08-10 cache/crash RCA: `.deckent/crashes` altında 6 ignored log var (3 tarihsel EPIPE false-positive, 3 EADDRINUSE); writer `formatFatalAndExit`, production reader/rotation/retention/support-bundle consumer yok; dosyalar 0644, dizin 0755, timestamp-only ad aynı milisaniyede overwrite edebilir ve artifact command/version/process/project/tenant provenance taşımadığı için EADDRINUSE ingress'i kanıtlanamıyor. Mevcut loglarda credential pattern bulunmadı; silme ancak typed retention/prune receipt'iyle; exact expansion CRASH-FORENSICS-AUTHORITY-001 childındadır",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 121,
+      "id": "CRASH-FORENSICS-AUTHORITY-001",
+      "parent": "STATE-RETENTION-001",
+      "program": "TRUTH",
+      "outcome": "Crash artifact schema, privacy, collision-free retention, typed classification ve support/recovery consumption authority",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Crash artifacts versioned schema, redaction, least-privilege mode/ACL, collision-free atomic naming, safe project/tenant/process/command/version provenance, age/count/size retention, legal hold ve bounded support-bundle reader taşır; operator-recoverable resource conflicts typed remedy üretir; Linux/macOS/Windows-native/WSL failure-injection proof'u vardır",
+      "evidence": "2026-08-10 disk/code RCA ve Alperen onayı: 6 ignored logun üçü pre-fix EPIPE false-positive, üçü EADDRINUSE; production reader/rotation/retention/support consumer yok, 0644/0755 permissions ve timestamp-only ad var, mevcut schema exact ingress attributionına yetmiyor; current credential-pattern scan temiz; EPIPE silme adayı ancak prune receipt'i sonrası; ERROR-SEVERITY-001 ve OPERATIONS-PACK-001 cross-link'leri aggregate-cycle üretmemesi için evidence düzeyinde tutulur",
       "updated": "2026-08-10"
     },
     {
@@ -6968,6 +7036,7 @@
         "DOCS-ARCHIVE-001",
         "DOCS-I18N-001",
         "DOCS-RELEASE-TRUTH-001",
+        "MANAGED-DOC-CACHE-TRUTH-001",
         "REPO-MIGRATION-001",
         "STATE-ARCHIVE-RESTORE-001"
       ],
@@ -7047,7 +7116,7 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
+        "C": "1",
         "W": "0",
         "E": "0",
         "H": "?",
@@ -7060,8 +7129,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "No missing, divergent or stale accepted ADR projection",
-      "evidence": "2026-07-21 decision table",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-21 decision table; 2026-08-10 RCA: ADR-G-025 residual-ceiling metni AWS AKIA, GitHub token, JWT ve generic assignment redaction'ını hâlâ eksik gösteriyor, fakat `src/core/redact-sensitive.ts` bugün bu dört sınıfı kapsıyor; accepted ADR projection code-truth karşısında bayat",
+      "updated": "2026-08-10"
     },
     {
       "order": 170,
@@ -7078,15 +7147,18 @@
         "AGENT-DOCS-TRUTH-001",
         "DOC-IMPACT-001",
         "DOCS-I18N-001",
+        "I18N-CATALOG-AUTHORITY-001",
         "SKILL-DOCS-TRUTH-001"
       ],
-      "children": [],
+      "children": [
+        "MANAGED-DOC-CACHE-TRUTH-001"
+      ],
       "gates": [
         "G1"
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
+        "C": "1",
         "W": "0",
         "E": "0",
         "H": "?",
@@ -7097,12 +7169,13 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "DOCS-TOPOLOGY-001"
+        "DOCS-TOPOLOGY-001",
+        "MANAGED-DOC-CACHE-TRUTH-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One generator registry; CI and release gate enforce exact counts/links",
-      "evidence": "Cleanup plan and legacy 489,495,507; 2026-08-03 PAZARTESI FAZ-5 kuralının transkripsiyonu: doc-drift bir daha birikmesin — üretilen bölümleri managed-docs (src/orchestra/managed-docs/) sahiplenir, elle yazılan core set sınırlı kalır; bu satır o sahiplik sözleşmesinin gate tarafıdır",
-      "updated": "2026-08-03"
+      "evidence": "Cleanup plan and legacy 489,495,507; 2026-08-03 PAZARTESI FAZ-5 kuralının transkripsiyonu: doc-drift bir daha birikmesin — üretilen bölümleri managed-docs (src/orchestra/managed-docs/) sahiplenir, elle yazılan core set sınırlı kalır; bu satır o sahiplik sözleşmesinin gate tarafıdır. 2026-08-10 managed-doc cache RCA: `.deckent/settings/docs.json` 9 entry taşıyor; yalnız 3 target bugün generator-eligible, 5 target yok ve `identity-md` auto-section/template taşımıyor; ignored cache 11 entry ile config'den kaldırılmış `claude-md` ve `agents-md` kayıtlarını tutuyor. Runner cache'i active-ID setiyle prune/reconcile etmiyor, `file_not_found` ve `no_auto_sections` finalization'da durable drift sinyali değil; shallow cache parse malformed entry'yi tekrar eden per-doc error'a çevirebilir; doğrudan write atomic/locked değil. Nervous `CACHE_INVALIDATE` açıklaması build/routing derken gerçek effect yalnız docs/all ve routing isteği no-op success; exact closure MANAGED-DOC-CACHE-TRUTH-001 childındadır",
+      "updated": "2026-08-10"
     },
     {
       "order": 171,
@@ -7134,6 +7207,44 @@
       "acceptance": "Dependency-doku kayıtları package.json+override gerçeğiyle mekanik karşılaştırılır (lint veya üreteç); ADR-D-005 merit-kayıt şablonuna bağlanır; drift CI'da görünür olur",
       "evidence": "Açılış 2026-08-06: tasarım-doku §9 açık-iş notunun (DOCS-DEPS-HOME) satırlaşması — Alperen seçimi (karar-turu: küçük işler)",
       "updated": "2026-08-05"
+    },
+    {
+      "order": 172,
+      "id": "MANAGED-DOC-CACHE-TRUTH-001",
+      "parent": "DOCS-RELEASE-TRUTH-001",
+      "program": "TRUTH",
+      "outcome": "Managed-doc config target, generator eligibility, cache lifecycle ve invalidation outcome tek truthful contractta uzlaşır",
+      "priority": "P1",
+      "dependsOn": [
+        "DOCS-TOPOLOGY-001",
+        "STATE-RETENTION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "DOCS-TOPOLOGY-001",
+        "STATE-RETENTION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Config active-ID seti target existence ve generator eligibility ile fail-closed doğrulanır; stale cache ID'leri bounded reconcile edilir; malformed cache self-heal olur; write atomic/concurrency-safe ve cache her zaman disposable/non-authoritative kalır; finalization typed drift sonucu yayınlar; CLI/MCP/Nervous invalidation aynı typed cache-kind ve effect receipt'ini tüketir, no-op success yasaktır",
+      "evidence": "2026-08-10 disk/code RCA ve Alperen onayı: config 9 entry, yalnız 3 generator-eligible; 5 target yok, identity generator'sız; cache 11 entry ve iki removed ID taşıyor; runner prune/reconcile yapmıyor ve non-fatal reason'lar durable görünmüyor; cache shallow-validated/direct-write; Nervous registry build/routing derken handler yalnız docs/all effecti üretiyor",
+      "updated": "2026-08-10"
     },
     {
       "order": 180,
@@ -7726,8 +7837,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "INFO is not reported as ERROR; forensic capacity and retention preserved",
-      "evidence": "Cleanup analysis",
-      "updated": "2026-07-26"
+      "evidence": "Cleanup analysis; 2026-08-10 crash RCA: üç pre-fix EPIPE kaydı tarihsel false-positive, üç EADDRINUSE kaydı operator-recoverable port conflict olduğu halde generic uncaught fatal artifactı; log context'i exact ingress/command'ı ayırmaya yetmiyor, bu yüzden sebep attribution HOLD; exact typed-classification closure CRASH-FORENSICS-AUTHORITY-001 childındadır",
+      "updated": "2026-08-10"
     },
     {
       "order": 320,
@@ -8293,7 +8404,9 @@
       "priority": "P1",
       "dependsOn": [],
       "dependents": [],
-      "children": [],
+      "children": [
+        "I18N-CATALOG-AUTHORITY-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -8309,11 +8422,51 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "I18N-CATALOG-AUTHORITY-001"
+      ],
       "evidenceReceipts": [],
       "acceptance": "`lint-i18n-hardcode` kapsamı TSX/subdir/MCP/connectors/VSCode dahil tüm user-facing yüzeylere genişler ve ratchet'lenir; root help tek locale render eder (EN/TR karışımı biter); commander `.description()`/`.option()` literal'leri message-key catalog'una taşınır; `chat --local` help gerçek davranışı söyler; localized risk-language renderer command-discovery consumer'ına production-wired olur ve registry↔permission sınıfları tek contract'ta uzlaşır",
-      "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk). Sahipsiz kalemler: F-018 · CLI-01 · CLI-02 · CLI-13 · GOV-03 · OQ-27 · aday-16. Boşluk kanıtı: FO-10-I18N yalnız Codex containment state'leri, DOCS-I18N-001 yalnız doküman ağacı — ürün-yüzeyi runtime enforcement satırı yoktu; quality-bar (i18n-FIRST) ihlali her yeni yüzeyle birikiyor. A11y canlı kanıtı (WCAG/axe/klavye) `TERMINAL-XPLAT-001` ve `DESIGN-SYSTEM-001` ile paylaşımlı acceptance'tır, bu satır string-authority tarafını kapatır",
-      "updated": "2026-08-03"
+      "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk). Sahipsiz kalemler: F-018 · CLI-01 · CLI-02 · CLI-13 · GOV-03 · OQ-27 · aday-16. Boşluk kanıtı: FO-10-I18N yalnız Codex containment state'leri, DOCS-I18N-001 yalnız doküman ağacı — ürün-yüzeyi runtime enforcement satırı yoktu; quality-bar (i18n-FIRST) ihlali her yeni yüzeyle birikiyor. A11y canlı kanıtı (WCAG/axe/klavye) `TERMINAL-XPLAT-001` ve `DESIGN-SYSTEM-001` ile paylaşımlı acceptance'tır, bu satır string-authority tarafını kapatır. 2026-08-10 RCA authority açığını I18N-CATALOG-AUTHORITY-001 childına ayırdı: tracked `.deckent/i18n` runtime tarafından okunmuyor ve green parity testleri dead projectionı canlı catalog sanıyor",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 505,
+      "id": "I18N-CATALOG-AUTHORITY-001",
+      "parent": "I18N-SURFACE-001",
+      "program": "TRUTH",
+      "outcome": "Runtime locale catalog, typed key projection, init/package dağıtımı ve project override için tek versioned authority",
+      "priority": "P1",
+      "dependsOn": [
+        "PACKAGING-001",
+        "DOCS-RELEASE-TRUTH-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PACKAGING-001",
+        "DOCS-RELEASE-TRUTH-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Tek canonical catalog'dan complete generated key type ve runtime assets üretilir; CLI/MCP/init/package aynı application service'i tüketir; locale negotiation, EN fallback, missing-key fail-closed gate, placeholder parity, tenant/project override precedence, schema migration, safe reload/cache ve Linux/macOS/Windows-native/WSL proof'u vardır; legacy `.deckent/i18n` ancak digest-bound migration/disposition receipt'i sonrası archive/delete edilir",
+      "evidence": "2026-08-10 disk/code RCA ve Alperen onayı: tracked EN/TR JSON'lar 110'ar valid key ve tam placeholder parity taşıyor fakat production reader yok; gerçek `messages.ts` catalogu 1,506 key, ortak küme 54, disk-only 56, runtime-only 1,452; ortak değerlerin EN'de 15'i, TR'de 16'sı drift. `MessageKey` yalnız 68 key beyan ediyor. CLI ve MCP init iki ayrı writer ile yalnız 6 eski ASCII-TR sprint stub'ı üretiyor; npm package `.deckent/i18n` taşımıyor. 80/80 hedefli test green çünkü JSON internal parity'yi pinliyor, producer→runtime consumption'ı değil. Aynı dead-file architecture commit `50b9b9f71` ile 2026-05-22'de belgelenmiş, docs reset sonrası canlı ledger'a taşınmamış ve writer'lar emekli edilmemiş",
+      "updated": "2026-08-10"
     },
     {
       "order": 510,
@@ -20494,6 +20647,7 @@
         "SUPPLY-CHAIN-001"
       ],
       "dependents": [
+        "I18N-CATALOG-AUTHORITY-001",
         "OPERATIONS-PACK-001",
         "RELEASE-001"
       ],
@@ -22242,6 +22396,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ddfb64e1daf128e473e982a52ef58435b2ec46806cfadeea9bfe50f464b60e8a"
+    "value": "f0321b083d2e8761313e951527c2022c7e06f12160557872d5aef5db1e939df6"
   }
 }
