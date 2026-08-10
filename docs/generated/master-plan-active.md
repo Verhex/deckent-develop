@@ -5,18 +5,18 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):0f01f411d02dff28210671957eff25acbf70846545def0829af56bee8f565906`
+**Source digest:** `sha256(normalized-lf-utf8):f00d56f32665a8e211826d3293692cace97909d446d4c6ec2558d81dc89d405a`
 
-**Rows:** 398 total · 351 active · 47 terminal
+**Rows:** 413 total · 366 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 259 |
+| OPEN | 273 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
-| BLOCKED | 67 |
+| BLOCKED | 68 |
 | VERIFY | 25 |
 | DONE | 47 |
 | DEFERRED | 0 |
@@ -306,6 +306,8 @@
 | 5110 | `TERMINAL-COLLAB-001` | OPEN | P1 | TERMINAL | `TERMINAL-CONTEXT-001`, `APPROVAL-001`, `AUDIT-001` | — | Solo, team and enterprise collaboration without operator overload |
 | 6000 | `SURFACES-001` | BLOCKED | P0 | PRODUCT | `KERNEL-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Shared product surfaces parent |
 | 6010 | `APP-SERVICE-001` | OPEN | P0 | PRODUCT | `SURFACE-CUTOVER-001` | — | Typed application-service layer |
+| 6011 | `AGENT-CUSTOM-MANAGEMENT-001` | OPEN | P0 | PRODUCT | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-ROUTING-ELIGIBILITY-001` | — | User-defined agent CRUD ve lifecycle bütün mutating yüzeylerde V3-routable, stable-ID ve i18n-clean olur |
+| 6012 | `SKILL-CUSTOM-MANAGEMENT-001` | OPEN | P0 | PRODUCT | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | User-defined skill create/install/update ve lifecycle bütün mutating yüzeylerde content-complete, V3-routable, transactional ve i18n-clean olur |
 | 6020 | `SURFACE-CONTRACT-001` | OPEN | P0 | PRODUCT | `APP-SERVICE-001`, `RECEIPT-001` | — | Versioned surface capability and truth receipts |
 | 6030 | `DESKTOP-001` | OPEN | P0 | DESKTOP | `APP-SERVICE-001`, `ENV-ADAPTER-001` | — | First-class Desktop architecture and product foundation |
 | 6040 | `DESKTOP-RUNTIME-001` | OPEN | P0 | DESKTOP | `APP-SERVICE-001`, `ENV-ADAPTER-001`, `RUNNER-PROTOCOL-001` | — | Managed-local, attach-local and remote managed runtime profiles |
@@ -326,7 +328,11 @@
 | 6180 | `ERP-AGENT-CONTRACT-001` | OPEN | P2 | CONNECTOR | — | — | Enterprise Application Agent Contract: ERP/iş-uygulaması agent'larına (Oracle AI Agent Studio, Fusion/NetSuite sınıfı) karşı discover_capabilities / invoke / stream_status / request_approval / commit_transaction / cancel / compensate_or_rollback / collect_audit sözleşmesi |
 | 7000 | `ECOSYSTEM-001` | OPEN | P0 | ECOSYSTEM | `P02-647`, `SURFACE-CUTOVER-001`, `CAPABILITY-001`, `AUDIT-001` | — | Governed agent, skill, plugin, tool, MCP and extension ecosystem |
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
+| 7011 | `AGENT-CATALOG-AUTHORITY-001` | OPEN | P0 | ECOSYSTEM | — | — | Shipped built-in, project override, learned/runtime ve archive katmanları için tek effective agent catalog authority |
+| 7012 | `SKILL-CATALOG-AUTHORITY-001` | OPEN | P0 | ECOSYSTEM | — | — | Shipped built-in, project override, generated/learned, quarantined ve retired katmanları için tek effective skill catalog authority |
+| 7013 | `SKILL-SYNC-CANONICALITY-001` | OPEN | P1 | ECOSYSTEM | `SKILL-CATALOG-AUTHORITY-001` | — | Built-in skill package ile project override arasındaki init/sync/update canonicalitysi user içeriğini ezmeden deterministic ve conflict-açıklanabilir olur |
 | 7020 | `SUPPLY-CHAIN-001` | OPEN | P0 | SECURITY | `AGENT-SKILL-001`, `P02-650` | — | Signed agent, skill and plugin provenance |
+| 7021 | `SKILL-SUPPLY-CHAIN-INGRESS-001` | OPEN | P0 | SECURITY | `SKILL-CATALOG-AUTHORITY-001`, `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | — | Skill create/import/install/update ingress'i path containment, complete-package provenance, concurrency isolation ve rollback ile fail-closed olur |
 | 7030 | `PLUGIN-SANDBOX-001` | OPEN | P0 | SECURITY | `SUPPLY-CHAIN-001`, `TOOL-AUTHORITY-001` | — | Plugin/skill runtime sandbox and capability enforcement |
 | 7031 | `PLUGIN-SANDBOX-WIRE-001` | OPEN | P0 | SECURITY | — | — | Sprint yolundaki plugin-hook güvenlik kablolaması: `validatePluginSecurity` 4-adım pipeline'ı (allowed-path containment + AST tarama + SHA-256 integrity + Ed25519 publisher imzası) production `loadPluginHooks` çağrısına bağlanır ve `PluginSecurityError` fail-closed olur |
 | 7040 | `MCP-TRUST-001` | OPEN | P0 | SECURITY | `PRINCIPAL-001`, `CAPABILITY-001`, `SUPPLY-CHAIN-001` | — | Outgoing MCP trust, identity and data-boundary authority |
@@ -338,7 +344,8 @@
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
-| 7120 | `SKILLMD-INGEST-001` | OPEN | P1 | ECOSYSTEM | — | — | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
+| 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
+| 7121 | `SKILLMD-V3-RECONCILIATION-001` | OPEN | P0 | ECOSYSTEM | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | SKILLMD-INGEST-001'in immutable V2 activation kabulünü production V3 SkillProfile ve fail-closed package ingress contractıyla lossless uzlaştır |
 | 7130 | `AGENT-RUNTIME-ADAPTER-001` | OPEN | P2 | PROVIDER | `COMPOSITE-WORKER-001` | — | Harici agent-runtime adapter ailesi değerlendirmesi: generic ACP worker adapter + Hermes/OpenClaw/Codex-remote/ADK sınıfı runtime'ların governed composite worker olarak admission'ı |
 | 8000 | `EVERY-ENV-001` | OPEN | P0 | XPLAT | `SSOT-003`, `TEST-PLATFORM-001` | — | Every-environment architecture and release parent |
 | 8010 | `ENV-ADAPTER-001` | OPEN | P0 | XPLAT | `KERNEL-001`, `AUTHORITY-001` | — | PlatformAdapter contracts for process, paths, locks, IPC, credentials, terminal and services |
@@ -346,6 +353,8 @@
 | 8030 | `PLATFORM-PROOF-001` | OPEN | P0 | XPLAT | `ENV-ADAPTER-001`, `TEST-PLATFORM-001` | — | Cross-platform CI, real-binary and hardware/OS certification |
 | 8040 | `PACKAGING-001` | OPEN | P0 | RELEASE | `INSTALL-SCOPE-001`, `SUPPLY-CHAIN-001` | — | CLI, daemon, Desktop, service and container packaging supply chain |
 | 8050 | `DOCS-PRODUCT-001` | BLOCKED | P0 | DOCS | `DOCS-ADR-SYNC-001`, `DOCS-I18N-001`, `SURFACE-PARITY-001` | `DEPENDENCY_UNSATISFIED` | Current code-truth architecture, guide, reference and operations docs |
+| 8051 | `AGENT-DOCS-TRUTH-001` | OPEN | P0 | DOCS | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-CUSTOM-MANAGEMENT-001`, `AGENT-PROMPT-SYNC-001`, `AGENT-ROUTING-ELIGIBILITY-001`, `AGENT-EVOLUTION-LIFECYCLE-001`, `AGENT-STATE-MIGRATION-001`, `DOCS-RELEASE-TRUTH-001`, `DOCS-I18N-001` | — | Agent catalog, routing, prompt ve lifecycle için user ve AI documentation code-truth ile hermetic tutulur |
+| 8052 | `SKILL-DOCS-TRUTH-001` | OPEN | P0 | DOCS | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-CUSTOM-MANAGEMENT-001`, `SKILL-SYNC-CANONICALITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-EVOLUTION-LIFECYCLE-001`, `SKILLMD-INGEST-001`, `DOCS-RELEASE-TRUTH-001`, `DOCS-I18N-001` | — | Skill catalog, schema, routing, prompt injection, management, trust ve lifecycle için user ve AI documentation canonical read modelden hermetic üretilir |
 | 8060 | `RELEASE-001` | BLOCKED | P0 | RELEASE | `TRUTH-BASELINE-001`, `PLATFORM-PROOF-001`, `PACKAGING-001`, `DOCS-PRODUCT-001` | `DEPENDENCY_UNSATISFIED` | Unified validate, soak, publish and rollback gate |
 | 8070 | `REPO-MIGRATION-001` | OPEN | P0 | REPO | `REPO-CLEANUP-APPLY-001`, `DOCS-TOPOLOGY-001`, `MEMORY-AUTHORITY-001` | — | Rebaseline and execute repository cutover |
 | 8080 | `OPERATIONS-PACK-001` | OPEN | P1 | OPS | `PACKAGING-001`, `STATE-RETENTION-001`, `AUDIT-001` | — | Install, backup, restore, diagnostics, support bundle and disaster recovery |
@@ -362,10 +371,16 @@
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |
 | 9022 | `PROMPT-V3-GOLDEN-EVAL-001` | OPEN | P2 | PROMPT | `PROMPT-V3-001` | — | Prompt V3 golden-eval: temsilî on-task değerlendirmesi, gerçek heterojen worker'lar, cost/quality eşikleri |
+| 9023 | `AGENT-PROMPT-SYNC-001` | OPEN | P1 | PROMPT | `AGENT-CATALOG-AUTHORITY-001` | — | Built-in ve project agent prompt/manifest sync canonicalitysi dogfood ile shipped productta aynı effective persona üretir |
 | 9030 | `ROUTING-001` | OPEN | P0 | ROUTING | `PROMPT-001`, `AGENT-SKILL-001`, `REACHABILITY-001` | — | Routing V3 quality, diversity and evidence-driven adaptation |
 | 9032 | `ROUTING-V3-LIVE-QUALITY-001` | OPEN | P2 | ROUTING | `ROUTING-V3-CUTOVER-001` | — | Routing V3 canlı kalite kanıtları: heterojen routing kalitesi, anti-collapse dağılım, rollback provası, cross-platform |
+| 9033 | `AGENT-ROUTING-ELIGIBILITY-001` | OPEN | P0 | ROUTING | `AGENT-CATALOG-AUTHORITY-001` | — | Routing V3 bütün candidate ve force yollarında tek effective agent eligibility policy uygular |
+| 9034 | `SKILL-ROUTING-ELIGIBILITY-001` | OPEN | P0 | ROUTING | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-SYNC-CANONICALITY-001` | — | Routing V3 bütün automatic, force, exclude, retry ve fallback yollarında tek effective skill eligibility ve prompt-delivery policy uygular |
 | 9040 | `EVALUATION-001` | OPEN | P0 | EVAL | `KERNEL-SETTLEMENT-001`, `CM-04` | — | Canonical evaluator, adversarial verification and proof boundary |
 | 9050 | `PROMOTION-001` | OPEN | P0 | EVOLUTION | `TRAINING-TRACE-001`, `ROUTING-001`, `EVALUATION-001` | — | Outcome→routing→agent/skill/model promotion and rollback |
+| 9051 | `AGENT-EVOLUTION-LIFECYCLE-001` | OPEN | P0 | EVOLUTION | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-ROUTING-ELIGIBILITY-001`, `TRAINING-TRACE-001`, `EVALUATION-001` | — | Learned/temp agent outcome, promotion, demotion, mutation, rollback ve retirement zinciri productionda gerçekten kapanır veya eval-backed negative-space kararıyla kaldırılır |
+| 9052 | `AGENT-STATE-MIGRATION-001` | OPEN | P1 | EVOLUTION | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-PROMPT-SYNC-001`, `AGENT-EVOLUTION-LIFECYCLE-001` | — | Mevcut temp, archive, prompt-version ve retirement agent statei lossless, recoverable ve policy-governed biçimde canonical namespacee taşınır |
+| 9053 | `SKILL-EVOLUTION-LIFECYCLE-001` | OPEN | P0 | EVOLUTION | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-DURABILITY-001`, `TRAINING-TRACE-001`, `EVALUATION-001` | — | Generated/learned skill outcome, promotion, demotion, mutation, rollback ve retirement zinciri productionda kapanır veya eval-backed negative-space kararıyla kaldırılır |
 | 9060 | `LEARNING-DOGFOOD-001` | OPEN | P1 | LEARNING | `PROMPT-001`, `ROUTING-001`, `KERNEL-001` | — | Historical dogfood findings atomized and regression-proofed |
 | 9070 | `FINE-TUNE-001` | OPEN | P2 | LEARNING | `TRAINING-TRACE-001`, `PROMOTION-001`, `DATA-GOV-001` | — | Deckent-core fine-tune only after trace/data/governance readiness |
 | 10000 | `SCALE-001` | OPEN | P0 | SCALE | `SSOT-003`, `TRUTH-BASELINE-001` | — | Million-scale assurance parent |
