@@ -704,13 +704,28 @@ function extractUsageFromPayload(payload: unknown): TokenUsage | null {
         readNum(asObject(usage['completion_tokens_details']), 'reasoning_tokens') ??
         readNum(usage, 'reasoning_tokens') ??
         readNum(usage, 'reasoning_output_tokens');
+      // TokenUsage contract: `inputTokens` is FRESH input — the cached prefix is
+      // reported separately in `cacheReadTokens` and must not be counted twice.
+      // OpenAI's `prompt_tokens` and codex v2's `input_tokens` both INCLUDE their
+      // cached subset (`prompt_tokens_details.cached_tokens` /
+      // `cached_input_tokens`), whereas Anthropic reports `input_tokens` and
+      // `cache_read_input_tokens` as disjoint. Passing the provider shape through
+      // unchanged made the same field mean two different things per provider, so
+      // one budget behaved differently depending on who ran it — measured
+      // 2026-08-09 (sprint-497): input 174,820 with 140,032 of it cached, giving a
+      // 320,015 aggregate for 179,983 real tokens, a 78% overstatement, while the
+      // per-leg input ceiling was compared against a number the cache leg already
+      // governed. Normalising here keeps the raw provider payload intact in the
+      // logs as evidence and gives policy one provider-neutral quantity to judge.
       return normalizeUsage({
-        inputTokens: promptTokens ?? 0,
+        inputTokens: Math.max((promptTokens ?? 0) - cached, 0),
         outputTokens: completionTokens ?? 0,
         cacheReadTokens: cached,
-        ...(readNum(usage, 'total_tokens') !== undefined
-          ? { totalTokens: readNum(usage, 'total_tokens') }
-          : {}),
+        // Total keeps the provider's meaning (cached prefix included). Without an
+        // explicit total, normalizeUsage would derive input+output — now FRESH
+        // input — and silently drop the cached prefix from the aggregate.
+        totalTokens: readNum(usage, 'total_tokens')
+          ?? ((promptTokens ?? 0) + (completionTokens ?? 0)),
         ...(reasoning !== undefined ? { reasoningTokens: reasoning } : {}),
       });
     }
@@ -734,13 +749,16 @@ function extractUsageFromPayload(payload: unknown): TokenUsage | null {
       // Codex reports reasoning as `reasoning_output_tokens` (folded into output_tokens).
       const reasoning =
         readNum(totals, 'reasoning_output_tokens') ?? readNum(totals, 'reasoning_tokens');
+      // Same fresh-input contract as branch (a): `input_tokens` here also carries
+      // its cached prefix, so a half-normalised adapter would make one field mean
+      // two things depending on which codex event happened to report it.
+      const cachedTotals = readNum(totals, 'cached_input_tokens') ?? 0;
       return normalizeUsage({
-        inputTokens: input ?? 0,
+        inputTokens: Math.max((input ?? 0) - cachedTotals, 0),
         outputTokens: output ?? 0,
-        cacheReadTokens: readNum(totals, 'cached_input_tokens') ?? 0,
-        ...(readNum(totals, 'total_tokens') !== undefined
-          ? { totalTokens: readNum(totals, 'total_tokens') }
-          : {}),
+        cacheReadTokens: cachedTotals,
+        totalTokens: readNum(totals, 'total_tokens')
+          ?? ((input ?? 0) + (output ?? 0)),
         ...(reasoning !== undefined ? { reasoningTokens: reasoning } : {}),
       });
     }
