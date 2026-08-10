@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "7e82783aa127597db2671bf939436f7162511ea695f9d8cbb6e1312701e6bcde"
+    "value": "098317412965b7542ac9f1dc30f01af098e4aa277292b93fadbdcfa1a02e4dc5"
   },
   "summary": {
     "total": 432,
     "active": 385,
     "terminal": 47,
-    "receipts": 182,
+    "receipts": 183,
     "byState": {
       "OPEN": 292,
       "READY": 0,
@@ -213,9 +213,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-10",
       "definitionDigest": "733250cf320fd9ab0a1c09a84df89e2691487a68c5f3dbdadd5f7ac943dd4118",
-      "progressDigest": "c1d284a9b9a4492df6b4bcfa21b99ccb54cdb2aefc1a9f20ef1695ed99968501",
+      "progressDigest": "d444ed51e1dbe2b294e40349556ed60178c5c1a9fd1fd5e00dddbd97080006f8",
       "terminalClosureDigest": null
     },
     {
@@ -6637,6 +6637,16 @@
         "transitionAt": "2026-08-10T21:18:10Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-DECK-DOCKERIGNORE-01",
+      "authorityDigest": "b31b917e53ed5a3fda8424d211c17d333ff1d46e4cca09c9d8e2730f2d7e8c48",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T21:46:16Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6970,8 +6980,8 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
+        "C": "1",
+        "W": "1",
         "E": "0",
         "H": "?",
         "L": "0",
@@ -6981,10 +6991,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-10-DECK-DOCKERIGNORE-01"
+      ],
       "acceptance": "`.dockerignore`, build-context negative test ve image-layer proof",
-      "evidence": "2026-07-21 decision; current `.dockerignore` gap",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-21 decision; current `.dockerignore` gap; `receipt=GR-2026-08-10-DECK-DOCKERIGNORE-01`; 2026-08-10 MEKANİK DİLİM: .deck + .deck.* dışlaması eklendi (owner-side); sprint-507-002 kanıtı — worker render-time scope-shrink (yeni bulgu: plan-time trackedRootFiles koruması render'da yeniden-sanitize edilip kök dosyaları SESSİZCE düşürüyor) nedeniyle kök dosyaya yazamadı, dürüst NO_GO; kalan kapsam: hermetik dockerignore-parse testi + image-layer proof (worker dilimi, kök-dosya yazımı gerektirmez)",
+      "updated": "2026-08-10"
     },
     {
       "order": 110,
@@ -22873,6 +22885,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "07d89bfa0a98ba04e8ecea6c5c63411fd2478d4c62e93b0938537d750597b186"
+    "value": "5a5c1687fde72f6aca240f11e861bd872cdad0b32f525bc4ebbfb0e91ce793eb"
   }
 }
