@@ -20,6 +20,8 @@ import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 import { extractSprintFromDebtId } from '../core/memory-import.js';
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { getAgentRole } from '../core/agent-role-contract.js';
+import { classifyFixFailure } from './fix-failure-classification.js';
+import { writeEvent } from './event-stream.js';
 import { resolveTaskLineageRootId } from '../core/task-lineage.js';
 import { resolveFixRepairAuthority } from './fix-repair-authority.js';
 import type {
@@ -588,6 +590,41 @@ export function handleEvaluation(
     debugLog(
       'handleEvaluation:fixBudgetExhausted',
       `task=${task.id} — retry authority exhausted; PAUSED without creating another priority fix`,
+    );
+    return;
+  }
+
+  // ── Failure classification decides the route (owner decision 2026-08-10) ──
+  // A retry is right when the ENVIRONMENT failed and wrong when the task or its
+  // scope is what broke. Until this gate existed, every NO_GO that was not a
+  // cascade-skip or a budget exhaustion became a same-scope re-run: sprint-496
+  // re-ran a scope contradiction three times for ~210k tokens and collected the
+  // same honest NO_GO each round. The decision lives here, in Deckent, so it is
+  // identical whichever provider backs the Brain — the model is left with the
+  // CONTENT of a fix, never the choice of whether re-running can possibly work.
+  //
+  // Dispositions that need a changed scope or a re-planned task have no automatic
+  // path yet, so they park as typed PAUSED for an operator/Brain decision rather
+  // than silently degrading into the retry this gate exists to prevent. That is
+  // the conservative direction: fewer fix tasks, more honest stops.
+  const failureClass = classifyFixFailure({
+    result,
+    exitCode: (result as { exitCode?: number | null } | null | undefined)?.exitCode ?? null,
+  });
+  if (!failureClass.allowsFixTask) {
+    updateTaskStatus(projectRoot, task.id, TaskStatus.PAUSED);
+    releaseAllLocks(projectRoot, workerId);
+    try {
+      writeEvent(projectRoot, task.sprintId ?? '', 'brain', 'user', 'BRAIN→USER:FIX_ROUTE_ESCALATED', {
+        taskId: task.id,
+        disposition: failureClass.disposition,
+        code: failureClass.code,
+        reason: failureClass.reason,
+      });
+    } catch (e) { debugLog('handleEvaluation:fixRouteEvent', e); }
+    debugLog(
+      'handleEvaluation:fixRouteEscalated',
+      `task=${task.id} — ${failureClass.code}: ${failureClass.reason}`,
     );
     return;
   }
