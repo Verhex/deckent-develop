@@ -38,6 +38,7 @@ import {
 } from '../../src/cli/repl/run-flow-inbox.js';
 import { sweepStaleRuns } from '../../src/orchestra/run-flow-death-sweep.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
+import { collectAddressableInboxRows, resolveDecideTarget } from '../../src/cli/commands/runs.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
 import { saveApprovedSnapshot, saveRunHandle } from '../../src/core/run-flow-store.js';
 import type { RunProposal, PlanPreview } from '../../src/core/run-flow-contract.js';
@@ -313,6 +314,33 @@ describe('resolveInboxSelection — /runs <n> numbered pick (D2)', () => {
 
   it('a non-numeric arg → list (a stray arg is not an error)', () => {
     expect(resolveInboxSelection('foo', rows)).toEqual({ kind: 'list' });
+  });
+});
+
+describe('runs addressing — complete durable inbox reachability (501-001)', () => {
+  let root: string;
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'runs-address-'));
+    _resetRunFlowCoordinatorsForTests();
+  });
+  afterEach(() => {
+    _resetRunFlowCoordinatorsForTests();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('finds a unique prefix beyond the default listing window and retains ambiguity refusal', () => {
+    for (let i = 0; i < MAX_INBOX_ROWS; i++) proposedFlow(root, `recent-${i}`, `recent ${i}`);
+    proposedFlow(root, 'older-unique-flow', 'older');
+    proposedFlow(root, 'shared-prefix-a', 'first');
+    proposedFlow(root, 'shared-prefix-b', 'second');
+
+    expect(collectInboxRows(root)).toHaveLength(MAX_INBOX_ROWS);
+    const allRows = collectAddressableInboxRows(root);
+    expect(allRows).toHaveLength(MAX_INBOX_ROWS + 3);
+    expect(resolveDecideTarget('older-unique', allRows)).toMatchObject({
+      kind: 'row', row: { flowId: 'older-unique-flow' },
+    });
+    expect(resolveDecideTarget('shared-prefix', allRows)).toEqual({ kind: 'not-found', arg: 'shared-prefix' });
   });
 });
 

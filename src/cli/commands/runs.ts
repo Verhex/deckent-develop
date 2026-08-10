@@ -32,6 +32,7 @@ import { getLangFromConfig } from '../helpers/config-reader.js';
 import type { ActorContext } from '../../core/work-model.js';
 
 const SHORT_ID_LEN = 8;
+const ALL_INBOX_ROWS = Number.MAX_SAFE_INTEGER;
 
 /** Actor identity for decisions issued via `deckent runs` (parity with the
  *  REPL's `{id:'repl-user'}` and do's `{id:'cli-non-interactive'}`). */
@@ -135,6 +136,12 @@ export function resolveDecideTarget(
   return { kind: 'not-found', arg };
 }
 
+/** Resolve stable flow-id handles against the complete durable inbox, rather
+ * than the bounded listing window displayed to the operator. */
+export function collectAddressableInboxRows(root: string): InboxRow[] {
+  return collectInboxRows(root, { limit: ALL_INBOX_ROWS });
+}
+
 /**
  * `deckent runs <n> --approve [--start] | --reject [--reason] | --start` —
  * the Desktop Telegraph's exact verbs from the terminal (SURF-6 Desktop→
@@ -236,6 +243,7 @@ export function registerRuns(program: Command): void {
     .command('runs')
     .description('List run-flows (the multi-flow inbox) — plus per-run decide: --approve/--reject/--start')
     .argument('[n]', 'Run to target: the list number, or (for decide flags) a unique flowId prefix')
+    .option('--limit <n>', 'Show up to n inbox rows (default: the recent window; a flow-id prefix always resolves against every flow)', Number)
     .option('--close-stale', 'Classify stale runs (dead process / unverifiable record); dry-run unless --yes')
     .option('--yes', 'With --close-stale: durably close the stale runs (failed/cancelled)')
     .option('--approve', 'Approve run #n (SLOW AHEAD; add --start for FULL AHEAD)')
@@ -245,7 +253,7 @@ export function registerRuns(program: Command): void {
     .option('--diff', "Show run #n's real footprint as a unified diff (583/N1)")
     .option('--commit', "Review-then-commit run #n's changes (583/N4; shows the proposal, prompts unless --yes)")
     .option('--message <text>', 'With --commit: use this commit message instead of the suggested one')
-    .action(async (n: string | undefined, opts: { closeStale?: boolean; yes?: boolean; diff?: boolean; commit?: boolean; message?: string } & DecideFlags) => {
+    .action(async (n: string | undefined, opts: { closeStale?: boolean; yes?: boolean; diff?: boolean; commit?: boolean; limit?: number; message?: string } & DecideFlags) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       try {
@@ -254,7 +262,7 @@ export function registerRuns(program: Command): void {
         // 583/N1 — `runs <n|prefix> --diff`: line-level footprint via the ONE
         // shared diff service (same output the Desktop diff panel renders).
         if (opts.diff === true) {
-          const target = resolveDecideTarget(n, collectInboxRows(root));
+          const target = resolveDecideTarget(n, collectAddressableInboxRows(root));
           if (target.kind !== 'row') {
             printError(new Error(
               target.kind === 'not-found'
@@ -286,7 +294,7 @@ export function registerRuns(program: Command): void {
         // --diff), a deterministic suggested message, then asks for the human
         // seal (y/N; --yes skips, --message overrides). NEVER pushes.
         if (opts.commit === true) {
-          const target = resolveDecideTarget(n, collectInboxRows(root));
+          const target = resolveDecideTarget(n, collectAddressableInboxRows(root));
           if (target.kind !== 'row') {
             printError(new Error(
               target.kind === 'not-found'
@@ -367,7 +375,7 @@ export function registerRuns(program: Command): void {
             process.exitCode = 1;
             return;
           }
-          const target = resolveDecideTarget(n, collectInboxRows(root));
+          const target = resolveDecideTarget(n, collectAddressableInboxRows(root));
           if (target.kind !== 'row') {
             printError(new Error(
               target.kind === 'not-found'
@@ -390,7 +398,9 @@ export function registerRuns(program: Command): void {
           print('');
         }
 
-        const rows = collectInboxRows(root);
+        const rows = opts.limit === undefined
+          ? collectInboxRows(root)
+          : collectInboxRows(root, { limit: opts.limit });
 
         // `deckent runs <n>` — rich single-run detail, same numbering as the
         // list (parity with the REPL's `/runs <n>`); SURF-6: a unique flowId
@@ -405,7 +415,7 @@ export function registerRuns(program: Command): void {
             print(labels.notFound.replace('{arg}', selection.arg));
             return;
           }
-          const target = resolveDecideTarget(n, rows);
+          const target = resolveDecideTarget(n, collectAddressableInboxRows(root));
           if (target.kind === 'row') {
             for (const line of buildRunDetailLines(collectRunDetail(root, target.row), labels)) print(line);
             return;
