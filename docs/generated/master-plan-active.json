@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d97e485bde7dd294e525c1dba6c18e358db491963273c30d0047d7ff7ae5192a"
+    "value": "355e31c2c3969c8487a9f21649cc8449eb13533fe58c26fd095b9e89ca8d8e55"
   },
   "summary": {
     "total": 398,
     "active": 351,
     "terminal": 47,
-    "receipts": 166,
+    "receipts": 170,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -6101,6 +6101,46 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-10T06:16:04Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-SCOPE-GATE-MIRROR-NARROW-01",
+      "authorityDigest": "854c3baba7a903b36c01f5b6ea1f554985a800bcdb7d0d115c3e45507d7b8201",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T07:51:08Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-FIX-FAILURE-CLASSIFICATION-01",
+      "authorityDigest": "15d2d76428a0181f6a55f3387b4d213c7dfc406196253f7ea96c7a87a769522a",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T07:51:08Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-RUN-FLOW-REACHABILITY-01",
+      "authorityDigest": "0806ad7fc7ebbe0eaacf08a28da8b671f7f751f1dacaa0255eda0a40cb3dfacc",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T07:51:08Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-FIX-CLASS-HERMETIC-SUPP-01",
+      "authorityDigest": "9e38adf75b08142ed00c5cff0f397fd90823af3e635b434a97398eead3026dda",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T07:51:08Z"
       },
       "g7AttemptIdentity": null
     }
@@ -20844,6 +20884,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "10d22690101c8bda9b9605632dad6468254d1fc26a626dff97add90f62a91dfc"
+    "value": "18f0cd1c7fc7636703c0ab3ff7f942ffaf12251fc84a680344a66c18421a8ea3"
   }
 }

@@ -137,7 +137,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: '1cdf75bd4f04af031d3f99321e109dbc94073440b2a73e3b35140619e2991128',
+  digest: 'e540197bc7f66019791d2455c47de42fce640af8b9bf8ed6934d13cbc1e74345',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -160,7 +160,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // autonomous ingresses all import — every local pendingPath helper deleted so
   // one resolver remains. Edits to already-inventoried modules only — same 1203
   // count, content digest only.
-  count: 1204,
+  count: 1205,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
@@ -176,7 +176,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-09 (MODEL-ACTIVATION-001): +1 REAL production module —
   // src/core/model-activation-store.ts (owner model-activation authority), plus
   // the auto-detect enforcement and CLI edits. Prior: STALE-SPRINT-LOCK (1203).
-  digest: 'ac824e6a555baa97ddd7a5680dc756dd08951bac4151500d22ba2f0fc047fdd8',
+  digest: '1bf0f9370b0572632b752b1dc381fac09b5a3e6ab4b53c91f89d1a598e42384f',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
