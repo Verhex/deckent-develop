@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9486a4bbe523f9ac86a01ffc9ad183dd02535ab5fb6efbcf3298cc433363c6ce"
+    "value": "a934762b6e16b430b43f0092072852e78f0c50a303fc9ceb94c3e9b0c2ed24af"
   },
   "summary": {
     "total": 398,
     "active": 351,
     "terminal": 47,
-    "receipts": 176,
+    "receipts": 180,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -6201,6 +6201,46 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-10T11:05:35Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-FLOW-RETIRE-SWEEP-01",
+      "authorityDigest": "5ebcb86327ad42e69a69a1d1080dcf7ad3fcbf15cb1f5b3a89536d7acdf6bdcf",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T13:26:04Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-START-GUARD-TERMINALITY-01",
+      "authorityDigest": "425c1dc23bd35b0417102b18e0b660865c06a6147909f382555f89822067a5c5",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T13:26:04Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-RETIRE-DOCS-01",
+      "authorityDigest": "6d94c0902767f74cba543fde5f6c7d4873c42adc6602efa7e0d74024a7b1bc66",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T13:26:04Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-RETIRE-HERMETIC-SUPP-01",
+      "authorityDigest": "bd54218a2b91192b9e4105e9ace4df990ffb4ff871a7380184d264e0f1e62752",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T13:26:04Z"
       },
       "g7AttemptIdentity": null
     }
@@ -20944,6 +20984,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "25f779a950c4d59e62bb5260c0b50cf035188f567fa5694b4e3fe930ac9153b9"
+    "value": "6f8b6cdbb2a908f3db2932522aff228133b897e47e610324ec523c55ee00dc6c"
   }
 }
