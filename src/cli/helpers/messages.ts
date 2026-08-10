@@ -46,6 +46,10 @@ const MESSAGES: MessageMap = {
     en: 'DECKENT_BINARY_IDENTITY_HOLD: this Deckent source checkout is being driven by a different or unverified CLI build (reason: {issue}).',
     tr: 'DECKENT_BINARY_IDENTITY_HOLD: bu Deckent source checkout farklı veya doğrulanmamış bir CLI build tarafından çalıştırılıyor (neden: {issue}).',
   },
+  'cli.binary_identity.warn': {
+    en: 'DECKENT_BINARY_IDENTITY_WARN: the build in `dist/` no longer matches this source checkout (reason: {issue}). Continuing — run `npm run build` so the CLI reflects your current source.',
+    tr: 'DECKENT_BINARY_IDENTITY_WARN: `dist/` içindeki build bu source checkout ile artık eşleşmiyor (neden: {issue}). Devam ediliyor — CLI güncel kaynağı yansıtsın diye `npm run build` çalıştırın.',
+  },
   'cli.binary_identity.paths': {
     en: 'Project checkout: {projectRoot}\nRuntime package: {runtimeRoot}',
     tr: 'Proje checkout: {projectRoot}\nRuntime paketi: {runtimeRoot}',

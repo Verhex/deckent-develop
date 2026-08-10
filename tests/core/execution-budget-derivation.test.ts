@@ -38,19 +38,25 @@ describe('buildTaskCostInput — config-resolved estimator defaults', () => {
 });
 
 describe('deriveRequestedExecutionBudget', () => {
-  it('scales input/output ceilings by retry × headroom — and NEVER derives aggregate maxTokens', () => {
+  it('scales the output ceiling by retry × headroom — and derives NEITHER aggregate maxTokens NOR an input ceiling', () => {
     const b = deriveRequestedExecutionBudget({
       estimatedInputTokens: 1_000,
       estimatedOutputTokens: 500,
       retryMultiplier: 1.2,
       headroomFactor: 2,
     });
-    expect(b.maxInputTokens).toBe(Math.ceil(1_000 * 1.2 * 2));
     expect(b.maxOutputTokens).toBe(Math.ceil(500 * 1.2 * 2));
     // KN5: maxTokens counts AGGREGATE usage (cache reads included) — a
     // cache-blind estimate must not manufacture that ceiling. Measured: an
     // honest worker was killed at 15,120 while consuming 42,126 aggregate.
     expect(b.maxTokens).toBeUndefined();
+    // sprint-496 (2026-08-09, first live worker): the input ceiling is wrong at
+    // the SAME class one level down. The estimate measures one assembled prompt
+    // while reported usage sums every model call in the turn — 3,201 estimated
+    // vs 101,859 reported (32x) — and `input_tokens` nests `cached_input_tokens`
+    // (66,560) that a separate 10M cache leg already governs, so a better cache
+    // hit rate blows the ceiling sooner. The derived request no longer carries it.
+    expect(b.maxInputTokens).toBeUndefined();
   });
 
   it('subscription-billed (USD 0 / absent) derives NO maxUsd — a 0-ceiling would block the task it contains', () => {
@@ -59,7 +65,7 @@ describe('deriveRequestedExecutionBudget', () => {
       estimatedCostUsd: 0, headroomFactor: 3,
     });
     expect(zero.maxUsd).toBeUndefined();
-    expect(zero.maxInputTokens).toBeGreaterThan(0); // containment still present (unit-correct ceilings)
+    expect(zero.maxOutputTokens).toBeGreaterThan(0); // containment still present via the output ceiling
   });
 
   it('API-billed derives maxUsd, hard-capped by the sprint budget', () => {

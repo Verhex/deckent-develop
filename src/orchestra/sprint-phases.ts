@@ -226,6 +226,7 @@ import {
   writeSprintState,
   spawnWorkers,
   buildSpawnRetryHint,
+  summarizeSpawnAttemptFailures,
   waitForResults,
   finalizeSprint,
   cleanup,
@@ -1178,6 +1179,10 @@ export async function runSpawnPhase(
   let scanInterval: ReturnType<typeof setInterval> | null = null;
   let taskQueue: Task[] = [];
   let spawnAttempts = 0;
+  // RECOVERY-DO-DOGFOOD: every attempt's error is retained so the terminal
+  // message can name ALL of them. Previously only the last survived, and a
+  // retry-artifact error could mask the real first-attempt failure.
+  const spawnAttemptErrors: unknown[] = [];
 
   while (spawnAttempts < 2) {
     try {
@@ -1235,6 +1240,17 @@ export async function runSpawnPhase(
         throw err;
       }
       spawnAttempts++;
+      spawnAttemptErrors.push(err);
+      // Typed, fail-soft journal record per failed attempt. The first attempt's
+      // error used to vanish entirely — not even the detached child log kept it.
+      try {
+        writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'SPAWN_ATTEMPT_FAILED', {
+          attempt: spawnAttempts,
+          errorName: err instanceof Error ? err.name : 'UnknownError',
+          errorCode: err instanceof Error && 'code' in err ? String((err as { code?: unknown }).code) : null,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
+      } catch (e) { debugLog('runSpawnPhase:attemptFailedEvent', e); }
       if (spawnAttempts >= 2) {
         if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
         // Sprint 156 Task 4 follow-up (Sprint 157 hot fix, 2026-05-12):
@@ -1244,8 +1260,14 @@ export async function runSpawnPhase(
         // destroyed Sprint 158 forensic evidence (.tasks/ wiped on lock conflict).
         try { cleanup(projectRoot, sprint, undefined, 'spawn-fail'); } catch (e) { debugLog('runSpawnPhase:cleanup', e); }
         const hint = buildSpawnRetryHint(err, sprint);
+        // The last error alone is not the whole truth: it may be a retry artifact
+        // caused by attempt 1 (measured 2026-08-09). Name every attempt in order
+        // so the ORIGINAL failure reads first and cannot be masked.
+        const attemptHistory = summarizeSpawnAttemptFailures(spawnAttemptErrors);
         throw new BrainError(
-          `Spawn phase failed after retry: ${err instanceof Error ? err.message : String(err)}. Hint: ${hint}`,
+          `Spawn phase failed after retry: ${err instanceof Error ? err.message : String(err)}.`
+          + `${attemptHistory ? ` Attempts: ${attemptHistory}.` : ''}`
+          + ` Hint: ${hint}`,
           SprintPhase.SPAWN,
         );
       }

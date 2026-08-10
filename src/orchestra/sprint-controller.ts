@@ -213,7 +213,7 @@ export {
   resolveDefaultUsageCli, getDefaultProvider, resolveTaskProvider,
   getSubprocessWorkerLogPath, readSubprocessWorkerLog, hasSubprocessWorkerLog,
   writeSprintState, readSprintState, clearSprintState,
-  detectOrphanWorkers, buildSpawnRetryHint,
+  detectOrphanWorkers, buildSpawnRetryHint, summarizeSpawnAttemptFailures,
 } from './sprint-utils.js';
 export type { SprintState } from './sprint-utils.js';
 

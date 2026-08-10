@@ -1211,6 +1211,11 @@ if (isEntryMain()) {
         issue: binaryAuthority.issue,
       })}\n`);
     }
+    if (binaryAuthority.status === 'warn') {
+      process.stderr.write(`${getMessage('cli.binary_identity.warn', binaryAuthorityLang, {
+        issue: binaryAuthority.issue,
+      })}\n`);
+    }
     if (shouldLaunchDefaultRepl(process.argv)) {
       launchDefaultRepl()
         .catch((err: unknown) => {

@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| rollback-sprint-496 | Sprint sprint-496 rollback SUCCESS | normal | sprint-496 | resolved |
 | debt-491-004 | Tech debt from 491-004: Implemented deterministic, idempotent lineage-scoped can | normal | sprint-491 | resolved |
 | debt-491-009 | Tech debt from 491-009: Run ownership is host-authored in the Docker producer bi | normal | sprint-491 | resolved |
 | debt-489-001 | Tech debt from 489-001: Exact two-line sentinel was read back and passed the pre | normal | sprint-489 | resolved |
