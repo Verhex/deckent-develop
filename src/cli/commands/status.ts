@@ -245,9 +245,16 @@ export function requiresPersistedRunStatusReadModel(authority: CanonicalRunStatu
   // paths short-circuit to a paused banner (below). ORPHANED stays — it is a
   // CONTESTED state (the authority emits conflicts[]) where the born-688
   // read-model safety still earns its keep.
-  return authority.active
+  // An ACTIVE lifecycle claim alone is not enough: stale sprint residue can
+  // retain it after its process has died. The authority's `alive` coordinator
+  // verdict is the sole exception, because it is derived from canonical PID
+  // evidence.
+  const hasProvenActiveLiveness = authority.active && authority.coordinator === 'alive';
+  return !hasProvenActiveLiveness && (
+    authority.active
     || authority.resumable
-    || authority.lifecycle === 'ORPHANED';
+    || authority.lifecycle === 'ORPHANED'
+  );
 }
 
 /**
