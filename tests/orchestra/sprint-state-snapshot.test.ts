@@ -57,6 +57,19 @@ describe('sprint-state-tracker (Sprint 180 W1-1)', () => {
       JSON.stringify({ sprintId: 'sprint-x', phase: 'EXECUTE', taskIds: ['x-001', 'x-002'] }),
     );
     // Worker A: still running — only a heartbeat, no result.
+    // A live worker always has its task JSON on disk — it is the claim surface the
+    // worker operates on, and cleanup removes it when the sprint settles. The
+    // snapshot now requires that evidence, so a residue heartbeat cannot pose as
+    // an active worker (measured 2026-08-10: a leftover .hb drove two spurious
+    // WORKER_RESPAWN actions on an already-settled sprint).
+    writeFileSync(
+      join(tmp, '.tasks/task-x-001.json'),
+      JSON.stringify({ id: 'x-001', title: 'x-001', scope: {} }),
+    );
+    writeFileSync(
+      join(tmp, '.tasks/task-x-002.json'),
+      JSON.stringify({ id: 'x-002', title: 'x-002', scope: {} }),
+    );
     writeFileSync(
       join(tmp, '.tasks/task-x-001.hb'),
       JSON.stringify({ workerId: 'w-x-001', taskId: 'x-001', timestamp: new Date().toISOString() }),
