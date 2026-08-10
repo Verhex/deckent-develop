@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-506 Learnings
+- Sprint sprint-506 Learnings: ## Sprint sprint-506 Learnings
+- Sweep task artifacts by task identity, not by filename prefix: GO_WITH_TECH_DEBT — TypeScript type check and the declared targeted orphan-cleaner test suite passed. Preflight now admits eligible artifact
+
+## Gains
+- 506-001 — Let an approved-but-unstarted flow be retired from the inbox — Verified existing scoped implementation: --retire is an explicit, mutually exclusive CLI option t...
+
 ## Sprint sprint-505 Learnings
 - Sprint sprint-505 Learnings: ## Sprint sprint-505 Learnings
 

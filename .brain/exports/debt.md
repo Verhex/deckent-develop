@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-506-002 | Tech debt from 506-002: TypeScript type check and the declared targeted orphan-c | normal | sprint-506 | resolved |
 | rollback-sprint-503 | Sprint sprint-503 rollback SUCCESS | normal | sprint-503 | resolved |
 | rollback-sprint-502 | Sprint sprint-502 rollback SUCCESS | normal | sprint-502 | resolved |
 | rollback-sprint-496 | Sprint sprint-496 rollback SUCCESS | normal | sprint-496 | resolved |

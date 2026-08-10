@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5d6a80d79462a7f48cde0d46a928541548a062f826f07d54478a190e74e30716"
+    "value": "7e82783aa127597db2671bf939436f7162511ea695f9d8cbb6e1312701e6bcde"
   },
   "summary": {
-    "total": 430,
-    "active": 383,
+    "total": 432,
+    "active": 385,
     "terminal": 47,
-    "receipts": 181,
+    "receipts": 182,
     "byState": {
-      "OPEN": 290,
+      "OPEN": 292,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -22,8 +22,8 @@
     },
     "byPriority": {
       "P0": 275,
-      "P1": 118,
-      "P2": 37
+      "P1": 119,
+      "P2": 38
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 82,
+      "TRUTH": 84,
       "XPLAT": 3
     }
   },
@@ -1009,6 +1009,28 @@
       "definitionDigest": "e6230fc41345dabe30204030b8f4d0b39d82385e09b9b05099ae0167faf9d5bd",
       "progressDigest": "ff43ed2655e9a017523749417bf26fdf195a340f9b55b6240708bb87db814d94",
       "terminalClosureDigest": "80b44ce9ba7777c3b09ad85e78a9c87a4b4478ee66c5109d1f2502b36ed695c2"
+    },
+    {
+      "order": 538,
+      "id": "CI-NIGHTLY-GREEN-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "15d27c529193bcf4e7b6b9b382b8350de88daf68fb538abfb6bae513bf405d59",
+      "progressDigest": "0614a2146b3358518866c2a6447d047ba46725357c0a3bdbaf86ef273a61d5be",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 539,
+      "id": "MODEL-CATALOG-ENDPOINT-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "241173426e94961b5c42aecb071157c2d15d38a0873087f2f8fbe8269b415925",
+      "progressDigest": "4d37727060cd6abd0491a14f8e915dc6c88fcfab1edf30839c7b33684a13bf01",
+      "terminalClosureDigest": null
     },
     {
       "order": 1000,
@@ -6605,6 +6627,16 @@
         "transitionAt": "2026-08-10T13:26:04Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-NIGHTLY-GREEN-01",
+      "authorityDigest": "698a3d82c5d854cea9d5b5b9166dc0ac84e0feab1fa4fddee7f9db21155300d7",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T21:18:10Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -8798,6 +8830,70 @@
       "acceptance": "Onay ve settlement kayıtları owner-approved immutable external ledger'a bağlanır; MASTER'daki receipt register'ı onun projection'ı olur; Git trust-anchor zinciri commit-bound doğrulanır",
       "evidence": "Açılış 2026-08-06: SSOT-003 bölmesinden doğdu (MASTER §3.3 — residual child'a taşınır; Alperen G1 onayı, karar-turu); taşınan evidence-cümlesi bu satırın outcome'udur; `receipt=GR-2026-08-06-SSOT-SPLIT-01`",
       "updated": "2026-08-06"
+    },
+    {
+      "order": 538,
+      "id": "CI-NIGHTLY-GREEN-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-10-NIGHTLY-GREEN-01"
+      ],
+      "acceptance": "Üç test dosyası (audit-operation-ingress, brain/decisions, governance/orphan-deliverables) lokalde ve gece Coverage'da yeşil; baseline mekanik regen digest'li; ADR Context içeriği owner-görünür; orphan pini O-ailesi bilinçli-unwired gerçeğini not eder",
+      "evidence": "Açılış 2026-08-10 (post-PR116 sağlık taraması, Alperen 'sen taslakla' onayı): 3 kırık lokal reproduce — audit 673≠674 (ab14d45cd debt-manager +1 write sitesi), 'Provider Authority Key Custody, Rotation & Composition' ADR'sinde Context alanı yok, orphan taraması 91≠90 (operation-catalog O1 2026-08-07 indi, pin güncellenmedi); kökler satır 4030 (O3 typed-residual) · 160 (ADR parity) · 531 (Coverage-only aileler) ile bağlantılı; `receipt=GR-2026-08-10-NIGHTLY-GREEN-01`; 2026-08-10 SETTLEMENT: üç parça kapandı — baseline 674 regen (audit --write), adr-g-039 gerçek Context (MemoryStore.update, audit-chain + entry_history korunur; writeGuardedExports re-export), KNOWN_ORPHANS += operation-catalog/index.ts (tarihli yorum + 92 pin); `proof=nightly-drift-trio-37of37-local`; X kanıtı gece Coverage koşusunda — satır o kanıta ve owner DONE-onayına dek OPEN",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 539,
+      "id": "MODEL-CATALOG-ENDPOINT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "models.dev catalog endpoint'i taşındı (api/v1/catalog 302 ile HTML ana sayfaya düşüyor): CATALOG_URL güncellenir, redirect-to-HTML typed catalog-fetch hatasına çevrilir, remote-refresh gerçek JSON kaynağına döner",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "fetchRemoteCatalog HTML/redirect yanıtında typed hata üretir (warning'li bundled-düşüş davranışı aynen kalır); yeni endpoint gerçek koşuda JSON döner veya endpoint yoksa owner'a typed unreachable raporlanır; cache'e bozuk içerik yazılmadığı testle pinlenir",
+      "evidence": "Açılış 2026-08-10: deckent models koşusunda remote-fetch-failed ('Unexpected token <'); curl kanıtı 302 → ana sayfa (HTML); mevcut davranış fail-safe (writeCache parse+shape sonrası; catalog cache dosyası hiç oluşmamış) — sorun yalnız ölü URL",
+      "updated": "2026-08-10"
     },
     {
       "order": 1000,
@@ -22777,6 +22873,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "75c30ed3062bdd8b81ddd0025e92dc231bd77cba0fa546b8cf0275d8c6db182a"
+    "value": "07d89bfa0a98ba04e8ecea6c5c63411fd2478d4c62e93b0938537d750597b186"
   }
 }

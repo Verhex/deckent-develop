@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):5d6a80d79462a7f48cde0d46a928541548a062f826f07d54478a190e74e30716`
+**Source digest:** `sha256(normalized-lf-utf8):7e82783aa127597db2671bf939436f7162511ea695f9d8cbb6e1312701e6bcde`
 
-**Rows:** 430 total · 383 active · 47 terminal
+**Rows:** 432 total · 385 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 290 |
+| OPEN | 292 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -86,6 +86,8 @@
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
+| 538 | `CI-NIGHTLY-GREEN-001` | OPEN | P1 | TRUTH | — | — | Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder |
+| 539 | `MODEL-CATALOG-ENDPOINT-001` | OPEN | P2 | TRUTH | — | — | models.dev catalog endpoint'i taşındı (api/v1/catalog 302 ile HTML ana sayfaya düşüyor): CATALOG_URL güncellenir, redirect-to-HTML typed catalog-fetch hatasına çevrilir, remote-refresh gerçek JSON kaynağına döner |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |

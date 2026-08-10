@@ -13,9 +13,9 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 673,
+  "total": 674,
   "mediated": 0,
-  "unmediated": 673,
+  "unmediated": 674,
   "fileCount": 233,
   "byFile": {
     "src/agent/permission-store.ts": {
@@ -739,7 +739,7 @@
       "mediated": false
     },
     "src/orchestra/debt-manager.ts": {
-      "count": 2,
+      "count": 3,
       "mediated": false
     },
     "src/orchestra/dependency-scheduler.ts": {
@@ -951,5 +951,5 @@
       "mediated": false
     }
   },
-  "digest": "f70e22733e555f42ab2e050a5d050a44d3bf789774b46b9415b8247849efc211"
+  "digest": "3ea3203ff291a6cb84fb52dc7d0fdf896f4e4923a7902f20e91e8bc402c6c761"
 }

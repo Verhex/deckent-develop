@@ -55,6 +55,8 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-506 Learnings** (sprint-506): ## Sprint sprint-506 Learnings
+- Sweep task artifacts by task identity, not by filename prefix: GO_WITH_TECH_DEBT — T...
 - **Sprint sprint-505 Learnings** (sprint-505): ## Sprint sprint-505 Learnings
 
 ## Gains
@@ -85,16 +87,14 @@
 - Cross-fix: Canonical logical-progress identity contract: NO_GO — Authority blocker: ...
 - **Sprint sprint-487 Learnings** (sprint-487): ## Sprint sprint-487 Learnings
 - Fix: Terminal publication real-binary contract: NO_GO — Verification: node scripts/t...
-- **Sprint sprint-486 Learnings** (sprint-486): ## Sprint sprint-486 Learnings
-- Finalizer terminal-evidence wiring: NO_GO — Host runtime-budget evidence is not term...
 
 ## Active Technical Debt
 _No active technical debt._
 
 ## Active Patterns
-- Violation pattern: stale_heartbeat (×44 sprints)
+- Violation pattern: stale_heartbeat (×45 sprints)
 - Violation pattern: file_outside_scope (×21 sprints)
 - Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1799 | Generated: 2026-08-10_
+_Total entries: 1804 | Generated: 2026-08-10_
