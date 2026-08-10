@@ -1,5 +1,31 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-505 Learnings
+- Sprint sprint-505 Learnings: ## Sprint sprint-505 Learnings
+
+## Gains
+- 505-001 — Let an approved-but-unstarted flow be retired from the inbox — Verification failed: vitest=0, tsc=2, diff-check=0.
+- 505-002 — Sweep task artifacts by task identity, not by filename prefix — Implemented task-identity-based cleanup admission for prefixed and unprefixed artifacts while pre...
+
+## Sprint sprint-504 Learnings
+- Sprint sprint-504 Learnings: ## Sprint sprint-504 Learnings
+
+## Gains
+- 504-001 — Render a liveness-proven ACTIVE run instead of holding it — Baseline targeted suite completed with its existing subprocess-dependent cases skipped.
+
+## Sprint sprint-501 Learnings
+- Sprint sprint-501 Learnings: ## Sprint sprint-501 Learnings
+
+## Gains
+- 501-001 — Address any run-flow directly and page the inbox — Implemented complete-store flow-prefix lookup for direct read/decide/diff/commit targeting and an...
+
+## Sprint sprint-499 Learnings
+- Sprint sprint-499 Learnings: ## Sprint sprint-499 Learnings
+
+## Gains
+- 499-001 — Escape Unicode line separators in the structured-criteria projection — Declared targeted verification passed: npx vitest run tests/orchestra/directives-delimiter-safety...
+- 499-002 — Make the declared minimum model tier authoritative — Implemented activeModeConfig.min_tier precedence in Layer 1b while reusing the existing TIER_RANK...
+
 ## Sprint sprint-498 Learnings
 - Sprint sprint-498 Learnings: ## Sprint sprint-498 Learnings
 
