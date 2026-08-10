@@ -112,6 +112,7 @@ export function executeInboxDecision(
 interface DecideFlags {
   readonly approve?: boolean;
   readonly reject?: boolean;
+  readonly retire?: boolean;
   readonly reason?: string;
   readonly start?: boolean;
 }
@@ -143,7 +144,7 @@ export function collectAddressableInboxRows(root: string): InboxRow[] {
 }
 
 /**
- * `deckent runs <n> --approve [--start] | --reject [--reason] | --start` —
+ * `deckent runs <n> --approve [--start] | --reject [--reason] | --retire | --start` —
  * the Desktop Telegraph's exact verbs from the terminal (SURF-6 Desktop→
  * Terminal handoff): reject=STOP, approve=SLOW AHEAD, approve+start=FULL
  * AHEAD. All writes go through the ONE shared decision service; deterministic
@@ -151,7 +152,7 @@ export function collectAddressableInboxRows(root: string): InboxRow[] {
  * idempotently instead of racing. Prints the refreshed detail afterwards so
  * the operator sees the daemon-truth, not the intent.
  */
-function runDecide(root: string, flowId: string, flags: DecideFlags, lang: string, labels: InboxLabels): void {
+export function runDecide(root: string, flowId: string, flags: DecideFlags, lang: string, labels: InboxLabels): void {
   if (flags.approve) {
     const context = decideRunFlow(root, flowId, { decision: 'approve', actor: CLI_OPERATOR_ACTOR });
     // SURF-6 kuyruk-D — gate-fail visibility: an approve on a gate-FAIL plan
@@ -174,6 +175,11 @@ function runDecide(root: string, flowId: string, flags: DecideFlags, lang: strin
     print(flags.reason !== undefined
       ? getMessage('runs.decide.rejected_reason', lang, { reason: flags.reason })
       : getMessage('runs.decide.rejected', lang));
+  } else if (flags.retire) {
+    // `reject` remains the approval-stage decision. Retirement is the explicit
+    // operator action for an already-approved flow and reuses the coordinator's
+    // terminal-safe abort command rather than changing the state machine.
+    getRunFlowCoordinator(root).abortFlow({ flowId });
   }
 
   if (flags.start && !flags.reject) {
@@ -241,13 +247,14 @@ export function buildCloseStaleLines(report: StaleRunSweepReport, lang: string):
 export function registerRuns(program: Command): void {
   program
     .command('runs')
-    .description('List run-flows (the multi-flow inbox) — plus per-run decide: --approve/--reject/--start')
+    .description('List run-flows (the multi-flow inbox) — plus per-run decide: --approve/--reject/--retire/--start')
     .argument('[n]', 'Run to target: the list number, or (for decide flags) a unique flowId prefix')
     .option('--limit <n>', 'Show up to n inbox rows (default: the recent window; a flow-id prefix always resolves against every flow)', Number)
     .option('--close-stale', 'Classify stale runs (dead process / unverifiable record); dry-run unless --yes')
     .option('--yes', 'With --close-stale: durably close the stale runs (failed/cancelled)')
     .option('--approve', 'Approve run #n (SLOW AHEAD; add --start for FULL AHEAD)')
     .option('--reject', 'Reject run #n (STOP)')
+    .option('--retire', 'Retire an unstarted approved run #n (CANCELLED)')
     .option('--reason <text>', 'Reason recorded with --reject')
     .option('--start', 'Start the approved run #n as a detached background run')
     .option('--diff', "Show run #n's real footprint as a unified diff (583/N1)")
@@ -363,9 +370,9 @@ export function registerRuns(program: Command): void {
           return;
         }
 
-        const wantsDecide = opts.approve === true || opts.reject === true || opts.start === true;
+        const wantsDecide = opts.approve === true || opts.reject === true || opts.retire === true || opts.start === true;
         if (wantsDecide || opts.reason !== undefined) {
-          if (opts.approve && opts.reject) {
+          if ((opts.approve && opts.reject) || (opts.retire && (opts.approve || opts.reject || opts.start))) {
             printError(new Error(getMessage('runs.decide.flag_conflict', lang)));
             process.exitCode = 1;
             return;

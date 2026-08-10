@@ -166,9 +166,18 @@ function hasReceiptProjectionProof(
  * Extract sprint number from a task filename like "task-143-001.json".
  * Returns the sprint number string (e.g. "143") or null.
  */
+function taskIdFromArtifactFilename(filename: string): string | null {
+  const extensionBoundary = filename.indexOf('.');
+  if (extensionBoundary <= 0) return null;
+  const artifactTaskId = filename.slice(0, extensionBoundary);
+  const canonicalTaskId = artifactTaskId.replace(/^task-/, '');
+  return /^\d+-\d+(?:-(?:fix|xfix))*$/.test(canonicalTaskId)
+    ? canonicalTaskId
+    : null;
+}
+
 function sprintNumberFromFilename(filename: string): string | null {
-  const match = filename.match(/^task-(\d+)-/);
-  return match?.[1] ?? null;
+  return taskIdFromArtifactFilename(filename)?.split('-', 1)[0] ?? null;
 }
 
 // ─── Sprint-Scoped Task-File Classification (shared) ────────────────
@@ -185,8 +194,9 @@ export interface SprintFileClassification {
 
 /**
  * Classify a sprint's task files into archive-eligible vs preserved, WITHOUT
- * mutating anything. Sprint-scoped by the `task-<sprintNum>-` filename prefix,
- * so it never touches another sprint's files. Active tasks (PENDING — incl.
+ * mutating anything. Sprint-scoped by parsed task identity, so artifacts with
+ * or without the `task-` filename prefix are considered only when their
+ * canonical task JSON belongs to this sprint. Active tasks (PENDING — incl.
  * pending fix tasks — EXECUTING, PAUSED, …) are preserved; only an explicit
  * terminal status (DONE/NO_GO) is archive-eligible. Missing/malformed/unknown
  * status is preserved because absence of terminal proof is not completion.
@@ -214,9 +224,6 @@ export function classifySprintTaskFiles(
   const tasksDir = join(projectRoot, TASKS_DIR);
   if (!existsSync(tasksDir)) return result;
 
-  const prefix = `task-${sprintNum}-`;
-  const allFiles = readdirSync(tasksDir).filter(f => f.startsWith(prefix));
-
   // Group files by the COMPLETE task ID. Task IDs may carry one or more
   // `-fix` suffixes (`task-144-001-fix-fix`). Grouping with the old
   // `/^(task-\d+-\d+)/` prefix collapsed every fix/xfix artifact into the base
@@ -224,14 +231,12 @@ export function classifySprintTaskFiles(
   // Artifact filenames use the first `.` as the task-id/extension boundary;
   // task IDs themselves never contain dots.
   const taskGroups = new Map<string, string[]>();
-  for (const file of allFiles) {
-    const extensionBoundary = file.indexOf('.');
-    if (extensionBoundary <= 0) continue;
-    const taskId = file.slice(0, extensionBoundary);
-    if (!/^task-\d+-\d+(?:-(?:fix|xfix))*$/.test(taskId)) continue;
-    const group = taskGroups.get(taskId) ?? [];
+  for (const file of readdirSync(tasksDir)) {
+    const canonicalTaskId = taskIdFromArtifactFilename(file);
+    if (!canonicalTaskId || !canonicalTaskId.startsWith(`${sprintNum}-`)) continue;
+    const group = taskGroups.get(canonicalTaskId) ?? [];
     group.push(file);
-    taskGroups.set(taskId, group);
+    taskGroups.set(canonicalTaskId, group);
   }
 
   let projectionStore: ReturnType<typeof openTaskSettlementProjection> | null = null;
@@ -248,8 +253,8 @@ export function classifySprintTaskFiles(
   }
 
   try {
-    for (const [artifactTaskId, files] of taskGroups) {
-      const canonicalTaskId = artifactTaskId.slice('task-'.length);
+    for (const [canonicalTaskId, files] of taskGroups) {
+      const artifactTaskId = `task-${canonicalTaskId}`;
       const jsonPath = join(tasksDir, `${artifactTaskId}.json`);
       const identity = existsSync(jsonPath)
         ? readTaskAuthorityIdentity(projectRoot, jsonPath, canonicalTaskId)
@@ -442,9 +447,7 @@ export function preflightOrphanCleanup(
     return report;
   }
 
-  const allFiles = readdirSync(tasksDir).filter(f =>
-    f.startsWith('task-') && TASK_FILE_RE.test(f),
-  );
+  const allFiles = readdirSync(tasksDir).filter(f => TASK_FILE_RE.test(f));
 
   // Group orphan files by their sprint number
   const orphansBySprintNum = new Map<string, string[]>();
