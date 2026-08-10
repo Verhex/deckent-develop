@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "355e31c2c3969c8487a9f21649cc8449eb13533fe58c26fd095b9e89ca8d8e55"
+    "value": "e158f3f1438556564b7bf18908ec102e782f6ce42b9b0c29a0249725f82d082c"
   },
   "summary": {
     "total": 398,
     "active": 351,
     "terminal": 47,
-    "receipts": 170,
+    "receipts": 173,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -6141,6 +6141,36 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-10T07:51:08Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-REPLAN-PROPOSAL-01",
+      "authorityDigest": "8a9f514c4e2f561742688a976691644a6bf629ddc2f1616c47aec877bee2f2a2",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T09:10:44Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-LIVE-STATUS-READABLE-01",
+      "authorityDigest": "61c3c90e137396bb074a6c442e3e5fa455f8fd7f40b1083caeb673ec8e5f20c5",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T09:10:44Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-REPLAN-HERMETIC-SUPP-01",
+      "authorityDigest": "202fc981f4e7c244721be1c87b1b7ad76175af0150def9c32d4773956775fee9",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T09:10:44Z"
       },
       "g7AttemptIdentity": null
     }
@@ -20884,6 +20914,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "18f0cd1c7fc7636703c0ab3ff7f942ffaf12251fc84a680344a66c18421a8ea3"
+    "value": "5cfa88792d6c7430da05361486195009a336bac01ca027504bab35f573be69a7"
   }
 }
