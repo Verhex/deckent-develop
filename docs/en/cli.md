@@ -88,7 +88,7 @@ Use the installed binary as `deckent …`, or the repository build as `node dist
 | `trace` | `extract` | Extract aligned/general training examples from Claude Code transcripts. |
 | `nervous` | `enable`, `accept`, `reject`, `edit`, `undo`, `history`, `recommendations` (`recs`), `log`, `accept-panic`, `baseline-refresh` | Inspect or govern proactive recommendations and reversible actions. |
 | `mode` | `show`, `sprint`, `run`, `task`, `process`, `auto`, `global` | Read or set `deckent_style`; `run` currently persists `sprint`. |
-| `models` | `list`, `refresh`, `tier` | Browse, refresh, and classify registry models. |
+| `models` | `list`, `refresh`, `tier`, `activate <model> --provider <name>`, `deactivate <model> --provider <name>`, `activation` | Browse, refresh, classify, and manage model activation decisions. |
 | `flow` | `list`, `add`, `run`, `approve` | Manage scheduled process-mode flows and pending dispatch approval. |
 | `rbac` | `check`, `roles`, `grant`, `revoke` | Inspect permissions and mutate user-role assignments. |
 | `evolve` | `report` | Show cross-sprint agent/skill trends and prompt suggestions. |
@@ -111,7 +111,7 @@ The hidden `gateway-runtime` command is an internal per-project child spawned by
 |---|---|
 | `start`, `run`, `do --run`, `spawn`, `test`, `resume`, `recover` | Start, resume, or alter execution and may create runtime/task state. |
 | `kill`, `cleanup`, `autonomous stop`, `autonomous cleanup` | Terminate workers or remove runtime artifacts; owner approval and exact scope are required by repository policy. |
-| `config set\|import\|migrate`, `mode …`, `nervous enable`, `autonomous enable` | Persist policy/configuration changes. |
+| `config set\|import\|migrate`, `mode …`, `nervous enable`, `autonomous enable`, `models activate\|deactivate` | Persist policy/configuration changes. |
 | `agent …`, `skill …`, `plugin …`, `rbac grant\|revoke`, `mcp add\|remove` | Mutate registries, packages, identities, or external-server configuration. |
 | `memory rebuild\|export\|backup`, `remember`, `docs …`, `finalize`, `set-directives` | Write project knowledge, generated projections, or directives. |
 | `models refresh`, `cost update`, `openrouter-probe`, `upgrade`, `image build` | Perform network, cache, installation, or image side effects. |

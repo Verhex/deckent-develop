@@ -75,6 +75,14 @@ The zero-row authority tables are referenced by the current mission store and ca
 
 Both tables have active store consumers; zero rows means no captured identity/pending-verification records in this project snapshot, not dead schema. [Evidence: `src/connectors/identity/identity-store.ts:38-114`]
 
+### `.deckent/models.db`
+
+| Table | Current schema columns |
+|---|---|
+| `model_activation` | `provider TEXT PK1!`; `model_id TEXT PK2!`; `active INTEGER!`; `updated_at TEXT!`; `actor TEXT!` |
+
+This store records an owner's activation decision for each detected provider/model pair. Its composite primary key is `(provider, model_id)`. A model without a record is active, so the store is an opt-in denial list and its introduction does not narrow an existing project's eligible model pool. [Evidence: `src/core/model-activation-store.ts:50-57,84-109`]
+
 ### `.deckent/provider-execution-observations.db`
 
 | Table | Rows | Actual on-disk v1 columns |

@@ -44,6 +44,8 @@ English under `docs/en/` is canonical. Turkish under `docs/tr/` is a full-parity
 | Platform and security | [Reference](./en/reference/platform-security.md) | [Referans](./tr/reference/platform-security.md) |
 | Enterprise controls, integrations, and resources | [Reference](./en/reference/enterprise-and-resources.md) | [Referans](./tr/reference/enterprise-and-resources.md) |
 | Terminal, events, and worker wrappers | [Reference](./en/reference/terminal-events-and-wrappers.md) | [Referans](./tr/reference/terminal-events-and-wrappers.md) |
+| Model activation | [Reference](./en/reference/model-activation.md) | [Referans](./tr/reference/model-activation.md) |
+| Run-flow inbox | [Reference](./en/reference/run-flow-inbox.md) | [Referans](./tr/reference/run-flow-inbox.md) |
 
 ## Operations and governance
 

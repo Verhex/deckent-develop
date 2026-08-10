@@ -75,6 +75,14 @@ Zero-row authority table'ların tamamı güncel mission store tarafından refera
 
 İki table'ın da active store consumer'ı vardır; zero row bu project snapshot'ta identity/pending-verification record bulunmadığı anlamına gelir, dead schema demek değildir. [Kanıt: `src/connectors/identity/identity-store.ts:38-114`]
 
+### `.deckent/models.db`
+
+| Table | Güncel schema column'ları |
+|---|---|
+| `model_activation` | `provider TEXT PK1!`; `model_id TEXT PK2!`; `active INTEGER!`; `updated_at TEXT!`; `actor TEXT!` |
+
+Bu store, algılanan her provider/model çifti için owner'ın activation kararını kaydeder. Composite primary key `(provider, model_id)`'dir. Kaydı olmayan model active kabul edilir; bu nedenle store opt-in denial list'tir ve eklenmesi mevcut project'in eligible model pool'unu daraltmaz. [Kanıt: `src/core/model-activation-store.ts:50-57,84-109`]
+
 ### `.deckent/provider-execution-observations.db`
 
 | Table | Row | Gerçek on-disk v1 column'ları |
