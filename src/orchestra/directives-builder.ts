@@ -196,8 +196,22 @@ export function unescapeListItem(item: string): string {
 
 // ═══ Writer ══════════════════════════════════════════════════════════════
 
+/**
+ * Render a scope entry for the `- Scope:` line. A directory gains its trailing
+ * slash; a FILE path keeps its exact shape.
+ *
+ * Measured 2026-08-10: appending unconditionally turned every file entry into a
+ * phantom directory — a re-plan proposal reported `src/core/run-status-authority.ts/`
+ * among a task's directories, and any consumer treating that list as directories
+ * inherits a path that cannot exist. A final segment carrying an extension is a
+ * file; anything else is a directory.
+ */
 function normalizeScopeDir(dir: string): string {
-  return dir.endsWith('/') ? dir : `${dir}/`;
+  if (dir.endsWith('/')) return dir;
+  const lastSegment = dir.slice(dir.lastIndexOf('/') + 1);
+  // A leading dot is a dotfile/dotdir marker, not an extension separator.
+  const looksLikeFile = /\.[A-Za-z0-9]+$/.test(lastSegment) && !lastSegment.startsWith('.');
+  return looksLikeFile ? dir : `${dir}/`;
 }
 
 function validateTask(task: DirectiveBuildTask): void {

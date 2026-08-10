@@ -229,3 +229,21 @@ describe('directives-builder reserved-label safety on single-line encoded fields
     expect(() => buildDirectives(intent)).toThrow(/heading/);
   });
 });
+
+describe('scope entry rendering', () => {
+  it('keeps a file path intact while a directory still gains its trailing slash', () => {
+    // A re-plan proposal reported `src/core/run-status-authority.ts/` among a
+    // task's directories; unconditional slash-appending invents a path that
+    // cannot exist, and any consumer reading that list inherits it.
+    const doc = buildDirectives({
+      title: 'T', goal: 'G',
+      tasks: [{
+        title: 'x', desc: 'y', files: ['src/core/a.ts'],
+        scope: ['src/core', 'src/core/a.ts', 'tests/core/'],
+        deps: [], goCriteria: ['g'], nogo: ['n'],
+      }],
+    });
+    const scopeLine = doc.split('\n').find(l => l.startsWith('- Scope:'));
+    expect(scopeLine).toBe('- Scope: src/core/, src/core/a.ts, tests/core/');
+  });
+});
