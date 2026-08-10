@@ -370,7 +370,13 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
   const plannedWrites = new Set<string>();
   for (const t of tasks) for (const w of t.scope.filesWrite ?? []) plannedWrites.add(w);
 
-  const classify = (taskId: string, path: string, role: 'write' | 'read', taskPaths: readonly string[]): ScopePathVerdict => {
+  const classify = (
+    taskId: string,
+    path: string,
+    role: 'write' | 'read',
+    taskPaths: readonly string[],
+    declaredDirs: readonly string[] = [],
+  ): ScopePathVerdict => {
     if (tracked.has(path) || (role === 'read' && plannedWrites.has(path))) {
       return { taskId, path, role, classification: 'confirmed', reason: 'exists in the repo' };
     }
@@ -395,6 +401,30 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     const testMirrorInTrackedDir = isRecurringTestBasename(b)
       && trackedDirs.has(dirname(path))
       && taskOwnsMatchingSource(b, taskPaths);
+    // sprint-500 (2026-08-10) — declared-directory carve-out. A path inside a
+    // directory the task EXPLICITLY declared in `scope.directories` is a file the
+    // task intends to create; it is not a typo, however closely its basename
+    // matches something elsewhere. Measured: a doc task declared
+    // `docs/tr/reference/` and planned to CREATE the Turkish mirrors of two
+    // English pages. Both were absent (that is the task) and shared a basename
+    // with their English source, so the sibling branch below called them suspect
+    // and the drop-duplicate resolution then DELETED the task's only deliverables,
+    // leaving it scoped to overwrite the English originals its own NO-GO clause
+    // forbade touching. Every parallel tree — language mirrors, per-OS variants,
+    // versioned copies — collides the same way. Same shape as the born-629c
+    // carve-out below: reuse `new-plausible` so the worker-prompt scope renderer
+    // keeps bucketing it, and let a declared directory outrank a basename
+    // coincidence. Nothing here is a new lookup.
+    if (declaredDirs.some((dir) => {
+      const d = dir.replace(/^\.\//, '').replace(/\/+$/, '').toLowerCase();
+      return d.length > 0 && path.replace(/^\.\//, '').toLowerCase().startsWith(`${d}/`);
+    })) {
+      return {
+        taskId, path, role,
+        classification: 'new-plausible',
+        reason: 'new file inside a directory this task explicitly declared in scope',
+      };
+    }
     if (siblings && siblings.length > 0 && !COMMON_BASENAMES.has(b.toLowerCase()) && !testMirrorInTrackedDir) {
       const suggestion = pickClosest(path, siblings);
       return {
@@ -453,8 +483,9 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
   const verdicts: ScopePathVerdict[] = [];
   for (const t of tasks) {
     const taskPaths = [...(t.scope.filesWrite ?? []), ...(t.scope.filesRead ?? [])];
-    for (const w of t.scope.filesWrite ?? []) verdicts.push(classify(t.id, w, 'write', taskPaths));
-    for (const r of t.scope.filesRead ?? []) verdicts.push(classify(t.id, r, 'read', taskPaths));
+    const declaredDirs = t.scope.directories ?? [];
+    for (const w of t.scope.filesWrite ?? []) verdicts.push(classify(t.id, w, 'write', taskPaths, declaredDirs));
+    for (const r of t.scope.filesRead ?? []) verdicts.push(classify(t.id, r, 'read', taskPaths, declaredDirs));
   }
 
   const writeSuspects = verdicts.filter(v => v.role === 'write' && v.classification === 'suspect');

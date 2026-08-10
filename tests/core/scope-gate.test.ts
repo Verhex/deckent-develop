@@ -307,6 +307,31 @@ describe('evaluateScopeGate', () => {
       expect(res.advisories.some(a => a.path === 'docs/refdocs-adr-regen.test.ts' && a.role === 'write')).toBe(true);
     });
 
+    // rule (0) — sprint-500 (2026-08-10): a parallel mirror tree is not a typo.
+    // A doc task declared `docs/tr/reference/` in scope and planned to CREATE the
+    // Turkish mirrors of two English pages. Both were absent (the point of the
+    // task) and shared a basename with their English source, so rule (a) dropped
+    // the task's only deliverables and left it scoped to overwrite the English
+    // originals. A declared scope directory is stated operator intent and must
+    // outrank a basename coincidence.
+    it('rule (0): a suspect inside a declared scope directory is intent, not a duplicate', () => {
+      const res = evaluateScopeGate({
+        tasks: [{
+          id: 't1',
+          scope: {
+            filesWrite: ['docs/en/reference/model-activation.md', 'docs/tr/reference/model-activation.md'],
+            directories: ['docs/tr/reference/', 'docs/en/reference/'],
+          },
+        }],
+        trackedFiles: ['docs/en/reference/model-activation.md', 'docs/en/reference/other.md'],
+        resolveSuggestions: true,
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      // The mirror must survive: no resolution may drop or rewrite it.
+      expect(res.resolutions.some(r => r.path === 'docs/tr/reference/model-activation.md')).toBe(false);
+    });
+
     it('rule (b) auto-replace: resolveSuggestions=true does not block the 397-007 unambiguous rename', () => {
       const res = evaluateScopeGate({
         tasks: [renameTask()],
