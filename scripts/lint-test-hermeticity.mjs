@@ -131,13 +131,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // in clean-active-execution-guard.test, each writing a sprint-state.json into a
   // tmpdir fixtureRoot (the same helper the file's existing cases use); the scan
   // counts each write site. Prior: DRIFT-VISIBILITY (12499).
-  count: 12516,
+  count: 12517,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: '56338414a7ca9a251b81bb7d5b60232e2571fe40a650d883e55a383bb2ef23b1',
+  digest: '93dde03930bed9c12e41fb7549cbb7634cf331b54acfeb7d34ebef58cd9176b5',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -176,7 +176,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-09 (MODEL-ACTIVATION-001): +1 REAL production module —
   // src/core/model-activation-store.ts (owner model-activation authority), plus
   // the auto-detect enforcement and CLI edits. Prior: STALE-SPRINT-LOCK (1203).
-  digest: '6dd1cdf3f09036ba3d9af34dcffecc83fcd5f99134f8893793be9373d5e0628f',
+  digest: 'f091ca32a2a48642ca91aa564f1df06be3d1c35ec1f1031945c6f7d1368daeae',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e158f3f1438556564b7bf18908ec102e782f6ce42b9b0c29a0249725f82d082c"
+    "value": "9486a4bbe523f9ac86a01ffc9ad183dd02535ab5fb6efbcf3298cc433363c6ce"
   },
   "summary": {
     "total": 398,
     "active": 351,
     "terminal": 47,
-    "receipts": 173,
+    "receipts": 176,
     "byState": {
       "OPEN": 259,
       "READY": 0,
@@ -6171,6 +6171,36 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-10T09:10:44Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-RESIDUE-HEARTBEAT-01",
+      "authorityDigest": "af26589c3a45cfd5c3ebd4ed27b15d39e7f8812fe49a8b4ab8e3d54d2e8939f9",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T11:05:35Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-SCOPE-ENTRY-RENDER-01",
+      "authorityDigest": "f1cb588a766c801252ef60c30a6d3581f7ffdaa4ff6051d0778f4685b31590f2",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T11:05:35Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-RESIDUE-SCOPE-HERMETIC-SUPP-01",
+      "authorityDigest": "84870dd01e3ff6494802407a2bd1f7ae3cf41a46757c7511b375148fd1056ded",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T11:05:35Z"
       },
       "g7AttemptIdentity": null
     }
@@ -20914,6 +20944,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5cfa88792d6c7430da05361486195009a336bac01ca027504bab35f573be69a7"
+    "value": "25f779a950c4d59e62bb5260c0b50cf035188f567fa5694b4e3fe930ac9153b9"
   }
 }
