@@ -31,6 +31,20 @@ Karar bayrakları bir hedef gerektirir (`<n>` veya benzersiz flow-id ön eki).
   kullanılamaz.
 - `--reason <text>` `--reject` ile birlikte bir gerekçe kaydeder; `--reject`
   olmadan geçersizdir.
+- `--retire` onaylanmış ama hiç başlatılmamış bir flow'u iptal eder. `--reject`
+  onay aşamasının kararıdır ve yalnızca flow hâlâ onay beklerken geçerlidir; onay
+  verildikten sonra hiç koşmayacak bir flow'u kapatmanın yolu retire'dır. Bilinçli
+  olarak `--reject`'in sessiz bir fallback'i değil, ayrı ve açık bir bayraktır ve
+  diğer karar bayraklarıyla birlikte kullanılamaz. Zaten terminal duruma ulaşmış
+  bir flow yeniden emekliye ayrılmaz.
+
+Bir flow-id ön eki, yalnızca o an görüntülenen satırlara değil, store'un tuttuğu
+tüm flow'lara karşı çözülür; böylece eski bir flow'a sayfalamadan erişilebilir.
+
+## Sayfalama
+
+`--limit <n>` en fazla `n` satır gösterir. Verilmediğinde listeleme, önceki
+davranışla bayt-değişmez biçimde güncel pencereyi gösterir.
 
 ## Bayat koşu sınıflandırması
 

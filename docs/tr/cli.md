@@ -39,7 +39,7 @@ Installed binary `deckent …`, repository build ise `node dist/cli/entry.js …
 | `sync` | Adapter file'ları sync eder ve out-of-band değişiklikleri bulur. |
 | `watch` | Worker'ı izler veya tmux dashboard split açar. |
 | `run <description>` | Tek one-shot task çalıştırır; aşağıdaki alias child'lara da sahiptir. |
-| `runs` | RunFlow'ları listeler; seçili flow'u approve, reject veya start eder. |
+| `runs` | RunFlow'ları listeler; seçili flow'u approve, reject, retire veya start eder; `--limit` listeyi sayfalar. |
 | `test` | Retro, memory update ve decay olmadan test sprint çalıştırır. |
 | `review` | Task evaluation'larını inceler. |
 | `finalize` | Managed sprint knowledge/config projection'larını update eder ve decay çalıştırır. |

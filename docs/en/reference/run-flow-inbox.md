@@ -31,6 +31,20 @@ Decision flags require a target (`<n>` or a unique flow-id prefix).
   with `--approve`.
 - `--reason <text>` records a reason with `--reject`; it is invalid without
   `--reject`.
+- `--retire` cancels an approved flow that was never started. `--reject` is the
+  approval-stage decision and only applies while a flow is still awaiting
+  approval; once approval is granted, retiring is the way to close a flow that
+  will never run. It is deliberately a separate, explicit flag rather than a
+  silent fallback of `--reject`, and it cannot be combined with the other decide
+  flags. A flow that has already reached a terminal state is not retired again.
+
+A flow-id prefix resolves against every flow the store holds, not only the rows
+currently displayed, so an older flow stays reachable without paging to it.
+
+## Paging
+
+`--limit <n>` shows up to `n` rows. Without it the listing is the recent window,
+byte-identical to previous behaviour.
 
 ## Stale-run classification
 

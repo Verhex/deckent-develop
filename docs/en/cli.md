@@ -39,7 +39,7 @@ Use the installed binary as `deckent …`, or the repository build as `node dist
 | `sync` | Sync adapter files and detect out-of-band changes. |
 | `watch` | Follow a worker or open the tmux dashboard split. |
 | `run <description>` | Run one one-shot task; also owns alias children described below. |
-| `runs` | List RunFlows and approve, reject, or start a selected flow. |
+| `runs` | List RunFlows and approve, reject, retire, or start a selected flow; `--limit` pages the list. |
 | `test` | Run a test sprint without retro, memory update, or decay. |
 | `review` | Review task evaluations. |
 | `finalize` | Update managed sprint knowledge/config projections and run decay. |
