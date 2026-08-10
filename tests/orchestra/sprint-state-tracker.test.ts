@@ -35,6 +35,17 @@ describe('sprint-state-tracker — worker freshness uses .hb mtime (clock-skew-p
       }),
       'utf-8',
     );
+    // A live worker always has its task JSON on disk — it is the claim surface the
+    // worker operates on, and the docker backend refuses to spawn without it. The
+    // fixture writes one per task so activeWorkers is exercised against the same
+    // evidence production has.
+    for (const id of taskIds) {
+      writeFileSync(
+        join(root, '.tasks', `task-${id}.json`),
+        JSON.stringify({ id, title: `task ${id}`, scope: {} }),
+        'utf-8',
+      );
+    }
     return root;
   }
 
@@ -82,6 +93,25 @@ describe('sprint-state-tracker — worker freshness uses .hb mtime (clock-skew-p
     const res = detect(snap, now);
     expect(res).not.toBeNull();
     expect(res!.metadata).toMatchObject({ type: 'stale-worker' });
+  });
+
+  // Measured 2026-08-10: a residue heartbeat named `500-003-fix-fix-fix.hb` (no
+  // `task-` prefix; the producer is still unidentified) survived cleanup because
+  // the sweep matches on that prefix. The finished-worker guard then looked for
+  // `500-003-fix-fix-fix.result`, a name nothing writes, so the file read as an
+  // active worker; its six-hour-old mtime read as stale and StaleWorkerDetector
+  // fired WORKER_RESPAWN twice against a sprint settled hours earlier. Keying on
+  // the heartbeat's own taskId, and on whether the task still exists, makes the
+  // detector immune to whatever the file happens to be called.
+  it('residue heartbeat whose task no longer exists is not an active worker', () => {
+    const r = setup(['290-011']);
+    const now = 1_750_000_000_000;
+    writeHb(r, '290-011', new Date(now).toISOString(), now - 6 * 60 * 60 * 1000);
+    // Cleanup removed the task JSON when the sprint settled; only the .hb lingers.
+    rmSync(join(r, '.tasks', 'task-290-011.json'));
+
+    const snap = getSprintStateSnapshot(r);
+    expect(snap.activeWorkers.find((x) => x.taskId === '290-011')).toBeUndefined();
   });
 
   it('FINISHED-worker guard intact: .hb with sibling .result → not in activeWorkers', () => {

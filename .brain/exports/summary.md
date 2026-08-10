@@ -55,6 +55,22 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-505 Learnings** (sprint-505): ## Sprint sprint-505 Learnings
+
+## Gains
+- 505-001 — Let an approved-but-unstarted flow be retired from the inbox — V...
+- **Sprint sprint-504 Learnings** (sprint-504): ## Sprint sprint-504 Learnings
+
+## Gains
+- 504-001 — Render a liveness-proven ACTIVE run instead of holding it — Base...
+- **Sprint sprint-501 Learnings** (sprint-501): ## Sprint sprint-501 Learnings
+
+## Gains
+- 501-001 — Address any run-flow directly and page the inbox — Implemented c...
+- **Sprint sprint-499 Learnings** (sprint-499): ## Sprint sprint-499 Learnings
+
+## Gains
+- 499-001 — Escape Unicode line separators in the structured-criteria projec...
 - **Sprint sprint-498 Learnings** (sprint-498): ## Sprint sprint-498 Learnings
 
 ## Gains
@@ -71,27 +87,14 @@
 - Fix: Terminal publication real-binary contract: NO_GO — Verification: node scripts/t...
 - **Sprint sprint-486 Learnings** (sprint-486): ## Sprint sprint-486 Learnings
 - Finalizer terminal-evidence wiring: NO_GO — Host runtime-budget evidence is not term...
-- **Sprint sprint-485 Learnings** (sprint-485): ## Sprint sprint-485 Learnings
-
-## Gains
-- 485-001 — Provider concurrency capability authority — Verified: npx tsc --...
-- **Sprint sprint-484 Learnings** (sprint-484): ## Sprint sprint-484 Learnings
-
-## Gains
-- 484-001 — Enforce recovery-born evaluation honesty with regression coverag...
-- **Sprint sprint-483 Learnings** (sprint-483): ## Sprint sprint-483 Learnings
-- Integrate DOGFOOD-3178 bounded validation evidence: GO_WITH_TECH_DEBT — Budget Landi...
-- **Sprint sprint-482 Learnings** (sprint-482): ## Sprint sprint-482 Learnings
-- Unify finalize and recover adapters: NO_GO — npx tsc --noEmit passed.
-The mandated t...
 
 ## Active Technical Debt
 _No active technical debt._
 
 ## Active Patterns
-- Violation pattern: stale_heartbeat (×39 sprints)
+- Violation pattern: stale_heartbeat (×44 sprints)
 - Violation pattern: file_outside_scope (×21 sprints)
 - Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1780 | Generated: 2026-08-09_
+_Total entries: 1799 | Generated: 2026-08-10_

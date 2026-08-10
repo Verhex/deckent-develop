@@ -20,6 +20,9 @@ import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 import { extractSprintFromDebtId } from '../core/memory-import.js';
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { getAgentRole } from '../core/agent-role-contract.js';
+import { classifyFixFailure } from './fix-failure-classification.js';
+import { buildReplanProposal } from './replan-proposal.js';
+import { writeEvent } from './event-stream.js';
 import { resolveTaskLineageRootId } from '../core/task-lineage.js';
 import { resolveFixRepairAuthority } from './fix-repair-authority.js';
 import type {
@@ -66,6 +69,37 @@ function regateInheritedScope(
   } catch {
     return scope; // fail-open: inherited scope is used unchanged
   }
+}
+
+/**
+ * Count the attempts in this task's fix lineage that ended as a NO_GO changing
+ * nothing. Host-measured from the persisted results — the caller never asks a
+ * worker whether its task is possible, it counts what the lineage actually did.
+ *
+ * The lineage is the id chain `<root>`, `<root>-fix`, `<root>-fix-fix`, … so the
+ * root's own result is included: two zero-diff NO_GOs across the chain already
+ * prove that re-running this definition produces nothing.
+ */
+function countZeroDiffAttempts(projectRoot: string, taskId: string): number {
+  // The fix chain is a pure id suffix (`<root>-fix`, `<root>-fix-fix`, …), so the
+  // root is recoverable from the id alone. resolveTaskLineageRootId needs the live
+  // Task map, which this counter deliberately does not depend on: it reads only
+  // persisted results.
+  const root = taskId.replace(/(?:-fix)+$/u, '');
+  let count = 0;
+  let id = root;
+  // Bounded by the fix chain itself: each hop appends one `-fix` suffix, and the
+  // retry budget caps that chain long before this loop could run away.
+  for (let depth = 0; depth <= 8; depth++) {
+    const past = readJsonSafe<TaskResult>(join(projectRoot, TASKS_DIR, `task-${id}.result`));
+    if (past
+      && past.selfAssessment === 'NO_GO'
+      && (past.filesChanged?.length ?? 0) === 0
+      && (past.linesAdded ?? 0) === 0
+    ) count++;
+    id = `${id}-fix`;
+  }
+  return count;
 }
 
 /** The repair-authority lineage a task already carried BEFORE this FIX round. */
@@ -588,6 +622,68 @@ export function handleEvaluation(
     debugLog(
       'handleEvaluation:fixBudgetExhausted',
       `task=${task.id} — retry authority exhausted; PAUSED without creating another priority fix`,
+    );
+    return;
+  }
+
+  // ── Failure classification decides the route (owner decision 2026-08-10) ──
+  // A retry is right when the ENVIRONMENT failed and wrong when the task or its
+  // scope is what broke. Until this gate existed, every NO_GO that was not a
+  // cascade-skip or a budget exhaustion became a same-scope re-run: sprint-496
+  // re-ran a scope contradiction three times for ~210k tokens and collected the
+  // same honest NO_GO each round. The decision lives here, in Deckent, so it is
+  // identical whichever provider backs the Brain — the model is left with the
+  // CONTENT of a fix, never the choice of whether re-running can possibly work.
+  //
+  // Dispositions that need a changed scope or a re-planned task have no automatic
+  // path yet, so they park as typed PAUSED for an operator/Brain decision rather
+  // than silently degrading into the retry this gate exists to prevent. That is
+  // the conservative direction: fewer fix tasks, more honest stops.
+  const failureClass = classifyFixFailure({
+    result,
+    exitCode: (result as { exitCode?: number | null } | null | undefined)?.exitCode ?? null,
+    priorZeroDiffAttempts: countZeroDiffAttempts(projectRoot, task.id),
+  });
+  if (!failureClass.allowsFixTask) {
+    updateTaskStatus(projectRoot, task.id, TaskStatus.PAUSED);
+    releaseAllLocks(projectRoot, workerId);
+    // The stop carries WHAT the task would need, so the owner is not left
+    // reconstructing it by hand. Naming a path here is evidence, never a grant:
+    // fix-repair-authority refuses to let worker prose widen scope and ADR-G-020
+    // keeps write authority host-controlled, so the proposal states the case and
+    // the decision stays with the owner.
+    const proposal = buildReplanProposal({
+      taskId: task.id,
+      classification: failureClass,
+      scope: task.scope,
+      result,
+    });
+    if (proposal) {
+      try {
+        writeFileSync(
+          join(projectRoot, TASKS_DIR, `task-${task.id}.replan-proposal.json`),
+          `${JSON.stringify(proposal, null, 2)}\n`,
+        );
+      } catch (e) { debugLog('handleEvaluation:replanProposalWrite', e); }
+    }
+    try {
+      writeEvent(projectRoot, task.sprintId ?? '', 'brain', 'user', 'BRAIN→USER:FIX_ROUTE_ESCALATED', {
+        taskId: task.id,
+        disposition: failureClass.disposition,
+        code: failureClass.code,
+        reason: failureClass.reason,
+        ...(proposal
+          ? {
+              requiresNewAuthority: proposal.requiresNewAuthority,
+              requestedPaths: proposal.requestedPaths.map(p => p.path),
+              decisionRequired: proposal.decisionRequired,
+            }
+          : {}),
+      });
+    } catch (e) { debugLog('handleEvaluation:fixRouteEvent', e); }
+    debugLog(
+      'handleEvaluation:fixRouteEscalated',
+      `task=${task.id} — ${failureClass.code}: ${failureClass.reason}`,
     );
     return;
   }

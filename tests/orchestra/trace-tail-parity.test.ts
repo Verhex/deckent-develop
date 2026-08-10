@@ -280,7 +280,12 @@ describe('usage-patch regresyon: codex/gemini real numbers preserved after .log 
     const result = JSON.parse(readFileSync(join(tasksDir, 'task-999-codex-usage.result'), 'utf-8')) as {
       tokenUsage: Record<string, unknown>;
     };
-    expect(result.tokenUsage.inputTokens).toBe(271223);
+    // Fresh-input contract (2026-08-10): codex reports 271,223 input with 232,320
+    // of it cached, so the adapter records 38,903 fresh plus a separate cache leg.
+    // The guard's intent is unchanged — real, non-zero numbers survive the .log
+    // normalization instead of collapsing to 0/0.
+    expect(result.tokenUsage.inputTokens).toBe(38903);
+    expect(result.tokenUsage.cacheReadTokens).toBe(232320);
     expect(result.tokenUsage.outputTokens).toBe(4473);
   });
 

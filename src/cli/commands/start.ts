@@ -33,6 +33,7 @@ import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprin
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
 import { loadApprovedSnapshot, loadStartAttempt, listFlowIds, loadRunHandle } from '../../core/run-flow-store.js';
+import { isTerminalRunFlowState } from '../../core/run-flow-contract.js';
 import { debugLog } from '../../core/utils.js';
 import { startRunFlow, RunFlowDecisionError } from '../../orchestra/run-flow-decision-service.js';
 import { buildFlowStartSpawn } from '../helpers/detached-start.js';
@@ -795,6 +796,26 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
               .map((id) => loadApprovedSnapshot(root, id))
               .filter((snap): snap is NonNullable<typeof snap> => snap !== undefined)
               .filter((snap) => loadRunHandle(root, snap.flowId) === undefined)
+              // A run handle is not the only way an approval stops awaiting
+              // execution. Measured 2026-08-10: 21 flows were retired through the
+              // inbox and every one folded to a terminal CANCELLED, yet this guard
+              // still listed them and still demanded --force-replan — because
+              // aborting a flow creates no handle, and the handle was the sole
+              // liveness test here. That left two sources of truth for the same
+              // question, with the guard deaf to the state machine's verdict. A
+              // terminal flow cannot be awaiting execution, whatever its snapshot
+              // says. Fail-soft like the scan around it: an unreadable context is
+              // treated as still-awaiting, the conservative side.
+              .filter((snap) => {
+                try {
+                  return !isTerminalRunFlowState(
+                    getRunFlowCoordinator(root).getFlow(snap.flowId).state,
+                  );
+                } catch (e) {
+                  debugLog('start:approvedFlowGuard:flowState', e);
+                  return true;
+                }
+              })
               .sort((a, b) => ((a?.approvedAt ?? '') < (b?.approvedAt ?? '') ? 1 : -1));
           } catch (e) {
             debugLog('start:approvedFlowGuard:storeRead', e);

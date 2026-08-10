@@ -370,7 +370,13 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
   const plannedWrites = new Set<string>();
   for (const t of tasks) for (const w of t.scope.filesWrite ?? []) plannedWrites.add(w);
 
-  const classify = (taskId: string, path: string, role: 'write' | 'read', taskPaths: readonly string[]): ScopePathVerdict => {
+  const classify = (
+    taskId: string,
+    path: string,
+    role: 'write' | 'read',
+    taskPaths: readonly string[],
+    declaredDirs: readonly string[] = [],
+  ): ScopePathVerdict => {
     if (tracked.has(path) || (role === 'read' && plannedWrites.has(path))) {
       return { taskId, path, role, classification: 'confirmed', reason: 'exists in the repo' };
     }
@@ -395,6 +401,49 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     const testMirrorInTrackedDir = isRecurringTestBasename(b)
       && trackedDirs.has(dirname(path))
       && taskOwnsMatchingSource(b, taskPaths);
+    // sprint-500 (2026-08-10) — parallel-tree carve-out. Measured: a doc task declared
+    // `docs/tr/reference/` and planned to CREATE the Turkish mirrors of two
+    // English pages. Both were absent (that is the task) and shared a basename
+    // with their English source, so the sibling branch below called them suspect
+    // and the drop-duplicate resolution then DELETED the task's only deliverables,
+    // leaving it scoped to overwrite the English originals its own NO-GO clause
+    // forbade touching. Every parallel tree — language mirrors, per-OS variants,
+    // versioned copies — collides the same way. Same shape as the born-629c
+    // carve-out below: reuse `new-plausible` so the worker-prompt scope renderer
+    // keeps bucketing it. Nothing here is a new lookup.
+    //
+    // Deliberately NARROW: a declared directory alone proves nothing. The 449
+    // death was a plausible typo INSIDE a real declared directory
+    // (`src/orchestra/worker.ts` for the real `src/agents/worker.ts`), and the
+    // existing mirror suite failed loudly when a first attempt exempted every
+    // declared directory. The signal that separates a mirror from a typo is that
+    // the task declared BOTH trees as SEPARATE entries: one covering the suspect,
+    // a different one covering the same-named file. A single broad parent such as
+    // `src/` covers a typo and its target alike and therefore proves nothing — the
+    // 449 fixture declares exactly that, and a first attempt keyed on containment
+    // alone exempted the very death this gate exists to prevent. A typo whose
+    // look-alike sits outside the task's declared scope, or under the same
+    // declared entry, stays a suspect exactly as before.
+    // Which declared entry covers a path, if any. Identity is the ENTRY, not mere
+    // containment: one broad parent covering both sides proves nothing.
+    const coveringEntry = (candidate: string): string | undefined => {
+      const c = candidate.replace(/^\.\//, '').toLowerCase();
+      return declaredDirs
+        .map(dir => dir.replace(/^\.\//, '').replace(/\/+$/, '').toLowerCase())
+        .find(d => d.length > 0 && c.startsWith(`${d}/`));
+    };
+    const suspectEntry = coveringEntry(path);
+    const mirrorEntry = suspectEntry === undefined
+      ? undefined
+      : siblings?.map(coveringEntry).find(e => e !== undefined && e !== suspectEntry);
+    if (siblings && siblings.length > 0 && suspectEntry !== undefined && mirrorEntry !== undefined) {
+      return {
+        taskId, path, role,
+        classification: 'new-plausible',
+        reason: 'parallel-tree mirror: this task declared both this directory and the '
+          + 'directory holding the same-named file',
+      };
+    }
     if (siblings && siblings.length > 0 && !COMMON_BASENAMES.has(b.toLowerCase()) && !testMirrorInTrackedDir) {
       const suggestion = pickClosest(path, siblings);
       return {
@@ -453,8 +502,9 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
   const verdicts: ScopePathVerdict[] = [];
   for (const t of tasks) {
     const taskPaths = [...(t.scope.filesWrite ?? []), ...(t.scope.filesRead ?? [])];
-    for (const w of t.scope.filesWrite ?? []) verdicts.push(classify(t.id, w, 'write', taskPaths));
-    for (const r of t.scope.filesRead ?? []) verdicts.push(classify(t.id, r, 'read', taskPaths));
+    const declaredDirs = t.scope.directories ?? [];
+    for (const w of t.scope.filesWrite ?? []) verdicts.push(classify(t.id, w, 'write', taskPaths, declaredDirs));
+    for (const r of t.scope.filesRead ?? []) verdicts.push(classify(t.id, r, 'read', taskPaths, declaredDirs));
   }
 
   const writeSuspects = verdicts.filter(v => v.role === 'write' && v.classification === 'suspect');

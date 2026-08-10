@@ -40,6 +40,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildStatusJsonSnapshot } from '../../src/cli/commands/status.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const VITE_NODE_BIN = join(REPO_ROOT, 'node_modules', '.bin', 'vite-node');
@@ -414,4 +415,55 @@ describe.skipIf(NESTED_FORK_RUNNER)('deckent status --json — no-active-run con
     // JSON reports active:false — the two surfaces agree the sprint is not live.
     expect((JSON.parse(json.stdout.trim()) as { active: boolean }).active).toBe(false);
   }, 20000);
+});
+
+describe('deckent status --json — canonical ACTIVE liveness gate (504-001)', () => {
+  it('renders a PID-proven ACTIVE authority without requiring a republished read model', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-status-live-authority-'));
+    try {
+      seedConflictingLiveDashboard(root);
+      const snapshot = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {});
+
+      expect(snapshot).toMatchObject({
+        active: true,
+        lifecycle: 'ACTIVE',
+        statusReadModel: { state: 'unavailable-or-stale' },
+      });
+      expect(snapshot).not.toHaveProperty('error');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps an ACTIVE claim without PID proof fail-closed', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-status-unproven-authority-'));
+    try {
+      mkdirSync(join(root, '.deckent'), { recursive: true });
+      writeFileSync(
+        join(root, '.deckent', 'sprint-state.json'),
+        JSON.stringify({ sprintId: 'sprint-unproven', phase: 'EXECUTE', status: 'ACTIVE' }),
+        'utf-8',
+      );
+      writeFileSync(
+        join(root, '.dashboard'),
+        JSON.stringify({
+          sprint: { id: 'sprint-unproven', number: 1, phase: 'EXECUTE', status: 'ACTIVE' },
+          agents: [],
+          progress: { done: 0, active: 1, blocked: 0, total: 1 },
+          alerts: [],
+          updatedAt: new Date().toISOString(),
+        }),
+        'utf-8',
+      );
+
+      const snapshot = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {});
+      expect(snapshot).toMatchObject({
+        active: false,
+        lifecycle: 'UNAVAILABLE',
+        error: { code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE', disposition: 'HOLD' },
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

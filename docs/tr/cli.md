@@ -39,7 +39,7 @@ Installed binary `deckent …`, repository build ise `node dist/cli/entry.js …
 | `sync` | Adapter file'ları sync eder ve out-of-band değişiklikleri bulur. |
 | `watch` | Worker'ı izler veya tmux dashboard split açar. |
 | `run <description>` | Tek one-shot task çalıştırır; aşağıdaki alias child'lara da sahiptir. |
-| `runs` | RunFlow'ları listeler; seçili flow'u approve, reject veya start eder. |
+| `runs` | RunFlow'ları listeler; seçili flow'u approve, reject, retire veya start eder; `--limit` listeyi sayfalar. |
 | `test` | Retro, memory update ve decay olmadan test sprint çalıştırır. |
 | `review` | Task evaluation'larını inceler. |
 | `finalize` | Managed sprint knowledge/config projection'larını update eder ve decay çalıştırır. |
@@ -88,7 +88,7 @@ Installed binary `deckent …`, repository build ise `node dist/cli/entry.js …
 | `trace` | `extract` | Claude Code transcript'lerinden aligned/general training example çıkarır. |
 | `nervous` | `enable`, `accept`, `reject`, `edit`, `undo`, `history`, `recommendations` (`recs`), `log`, `accept-panic`, `baseline-refresh` | Proactive recommendation ve reversible action'ları inceler/yönetir. |
 | `mode` | `show`, `sprint`, `run`, `task`, `process`, `auto`, `global` | `deckent_style` okur veya ayarlar; `run` güncel olarak `sprint` persist eder. |
-| `models` | `list`, `refresh`, `tier` | Registry model'lerini browse, refresh ve classify eder. |
+| `models` | `list`, `refresh`, `tier`, `activate <model> --provider <name>`, `deactivate <model> --provider <name>`, `activation` | Registry model'lerini browse, refresh, classify eder ve model activation decision'larını yönetir. |
 | `flow` | `list`, `add`, `run`, `approve` | Scheduled process-mode flow ve pending dispatch approval yönetir. |
 | `rbac` | `check`, `roles`, `grant`, `revoke` | Permission inceler, user-role assignment değiştirir. |
 | `evolve` | `report` | Cross-sprint agent/skill trend ve prompt suggestion gösterir. |
@@ -111,7 +111,7 @@ Hidden `gateway-runtime`, supervisor tarafından spawn edilen internal per-proje
 |---|---|
 | `start`, `run`, `do --run`, `spawn`, `test`, `resume`, `recover` | Execution başlatır, devam ettirir veya değiştirir; runtime/task state üretebilir. |
 | `kill`, `cleanup`, `autonomous stop`, `autonomous cleanup` | Worker sonlandırır veya runtime artifact kaldırır; repository policy owner approval ve exact scope ister. |
-| `config set\|import\|migrate`, `mode …`, `nervous enable`, `autonomous enable` | Policy/configuration değişikliği persist eder. |
+| `config set\|import\|migrate`, `mode …`, `nervous enable`, `autonomous enable`, `models activate\|deactivate` | Policy/configuration değişikliği persist eder. |
 | `agent …`, `skill …`, `plugin …`, `rbac grant\|revoke`, `mcp add\|remove` | Registry, package, identity veya external-server configuration değiştirir. |
 | `memory rebuild\|export\|backup`, `remember`, `docs …`, `finalize`, `set-directives` | Project knowledge, generated projection veya directives yazar. |
 | `models refresh`, `cost update`, `openrouter-probe`, `upgrade`, `image build` | Network, cache, installation veya image side effect oluşturur. |

@@ -294,8 +294,9 @@ export function resolveTaskModel(
     currentTier = 'standard';
   }
 
-  // Layer 1b: minimum tier enforcement (haiku_allowed backward compat)
-  const minTier: ModelTier = config.activeModeConfig.haiku_allowed === false ? 'standard' : 'economy';
+  // Layer 1b: declared minimum tier takes precedence; haiku_allowed is legacy fallback.
+  const minTier: ModelTier = config.activeModeConfig.min_tier
+    ?? (config.activeModeConfig.haiku_allowed === false ? 'standard' : 'economy');
   if (TIER_RANK[currentTier] < TIER_RANK[minTier]) {
     currentTier = minTier;
   }

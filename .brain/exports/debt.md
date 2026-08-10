@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| rollback-sprint-503 | Sprint sprint-503 rollback SUCCESS | normal | sprint-503 | resolved |
+| rollback-sprint-502 | Sprint sprint-502 rollback SUCCESS | normal | sprint-502 | resolved |
 | rollback-sprint-496 | Sprint sprint-496 rollback SUCCESS | normal | sprint-496 | resolved |
 | debt-491-004 | Tech debt from 491-004: Implemented deterministic, idempotent lineage-scoped can | normal | sprint-491 | resolved |
 | debt-491-009 | Tech debt from 491-009: Run ownership is host-authored in the Docker producer bi | normal | sprint-491 | resolved |

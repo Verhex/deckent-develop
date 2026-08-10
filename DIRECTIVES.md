@@ -1,47 +1,86 @@
-# DIRECTIVES — Dogfood verification run 2: single documentation task
+# DIRECTIVES — Retire an approved flow, and sweep artifacts by identity
 
 ## Goal
 
-Second consecutive measurement of the run lifecycle with a payload of the same
-shape as the previous run: one worker, one new documentation file, zero edits to
-any existing file. This run exists to confirm that the previous success was
-repeatable and to produce a comparable token profile.
+Two measured residuals from the 2026-08-09/10 dogfood campaign. Both are about
+reachability: state a flow can never leave, and files a sweep can never see.
 
-This is a documentation sprint only. Provider, model, effort and effective concurrency are resolved
-exclusively from effective config, registry, role policy, auth/reachability evidence, usage/limit
-authority and host admission. No instruction-level provider or model override exists.
+Provider, model, effort and effective concurrency are resolved exclusively from effective config,
+registry, role policy, auth/reachability evidence, usage/limit authority and host admission. No
+instruction-level provider or model override exists.
 
 ## Execution Contract
 
-- The worker creates exactly one NEW file. It must not edit, move or delete any existing file.
-- No source code, no configuration, no test file and no lifecycle command is in scope.
-- Workers must not run `npm run build`, `npm test`, a full suite, provider login/auth mutation,
+- Behaviour outside these two defects stays byte-identical. Every test passing today must still
+  pass, unchanged.
+- Do not weaken or delete an existing assertion to make new behaviour pass. If an existing test
+  encodes the old contract, say so in the result notes instead of rewriting it.
+- Read the existing mechanism before designing. Both tasks EXTEND something already present; a
+  second parallel mechanism is a NO-GO in either.
+- Fail closed on ambiguity. Neither task may make a destructive action easier to trigger by
+  accident.
+- Workers must not run `npm run build`, `npm test`, a full suite, provider login or auth mutation,
   sprint lifecycle commands, git commit or cleanup.
-- Content must be grounded in the repository as it actually is. Any command or flag named in the
-  document must exist in the source; nothing may be invented from the prompt text alone.
-- Write for both audiences (dual-lens): precise enough for an enterprise operator, plain enough for
-  a solo user.
+- CLI option and command DESCRIPTIONS in this codebase are plain strings; match the surrounding
+  file. Other new user-facing text goes through the i18n message authority.
+- Zero hardcode (ADR-G-036): no model name or flow value literal on a code path.
 
 ---
 
-## Task 1: Document the run-flow inbox surface
+## Task 1: Let an approved-but-unstarted flow be retired from the inbox
 
-- Files: docs/reference/run-flow-inbox.md
-- Scope: docs/reference/, src/cli/commands/runs.ts
+- Files: src/cli/commands/runs.ts, tests/cli/run-flow-inbox.test.ts
+- Scope: src/cli/commands/runs.ts, tests/cli/run-flow-inbox.test.ts, src/orchestra/run-flow-coordinator.ts, src/orchestra/run-flow-reducer.ts
 - Dependencies: none
 
-Create a new reference page describing the run-flow inbox that `deckent runs` exposes. Read the
-actual command registration and option wiring in src/cli/commands/runs.ts before writing, and
-describe only what the code really does. That source path is inside your read scope.
+Measured: the store held 17 flows stuck in `APPROVED` — approved, never started, and impossible to
+retire. `runs --reject` maps to `APPROVAL_REJECTED`, which the reducer accepts only from
+`AWAITING_APPROVAL`, so those flows are permanent. Every `deckent start` then has to be forced past
+them.
 
-The page must cover: what the inbox lists and what a run-flow is in lifecycle terms, how a run is
-targeted (list position versus flow-id prefix), each decide option that is actually registered
-including what it does and what it requires, and the stale-classification option together with its
-dry-run-by-default behaviour and the flag that makes it durable. Keep it to roughly one screen and
-include one short worked example of inspecting the inbox and then acting on a single run.
+The capability already exists and MUST be reused rather than duplicated: read
+`src/orchestra/run-flow-reducer.ts` and `src/orchestra/run-flow-coordinator.ts` first. The reducer
+already routes an abort from any non-terminal state to `CANCELLED`, and the coordinator already
+exposes that as a command. Nothing in the state machine needs to change — the gap is only that the
+inbox never offers it.
 
-**Test:** `npx vitest run tests/docs/config-reference.test.ts`
+Expose that existing capability from `deckent runs`, following the file's current option and
+refusal style, and reusing the target-resolution the decide flags already share. Retiring a flow is
+destructive, so it must be explicit and never a silent fallback of `--reject`: a flow that CAN be
+rejected keeps being rejected exactly as today.
 
-**NO-GO:** The file edits or deletes anything outside the single new page, names an option that is
-not registered in the source, describes the stale-classification default incorrectly, or omits how a
-run is targeted.
+**Test:** `npx vitest run tests/cli/run-flow-inbox.test.ts`
+
+**NO-GO:** The reducer or coordinator state machine is modified, `--reject` silently changes
+meaning for a flow it can already handle, a terminal flow can be retired, retiring happens without
+an explicit operator instruction, or an existing assertion is weakened.
+
+---
+
+## Task 2: Sweep task artifacts by task identity, not by filename prefix
+
+- Files: src/core/orphan-cleaner.ts, tests/core/orphan-cleaner.test.ts
+- Scope: src/core/orphan-cleaner.ts, tests/core/orphan-cleaner.test.ts
+- Dependencies: none
+
+Measured on 2026-08-10: three artifacts for task `500-003-fix-fix-fix` — a heartbeat, a plan and a
+landing proposal — were written WITHOUT the `task-` filename prefix, all in the same second. The
+sweep in `src/core/orphan-cleaner.ts` selects files by `task-<sprintNum>-`, so it never saw them.
+They survived cleanup, the stale heartbeat read as a live worker, and Nervous fired repeated
+respawn actions against a sprint that had settled hours earlier.
+
+The producer that dropped the prefix has NOT been identified, and this task does not need to find
+it. Make the sweep robust to artifact naming instead: an artifact belonging to a task of this
+sprint must be swept whether or not its filename carries the prefix, while files belonging to
+another sprint, or to no task at all, must still be left untouched.
+
+Preserve the existing grouping contract exactly: task IDs may carry one or more `-fix` suffixes,
+the first `.` separates the task id from the extension, and a PENDING fix must never be archived
+merely because its base task is DONE. That logic is already correct — widen only which files enter
+it.
+
+**Test:** `npx vitest run tests/core/orphan-cleaner.test.ts`
+
+**NO-GO:** A file belonging to another sprint or to no task is swept, the `-fix` grouping contract
+changes, a PENDING fix is archived because its base task finished, the prefix-carrying path stops
+working, or an existing assertion is weakened.

@@ -194,6 +194,29 @@ describe('directives-builder reserved-label safety on single-line encoded fields
     expect(extractStructuredGoNogo(text).items[0]!.evidenceRequirements).toEqual([requirement]);
   });
 
+  it('round-trips Unicode line and paragraph separators through the criteriaItems JSON channel', () => {
+    const statement = 'Statement before\u2028line separator and after\u2029paragraph separator';
+    const evidenceRequirements = [
+      'Evidence before\u2028line separator',
+      'Evidence before\u2029paragraph separator',
+    ];
+    const item = createGoNoGoCriterionItem({
+      polarity: 'go',
+      statement,
+      evidenceRequirements,
+    });
+    const intent = makeIntent(['baseline goCriteria'], ['baseline nogo']);
+    intent.tasks[0]!.criteriaItems = [item];
+
+    const { text, reconstructed } = roundTrip(intent);
+    const criteriaLine = text.split('\n').find(line => line.trimStart().startsWith('- criteriaItems:'));
+    expect(criteriaLine).toContain('\\u2028');
+    expect(criteriaLine).toContain('\\u2029');
+    expect(criteriaLine).not.toContain('\u2028');
+    expect(criteriaLine).not.toContain('\u2029');
+    expect(reconstructed.criteriaItems).toEqual([item]);
+  });
+
   it('still rejects a reserved directive label in desc — that field is emitted raw', () => {
     const intent = makeIntent(['baseline goCriteria'], ['baseline nogo']);
     intent.tasks[0]!.desc = 'Normal text\nModel: haiku\nmore text';
@@ -204,5 +227,23 @@ describe('directives-builder reserved-label safety on single-line encoded fields
     const intent = makeIntent(['baseline goCriteria'], ['baseline nogo']);
     intent.tasks[0]!.desc = 'Normal text\n## Task 2: hijacked\nmore text';
     expect(() => buildDirectives(intent)).toThrow(/heading/);
+  });
+});
+
+describe('scope entry rendering', () => {
+  it('keeps a file path intact while a directory still gains its trailing slash', () => {
+    // A re-plan proposal reported `src/core/run-status-authority.ts/` among a
+    // task's directories; unconditional slash-appending invents a path that
+    // cannot exist, and any consumer reading that list inherits it.
+    const doc = buildDirectives({
+      title: 'T', goal: 'G',
+      tasks: [{
+        title: 'x', desc: 'y', files: ['src/core/a.ts'],
+        scope: ['src/core', 'src/core/a.ts', 'tests/core/'],
+        deps: [], goCriteria: ['g'], nogo: ['n'],
+      }],
+    });
+    const scopeLine = doc.split('\n').find(l => l.startsWith('- Scope:'));
+    expect(scopeLine).toBe('- Scope: src/core/, src/core/a.ts, tests/core/');
   });
 });

@@ -5,6 +5,12 @@ import { CodexAdapter, CODEX_USAGE_EMIT_ARGS } from '../../src/providers/codex.j
 // `extractUsage` is a pure stdout parser — no spawn, no fs. Construct the
 // adapter directly against a tmpdir (the constructor performs no I/O).
 
+// TokenUsage contract (2026-08-10): `inputTokens` is FRESH input. OpenAI's
+// `prompt_tokens` and codex v2's `input_tokens` both INCLUDE their cached
+// subset, so the adapter subtracts it and reports the cached prefix only in
+// `cacheReadTokens`. These expectations previously encoded the raw pass-through,
+// which made the same field mean different things on Anthropic vs codex and let
+// one budget behave differently depending on which provider ran it.
 describe('CodexAdapter.extractUsage', () => {
   let adapter: CodexAdapter;
 
@@ -30,7 +36,7 @@ describe('CodexAdapter.extractUsage', () => {
     const usage = adapter.extractUsage(raw);
     expect(usage).not.toBeNull();
     expect(usage).toEqual({
-      inputTokens: 1200,
+      inputTokens: 400, // fresh = 1200 reported − 800 cached
       outputTokens: 340,
       cacheReadTokens: 800,
       cacheCreationTokens: 0,
@@ -59,7 +65,7 @@ describe('CodexAdapter.extractUsage', () => {
     const usage = adapter.extractUsage(raw);
     // reasoning_output_tokens → reasoningTokens (folded into output; total is authoritative).
     expect(usage).toEqual({
-      inputTokens: 2048,
+      inputTokens: 1536, // fresh = 2048 reported − 512 cached
       outputTokens: 256,
       cacheReadTokens: 512,
       cacheCreationTokens: 0,
@@ -156,7 +162,7 @@ describe('CodexAdapter.extractUsage', () => {
     ].join('\n');
     const usage = adapter.extractUsage(raw);
     expect(usage).toEqual({
-      inputTokens: 3200,
+      inputTokens: 2300, // fresh = 3200 reported − 900 cached
       outputTokens: 540,
       cacheReadTokens: 900,
       cacheCreationTokens: 0,
@@ -180,7 +186,7 @@ describe('CodexAdapter.extractUsage', () => {
     });
     const usage = adapter.extractUsage(raw);
     expect(usage).toEqual({
-      inputTokens: 80,
+      inputTokens: 64, // fresh = 80 reported − 16 cached
       outputTokens: 24,
       cacheReadTokens: 16,
       cacheCreationTokens: 0,
@@ -203,7 +209,7 @@ describe('CodexAdapter.extractUsage', () => {
     });
     const usage = adapter.extractUsage(raw);
     expect(usage).toEqual({
-      inputTokens: 900,
+      inputTokens: 800, // fresh = 900 reported − 100 cached
       outputTokens: 300,
       cacheReadTokens: 100,
       cacheCreationTokens: 0,
@@ -236,7 +242,7 @@ describe('CodexAdapter.extractUsage', () => {
     // reasoning_output_tokens (codex-native) MUST surface as reasoningTokens —
     // pre-fix branch (a) only knew OpenAI's `reasoning_tokens` and dropped it.
     expect(usage).toEqual({
-      inputTokens: 2048,
+      inputTokens: 1536, // fresh = 2048 reported − 512 cached
       outputTokens: 256,
       cacheReadTokens: 512,
       cacheCreationTokens: 0,
@@ -252,7 +258,7 @@ describe('CodexAdapter.extractUsage', () => {
     const raw = '{"type":"turn.completed","usage":{"input_tokens":1500,"cached_input_tokens":400,"output_tokens":120}}';
     const usage = adapter.extractUsage(raw);
     expect(usage).toEqual({
-      inputTokens: 1500,
+      inputTokens: 1100, // fresh = 1500 reported − 400 cached
       outputTokens: 120,
       cacheReadTokens: 400,
       cacheCreationTokens: 0,

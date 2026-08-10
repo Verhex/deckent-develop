@@ -78,7 +78,6 @@ function readActiveWorkers(tasksDir: string): ActiveWorker[] {
     // (without this guard) reads as "stale". Skipping it here keeps
     // activeWorkers genuinely-active, so StaleWorkerDetector never proposes a
     // spurious WORKER_RESPAWN for a DONE worker (the false-positive root).
-    if (existsSync(join(tasksDir, file.replace(/\.hb$/, '.result')))) continue;
     try {
       const hbPath = join(tasksDir, file);
       const raw = readFileSync(hbPath, 'utf-8');
@@ -86,6 +85,20 @@ function readActiveWorkers(tasksDir: string): ActiveWorker[] {
       const workerId = typeof hb.workerId === 'string' ? hb.workerId : null;
       const taskId = typeof hb.taskId === 'string' ? hb.taskId : null;
       if (workerId === null || taskId === null) continue;
+      // Identity comes from the heartbeat's OWN taskId, never from its filename.
+      // Measured 2026-08-10: a residue heartbeat named `500-003-fix-fix-fix.hb`
+      // (no `task-` prefix, producer still unidentified) made the finished-worker
+      // guard look for `500-003-fix-fix-fix.result` — a name nothing ever writes.
+      // The guard missed, the file read as an active worker, its 6-hour-old mtime
+      // read as stale, and StaleWorkerDetector fired WORKER_RESPAWN twice on a
+      // sprint that had been settled and cleaned hours earlier.
+      if (existsSync(join(tasksDir, `task-${taskId}.result`))) continue;
+      // A live worker always has its task JSON on disk — that file is the claim
+      // surface it operates on, and cleanup removes it when the sprint settles.
+      // Its absence therefore proves this heartbeat is residue, whatever the file
+      // is called. This holds even if some path writes a misnamed artifact again:
+      // the check is on evidence, not on a filename convention.
+      if (!existsSync(join(tasksDir, `task-${taskId}.json`))) continue;
       out.push({
         id: workerId,
         taskId,

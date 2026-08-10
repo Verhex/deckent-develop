@@ -326,6 +326,26 @@ describe('postFinalizeCleanup', () => {
     expect(report.archivedFiles.length).toBe(0);
     expect(report.preservedFiles).toContain('task-144-005.hb');
   });
+
+  it('archives unprefixed artifacts for a terminal task without touching other or taskless files', () => {
+    writeTaskJson(testRoot, 'task-144-006-fix-fix', 'DONE');
+    writeFileSync(join(testRoot, '.tasks', '144-006-fix-fix.hb'), JSON.stringify({ taskId: '144-006-fix-fix' }));
+    writeFileSync(join(testRoot, '.tasks', '144-006-fix-fix.plan'), 'plan');
+    writeFileSync(join(testRoot, '.tasks', '144-006-fix-fix.landing-proposal.json'), JSON.stringify({ taskId: '144-006-fix-fix' }));
+    writeFileSync(join(testRoot, '.tasks', '143-006.hb'), JSON.stringify({ taskId: '143-006' }));
+    writeFileSync(join(testRoot, '.tasks', 'unrelated.hb'), 'not a task artifact');
+
+    const report = postFinalizeCleanup(testRoot, 'sprint-144');
+
+    expect(report.archivedFiles).toEqual(expect.arrayContaining([
+      'task-144-006-fix-fix.json',
+      '144-006-fix-fix.hb',
+      '144-006-fix-fix.plan',
+      '144-006-fix-fix.landing-proposal.json',
+    ]));
+    expect(existsSync(join(testRoot, '.tasks', '143-006.hb'))).toBe(true);
+    expect(existsSync(join(testRoot, '.tasks', 'unrelated.hb'))).toBe(true);
+  });
 });
 
 // ─── Pre-flight Tests ──────────────────────────────────────────────
@@ -355,6 +375,27 @@ describe('preflightOrphanCleanup', () => {
 
     // Sprint 144 files preserved
     expect(existsSync(join(testRoot, '.tasks', 'task-144-001.json'))).toBe(true);
+  });
+
+  it('archives unprefixed previous-sprint artifacts without touching current or taskless files', () => {
+    writeTaskJson(testRoot, 'task-143-003-fix-fix', 'DONE');
+    writeFileSync(join(testRoot, '.tasks', '143-003-fix-fix.hb'), JSON.stringify({ taskId: '143-003-fix-fix' }));
+    writeFileSync(join(testRoot, '.tasks', '143-003-fix-fix.plan'), 'plan');
+    writeFileSync(join(testRoot, '.tasks', '143-003-fix-fix.landing-proposal.json'), JSON.stringify({ taskId: '143-003-fix-fix' }));
+    writeTaskJson(testRoot, 'task-144-003', 'PENDING');
+    writeFileSync(join(testRoot, '.tasks', '144-003.hb'), JSON.stringify({ taskId: '144-003' }));
+    writeFileSync(join(testRoot, '.tasks', 'unrelated.hb'), 'not a task artifact');
+
+    const report = preflightOrphanCleanup(testRoot, 'sprint-144');
+
+    expect(report.archivedFiles).toEqual(expect.arrayContaining([
+      'task-143-003-fix-fix.json',
+      '143-003-fix-fix.hb',
+      '143-003-fix-fix.plan',
+      '143-003-fix-fix.landing-proposal.json',
+    ]));
+    expect(existsSync(join(testRoot, '.tasks', '144-003.hb'))).toBe(true);
+    expect(existsSync(join(testRoot, '.tasks', 'unrelated.hb'))).toBe(true);
   });
 
   it('should skip cleanup if another live sprint pid exists', () => {

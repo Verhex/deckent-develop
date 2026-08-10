@@ -131,13 +131,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // in clean-active-execution-guard.test, each writing a sprint-state.json into a
   // tmpdir fixtureRoot (the same helper the file's existing cases use); the scan
   // counts each write site. Prior: DRIFT-VISIBILITY (12499).
-  count: 12516,
+  count: 12517,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: '1cdf75bd4f04af031d3f99321e109dbc94073440b2a73e3b35140619e2991128',
+  digest: '93dde03930bed9c12e41fb7549cbb7634cf331b54acfeb7d34ebef58cd9176b5',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -160,7 +160,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // autonomous ingresses all import — every local pendingPath helper deleted so
   // one resolver remains. Edits to already-inventoried modules only — same 1203
   // count, content digest only.
-  count: 1204,
+  count: 1206,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
@@ -176,7 +176,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-09 (MODEL-ACTIVATION-001): +1 REAL production module —
   // src/core/model-activation-store.ts (owner model-activation authority), plus
   // the auto-detect enforcement and CLI edits. Prior: STALE-SPRINT-LOCK (1203).
-  digest: '2a4d8f341eea028c9c37420cefff6760c68cded5d229a3b8f1e84a5f794e6358',
+  digest: '31c1c76ee1d15909780f8e8cc42eb02f5222b402afa9b28acd1c18c0bfd2bc99',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
