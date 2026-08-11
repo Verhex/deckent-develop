@@ -2783,8 +2783,8 @@ const MESSAGES: MessageMap = {
 
   // ─── memory backup subcommand ──────────────────────────────────
   'trace.desc': {
-    en: 'Claude Code trace tooling for training corpora',
-    tr: 'Eğitim korpusları için Claude Code trace araçları',
+    en: 'Trace extraction, immutable migration, and governed training-corpus tooling',
+    tr: 'Trace çıkarma, immutable migration ve yönetişimli eğitim-korpusu araçları',
   },
   'trace.extract.desc': {
     en: 'Extract aligned + general training examples from Claude Code session transcript(s)',
@@ -2809,6 +2809,102 @@ const MESSAGES: MessageMap = {
   'trace.extract.summary': {
     en: 'Extracted {aligned} aligned + {general} general example(s) from {files} transcript file(s) -> {outDir} ({redacted} redacted).',
     tr: '{files} transkript dosyasından {aligned} aligned + {general} general örnek çıkarıldı -> {outDir} ({redacted} redaksiyonlu).',
+  },
+  'trace.opt.json': {
+    en: 'Emit stable machine-readable JSON',
+    tr: 'Kararlı ve makine-okunur JSON üret',
+  },
+  'trace.error': {
+    en: 'Trace command failed [{code}]: {message}',
+    tr: 'Trace komutu başarısız [{code}]: {message}',
+  },
+  'trace.migrate.desc': {
+    en: 'Reconcile historical JSONL traces into a canonical immutable projection (dry-run by default)',
+    tr: 'Geçmiş JSONL trace kayıtlarını canonical immutable projection ile uzlaştır (varsayılan dry-run)',
+  },
+  'trace.migrate.arg.inputs': {
+    en: 'One or more project-relative trace files or directories',
+    tr: 'Bir veya daha çok proje-relative trace dosyası ya da dizini',
+  },
+  'trace.migrate.opt.out': {
+    en: 'New no-clobber migration output directory',
+    tr: 'Yeni, üzerine yazılmayan migration çıktı dizini',
+  },
+  'trace.migrate.opt.apply': {
+    en: 'Publish the reconciled projection; omission remains side-effect-free',
+    tr: "Uzlaştırılmış projection'ı yayınla; verilmezse işlem side-effect-free kalır",
+  },
+  'trace.migrate.opt.allow_training': {
+    en: 'Explicitly admit structurally valid records for training',
+    tr: 'Yapısal olarak geçerli kayıtları eğitim için açıkça kabul et',
+  },
+  'trace.migrate.opt.weight': {
+    en: 'Positive training weight (requires --allow-training; default 1)',
+    tr: 'Pozitif eğitim ağırlığı (--allow-training gerektirir; varsayılan 1)',
+  },
+  'trace.migrate.opt.require_consent': {
+    en: 'Require observed per-record consent authority for train-ready disposition',
+    tr: 'Train-ready kararı için kayıt üzerinde gözlenen consent authority iste',
+  },
+  'trace.migrate.opt.require_lineage': {
+    en: 'Require observed run or sprint lineage for train-ready disposition',
+    tr: 'Train-ready kararı için gözlenen run veya sprint lineage iste',
+  },
+  'trace.migrate.opt.exclude': {
+    en: 'Policy-exclude every record while retaining the immutable projection',
+    tr: "Immutable projection'ı koruyarak tüm kayıtları policy ile dışla",
+  },
+  'trace.migrate.opt.policy_version': {
+    en: 'Explicit policy authority version',
+    tr: 'Açık policy authority sürümü',
+  },
+  'trace.migrate.opt.contract_version': {
+    en: 'Explicit migration contract version',
+    tr: 'Açık migration contract sürümü',
+  },
+  'trace.migrate.summary': {
+    en: 'Trace migration {mode}/{status}: id={migrationId}, parsed={parsed}, projected={projected}, malformed={malformed}, output={outputPath}',
+    tr: 'Trace migration {mode}/{status}: id={migrationId}, parsed={parsed}, projected={projected}, malformed={malformed}, çıktı={outputPath}',
+  },
+  'trace.corpus.desc': {
+    en: 'Build and audit manifest-authorized Deckent training corpora',
+    tr: 'Manifest-authorized Deckent eğitim korpuslarını üret ve denetle',
+  },
+  'trace.corpus.build.desc': {
+    en: 'Build a fail-closed ShareGPT corpus from a verified migration',
+    tr: "Doğrulanmış migration'dan fail-closed ShareGPT korpusu üret",
+  },
+  'trace.corpus.lint.desc': {
+    en: 'Verify corpus schema, provenance, causality, secrets, duplicates, and manifest reconciliation',
+    tr: 'Korpus şeması, provenance, causality, secret, duplicate ve manifest uzlaşmasını doğrula',
+  },
+  'trace.corpus.arg.migration': {
+    en: 'Project-relative canonical migration directory',
+    tr: 'Proje-relative canonical migration dizini',
+  },
+  'trace.corpus.arg.corpus': {
+    en: 'Project-relative ShareGPT corpus JSONL file',
+    tr: 'Proje-relative ShareGPT korpus JSONL dosyası',
+  },
+  'trace.corpus.opt.out': {
+    en: 'New no-clobber corpus output file',
+    tr: 'Yeni, üzerine yazılmayan korpus çıktı dosyası',
+  },
+  'trace.corpus.opt.manifest': {
+    en: 'Pipeline manifest path (default: <corpus>.manifest.json)',
+    tr: 'Pipeline manifest yolu (varsayılan: <corpus>.manifest.json)',
+  },
+  'trace.corpus.build.summary': {
+    en: 'Canonical corpus published: {written} train-ready record(s), {rejected} held out -> {outputPath}',
+    tr: 'Canonical korpus yayınlandı: {written} train-ready kayıt, {rejected} dışarıda tutuldu -> {outputPath}',
+  },
+  'trace.corpus.lint.ok': {
+    en: 'Corpus verified: {valid} valid record(s), zero violations.',
+    tr: 'Korpus doğrulandı: {valid} geçerli kayıt, sıfır ihlal.',
+  },
+  'trace.corpus.lint.failed': {
+    en: 'Corpus verification failed: {valid} valid record(s), {violations} violation(s).',
+    tr: 'Korpus doğrulaması başarısız: {valid} geçerli kayıt, {violations} ihlal.',
   },
   'memory.backup.desc': {
     en: 'Create a WAL-safe backup of memory.db',

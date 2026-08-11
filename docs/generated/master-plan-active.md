@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f510d8ce3caf55cd21bf1691c8a4fb14fb456556fa4e840ecf31f1ab6a42868d`
+**Source digest:** `sha256(normalized-lf-utf8):a5a1bb1e98ec6cb7df5d2616338d318e5eccdb920f3244daee6370e9299cfd42`
 
-**Rows:** 460 total · 413 active · 47 terminal
+**Rows:** 469 total · 422 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 320 |
+| OPEN | 329 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -283,6 +283,7 @@
 | 3313 | `RUN-STATUS-LIVENESS-TRUTH-001` | OPEN | P1 | OBS | — | — | Status yüzeyi liveness-kanıtsız satırı aktif gösteremez: taze heartbeat/pid kanıtı olmayan worker satırı typed stale/unproven işaretlenir |
 | 3314 | `ARCHIVE-PATH-AUTHORITY-001` | OPEN | P1 | KERNEL | — | — | Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı |
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
+| 3316 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | OPEN | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001` | — | Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
@@ -411,6 +412,13 @@
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9011 | `PROMPT-INJECTION-TRACE-001` | OPEN | P0 | LEARNING | `PROMPT-001`, `AUDIT-001`, `STATE-RETENTION-001` | — | Prompt/ADR injection kararları için project-root-bound, versioned, privacy-safe ve outcome-linked causal trace authority |
+| 9012 | `TRACE-DATA-GOVERNANCE-001` | OPEN | P0 | DATA | `DATA-GOV-001`, `STATE-RETENTION-001`, `AUDIT-001` | — | Training trace için purpose-bound consent, rights, classification, tenant isolation, retention ve deletion authority |
+| 9013 | `TRACE-AUTHORITY-SCHEMA-001` | OPEN | P0 | LEARNING | `TRACE-DATA-GOVERNANCE-001`, `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Attempt→event→evidence→evaluation→accepted outcome için versioned canonical trace envelope ve indexed read model |
+| 9014 | `TRACE-CAPTURE-CUTOVER-001` | OPEN | P0 | LEARNING | `TRACE-AUTHORITY-SCHEMA-001`, `PROMPT-COMPILE-EVIDENCE-AUTHORITY-001`, `EVALUATION-EVIDENCE-AUTHORITY-001` | — | Bütün production capture producerları canonical trace authorityye bağlanır, competing ve cumulative writerlar retirement receipt'iyle kapanır |
+| 9015 | `TRACE-HISTORICAL-MIGRATION-001` | OPEN | P0 | DATA | `TRACE-DATA-GOVERNANCE-001`, `TRACE-AUTHORITY-SCHEMA-001` | — | Mevcut bütün trace corpusu immutable raw provenance korunarak canonical schema projectionına lossless ve idempotent taşınır |
+| 9016 | `TRACE-CORPUS-PIPELINE-001` | OPEN | P0 | LEARNING | `TRACE-AUTHORITY-SCHEMA-001`, `TRACE-CAPTURE-CUTOVER-001`, `TRACE-HISTORICAL-MIGRATION-001` | — | Canonical trace authorityden reproducible, bounded ve provenance-complete training/eval corpus builder |
+| 9017 | `TRACE-QUALITY-LEAKAGE-GATE-001` | OPEN | P0 | ASSURANCE | `TRACE-CORPUS-PIPELINE-001`, `EVALUATION-001`, `AUDIT-001` | — | Dataset quality, privacy, contamination, dedupe, split ve representativeness kapısı training admissionı deterministik olarak yönetir |
+| 9018 | `WORKER-LOG-AUTHORITY-001` | OPEN | P0 | OBS | `TRACE-AUTHORITY-SCHEMA-001`, `CM-01`, `STATE-RETENTION-001` | — | Normal, FIX ve XFIX worker logları attempt-bound causal event, occurrence-time ve capture-integrity authoritysi taşır |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |
 | 9022 | `PROMPT-V3-GOLDEN-EVAL-001` | OPEN | P2 | PROMPT | `PROMPT-V3-001` | — | Prompt V3 golden-eval: temsilî on-task değerlendirmesi, gerçek heterojen worker'lar, cost/quality eşikleri |
 | 9023 | `AGENT-PROMPT-SYNC-001` | OPEN | P1 | PROMPT | `AGENT-CATALOG-AUTHORITY-001` | — | Built-in ve project agent prompt/manifest sync canonicalitysi dogfood ile shipped productta aynı effective persona üretir |
@@ -427,7 +435,8 @@
 | 9052 | `AGENT-STATE-MIGRATION-001` | OPEN | P1 | EVOLUTION | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-PROMPT-SYNC-001`, `AGENT-EVOLUTION-LIFECYCLE-001` | — | Mevcut temp, archive, prompt-version ve retirement agent statei lossless, recoverable ve policy-governed biçimde canonical namespacee taşınır |
 | 9053 | `SKILL-EVOLUTION-LIFECYCLE-001` | OPEN | P0 | EVOLUTION | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-DURABILITY-001`, `TRAINING-TRACE-001`, `EVALUATION-001` | — | Generated/learned skill outcome, promotion, demotion, mutation, rollback ve retirement zinciri productionda kapanır veya eval-backed negative-space kararıyla kaldırılır |
 | 9060 | `LEARNING-DOGFOOD-001` | OPEN | P1 | LEARNING | `PROMPT-001`, `ROUTING-001`, `KERNEL-001` | — | Historical dogfood findings atomized and regression-proofed |
-| 9070 | `FINE-TUNE-001` | OPEN | P2 | LEARNING | `TRAINING-TRACE-001`, `PROMOTION-001`, `DATA-GOV-001` | — | Deckent-core fine-tune only after trace/data/governance readiness |
+| 9070 | `FINE-TUNE-001` | OPEN | P0 | LEARNING | `TRAINING-TRACE-001`, `PROMOTION-001`, `DATA-GOV-001` | — | Deckent-core fine-tune only after trace/data/governance readiness |
+| 9071 | `DECKENT-CORE-MODEL-LIFECYCLE-001` | OPEN | P0 | LEARNING | `TRACE-QUALITY-LEAKAGE-GATE-001`, `PROMOTION-001`, `MODEL-ACTIVATION-001` | — | Deckent-core Brain modelinin dataset→train→eval→registry→shadow/canary→serve→monitor→rollback lifecycle authoritysi |
 | 10000 | `SCALE-001` | OPEN | P0 | SCALE | `SSOT-003`, `TRUTH-BASELINE-001` | — | Million-scale assurance parent |
 | 10010 | `STORAGE-001` | OPEN | P0 | DURABILITY | `KERNEL-STATE-001`, `TENANT-001` | — | Transactional durable state backend and migration strategy |
 | 10011 | `AUTONOMOUS-STATE-AUTHORITY-001` | OPEN | P0 | DURABILITY | `KERNEL-STATE-001`, `TENANT-001`, `STATE-ARCHIVE-RESTORE-001` | — | Autonomous state catalog, pure readers ve versioned transactional migration authority |

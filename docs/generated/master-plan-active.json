@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f510d8ce3caf55cd21bf1691c8a4fb14fb456556fa4e840ecf31f1ab6a42868d"
+    "value": "a5a1bb1e98ec6cb7df5d2616338d318e5eccdb920f3244daee6370e9299cfd42"
   },
   "summary": {
-    "total": 460,
-    "active": 413,
+    "total": 469,
+    "active": 422,
     "terminal": 47,
     "receipts": 183,
     "byState": {
-      "OPEN": 320,
+      "OPEN": 329,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,19 +21,19 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 295,
+      "P0": 305,
       "P1": 127,
-      "P2": 38
+      "P2": 37
     },
     "byProgram": {
       "API": 5,
-      "ASSURANCE": 14,
+      "ASSURANCE": 15,
       "AUTHORITY": 46,
       "CODEX": 44,
       "CONNECTOR": 2,
       "COST": 5,
       "DASHBOARD": 2,
-      "DATA": 1,
+      "DATA": 3,
       "DESKTOP": 6,
       "DOCS": 6,
       "DURABILITY": 2,
@@ -41,9 +41,9 @@
       "ENTERPRISE": 1,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 107,
-      "LEARNING": 5,
-      "OBS": 5,
+      "KERNEL": 108,
+      "LEARNING": 9,
+      "OBS": 6,
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
@@ -1093,9 +1093,9 @@
       "program": "CODEX",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-11",
       "definitionDigest": "cd16fa1ada0c08bc56838208fc00a77b8a5897290b8e5f63c2c1c4b32563b7a2",
-      "progressDigest": "2afe1d8e5d2581fc0e110332d94a44a2e21dce7aa8dd1c41d95c0dcb1d7de809",
+      "progressDigest": "a6d4cebf6dfa9b9ae32dd4f6fa6b180f3bbcce3dc9bfff966b8708a618e8599e",
       "terminalClosureDigest": null
     },
     {
@@ -2204,9 +2204,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-30",
+      "updated": "2026-08-11",
       "definitionDigest": "d28e2b40b71553096c9f0fc8df5e656d14e75d607fcf156abc56fcf82b87bd75",
-      "progressDigest": "5a88f5da021af1c161d3956dcb3b8e39cbde7b3b4e4e0a0f34458f338624ead1",
+      "progressDigest": "c7d13943ccce08345281787cc2a7f2c4ec2365a8d6682a6f00a0ef9c13309de7",
       "terminalClosureDigest": null
     },
     {
@@ -3274,6 +3274,17 @@
       "updated": "2026-08-03",
       "definitionDigest": "b49217770cf4d9965c24f57a176ff35b48f9314e94bdf3c001e11bfdaa6717e5",
       "progressDigest": "c4156f0c8472042c29e198dc49028eeda1776ec737af23983eba00abbd06b26d",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3316,
+      "id": "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "253a45b8d84cb9a0683b902baec9f345937df8b4fe8e9d753c0dda1b22a9a440",
+      "progressDigest": "282d27d4f3371981370cab8e27f8a157ff8ff18a44775c82e276c12bc6b88a8a",
       "terminalClosureDigest": null
     },
     {
@@ -4778,9 +4789,9 @@
       "program": "LEARNING",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-11",
       "definitionDigest": "1afbfe62691bfc0e05b81e52b4760c68b9e9fde571103479ff68f09062cf9895",
-      "progressDigest": "586608dd4ced6ec02b5f8f88e52b695f3bac863bd3d7bba4aadc49956652ccc6",
+      "progressDigest": "01b354c51c01e1e48d2fd9d8a79f99f161962d79949a8917e34a61428ff88622",
       "terminalClosureDigest": null
     },
     {
@@ -4792,6 +4803,83 @@
       "updated": "2026-08-10",
       "definitionDigest": "3de72893afea9e976964252f33541918c0eb15291311279fd52109570ac13ef0",
       "progressDigest": "49a965a83be4d6374fbe4eabae1e14cfac42ec60c1c381e2322c2583d9b2cc67",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9012,
+      "id": "TRACE-DATA-GOVERNANCE-001",
+      "program": "DATA",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "225f193a366d131e98874a06d9a15d06d21c07909af9374741a1f80e97851af7",
+      "progressDigest": "ee6efab08a8ba3b664b7e5a802d352b95d6f0e3e40e73fd7112071b1db15ecb2",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9013,
+      "id": "TRACE-AUTHORITY-SCHEMA-001",
+      "program": "LEARNING",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "110f09400b81d865995e41142bcadf3ba79692d9f0cecacd86850728af6ad1d9",
+      "progressDigest": "c81d3e422a722fde4dde87e536f13aad6ef53d20e869e012ed19976b96df32b0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9014,
+      "id": "TRACE-CAPTURE-CUTOVER-001",
+      "program": "LEARNING",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "eee297787301119ce58484461b69edc8466ce6cafa175bad89e878a9c06c90e5",
+      "progressDigest": "f2e34f362620e8e5b57f3cc44ba4a5c5dc0de838b9e2dd7ee3d6b0bcd004a0b6",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9015,
+      "id": "TRACE-HISTORICAL-MIGRATION-001",
+      "program": "DATA",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "1c6046516e7f3aceba3ce8b02d07f7a26cd15e168f70483fea10186fdaaea395",
+      "progressDigest": "f13980aef360962ba7640f6f4bb410f7ad733b9acb81cb1cc17cba3f9df161b0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9016,
+      "id": "TRACE-CORPUS-PIPELINE-001",
+      "program": "LEARNING",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "02d0e47bb73d63eb37a5ae5f2ab341c2b5ecb211ae5005a4caebf559c5514867",
+      "progressDigest": "8438dd0050f535939c125788c1a78e1bbb393cb99514f3aafdb5f8c8ecd0baa0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9017,
+      "id": "TRACE-QUALITY-LEAKAGE-GATE-001",
+      "program": "ASSURANCE",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "4bb4240b9be90bed7d4ac329047e36f884974dad0b8a36484e78bbc5ab2efe4d",
+      "progressDigest": "a2411df97ad5b1d5ce8c15d4bba86d45df4c39c965eb08fd49bd165fe151bd83",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9018,
+      "id": "WORKER-LOG-AUTHORITY-001",
+      "program": "OBS",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "6d609ad1107b8ca15d334bc99826c0dec76fc48b6159f7fa4b0d1a1a2662b859",
+      "progressDigest": "c406a91f3342112ffc82c8cd54ed63e058e43e6a4abb3eb41a39b1fed983184e",
       "terminalClosureDigest": null
     },
     {
@@ -4996,11 +5084,22 @@
       "order": 9070,
       "id": "FINE-TUNE-001",
       "program": "LEARNING",
-      "priority": "P2",
+      "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-11",
       "definitionDigest": "031a8b3e95ed8af6ae7b974b3fe648fde0bf9c84063bbba435f4d6a692af0092",
-      "progressDigest": "d0af1428c8805cfc3a660a53aa7c1c371e9ea95aaf47bc0296f5751f4920e64a",
+      "progressDigest": "29bbe1d0888b75ae0d1d4879c309cc3f96f87371fe4a6a1f82fec2292c46278a",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9071,
+      "id": "DECKENT-CORE-MODEL-LIFECYCLE-001",
+      "program": "LEARNING",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "67809148d14c4817356049181cc3d41fffd8b303047ad755cc29038d1c92cd49",
+      "progressDigest": "ea4001e7669fdcb21bbee315a60e8756fdec84a72be5fded40f4edf6664a8343",
       "terminalClosureDigest": null
     },
     {
@@ -7360,7 +7459,9 @@
         "RUNFLOW-STORE-RECONCILIATION-001",
         "SCHEDULER-SHADOW-EVIDENCE-001",
         "STATE-PRUNE-001",
-        "TASK-RETENTION-001"
+        "TASK-RETENTION-001",
+        "TRACE-DATA-GOVERNANCE-001",
+        "WORKER-LOG-AUTHORITY-001"
       ],
       "children": [
         "CRASH-FORENSICS-AUTHORITY-001",
@@ -9502,6 +9603,7 @@
         "P01-TRUTH-GATE",
         "PA-662",
         "TERMINAL-ONBOARD-001",
+        "WORKER-LOG-AUTHORITY-001",
         "ZERO-HARDCODE-PROVIDER-001"
       ],
       "children": [],
@@ -9523,8 +9625,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Brain, Worker, Auditor, chat and native exact IDs; foreign Anthropic requirement removed; invalid provider typed HOLD",
-      "evidence": "Config and `config.ts` audit",
-      "updated": "2026-07-26"
+      "evidence": "Config and `config.ts` audit. 2026-08-11 Sprint-515 RCA: beş canlı result ve arşivde task-507-002 olmak üzere altı kayıtta task `budgetPolicy.resolvedProvider=codex`, TASK_ASSIGN ve gerçek Docker command `codex`, model `gpt-5.6-terra` veya `gpt-5.6-sol` iken `tokenUsage.provider=claude`; cost pricing source ise doğru biçimde `openai/gpt-5.6-*`. Kök zincir: `buildWorkerPrompt` provider resolutiondan önce çalışıyor; prompt-god-template `task.provider` yoksa default `claude` yazıyor; worker timeout/EXIT_WITHOUT_RESULT fallbackleri de aynı yanlış kimliği hardcode ediyor; Docker gerçek providerı model registryden `codex` çözüyor; host runtime-budget projectionı ölçülen sayaçları alırken önceki worker provider claimini host identity üstünde koruyor. Sonuç: token sayıları host-measured olsa da provider identity otoritesi ters çevrilmiş; normal ve FIX aynı kusurda",
+      "updated": "2026-08-11"
     },
     {
       "order": 1020,
@@ -13240,6 +13342,7 @@
         "RECOVERY-DECISION-001",
         "RUNNER-PROTOCOL-001",
         "SCHEDULER-001",
+        "TRACE-AUTHORITY-SCHEMA-001",
         "WORKER-REGISTRY-001"
       ],
       "children": [],
@@ -13301,6 +13404,7 @@
         "RECOVERY-BORN-483-EVALUATION-HONESTY-001",
         "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001",
         "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
+        "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
         "RECOVERY-DECISION-001",
         "RECOVERY-STALE-PROJECTION-001",
         "RESULT-INGEST-001",
@@ -13308,6 +13412,7 @@
         "SPRINT-HONESTY-001",
         "SSOT-SETTLEMENT-001",
         "TERMINAL-LIVE-001",
+        "TRACE-AUTHORITY-SCHEMA-001",
         "TRAINING-TRACE-001"
       ],
       "children": [],
@@ -14082,7 +14187,8 @@
       "dependents": [
         "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
-        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001"
+        "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
+        "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001"
       ],
       "children": [],
       "gates": [
@@ -14105,8 +14211,8 @@
         "GR-2026-07-30-RECOVERY-RESIDUALS-01"
       ],
       "acceptance": "Explicit matching sprint ve force authority, durable pause/checkpoint evidence'ini terminal ABORTED settlement'a taşır; task evidence yokken COMPLETE veya başarı metriği üretmez; pause/checkpoint/PID/dashboard/status aynı terminal truth'a gelir",
-      "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; real CLI `deckent finalize --sprint sprint-467 --force` exits zero with “no tasks” and leaves matching pause plus checkpoint untouched, so canonical status remains PAUSED/resumable; manual deletion was refused and no terminal claim is made",
-      "updated": "2026-07-30"
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; real CLI `deckent finalize --sprint sprint-467 --force` exits zero with “no tasks” and leaves matching pause plus checkpoint untouched, so canonical status remains PAUSED/resumable; manual deletion was refused and no terminal claim is made. 2026-08-11 Sprint-515 canlı recovery: receipt generation 1 `terminalOutcome=COMPLETE` yayımlanmış olmasına rağmen logical progress 3 done ve 1 blocked, cleanup `LINEAGE_NOT_COMPLETED` nedeniyle HOLD ve canonical sprint state `PAUSED/FIX`; `finalize --force` truthful ABORTED yayınlamak isterken immutable receipt CAS `TERMINAL_PUBLICATION_generation_conflict` verdi. Receipt silinmedi veya overwrite edilmedi; sprint typed HOLD/resumable kaldı. Exact kapanış child'ı RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
+      "updated": "2026-08-11"
     },
     {
       "order": 3163,
@@ -14435,6 +14541,7 @@
         "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
         "RECOVERY-BORN-507-FIX-SPAWN-001",
         "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
+        "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "gates": [
@@ -14500,6 +14607,7 @@
         "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
         "RECOVERY-BORN-507-FIX-SPAWN-001",
         "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
+        "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "evidenceReceipts": [
@@ -17763,6 +17871,46 @@
       "updated": "2026-08-03"
     },
     {
+      "order": 3316,
+      "id": "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır",
+      "priority": "P0",
+      "dependsOn": [
+        "PAUSED-FINALIZE-001",
+        "RECEIPT-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PAUSED-FINALIZE-001",
+        "RECEIPT-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Terminal publication logical lineage settlement ve cleanup eligibilityden önce COMPLETE yayımlayamaz; blocked veya unresolved lineage success metriğine terfi etmez; publication sonrası yeni durable evidence önceki receipt'i geçersiz kılıyorsa eski artifact korunur ve reason-bound append-only superseding receipt tek current authority olarak CAS ile yayımlanır; force-finalize normal, missing/partial projection ve already-published conflict vakalarında idempotenttir; pause/checkpoint/status/dashboard/sprint-log aynı revisionı okur; crash, concurrent finalizer, stale generation ve replay testleri ile real-binary recovery proof'u vardır",
+      "evidence": "Açılış 2026-08-11 Sprint-515 manual recovery: `.deckent/recently-works/sprint-515-terminal-receipt.json` COMPLETE ve 3 done artı 1 blocked yayımladı, sonra cleanup `LINEAGE_NOT_COMPLETED` ile durdu; `.deckent/sprint-state.json` PAUSED/FIX kaldı. Aynı sprint için truthful force-ABORT generation 6, immutable terminal publication generation 1 ile `generation_conflict` aldı. Mevcut receipt overwrite/silme çözüm değildir; terminal ordering ve supersession authority birlikte kapanmalıdır",
+      "updated": "2026-08-11"
+    },
+    {
       "order": 3320,
       "id": "BOT-LIFECYCLE-HONESTY-001",
       "parent": "RECOVERY-TERMINATION-001",
@@ -18585,9 +18733,11 @@
         "REACHABILITY-001",
         "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
         "RECOVERY-BORN-485-USAGE-BILLING-001",
+        "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
         "SPEND-LEDGER-AUTHORITY-001",
         "SSOT-SETTLEMENT-001",
         "SURFACE-CONTRACT-001",
+        "TRACE-AUTHORITY-SCHEMA-001",
         "TRAINING-TRACE-001",
         "XVERIFY-TRUTH-001"
       ],
@@ -19024,6 +19174,8 @@
         "SPEND-LEDGER-AUTHORITY-001",
         "SSOT-SETTLEMENT-001",
         "TERMINAL-COLLAB-001",
+        "TRACE-DATA-GOVERNANCE-001",
+        "TRACE-QUALITY-LEAKAGE-GATE-001",
         "TRUST-HANDOFF-001"
       ],
       "children": [
@@ -21847,7 +21999,9 @@
       "outcome": "Owner-managed model activation over the auto-detected pool",
       "priority": "P1",
       "dependsOn": [],
-      "dependents": [],
+      "dependents": [
+        "DECKENT-CORE-MODEL-LIFECYCLE-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -23019,7 +23173,13 @@
         "SKILL-EVOLUTION-LIFECYCLE-001"
       ],
       "children": [
-        "PROMPT-INJECTION-TRACE-001"
+        "PROMPT-INJECTION-TRACE-001",
+        "TRACE-DATA-GOVERNANCE-001",
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "TRACE-CAPTURE-CUTOVER-001",
+        "TRACE-HISTORICAL-MIGRATION-001",
+        "TRACE-CORPUS-PIPELINE-001",
+        "TRACE-QUALITY-LEAKAGE-GATE-001"
       ],
       "gates": [
         "G1"
@@ -23039,12 +23199,18 @@
       "closureBlockedBy": [
         "KERNEL-SETTLEMENT-001",
         "RECEIPT-001",
-        "PROMPT-INJECTION-TRACE-001"
+        "PROMPT-INJECTION-TRACE-001",
+        "TRACE-DATA-GOVERNANCE-001",
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "TRACE-CAPTURE-CUTOVER-001",
+        "TRACE-HISTORICAL-MIGRATION-001",
+        "TRACE-CORPUS-PIPELINE-001",
+        "TRACE-QUALITY-LEAKAGE-GATE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Prompt/config/tools/evidence/verdict lineage, consent, redaction and retention",
-      "evidence": "Active direction; current trace unwired. 2026-08-10 injection audit RCA: 30947 JSON kayıt parse-valid olsa da test/live/calibration, run/attempt/project/tenant/config ve accepted-outcome provenance taşımıyor; 1292 unique task değerine karşı fixture IDleri binlerce kez tekrar ediyor (`025-001` 11413, `030-001` 2618, `900-001` 2052). Bu dosya training evidence değildir; exact closure PROMPT-INJECTION-TRACE-001 childındadır",
-      "updated": "2026-08-10"
+      "evidence": "Active direction; current trace unwired. 2026-08-10 injection audit RCA: 30947 JSON kayıt parse-valid olsa da test/live/calibration, run/attempt/project/tenant/config ve accepted-outcome provenance taşımıyor; 1292 unique task değerine karşı fixture IDleri binlerce kez tekrar ediyor (`025-001` 11413, `030-001` 2618, `900-001` 2052). 2026-08-11 `.deckent/traces` RCA: bütün dosyalar parse-valid görünse de sprint-worker v1/v2 karışık, yüzlerce kayıt eligible/quarantine ayrımında, accepted Brain verdict ile worker claim arasında yüksek disagreement var; project/tenant/run/consent/policy/config/prompt/evidence digestleri yok, overlapping extracted corpora double-weight riski taşıyor, cumulative REPL transcriptleri turnleri tekrar ediyor ve tool content-array kayıtları mevcut pipelineı stream ortasında düşürebiliyor. Ham dosyalar training evidence değildir; silinmeden veya yerinde rewrite edilmeden child authority, migration ve quality gate zincirinden geçer",
+      "updated": "2026-08-11"
     },
     {
       "order": 9011,
@@ -23085,6 +23251,307 @@
       "acceptance": "Canonical prompt compile boundary her run/attempt/task için zero-selection dahil exactly-one versioned injection decisionı üretir; project+tenant+environment+test/calibration/live provenance, selector/corpus/config/prompt digests, selected/rejected reasonları, consent/redaction ve accepted outcome lineageı taşır; caller-provided canonical project root hiçbir yerde `process.cwd()` ile bypass edilmez; concurrent writers atomic/locked veya append-integrity-fenced olur; least-privilege mode/ACL, age+count+size+legal-hold retention, rotation/compaction, bounded streaming reader, tamper evidence ve deletion dry-run manifest+receipt'i vardır; Linux/macOS/Windows-native/WSL ile multi-project daemon ve million-scale load proof'u pass olur; test fixtures production telemetryye yazmaz",
       "evidence": "2026-08-10 code/disk RCA ve Alperen onayı: `.deckent/prompts/injection-audit.jsonl` 12214382 byte/30947 valid line, 30872 unique exact record ve 13053 adet 30 günden eski kayıt taşıyor; credential-pattern scan temiz fakat dosya 0644/dizin 0755. `logInjectionAudit` direct append+fail-soft, schema version/reader/rotation/retention/lock yok; primary prompt compiler `projectRoot` alırken logging `process.cwd()` kullanıyor; ayrı query ingressi root kullanarak competing producer yaratıyor; zero-selection/fallback yazılmıyor. Test fixtureları dominant ve VITEST guardı yok; hiçbir record environment/run/attempt/project/tenant taşımadığından live veri güvenilir ayrıştırılamaz. Provenance migration+retention authority kurulmadan dosya silinmez veya prune edilmez",
       "updated": "2026-08-10"
+    },
+    {
+      "order": 9012,
+      "id": "TRACE-DATA-GOVERNANCE-001",
+      "parent": "TRAINING-TRACE-001",
+      "program": "DATA",
+      "outcome": "Training trace için purpose-bound consent, rights, classification, tenant isolation, retention ve deletion authority",
+      "priority": "P0",
+      "dependsOn": [
+        "DATA-GOV-001",
+        "STATE-RETENTION-001",
+        "AUDIT-001"
+      ],
+      "dependents": [
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "TRACE-HISTORICAL-MIGRATION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "DATA-GOV-001",
+        "STATE-RETENTION-001",
+        "AUDIT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Capture ve downstream kullanım ayrı versioned purpose/consent kararları taşır; dataset rights, confidentiality, residency, tenant/project isolation, subject export/delete, legal hold, key custody, least privilege ve policy revocation bütün raw, curated, eval ve model artifactlarında enforce edilir; missing veya ambiguous authority typed HOLD olur; opt-out varsayılanı ve test/calibration/live ayrımı user ile enterprise policy yüzeylerinde açıkça görünür; hiçbir training/export silent default-on olamaz",
+      "evidence": "2026-08-11 owner direction + disk/code RCA: REPL capture `DECKENT_TRACE !== '0'` ile default-on opt-out; sprint trace local/ignored olsa da kayıtların tamamında consent, purpose, tenant, principal ve policy version provenanceı eksik, dosyalar 0644. Local-only olmak dataset hakkı veya training consent kanıtı değildir",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 9013,
+      "id": "TRACE-AUTHORITY-SCHEMA-001",
+      "parent": "TRAINING-TRACE-001",
+      "program": "LEARNING",
+      "outcome": "Attempt→event→evidence→evaluation→accepted outcome için versioned canonical trace envelope ve indexed read model",
+      "priority": "P0",
+      "dependsOn": [
+        "TRACE-DATA-GOVERNANCE-001",
+        "KERNEL-ATTEMPT-001",
+        "KERNEL-SETTLEMENT-001",
+        "RECEIPT-001"
+      ],
+      "dependents": [
+        "TRACE-CAPTURE-CUTOVER-001",
+        "TRACE-CORPUS-PIPELINE-001",
+        "TRACE-HISTORICAL-MIGRATION-001",
+        "WORKER-LOG-AUTHORITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TRACE-DATA-GOVERNANCE-001",
+        "KERNEL-ATTEMPT-001",
+        "KERNEL-SETTLEMENT-001",
+        "RECEIPT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Schema stable record/event/run/attempt IDs, project/tenant/principal/environment, source+schema version, causal sequence/tool-call links, agent/skill/provider/model effective identity, config/prompt/code/evidence digests, worker claim, independent evaluator verdict, accepted outcome, consent/purpose/policy, integrity chain ve disposition taşır; unknown değer tahmin edilmez; append exactly-once veya deterministic idempotent, concurrent-safe, tamper-evident ve bounded-indexed olur; writer ve reader aynı schema registry/migration authoritysini tüketir; unsupported version honest HOLD verir",
+      "evidence": "2026-08-11 RCA: sprint-worker v2 daha zengin causal messages taşısa da governance ve accepted-settlement join alanları yok; v1 ile aynı dosyada coexist ediyor, model/agent aliasları identity fragmentation yaratıyor ve mevcut pipeline provenanceı ShareGPT labels'a indirgerken task/sprint/attempt/tool causal authoritysini düşürüyor. 2026-08-11 manual recovery settlement: `training-trace-envelope.ts` canonical versioned envelope, evidence-bound source provenance/digest, nullable observed unknowns, governance/lineage, tool causality ve fail-closed disposition validatorını kurdu; legacy missing causal references yalnız quarantine/excluded altında reason-bound kabul edilir, train-ready olamaz. Targeted trace suite ve typecheck green; production capture cutover, indexed read model, governance authority ve every-environment proof açık olduğundan satır OPEN kalır",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 9014,
+      "id": "TRACE-CAPTURE-CUTOVER-001",
+      "parent": "TRAINING-TRACE-001",
+      "program": "LEARNING",
+      "outcome": "Bütün production capture producerları canonical trace authorityye bağlanır, competing ve cumulative writerlar retirement receipt'iyle kapanır",
+      "priority": "P0",
+      "dependsOn": [
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001",
+        "EVALUATION-EVIDENCE-AUTHORITY-001"
+      ],
+      "dependents": [
+        "TRACE-CORPUS-PIPELINE-001"
+      ],
+      "children": [
+        "WORKER-LOG-AUTHORITY-001"
+      ],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001",
+        "EVALUATION-EVIDENCE-AUTHORITY-001",
+        "WORKER-LOG-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Sprint worker, output collector, evaluator, settlement, REPL/terminal, CLI extractor ve supported provider adapters aynı canonical append service üzerinden event-level kayıt üretir; transcript snapshot yerine incremental turn, duplicate/retry için stable identity ve accepted outcome için immutable late binding kullanılır; fail-soft capture kaybı typed telemetry ve health gate üretir; feature/config/consent resolution bütün yüzeylerde aynıdır; old writerlar dual-write reconciliation kanıtından sonra retirement receipt'i olmadan kaldırılmaz; real-binary dogfood run producer→consumer→entrypoint→policy closure'ı kanıtlar",
+      "evidence": "2026-08-11 code RCA: sprint-phases/output-collector ve REPL ayrı writer yolları; REPL her turda tüm `session.transcript()` snapshotını yazar, eski `scripts/extract-traces.mjs` ile `deckent trace extract` redaction ve content semanticsinde drift eder; appendTraceSegment/compaction/retention organlarının production callerı yok. 2026-08-11 worker-log RCA ayrı uygulanabilir child'a bağlandı: WORKER-LOG-AUTHORITY-001",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 9015,
+      "id": "TRACE-HISTORICAL-MIGRATION-001",
+      "parent": "TRAINING-TRACE-001",
+      "program": "DATA",
+      "outcome": "Mevcut bütün trace corpusu immutable raw provenance korunarak canonical schema projectionına lossless ve idempotent taşınır",
+      "priority": "P0",
+      "dependsOn": [
+        "TRACE-DATA-GOVERNANCE-001",
+        "TRACE-AUTHORITY-SCHEMA-001"
+      ],
+      "dependents": [
+        "TRACE-CORPUS-PIPELINE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G3",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "~"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TRACE-DATA-GOVERNANCE-001",
+        "TRACE-AUTHORITY-SCHEMA-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Migration önce dry-run source manifesti ve byte SHA-256 inventory üretir; raw dosyaları değiştirmez veya silmez; parseable, partial ve corrupt her source unit exactly-one deterministic record/disposition alır; eksik alanlar `unknown` kalır ve sentetik prompt/outcome/consent üretilmez; exact/near duplicate, aligned-general overlap ve cumulative transcript ilişkileri provenance referansıyla korunur fakat training weight çoğaltmaz; train-ready, auxiliary ve quarantine ayrımı reason code taşır; atomic/resumable output, rerunda aynı digest, rollback/restore ve Linux/macOS/Windows-native/WSL path proof'u vardır; apply sonrası pre/post byte hash ve record-accounting eşitliği receipt'e bağlanır",
+      "evidence": "2026-08-11 owner direction: eski veri kaybedilmeyecek veya görünmez bırakılmayacak, uydurma alanla A-grade gösterilmeyecek. 2026-08-11 manual recovery apply: beş immutable source dosyada 1,455 parse ve 1,455 canonical projection, sıfır malformed; 780 train-ready, 389 manual-review, 286 quarantine, 421 zero-weight duplicate, 752 unknown provenance. Raw kaynaklar değiştirilmedi; dry-run, apply ve replay aynı migration `3e742961920165755d2fb710c591cb5170f737fe4cc39ea9e741effbb2159d39`, source digest `8d3079ff980f62fe0997a8ca9342294b009328f6c5423c8c6c67c86f7d06ee97` ve projection digest `87c3a42b19337438a1d38a1badb6f4356409a7f24101e01d0f3690263ee0c8d5` üretti; replay no-op. Output `.deckent/training/migrations/historical-v2-2026-08-11`. Native macOS/Windows/WSL ve restore drill proof'u açık olduğundan OPEN",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 9016,
+      "id": "TRACE-CORPUS-PIPELINE-001",
+      "parent": "TRAINING-TRACE-001",
+      "program": "LEARNING",
+      "outcome": "Canonical trace authorityden reproducible, bounded ve provenance-complete training/eval corpus builder",
+      "priority": "P0",
+      "dependsOn": [
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "TRACE-CAPTURE-CUTOVER-001",
+        "TRACE-HISTORICAL-MIGRATION-001"
+      ],
+      "dependents": [
+        "TRACE-QUALITY-LEAKAGE-GATE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "~",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "~"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "TRACE-CAPTURE-CUTOVER-001",
+        "TRACE-HISTORICAL-MIGRATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Tek supported CLI/library pipeline v1/v2/v3 registry readersını, string ve structured multimodal content partsı, tool causal graphını, redaction/tokenization adapterlarını ve accepted-outcome filtersını crash-isolated bounded streaming ile işler; source/record/dataset digests, transformation graph, code+config+policy version, labels, exclusions ve count reconciliation manifestte kalır; retry/fix lineage ve Brain-vs-worker disagreement preference/eval sinyali olarak kaybolmaz; partial failure bütün streami abort etmez ve silent skip yoktur; eski extractor competing path olmaktan çıkar veya aynı libraryye bağlanır",
+      "evidence": "2026-08-11 manual recovery: canonical envelope→ShareGPT builder structured contenti crash etmeden normalize ediyor, provenance/authority ve causal dispositionı koruyor, manifest-last atomic publish ile pre-publish lint uyguluyor; `deckent trace migrate`, `trace corpus build` ve `trace corpus lint` i18n en/tr, dry-run default ve path-safe service wiring kazandı. Historical corpus 780 unique admitted örnek ve 675 policy-rejected/quarantine skip üretti; 4 redaction, 333 bounded truncation; digest `0dec46a7c6bd75f12d5d8cca9a3ada1b64df107280e87b133a94d911fb90617d`, output `.deckent/training/corpus/historical-v2-2026-08-11.sharegpt.jsonl`. Capture cutover ve old extractor retirement açık olduğundan OPEN",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 9017,
+      "id": "TRACE-QUALITY-LEAKAGE-GATE-001",
+      "parent": "TRAINING-TRACE-001",
+      "program": "ASSURANCE",
+      "outcome": "Dataset quality, privacy, contamination, dedupe, split ve representativeness kapısı training admissionı deterministik olarak yönetir",
+      "priority": "P0",
+      "dependsOn": [
+        "TRACE-CORPUS-PIPELINE-001",
+        "EVALUATION-001",
+        "AUDIT-001"
+      ],
+      "dependents": [
+        "DECKENT-CORE-MODEL-LIFECYCLE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G6",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "~",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "~"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TRACE-CORPUS-PIPELINE-001",
+        "EVALUATION-001",
+        "AUDIT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Secret/credential/PII policy scan, consent/rights completeness, schema/integrity, causal completeness, exact+semantic duplicate clusters, train/eval leakage, project/time/task lineage-group split, synthetic/test/calibration exclusion, source/agent/model/outcome/locale/platform dağılımı, imbalance weighting, adversarial canaries ve memorization riskleri versioned thresholds/policyyle ölçülür; gate fail corpus/model runını typed HOLD eder; exemptions scoped owner receipt'i ister; quality report hiçbir missing fieldi success saymaz ve representative olmayan dogfood datasından universal claim üretmez",
+      "evidence": "2026-08-11 data-quality RCA: corpus yalnız yakın dönem ve ağırlıkla tek repo/az sayıdaki agent-model aliasında yoğun; quarantined küme NO_GO örnekleri de taşıyor, raw ile extracted setlerde processing-time redaction farkları ve email/path sinyalleri var. 2026-08-11 corpus lint: 780 valid, 780 unique, sıfır duplicate ve sıfır schema/policy violation; migration accounting ve admission fail-closed. Altı targeted test dosyasında 76 test ve `tsc --noEmit` green. Full `npm test` 2,486 test file keşfinden sonra önceden mevcut lifecycle teardown leakleriyle uzadığı için elle kesildi ve full-suite green iddiası yapılmadı. Semantic dedupe, train/eval leakage split, rights/privacy, representativeness, adversarial canary ve every-environment gates açık olduğundan OPEN",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 9018,
+      "id": "WORKER-LOG-AUTHORITY-001",
+      "parent": "TRACE-CAPTURE-CUTOVER-001",
+      "program": "OBS",
+      "outcome": "Normal, FIX ve XFIX worker logları attempt-bound causal event, occurrence-time ve capture-integrity authoritysi taşır",
+      "priority": "P0",
+      "dependsOn": [
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "CM-01",
+        "STATE-RETENTION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TRACE-AUTHORITY-SCHEMA-001",
+        "CM-01",
+        "STATE-RETENTION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Provider event occurrence time ile host capturedAt/writtenAt ayrı alanlardır ve bilinmeyen occurrence time uydurulmaz; her attempt ayrı stable identity taşır, atomic no-clobber veya idempotent append kullanır, sequence reset/duplicate block üretemez; Codex `command_execution`, file change ve bütün supported provider tool eventleri stable call ID, start/result, exit/status ve raw digest ile lossless causal graph oluşturur; captureIncomplete, timeout, ceiling, spawn/read error ve terminal-envelope absence result, receipt, health ve UI'da typed HOLD/telemetry olur; 256 MiB bound ve streaming korunur; normal/FIX/XFIX, retry, landing-recapture, crash, large-line, malformed-event, Linux/macOS/Windows-native/WSL ve million-event proofs pass olur; legacy loglar immutable inventory+migration dispositionı olmadan rewrite/delete edilmez",
+      "evidence": "2026-08-11 disk/code RCA: 2,912 log tarandı, 2,493 normal ve 419 FIX/XFIX; 666 canonical normalized, 566 raw-JSON legacy, 1,675 mixed legacy, 5 empty. Sprint-515'in beş logu newline, JSON, continuous seq ve terminal usage bakımından tam; fiziksel kesilme yok. Buna karşın post-exit `writeLogEvent` tüm olaya capture anında timestamp verdiği için 666 normalized logun 660'ı beşten fazla event taşımasına rağmen 100 ms veya daha az span gösteriyor; örnek 515-001 gerçek event spanı yaklaşık 298 s iken log spanı 3 ms, 515-004-fix gerçek span yaklaşık 54 s iken log spanı 0 ms. `bridgeCodexEvent` command_execution türünü tanımadığından 257 dosyada 2,753 command eventinin tamamı `text`; 113 dosyadaki 170 failed command causal tool failure olarak görünmüyor, Sprint-515 FIX shell parse failureı bu sınıfta. Altı normalized dosyada seq yeniden 1'den başlıyor; dört dosyada ikinci blok payload olarak birebir duplicate, kök `writeNormalizedDockerLog` mevcut path'e append edip her captureda seq=1 başlatması. 44 normalized logda terminal usage yok; 25 dosya eski 1 MiB cut-band ile uyumlu fakat tek tek kesin cut hükmü verilmedi. `captureIncomplete` yalnız ceiling markerında on-disk görünür, diğer read/spawn/nonzero durumları warning ve broad catch içinde durable artifacta bağlanmıyor",
+      "updated": "2026-08-11"
     },
     {
       "order": 9020,
@@ -23223,7 +23690,9 @@
         "AUDIT-001",
         "STATE-RETENTION-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "TRACE-CAPTURE-CUTOVER-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -23478,6 +23947,7 @@
         "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
         "RECOVERY-BORN-485-SEMANTIC-VERDICT-001",
         "SKILL-EVOLUTION-LIFECYCLE-001",
+        "TRACE-QUALITY-LEAKAGE-GATE-001",
         "XVERIFY-TRUTH-001"
       ],
       "children": [
@@ -23522,7 +23992,9 @@
         "AUDIT-001",
         "STATE-RETENTION-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "TRACE-CAPTURE-CUTOVER-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -23564,6 +24036,7 @@
         "EVALUATION-001"
       ],
       "dependents": [
+        "DECKENT-CORE-MODEL-LIFECYCLE-001",
         "FINE-TUNE-001"
       ],
       "children": [
@@ -23779,14 +24252,16 @@
       "parent": "LEARNING-001",
       "program": "LEARNING",
       "outcome": "Deckent-core fine-tune only after trace/data/governance readiness",
-      "priority": "P2",
+      "priority": "P0",
       "dependsOn": [
         "TRAINING-TRACE-001",
         "PROMOTION-001",
         "DATA-GOV-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "DECKENT-CORE-MODEL-LIFECYCLE-001"
+      ],
       "gates": [
         "G2",
         "G6"
@@ -23806,12 +24281,54 @@
       "closureBlockedBy": [
         "TRAINING-TRACE-001",
         "PROMOTION-001",
-        "DATA-GOV-001"
+        "DATA-GOV-001",
+        "DECKENT-CORE-MODEL-LIFECYCLE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Dataset rights, privacy, eval uplift, rollback and serving economics proven before scheduling",
-      "evidence": "Legacy SP2-FT; dependency-gated, not date-deferred",
-      "updated": "2026-07-26"
+      "evidence": "Legacy SP2-FT; 2026-08-11 owner direction: kurum içi ve Deckent genel agent süreçlerinde deterministik yapıları kavrayan/yöneten provider-neutral Brain modeli stratejik P0'dır; priority artışı gate bypass değildir, model execution TRACE-QUALITY-LEAKAGE-GATE-001 ve DECKENT-CORE-MODEL-LIFECYCLE-001 altında HOLD kalır",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 9071,
+      "id": "DECKENT-CORE-MODEL-LIFECYCLE-001",
+      "parent": "FINE-TUNE-001",
+      "program": "LEARNING",
+      "outcome": "Deckent-core Brain modelinin dataset→train→eval→registry→shadow/canary→serve→monitor→rollback lifecycle authoritysi",
+      "priority": "P0",
+      "dependsOn": [
+        "TRACE-QUALITY-LEAKAGE-GATE-001",
+        "PROMOTION-001",
+        "MODEL-ACTIVATION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G6",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TRACE-QUALITY-LEAKAGE-GATE-001",
+        "PROMOTION-001",
+        "MODEL-ACTIVATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Model charter deterministik Goal/Mission/Flow/Run/Autonomous/Do state reasoning, policy/authority following, recovery, routing ve settlement yeteneklerini açıklar; licensed base/model/data rights ve tenant isolation kanıtlıdır; reproducible training recipe immutable dataset/code/config digests, seed policy, checkpoint provenance ve resource/cost receipt'i taşır; lineage-safe holdout ile orchestration correctness, authority compliance, honest HOLD, tool causality, long-horizon recovery, leakage/memorization, safety ve provider-baseline eval kapıları pass olur; registry version/signature/SBOM/model card üretir; shadow ve approval-gated canary promotion, drift/quality/cost monitoring, instant rollback ve retirement vardır; training data toplamak user product privacy ve performansını gizlice bozmaz; fresh independent verification olmadan production Brain promotionı olmaz",
+      "evidence": "2026-08-11 owner product direction + Alp Discipline boundary: model deckent dogfood ve izinli enterprise corpusundan beslenecek; tarihî kayıp/uydurma repair kabul edilmiyor. Bugünkü corpus tek repo/yakın dönem/identity-fragmented ve governance metadata eksik olduğundan training execution açık değildir; önce 9012-9017 closure gerekir",
+      "updated": "2026-08-11"
     },
     {
       "order": 10000,
@@ -23969,7 +24486,8 @@
       ],
       "dependents": [
         "ASSURANCE-PACK-001",
-        "FINE-TUNE-001"
+        "FINE-TUNE-001",
+        "TRACE-DATA-GOVERNANCE-001"
       ],
       "children": [],
       "gates": [
@@ -24282,6 +24800,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5e8c4dbaecb4c352f4b31001eced7fcec659ebc78e53f5df341bdd3211937ff2"
+    "value": "60e1b50ef168e7fca5f602f4c595315289009adaa214be991bcb711e0f9d8e2c"
   }
 }

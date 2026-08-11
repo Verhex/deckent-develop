@@ -46,7 +46,7 @@ describe('lintCorpus — clean fixture', () => {
 
     expect(report.ok).toBe(true);
     expect(report.violations).toEqual([]);
-    expect(report.stats).toEqual({ linesRead: 2, validExamples: 2, duplicateCount: 0, uniqueCount: 2 });
+    expect(report.stats).toEqual({ linesRead: 2, validExamples: 2, duplicateCount: 0, uniqueCount: 2, duplicateWeightZeroCount: 0 });
   });
 
   it('skips blank lines without counting them (mirrors pipeline.ts convention)', async () => {
@@ -137,13 +137,13 @@ describe('lintCorpus — empty/too-short example detection', () => {
 // ─── Dedupe statistics ───────────────────────────────────────────────────────
 
 describe('lintCorpus — dedupe statistics', () => {
-  it('counts exact-duplicate examples in stats without emitting a violation for them', async () => {
+  it('counts and fails closed on exact duplicate trainable examples', async () => {
     const dup = JSON.stringify(example());
     const report = await run([dup, dup, dup]);
 
-    expect(report.stats).toEqual({ linesRead: 3, validExamples: 3, duplicateCount: 2, uniqueCount: 1 });
-    expect(report.violations).toEqual([]);
-    expect(report.ok).toBe(true);
+    expect(report.stats).toEqual({ linesRead: 3, validExamples: 3, duplicateCount: 2, uniqueCount: 1, duplicateWeightZeroCount: 0 });
+    expect(report.violations.map(v => v.kind)).toEqual(['DUPLICATE_EXAMPLE', 'DUPLICATE_EXAMPLE']);
+    expect(report.ok).toBe(false);
   });
 
   it('treats examples with different content as unique', async () => {
@@ -153,6 +153,23 @@ describe('lintCorpus — dedupe statistics', () => {
     ]);
     expect(report.stats.duplicateCount).toBe(0);
     expect(report.stats.uniqueCount).toBe(2);
+  });
+});
+
+describe('lintCorpus — structured-v2 provenance and duplicate weight', () => {
+  it('accepts complete provenance and reports zero-weight duplicates as a retained statistic', async () => {
+    const report = await run([JSON.stringify(example({
+      provenance: { taskId: '515-003', sprintId: '515', attemptId: 'a1', integrity: 'verified', disposition: 'auxiliary', duplicateOf: ['a'.repeat(64)] },
+      weight: 0,
+    }))]);
+    expect(report.ok).toBe(true);
+    expect(report.stats.duplicateWeightZeroCount).toBe(1);
+    expect(report.violations).toEqual([]);
+  });
+
+  it('flags malformed structured provenance without treating an ordinary duplicate as a destructive fix', async () => {
+    const report = await run([JSON.stringify(example({ provenance: { taskId: '' } }))]);
+    expect(report.violations).toContainEqual({ line: 1, kind: 'PROVENANCE_INVALID', detail: 'structured provenance field is invalid' });
   });
 });
 
