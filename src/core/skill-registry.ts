@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import type { SkillDefinition } from './skill-types.js';
 import { parseSkillId } from './skill-pool.js';
 import { readJsonSafe } from './utils.js';
+import { DeckentError } from './errors.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ export class SkillRegistry {
   register(skill: SkillDefinition): void {
     const parsedId = parseSkillId(skill?.id);
     if (!parsedId.ok) {
-      throw new Error(`SkillRegistry.register: refusing to register skill — ${parsedId.reason}`);
+      throw new DeckentError('E_SKILL_ID_INVALID', `SkillRegistry.register: refusing to register skill — ${parsedId.reason}`);
     }
     const data = this._readData();
     const existingIdx = data.skills.findIndex((s) => s.id === skill.id);

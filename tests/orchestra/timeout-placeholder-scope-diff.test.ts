@@ -413,7 +413,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
     );
     writeFileSync(resultPath, JSON.stringify(resultFixture('shared.ts')), 'utf-8');
 
-    const outcome = reconcileDockerResultWorkAttribution({
+    const outcome = await reconcileDockerResultWorkAttribution({
       projectRoot: repo,
       resultPath,
       baselinePath,
@@ -459,7 +459,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
     appendFileSync(join(repo, 'shared.ts'), '// current attempt work\n');
     writeFileSync(resultPath, JSON.stringify(resultFixture('shared.ts')), 'utf-8');
 
-    const outcome = reconcileDockerResultWorkAttribution({
+    const outcome = await reconcileDockerResultWorkAttribution({
       projectRoot: repo,
       resultPath,
       baselinePath,
@@ -505,7 +505,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
       filesChanged: [],
     }), 'utf-8');
 
-    const outcome = reconcileDockerResultWorkAttribution({
+    const outcome = await reconcileDockerResultWorkAttribution({
       projectRoot: repo,
       resultPath,
       baselinePath,
@@ -536,7 +536,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
     writeFileSync(join(repo, 'new.ts'), 'export const created = true;\n', 'utf-8');
     writeFileSync(resultPath, JSON.stringify(resultFixture('new.ts')), 'utf-8');
 
-    const outcome = reconcileDockerResultWorkAttribution({
+    const outcome = await reconcileDockerResultWorkAttribution({
       projectRoot: repo,
       resultPath,
       baselinePath,
@@ -572,7 +572,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
     rmSync(join(repo, 'deleted.ts'));
     writeFileSync(resultPath, JSON.stringify(resultFixture('deleted.ts')), 'utf-8');
 
-    const outcome = reconcileDockerResultWorkAttribution({
+    const outcome = await reconcileDockerResultWorkAttribution({
       projectRoot: repo,
       resultPath,
       baselinePath,
@@ -594,7 +594,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
     const resultPath = join(repo, '.result.json');
     writeFileSync(resultPath, JSON.stringify(resultFixture('shared.ts')), 'utf-8');
 
-    const outcome = reconcileDockerResultWorkAttribution({
+    const outcome = await reconcileDockerResultWorkAttribution({
       projectRoot: repo,
       resultPath,
       baselinePath: join(repo, '.missing-baseline'),

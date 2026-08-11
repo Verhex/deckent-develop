@@ -393,12 +393,18 @@ describe('buildAllowedWriteTargets', () => {
   // ─── Deduplication ───────────────────────────────────────────────
 
   it('should deduplicate identical paths', () => {
+    // born-471 (sprint-517) unified this onto the docker deriver: a task that
+    // declares exact filesWrite gets EXACTLY those files — directories are the
+    // fallback for tasks with no exact file scope, never a widening union.
     const task = makeTask(['src/core/', 'src/core/'], ['src/core/config.ts', 'src/core/config.ts']);
     const result = buildAllowedWriteTargets(task);
-    const srcCoreCount = result.filter(p => p === 'src/core/').length;
     const configCount = result.filter(p => p === 'src/core/config.ts').length;
-    expect(srcCoreCount).toBe(1);
     expect(configCount).toBe(1);
+    expect(result).not.toContain('src/core/');
+
+    const dirOnly = makeTask(['src/core/', 'src/core/'], []);
+    const dirResult = buildAllowedWriteTargets(dirOnly);
+    expect(dirResult.filter(p => p === 'src/core/').length).toBe(1);
   });
 
   // ─── Sprint 138 xfix scenario ─────────────────────────────────────
@@ -411,7 +417,10 @@ describe('buildAllowedWriteTargets', () => {
     );
     const result = buildAllowedWriteTargets(task);
     expect(result).toContain('.tasks/');
-    expect(result).toContain('src/orchestra/');
+    // born-471 (sprint-517): exact filesWrite narrows the grant — the invalid
+    // directory entries are still rejected, and the valid directory is NOT
+    // granted alongside an exact file scope.
+    expect(result).not.toContain('src/orchestra/');
     expect(result).toContain('src/orchestra/sprint-spawner.ts');
     expect(result).not.toContain('DECKENT.md/');
     expect(result).not.toContain('DECKENT.md');
@@ -427,7 +436,9 @@ describe('buildAllowedWriteTargets', () => {
     expect(result).not.toContain('CLAUDE.md');
     expect(result).not.toContain('DECKENT.md');
     expect(result).not.toContain('DECKENT.md/');
-    expect(result).toContain('src/');
+    // born-471 (sprint-517): the surviving exact file scope is the whole write
+    // grant — the directory is not granted alongside it.
+    expect(result).not.toContain('src/');
     expect(result).toContain('src/agents/worker.ts');
   });
 });

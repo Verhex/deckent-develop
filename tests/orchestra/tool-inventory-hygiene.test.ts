@@ -47,7 +47,7 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
   readContext: vi.fn(),
   planSprint: vi.fn(),
   writeSprintState: vi.fn(),
-  spawnWorkers: vi.fn(),
+  spawnWorkers: vi.fn(async () => []),
   buildSpawnRetryHint: vi.fn(),
   waitForResults: vi.fn(),
   finalizeSprint: vi.fn(),

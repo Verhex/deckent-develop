@@ -135,6 +135,10 @@ describe('Sprint-486 EXECUTE/FIX quiescence replay', () => {
     };
     fixWait.mockReset();
     fixSpawn.mockReset();
+    // Row 3309 made the overflow-queue return value load-bearing (runFixPhase
+    // publishes it as spawn-skip observability) — resolving undefined kills the
+    // phase with `undefined.map`.
+    fixSpawn.mockResolvedValue([]);
   });
 
   afterEach(() => {
