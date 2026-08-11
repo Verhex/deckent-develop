@@ -1,14 +1,18 @@
-# DIRECTIVES — Sprint-B10: eight-task factory wave with a declared dependency
+# DIRECTIVES — Sprint-B11: eight-task factory wave two
 
 ## Goal
 
-Eight MASTER-PLAN rows advance in one factory wave across four production lines:
-credential exposure taxonomy (2030) feeding the runtime credential lifecycle (4131);
-the born-ledger intake contract (3169) and post-settlement binary staging (3275); ADR
-sync parity (160) and the canonical memory contract (190); npm channel preparation
-(8091) and the capability wiring residual (4040). Task 2 declares a dependency on
-task 1; all other tasks are scope-disjoint and run in parallel. Analysis artifacts
-belong under follow-up-works/ — docs/ is product documentation only.
+Eight MASTER-PLAN rows advance: the credential exposure taxonomy rerun (2030) feeding
+the runtime credential lifecycle design (4131); the invocation receipt design (4070);
+the kernel ontology design (3010); the autonomous tenant authority slice (4021); the
+config truth slice (470); the trust-anchor solo mitigation design (526); and the
+owner-commissioned persona-as-system-prompt spawn analysis (agent design D4 addendum).
+Task 2 declares a dependency on task 1; all other tasks are scope-disjoint. Analysis
+artifacts belong under follow-up-works/ — docs/ is product documentation only.
+
+Read visibility note for every documentation task: reading the repository sources for
+EVIDENCE is expected and permitted — the write authority is what the Files line
+constrains. State every claim with file-level evidence.
 
 Provider, model, effort and effective concurrency are resolved from effective config,
 registry, role policy, auth/reachability evidence, usage/limit authority and host admission.
@@ -32,23 +36,26 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
 
 ---
 
-## Task 1: Runtime-visible credential exposure taxonomy (row 2030)
+## Task 1: Runtime-visible credential exposure taxonomy (row 2030, rerun)
 
 - Files: follow-up-works/credential-exposure-taxonomy-2026-08-11.md
-- Scope: follow-up-works/credential-exposure-taxonomy-2026-08-11.md, follow-up-works/
-- Model: gpt-5.6-sol
+- Scope: follow-up-works/credential-exposure-taxonomy-2026-08-11.md, follow-up-works/, src/providers/, src/orchestra/, src/core/
+- Model: claude-sonnet-5
 - Dependencies: none
 
-Measured (row 2030): the current Docker Codex auth copy is not zero-exposure, and no
-honest classification exists for how each provider credential is visible at runtime.
+Measured (row 2030; first attempt refused honestly when its read view excluded the
+sources): the current Docker Codex auth copy is not zero-exposure, and no honest
+classification exists for how each provider credential is visible at runtime. A
+partial artifact from the refused attempt exists at the target path recording the
+evidence hold — REPLACE it with the completed taxonomy.
 
-Required: a single taxonomy document (the file named in Files — NEW) classifying every
-provider credential path the code ACTUALLY uses (read the spawn backends, the
-credential stores, the provider adapters) into the row's classes — host-only, env,
-tmpfs-copy, persistent-copy, enterprise custody — with file-level evidence per
-classification, the exposure window and revocation story for each, and the honest
-current verdict for the Docker Codex auth copy. Owner decision points for every
-tightening step. Proposes only; no production or config edits.
+Required: classify every provider credential path the code ACTUALLY uses (read the
+spawn backends, credential stores and provider adapters — they are inside your scope)
+into host-only, env, tmpfs-copy, persistent-copy and enterprise custody — with
+file-level evidence per classification, the exposure window and revocation story for
+each, and the honest verdict for the Docker Codex auth copy. Owner decision points for
+every tightening step. Document only; the src/ scope entries are for READ evidence —
+writing any file outside follow-up-works is a NO-GO.
 
 **Test:** the document exists at the exact path with every credential path classified;
 `node scripts/lint-links.mjs` stays green.
@@ -61,194 +68,202 @@ or claiming zero-exposure anywhere the code shows a copy.
 ## Task 2: Runtime credential lifecycle service contract (row 4131 first slice)
 
 - Files: follow-up-works/runtime-credential-lifecycle-design-2026-08-11.md
-- Scope: follow-up-works/runtime-credential-lifecycle-design-2026-08-11.md, follow-up-works/
+- Scope: follow-up-works/runtime-credential-lifecycle-design-2026-08-11.md, follow-up-works/, src/api/, src/cli/, src/connectors/
 - Model: claude-opus-5
 - Dependencies: taxonomy
 
 Measured (row 4131): API/terminal tokens and serve daemon descriptors are created,
-published, rotated and retired by scattered call sites today — dead PIDs, port reuse,
+published, rotated and retired by scattered call sites — dead PIDs, port reuse,
 restarts, concurrent daemons and partial writes each have ad-hoc handling.
 
 Required: a design document (the file named in Files — NEW) that inventories every
 current credential/descriptor call site (api-token, terminal-token, serve-daemon
-descriptors, bot pid publication) with file-level evidence; consumes task 1's taxonomy
-classes for custody labeling (read its artifact from follow-up-works when it exists —
-the declared dependency guarantees ordering); and specifies the single lifecycle
-service the row demands — creation→publication→rotation→revocation→shutdown/crash
-retirement, atomic and least-privilege, bound to project+tenant+principal+generation+
-endpoint+expiry — sliced into admission-sized implementation packages with per-slice
-proof obligations and explicit owner decision points. Proposes only.
+descriptors, bot pid publication) with file-level evidence; consumes task 1's
+taxonomy classes for custody labeling (read its artifact from follow-up-works — the
+declared dependency guarantees ordering); and specifies the single lifecycle service
+the row demands — creation→publication→rotation→revocation→shutdown/crash retirement,
+atomic and least-privilege, bound to project+tenant+principal+generation+endpoint+
+expiry — sliced into admission-sized packages with proof obligations and owner
+decision points. Proposes only; writes only its own file.
 
-**Test:** the document exists at the exact path with every section above;
-`node scripts/lint-links.mjs` stays green.
+**Test:** the document exists at the exact path; `node scripts/lint-links.mjs` green.
 
-**NO-GO:** production or config edits, a lifecycle that loses the crash-retirement
-case, or custody labels that contradict task 1's taxonomy.
-
----
-
-## Task 3: Born-ledger intake template and checker (row 3169)
-
-- Files: follow-up-works/born-intake-template.md, scripts/check-born-intake.mjs, tests/scripts/born-intake-checker.test.ts
-- Scope: follow-up-works/born-intake-template.md, scripts/check-born-intake.mjs, tests/scripts/born-intake-checker.test.ts, scripts/
-- Model: claude-sonnet-5
-- Dependencies: none
-
-Measured (row 3169, owner-mandated): every emergent dogfood defect must land as an
-immutable RECOVERY-BORN-* row BEFORE its fix — this campaign opened six such rows by
-hand, each hand-formatted against the row's requirements (trigger, affected surfaces,
-exact evidence, priority, dependencies, acceptance, negative scope).
-
-Required: a canonical intake template (the .md named in Files — NEW, under
-follow-up-works as working material) capturing the row's mandatory fields; a checker
-script (the .mjs named in Files — NEW) that validates a drafted born entry text
-against the template's mandatory fields and reports typed gaps — consumed manually
-before a born row is inserted, NOT wired into any lint chain (that wiring is an owner
-decision for the result notes); and a test driving the checker against a valid
-fixture, each single-field-missing fixture, and one of the six real born rows from
-the ledger as a golden case (read-only). The ledger itself is untouched.
-
-**Test:** `npx vitest run tests/scripts/born-intake-checker.test.ts`
-
-**NO-GO:** editing docs/MASTER-PLAN.md, wiring the checker into CI, or a template
-that drops any of the row's mandatory fields.
+**NO-GO:** production or config edits, losing the crash-retirement case, or custody
+labels contradicting the taxonomy.
 
 ---
 
-## Task 4: Source verification and built-binary proof become separate planner stages (row 3275)
+## Task 3: Immutable InvocationReceipt design and first slice map (row 4070)
 
-- Files: src/orchestra/planner.ts, tests/orchestra/post-settlement-binary-staging.test.ts
-- Scope: src/orchestra/planner.ts, src/orchestra/task-builder.ts, src/orchestra/, tests/orchestra/post-settlement-binary-staging.test.ts
+- Files: follow-up-works/invocation-receipt-design-2026-08-11.md
+- Scope: follow-up-works/invocation-receipt-design-2026-08-11.md, follow-up-works/, src/providers/, src/core/, src/orchestra/
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 3275, sprint-487): task 006 and its FIX failed against an impossible
-dependency — the plan demanded a built-CLI proof while the sprint itself forbids
-building during execution, so every retry burned against stale dist by construction.
+Measured (row 4070): every provider call must eventually carry an immutable
+InvocationReceipt — requested/resolved/called identity, authority, fallback, usage and
+settlement provenance — while today usage evidence lives across the budget-observation
+chain, the provider-execution-observation store and per-provider usage streams
+without one immutable per-call receipt.
 
-Required: root-cause first — find where a plan can express a proof obligation that
-requires the built binary, and record in the result notes how sprint-487's plan
-produced the impossible case. Then: the planner represents source verification and
-post-settlement build/binary proof as SEPARATE authority stages — a task whose proof
-needs the built binary carries a typed post-settlement proof obligation instead of an
-in-sprint criterion, and plan-time validation rejects an in-sprint built-binary
-demand with a typed finding. No change to what sprints may build (nothing). Hermetic
-test pins: an in-sprint binary demand is rejected typed, a post-settlement obligation
-round-trips into the plan artifacts, and today's normal tasks plan byte-identically.
+Required: a design document (NEW) that maps today's per-call evidence surfaces with
+file-level anchors (where a provider call's identity, authority resolution, fallback
+decision, usage and settlement are recorded NOW); defines the receipt schema and its
+immutability/chaining contract reusing the existing audit-chain patterns; states how
+it composes with (not duplicates) the budget-observation and provider-observation
+stores; slices implementation into admission-sized packages; and names the owner
+decision points (retention, tenant fencing, redaction). Proposes only.
 
-**Test:** `npx vitest run tests/orchestra/post-settlement-binary-staging.test.ts`
+**Test:** the document exists at the exact path; `node scripts/lint-links.mjs` green.
 
-**NO-GO:** allowing builds during sprints, silently dropping binary-proof demands, or
-changing normal task planning output.
+**NO-GO:** production edits, a second usage-evidence mechanism (composition only), or
+claims without file anchors.
 
 ---
 
-## Task 5: Accepted-ADR DB↔filesystem parity gate (row 160)
+## Task 4: Kernel ontology — canonical entities, ownership, transitions (row 3010)
 
-- Files: scripts/lint-adr-sync.mjs, tests/scripts/adr-sync-parity.test.ts
-- Scope: scripts/lint-adr-sync.mjs, tests/scripts/adr-sync-parity.test.ts, scripts/
-- Model: claude-sonnet-5
+- Files: follow-up-works/kernel-ontology-design-2026-08-11.md
+- Scope: follow-up-works/kernel-ontology-design-2026-08-11.md, follow-up-works/, src/core/, src/orchestra/
+- Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 160, 2026-08-10 RCA): the accepted-ADR projection can go stale against
-the DB — ADR-G-025's exported text still claims four redaction classes are missing
-while src/core/redact-sensitive.ts covers all four today. The DB is the SSOT; the
-exports are guarded projections.
+Measured (row 3010, 2026-07-27 code-truth, still live): `Flow` is used in three
+unrelated senses (ScheduledFlow, RunFlow lifecycle, autonomous trace); entities carry
+no causal ownership between Goal, Mission, Flow, Run, WorkItem, Attempt and Operation
+even though the Brain contract names that chain as canonical.
 
-Required: a parity lint (the .mjs named in Files — NEW) that reads the accepted ADRs
-from the live memory.db (read-only, through the compiled store the way existing
-scripts do) and the exported decisions projection, and fails closed on missing,
-divergent or stale entries by content digest; a test driving it against tmpdir
-fixtures (in-sync passes, each divergence class fails typed) plus a read-only smoke
-against the real repo state recorded in the result notes. Do NOT edit the ADR content
-itself — the ADR-G-025 staleness is DB-side owner material; report its current
-DB-vs-code truth in the result notes for the owner's store-API correction. Not wired
-into CI chains in this slice.
+Required: a design document (NEW) that inventories every entity noun in src/core and
+src/orchestra with its actual current meaning(s) and file anchors; proposes the
+canonical entity table — identity scheme, owner, allowed transitions, invariants,
+versioning — resolving each name collision with an explicit rename-or-alias route;
+maps the canonical chain onto the existing stores; slices the migration into
+admission-sized packages that never break running lifecycles mid-migration; and names
+the owner decision points. Proposes only.
 
-**Test:** `npx vitest run tests/scripts/adr-sync-parity.test.ts`
+**Test:** the document exists at the exact path; `node scripts/lint-links.mjs` green.
 
-**NO-GO:** writing to memory.db, editing exports by hand, or wiring into CI here.
+**NO-GO:** production edits, an ontology that renames without a migration route, or
+unanchored claims.
 
 ---
 
-## Task 6: Canonical memory authority contract (row 190 first slice)
+## Task 5: Fail-closed tenant authority for autonomous ingress (row 4021 first slice)
 
-- Files: follow-up-works/memory-authority-contract-2026-08-11.md
-- Scope: follow-up-works/memory-authority-contract-2026-08-11.md, follow-up-works/
+- Files: src/orchestra/autonomous/approval-adapter.ts, tests/orchestra/autonomous-tenant-authority.test.ts
+- Scope: src/orchestra/autonomous/approval-adapter.ts, src/orchestra/autonomous/, tests/orchestra/autonomous-tenant-authority.test.ts
 - Model: gpt-5.6-sol
 - Dependencies: none
 
-Measured (row 190): the repo-local core memory is canonical and provider HOME
-surfaces are projections (the Stop-hook sync overwrote a projection edit live this
-campaign — the exact hazard the row exists for); a prior design exists at
-docs/superpowers/specs/2026-07-30-provider-agnostic-memory-projection-design.md and
-the analysis at docs/alperen-analysis/2026-07-30-memory-projection-rev3-yuzey-analizi.md.
+Measured (row 4021): autonomous read, mutation, approval and reactive ingress must
+resolve one tenant/project scope from a verified principal — a non-admin foreign or
+tenant-less strict caller must obtain no metadata, existence signal or mutation
+authority. Today the approval adapter accepts callers without a single fail-closed
+tenant resolution.
 
-Required: a contract document (the file named in Files — NEW) that reconciles the
-prior design with today's code truth (read the sync script and both prior docs):
-the revision/hash conflict journal, the no-silent-delete guarantee, and
-Claude/Codex/Gemini projection parity — stating for each: what exists, what the
-design demanded, the gap, and admission-sized implementation slices with proof
-obligations and owner decision points. Proposes only.
+Required: root-cause first — read the autonomous ingress surfaces (the approval
+adapter at minimum; inventory the others in the result notes) and record which today
+resolve tenant scope and which accept tenant-less callers. Then the FIRST slice: the
+approval ingress (approve/reject/pending) resolves exactly one tenant/project scope
+from the verified principal via the existing principal machinery (PRINCIPAL-001 is
+DONE — consume it, never reimplement), fails closed typed for foreign or tenant-less
+strict callers WITHOUT leaking existence, and keeps solo-mode default-tenant
+behaviour byte-identical. Hermetic tests pin: solo passes unchanged, foreign caller
+gets the typed refusal with no metadata, tenant-less strict caller likewise.
 
-**Test:** the document exists at the exact path with every section above;
-`node scripts/lint-links.mjs` stays green.
+**Test:** `npx vitest run tests/orchestra/autonomous-tenant-authority.test.ts`
 
-**NO-GO:** editing the sync script or any memory file, or contradicting the
-repo-local-canonical rule.
+**NO-GO:** changing solo-mode behaviour, a second principal/tenant resolver, or a
+refusal that leaks existence metadata.
 
 ---
 
-## Task 7: npm channel preparation under owner-manual publish (row 8091)
+## Task 6: Config leaf metadata from one canonical source (row 470 first slice)
 
-- Files: tests/release/npm-pack-whitelist.test.ts
-- Scope: tests/release/npm-pack-whitelist.test.ts, tests/release/
+- Files: scripts/lint-config-truth.mjs, tests/scripts/config-truth-gate.test.ts
+- Scope: scripts/lint-config-truth.mjs, tests/scripts/config-truth-gate.test.ts, scripts/
+- Model: gpt-5.6-terra
+- Dependencies: none
+
+Measured (row 470, CFG-03/CFG-04): 164 config leaves need a no-missing and equality
+gate — leaf metadata and default production must come from one canonical source, and
+the manifest backend default must consume the same source; today defaults drift
+between config-types, the config loader and the manifest.
+
+Required: a fail-closed lint (the .mjs named in Files — NEW) that enumerates the
+config leaves from the canonical typed source (read src/core/config-types.ts and the
+loader read-only), compares every leaf's default against what the runtime
+config-loading path would produce, and reports missing or divergent leaves typed; a
+test driving it against the real repo (recording the current pass/fail truth in the
+result notes honestly — if leaves diverge TODAY, the lint proves it and the count is
+the finding, not a reason to weaken the gate) plus fixture divergences. NOT wired
+into CI chains in this slice.
+
+**Test:** `npx vitest run tests/scripts/config-truth-gate.test.ts`
+
+**NO-GO:** editing any config source or default to make the gate pass, or wiring
+into CI here.
+
+---
+
+## Task 7: Trust-anchor solo mitigation package design (row 526)
+
+- Files: follow-up-works/trust-anchor-solo-design-2026-08-11.md
+- Scope: follow-up-works/trust-anchor-solo-design-2026-08-11.md, follow-up-works/, .github/, docs/evidence/
 - Model: claude-sonnet-5
 - Dependencies: none
 
-Measured (row 8091): the deckent name returned registry 404 on 2026-07-31 —
-unregistered and squatting-exposed; publish is ALWAYS owner-manual. The row's
-preparable half is the tarball whitelist proof: dist, bin, README and LICENSE only.
+Measured (row 526): the solo-account structural mitigations are named by the row —
+out-of-repo canonical check via a GitHub App with a separate integration identity, a
+bot machine-account with a path-scoped required-reviewer rule on
+.github/workflows/** and the validator paths, a nightly ruleset snapshot into an
+append-only ledger the org owner cannot write, and a GHEC-trial evaluation.
 
-Required: a hermetic test (the file named in Files — NEW) that derives the would-be
-tarball contents WITHOUT publishing and without network — using npm pack --dry-run
---json against the real manifest in a read-only fashion (a local child process of npm
-pack is acceptable as it performs no network I/O; if the runner's hermeticity policy
-refuses even that, derive from the package.json files field plus npmignore semantics
-in-process and record which path was taken) — and asserts the whitelist: dist, bin,
-README variants and LICENSE only, no .deckent, no .brain, no tests, no docs beyond
-the whitelisted files, no source maps of private material. The result notes list the
-exact owner-run publish commands for the reservation and beta dist-tag, unexecuted.
+Required: a design document (NEW) that reads the existing trust-anchor evidence
+(docs/evidence/trust-anchor/, the workflows, the ruleset facts recorded in ledger
+row 520) and specifies each of the four mitigations concretely for THIS repository:
+exact GitHub resources to create, their identity separation argument, the failure
+modes each mitigation closes (mapped to the xverify-E mechanical variants recorded on
+row 520), rollout order, and the owner actions versus automatable steps. Honest cost
+notes (GHEC trial, App hosting). Proposes only.
 
-**Test:** `npx vitest run tests/release/npm-pack-whitelist.test.ts`
+**Test:** the document exists at the exact path; `node scripts/lint-links.mjs` green.
 
-**NO-GO:** running npm publish or any registry-mutating command, network access, or
-editing the package manifest.
+**NO-GO:** creating any GitHub resource, editing workflows, or a mitigation without
+an identity-separation argument.
 
 ---
 
-## Task 8: Capability broker authority-resolution wiring residual (row 4040)
+## Task 8: Persona-as-system-prompt agent spawning across providers (owner D4 addendum)
 
-- Files: src/core/capability-runtime.ts, tests/core/capability-authority-resolution.test.ts
-- Scope: src/core/capability-runtime.ts, src/core/, tests/core/capability-authority-resolution.test.ts
+- Files: follow-up-works/persona-systemprompt-spawn-analysis-2026-08-11.md
+- Scope: follow-up-works/persona-systemprompt-spawn-analysis-2026-08-11.md, follow-up-works/, src/providers/, src/orchestra/
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 4040, DESIGN+G1 already receipted on 2026-08-08/09): the capability
-broker is wired for dispatch but the row's own settlement notes the authority-
-resolution residual — principal, tenant, operation, resource and environment do not
-yet resolve into one scoped capability decision on the enforcement path.
+Measured (owner decision D4 addendum on the agent catalog design, 2026-08-11): the
+owner proposes spawning deckent agents by injecting the agent persona as a system
+prompt at the provider CLI/API boundary — the `claude -p` append-system-prompt
+pattern generalized — instead of only prepending persona text into the user prompt,
+and asks for an analysis across the most popular ~20 providers in both API and
+subscription modes.
 
-Required: root-cause first — read the capability runtime and the receipted design
-notes, and record in the result notes exactly which resolution inputs reach the
-broker today and which are absent. Then the smallest sound wiring that makes the
-broker resolve the design's five inputs into one scoped decision on the existing
-enforcement path, advisory-preserving where the design marks enforcement owner-gated
-(no default flips). Regression test pins: a fully-resolved request produces the
-scoped decision, a missing input fails closed typed, and the advisory path's observable
-behaviour stays byte-identical.
+Required: an analysis document (NEW) with three parts. (1) Code truth: how each
+CURRENT deckent provider adapter (read src/providers/) injects persona/system
+content today — exact command/flag/API-field per adapter with file anchors, and
+whether a true system-role channel is used or the persona rides the user prompt.
+(2) Capability matrix: for the popular provider set (the adapters present in the
+repo plus the majors you can enumerate from training — label anything unverifiable
+as needs-live-verification, NEVER invent a flag), whether a system-prompt injection
+channel exists in CLI mode, API mode and subscription mode, and its shape. (3)
+Design proposal: a provider-neutral persona-injection contract for the spawn layer —
+where the persona resolves from the (freshly owner-decided) agent catalog, how it
+degrades on providers without a system channel, and admission-sized implementation
+slices with owner decision points. Proposes only.
 
-**Test:** `npx vitest run tests/core/capability-authority-resolution.test.ts`
+**Test:** the document exists at the exact path with all three parts;
+`node scripts/lint-links.mjs` stays green.
 
-**NO-GO:** flipping any enforcement default, a second resolution path, or capability
-decisions from partial inputs.
+**NO-GO:** production edits, inventing provider flags without a needs-live-
+verification label, or a design that hardcodes provider names on code paths instead
+of adapter capability declarations.
