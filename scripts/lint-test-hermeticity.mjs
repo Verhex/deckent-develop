@@ -152,7 +152,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: '8532dbc985fcb3e42c6b880d65247722af76ab0eb4dce2d4c6fa201c08efe67f',
+  digest: 'cb74986544302ac4e75d2071125f355119b0ee48563d1595bd8a6b1081d22537',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -204,7 +204,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-11 (sprint-510 harvest): edits to already-inventoried modules only
   // (parser, verify, controller, finalizer, plugin, catalog) — same 1207 count,
   // content digest only. Measured on a clean HEAD worktree (27d9bdec4).
-  digest: '8659a64bd49d7bfeb203c368d4671a3da8b915d03d5ecccade2884df68a0ec04',
+  digest: '091c3a13a9bd6b13ad3946c707f9f14a359a20bc53f228693a67b33bd4cc354a',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
