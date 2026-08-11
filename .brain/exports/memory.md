@@ -1,5 +1,19 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-510 Learnings
+- Sprint sprint-510 Learnings: ## Sprint sprint-510 Learnings
+- Worker verification cannot judge unrelated concurrent partial writes (row 3277): GO_WITH_TECH_DEBT — Mechanism: whole-program analysis, scope-restricted judgment. The worker still runs the full `npx tsc --noEmit` (invocat
+- enforce_spend_gate becomes a real typed pre-spawn gate, flag-gated (row 4091): GO_WITH_TECH_DEBT — Row 4091 closed on the ADMISSION side: cost_limits.enforce_spend_gate is now a real typed pre-spawn gate.
+
+WHAT CHANGED
+
+
+## Gains
+- 510-001 — The DIRECTIVES scope chain stops producing phantoms and silent shrinks (row 3312) — Row 3312 — all five measured cases fixed at their token class, no filename special-casing, no rul...
+- 510-003 — Wire validatePluginSecurity into the production plugin load path, flag-gated (row 7031) — Row 7031 wired.
+- 510-005 — A PLAN-generated skill survives every FIX turn (row 3310) — ROOT CAUSE (stated before the fix, verified against the real call sites):
+- 510-006 — Point the model catalog at the live models.dev endpoint, typed on drift (row 539) — Working tree already contained the full required implementation for this row (uncommitted, presen...
+
 ## Sprint sprint-508 Learnings
 - Sprint sprint-508 Learnings: ## Sprint sprint-508 Learnings
 

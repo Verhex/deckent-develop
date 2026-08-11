@@ -4,11 +4,17 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-509-002-fix | Tech debt from 509-002-fix: Bug Fix Report
+Bug: tests/connectors/bot-lifecycle-h | high | sprint-509 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-510-002 | Tech debt from 510-002: Mechanism: whole-program analysis, scope-restricted judg | normal | sprint-510 | resolved |
+| debt-510-004 | Tech debt from 510-004: Row 4091 closed on the ADMISSION side: cost_limits.enfor | normal | sprint-510 | resolved |
+| debt-509-003 | Tech debt from 509-003: WHICH SIDE WAS WRONG: the TEMPLATE, not the guard. Both  | normal | sprint-509 | resolved |
+| debt-509-004 | Tech debt from 509-004: TYPED DECISION (recorded as required): WIDEST-SIDE-EFFEC | normal | sprint-509 | resolved |
 | debt-506-002 | Tech debt from 506-002: TypeScript type check and the declared targeted orphan-c | normal | sprint-506 | resolved |
 | rollback-sprint-503 | Sprint sprint-503 rollback SUCCESS | normal | sprint-503 | resolved |
 | rollback-sprint-502 | Sprint sprint-502 rollback SUCCESS | normal | sprint-502 | resolved |
