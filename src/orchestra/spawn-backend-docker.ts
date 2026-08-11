@@ -2075,15 +2075,77 @@ export interface DockerResultWorkAttributionOutcome {
   readonly reasonCode?: string;
 }
 
-function gitBlobHash(projectRoot: string, path: string): string | null {
-  if (!existsSync(resolve(projectRoot, path))) return null;
-  const result = spawnSync('git', ['hash-object', '-w', '--', path], {
-    cwd: projectRoot,
-    encoding: 'utf-8',
-    timeout: 5_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
+/** Default Node child_process maxBuffer (1 MiB) — matches the spawnSync default these calls replace. */
+const GIT_ASYNC_COMMAND_MAX_BUFFER_BYTES = 1024 * 1024;
+const GIT_ASYNC_COMMAND_TIMEOUT_MS = 5_000;
+
+interface GitAsyncCommandResult {
+  readonly status: number | null;
+  readonly stdout: Buffer<ArrayBufferLike>;
+  readonly stderr: Buffer<ArrayBufferLike>;
+}
+
+/**
+ * Async, non-blocking `git` subprocess runner for the result-attribution evidence
+ * path (born-511-001). Mirrors the spawnSync options it replaces (`cwd`,
+ * `timeout: 5_000`) but never blocks the Node.js event loop while the subprocess
+ * runs. Returns raw Buffer output — unlike {@link runBoundedCrossVerifyRuntimeCommand}
+ * this must not coerce to utf-8 internally, since `git cat-file blob` output can be
+ * arbitrary (binary) file content.
+ */
+function runGitCommandAsync(cwd: string, args: readonly string[]): Promise<GitAsyncCommandResult> {
+  return new Promise(resolveCommand => {
+    let settled = false;
+    let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let child: ReturnType<typeof nodeSpawn>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (result: GitAsyncCommandResult): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolveCommand(result);
+    };
+    const append = (current: Buffer<ArrayBufferLike>, chunk: string | Buffer): Buffer<ArrayBufferLike> => {
+      const incoming = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const remaining = GIT_ASYNC_COMMAND_MAX_BUFFER_BYTES - current.length;
+      if (remaining <= 0) return current;
+      return Buffer.concat([current, incoming.subarray(0, remaining)]);
+    };
+
+    try {
+      child = nodeSpawn('git', [...args], { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (error) {
+      resolveCommand({
+        status: null,
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.from(error instanceof Error ? error.message : String(error)),
+      });
+      return;
+    }
+
+    child.stdout?.on('data', chunk => { stdout = append(stdout, chunk as string | Buffer); });
+    child.stderr?.on('data', chunk => { stderr = append(stderr, chunk as string | Buffer); });
+    child.once('error', error => finish({ status: null, stdout, stderr: Buffer.from(error.message) }));
+    child.once('close', code => finish({ status: code, stdout, stderr }));
+
+    timer = setTimeout(() => {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // The process may already have exited.
+      }
+      finish({ status: null, stdout, stderr: Buffer.from('git command timed out') });
+    }, GIT_ASYNC_COMMAND_TIMEOUT_MS);
+    timer.unref();
   });
-  const hash = (result.stdout ?? '').trim();
+}
+
+async function gitBlobHash(projectRoot: string, path: string): Promise<string | null> {
+  if (!existsSync(resolve(projectRoot, path))) return null;
+  const result = await runGitCommandAsync(projectRoot, ['hash-object', '-w', '--', path]);
+  const hash = result.stdout.toString('utf-8').trim();
   if (result.status !== 0 || !/^[0-9a-f]{40,64}$/.test(hash)) {
     throw new DeckentError('E_BLOB_HASH_UNAVAILABLE', `blob-hash-unavailable:${path}`);
   }
@@ -2098,31 +2160,21 @@ function countTextLines(bytes: Buffer): number {
   return bytes[bytes.length - 1] === 0x0a ? lines : lines + 1;
 }
 
-function gitBlobLineCount(projectRoot: string, hash: string): number {
-  const result = spawnSync('git', ['cat-file', 'blob', hash], {
-    cwd: projectRoot,
-    encoding: null,
-    timeout: 5_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+async function gitBlobLineCount(projectRoot: string, hash: string): Promise<number> {
+  const result = await runGitCommandAsync(projectRoot, ['cat-file', 'blob', hash]);
+  if (result.status !== 0) {
     throw new DeckentError('E_BASELINE_BLOB_UNAVAILABLE', 'baseline-blob-unavailable');
   }
   return countTextLines(result.stdout);
 }
 
-function blobNumstat(
+async function blobNumstat(
   projectRoot: string,
   beforeHash: string,
   afterHash: string,
-): { added: number; removed: number } {
-  const result = spawnSync('git', ['diff', '--numstat', beforeHash, afterHash], {
-    cwd: projectRoot,
-    encoding: 'utf-8',
-    timeout: 5_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  const first = (result.stdout ?? '').trim().split(/\r?\n/, 1)[0] ?? '';
+): Promise<{ added: number; removed: number }> {
+  const result = await runGitCommandAsync(projectRoot, ['diff', '--numstat', beforeHash, afterHash]);
+  const first = result.stdout.toString('utf-8').trim().split(/\r?\n/, 1)[0] ?? '';
   const [addedRaw, removedRaw] = first.split('\t');
   if (
     result.status !== 0
@@ -2185,9 +2237,9 @@ function writeAttributionResult(
  * evidence. Missing/foreign authority is a durable HOLD, never an authorship
  * guess from the final repository diff.
  */
-export function reconcileDockerResultWorkAttribution(
+export async function reconcileDockerResultWorkAttribution(
   input: ReconcileDockerResultWorkAttributionInput,
-): DockerResultWorkAttributionOutcome {
+): Promise<DockerResultWorkAttributionOutcome> {
   const result = JSON.parse(readFileSync(input.resultPath, 'utf-8')) as Record<string, unknown>;
   const scopeFiles = normalizedScopeFiles(input.scopeFilesWrite);
   const scopeSet = new Set(scopeFiles);
@@ -2223,7 +2275,7 @@ export function reconcileDockerResultWorkAttribution(
   try {
     for (const path of scopeFiles) {
       const beforeHash = baseline.get(path) ?? null;
-      const afterHash = gitBlobHash(input.projectRoot, path);
+      const afterHash = await gitBlobHash(input.projectRoot, path);
       if (beforeHash === afterHash) continue;
       const counts = beforeHash === null
         ? {
@@ -2231,8 +2283,8 @@ export function reconcileDockerResultWorkAttribution(
             removed: 0,
           }
         : afterHash === null
-          ? { added: 0, removed: gitBlobLineCount(input.projectRoot, beforeHash) }
-          : blobNumstat(input.projectRoot, beforeHash, afterHash);
+          ? { added: 0, removed: await gitBlobLineCount(input.projectRoot, beforeHash) }
+          : await blobNumstat(input.projectRoot, beforeHash, afterHash);
       changes.push({
         path,
         status: beforeHash === null ? 'added' : afterHash === null ? 'deleted' : 'modified',
@@ -6953,7 +7005,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       // settlement receipt. A missing/mismatched baseline becomes a durable
       // NO_GO/HOLD; it never falls back to the final shared-worktree diff.
       try {
-        reconcileDockerResultWorkAttribution({
+        await reconcileDockerResultWorkAttribution({
           projectRoot: projectDir,
           resultPath,
           baselinePath: settlementRef
