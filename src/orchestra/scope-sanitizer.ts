@@ -94,6 +94,75 @@ export function hasMultiDotBasename(path: string): boolean {
   return dotCount >= 2 && REAL_EXTENSION_RE.test(path);
 }
 
+/**
+ * Bare `.<token>` fragments that are EXTENSIONS, not files. Rule 4 exists to drop
+ * these (a directive line yielding a lone ".ts"/".md" is noise); every OTHER bare
+ * dot-led name is a real repo-root dotfile. Token class, not a filename list.
+ */
+const BARE_EXTENSION_TOKENS = new Set([
+  'ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs',
+  'md', 'mdx', 'json', 'jsonc', 'txt', 'yaml', 'yml', 'toml', 'ini',
+  'css', 'scss', 'html', 'sh', 'py', 'rs', 'go',
+  'test', 'spec', 'lock', 'map', 'snap',
+]);
+
+/**
+ * row 3312 (d) — is this a repo-root DOTFILE (`.dockerignore`, `.npmrc`,
+ * `.secrets-baseline`) rather than a bare extension fragment (`.ts`, `.md`)?
+ *
+ * Rule 4 used to drop every `^\.[a-zA-Z0-9]+$` token, which fires on
+ * `.dockerignore` just as hard as on `.ts` — and it fires BEFORE Rule 5, so the
+ * `trackedRootFiles` vouch never got a chance to speak. The class is decided by
+ * the token body: a known bare extension is a fragment, anything else is a file.
+ * Deciding it from the token alone (not from a caller-supplied vouch) is what
+ * makes plan-time and render-time sanitization agree byte-for-byte.
+ */
+export function isRootDotfileToken(path: string): boolean {
+  if (path.includes('/') || path.includes('\\')) return false;
+  if (!path.startsWith('.') || path.length < 2) return false;
+  const body = path.slice(1);
+  if (body.includes('.')) return false; // ".a.b" — handled by hasMultiDotBasename
+  if (BARE_EXTENSION_TOKENS.has(body.toLowerCase())) return false;
+  return /^[A-Za-z][\w-]*$/.test(body);
+}
+
+/**
+ * row 3312 (c)/(d) — is this a bare, extension-less repo-root FILE (`Dockerfile`,
+ * `Makefile`, `LICENSE`, `NOTICE`) rather than a directory?
+ *
+ * Directory tokens in a scope list are conventionally lowercase (`src`, `tests`)
+ * or slash-qualified; an uppercase-initial bare token with no extension is a root
+ * file. Evidence: task JSON carrying a phantom `Dockerfile/` directory, and a
+ * granted `Dockerfile` silently dropped by Rule 5 at render time. Misreading a
+ * capitalized directory as a file NARROWS authority (one exact path instead of a
+ * subtree) — it can never grant something the operator did not write.
+ */
+export function isBareRootFileToken(path: string): boolean {
+  if (path.includes('/') || path.includes('\\')) return false;
+  if (path.includes('.')) return false;
+  return /^[A-Z][\w-]*$/.test(path);
+}
+
+/**
+ * Shared file-vs-directory classifier for a scope token — the reader-side mirror
+ * of `normalizeScopeDir` in `directives-builder.ts` (writer side). A final segment
+ * carrying a real extension is a file; a root dotfile or an uppercase-initial
+ * extension-less bare token is a file; everything else is a directory.
+ *
+ * row 3312 (c): the `Scope:`/`Kapsam:` label parser appended a slash to EVERY
+ * entry, so `README.md` became the phantom directory `README.md/` and the file it
+ * named never became write authority at all.
+ */
+export function isFileScopeToken(path: string): boolean {
+  const trimmed = path.trim();
+  if (!trimmed || trimmed.endsWith('/') || trimmed.endsWith('\\')) return false;
+  const lastSep = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  const lastSegment = trimmed.slice(lastSep + 1);
+  if (!lastSegment || lastSegment === '.' || lastSegment === '..') return false;
+  if (REAL_EXTENSION_RE.test(lastSegment) && !lastSegment.startsWith('.')) return true;
+  return isRootDotfileToken(trimmed) || isBareRootFileToken(trimmed);
+}
+
 /** Global protected filenames that workers should never write to */
 const GLOBAL_PROTECTED = new Set([
   'config.json',
@@ -134,6 +203,11 @@ function isWellKnownRootFile(path: string): boolean {
  *    UNLESS the exact path is present in `trackedRootFiles` (a known git-tracked
  *    root file, e.g. README.md) — those are preserved. Rule 6 still wins: a
  *    GLOBAL_PROTECTED root file drops even if it is also in `trackedRootFiles`.
+ *    ALSO preserved (silently, no warning — row 3312 (d)): a repo-root dotfile
+ *    ({@link isRootDotfileToken}) and a bare extension-less root file
+ *    ({@link isBareRootFileToken}) — both decided from the token alone, so a
+ *    render-time re-sanitization without `trackedRootFiles` cannot re-narrow the
+ *    plan-time result.
  *    ALSO preserved (silently, no warning — born-675): a bare filename with a
  *    multi-dot compound basename (`soul.default.md`, `a.b.c.ts`,
  *    {@link hasMultiDotBasename}) — a genuinely-unqualified single-extension name
@@ -175,8 +249,11 @@ export function sanitizeScope(
       continue;
     }
 
-    // Rule 4: Extension-only (e.g. ".ts", ".md") → remove
-    if (/^\.[a-zA-Z0-9]+$/.test(path)) {
+    // Rule 4: Extension-only (e.g. ".ts", ".md") → remove. A real root dotfile
+    // (`.dockerignore`, `.npmrc`) has the same shape but is a FILE — dropping it
+    // here removed it from the worker's canonical write view before Rule 5's
+    // root-file handling could preserve it (row 3312 (d), sprint-507-002).
+    if (/^\.[a-zA-Z0-9]+$/.test(path) && !isRootDotfileToken(path)) {
       continue;
     }
 
@@ -205,6 +282,12 @@ export function sanitizeScope(
         // tracked yet, so trackedRootFiles cannot vouch) — preserve silently,
         // no warning: SAN-1 treats every sanitizeScope warning as a plan-time
         // BLOCK (same rationale as the multi-dot branch below).
+      } else if (isRootDotfileToken(path) || isBareRootFileToken(path)) {
+        // row 3312 (d): a root dotfile (`.dockerignore`) or a bare extension-less
+        // root file (`Dockerfile`) — classified from the token itself, so the
+        // render stage reaches the same verdict as plan-time even when no
+        // `trackedRootFiles` vouch is available. Silent, for the same reason as
+        // the branches above: SAN-1 reads any warning as a shrink-BLOCK.
       } else if (hasMultiDotBasename(path)) {
         // Compound-name file (soul.default.md, a.b.c.ts) that lost its directory
         // prefix upstream — preserve (born-675: silent-drop of a real file).

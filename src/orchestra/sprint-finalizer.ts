@@ -146,7 +146,7 @@ import type { UsageTotals } from '../core/kpi/collection.js';
 // ─── Cumulative Spend Advisory (B6 — warn-only finalize hook, Sprint 333 333-005) ──
 // orchestra → core import: ADR-008 allowed direction (core never imports orchestra).
 // checkSpendGate is pure + flag-gated; spend-window read + cost-config load live in core.
-import { checkSpendGate } from '../core/cost-gate.js';
+import { checkSpendGate, evaluateSpendWarnAtSpawn } from '../core/cost-gate.js';
 import type { CostLimitWarnEvent } from '../core/cost-gate.js';
 import { readSpendWindow, loadCostConfig } from '../core/cost-config-loader.js';
 import type { CostConfig } from '../core/cost-config-loader.js';
@@ -1917,6 +1917,108 @@ export function recordSprintKpis(
 }
 
 
+// ═══ Cumulative Spend Admission Gate (row 4091 — pre-spawn HARD block) ══
+//
+// `cost_limits.enforce_spend_gate` used to be a name-behaviour gap: the key only
+// enabled a warning at both the pre-spawn (start.ts / MCP deckent_start) and the
+// finalize (emitFinalizeSpendAdvisory, below) call sites. This section closes the
+// gap on ONE side only, deliberately:
+//
+//   • ADMISSION (pre-spawn) — enforcing. Over-ceiling cumulative day/month spend
+//     refuses to admit a NEW run with a typed COST_GATE_EXCEEDED.
+//   • FINALIZE (in-flight) — advisory, forever. An ACTIVE sprint is never cut,
+//     paused or killed on breach; it lands gracefully and only the NEXT admission
+//     is refused. See emitFinalizeSpendAdvisory's contract note below.
+//
+// Both faces live in this one module so that invariant stays visible at both ends.
+// The gate owns NO spend math and NO spend source: the projection + thresholds are
+// delegated wholesale to core (`evaluateSpendWarnAtSpawn` → `checkSpendGate` over
+// `readSpendWindow`, the canonical cost/usage authority). This function only turns
+// that authority's breach event into a typed admission decision.
+
+/** Admission allowed — the run may spawn. */
+export interface SpendAdmissionAllowed {
+  ok: true;
+  /**
+   * The window breach, when one occurred but the operator acknowledged it
+   * (CLI `--force`, MCP `acknowledgeCost: true`) — callers surface it as the
+   * unchanged COST_LIMIT_WARN advisory. Null when no window limit was breached
+   * (which includes every flag-off run: the gate is a no-op then).
+   */
+  breach: CostLimitWarnEvent | null;
+  /** True when a breach was downgraded to a warning by operator acknowledgement. */
+  overrideApplied: boolean;
+}
+
+/** Admission refused — the run must NOT spawn. */
+export interface SpendAdmissionBlocked {
+  ok: false;
+  reason: 'COST_GATE_EXCEEDED';
+  /** The breach detail (window, spent, projection, limit) from the canonical authority. */
+  breach: CostLimitWarnEvent;
+  /** Human-readable refusal, breach message + override guidance. */
+  message: string;
+}
+
+export type SpendAdmissionDecision = SpendAdmissionAllowed | SpendAdmissionBlocked;
+
+export interface SpendAdmissionGateInput {
+  /** Project root — the resource ledger (canonical spend authority) lives under it. */
+  root: string;
+  /** Loaded cost config (provides daily_max_usd / monthly_max_usd / enforce_spend_gate). */
+  costConfig: CostConfig;
+  /** This run's cost estimate, projected on top of the already-logged spend. */
+  sprintEstimateUsd: number;
+  /**
+   * Operator acknowledgement (CLI `--force`, MCP `acknowledgeCost: true`). When set,
+   * a breach is downgraded to the pre-existing warn instead of blocking — the same
+   * override contract the estimate gate (`evaluateCostGate`) already uses.
+   */
+  acknowledged?: boolean;
+  /** Spend-window reader override (tests). Threaded into evaluateSpendWarnAtSpawn. */
+  readSpend?: (root: string, window: 'day' | 'month') => number;
+}
+
+/**
+ * Row 4091 — PRE-SPAWN cumulative-spend admission gate.
+ *
+ * Returns a typed `COST_GATE_EXCEEDED` refusal when `cost_limits.enforce_spend_gate`
+ * is true (default-off, unchanged) AND the projected day/month spend crosses its
+ * ceiling AND the operator has not acknowledged the cost.
+ *
+ * Flag-off is a strict no-op: `evaluateSpendWarnAtSpawn` short-circuits before the
+ * ledger is touched, so the gate performs zero I/O and returns `{ok: true, breach: null}`
+ * — the caller's spawn path stays byte-for-byte what it is today.
+ *
+ * Pure with respect to orchestration state: it never kills, pauses or signals a
+ * running sprint. It answers one question — may a NEW run be admitted?
+ */
+export function evaluateSpendAdmissionGate(
+  input: SpendAdmissionGateInput,
+): SpendAdmissionDecision {
+  const breach = evaluateSpendWarnAtSpawn({
+    root: input.root,
+    costConfig: input.costConfig,
+    sprintEstimateUsd: input.sprintEstimateUsd,
+    ...(input.readSpend ? { readSpendWindow: input.readSpend } : {}),
+  });
+
+  if (!breach) return { ok: true, breach: null, overrideApplied: false };
+  if (input.acknowledged) return { ok: true, breach, overrideApplied: true };
+
+  return {
+    ok: false,
+    reason: 'COST_GATE_EXCEEDED',
+    breach,
+    message:
+      `${breach.message} Cumulative spend gate (cost_limits.enforce_spend_gate) is enforcing — ` +
+      `no new sprint is admitted. Any already-running sprint keeps going and lands normally. ` +
+      `Override with --force (CLI) / acknowledgeCost=true (MCP), or raise ` +
+      `cost_limits.${breach.window === 'day' ? 'daily_max_usd' : 'monthly_max_usd'} in .deckent/cost-config.json.`,
+  };
+}
+
+
 // ═══ Cumulative Spend Advisory (B6 — warn-only, never blocks) ═════
 // DECKENT-TRIAGE-PLAN B6 / Sprint 333 333-005.
 
@@ -1947,10 +2049,13 @@ export interface FinalizeSpendAdvisoryOptions {
  * ledger) and, when `cost_limits.enforce_spend_gate` is enabled AND a window
  * limit is breached, EMIT a `BRAIN→USER:COST_LIMIT_WARN` advisory.
  *
- * VISIBILITY ONLY — warn-only, NON-BLOCKING. The HARD spend gate (turning
- * `enforce_spend_gate` into an actual block / `COST_GATE_EXCEEDED`) is a
- * deliberate POST-BETA follow-up (DECKENT-TRIAGE-PLAN B6 step 3) and is NOT
- * implemented here — finalize is never blocked or failed by this hook.
+ * VISIBILITY ONLY — warn-only, NON-BLOCKING, and PERMANENTLY so (row 4091).
+ * `enforce_spend_gate` IS a hard block now, but only at ADMISSION — see
+ * {@link evaluateSpendAdmissionGate}. Enforcement deliberately stops at the
+ * spawn boundary: a sprint that is already ACTIVE is never cut, paused or failed
+ * when a ceiling is crossed mid-flight; it lands gracefully and only the next
+ * admission is refused. Turning this hook into a block would violate that
+ * property, so it stays an advisory regardless of the flag.
  *
  * The spend math is delegated ENTIRELY to readSpendWindow + checkSpendGate
  * (no re-implementation). READ-only against the spend ledger; the only write
@@ -2391,8 +2496,9 @@ export async function finalizeSprint(
   // EMIT a BRAIN→USER:COST_LIMIT_WARN advisory. Warn-only + NON-BLOCKING: the hook
   // is self-fail-safe (swallows every throw) and checkSpendGate is flag-gated
   // default-off, so the flag-off common path is a no-op and finalize is byte-for-byte
-  // unchanged. The HARD spend gate (enforce_spend_gate as a real block) is a
-  // deliberate POST-BETA follow-up — NOT flipped here.
+  // unchanged. Row 4091: enforce_spend_gate is a real block at ADMISSION
+  // (evaluateSpendAdmissionGate, pre-spawn) — never here. This sprint is already
+  // ACTIVE; it lands gracefully and only the next admission is refused.
   emitFinalizeSpendAdvisory(
     projectRoot,
     sprint.id,

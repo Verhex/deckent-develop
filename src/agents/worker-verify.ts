@@ -207,13 +207,21 @@ export const MAX_COMPILATION_RETRIES = 3;
 
 export interface CompilationResult {
   success: boolean;
+  /** Diagnostics located inside the task's own write authority — these decide the verdict. */
   errors: string[];
+  /**
+   * Diagnostics located outside the task's write authority (row 3277: a parallel writer's
+   * partial source). Reported for evidence, never a failure and never a FIX retry.
+   */
+  foreignErrors: string[];
 }
 
 export interface CompilationLoopResult {
   success: boolean;
   attempts: number;
   errors: string[];
+  /** Foreign diagnostics observed on the final attempt — diagnostic only, never a failure. */
+  foreignErrors: string[];
 }
 
 /**
@@ -241,19 +249,110 @@ export function parseCompilationErrors(err: unknown): string[] {
   return errorLines.length > 0 ? errorLines : lines.slice(0, 20);
 }
 
+// ─── Scoped Compilation Judgment (row 3277) ─────────────────────────
+// Measured defect: workers ran a repository-wide `tsc --noEmit` while parallel
+// writers were mid-change, so another task's partial source produced a false
+// NO_GO and burned FIX retries. The compile itself stays whole-program — that
+// is what makes it sound, because the analysis set remains a superset of the
+// task scope and no in-scope error can be hidden. Only the *judgment* is
+// restricted: a diagnostic decides this task's verdict when, and only when, it
+// is located in a file the task is authorised to write.
+
+/** Normalise a repository path for scope comparison: `\` → `/`, no `./`, no trailing `/`. */
+function normalizeScopePath(rawPath: string, projectRoot?: string): string {
+  let value = rawPath.trim().replace(/\\/g, '/');
+  if (projectRoot) {
+    const root = projectRoot.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (root && value.startsWith(`${root}/`)) {
+      value = value.slice(root.length + 1);
+    }
+  }
+  value = value.replace(/^\.\//, '').replace(/\/+$/, '');
+  return value;
+}
+
+/**
+ * The set of repository paths a task may legitimately break: its declared write
+ * files plus its declared directories. A concurrent unrelated writer is outside
+ * this set by file-collision admission, which is what makes the partition sound.
+ */
+export function scopeAuthorityPaths(scope?: TaskScope): string[] {
+  const raw = [...(scope?.filesWrite ?? []), ...(scope?.directories ?? [])];
+  const paths = raw
+    .map(entry => normalizeScopePath(entry))
+    .filter(entry => entry.length > 0);
+  return [...new Set(paths)];
+}
+
+/**
+ * Extract the source file a tsc diagnostic is reported against.
+ * Accepts the piped (`path(line,col): error TS…`) and pretty
+ * (`path:line:col - error TS…`) formats. Returns null for lines that carry no
+ * file location (summary lines, `error TS5083`, raw stderr).
+ */
+export function compilationErrorFilePath(errorLine: string): string | null {
+  const parenthesised = errorLine.match(/^\s*(\S.*?)\((\d+),(\d+)\):\s*error\s+TS\d+/);
+  if (parenthesised?.[1]) return normalizeScopePath(parenthesised[1]);
+
+  const pretty = errorLine.match(/^\s*(\S.*?):(\d+):(\d+)\s*-\s*error\s+TS\d+/);
+  if (pretty?.[1]) return normalizeScopePath(pretty[1]);
+
+  return null;
+}
+
+/**
+ * Split compilation diagnostics into the ones this task owns and the ones that
+ * belong to files outside its write authority.
+ *
+ * Without scope authority (no filesWrite and no directories) every diagnostic is
+ * in-scope — behaviour is then identical to the ambient repository-wide verdict.
+ * A diagnostic that carries no file location is always treated as in-scope: it
+ * cannot be attributed to a foreign writer, so the conservative reading keeps it.
+ */
+export function partitionCompilationErrors(
+  errors: string[],
+  scope?: TaskScope,
+  projectRoot?: string,
+): { inScope: string[]; foreign: string[] } {
+  const authority = scopeAuthorityPaths(scope);
+  if (authority.length === 0) {
+    return { inScope: [...errors], foreign: [] };
+  }
+
+  const inScope: string[] = [];
+  const foreign: string[] = [];
+  for (const error of errors) {
+    const filePath = compilationErrorFilePath(error);
+    if (filePath === null) {
+      inScope.push(error);
+      continue;
+    }
+    const relativePath = normalizeScopePath(filePath, projectRoot);
+    const owned = authority.some(
+      entry => relativePath === entry || relativePath.startsWith(`${entry}/`),
+    );
+    (owned ? inScope : foreign).push(error);
+  }
+  return { inScope, foreign };
+}
+
 /**
  * Run build verification in the given project root and return success/errors.
  * Uses stack-detected build command. If build command is empty, skips verification.
+ *
+ * The compile stays whole-program; when `taskScope` declares write authority the
+ * verdict is restricted to diagnostics located inside that authority, so a
+ * concurrent unrelated partial write cannot fail this task (row 3277).
  */
 export function verifyCompilation(projectRoot: string, taskScope?: TaskScope): CompilationResult {
   if (isDocOnlyScope(taskScope)) {
-    return { success: true, errors: [] };
+    return { success: true, errors: [], foreignErrors: [] };
   }
 
   const { build } = getVerifyCommands(projectRoot);
 
   if (!build) {
-    return { success: true, errors: [] };
+    return { success: true, errors: [], foreignErrors: [] };
   }
 
   const command = build === 'npx tsc' ? 'npx tsc --noEmit' : build;
@@ -265,10 +364,14 @@ export function verifyCompilation(projectRoot: string, taskScope?: TaskScope): C
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 120_000,
     });
-    return { success: true, errors: [] };
+    return { success: true, errors: [], foreignErrors: [] };
   } catch (err: unknown) {
-    const errors = parseCompilationErrors(err);
-    return { success: false, errors };
+    const { inScope, foreign } = partitionCompilationErrors(
+      parseCompilationErrors(err),
+      taskScope,
+      projectRoot,
+    );
+    return { success: inScope.length === 0, errors: inScope, foreignErrors: foreign };
   }
 }
 
@@ -285,10 +388,11 @@ export function runCompilationLoop(
   taskScope?: TaskScope,
 ): CompilationLoopResult {
   if (isDocOnlyScope(taskScope)) {
-    return { success: true, attempts: 0, errors: [] };
+    return { success: true, attempts: 0, errors: [], foreignErrors: [] };
   }
 
   let lastErrors: string[] = [];
+  let lastForeignErrors: string[] = [];
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const hb = createHeartbeat(
@@ -302,20 +406,23 @@ export function runCompilationLoop(
     );
     writeHeartbeat(projectRoot, hb);
 
-    const result = verifyCompilation(projectRoot);
+    // Row 3277 wiring fix: the scope was previously dropped here, so the loop
+    // spent every retry on diagnostics the task had no authority to fix.
+    const result = verifyCompilation(projectRoot, taskScope);
 
     if (result.success) {
-      return { success: true, attempts: attempt, errors: [] };
+      return { success: true, attempts: attempt, errors: [], foreignErrors: result.foreignErrors };
     }
 
     lastErrors = result.errors;
+    lastForeignErrors = result.foreignErrors;
 
     if (onAttempt) {
       onAttempt(attempt, maxRetries, result.errors);
     }
   }
 
-  return { success: false, attempts: maxRetries, errors: lastErrors };
+  return { success: false, attempts: maxRetries, errors: lastErrors, foreignErrors: lastForeignErrors };
 }
 
 // ─── Coverage Parse & Verify ────────────────────────────────────────

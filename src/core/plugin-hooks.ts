@@ -10,8 +10,8 @@ import type { Task, TaskResult, Sprint, ResolvedConfig } from './types.js';
 import { scanPlugins } from './plugin.js';
 import { PluginSecurityError } from './plugin.js';
 import type { Plugin } from './plugin.js';
-import { validatePluginSecurity } from './plugin-loader.js';
-import type { PluginSecurityConfig } from './plugin-loader.js';
+import { validatePluginSecurity, resolvePluginSecurityConfig } from './plugin-loader.js';
+import type { PluginSecurityConfig, PluginsRawConfig } from './plugin-loader.js';
 import { detectFullStack } from './stack-detector.js';
 import { debugLog } from './utils.js';
 
@@ -119,6 +119,90 @@ export function clearHook(hook: PluginHook): void {
 /** Valid hook names that can appear in a plugin manifest */
 const VALID_HOOK_NAMES: readonly PluginHook[] = ['beforeSprint', 'afterSprint', 'beforeTask', 'afterTask'];
 
+// ─── Plugin Security Stance (row 7031) ───────────────────────────────────────
+
+/**
+ * Advisory→enforce stance for the 4-step plugin security pipeline
+ * (allowed-path containment · SkillSandbox AST scan · SHA-256 integrity ·
+ * Ed25519 publisher identity — see validatePluginSecurity()).
+ *
+ * - `advisory` (DEFAULT): the pipeline runs and every finding is reported loudly to
+ *   stderr, but the plugin still loads. This keeps the default byte-identical in what
+ *   loads: before row 7031 the production path passed no security config at all, so
+ *   every plugin loaded unchecked. Advisory only adds the warnings.
+ * - `enforce`: a rejected plugin fails closed — the typed PluginSecurityError
+ *   propagates out of loadPluginHooks() instead of being downgraded to a stderr line.
+ *
+ * Flipping the default to 'enforce' is an owner decision, not a code default.
+ */
+export type PluginSecurityEnforcement = 'advisory' | 'enforce';
+
+/** Default stance — advisory. Do not flip without an explicit owner decision. */
+export const DEFAULT_PLUGIN_SECURITY_ENFORCEMENT: PluginSecurityEnforcement = 'advisory';
+
+/** Options accepted by loadPluginHooks(). Superset of the previous inline
+ *  `{ plugin_require_signature }` shape, so existing callers keep compiling. */
+export interface LoadPluginHooksOptions {
+  /** Legacy top-level config field (`DeckentConfig.plugin_require_signature`).
+   *  When defined it wins over `plugins.require_signature`. */
+  plugin_require_signature?: boolean;
+  /** The effective config's `plugins` block (require_signature, trusted publisher
+   *  keys, allowed paths) — the real security config for the pipeline. */
+  plugins?: PluginsRawConfig;
+  /** Advisory (default) or enforce. See PluginSecurityEnforcement. */
+  security_enforcement?: PluginSecurityEnforcement;
+}
+
+/**
+ * Read the advisory→enforce stance off the effective config's `plugins` block.
+ *
+ * `plugins.security_enforcement` is not declared in config-types.ts yet (that file is
+ * outside this slice's write authority), but `ResolvedConfig.plugins` is a runtime
+ * passthrough of the operator's config block, so the field is readable structurally
+ * today. Anything unrecognized — including an absent block — resolves to the advisory
+ * default; a present-but-unrecognized value additionally emits a typed warning rather
+ * than silently degrading a security stance.
+ */
+export function resolvePluginSecurityEnforcement(plugins: unknown): PluginSecurityEnforcement {
+  const raw = (plugins as { security_enforcement?: unknown } | null | undefined)?.security_enforcement;
+  if (raw === undefined || raw === null) return DEFAULT_PLUGIN_SECURITY_ENFORCEMENT;
+  if (raw === 'enforce') return 'enforce';
+  if (raw === 'advisory') return 'advisory';
+  process.stderr.write(
+    `[plugin-hooks] PLUGIN_SECURITY_ENFORCEMENT_INVALID: unrecognized plugins.security_enforcement ${JSON.stringify(raw)} — falling back to "${DEFAULT_PLUGIN_SECURITY_ENFORCEMENT}"\n`,
+  );
+  return DEFAULT_PLUGIN_SECURITY_ENFORCEMENT;
+}
+
+/**
+ * Build the PluginSecurityConfig for a load. Always returns a config — an absent
+ * `plugins` block means advisory defaults plus a typed PLUGIN_SECURITY_CONFIG_ABSENT
+ * warning, never an undefined-skip of the pipeline (that undefined-skip was the row-7031
+ * production gap).
+ *
+ * `allowed_paths` defaults to `<projectRoot>/.deckent/plugins` — the only directory
+ * scanPlugins() reads — so step 1 (containment) is live rather than dormant while
+ * remaining a provable no-op for every plugin the scanner can return.
+ */
+export function resolveLoadPluginSecurityConfig(
+  projectRoot: string,
+  options?: LoadPluginHooksOptions,
+): PluginSecurityConfig {
+  const configured = options?.plugins;
+  const hasConfig = configured !== undefined || options?.plugin_require_signature !== undefined;
+  if (!hasConfig) {
+    process.stderr.write(
+      '[plugin-hooks] PLUGIN_SECURITY_CONFIG_ABSENT: no plugin security config resolved — running the security pipeline with advisory defaults (require_signature=false, no publisher trust root)\n',
+    );
+  }
+  const plugins: PluginsRawConfig = {
+    require_signature: options?.plugin_require_signature ?? configured?.require_signature ?? false,
+    trusted_publisher_keys: configured?.trusted_publisher_keys,
+    allowed_paths: configured?.allowed_paths ?? [join(projectRoot, '.deckent', 'plugins')],
+  };
+  return resolvePluginSecurityConfig(projectRoot, { plugins });
+}
+
 /**
  * Try to load a hook module from a plugin directory.
  * The hook path (from manifest.hooks) is resolved relative to the plugin dir.
@@ -166,6 +250,7 @@ export async function loadHookModule(
 export async function registerPluginHooks(
   plugin: Plugin,
   securityConfig?: PluginSecurityConfig,
+  enforcement: PluginSecurityEnforcement = 'enforce',
 ): Promise<number> {
   const hooks = plugin.manifest.hooks;
   if (!hooks) return 0;
@@ -179,11 +264,18 @@ export async function registerPluginHooks(
       process.stderr.write(`[plugin-hooks] ${warning}\n`);
     }
 
-    // If not allowed, reject the plugin entirely
+    // If not allowed: fail closed under `enforce`, report-only under `advisory`.
+    // Advisory still loads the plugin — before row 7031 the production path ran no
+    // pipeline at all, so blocking here by default would stop plugins that load today.
     if (!secResult.allowed) {
       const errorMsg = secResult.errors.join('; ');
-      throw new PluginSecurityError(
-        `Plugin "${plugin.manifest.name}" rejected: ${errorMsg}`
+      if (enforcement === 'enforce') {
+        throw new PluginSecurityError(
+          `Plugin "${plugin.manifest.name}" rejected: ${errorMsg}`
+        );
+      }
+      process.stderr.write(
+        `[plugin-hooks] PLUGIN_SECURITY_ADVISORY: Plugin "${plugin.manifest.name}" would be rejected under enforce: ${errorMsg} — loading anyway (plugins.security_enforcement=advisory)\n`,
       );
     }
   }
@@ -206,33 +298,41 @@ export async function registerPluginHooks(
  * Scan .deckent/plugins/ for enabled plugins, load their hook modules, and register
  * all declared hooks. Clears any previously registered hooks first.
  *
- * When `options.plugin_require_signature` is true, plugins without a valid SHA-256
- * signature are rejected. When false (default), unsigned plugins emit a warning.
+ * The 4-step security pipeline (allowed-path containment · SkillSandbox AST scan ·
+ * SHA-256 integrity · Ed25519 publisher identity) ALWAYS runs — an absent config means
+ * advisory defaults plus a typed warning, never a silent skip (row 7031).
  *
- * Non-fatal: individual plugin/hook loading failures are logged to stderr.
+ * When `options.plugin_require_signature` (or `options.plugins.require_signature`) is
+ * true, plugins without a valid signature are rejected by the pipeline. Whether that
+ * rejection blocks the load is governed by `options.security_enforcement`:
+ * `advisory` (default) warns and loads anyway; `enforce` fails closed and the typed
+ * PluginSecurityError propagates out of this function.
+ *
+ * Non-security plugin/hook loading failures stay non-fatal: logged to stderr, load continues.
  * Returns the total number of hooks registered.
  */
 export async function loadPluginHooks(
   projectRoot: string,
-  options?: { plugin_require_signature?: boolean },
+  options?: LoadPluginHooksOptions,
 ): Promise<number> {
   clearHooks();
   const plugins = scanPlugins(projectRoot);
   if (plugins.length === 0) return 0;
 
-  // Security config is only created when explicitly requested via options.
-  // This preserves backwards-compat: existing callers without options get no sandbox scan.
-  const securityConfig: PluginSecurityConfig | undefined = options
-    ? { require_signature: options.plugin_require_signature ?? false, projectRoot }
-    : undefined;
+  const securityConfig = resolveLoadPluginSecurityConfig(projectRoot, options);
+  const enforcement = options?.security_enforcement ?? DEFAULT_PLUGIN_SECURITY_ENFORCEMENT;
 
   let totalRegistered = 0;
   for (const plugin of plugins) {
     try {
-      const count = await registerPluginHooks(plugin, securityConfig);
+      const count = await registerPluginHooks(plugin, securityConfig, enforcement);
       totalRegistered += count;
     } catch (err) {
-      // Non-fatal — log and continue with next plugin
+      // Fail closed under enforce: a security rejection blocks the plugin load instead of
+      // being downgraded to a stderr line. Every other failure stays non-fatal as before.
+      if (enforcement === 'enforce' && err instanceof PluginSecurityError) {
+        throw err;
+      }
       process.stderr.write(
         `[plugin-hooks] Failed to register hooks for plugin "${plugin.manifest.name}": ${err instanceof Error ? err.message : String(err)}\n`,
       );

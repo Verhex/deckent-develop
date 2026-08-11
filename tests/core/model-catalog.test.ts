@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os';
 import {
   loadCatalog,
   fetchRemoteCatalog,
+  adaptModelsDevCatalog,
+  bootstrapFromCatalog as bootstrapCatalog,
   mapRemoteEntry,
   normalizeProvider,
   normalizeTier,
@@ -20,7 +22,6 @@ import {
   BUILTIN_MODELS,
   CANONICAL_MODELS,
   ModelRegistry,
-  bootstrapFromCatalog,
   type ModelDefinition,
 } from '../../src/core/model-registry.js';
 
@@ -230,10 +231,65 @@ describe('fetchRemoteCatalog', () => {
 
   it('throws when payload shape is invalid', async () => {
     const impl: typeof fetch = async () =>
-      new Response(JSON.stringify({ not: 'a catalog' }), { status: 200 });
+      new Response(JSON.stringify({ not: 'a catalog' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     await expect(
       fetchRemoteCatalog('https://example.test/api', { fetchImpl: impl }),
-    ).rejects.toThrow(/missing models/);
+    ).rejects.toThrow(/missing provider models/);
+  });
+
+  it('throws a typed error before parsing a redirected response', async () => {
+    const impl: typeof fetch = async () => {
+      const response = new Response('<html></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+      Object.defineProperty(response, 'redirected', { value: true });
+      Object.defineProperty(response, 'url', { value: 'https://models.dev/' });
+      return response;
+    };
+    await expect(
+      fetchRemoteCatalog('https://example.test/api', { fetchImpl: impl }),
+    ).rejects.toMatchObject({ code: 'E_CATALOG_FETCH_REDIRECT' });
+  });
+
+  it('throws a typed error before parsing HTML content', async () => {
+    const impl: typeof fetch = async () =>
+      new Response('<html></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    await expect(
+      fetchRemoteCatalog('https://example.test/api', { fetchImpl: impl }),
+    ).rejects.toMatchObject({ code: 'E_CATALOG_FETCH_CONTENT_TYPE' });
+  });
+
+  it('adapts the provider-keyed models.dev payload', () => {
+    const catalog = adaptModelsDevCatalog({
+      anthropic: {
+        models: {
+          'fixture-catalog-model': {
+            id: 'fixture-catalog-model',
+            cost: { input: 3, output: 15 },
+            limit: { context: 200_000, output: 8_000 },
+            modalities: { input: ['text', 'image'] },
+            tool_call: true,
+            reasoning: true,
+          },
+        },
+      },
+    });
+    const mapped = mapRemoteEntry(catalog.models[0]!);
+    expect(mapped).toMatchObject({
+      id: 'fixture-catalog-model',
+      provider: 'claude',
+      contextWindow: 200_000,
+      maxOutputTokens: 8_000,
+      costPerMillion: { input: 3, output: 15 },
+      capabilities: { toolUse: true, vision: true, reasoning: true },
+    });
   });
 });
 
@@ -362,6 +418,31 @@ describe('loadCatalog: remote failure falls back to cache then bundled', () => {
     });
     expect(result.source).toBe('bundled');
     expect(result.models.length).toBe(CANONICAL_MODELS.length);
+    await expect(fs.access(cachePath())).rejects.toThrow();
+  });
+
+  it('does not overwrite a stale cache when a typed response guard fails', async () => {
+    const cached = {
+      fetchedAt: Date.now() - (CACHE_TTL_MS + 60_000),
+      url: 'https://example.test/api',
+      payload: fakeCatalogResponse(),
+    };
+    await fs.writeFile(cachePath(), JSON.stringify(cached));
+    const before = await fs.readFile(cachePath(), 'utf-8');
+    const impl: typeof fetch = async () =>
+      new Response('<html></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+
+    const result = await loadCatalog({
+      url: 'https://example.test/api',
+      cachePath: cachePath(),
+      fetchImpl: impl,
+    });
+
+    expect(result.source).toBe('cache');
+    await expect(fs.readFile(cachePath(), 'utf-8')).resolves.toBe(before);
   });
 
   it('treats malformed cache as missing and falls back', async () => {
@@ -439,12 +520,17 @@ describe('ModelRegistry.loadFromCatalog / mergeFromCatalog', () => {
 });
 
 describe('bootstrapFromCatalog (singleton glue)', () => {
-  it('does not throw even in offline / no-network scenarios', async () => {
-    // We can't easily inject opts into the singleton bootstrap; just verify it
-    // completes and returns a sensible payload. Network may or may not be live
-    // in CI — bundled fallback guarantees success.
-    const result = await bootstrapFromCatalog({ mode: 'merge' });
-    expect(['remote', 'cache', 'bundled']).toContain(result.source);
-    expect(result.count).toBeGreaterThan(0);
+  it('merges the bundled catalog through the offline test seam', async () => {
+    const merged: ModelDefinition[][] = [];
+    await bootstrapCatalog({
+      offline: true,
+      force: true,
+      _cachePath: cachePath(),
+      _registry: {
+        getAllModels: () => [],
+        mergeFromCatalog: models => merged.push(models),
+      },
+    });
+    expect(merged[0]).toHaveLength(CANONICAL_MODELS.length);
   });
 });

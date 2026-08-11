@@ -75,9 +75,17 @@ export interface CostLimits {
   monthly_max_usd?: number;
   auto_confirm_below_usd?: number;
   /**
-   * When true, checkSpendGate() emits BRAIN→USER:COST_LIMIT_WARN when projected
-   * cumulative spend (spentThisWindow + sprintEstimate) exceeds daily_max_usd or
-   * monthly_max_usd. Warn-only — sprint is never blocked. Default: false.
+   * When true, projected cumulative spend (spentThisWindow + sprintEstimate) over
+   * daily_max_usd / monthly_max_usd is ENFORCED at admission: the pre-spawn gate
+   * (evaluateSpendAdmissionGate) refuses a new run with a typed COST_GATE_EXCEEDED
+   * unless the operator acknowledges it (CLI --force / MCP acknowledgeCost).
+   *
+   * Enforcement stops at the spawn boundary — an already-ACTIVE sprint is never cut
+   * or paused on breach; it lands gracefully and only new admission stops. At
+   * finalize the same breach stays a BRAIN→USER:COST_LIMIT_WARN advisory
+   * (checkSpendGate / emitFinalizeSpendAdvisory).
+   *
+   * Default: false — with the flag off nothing is read and nothing is emitted.
    */
   enforce_spend_gate?: boolean;
   alert_thresholds?: {

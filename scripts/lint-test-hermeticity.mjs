@@ -137,13 +137,16 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // (tmpdir fixtures) and the doctor fixture modernization retired unresolved
   // entries. Measured on a clean HEAD worktree (b381c03fd) — the dirty
   // shared-worktree scan is ineligible by rule. Prior: STALE-SPRINT-LOCK (12517).
-  count: 12213,
+  // 2026-08-11 (sprint-510 harvest): +2 — the generated-skill-durability and
+  // plugin-sandbox-wire suites add two tracked tmpdir write sites. Measured on
+  // a clean HEAD worktree (27d9bdec4). Prior: NIGHT-DOGFOOD 508-509 (12213).
+  count: 12215,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: '4a6bf026c472fe0010be96e4c677c08747857ae8ee0a08179b35c51a686af2d3',
+  digest: 'c4684b4a8d2151ed6272397123e1108c1b7e4466aad55dfd94f90d53fe1eb4ce',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -187,7 +190,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-09 (MODEL-ACTIVATION-001): +1 REAL production module —
   // src/core/model-activation-store.ts (owner model-activation authority), plus
   // the auto-detect enforcement and CLI edits. Prior: STALE-SPRINT-LOCK (1203).
-  digest: '5a0a9c5328cc2c3b4f9ca54e8f05bb7fd637b9ea14eb8d489b6c4283b8ac1868',
+  // 2026-08-11 (sprint-510 harvest): edits to already-inventoried modules only
+  // (parser, verify, controller, finalizer, plugin, catalog) — same 1207 count,
+  // content digest only. Measured on a clean HEAD worktree (27d9bdec4).
+  digest: '9f913c49d77f0b4dddbbcc047faf7b0155a23ee93e61a11d8d0fd22318dc3928',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

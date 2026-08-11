@@ -162,7 +162,8 @@ import { PanicGuard } from '../core/panic-guard.js';
 import { metric, trace, structuredLog, initObservability, setObservabilitySprintId } from '../core/observability.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
-import { loadPluginHooks } from '../core/plugin-hooks.js';
+import { loadPluginHooks, resolvePluginSecurityEnforcement } from '../core/plugin-hooks.js';
+import { PluginSecurityError } from '../core/plugin.js';
 
 // ─── Auditor ──────────────────────────────────────────────────────
 import { resetDashboard, updateDashboard } from '../monitor/auditor.js';
@@ -1651,9 +1652,30 @@ export async function runSprint(
   initObservability(projectRoot);
   structuredLog('info', 'Sprint starting', { sprintPhase: 'INIT' });
 
+  // row 7031: the production load carries the real plugin-security config, so the 4-step
+  // pipeline (allowed-path containment · SkillSandbox AST scan · SHA-256 integrity ·
+  // Ed25519 publisher identity) actually runs here instead of being skipped by an
+  // undefined config. Enforcement stays advisory unless the operator sets
+  // `plugins.security_enforcement: "enforce"` — flipping that default is an owner decision.
   try {
-    await loadPluginHooks(projectRoot);
-  } catch (e) { debugLog('runSprint:loadPluginHooks', e); }
+    // `plugins.require_signature` is the reachable knob: config.ts passes the whole
+    // `plugins` block through to ResolvedConfig. The legacy top-level
+    // `plugin_require_signature` is declared on DeckentConfig but never resolved into
+    // ResolvedConfig (born-464 shape) — wiring that passthrough belongs to config.ts,
+    // which is outside this slice's write authority. loadPluginHooks still accepts the
+    // legacy field for callers holding a raw DeckentConfig.
+    await loadPluginHooks(projectRoot, {
+      plugins: config.plugins,
+      security_enforcement: resolvePluginSecurityEnforcement(config.plugins),
+    });
+  } catch (e) {
+    if (e instanceof PluginSecurityError) {
+      process.stderr.write(
+        `[sprint] PLUGIN_SECURITY_BLOCKED: plugin hooks not loaded — ${e.message}\n`,
+      );
+    }
+    debugLog('runSprint:loadPluginHooks', e);
+  }
 
   // Sprint Lock
   // Planning needs project leadership before a fresh sprint id exists. Use an
