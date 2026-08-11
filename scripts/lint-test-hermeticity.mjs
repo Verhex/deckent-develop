@@ -143,13 +143,16 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-11 (B5/B6 hasadı + mutabakat): +120 — runner-death, archive-authority,
   // status-liveness, error-registry-integrity, fix-spawn, retirement ve force-
   // finalize suite'lerinin tmpdir yazım siteleri. Temiz HEAD worktree (a8c6c0d8d).
-  count: 12335,
+  // 2026-08-11 (B10+B11 hasadı): +339 — born-intake, binary-staging, adr-sync,
+  // npm-pack, capability-resolution ve config-truth suite'lerinin tmpdir yazım
+  // siteleri. Temiz HEAD worktree (0f951956d).
+  count: 12674,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: 'aff1c7395de8a5151b249450a23fd3ddb5d6a12283e15473e7ba2df045c084cb',
+  digest: 'fc285bab5aed0906046b2c8ae995590b85f1e12d3a990de0723aa2425fd88bae',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -180,7 +183,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-11 (B5/B6 hasadı): +4 — error-registry, recover-helpers, status ve
   // runner-entry modülleri yeni suite'lerin test-support bağımlılığı olarak
   // envantere girdi. Temiz HEAD worktree (a8c6c0d8d).
-  count: 1211,
+  // 2026-08-11 (B10+B11): +4 — census/registry/lint modülleri yeni suite'lerin
+  // test-support bağımlılığı olarak envantere girdi. Temiz worktree (0f951956d).
+  count: 1215,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
@@ -199,7 +204,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-11 (sprint-510 harvest): edits to already-inventoried modules only
   // (parser, verify, controller, finalizer, plugin, catalog) — same 1207 count,
   // content digest only. Measured on a clean HEAD worktree (27d9bdec4).
-  digest: 'cbc4cb547562a1b7449d5086666c9d1b15e5394664164624f83015e7058ce283',
+  digest: '180ead1217d96170d357f62b695b943d0d76d1a0767cf433befcb5fc057bcc0d',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
