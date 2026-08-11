@@ -9,6 +9,9 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-517-004 | Tech debt from 517-004: Created and verified the exact-path owner-decision propo | normal | sprint-517 | resolved |
+| debt-517-002 | Tech debt from 517-002: CANONICAL SEMANTICS CHOSEN: the docker ALLOWLIST-SSOT ru | normal | sprint-517 | resolved |
+| debt-517-001 | Tech debt from 517-001: ROOT CAUSE / CALLER INVENTORY (row 60) — the destructive | normal | sprint-517 | resolved |
 | debt-513-003 | Tech debt from 513-003: Row 3296 ownership/retirement policy closed at the settl | normal | sprint-513 | resolved |
 | debt-512-003 | Tech debt from 512-003: Added runtime ErrorRegistry integrity validation and ded | normal | sprint-512 | resolved |
 | debt-512-002 | Tech debt from 512-002: Projection-only liveness gate added; persisted run-statu | normal | sprint-512 | resolved |
