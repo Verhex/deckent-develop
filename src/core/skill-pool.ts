@@ -518,6 +518,27 @@ export class SkillPoolManager {
     );
   }
 
+  /**
+   * Persist a generated skill's manifest and exact rendered entrypoint together.
+   *
+   * Generated content is intentionally not part of SkillDefinition's persisted
+   * manifest contract. Keeping it in SKILL.md makes later worker prompt
+   * resolution independent of the in-memory PLAN catalog that created it.
+   */
+  saveGeneratedSkill(skill: SkillDefinition, content: string): void {
+    const skillDir = path.join(this.projectRoot, SKILLS_DIR, skill.id);
+    const { _generatedContent: _ignored, ...manifest } = skill as SkillDefinition & {
+      _generatedContent?: string;
+    };
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillDir, MANIFEST_FILENAME),
+      JSON.stringify(manifest, null, 2) + '\n',
+      'utf8',
+    );
+    fs.writeFileSync(path.join(skillDir, SKILL_MD_FILENAME), content, 'utf8');
+  }
+
   // ─── Remove ─────────────────────────────────────────────────────────────────
 
   /**

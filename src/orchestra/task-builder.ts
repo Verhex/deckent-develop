@@ -25,6 +25,7 @@ import {
   type ProductionWiringDecision,
 } from '../core/production-wiring-contract.js';
 import { shellSplit } from './proof-of-function.js';
+import { isFileScopeToken } from './scope-sanitizer.js';
 import { TaskStatus, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { VALID_PROVIDERS_ALL } from '../core/config.js';
 import { detectTaskType } from './rubric-registry.js';
@@ -1113,6 +1114,34 @@ export function validateScopeFilesWrite(filesWrite: string[]): ValidationResult 
 }
 
 /**
+ * row 3312 (a)/(b)/(e) — is this BARE token merely the tail of a longer path that
+ * is already present on the same directive line (or among the entries extracted
+ * from it)?
+ *
+ * The loose scavenger regexes below match on word boundaries, so a longer path
+ * donates its own tail as a second, unqualified "file": `README.tr.md` → `tr.md`,
+ * `tests/PLATFORM.md` → `PLATFORM.md`, `tests\orchestra\x.test.ts` → `x.test.ts`.
+ * The phantom is not a file anyone granted — the sanitizer drops it and the
+ * prompt-gate reads that drop as a write-authority shrink BLOCK (or, when
+ * `hasMultiDotBasename` preserves it, a root-level test file that vitest's
+ * `tests/**` include cannot discover → a test-discoverability BLOCK).
+ *
+ * Boundary characters are the two path separators and `.` (the multi-dot basename
+ * case). Only SCAVENGED tokens are suppressed: an entry the operator wrote on a
+ * `Files:`/`Scope:` label is pushed before these passes run and is never removed
+ * here, so suppressing a tail can never shrink a granted authority.
+ */
+function isPhantomTailToken(token: string, line: string, extracted: readonly string[]): boolean {
+  if (token.includes('/') || token.includes('\\')) return false;
+  for (const boundary of ['/', '\\', '.']) {
+    const suffix = boundary + token;
+    if (line.includes(suffix)) return true;
+    if (extracted.some(entry => entry !== token && entry.endsWith(suffix))) return true;
+  }
+  return false;
+}
+
+/**
  * Extract a TaskScope from a directive line by matching directory and file path patterns.
  * Matches directories like src/..., tests/... and files ending in .ts or .js.
  * @param line - A single line from a directive document
@@ -1139,6 +1168,15 @@ export function extractScopeFromDirective(line: string): TaskScope {
   if (scopeLabelMatch?.[1]) {
     const scopes = scopeLabelMatch[1].split(',').map(s => s.trim()).filter(Boolean);
     for (const s of scopes) {
+      // row 3312 (c): appending a slash to EVERY entry turned granted FILES into
+      // phantom directories (`README.md/`, `Dockerfile/` were both observed in
+      // real task JSON) and left the file itself with no write authority at all.
+      // `isFileScopeToken` is the reader-side mirror of the writer's
+      // `normalizeScopeDir` file-vs-directory fix.
+      if (isFileScopeToken(s)) {
+        if (!filesWrite.includes(s)) filesWrite.push(s);
+        continue;
+      }
       const dir = s.endsWith('/') ? s : s + '/';
       // './' means project root — valid scope
       if (!directories.includes(dir)) directories.push(dir);
@@ -1162,7 +1200,9 @@ export function extractScopeFromDirective(line: string): TaskScope {
       // also matching "PROMPT.md") is NOT a root-level file — skipping it keeps the
       // unqualified duplicate out of filesWrite (scope-sanitizer would drop it and
       // prompt-gate reads that drop as a write-authority shrink BLOCK).
-      if (!f.includes('/') && (line.includes(`/${f}`) || filesWrite.some(existing => existing.endsWith(`/${f}`)))) {
+      // row 3312 (a): the `.` boundary belongs to the same class — `README.tr.md`
+      // donates the phantom `tr.md`, which the `/`-only guard never caught.
+      if (isPhantomTailToken(f, line, filesWrite)) {
         continue;
       }
       // Only add docs/ directory when the file is actually inside docs/
@@ -1204,6 +1244,12 @@ export function extractScopeFromDirective(line: string): TaskScope {
   const fileMatches = line.match(/\b[\w/.-]+\.(?:ts|js)\b/g);
   if (fileMatches) {
     for (const f of fileMatches) {
+      // row 3312 (e): the char class has no `\`, so a backslash-qualified path
+      // (`tests\orchestra\x.test.ts`) matches only its tail — a bare `x.test.ts`
+      // that `hasMultiDotBasename` then preserves as a ROOT-level test file, which
+      // vitest's `tests/**` include cannot discover → false test-discoverability
+      // BLOCK. The Scope/Files label already carries the qualified path.
+      if (isPhantomTailToken(f, line, filesWrite)) continue;
       if (!filesWrite.includes(f)) filesWrite.push(f);
     }
   }
@@ -1215,7 +1261,11 @@ export function extractScopeFromDirective(line: string): TaskScope {
     for (const f of standaloneMatches) {
       // Skip if already present or if a directory-prefixed version exists in filesWrite
       const alreadyCovered = filesWrite.some(existing => existing === f || existing.endsWith('/' + f));
-      if (!alreadyCovered) filesWrite.push(f);
+      // row 3312 (b): this pass had no LINE-level tail guard, so on a `Scope:` line
+      // — where the qualified path used to land in `directories`, never in
+      // filesWrite — `tests/PLATFORM.md` and `scripts/spawnsync-baseline.json`
+      // were emitted as bare tails and then dropped by the sanitizer.
+      if (!alreadyCovered && !isPhantomTailToken(f, line, filesWrite)) filesWrite.push(f);
     }
   }
 

@@ -1,14 +1,14 @@
-# DIRECTIVES — Sprint-B2c: six hardening slices, claude-weighted
+# DIRECTIVES — Sprint-B3: six approved slices, claude-weighted
 
 ## Goal
 
-Six MASTER-PLAN rows advance: sprint-log terminal projection (3298), bot daemon
-lifecycle honesty (3320), heartbeat template contract (110), MCP annotation truth
-(490), xverify bounded targeting (340), clean-dashboard policy (3325). Every slice is
-scope-disjoint; none writes a repository-root file, touches provider auth, or runs
-build tooling. Codex-provider routing is unavailable for this run (row 3308
-continuation defect); model hints below are Brain-assigned claude-tier choices under
-the owner's weighting directive.
+Six MASTER-PLAN rows advance: spawnsync hot-path (3315), scoped typecheck authority
+(3277), plugin sandbox wiring (7031), spend-gate enforcement (4091), generated-skill
+durability (3310), model-catalog endpoint (539). Every slice is scope-disjoint; none
+writes a repository-root file, touches provider auth, or runs build tooling.
+Codex-provider routing is unavailable for this run (row 3308 continuation defect);
+model hints below are Brain-assigned claude-tier choices under the owner's weighting
+directive and the owner-approved wave roster.
 
 Provider, model, effort and effective concurrency are resolved from effective config,
 registry, role policy, auth/reachability evidence, usage/limit authority and host admission.
@@ -20,7 +20,7 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
 - Do not weaken or delete an existing assertion to make new behaviour pass; report the
   conflict in result notes instead.
 - Read the existing mechanism before designing; every task EXTENDS something present.
-  A second parallel mechanism is a NO-GO in all three.
+  A second parallel mechanism is a NO-GO in all six.
 - Fail closed on ambiguity; nothing may make a destructive action easier to trigger.
 - Workers must not run `npm run build`, full `npm test`, provider login/auth mutation,
   sprint lifecycle commands, git commit, or cleanup. Scoped vitest runs only.
@@ -29,161 +29,194 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
 - New user-facing text goes through the i18n message authority (`getMessage`, en+tr);
   CLI descriptions are plain strings matching the surrounding file.
 - Zero hardcode (ADR-G-036): no model name or flow value literal on a code path.
+- Enforcement-class changes (tasks 3 and 4) ship flag-gated with today's default
+  behaviour unchanged; blind default-on is a NO-GO.
 
 ---
 
-## Task 1: Sprint log projects terminal COMPLETE and ABORTED truth exactly once (row 3298)
+## Task 1: The DIRECTIVES scope chain stops producing phantoms and silent shrinks (row 3312)
 
-- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/doc-updaters/sprint-log.ts, tests/orchestra/sprint-log-projection.test.ts
-- Scope: src/orchestra/sprint-finalizer.ts, src/orchestra/doc-updaters/sprint-log.ts, tests/orchestra/sprint-log-projection.test.ts
-- Model: claude-sonnet-5
-- Dependencies: none
-
-Measured (row 3298, EK-3 source trace): normal finalize invokes the sprint-log updater
-while the sprint status is still RETROSPECTIVE, then terminal authority changes to
-COMPLETE without reconciling the written section; `forceAbortSprint` publishes a fenced
-ABORTED receipt but never invokes the updater at all (Sprint-489 is absent from the log).
-This is projection completeness — canonical receipts are complete and stay authoritative.
-
-Required: after terminal publication, `docs/SPRINT-LOG.md` contains exactly one
-idempotently upserted section per sprint with the true terminal status (COMPLETE or
-ABORTED); unrelated sections are byte-preserved; partial writes are impossible (use the
-atomic write pattern the doc-updaters already use); the human projection never becomes
-settlement authority. Hermetic test drives the updater against a tmpdir log fixture
-through both paths (complete-after-retro and force-abort) and asserts single-section
-idempotency on double invocation.
-
-**Test:** `npx vitest run tests/orchestra/sprint-log-projection.test.ts`
-
-**NO-GO:** deriving settlement state FROM the log, rewriting unrelated sections, or a
-non-atomic write path.
-
----
-
-## Task 2: Bot daemon lifecycle honesty — stop works under HOLD, SIGTERM cleans the pid (row 3320)
-
-- Files: src/connectors/bot-daemon.ts, src/cli/commands/bot.ts, tests/connectors/bot-lifecycle-honesty.test.ts
-- Scope: src/connectors/bot-daemon.ts, src/cli/commands/bot.ts, src/connectors/, tests/connectors/bot-lifecycle-honesty.test.ts
-- Model: claude-sonnet-5
-- Dependencies: none
-
-Measured (row 3320, caught live 2026-08-01): the build-source-mismatch HOLD blocked the
-very stop/recovery commands that would resolve the drift — the workaround was OS SIGTERM,
-and the SIGTERM path leaves the bot pid file behind (ADR-G-013 pid hygiene).
-
-Required: recovery-class commands (`deckent bot stop` at minimum) run under the
-build-source-mismatch HOLD — exempt or carrying a typed override, following the
-identity-guard's existing exemption pattern if one exists; the SIGTERM graceful-shutdown
-path removes the pid file the process itself owns. Both behaviours carry hermetic tests
-(simulated pid file + signal handling in tmpdir; no real daemon spawn needed if the
-shutdown path is testable in-process).
-
-**Test:** `npx vitest run tests/connectors/bot-lifecycle-honesty.test.ts`
-
-**NO-GO:** exempting non-recovery commands from the guard, deleting a pid file the
-process does not own (ownership check stays), or weakening the identity-guard for
-start-class commands.
-
----
-
-## Task 3: Resolve the heartbeat template vs metachar guard contradiction (row 110)
-
-- Files: src/orchestra/heartbeat-daemon.ts, tests/orchestra/heartbeat-contract.test.ts
-- Scope: src/orchestra/heartbeat-daemon.ts, src/orchestra/spawn-backend-docker.ts, tests/orchestra/heartbeat-contract.test.ts
+- Files: src/orchestra/task-builder.ts, src/orchestra/scope-sanitizer.ts, tests/orchestra/scope-parser-phantom.test.ts
+- Scope: src/orchestra/task-builder.ts, src/orchestra/scope-sanitizer.ts, tests/orchestra/scope-parser-phantom.test.ts
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 110): the default heartbeat template conflicts with the shell-metachar
-guard — the guard rejects the very template the product emits by default. Read
-`src/orchestra/heartbeat-daemon.ts` and the wrapper-template composition in
-`src/orchestra/spawn-backend-docker.ts` first and state in the result notes WHICH side
-is wrong before changing either.
+Measured (row 3312, five live-evidenced cases from tonight's runs — filenames below are
+written with bracketed dots so this very parser does not re-trigger on its own bug report):
+(a) the doc-file regex in extractScopeFromDirective captures the TAIL of a multi-dot root
+basename as its own token — README[.]tr[.]md yields a phantom tr[.]md entry, which the
+sanitizer drops and the prompt-gate reads as a write-authority shrink BLOCK; (b) the same
+phantom fires even for slash-qualified multi-dot paths like tests/PLATFORM[.]md and
+scripts/spawnsync-baseline[.]json at render time; (c) the Scope-label parser appends a
+slash to EVERY entry, turning files into phantom directories (real task JSON evidence:
+directories containing README[.]md/ and Dockerfile/); (d) render-time re-sanitization
+runs WITHOUT the trackedRootFiles vouch that plan-time had, silently dropping root files
+like [.]dockerignore from the worker's canonical write view — the worker then honestly
+refuses (sprint-507-002); (e) a bare test-file mention in prose produced a
+test-discoverability false BLOCK.
 
-Required: one coherent contract — the default template passes its own guard; empty-success
-and exit semantics are explicit; no unsafe shell widening (the guard must not be loosened
-to admit metacharacters it exists to reject). Regression test pins the default template
-against the guard plus at least one genuinely-hostile template still rejected.
+Required: one sanitize authority — the plan-time sanitized scope is the canonical result
+and render/prompt stages may project but never re-narrow it; the multi-dot basename and
+root-file handling already present in the sanitizer covers every extractor path (the
+doc-file regex must not emit a token that is the tail of a longer path on the same line);
+the Scope-label parser distinguishes files from directories instead of appending a slash
+blindly (the existing normalizeScopeDir file-vs-directory fix is the pattern to follow);
+regression tests pin all five cases end-to-end from a DIRECTIVES fixture to the rendered
+worker scope. Behaviour for today's already-working single-dot slash-qualified paths
+stays byte-identical.
 
-**Test:** `npx vitest run tests/orchestra/heartbeat-contract.test.ts`
+**Test:** `npx vitest run tests/orchestra/scope-parser-phantom.test.ts`
 
-**NO-GO:** widening the guard's accepted character class, changing wrapper runtime
-behaviour beyond the contradiction, or a template fix that only works on one platform.
+**NO-GO:** loosening scope enforcement itself (a file the operator never granted must
+still be rejected), rewriting the sanitizer's rule order beyond the stated defects, or a
+fix that special-cases specific filenames instead of the token classes.
 
 ---
 
-## Task 4: MCP tool annotations tell the true side-effect class (row 490)
+## Task 2: Worker verification cannot judge unrelated concurrent partial writes (row 3277)
 
-- Files: src/mcp/tools/index.ts, src/mcp/tools/audit.ts, tests/mcp/annotation-parity.test.ts
-- Scope: src/mcp/tools/index.ts, src/mcp/tools/audit.ts, src/mcp/tools/, tests/mcp/annotation-parity.test.ts
+- Files: src/agents/worker-verify.ts, tests/agents/scoped-typecheck-authority.test.ts
+- Scope: src/agents/worker-verify.ts, src/agents/, tests/agents/scoped-typecheck-authority.test.ts
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 490, security-critical, code-line verified): the audit tool declares
-readOnlyHint true, destructiveHint false and idempotentHint true (src/mcp/tools/audit.ts
-line ~33) while its gate path calls writeFileSync (line ~114) and retention with apply
-performs a permanent, irreversible prune — all three hints are wrong. MCP clients trust
-readOnlyHint to skip approval prompts. The models refresh tool (cache invalidate plus
-remote fetch) is the second known mismatch.
+Measured (row 3277, sprint-487): workers ran repository-wide `tsc --noEmit` while
+parallel writers were mid-change — another task's partial source created false NO_GOs
+and consumed FIX retries; a supervisor rerun after quiescence passed. Timing-dependent
+global judgment is the defect.
 
-Required: adopt the widest-side-effect annotation contract (a tool that CAN mutate
-declares the mutating class — record this as the typed decision in the result notes),
-fix every mismatched annotation across the 49 tools, and extend the existing annotations
-guard suite into a full annotation-implementation parity gate that fails closed in the
-scoped test run. Implementation behaviour of the tools themselves does not change.
+Required: worker typecheck authority becomes scoped or snapshot-based — the verification
+a worker runs must be unable to fail on files outside its own task scope. Read how
+src/agents/worker-verify.ts composes verification commands first; prefer the smallest
+sound mechanism (scoped tsc project/file-list if sound for the scope shape, or an
+immutable settled-snapshot check) and record the chosen mechanism and its soundness
+argument in the result notes. A cross-contamination regression test proves: task A's
+scoped verify stays green while an unrelated file contains a type error, and still fails
+when the error is inside A's own scope.
 
-**Test:** `npx vitest run tests/mcp/annotation-parity.test.ts`
+**Test:** `npx vitest run tests/agents/scoped-typecheck-authority.test.ts`
 
-**NO-GO:** changing tool behaviour, weakening the existing guard suite, or an annotation
-"fixed" by documentation instead of the declared hint fields.
+**NO-GO:** dropping type verification entirely, a mechanism that misses in-scope errors,
+or global-state coordination that serializes all workers.
 
 ---
 
-## Task 5: Xverify bounded targeting and actionable preflight (row 340)
+## Task 3: Wire validatePluginSecurity into the production plugin load path, flag-gated (row 7031)
 
-- Files: src/cli/commands/xverify.ts, tests/cli/xverify-ux.test.ts
-- Scope: src/cli/commands/xverify.ts, src/cli/helpers/, tests/cli/xverify-ux.test.ts
+- Files: src/orchestra/sprint-controller.ts, src/core/plugin-hooks.ts, tests/core/plugin-sandbox-wire.test.ts
+- Scope: src/orchestra/sprint-controller.ts, src/core/plugin-hooks.ts, src/core/plugin.ts, tests/core/plugin-sandbox-wire.test.ts
+- Model: claude-opus-5
+- Dependencies: none
+
+Measured (row 7031, the inventory's number-one real risk, code-line verified):
+src/orchestra/sprint-controller.ts around line 1654 calls `loadPluginHooks` with no
+options, so securityConfig is undefined and the 4-step security pipeline (allowed-path
+containment + AST scan + SHA-256 integrity + Ed25519 publisher signature) never runs in
+production; src/core/plugin-hooks.ts lines 225-238 downgrade PluginSecurityError to a
+stderr line ("Non-fatal — log and continue").
+
+Required: the production `loadPluginHooks` call receives the real security config
+(plugin_require_signature and trusted publisher keys reachable from effective config);
+PluginSecurityError becomes typed fail-closed under an advisory-to-enforce flag whose
+DEFAULT keeps today's advisory behaviour byte-identical (the default flip is an owner
+decision, not this slice); negative test proves an unsigned or out-of-scope hook blocks
+the load when the flag is enforce, and only warns exactly as today when advisory.
+
+**Test:** `npx vitest run tests/core/plugin-sandbox-wire.test.ts`
+
+**NO-GO:** default-on enforcement, weakening any of the 4 pipeline steps, silently
+skipping the pipeline when config is absent (absent config means advisory plus a typed
+warning, never an undefined-skip), or breaking currently-loading legitimate plugins
+under the default.
+
+---
+
+## Task 4: enforce_spend_gate becomes a real typed pre-spawn gate, flag-gated (row 4091)
+
+- Files: src/cli/commands/start.ts, src/orchestra/sprint-finalizer.ts, tests/orchestra/spend-gate-enforce.test.ts
+- Scope: src/cli/commands/start.ts, src/orchestra/sprint-finalizer.ts, src/core/cost-config-loader.ts, tests/orchestra/spend-gate-enforce.test.ts
+- Model: claude-opus-5
+- Dependencies: none
+
+Measured (row 4091, 2026-08-05 code-truth scan): src/orchestra/sprint-finalizer.ts lines
+1886-1889 document "HARD spend gate ... NOT implemented"; src/cli/commands/start.ts line
+951 carries a TODO(post-beta); the cost_limits enforce_spend_gate key today only enables
+a warning emission — the inventory's largest name-behaviour gap.
+
+Required (owner principle from the row, binding): pre-spawn cumulative daily/monthly
+spend over the ceiling produces the typed hard block (COST_GATE_EXCEEDED) when
+enforce_spend_gate is true; an ACTIVE sprint is never cut mid-flight — graceful landing,
+only new admission stops; when the flag is false, today's warning behaviour stays
+byte-identical. Tests pin both modes and the mid-flight non-interruption property.
+
+**Test:** `npx vitest run tests/orchestra/spend-gate-enforce.test.ts`
+
+**NO-GO:** killing or pausing an active sprint on breach, changing the flag's default,
+renaming the config key in this slice, or a gate that reads spend from anywhere but the
+canonical cost/usage authority.
+
+---
+
+## Task 5: A PLAN-generated skill survives every FIX turn (row 3310)
+
+- Files: src/orchestra/temp-agent-generator.ts, src/core/skill-pool.ts, src/orchestra/sprint-phases.ts, tests/orchestra/generated-skill-durability.test.ts
+- Scope: src/orchestra/temp-agent-generator.ts, src/core/skill-pool.ts, src/orchestra/sprint-phases.ts, tests/orchestra/generated-skill-durability.test.ts
+- Model: claude-opus-5
+- Dependencies: none
+
+Measured (sprint-491, owner-recorded 2026-08-01): a skill generated during PLAN was gone
+by the FIX turn — the FIX-round worker prompt could not resolve it and the run produced
+FORCED_SKILL_UNAVAILABLE. Acceptance (row 3310): a PLAN-generated skill reaches the
+worker prompt with identical content across the whole FIX/XFIX lineage, and the
+FORCED_SKILL_UNAVAILABLE class fails closed with a regression test.
+
+Required: root-cause first — read the generated-skill write path (where PLAN persists
+it), the FIX respawn path (where the worker prompt resolves skills), and find the exact
+step where availability is lost (cleanup between phases, a temp dir FIX does not
+re-create, a pool that reloads only built-ins — whatever the evidence shows). State the
+root cause explicitly in the result notes BEFORE the fix. Fix at the root: the generated
+skill persists across FIX/XFIX rounds of the same lineage with identical content; do not
+re-generate per round; do not widen any skill-loading surface beyond the run's own
+lineage. When a forced skill genuinely cannot be resolved, the failure stays typed and
+fail-closed. Regression test pins durability (skill present in round-two prompt input)
+and the typed failure when truly absent. Tests hermetic (tmpdir fixture, no provider
+calls, no real spawn).
+
+**Test:** `npx vitest run tests/orchestra/generated-skill-durability.test.ts`
+
+**NO-GO:** regenerating the skill per round instead of persisting it, weakening the
+typed failure into a warning, touching provider dispatch, or a fix that only works for
+the first FIX round.
+
+---
+
+## Task 6: Point the model catalog at the live models.dev endpoint, typed on drift (row 539)
+
+- Files: src/core/model-catalog.ts, tests/core/model-catalog.test.ts
+- Scope: src/core/model-catalog.ts, tests/core/model-catalog.test.ts
 - Model: claude-sonnet-5
 - Dependencies: none
 
-Measured (row 340): the files flag contract is dishonest (accepted but not honored as
-documented), an empty evidence set produces no actionable remedy, and large files cannot
-be targeted by exact range or symbol without operator prompt hacks.
+Measured (row 539): the current remote catalog URL answers HTTP 302 to the HTML
+homepage, so every remote refresh dies at res.json() with "Unexpected token '<'" and the
+loader silently lives on the bundled catalog. Live probe: https://models.dev/api.json
+answers 200 application/json (~3.6 MB). Its shape is NOT the current
+RemoteCatalogResponse (a models array): api.json is a provider-keyed object map
+(provider id → models map keyed by model id).
 
-Required: the files flag filters exactly as documented or its help text tells the truth
-(pick the smaller honest change and record which); empty evidence exits with a typed,
-actionable remedy message through the i18n authority; bounded targeting accepts an exact
-path plus line-range or symbol so a large file never needs manual prompt surgery. New
-flags follow the file's existing option style; JSON output (if present) carries the same
-fields.
+Required, extending the existing 3-stage fallback exactly where it stands: the catalog
+URL moves to the live JSON endpoint; fetchRemoteCatalog gains a typed guard BEFORE
+parsing — a redirected final response or a non-JSON content-type produces a typed
+DeckentError in the existing catalog-error family, never a raw SyntaxError, and the
+warning-based fallback to cache then bundled stays as is; a shape adapter maps the
+provider-keyed api.json payload into the existing internal model list contract, with
+unknown entries keeping the existing skipped-model warning path and the catalog-empty
+merge staying intact. Tests pin: redirect produces the typed error, HTML content-type
+produces the typed error, a small inline provider-keyed fixture maps correctly (no
+network), and the cache is never written on any failure path.
 
-**Test:** `npx vitest run tests/cli/xverify-ux.test.ts`
+**Test:** `npx vitest run tests/core/model-catalog.test.ts`
 
-**NO-GO:** breaking existing xverify invocations, provider-call changes (targeting is
-pre-provider input shaping only), or free-string user-facing text outside the i18n catalog.
-
----
-
-## Task 6: One typed decision reconciles clean's dashboard-preserve policy with the dashboard build (row 3325)
-
-- Files: scripts/build-dashboard.mjs, tests/scripts/clean-dashboard-policy.test.ts
-- Scope: scripts/build-dashboard.mjs, scripts/clean.mjs, tests/scripts/clean-dashboard-policy.test.ts
-- Model: claude-opus-5
-- Dependencies: none
-
-Measured (row 3325, caught live 2026-08-01): clean preserves dist/dashboard by policy
-while the dashboard build expects an empty output directory and dies with
-E_DASHBOARD_BUILD_OUTPUT_NOT_EMPTY — the workaround was a manual removal. Two scripts
-read two contradictory policies.
-
-Required: one typed decision, defined once and consumed by both scripts. Read both
-scripts first and record in the result notes which policy wins and why
-(preserve-then-overwrite vs clean-slate) — the decision must remove the manual workaround
-in both directions: a clean followed by the dashboard build succeeds. Touch
-scripts/clean.mjs minimally — only the policy-read surface; its execution-authority
-machinery is out of bounds.
-
-**Test:** `npx vitest run tests/scripts/clean-dashboard-policy.test.ts`
-
-**NO-GO:** modifying clean's execution-authority or admission code paths, deleting dist
-content in the test process's real tree, or leaving either script reading a private
-policy copy.
+**NO-GO:** network access in tests, cache written on any failure path, bundled fallback
+removed or reordered, loadCatalog public signature changed, or a model-name literal
+introduced outside fixtures.

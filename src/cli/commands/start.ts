@@ -20,7 +20,10 @@ import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../
 import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '../../connectors/kpi-summary-dispatch.js';
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
 import { estimateSprintCost, formatEstimate, resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
-import { evaluateCostGate, evaluateSpendWarnAtSpawn } from '../../core/cost-gate.js';
+import { evaluateCostGate } from '../../core/cost-gate.js';
+// Pre-spawn cumulative-spend admission gate (row 4091). Surface → approved orchestra
+// entrypoint (ADR-D-004 C3): the enforcement decision is shared policy, not CLI logic.
+import { evaluateSpendAdmissionGate } from '../../orchestra/sprint-finalizer.js';
 import { evaluateScopeGate, applyScopeResolutions } from '../../core/scope-gate.js';
 import { writeEvent } from '../../core/event-stream.js';
 import { notifyAsync } from '../../core/notify.js';
@@ -1085,23 +1088,34 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
               return;
             }
 
-            // ─── PRE-SPAWN CUMULATIVE-SPEND WARN-GATE (B6 — warn-only) ──
-            // The estimate gate above checks only THIS sprint's cost. This
-            // advisory additionally projects the estimate on top of already-
-            // logged daily/monthly spend and WARNS (never blocks) when a rolling
-            // limit would be crossed. Flag-gated by cost_limits.enforce_spend_gate
-            // (default-off): flag-off / under-limit → no read, no event, sprint
-            // start byte-for-byte unchanged.
-            // TODO(phase2, post-beta): hard pre-spawn block unless acknowledged.
-            const spendWarn = evaluateSpendWarnAtSpawn({
+            // ─── PRE-SPAWN CUMULATIVE-SPEND ADMISSION GATE (row 4091) ──
+            // The estimate gate above checks only THIS sprint's cost. This gate
+            // additionally projects the estimate on top of already-logged
+            // daily/monthly spend (canonical authority: the resource ledger via
+            // readSpendWindow) and REFUSES ADMISSION when a rolling limit would be
+            // crossed. Flag-gated by cost_limits.enforce_spend_gate (default-off,
+            // unchanged): flag-off → no read, no event, sprint start byte-for-byte
+            // unchanged. --force acknowledges the breach and restores the previous
+            // warn-only behaviour, mirroring the estimate gate's acknowledgeCost.
+            // Enforcement stops at this boundary by design — a sprint that is
+            // already running is never cut; only new admission stops.
+            const spendAdmission = evaluateSpendAdmissionGate({
               root,
               costConfig,
               sprintEstimateUsd: gate.estimate.costRealistic,
+              acknowledged: opts.force === true,
             });
+            const spendWarn = spendAdmission.breach;
             if (spendWarn) {
               writeEvent(root, planForCost.id, 'brain', 'user', spendWarn.type, { ...spendWarn, sprintId: planForCost.id });
               print(`⚠️  [cost-advisory] ${spendWarn.message}`);
               notifyAsync('progress', planForCost.id, 'Cost limit warning', spendWarn.message);
+            }
+            if (!spendAdmission.ok) {
+              if (sandboxState) restoreSandbox(root, sandboxState);
+              printError(new Error(spendAdmission.message));
+              process.exitCode = 1;
+              return;
             }
 
             // Auto-confirm threshold

@@ -109,6 +109,10 @@ import {
 import { AgentPoolManager } from '../core/agent-pool.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
 import { detectProjectStack } from '../core/stack-detector.js';
+import {
+  generateProjectConventionsSkill,
+  getGeneratedContent,
+} from './temp-skill-generator.js';
 
 // ─── Rich Output ─────────────────────────────────────────────────
 import { showSplashIfEnabled } from '../cli/helpers/splash.js';
@@ -1097,6 +1101,26 @@ export interface SpawnPhaseResult {
   scanInterval: ReturnType<typeof setInterval> | null;
 }
 
+/**
+ * Materialize the PLAN-generated project-conventions skill once for this run.
+ *
+ * PLAN routing holds the generated definition only in memory, while every
+ * later FIX/XFIX spawn resolves assigned skills from .deckent/skills. Persist
+ * the exact PLAN rendering at the phase boundary so the lineage reuses one
+ * immutable-on-disk body instead of regenerating it during each repair round.
+ */
+export function persistPlanGeneratedProjectConventionsSkill(projectRoot: string): boolean {
+  const projectStack = detectProjectStack(projectRoot);
+  if (!projectStack) return false;
+
+  const generatedSkill = generateProjectConventionsSkill(projectStack);
+  const content = getGeneratedContent(generatedSkill);
+  if (!content) return false;
+
+  new SkillPoolManager(projectRoot).saveGeneratedSkill(generatedSkill, content);
+  return true;
+}
+
 
 // ═══ Phase 1: PLAN ════════════════════════════════════════════════
 
@@ -1122,6 +1146,13 @@ export async function runPlanPhase(
     };
     const sprint = await planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
+
+    // PLAN creates project-conventions in the routing catalog only. The worker
+    // resolver used by every later FIX/XFIX round is disk-backed, so persist
+    // this single PLAN rendering before the first task can be dispatched.
+    try {
+      persistPlanGeneratedProjectConventionsSkill(projectRoot);
+    } catch (e) { debugLog('runPlanPhase:persistGeneratedSkill', e); }
 
     // Sprint 161 Task 2 (T-003): emit PLAN/PLANNING transition to disk so
     // external observers (CLI status, recovery) see the live phase from

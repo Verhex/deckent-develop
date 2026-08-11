@@ -1,7 +1,7 @@
 // ─── Model Catalog (Sprint 190 W-F F-6/F-7) ────────────────────────────────
 // Runtime model catalog with 3-stage fallback: fresh fetch → 24h cache → bundled.
 //
-// Source of truth at runtime: https://models.dev/api/v1/catalog
+// Source of truth at runtime: https://models.dev/api.json
 // Cache file: ~/.deckent/cache/models-catalog.json (24h TTL)
 // Bundled fallback: CANONICAL_MODELS from model-registry.ts (offline safety net)
 //
@@ -23,7 +23,7 @@ import {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-export const CATALOG_URL = 'https://models.dev/api/v1/catalog';
+export const CATALOG_URL = 'https://models.dev/api.json';
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const FETCH_TIMEOUT_MS = 5_000;
 
@@ -60,6 +60,21 @@ export interface RemoteCatalogResponse {
   version: string;
   generatedAt?: string;
   models: RemoteCatalogModel[];
+}
+
+type JsonRecord = Record<string, unknown>;
+
+interface ModelsDevModel {
+  id?: unknown;
+  cost?: { input?: unknown; output?: unknown };
+  limit?: { context?: unknown; output?: unknown };
+  modalities?: { input?: unknown };
+  tool_call?: unknown;
+  reasoning?: unknown;
+}
+
+interface ModelsDevProvider {
+  models?: unknown;
 }
 
 export interface CachedCatalog {
@@ -279,6 +294,76 @@ async function writeCache(path: string, cached: CachedCatalog): Promise<void> {
   await fs.writeFile(path, JSON.stringify(cached, null, 2), 'utf-8');
 }
 
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function isJsonContentType(contentType: string | null): boolean {
+  if (!contentType) return false;
+  const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase();
+  return mediaType === 'application/json' || mediaType?.endsWith('+json') === true;
+}
+
+/** Adapt models.dev's provider-keyed api.json payload to the cache contract. */
+export function adaptModelsDevCatalog(payload: unknown): RemoteCatalogResponse {
+  if (!isJsonRecord(payload)) {
+    throw new DeckentError('E_CATALOG_FETCH_SHAPE', 'models.dev catalog response must be an object');
+  }
+
+  if (Array.isArray(payload.models)) {
+    return payload as unknown as RemoteCatalogResponse;
+  }
+
+  const models: RemoteCatalogModel[] = [];
+  for (const [provider, providerValue] of Object.entries(payload)) {
+    const providerCatalog = providerValue as ModelsDevProvider;
+    if (!isJsonRecord(providerCatalog) || !isJsonRecord(providerCatalog.models)) continue;
+
+    for (const [modelId, modelValue] of Object.entries(providerCatalog.models)) {
+      if (!isJsonRecord(modelValue)) {
+        models.push({ id: modelId, provider });
+        continue;
+      }
+
+      const model = modelValue as ModelsDevModel;
+      const apiId = typeof model.id === 'string' && model.id.length > 0 ? model.id : modelId;
+      const inputCost = finiteNumber(model.cost?.input);
+      const outputCost = finiteNumber(model.cost?.output);
+      const contextWindow = finiteNumber(model.limit?.context);
+      const maxOutputTokens = finiteNumber(model.limit?.output);
+      const modalityInputs = model.modalities?.input;
+
+      models.push({
+        id: modelId,
+        apiId,
+        provider,
+        ...(inputCost !== undefined && outputCost !== undefined
+          ? { costPerMillion: { input: inputCost, output: outputCost } }
+          : {}),
+        ...(contextWindow !== undefined ? { contextWindow } : {}),
+        ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+        capabilities: {
+          streaming: true,
+          toolUse: model.tool_call === true,
+          vision: Array.isArray(modalityInputs) && modalityInputs.includes('image'),
+          codeExecution: false,
+          reasoning: model.reasoning === true,
+        },
+      });
+    }
+  }
+
+  if (models.length === 0) {
+    throw new DeckentError('E_CATALOG_FETCH_SHAPE', 'models.dev catalog response missing provider models');
+  }
+
+  return { version: 'models.dev/api.json', models };
+}
+
 // ─── Fetch ─────────────────────────────────────────────────────────────────
 
 export async function fetchRemoteCatalog(
@@ -303,14 +388,28 @@ export async function fetchRemoteCatalog(
         `models.dev catalog HTTP ${res.status}`,
       );
     }
-    const json = (await res.json()) as RemoteCatalogResponse;
-    if (!json || !Array.isArray(json.models)) {
+    if (res.redirected) {
       throw new DeckentError(
-        'E_CATALOG_FETCH_SHAPE',
-        'models.dev catalog response missing models[]',
+        'E_CATALOG_FETCH_REDIRECT',
+        `models.dev catalog redirected to ${res.url || 'an unexpected URL'}`,
       );
     }
-    return json;
+    if (!isJsonContentType(res.headers.get('content-type'))) {
+      throw new DeckentError(
+        'E_CATALOG_FETCH_CONTENT_TYPE',
+        `models.dev catalog returned non-JSON content-type ${res.headers.get('content-type') ?? '<missing>'}`,
+      );
+    }
+    let json: unknown;
+    try {
+      json = await res.json();
+    } catch (err) {
+      throw new DeckentError(
+        'E_CATALOG_FETCH_JSON',
+        `models.dev catalog response contained invalid JSON: ${(err as Error).message}`,
+      );
+    }
+    return adaptModelsDevCatalog(json);
   } finally {
     clearTimeout(timer);
   }
