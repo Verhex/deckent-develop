@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "098317412965b7542ac9f1dc30f01af098e4aa277292b93fadbdcfa1a02e4dc5"
+    "value": "bce06b6b8a780a926c97095e80be0f795ebef85434b63539509771a39680a4b5"
   },
   "summary": {
-    "total": 432,
-    "active": 385,
+    "total": 433,
+    "active": 386,
     "terminal": 47,
     "receipts": 183,
     "byState": {
-      "OPEN": 292,
+      "OPEN": 293,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 275,
+      "P0": 276,
       "P1": 119,
       "P2": 38
     },
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 4,
-      "KERNEL": 99,
+      "KERNEL": 100,
       "LEARNING": 5,
       "OBS": 3,
       "ONBOARDING": 1,
@@ -3109,6 +3109,17 @@
       "updated": "2026-08-05",
       "definitionDigest": "9aa2b9863c3cbc36bc53b6d30ff58fbd8068688fb5aa4681ef6f2698bfc3aa7a",
       "progressDigest": "26f243d3e420279598c3134eb47cb618f9c0bda7b3415e244ceed1f266875844",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3308,
+      "id": "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "95b6d486e8956f60460bea1a5aaf218b7a21ced7caa33689ba4351046732372f",
+      "progressDigest": "a637ffd18ec0ab078d3f4a4e50ebe444c573cb02359b93e8200a160f6c90ad00",
       "terminalClosureDigest": null
     },
     {
@@ -13836,6 +13847,7 @@
         "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
         "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
         "RECOVERY-LIVE-CONTINUATION-PROOF-001",
+        "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "gates": [
@@ -13898,6 +13910,7 @@
         "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
         "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
         "RECOVERY-LIVE-CONTINUATION-PROOF-001",
+        "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "evidenceReceipts": [
@@ -16904,6 +16917,37 @@
       "acceptance": "Gerçek PAUSED run'dan continuation canlı kanıtlanır; dependency shared-digest non-Sprint modlarda (Run/Do/Flow) ve every-environment'ta aynı authority'den doğrulanır",
       "evidence": "Açılış 2026-08-05: 24-satır DONE turunda residual-çıkarma (Alperen onaylı); kaynaklar: RECOVERY-BORN-488-RECOVERY-TERMINAL-001 (fresh-PAUSED + non-Sprint), RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001 (shared-digest modları + every-environment)",
       "updated": "2026-08-05"
+    },
+    {
+      "order": 3308,
+      "id": "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Codex-provider attempt'leri landing-checkpoint continuation admission'ından geçebilir: cumulative-mode startup observation ile incremental-şartı tek doğru kontrata bağlanır",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Continuation admission (execution-continuation-runner assertContinuationStartupReserve) ile observation yazıcısının mode kontratı tek karara bağlanır: ya codex startup observation'ı semantik-doğru incremental delta olarak yazılır ya admission cumulative-first'ü doğru delta hesabıyla kabul eder; budget-truth semantiği (appliedDelta toplamları, turn sayımı) bayt-doğru korunur; regresyon testi her iki provider usage-semantiğini pinler; gerçek codex koşusu landing sonrası continuation'dan geçer",
+      "evidence": "Açılış 2026-08-10 gece dogfood (Alperen 'ekle' onayı): sprint-507'de her iki codex görevi attempt-1'de öldü — kanıt: attempt 417a381d ilk observation mode=cumulative countsAsTurn=true iken admission mode=incremental şart koşuyor (runner satır ~106, 'immutable incremental parent startup observation'); attempt-2'ler status'ta Writing-code görünürken heartbeat 00:41'de durdu, sonuçsuz vanish (E091 vanished-worker-settlement-pending ailesi); 507-002 codex logu usageSemantics mode=cumulative terminal=true kaydını gösteriyor; sprint-507 runner PID 55905 dahil tamamen öldü, recover ile finalize edildi",
+      "updated": "2026-08-10"
     },
     {
       "order": 3310,
@@ -22885,6 +22929,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5a5c1687fde72f6aca240f11e861bd872cdad0b32f525bc4ebbfb0e91ce793eb"
+    "value": "6e294063e246cc3358dfb43d418d867ded7f038d9f0f8e40dcac32e24d8ac259"
   }
 }

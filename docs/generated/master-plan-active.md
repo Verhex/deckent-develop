@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):098317412965b7542ac9f1dc30f01af098e4aa277292b93fadbdcfa1a02e4dc5`
+**Source digest:** `sha256(normalized-lf-utf8):bce06b6b8a780a926c97095e80be0f795ebef85434b63539509771a39680a4b5`
 
-**Rows:** 432 total · 385 active · 47 terminal
+**Rows:** 433 total · 386 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 292 |
+| OPEN | 293 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -268,6 +268,7 @@
 | 3305 | `LIFECYCLE-VOCAB-001` | OPEN | P1 | KERNEL | — | — | Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir |
 | 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |
 | 3307 | `RECOVERY-LIVE-CONTINUATION-PROOF-001` | OPEN | P2 | KERNEL | — | — | Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı |
+| 3308 | `RECOVERY-BORN-507-CODEX-CONTINUATION-001` | OPEN | P0 | KERNEL | — | — | Codex-provider attempt'leri landing-checkpoint continuation admission'ından geçebilir: cumulative-mode startup observation ile incremental-şartı tek doğru kontrata bağlanır |
 | 3310 | `SKILL-DURABILITY-001` | OPEN | P0 | KERNEL | — | — | PLAN'da üretilen skill FIX turlarında kaybolmaz: generated-skill durability |
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
