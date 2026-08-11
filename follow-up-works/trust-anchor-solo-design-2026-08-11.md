@@ -155,3 +155,18 @@ Closes the residual gap left open by Mitigation 1 alone: an enterprise ruleset c
 ## Residual risk after all four
 
 Mitigations 1–3 are primarily **detective**, not preventive, for the one action none of them can fully block: the sole admin still holds repository Settings/ruleset-admin power and can, if determined, delete the App installation, remove the bot collaborator, or edit the ruleset directly. What 1–3 change is that every one of those actions becomes independently verifiable and time-stamped rather than silent. Only Mitigation 4, and only if its enterprise-owner credential is operated as a genuinely separate identity from day-to-day admin use, converts this from detective to preventive. A structurally complete answer to "solo account" ultimately requires either a second human trustee with independent org-owner rights, or the enterprise-ruleset lock from Mitigation 4 under real credential separation — this document surfaces that honestly rather than implying Mitigations 1–3 alone close the gap.
+
+---
+
+## OWNER DECISION (Alperen, 2026-08-11 — codex cross-review sonrası)
+
+**REVİZYONA GÖNDERİLDİ** (codex verdict: UNSOUND). Revizyon şartları:
+1. Rollout sırası ters çevrilir: GHEC/ayrı-trustee feasibility ÖNCE; dış App check bu üst
+   katmana pinlenir.
+2. Korumalı path'ler `.github/CODEOWNERS` dosyasının KENDİSİNİ kapsar (self-protection).
+3. Mitigation 1 check'i yeni App'in `integration_id`'sine pinlenir (yalnız isimle değil).
+4. Mitigation 3 polling yerine webhook+audit-log tabanlı olur (transient gevşet-merge-geri-yükle
+   saldırısını yakalamak için); `bypass_actors` görünürlük sınırı belgelenir.
+5. Her mitigation için canlı NEGATİF test tanımı zorunlu ("sole admin bunu sökebiliyor mu?").
+6. Threat model genişletilir: App-host compromise, webhook replay/ref-TOCTOU, bot-policy
+   compromise, ledger-yazım durdurma.

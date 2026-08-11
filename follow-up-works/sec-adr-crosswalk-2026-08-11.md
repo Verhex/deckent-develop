@@ -75,3 +75,16 @@ Until those decisions are recorded, this crosswalk makes no product, ADR, or imp
 
 - `follow-up-works/OWASP-ASI-REVERIFY-2026-08-11.md`, §§8.2–8.3 and §9.2: nine-design inventory, four conflict types/routes, and bounded code-truth observations.
 - `follow-up-works/dep-supply-defense-2026-08-11.md`, §§5 and repository anchors: the separately counted tenth evaluation and its `ADR-D-005` policy anchor.
+
+---
+
+## OWNER DECISIONS (Alperen, 2026-08-11 — codex cross-review sonrası)
+
+- **C1-C4 mandate'leri: ŞARTLI ONAY.** Her proposal'ın zorunlu İLK çıktısı normative-field-diff
+  matrisidir (exact eski alan → önerilen yeni alan → değişmeden korunan TÜM invariant'lar +
+  immutable ADR'yi successor'lamaya yetki veren exact ADR-G-019 maddesi). Matris çürürse ilgili
+  mandate düşer; tipleme (SUCCESSOR/AMENDMENT) matristen türetilir, `Immutable` bayrağından değil.
+- **Paket madde 3: EVET** — A1/A4/A5/A8/A9 için authoritative memory-export recall B13'te tek
+  mikro-task; sonuçları ilgili implementation satırlarına admission gate olarak bağlanır.
+- Codex ikinci-görüş kaydı: verdict UNSOUND (tipleme mekaniği); şartlı-onay bu itirazı matris
+  zorunluluğuyla içselleştirir. Kaynak: xverify bootstrap-seam analizi, 2026-08-11.
