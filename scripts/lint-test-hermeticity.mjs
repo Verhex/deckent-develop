@@ -140,13 +140,16 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-11 (sprint-510 harvest): +2 — the generated-skill-durability and
   // plugin-sandbox-wire suites add two tracked tmpdir write sites. Measured on
   // a clean HEAD worktree (27d9bdec4). Prior: NIGHT-DOGFOOD 508-509 (12213).
-  count: 12215,
+  // 2026-08-11 (B5/B6 hasadı + mutabakat): +120 — runner-death, archive-authority,
+  // status-liveness, error-registry-integrity, fix-spawn, retirement ve force-
+  // finalize suite'lerinin tmpdir yazım siteleri. Temiz HEAD worktree (a8c6c0d8d).
+  count: 12335,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: 'c4684b4a8d2151ed6272397123e1108c1b7e4466aad55dfd94f90d53fe1eb4ce',
+  digest: 'aff1c7395de8a5151b249450a23fd3ddb5d6a12283e15473e7ba2df045c084cb',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -174,7 +177,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // time via the new clean-dashboard-policy suite (row 3325's single typed
   // preserve-then-overwrite decision is proven from the real script). Measured
   // on a clean HEAD worktree (b381c03fd). Prior: MODEL-ACTIVATION-001 (1206).
-  count: 1207,
+  // 2026-08-11 (B5/B6 hasadı): +4 — error-registry, recover-helpers, status ve
+  // runner-entry modülleri yeni suite'lerin test-support bağımlılığı olarak
+  // envantere girdi. Temiz HEAD worktree (a8c6c0d8d).
+  count: 1211,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
@@ -193,7 +199,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-11 (sprint-510 harvest): edits to already-inventoried modules only
   // (parser, verify, controller, finalizer, plugin, catalog) — same 1207 count,
   // content digest only. Measured on a clean HEAD worktree (27d9bdec4).
-  digest: '9f913c49d77f0b4dddbbcc047faf7b0155a23ee93e61a11d8d0fd22318dc3928',
+  digest: 'cbc4cb547562a1b7449d5086666c9d1b15e5394664164624f83015e7058ce283',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
