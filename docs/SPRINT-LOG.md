@@ -187,3 +187,32 @@ Bug: tests/connectors/bot-lifecycle-hones… (PAUSED)
 - 519-008: Capability broker authority-resolution wiring residual (row 4040) (DONE)
 
 ---
+## Sprint 521 — sprint-521
+
+**Status:** COMPLETE
+**Date:** 2026-08-11
+**Duration:** 1581s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1580796ms |
+
+### Tasks
+
+- 521-001: Fail-closed tenant authority for autonomous approval ingress (row 4021, rerun) (DONE)
+- 521-002: Agent catalog S1 — schema and state model, types only (row 7011) (DONE)
+- 521-003: Agent catalog S2 — the resolver behind the existing API (row 7011) (DONE)
+- 521-004: Skill catalog S1 — one effective read model behind the existing API (row 7012) (DONE)
+- 521-005: Skill catalog S2 — V3 profile state carried as data (row 7012) (DONE)
+- 521-006: Crash artifacts gain retention and a bounded reader (row 121 second slice) (DONE)
+- 521-007: Agent catalog S0 — the discovery census gate (row 7011) (DONE)
+- 521-008: The plan gate learns read-satisfiability (born from two honest refusals) (DONE)
+
+---

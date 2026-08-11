@@ -23,6 +23,10 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { writeAuditEvent } from '../../core/audit-writer.js';
+import {
+  resolveCallerTenant,
+  type VerifiedPrincipal,
+} from '../../core/principal.js';
 import type { Executor } from '../../nervous/executor.js';
 import type {
   ApprovalDecision,
@@ -36,6 +40,8 @@ export interface PendingApproval {
   action: string;
   requestedBy: string;
   enqueuedAt: string;
+  /** Tenant authority for enterprise callers. Absent means legacy solo `local`. */
+  tenantId?: string;
   /**
    * Full parked trigger, stored so the loop can REPLAY it once a decision is
    * recorded (APPROVE-006 run-on-approve). Optional for backward compat with
@@ -95,6 +101,10 @@ export interface ApprovalGateOptions {
   now?: () => string;
   /** Optional nervous Executor delegate — accept/reject also calls resolveApproval. */
   executor?: Pick<Executor, 'resolveApproval'>;
+  /** Verified caller identity supplied by the approval ingress. */
+  principal?: VerifiedPrincipal;
+  /** Refuse a principal without a tenant claim instead of using solo `local`. */
+  strictTenantIsolation?: boolean;
 }
 
 const isoNow = (): string => new Date().toISOString();
@@ -118,6 +128,25 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
 
   type DecisionMap = Record<string, ApprovalDecision>;
 
+  function callerTenant(): string {
+    return resolveCallerTenant(
+      opts.principal ?? { id: 'approval-ingress' },
+      opts.strictTenantIsolation ?? false,
+    );
+  }
+
+  function entryTenant(entry: PendingApproval): string {
+    return entry.tenantId ?? 'local';
+  }
+
+  function scopedKey(tenantId: string, triggerId: string): string {
+    return tenantId === 'local' ? triggerId : `${tenantId}:${triggerId}`;
+  }
+
+  function entryKey(entry: PendingApproval): string {
+    return scopedKey(entryTenant(entry), entry.triggerId);
+  }
+
   function loadDecisions(): DecisionMap {
     if (!decisionsPath || !existsSync(decisionsPath)) return {};
     try {
@@ -137,15 +166,16 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
 
   function recordDecision(triggerId: string, decision: ApprovalDecision): void {
     const map = loadDecisions();
-    map[triggerId] = decision;
+    map[scopedKey(callerTenant(), triggerId)] = decision;
     writeDecisions(map);
   }
 
   function clearDecision(triggerId: string): void {
     if (!decisionsPath) return;
     const map = loadDecisions();
-    if (triggerId in map) {
-      delete map[triggerId];
+    const key = scopedKey(callerTenant(), triggerId);
+    if (key in map) {
+      delete map[key];
       writeDecisions(map);
     }
   }
@@ -155,7 +185,7 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
       const data = JSON.parse(readFileSync(opts.pendingPath, 'utf-8'));
       if (Array.isArray(data)) {
         for (const item of data as PendingApproval[]) {
-          if (item?.triggerId) pendingMap.set(item.triggerId, item);
+          if (item?.triggerId) pendingMap.set(entryKey(item), item);
         }
       }
     } catch {
@@ -168,12 +198,16 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
    *  in-memory pendingMap for the same-process case. Re-read fresh so a request
    *  added after construction is honoured. */
   function isKnownPending(triggerId: string): boolean {
-    if (pendingMap.has(triggerId)) return true;
+    const tenantId = callerTenant();
+    const inMemory = pendingMap.get(scopedKey(tenantId, triggerId));
+    if (inMemory && entryTenant(inMemory) === tenantId) return true;
     if (opts.pendingPath && existsSync(opts.pendingPath)) {
       try {
         const data = JSON.parse(readFileSync(opts.pendingPath, 'utf-8'));
         if (Array.isArray(data)) {
-          return (data as PendingApproval[]).some((item) => item?.triggerId === triggerId);
+          return (data as PendingApproval[]).some(
+            (item) => item?.triggerId === triggerId && entryTenant(item) === tenantId,
+          );
         }
       } catch {
         // Corrupt pending file must not weaken the guard — treat as no match.
@@ -215,27 +249,30 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
 
   return {
     request(trigger: AutonomousTrigger): Promise<ApprovalDecision> {
+      const tenantId = callerTenant();
+      const key = scopedKey(tenantId, trigger.id);
       // A decision may arrive in-memory (same-process accept/reject) OR on disk
       // (a separate `autonomous approve/reject` process) — check both.
-      let decision = resolved.get(trigger.id);
+      let decision = resolved.get(key);
       if (!decision || decision.outcome === 'pending') {
-        const onDisk = loadDecisions()[trigger.id];
+        const onDisk = loadDecisions()[key];
         if (onDisk && onDisk.outcome !== 'pending') decision = onDisk;
       }
       if (decision && decision.outcome !== 'pending') {
-        resolved.delete(trigger.id);
-        pendingMap.delete(trigger.id);
+        resolved.delete(key);
+        pendingMap.delete(key);
         clearDecision(trigger.id);
         persist();
         return Promise.resolve(decision);
       }
       // 🔴 INVARIANT: stays pending until external accept/reject.
-      if (!pendingMap.has(trigger.id)) {
-        pendingMap.set(trigger.id, {
+      if (!pendingMap.has(key)) {
+        pendingMap.set(key, {
           triggerId: trigger.id,
           action: trigger.action,
           requestedBy: trigger.requestedBy,
           enqueuedAt: now(),
+          ...(tenantId === 'local' ? {} : { tenantId }),
           trigger,
         });
         persist();
@@ -252,7 +289,7 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
         outcome: 'approved',
         reason: reason ?? 'user accepted',
       };
-      resolved.set(triggerId, decision);
+      resolved.set(scopedKey(callerTenant(), triggerId), decision);
       recordDecision(triggerId, decision); // cross-process channel
       opts.executor?.resolveApproval(triggerId, 'accepted');
     },
@@ -263,13 +300,14 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
         outcome: 'rejected',
         reason: reason ?? 'user rejected',
       };
-      resolved.set(triggerId, decision);
+      resolved.set(scopedKey(callerTenant(), triggerId), decision);
       recordDecision(triggerId, decision); // cross-process channel
       opts.executor?.resolveApproval(triggerId, 'rejected');
     },
 
     pending(): readonly PendingApproval[] {
-      return [...pendingMap.values()];
+      const tenantId = callerTenant();
+      return [...pendingMap.values()].filter((entry) => entryTenant(entry) === tenantId);
     },
 
     takeResolved(): AutonomousTrigger | null {
@@ -278,7 +316,8 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
       // — NOT the in-memory `resolved` map (which is empty in the loop process).
       const decisions = loadDecisions();
       for (const entry of pendingMap.values()) {
-        const decision = decisions[entry.triggerId];
+        if (entryTenant(entry) !== callerTenant()) continue;
+        const decision = decisions[entryKey(entry)];
         if (decision && decision.outcome !== 'pending') {
           return (
             entry.trigger ?? {

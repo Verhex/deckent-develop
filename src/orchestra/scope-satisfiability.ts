@@ -1,10 +1,15 @@
 // ─── Scope Satisfiability Lint (G1b) ────────────────────────────────
 // Cross-checks a task's declarative text (description/goCriteria/proofCommands)
-// against its declared write authority (filesWrite/directories/trackedFiles).
-// Pure, orchestra-type-free: callers own how a task JSON maps onto
+// against its declared write authority (filesWrite/directories/trackedFiles) and,
+// since sprint-521 (521-008), its declared READ authority (filesRead/directories/
+// filesWrite). Pure, orchestra-type-free: callers own how a task JSON maps onto
 // SatisfiabilityInput. See tests/fixtures/prompt-contract-397/ for the
 // sprint-397 incidents (typo-path, silently-dropped root file, unchanged∩WRITE)
-// this module is a regression base for.
+// this module is a regression base for. The read-side rule was born from two
+// honest sprint-519/520 BOUNDARY_BLOCKED refusals (task 2030 could not read the
+// providers it had to classify; task 4021 could not read the principal resolver
+// it was ordered to consume) — the write-side gate warned on that class of
+// mismatch already; the read side was blind until now.
 
 export interface SatisfiabilityInput {
   description: string;
@@ -13,12 +18,17 @@ export interface SatisfiabilityInput {
   filesWrite: string[];
   directories: string[];
   trackedFiles: readonly string[];
+  /** Optional: individually-listed read-only visible files (scope.filesRead).
+   * Absent/omitted callers simply never trigger MENTIONED_NOT_READABLE beyond
+   * what `directories`/`filesWrite` already cover. */
+  filesRead?: readonly string[];
 }
 
 export type SatisfiabilityFindingCode =
   | 'MENTIONED_NOT_WRITABLE'
   | 'PROOF_PATH_MISSING'
-  | 'UNCHANGED_IN_WRITE';
+  | 'UNCHANGED_IN_WRITE'
+  | 'MENTIONED_NOT_READABLE';
 
 export interface SatisfiabilityFinding {
   severity: 'BLOCK' | 'WARN';
@@ -147,6 +157,15 @@ const NEGATION_LEMMAS = [
   'dokunma', 'değiştirme', 'dokunulmaz', 'do not touch', "don't modify",
 ];
 
+// Verbs implying a mentioned path/module must be CONSUMED (read), not written —
+// deliberately narrow (born from the two measured incidents' own wording:
+// "classify" the providers, "consume" the principal resolver) rather than a
+// broad synonym sweep, to keep the false-positive surface small.
+const READ_VERB_LEMMAS = [
+  'oku', 'tüket', 'sınıflandır', 'işle',
+  'read', 'consume', 'classify',
+];
+
 const UNCHANGED_DECLARATION_RE = /değişmeyecek|unchanged|aynen kal|must remain/i;
 
 function containsLemma(sentence: string, lemmas: string[]): boolean {
@@ -269,6 +288,48 @@ function lintMentionedNotWritable(input: SatisfiabilityInput): SatisfiabilityFin
   return findings;
 }
 
+// ─── Rule 1c: MENTIONED_NOT_READABLE ───────────────────────────────
+// Read-side sibling of rule 1b: a description mention adjacent to a
+// consume/read verb, with the same sentence-scoped negation guard. A mention
+// is readable when it is individually listed (filesRead), covered by a scoped
+// directory (directories — reused as-is: a directory grant makes everything
+// under it visible, not only the narrower write subset), or itself in
+// filesWrite (you can always read what you're authorized to write). WARN-only
+// by construction — this rule never emits BLOCK.
+
+function isReadable(token: string, input: SatisfiabilityInput): boolean {
+  return (
+    (input.filesRead ?? []).includes(token) ||
+    isCoveredByDirectories(token, input.directories) ||
+    input.filesWrite.includes(token)
+  );
+}
+
+function lintMentionedNotReadable(input: SatisfiabilityInput): SatisfiabilityFinding[] {
+  const findings: SatisfiabilityFinding[] = [];
+  const seen = new Set<string>();
+
+  const masked = maskPathSpans(input.description);
+  for (const mention of extractMentions(input.description)) {
+    if (mention.kind === 'bare' && !isRootTrackedFile(mention.token, input.trackedFiles)) continue;
+    if (isReadable(mention.token, input)) continue;
+    const sentence = sentenceAround(input.description, masked, mention.start, mention.end);
+    if (!containsLemma(sentence, READ_VERB_LEMMAS)) continue;
+    if (containsLemma(sentence, NEGATION_LEMMAS)) continue;
+    const key = `WARN-READ:${mention.token}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    findings.push({
+      severity: 'WARN',
+      code: 'MENTIONED_NOT_READABLE',
+      path: mention.token,
+      message: `description implies reading "${mention.token}" but it is not covered by filesRead/directories/filesWrite`,
+    });
+  }
+
+  return findings;
+}
+
 // ─── Rule 2: PROOF_PATH_MISSING ────────────────────────────────────
 
 function lintProofPathMissing(input: SatisfiabilityInput): SatisfiabilityFinding[] {
@@ -354,6 +415,7 @@ function lintUnchangedInWrite(input: SatisfiabilityInput): SatisfiabilityFinding
 export function lintScopeSatisfiability(input: SatisfiabilityInput): SatisfiabilityFinding[] {
   return [
     ...lintMentionedNotWritable(input),
+    ...lintMentionedNotReadable(input),
     ...lintProofPathMissing(input),
     ...lintUnchangedInWrite(input),
   ];

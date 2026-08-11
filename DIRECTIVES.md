@@ -1,18 +1,18 @@
-# DIRECTIVES — Sprint-B11: eight-task factory wave two
+# DIRECTIVES — Sprint-B12: factory wave three, the catalog implementation begins
 
 ## Goal
 
-Eight MASTER-PLAN rows advance: the credential exposure taxonomy rerun (2030) feeding
-the runtime credential lifecycle design (4131); the invocation receipt design (4070);
-the kernel ontology design (3010); the autonomous tenant authority slice (4021); the
-config truth slice (470); the trust-anchor solo mitigation design (526); and the
-owner-commissioned persona-as-system-prompt spawn analysis (agent design D4 addendum).
-Task 2 declares a dependency on task 1; all other tasks are scope-disjoint. Analysis
-artifacts belong under follow-up-works/ — docs/ is product documentation only.
+Eight tasks: the tenant-authority rerun with corrected scope (4021), the first three
+catalog implementation slices executing the owner's recorded decisions (agent census,
+agent schema S1, agent resolver S2, skill resolver S1, skill V3-state S2 — rows 7011
+and 7012), the crash retention slice (121), and the read-satisfiability plan gate born
+from this week's two honest BOUNDARY_BLOCKED refusals. Tasks 3 and 5 declare
+dependencies. The catalog tasks MUST read their governing design documents and the
+OWNER DECISIONS addenda in follow-up-works — the decisions there are binding.
 
-Read visibility note for every documentation task: reading the repository sources for
-EVIDENCE is expected and permitted — the write authority is what the Files line
-constrains. State every claim with file-level evidence.
+Read visibility note for every task: reading repository sources and the design
+documents for evidence is expected and permitted — the write authority is what the
+Files line constrains.
 
 Provider, model, effort and effective concurrency are resolved from effective config,
 registry, role policy, auth/reachability evidence, usage/limit authority and host admission.
@@ -36,234 +36,221 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
 
 ---
 
-## Task 1: Runtime-visible credential exposure taxonomy (row 2030, rerun)
-
-- Files: follow-up-works/credential-exposure-taxonomy-2026-08-11.md
-- Scope: follow-up-works/credential-exposure-taxonomy-2026-08-11.md, follow-up-works/, src/providers/, src/orchestra/, src/core/
-- Model: claude-sonnet-5
-- Dependencies: none
-
-Measured (row 2030; first attempt refused honestly when its read view excluded the
-sources): the current Docker Codex auth copy is not zero-exposure, and no honest
-classification exists for how each provider credential is visible at runtime. A
-partial artifact from the refused attempt exists at the target path recording the
-evidence hold — REPLACE it with the completed taxonomy.
-
-Required: classify every provider credential path the code ACTUALLY uses (read the
-spawn backends, credential stores and provider adapters — they are inside your scope)
-into host-only, env, tmpfs-copy, persistent-copy and enterprise custody — with
-file-level evidence per classification, the exposure window and revocation story for
-each, and the honest verdict for the Docker Codex auth copy. Owner decision points for
-every tightening step. Document only; the src/ scope entries are for READ evidence —
-writing any file outside follow-up-works is a NO-GO.
-
-**Test:** the document exists at the exact path with every credential path classified;
-`node scripts/lint-links.mjs` stays green.
-
-**NO-GO:** production or config edits, a classification without file-level evidence,
-or claiming zero-exposure anywhere the code shows a copy.
-
----
-
-## Task 2: Runtime credential lifecycle service contract (row 4131 first slice)
-
-- Files: follow-up-works/runtime-credential-lifecycle-design-2026-08-11.md
-- Scope: follow-up-works/runtime-credential-lifecycle-design-2026-08-11.md, follow-up-works/, src/api/, src/cli/, src/connectors/
-- Model: claude-opus-5
-- Dependencies: taxonomy
-
-Measured (row 4131): API/terminal tokens and serve daemon descriptors are created,
-published, rotated and retired by scattered call sites — dead PIDs, port reuse,
-restarts, concurrent daemons and partial writes each have ad-hoc handling.
-
-Required: a design document (the file named in Files — NEW) that inventories every
-current credential/descriptor call site (api-token, terminal-token, serve-daemon
-descriptors, bot pid publication) with file-level evidence; consumes task 1's
-taxonomy classes for custody labeling (read its artifact from follow-up-works — the
-declared dependency guarantees ordering); and specifies the single lifecycle service
-the row demands — creation→publication→rotation→revocation→shutdown/crash retirement,
-atomic and least-privilege, bound to project+tenant+principal+generation+endpoint+
-expiry — sliced into admission-sized packages with proof obligations and owner
-decision points. Proposes only; writes only its own file.
-
-**Test:** the document exists at the exact path; `node scripts/lint-links.mjs` green.
-
-**NO-GO:** production or config edits, losing the crash-retirement case, or custody
-labels contradicting the taxonomy.
-
----
-
-## Task 3: Immutable InvocationReceipt design and first slice map (row 4070)
-
-- Files: follow-up-works/invocation-receipt-design-2026-08-11.md
-- Scope: follow-up-works/invocation-receipt-design-2026-08-11.md, follow-up-works/, src/providers/, src/core/, src/orchestra/
-- Model: claude-opus-5
-- Dependencies: none
-
-Measured (row 4070): every provider call must eventually carry an immutable
-InvocationReceipt — requested/resolved/called identity, authority, fallback, usage and
-settlement provenance — while today usage evidence lives across the budget-observation
-chain, the provider-execution-observation store and per-provider usage streams
-without one immutable per-call receipt.
-
-Required: a design document (NEW) that maps today's per-call evidence surfaces with
-file-level anchors (where a provider call's identity, authority resolution, fallback
-decision, usage and settlement are recorded NOW); defines the receipt schema and its
-immutability/chaining contract reusing the existing audit-chain patterns; states how
-it composes with (not duplicates) the budget-observation and provider-observation
-stores; slices implementation into admission-sized packages; and names the owner
-decision points (retention, tenant fencing, redaction). Proposes only.
-
-**Test:** the document exists at the exact path; `node scripts/lint-links.mjs` green.
-
-**NO-GO:** production edits, a second usage-evidence mechanism (composition only), or
-claims without file anchors.
-
----
-
-## Task 4: Kernel ontology — canonical entities, ownership, transitions (row 3010)
-
-- Files: follow-up-works/kernel-ontology-design-2026-08-11.md
-- Scope: follow-up-works/kernel-ontology-design-2026-08-11.md, follow-up-works/, src/core/, src/orchestra/
-- Model: claude-opus-5
-- Dependencies: none
-
-Measured (row 3010, 2026-07-27 code-truth, still live): `Flow` is used in three
-unrelated senses (ScheduledFlow, RunFlow lifecycle, autonomous trace); entities carry
-no causal ownership between Goal, Mission, Flow, Run, WorkItem, Attempt and Operation
-even though the Brain contract names that chain as canonical.
-
-Required: a design document (NEW) that inventories every entity noun in src/core and
-src/orchestra with its actual current meaning(s) and file anchors; proposes the
-canonical entity table — identity scheme, owner, allowed transitions, invariants,
-versioning — resolving each name collision with an explicit rename-or-alias route;
-maps the canonical chain onto the existing stores; slices the migration into
-admission-sized packages that never break running lifecycles mid-migration; and names
-the owner decision points. Proposes only.
-
-**Test:** the document exists at the exact path; `node scripts/lint-links.mjs` green.
-
-**NO-GO:** production edits, an ontology that renames without a migration route, or
-unanchored claims.
-
----
-
-## Task 5: Fail-closed tenant authority for autonomous ingress (row 4021 first slice)
+## Task 1: Fail-closed tenant authority for autonomous approval ingress (row 4021, rerun)
 
 - Files: src/orchestra/autonomous/approval-adapter.ts, tests/orchestra/autonomous-tenant-authority.test.ts
-- Scope: src/orchestra/autonomous/approval-adapter.ts, src/orchestra/autonomous/, tests/orchestra/autonomous-tenant-authority.test.ts
+- Scope: src/orchestra/autonomous/approval-adapter.ts, src/orchestra/autonomous/, src/core/principal.ts, src/core/, tests/orchestra/autonomous-tenant-authority.test.ts
 - Model: gpt-5.6-sol
 - Dependencies: none
 
-Measured (row 4021): autonomous read, mutation, approval and reactive ingress must
-resolve one tenant/project scope from a verified principal — a non-admin foreign or
-tenant-less strict caller must obtain no metadata, existence signal or mutation
-authority. Today the approval adapter accepts callers without a single fail-closed
-tenant resolution.
+Measured (row 4021; the first attempt refused honestly because the principal
+machinery was outside its read scope — src/core/principal.ts is IN scope now): the
+approval ingress accepts callers without a single fail-closed tenant resolution.
 
-Required: root-cause first — read the autonomous ingress surfaces (the approval
-adapter at minimum; inventory the others in the result notes) and record which today
-resolve tenant scope and which accept tenant-less callers. Then the FIRST slice: the
-approval ingress (approve/reject/pending) resolves exactly one tenant/project scope
-from the verified principal via the existing principal machinery (PRINCIPAL-001 is
-DONE — consume it, never reimplement), fails closed typed for foreign or tenant-less
-strict callers WITHOUT leaking existence, and keeps solo-mode default-tenant
-behaviour byte-identical. Hermetic tests pin: solo passes unchanged, foreign caller
-gets the typed refusal with no metadata, tenant-less strict caller likewise.
+Required: root-cause first — inventory in the result notes which autonomous ingress
+surfaces resolve tenant scope today. Then the FIRST slice: approve/reject/pending
+resolve exactly one tenant/project scope from the verified principal via the existing
+principal machinery in src/core/principal.ts (PRINCIPAL-001 is DONE — consume, never
+reimplement), fail closed typed for foreign or tenant-less strict callers WITHOUT
+leaking existence, and keep solo-mode default-tenant behaviour byte-identical.
+Hermetic tests pin solo-unchanged, foreign-refused-no-metadata, tenantless-strict-
+refused.
 
 **Test:** `npx vitest run tests/orchestra/autonomous-tenant-authority.test.ts`
 
-**NO-GO:** changing solo-mode behaviour, a second principal/tenant resolver, or a
-refusal that leaks existence metadata.
+**NO-GO:** changing solo-mode behaviour, a second resolver, or existence-leaking
+refusals.
 
 ---
 
-## Task 6: Config leaf metadata from one canonical source (row 470 first slice)
+## Task 2: Agent catalog S1 — schema and state model, types only (row 7011)
 
-- Files: scripts/lint-config-truth.mjs, tests/scripts/config-truth-gate.test.ts
-- Scope: scripts/lint-config-truth.mjs, tests/scripts/config-truth-gate.test.ts, scripts/
-- Model: gpt-5.6-terra
-- Dependencies: none
-
-Measured (row 470, CFG-03/CFG-04): 164 config leaves need a no-missing and equality
-gate — leaf metadata and default production must come from one canonical source, and
-the manifest backend default must consume the same source; today defaults drift
-between config-types, the config loader and the manifest.
-
-Required: a fail-closed lint (the .mjs named in Files — NEW) that enumerates the
-config leaves from the canonical typed source (read src/core/config-types.ts and the
-loader read-only), compares every leaf's default against what the runtime
-config-loading path would produce, and reports missing or divergent leaves typed; a
-test driving it against the real repo (recording the current pass/fail truth in the
-result notes honestly — if leaves diverge TODAY, the lint proves it and the count is
-the finding, not a reason to weaken the gate) plus fixture divergences. NOT wired
-into CI chains in this slice.
-
-**Test:** `npx vitest run tests/scripts/config-truth-gate.test.ts`
-
-**NO-GO:** editing any config source or default to make the gate pass, or wiring
-into CI here.
-
----
-
-## Task 7: Trust-anchor solo mitigation package design (row 526)
-
-- Files: follow-up-works/trust-anchor-solo-design-2026-08-11.md
-- Scope: follow-up-works/trust-anchor-solo-design-2026-08-11.md, follow-up-works/, .github/, docs/evidence/
-- Model: claude-sonnet-5
-- Dependencies: none
-
-Measured (row 526): the solo-account structural mitigations are named by the row —
-out-of-repo canonical check via a GitHub App with a separate integration identity, a
-bot machine-account with a path-scoped required-reviewer rule on
-.github/workflows/** and the validator paths, a nightly ruleset snapshot into an
-append-only ledger the org owner cannot write, and a GHEC-trial evaluation.
-
-Required: a design document (NEW) that reads the existing trust-anchor evidence
-(docs/evidence/trust-anchor/, the workflows, the ruleset facts recorded in ledger
-row 520) and specifies each of the four mitigations concretely for THIS repository:
-exact GitHub resources to create, their identity separation argument, the failure
-modes each mitigation closes (mapped to the xverify-E mechanical variants recorded on
-row 520), rollout order, and the owner actions versus automatable steps. Honest cost
-notes (GHEC trial, App hosting). Proposes only.
-
-**Test:** the document exists at the exact path; `node scripts/lint-links.mjs` green.
-
-**NO-GO:** creating any GitHub resource, editing workflows, or a mitigation without
-an identity-separation argument.
-
----
-
-## Task 8: Persona-as-system-prompt agent spawning across providers (owner D4 addendum)
-
-- Files: follow-up-works/persona-systemprompt-spawn-analysis-2026-08-11.md
-- Scope: follow-up-works/persona-systemprompt-spawn-analysis-2026-08-11.md, follow-up-works/, src/providers/, src/orchestra/
+- Files: src/core/agent-types.ts, tests/core/agent-catalog-schema.test.ts
+- Scope: src/core/agent-types.ts, src/core/, .deckent/agents/, .claude/agents/, tests/core/agent-catalog-schema.test.ts, follow-up-works/
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured (owner decision D4 addendum on the agent catalog design, 2026-08-11): the
-owner proposes spawning deckent agents by injecting the agent persona as a system
-prompt at the provider CLI/API boundary — the `claude -p` append-system-prompt
-pattern generalized — instead of only prepending persona text into the user prompt,
-and asks for an analysis across the most popular ~20 providers in both API and
-subscription modes.
+Measured: the design at
+follow-up-works/agent-catalog-authority-design-2026-08-11.md (READ IT and its OWNER
+DECISIONS addendum — binding) defines S1 as schema and state model, types only,
+consuming decision D2 (schemaVersion required-on-write, defaulted-on-read,
+unknown-future = typed invalid) and D4 (capabilities missing = definitively
+non-routable; unresolvable preferredModel never blocks).
 
-Required: an analysis document (NEW) with three parts. (1) Code truth: how each
-CURRENT deckent provider adapter (read src/providers/) injects persona/system
-content today — exact command/flag/API-field per adapter with file anchors, and
-whether a true system-role channel is used or the persona rides the user prompt.
-(2) Capability matrix: for the popular provider set (the adapters present in the
-repo plus the majors you can enumerate from training — label anything unverifiable
-as needs-live-verification, NEVER invent a flag), whether a system-prompt injection
-channel exists in CLI mode, API mode and subscription mode, and its shape. (3)
-Design proposal: a provider-neutral persona-injection contract for the spawn layer —
-where the persona resolves from the (freshly owner-decided) agent catalog, how it
-degrades on providers without a system channel, and admission-sized implementation
-slices with owner decision points. Proposes only.
+Required: exactly the design's S1 — the versioned manifest schema and the
+validity/provenance/routability state model as TYPES plus a pure classification
+function, no resolver change yet. The design's S1 proof obligation is the acceptance:
+every current live manifest (21 builtin, 21 shadow, 2 learned, 3 archived — read them
+from the real directories) classifies to an explicit validity and provenance with
+zero silent skips, and the known id/directory-mismatch case classifies as a warning
+rather than loading clean. Tests pin the classification table against real-manifest
+fixtures copied into tmpdir.
 
-**Test:** the document exists at the exact path with all three parts;
-`node scripts/lint-links.mjs` stays green.
+**Test:** `npx vitest run tests/core/agent-catalog-schema.test.ts`
 
-**NO-GO:** production edits, inventing provider flags without a needs-live-
-verification label, or a design that hardcodes provider names on code paths instead
-of adapter capability declarations.
+**NO-GO:** touching the resolver or any consumer surface (that is S2), silent skips,
+or deviating from the recorded D2/D4 decisions.
+
+---
+
+## Task 3: Agent catalog S2 — the resolver behind the existing API (row 7011)
+
+- Files: src/core/agent-pool.ts, tests/core/agent-layer-precedence.test.ts
+- Scope: src/core/agent-pool.ts, src/core/, tests/core/agent-layer-precedence.test.ts, follow-up-works/
+- Model: claude-sonnet-5
+- Dependencies: schema and state model
+
+Measured: the design's S2 (READ the design and addendum) puts the layered resolver
+behind the existing AgentPoolManager API, consuming S1's types and decision D1 — the
+owner-approved precedence inversion: L1 project-override above L2 learned/runtime
+above L0 builtin, with field-level L2 override restricted to runtime-derived fields
+(today L2 whole-record-wins at agent-pool.ts:585-586; that behaviour change is
+APPROVED).
+
+Required: exactly the design's S2 with its proof obligations — the existing
+tests/core/agent-pool.test.ts stays green UNMODIFIED (its exact-call-count and
+ordered-mock assertions are documented constraints), a layer-precedence table test
+covers every L0/L1/L2 collision combination under the new order, and syscall count
+does not regress.
+
+**Test:** `npx vitest run tests/core/agent-layer-precedence.test.ts tests/core/agent-pool.test.ts`
+
+**NO-GO:** modifying the existing agent-pool test file, a precedence other than the
+recorded D1, or consumer-surface changes (S3+ territory).
+
+---
+
+## Task 4: Skill catalog S1 — one effective read model behind the existing API (row 7012)
+
+- Files: src/core/skill-pool.ts, tests/core/skill-catalog-readmodel.test.ts
+- Scope: src/core/skill-pool.ts, src/core/skill-registry.ts, src/core/, tests/core/skill-catalog-readmodel.test.ts, follow-up-works/
+- Model: claude-opus-5
+- Dependencies: none
+
+Measured: the design at
+follow-up-works/skill-catalog-authority-design-2026-08-11.md (READ IT and its OWNER
+DECISIONS addendum — binding) defines the first implementation slice as the single
+effective read model: shipped, project-override, generated/learned, quarantined and
+retired layers resolving through one resolver behind the existing skill-pool API,
+with generated BELOW hand-authored (decision D1) and flat ids (decision D9).
+
+Required: the design's first slice with its stated proof obligations — every current
+consumer keeps its observable behaviour for today's non-conflicting catalogs, layer
+collisions resolve per D1 with a precedence table test, and the resolver is the ONLY
+directory-scan path inside skill-pool/skill-registry (private rescans retired; the
+D10 lint ratchet is a LATER slice — here the structure just makes it possible).
+
+**Test:** `npx vitest run tests/core/skill-catalog-readmodel.test.ts`
+
+**NO-GO:** generated-above-human precedence, publisher-qualified ids, or a surviving
+second scan path inside the two scoped modules.
+
+---
+
+## Task 5: Skill catalog S2 — V3 profile state carried as data (row 7012)
+
+- Files: src/core/skill-types.ts, tests/core/skill-profile-state.test.ts
+- Scope: src/core/skill-types.ts, src/core/, tests/core/skill-profile-state.test.ts, follow-up-works/
+- Model: claude-opus-5
+- Dependencies: one effective read model
+
+Measured: the design (and owner decision D6) requires the catalog to CARRY V3
+profile state as data — present-valid, present-invalid, absent — while the
+reconciliation DECISION stays with row 7121. Today 30 of 31 project skills carry no
+profile and are silently never V3-routed while every surface shows them available
+(decision D5: visible installed-but-unroutable).
+
+Required: typed profileState on the effective record (consuming task 4's read model —
+the declared dependency guarantees ordering), derived per skill from the real
+manifest/profile files, with the D5 visibility contract expressed in the read model
+(a surface CAN now render installed-but-unroutable; surface wiring itself is a later
+slice). Tests pin the three states against fixtures and the real-tree count truth
+recorded in the result notes.
+
+**Test:** `npx vitest run tests/core/skill-profile-state.test.ts`
+
+**NO-GO:** deciding any profile reconciliation (7121's authority), hiding unroutable
+skills, or a second derivation path.
+
+---
+
+## Task 6: Crash artifacts gain retention and a bounded reader (row 121 second slice)
+
+- Files: src/cli/helpers/error-handler.ts, tests/cli/crash-retention-reader.test.ts
+- Scope: src/cli/helpers/error-handler.ts, src/cli/helpers/, tests/cli/crash-retention-reader.test.ts
+- Model: claude-sonnet-5
+- Dependencies: none
+
+Measured (row 121; the schema slice landed in sprint-517 as CrashArtifactV1): the
+crashes directory still has no retention policy and no bounded production reader —
+six legacy logs sit unreadable-by-contract, and nothing prunes by age/count/size.
+
+Required: age+count+size retention for crash artifacts applied ONLY at write time by
+the crash writer itself (never a background job), with config-resolved limits
+following the existing retention-family config patterns (no new literals); a bounded
+reader that lists/reads artifacts newest-first with a hard cap and typed handling of
+legacy pre-schema files (classified legacy, never parsed as V1, NEVER deleted —
+legacy prune stays receipt-gated per the row). The never-mask property is preserved:
+retention failures cannot obscure the original fatal. Hermetic tests pin retention
+boundaries, legacy classification and never-mask.
+
+**Test:** `npx vitest run tests/cli/crash-retention-reader.test.ts`
+
+**NO-GO:** deleting legacy artifacts, a background pruner, retention literals in
+code, or masking the original fatal.
+
+---
+
+## Task 7: Agent catalog S0 — the discovery census gate (row 7011)
+
+- Files: tests/governance/agent-discovery-census.test.ts
+- Scope: tests/governance/agent-discovery-census.test.ts, tests/governance/, follow-up-works/
+- Model: gpt-5.6-terra
+- Dependencies: none
+
+Measured: the design's census slice (READ the design §1) inventories every current
+agent-discovery call site — including the eleven AGENTS_DIR definition sites — and
+demands a generated census that reproduces every inventoried row, where a
+deliberately added twelfth raw scan makes the check fail.
+
+Required: a governance test (the file named in Files — NEW, following the
+orphan-deliverables sweep pattern in the same directory) that walks src/ for
+agent-directory scan sites (AGENTS_DIR usages and raw directory reads over the agent
+layers), pins the current census as the known-set, and fails loudly when a new
+unregistered scan site appears OR a known one disappears — the same
+drift-visible-both-ways contract the orphan sweep uses. Read-only over src; the
+census constant lives in the test.
+
+**Test:** `npx vitest run tests/governance/agent-discovery-census.test.ts`
+
+**NO-GO:** editing any production file, a census that samples instead of walking, or
+a pin that only fails in one direction.
+
+---
+
+## Task 8: The plan gate learns read-satisfiability (born from two honest refusals)
+
+- Files: src/orchestra/scope-satisfiability.ts, tests/orchestra/read-satisfiability-gate.test.ts
+- Scope: src/orchestra/scope-satisfiability.ts, src/orchestra/, tests/orchestra/read-satisfiability-gate.test.ts
+- Model: claude-sonnet-5
+- Dependencies: none
+
+Measured (sprints 519 and 520, two honest BOUNDARY_BLOCKED refusals): a task whose
+description demands consuming machinery outside its read scope reaches a worker and
+fails only at execution time — the 2030 taxonomy task could not read the providers it
+had to classify, and the 4021 tenant task could not read the principal resolver it
+was ordered to consume. The plan-time gate already warns on write-side
+MENTIONED_NOT_WRITABLE; the read side is blind.
+
+Required: extend the existing scope-satisfiability analysis with a read-side check —
+when a task description names concrete source paths or modules to READ/consume and
+none of the scope entries makes them visible, the gate emits a typed
+MENTIONED_NOT_READABLE finding (warning-class like its write sibling, with the same
+remedy text pattern). No new gate mechanism — extend the existing one; the finding
+must have fired for both measured cases, pinned by fixtures reproducing each. Today's
+passing plans stay finding-free (no false positives on prose that names no path).
+
+**Test:** `npx vitest run tests/orchestra/read-satisfiability-gate.test.ts`
+
+**NO-GO:** blocking-class findings (warning only — the owner decides escalation), a
+second gate, or false positives on path-free prose.
