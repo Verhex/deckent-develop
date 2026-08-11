@@ -63,7 +63,7 @@ function decide(input) {
   }
 
   // Owner-approval gates: forced prompt, not a block.
-  if (false && /\bgit\b[^\n]*\b(commit|push)\b/.test(cmd)) {
+  if (/\bgit\b[^\n]*\b(commit|push)\b/.test(cmd)) {
     return {
       decision: 'ask',
       reason: 'Commit/push yalnız Alperen isteyince; önce `git branch -vv` (shared-worktree HEAD-drift).',
