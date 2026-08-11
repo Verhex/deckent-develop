@@ -1,13 +1,13 @@
-# DIRECTIVES — Sprint-B4: four approved slices, codex-continuation on the roster
+# DIRECTIVES — Sprint-B5: codex canary pair plus two kernel truths
 
 ## Goal
 
-Four MASTER-PLAN rows advance: spawnsync hot-path (3315), platform registry (90),
-beta README truth (8092), and the codex continuation-admission defect itself (3308).
-Every slice is scope-disjoint; none touches provider auth or runs build tooling.
-The scope-parser phantom fix (row 3312) is live in the running build, so multi-dot
-paths in Files lines are first-class again. Codex-provider routing stays claude-side
-for THIS run — row 3308's fix must land and be rebuilt before codex workers return.
+Four MASTER-PLAN rows advance: status liveness truth (3313), error registry (460),
+archive path authority (3314), runner silent death (3311). Rows 3313 and 460 are the
+codex canary pair — the first codex-provider workers since the row-3308 continuation
+fix went live in the running build; if either dies at a landing continuation again,
+that is X-evidence against 3308 and goes back to its ledger row. Every slice is
+scope-disjoint; none touches provider auth or runs build tooling.
 
 Provider, model, effort and effective concurrency are resolved from effective config,
 registry, role policy, auth/reachability evidence, usage/limit authority and host admission.
@@ -31,118 +31,120 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
 
 ---
 
-## Task 1: Move the 4 sync git calls off the worker-dispatch hot path (row 3315)
+## Task 1: Status cannot show a liveness-unproven worker as active (row 3313)
 
-- Files: src/orchestra/spawn-backend-docker.ts, scripts/spawnsync-baseline.json, tests/orchestra/spawn-git-async.test.ts
-- Scope: src/orchestra/spawn-backend-docker.ts, scripts/spawnsync-baseline.json, tests/orchestra/spawn-git-async.test.ts
-- Model: claude-sonnet-5
+- Files: src/cli/commands/status.ts, tests/cli/status-liveness-truth.test.ts
+- Scope: src/cli/commands/status.ts, src/core/run-status-read-model.ts, src/cli/helpers/, tests/cli/status-liveness-truth.test.ts
+- Model: gpt-5.6-sol
 - Dependencies: none
 
-Measured (row 3315, owner decision #2 of 2026-08-02): src/orchestra/spawn-backend-docker.ts
-performs `git hash-object -w` twice, `git cat-file blob` and `git diff --numstat`
-synchronously on the dispatch hot path. The code stays — provider-observation v2's
-file-diff evidence depends on it — but the calls must stop blocking dispatch.
+Measured (row 3313, sprint-507 disk evidence): at 00:44 the status surface showed two
+workers as "Writing code" while their last heartbeats were from 00:41 and every worker
+process plus the runner (PID 55905) was dead. The projection was fiction and reached
+the owner's report; the disk truth contradicted it on four axes (heartbeat age, pid
+liveness, log tail, missing results).
 
-Required: the four call sites move to non-blocking async equivalents with identical
-outputs and ordering guarantees (the observation evidence they feed must be
-byte-identical); the corresponding entries leave scripts/spawnsync-baseline.json (the
-ratchet shrinks, never grows); a test pins the async path produces the same evidence
-as before on a hermetic tmpdir git fixture (no network).
+Required: the status renderer marks a worker row as active ONLY with fresh liveness
+evidence — a heartbeat younger than a config-resolved threshold (the existing
+heartbeat_timeout family, never a new literal) or a verifiable process check; stale
+evidence renders the row as a typed stale/unproven state with an actionable hint
+(inspect/recover) through the i18n authority. The persisted read model itself stays
+untouched as authority — this is projection honesty at render time. Regression test
+pins the exact scenario: fresh heartbeat renders active, stale heartbeat renders
+stale-labeled, and the dead-workers-shown-as-writing case can never render as active.
 
-**Test:** `npx vitest run tests/orchestra/spawn-git-async.test.ts`
+**Test:** `npx vitest run tests/cli/status-liveness-truth.test.ts`
 
-**NO-GO:** dropping or reordering observation evidence, adding a new sync call anywhere,
-or growing any ratchet baseline.
+**NO-GO:** changing the persisted read-model write path, a hardcoded staleness
+threshold, hiding stale rows entirely (they must be VISIBLE as stale), or breaking the
+existing status output contract for genuinely-live runs.
 
 ---
 
-## Task 2: Bind tests/PLATFORM.md to a source-derived platform registry (row 90)
+## Task 2: Every emitted error code lives in one registry with message and remediation (row 460)
 
-- Files: scripts/gen-platform-registry.mjs, tests/PLATFORM.md, tests/scripts/platform-registry.test.ts
-- Scope: scripts/gen-platform-registry.mjs, tests/PLATFORM.md, tests/scripts/platform-registry.test.ts, scripts/
-- Model: claude-sonnet-5
+- Files: src/core/error-registry.ts, tests/core/error-registry-integrity.test.ts
+- Scope: src/core/error-registry.ts, src/core/, tests/core/error-registry-integrity.test.ts
+- Model: gpt-5.6-terra
 - Dependencies: none
 
-Measured (row 90, 2026-08-03): ~6 environment-dependent test breaks are platform-condition
-gaps, not product bugs — Windows taskkill tests on Linux runners, a missing
-`.deckent/skills/docs` directory in CI, a containment ratchet timing out at 60s, two
-dashboard files needing a live server. tests/PLATFORM.md is stale prose no tool consumes.
+Measured (row 460): 46 raw throws were already converted to typed DeckentError with
+`lint:errors` green (0 new violations over a 321-occurrence baseline), but the row's
+remaining acceptance is unproven: registry-backed message/remediation integrity. Today
+nothing guarantees a registered code carries a human message and a remediation hint —
+`ErrorRegistry.get` consumers (the doctor checks are one live example) defensively
+optional-chain around missing entries.
 
-Required: a generator derives the platform-tag registry (linux, macos, windows-native,
-WSL) from source truth — the actual platform-conditional patterns in the test tree —
-regenerates tests/PLATFORM.md between AUTOGEN markers, and a drift test fails closed
-when the file no longer matches the generated truth. Do NOT rewrite the conditional
-skips themselves in this slice — registry, doc truth and drift gate only. The
-human-authored sections of tests/PLATFORM.md outside the markers are byte-preserved.
+Required: the registry contract gains integrity — every registered code carries a
+non-empty message and remediation (or an explicit typed none-with-reason), and a new
+integrity test walks the ACTUAL registry at runtime and fails closed on any entry
+violating the contract, plus pins that every code the registry exports is unique and
+well-formed. Do NOT rename codes or change any emission site in this slice — registry
+contract and its proof only. If real entries violate the contract today, FIX the
+entries (write the honest message/remediation), listing each in the result notes.
 
-**Test:** `npx vitest run tests/scripts/platform-registry.test.ts`
+**Test:** `npx vitest run tests/core/error-registry-integrity.test.ts`
 
-**NO-GO:** editing individual platform-conditional tests, deleting human-authored
-sections, or a hand-maintained registry instead of a derived one.
+**NO-GO:** renaming or deleting error codes, touching emission sites, weakening
+lint:errors, or filling entries with placeholder text instead of real remediation.
 
 ---
 
-## Task 3: Beta-scope README reality pass, EN and TR in lockstep (row 8092)
+## Task 3: One canonical archive authority for task artifacts (row 3314)
 
-- Files: README.md, README.tr.md
-- Scope: README.md, README.tr.md, docs/en/getting-started.md, docs/tr/getting-started.md
+- Files: src/orchestra/sprint-finalizer.ts, src/cli/commands/recover-helpers.ts, tests/orchestra/archive-path-authority.test.ts
+- Scope: src/orchestra/sprint-finalizer.ts, src/cli/commands/, src/orchestra/, tests/orchestra/archive-path-authority.test.ts
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured: the public README pair predates several shipped surfaces (run-flow inbox
-`runs --retire` and `--limit`, owner-managed model activation `deckent models
-activate/deactivate/activation`, the merge-queue governed release flow) and still
-describes some aspirational behaviour as present. Beta publication needs the README to
-claim exactly what the binary does today.
+Measured (row 3314, three manual moves in one night): normal settlement archives task
+artifacts under the brain archive (sprint-NNN-tasks), the recover path archives under a
+DIFFERENT tasks-local archive directory and preserves non-terminal files in the tasks
+root, and hidden worker shell scripts were left behind by both. The owner manually
+consolidated sprints 507, 509, 510 and 511 into the brain archive.
 
-Required: verify every user-facing claim in README.md against the current CLI surface —
-each command, flag and workflow named there must exist in src/cli with the same name and
-semantics; correct or remove what does not hold; add the shipped-but-undocumented
-surfaces listed above in the appropriate existing sections. AUTOGEN/managed sections
-(stats badges, generated blocks) are OFF-LIMITS. README.tr.md mirrors every change 1:1
-in meaning, matching the file's existing TR voice. Getting-started pages update only
-where they contradict the README fixes. Result notes carry a claim-by-claim
-verification table (claim, code evidence, kept/fixed/removed).
+Required: root-cause first — locate every code path that archives or preserves task
+artifacts (normal finalize, force-abort, recover, cleanup) and record the inventory in
+the result notes. Then one archive authority: a single resolver provides the canonical
+archive destination, every path consumes it, no path leaves residue (including
+dot-prefixed worker scripts) in the tasks root after its operation completes, and
+non-terminal preservation still works but INSIDE the canonical location with a typed
+marker. The destination resolves from effective config where a key exists (the
+sprint_file_retention family) — never a new literal. Hermetic test drives a tmpdir
+fixture through settle/recover paths and asserts zero-residue plus single-destination.
 
-**Test:** run `npx vitest run tests/scripts/update-readme-stats.test.ts` purely as an
-unchanged-file proof that generated markers stayed intact — that test file itself is
-read-only for this task and must not be edited.
+**Test:** `npx vitest run tests/orchestra/archive-path-authority.test.ts`
 
-**NO-GO:** editing inside AUTOGEN markers, EN/TR divergence, documenting an unshipped
-surface as present, or deleting the stats badges.
+**NO-GO:** deleting any artifact (archive means move, never remove), changing what
+counts as non-terminal, or a second resolver anywhere.
 
 ---
 
-## Task 4: Codex attempts pass the landing continuation admission (row 3308)
+## Task 4: The sprint runner cannot die without a typed record (row 3311)
 
-- Files: src/orchestra/execution-continuation-runner.ts, src/orchestra/runtime-budget-monitor.ts, tests/orchestra/continuation-admission-modes.test.ts
-- Scope: src/orchestra/execution-continuation-runner.ts, src/orchestra/runtime-budget-monitor.ts, tests/orchestra/continuation-admission-modes.test.ts
+- Files: src/orchestra/sprint-runner-entry.ts, tests/orchestra/runner-death-record.test.ts
+- Scope: src/orchestra/sprint-runner-entry.ts, src/orchestra/, tests/orchestra/runner-death-record.test.ts
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 3308, sprint-507 disk evidence): both codex tasks died at attempt-1
-because assertContinuationStartupReserve (execution-continuation-runner.ts, around line
-106) requires the first runtime-budget observation to have mode 'incremental', while
-the codex adapter's startup observation is honestly recorded as mode 'cumulative'
-(attempt 417a381d observation file; the codex usage event stream reports cumulative
-turn totals with usageSemantics mode 'cumulative', terminal true). Claude-mode
-attempts, whose first observation is incremental, pass the same admission.
+Measured (row 3311, sprint-507): the detached runner (PID 55905) died mid
+scheduler-shadow journal line at 00:43:21 with NOTHING written to the crashes
+directory; the status read model went HOLD, cleanup went run-orphaned HOLD, and the
+whole chain needed manual recovery. Sprint-508's runner also exited leaving its pid
+file behind while 510 and 511 exited cleanly — exit hygiene is path-dependent.
 
-Required: one true contract between the observation writer and the continuation
-admission. Root-cause first — read how the writer derives mode from provider usage
-semantics and how appliedDelta is computed for cumulative streams, then pick the
-smaller sound change and state why in the result notes: either the first observation
-of a cumulative-mode stream is written as the semantically-correct incremental delta
-from zero, or the admission accepts a cumulative-mode first observation whose
-appliedDelta arithmetic is delta-correct. Budget truth is inviolable either way: the
-appliedDelta totals, turn counting and reserve arithmetic must stay byte-correct for
-BOTH provider semantics, and the existing claude-mode admission behaviour must not
-change. The regression test pins both modes through the admission — cumulative-first
-passes with correct deltas, incremental-first passes unchanged, and a genuinely
-malformed first observation still fails closed.
+Required: root-cause first — inventory the runner's exit paths (normal terminal,
+thrown error, unhandled rejection, signals, and the possibility of SIGKILL/OOM which
+CANNOT be caught) and record which paths today write what. Then: every catchable exit
+path writes a typed exit record (reusing the existing crashes-directory format) and
+removes the pid file it owns; for the uncatchable-kill case, add a startup-time
+detection — a runner finding a stale pid file plus no matching live process publishes
+a typed posthumous death record before proceeding. No new daemon, no watchdog process
+— detection rides existing entry points. Hermetic tests pin the catchable paths and
+the posthumous detection with fixture pid files.
 
-**Test:** `npx vitest run tests/orchestra/continuation-admission-modes.test.ts`
+**Test:** `npx vitest run tests/orchestra/runner-death-record.test.ts`
 
-**NO-GO:** weakening the fail-closed admission for malformed observations, double
-counting cache tokens in either mode, changing claude-mode behaviour, or provider-name
-literals outside fixtures (ADR-G-036 — branch on usage semantics, never on provider id).
+**NO-GO:** a watchdog process or new daemon, swallowing the original error while
+recording it, deleting a pid file the process does not own, or changing normal
+COMPLETE settlement behaviour.

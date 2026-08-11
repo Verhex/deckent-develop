@@ -5,10 +5,10 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import {
   readFileSync, writeFileSync, existsSync,
-  mkdirSync, readdirSync, renameSync, unlinkSync,
+  mkdirSync, readdirSync, renameSync, unlinkSync, rmdirSync, statSync,
 } from 'node:fs';
 import { promises as fsPromises } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
@@ -35,6 +35,7 @@ import type { TaskDNA } from '../core/routing-types.js';
 import {
   BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE, RECENT_WORKS_DIR, TASKS_DIR,
   SPRINT_ACTIVE_FILE, SPRINT_PAUSE_STATE_FILE,
+  ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, PROJECT_CONFIG_PATH,
 } from '../core/constants.js';
 
 import { cleanupCounters, runRetention } from '../core/sprint-file-retention.js';
@@ -80,7 +81,7 @@ import {
 import {
   writeRetrospective, appendRetroSection, writeSprintLog, calculateMetrics,
   updateProjectDocs,
-  buildAgentPerformance, archiveDirectives, archiveOrphanTasks,
+  buildAgentPerformance, archiveDirectives,
   buildSprintLimitBurnRow, buildFilesChangedCostSection,
 } from './sprint-reporter.js';
 
@@ -2346,6 +2347,301 @@ export function buildSprintCompletionRecord(
 }
 
 
+// ═══ Canonical Task-Artifact Archive Authority (row 3314) ═════════
+// Measured on row 3314 (three manual moves in one night): normal settlement
+// archived task artifacts under the brain archive, the recover path archived
+// under a DIFFERENT tasks-local directory and left non-terminal files loose in
+// the tasks root, and hidden worker shell scripts were left behind by both. The
+// owner hand-consolidated sprints 507/509/510/511 into the brain archive.
+//
+// This section is the SINGLE archive authority. Every lifecycle path that moves
+// task artifacts (finalize, force-abort, recover, cleanup) resolves its
+// destination through resolveTaskArtifactArchiveDir() and mutates through
+// archiveTaskArtifacts(). No second resolver exists: the destination comes from
+// the `sprint_file_retention` config family when the project sets
+// `archive_path`, otherwise from the existing brain-archive constants — never
+// from a fresh path literal.
+//
+// Archive means MOVE. Nothing here deletes an artifact, nothing unlinks a
+// source before its copy is byte-verified at the destination, and nothing
+// clobbers an existing destination file.
+
+/** Subdirectory (inside the canonical destination) that holds non-terminal artifacts. */
+export const TASK_ARTIFACT_PRESERVED_SUBDIR = 'preserved';
+
+/** Typed marker file written alongside preserved (non-terminal) artifacts. */
+export const TASK_ARTIFACT_PRESERVATION_MARKER_FILE = 'preservation-marker.json';
+
+/** Marker discriminator — consumers match on this `kind`, never on the filename. */
+export const TASK_ARTIFACT_PRESERVATION_MARKER_KIND = 'deckent.task-artifact-preservation';
+
+/** Tasks-local archive directory that predates the single authority (recover/cleanup wrote here). */
+const LEGACY_TASK_ARCHIVE_SUBDIR = 'archive';
+
+/**
+ * Dot-prefixed worker artifacts that no path swept before — the residue class
+ * row 3314 caught (hidden worker shell scripts alongside `.prompt-*` files).
+ */
+const WORKER_RESIDUE_PATTERNS: readonly RegExp[] = [
+  /^\.prompt-/u,
+  /^\.worker-/u,
+  /^\.[^.].*\.(?:sh|bash|zsh|cmd|bat|ps1)$/u,
+];
+
+/** Typed marker recorded next to non-terminal artifacts held inside the canonical destination. */
+export interface TaskArtifactPreservationMarker {
+  readonly kind: typeof TASK_ARTIFACT_PRESERVATION_MARKER_KIND;
+  readonly version: 1;
+  readonly sprintId: string;
+  /** Why these artifacts were held rather than settled — classification is the caller's, not ours. */
+  readonly reason: 'non-terminal';
+  /** Project-relative directory the entries were lifted from, for restoration. */
+  readonly restorePath: string;
+  readonly entries: readonly string[];
+  readonly recordedAt: string;
+}
+
+/**
+ * Classification supplied by the CALLING lifecycle path. This authority owns the
+ * destination, never the classification — what counts as non-terminal stays with
+ * `classifyTaskFiles` (finalize) / `classifySprintTaskFiles` (recover).
+ */
+export interface TaskArtifactArchivePlan {
+  /** Artifact filenames (relative to `.tasks/`) the caller classified terminal. */
+  readonly archive: readonly string[];
+  /** Artifact filenames (relative to `.tasks/`) the caller classified non-terminal. */
+  readonly preserve: readonly string[];
+}
+
+export interface TaskArtifactArchiveResult {
+  /** The one canonical destination every path shares. */
+  readonly destination: string;
+  /** Where non-terminal artifacts are held — inside `destination`, never in the tasks root. */
+  readonly preservedDestination: string;
+  readonly archived: string[];
+  readonly preserved: string[];
+  /** Files lifted out of the legacy tasks-local archive into the canonical destination. */
+  readonly consolidated: string[];
+  /** Leftovers (hidden worker scripts, unmatched sprint artifacts) swept to the destination. */
+  readonly residueSwept: string[];
+  /** Artifacts that could not be moved — left in place, never deleted. */
+  readonly failures: string[];
+}
+
+/**
+ * Read `sprint_file_retention.archive_path` from the project config. Returns
+ * null when the family is absent so the caller falls back to the established
+ * brain-archive constants instead of inventing a path.
+ */
+function readConfiguredSprintArchiveBase(projectRoot: string): string | null {
+  try {
+    const cfgPath = join(projectRoot, PROJECT_CONFIG_PATH);
+    if (!existsSync(cfgPath)) return null;
+    const raw = JSON.parse(readFileSync(cfgPath, 'utf-8')) as {
+      sprint_file_retention?: { archive_path?: unknown };
+    } | null;
+    const configured = raw?.sprint_file_retention?.archive_path;
+    return typeof configured === 'string' && configured.trim().length > 0
+      ? configured.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * THE resolver. Every archive/preserve path for task artifacts asks this and
+ * nothing else for its destination.
+ */
+export function resolveTaskArtifactArchiveDir(projectRoot: string, sprintId: string): string {
+  const base = readConfiguredSprintArchiveBase(projectRoot)
+    ?? join(BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR);
+  return join(projectRoot, base, `${sprintId}-tasks`);
+}
+
+/** Pick a destination filename that never clobbers existing archived evidence. */
+function nonClobberingDest(destDir: string, name: string): string {
+  let candidate = join(destDir, name);
+  let n = 1;
+  while (existsSync(candidate)) {
+    candidate = join(destDir, `${name}.dup-${n}`);
+    n += 1;
+  }
+  return candidate;
+}
+
+/**
+ * Move one artifact. Rename first; on cross-device/busy rename fall back to
+ * copy + byte-verify + unlink. A source is never unlinked without a verified
+ * copy at the destination, so a failure leaves the artifact in place.
+ */
+function moveTaskArtifact(srcPath: string, destPath: string): boolean {
+  try {
+    mkdirSync(dirname(destPath), { recursive: true });
+  } catch {
+    return false;
+  }
+  try {
+    renameSync(srcPath, destPath);
+    return true;
+  } catch {
+    try {
+      const content = readFileSync(srcPath) as Buffer;
+      writeFileSync(destPath, content);
+      const written = readFileSync(destPath) as Buffer;
+      if (!written.equals(content)) return false;
+      unlinkSync(srcPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/** Numeric sprint number used to recognise this sprint's leftovers in the tasks root. */
+function sprintArtifactPrefix(sprintId: string): string | null {
+  const m = sprintId.match(/(\d+)/u);
+  return m?.[1] ? `task-${m[1]}-` : null;
+}
+
+function isWorkerResidue(name: string): boolean {
+  return WORKER_RESIDUE_PATTERNS.some(re => re.test(name));
+}
+
+/**
+ * The single mutation entrypoint. Settles a sprint's task artifacts into the
+ * canonical destination and guarantees the tasks root holds no residue for that
+ * sprint afterwards:
+ *
+ *  1. terminal artifacts (caller's classification) → `destination`
+ *  2. non-terminal artifacts → `destination/preserved/` + typed marker
+ *  3. any legacy `.tasks/archive/<sprintId>` content → `destination`
+ *  4. residue sweep: sprint-prefixed leftovers + hidden worker artifacts → `destination`
+ */
+export function archiveTaskArtifacts(
+  projectRoot: string,
+  sprintId: string,
+  plan: TaskArtifactArchivePlan = { archive: [], preserve: [] },
+): TaskArtifactArchiveResult {
+  const destination = resolveTaskArtifactArchiveDir(projectRoot, sprintId);
+  const preservedDestination = join(destination, TASK_ARTIFACT_PRESERVED_SUBDIR);
+  const result: TaskArtifactArchiveResult = {
+    destination,
+    preservedDestination,
+    archived: [],
+    preserved: [],
+    consolidated: [],
+    residueSwept: [],
+    failures: [],
+  };
+
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tasksDir)) return result;
+
+  // Preservation wins over archival when a caller lists a name in both.
+  const preserveSet = new Set(plan.preserve);
+
+  // 1. Terminal artifacts.
+  for (const name of plan.archive) {
+    if (preserveSet.has(name)) continue;
+    const src = join(tasksDir, name);
+    if (!existsSync(src)) continue;
+    if (moveTaskArtifact(src, nonClobberingDest(destination, name))) {
+      result.archived.push(name);
+    } else {
+      result.failures.push(name);
+    }
+  }
+
+  // 2. Non-terminal artifacts — still preserved, but INSIDE the canonical
+  //    location rather than loose in the tasks root.
+  for (const name of preserveSet) {
+    const src = join(tasksDir, name);
+    if (!existsSync(src)) continue;
+    if (moveTaskArtifact(src, nonClobberingDest(preservedDestination, name))) {
+      result.preserved.push(name);
+    } else {
+      result.failures.push(name);
+    }
+  }
+  if (result.preserved.length > 0) {
+    const marker: TaskArtifactPreservationMarker = {
+      kind: TASK_ARTIFACT_PRESERVATION_MARKER_KIND,
+      version: 1,
+      sprintId,
+      reason: 'non-terminal',
+      restorePath: TASKS_DIR,
+      entries: [...result.preserved].sort(),
+      recordedAt: new Date().toISOString(),
+    };
+    try {
+      mkdirSync(preservedDestination, { recursive: true });
+      writeFileSync(
+        join(preservedDestination, TASK_ARTIFACT_PRESERVATION_MARKER_FILE),
+        `${JSON.stringify(marker, null, 2)}\n`,
+        'utf-8',
+      );
+    } catch (e) {
+      debugLog('archiveTaskArtifacts:marker', e);
+    }
+  }
+
+  // 3. Consolidate the legacy tasks-local archive for this sprint — the exact
+  //    manual move row 3314 recorded for sprints 507/509/510/511.
+  const legacyDir = join(tasksDir, LEGACY_TASK_ARCHIVE_SUBDIR, sprintId);
+  if (existsSync(legacyDir)) {
+    let legacyEntries: string[] = [];
+    try {
+      legacyEntries = readdirSync(legacyDir) as string[];
+    } catch (e) {
+      debugLog('archiveTaskArtifacts:legacyRead', e);
+    }
+    for (const name of legacyEntries) {
+      const src = join(legacyDir, name);
+      try {
+        if (statSync(src).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      if (moveTaskArtifact(src, nonClobberingDest(destination, name))) {
+        result.consolidated.push(name);
+      } else {
+        result.failures.push(name);
+      }
+    }
+    try {
+      if ((readdirSync(legacyDir) as string[]).length === 0) rmdirSync(legacyDir);
+    } catch { /* leave a non-empty legacy dir alone — never remove evidence */ }
+  }
+
+  // 4. Residue sweep — whatever the classification never named still belongs to
+  //    this sprint's archive, not to the tasks root.
+  const prefix = sprintArtifactPrefix(sprintId);
+  let rootEntries: string[] = [];
+  try {
+    rootEntries = readdirSync(tasksDir) as string[];
+  } catch (e) {
+    debugLog('archiveTaskArtifacts:residueRead', e);
+  }
+  for (const name of rootEntries) {
+    const belongsToSprint = prefix !== null && name.startsWith(prefix);
+    if (!belongsToSprint && !isWorkerResidue(name)) continue;
+    const src = join(tasksDir, name);
+    try {
+      if (!statSync(src).isFile()) continue;
+    } catch {
+      continue;
+    }
+    if (moveTaskArtifact(src, nonClobberingDest(destination, name))) {
+      result.residueSwept.push(name);
+    } else {
+      result.failures.push(name);
+    }
+  }
+
+  return result;
+}
+
 // ═══ Finalize Sprint ══════════════════════════════════════════════
 
 /**
@@ -3264,9 +3560,11 @@ export async function finalizeSprint(
     archiveDirectives(projectRoot, sprint.id, 'CLEANUP', { autoArchive: autoArchive === true });
   } catch (e) { debugLog('finalizeSprint:archiveDirectives', e); }
 
-  // 12b. Archive orphan task files from .tasks/ to .brain/archive/sprint-NNN-tasks/
-  // Guard: create pre-archive snapshot + preserve active (PENDING/EXECUTING) tasks
-  debugLog('finalizeSprint:breadcrumb', 'Step 12b (archiveOrphanTasks) — entering');
+  // 12b. Settle task artifacts into the canonical archive destination
+  // (resolveTaskArtifactArchiveDir — the single authority, row 3314). Guard:
+  // pre-archive snapshot + non-terminal preservation, now held INSIDE the
+  // canonical location with a typed marker instead of loose in the tasks root.
+  debugLog('finalizeSprint:breadcrumb', 'Step 12b (archiveTaskArtifacts) — entering');
   try {
     // Step 12b-i: Create pre-archive snapshot for rollback safety
     const snapshot = createPreArchiveSnapshot(projectRoot, sprint.id);
@@ -3274,25 +3572,32 @@ export async function finalizeSprint(
       debugLog('finalizeSprint:preArchiveSnapshot', `Snapshot created: ${snapshot.fileCount} files, hash=${snapshot.hash.slice(0, 12)}...`);
     }
 
-    // Step 12b-ii: Classify tasks by status — only archive terminal (DONE/NO_GO)
-    const tasksDir = join(projectRoot, '.tasks');
+    // Step 12b-ii: Classify tasks by status — only archive terminal (DONE/NO_GO).
+    // classifyTaskFiles stays the sole authority on what counts as non-terminal.
+    const tasksDir = join(projectRoot, TASKS_DIR);
     const sprintMatch = sprint.id.match(/sprint-(\d+)/);
+    let plan: TaskArtifactArchivePlan = { archive: [], preserve: [] };
     if (existsSync(tasksDir) && sprintMatch) {
       const prefix = `task-${sprintMatch[1]}-`;
-      const allFiles = readdirSync(tasksDir);
+      const allFiles = readdirSync(tasksDir) as string[];
       const sprintFiles = allFiles.filter(f => f.startsWith(prefix));
-      const { preserved } = classifyTaskFiles(tasksDir, prefix, sprintFiles);
+      const { archivable, preserved } = classifyTaskFiles(tasksDir, prefix, sprintFiles);
+      plan = { archive: archivable, preserve: preserved };
 
       if (preserved.length > 0) {
         debugLog('finalizeSprint:archiveGuard', `Preserving ${preserved.length} active task files: ${preserved.slice(0, 5).join(', ')}${preserved.length > 5 ? '...' : ''}`);
       }
     }
 
-    // Step 12b-iii: Archive only completed tasks (archiveOrphanTasks archives all — we accept this for now
-    // since the snapshot provides rollback capability)
-    const count = archiveOrphanTasks(projectRoot, sprint.id);
-    debugLog('finalizeSprint:archiveOrphanTasks', `Archived ${count} orphan task files`);
-  } catch (e) { debugLog('finalizeSprint:archiveOrphanTasks', e); }
+    // Step 12b-iii: One destination, zero residue — terminal artifacts, preserved
+    // non-terminal artifacts, legacy tasks-local archives and hidden worker
+    // artifacts all land under the same resolved directory.
+    const settlement = archiveTaskArtifacts(projectRoot, sprint.id, plan);
+    debugLog('finalizeSprint:archiveTaskArtifacts',
+      `Archived ${settlement.archived.length} → ${settlement.destination} `
+      + `(preserved=${settlement.preserved.length}, consolidated=${settlement.consolidated.length}, `
+      + `residue=${settlement.residueSwept.length}, failures=${settlement.failures.length})`);
+  } catch (e) { debugLog('finalizeSprint:archiveTaskArtifacts', e); }
 
   // 12c. Apply .tasks/archive/ retention policy — remove archives beyond retention limit
   debugLog('finalizeSprint:breadcrumb', 'Step 12c (cleanTasksArchive) — entering');

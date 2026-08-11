@@ -140,7 +140,9 @@ function resolveNodeEngineFloor(): { range: string; major: number } {
   const match = range.match(/(\d+)/);
   const major = parseInt(match?.[1] ?? '', 10);
   if (!Number.isFinite(major)) {
-    throw new Error(`doctor: cannot parse a major version from package.json engines.node: "${range}"`);
+    throw ErrorRegistry.createError('DECKENT_E080', {
+      message: `doctor: cannot parse a major version from package.json engines.node: "${range}"`,
+    });
   }
   return { range, major };
 }

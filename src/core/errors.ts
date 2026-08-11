@@ -675,6 +675,19 @@ registry.set('DECKENT_E079', {
   ],
 });
 
+// ─── Runtime Floor Error Codes (DECKENT_E080) ───────────────────────
+
+registry.set('DECKENT_E080', {
+  message: 'cannot derive the Node.js runtime floor from package.json engines.node',
+  suggestion: 'Fix the engines.node range in package.json to contain a parseable major version',
+  whatHappened: 'doctor tried to derive the runtime floor from the manifest and found no parseable major version.',
+  why: 'The floor is intentionally single-sourced from engines.node (row 450); an unparseable range would silently disable the check.',
+  howToFix: [
+    'Open package.json and inspect the engines.node value',
+    'Use a range that names a major version, e.g. ">=24"',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {
