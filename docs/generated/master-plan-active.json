@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2e35f8aa88680beea99f01c162b158fa99e2e98e8fdf9800057de5cc1df8944c"
+    "value": "5f0b12efeadad157b80e10823d0040d1233ed2461d4502d1ea6fae92dcae1277"
   },
   "summary": {
-    "total": 438,
-    "active": 391,
+    "total": 454,
+    "active": 407,
     "terminal": 47,
     "receipts": 183,
     "byState": {
-      "OPEN": 298,
+      "OPEN": 314,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,17 +21,17 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 279,
-      "P1": 121,
+      "P0": 290,
+      "P1": 126,
       "P2": 38
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 14,
-      "AUTHORITY": 36,
+      "AUTHORITY": 41,
       "CODEX": 44,
       "CONNECTOR": 2,
-      "COST": 4,
+      "COST": 5,
       "DASHBOARD": 2,
       "DATA": 1,
       "DESKTOP": 6,
@@ -39,27 +39,27 @@
       "DURABILITY": 2,
       "ECOSYSTEM": 10,
       "ENTERPRISE": 1,
-      "EVAL": 4,
+      "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 104,
+      "KERNEL": 107,
       "LEARNING": 5,
-      "OBS": 4,
+      "OBS": 5,
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
       "PRODUCT": 14,
-      "PROMPT": 4,
+      "PROMPT": 5,
       "PROVIDER": 4,
       "RELEASE": 4,
       "REPO": 1,
       "RESILIENCE": 1,
-      "ROUTING": 5,
+      "ROUTING": 6,
       "SCALE": 1,
       "SECURITY": 7,
       "SURFACE": 1,
-      "TERMINAL": 12,
+      "TERMINAL": 13,
       "TOOL": 1,
-      "TRUTH": 84,
+      "TRUTH": 86,
       "XPLAT": 3
     }
   },
@@ -505,6 +505,28 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 306,
+      "id": "RESOURCE-TELEMETRY-LIFECYCLE-001",
+      "program": "OBS",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "8ec1cbad2a1ed53db4a5329c7c090489c427a2b023ffbabf5ec0df9654e0885b",
+      "progressDigest": "e916b380fcd092ca04e6b1e4d75e0eb85ea61b72d2ffe29081c4405d1d9ba31e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 307,
+      "id": "RUNTIME-ARTIFACT-CATALOG-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "54ecd651eff65ab8a696b6ab8a92f0d1a5ef9dba117c96098047a9fef5d128c9",
+      "progressDigest": "eaa9d6377f7876f24296e1dcfbf233e47c45b152d1575d27c5c89d74eccc7e2e",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 310,
       "id": "ERROR-SEVERITY-001",
       "program": "TRUTH",
@@ -686,9 +708,31 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-11",
       "definitionDigest": "5c7491631d048c8cc869c5c83bcda3f3bbee1df0b161179aea888d39e6bfd4f2",
-      "progressDigest": "b89add34769c5f282e3c39058d65148895739b7b6475e49b48cda29ae317403a",
+      "progressDigest": "399680eb30f93dfc1027c1aa189916074772c0386b19336a0765c75b03c29b03",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 471,
+      "id": "CONFIG-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "255300b6290a5528c01958dd265c772a9228b8fba0921953b8c722a7dc27dfb3",
+      "progressDigest": "5438afea2edd423bd35da08a5241c67b9dd7709911b861aa6524d7ff117a27c9",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 472,
+      "id": "LAYER-BOUNDARY-GATE-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "2e4045e6740aa94126bdf04ad9cc77bbd2be4c1e7f85ae755812ca84ee3f229e",
+      "progressDigest": "d0011103a9f3994ce940a80cb1358624810a9d7fd6d267d9e33d8bc7f8772bd4",
       "terminalClosureDigest": null
     },
     {
@@ -2078,6 +2122,28 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3131,
+      "id": "RUNFLOW-STORE-RECONCILIATION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "448d4917c89b8c471d334ee0c5eb99a89e48283966e30a0a14b593f14a93f794",
+      "progressDigest": "808af03e976afed41150364bba0cbda48509249c593a53d83e41a059ce70791c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3132,
+      "id": "RUN-JOB-AUTHORITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "12e1093141a80cc80d6230dab8d59ed479a1cdf261281200fd60b32823f824b3",
+      "progressDigest": "62aa9cf83c44d74bad6b22556b92d1b66da9f1e5a6a28d23f5239fd68c6f2550",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3140,
       "id": "SCHEDULER-001",
       "program": "KERNEL",
@@ -2086,6 +2152,17 @@
       "updated": "2026-08-03",
       "definitionDigest": "bd13fbd19dc7b82df83e4e4de674ad1f43825cd56a8d1941f9aca0972f2d1c97",
       "progressDigest": "1355dd386b1f83c71c204955ce8df6145fdb36178b0bcc9590747f65c8949e28",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3141,
+      "id": "SCHEDULER-SHADOW-EVIDENCE-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "a04fa29c78c487e0232c2084b1284bc0750de67264c9ad08c30c1d1c4cfc9f94",
+      "progressDigest": "e191d91757305737d4bf58653d84280838627432f4eb435975b5faac6313c501",
       "terminalClosureDigest": null
     },
     {
@@ -3513,9 +3590,31 @@
       "program": "AUTHORITY",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-05",
+      "updated": "2026-08-11",
       "definitionDigest": "1d8f9fec4cc7e883b5d3fedcf416a3e616b5ec0accffcbc502c4325e61d51408",
-      "progressDigest": "cea9887ccbbf03d24287e5ba6cf7163846a925a2ba450685af246bf4d70144e9",
+      "progressDigest": "b06f8e935bf9631feff469e2a305dd2cbf22ae1515591d9469fbb4a1087deb65",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4092,
+      "id": "SPEND-LEDGER-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "ce953f792c277ee45829d84bf8ee7cba7a4cd2b71455416ee5fa9d5d18c744a9",
+      "progressDigest": "d458c159388a56467559cd471fceb40e37b31975ff39db9de093584a3558289f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4093,
+      "id": "PERMISSION-MEMORY-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "e0c7b26320234611d16a9e85075eb489fc5bb9c4c40ea55c50f40fbb773e86b1",
+      "progressDigest": "12cb61ae739b9a62e721fff89b976d4b5a77b28d61a8ac437eacced82fd339e4",
       "terminalClosureDigest": null
     },
     {
@@ -3585,6 +3684,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 4122,
+      "id": "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "e1a289121ebeda4487e253251dedfce0c385fe819df599d74ec274e1da93f8ff",
+      "progressDigest": "41c08d4cfcc3fdedc584b5a2ea971987d1319e459de91936ac139c438c8173ed",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 4125,
       "id": "PROVENANCE-CONTEXT-001",
       "program": "AUTHORITY",
@@ -3604,6 +3714,17 @@
       "updated": "2026-08-10",
       "definitionDigest": "1c4e9939ebd9c9173d74783a52f31677c531ccd83dc6edec3b63be525ad8fb4d",
       "progressDigest": "7e9b331398728808104b851e3327f9785893123c4729ad362aff5253b96c9ba4",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4131,
+      "id": "RUNTIME-CREDENTIAL-LIFECYCLE-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "ca37c7f91aae3d1fe9760d3816ee4d6042d4e9b7de717306f3ca16d34089faf6",
+      "progressDigest": "70eeb1f4fad102a5b37e191d6ff84d5a589d4e527fe1c40d0fdc9a4bc64a277f",
       "terminalClosureDigest": null
     },
     {
@@ -3733,9 +3854,20 @@
       "program": "TERMINAL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-11",
       "definitionDigest": "e1f3b90cef487b9e480e6f3881a08110125fa219e192b432d8b0889d3d87b3b8",
-      "progressDigest": "36de3e83d043ad1071534b5e305c8be113bbc7f21a22310ac4b22a2f0c9538d3",
+      "progressDigest": "56ac871fc1f8c6c7d26cc3373a0b2337ed400efc44b4f6a39ff9a44c12601cd4",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 5041,
+      "id": "REPL-HISTORY-PRIVACY-001",
+      "program": "TERMINAL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "5d8b5854cc351eb9b802c8992e0ddbd94810df137beadbf7071db24c98f4e5f6",
+      "progressDigest": "380b028a0439f82a0a97a2edb4faf6acdb2ec59d82b8cd72c281b33c7a77b940",
       "terminalClosureDigest": null
     },
     {
@@ -4641,6 +4773,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 9024,
+      "id": "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001",
+      "program": "PROMPT",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "2b82eb7e6b2f0f4538a3e049f02c1b97e6688a7c066e5bd07a05a9589d6b26b2",
+      "progressDigest": "d2601f13a54c11e87f96a0b29ff3447ac34ba32bf80fb78b3ad22d43f87033ee",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 9030,
       "id": "ROUTING-001",
       "program": "ROUTING",
@@ -4696,6 +4839,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 9035,
+      "id": "PROJECT-STACK-CACHE-AUTHORITY-001",
+      "program": "ROUTING",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "b3a878163985ad5e914eb20af410285b73c82f25a9666b12388d6affe34421d5",
+      "progressDigest": "c8ea74d36e0e107d1b9068d8f1952b563fb0909ec278c3ef36fe49797637e589",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 9040,
       "id": "EVALUATION-001",
       "program": "EVAL",
@@ -4704,6 +4858,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "d3687b7daefeef050420e72756805fc228bf8e7c832b780137ecce5010da12bc",
       "progressDigest": "1f6bed970149c2e69aa006964f6ff2ade549f8d36dc782896df4d96d3669ce52",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9041,
+      "id": "EVALUATION-EVIDENCE-AUTHORITY-001",
+      "program": "EVAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "0e30fec0814b603205058efa30fcc3d46073b667efd0f1c4d4c99e4f486bd82e",
+      "progressDigest": "d9ba196108e8a2acbdc121fd851b1b27cc58b73dc29ea954910df18c4963ba57",
       "terminalClosureDigest": null
     },
     {
@@ -4855,9 +5020,20 @@
       "program": "COST",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-11",
       "definitionDigest": "9f63e4ac65d79281128f945c98075dccb9411808f696e1907a20e3f4d168b2ca",
-      "progressDigest": "e67d6b32e08f862d4f23cc2213136165e89259a7f1a0a36243debcbdca6bb145",
+      "progressDigest": "07e471b74ea0724d2b5bd44deef907be4f8b2854d78c0482e17649a956ca7eb1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 10061,
+      "id": "COST-CONFIG-RECONCILIATION-001",
+      "program": "COST",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "5ee09d666f36d69c1aec93e2ccca0953940d4bccbe072b1c6ae1d487d57a4873",
+      "progressDigest": "e72d5c83f17a186982e13868fdb98b10e66e6a22c625e46e7aa3e2dd7bcb9b39",
       "terminalClosureDigest": null
     },
     {
@@ -7108,16 +7284,24 @@
       "dependents": [
         "DATA-GOV-001",
         "ERROR-SEVERITY-001",
+        "EVALUATION-EVIDENCE-AUTHORITY-001",
         "MANAGED-DOC-CACHE-TRUTH-001",
         "OPERATIONS-PACK-001",
+        "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001",
         "PROMPT-INJECTION-TRACE-001",
+        "REPL-HISTORY-PRIVACY-001",
+        "RUN-JOB-AUTHORITY-001",
+        "RUNFLOW-STORE-RECONCILIATION-001",
+        "SCHEDULER-SHADOW-EVIDENCE-001",
         "STATE-PRUNE-001",
         "TASK-RETENTION-001"
       ],
       "children": [
         "CRASH-FORENSICS-AUTHORITY-001",
         "NERVOUS-STATE-LIFECYCLE-001",
-        "STATE-ARCHIVE-RESTORE-001"
+        "STATE-ARCHIVE-RESTORE-001",
+        "RESOURCE-TELEMETRY-LIFECYCLE-001",
+        "RUNTIME-ARTIFACT-CATALOG-001"
       ],
       "gates": [
         "G2",
@@ -7138,7 +7322,9 @@
       "closureBlockedBy": [
         "CRASH-FORENSICS-AUTHORITY-001",
         "NERVOUS-STATE-LIFECYCLE-001",
-        "STATE-ARCHIVE-RESTORE-001"
+        "STATE-ARCHIVE-RESTORE-001",
+        "RESOURCE-TELEMETRY-LIFECYCLE-001",
+        "RUNTIME-ARTIFACT-CATALOG-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Tenant-aware age/count/size policies; bounded readers; atomic rotation",
@@ -8033,6 +8219,78 @@
       "updated": "2026-08-10"
     },
     {
+      "order": 306,
+      "id": "RESOURCE-TELEMETRY-LIFECYCLE-001",
+      "parent": "STATE-RETENTION-001",
+      "program": "OBS",
+      "outcome": "Resource telemetry schema, provenance, bounded lifecycle ve financial-ledger separation authority",
+      "priority": "P1",
+      "dependsOn": [
+        "AUDIT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "AUDIT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Resource sample ile billed/estimated spend farklı versioned event türleri ve store'larda tutulur; telemetry project+tenant+run+attempt+task+container+producer+schema provenanceı, monotonic ordering ve unit contractı taşır; append/rotation/compaction crash-safe, concurrency-safe ve age+count+size+legal-hold bounded olur; reader streaming ve corruption-tolerant çalışır; least-privilege permissions, generated gitignore ve privacy classification uygulanır; tracked legacy log için keep/migrate/untrack/history-rewrite seçenekleri ayrı owner-approved disposition receipt'iyle karara bağlanır; Linux/macOS/Windows-native/WSL/OCI ve million-scale soak kanıtı vardır",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: tracked `.deckent/settings/resource-log.jsonl` 21,695,651 byte ve 98,025 valid satır; 72 reachable blobun kümülatif logical boyutu 854,476,169 byte. Her kayıt yalnız `ts`, `container`, `taskId`, memory/CPU/net/block telemetrysi taşıyor; `costUsd` yok. Aktif ignored `.deckent/runtime/resource-log-dogfood.jsonl` aynı resource schema ile büyüyor. Producer direct fail-soft append yapıyor; schema version, tenant/run/attempt provenance, rotation/retention ve bounded reader yok; finansal reader ise eski tracked yolu hardcode edip hiç üretilmeyen `costUsd` alanını topluyor",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 307,
+      "id": "RUNTIME-ARTIFACT-CATALOG-001",
+      "parent": "STATE-RETENTION-001",
+      "program": "TRUTH",
+      "outcome": "`.deckent/runtime` için typed artifact catalog, ownership, confidentiality ve lifecycle authority",
+      "priority": "P0",
+      "dependsOn": [
+        "AUDIT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "AUDIT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her runtime path authority/projection/cache/secret/audit/forensic sınıfı, canonical producer/consumer, schema+migration ownerı, tenant/project/run/attempt identitysi, confidentiality, permission/ACL, git policy, retention+legal hold, archive/restore ve deletion receipt'iyle registryde tanımlanır; unknown artifact ve undocumented writer fail-closed/typed olur; kullanıcı ve AI reference dokümanları registryden generated üretilir, static count taşımaz; Linux/macOS/Windows-native/WSL/OCI, multi-project daemon ve million-artifact scale/chaos proof'u pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: aktif `.deckent/runtime` snapshotı yaklaşık 2,621 dosya ve 35,607,684 payload byte taşıyor; 77 tracked, 2,431 adet 0644 ve yalnız 190 adet 0600 artifact var. RunFlow DB+legacy JSONL, jobs, evaluations, scheduler shadow, prompt evidence, invocation DB, tokenlar, status projectionı, tool inventory ve tracked `bot-listen.log` aynı convention dizininde farklı authority/lifecycle anlamlarıyla birikiyor. JSON/SQLite integrity semantics doğruluğunu, `.gitignore` confidentialityyi kanıtlamıyor; merkezi artifact catalog/permission/retention/migration ve generated runtime reference bulunmuyor. Canlı dosyalarda migrate/delete/prune bu satırın dry-run manifest+owner-approved receipt kapanışından önce yapılmaz",
+      "updated": "2026-08-11"
+    },
+    {
       "order": 310,
       "id": "ERROR-SEVERITY-001",
       "parent": "P00",
@@ -8536,8 +8794,12 @@
       "dependsOn": [
         "SSOT-003"
       ],
-      "dependents": [],
+      "dependents": [
+        "COST-CONFIG-RECONCILIATION-001",
+        "PROJECT-STACK-CACHE-AUTHORITY-001"
+      ],
       "children": [
+        "CONFIG-AUTHORITY-001",
         "NERVOUS-CONFIG-EXECUTION-TRUTH-001"
       ],
       "gates": [
@@ -8545,7 +8807,7 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
+        "C": "1",
         "W": "0",
         "E": "0",
         "H": "?",
@@ -8556,12 +8818,82 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
+        "CONFIG-AUTHORITY-001",
         "NERVOUS-CONFIG-EXECUTION-TRUTH-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "164 config leaf için no-missing ve equality gate CI'da fail-closed; manifest default'u canonical config'ten türer",
-      "evidence": "CODE-DOC-DIFF-2026-08 CFG-03, CFG-04",
-      "updated": "2026-08-03"
+      "evidence": "CODE-DOC-DIFF-2026-08 CFG-03, CFG-04; 2026-08-11 `.deckent` settings/config RCA exact runtime authority closure'ını CONFIG-AUTHORITY-001 childına ayırdı",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 471,
+      "id": "CONFIG-AUTHORITY-001",
+      "parent": "CONFIG-TRUTH-001",
+      "program": "AUTHORITY",
+      "outcome": "Authored/effective config, secret resolution ve concurrent mutation için tek versioned authority",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-STATE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-STATE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Raw authored config ile effective/redacted operator view farklı typed contractlardır; secret-bearing leaves yalnız governed reference kabul eder ve CLI/MCP/API/resource/log/backuplarda resolved secret asla dönmez; secret source revisionı cache invalidation/fresh-resolutiona katılır; bütün config mutationları schema-aware patch, revision/CAS, lock, atomic replace, fsync/recovery ve versioned bounded backup üzerinden tek service tüketir; unknown leaves ve concurrent lost update typed fail-closed olur; least-privilege permission/ACL ve Linux/macOS/Windows-native/WSL multi-process fault-injection proof'u vardır",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: current config ve üç backup yalnız `$DECK:` reference taşıyor, raw secret taşımıyor; fakat schema inline secretı kabul ediyor. Effective config cache stamp `.deck` secret sourceunu izlemiyor; interpolation cache öncesi. CLI `config` ve MCP `deckent_config` resolved full config döndürüyor. En az 12 project-config direct read-modify-write yolu ortak revision/CAS/atomic mutation service tüketmiyor; migration backupı inline secret verilirse onu da kopyalayabilir",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 472,
+      "id": "LAYER-BOUNDARY-GATE-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Architecture layer boundary gate'i source graphından tüm yeni crossing'leri discover edip exception authority'sini fail-closed enforce eder",
+      "priority": "P1",
+      "dependsOn": [
+        "SSOT-003"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Gate tüm production source graphını tarar; registry'de olmayan yeni cross-layer import ilk committe fail olur; allowed shim exact source/target/symbol/reason/owner/expiry/replacement bind eder; expired veya broadened exception deny olur; generated topology ve accepted ADR aynı canonical rule setini tüketir; path-case, separator, symlink ve workspace layoutı Linux/macOS/Windows-native/WSL'de kanıtlanır",
+      "evidence": "2026-08-11 code/doc RCA ve Alperen onayı: `lint-layer-shims.mjs` yalnız `.deckent/settings/layer-shims.json` içinde önceden adı bulunan dosyaları tarıyor; yeni bir dosyadaki MCP→CLI crossing auto-discover edilmiyor. Registry bunu D004-W6 olarak açıkça not ediyor; MASTER'da ayrı closure yoktu. Accepted ADR-D-004 ayrıca gate'in package scripts'e bağlı olmadığını söylüyor, fakat `lint:gates` bugün linter'ı çalıştırıyor",
+      "updated": "2026-08-11"
     },
     {
       "order": 475,
@@ -12779,9 +13111,14 @@
       ],
       "dependents": [
         "AUTONOMOUS-STATE-AUTHORITY-001",
+        "CONFIG-AUTHORITY-001",
         "GOAL-DAG-001",
         "KERNEL-ATTEMPT-001",
+        "PERMISSION-MEMORY-AUTHORITY-001",
+        "PROJECT-STACK-CACHE-AUTHORITY-001",
         "RUNFLOW-001",
+        "RUNFLOW-STORE-RECONCILIATION-001",
+        "SPEND-LEDGER-AUTHORITY-001",
         "STORAGE-001"
       ],
       "children": [
@@ -12887,6 +13224,7 @@
         "DEBT-GOVERNANCE-001",
         "DOC-IMPACT-001",
         "EVALUATION-001",
+        "EVALUATION-EVIDENCE-AUTHORITY-001",
         "GOAL-ACCEPTANCE-001",
         "METRICS-NORTHSTAR-001",
         "RECOVERY-BORN-480-ATTRIBUTION-001",
@@ -13325,7 +13663,10 @@
         "RECOVERY-BORN-483-PROMPT-AUTHORITY-001",
         "RECOVERY-MODE-ADAPTERS-001"
       ],
-      "children": [],
+      "children": [
+        "RUNFLOW-STORE-RECONCILIATION-001",
+        "RUN-JOB-AUTHORITY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -13344,7 +13685,9 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "KERNEL-STATE-001",
-        "KERNEL-SETTLEMENT-001"
+        "KERNEL-SETTLEMENT-001",
+        "RUNFLOW-STORE-RECONCILIATION-001",
+        "RUN-JOB-AUTHORITY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-RUNFLOW-EXACT-01",
@@ -13354,6 +13697,83 @@
       "acceptance": "`do`, run, API, terminal and Desktop consume one service; legacy stores migrated",
       "evidence": "`receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; `receipt=GR-2026-07-28-RUNFLOW-ADOPTION-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; one canonical service generates and approves the same exact `Sprint+revision+planDigest+source/topology/scope lineage` and drives durable start-attempt CAS across CLI, MCP, API, Terminal, Autonomous and Process; execution digest V4 closes the structured-criteria authority gap; owner `Alperen` approved canonical sprint-461 flow `adoption-3b945d6a1400dc3687a55b68f036b0e4` at revision 1 with plan `dfa5882f793082a045ce623a49db09c1209560e8576b17c5ede3b5297fa1f596`, legacy projection `0e6e6b941d29bfb88c404984572f7a19048705b54b31a8c0f2c35fbff4ca2cb7` and canonical projection `a1989eb1876285500688f2cd78dfbbab970b1e103a8f77a6650a72c64317c6a6`; the first real built-CLI start stopped before provider dispatch, start-attempt publication or task migration on an approval-actor mismatch, leaving the four approval events, task byte-set `495410164414c24fe3c765dedab0e87c4db48e0ee6e0b267bf2dea1dc454b6a8`, 0/24 structured items and empty attempts unchanged; the CLI adapter now preserves `approvedSnapshot.approvedBy`, matching Terminal semantics, with 63/63 focused proof and fresh Fable 5 CONFIRMED evidence in `.analysis/xverify/xv-manual-20260728-runs-start-actor-fable5.md`; live truth remains open until the repaired exact start executes this approved record, provider authority admits its heterogeneous workers, default non-exact start retires and Desktop/cancel/recovery/every-environment/scale proof completes",
       "updated": "2026-07-28"
+    },
+    {
+      "order": 3131,
+      "id": "RUNFLOW-STORE-RECONCILIATION-001",
+      "parent": "RUNFLOW-001",
+      "program": "KERNEL",
+      "outcome": "Canonical RunFlow store için read-purity, complete legacy reconciliation ve versioned migration authority",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-STATE-001",
+        "STATE-RETENTION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-STATE-001",
+        "STATE-RETENTION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Read-only paths directory/schema/WAL/migration veya marker yazmaz; explicit init/migrate commandı source inventory+coverage manifesti çıkarır, bütün legacy recordları digest/identity/sequence ile reconcile eder ve imported/malformed/skipped totalsını kanıtlar; marker coverage digestine ve migration versionına bind edilir, interrupted/repeated/concurrent migration idempotent ve rollback-safe olur; legacy read fallback ancak verified cutover receipt'ine kadar yaşar; DB+legacy confidentiality least-privilege olur; corrupt/gap/tamper, Linux/macOS/Windows-native/WSL ve million-flow proof'u pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: canonical DB `quick_check=ok`, 553 record ve payload hash/JSON/sequence kontrolleri temiz; buna rağmen 26 flowa ait 63 adet 0644 legacy JSONL içindeki 78 valid record canonical DB'de yok. Migration meta `imported=0, malformed=0, completedAt=2026-07-28...` taşıyor fakat source coverage manifest/reconciliation yok; tarihsel sıfırın nedeni kanıtlanamıyor. Immediate root cause one-shot unverified marker contractıdır. Ayrıca bütün read fonksiyonları `withStore` üzerinden read-write `openStore` çağırarak mkdir/WAL/schema/migration side effecti üretebiliyor; bu nedenle okuma authoritysi saf değil. Hiçbir DB/JSONL bu kapanıştan önce silinmez",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 3132,
+      "id": "RUN-JOB-AUTHORITY-001",
+      "parent": "RUNFLOW-001",
+      "program": "KERNEL",
+      "outcome": "Cross-process RunJob execution truth için versioned state machine, bounded read model ve terminal-receipt adoption",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-STALE-PROJECTION-001",
+        "RECOVERY-BORN-485-TERMINAL-PUBLICATION-001",
+        "STATE-RETENTION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-STALE-PROJECTION-001",
+        "STATE-RETENTION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Tek versioned RunJob schema ve canonical application service atomik/CAS-fenced transitionlar, flow/run/sprint/task/attempt identity joini, exactly-one terminal settlement ve terminal receipt monotonicitysi sağlar; job-runner/finalizer schema varyantları explicit migrate edilir; list/latest queryleri indexed, paginated, tenant-scoped ve bounded olur; stale RUNNING kayıtlar evidence-honest terminal/HOLD'a reconcile edilir; age+count+size+legal-hold retention ve archive/restore vardır; failure injection, concurrent writers, every-environment ve million-job proof'u pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: flat `.deckent/runtime/jobs` içinde 495 valid JSON ve 8 top-level schema imzası var; job-runner ile finalizer aynı dizine farklı schema yazıyor. 466 COMPLETE, 13 FAILED ve Mart-Mayıs'tan kalan 16 RUNNING kayıt ölçüldü; cross-process read modeli bunları execution truth sayıyor. Writer direct non-atomic write yapıyor, schemaVersion/CAS/explicit mode yok; readers synchronous unbounded scan, MCP latest seçimi lexicographic filename ve retention yok. `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001` kanıtında adı geçen fakat ayrı ledger satırı olmayan 485b job-adoption successorı bu closure altında somutlaştırıldı; stale 16 kayıt silinmeden reconcile edilir",
+      "updated": "2026-08-11"
     },
     {
       "order": 3140,
@@ -13374,7 +13794,9 @@
         "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
         "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001"
       ],
-      "children": [],
+      "children": [
+        "SCHEDULER-SHADOW-EVIDENCE-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -13392,12 +13814,51 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "KERNEL-ATTEMPT-001"
+        "KERNEL-ATTEMPT-001",
+        "SCHEDULER-SHADOW-EVIDENCE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Shadow differential, rollback, checkpoint semantics and all dispatch sites",
       "evidence": "2026-07-27 code-truth: reducer enabled fakat tüm typed effects/call sites tek authority değil; ScheduledFlow ilk tick'i epoch nedeniyle hemen due, cursor RAM-only ve durable occurrence/drain yok; 2026-08-03 ölçüm (PAZARTESI P2): orchestra kalanı 135 kırık / 38 dosya / 61 farklı hata imzası; mekanik sınıf tükendi. Baskın imzalar: Docker provider principal, brain leadership binding, plan-phase DB dizini, spy beklenti drift'i",
       "updated": "2026-08-03"
+    },
+    {
+      "order": 3141,
+      "id": "SCHEDULER-SHADOW-EVIDENCE-001",
+      "parent": "SCHEDULER-001",
+      "program": "KERNEL",
+      "outcome": "Scheduler shadow evidence için generation-bound sequence, engine provenance ve bounded differential lifecycle",
+      "priority": "P0",
+      "dependsOn": [
+        "AUDIT-001",
+        "STATE-RETENTION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "AUDIT-001",
+        "STATE-RETENTION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her shadow session generation/run/attempt identitysi, resolved configured/executed engine, reducer/legacy input+output digestleri ve monotonic sequence taşır; repeated collector invocations aynı generationı durable resume eder veya yeni generationı explicit başlatır; duplicate/reset/gap typed olur; terminal/finalizer aynı effective scheduler authoritysini geçirir; reader streaming/paginated, evidence tamper-evident, redacted ve age+count+size+legal-hold bounded olur; divergence promotion/rollback receipt'e bağlanır; crash/restart/concurrency/every-environment/scale proof'u pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: 43 scheduler shadow dosyasında 15,210 valid record, 399 divergence ticki/409 entry, 50 adet sequence yeniden `1` başlangıcı ve 2 duplicate transition ölçüldü; hiçbir kayıtta `executedEngine` yok. Root cause `shadowTickSequence=0` değerinin her `waitForResults` çağrısında lokal yeniden kurulması ve aynı sprint dosyasına generation/session kimliği olmadan append edilmesidir. `result-collector` finalize çağrısına resolved `schedulerEngine` geçirmiyor; source comment sorumluluğu var olmayan “SCHED-8”e bırakıyor. 14-gün cleanup yalnız terminal/finalizer yolunda ve count/size/legal-hold kapsamı yok",
+      "updated": "2026-08-11"
     },
     {
       "order": 3150,
@@ -13772,7 +14233,8 @@
       "dependents": [
         "RECOVERY-ASSURANCE-001",
         "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
-        "RECOVERY-BORN-481-FAILED-RUN-STATUS-001"
+        "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
+        "RUN-JOB-AUTHORITY-001"
       ],
       "children": [],
       "gates": [
@@ -17548,6 +18010,7 @@
         "DATA-GOV-001",
         "ENTERPRISE-AUTH-001",
         "NERVOUS-APPROVAL-SETTLEMENT-001",
+        "PERMISSION-MEMORY-AUTHORITY-001",
         "RECEIPT-001",
         "STORAGE-001",
         "TERMINAL-CONTEXT-001"
@@ -17686,6 +18149,7 @@
         "ENTERPRISE-AUTH-001",
         "MCP-TRUST-001",
         "P02-634",
+        "PERMISSION-MEMORY-AUTHORITY-001",
         "SURFACE-ADAPTER-001",
         "TOOL-AUTHORITY-001"
       ],
@@ -17867,9 +18331,12 @@
       ],
       "dependents": [
         "AUTONOMOUS-CONTROL-PLANE-001",
+        "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
         "NERVOUS-APPROVAL-SETTLEMENT-001"
       ],
-      "children": [],
+      "children": [
+        "PERMISSION-MEMORY-AUTHORITY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -17888,7 +18355,8 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "TENANT-001",
-        "CAPABILITY-001"
+        "CAPABILITY-001",
+        "PERMISSION-MEMORY-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Protected effect için `authorization` mandatory ve cryptographically verified olur; decision store worker-write boundary dışında host-owned custody taşır; terminal, RPC, API, Desktop, connectors, Worker ve Nervous tek verified ingress/policy tüketir; unsigned legacy kayıt hiçbir effect authorize etmez; principal, tenant, operation, request revision, expiry ve one-shot nonce bind edilir; tamper, replay, overwrite, CAS race, crash recovery ve Linux/macOS/Windows-native/WSL kanıtları pass",
@@ -17999,8 +18467,10 @@
       "dependents": [
         "AUDIT-001",
         "CODEX-MAIN-001",
+        "EVALUATION-EVIDENCE-AUTHORITY-001",
         "FO-08",
         "GOAL-PROVIDER-001",
+        "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
         "KERNEL-001",
         "KERNEL-SETTLEMENT-001",
         "LIMIT-001",
@@ -18011,6 +18481,7 @@
         "REACHABILITY-001",
         "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001",
         "RECOVERY-BORN-485-USAGE-BILLING-001",
+        "SPEND-LEDGER-AUTHORITY-001",
         "SSOT-SETTLEMENT-001",
         "SURFACE-CONTRACT-001",
         "TRAINING-TRACE-001",
@@ -18096,6 +18567,7 @@
         "BUDGET-CONTINUATION-001",
         "CODEX-MAIN-001",
         "COST-001",
+        "COST-CONFIG-RECONCILIATION-001",
         "GOAL-PROVIDER-001",
         "KERNEL-001",
         "PROVIDER-HOLD-001",
@@ -18106,7 +18578,8 @@
         "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001"
       ],
       "children": [
-        "LIMIT-SPEND-ENFORCE-001"
+        "LIMIT-SPEND-ENFORCE-001",
+        "SPEND-LEDGER-AUTHORITY-001"
       ],
       "gates": [
         "G2",
@@ -18127,7 +18600,8 @@
       "closureBlockedBy": [
         "RECEIPT-001",
         "REACHABILITY-001",
-        "LIMIT-SPEND-ENFORCE-001"
+        "LIMIT-SPEND-ENFORCE-001",
+        "SPEND-LEDGER-AUTHORITY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-COST-ADMISSION-01"
@@ -18165,8 +18639,89 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Pre-spawn'da kümülatif spend aşımı typed block üretir; aşım anındaki aktif sprint kesilmez — graceful-landing, yalnız yeni admission durur (owner ilkesi: akış-engellememe); default davranış değişimi flag-gated + owner-onaylı; config-key adı davranışla birebir örtüşür",
-      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `sprint-finalizer.ts:1886-1889` \"HARD spend gate ... NOT implemented\", `start.ts:951` TODO(post-beta); `cost_limits.enforce_spend_gate` bugün yalnız uyarı emisyonunu açıyor. Envanterdeki en büyük ad-davranış açığı",
-      "updated": "2026-08-05"
+      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `sprint-finalizer.ts:1886-1889` \"HARD spend gate ... NOT implemented\", `start.ts:951` TODO(post-beta); `cost_limits.enforce_spend_gate` bugün yalnız uyarı emisyonunu açıyor. 2026-08-11 RCA enforcement'ın önce canonical actual-spend producer/ledger authority'sine bağımlı olduğunu kanıtladı; exact prerequisite SPEND-LEDGER-AUTHORITY-001",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 4092,
+      "id": "SPEND-LEDGER-AUTHORITY-001",
+      "parent": "LIMIT-001",
+      "program": "AUTHORITY",
+      "outcome": "Actual billed, estimated ve quota usage için provider-receipt-bound canonical spend ledger",
+      "priority": "P0",
+      "dependsOn": [
+        "RECEIPT-001",
+        "AUDIT-001",
+        "KERNEL-STATE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECEIPT-001",
+        "AUDIT-001",
+        "KERNEL-STATE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her provider/account/tenant/project/run/attempt charge immutable receipt identity, currency, tax/discount scope, billing period, observed-at ve source-confidence ile exactly-once ledger'a land eder; actual billed ile estimate/resource telemetry ayrıdır; reservation→usage→settlement idempotent, crash-safe ve reconcilable olur; late/reversed charge, unknown price ve subscription quota typed states taşır; günlük/aylık reader canonical ledgerı bounded query eder; provider invoice reconciliationı ve multi-tenant isolation vardır; duplicate/out-of-order/fault/scale proof pass olur",
+      "evidence": "2026-08-11 code/data RCA ve Alperen onayı: `readSpendWindow` eski tracked `.deckent/settings/resource-log.jsonl` yolunu hardcode edip `costUsd` topluyor; 98,025 kaydın hiçbirinde bu alan yok ve resource-monitor producerı cost üretmiyor. Aktif runtime telemetry de aynı cost'suz schema. Dolayısıyla mevcut günlük/aylık spend toplamı canonical billed authority değil; telemetry-finance path conflation enforcement'a güvenilir input vermiyor",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 4093,
+      "id": "PERMISSION-MEMORY-AUTHORITY-001",
+      "parent": "APPROVAL-DECISION-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "outcome": "Persistent local permission memory için principal/tenant/scope/expiry-bound tek transactional authority",
+      "priority": "P0",
+      "dependsOn": [
+        "PRINCIPAL-001",
+        "TENANT-001",
+        "CAPABILITY-001",
+        "KERNEL-STATE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TENANT-001",
+        "CAPABILITY-001",
+        "KERNEL-STATE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Legacy REPL, native agent, Terminal, CLI, MCP ve Desktop tek versioned permission schema/store/policy evaluator tüketir; allow/deny exact principal+tenant+project+operation+resource pattern+environment+revision+expiry+issuer bind eder; deny precedence ve unknown-tool behavior explicit fail-closed olur; RMW mutation revision/CAS, lock, atomic replace, crash recovery ve tamper-evident audit taşır; least-privilege file mode/ACL ve migration/rollback vardır; concurrent multi-process, symlink/path-case ve Linux/macOS/Windows-native/WSL proofs pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: ignored `.deckent/settings.local.json` 0644 ve geniş `deckent_bash`/edit/write grants taşıyor. Legacy REPL aynı dosyada tool-name-only `permissions.allow`, native agent ise globlu `permissions.rules/deny` kullanıyor; iki writer direct RMW yapıyor. Persisted authority principal, tenant, environment, expiry, revision veya signature bind etmiyor; mevcut testler gerçek concurrent process lost-update/tamper kanıtı vermiyor",
+      "updated": "2026-08-11"
     },
     {
       "order": 4100,
@@ -18350,18 +18905,26 @@
         "DASHBOARD-OBS-001",
         "ECOSYSTEM-001",
         "ENTERPRISE-AUTH-001",
+        "EVALUATION-EVIDENCE-AUTHORITY-001",
         "LEARNING-001",
         "NERVOUS-CONFIG-EXECUTION-TRUTH-001",
         "NERVOUS-STATE-LIFECYCLE-001",
         "OPERATIONS-PACK-001",
+        "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001",
         "PROMPT-INJECTION-TRACE-001",
+        "REPL-HISTORY-PRIVACY-001",
+        "RESOURCE-TELEMETRY-LIFECYCLE-001",
+        "RUNTIME-ARTIFACT-CATALOG-001",
+        "SCHEDULER-SHADOW-EVIDENCE-001",
         "SLO-001",
+        "SPEND-LEDGER-AUTHORITY-001",
         "SSOT-SETTLEMENT-001",
         "TERMINAL-COLLAB-001",
         "TRUST-HANDOFF-001"
       ],
       "children": [
         "NERVOUS-EFFECT-OUTCOME-TRUTH-001",
+        "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
         "PROVENANCE-CONTEXT-001"
       ],
       "gates": [
@@ -18383,6 +18946,7 @@
         "RECEIPT-001",
         "OPERATION-001",
         "NERVOUS-EFFECT-OUTCOME-TRUTH-001",
+        "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
         "PROVENANCE-CONTEXT-001"
       ],
       "evidenceReceipts": [],
@@ -18426,6 +18990,44 @@
       "acceptance": "Finding observed, proposal recorded, accepted, rejected, expired, orphaned, effect applied, failed, compensated ve unsupported ayrı terminal/non-terminal durumlar taşır; recommendation hiçbir zaman success/executed sayılmaz; detector'ın önerdiği her action canonical registry effectine bağlanır veya typed unsupported olur; edit/undo gerçek compensating action yürütür ya da dürüst unavailable döner; stale recommendation resume/finalize/abort/cleanup sırasında exact source authority ile reconcile edilir; audit tenant-scoped, tamper-evident, redacted ve bounded olur",
       "evidence": "2026-08-10 disk/code RCA ve Alperen onayı: history'deki 188 success kaydın tamamı 143 scope-collision +45 worker-respawn recommendation append'idir, effect kanıtı değildir; reject terminal kararları `outcome=pending` taşır. Executor proposal successini decision-memory'de `executed` işaretleyebilir. Detectorların ürettiği `BUILD_FAILURE_INVESTIGATE`, `INVESTIGATE_STALL`, `FORCE_EVALUATE`, `KILL_WORKERS`, `NOTIFICATION_BRIDGE_REPAIR` canonical registryde yok ve kabul sonrası unimplemented olur. 11 open recommendationın 10'u artık pause-state taşımayan eski sprint recovery kaydı, biri olmayan task için respawn; CLI edit/undo history success yazabildiği hâlde effect/compensation yürütmeyebilir, MCP yolları plan-onlydir. Hedefli mevcut davranış testleri toplam 160 pass olsa da production effect settlementını sınamıyor",
       "updated": "2026-08-10"
+    },
+    {
+      "order": 4122,
+      "id": "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
+      "parent": "AUDIT-001",
+      "program": "AUTHORITY",
+      "outcome": "Ground-truth override için verified exception authority, bounded scope, expiry ve causal audit",
+      "priority": "P0",
+      "dependsOn": [
+        "APPROVAL-DECISION-AUTHORITY-001",
+        "RECEIPT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "APPROVAL-DECISION-AUTHORITY-001",
+        "RECEIPT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Override yalnız cryptographically verified principal/tenant/project ve exact mismatch rule+artifact digest+revisiona bağlanır; justification, owner, issued-at, expiry, max-use ve replacement/rollback taşır; stale/broadened/replayed override fail-closed olur; evaluator, planner ve auditor tek schema/loader/policy tüketir; suppression ve her kullanım causal receipt üretir; no-override negative path ile tamper/expiry/concurrency/every-environment proofs pass olur",
+      "evidence": "2026-08-11 code/data RCA ve Alperen onayı: tracked `.deckent/ground-truth-overrides.json` bugün boş, fakat üç ayrı loader/regex implementationı aynı authority'yi farklı yollarla yorumluyor. Dolu olduğunda truth mismatch suppression yapabiliyor; `approvedBy` yalnız doğrulanmayan metin, principal/tenant/scope revision/expiry/signature bindingi yok",
+      "updated": "2026-08-11"
     },
     {
       "order": 4125,
@@ -18478,7 +19080,9 @@
         "API-IDENTITY-001",
         "DESKTOP-SECURITY-001"
       ],
-      "children": [],
+      "children": [
+        "RUNTIME-CREDENTIAL-LIFECYCLE-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -18496,12 +19100,45 @@
       "blockerRemedy": "exact ledger `DependsOn` IDs",
       "closureBlockedBy": [
         "TENANT-001",
-        "APPROVAL-001"
+        "APPROVAL-001",
+        "RUNTIME-CREDENTIAL-LIFECYCLE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "No raw config disclosure, IDOR, query-token persistence or unscoped admin action",
       "evidence": "2026-07-27 code-truth: autonomous strict-tenant option composition root'a geçmiyor; 2026-08-10 CURRENT CORRECTION: v1 approval unknown-ID guard 2026-08-08'de fail-closed kapandı, fakat production autonomous composition hâlâ strict option geçirmiyor ve pending/status/approve/reject tenant-scope uygulamıyor; exact IDOR closure AUTONOMOUS-TENANT-AUTHORITY-001 kapsamındadır; 2026-08-05 kod-truth: loopback kombinasyonu — localhost auto-inject (`auth.ts:177-179,201-209`) + rate-limit `exemptLoopback` default-true (`server.ts:169,2015`) lokal caller'ı hem auth'suz hem throttle'sız bırakıyor; CORS `Origin: null` verbatim kabul (`server.ts:317`, sandboxed iframe/data: dokümanları da null gönderir); `DECKENT_API_AUTH_DISABLED=1` yalnız stderr uyarısıyla tam bypass (`auth.ts:181-188`)",
       "updated": "2026-08-10"
+    },
+    {
+      "order": 4131,
+      "id": "RUNTIME-CREDENTIAL-LIFECYCLE-001",
+      "parent": "API-SECURITY-001",
+      "program": "AUTHORITY",
+      "outcome": "Runtime API/terminal credential ve daemon descriptor lifecycle, revocation ve stale-state authority",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "API/terminal token ve serve descriptor creation→publication→rotation→revocation→shutdown/crash retirement zinciri tek service üzerinden atomik ve least-privilege işler; credential project+tenant+principal+server generation/endpoint/expiry ile bind edilir; dead PID, port reuse, restart, concurrent daemon ve partial-write durumları stale descriptor/tokenı authorize etmez; normal close tokenları emekli eder, crash recovery explicit reconcile/dry-run receipt'i üretir; secrets log/git/support bundle dışı kalır; OS credential-store/platform adapter ve Linux/macOS/Windows-native/WSL multi-project proof'u pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: `api-token`, `terminal-token` ve `serve-daemon.json` 0600 ve atomik yazılıyor; olumlu sınır budur. Mevcut serve descriptorındaki PID canlı değil ve port 3100 health bağlantısı reddedildi, yani projection stale. Desktop reader dead-process descriptorını temizleyebiliyor ve normal serve shutdown descriptorı kaldırıyor; API server close ise token dosyalarını unlink/revoke etmiyor, credentiallar process ömründen sonra kalıyor. Bu veri aktif bypass kanıtı değildir; kök sorun creation güçlü iken retirement/revocation ownershipinin kapanmamasıdır. Canlı token/descriptor bu satırın owner-approved reconcile akışından önce manuel silinmez",
+      "updated": "2026-08-11"
     },
     {
       "order": 4140,
@@ -18960,7 +19597,9 @@
         "TERMINAL-CONTEXT-001",
         "TERMINAL-XPLAT-001"
       ],
-      "children": [],
+      "children": [
+        "REPL-HISTORY-PRIVACY-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -18977,12 +19616,51 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "TERMINAL-LIVE-001"
+        "TERMINAL-LIVE-001",
+        "REPL-HISTORY-PRIVACY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Long-session soak, Unicode, resize, pipe/EPIPE, cancellation and recovery",
-      "evidence": "Legacy F11-016",
-      "updated": "2026-07-26"
+      "evidence": "Legacy F11-016; 2026-08-11 persisted command/prompt history privacy ve physical-retention closure'ı REPL-HISTORY-PRIVACY-001 childına ayrıldı",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 5041,
+      "id": "REPL-HISTORY-PRIVACY-001",
+      "parent": "TERMINAL-REPL-001",
+      "program": "TERMINAL",
+      "outcome": "User-authored REPL history için consent, privacy, provenance ve bounded durable lifecycle",
+      "priority": "P1",
+      "dependsOn": [
+        "STATE-RETENTION-001",
+        "AUDIT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "STATE-RETENTION-001",
+        "AUDIT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "History default/consent ve project-vs-user scope policy'si explicit olur; versioned record principal+tenant+project+session+timestamp+command-kind provenanceı taşır; secret/PII protection typed parser ve central redaction contractını tüketir; physical age+count+size compaction atomic/concurrency-safe olur; clear/export/legal-hold işlemleri audited receipt taşır; generated gitignore ve least-privilege mode/ACL uygulanır; corrupt/oversized input ile Linux/macOS/Windows-native/WSL long-session proofs pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: tracked `.deckent/settings/repl-history` 8,271 byte/78 satır ve 56 unique command/prompt içeriyor; 10 reachable blob 57,512 logical byte geçmiş taşıyor. Writer append-only ve regex redaction+newline flatten yapıyor; 1000 sınırı yalnız load-time, fiziksel compaction/retention yok. Kayıtlar timestamp/session/user/tenant taşımıyor, dosya 0644 ve generated project `.gitignore` bu yolu kapsamıyor",
+      "updated": "2026-08-11"
     },
     {
       "order": 5050,
@@ -22143,7 +22821,8 @@
       "children": [
         "PROMPT-V3-001",
         "PROMPT-V3-GOLDEN-EVAL-001",
-        "AGENT-PROMPT-SYNC-001"
+        "AGENT-PROMPT-SYNC-001",
+        "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001"
       ],
       "gates": [
         "G2",
@@ -22165,7 +22844,8 @@
         "KERNEL-ONTOLOGY-001",
         "ALP-RUNTIME-001",
         "PROMPT-V3-GOLDEN-EVAL-001",
-        "AGENT-PROMPT-SYNC-001"
+        "AGENT-PROMPT-SYNC-001",
+        "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Canonical acceptance, authority, context budget and role sections; no append-only contradiction; representative 10-task golden set",
@@ -22245,6 +22925,44 @@
       "updated": "2026-08-10"
     },
     {
+      "order": 9024,
+      "id": "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001",
+      "parent": "PROMPT-001",
+      "program": "PROMPT",
+      "outcome": "Prompt authority ve lint kararları için compile-bound, outcome-linked, tamper-evident evidence authority",
+      "priority": "P0",
+      "dependsOn": [
+        "AUDIT-001",
+        "STATE-RETENTION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "AUDIT-001",
+        "STATE-RETENTION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Canonical prompt compile her run/attempt/task için exact approved source+digesleri, section authority/provenanceı, selected agent/skill/config/model capability identitysi, token budgetı ve lint decisionlarını exactly-one versioned recorda bağlar; block gerçekten admissionı durdurur, warn typed kalır; duplicate/fallback/zero-selection görünürdür; record outcome/evaluation/receipt ile join edilir; append concurrency-safe, tamper-evident, least-privilege, redacted ve bounded olur; test/calibration/live ayrılır; reader ve user/AI diagnostics aynı schema tüketir; every-environment ve million-compile proof'u pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: tracked `runtime/prompt-authority/execution-authority.jsonl` aktif olarak worktreeyi kirletiyor; direct fail-soft append, schema v1 olsa da attempt/project/tenant/integrity/retention yok ve production reader bulunmadı. `prompt-lint.jsonl` snapshotında 232 valid record, 2 exact duplicate, 225 warn/7 block var; wiring warn-only olduğundan `block` enforcement değildir ve provider/model/config/outcome provenanceı yoktur. Runtime archive corpora `fixture-kirli`de 193 kaydın 176'sını, `calibration`da 259 kaydın 210'unu duplicate taşıyor; source consumer/archiver bulunmadı. Bu kanıtlar execution truth veya training authority sayılmaz; canlı log prune/untrack edilmeden önce migration+disposition receipt'i gerekir",
+      "updated": "2026-08-11"
+    },
+    {
       "order": 9030,
       "id": "ROUTING-001",
       "parent": "LEARNING-001",
@@ -22265,7 +22983,8 @@
         "ROUTING-V3-CUTOVER-001",
         "ROUTING-V3-LIVE-QUALITY-001",
         "AGENT-ROUTING-ELIGIBILITY-001",
-        "SKILL-ROUTING-ELIGIBILITY-001"
+        "SKILL-ROUTING-ELIGIBILITY-001",
+        "PROJECT-STACK-CACHE-AUTHORITY-001"
       ],
       "gates": [
         "G2",
@@ -22289,7 +23008,8 @@
         "REACHABILITY-001",
         "ROUTING-V3-LIVE-QUALITY-001",
         "AGENT-ROUTING-ELIGIBILITY-001",
-        "SKILL-ROUTING-ELIGIBILITY-001"
+        "SKILL-ROUTING-ELIGIBILITY-001",
+        "PROJECT-STACK-CACHE-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Intent, role, skills, model, cost, capability and anti-collapse decisions measured; all fallback chains avoid role/tool mismatch; rollbackable",
@@ -22413,6 +23133,44 @@
       "updated": "2026-08-10"
     },
     {
+      "order": 9035,
+      "id": "PROJECT-STACK-CACHE-AUTHORITY-001",
+      "parent": "ROUTING-001",
+      "program": "ROUTING",
+      "outcome": "Project stack detection inputs, cache invalidation ve bounded multi-root scan için canonical authority",
+      "priority": "P1",
+      "dependsOn": [
+        "CONFIG-TRUTH-001",
+        "KERNEL-STATE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "CONFIG-TRUTH-001",
+        "KERNEL-STATE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Detectionın tükettiği her root/nested manifest, workspace identity, language override, source composition ve adapter versionı canonical dependency fingerprintine girer; cache versioned, integrity-checked, disposable, atomic ve project/tenant/root-bound olur; incomplete/ambiguous/unsupported sonucu typed ve observable kalır; file/depth/item/time/memory budgets config-resolved olup partial scanı success göstermez; monorepo, symlink, case, rename ve Linux/macOS/Windows-native/WSL proofs ile million-file scale testleri pass olur",
+      "evidence": "2026-08-11 code/data RCA ve Alperen onayı: ignored `.deckent/settings/project-stack.json` cache invalidationı yalnız birkaç root manifestin mtime'ına bakıyor; detection ise `.deckent/workspace/IDENTITY.md`, config `language_override`, source-file composition ve nested subproject markerlarını da tüketiyor. Bu girdiler değişince cache fresh görünerek stale routing/skill/verification sonucu verebilir. Depth sınırı var fakat item/time/memory resource budgetı yok",
+      "updated": "2026-08-11"
+    },
+    {
       "order": 9040,
       "id": "EVALUATION-001",
       "parent": "LEARNING-001",
@@ -22434,7 +23192,9 @@
         "SKILL-EVOLUTION-LIFECYCLE-001",
         "XVERIFY-TRUTH-001"
       ],
-      "children": [],
+      "children": [
+        "EVALUATION-EVIDENCE-AUTHORITY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -22453,12 +23213,55 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "KERNEL-SETTLEMENT-001",
-        "CM-04"
+        "CM-04",
+        "EVALUATION-EVIDENCE-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Code, live, user and independent-verifier evidence never conflated; false GO/NO_GO calibrated",
       "evidence": "Xverify and Brain evaluation residuals",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 9041,
+      "id": "EVALUATION-EVIDENCE-AUTHORITY-001",
+      "parent": "EVALUATION-001",
+      "program": "EVAL",
+      "outcome": "Evaluation artifactlarını production input yapan versioned, immutable ve outcome-bound evidence authority",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-SETTLEMENT-001",
+        "RECEIPT-001",
+        "AUDIT-001",
+        "STATE-RETENTION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-SETTLEMENT-001",
+        "RECEIPT-001",
+        "AUDIT-001",
+        "STATE-RETENTION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Evaluation schema project+tenant+run/sprint+task+attempt, evaluator/provider/model/config/prompt/code/evidence digestleri, criterion decisions ve independent-verifier provenanceı taşır; append/settlement immutable ve exactly-once olur, retry/fix attemptleri overwrite edilmez; consumer yalnız verified latest-by-authority kaydını okur ve missing/corrupt/ambiguous input typed HOLD olur; training/routing dependency promptu aynı bounded indexed read modelini tüketir; least-privilege, retention/legal-hold/archive/restore ve tamper evidence vardır; every-environment, concurrent evaluator ve million-evaluation proof'u pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: yaklaşık 1,790 valid evaluation JSON Mayıs-Ağustos aralığında birikmiş; snapshotta 1,187 DONE, 365 NO_GO, 238 GO_WITH_TECH_DEBT. Writer atomic temp+rename kullansa da sabit `{taskId}-attempt-{n}.json` adıyla overwrite ediyor; standard evaluation attempt 1, FIX root-attempt ekliyor. `task-builder` latest evaluation decisionını dependency promptuna dahil ettiğinden dosyalar yalnız forensic çıktı değil production inputudur. Artifactlarda schemaVersion/run/project/tenant/provider/model/config/digest/signature yok, mode 0644, retention yok ve ignored kuralına rağmen 75 tarihsel evaluation tracked. Geçerli JSON doğrulanmış evaluator authoritysi veya doğru latest semantics kanıtlamaz; migration/disposition öncesi silme/untrack yok",
+      "updated": "2026-08-11"
     },
     {
       "order": 9050,
@@ -23043,7 +23846,9 @@
         "SLO-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "COST-CONFIG-RECONCILIATION-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -23062,12 +23867,51 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "LIMIT-001",
-        "SLO-001"
+        "SLO-001",
+        "COST-CONFIG-RECONCILIATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Actual billed/estimated split, cache/context/turn attribution, tenant budgets and forecast accuracy",
-      "evidence": "Legacy 529,554,577",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 529,554,577; 2026-08-11 project-vs-bundled pricing field-ownership ve reconciliation closure'ı COST-CONFIG-RECONCILIATION-001 childına ayrıldı; actual spend producer closure SPEND-LEDGER-AUTHORITY-001'dedir",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 10061,
+      "id": "COST-CONFIG-RECONCILIATION-001",
+      "parent": "COST-001",
+      "program": "COST",
+      "outcome": "Bundled pricing catalog, project policy ve learned estimator için versioned field-ownership/reconciliation authority",
+      "priority": "P1",
+      "dependsOn": [
+        "CONFIG-TRUTH-001",
+        "LIMIT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "CONFIG-TRUTH-001",
+        "LIMIT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Canonical model identity/alias registry her cost fieldinin owner, source, version, observed-at, confidence ve override policy'sini tanımlar; project config full bundled snapshotı gölgelemez, reviewed patch/overlay uygular; catalog additions/removals/renames ve stale overrides typed migration+diff üretir; estimator learning provider price authority'sini değiştiremez; unknown price fail-closed admissiona bağlanır; signed update, rollback, offline fallback, concurrent mutation ve cross-platform proof'u vardır",
+      "evidence": "2026-08-11 code/data RCA ve Alperen onayı: tracked `.deckent/cost-config.json` full project snapshotı bundled `pricing-data-baseline.json` üstünde shadow authority oluyor; loader yalnız eksik `estimator` alanını dolduruyor. Ölçülen snapshot 21, bundled catalog 23 model entry taşıyor; generic `gpt-5.5`/`gpt-5.6` bundled tarafta var fakat project snapshotta yok, variantlar var. Aktif dogfood overrides meşru olabilir; kök sorun değişikliklerin yanlışlığı değil, field-level source/version/reconciliation contractının bulunmaması",
+      "updated": "2026-08-11"
     },
     {
       "order": 10070,
@@ -23150,6 +23994,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "de5cd20ade37db39e97092e41a956a6fd62fa43d4bdf44364150340e84001e2c"
+    "value": "adbfe10ef1165b8a7f0d3a3ac129561fe19f74f1dd929ca627af39d48bea4275"
   }
 }
