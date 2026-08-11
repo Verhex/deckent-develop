@@ -43,6 +43,15 @@ import { archiveStaleSchedulerShadowJournals } from '../core/scheduler-shadow-re
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { updateLastSprintId, debugLog, readJsonSafe } from '../core/utils.js';
+
+// ─── Provider execution observation retirement (row 3296) ─────────
+// orchestra → core import: ADR-D-004 C2 allowed direction.
+import { canonicalProjectRoot } from '../core/task-result-settlement.js';
+import {
+  ProviderExecutionObservationStore,
+  type ProviderExecutionGenerationReconciliation,
+  type ProviderExecutionIntervalRetirementReason,
+} from '../core/provider-execution-observation-store.js';
 import { getDebtItems } from '../core/debt-store.js';
 import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
 
@@ -1262,6 +1271,52 @@ function asTerminalVerdict(
  * attempts are intentionally not appended to `sprint.tasks`; final settlement
  * therefore reloads the exact same-sprint task JSONs before lineage folding.
  */
+/**
+ * Host-owned tenant/run identity for provider execution observations. Derived
+ * exactly like the spawn-time settlement reference's `projectRootSha256`, which
+ * is what the spawn site binds as the observation `runId` — so a settling
+ * generation can only ever match intervals from its own project/tenant.
+ */
+export function resolveProviderExecutionObservationRunId(projectRoot: string): string {
+  return createHash('sha256').update(canonicalProjectRoot(projectRoot)).digest('hex');
+}
+
+/**
+ * Close the provider execution intervals owned by the exact attempt generation
+ * being settled, with a typed retirement reason. Left open, they survive
+ * cleanup as `unresolved-provider-observation` evidence and hold an unrelated
+ * IDLE or next run (row 3296). Foreign and historical intervals are untouched
+ * forensic evidence — nothing is deleted and closure is never inferred.
+ *
+ * Returns null when no observation authority exists: settlement never creates
+ * a provider observation store, and a generation with no exact attempt identity
+ * owns nothing to reconcile.
+ */
+export function reconcileSettledProviderExecutionObservations(input: {
+  readonly projectRoot: string;
+  readonly attempts: readonly ExactAttemptIdentity[];
+  readonly reason: ProviderExecutionIntervalRetirementReason;
+  readonly dbPath?: string;
+}): ProviderExecutionGenerationReconciliation | null {
+  const dbPath = input.dbPath
+    ?? join(input.projectRoot, '.deckent', 'provider-execution-observations.db');
+  if (!existsSync(dbPath)) return null;
+  const attempts = input.attempts.filter(
+    attempt => attempt.taskId.trim() !== '' && attempt.attemptId.trim() !== '',
+  );
+  if (attempts.length === 0) return null;
+  const store = new ProviderExecutionObservationStore(input.projectRoot, { dbPath });
+  try {
+    return store.reconcileGenerationRetirement({
+      runId: resolveProviderExecutionObservationRunId(input.projectRoot),
+      attempts,
+      reason: input.reason,
+    });
+  } finally {
+    store.close();
+  }
+}
+
 export function loadFinalizerAttemptTasks(
   projectRoot: string,
   sprint: Sprint,
@@ -3542,6 +3597,27 @@ export async function finalizeSprint(
     throw new FinalizerTerminalEvidenceError('TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE');
   }
   if (receiptAllowsArchive) {
+
+  // 12a. Retire the provider execution intervals THIS generation owns (row 3296).
+  // COMPLETE and cleanup share this boundary: the fenced receipt above already
+  // proved cleanup eligibility, and archiving below removes the task artifacts
+  // that keep these intervals inside the exact current task set. Reconciling
+  // here — and only over `terminalTruth.attempts`, the exact settling attempt
+  // identities — closes what this run owns while foreign and historical
+  // intervals stay open, forensic, and harmless to the next run. Idempotent, so
+  // a re-finalize retires nothing further.
+  debugLog('finalizeSprint:breadcrumb', 'Step 12a (providerObservationRetirement) — entering');
+  try {
+    const reconciliation = reconcileSettledProviderExecutionObservations({
+      projectRoot,
+      attempts: terminalTruth.attempts.map(attempt => attempt.identity),
+      reason: 'run-generation-settled',
+    });
+    debugLog('finalizeSprint:providerObservationRetirement', reconciliation === null
+      ? 'No provider execution observation authority — nothing to reconcile'
+      : `Retired ${reconciliation.retired.length} owned interval(s) `
+        + `(reason=${reconciliation.reason}, foreignOpen=${reconciliation.foreignOpenIntervals})`);
+  } catch (e) { debugLog('finalizeSprint:providerObservationRetirement', e); }
 
   // 12. Archive DIRECTIVES.md — always archive copy; PRESERVE working DIRECTIVES.md by default.
   //

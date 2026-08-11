@@ -130,6 +130,10 @@ import { bootstrapProviders } from '../core/provider.js';
 import {
   assertSprintWorkerProviderAuthority,
   executeSpawnTask,
+  describeSpawnSkip,
+  spawnSkipFromDisposition,
+  publishSchedulerSpawnSkips,
+  type SchedulerSpawnSkip,
 } from './scheduler-effects.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 
@@ -861,6 +865,13 @@ export async function spawnWorkers(
   }
 
   // Dependency pipeline guard: when enabled, only spawn tasks whose dependencies are all DONE
+  //
+  // Row 3309: every branch below can move a spawnable PENDING task into
+  // `queuedTasks` — and, before this wire, said nothing about it anywhere on
+  // disk. `waveSkips` collects the typed reason for each such task and is
+  // published to the scheduler journal at the end of the wave. Collection only:
+  // no predicate below is changed.
+  const waveSkips: SchedulerSpawnSkip[] = [];
   let activeTasks: Task[];
   let queuedTasks: Task[];
   if (config.dependency_pipeline_enabled) {
@@ -871,6 +882,16 @@ export async function spawnWorkers(
       if (!t.dependencies || t.dependencies.length === 0) return true;
       return t.dependencies.every(dep => doneTasks.has(dep));
     });
+    const eligibleIds = new Set(eligibleTasks.map(t => t.id));
+    for (const t of pendingTasks) {
+      if (eligibleIds.has(t.id)) continue;
+      const unresolved = (t.dependencies ?? []).filter(dep => !doneTasks.has(dep));
+      waveSkips.push(describeSpawnSkip(
+        t,
+        'dependency-unsatisfied',
+        `dependencies not yet DONE at wave time: ${unresolved.join(', ')}`,
+      ));
+    }
     const dispatchableTasks = eligibleTasks.filter(task => !blockedTaskIds.has(task.id));
     activeTasks = dispatchableTasks.slice(0, maxWorkers);
     const activeIds = new Set(activeTasks.map(task => task.id));
@@ -885,6 +906,25 @@ export async function spawnWorkers(
     activeTasks = dispatchableTasks.slice(0, maxWorkers);
     const activeIds = new Set(activeTasks.map(task => task.id));
     queuedTasks = eligibleTasks.filter(task => !activeIds.has(task.id));
+  }
+
+  // Row 3309 — the two remaining ways a dependency-clear task ends the wave
+  // un-dispatched. `SPAWN_BLOCKED` already covers the collision case on the
+  // event stream, but it is debounced by collision signature, so a block that
+  // PERSISTS across ticks stops being announced; the journal line below is the
+  // durable statement of the same fact.
+  for (const t of queuedTasks) {
+    waveSkips.push(blockedTaskIds.has(t.id)
+      ? describeSpawnSkip(
+        t,
+        'scope-collision-blocked',
+        'deferred this wave as a scope-collision serialization loser or by the ADR-037 RBAC gate',
+      )
+      : describeSpawnSkip(
+        t,
+        'worker-slot-exhausted',
+        `wave capacity ${maxWorkers} was filled by ${activeTasks.length} dispatched task(s) on this pass`,
+      ));
   }
 
   // Pre-check: do any active tasks need tmux?
@@ -1291,6 +1331,11 @@ export async function spawnWorkers(
           'utf-8',
         );
       } catch (e) { debugLog('spawnWorkers:honestFailWrite', e); }
+      waveSkips.push(describeSpawnSkip(
+        task,
+        'provider-unavailable',
+        `provider "${String(task.provider)}" has no registered host adapter; the host wrote a pre-dispatch NO_GO instead of degrading the spawn`,
+      ));
       continue;
     } else if (effectiveBackend) {
       if (!finalOnlyUsageContainment) {
@@ -1450,6 +1495,14 @@ export async function spawnWorkers(
     updatedAt: now(),
   });
 
+  publishSchedulerSpawnSkips(
+    projectRoot,
+    getCurrentSprintId(projectRoot) ?? sprint.id,
+    'initial-wave',
+    spawnedTasks.map(task => task.id),
+    waveSkips,
+  );
+
   return queuedTasks;
 }
 
@@ -1471,9 +1524,30 @@ export async function respawnEligibleTasks(
   },
   onWaveTransition?: (durationMs: number, fromWave: string, toWave: string) => void,
 ): Promise<string[]> {
-  if (!config.dependency_pipeline_enabled) return [];
+  if (!config.dependency_pipeline_enabled) {
+    // Row 3309 S5: the earliest and quietest exit — a queued FIX task is never
+    // even looked at on this pass. Name the tasks that are waiting so the
+    // config cause is readable from the journal instead of being inferred.
+    publishSchedulerSpawnSkips(
+      projectRoot,
+      getCurrentSprintId(projectRoot) ?? sprint.id,
+      'respawn-wave',
+      [],
+      sprint.tasks
+        .filter(t => t.status === TaskStatus.PENDING)
+        .map(t => describeSpawnSkip(
+          t,
+          'dependency-pipeline-disabled',
+          'this pass returns before the queue is read because config.dependency_pipeline_enabled is not true',
+        )),
+    );
+    return [];
+  }
 
   const waveStart = Date.now();
+  // Row 3309: typed reasons for every queued task this pass declines to spawn,
+  // published to the scheduler journal before each return path below.
+  const passSkips: SchedulerSpawnSkip[] = [];
 
   // born-610 SINGLE-TRUTH: dependency satisfaction comes from ONE predicate
   // (scheduler-truth.ts). MRR is NO LONGER satisfying — it is unverified
@@ -1501,17 +1575,29 @@ export async function respawnEligibleTasks(
 
   // Emit blocked events to event stream
   const sprintIdForDeps = getCurrentSprintId(projectRoot) ?? sprint.id;
+  const tasksByIdForSkips = new Map(sprint.tasks.map(t => [t.id, t]));
   for (const [blockedId, unresolvedDeps] of enforcement.reasons) {
     writeEvent(
       projectRoot, sprintIdForDeps, 'brain', 'worker',
       'BRAIN→WORKER:DEPENDENCY_BLOCKED',
       { taskId: blockedId, unresolvedDeps, reason: 'dependencies not yet DONE' },
     );
+    const blockedTask = tasksByIdForSkips.get(blockedId);
+    if (blockedTask) {
+      passSkips.push(describeSpawnSkip(
+        blockedTask,
+        'dependency-unsatisfied',
+        `dependencies not yet satisfying: ${unresolvedDeps.join(', ')}`,
+      ));
+    }
   }
 
   const nowEligible = sprint.tasks.filter(t => enforcement.eligible.includes(t.id));
 
-  if (nowEligible.length === 0) return [];
+  if (nowEligible.length === 0) {
+    publishSchedulerSpawnSkips(projectRoot, sprintIdForDeps, 'respawn-wave', [], passSkips);
+    return [];
+  }
 
   const systemProfile = getSystemProfile();
   const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
@@ -1521,7 +1607,21 @@ export async function respawnEligibleTasks(
   const slotsAvailable = Math.max(0, maxWorkers - currentlyExecuting);
 
   const toSpawn = nowEligible.slice(0, slotsAvailable);
-  if (toSpawn.length === 0) return [];
+  // Row 3309 S6/S7 — the measured stall: dependency-clear, unblocked, and still
+  // not spawned because the fleet is full. Previously this returned an empty
+  // array with no trace at all, which is exactly what the 92 empty watcher
+  // decisions looked like from disk.
+  for (const overflow of nowEligible.slice(slotsAvailable)) {
+    passSkips.push(describeSpawnSkip(
+      overflow,
+      'worker-slot-exhausted',
+      `no free worker slot: ${currentlyExecuting} of ${maxWorkers} slot(s) are occupied by live workers`,
+    ));
+  }
+  if (toSpawn.length === 0) {
+    publishSchedulerSpawnSkips(projectRoot, sprintIdForDeps, 'respawn-wave', [], passSkips);
+    return [];
+  }
 
   // Dependency descendants are parked PAUSED while their failed lineage is
   // repaired. Once every dependency is satisfying, reopening is an explicit
@@ -1621,11 +1721,14 @@ export async function respawnEligibleTasks(
       },
     );
 
-    if (disposition.kind === 'routing-lineage-missing') {
-      debugLog('respawnEligibleTasks:routingLineageMissing', disposition.detail);
-      continue;
-    }
     if (disposition.kind !== 'spawned') {
+      if (disposition.kind === 'routing-lineage-missing') {
+        debugLog('respawnEligibleTasks:routingLineageMissing', disposition.detail);
+      }
+      // Row 3309 S8: admission refused this task for a real reason — keep the
+      // refusal (semantics unchanged) and publish WHICH refusal it was.
+      const skip = spawnSkipFromDisposition(disposition, task);
+      if (skip) passSkips.push(skip);
       continue;
     }
 
@@ -1670,6 +1773,8 @@ export async function respawnEligibleTasks(
     writeCheckpoint(projectRoot, sprint, eventOffset);
     debugLog('respawnEligibleTasks:checkpoint', `Checkpoint written at ${terminalCount} completed tasks`);
   }
+
+  publishSchedulerSpawnSkips(projectRoot, sprintIdForDeps, 'respawn-wave', spawnedTaskIds, passSkips);
 
   debugLog('respawnEligibleTasks', `Spawned ${spawnedTaskIds.length} newly eligible tasks: ${spawnedTaskIds.join(', ')}`);
   return spawnedTaskIds;

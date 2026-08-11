@@ -190,6 +190,8 @@ import {
 // sprint-spawner but had no runtime caller. Wired here so NO_GO →
 // dependents PAUSED and DONE → dependents PENDING actually fire.
 import { applyCascadeToSprint, applyUnblockToSprint, respawnEligibleTasks, assertTaskProjectionParity } from './sprint-spawner.js';
+// Row 3309 — typed spawn-skip observability for waves this phase drives.
+import { describeSpawnSkip, publishSchedulerSpawnSkips } from './scheduler-effects.js';
 import { writeEvent, getCurrentSprintId, readEvents, SCOPE_INSUFFICIENT_CHANNEL } from './event-stream.js';
 import { verifyProofOfFunction } from './proof-of-function.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
@@ -3295,12 +3297,29 @@ export async function runFixPhase(
       }
 
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
-      await spawnWorkers(projectRoot, fixSprint, config, {
+      const fixWaveQueue = await spawnWorkers(projectRoot, fixSprint, config, {
         autoApprove: opts?.autoApprove,
         spawnBackend,
         attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
         providerAuthority: opts?.providerAuthority,
       });
+      // Row 3309: this phase has always DISCARDED the wave's overflow queue.
+      // A FIX task left in it has no worker, no heartbeat and no pid, and its
+      // only remaining chance of running is a later watcher pass inside
+      // waitForResults below — which is precisely the state 507-002-fix sat in
+      // for five minutes with nothing on disk saying so. Publishing the queue
+      // does not dispatch it (admission is untouched); it makes the wait honest.
+      publishSchedulerSpawnSkips(
+        projectRoot,
+        getCurrentSprintId(projectRoot) ?? sprint.id,
+        'fix-wave',
+        fixTasks.filter(t => t.status === TaskStatus.EXECUTING).map(t => t.id),
+        fixWaveQueue.map(queued => describeSpawnSkip(
+          queued,
+          'queued-not-dispatched',
+          'left in the FIX wave overflow queue: this phase does not dispatch it, so it runs only if a later watcher pass picks it up',
+        )),
+      );
       // Sprint 154 audit A4.F2: 600s yetersiz (Sprint 152 opus FIX worker timeout cascade kanıt) → 1800s.
       const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
         ?? opts?.fixPhaseTimeoutMs
@@ -3550,12 +3569,24 @@ export async function runFixPhase(
           const reDispatchTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
             ?? opts?.fixPhaseTimeoutMs
             ?? 1_800_000;
-          await spawnWorkers(projectRoot, reDispatchSprint, config, {
+          const reDispatchQueue = await spawnWorkers(projectRoot, reDispatchSprint, config, {
             autoApprove: opts?.autoApprove,
             spawnBackend,
             attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
             providerAuthority: opts?.providerAuthority,
           });
+          // Same discarded-queue hole as the FIX wave above (row 3309).
+          publishSchedulerSpawnSkips(
+            projectRoot,
+            getCurrentSprintId(projectRoot) ?? sprint.id,
+            'fix-wave',
+            reDispatchSprint.tasks.filter(t => t.status === TaskStatus.EXECUTING).map(t => t.id),
+            reDispatchQueue.map(queued => describeSpawnSkip(
+              queued,
+              'queued-not-dispatched',
+              'left in the NOT_DISPATCHED re-dispatch wave overflow queue: this phase does not dispatch it, so it runs only if a later watcher pass picks it up',
+            )),
+          );
           const reDispatchResults = await waitForResults(
             projectRoot,
             reDispatchSprint,

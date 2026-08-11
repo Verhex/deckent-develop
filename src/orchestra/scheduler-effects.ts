@@ -28,8 +28,8 @@
 // collaborators (prompt resolution, write-target computation) are passed in
 // via `SpawnTaskDeps` instead of imported.
 
-import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, renameSync, appendFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 
 import type { Task, ResolvedConfig, TaskResult } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
@@ -72,6 +72,7 @@ import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 import { metric } from '../core/observability.js';
 import { buildWorkerPrompt } from './task-builder.js';
 import type { SchedulerDecision } from './scheduler-reducer.js';
+import { schedulerShadowJournalPath } from './scheduler-journal.js';
 
 // ─── Fix-Task Routing-Field Inheritance ───────────────────────────────────
 // Relocated from sprint-spawner.ts `preserveFixTaskRoutingFields` (born-476,
@@ -228,6 +229,164 @@ export type SpawnDisposition =
   | { kind: 'routing-lineage-missing'; taskId: string; fixForTaskId: string; detail: string }
   | { kind: 'provider-unavailable'; taskId: string; provider: string }
   | { kind: 'collision-held'; taskId: string; blockerTaskIds: readonly string[] };
+
+// ─── Typed Spawn-Skip Observability (row 3309) ─────────────────────────────
+//
+// Measured gap: sprint-507's `507-002-fix` sat Queued while 92 consecutive
+// watcher passes journaled an empty `spawnedTaskIds` — no heartbeat, no pid,
+// no log, and nothing anywhere saying WHY. Every skip site on the way from
+// "queued FIX task" to "spawned worker" ended in a bare `continue`/`return []`
+// plus at most a `debugLog` (off by default), so a stuck queue was undiagnosable
+// from disk.
+//
+// This block makes a skip VISIBLE; it never makes it different. No admission
+// predicate is touched — a task admission legitimately refuses still is not
+// spawned, it just says so in the journal now.
+//
+// File family: the EXISTING scheduler-shadow journal
+// (`.deckent/runtime/scheduler-shadow/<sprintId>.jsonl`, path owned by
+// scheduler-journal.ts). The record is additive and discriminated by
+// `recordKind: 'spawn-skip'`; tick records written by
+// `appendSchedulerShadowRecord` carry no `recordKind` at all, so a reader
+// dual-reads exactly the way `SchedulerShadowRecord.executedEngine` already
+// requires — a missing discriminator means "tick record", never an inferred
+// skip. Fail-soft, same contract as the journal module it shares a file with:
+// a write fault must NEVER affect scheduling.
+
+export type SchedulerSpawnSkipReasonCode =
+  /** `dependency_pipeline_enabled` is off, so the respawn pass returns before looking at the queue. */
+  | 'dependency-pipeline-disabled'
+  /** At least one dependency is not satisfying yet (single-truth scheduler state). */
+  | 'dependency-unsatisfied'
+  /** Deferred as the loser of a plan-time scope-collision serialization, or by the RBAC gate. */
+  | 'scope-collision-blocked'
+  /** Eligible and unblocked, but every worker slot is occupied this pass. */
+  | 'worker-slot-exhausted'
+  /** The idempotency guard already holds this id (a spawn is in flight for it). */
+  | 'already-assigned'
+  /** Held behind a live writer of an overlapping `scope.filesWrite` path. */
+  | 'collision-held'
+  /** Host-only provider with no registered adapter — host wrote a pre-dispatch NO_GO. */
+  | 'provider-unavailable'
+  /** Fix-task routing lineage could not be read, so the spawn was refused. */
+  | 'routing-lineage-missing'
+  /** The spawn attempt threw; the id was rolled back out of the assigned set. */
+  | 'spawn-threw'
+  /** A SpawnTask effect named an id the live task map does not contain. */
+  | 'task-not-found'
+  /** Returned in a wave's overflow queue and never handed to a later dispatcher. */
+  | 'queued-not-dispatched';
+
+/** Which scheduler pass observed the skip. */
+export type SchedulerSpawnPass = 'initial-wave' | 'fix-wave' | 'respawn-wave' | 'reducer-tick';
+
+export interface SchedulerSpawnSkip {
+  readonly taskId: string;
+  readonly reasonCode: SchedulerSpawnSkipReasonCode;
+  /** Human-readable specifics (which dependency, which blocker, how many slots). */
+  readonly detail: string;
+  /** Row 3309 is a FIX-task story — carried so a stuck fix is greppable on its own. */
+  readonly isPriorityFix: boolean;
+}
+
+export interface SchedulerSpawnSkipRecord {
+  readonly recordKind: 'spawn-skip';
+  readonly ts: string;
+  readonly pass: SchedulerSpawnPass;
+  /** What the same pass DID spawn — an empty array next to a populated `skips` is the honest "why nothing spawned". */
+  readonly spawnedTaskIds: readonly string[];
+  readonly skips: readonly SchedulerSpawnSkip[];
+}
+
+export function describeSpawnSkip(
+  task: Pick<Task, 'id' | 'isPriorityFix'>,
+  reasonCode: SchedulerSpawnSkipReasonCode,
+  detail: string,
+): SchedulerSpawnSkip {
+  return { taskId: task.id, reasonCode, detail, isPriorityFix: task.isPriorityFix === true };
+}
+
+/** Map a non-'spawned' disposition onto its typed skip. Returns null for a real spawn. */
+export function spawnSkipFromDisposition(
+  disposition: SpawnDisposition,
+  task: Pick<Task, 'id' | 'isPriorityFix'>,
+): SchedulerSpawnSkip | null {
+  switch (disposition.kind) {
+    case 'spawned':
+      return null;
+    case 'collision-held':
+      return describeSpawnSkip(
+        task,
+        'collision-held',
+        `held behind active writer(s) of an overlapping write scope: ${disposition.blockerTaskIds.join(', ')}`,
+      );
+    case 'provider-unavailable':
+      return describeSpawnSkip(
+        task,
+        'provider-unavailable',
+        `provider "${disposition.provider}" has no registered host adapter; the host wrote a pre-dispatch NO_GO instead of degrading the spawn`,
+      );
+    case 'routing-lineage-missing':
+      return describeSpawnSkip(task, 'routing-lineage-missing', disposition.detail);
+  }
+}
+
+/**
+ * Consecutive-identical-suppression, keyed by `${sprintId}|${pass}`. A genuinely
+ * stuck queue is re-observed on every completion tick; row 3309's own evidence
+ * was 92 passes in five minutes, so journaling each one verbatim would trade an
+ * invisible stall for an unreadable one. The FIRST pass that hits a given skip
+ * signature is always written — the diagnosis is present on disk — and the
+ * repeats are suppressed until the signature changes. Mirrors the
+ * `lastCollisionSignature` debounce in sprint-spawner.ts.
+ */
+const lastSpawnSkipSignatures = new Map<string, string>();
+
+/** Test seam — mirrors `resetCollisionDebounce` in sprint-spawner.ts. */
+export function resetSchedulerSpawnSkipDebounce(): void {
+  lastSpawnSkipSignatures.clear();
+}
+
+/**
+ * Append one typed spawn-skip record to this sprint's scheduler journal.
+ * No-op when the pass skipped nothing, or when this exact signature was the
+ * previous one published for the same sprint+pass.
+ *
+ * @returns the record that was published, or null when nothing was published.
+ */
+export function publishSchedulerSpawnSkips(
+  projectRoot: string,
+  sprintId: string,
+  pass: SchedulerSpawnPass,
+  spawnedTaskIds: readonly string[],
+  skips: readonly SchedulerSpawnSkip[],
+): SchedulerSpawnSkipRecord | null {
+  if (skips.length === 0) return null;
+
+  const signature = [...skips]
+    .map(skip => `${skip.taskId}:${skip.reasonCode}`)
+    .sort()
+    .join(';') + '|' + [...spawnedTaskIds].sort().join(',');
+  const key = `${sprintId}|${pass}`;
+  if (lastSpawnSkipSignatures.get(key) === signature) return null;
+  lastSpawnSkipSignatures.set(key, signature);
+
+  const record: SchedulerSpawnSkipRecord = {
+    recordKind: 'spawn-skip',
+    ts: new Date().toISOString(),
+    pass,
+    spawnedTaskIds: [...spawnedTaskIds],
+    skips: [...skips],
+  };
+  try {
+    const filePath = schedulerShadowJournalPath(projectRoot, sprintId);
+    mkdirSync(dirname(filePath), { recursive: true });
+    appendFileSync(filePath, JSON.stringify(record) + '\n', 'utf-8');
+  } catch (err) {
+    debugLog('scheduler-effects:publishSchedulerSpawnSkips', err);
+  }
+  return record;
+}
 
 /** Exact active writer overlap checked by the canonical spawn admission. */
 export function findActiveWriteCollisions(
@@ -742,6 +901,9 @@ export interface SchedulerDecisionExecutionResult {
   /** Count of WriteCheckpoint effects for which `deps.writeCheckpoint` was
    *  actually invoked without throwing (0 when the dep is omitted). */
   readonly checkpointsWritten: number;
+  /** Row 3309: every SpawnTask effect this tick declined to turn into a live
+   *  worker, with its typed reason — also published to the scheduler journal. */
+  readonly spawnSkips: readonly SchedulerSpawnSkip[];
 }
 
 function cascadeSkipResultPath(projectRoot: string, taskId: string): string {
@@ -820,6 +982,7 @@ export async function executeSchedulerDecision(
   const spawnedTaskIds: string[] = [];
   const killedWorkerIds: string[] = [];
   const cascadeSkippedTaskIds: string[] = [];
+  const spawnSkips: SchedulerSpawnSkip[] = [];
   let checkpointsWritten = 0;
 
   for (const effect of decision.orderedEffects) {
@@ -865,9 +1028,24 @@ export async function executeSchedulerDecision(
     const task = deps.taskMap.get(effect.taskId);
     if (!task) {
       debugLog('executeSchedulerDecision:missingTask', `SpawnTask effect for unknown task ${effect.taskId}`);
+      spawnSkips.push(describeSpawnSkip(
+        { id: effect.taskId },
+        'task-not-found',
+        'the tick decided to spawn this id but the live task map does not contain it',
+      ));
       continue;
     }
-    if (deps.assignedTaskIds.has(effect.taskId)) continue; // idempotency (Bug F parity)
+    if (deps.assignedTaskIds.has(effect.taskId)) {
+      // idempotency (Bug F parity) — a legitimate no-op, but an invisible one
+      // until now: a queue that never drains looks identical to one whose spawn
+      // is already in flight.
+      spawnSkips.push(describeSpawnSkip(
+        task,
+        'already-assigned',
+        'a spawn for this task is already in flight (idempotency guard); no second dispatch',
+      ));
+      continue;
+    }
     deps.assignedTaskIds.add(effect.taskId);
     try {
       const disposition = await executeSpawnTask({ task }, deps);
@@ -875,14 +1053,29 @@ export async function executeSchedulerDecision(
         spawnedTaskIds.push(effect.taskId);
       } else {
         deps.assignedTaskIds.delete(effect.taskId);
+        const skip = spawnSkipFromDisposition(disposition, task);
+        if (skip) spawnSkips.push(skip);
       }
     } catch (e) {
       debugLog('executeSchedulerDecision:spawn', e);
       deps.assignedTaskIds.delete(effect.taskId);
+      spawnSkips.push(describeSpawnSkip(
+        task,
+        'spawn-threw',
+        `the spawn attempt threw: ${e instanceof Error ? e.message : String(e)}`,
+      ));
     }
   }
 
+  publishSchedulerSpawnSkips(
+    deps.projectRoot,
+    getCurrentSprintId(deps.projectRoot) ?? deps.sprintFallbackId,
+    'reducer-tick',
+    spawnedTaskIds,
+    spawnSkips,
+  );
+
   return {
-    spawnedTaskIds, killedWorkerIds, cascadeSkippedTaskIds, checkpointsWritten,
+    spawnedTaskIds, killedWorkerIds, cascadeSkippedTaskIds, checkpointsWritten, spawnSkips,
   };
 }
