@@ -70,6 +70,8 @@
     "docs:ref:check": "node scripts/gen-reference-docs.mjs --check",
     "docs:stats": "node scripts/update-readme-stats.mjs --write",
     "docs:stats:check": "node scripts/update-readme-stats.mjs --check",
+    "docs:platform": "node scripts/gen-platform-registry.mjs --write",
+    "docs:platform:check": "node scripts/gen-platform-registry.mjs --check",
     "docs:stats:refresh": "node scripts/update-readme-stats.mjs --refresh-snapshot --write",
     "prepublishOnly": "npm run lint:master-plan && npm run docs:stats:check && npm run docs:ref:check && npm run lint:identity && npm run build",
     "tsc:desktop": "tsc --noEmit -p src/desktop",

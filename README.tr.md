@@ -18,6 +18,8 @@ npm package; `deckent` ve `deckent-mcp` binary'lerini sunar, Node.js `>=24.0.0` 
 
 Published-package installation için bildirilen komut `npm install -g deckent`'tir. Bu documentation audit network ve global state mutation yapan bu komutu **çalıştırmadı**; registry installation publish pipeline doğrulayana kadar `HOLD`'dur. Repository build komutu `npm run build:all`, bu yeniden-yazımdan hemen önce owner tarafından çalıştırıldı. [Kanıt: `package.json:22-38`; owner run bildirimi, 2026-08-01; `docs/analysis/OPEN-QUESTIONS-2026-08.md`]
 
+Release'ler manuel değil, governed'dır. `main` bir GitHub merge queue ile korunur; bu yüzden CI required check'leri yalnız pull-request branch'inde değil final merge result üzerinde yeniden koşar — CI workflow tam bu nedenle `merge_group` event'ini dinler. Ardından bir `v*` tag tek publish authority'yi çalıştırır: install → `build:all` → `validate:publish` → smoke gate → `npm publish` → GitHub Release. Eski publish workflow'u read-only dry-run'a indirgenmiştir ve registry'ye asla yükleme yapmaz. [Kanıt: `.github/workflows/ci.yml:3-11,17-23`; `.github/workflows/release.yml:1-11`; `.github/workflows/publish.yml:1-12`]
+
 ## Doğrulanmış beş dakikalık orientation
 
 Aşağıdaki dört komut 2026-08-01'de güncel compiled binary üzerinde gerçekten çalıştırıldı. Hepsi read-only'dir: binary identity'yi, readiness'i, onboarding preview'ını ve mevcut run authority'yi okur.
@@ -48,6 +50,8 @@ Gerçek work başlatma burada doğrulanmış gibi sunulmaz. Audit'in sprint/run/
 | Goal preview / governed start | `deckent do <goal>` | Varsayılan preview; RunFlow v2 açıkken `--run --yes` explicit non-interactive start yoludur | Proposal compilation gerçek provider call'dır; RunFlow yolu başlamadan da proposal persist edebilir, bu nedenle audit'te çalıştırılmadı. [Kanıt: `src/cli/commands/do.ts:132-179,219-357,440-517`] |
 | Structured lifecycle | `plan`, `start`, `status`, `review`, `retro` | Planlama, execution, observation, adjudication, learning | Tüm command/help contract'ları canlı; state-changing path'ler bu audit'te yalnız help ile doğrulandı. [Kanıt: `src/cli/commands/plan.ts:121-205`; `src/cli/commands/start.ts:329-345`; `src/cli/commands/status.ts:1024-1040`; `src/cli/commands/review.ts:184-224`; `src/cli/commands/retro.ts:334-342`] |
 | One-shot work | `run <description>` | Sprint cycle olmadan tek task yürütür | Aynı `run` parent lifecycle alias'larını da taşır; bu belgelenmiş bir CLI ambiguity'dir. [Kanıt: `src/cli/commands/run.ts:451-476,920-939`] |
+| Run inbox ve kararlar | `deckent runs [n]` | Run-flow'ları listeler, sonra tek bir run'ı `--approve`, `--reject`, `--start`, `--retire`, `--diff` veya `--commit` ile karara bağlar; `--limit <n>` listelenen pencereyi genişletir, `--close-stale` ölü kayıtları sınıflar | Bu flag'lerin tümü tek bir `runs` komutunda kayıtlıdır. `--retire` onaylanmış ama hiç başlamamış bir run'ı iptal eder; flow-id prefix'i `--limit`'ten bağımsız olarak tüm flow'lara karşı çözülür. [Kanıt: `src/cli/commands/runs.ts:249-262`] |
+| Owner-managed model activation | `deckent models list/activate/deactivate/activation` | Detection provider'ın ne sunduğunu bildirir; activation owner'ın routing pool'a neyi kabul ettiğini kaydeder | `activate` ve `deactivate` `--provider` ister; kaydı olmayan model active sayılır, bu yüzden dokunulmamış proje değişmez. [Kanıt: `src/cli/commands/models.ts:158-205`] |
 | Durable process work | `process submit/status/result` | Bir `ExecutionRequest` submit eder; side effect approval için park edebilir | CLI surface kayıtlıdır ve process service'lere gider. [Kanıt: `src/cli/commands/process.ts:142-190`] |
 | Continuous work | `autonomous …` | Durable backlog, approvals, status ve loop control | Manifest runtime'ı active ama default-off işaretler; MCP parity eksiği ve attach-only reactive bridge kaydeder. [Kanıt: `.deckent/settings/features-manifest.json`; `src/cli/commands/autonomous.ts:1710-1946`] |
 | Remote/programmatic control | HTTP/SSE ve MCP | API server ve 49 MCP tool / 8 resource | 49 tool kayıtlıdır; CLI/MCP parity gate hâlâ baseline ile 37 CLI-only ve 1 MCP-only gap kabul eder. [Kanıt: `src/mcp/tools/index.ts:68-125`; `src/mcp/server.ts`; `npm run lint:parity`, 2026-08-01] |
@@ -59,7 +63,7 @@ Gerçek work başlatma burada doğrulanmış gibi sunulmaz. Audit'in sprint/run/
 - SQLite/FTS5 tabanlı DB-first memory; relation/history, document freshness, KPI store'ları, recall ve export/backup operation'ları. [Kanıt: `src/core/memory-store.ts:100-338`; `src/core/memory-query.ts`; `src/cli/commands/memory.ts`; `src/cli/commands/recall.ts:11-20`]
 - Runtime-wide approval, authority, audit, scope ve immutable settlement contract'ları. [Kanıt: `src/core/approval-broker.ts`; `src/orchestra/authority-enforcer.ts`; `src/core/task-settlement-authority.ts`; `src/core/invocation-receipt-store.ts:705-850`]
 - Native REPL, terminal dashboard, web/API server, Desktop, VS Code extension, connectors, CLI ve MCP surface'leri. [Kanıt: `src/cli/entry.ts:664-713`; `src/cli/commands/dashboard.ts:147-214`; `src/cli/commands/serve.ts:72-80`; `src/desktop`; `src/extensions/vscode`; `src/connectors`; `src/mcp`]
-- 211 visible CLI command path, 49 canonical MCP tool, 8 resource ve 31 built-in skill sayım veya projection ile doğrulandı. Identity projection ayrıca “21 built-in + 2 custom” agent bildirirken güncel project ve built-in prompt ağaçlarının her biri 21 persona içeriyor; exact ek-iki mapping OQ-21'de `HOLD` kalır. [Kanıt: recursive `buildProgram()` ve `TOOL_CATALOG` introspection ile filesystem sayımları, 2026-08-01; `.deckent/workspace/IDENTITY.md:19-29`; `docs/analysis/OPEN-QUESTIONS-2026-08.md`]
+- 75 top-level komut altında 215 visible CLI command path, 49 canonical MCP tool, 8 MCP resource, 21 built-in agent ve 30 built-in skill. Identity projection aynı agent ve skill sayılarını bildirir. [Kanıt: recursive `buildProgram()` ve `TOOL_CATALOG` introspection ile filesystem sayımları, 2026-08-11; `.deckent/workspace/IDENTITY.md` `identity-summary` bloğu]
 
 ## Güncel repository gerçeği
 
@@ -94,12 +98,12 @@ Deckent'in üç Immutable Law'u Dual Lens + Scale, Every Environment ve Never MV
 License: MIT. [Kanıt: `package.json:90-91`; `LICENSE`]
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-34478%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-34601%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 <!-- AUTOGEN:START id="stat-counts" -->
 - **49 MCP tools** + **8 MCP resources**
 - **21 built-in agents**
-- **30 built-in skills**
+- **31 built-in skills**
 - **20 dashboard pages**
 <!-- AUTOGEN:END id="stat-counts" -->

@@ -1,8 +1,8 @@
 import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import { SprintPhase, SprintStatus, TaskStatus } from '../../core/types.js';
-import type { DashboardState, Task } from '../../core/types.js';
+import { AgentStatus, SprintPhase, SprintStatus, TaskStatus } from '../../core/types.js';
+import type { AgentInfo, DashboardState, Task } from '../../core/types.js';
 import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi , isDashboardOrphaned } from '../helpers/output.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
@@ -43,6 +43,8 @@ import {
   type CanonicalRunStatusReadModel,
 } from '../../core/run-status-read-model.js';
 import { DeckentError } from '../../core/errors.js';
+import { DEFAULT_HEARTBEAT_TIMEOUT_MS, loadConfig } from '../../core/config.js';
+import { isPidAlive } from '../../core/pid-liveness.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -207,6 +209,99 @@ export interface StatusCommandDeps {
     projectRoot: string,
     options?: { readonly currentTaskIds?: ReadonlySet<string> },
   ) => readonly ProviderConcurrencyRuntimeProjection[];
+  /** Effective heartbeat lease, resolved once by the command's config authority. */
+  readonly heartbeatTimeoutMs?: number;
+  /** Injectable portable process probe for deterministic projection tests. */
+  readonly workerProcessAlive?: (pid: number) => boolean;
+}
+
+interface WorkerProcessProjection extends AgentInfo {
+  readonly pid?: number;
+}
+
+export interface WorkerLivenessProjectionOptions {
+  readonly heartbeatTimeoutMs: number;
+  readonly nowMs?: number;
+  readonly lang?: string;
+  readonly isProcessAlive?: (pid: number) => boolean;
+}
+
+const ACTIVE_AGENT_STATUSES = new Set<AgentStatus>([
+  AgentStatus.PLANNING,
+  AgentStatus.EXECUTING,
+  AgentStatus.EVALUATING,
+  AgentStatus.SCANNING,
+  AgentStatus.CODING,
+  AgentStatus.VERIFYING,
+  AgentStatus.TESTING,
+  AgentStatus.DOCUMENTING,
+]);
+
+/**
+ * Presentation-only worker liveness gate. Dashboard bytes remain immutable
+ * authority; active-shaped rows are copied into an honest live or stale view.
+ */
+export function projectWorkerLiveness(
+  state: DashboardState,
+  options: WorkerLivenessProjectionOptions,
+): DashboardState {
+  const nowMs = options.nowMs ?? Date.now();
+  const lang = options.lang ?? 'en';
+  const processAlive = options.isProcessAlive ?? isPidAlive;
+  let provenActive = 0;
+
+  const agents = state.agents.map((agent): AgentInfo => {
+    if (!ACTIVE_AGENT_STATUSES.has(agent.status)) return agent;
+    const heartbeatAt = agent.lastHeartbeat === undefined
+      ? Number.NaN
+      : Date.parse(agent.lastHeartbeat);
+    const heartbeatAgeMs = nowMs - heartbeatAt;
+    const heartbeatFresh = Number.isFinite(heartbeatAt)
+      && heartbeatAgeMs >= 0
+      && heartbeatAgeMs < options.heartbeatTimeoutMs;
+    const pid = (agent as WorkerProcessProjection).pid;
+    const processProven = typeof pid === 'number' && processAlive(pid);
+    if (heartbeatFresh || processProven) {
+      provenActive += 1;
+      return agent;
+    }
+
+    const ageMinutes = Number.isFinite(heartbeatAgeMs) && heartbeatAgeMs >= 0
+      ? String(Math.floor(heartbeatAgeMs / 60_000))
+      : '?';
+    const staleHeader = getMessage('resume.stale_header', lang, { count: '1' }).trim();
+    const staleDetail = getMessage('resume.stale_item', lang, {
+      workerId: agent.id,
+      taskId: agent.taskId ?? '?',
+      reason: getMessage('tui.inbox_liveness_unknown', lang),
+      age: ageMinutes,
+    }).trim();
+    return {
+      ...agent,
+      status: AgentStatus.ERROR,
+      currentAction: `${staleHeader}: ${staleDetail} — ${getMessage('recover.description', lang)}`,
+    };
+  });
+
+  return {
+    ...state,
+    agents,
+    progress: {
+      ...state.progress,
+      active: provenActive,
+    },
+  };
+}
+
+function statusLivenessOptions(
+  deps: StatusCommandDeps,
+  lang = 'en',
+): WorkerLivenessProjectionOptions {
+  return {
+    heartbeatTimeoutMs: deps.heartbeatTimeoutMs ?? DEFAULT_HEARTBEAT_TIMEOUT_MS,
+    lang,
+    isProcessAlive: deps.workerProcessAlive,
+  };
 }
 
 function matchingRunStatusReadModel(
@@ -846,6 +941,9 @@ export function projectDashboardThroughRunAuthority(
   tasks: readonly Task[],
   authority: CanonicalRunStatus,
   canonicalProgress?: CanonicalRunStatusReadModel['logicalProgress'],
+  livenessOptions: WorkerLivenessProjectionOptions = {
+    heartbeatTimeoutMs: DEFAULT_HEARTBEAT_TIMEOUT_MS,
+  },
 ): CanonicalDashboardProjection {
   const taskProgress = canonicalProgress ?? (
     hasNoDurableRunIdentity(authority)
@@ -870,8 +968,7 @@ export function projectDashboardThroughRunAuthority(
     || progress.blocked !== taskProgress.blocked
     || progress.total !== taskProgress.total;
 
-  return {
-    dashboard: {
+  const dashboard = projectWorkerLiveness({
       ...state,
       sprint: {
         ...state.sprint,
@@ -889,7 +986,9 @@ export function projectDashboardThroughRunAuthority(
         ? state.agents
         : [],
       progress,
-    },
+    }, livenessOptions);
+  return {
+    dashboard,
     metadata: {
       schemaVersion: 1,
       lifecycleAuthority: 'run-status-authority-v1',
@@ -1018,6 +1117,7 @@ export function buildStatusJsonSnapshot(
     tasks,
     authority,
     readModel?.logicalProgress,
+    statusLivenessOptions(deps, getLangFromRoot(root)),
   );
   const projectedState = projection.dashboard;
   const snapshot = verbose
@@ -1069,10 +1169,15 @@ export function registerStatus(
     .option('--no-color', 'Disable colored output')
     .option('--graph', 'Display dependency graph as Mermaid diagram')
     .option('--mode <mode>', 'Output render mode: explainatory | standart | verbose | json')
-    .action((opts: StatusOpts) => {
+    .action(async (opts: StatusOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
       const lang = getLangFromRoot(root);
+      const resolvedConfig = await loadConfig(root);
+      const commandDeps: StatusCommandDeps = {
+        ...deps,
+        heartbeatTimeoutMs: (resolvedConfig.heartbeat_timeout ?? (DEFAULT_HEARTBEAT_TIMEOUT_MS / 1000)) * 1000,
+      };
       const resolvedMode = opts.mode ? resolveOutputMode(opts.mode) : undefined;
       const jsonMode = opts.json === true || resolvedMode === 'json';
 
@@ -1133,7 +1238,7 @@ export function registerStatus(
               snapshot,
               root,
               tasks,
-              deps,
+              commandDeps,
               lang,
             );
           }
@@ -1151,7 +1256,7 @@ export function registerStatus(
               snapshot,
               root,
               tasks,
-              deps,
+              commandDeps,
               lang,
             );
           }
@@ -1159,7 +1264,7 @@ export function registerStatus(
             renderer.snapshot(),
             root,
             tasks,
-            deps,
+            commandDeps,
             lang,
           );
         };
@@ -1226,7 +1331,7 @@ export function registerStatus(
           try {
             if (jsonMode) {
               writer.enqueue(
-                `${JSON.stringify(buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose))}\n`,
+                `${JSON.stringify(buildStatusJsonSnapshot(root, dashPath, commandDeps, !!opts.verbose))}\n`,
               );
               return;
             }
@@ -1244,7 +1349,7 @@ export function registerStatus(
         try {
           if (jsonMode) {
             writer.enqueue(
-              `${JSON.stringify(buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose))}\n`,
+              `${JSON.stringify(buildStatusJsonSnapshot(root, dashPath, commandDeps, !!opts.verbose))}\n`,
             );
           } else {
             writer.enqueue(hideCursor() + clearScreen() + followSnapshot());
@@ -1283,7 +1388,7 @@ export function registerStatus(
       if (jsonMode && !opts.watch) {
         try {
           output(JSON.stringify(
-            buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose),
+            buildStatusJsonSnapshot(root, dashPath, commandDeps, !!opts.verbose),
             null,
             2,
           ));
@@ -1309,7 +1414,7 @@ export function registerStatus(
           }
           // Use canonical sprint-state.json as source of truth; fall back to task file scan
           const sprintId = getCurrentSprintId(root) ?? detectSprintId(tasks);
-          const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+          const taskSettlements = loadStatusTaskSettlements(root, tasks, commandDeps);
           if (jsonMode) {
             const standaloneData = {
               standalone: true,
@@ -1331,7 +1436,7 @@ export function registerStatus(
           return;
         }
         if (jsonMode) {
-          output(JSON.stringify(buildNoActiveStatusJson(root, deps), null, 2));
+          output(JSON.stringify(buildNoActiveStatusJson(root, commandDeps), null, 2));
           return;
         }
         print(getMessage('status.no_active_sprint', lang));
@@ -1391,7 +1496,7 @@ export function registerStatus(
         const watchFrame = (): string | null => {
           if (jsonMode) {
             return `${JSON.stringify(
-              buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose),
+              buildStatusJsonSnapshot(root, dashPath, commandDeps, !!opts.verbose),
             )}\n`;
           }
           const rawState = readDashboard(dashPath);
@@ -1403,15 +1508,14 @@ export function registerStatus(
           if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
             return `\x1Bc${getMessage('status.read_model_hold', lang)}\n`;
           }
-          const state = opts.raw
-            ? rawState
-            : projectDashboardThroughRunAuthority(
-                rawState,
-                tasks,
-                authority,
-                readModel?.logicalProgress,
-              ).dashboard;
-          const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+          const state = projectDashboardThroughRunAuthority(
+            rawState,
+            tasks,
+            authority,
+            readModel?.logicalProgress,
+            statusLivenessOptions(commandDeps, lang),
+          ).dashboard;
+          const taskSettlements = loadStatusTaskSettlements(root, tasks, commandDeps);
           const sections: string[] = [];
           if (opts.raw) {
             sections.push(formatDashboard(state));
@@ -1494,14 +1598,13 @@ export function registerStatus(
           process.exitCode = 2;
           return;
         }
-        const state = opts.raw
-          ? rawState
-          : projectDashboardThroughRunAuthority(
-              rawState,
-              tasks,
-              authority,
-              readModel?.logicalProgress,
-            ).dashboard;
+        const state = projectDashboardThroughRunAuthority(
+          rawState,
+          tasks,
+          authority,
+          readModel?.logicalProgress,
+          statusLivenessOptions(commandDeps, lang),
+        ).dashboard;
         // ─── W0-TRUTH (#491) orphan-gate ─────────────────────────────
         // Crash-case: an ACTIVE-shaped .dashboard whose writer died must not be
         // presented as live. Stale + no live sprint + no task files → honest
@@ -1513,7 +1616,7 @@ export function registerStatus(
         });
         if (isOrphaned) {
           if (jsonMode) {
-            output(JSON.stringify(buildNoActiveStatusJson(root, deps), null, 2));
+            output(JSON.stringify(buildNoActiveStatusJson(root, commandDeps), null, 2));
             return;
           }
           print(getMessage('status.no_active_sprint', lang));
@@ -1533,12 +1636,12 @@ export function registerStatus(
         // BOTH surfaces.
         const spTerminal = state.sprint as { status?: string; phase?: string };
         if (jsonMode && !opts.raw && (spTerminal.status === 'COMPLETE' || spTerminal.phase === 'COMPLETE')) {
-          output(JSON.stringify(buildNoActiveStatusJson(root, deps), null, 2));
+          output(JSON.stringify(buildNoActiveStatusJson(root, commandDeps), null, 2));
           return;
         }
         if (jsonMode) {
           // (E) --json + --verbose: include agent/skill info
-          const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+          const taskSettlements = loadStatusTaskSettlements(root, tasks, commandDeps);
           const jsonData = opts.verbose
             ? { ...state, taskSettlements, _verbose: { agents: tasks.map(t => ({ id: t.id, agent: t.assignedAgent ?? 'generic', skills: t.assignedSkills ?? [] })) } }
             : { ...state, taskSettlements };
@@ -1551,7 +1654,7 @@ export function registerStatus(
             output(formatSkillAssignments(tasks, !!opts.verbose));
           }
           const settlementsRaw = formatStatusTaskSettlements(
-            loadStatusTaskSettlements(root, tasks, deps),
+            loadStatusTaskSettlements(root, tasks, commandDeps),
             lang,
           );
           if (settlementsRaw) output(settlementsRaw);
@@ -1559,7 +1662,7 @@ export function registerStatus(
           if (pendingRaw) output(pendingRaw);
         } else {
           // Human-friendly output (default)
-          const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+          const taskSettlements = loadStatusTaskSettlements(root, tasks, commandDeps);
           const meta = readSprintMeta(root, state.sprint.id);
           const ci = readCIData(root, state.sprint.id);
 

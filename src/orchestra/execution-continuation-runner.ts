@@ -25,7 +25,10 @@ import {
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
 import type { ModelType } from '../core/types.js';
-import { readRuntimeBudgetObservations } from './runtime-budget-monitor.js';
+import {
+  readRuntimeBudgetObservations,
+  type RuntimeBudgetObservationEvidence,
+} from './runtime-budget-monitor.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 
 export interface DispatchExecutionContinuationInput {
@@ -88,6 +91,36 @@ function assertContinuationTurnReserve(
   }
 }
 
+const STARTUP_DELTA_FIELDS = [
+  'inputTokens',
+  'outputTokens',
+  'cacheReadTokens',
+  'cacheCreationTokens',
+] as const;
+
+/**
+ * Replay the host's own applied-delta arithmetic from the immutable record.
+ *
+ * Usage semantics — never a provider name — decide which arithmetic is correct:
+ * an incremental sample IS its own applied delta, while a cumulative sample
+ * reports running attempt totals and may only apply what it adds on top of the
+ * counters that preceded it. Both are honest provider contracts; a startup
+ * observation is admissible evidence in either one exactly when its recorded
+ * delta reproduces here, so an inflated, invented or double-counted delta
+ * (including cache tokens) still fails closed.
+ */
+function hasExactStartupDelta(evidence: RuntimeBudgetObservationEvidence): boolean {
+  const { observation, appliedDelta, countersAfter } = evidence;
+  return STARTUP_DELTA_FIELDS.every(field => {
+    const before = countersAfter[field] - appliedDelta[field];
+    if (before < 0) return false;
+    const expected = observation.mode === 'cumulative'
+      ? Math.max(0, observation.counts[field] - before)
+      : observation.counts[field];
+    return appliedDelta[field] === expected;
+  });
+}
+
 function assertContinuationStartupReserve(
   projectRoot: string,
   checkpoint: ExecutionLandingCheckpointV1,
@@ -97,13 +130,14 @@ function assertContinuationStartupReserve(
     checkpoint.taskId,
     checkpoint.attemptId,
   )[0];
-  if (
-    !firstObservation
-    || firstObservation.observation.mode !== 'incremental'
-    || !firstObservation.observation.countsAsTurn
-  ) {
+  if (!firstObservation || !firstObservation.observation.countsAsTurn) {
     throw createExecutionAuthorityError(
-      'Execution continuation requires an immutable incremental parent startup observation before new provider work',
+      'Execution continuation requires an immutable incremental parent startup observation, or the cumulative-semantics equivalent, before new provider work',
+    );
+  }
+  if (!hasExactStartupDelta(firstObservation)) {
+    throw createExecutionAuthorityError(
+      'Execution continuation parent startup observation applied delta is not exact for its usage semantics',
     );
   }
   const applied = firstObservation.appliedDelta;

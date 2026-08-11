@@ -41,6 +41,7 @@
     "skills::diff::system-architect::doc",
     "skills::diff::testing-expert::doc",
     "skills::diff::typescript-expert::doc",
+    "skills::only-a::project-conventions",
     "skills::only-b::observability"
   ]
 }

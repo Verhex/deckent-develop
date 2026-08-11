@@ -164,6 +164,7 @@ const RUN_FLOW_EVENT_TYPES = new Set([
   'START_REQUESTED',
   'RUN_STARTED',
   'RUN_COMPLETED',
+  'RUN_PAUSED',
   'RUN_FAILED',
   'FLOW_ABORTED',
 ]);
@@ -3283,6 +3284,16 @@ function foldRunFlowEvents(events, flowId) {
         throw new EvidenceReadError('INVALID_EVENT_TRANSITION');
       }
       context = { ...context, state: 'FAILED' };
+      continue;
+    }
+    // Mirrors run-flow-reducer RUN_PAUSED: a typed pause parks the flow in
+    // BLOCKED, which this admission twin already classes as settled — a paused
+    // run awaits an explicit recover/force-finalize and must not hold clean.
+    if (event.type === 'RUN_PAUSED') {
+      if (context.state !== 'STARTING' && context.state !== 'DETACHED_RUNNING') {
+        throw new EvidenceReadError('INVALID_EVENT_TRANSITION');
+      }
+      context = { ...context, state: 'BLOCKED' };
       continue;
     }
     context = { ...context, state: 'CANCELLED' };

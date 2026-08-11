@@ -62,6 +62,45 @@ export interface ProviderExecutionObservationScope {
   readonly fence: string;
 }
 
+/**
+ * Why a settling generation closed its own open interval. Retirement is a typed
+ * settlement act by the owner, never an inference from cost, silence or age.
+ */
+export type ProviderExecutionIntervalRetirementReason = 'run-generation-settled';
+
+/** One exact execution attempt the settling generation owns. */
+export interface ProviderExecutionOwnedAttempt {
+  readonly taskId: string;
+  readonly attemptId: string;
+}
+
+export interface ProviderExecutionGenerationScope {
+  /** Host-owned tenant/run identity; another tenant's intervals are never reconciled. */
+  readonly runId: string;
+  /** The exact attempt identities being settled — ownership is listed, never derived. */
+  readonly attempts: readonly ProviderExecutionOwnedAttempt[];
+  /** Optional provider fence: when present only these principals are reconciled. */
+  readonly providerPrincipalDigests?: readonly string[];
+  readonly reason: ProviderExecutionIntervalRetirementReason;
+}
+
+export interface ProviderExecutionRetiredInterval {
+  readonly executionId: string;
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly providerPrincipalDigest: string;
+  readonly fence: string;
+  readonly reason: ProviderExecutionIntervalRetirementReason;
+}
+
+export interface ProviderExecutionGenerationReconciliation {
+  readonly runId: string;
+  readonly reason: ProviderExecutionIntervalRetirementReason;
+  readonly retired: readonly ProviderExecutionRetiredInterval[];
+  /** Open intervals left untouched because this generation does not own them. */
+  readonly foreignOpenIntervals: number;
+}
+
 export interface ProviderExecutionObservationWriteResult {
   readonly accepted: boolean;
   readonly duplicate: boolean;
@@ -258,6 +297,64 @@ export class ProviderExecutionObservationStore {
     return result.changes;
   }
 
+  /**
+   * Reconcile one settling run/attempt generation: every open interval that
+   * generation owns is retired with a typed reason, and nothing else is
+   * touched. Ownership is the listed `(runId, taskId, attemptId)` tuple set —
+   * never inferred from age, silence or cost — so foreign runs, superseded
+   * attempts and legacy rows with no run ownership stay open and forensic
+   * instead of holding an unrelated run. No row is deleted and the schema
+   * version does not move. Re-running the same generation retires nothing
+   * further, which makes COMPLETE followed by cleanup a no-op.
+   */
+  reconcileGenerationRetirement(
+    scope: ProviderExecutionGenerationScope,
+  ): ProviderExecutionGenerationReconciliation {
+    assertGenerationScope(scope);
+    const settled = { runId: scope.runId, reason: scope.reason };
+    if (this.legacyReadSchema) {
+      return { ...settled, retired: [], foreignOpenIntervals: 0 };
+    }
+    const owned = new Set(scope.attempts.map(attempt => ownershipKey(attempt.taskId, attempt.attemptId)));
+    const principalFence = scope.providerPrincipalDigests === undefined
+      ? null
+      : new Set(scope.providerPrincipalDigests);
+    return this.db.transaction(() => {
+      const rows = this.db.prepare(`
+        SELECT execution_id, task_id, attempt_id, principal_digest, fence, run_id, retired,
+          start_json, end_json
+        FROM provider_execution_intervals
+        WHERE end_json IS NULL AND retired = 0
+        ORDER BY start_sequence, execution_id
+      `).all() as ExecutionRow[];
+      const retire = this.db.prepare(`
+        UPDATE provider_execution_intervals SET retired = 1
+        WHERE execution_id = ? AND end_json IS NULL AND retired = 0
+      `);
+      const retired: ProviderExecutionRetiredInterval[] = [];
+      let foreignOpenIntervals = 0;
+      for (const row of rows) {
+        const ownedByGeneration = row.run_id === scope.runId
+          && owned.has(ownershipKey(row.task_id, row.attempt_id))
+          && (principalFence === null || principalFence.has(row.principal_digest));
+        if (!ownedByGeneration) {
+          foreignOpenIntervals += 1;
+          continue;
+        }
+        retire.run(row.execution_id);
+        retired.push({
+          executionId: row.execution_id,
+          taskId: row.task_id,
+          attemptId: row.attempt_id,
+          providerPrincipalDigest: row.principal_digest,
+          fence: row.fence,
+          reason: scope.reason,
+        });
+      }
+      return { ...settled, retired, foreignOpenIntervals };
+    })();
+  }
+
   close(): void {
     this.db.close();
   }
@@ -348,6 +445,28 @@ export class ProviderExecutionObservationStore {
 function assertScope(scope: ProviderExecutionObservationScope): void {
   for (const [name, value] of Object.entries(scope)) {
     if (value.trim() === '') throw new TypeError(`${name} must be non-empty`);
+  }
+}
+
+function ownershipKey(taskId: string, attemptId: string): string {
+  return `${taskId} ${attemptId}`;
+}
+
+function assertGenerationScope(scope: ProviderExecutionGenerationScope): void {
+  if (scope.runId.trim() === '') throw new TypeError('runId must be non-empty');
+  if (scope.reason !== 'run-generation-settled') {
+    throw new TypeError('retirement reason must be a typed settlement reason');
+  }
+  if (scope.attempts.length === 0) {
+    throw new TypeError('a settling generation must list at least one owned attempt');
+  }
+  for (const attempt of scope.attempts) {
+    if (attempt.taskId.trim() === '' || attempt.attemptId.trim() === '') {
+      throw new TypeError('owned attempt identity must be non-empty');
+    }
+  }
+  for (const digest of scope.providerPrincipalDigests ?? []) {
+    if (digest.trim() === '') throw new TypeError('provider principal digest must be non-empty');
   }
 }
 

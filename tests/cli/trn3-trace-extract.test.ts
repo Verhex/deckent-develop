@@ -197,7 +197,7 @@ describe('deckent trace extract (CLI wiring)', () => {
     const missing = join(tmpdir(), 'trn3-does-not-exist-' + Date.now().toString(), 'x.jsonl');
     process.exitCode = undefined;
     const err = await captureStderr(() => runCli(['trace', 'extract', missing]));
-    expect(err).toContain('not found');
+    expect(err).toMatch(/not found|bulunamadı/);
     expect(process.exitCode).toBe(1);
     process.exitCode = undefined;
   });

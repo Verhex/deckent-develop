@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):2e35f8aa88680beea99f01c162b158fa99e2e98e8fdf9800057de5cc1df8944c`
+**Source digest:** `sha256(normalized-lf-utf8):0fcc856afacdf33d5ba9fb49eab65324db303808cae6b9f8bbf5e99d13fa8475`
 
-**Rows:** 438 total · 391 active · 47 terminal
+**Rows:** 469 total · 409 active · 60 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 298 |
+| OPEN | 316 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
 | VERIFY | 25 |
-| DONE | 47 |
+| DONE | 60 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -33,9 +33,7 @@
 | 70 | `TEST-HERMETIC-001` | OPEN | P0 | TRUTH | `TEST-675` | — | Project root, HOME, `.tasks` ve tracked-file test writer discovery/migration |
 | 75 | `TEST-CONTAINMENT-001` | VERIFY | P0 | TRUTH | `TEST-675` | — | Process-birth, descendant ownership ve OS/OCI test containment authority foundation'ı |
 | 80 | `TEST-SPAWN-001` | OPEN | P1 | TRUTH | `TEST-HERMETIC-001` | — | Test `spawnSync` policy ve async migration |
-| 90 | `TEST-PLATFORM-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | `tests/PLATFORM.md` ve enforcement'ı source-derived platform registry'ye bağla |
 | 100 | `REPO-DECK-001` | OPEN | P0 | TRUTH | — | — | `.deck` secret'ını Docker context ve image layers'dan dışla |
-| 110 | `HEARTBEAT-001` | OPEN | P1 | TRUTH | — | — | Default heartbeat template ile metachar guard çelişkisini gider |
 | 120 | `STATE-RETENTION-001` | OPEN | P1 | TRUTH | `SSOT-002` | — | Runtime state/log retention, rotation, legal hold ve crash recovery contract |
 | 121 | `CRASH-FORENSICS-AUTHORITY-001` | OPEN | P1 | TRUTH | — | — | Crash artifact schema, privacy, collision-free retention, typed classification ve support/recovery consumption authority |
 | 122 | `NERVOUS-STATE-LIFECYCLE-001` | OPEN | P1 | TRUTH | `AUDIT-001`, `APPROVAL-001` | — | Nervous durable state, proposal, history ve IPC artefaktları için tenant-aware lifecycle, privacy ve recovery authority |
@@ -61,10 +59,11 @@
 | 290 | `TEST-ORPHAN-001` | BLOCKED | P2 | TRUTH | `TEST-HERMETIC-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Orphan benchmark, skips and test naming disposition |
 | 300 | `TASK-RETENTION-001` | OPEN | P1 | TRUTH | `STATE-RETENTION-001` | — | Task artifacts and archive retention coverage |
 | 305 | `STATE-ARCHIVE-RESTORE-001` | OPEN | P0 | TRUTH | `RECOVERY-COMMAND-SERVICE-001`, `DOCS-TOPOLOGY-001` | — | Warm ve cold archive için lossless restore, lineage-reader ve integrity authority |
+| 306 | `RESOURCE-TELEMETRY-LIFECYCLE-001` | OPEN | P1 | OBS | `AUDIT-001` | — | Resource telemetry schema, provenance, bounded lifecycle ve financial-ledger separation authority |
+| 307 | `RUNTIME-ARTIFACT-CATALOG-001` | OPEN | P0 | TRUTH | `AUDIT-001` | — | `.deckent/runtime` için typed artifact catalog, ownership, confidentiality ve lifecycle authority |
 | 310 | `ERROR-SEVERITY-001` | OPEN | P2 | TRUTH | `STATE-RETENTION-001` | — | Operational breadcrumb and error forensic severity truth |
 | 320 | `OPS-BRANCH-001` | OPEN | P1 | TRUTH | `SSOT-001` | — | Branch, worktree, remote and unpushed-commit authority inventory |
 | 330 | `OPS-RETIRE-001` | BLOCKED | P2 | TRUTH | `OPS-BRANCH-001` | `FRESH_REMOTE_APPROVAL_REQUIRED` | Approved branch and remote retirement |
-| 340 | `XVERIFY-UX-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Xverify optional evidence, bounded path/range/symbol targeting and actionable preflight |
 | 350 | `XVERIFY-TRUTH-001` | BLOCKED | P0 | TRUTH | `EVALUATION-001`, `RECEIPT-001` | `DEPENDENCY_UNSATISFIED` | Dispatch rejection, verifier abstention and semantic `UNCLEAR` remain distinct |
 | 370 | `DOC-IMPACT-001` | BLOCKED | P1 | TRUTH | `KERNEL-SETTLEMENT-001`, `DOCS-RELEASE-TRUTH-001` | `DEPENDENCY_UNSATISFIED` | Finalization surfaces Worker `docImpact` as governed follow-up |
 | 380 | `DEBT-GOVERNANCE-001` | BLOCKED | P0 | TRUTH | `SSOT-003`, `KERNEL-SETTLEMENT-001` | `DEPENDENCY_UNSATISFIED` | Technical/product/operational debt ingestion, ownership and closure authority |
@@ -73,9 +72,10 @@
 | 420 | `GIT-MAINT-REPORT-001` | BLOCKED | P2 | OPS | `OPS-BRANCH-001` | `DEPENDENCY_UNSATISFIED` | Read-only git object and pack health report |
 | 430 | `GIT-MAINT-APPLY-001` | BLOCKED | P2 | OPS | `GIT-MAINT-REPORT-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Approved local repository maintenance and repack |
 | 440 | `EXEC-TEMPO-001` | OPEN | P1 | OPS | — | — | Config-resolved high-parallelism execution tempo with batch-receipt owner approvals |
-| 450 | `RUNTIME-FLOOR-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Tek runtime minimum sürüm contractı: package engines, doctor, onboarding ve release gate aynı floor'u ilan ve test eder |
 | 460 | `ERROR-REGISTRY-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Emitted her typed error kodu tek registry'de message ve remediation ile kayıtlı; kullanıcıya görünen doküman aynı kaynaktan üretilir |
 | 470 | `CONFIG-TRUTH-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Config leaf metadata ve default üretimi tek canonical kaynaktan; manifest backend default'u aynı kaynağı tüketir |
+| 471 | `CONFIG-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `KERNEL-STATE-001` | — | Authored/effective config, secret resolution ve concurrent mutation için tek versioned authority |
+| 472 | `LAYER-BOUNDARY-GATE-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Architecture layer boundary gate'i source graphından tüm yeni crossing'leri discover edip exception authority'sini fail-closed enforce eder |
 | 475 | `NERVOUS-CONFIG-EXECUTION-TRUTH-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `AUDIT-001` | — | Nervous config, detector/action capability registry, host ownership ve status/docs projectionı tek execution truth üretir |
 | 480 | `PROVIDER-OBS-MIGRATION-001` | OPEN | P1 | TRUTH | — | — | Provider-execution-observation DB'sinin owner-controlled v1→v2 migration'ı: backup, migrate, adoption proof |
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
@@ -87,7 +87,6 @@
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
 | 538 | `CI-NIGHTLY-GREEN-001` | OPEN | P1 | TRUTH | — | — | Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder |
-| 539 | `MODEL-CATALOG-ENDPOINT-001` | OPEN | P2 | TRUTH | — | — | models.dev catalog endpoint'i taşındı (api/v1/catalog 302 ile HTML ana sayfaya düşüyor): CATALOG_URL güncellenir, redirect-to-HTML typed catalog-fetch hatasına çevrilir, remote-refresh gerçek JSON kaynağına döner |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -182,7 +181,10 @@
 | 3111 | `AUTONOMOUS-CONTROL-PLANE-001` | OPEN | P0 | KERNEL | `MISSION-KIND-001`, `AUTONOMOUS-STATE-AUTHORITY-001`, `AUTONOMOUS-TENANT-AUTHORITY-001`, `APPROVAL-DECISION-AUTHORITY-001` | — | Canonical autonomous v2 control plane ve lossless legacy retirement |
 | 3120 | `GOAL-CANARY-001` | BLOCKED | P0 | KERNEL | `GOAL-POLICY-001`, `GOAL-ACCEPTANCE-001`, `GOAL-PROVIDER-001`, `GOAL-CRASH-001`, `GOAL-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Goal-v2 approval, dependency, receipt and recovery canaries |
 | 3130 | `RUNFLOW-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `KERNEL-SETTLEMENT-001` | — | Durable RunFlow coordinator as sole proposal/approval/run authority |
+| 3131 | `RUNFLOW-STORE-RECONCILIATION-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `STATE-RETENTION-001` | — | Canonical RunFlow store için read-purity, complete legacy reconciliation ve versioned migration authority |
+| 3132 | `RUN-JOB-AUTHORITY-001` | OPEN | P0 | KERNEL | `RECOVERY-STALE-PROJECTION-001`, `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001`, `STATE-RETENTION-001` | — | Cross-process RunJob execution truth için versioned state machine, bounded read model ve terminal-receipt adoption |
 | 3140 | `SCHEDULER-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001` | — | Pure reducer and typed effect executor scheduler cutover |
+| 3141 | `SCHEDULER-SHADOW-EVIDENCE-001` | OPEN | P0 | KERNEL | `AUDIT-001`, `STATE-RETENTION-001` | — | Scheduler shadow evidence için generation-bound sequence, engine provenance ve bounded differential lifecycle |
 | 3150 | `RUNNER-PROTOCOL-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `FO-06` | — | SpawnBackend protocol v2 |
 | 3160 | `RECOVERY-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RUNNER-PROTOCOL-001` | — | Cross-surface recovery leadership and orphan containment |
 | 3161 | `RECOVERY-RESUME-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Durable pause notification, approval and lease-safe resume continuation |
@@ -257,7 +259,6 @@
 | 3291 | `RECOVERY-BORN-488-STATUS-PROJECTION-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001`, `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`, `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001` | — | Every surface and metric projects one persisted logical run read model |
 | 3295 | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001` | OPEN | P0 | KERNEL | `SCHEDULER-001` | — | Successful lineage settlement cancels every not-yet-started redundant repair descendant |
 | 3296 | `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | OPEN | P1 | KERNEL | `PROVIDER-HOLD-001`, `RUN-STATUS-AUTHORITY-001` | — | Terminal retirement closes or scopes historical provider execution intervals |
-| 3297 | `RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001` | OPEN | P1 | ASSURANCE | `RESULT-RECONCILIATION-001`, `RUN-STATUS-AUTHORITY-001` | — | Legacy monolithic controller fixtures satisfy fail-closed terminal and atomic status contracts |
 | 3298 | `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | OPEN | P1 | OBS | `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-490-TERMINALIZATION-EVENTS-001` | — | Human sprint log projects receipt-backed terminal COMPLETE and ABORTED truth exactly once |
 | 3299 | `RECOVERY-BORN-490-REPLAY-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001`, `RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Recovery replay ladder certifies isolated failure classes before publish planning resumes |
 | 3300 | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Settled source is built once and source/dist identity is proven before binary replay |
@@ -268,16 +269,10 @@
 | 3305 | `LIFECYCLE-VOCAB-001` | OPEN | P1 | KERNEL | — | — | Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir |
 | 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |
 | 3307 | `RECOVERY-LIVE-CONTINUATION-PROOF-001` | OPEN | P2 | KERNEL | — | — | Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı |
-| 3308 | `RECOVERY-BORN-507-CODEX-CONTINUATION-001` | OPEN | P0 | KERNEL | — | — | Codex-provider attempt'leri landing-checkpoint continuation admission'ından geçebilir: cumulative-mode startup observation ile incremental-şartı tek doğru kontrata bağlanır |
-| 3309 | `RECOVERY-BORN-507-FIX-SPAWN-001` | OPEN | P0 | KERNEL | — | — | NO_GO sonrası kuyruğa giren FIX task'ı gerçek worker olarak spawn edilir veya spawn edilemiyorsa typed neden yayınlanır — sessiz boş-döngü imkânsızlaşır |
-| 3310 | `SKILL-DURABILITY-001` | OPEN | P0 | KERNEL | — | — | PLAN'da üretilen skill FIX turlarında kaybolmaz: generated-skill durability |
-| 3311 | `RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001` | OPEN | P0 | KERNEL | — | — | Sprint runner'ı hiçbir ölüm yolunda kayıtsız ölemez: fatal handler + runner-liveness kanıtı her kesintiyi typed crash/exit kaydına bağlar |
-| 3312 | `PLAN-SCOPE-PARSER-PHANTOM-001` | OPEN | P0 | KERNEL | — | — | DIRECTIVES scope zinciri phantom üretemez ve yetkiyi sessizce daraltamaz: tek sanitize authority, çok-noktalı/kök dosya desteği, render plan-time sonucunu yeniden daraltamaz |
-| 3313 | `RUN-STATUS-LIVENESS-TRUTH-001` | OPEN | P1 | OBS | — | — | Status yüzeyi liveness-kanıtsız satırı aktif gösteremez: taze heartbeat/pid kanıtı olmayan worker satırı typed stale/unproven işaretlenir |
 | 3314 | `ARCHIVE-PATH-AUTHORITY-001` | OPEN | P1 | KERNEL | — | — | Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı |
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
+| 3316 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | OPEN | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001` | — | Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
-| 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
@@ -293,30 +288,40 @@
 | 4054 | `APPROVAL-DECISION-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `CAPABILITY-001` | — | Protected approval decisionları için worker-dışı, zorunlu ve doğrulanmış human authority chain |
 | 4055 | `NERVOUS-APPROVAL-SETTLEMENT-001` | OPEN | P0 | AUTHORITY | `APPROVAL-DECISION-AUTHORITY-001`, `PRINCIPAL-001`, `TENANT-001` | — | Nervous proposal, approval ve effect için tek runtime-wide first-writer-wins settlement authority |
 | 4060 | `TOOL-AUTHORITY-001` | VERIFY | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
+| 4061 | `WRITE-SCOPE-BACKEND-PARITY-001` | OPEN | P0 | AUTHORITY | — | — | Worker write-target türetimi tüm spawn backend'lerinde tek authority'den gelir |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
 | 4090 | `LIMIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001` | — | Unified provider/account/tenant/project budget and limit ledger |
 | 4091 | `LIMIT-SPEND-ENFORCE-001` | OPEN | P1 | AUTHORITY | — | — | Kümülatif günlük/aylık harcama tavanı gerçek enforcement'a bağlanır: `enforce_spend_gate` semantiği ya typed hard-block (`COST_GATE_EXCEEDED`) üretir ya key dürüst şekilde yeniden adlandırılır |
+| 4092 | `SPEND-LEDGER-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `AUDIT-001`, `KERNEL-STATE-001` | — | Actual billed, estimated ve quota usage için provider-receipt-bound canonical spend ledger |
+| 4093 | `PERMISSION-MEMORY-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `CAPABILITY-001`, `KERNEL-STATE-001` | — | Persistent local permission memory için principal/tenant/scope/expiry-bound tek transactional authority |
 | 4100 | `PROVIDER-INGRESS-001` | BLOCKED | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001`, `LIMIT-001` | `PROVIDER_INGRESS_HOLD` | Provider authority composition for all production ingress |
 | 4101 | `PROVIDER-HOLD-001` | VERIFY | P0 | AUTHORITY | `LIMIT-001` | — | Provider-scoped execution holds are independent from task and USD budget exhaustion |
 | 4102 | `PROVIDER-HOLD-LIVE-PROOF-001` | OPEN | P2 | AUTHORITY | `PROVIDER-HOLD-001` | — | Provider-hold'un canlı kanıtları: login-recovery, mixed-provider continuation, expiry ve authoritative usage-source |
 | 4110 | `ATTENDED-STOP-001` | OPEN | P0 | AUTHORITY | `APPROVAL-001`, `LIMIT-001` | — | Exact attended hard-stop approval authority |
 | 4120 | `AUDIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `OPERATION-001` | — | Tamper-evident, tenant-scoped causal audit |
 | 4121 | `NERVOUS-EFFECT-OUTCOME-TRUTH-001` | OPEN | P0 | AUTHORITY | `NERVOUS-APPROVAL-SETTLEMENT-001`, `RECEIPT-001` | — | Nervous finding→proposal→decision→effect→settlement ve compensation outcome'ları için causal audit truth |
+| 4122 | `GROUND-TRUTH-OVERRIDE-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `APPROVAL-DECISION-AUTHORITY-001`, `RECEIPT-001` | — | Ground-truth override için verified exception authority, bounded scope, expiry ve causal audit |
 | 4125 | `PROVENANCE-CONTEXT-001` | OPEN | P1 | AUTHORITY | `RECEIPT-001` | — | Content provenance and context integrity authority wiring |
+| 4126 | `AUDIT-SECRET-CUSTODY-001` | OPEN | P0 | AUTHORITY | `SEC-ADR-CROSSWALK-001` | — | Audit zinciri HMAC anahtarı sabit kaynak-görünür string yerine config/secret-manager authority'sinden gelir |
 | 4130 | `API-SECURITY-001` | BLOCKED | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `APPROVAL-001` | `DEPENDENCY_UNSATISFIED` | API authentication, authorization and config-secret containment |
+| 4131 | `RUNTIME-CREDENTIAL-LIFECYCLE-001` | OPEN | P0 | AUTHORITY | — | — | Runtime API/terminal credential ve daemon descriptor lifecycle, revocation ve stale-state authority |
+| 4132 | `TERMINAL-SESSION-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `SEC-ADR-CROSSWALK-001` | — | Terminal session execution authority: kind-bağımsız command guard, host-bağımsız yetki sınırı ve principal-bound session kimliği |
 | 4140 | `ENTERPRISE-AUTH-001` | OPEN | P0 | AUTHORITY | `TENANT-001`, `CAPABILITY-001`, `APPROVAL-001`, `AUDIT-001` | — | Community-safe and enterprise fail-closed profiles |
 | 4150 | `ALP-RUNTIME-001` | OPEN | P1 | AUTHORITY | `OPERATION-001`, `APPROVAL-001` | — | Alp Discipline decision anchor in runtime agents and planners |
 | 4160 | `MCP-LEASE-001` | VERIFY | P1 | AUTHORITY | `PRINCIPAL-001`, `OPERATION-001` | — | Multi-window MCP writer lease and authority-safe read/write split |
 | 4170 | `APPROVAL-QOL-001` | BLOCKED | P1 | AUTHORITY | `APPROVAL-001`, `MCP-LEASE-001` | `DEPENDENCY_UNSATISFIED` | Approval classifier, cross-process expiry and notification dedupe closure |
 | 4180 | `TRUST-HANDOFF-001` | OPEN | P1 | AUTHORITY | `TOOL-AUTHORITY-001`, `AUDIT-001` | — | Agent-çıktısından host-etkisine güven-aktarım zinciri: out-of-band telemetry, monitoring-loss=authority-suspension, egress gateway, Docker-socket default-deny, agent-üretimi dosya provenance'ı ve execution-capable config-mutation admission'ı |
 | 4190 | `SEC-OWASP-ASI-001` | OPEN | P1 | AUTHORITY | — | — | OWASP Agentic Top 10 (ASI01–ASI10, 2026) öz-değerlendirme baseline'ı: her ASI riski için mevcut mekanizma → enforcement sınıfı (ENFORCED/ADVISORY/CONFIG-GATED/UNWIRED) haritası, gap register ve ilgili ledger satırlarına kanıt-bağlaması |
+| 4191 | `SEC-ADR-CROSSWALK-001` | OPEN | P0 | AUTHORITY | — | — | 9 onaylı güvenlik tasarımının ADR crosswalk'ı ve 4 doğrudan-alan çakışmasının owner-kararlı reconciliation'ı |
 | 4200 | `SEC-ENFORCE-WIRE-001` | OPEN | P1 | AUTHORITY | — | — | Unwired/inert enforcement envanterinin tipli disposition'ı: yazılmış-ama-devrede-olmayan her güvenlik modülü wire-or-retire kararına bağlanır, sessiz-ölü enforcement kodu kalmaz |
+| 4210 | `CONFIG-AUTHORITY-CONSOLIDATION-001` | OPEN | P1 | AUTHORITY | `SEC-ADR-CROSSWALK-001` | — | 9 güvenlik tasarımının config yüzeyi tek authority contract'ında uzlaştırılır ve paralel yazım serialize edilir |
 | 5000 | `TERMINAL-001` | BLOCKED | P0 | TERMINAL | `KERNEL-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Terminal as canonical management and usage surface |
 | 5010 | `TERMINAL-TOOLS-001` | OPEN | P0 | TERMINAL | `TOOL-AUTHORITY-001`, `SURFACE-CUTOVER-001` | — | Role-model tool surface and progressive disclosure |
 | 5020 | `TERMINAL-DEV-001` | OPEN | P0 | TERMINAL | `DO-CUTOVER-001`, `TERMINAL-TOOLS-001` | — | Full codebase development loop inside Deckent terminal |
 | 5030 | `TERMINAL-LIVE-001` | OPEN | P0 | TERMINAL | `WORKER-REGISTRY-001`, `KERNEL-SETTLEMENT-001` | — | Live Worker explanations, logs, progress and drill-down |
 | 5040 | `TERMINAL-REPL-001` | OPEN | P1 | TERMINAL | `TERMINAL-LIVE-001` | — | REPL cursor, queue, streaming, cancellation and context stability |
+| 5041 | `REPL-HISTORY-PRIVACY-001` | OPEN | P1 | TERMINAL | `STATE-RETENTION-001`, `AUDIT-001` | — | User-authored REPL history için consent, privacy, provenance ve bounded durable lifecycle |
 | 5050 | `TERMINAL-REF-001` | OPEN | P1 | TERMINAL | `TERMINAL-TOOLS-001` | — | `@` references for files, resources, agents and skills |
 | 5060 | `TERMINAL-ONBOARD-001` | OPEN | P1 | TERMINAL | `CM-01`, `PRINCIPAL-001` | — | Conversational setup, doctor and capability discovery |
 | 5070 | `TERMINAL-AUTH-001` | BLOCKED | P0 | TERMINAL | `P02-635`, `P02-644` | `DEPENDENCY_UNSATISFIED` | Provider login/session binding and real auth probes |
@@ -358,6 +363,7 @@
 | 7031 | `PLUGIN-SANDBOX-WIRE-001` | OPEN | P0 | SECURITY | — | — | Sprint yolundaki plugin-hook güvenlik kablolaması: `validatePluginSecurity` 4-adım pipeline'ı (allowed-path containment + AST tarama + SHA-256 integrity + Ed25519 publisher imzası) production `loadPluginHooks` çağrısına bağlanır ve `PluginSecurityError` fail-closed olur |
 | 7032 | `PLUGIN-SUPPLY-CHAIN-INGRESS-001` | OPEN | P0 | SECURITY | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-WIRE-001` | — | Plugin create/install/update/enable/disable/remove ingress'i path-safe, provenance-bound, transactional ve recoverable tek authority olur |
 | 7033 | `PLUGIN-PACKAGE-RUNTIME-TRUTH-001` | OPEN | P0 | ECOSYSTEM | `PLUGIN-SUPPLY-CHAIN-INGRESS-001`, `PLUGIN-SANDBOX-WIRE-001` | — | Plugin manifest, complete package, capability runtimeı ve bütün kullanıcı/AI yüzeyleri tek canonical truth üretir |
+| 7034 | `PLUGIN-SECURITY-CONFIG-AUTHORITY-001` | OPEN | P0 | SECURITY | — | — | Plugin güvenlik enforcement'ının typed config authority'si ve owner-kararlı ratchet default'u |
 | 7040 | `MCP-TRUST-001` | OPEN | P0 | SECURITY | `PRINCIPAL-001`, `CAPABILITY-001`, `SUPPLY-CHAIN-001` | — | Outgoing MCP trust, identity and data-boundary authority |
 | 7050 | `HUB-001` | BLOCKED | P1 | ECOSYSTEM | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | `OWNER_DECISION_REQUIRED` | Production-ready Deckent Hub and signed distribution |
 | 7060 | `TOOL-COMPUTER-001` | OPEN | P2 | TOOL | `TOOL-AUTHORITY-001`, `PLUGIN-SANDBOX-001` | — | Optional computer-use/browser automation pack |
@@ -393,20 +399,31 @@
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9011 | `PROMPT-INJECTION-TRACE-001` | OPEN | P0 | LEARNING | `PROMPT-001`, `AUDIT-001`, `STATE-RETENTION-001` | — | Prompt/ADR injection kararları için project-root-bound, versioned, privacy-safe ve outcome-linked causal trace authority |
+| 9012 | `TRACE-DATA-GOVERNANCE-001` | OPEN | P0 | DATA | `DATA-GOV-001`, `STATE-RETENTION-001`, `AUDIT-001` | — | Training trace için purpose-bound consent, rights, classification, tenant isolation, retention ve deletion authority |
+| 9013 | `TRACE-AUTHORITY-SCHEMA-001` | OPEN | P0 | LEARNING | `TRACE-DATA-GOVERNANCE-001`, `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Attempt→event→evidence→evaluation→accepted outcome için versioned canonical trace envelope ve indexed read model |
+| 9014 | `TRACE-CAPTURE-CUTOVER-001` | OPEN | P0 | LEARNING | `TRACE-AUTHORITY-SCHEMA-001`, `PROMPT-COMPILE-EVIDENCE-AUTHORITY-001`, `EVALUATION-EVIDENCE-AUTHORITY-001` | — | Bütün production capture producerları canonical trace authorityye bağlanır, competing ve cumulative writerlar retirement receipt'iyle kapanır |
+| 9015 | `TRACE-HISTORICAL-MIGRATION-001` | OPEN | P0 | DATA | `TRACE-DATA-GOVERNANCE-001`, `TRACE-AUTHORITY-SCHEMA-001` | — | Mevcut bütün trace corpusu immutable raw provenance korunarak canonical schema projectionına lossless ve idempotent taşınır |
+| 9016 | `TRACE-CORPUS-PIPELINE-001` | OPEN | P0 | LEARNING | `TRACE-AUTHORITY-SCHEMA-001`, `TRACE-CAPTURE-CUTOVER-001`, `TRACE-HISTORICAL-MIGRATION-001` | — | Canonical trace authorityden reproducible, bounded ve provenance-complete training/eval corpus builder |
+| 9017 | `TRACE-QUALITY-LEAKAGE-GATE-001` | OPEN | P0 | ASSURANCE | `TRACE-CORPUS-PIPELINE-001`, `EVALUATION-001`, `AUDIT-001` | — | Dataset quality, privacy, contamination, dedupe, split ve representativeness kapısı training admissionı deterministik olarak yönetir |
+| 9018 | `WORKER-LOG-AUTHORITY-001` | OPEN | P0 | OBS | `TRACE-AUTHORITY-SCHEMA-001`, `CM-01`, `STATE-RETENTION-001` | — | Normal, FIX ve XFIX worker logları attempt-bound causal event, occurrence-time ve capture-integrity authoritysi taşır |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |
 | 9022 | `PROMPT-V3-GOLDEN-EVAL-001` | OPEN | P2 | PROMPT | `PROMPT-V3-001` | — | Prompt V3 golden-eval: temsilî on-task değerlendirmesi, gerçek heterojen worker'lar, cost/quality eşikleri |
 | 9023 | `AGENT-PROMPT-SYNC-001` | OPEN | P1 | PROMPT | `AGENT-CATALOG-AUTHORITY-001` | — | Built-in ve project agent prompt/manifest sync canonicalitysi dogfood ile shipped productta aynı effective persona üretir |
+| 9024 | `PROMPT-COMPILE-EVIDENCE-AUTHORITY-001` | OPEN | P0 | PROMPT | `AUDIT-001`, `STATE-RETENTION-001` | — | Prompt authority ve lint kararları için compile-bound, outcome-linked, tamper-evident evidence authority |
 | 9030 | `ROUTING-001` | OPEN | P0 | ROUTING | `PROMPT-001`, `AGENT-SKILL-001`, `REACHABILITY-001` | — | Routing V3 quality, diversity and evidence-driven adaptation |
 | 9032 | `ROUTING-V3-LIVE-QUALITY-001` | OPEN | P2 | ROUTING | `ROUTING-V3-CUTOVER-001` | — | Routing V3 canlı kalite kanıtları: heterojen routing kalitesi, anti-collapse dağılım, rollback provası, cross-platform |
 | 9033 | `AGENT-ROUTING-ELIGIBILITY-001` | OPEN | P0 | ROUTING | `AGENT-CATALOG-AUTHORITY-001` | — | Routing V3 bütün candidate ve force yollarında tek effective agent eligibility policy uygular |
 | 9034 | `SKILL-ROUTING-ELIGIBILITY-001` | OPEN | P0 | ROUTING | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-SYNC-CANONICALITY-001` | — | Routing V3 bütün automatic, force, exclude, retry ve fallback yollarında tek effective skill eligibility ve prompt-delivery policy uygular |
+| 9035 | `PROJECT-STACK-CACHE-AUTHORITY-001` | OPEN | P1 | ROUTING | `CONFIG-TRUTH-001`, `KERNEL-STATE-001` | — | Project stack detection inputs, cache invalidation ve bounded multi-root scan için canonical authority |
 | 9040 | `EVALUATION-001` | OPEN | P0 | EVAL | `KERNEL-SETTLEMENT-001`, `CM-04` | — | Canonical evaluator, adversarial verification and proof boundary |
+| 9041 | `EVALUATION-EVIDENCE-AUTHORITY-001` | OPEN | P0 | EVAL | `KERNEL-SETTLEMENT-001`, `RECEIPT-001`, `AUDIT-001`, `STATE-RETENTION-001` | — | Evaluation artifactlarını production input yapan versioned, immutable ve outcome-bound evidence authority |
 | 9050 | `PROMOTION-001` | OPEN | P0 | EVOLUTION | `TRAINING-TRACE-001`, `ROUTING-001`, `EVALUATION-001` | — | Outcome→routing→agent/skill/model promotion and rollback |
 | 9051 | `AGENT-EVOLUTION-LIFECYCLE-001` | OPEN | P0 | EVOLUTION | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-ROUTING-ELIGIBILITY-001`, `TRAINING-TRACE-001`, `EVALUATION-001` | — | Learned/temp agent outcome, promotion, demotion, mutation, rollback ve retirement zinciri productionda gerçekten kapanır veya eval-backed negative-space kararıyla kaldırılır |
 | 9052 | `AGENT-STATE-MIGRATION-001` | OPEN | P1 | EVOLUTION | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-PROMPT-SYNC-001`, `AGENT-EVOLUTION-LIFECYCLE-001` | — | Mevcut temp, archive, prompt-version ve retirement agent statei lossless, recoverable ve policy-governed biçimde canonical namespacee taşınır |
 | 9053 | `SKILL-EVOLUTION-LIFECYCLE-001` | OPEN | P0 | EVOLUTION | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-DURABILITY-001`, `TRAINING-TRACE-001`, `EVALUATION-001` | — | Generated/learned skill outcome, promotion, demotion, mutation, rollback ve retirement zinciri productionda kapanır veya eval-backed negative-space kararıyla kaldırılır |
 | 9060 | `LEARNING-DOGFOOD-001` | OPEN | P1 | LEARNING | `PROMPT-001`, `ROUTING-001`, `KERNEL-001` | — | Historical dogfood findings atomized and regression-proofed |
-| 9070 | `FINE-TUNE-001` | OPEN | P2 | LEARNING | `TRAINING-TRACE-001`, `PROMOTION-001`, `DATA-GOV-001` | — | Deckent-core fine-tune only after trace/data/governance readiness |
+| 9070 | `FINE-TUNE-001` | OPEN | P0 | LEARNING | `TRAINING-TRACE-001`, `PROMOTION-001`, `DATA-GOV-001` | — | Deckent-core fine-tune only after trace/data/governance readiness |
+| 9071 | `DECKENT-CORE-MODEL-LIFECYCLE-001` | OPEN | P0 | LEARNING | `TRACE-QUALITY-LEAKAGE-GATE-001`, `PROMOTION-001`, `MODEL-ACTIVATION-001` | — | Deckent-core Brain modelinin dataset→train→eval→registry→shadow/canary→serve→monitor→rollback lifecycle authoritysi |
 | 10000 | `SCALE-001` | OPEN | P0 | SCALE | `SSOT-003`, `TRUTH-BASELINE-001` | — | Million-scale assurance parent |
 | 10010 | `STORAGE-001` | OPEN | P0 | DURABILITY | `KERNEL-STATE-001`, `TENANT-001` | — | Transactional durable state backend and migration strategy |
 | 10011 | `AUTONOMOUS-STATE-AUTHORITY-001` | OPEN | P0 | DURABILITY | `KERNEL-STATE-001`, `TENANT-001`, `STATE-ARCHIVE-RESTORE-001` | — | Autonomous state catalog, pure readers ve versioned transactional migration authority |
@@ -415,5 +432,6 @@
 | 10040 | `SLO-001` | OPEN | P0 | OBS | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Product and platform SLI/SLO/error-budget contract |
 | 10050 | `LOAD-CHAOS-001` | OPEN | P0 | ASSURANCE | `HA-001`, `SLO-001`, `PLATFORM-PROOF-001` | — | Load, soak, fault, chaos and noisy-neighbor certification |
 | 10060 | `COST-001` | OPEN | P1 | COST | `LIMIT-001`, `SLO-001` | — | Provider, compute, storage and operator cost authority |
+| 10061 | `COST-CONFIG-RECONCILIATION-001` | OPEN | P1 | COST | `CONFIG-TRUTH-001`, `LIMIT-001` | — | Bundled pricing catalog, project policy ve learned estimator için versioned field-ownership/reconciliation authority |
 | 10070 | `ENTERPRISE-MODULARITY-001` | OPEN | P1 | ENTERPRISE | `ENTERPRISE-AUTH-001`, `STORAGE-001` | — | Solo/community/enterprise module boundaries without core forks |
 | 10080 | `ASSURANCE-PACK-001` | OPEN | P0 | ASSURANCE | `DATA-GOV-001`, `LOAD-CHAOS-001`, `P02-655` | — | Security, privacy, reliability, performance and compliance evidence pack |

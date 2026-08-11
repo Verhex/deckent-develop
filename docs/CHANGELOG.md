@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0-beta.1-sprint511] - 2026-08-11
+
+### Added
+
+- Bind tests/PLATFORM.md to a source-derived platform registry (row 90)
+- Beta-scope README reality pass, EN and TR in lockstep (row 8092)
+- Codex attempts pass the landing continuation admission (row 3308)
+
+### Changed
+
+- Move the 4 sync git calls off the worker-dispatch hot path (row 3315) (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint510] - 2026-08-11
 
 ### Added

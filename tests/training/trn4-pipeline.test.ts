@@ -1,6 +1,6 @@
 // tests/training/trn4-pipeline.test.ts
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -11,14 +11,18 @@ import {
   traceToShareGpt,
   isValidShareGptExample,
   parseTraceLine,
+  parseTraceLineDetailed,
+  normalizeContent,
   runPipeline,
   DEFAULT_TRUNCATION_POLICY,
   type TraceLike,
   type TruncationPolicy,
   type ShareGptExample,
   type LineSink,
+  type CanonicalCorpusAuthority,
 } from '../../src/training/pipeline.js';
 import type { OpenAiMessage, TraceMeta } from '../../src/agent/trace-recorder.js';
+import { migrateHistoricalTraces } from '../../src/training/historical-trace-migration.js';
 
 // ─── Fixture helpers ─────────────────────────────────────────────────────────
 
@@ -296,6 +300,39 @@ describe('parseTraceLine', () => {
   });
 });
 
+describe('structured canonical records', () => {
+  it('normalizes structured content and preserves canonical provenance only in the versioned projection', () => {
+    const trace = parseTraceLine(JSON.stringify({
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'inspect the run' }] },
+        { role: 'assistant', content: [{ type: 'text', text: 'working' }], tool_calls: [{ id: 'c1', type: 'function', function: { name: 'Read', arguments: '{}' } }] },
+        { role: 'tool', tool_call_id: 'c1', content: [{ type: 'text', text: 'tool result' }] },
+      ],
+      acceptedVerdict: 'DONE',
+      acceptedVerdictAuthorityRef: '.tasks/task-515-003.result#brainEvaluation',
+      duplicateWeight: 0,
+      provenance: { taskId: '515-003', sprintId: '515', attemptId: 'a1', integrity: 'verified', disposition: 'auxiliary' },
+      meta: { selfAssessment: 'NO_GO', model: 'model-a' },
+    }))!;
+
+    expect(normalizeContent([{ type: 'text', text: 'a' }, { type: 'image', id: 'b' }])).toBe('a\n{"type":"image","id":"b"}');
+    const legacy = convertToShareGpt(trace);
+    expect(legacy.provenance).toBeUndefined();
+    expect(legacy.labels).toEqual({ outcome: 'failed', model: 'model-a' });
+    const structured = convertToShareGpt(trace, 'structured-v2');
+    expect(structured.provenance).toEqual(trace.provenance);
+    expect(structured.weight).toBe(0);
+    expect(structured.labels).toEqual({ outcome: 'success', workerClaim: 'NO_GO', model: 'model-a' });
+    expect(structured.conversations).toContainEqual({ from: 'function_call', value: JSON.stringify({ name: 'Read', arguments: {} }), causalId: 'c1' });
+    expect(structured.conversations).toContainEqual({ from: 'observation', value: 'tool result', causalId: 'c1' });
+  });
+
+  it('returns a typed parse rejection reason', () => {
+    expect(parseTraceLineDetailed('{ nope')).toEqual({ ok: false, reason: 'MALFORMED_JSON' });
+    expect(parseTraceLineDetailed('{}')).toEqual({ ok: false, reason: 'MISSING_MESSAGES' });
+  });
+});
+
 // ─── runPipeline — streaming driver (memory-safe: line-in, line-out) ────────
 
 /** Injectable line source from an in-memory array (hermetic — same pattern as core/limit-ledger.ts tests). */
@@ -409,6 +446,30 @@ describe('runPipeline (hermetic — injected I/O)', () => {
     expect(summary.examplesWritten).toBe(N);
     expect(written).toHaveLength(N);
   });
+
+  it('isolates one conversion failure and reconciles structured counters without truncating following records', async () => {
+    const valid = JSON.stringify({ messages: [{ role: 'user', content: 'good' }], duplicateWeight: 0, provenance: { taskId: 't', disposition: 'auxiliary' } });
+    const invalidRole = JSON.stringify({ messages: [{ role: 'unsupported', content: 'bad' }] });
+    const { sink, lines: written } = fakeSink();
+    const summary = await runPipeline({
+      inputPath: '/fake/in.jsonl', outputPath: '/fake/out.jsonl', projectionMode: 'structured-v2',
+      openLines: fakeOpenLines({ '/fake/in.jsonl': [invalidRole, valid] }), openSink: () => sink,
+    });
+    expect(summary).toMatchObject({ linesRead: 2, examplesWritten: 1, conversionFailedCount: 1, auxiliaryCount: 1, duplicateWeightZeroCount: 1 });
+    expect(summary.conversionFailureReasons).toEqual({ INVALID_MESSAGE_ROLE: 1 });
+    expect(summary.manifest).toMatchObject({ linesRead: 2, examplesWritten: 1, conversionFailedCount: 1, auxiliaryCount: 1, duplicateWeightZeroCount: 1 });
+    expect(written).toHaveLength(1);
+  });
+
+  it('surfaces sink write failures after closing the sink', async () => {
+    let closed = false;
+    await expect(runPipeline({
+      inputPath: '/fake/in.jsonl', outputPath: '/fake/out.jsonl',
+      openLines: fakeOpenLines({ '/fake/in.jsonl': [JSON.stringify({ messages: [{ role: 'user', content: 'x' }] })] }),
+      openSink: () => ({ write: () => Promise.reject(new Error('disk full')), close: async () => { closed = true; } }),
+    })).rejects.toThrow('disk full');
+    expect(closed).toBe(true);
+  });
 });
 
 describe('runPipeline (default fs I/O — real tmpdir, end-to-end)', () => {
@@ -446,5 +507,77 @@ describe('runPipeline (default fs I/O — real tmpdir, end-to-end)', () => {
     for (const l of outLines) {
       expect(isValidShareGptExample(JSON.parse(l))).toBe(true);
     }
+  });
+
+  it('verifies migration authority and projects only train-ready canonical envelopes with tool causality', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'trn4-canonical-'));
+    mkdirSync(join(dir, 'traces'));
+    const records = [
+      {
+        schemaVersion: 2,
+        messages: [
+          { role: 'user', content: 'read it' },
+          { role: 'assistant', content: '', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'Read', arguments: '{"path":"x.ts"}' } }] },
+          { role: 'tool', tool_call_id: 'c1', content: 'file body' },
+          { role: 'assistant', content: 'done' },
+        ],
+        meta: { source: 'sprint-worker', schemaVersion: 2, sprintId: 'sprint-515', taskId: '515-003', model: 'model-a', agent: 'worker-a', selfAssessment: 'DONE' },
+      },
+      {
+        schemaVersion: 2,
+        messages: [{ role: 'user', content: 'incomplete' }],
+        meta: { source: 'sprint-worker', schemaVersion: 2, quarantine: true, quarantineReasons: ['no-prompt'] },
+      },
+    ];
+    writeFileSync(join(dir, 'traces', 'sprint-worker.jsonl'), records.map(value => JSON.stringify(value)).join('\n') + '\n');
+    const migration = await migrateHistoricalTraces({
+      projectRoot: dir, inputPaths: ['traces'], outputPath: 'migration', dryRun: false,
+      policy: { allowTraining: true, trainingWeight: 1 },
+    });
+    const authority: CanonicalCorpusAuthority = {
+      migrationId: migration.manifest.migrationId,
+      codeVersion: migration.manifest.codeVersion,
+      envelopeSchemaVersion: migration.manifest.envelopeSchemaVersion,
+      policyVersion: migration.manifest.policyVersion,
+      contractVersion: migration.manifest.contractVersion,
+      policy: migration.manifest.policy,
+      policyDigest: migration.manifest.policyDigest,
+      sourceDigest: migration.manifest.sourceDigest,
+      projectionDigest: migration.manifest.projectionDigest,
+    };
+    const inputPath = join(dir, 'migration', 'projection.jsonl');
+    const outputPath = join(dir, 'corpus.jsonl');
+    const summary = await runPipeline({ inputPath, outputPath, projectionMode: 'canonical-v1', canonicalAuthority: authority });
+    expect(summary).toMatchObject({ canonicalRecordsSeen: 2, examplesWritten: 1, quarantinedSkipped: 1, policyRejectedCount: 1 });
+    const corpus = JSON.parse(readFileSync(outputPath, 'utf8').trim());
+    expect(corpus.provenance).toMatchObject({ schemaVersion: 1, migrationId: authority.migrationId, disposition: 'train-ready', integrity: 'verified', verdictAuthority: 'trace-meta-brain-evaluation' });
+    expect(corpus.labels).toMatchObject({ outcome: 'success', model: 'model-a', agent: 'worker-a' });
+    expect(corpus.conversations).toContainEqual({ from: 'function_call', value: JSON.stringify({ name: 'Read', arguments: { path: 'x.ts' } }), causalId: 'c1' });
+    expect(corpus.conversations).toContainEqual({ from: 'observation', value: 'file body', causalId: 'c1' });
+    expect(isValidShareGptExample(corpus)).toBe(true);
+    expect(JSON.parse(readFileSync(`${outputPath}.manifest.json`, 'utf8'))).toMatchObject({ outputDigest: summary.manifest.outputDigest, migrationId: authority.migrationId });
+  });
+
+  it('refuses absent/tampered canonical authority and never clobbers an existing corpus', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'trn4-canonical-hold-'));
+    mkdirSync(join(dir, 'traces'));
+    writeFileSync(join(dir, 'traces', 'sprint-worker.jsonl'), JSON.stringify({
+      schemaVersion: 2, messages: [{ role: 'user', content: 'hello' }], meta: { source: 'sprint-worker', schemaVersion: 2 },
+    }) + '\n');
+    const migration = await migrateHistoricalTraces({ projectRoot: dir, inputPaths: ['traces'], outputPath: 'migration', dryRun: false, policy: { allowTraining: true, trainingWeight: 1 } });
+    const inputPath = join(dir, 'migration', 'projection.jsonl');
+    const outputPath = join(dir, 'corpus.jsonl');
+    await expect(runPipeline({ inputPath, outputPath, projectionMode: 'canonical-v1' })).rejects.toMatchObject({ code: 'CANONICAL_AUTHORITY_REQUIRED' });
+    expect(existsSync(outputPath)).toBe(false);
+    const authority: CanonicalCorpusAuthority = {
+      migrationId: migration.manifest.migrationId, codeVersion: migration.manifest.codeVersion,
+      envelopeSchemaVersion: migration.manifest.envelopeSchemaVersion, policyVersion: migration.manifest.policyVersion,
+      contractVersion: migration.manifest.contractVersion, policy: migration.manifest.policy,
+      policyDigest: migration.manifest.policyDigest, sourceDigest: migration.manifest.sourceDigest,
+      projectionDigest: migration.manifest.projectionDigest,
+    };
+    writeFileSync(inputPath, readFileSync(inputPath, 'utf8') + ' ');
+    await expect(runPipeline({ inputPath, outputPath, projectionMode: 'canonical-v1', canonicalAuthority: authority })).rejects.toMatchObject({ code: 'CANONICAL_SOURCE_DIGEST_MISMATCH' });
+    expect(existsSync(outputPath)).toBe(false);
   });
 });
