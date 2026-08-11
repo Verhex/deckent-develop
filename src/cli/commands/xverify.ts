@@ -23,7 +23,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type {
@@ -60,8 +60,13 @@ export interface XverifyCommandOpts {
   verifier?: string;
   /** Include `git diff` output as evidence context for the verifier. */
   diff?: boolean;
-  /** Comma-separated file list the claim says were changed. */
+  /** Comma-separated file list the claim says were changed; also scopes the
+   *  `--diff` evidence to exactly these paths when both are given. */
   files?: string;
+  /** Comma-separated bounded targets — `path:START-END` (1-based inclusive line
+   *  range) or `path:symbolName` — each resolves to an exact excerpt so a large
+   *  file never needs manual prompt surgery. */
+  target?: string;
   /** Explicit verifier MODEL id (canonical provider API id, e.g. gpt-5.6-sol).
    *  Bypasses tier-equivalence resolution — needed when the verifier account
    *  supports a narrower model set than the tier map assumes (row 607/608). */
@@ -79,8 +84,9 @@ export interface XverifyDeps {
   /** Deferred import seam for the heavy runner (mirrors cross-verify-runner's own style). */
   runCrossVerifyFn?: typeof import('../../orchestra/cross-verify-runner.js')['runCrossVerify'];
   bootstrapProvidersFn?: (config: ResolvedConfig, root: string) => Promise<unknown>;
-  /** Captures `git diff` text; default shells out. Injectable for hermetic tests. */
-  captureDiffFn?: (root: string) => string;
+  /** Captures `git diff` text; default shells out. `files` (from `--files`, when
+   *  non-empty) scopes the diff to exactly those paths. Injectable for hermetic tests. */
+  captureDiffFn?: (root: string, files?: readonly string[]) => string;
   nowFn?: () => Date;
   /** Invoked AFTER validation, BEFORE the verifier spawn — CLI prints its
    *  progress line here; the MCP twin passes nothing and stays silent. */
@@ -98,11 +104,15 @@ export interface XverifyDeps {
 
 // ─── Diff capture (default impl) ────────────────────────────────────────
 
-function defaultCaptureDiff(root: string): string {
+function defaultCaptureDiff(root: string, files: readonly string[] = []): string {
   // execFileSync (argv-array) — no shell interpolation, cross-platform (Law #2).
+  // Non-empty `files` (sourced from `--files`) scopes both the stat summary and
+  // the full diff to exactly those paths — the flag now filters what it documents
+  // instead of silently attaching the whole working tree.
+  const pathArgs = files.length > 0 ? ['--', ...files] : [];
   try {
-    const out = execFileSync('git', ['diff', '--stat', 'HEAD'], { cwd: root, encoding: 'utf-8', maxBuffer: 1024 * 1024 });
-    const full = execFileSync('git', ['diff', 'HEAD'], { cwd: root, encoding: 'utf-8', maxBuffer: 4 * 1024 * 1024 });
+    const out = execFileSync('git', ['diff', '--stat', 'HEAD', ...pathArgs], { cwd: root, encoding: 'utf-8', maxBuffer: 1024 * 1024 });
+    const full = execFileSync('git', ['diff', 'HEAD', ...pathArgs], { cwd: root, encoding: 'utf-8', maxBuffer: 4 * 1024 * 1024 });
     // Cap the inline diff so a huge working tree cannot blow the verifier's
     // context. Stat summary always included; body truncated with an honest marker.
     const CAP = 60_000;
@@ -111,6 +121,118 @@ function defaultCaptureDiff(root: string): string {
   } catch (err) {
     return `(git diff unavailable: ${err instanceof Error ? err.message : String(err)})`;
   }
+}
+
+// ─── Bounded targeting (`--target path:START-END` / `path:symbolName`) ─────
+//
+// Lets an operator point the verifier at an exact excerpt of a large file
+// instead of pasting bounded fragments into the claim text by hand. Resolution
+// is pure/local — no provider call — so it stays legal as pre-provider input
+// shaping (task NO-GO: "targeting is pre-provider input shaping only").
+
+const TARGET_LINE_RANGE_RE = /^(\d+)-(\d+)$/;
+const TARGET_SYMBOL_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+/** Bounded lookahead for symbol-block extraction — never scans an entire huge
+ *  file hunting for a brace match that isn't there. */
+const TARGET_SYMBOL_LOOKAHEAD_LINES = 400;
+
+/** Carries an i18n key + params instead of a free-string message — the caller
+ *  localizes via `getMessage` so every target failure stays in the i18n catalog. */
+class TargetSpecError extends Error {
+  constructor(
+    public readonly messageKey: string,
+    public readonly params: Record<string, string> = {},
+  ) {
+    super(messageKey);
+  }
+}
+
+interface ResolvedTarget {
+  path: string;
+  locatorDescription: string;
+  content: string;
+}
+
+function parseTargetSpec(spec: string): { path: string; locator: string } {
+  const idx = spec.lastIndexOf(':');
+  if (idx <= 0 || idx === spec.length - 1) {
+    throw new TargetSpecError('xverify.err.target_invalid_spec', { spec });
+  }
+  return { path: spec.slice(0, idx), locator: spec.slice(idx + 1) };
+}
+
+function extractLineRange(
+  lines: readonly string[],
+  start: number,
+  end: number,
+  path: string,
+): { content: string; startLine: number; endLine: number } {
+  if (start < 1 || end < start || end > lines.length) {
+    throw new TargetSpecError('xverify.err.target_range_invalid', {
+      path, start: String(start), end: String(end), total: String(lines.length),
+    });
+  }
+  return { content: lines.slice(start - 1, end).join('\n'), startLine: start, endLine: end };
+}
+
+function extractSymbolBlock(
+  lines: readonly string[],
+  symbol: string,
+  path: string,
+): { content: string; startLine: number; endLine: number } {
+  const symbolRe = new RegExp(`\\b${symbol}\\b`);
+  const startIdx = lines.findIndex((line) => symbolRe.test(line));
+  if (startIdx === -1) {
+    throw new TargetSpecError('xverify.err.target_symbol_not_found', { symbol, path });
+  }
+  let depth = 0;
+  let sawBrace = false;
+  let endIdx = startIdx;
+  const scanLimit = Math.min(lines.length, startIdx + TARGET_SYMBOL_LOOKAHEAD_LINES);
+  for (let i = startIdx; i < scanLimit; i += 1) {
+    const line = lines[i]!;
+    for (const ch of line) {
+      if (ch === '{') { depth += 1; sawBrace = true; }
+      else if (ch === '}') { depth -= 1; }
+    }
+    endIdx = i;
+    if (sawBrace && depth <= 0) break;
+    if (!sawBrace && /[;,]\s*$/u.test(line)) break; // brace-less one-liner (const/type alias)
+  }
+  return {
+    content: lines.slice(startIdx, endIdx + 1).join('\n'),
+    startLine: startIdx + 1,
+    endLine: endIdx + 1,
+  };
+}
+
+function resolveTarget(root: string, spec: string): ResolvedTarget {
+  const { path: relPath, locator } = parseTargetSpec(spec);
+  let raw: string;
+  try {
+    raw = readFileSync(join(root, relPath), 'utf-8');
+  } catch {
+    throw new TargetSpecError('xverify.err.target_file_not_found', { path: relPath });
+  }
+  const lines = raw.split(/\r?\n/u);
+  const rangeMatch = TARGET_LINE_RANGE_RE.exec(locator);
+  if (rangeMatch) {
+    const extracted = extractLineRange(lines, Number.parseInt(rangeMatch[1]!, 10), Number.parseInt(rangeMatch[2]!, 10), relPath);
+    return {
+      path: relPath,
+      locatorDescription: `lines ${extracted.startLine}-${extracted.endLine}`,
+      content: extracted.content,
+    };
+  }
+  if (TARGET_SYMBOL_RE.test(locator)) {
+    const extracted = extractSymbolBlock(lines, locator, relPath);
+    return {
+      path: relPath,
+      locatorDescription: `symbol ${locator} (lines ${extracted.startLine}-${extracted.endLine})`,
+      content: extracted.content,
+    };
+  }
+  throw new TargetSpecError('xverify.err.target_invalid_spec', { spec });
 }
 
 // ─── Result shape (shared CLI ↔ MCP twin) ───────────────────────────────
@@ -142,6 +264,15 @@ export interface XverifyResult {
    */
   rejection: VerifierDispatchRejection | null;
   report: string;
+  /**
+   * Typed, i18n-sourced next step when this claim carried no bounded evidence
+   * (no `--files`, `--diff`, or `--target`) or the runner independently
+   * reported `verifier-eligibility-evidence-missing`. `null` when evidence
+   * was attached and the runner raised no evidence complaint. Never blocks
+   * dispatch — an unevidenced claim can be a legitimate self-contained
+   * logical claim, so this is guidance, not a refusal.
+   */
+  remedy: string | null;
 }
 
 /** Invocation error carrying the ALREADY-LOCALIZED message (CLI prints it,
@@ -184,6 +315,22 @@ export async function runXverifyForResult(
     }
   }
 
+  // ── Resolve bounded targets (fail loudly BEFORE any spawn, same contract
+  // as provider validation above — malformed/missing targets are cheap to
+  // catch locally and never justify a provider round trip). ──
+  const targetSpecs = (opts.target ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  let resolvedTargets: ResolvedTarget[] = [];
+  if (targetSpecs.length > 0) {
+    try {
+      resolvedTargets = targetSpecs.map((spec) => resolveTarget(root, spec));
+    } catch (err) {
+      if (err instanceof TargetSpecError) {
+        throw new XverifyInvocationError(getMessage(err.messageKey, lang, err.params));
+      }
+      throw err;
+    }
+  }
+
   // ── Bootstrap providers so the verifier pool reflects reality ──
   // Same lazy-bootstrap contract as `deckent run` (row 477 B7): interactive
   // entry points never ran bootstrapProviders, leaving the registry empty.
@@ -197,10 +344,24 @@ export async function runXverifyForResult(
 
   // ── Synthetic verification envelope around the claim ──
   const id = `xv-${now.getTime()}-${randomUUID()}`;
-  const filesChanged = (opts.files ?? '').split(',').map((f) => f.trim()).filter(Boolean);
+  const filesFromFlag = (opts.files ?? '').split(',').map((f) => f.trim()).filter(Boolean);
+  // Evidence requirements/scope cover both explicitly-changed files AND bounded
+  // target paths (dedup) — diff scoping stays --files-only below, since a target
+  // path is a read excerpt, not a claim about what changed.
+  const filesChanged = Array.from(new Set([...filesFromFlag, ...resolvedTargets.map((t) => t.path)]));
   const diffText = opts.diff
-    ? (deps.captureDiffFn ?? defaultCaptureDiff)(root)
+    ? (deps.captureDiffFn ?? defaultCaptureDiff)(root, filesFromFlag)
     : undefined;
+  const targetsText = resolvedTargets.length > 0
+    ? resolvedTargets.map((t) => [
+        `### Target: ${t.path} (${t.locatorDescription})`,
+        '```',
+        t.content,
+        '```',
+      ].join('\n')).join('\n\n')
+    : undefined;
+  const evidenceContext = [diffText, targetsText].filter((p): p is string => Boolean(p)).join('\n\n') || undefined;
+  const hasEvidence = filesChanged.length > 0 || Boolean(opts.diff) || resolvedTargets.length > 0;
 
   const criterion = createGoNoGoCriterionItem({
     polarity: 'go',
@@ -241,7 +402,7 @@ export async function runXverifyForResult(
     linesRemoved: 0,
     testsPassed: true,
     notes: claim,
-    ...(diffText ? { evidenceContext: diffText } : {}),
+    ...(evidenceContext ? { evidenceContext } : {}),
   } as TaskResult;
 
   // The parent claim/result are immutable audit inputs for this standalone
@@ -368,6 +529,13 @@ export async function runXverifyForResult(
   // exact confusion MASTER-PLAN 671 removed from the machine-readable path.
   const verdict = outcome.advisory?.verdict ?? null;
   const execution = outcome.advisory?.execution ?? null;
+  // Empty evidence previously produced no next step — the operator only learned
+  // something was wrong from a vague verdict. Never blocks dispatch (a claim can
+  // be legitimately self-contained), but always names the fix when either our
+  // own input carried zero evidence or the runner independently flagged it missing.
+  const remedy = (!hasEvidence || outcome.skippedReason === 'verifier-eligibility-evidence-missing')
+    ? getMessage('xverify.remedy.no_evidence', lang)
+    : null;
   const executionLines = execution
     ? [
         `- ${getMessage('xverify.report.execution', lang, {
@@ -402,6 +570,7 @@ export async function runXverifyForResult(
       ? [`- **Adjudication receipt:** ${outcome.advisory.adjudicationReceiptRef}`]
       : []),
     ...executionLines,
+    ...(remedy ? [`- **Remedy:** ${remedy}`] : []),
     `- **At:** ${now.toISOString()}`,
     '',
     '## Claim',
@@ -431,6 +600,7 @@ export async function runXverifyForResult(
     execution,
     assurance: outcome.advisory?.assurance ?? null,
     adjudicationReceiptRef: outcome.advisory?.adjudicationReceiptRef ?? null,
+    remedy,
     rejection: outcome.rejection ?? null,
     report: reportPath,
   };
@@ -469,6 +639,9 @@ export async function runXverifyCommand(
       verifier: result.verifier ?? '-',
       report: result.report,
     }));
+    if (result.remedy) {
+      print(result.remedy);
+    }
   } catch (err) {
     // Invocation errors only — verification outcomes never throw (advisory).
     printError(err instanceof Error ? err : new Error(String(err)));
@@ -487,6 +660,7 @@ export function registerXverifyCommand(program: Command, deps: XverifyDeps = {})
     .option('--verifier-model <id>', getMessage('xverify.opt_verifier_model', getLanguage(undefined)))
     .option('--diff', getMessage('xverify.opt_diff', getLanguage(undefined)))
     .option('--files <csv>', getMessage('xverify.opt_files', getLanguage(undefined)))
+    .option('--target <specs>', getMessage('xverify.opt_target', getLanguage(undefined)))
     .option('--timeout <ms>', getMessage('xverify.opt_timeout', getLanguage(undefined)))
     .option('--json', getMessage('xverify.opt_json', getLanguage(undefined)))
     .action(async (claim: string, opts: XverifyCommandOpts) => {

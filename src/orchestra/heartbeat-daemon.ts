@@ -31,9 +31,38 @@ const SHELL_METACHAR_REGEX = /[;&|`$()]/;
 /** Maximum timeout for heartbeat command execution (5 seconds) */
 const HEARTBEAT_EXEC_TIMEOUT = 5_000;
 
-const DEFAULT_HEARTBEAT_TEMPLATE = `# Heartbeat Tasks
-- [ ] tsc --noEmit
-- [ ] npx vitest run --reporter=verbose 2>&1 | tail -5
+/**
+ * Recorded in place of a successful command's output when that command printed
+ * nothing. A quiet tool (`tsc --noEmit` over a clean tree) exiting 0 with no
+ * output is a *pass*, and must never be logged as an empty block that reads
+ * like a lost or truncated run.
+ */
+export const EMPTY_SUCCESS_OUTPUT = '(no output — exit 0)';
+
+/**
+ * Default `HEARTBEAT.md` contents, written by {@link ensureHeartbeatFile} when
+ * the file is absent.
+ *
+ * CONTRACT — every command here MUST pass {@link validateCommand}. The guard
+ * rejects the shell metacharacters `;&|\`$()` because these strings are handed
+ * to a real shell by `execSync`, so the template carries no pipes, no
+ * redirections, no `&&`, and no command substitution. Two omissions are
+ * deliberate:
+ *
+ * - No `| tail -5`. Truncation is already the runner's job (see the
+ *   {@link runHeartbeat} log write), and a pipe would report the *last* stage's
+ *   exit code — `tail` always succeeds — so a failing check would be recorded
+ *   as a pass.
+ * - No `2>&1`. {@link runHeartbeat} merges stderr into the recorded output on
+ *   failure, so the redirect buys nothing and only trips the guard.
+ *
+ * `npx tsc` rather than a bare `tsc`: npx resolves the workspace-local binary
+ * identically on macOS, Linux, and Windows, whereas a bare `tsc` silently
+ * depends on a global install.
+ */
+export const DEFAULT_HEARTBEAT_TEMPLATE = `# Heartbeat Tasks
+- [ ] npx tsc --noEmit
+- [ ] npx vitest run --reporter=verbose
 `;
 
 // ─── Types ─────────────────────────────────────────────────────────
@@ -67,7 +96,7 @@ export interface HeartbeatRunResult {
  * Lines matching `- [ ] <command>` are pending tasks.
  * Lines matching `- [x] <command>` are completed (skipped).
  */
-function parseHeartbeatTasks(content: string): HeartbeatTaskEntry[] {
+export function parseHeartbeatTasks(content: string): HeartbeatTaskEntry[] {
   const entries: HeartbeatTaskEntry[] = [];
   for (const line of content.split('\n')) {
     const pendingMatch = line.match(/^- \[ \] (.+)$/);
@@ -170,20 +199,32 @@ export function runHeartbeat(projectRoot: string): HeartbeatRunResult {
 
     try {
       validateCommand(task.command);
-      output = execSync(task.command, {
+      // Exit semantics: execSync throws on ANY non-zero exit (and on timeout),
+      // so reaching the line below IS the exit-0 signal. Commands are
+      // pipe-free by contract (see DEFAULT_HEARTBEAT_TEMPLATE), which is what
+      // keeps that exit code honest rather than the last pipeline stage's.
+      const stdout = execSync(task.command, {
         cwd: projectRoot,
         encoding: 'utf-8',
         timeout: HEARTBEAT_EXEC_TIMEOUT,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
+      // Empty-success semantics: silence from a passing command is a pass.
+      output = stdout.trim().length > 0 ? stdout : EMPTY_SUCCESS_OUTPUT;
       success = true;
       result.passed++;
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         output = `BLOCKED: ${err.message}`;
       } else {
+        // Non-zero exit or timeout. The template carries no `2>&1`, so stdout
+        // and stderr arrive separately — merge both non-empty streams instead
+        // of letting an empty-string stdout mask stderr-only diagnostics.
         const execErr = err as { stdout?: string; stderr?: string; message?: string };
-        output = execErr.stdout ?? execErr.stderr ?? execErr.message ?? 'Unknown error';
+        const streams = [execErr.stdout, execErr.stderr].filter(
+          (s): s is string => typeof s === 'string' && s.trim().length > 0,
+        );
+        output = streams.length > 0 ? streams.join('\n') : execErr.message ?? 'Unknown error';
       }
       result.failed++;
       debugLog('heartbeat-daemon', err);

@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-508 Learnings
+- Sprint sprint-508 Learnings: ## Sprint sprint-508 Learnings
+
+## Gains
+- 508-001 — One runtime floor: doctor derives from package engines (row 450) — Runtime budget circuit breaker stopped the worker: output token budget exceeded (36806 > 14400).
+- 508-002 — Legacy controller fixtures satisfy today's fail-closed contracts (row 3297) — NO-OP OUTCOME — the required end-state already holds at HEAD; no file was modified.
+
 ## Sprint sprint-506 Learnings
 - Sprint sprint-506 Learnings: ## Sprint sprint-506 Learnings
 - Sweep task artifacts by task identity, not by filename prefix: GO_WITH_TECH_DEBT — TypeScript type check and the declared targeted orphan-cleaner test suite passed. Preflight now admits eligible artifact

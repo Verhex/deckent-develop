@@ -2,8 +2,28 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, unlinkS
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import type { DocUpdater, DocUpdateContext, DocUpdateResult } from './types.js';
+import type { Sprint, SprintMetrics, TaskEvaluation } from '../../core/types.js';
 
 export type SprintLogTerminalStatus = 'COMPLETE' | 'ABORTED';
+
+/**
+ * Minimal input `upsertSprintLog` actually reads. Narrower than
+ * `DocUpdateContext` (which requires a resolved config, isInternalProject,
+ * etc.) so terminal-authority publishers can project the log right after
+ * settlement without fabricating unrelated context fields. Any
+ * `DocUpdateContext` structurally satisfies this.
+ */
+export interface SprintLogUpsertInput {
+  projectRoot: string;
+  sprintResult: {
+    sprint: Sprint;
+    evaluations: ReadonlyMap<string, TaskEvaluation>;
+    metrics: Pick<
+      SprintMetrics,
+      'durationMs' | 'totalTasks' | 'completedTasks' | 'techDebtTasks' | 'noGoTasks' | 'coveragePercent'
+    >;
+  };
+}
 
 function replaceSprintSections(existing: string, heading: string, newSection: string): string {
   const headingPattern = /^## Sprint \d+ — .*$/gm;
@@ -50,7 +70,7 @@ function atomicWrite(path: string, content: string): void {
 }
 
 export function upsertSprintLog(
-  ctx: DocUpdateContext,
+  ctx: SprintLogUpsertInput,
   terminalStatus: SprintLogTerminalStatus,
 ): DocUpdateResult {
   const { projectRoot, sprintResult } = ctx;

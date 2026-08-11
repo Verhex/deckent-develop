@@ -24,10 +24,30 @@ import {
 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { DASHBOARD_OUTPUT_POLICY } from './clean.mjs';
+
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(dirname(SCRIPT_PATH), '..');
 const DASHBOARD_RELATIVE_PATH = join('src', 'dashboard');
-const DEFAULT_OUTPUT_RELATIVE_PATH = join('dist', 'dashboard');
+// One typed decision, defined once in scripts/clean.mjs and read here: which
+// dist entry survives a clean, and whether this build may overwrite it instead
+// of demanding a clean slate. No private copy lives in this file.
+const DEFAULT_OUTPUT_RELATIVE_PATH = DASHBOARD_OUTPUT_POLICY.outputRelativePath;
+
+/**
+ * True only for the output directory the policy itself names — the artifact
+ * `scripts/clean.mjs` preserves and this build produces. For that directory a
+ * leftover bundle is the expected post-clean state, so the build reclaims it.
+ * Any other (caller-staged) directory stays clean-slate: the build never
+ * delegates destructive cleanup for output it does not own.
+ */
+function reclaimsPreservedOutput(root, outputDirectory) {
+  return DASHBOARD_OUTPUT_POLICY.mode === 'preserve-then-overwrite'
+    && outputDirectory === resolve(
+      root,
+      DASHBOARD_OUTPUT_POLICY.outputRelativePath,
+    );
+}
 
 function codedError(code, detail) {
   const error = new Error(detail ? `${code}:${detail}` : code);
@@ -301,8 +321,12 @@ export async function buildDashboard(options = {}) {
     root,
     options.toolchainDashboardDirectory,
   );
+  const reclaimsOutput = reclaimsPreservedOutput(root, outputDirectory);
   mkdirSync(outputDirectory, { recursive: true, mode: 0o700 });
-  if (readdirSync(outputDirectory).length !== 0) {
+  // The policy, not a private expectation: for the preserved bundle a bundle
+  // left by `scripts/clean.mjs` is the normal starting state, so a non-empty
+  // output directory is not an error there.
+  if (!reclaimsOutput && readdirSync(outputDirectory).length !== 0) {
     throw codedError(
       'E_DASHBOARD_BUILD_OUTPUT_NOT_EMPTY',
       outputDirectory,
@@ -376,6 +400,11 @@ export async function buildDashboard(options = {}) {
       'build',
       '--outDir',
       outputDirectory,
+      // The output directory sits outside vite's root, so vite only clears a
+      // preserved bundle when explicitly told to. This is the overwrite half of
+      // `preserve-then-overwrite`, and only for policy-owned output: elsewhere
+      // the directory was already proven empty above.
+      ...(reclaimsOutput ? ['--emptyOutDir'] : []),
     ],
     sourceDirectory,
     options,
