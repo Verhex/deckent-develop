@@ -199,6 +199,16 @@
       "notes": "End-to-end smoke for `deckent chat --native` tool-dispatch flow."
     },
     {
+      "file": "scripts/check-born-intake.mjs",
+      "class": "one-shot",
+      "owner": "born-intake",
+      "npmScript": null,
+      "input": "a drafted RECOVERY-BORN row text file (arg) + follow-up-works/born-intake-template.md",
+      "output": "exit 0 valid / exit 1 typed field gaps / exit 2 file not found",
+      "expiry": "none — manual pre-insertion aid; CI wiring is an explicit owner decision left open (row 3169)",
+      "notes": "B10 task 3 (row 3169). Validates mandatory born-row fields against the intake template; deliberately not wired into any lint chain."
+    },
+    {
       "file": "scripts/check-dependency-audit.mjs",
       "class": "gate",
       "owner": "dependency-security",
@@ -469,6 +479,16 @@
       "notes": "Sprint 285 T-285-005; regression harness for the REPL tool-call protocol."
     },
     {
+      "file": "scripts/lint-adr-sync.mjs",
+      "class": "gate",
+      "owner": "adr-sync",
+      "npmScript": null,
+      "input": ".brain/memory.db accepted ADRs (read-only) + .brain/exports/decisions.md projection",
+      "output": "exit 1 typed on MISSING/DIVERGENT/STALE by normalized content digest",
+      "expiry": "none — designed as a fail-closed parity gate; CI wiring deferred to a later slice (row 160)",
+      "notes": "B10 task 5 (row 160). DB is SSOT, export is projection; not yet in lint:gates by design."
+    },
+    {
       "file": "scripts/lint-cli-mcp-parity.mjs",
       "class": "gate",
       "owner": "cli-mcp-parity",
@@ -477,6 +497,16 @@
       "output": "exit 1 on NEW gap vs scripts/cli-mcp-parity-baseline.json",
       "expiry": "none — permanent lint:gates member",
       "notes": "--update-baseline regenerates the known-intentional-gap baseline."
+    },
+    {
+      "file": "scripts/lint-config-truth.mjs",
+      "class": "gate",
+      "owner": "config-truth",
+      "npmScript": null,
+      "input": "typed DeckentConfig declaration + createDefaultConfig()/loadConfig() static follow (no config import, no env)",
+      "output": "exit 1 fail-closed on CFG-03/CFG-04 truth drift",
+      "expiry": "none — designed as a fail-closed truth gate; CI wiring deferred (row 520-006 config-truth family)",
+      "notes": "Sprint-520 orphaned-fix harvest; statically verifies config metadata truth without importing the config module."
     },
     {
       "file": "scripts/lint-desktop-api-sync.mjs",
@@ -549,16 +579,6 @@
       "notes": "Canonical MASTER-PLAN validator and deterministic active-view generator."
     },
     {
-      "file": "scripts/lint-script-registry.mjs",
-      "class": "gate",
-      "owner": "script-lifecycle-registry-governance",
-      "npmScript": null,
-      "input": "scripts/script-registry.json + the real top-level scripts/*.mjs directory listing",
-      "output": "exit 0 registry covers exactly the real directory + every entry well-formed / 1 coverage-or-shape violation / 2 missing-or-unparsable registry",
-      "expiry": "none — permanent coverage+shape gate for this very registry",
-      "notes": "Task 517-006 (row 270); deliberately NOT wired into any npm script or lint:gates in this slice — that is a follow-up owner decision recorded in the task result notes. Self-registers (this file is itself scripts/*.mjs and required its own entry)."
-    },
-    {
       "file": "scripts/lint-mcp-instructions.mjs",
       "class": "gate",
       "owner": "mcp-instructions-governance",
@@ -607,6 +627,16 @@
       "output": "flags domains.$contains/$in words that detectDomains() can never emit",
       "expiry": "none — permanent gate (see notes: not wired via any package.json script)",
       "notes": "born-589; not found in package.json scripts as of 2026-08-11."
+    },
+    {
+      "file": "scripts/lint-script-registry.mjs",
+      "class": "gate",
+      "owner": "script-lifecycle-registry-governance",
+      "npmScript": null,
+      "input": "scripts/script-registry.json + the real top-level scripts/*.mjs directory listing",
+      "output": "exit 0 registry covers exactly the real directory + every entry well-formed / 1 coverage-or-shape violation / 2 missing-or-unparsable registry",
+      "expiry": "none — permanent coverage+shape gate for this very registry",
+      "notes": "Task 517-006 (row 270); deliberately NOT wired into any npm script or lint:gates in this slice — that is a follow-up owner decision recorded in the task result notes. Self-registers (this file is itself scripts/*.mjs and required its own entry)."
     },
     {
       "file": "scripts/lint-test-hermeticity.mjs",

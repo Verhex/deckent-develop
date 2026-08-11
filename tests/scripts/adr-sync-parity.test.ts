@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
 import {
-  existsSync,
   mkdtempSync,
   rmSync,
   writeFileSync,
@@ -35,15 +35,41 @@ function runLintCli(
   });
 }
 
-const distStorePath = join(process.cwd(), 'dist', 'core', 'memory-store.js');
-
-async function loadMemoryStoreCtor() {
-  if (existsSync(distStorePath)) {
-    const mod = await import(distStorePath);
-    return mod.MemoryStore;
+// Mirrors the columns the lint's SELECT actually reads — a subset of the real
+// `entries` table schema (src/core/memory-store.ts), all of which have defaults
+// in production so these INSERTs work unmodified against the live DB. Direct
+// better-sqlite3 (the reclassify-backfill.test.ts idiom) keeps the suite
+// hermetic in CI shards that run without dist/.
+function seedDbSync(
+  dbPath: string,
+  entries: Array<{ id: string; title: string; content: string; status?: string }>,
+): void {
+  const db = new Database(dbPath);
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS entries (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'system',
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        sprint_id TEXT,
+        sprint_num INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      );
+    `);
+    const insert = db.prepare(
+      `INSERT INTO entries (id, type, title, content, status) VALUES (?, 'adr', ?, ?, ?)`,
+    );
+    for (const e of entries) {
+      insert.run(e.id, e.title, e.content, e.status ?? 'accepted');
+    }
+  } finally {
+    db.close();
   }
-  const mod = await import(join(process.cwd(), 'src', 'core', 'memory-store.ts'));
-  return mod.MemoryStore;
 }
 
 // ─── normalizeContent / digestOf ───────────────────────────────────────────
@@ -155,15 +181,7 @@ describe('lint-adr-sync CLI (tmpdir fixtures)', () => {
   });
 
   async function seedDb(entries: Array<{ id: string; title: string; content: string; status?: string }>) {
-    const MemoryStore = await loadMemoryStoreCtor();
-    const store = new MemoryStore(dbPath);
-    try {
-      for (const e of entries) {
-        store.insert({ id: e.id, type: 'adr', title: e.title, content: e.content, status: e.status ?? 'accepted' });
-      }
-    } finally {
-      store.close();
-    }
+    seedDbSync(dbPath, entries);
   }
 
   it('exits 0 and reports PASS when db and export are in sync', async () => {

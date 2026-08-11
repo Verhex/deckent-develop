@@ -1,4 +1,13 @@
+import { createRequire } from 'node:module';
 import { PROVIDER_PACKAGES } from './provider-packages.js';
+
+// Row 450: the Node.js floor is single-sourced from package.json engines.node —
+// a literal here drifts the moment the floor moves (the ">=18" remedy outlived
+// two floor raises before this derivation).
+const NODE_ENGINE_RANGE = (createRequire(import.meta.url)('../../package.json') as {
+  engines: { node: string };
+}).engines.node;
+const NODE_ENGINE_MAJOR = parseInt(NODE_ENGINE_RANGE.match(/(\d+)/)?.[1] ?? '0', 10);
 
 // ─── DeckentError ───────────────────────────────────────────────────
 
@@ -138,12 +147,12 @@ registry.set('DECKENT_E009', {
 
 registry.set('DECKENT_E010', {
   message: 'node version too low',
-  suggestion: 'Upgrade Node.js to >=18',
+  suggestion: `Upgrade Node.js to ${NODE_ENGINE_RANGE}`,
   whatHappened: 'Your Node.js version is below the minimum requirement.',
-  why: 'Deckent requires Node.js 18 or higher for ESM support and modern APIs.',
+  why: `Deckent requires Node.js ${NODE_ENGINE_MAJOR} or higher for ESM support and modern APIs.`,
   howToFix: [
-    'Upgrade Node.js to version 18 or higher',
-    'Use nvm: nvm install 18 && nvm use 18',
+    `Upgrade Node.js to version ${NODE_ENGINE_MAJOR} or higher`,
+    `Use nvm: nvm install ${NODE_ENGINE_MAJOR} && nvm use ${NODE_ENGINE_MAJOR}`,
     'Verify: node --version',
   ],
 });

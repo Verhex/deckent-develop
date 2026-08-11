@@ -64,10 +64,12 @@ describe('deckent_audit MCP tool', () => {
     expect(server.tools.has('deckent_audit')).toBe(true);
   });
 
-  it('should have readOnly annotation', () => {
+  it('declares its widest side effects — gate writes gate.json, retention apply prunes (row 490)', () => {
     const tool = server.tools.get('deckent_audit')!;
+    // MCP clients skip approval prompts on readOnlyHint, so understating the
+    // side-effect contract is a security defect, not a cosmetic choice.
     expect((tool.config as Record<string, unknown>).annotations).toEqual(
-      expect.objectContaining({ readOnlyHint: true, destructiveHint: false }),
+      expect.objectContaining({ readOnlyHint: false, destructiveHint: true }),
     );
   });
 

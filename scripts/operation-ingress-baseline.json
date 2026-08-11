@@ -13,10 +13,10 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 674,
+  "total": 692,
   "mediated": 0,
-  "unmediated": 674,
-  "fileCount": 233,
+  "unmediated": 692,
+  "fileCount": 235,
   "byFile": {
     "src/agent/permission-store.ts": {
       "count": 1,
@@ -263,7 +263,7 @@
       "mediated": false
     },
     "src/cli/helpers/error-handler.ts": {
-      "count": 1,
+      "count": 2,
       "mediated": false
     },
     "src/cli/helpers/gemini-config.ts": {
@@ -555,7 +555,7 @@
       "mediated": false
     },
     "src/core/skill-pool.ts": {
-      "count": 4,
+      "count": 6,
       "mediated": false
     },
     "src/core/skill-registry.ts": {
@@ -839,7 +839,7 @@
       "mediated": false
     },
     "src/orchestra/scheduler-effects.ts": {
-      "count": 3,
+      "count": 4,
       "mediated": false
     },
     "src/orchestra/scheduler-journal.ts": {
@@ -871,7 +871,7 @@
       "mediated": false
     },
     "src/orchestra/sprint-finalizer.ts": {
-      "count": 10,
+      "count": 14,
       "mediated": false
     },
     "src/orchestra/sprint-lifecycle.ts": {
@@ -891,7 +891,7 @@
       "mediated": false
     },
     "src/orchestra/sprint-runner-entry.ts": {
-      "count": 6,
+      "count": 7,
       "mediated": false
     },
     "src/orchestra/sprint-spawner.ts": {
@@ -949,7 +949,15 @@
     "src/providers/subprocess.ts": {
       "count": 2,
       "mediated": false
+    },
+    "src/training/historical-trace-migration.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/training/pipeline.ts": {
+      "count": 5,
+      "mediated": false
     }
   },
-  "digest": "3ea3203ff291a6cb84fb52dc7d0fdf896f4e4923a7902f20e91e8bc402c6c761"
+  "digest": "f656b4789198658431fa3b57142e4c3d4eec3d7cd3bd4dd710be4dfd4ed23d3c"
 }

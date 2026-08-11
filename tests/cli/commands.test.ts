@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
@@ -69,7 +70,11 @@ vi.mock('../../src/core/run-status-authority.js', () => ({
   })),
 }));
 
-vi.mock('../../src/core/config.js', () => ({
+vi.mock('../../src/core/config.js', async (importOriginal) => ({
+  // Spread the real module first: command modules keep growing new config
+  // imports (DEFAULT_HEARTBEAT_TIMEOUT_MS landed via sprint-512) and a
+  // closed factory turns each one into a strict-ESM mock crash.
+  ...(await importOriginal<typeof import('../../src/core/config.js')>()),
   resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
@@ -289,6 +294,15 @@ import { registerInit } from '../../src/cli/commands/init.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
+// Row 450: the doctor derives its Node floor from package.json engines.node at
+// runtime, so a passing fixture must derive the same way — a version literal
+// here re-creates the duplicated-floor drift the row closed (rotted once
+// already when the floor moved past the old 'v22.0.0' fixtures).
+const enginesNode = (createRequire(import.meta.url)('../../package.json') as {
+  engines: { node: string };
+}).engines.node;
+const PASSING_NODE_VERSION = `v${parseInt(enginesNode.match(/(\d+)/)?.[1] ?? '0', 10)}.0.0`;
+
 let stdoutData: string[];
 let stderrData: string[];
 let stdoutSpy: ReturnType<typeof vi.spyOn>;
@@ -402,7 +416,7 @@ describe('doctor command', () => {
   it('reports all passing checks', async () => {
     vi.mocked(spawnSync).mockImplementation((cmd) => {
       const outputs: Record<string, string> = {
-        node: 'v22.0.0', git: 'git version 2.44.0', tmux: 'tmux 3.4', claude: '1.0.0',
+        node: PASSING_NODE_VERSION, git: 'git version 2.44.0', tmux: 'tmux 3.4', claude: '1.0.0',
       };
       return { status: 0, stdout: outputs[cmd as string] ?? '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });
@@ -414,7 +428,7 @@ describe('doctor command', () => {
   it('reports failing required check', async () => {
     vi.mocked(spawnSync).mockImplementation((cmd) => {
       if (cmd === 'tmux') return { status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
-      return { status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
+      return { status: 0, stdout: PASSING_NODE_VERSION, stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('FAIL tmux');
@@ -440,7 +454,7 @@ describe('doctor command', () => {
   it('handles git version output format', async () => {
     vi.mocked(spawnSync).mockImplementation((cmd) => {
       if (cmd === 'git') return { status: 0, stdout: 'git version 2.44.0.windows.1', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
-      return { status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
+      return { status: 0, stdout: PASSING_NODE_VERSION, stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('v2.44.0');
@@ -453,14 +467,14 @@ describe('doctor command', () => {
   });
 
   it('reports workspace missing', async () => {
-    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: PASSING_NODE_VERSION, stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(false);
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('.deckent/ missing');
   });
 
   it('reports brain budget over limit', async () => {
-    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: PASSING_NODE_VERSION, stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
     // DB-first: existsSync must return true for the memory.db path so
     // getMemoryEntryCount opens the store, and totalCount returns 950.
     vi.mocked(existsSync).mockImplementation((p: unknown) => {
@@ -477,7 +491,7 @@ describe('doctor command', () => {
   });
 
   it('reports critical debt', async () => {
-    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: PASSING_NODE_VERSION, stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     // DB-first: countDebtItems uses MemoryStore.getByType('debt')
     mockCmdMemStore.getByType.mockReturnValue([
@@ -490,7 +504,7 @@ describe('doctor command', () => {
   });
 
   it('reports stale locks', async () => {
-    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: PASSING_NODE_VERSION, stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
     vi.mocked(readdirSync).mockReturnValue(['test.lock'] as unknown as ReturnType<typeof readdirSync>);
     const staleTime = new Date(Date.now() - 400_000).toISOString();
     vi.mocked(readFileSync).mockImplementation((p: unknown) => {
@@ -1091,7 +1105,7 @@ describe('start command', () => {
     // Doctor pre-flight: make all tool checks pass
     vi.mocked(spawnSync).mockImplementation((cmd) => {
       const outputs: Record<string, string> = {
-        node: 'v22.0.0', git: 'git version 2.44.0', tmux: 'tmux 3.4', claude: '1.0.0',
+        node: PASSING_NODE_VERSION, git: 'git version 2.44.0', tmux: 'tmux 3.4', claude: '1.0.0',
       };
       return { status: 0, stdout: outputs[cmd as string] ?? '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });

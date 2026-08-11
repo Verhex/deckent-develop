@@ -15,9 +15,17 @@
 // only) nor doctor-preflight-honesty.test.ts (exercises resolvePreFlightResult,
 // not the raw re-export) covers.
 
+import { createRequire } from 'node:module';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+
+// Row 450: the doctor's Node floor derives from package.json engines.node —
+// the passing fixture derives the same way instead of pinning a version literal.
+const enginesNode = (createRequire(import.meta.url)('../../package.json') as {
+  engines: { node: string };
+}).engines.node;
+const PASSING_NODE_VERSION = `v${parseInt(enginesNode.match(/(\d+)/)?.[1] ?? '0', 10)}.0.0`;
 import { join } from 'node:path';
 
 vi.mock('node:child_process', () => ({
@@ -55,7 +63,7 @@ describe('MASTER-PLAN 505 — runPreFlightHealthCheck de-dup stays closed', () =
       // runPreFlightHealthCheck drives it down the "script missing, fall back
       // to runDoctorChecks()" branch; only the doctor-check probes themselves
       // (node/git/tmux/docker/claude version probes) go through spawnSync.
-      vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
+      vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: PASSING_NODE_VERSION, stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
     });
 
     afterEach(() => {

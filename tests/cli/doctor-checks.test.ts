@@ -1,4 +1,13 @@
+import { createRequire } from 'node:module';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Row 450: checkNode derives its floor from package.json engines.node, so the
+// passing fixture must derive the same way — a version literal rots when the
+// floor moves (the old 'v22.0.0' fixtures broke at the >=24 raise).
+const enginesNode = (createRequire(import.meta.url)('../../package.json') as {
+  engines: { node: string };
+}).engines.node;
+const PASSING_NODE_VERSION = `v${parseInt(enginesNode.match(/(\d+)/)?.[1] ?? '0', 10)}.0.0`;
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -463,7 +472,7 @@ describe('runDoctorChecks (checks module)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);
@@ -502,7 +511,7 @@ describe('checkDebt via runDoctorChecks (checks module, DB-first — born-651)',
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);
@@ -534,7 +543,7 @@ describe('runPreFlightHealthCheck (checks module)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);

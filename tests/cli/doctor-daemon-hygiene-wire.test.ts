@@ -34,10 +34,20 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
-vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 1, signal: null, output: [] }),
-  spawn: vi.fn(),
-}));
+vi.mock('node:child_process', async () => {
+  // Row 450: the doctor's Node floor derives from package.json engines.node —
+  // the passing fixture derives the same way (a 'v22.0.0' literal here broke
+  // the exit-code assertions when the floor moved past it).
+  const { createRequire } = await import('node:module');
+  const enginesNode = (createRequire(import.meta.url)('../../package.json') as {
+    engines: { node: string };
+  }).engines.node;
+  const passingNodeVersion = `v${parseInt(enginesNode.match(/(\d+)/)?.[1] ?? '0', 10)}.0.0`;
+  return {
+    spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: passingNodeVersion, stderr: '', pid: 1, signal: null, output: [] }),
+    spawn: vi.fn(),
+  };
+});
 
 vi.mock('../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),

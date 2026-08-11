@@ -18,13 +18,11 @@
  *   node scripts/lint-adr-sync.mjs [--db <path>] [--export <path>]
  */
 
+import Database from 'better-sqlite3';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseADRs } from './adr-validator.mjs';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Collapse incidental markdown-formatting drift (whitespace runs, casing) while still
@@ -53,30 +51,27 @@ export function loadExportedAdrs(exportContent) {
   return out;
 }
 
-async function loadMemoryStore() {
-  const distPath = join(__dirname, '..', 'dist', 'core', 'memory-store.js');
-  if (existsSync(distPath)) {
-    return import(pathToFileURL(distPath).href);
-  }
-  return import(pathToFileURL(join(__dirname, '..', 'src', 'core', 'memory-store.ts')).href);
-}
-
 /**
- * Read every accepted ADR straight from the live store — read-only, mirrors
- * `scripts/measure-prompt-cost.mjs` (`store.getByType('adr').filter(status==='accepted')`).
+ * Read every accepted ADR straight from the live DB — read-only, direct
+ * better-sqlite3 like the other scripts-land DB readers (backfill-sprint-log-rows,
+ * sprint-retroactive-reclassify). The SELECT mirrors MemoryStore.getByType('adr')'s
+ * tenant-less branch (`type = ? AND deleted_at IS NULL`) so the lint stays truthful
+ * to the store contract without needing the compiled store on disk — CI test shards
+ * run without dist/, and importing src/*.ts from a script cannot resolve the
+ * compiled-name (`./x.js`) specifiers.
  */
-export async function loadDbAcceptedAdrs(dbPath) {
-  const { MemoryStore } = await loadMemoryStore();
-  const store = new MemoryStore(dbPath);
+export function loadDbAcceptedAdrs(dbPath) {
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
   const out = new Map();
   try {
-    for (const entry of store.getByType('adr')) {
-      if (entry.status === 'accepted') {
-        out.set(entry.id, { title: entry.title, content: entry.content });
-      }
+    const rows = db.prepare(
+      `SELECT id, title, content FROM entries WHERE type = 'adr' AND deleted_at IS NULL AND status = 'accepted'`,
+    ).all();
+    for (const entry of rows) {
+      out.set(entry.id, { title: entry.title, content: entry.content });
     }
   } finally {
-    store.close();
+    db.close();
   }
   return out;
 }
@@ -160,7 +155,7 @@ export async function runLint({ dbPath, exportPath }) {
     return 2;
   }
 
-  const dbAccepted = await loadDbAcceptedAdrs(dbPath);
+  const dbAccepted = loadDbAcceptedAdrs(dbPath);
   const exportedAdrs = loadExportedAdrs(readFileSync(exportPath, 'utf-8'));
   const result = diffAdrSync(dbAccepted, exportedAdrs);
 
