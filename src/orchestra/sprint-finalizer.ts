@@ -95,6 +95,13 @@ import {
 // ─── Sprint Docs Updater (direct — cleanTasksArchive not re-exported via sprint-reporter) ──
 import { cleanTasksArchive } from './sprint-docs-updater.js';
 
+// ─── Sprint Log Projection (row 3298 — terminal COMPLETE/ABORTED truth) ───
+// Called directly (not via the tier-1 doc-updaters registry) because the
+// registry's step 9 pass runs while sprint.status is still RETROSPECTIVE —
+// `upsertSprintLog` takes its terminal status as an explicit argument so it
+// can be invoked once the status is genuinely terminal.
+import { upsertSprintLog } from './doc-updaters/sprint-log.js';
+
 // ─── Result Evaluator ─────────────────────────────────────────────
 import {
   getRecentSprintStats,
@@ -1827,6 +1834,33 @@ export function forceAbortSprint(
       : {}),
   });
   publishAbortedSprintAuthority(projectRoot, sprint, truth.logicalMetrics);
+  // Sprint log projection (row 3298): publishAbortedSprintAuthority just set
+  // sprint.status = ABORTED and sprint.completedAt — genuinely terminal, so
+  // this is the correct place to upsert the ABORTED log section. Non-fatal:
+  // the log is a projection, never settlement authority.
+  try {
+    const startedAtMs = sprint.startedAt ? Date.parse(sprint.startedAt) : NaN;
+    const completedAtMs = sprint.completedAt ? Date.parse(sprint.completedAt) : Date.now();
+    const durationMs = Number.isFinite(startedAtMs) ? Math.max(0, completedAtMs - startedAtMs) : 0;
+    upsertSprintLog(
+      {
+        projectRoot,
+        sprintResult: {
+          sprint,
+          evaluations: truth.logicalEvaluations,
+          metrics: {
+            durationMs,
+            totalTasks: truth.logicalMetrics.totalTasks,
+            completedTasks: truth.logicalMetrics.completedTasks,
+            techDebtTasks: truth.logicalMetrics.techDebtTasks,
+            noGoTasks: truth.logicalMetrics.noGoTasks,
+            coveragePercent: truth.logicalMetrics.coveragePercent,
+          },
+        },
+      },
+      'ABORTED',
+    );
+  } catch (e) { debugLog('forceAbortSprint:sprintLogProjection', e); }
   return { outcome: 'ABORTED', receiptPublication, terminalTruth: truth };
 }
 
@@ -3427,7 +3461,7 @@ export async function finalizeSprint(
   }
 
   if (!opts?.deferTerminalAuthority) {
-    publishFinalSprintAuthority(projectRoot, sprint, metrics, opts?.config?.language ?? 'en');
+    publishFinalSprintAuthority(projectRoot, sprint, metrics, opts?.config?.language ?? 'en', logicalEvaluations);
   }
 
   // Counter cleanup must be the final filesystem action after the terminal
@@ -3445,15 +3479,35 @@ export async function finalizeSprint(
 /**
  * Single terminal authority publisher shared by external finalize and the
  * in-process controller after every ref'ed cleanup operation has completed.
+ * @param evaluations - Logical task evaluations for the sprint-log projection
+ *   (row 3298). Optional so the existing deferred/checkpoint-recovery callers
+ *   (sprint-controller.ts, completed-checkpoint-terminalizer.ts) stay
+ *   source-compatible; `upsertSprintLog` falls back to each task's own
+ *   status when an id is missing from the map.
  */
 export function publishFinalSprintAuthority(
   projectRoot: string,
   sprint: Sprint,
   metrics: SprintMetrics,
   lang = 'en',
+  evaluations?: ReadonlyMap<string, TaskEvaluation>,
 ): void {
   debugLog('finalizeSprint:breadcrumb', 'terminal authority publication — entering');
   persistFinalSprintState(projectRoot, sprint);
+  // Sprint log projection (row 3298): sprint.status is genuinely COMPLETE at
+  // this point (persistFinalSprintState just set it) — this is the only
+  // place the true terminal status is known, so it is the correct place to
+  // upsert the human-readable log section. Non-fatal: the log is a
+  // projection, never settlement authority, and must never abort finalize.
+  try {
+    upsertSprintLog(
+      {
+        projectRoot,
+        sprintResult: { sprint, evaluations: evaluations ?? new Map(), metrics },
+      },
+      'COMPLETE',
+    );
+  } catch (e) { debugLog('finalizeSprint:sprintLogProjection', e); }
   // Dashboard is an input to the canonical read-model conflict detector. It
   // must reach the same COMPLETE generation before the model is published;
   // publishing first and rewriting dashboard second immediately invalidated

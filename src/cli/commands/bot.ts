@@ -224,8 +224,17 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
   try {
     await wait();
   } finally {
-    nervousHandle?.dispose();
-    await handle.dispose();
+    // Each disposal step is best-effort here: this listener's pid record is
+    // this process's own to retire, and a connector/nervous disposal failure
+    // during SIGTERM-triggered shutdown must never leave it behind (ADR-G-013
+    // pid hygiene) — the whole point of a graceful path over an operator's
+    // OS-level `kill` fallback is that pid cleanup actually runs.
+    try {
+      nervousHandle?.dispose();
+    } catch { /* pid cleanup below must still run */ }
+    try {
+      await handle.dispose();
+    } catch { /* pid cleanup below must still run */ }
     clearBotPid(root);
     print(getMessage('bot.listen_stopped', lang));
   }

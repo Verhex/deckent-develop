@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5d6a80d79462a7f48cde0d46a928541548a062f826f07d54478a190e74e30716"
+    "value": "2e35f8aa88680beea99f01c162b158fa99e2e98e8fdf9800057de5cc1df8944c"
   },
   "summary": {
-    "total": 430,
-    "active": 383,
+    "total": 438,
+    "active": 391,
     "terminal": 47,
-    "receipts": 181,
+    "receipts": 183,
     "byState": {
-      "OPEN": 290,
+      "OPEN": 298,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,9 +21,9 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 275,
-      "P1": 118,
-      "P2": 37
+      "P0": 279,
+      "P1": 121,
+      "P2": 38
     },
     "byProgram": {
       "API": 5,
@@ -41,9 +41,9 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 4,
-      "KERNEL": 99,
+      "KERNEL": 104,
       "LEARNING": 5,
-      "OBS": 3,
+      "OBS": 4,
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 82,
+      "TRUTH": 84,
       "XPLAT": 3
     }
   },
@@ -213,9 +213,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-10",
       "definitionDigest": "733250cf320fd9ab0a1c09a84df89e2691487a68c5f3dbdadd5f7ac943dd4118",
-      "progressDigest": "c1d284a9b9a4492df6b4bcfa21b99ccb54cdb2aefc1a9f20ef1695ed99968501",
+      "progressDigest": "d444ed51e1dbe2b294e40349556ed60178c5c1a9fd1fd5e00dddbd97080006f8",
       "terminalClosureDigest": null
     },
     {
@@ -664,9 +664,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-10",
       "definitionDigest": "cc9b46006ce0ad803edbe71c3726e8897ce181e3b62c1ff313c773fb0791af93",
-      "progressDigest": "480252ada95fd2029e7e83ee932450ec40987aa9630f04d8da9c202fb7bd2e30",
+      "progressDigest": "e36ef0b56dce40ae50c1440cd929bfbd08fea3d907d5ccc4b7290c60c21f5cce",
       "terminalClosureDigest": null
     },
     {
@@ -1009,6 +1009,28 @@
       "definitionDigest": "e6230fc41345dabe30204030b8f4d0b39d82385e09b9b05099ae0167faf9d5bd",
       "progressDigest": "ff43ed2655e9a017523749417bf26fdf195a340f9b55b6240708bb87db814d94",
       "terminalClosureDigest": "80b44ce9ba7777c3b09ad85e78a9c87a4b4478ee66c5109d1f2502b36ed695c2"
+    },
+    {
+      "order": 538,
+      "id": "CI-NIGHTLY-GREEN-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "15d27c529193bcf4e7b6b9b382b8350de88daf68fb538abfb6bae513bf405d59",
+      "progressDigest": "0614a2146b3358518866c2a6447d047ba46725357c0a3bdbaf86ef273a61d5be",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 539,
+      "id": "MODEL-CATALOG-ENDPOINT-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "241173426e94961b5c42aecb071157c2d15d38a0873087f2f8fbe8269b415925",
+      "progressDigest": "4d37727060cd6abd0491a14f8e915dc6c88fcfab1edf30839c7b33684a13bf01",
+      "terminalClosureDigest": null
     },
     {
       "order": 1000,
@@ -2974,9 +2996,9 @@
       "program": "ASSURANCE",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-10",
       "definitionDigest": "2c26e9dff54c59731b1b34ba362aa0793718b558ccf6d283143ec604e912bc69",
-      "progressDigest": "386bb69538bb562746901e25987f81e067428cd3da808223497f4b86cf7ffef9",
+      "progressDigest": "4e602a98d29adce70c62612c16ccc14fe4c90fe90c52204af13392a9e45cf45c",
       "terminalClosureDigest": null
     },
     {
@@ -3090,6 +3112,28 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3308,
+      "id": "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-10",
+      "definitionDigest": "95b6d486e8956f60460bea1a5aaf218b7a21ced7caa33689ba4351046732372f",
+      "progressDigest": "a637ffd18ec0ab078d3f4a4e50ebe444c573cb02359b93e8200a160f6c90ad00",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3309,
+      "id": "RECOVERY-BORN-507-FIX-SPAWN-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "5f183f4784b0cf1d5f240bca05bfa324979a97e87a5b75c08c703b73230450e3",
+      "progressDigest": "7e36e2dd48e2c869c34b986d3c2facd419fabedecc85c2124c450abec92289f3",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3310,
       "id": "SKILL-DURABILITY-001",
       "program": "KERNEL",
@@ -3098,6 +3142,50 @@
       "updated": "2026-08-03",
       "definitionDigest": "0ed918c72bb795c3cc2c2dd6fc4ef6df868dba1cfe666e01f7f9f6e5aefd3c9c",
       "progressDigest": "1c1407fe7319ca066265a5385ccaa4625576b31c57c8509fb7329fa631dfd7b7",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3311,
+      "id": "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "8154f0544a9f5139dc748673285d6638ef1168a63ab70d7739331ccb3e740a9a",
+      "progressDigest": "626c9d4006bfe076693cfdc3418e570f5301eb453be088a30aa8f503bd1a3d75",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3312,
+      "id": "PLAN-SCOPE-PARSER-PHANTOM-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "6d97dcfb46772765d24c27251669e57baa7c4bb5bea1441946bcd7ab53af8c52",
+      "progressDigest": "7043584decf643420b9190ac555fc4f2d28398ae6730d66d2bcd2d80c7f94888",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3313,
+      "id": "RUN-STATUS-LIVENESS-TRUTH-001",
+      "program": "OBS",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "5d246ced32015f6416b45826d0ac3fe37a0cd5af4d4dbe7eac0650bdb2753708",
+      "progressDigest": "ca945b73d5e211a3091911ce0fac28a686e53f580dc9a6ba25c41da1b22ec911",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3314,
+      "id": "ARCHIVE-PATH-AUTHORITY-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "83795f31cdf8bfbbd8fe65aee317d73f967715e1b35b2947dcf52f9e19fcb12c",
+      "progressDigest": "ae2912c29cfde271abdfa9560feaf44c6185ce34a406df3ff453c821e0031165",
       "terminalClosureDigest": null
     },
     {
@@ -6605,6 +6693,26 @@
         "transitionAt": "2026-08-10T13:26:04Z"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-NIGHTLY-GREEN-01",
+      "authorityDigest": "698a3d82c5d854cea9d5b5b9166dc0ac84e0feab1fa4fddee7f9db21155300d7",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T21:18:10Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-10-DECK-DOCKERIGNORE-01",
+      "authorityDigest": "b31b917e53ed5a3fda8424d211c17d333ff1d46e4cca09c9d8e2730f2d7e8c48",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-10T21:46:16Z"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -6938,8 +7046,8 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
+        "C": "1",
+        "W": "1",
         "E": "0",
         "H": "?",
         "L": "0",
@@ -6949,10 +7057,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-10-DECK-DOCKERIGNORE-01"
+      ],
       "acceptance": "`.dockerignore`, build-context negative test ve image-layer proof",
-      "evidence": "2026-07-21 decision; current `.dockerignore` gap",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-21 decision; current `.dockerignore` gap; `receipt=GR-2026-08-10-DECK-DOCKERIGNORE-01`; 2026-08-10 MEKANİK DİLİM: .deck + .deck.* dışlaması eklendi (owner-side); sprint-507-002 kanıtı — worker render-time scope-shrink (yeni bulgu: plan-time trackedRootFiles koruması render'da yeniden-sanitize edilip kök dosyaları SESSİZCE düşürüyor) nedeniyle kök dosyaya yazamadı, dürüst NO_GO; kalan kapsam: hermetik dockerignore-parse testi + image-layer proof (worker dilimi, kök-dosya yazımı gerektirmez)",
+      "updated": "2026-08-10"
     },
     {
       "order": 110,
@@ -8380,8 +8490,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`doctor`, `package.json engines`, onboarding ve release gate tek kaynaktan aynı minimum Node sürümünü verir; drift CI'da fail-closed olur",
-      "evidence": "CODE-DOC-DIFF-2026-08 CLI-12: `doctor --json` \"v24.15.0 (>=18 required)\" derken `package.json` `engines>=24` ister; 2026-08-02 gerçek binary çıktısıyla yeniden üretildi. Kanıtlamadığı: hangi floor'un canonical olacağı owner kararıdır",
-      "updated": "2026-08-03"
+      "evidence": "CODE-DOC-DIFF-2026-08 CLI-12: `doctor --json` \"v24.15.0 (>=18 required)\" derken `package.json` `engines>=24` ister; 2026-08-02 gerçek binary çıktısıyla yeniden üretildi. Kanıtlamadığı: hangi floor'un canonical olacağı owner kararıdır; 2026-08-10 GECE DOGFOOD SETTLEMENT (sprint-508-001, claude-sonnet-5): floor kararı = engines.node (npm'in kendisinin zorladığı değer — Brain kararı, owner onay-turu bekler); checkNode floor'u createRequire ile manifest'ten türetir (fs-mock'lu testlerle çakışmamak için bilinçli seçim, kod-içi yorumlu), yeni tests/cli/runtime-floor.test.ts 4/4 dinamik-okumalı; worker attempt-1 budget circuit-breaker ile kesildi (36806>14400 output token, exitCode 137) ama iş diskte tamamdı; Brain-tamamlama: 7 legacy doctor fixture'ı eski >=18 kontratını v22-literal'le pinliyordu → PASSING_NODE_VERSION engines-türevi yapıldı; doctor 203/203 + tsc temiz; typed gözlem-1: evaluator scoped-green'le DONE verdi, kırık doctor.test.ts'i görmedi (affected-tests süpürmesi yok — born-satır adayı); typed gözlem-2: 14400 output-token tavanı kod-görevi için dar (budget-locality ailesi)",
+      "updated": "2026-08-10"
     },
     {
       "order": 460,
@@ -8798,6 +8908,70 @@
       "acceptance": "Onay ve settlement kayıtları owner-approved immutable external ledger'a bağlanır; MASTER'daki receipt register'ı onun projection'ı olur; Git trust-anchor zinciri commit-bound doğrulanır",
       "evidence": "Açılış 2026-08-06: SSOT-003 bölmesinden doğdu (MASTER §3.3 — residual child'a taşınır; Alperen G1 onayı, karar-turu); taşınan evidence-cümlesi bu satırın outcome'udur; `receipt=GR-2026-08-06-SSOT-SPLIT-01`",
       "updated": "2026-08-06"
+    },
+    {
+      "order": 538,
+      "id": "CI-NIGHTLY-GREEN-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-08-10-NIGHTLY-GREEN-01"
+      ],
+      "acceptance": "Üç test dosyası (audit-operation-ingress, brain/decisions, governance/orphan-deliverables) lokalde ve gece Coverage'da yeşil; baseline mekanik regen digest'li; ADR Context içeriği owner-görünür; orphan pini O-ailesi bilinçli-unwired gerçeğini not eder",
+      "evidence": "Açılış 2026-08-10 (post-PR116 sağlık taraması, Alperen 'sen taslakla' onayı): 3 kırık lokal reproduce — audit 673≠674 (ab14d45cd debt-manager +1 write sitesi), 'Provider Authority Key Custody, Rotation & Composition' ADR'sinde Context alanı yok, orphan taraması 91≠90 (operation-catalog O1 2026-08-07 indi, pin güncellenmedi); kökler satır 4030 (O3 typed-residual) · 160 (ADR parity) · 531 (Coverage-only aileler) ile bağlantılı; `receipt=GR-2026-08-10-NIGHTLY-GREEN-01`; 2026-08-10 SETTLEMENT: üç parça kapandı — baseline 674 regen (audit --write), adr-g-039 gerçek Context (MemoryStore.update, audit-chain + entry_history korunur; writeGuardedExports re-export), KNOWN_ORPHANS += operation-catalog/index.ts (tarihli yorum + 92 pin); `proof=nightly-drift-trio-37of37-local`; X kanıtı gece Coverage koşusunda — satır o kanıta ve owner DONE-onayına dek OPEN",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 539,
+      "id": "MODEL-CATALOG-ENDPOINT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "models.dev catalog endpoint'i taşındı (api/v1/catalog 302 ile HTML ana sayfaya düşüyor): CATALOG_URL güncellenir, redirect-to-HTML typed catalog-fetch hatasına çevrilir, remote-refresh gerçek JSON kaynağına döner",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "fetchRemoteCatalog HTML/redirect yanıtında typed hata üretir (warning'li bundled-düşüş davranışı aynen kalır); yeni endpoint gerçek koşuda JSON döner veya endpoint yoksa owner'a typed unreachable raporlanır; cache'e bozuk içerik yazılmadığı testle pinlenir",
+      "evidence": "Açılış 2026-08-10: deckent models koşusunda remote-fetch-failed ('Unexpected token <'); curl kanıtı 302 → ana sayfa (HTML); mevcut davranış fail-safe (writeCache parse+shape sonrası; catalog cache dosyası hiç oluşmamış) — sorun yalnız ölü URL",
+      "updated": "2026-08-10"
     },
     {
       "order": 1000,
@@ -12473,6 +12647,7 @@
         "WORKER-DISCOVERY-001",
         "RESULT-INGEST-001",
         "SKILL-DURABILITY-001",
+        "PLAN-SCOPE-PARSER-PHANTOM-001",
         "PROD-SPAWNSYNC-ASYNC-001",
         "PROD-SPRINT-PREFIX-PAD-001",
         "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
@@ -12535,6 +12710,7 @@
         "WORKER-DISCOVERY-001",
         "RESULT-INGEST-001",
         "SKILL-DURABILITY-001",
+        "PLAN-SCOPE-PARSER-PHANTOM-001",
         "PROD-SPAWNSYNC-ASYNC-001",
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "COMPOSITE-WORKER-001",
@@ -13728,6 +13904,9 @@
         "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
         "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
         "RECOVERY-LIVE-CONTINUATION-PROOF-001",
+        "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
+        "RECOVERY-BORN-507-FIX-SPAWN-001",
+        "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "gates": [
@@ -13790,6 +13969,9 @@
         "RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001",
         "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
         "RECOVERY-LIVE-CONTINUATION-PROOF-001",
+        "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
+        "RECOVERY-BORN-507-FIX-SPAWN-001",
+        "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "evidenceReceipts": [
@@ -15849,7 +16031,9 @@
         "RUN-STATUS-AUTHORITY-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "ARCHIVE-PATH-AUTHORITY-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -15866,7 +16050,8 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001"
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "ARCHIVE-PATH-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Cleanup never routes landing proposals, partial results or temp residue as executable Task records; terminal cleanup removes only the settled sprint's process-suffixed residue and preserves foreign-run evidence",
@@ -16270,7 +16455,8 @@
       "dependents": [],
       "children": [
         "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001",
-        "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001"
+        "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001",
+        "RUN-STATUS-LIVENESS-TRUTH-001"
       ],
       "gates": [
         "G1"
@@ -16292,7 +16478,8 @@
         "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
         "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
         "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001",
-        "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001"
+        "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001",
+        "RUN-STATUS-LIVENESS-TRUTH-001"
       ],
       "evidenceReceipts": [
         "GR-2026-08-01-LIFECYCLE-RECOVERY-01",
@@ -16412,8 +16599,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Controller tests use complete atomic-filesystem/provider-observation mocks and exact attempt attribution fixtures; pause/resume and finalizer assertions exercise current fail-closed authority without weakening production receipt or status publication",
-      "evidence": "Changed-test batch passed 14/15 files and 314 assertions, while 25 cases in `sprint-controller.test.ts` failed on missing `renameSync`, absent temp DB directories, attribution-less terminal fixtures and a stale `appendRetroSection` mock. The exact changed routing-HOLD assertion passes in isolation. Negative scope: do not restore ambient/synthetic DONE or make status publication fail-open to satisfy legacy mocks",
-      "updated": "2026-08-01"
+      "evidence": "Changed-test batch passed 14/15 files and 314 assertions, while 25 cases in `sprint-controller.test.ts` failed on missing `renameSync`, absent temp DB directories, attribution-less terminal fixtures and a stale `appendRetroSection` mock. The exact changed routing-HOLD assertion passes in isolation. Negative scope: do not restore ambient/synthetic DONE or make status publication fail-open to satisfy legacy mocks; 2026-08-10 GECE DOGFOOD (sprint-508-002, claude-opus-5): dürüst NO-OP DONE — ölçüm bayat, 25 kırık c917e3593 (FAZ4A-S3 gerçek-tmpdir dönüşümü, 95→0) ile zaten kapanmış; worker iki koşum 166/166 + tsc temiz raporladı, Brain bağımsız koşumla doğruladı (166/166); satır owner DONE-onay turunu bekler",
+      "updated": "2026-08-10"
     },
     {
       "order": 3298,
@@ -16798,6 +16985,68 @@
       "updated": "2026-08-05"
     },
     {
+      "order": 3308,
+      "id": "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Codex-provider attempt'leri landing-checkpoint continuation admission'ından geçebilir: cumulative-mode startup observation ile incremental-şartı tek doğru kontrata bağlanır",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Continuation admission (execution-continuation-runner assertContinuationStartupReserve) ile observation yazıcısının mode kontratı tek karara bağlanır: ya codex startup observation'ı semantik-doğru incremental delta olarak yazılır ya admission cumulative-first'ü doğru delta hesabıyla kabul eder; budget-truth semantiği (appliedDelta toplamları, turn sayımı) bayt-doğru korunur; regresyon testi her iki provider usage-semantiğini pinler; gerçek codex koşusu landing sonrası continuation'dan geçer",
+      "evidence": "Açılış 2026-08-10 gece dogfood (Alperen 'ekle' onayı): sprint-507'de her iki codex görevi attempt-1'de öldü — kanıt: attempt 417a381d ilk observation mode=cumulative countsAsTurn=true iken admission mode=incremental şart koşuyor (runner satır ~106, 'immutable incremental parent startup observation'); attempt-2'ler status'ta Writing-code görünürken heartbeat 00:41'de durdu, sonuçsuz vanish (E091 vanished-worker-settlement-pending ailesi); 507-002 codex logu usageSemantics mode=cumulative terminal=true kaydını gösteriyor; sprint-507 runner PID 55905 dahil tamamen öldü, recover ile finalize edildi",
+      "updated": "2026-08-10"
+    },
+    {
+      "order": 3309,
+      "id": "RECOVERY-BORN-507-FIX-SPAWN-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "NO_GO sonrası kuyruğa giren FIX task'ı gerçek worker olarak spawn edilir veya spawn edilemiyorsa typed neden yayınlanır — sessiz boş-döngü imkânsızlaşır",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "NO_GO'lu task için FIX kararı (retry/revise) admission uygunsa gözlemlenebilir worker doğumuyla sonuçlanır (hb + pid + log); spawn engellendiyse typed engel kaydı scheduler journal'a düşer; regresyon testi kuyruk-ama-spawn-yok durumunu pinler",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-507'de 507-002-fix Queued görünürken scheduler-shadow 00:38→00:43 arası 92 kayıt boyunca spawnedTaskIds bos kaldı, fix worker'ın hb/pid/log'u hiç oluşmadı; olası bağlantı PR-116 FIX-karar dilimleri (classifyFixFailure/buildReplanProposal) — Alperen: o gün FIX-faz başlangıcında çalışma yapılmıştı",
+      "updated": "2026-08-11"
+    },
+    {
       "order": 3310,
       "id": "SKILL-DURABILITY-001",
       "parent": "KERNEL-001",
@@ -16829,6 +17078,130 @@
       "acceptance": "PLAN fazında üretilen skill, FIX/XFIX lineage'ı boyunca worker prompt'una aynı içerikle ulaşır; `FORCED_SKILL_UNAVAILABLE` sınıfı hata fail-closed yakalanır ve regresyon testi taşır",
       "evidence": "PAZARTESI FAZ-4a maddesinin transkripsiyonu (owner-kayıtlı, 2026-08-01 Codex denetimi): sprint-491 vakalarında PLAN'da üretilen skill FIX'lerde kayboldu ve `FORCED_SKILL_UNAVAILABLE` üretti; crosswalk turunda satırı olmayan tek 4a maddesi buydu — diğer beşi RESULT-RECONCILIATION-001, RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001, RECOVERY-BORN-485/488-FIX-AUTHORITY/REPAIR-CAPABILITY-001, RECOVERY-BORN-488-STATUS-PROJECTION-001 ve RECOVERY-BORN-488-CONTINUOUS-REFILL-001 ile kapsanıyor",
       "updated": "2026-08-03"
+    },
+    {
+      "order": 3311,
+      "id": "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Sprint runner'ı hiçbir ölüm yolunda kayıtsız ölemez: fatal handler + runner-liveness kanıtı her kesintiyi typed crash/exit kaydına bağlar",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Runner'ın her çıkışı (normal terminal, hata, sinyal, OOM-sonrası yeniden bakış) typed kayıt üretir; kayıtsız kesinti regresyon testiyle imkânsız pinlenir; ölü runner'ın pid dosyası ve read-model'i bir sonraki CLI komutunda dürüst raporlanır",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-507 runner PID 55905 scheduler-shadow seq-92 kaydından (00:43:21.595Z) sonra günlük ortasında kesildi, .deckent/crashes'e hiçbir kayıt düşmedi; aynı gece status read-model HOLD'a düştü (RUN_STATUS_READ_MODEL_UNAVAILABLE) ve cleanup run-orphaned HOLD verdi — zincir recover ile elle kapatıldı",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 3312,
+      "id": "PLAN-SCOPE-PARSER-PHANTOM-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "DIRECTIVES scope zinciri phantom üretemez ve yetkiyi sessizce daraltamaz: tek sanitize authority, çok-noktalı/kök dosya desteği, render plan-time sonucunu yeniden daraltamaz",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Files/Scope/prose'daki çok-noktalı ve kök dosya adları (README.tr.md, tests/PLATFORM.md, .dockerignore, Dockerfile) phantom token üretmeden ve sessiz düşmeden yazma yetkisine ulaşır; plan-time'da korunmuş bir filesWrite girdisi render/prompt aşamasında kaybolamaz (tek-sanitize kontratı); Scope satırı dosyayı dizine çevirmez; bare-name discoverability false-BLOCK üretmez; her vaka regresyon-pinli",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı), beş kanıtlı vaka: (a) task-builder docFile regex kuyruk-token — README.tr.md'den tr.md phantom'ı, gate BLOCK; (b) tests/PLATFORM.md nitelikli yazımda bile render'da phantom BLOCK; (c) Scope-satırı her girdiye '/' ekleyip file-as-directory phantom'ı üretiyor (task-507-004 scope.directories kanıtı); (d) render-time yeniden-sanitize plan-time trackedRootFiles korumasını bilmiyor — 507-002'de .dockerignore filesWrite'ta VARKEN worker'ın canonical görünümünden sessizce düştü, dürüst NO_GO'ya yol açtı; (e) prose'daki bare sprint-controller.test.ts mention'ı test-discoverability false-BLOCK üretti",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 3313,
+      "id": "RUN-STATUS-LIVENESS-TRUTH-001",
+      "parent": "RECOVERY-BORN-488-STATUS-PROJECTION-001",
+      "program": "OBS",
+      "outcome": "Status yüzeyi liveness-kanıtsız satırı aktif gösteremez: taze heartbeat/pid kanıtı olmayan worker satırı typed stale/unproven işaretlenir",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "deckent status bir worker'ı ancak taze hb (yaş eşiği config-resolved) + doğrulanabilir process kanıtıyla aktif gösterir; kanıt bayatsa satır typed stale görünür ve öneri (recover/inspect) basılır; Writing-code-iken-ölü senaryosu regresyon testiyle pinlenir",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-507'de 00:44+ status çıktısı 507-001/003'ü Writing code [codex] gösterdi; disk gerçeği son hb 00:41:37, worker processleri ve runner (PID 55905) ölüydü — projection kurgusu asistan raporuna taşındı ve owner tarafından yakalandı (core-memory kanun-15'in doğuş vakası)",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 3314,
+      "id": "ARCHIVE-PATH-AUTHORITY-001",
+      "parent": "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
+      "program": "KERNEL",
+      "outcome": "Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Tüm yollar (normal settlement, force-abort, recover, cleanup) aynı kanonik arşiv konumuna yazar; hiçbir yol .tasks kökünde kalıntı bırakmaz; konum ve retention effective config'ten çözülür; split-arşiv regresyon testiyle pinlenir",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-508 settlement'ı sonuçları .brain/archive/sprints/sprint-508-tasks/'a taşıdı ama .tasks/archive/sprint-508/ altına yalnız worker script'leri düştü; sprint-507 recover'ı 6 dosyayı .tasks/archive/sprint-507/'ye arşivleyip 9 dosyayı .tasks kökünde bıraktı; 15 kalıntı owner talimatıyla elle .brain/archive/sprints/sprint-507-tasks/'a taşındı",
+      "updated": "2026-08-11"
     },
     {
       "order": 3315,
@@ -22777,6 +23150,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "75c30ed3062bdd8b81ddd0025e92dc231bd77cba0fa546b8cf0275d8c6db182a"
+    "value": "de5cd20ade37db39e97092e41a956a6fd62fa43d4bdf44364150340e84001e2c"
   }
 }

@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):5d6a80d79462a7f48cde0d46a928541548a062f826f07d54478a190e74e30716`
+**Source digest:** `sha256(normalized-lf-utf8):2e35f8aa88680beea99f01c162b158fa99e2e98e8fdf9800057de5cc1df8944c`
 
-**Rows:** 430 total · 383 active · 47 terminal
+**Rows:** 438 total · 391 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 290 |
+| OPEN | 298 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -86,6 +86,8 @@
 | 526 | `TRUST-ANCHOR-003` | OPEN | P1 | TRUTH | — | — | Solo-hesap yapısal mitigasyon paketi: out-of-repo canonical check (GitHub App ayrı integration-ID), bot machine-account + path-scoped required-reviewer, nightly ruleset-snapshot dış defteri, GHEC-trial değerlendirmesi |
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
+| 538 | `CI-NIGHTLY-GREEN-001` | OPEN | P1 | TRUTH | — | — | Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder |
+| 539 | `MODEL-CATALOG-ENDPOINT-001` | OPEN | P2 | TRUTH | — | — | models.dev catalog endpoint'i taşındı (api/v1/catalog 302 ile HTML ana sayfaya düşüyor): CATALOG_URL güncellenir, redirect-to-HTML typed catalog-fetch hatasına çevrilir, remote-refresh gerçek JSON kaynağına döner |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -266,7 +268,13 @@
 | 3305 | `LIFECYCLE-VOCAB-001` | OPEN | P1 | KERNEL | — | — | Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir |
 | 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |
 | 3307 | `RECOVERY-LIVE-CONTINUATION-PROOF-001` | OPEN | P2 | KERNEL | — | — | Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı |
+| 3308 | `RECOVERY-BORN-507-CODEX-CONTINUATION-001` | OPEN | P0 | KERNEL | — | — | Codex-provider attempt'leri landing-checkpoint continuation admission'ından geçebilir: cumulative-mode startup observation ile incremental-şartı tek doğru kontrata bağlanır |
+| 3309 | `RECOVERY-BORN-507-FIX-SPAWN-001` | OPEN | P0 | KERNEL | — | — | NO_GO sonrası kuyruğa giren FIX task'ı gerçek worker olarak spawn edilir veya spawn edilemiyorsa typed neden yayınlanır — sessiz boş-döngü imkânsızlaşır |
 | 3310 | `SKILL-DURABILITY-001` | OPEN | P0 | KERNEL | — | — | PLAN'da üretilen skill FIX turlarında kaybolmaz: generated-skill durability |
+| 3311 | `RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001` | OPEN | P0 | KERNEL | — | — | Sprint runner'ı hiçbir ölüm yolunda kayıtsız ölemez: fatal handler + runner-liveness kanıtı her kesintiyi typed crash/exit kaydına bağlar |
+| 3312 | `PLAN-SCOPE-PARSER-PHANTOM-001` | OPEN | P0 | KERNEL | — | — | DIRECTIVES scope zinciri phantom üretemez ve yetkiyi sessizce daraltamaz: tek sanitize authority, çok-noktalı/kök dosya desteği, render plan-time sonucunu yeniden daraltamaz |
+| 3313 | `RUN-STATUS-LIVENESS-TRUTH-001` | OPEN | P1 | OBS | — | — | Status yüzeyi liveness-kanıtsız satırı aktif gösteremez: taze heartbeat/pid kanıtı olmayan worker satırı typed stale/unproven işaretlenir |
+| 3314 | `ARCHIVE-PATH-AUTHORITY-001` | OPEN | P1 | KERNEL | — | — | Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı |
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |

@@ -10,6 +10,8 @@ README.md
 .DS_Store
 .tasks
 .locks
+.deck
+.deck.*
 .deckent
 dist
 .brain

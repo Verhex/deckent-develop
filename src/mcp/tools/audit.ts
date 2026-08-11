@@ -30,7 +30,11 @@ export function registerAuditTool(server: McpServer): void {
     {
       title: 'Sprint Audit',
       description: 'Sprint audit multitool, mirrors the `deckent audit` CLI (ADR-022 parity). action="gate" (default): run the Brain Self-Audit Gate for a sprint — checks tsc, vitest, honesty violations, and observability; returns PASS or GATE_FAILURE and writes .deckent/{sprintId}-gate.json. action="query": filter audit-log events by channel/tenant with an optional result limit. action="compliance": build a compliance report (audit-chain integrity, RBAC, tenant isolation) over the retained audit trail. action="retention": plan audit-log retention via keepDays/keepCount — dry-run by default (ZERO writes); apply=true is DESTRUCTIVE: it archives the planned partition and permanently deletes pruned events from the sprint event stream. The CLI "forward" subcommand (SIEM export) is intentionally not exposed over MCP because it requires network egress.',
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+      // Widest-side-effect contract (row 490): action="gate" writes
+      // .deckent/{sprintId}-gate.json and action="retention" apply=true permanently
+      // prunes audit events — this tool is destructive, never read-only. MCP clients
+      // skip approval prompts on readOnlyHint, so understating it is a security defect.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
         sprintId: z.string().optional().describe('Sprint ID (e.g. "sprint-150"). Required for action="gate"; defaults to "sprint-001" for query/compliance/retention (CLI --sprint parity).'),
         action: z.enum(AUDIT_ACTIONS as [AuditAction, ...AuditAction[]]).optional().default('gate').describe('Audit subcommand: gate (default, back-compatible) | query | compliance | retention.'),

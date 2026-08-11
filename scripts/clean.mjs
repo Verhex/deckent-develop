@@ -51,7 +51,38 @@ import { fileURLToPath } from 'node:url';
 const SOURCE_FILE = realpathSync.native(fileURLToPath(import.meta.url));
 const SOURCE_ROOT = resolve(dirname(SOURCE_FILE), '..');
 const SOURCE_ROOT_IDENTITY = lstatSync(SOURCE_ROOT, { bigint: true });
-const PRESERVE = new Set(['dashboard']);
+
+/**
+ * The single typed decision for the built dashboard bundle, defined here and
+ * consumed by `scripts/build-dashboard.mjs` — neither script keeps a private
+ * copy. It used to be split in two contradictory halves: this script preserved
+ * `dist/dashboard`, while the build demanded an empty output directory and died
+ * with E_DASHBOARD_BUILD_OUTPUT_NOT_EMPTY straight after a clean, so the only
+ * way through was a manual `rm -rf dist/dashboard`.
+ *
+ * Decision: `preserve-then-overwrite`. Preserve wins because it closes the
+ * user-visible footgun described at the top of this file, and the build — the
+ * sole producer of the directory — reclaims its own stale bundle instead of
+ * demanding a clean slate. Reclaim authority is bound to the entries named
+ * here: an output directory this policy does not cover is not the build's to
+ * clear. This script owns the decision because it must stay runnable as a
+ * single copied file, with no sibling import.
+ *
+ * @typedef {Object} DashboardOutputPolicy
+ * @property {number} schemaVersion
+ * @property {'preserve-then-overwrite' | 'clean-slate'} mode
+ * @property {string} outputRelativePath repo-relative build output directory
+ * @property {readonly string[]} preservedDistEntries `dist/` entries kept here
+ */
+/** @type {DashboardOutputPolicy} */
+export const DASHBOARD_OUTPUT_POLICY = Object.freeze({
+  schemaVersion: 1,
+  mode: 'preserve-then-overwrite',
+  outputRelativePath: join('dist', 'dashboard'),
+  preservedDistEntries: Object.freeze(['dashboard']),
+});
+
+const PRESERVE = new Set(DASHBOARD_OUTPUT_POLICY.preservedDistEntries);
 const loadModule = createRequire(SOURCE_FILE);
 
 const ACTIVE_TASK_STATUSES = new Set([

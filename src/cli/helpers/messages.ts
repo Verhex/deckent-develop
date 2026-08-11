@@ -684,8 +684,12 @@ const MESSAGES: MessageMap = {
     tr: 'Hakeme kanıt bağlamı olarak `git diff HEAD` çıktısını ekle',
   },
   'xverify.opt_files': {
-    en: 'Comma-separated list of files the claim says were changed',
-    tr: 'İddianın değiştirildiğini söylediği dosyaların virgülle ayrılmış listesi',
+    en: 'Comma-separated list of files the claim says were changed — when --diff is also passed, scopes the attached diff to exactly these paths',
+    tr: 'İddianın değiştirildiğini söylediği dosyaların virgülle ayrılmış listesi — --diff de verilirse, eklenen diff tam olarak bu dosyalarla sınırlanır',
+  },
+  'xverify.opt_target': {
+    en: 'Comma-separated bounded targets `path:START-END` (1-based inclusive line range) or `path:symbolName` — extracts an exact excerpt so a large file never needs manual prompt surgery',
+    tr: 'Virgülle ayrılmış sınırlı hedefler `path:START-END` (1-tabanlı kapsayıcı satır aralığı) veya `path:symbolName` — büyük bir dosyanın elle prompt cerrahisi gerektirmemesi için tam bir kesit çıkarır',
   },
   'xverify.opt_timeout': {
     en: 'Verifier timeout in milliseconds (default: 300000)',
@@ -706,6 +710,22 @@ const MESSAGES: MessageMap = {
   'xverify.err.self_verify': {
     en: 'Verifier must differ from --author ("{provider}") — self-verification defeats the purpose of an independent second opinion.',
     tr: 'Hakem --author ("{provider}") ile aynı olamaz — öz-doğrulama bağımsız ikinci görüşün amacını boşa çıkarır.',
+  },
+  'xverify.err.target_invalid_spec': {
+    en: 'Malformed --target entry "{spec}" — expected path:START-END (1-based inclusive line range) or path:symbolName.',
+    tr: 'Bozuk --target girişi "{spec}" — path:START-END (1-tabanlı kapsayıcı satır aralığı) veya path:symbolName bekleniyordu.',
+  },
+  'xverify.err.target_file_not_found': {
+    en: 'Target file not found: "{path}" — check the path is project-relative and exists.',
+    tr: 'Hedef dosya bulunamadı: "{path}" — yolun proje-relative olduğundan ve var olduğundan emin olun.',
+  },
+  'xverify.err.target_range_invalid': {
+    en: 'Target range invalid for "{path}": {start}-{end} (file has {total} lines). Ranges are 1-based and inclusive.',
+    tr: '"{path}" için hedef aralık geçersiz: {start}-{end} (dosyada {total} satır var). Aralıklar 1-tabanlı ve kapsayıcıdır.',
+  },
+  'xverify.err.target_symbol_not_found': {
+    en: 'Symbol "{symbol}" not found in "{path}" — pass an exact identifier that appears verbatim in the file, or use a path:START-END line range instead.',
+    tr: '"{path}" içinde "{symbol}" sembolü bulunamadı — dosyada aynen geçen tam bir tanımlayıcı verin veya yerine path:START-END satır aralığı kullanın.',
   },
   'xverify.dispatching': {
     en: 'Dispatching adversarial verifier (author: {author}, priority: {priority})…',
@@ -740,6 +760,10 @@ const MESSAGES: MessageMap = {
   'xverify.report.no_verdict': {
     en: '— (no verdict — verifier produced no output)',
     tr: '— (karar yok — hakem çıktı üretmedi)',
+  },
+  'xverify.remedy.no_evidence': {
+    en: 'No bounded evidence attached to this claim — pass --files <path[,path...]>, --diff, and/or --target <path:START-END|path:symbol> so the verifier has something concrete to check; an unevidenced claim is unlikely to produce a confident verdict.',
+    tr: 'Bu iddiaya sınırlı kanıt eklenmedi — hakemin kontrol edebileceği somut bir şey olması için --files <path[,path...]>, --diff ve/veya --target <path:START-END|path:symbol> verin; kanıtsız bir iddia kararlı bir karar üretme olasılığı düşüktür.',
   },
   // Worker-facing prompt fragments (deliberately EN-only content, keyed for
   // single-source maintenance — the VERIFIER reads these, not the operator).
@@ -780,8 +804,8 @@ const MESSAGES: MessageMap = {
     tr: 'Sınırlı host-side git diff bağlamını kaydet; v2 kanıtı broker yönetir',
   },
   'xverify.mcp.files': {
-    en: 'Comma-separated exact project-relative evidence files',
-    tr: 'Virgülle ayrılmış exact proje-relative kanıt dosyaları',
+    en: 'Comma-separated exact project-relative evidence files — scopes the diff evidence to exactly these paths when diff is also requested',
+    tr: 'Virgülle ayrılmış exact proje-relative kanıt dosyaları — diff de istenirse, diff kanıtı tam olarak bu dosyalarla sınırlanır',
   },
   'xverify.mcp.timeout': {
     en: 'Verifier timeout in milliseconds (default 300000)',

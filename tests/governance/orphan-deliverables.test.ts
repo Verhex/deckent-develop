@@ -492,6 +492,11 @@ const KNOWN_ORPHANS = [
   'src/core/notification-config.ts',
   'src/core/notification-providers/discord.ts',
   'src/core/notification-providers/slack.ts',
+  // OPERATION-001 O1 (2026-08-07): the canonical operation catalog landed with
+  // resolveOperation deliberately unconsumed — the O3 audit pins mediated=0 as
+  // the honest gap. Orphan by design until the ingress-wiring successor slice
+  // consumes it; recorded in MASTER 538 (CI-NIGHTLY-GREEN-001) evidence.
+  'src/core/operation-catalog/index.ts',
   // `src/core/provider-authority-composition.ts` and
   // `src/providers/claude-provider-evidence-sources.ts` closed on 2026-07-25:
   // provider-authority-runtime-bootstrap.ts constructs both, and Goal-v2
@@ -548,7 +553,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(91); // 531 süpürme (2026-08-06): +8 yeni orphan (yukarıdaki tarihli blok)
+    expect(KNOWN_ORPHANS.length).toBe(92); // 538 (2026-08-10): +1 operation-catalog/index.ts (O1 bilinçli-unwired, tarihli blok yukarıda)
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

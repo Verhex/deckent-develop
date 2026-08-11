@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
+import { createRequire } from 'node:module';
+
+// Row 450: checkNode derives its floor from the manifest engines.node at
+// runtime, so the "passing" fixture must track the same source dynamically —
+// a literal here would re-create the exact duplicated-floor drift the row
+// closes. node:module is not mocked below, so this read stays real.
+const enginesNode = (createRequire(import.meta.url)('../../../package.json') as {
+  engines: { node: string };
+}).engines.node;
+const PASSING_NODE_VERSION = `v${parseInt(enginesNode.match(/(\d+)/)?.[1] ?? '0', 10)}.0.0`;
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -172,7 +182,7 @@ describe('registerDoctor', () => {
     process.exitCode = undefined;
     // Default: all tools found, workspace exists, linux platform
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     mockMemoryStore.totalCount.mockReturnValue(50);
@@ -263,7 +273,7 @@ describe('runDoctorChecks', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     mockMemoryStore.totalCount.mockReturnValue(50);
@@ -279,7 +289,7 @@ describe('runDoctorChecks', () => {
 
   it('includes node check in results', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
-      if (cmd === 'node') return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      if (cmd === 'node') return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
       return makeSpawnResult(0, '') as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
@@ -291,7 +301,7 @@ describe('runDoctorChecks', () => {
   it('includes git check in results', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'git') return makeSpawnResult(0, 'git version 2.40.0') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
     const gitCheck = result.checks.find(c => c.name === 'git');
@@ -302,7 +312,7 @@ describe('runDoctorChecks', () => {
   it('includes tmux check in results', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'tmux') return makeSpawnResult(0, 'tmux 3.3') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
     const tmuxCheck = result.checks.find(c => c.name === 'tmux');
@@ -313,7 +323,7 @@ describe('runDoctorChecks', () => {
   it('includes claude check in results', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'claude') return makeSpawnResult(0, '1.2.3') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
     const claudeCheck = result.checks.find(c => c.name === 'Claude CLI');
@@ -322,7 +332,7 @@ describe('runDoctorChecks', () => {
   });
 
   it('marks ok=true when all required checks pass', () => {
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     const result = runDoctorChecks('/mock/root');
     expect(result.ok).toBe(true);
   });
@@ -330,7 +340,7 @@ describe('runDoctorChecks', () => {
   it('marks ok=false when a required check fails (node not found)', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'node') return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
     expect(result.ok).toBe(false);
@@ -339,7 +349,7 @@ describe('runDoctorChecks', () => {
   it('marks ok=false when tmux is missing', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'tmux') return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
     expect(result.ok).toBe(false);
@@ -348,7 +358,7 @@ describe('runDoctorChecks', () => {
   it('marks ok=false when git is missing', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'git') return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
     expect(result.ok).toBe(false);
@@ -357,7 +367,7 @@ describe('runDoctorChecks', () => {
   it('marks node check failed for Node <18', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'node') return makeSpawnResult(0, 'v16.0.0') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
     const nodeCheck = result.checks.find(c => c.name === 'Node.js');
@@ -367,7 +377,7 @@ describe('runDoctorChecks', () => {
 
   it('non-required checks do not affect ok', () => {
     // All tools pass, workspace missing (non-required)
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(false); // workspace/brain missing
     vi.mocked(readFileSync).mockImplementation(() => { throw new Error('no file'); });
     const result = runDoctorChecks('/mock/root');
@@ -389,7 +399,7 @@ describe('formatDoctorResult (output.ts helper)', () => {
   });
 
   it('doctor result checks have name, passed, message, required fields', () => {
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue('content' as unknown as ReturnType<typeof readFileSync>);
@@ -406,7 +416,7 @@ describe('formatDoctorResult (output.ts helper)', () => {
   it('failed check has passed=false and descriptive message', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'tmux') return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
@@ -421,7 +431,7 @@ describe('formatDoctorResult (output.ts helper)', () => {
   it('passed check has passed=true and version info in message', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'git') return makeSpawnResult(0, 'git version 2.40.1') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
@@ -493,7 +503,7 @@ describe('--profile flag', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     mockMemoryStore.totalCount.mockReturnValue(50);
@@ -570,7 +580,7 @@ describe('error handling', () => {
   it('claude not found — check returns passed=false', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'claude') return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     const result = runDoctorChecks('/mock/root');
     const check = result.checks.find(c => c.name === 'Claude CLI');
@@ -579,7 +589,7 @@ describe('error handling', () => {
   });
 
   it('workspace missing — check returns passed=false with hint message', () => {
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockImplementation((p: string) => {
       if (String(p).includes('.deckent')) return false;
       return true;
@@ -591,7 +601,7 @@ describe('error handling', () => {
   });
 
   it('stale lock detected — locks check returns passed=false', () => {
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     const staleTime = new Date(Date.now() - 600000).toISOString(); // 10 min ago
     vi.mocked(readdirSync).mockReturnValue(['task-001.lock'] as unknown as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockImplementation((p: string) => {
@@ -607,7 +617,7 @@ describe('error handling', () => {
   });
 
   it('brain budget over 900 — check passes=false with decay hint', () => {
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     mockMemoryStore.totalCount.mockReturnValue(950);
     const result = runDoctorChecks('/mock/root');
     const check = result.checks.find(c => c.name === 'Brain Budget');
@@ -636,14 +646,14 @@ describe('exit code', () => {
   it('sets process.exitCode=1 when a required check fails', async () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'tmux') return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
-      return makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>;
     });
     await runCommand(['doctor']);
     expect(process.exitCode).toBe(1);
   });
 
   it('does NOT set process.exitCode=1 when all required checks pass', async () => {
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     await runCommand(['doctor']);
     expect(process.exitCode).toBeUndefined();
   });
@@ -656,7 +666,7 @@ describe('i18n integration', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     mockMemoryStore.totalCount.mockReturnValue(50);
@@ -800,7 +810,7 @@ describe('checkPlatform', () => {
 
   it('native Windows platform check does not affect ok (non-required)', () => {
     vi.mocked(platform).mockReturnValue('win32' as NodeJS.Platform);
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     mockMemoryStore.totalCount.mockReturnValue(50);
@@ -2272,7 +2282,7 @@ describe('runDoctorChecks - includes new checks', () => {
   it('passes providerNames to checkTmux — tmux not required for non-claude', () => {
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'tmux') return { status: 1, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>;
-      return { status: 0, stdout: 'v22.0.0', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>;
+      return { status: 0, stdout: PASSING_NODE_VERSION, stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>;
     });
     // Pass only codex providers → tmux not required
     const result = runDoctorChecks('/mock/root', ['codex']);
