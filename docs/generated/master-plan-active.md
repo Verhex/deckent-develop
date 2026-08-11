@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):a5a1bb1e98ec6cb7df5d2616338d318e5eccdb920f3244daee6370e9299cfd42`
+**Source digest:** `sha256(normalized-lf-utf8):f4e84136804281fc5f7c0b1004a793aba5d4013a411be5968ea42994f8edc3ab`
 
-**Rows:** 469 total · 422 active · 47 terminal
+**Rows:** 469 total · 409 active · 60 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 329 |
+| OPEN | 316 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
 | VERIFY | 25 |
-| DONE | 47 |
+| DONE | 60 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -33,9 +33,7 @@
 | 70 | `TEST-HERMETIC-001` | OPEN | P0 | TRUTH | `TEST-675` | — | Project root, HOME, `.tasks` ve tracked-file test writer discovery/migration |
 | 75 | `TEST-CONTAINMENT-001` | VERIFY | P0 | TRUTH | `TEST-675` | — | Process-birth, descendant ownership ve OS/OCI test containment authority foundation'ı |
 | 80 | `TEST-SPAWN-001` | OPEN | P1 | TRUTH | `TEST-HERMETIC-001` | — | Test `spawnSync` policy ve async migration |
-| 90 | `TEST-PLATFORM-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | `tests/PLATFORM.md` ve enforcement'ı source-derived platform registry'ye bağla |
 | 100 | `REPO-DECK-001` | OPEN | P0 | TRUTH | — | — | `.deck` secret'ını Docker context ve image layers'dan dışla |
-| 110 | `HEARTBEAT-001` | OPEN | P1 | TRUTH | — | — | Default heartbeat template ile metachar guard çelişkisini gider |
 | 120 | `STATE-RETENTION-001` | OPEN | P1 | TRUTH | `SSOT-002` | — | Runtime state/log retention, rotation, legal hold ve crash recovery contract |
 | 121 | `CRASH-FORENSICS-AUTHORITY-001` | OPEN | P1 | TRUTH | — | — | Crash artifact schema, privacy, collision-free retention, typed classification ve support/recovery consumption authority |
 | 122 | `NERVOUS-STATE-LIFECYCLE-001` | OPEN | P1 | TRUTH | `AUDIT-001`, `APPROVAL-001` | — | Nervous durable state, proposal, history ve IPC artefaktları için tenant-aware lifecycle, privacy ve recovery authority |
@@ -66,7 +64,6 @@
 | 310 | `ERROR-SEVERITY-001` | OPEN | P2 | TRUTH | `STATE-RETENTION-001` | — | Operational breadcrumb and error forensic severity truth |
 | 320 | `OPS-BRANCH-001` | OPEN | P1 | TRUTH | `SSOT-001` | — | Branch, worktree, remote and unpushed-commit authority inventory |
 | 330 | `OPS-RETIRE-001` | BLOCKED | P2 | TRUTH | `OPS-BRANCH-001` | `FRESH_REMOTE_APPROVAL_REQUIRED` | Approved branch and remote retirement |
-| 340 | `XVERIFY-UX-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Xverify optional evidence, bounded path/range/symbol targeting and actionable preflight |
 | 350 | `XVERIFY-TRUTH-001` | BLOCKED | P0 | TRUTH | `EVALUATION-001`, `RECEIPT-001` | `DEPENDENCY_UNSATISFIED` | Dispatch rejection, verifier abstention and semantic `UNCLEAR` remain distinct |
 | 370 | `DOC-IMPACT-001` | BLOCKED | P1 | TRUTH | `KERNEL-SETTLEMENT-001`, `DOCS-RELEASE-TRUTH-001` | `DEPENDENCY_UNSATISFIED` | Finalization surfaces Worker `docImpact` as governed follow-up |
 | 380 | `DEBT-GOVERNANCE-001` | BLOCKED | P0 | TRUTH | `SSOT-003`, `KERNEL-SETTLEMENT-001` | `DEPENDENCY_UNSATISFIED` | Technical/product/operational debt ingestion, ownership and closure authority |
@@ -75,7 +72,6 @@
 | 420 | `GIT-MAINT-REPORT-001` | BLOCKED | P2 | OPS | `OPS-BRANCH-001` | `DEPENDENCY_UNSATISFIED` | Read-only git object and pack health report |
 | 430 | `GIT-MAINT-APPLY-001` | BLOCKED | P2 | OPS | `GIT-MAINT-REPORT-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Approved local repository maintenance and repack |
 | 440 | `EXEC-TEMPO-001` | OPEN | P1 | OPS | — | — | Config-resolved high-parallelism execution tempo with batch-receipt owner approvals |
-| 450 | `RUNTIME-FLOOR-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Tek runtime minimum sürüm contractı: package engines, doctor, onboarding ve release gate aynı floor'u ilan ve test eder |
 | 460 | `ERROR-REGISTRY-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Emitted her typed error kodu tek registry'de message ve remediation ile kayıtlı; kullanıcıya görünen doküman aynı kaynaktan üretilir |
 | 470 | `CONFIG-TRUTH-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Config leaf metadata ve default üretimi tek canonical kaynaktan; manifest backend default'u aynı kaynağı tüketir |
 | 471 | `CONFIG-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `KERNEL-STATE-001` | — | Authored/effective config, secret resolution ve concurrent mutation için tek versioned authority |
@@ -91,7 +87,6 @@
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
 | 538 | `CI-NIGHTLY-GREEN-001` | OPEN | P1 | TRUTH | — | — | Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder |
-| 539 | `MODEL-CATALOG-ENDPOINT-001` | OPEN | P2 | TRUTH | — | — | models.dev catalog endpoint'i taşındı (api/v1/catalog 302 ile HTML ana sayfaya düşüyor): CATALOG_URL güncellenir, redirect-to-HTML typed catalog-fetch hatasına çevrilir, remote-refresh gerçek JSON kaynağına döner |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -264,7 +259,6 @@
 | 3291 | `RECOVERY-BORN-488-STATUS-PROJECTION-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001`, `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`, `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001` | — | Every surface and metric projects one persisted logical run read model |
 | 3295 | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001` | OPEN | P0 | KERNEL | `SCHEDULER-001` | — | Successful lineage settlement cancels every not-yet-started redundant repair descendant |
 | 3296 | `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | OPEN | P1 | KERNEL | `PROVIDER-HOLD-001`, `RUN-STATUS-AUTHORITY-001` | — | Terminal retirement closes or scopes historical provider execution intervals |
-| 3297 | `RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001` | OPEN | P1 | ASSURANCE | `RESULT-RECONCILIATION-001`, `RUN-STATUS-AUTHORITY-001` | — | Legacy monolithic controller fixtures satisfy fail-closed terminal and atomic status contracts |
 | 3298 | `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | OPEN | P1 | OBS | `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-490-TERMINALIZATION-EVENTS-001` | — | Human sprint log projects receipt-backed terminal COMPLETE and ABORTED truth exactly once |
 | 3299 | `RECOVERY-BORN-490-REPLAY-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001`, `RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Recovery replay ladder certifies isolated failure classes before publish planning resumes |
 | 3300 | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Settled source is built once and source/dist identity is proven before binary replay |
@@ -275,17 +269,10 @@
 | 3305 | `LIFECYCLE-VOCAB-001` | OPEN | P1 | KERNEL | — | — | Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir |
 | 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |
 | 3307 | `RECOVERY-LIVE-CONTINUATION-PROOF-001` | OPEN | P2 | KERNEL | — | — | Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı |
-| 3308 | `RECOVERY-BORN-507-CODEX-CONTINUATION-001` | OPEN | P0 | KERNEL | — | — | Codex-provider attempt'leri landing-checkpoint continuation admission'ından geçebilir: cumulative-mode startup observation ile incremental-şartı tek doğru kontrata bağlanır |
-| 3309 | `RECOVERY-BORN-507-FIX-SPAWN-001` | OPEN | P0 | KERNEL | — | — | NO_GO sonrası kuyruğa giren FIX task'ı gerçek worker olarak spawn edilir veya spawn edilemiyorsa typed neden yayınlanır — sessiz boş-döngü imkânsızlaşır |
-| 3310 | `SKILL-DURABILITY-001` | OPEN | P0 | KERNEL | — | — | PLAN'da üretilen skill FIX turlarında kaybolmaz: generated-skill durability |
-| 3311 | `RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001` | OPEN | P0 | KERNEL | — | — | Sprint runner'ı hiçbir ölüm yolunda kayıtsız ölemez: fatal handler + runner-liveness kanıtı her kesintiyi typed crash/exit kaydına bağlar |
-| 3312 | `PLAN-SCOPE-PARSER-PHANTOM-001` | OPEN | P0 | KERNEL | — | — | DIRECTIVES scope zinciri phantom üretemez ve yetkiyi sessizce daraltamaz: tek sanitize authority, çok-noktalı/kök dosya desteği, render plan-time sonucunu yeniden daraltamaz |
-| 3313 | `RUN-STATUS-LIVENESS-TRUTH-001` | OPEN | P1 | OBS | — | — | Status yüzeyi liveness-kanıtsız satırı aktif gösteremez: taze heartbeat/pid kanıtı olmayan worker satırı typed stale/unproven işaretlenir |
 | 3314 | `ARCHIVE-PATH-AUTHORITY-001` | OPEN | P1 | KERNEL | — | — | Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı |
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3316 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | OPEN | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001` | — | Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
-| 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
