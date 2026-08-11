@@ -525,3 +525,17 @@ Link lint (task test condition):
 ```
 node scripts/lint-links.mjs      # exit 0
 ```
+
+---
+
+## OWNER DECISIONS — 2026-08-11 (Alperen)
+
+- **D1 KABUL:** L1 > L2 > L0, alan-seviyesi L2 istisnası runtime-türevi alanlarla sınırlı (davranış değişikliği onaylandı).
+- **D2 KABUL:** required-on-write, defaulted-on-read, unknown-future = typed `invalid`.
+- **D3 KABUL.**
+- **D4:** capabilities YOKSA kesin non-routable (personasız agent anlamsız). System-prompt bozuksa non-routable — AÇIK SORU: bozukluğu makine tespit edebilir mi? (tasarım sorusu, S-dilimine taşınır). `preferredModel` çözülemiyorsa ENGELLEMEZ — herhangi bir model personaya bürünebilir.
+- **D4-EK (yeni analiz konusu):** iş-bazında agent-personasını system-prompt olarak enjekte etmek — `claude -p --append-system-prompt` benzeri komutlarla deckent-agent spawn'ı; yalnız Anthropic değil, api+subscription en popüler ~20 provider çerçevesinde tartışılıp analiz edilecek (B11 görevi).
+- **D5 KABUL.**
+- **D6:** read-only catalog view eklenir.
+- **D7:** **deckent-hub** canlı yapı — beğenilen ve OWNER-ONAYINDAN geçen agent'lar promote edilir; hiçbir otonomluk yok, olmayacak.
+- **D8:** PROMPT.md formatı sorgulanacak — skill için SKILL.md klasik/şema; agent-persona tarafı D4-EK'teki injection tasarımıyla birlikte yeniden biçimlenebilir.

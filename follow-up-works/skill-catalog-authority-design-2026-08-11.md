@@ -336,3 +336,18 @@ All anchors observed 2026-08-11 in the working tree; line numbers are for that s
 - MASTER rows: `docs/MASTER-PLAN.md:1114` (7012), `:1115` (7013), `:1132` (7120), `:1133` (7121), `:1147` (8052), `:468` (`SKILL_V3_PROFILE_RECONCILIATION_REQUIRED`)
 - Directory observation: `.deckent/skills/` = 31 manifest dirs, all `entrypoint: "SKILL.md"`, 30 with `source`, 1 with `profile` (`project-conventions`); `src/core/builtins/skills/` = 31; set difference = `observability` (builtin-only), `project-conventions` (project-only)
 - Structural precedent: `docs/analysis/operation-catalog-authority-design-2026-08-06.md` §3.1–§3.3 (stable ids, version++/retire, file-based catalog with runtime cache)
+
+---
+
+## OWNER DECISIONS — 2026-08-11 (Alperen)
+
+- **D1 KABUL:** generated katman insan-yazımı override'ın ALTINDA.
+- **D2 → Brain'e delege edildi; Brain kararı:** terfi YALNIZ owner-onaylı review-receipt ile (agent-D7'deki "onayımızdan geçmeden promote yok, otonomluk yok" ilkesiyle tutarlı); stats sidecar yalnız ÖNERİ üretebilir, asla oto-terfi edemez.
+- **D3 KABUL + kısıt:** retired id kalıcı kilitli + okunabilir tombstone; ANCAK id'ler jenerik kelime olamaz — namespace zorunlu (örn. `deckent-dev-ops`, gerekirse `-2` süreks); id seçim/çağrım (resolution) yapısı ayrıca iyi tasarlanacak. Jenerik bir kelimeyi (`dev-ops`) emekli edip yakmak kabul edilemez.
+- **D4:** sandbox-otomasyonu karantina ÖNERİR; karantina KARARI insan-owner'da kalır (güvenlik-ihlali aciliyeti dahil — otomatik alım yok).
+- **D5 KABUL:** installed-but-unroutable görünür etiket.
+- **D6 EVET:** V3 eşleme kararı 7121'de.
+- **D7 EN-KABUL:** locale-map; bare-string `{en}` olarak.
+- **D8:** başlangıç bütçeleri YÜKSEK ve blocker-olmayan; sonradan kullanıcı/admin'e öneri yüzeyi.
+- **D9 ALTERNATİF KABUL:** flat-id + registry-mapping (publisher/id nitelemesi değil).
+- **D10 KABUL:** kaçak resolver = lint FAILURE (warning yok).
