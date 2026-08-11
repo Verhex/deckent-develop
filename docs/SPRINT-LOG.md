@@ -133,3 +133,57 @@ Bug: tests/connectors/bot-lifecycle-hones… (PAUSED)
 - 517-006: Script lifecycle and proof-harness registry (row 270, rerouted) (DONE)
 
 ---
+## Sprint 518 — sprint-518
+
+**Status:** COMPLETE
+**Date:** 2026-08-11
+**Duration:** 537s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 537254ms |
+
+### Tasks
+
+- 518-001: Agent catalog authority — design and owner decision points (row 7011) (DONE)
+- 518-002: Skill catalog authority — design and owner decision points (row 7012) (DONE)
+
+---
+## Sprint 519 — sprint-519
+
+**Status:** ABORTED
+**Date:** 2026-08-11
+**Duration:** 1106s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 6 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1105747ms |
+
+### Tasks
+
+- 519-001-fix-fix: Fix: Fix: Runtime-visible credential exposure taxonomy (row 2030) (PAUSED)
+- 519-001-fix: Fix: Runtime-visible credential exposure taxonomy (row 2030) (NO_GO)
+- 519-001: Runtime-visible credential exposure taxonomy (row 2030) (NO_GO)
+- 519-002: Runtime credential lifecycle service contract (row 4131 first slice) (PAUSED)
+- 519-003: Born-ledger intake template and checker (row 3169) (DONE)
+- 519-004: Source verification and built-binary proof become separate planner stages (row 3275) (GO_WITH_TECH_DEBT)
+- 519-005: Accepted-ADR DB↔filesystem parity gate (row 160) (DONE)
+- 519-006: Canonical memory authority contract (row 190 first slice) (DONE)
+- 519-007: npm channel preparation under owner-manual publish (row 8091) (DONE)
+- 519-008: Capability broker authority-resolution wiring residual (row 4040) (DONE)
+
+---

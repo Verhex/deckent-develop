@@ -12,7 +12,17 @@
 import {
   CapabilityRegistry,
   createDefaultRegistry,
+  deriveGrantedCapabilities,
+  type InvocationContext,
 } from './capability-broker.js';
+import type { Capability } from './work-model.js';
+import type { VerifiedPrincipal } from './principal.js';
+import type { AuthorityMode } from './nervous-types.js';
+import {
+  resolveOperation,
+  UnknownOperationError,
+  type OperationGate,
+} from './operation-catalog/index.js';
 import {
   installExtendedHandlers,
   type ExtendedHandlerOptions,
@@ -207,4 +217,258 @@ export function createAuditedCapabilityRegistry(
   }
 
   return registry;
+}
+
+// ═══ CAPABILITY-001 — five-input scoped capability decision (row 4040) ════════
+// The residual the G1 advisory slice named: `resolveCapabilityEnforcement` types
+// WHETHER the gate is armed, but nothing resolved the acceptance's five inputs —
+// principal, tenant, operation, resource, environment — into ONE scoped decision.
+// Measured code-truth before this slice (capability-broker.ts `invoke`):
+//   principal   partial — `ctx.actor.{id,role}` arrive, `role` is read only when the
+//                         gate is armed; assurance/identityClass/provenance never read.
+//   tenant      partial — `ctx.actor.tenantId` is copied into `emitDenied` audit info
+//                         only; it scopes no decision.
+//   operation   absent  — the broker gates on a VERB string's handler
+//                         `requiredCapability`; the operation catalog never participates.
+//   resource    absent  — only `ctx.projectRoot`, consumed inside fsReadHandler.
+//   environment absent  — no AuthorityMode value reaches the broker at all.
+// This implements design §2.1/§2.2 (docs/analysis/capability-authority-design-2026-08-08.md)
+// as a decision that PROJECTS onto the broker's EXISTING grant gate — deliberately not a
+// second gate, and deliberately not a default flip: when the posture is
+// ADVISORY_GATE_DISABLED (the production default) the projection leaves
+// `grantedCapabilities` unset, so the permissive path stays byte-identical and the
+// decision is carried as typed evidence. Arming stays owner-gated behind
+// `enforce_least_privilege` (design §4 Faz 4).
+
+/** One of the five inputs the acceptance requires to resolve together. */
+export type CapabilityDecisionInput =
+  | 'principal'
+  | 'tenant'
+  | 'operation'
+  | 'resource'
+  | 'environment';
+
+/** WHAT the operation acts on — identity plus the tenant that owns it. */
+export interface ResourceRef {
+  readonly id: string;
+  /** Owning tenant. A mismatch against the request tenant denies (cross-tenant). */
+  readonly ownerTenant: string;
+}
+
+/** WHERE the request runs — the authority strictness in force. */
+export interface EnvironmentContext {
+  readonly authorityMode: AuthorityMode;
+}
+
+/** The five-input decision request (design §2.1). */
+export interface CapabilityDecisionRequest {
+  readonly principal: VerifiedPrincipal;
+  readonly tenant: string;
+  /** An operation-catalog id (see `Op` in operation-catalog/index.ts). */
+  readonly operation: string;
+  readonly resource: ResourceRef;
+  readonly environment: EnvironmentContext;
+}
+
+export type CapabilityDecisionReason =
+  | 'ALLOWED_WITHIN_GRANT'
+  /** Fail-closed: at least one of the five inputs did not resolve. */
+  | 'DENIED_UNRESOLVED_INPUT'
+  | 'DENIED_UNKNOWN_OPERATION'
+  | 'DENIED_CROSS_TENANT'
+  | 'DENIED_UNGRANTED_CAPABILITY'
+  | 'DENIED_LOW_ASSURANCE_STRICT'
+  | 'NEEDS_APPROVAL_LOW_ASSURANCE';
+
+/** The single scoped decision the five inputs resolve to (design §2.1). */
+export interface CapabilityDecision {
+  readonly outcome: 'allow' | 'deny' | 'needs_approval';
+  readonly reasonCode: CapabilityDecisionReason;
+  /** Derived from the operation catalog — `[]` when the operation did not resolve. */
+  readonly requiredCapabilities: readonly Capability[];
+  /** Derived from `principal.role` via the canonical ROLE_CAPABILITY_MAP. */
+  readonly grantedCapabilities: readonly Capability[];
+  /** The operation's gate — `null` when the operation did not resolve. */
+  readonly gate: OperationGate | null;
+  /** Whether a denial on this decision would reach the durable audit trail. */
+  readonly audited: boolean;
+  /** Inputs that failed to resolve — non-empty only for DENIED_UNRESOLVED_INPUT. */
+  readonly unresolvedInputs: readonly CapabilityDecisionInput[];
+}
+
+const AUTHORITY_MODES: readonly AuthorityMode[] = ['strict', 'balanced', 'autopilot', 'full-auto'];
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Which of the five inputs did NOT resolve. A decision is never made from a
+ * partial input set — an incomplete request denies with the gaps named.
+ * Validation is runtime, not type-level, because these inputs cross ingress
+ * boundaries (CLI / MCP / API) where the compiler does not reach.
+ */
+function unresolvedDecisionInputs(
+  request: CapabilityDecisionRequest | undefined,
+): CapabilityDecisionInput[] {
+  if (request === undefined || request === null) {
+    return ['principal', 'tenant', 'operation', 'resource', 'environment'];
+  }
+  const missing: CapabilityDecisionInput[] = [];
+  const principal = request.principal as VerifiedPrincipal | undefined;
+  // A principal without a role cannot derive a grant set — that is a gap, not a
+  // permissive default (design §3.2: absent/unknown role → deny).
+  if (!principal || !isNonEmptyString(principal.id) || !isNonEmptyString(principal.role)) {
+    missing.push('principal');
+  }
+  if (!isNonEmptyString(request.tenant)) missing.push('tenant');
+  if (!isNonEmptyString(request.operation)) missing.push('operation');
+  const resource = request.resource as ResourceRef | undefined;
+  if (!resource || !isNonEmptyString(resource.id) || !isNonEmptyString(resource.ownerTenant)) {
+    missing.push('resource');
+  }
+  const environment = request.environment as EnvironmentContext | undefined;
+  if (!environment || !AUTHORITY_MODES.includes(environment.authorityMode)) {
+    missing.push('environment');
+  }
+  return missing;
+}
+
+/**
+ * Resolve the five inputs into ONE scoped capability decision (design §2.2).
+ *
+ * Evaluation order — deny before escalate, because an ungranted capability is not
+ * an approvable one:
+ *   1. any input unresolved            → deny DENIED_UNRESOLVED_INPUT (fail closed)
+ *   2. operation id not in the catalog → deny DENIED_UNKNOWN_OPERATION
+ *   3. resource.ownerTenant ≠ tenant   → deny DENIED_CROSS_TENANT
+ *   4. required ⊄ granted              → deny DENIED_UNGRANTED_CAPABILITY
+ *   5. high-risk operation + unverified principal
+ *        · environment 'strict'        → deny DENIED_LOW_ASSURANCE_STRICT
+ *        · otherwise                   → needs_approval (progressive disclosure)
+ *   6. otherwise                       → allow
+ *
+ * Pure and total: like the broker's `invoke`, it never throws — every outcome is a
+ * returned `CapabilityDecision`.
+ */
+export function resolveCapabilityDecision(
+  request: CapabilityDecisionRequest,
+  enforcement: CapabilityEnforcement,
+): CapabilityDecision {
+  const audited = enforcement.denialAudited;
+  const unresolvedInputs = unresolvedDecisionInputs(request);
+  if (unresolvedInputs.length > 0) {
+    return {
+      outcome: 'deny',
+      reasonCode: 'DENIED_UNRESOLVED_INPUT',
+      requiredCapabilities: [],
+      grantedCapabilities: [],
+      gate: null,
+      audited,
+      unresolvedInputs,
+    };
+  }
+
+  let operation;
+  try {
+    operation = resolveOperation(request.operation);
+  } catch (err) {
+    if (!(err instanceof UnknownOperationError)) throw err;
+    return {
+      outcome: 'deny',
+      reasonCode: 'DENIED_UNKNOWN_OPERATION',
+      requiredCapabilities: [],
+      grantedCapabilities: deriveGrantedCapabilities(request.principal.role ?? ''),
+      gate: null,
+      audited,
+      unresolvedInputs: [],
+    };
+  }
+
+  const resolved = {
+    requiredCapabilities: operation.capabilities,
+    grantedCapabilities: deriveGrantedCapabilities(request.principal.role ?? ''),
+    gate: operation.gate,
+    audited,
+    unresolvedInputs: [] as readonly CapabilityDecisionInput[],
+  };
+
+  if (request.resource.ownerTenant !== request.tenant) {
+    return { ...resolved, outcome: 'deny', reasonCode: 'DENIED_CROSS_TENANT' };
+  }
+
+  const ungranted = resolved.requiredCapabilities.filter(
+    (capability) => !resolved.grantedCapabilities.includes(capability),
+  );
+  if (ungranted.length > 0) {
+    return { ...resolved, outcome: 'deny', reasonCode: 'DENIED_UNGRANTED_CAPABILITY' };
+  }
+
+  const highRisk = operation.risk === 'HIGH' || operation.risk === 'CRITICAL';
+  if (highRisk && request.principal.assurance === 'unverified') {
+    return request.environment.authorityMode === 'strict'
+      ? { ...resolved, outcome: 'deny', reasonCode: 'DENIED_LOW_ASSURANCE_STRICT' }
+      : { ...resolved, outcome: 'needs_approval', reasonCode: 'NEEDS_APPROVAL_LOW_ASSURANCE' };
+  }
+
+  return { ...resolved, outcome: 'allow', reasonCode: 'ALLOWED_WITHIN_GRANT' };
+}
+
+/** The decision plus the broker context it projects onto. */
+export interface ScopedCapabilityInvocation {
+  readonly decision: CapabilityDecision;
+  /** The context to pass to `CapabilityRegistry.invoke` — the EXISTING gate's input. */
+  readonly context: InvocationContext;
+  /** True when the decision actually scopes `context.grantedCapabilities`. False under
+   *  the advisory posture, where the decision is evidence only and the invocation
+   *  behaves exactly as it did before this slice. */
+  readonly enforcementApplied: boolean;
+}
+
+/** Audit lineage carried through unchanged — never a decision input. */
+type CapabilityLineage = Pick<InvocationContext, 'projectRoot' | 'correlationId' | 'causationId'>;
+
+/**
+ * Resolve the five inputs and project the resulting single decision onto the
+ * broker's EXISTING enforcement path.
+ *
+ * There is no second gate here: the returned `context` is the broker's own
+ * `InvocationContext`, and enforcement is still performed by
+ * `CapabilityRegistry.invoke`'s grant check. This function only decides WHICH
+ * grant set that check sees:
+ *  - `enforcement.enforced` (owner-gated `enforce_least_privilege`) → the decision's
+ *    grants on `allow`, `[]` on every other outcome (fail closed).
+ *  - advisory posture (production default) → `grantedCapabilities` is left UNSET, so
+ *    `invoke` takes the same permissive branch it took before this slice. The decision
+ *    still resolves and is returned with `enforcementApplied: false`.
+ *
+ * `lineage` carries audit identifiers only — accepting a full `InvocationContext`
+ * would let a caller smuggle a grant set past the decision, which is exactly the
+ * second resolution path this slice must not create.
+ */
+export function resolveScopedCapabilityInvocation(
+  request: CapabilityDecisionRequest,
+  enforcement: CapabilityEnforcement,
+  lineage: CapabilityLineage = {},
+): ScopedCapabilityInvocation {
+  const decision = resolveCapabilityDecision(request, enforcement);
+  const principal = request?.principal as VerifiedPrincipal | undefined;
+  const context: InvocationContext = {
+    actor: {
+      id: principal?.id ?? '',
+      role: principal?.role,
+      tenantId: request?.tenant,
+      identityClass: principal?.identityClass,
+      assurance: principal?.assurance,
+      provenance: principal?.provenance,
+    },
+    projectRoot: lineage.projectRoot,
+    correlationId: lineage.correlationId,
+    causationId: lineage.causationId,
+  };
+  if (enforcement.enforced) {
+    context.grantedCapabilities =
+      decision.outcome === 'allow' ? [...decision.grantedCapabilities] : [];
+  }
+  return { decision, context, enforcementApplied: enforcement.enforced };
 }
