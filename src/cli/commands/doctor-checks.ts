@@ -3,6 +3,7 @@ import { readFileSync, existsSync, readdirSync, accessSync, constants as fsConst
 import { join } from 'node:path';
 import { platform } from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { DebtPriority } from '../../core/types.js';
 import type { DoctorResult } from '../../core/types.js';
 import type { ProviderAvailabilityDetail, ProviderAdapter } from '../../core/provider.js';
@@ -13,6 +14,16 @@ import {
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { getDebtItems } from '../../core/debt-store.js';
+
+// Row 450 (508-001): the Node.js runtime floor comes from the manifest's own
+// `engines.node`, not a source literal. Read via `createRequire` (Node's own
+// CJS loader, resolved once at module init) rather than the mockable
+// `node:fs` readFileSync — several existing doctor tests mock `node:fs`
+// wholesale with path-independent return values, and routing this specific
+// read through it would make checkNode() pick up unrelated mock content and
+// break those pre-existing, passing tests.
+const requireFromHere = createRequire(import.meta.url);
+const pkgManifest = requireFromHere('../../../package.json') as { engines: { node: string } };
 
 // Memory V2 (Sprint 179 W3-6): exports/decisions.md is the auto-generated
 // source. doctor must accept EITHER this OR legacy .brain/DECISIONS.md.
@@ -117,27 +128,45 @@ export function checkPlatform(spawnBackend?: string): DoctorCheck {
   };
 }
 
-function checkNode(): DoctorCheck {
+/**
+ * Derive the Node.js runtime floor from the package manifest's `engines.node`
+ * field — the same field `npm install` itself enforces — instead of a
+ * duplicated source literal. Only the first integer run in the range string
+ * (e.g. "24" out of ">=24.0.0") is needed to gate against the running major
+ * version, mirroring how the installed version is already parsed below.
+ */
+function resolveNodeEngineFloor(): { range: string; major: number } {
+  const range = pkgManifest.engines.node;
+  const match = range.match(/(\d+)/);
+  const major = parseInt(match?.[1] ?? '', 10);
+  if (!Number.isFinite(major)) {
+    throw new Error(`doctor: cannot parse a major version from package.json engines.node: "${range}"`);
+  }
+  return { range, major };
+}
+
+export function checkNode(): DoctorCheck {
+  const { range: requiredRange, major: requiredMajor } = resolveNodeEngineFloor();
   const result = spawnSync('node', ['--version'], { encoding: 'utf-8' });
   if (result.status !== 0) {
     const entry = ErrorRegistry.get('DECKENT_E010');
-    return { name: 'Node.js', passed: false, message: `not found — ${entry?.suggestion ?? 'Install Node.js >=18'}`, required: true };
+    return { name: 'Node.js', passed: false, message: `not found — ${entry?.suggestion ?? `Install Node.js ${requiredRange}`}`, required: true };
   }
   const version = result.stdout.trim();
   const major = parseInt(version.replace('v', '').split('.')[0] ?? '0', 10);
-  if (major < 18) {
+  if (major < requiredMajor) {
     const entry = ErrorRegistry.get('DECKENT_E010');
     return {
       name: 'Node.js',
       passed: false,
-      message: `${version} found but >=18 required — ${entry?.suggestion ?? 'Upgrade Node.js'}`,
+      message: `${version} found but ${requiredRange} required — ${entry?.suggestion ?? 'Upgrade Node.js'}`,
       required: true,
     };
   }
   return {
     name: 'Node.js',
     passed: true,
-    message: `${version} (>=18 required)`,
+    message: `${version} (${requiredRange} required)`,
     required: true,
   };
 }

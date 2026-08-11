@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "bce06b6b8a780a926c97095e80be0f795ebef85434b63539509771a39680a4b5"
+    "value": "1ecb745bff8f64b25119911e709fb977e728505000749cc5cf8139efed805f27"
   },
   "summary": {
     "total": 433,
@@ -664,9 +664,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-10",
       "definitionDigest": "cc9b46006ce0ad803edbe71c3726e8897ce181e3b62c1ff313c773fb0791af93",
-      "progressDigest": "480252ada95fd2029e7e83ee932450ec40987aa9630f04d8da9c202fb7bd2e30",
+      "progressDigest": "e36ef0b56dce40ae50c1440cd929bfbd08fea3d907d5ccc4b7290c60c21f5cce",
       "terminalClosureDigest": null
     },
     {
@@ -2996,9 +2996,9 @@
       "program": "ASSURANCE",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-10",
       "definitionDigest": "2c26e9dff54c59731b1b34ba362aa0793718b558ccf6d283143ec604e912bc69",
-      "progressDigest": "386bb69538bb562746901e25987f81e067428cd3da808223497f4b86cf7ffef9",
+      "progressDigest": "4e602a98d29adce70c62612c16ccc14fe4c90fe90c52204af13392a9e45cf45c",
       "terminalClosureDigest": null
     },
     {
@@ -8435,8 +8435,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`doctor`, `package.json engines`, onboarding ve release gate tek kaynaktan aynı minimum Node sürümünü verir; drift CI'da fail-closed olur",
-      "evidence": "CODE-DOC-DIFF-2026-08 CLI-12: `doctor --json` \"v24.15.0 (>=18 required)\" derken `package.json` `engines>=24` ister; 2026-08-02 gerçek binary çıktısıyla yeniden üretildi. Kanıtlamadığı: hangi floor'un canonical olacağı owner kararıdır",
-      "updated": "2026-08-03"
+      "evidence": "CODE-DOC-DIFF-2026-08 CLI-12: `doctor --json` \"v24.15.0 (>=18 required)\" derken `package.json` `engines>=24` ister; 2026-08-02 gerçek binary çıktısıyla yeniden üretildi. Kanıtlamadığı: hangi floor'un canonical olacağı owner kararıdır; 2026-08-10 GECE DOGFOOD SETTLEMENT (sprint-508-001, claude-sonnet-5): floor kararı = engines.node (npm'in kendisinin zorladığı değer — Brain kararı, owner onay-turu bekler); checkNode floor'u createRequire ile manifest'ten türetir (fs-mock'lu testlerle çakışmamak için bilinçli seçim, kod-içi yorumlu), yeni tests/cli/runtime-floor.test.ts 4/4 dinamik-okumalı; worker attempt-1 budget circuit-breaker ile kesildi (36806>14400 output token, exitCode 137) ama iş diskte tamamdı; Brain-tamamlama: 7 legacy doctor fixture'ı eski >=18 kontratını v22-literal'le pinliyordu → PASSING_NODE_VERSION engines-türevi yapıldı; doctor 203/203 + tsc temiz; typed gözlem-1: evaluator scoped-green'le DONE verdi, kırık doctor.test.ts'i görmedi (affected-tests süpürmesi yok — born-satır adayı); typed gözlem-2: 14400 output-token tavanı kod-görevi için dar (budget-locality ailesi)",
+      "updated": "2026-08-10"
     },
     {
       "order": 460,
@@ -16533,8 +16533,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Controller tests use complete atomic-filesystem/provider-observation mocks and exact attempt attribution fixtures; pause/resume and finalizer assertions exercise current fail-closed authority without weakening production receipt or status publication",
-      "evidence": "Changed-test batch passed 14/15 files and 314 assertions, while 25 cases in `sprint-controller.test.ts` failed on missing `renameSync`, absent temp DB directories, attribution-less terminal fixtures and a stale `appendRetroSection` mock. The exact changed routing-HOLD assertion passes in isolation. Negative scope: do not restore ambient/synthetic DONE or make status publication fail-open to satisfy legacy mocks",
-      "updated": "2026-08-01"
+      "evidence": "Changed-test batch passed 14/15 files and 314 assertions, while 25 cases in `sprint-controller.test.ts` failed on missing `renameSync`, absent temp DB directories, attribution-less terminal fixtures and a stale `appendRetroSection` mock. The exact changed routing-HOLD assertion passes in isolation. Negative scope: do not restore ambient/synthetic DONE or make status publication fail-open to satisfy legacy mocks; 2026-08-10 GECE DOGFOOD (sprint-508-002, claude-opus-5): dürüst NO-OP DONE — ölçüm bayat, 25 kırık c917e3593 (FAZ4A-S3 gerçek-tmpdir dönüşümü, 95→0) ile zaten kapanmış; worker iki koşum 166/166 + tsc temiz raporladı, Brain bağımsız koşumla doğruladı (166/166); satır owner DONE-onay turunu bekler",
+      "updated": "2026-08-10"
     },
     {
       "order": 3298,
@@ -22929,6 +22929,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6e294063e246cc3358dfb43d418d867ded7f038d9f0f8e40dcac32e24d8ac259"
+    "value": "983964d0eb4be6514b9320cf5583fefca2b46df2bdf0555fc4d598697fbe0244"
   }
 }
