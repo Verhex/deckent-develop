@@ -131,13 +131,19 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // in clean-active-execution-guard.test, each writing a sprint-state.json into a
   // tmpdir fixtureRoot (the same helper the file's existing cases use); the scan
   // counts each write site. Prior: DRIFT-VISIBILITY (12499).
-  count: 12517,
+  // 2026-08-11 (NIGHT-DOGFOOD sprints 508-509): −304 — the runtime-floor,
+  // heartbeat-contract, annotation-parity, xverify-ux, bot-lifecycle,
+  // sprint-log-projection and clean-dashboard-policy suites landed hermetic
+  // (tmpdir fixtures) and the doctor fixture modernization retired unresolved
+  // entries. Measured on a clean HEAD worktree (b381c03fd) — the dirty
+  // shared-worktree scan is ineligible by rule. Prior: STALE-SPRINT-LOCK (12517).
+  count: 12213,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: '93dde03930bed9c12e41fb7549cbb7634cf331b54acfeb7d34ebef58cd9176b5',
+  digest: '4a6bf026c472fe0010be96e4c677c08747857ae8ee0a08179b35c51a686af2d3',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -160,7 +166,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // autonomous ingresses all import — every local pendingPath helper deleted so
   // one resolver remains. Edits to already-inventoried modules only — same 1203
   // count, content digest only.
-  count: 1206,
+  // 2026-08-11 (NIGHT-DOGFOOD sprint-509): +1 — scripts/build-dashboard.mjs
+  // enters the inventory as a test-support production dependency for the first
+  // time via the new clean-dashboard-policy suite (row 3325's single typed
+  // preserve-then-overwrite decision is proven from the real script). Measured
+  // on a clean HEAD worktree (b381c03fd). Prior: MODEL-ACTIVATION-001 (1206).
+  count: 1207,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
@@ -176,7 +187,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-09 (MODEL-ACTIVATION-001): +1 REAL production module —
   // src/core/model-activation-store.ts (owner model-activation authority), plus
   // the auto-detect enforcement and CLI edits. Prior: STALE-SPRINT-LOCK (1203).
-  digest: '31c1c76ee1d15909780f8e8cc42eb02f5222b402afa9b28acd1c18c0bfd2bc99',
+  digest: '5a0a9c5328cc2c3b4f9ca54e8f05bb7fd637b9ea14eb8d489b6c4283b8ac1868',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
