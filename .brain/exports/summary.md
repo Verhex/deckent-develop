@@ -55,6 +55,10 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-515 Learnings** (sprint-515): ## Sprint sprint-515 Learnings
+- Supported trace migrate and corpus CLI wiring with i18n: NO_GO — Bounded-discovery b...
+- **Sprint sprint-511 Learnings** (sprint-511): ## Sprint sprint-511 Learnings
+- Move the 4 sync git calls off the worker-dispatch hot path (row 3315): GO_WITH_TECH_...
 - **Sprint sprint-510 Learnings** (sprint-510): ## Sprint sprint-510 Learnings
 - Worker verification cannot judge unrelated concurrent partial writes (row 3277): GO_...
 - **Sprint sprint-508 Learnings** (sprint-508): ## Sprint sprint-508 Learnings
@@ -83,16 +87,9 @@
 
 ## Gains
 - 498-001 — Document the run-flow inbox surface — Created docs/reference/run...
-- **Sprint sprint-497 Learnings** (sprint-497): ## Sprint sprint-497 Learnings
-
-## Gains
-- 497-001 — Document the owner-managed model activation surface — Declared v...
-- **Sprint sprint-490 Learnings** (sprint-490): ## Sprint sprint-490 Learnings
-- Build right branch: NO_GO — Dependency 490-001 is verified through .deckent/runtime/...
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 509-002-fix: Bug Fix Report
-Bug: tests/connectors/bot-lifecycle-h
+_No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat (×46 sprints)
@@ -100,4 +97,4 @@ Bug: tests/connectors/bot-lifecycle-h
 - Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1816 | Generated: 2026-08-11_
+_Total entries: 1827 | Generated: 2026-08-11_

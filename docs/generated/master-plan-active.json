@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f4e84136804281fc5f7c0b1004a793aba5d4013a411be5968ea42994f8edc3ab"
+    "value": "0fcc856afacdf33d5ba9fb49eab65324db303808cae6b9f8bbf5e99d13fa8475"
   },
   "summary": {
     "total": 469,
@@ -3293,9 +3293,9 @@
       "program": "KERNEL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-11",
       "definitionDigest": "5bc34bde265f4f7a2ed01c2ed6fb9121864c8519059837591f67a8b350b386fd",
-      "progressDigest": "426a387274411fb43693de7a90d1b0c20357f93bc05c9631e39cf761298d6333",
+      "progressDigest": "c655dcfc9f41851a553b3d4828fe31c6da1860b1a0731ea0b100f75bf945b153",
       "terminalClosureDigest": null
     },
     {
@@ -17553,8 +17553,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`deckent bot stop` build-source-mismatch HOLD'undayken de çalışır (recovery-sınıfı komutlar guard'dan muaf veya typed override taşır); SIGTERM graceful-shutdown yolunda `bot.pid` temizlenir (ADR-G-013); iki davranış da gerçek-binary koşuyla kanıtlanır",
-      "evidence": "PAZARTESI 4a-ek transkripsiyonu (canlı yakalandı, 2026-08-01 build olayı): build-source-mismatch HOLD'u, drift'i çözecek stop/recovery komutlarının kendisini blokladı — workaround OS SIGTERM idi; SIGTERM ise `bot.pid`'i bırakıyor, clean guard ölü PID'i doğru tolere etti ama pid-dosya hijyeni açık. Parent RECOVERY-TERMINATION-001: bot stop, ownership-fenced termination ailesinin bir yüzeyidir",
-      "updated": "2026-08-03"
+      "evidence": "PAZARTESI 4a-ek transkripsiyonu (canlı yakalandı, 2026-08-01 build olayı): build-source-mismatch HOLD'u, drift'i çözecek stop/recovery komutlarının kendisini blokladı — workaround OS SIGTERM idi; SIGTERM ise `bot.pid`'i bırakıyor, clean guard ölü PID'i doğru tolere etti ama pid-dosya hijyeni açık. Parent RECOVERY-TERMINATION-001: bot stop, ownership-fenced termination ailesinin bir yüzeyidir ; 2026-08-11 BAYAT-BORÇ KAPANIŞI: 509-002-fix GO_WTD borcu (HOLD-muafiyeti) bayat-ölçümdü — worktree-binary-authority same-checkout driftini 2026-08-09 binary-identity dilimiyle zaten WARN sınıfına almış (kod-içi ölçüm yorumu: recovery komutlarının kilitlenmesi 3 kez ölçülüp çözülmüş); bugün tüm recovery komutları build-source-mismatch WARN altında canlı koştu; debt-509-002-fix resolved (stale-measurement, MemoryStore)",
+      "updated": "2026-08-11"
     },
     {
       "order": 3343,
@@ -24383,6 +24383,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9a7f3905b728be4bf8824b2e396d386d114144e7596d8c0ccf67684b607c8003"
+    "value": "9b9a023a5bca6d230c1384e26dc3c42af23231dc36e20a46f3357a2777a1f89f"
   }
 }

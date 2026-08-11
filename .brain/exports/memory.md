@@ -1,5 +1,24 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-515 Learnings
+- Sprint sprint-515 Learnings: ## Sprint sprint-515 Learnings
+- Supported trace migrate and corpus CLI wiring with i18n: NO_GO — Bounded-discovery blocker: the granted read scope (src/cli/commands, src/cli/helpers, tests/cli, tests/cli/commands, tes
+- Fix: Supported trace migrate and corpus CLI wiring with i18n: NO_GO — Landing checkpoint initialization failed before execution: the first lifecycle Bash call was rejected by a shell quoting
+
+## Gains
+- 515-001 — Canonical historical trace envelope and classification contract — Implemented a pure canonical historical trace envelope with deterministic SHA-256 identities/dige...
+- 515-002 — Immutable and idempotent historical trace migration engine — Implemented bounded, deterministic historical trace migration with canonical redaction/projection...
+- 515-003 — Corpus pipeline structured-content and per-record fault isolation — npx tsc --noEmit passed.
+
+## Sprint sprint-511 Learnings
+- Sprint sprint-511 Learnings: ## Sprint sprint-511 Learnings
+- Move the 4 sync git calls off the worker-dispatch hot path (row 3315): GO_WITH_TECH_DEBT — Moved 3 of the 4 measured sync `git` calls off the worker-dispatch hot path. Added runGitCommandAsync (nodeSpawn + Promi
+
+## Gains
+- 511-002 — Bind tests/PLATFORM.md to a source-derived platform registry (row 90) — Built scripts/gen-platform-registry.mjs: derives the platform-tag registry (linux, macos, windows...
+- 511-003 — Beta-scope README reality pass, EN and TR in lockstep (row 8092) — Beta-scope README reality pass complete.
+- 511-004 — Codex attempts pass the landing continuation admission (row 3308) — Root cause (read, not guessed): LiveExecutionBudgetGuard.observe applies snapshotDelta(counters, ...
+
 ## Sprint sprint-510 Learnings
 - Sprint sprint-510 Learnings: ## Sprint sprint-510 Learnings
 - Worker verification cannot judge unrelated concurrent partial writes (row 3277): GO_WITH_TECH_DEBT — Mechanism: whole-program analysis, scope-restricted judgment. The worker still runs the full `npx tsc --noEmit` (invocat
