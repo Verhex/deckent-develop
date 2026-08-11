@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5f0b12efeadad157b80e10823d0040d1233ed2461d4502d1ea6fae92dcae1277"
+    "value": "f510d8ce3caf55cd21bf1691c8a4fb14fb456556fa4e840ecf31f1ab6a42868d"
   },
   "summary": {
-    "total": 454,
-    "active": 407,
+    "total": 460,
+    "active": 413,
     "terminal": 47,
     "receipts": 183,
     "byState": {
-      "OPEN": 314,
+      "OPEN": 320,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,14 +21,14 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 290,
-      "P1": 126,
+      "P0": 295,
+      "P1": 127,
       "P2": 38
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 14,
-      "AUTHORITY": 41,
+      "AUTHORITY": 46,
       "CODEX": 44,
       "CONNECTOR": 2,
       "COST": 5,
@@ -55,7 +55,7 @@
       "RESILIENCE": 1,
       "ROUTING": 6,
       "SCALE": 1,
-      "SECURITY": 7,
+      "SECURITY": 8,
       "SURFACE": 1,
       "TERMINAL": 13,
       "TOOL": 1,
@@ -136,9 +136,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-08-04",
+      "updated": "2026-08-11",
       "definitionDigest": "2069ad6e437766f5bfa67ed3806ccbc6c42f7245047a37f19dd82f5e4154e780",
-      "progressDigest": "75376b5963976dc448cccc9b6f351d4d1619fd139d6c6f0697b9600038f0f42c",
+      "progressDigest": "6f20c021f1763ec26918f73c19991b87aacbc791651db56b88e39ee8e43fbd21",
       "terminalClosureDigest": null
     },
     {
@@ -3546,9 +3546,20 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-08",
+      "updated": "2026-08-11",
       "definitionDigest": "668be8d7c8c8074b2e7c7e44ad88edf2762e34d88491fc732d8cac72a60f6c48",
-      "progressDigest": "05c31dc2a467da3569e204ea6b4f9d139f61e123887e6140e0676f78b711e540",
+      "progressDigest": "a4a2715d35aa143bdba26eed7793ea10ebef13532c9483a42345bd1c7b9d2ad4",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4061,
+      "id": "WRITE-SCOPE-BACKEND-PARITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "7d98d9322306652ea01bf68322f4a9c011e9cb137591cc27d335843b8258827f",
+      "progressDigest": "b67c255ed7e1aab8e2d1841cdf61f70858e13201518a6f5fe37e418fb2c4cb3c",
       "terminalClosureDigest": null
     },
     {
@@ -3592,7 +3603,7 @@
       "state": "OPEN",
       "updated": "2026-08-11",
       "definitionDigest": "1d8f9fec4cc7e883b5d3fedcf416a3e616b5ec0accffcbc502c4325e61d51408",
-      "progressDigest": "b06f8e935bf9631feff469e2a305dd2cbf22ae1515591d9469fbb4a1087deb65",
+      "progressDigest": "ff7923a30b0e2e8165e230be5eca466960664fa9670c2e21c450dd881da4862a",
       "terminalClosureDigest": null
     },
     {
@@ -3667,9 +3678,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-11",
       "definitionDigest": "2cb6136b5bdec104b7c9947f80286e9aea2d9a4909f027986fe086aa2db70c3d",
-      "progressDigest": "9496a5fa664a8add63f09ae3cba8504a5df8efec3e5bd73df8ada22b6dbe9ab9",
+      "progressDigest": "2fda13fa6a975a4f6cfba7b4c292723a8e885f7f0c7c585ab4ae0bc972f59ab2",
       "terminalClosureDigest": null
     },
     {
@@ -3700,9 +3711,20 @@
       "program": "AUTHORITY",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-08",
+      "updated": "2026-08-11",
       "definitionDigest": "b12d4d83c668092d979d31ffa7026ea0d49d129b7562d34893755808ea9903a9",
-      "progressDigest": "6ce06d3598415619d4a12ba33c7faf7ae775d4ecde1577ac1621252a4b578acb",
+      "progressDigest": "bd3216176005dcb9e3334294c0e576f04b0f066f443ff36a277859020f6408fe",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4126,
+      "id": "AUDIT-SECRET-CUSTODY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "14ad2aaac383f6fd3322d9b60492d056172de91d847d4385e328d96c616181b0",
+      "progressDigest": "d4da6f6475dd1c389fb5cf5f3bf3517c3de1ac32ada6180c7c54a1f307fdc461",
       "terminalClosureDigest": null
     },
     {
@@ -3725,6 +3747,17 @@
       "updated": "2026-08-11",
       "definitionDigest": "ca37c7f91aae3d1fe9760d3816ee4d6042d4e9b7de717306f3ca16d34089faf6",
       "progressDigest": "70eeb1f4fad102a5b37e191d6ff84d5a589d4e527fe1c40d0fdc9a4bc64a277f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4132,
+      "id": "TERMINAL-SESSION-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "a4206f2a02ebc49802f2f70d00c2e389125a19cb97e84adb49cd0b73a39c07b8",
+      "progressDigest": "7f638b2ed03dfefba12ccfbac8278f8f9b11f54bbb09e89cf143f6949f4b0b5f",
       "terminalClosureDigest": null
     },
     {
@@ -3777,9 +3810,9 @@
       "program": "AUTHORITY",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-05",
+      "updated": "2026-08-11",
       "definitionDigest": "5f9c6237eef34cf0156c56c28d3db303240b365fc41c9ec7619b49d13c6adeb9",
-      "progressDigest": "1ff1d2b4a787e78f575060bf9044fb3656a2db887561c7c2f43c716f43505d72",
+      "progressDigest": "2a346d1813478446584ec8b919c2f3f17512aa9a0433ff531a14a6ba939359a3",
       "terminalClosureDigest": null
     },
     {
@@ -3788,9 +3821,20 @@
       "program": "AUTHORITY",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-05",
+      "updated": "2026-08-11",
       "definitionDigest": "653b022328da6daacd0392ded6904aaec57096c272ff760f61bc34e062d6c985",
-      "progressDigest": "bc702f42eeda00ba5bf2dbab336aa6837502b6a18cf7b5a253660532864a252c",
+      "progressDigest": "3c6e7fdd5f4725891091c3b589da18570828beddc08d161a0a7050e3c421a845",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4191,
+      "id": "SEC-ADR-CROSSWALK-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "bd595b798c550f8af645efdbf4fffef8ef1d039143623736fcb037002754a0a1",
+      "progressDigest": "f8ca080baf1b21d3b31c4fdf97b30a8966d1f3b8b0df6895eee2016a8b2f6f8e",
       "terminalClosureDigest": null
     },
     {
@@ -3799,9 +3843,20 @@
       "program": "AUTHORITY",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-05",
+      "updated": "2026-08-11",
       "definitionDigest": "c47f411a09453605f21ed040145a31fe79f5cf9e17e511b36fea99b5e126ac2f",
-      "progressDigest": "16c72a1003907ed0aee9fc27b15599064caa6ba59660a48937a9f7f96fe2d924",
+      "progressDigest": "59a5cd1f425f4c12b9202c59425fa84c74811473395b3bed569ba5975e6ff147",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4210,
+      "id": "CONFIG-AUTHORITY-CONSOLIDATION-001",
+      "program": "AUTHORITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "a21eebbcb8d6e8442247a014584ac1a6c3644fb5e116eba97dbb547330fa6e3e",
+      "progressDigest": "d4c93af0f844f2915abd68ff624dced5c1839dd6d6618b2aab103dd47eb3c852",
       "terminalClosureDigest": null
     },
     {
@@ -4283,9 +4338,9 @@
       "program": "SECURITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-11",
       "definitionDigest": "4bb60f86e62dc4b1e8f63d223565176e13b7ca55b88613fb7a735cff4e46973a",
-      "progressDigest": "ba043e26c7b38ef3a81f1a4ceea777df20c9021fccd616342958b68a145eb39e",
+      "progressDigest": "00fb0f8bb473547604f6ecafd757615a58b8fd6b6a8ee656ab20356e116903be",
       "terminalClosureDigest": null
     },
     {
@@ -4305,9 +4360,9 @@
       "program": "SECURITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-11",
       "definitionDigest": "6bb9e4a3ddd7e55e4d30aa981f35ed2690db03dda10719a498c38b97442a7130",
-      "progressDigest": "3b96661f5cd450cfbe963d919020c7f498309d5a2e19e59041d021ebec484097",
+      "progressDigest": "44f164e56196c6366f90bf2b30fab6533f7c77e14873a709dd01351633597aa0",
       "terminalClosureDigest": null
     },
     {
@@ -4333,14 +4388,25 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 7034,
+      "id": "PLUGIN-SECURITY-CONFIG-AUTHORITY-001",
+      "program": "SECURITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "0be5127fa5637db454be005e5a8c5579e5452e8c283d4b8d8ad8e77280c8a28e",
+      "progressDigest": "93f79f903f12081a476746aee6724e3c7094672bdb26e404d819def036a2713c",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 7040,
       "id": "MCP-TRUST-001",
       "program": "SECURITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-05",
+      "updated": "2026-08-11",
       "definitionDigest": "19a8088ac5887b8af0757125a21a737802e64fe9326aee3d2ea9e32d5c3fb9f3",
-      "progressDigest": "424ba6f6f575148477d4b686e7f8689830fe4057c7bfe5ef009bae185c3b0c3e",
+      "progressDigest": "ca07eba1bf9736a3bd33b0f52a2c5682a4c51d6d4d7e0c1823efc7612332e625",
       "terminalClosureDigest": null
     },
     {
@@ -4415,9 +4481,9 @@
       "program": "SECURITY",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-04",
+      "updated": "2026-08-11",
       "definitionDigest": "f9966b2806ff1abe2830e73eaf3b675dd8309a0cb77346ebd4162bbe0c5c671d",
-      "progressDigest": "35b1d091778d6bae1d7572da2dd2f504ab64e78bcdba97f5f718817a18f711ab",
+      "progressDigest": "2d3a066a94f2b91159dd4e2eb863b5b379992d65b33800bf05fb28c185e37e90",
       "terminalClosureDigest": null
     },
     {
@@ -4734,9 +4800,9 @@
       "program": "PROMPT",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-11",
       "definitionDigest": "518bea544ad1ba73de8c0a2fe0647f191a173c538686eac0c705bb93e08b5b67",
-      "progressDigest": "6911694e3467bf7efa7a73cd78c74c80081652f543ae50ed4981dbb63c8e5f5f",
+      "progressDigest": "d581a5cac315db7ac3eae11bbb8e1cc9c9320beb8a6f8f9c4f562e25941220ea",
       "terminalClosureDigest": null
     },
     {
@@ -6962,8 +7028,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Hermetic suite, build artifacts stable, binary proofs ayrı provenance ile kaydedilir",
-      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; 2026-08-04 FAZ4A-S3 ratchet düşüşü: 476/111 → 381/108 (−95; brain-pause-resume + pause-resume + sprint-controller kümeleri sıfırlandı, birleşik 236/236) — S3 pre-work admission rejimiyle koştu (receipt implementasyondan önce kendi commit'inde, parent 718c27f80); kritik yolda sıradaki: S4/S5/S6 (§10.1 slot bütçesiyle paralellenebilir), S7 en son; 2026-08-04 FAZ4A-S4 ratchet düşüşü: 381/108 → 354/105 (−27; runsprint-debt-integration + fix-phase-map + avgcoverage-repair sıfırlandı, birleşik 31/31) ve ÖLÇÜM-KAPANIŞI: S6 skill kümesi + S4 evaluator yarısı zaten settle (212/212, 7 suite) — S1 emsali, iş uydurulmadı; kalan: S5 brain dörtlüsü (35) sonra S7; 2026-08-04 FAZ4A-S5 ratchet düşüşü: 354/105 → 319/101 (−35; brain + brain-rollback + brain-ipc + brain-provider sıfırlandı, birleşik 262/262) — brain.test hibrit useRealFileSystem, rollback/ipc tam dönüşüm; S5a gerçek üretim bug'ı buldu (PROD-SPRINT-PREFIX-PAD-001 satırı); kalan tek dilim: S7 (refill/heartbeat); 2026-08-04 FAZ4A-S7 ratchet düşüşü + FAZ4A KAPANIŞI: 319/101 → 300/98 (−19; wrapper-hb + fix-dispatch-continuation + postfix-pending-scan sıfırlandı, birleşik 35/35) — FAZ4A yedi diliminin tamamı settle: S1+S6+evaluator ölçümle (iş uydurulmadı), S2-S5+S7 gerçek-tmpdir dönüşümüyle; kümülatif 539/113 → 300/98 (−239 kırık, −15 dosya), üretim koduna sıfır dokunuş, 1 gerçek üretim bug'ı kayda girdi (PROD-SPRINT-PREFIX-PAD-001); kalan borç FAZ4B+ işi: orchestra dağınık (~60: docker ~16 · auth-isolation ~12 · moat3 6 · memory-limit 7 · diğer) + CLI 116 + MCP 96 sınıflarının güncel karşılıkları; 2026-08-04 FAZ4B-B1 ratchet düşüşü: 300/98 → 231/86 (−69; MCP SINIFININ TAMAMI SIFIRLANDI — tests/mcp 1031/1031, 12 dosya) — kök nedenler: eşzamanlı-import deadlock'u + 5 bayat mock'ta 7 eksik export (annotations), ADR-G-037 final-only-usage owner-grant'ının fixture'larda olmaması, deckent_plan'ın planRunFlow seam'ine geçişi, authority-first status (yanlış-derinlik mock path'leri sessiz ölüydü), lifecycle metninde CLEANUP fazının kaldırılması; hepsi test-taraflı drift, üretim bug'ı yok; kalan: B2 CLI çekirdeği (~60) → B3 CLI smoke (~20) → B4 api+orchestra dağınık (~136); 2026-08-04 FAZ4B-B2 ratchet düşüşü: 231/86 → 169/75 (−62; CLI çekirdeğinin 12 dosyası sıfırlandı — tam-sınıf koşu 7477 testte 29 kırık kaldı: B3 smoke 12 + command-registry 2 GERÇEK-POZİTİF + 15 tekli, 2 tekli kendiliğinden iyileşti); üretim bug'ı yok, 1 gerçek üretim drift'i typed bulgu olarak CLI-VOCAB-001'e taşındı (execution-authority registry satırı eksik); kalan: B3 CLI smoke+tekliler (~31) → B4 api+orchestra (~136); 2026-08-04 FAZ4B-B3 ratchet düşüşü: 167/74 → 140/56 (−27; CLI sınıfı MCP gibi TAMAMEN sıfır — 7477/7477) — B3a yeni gerçek üretim-bug adayı kayda geçirdi (PROD-BINARY-IDENTITY-EAGER-CRASH-001, satır 3335: src'siz kullanıcı projesinde ham-stack çökme); kalan borç yalnız: orchestra 107/37 + api 22/9 + süpürme 7/5 + eski-baseline artıkları; 2026-08-04 FAZ4B-B4 ratchet düşüşü: 140/56 → 33/19 (−107; ORCHESTRA SINIFI TAMAMEN SIFIR — tests/orchestra 8770/8770, 37 dosya + PREFIX-PAD fixture yan-etkisi ek-receipt'le) — B4a P0 üretim regresyonu kayda geçirdi (PROD-LANDED-FENCE-ORDER-001, satır 3340: LANDED heartbeat+continuation sessiz kaybı) ve iki testte bilinçli REGRESSION-PIN bıraktı; pinlenen yeni gerçekler: worker prose asla scope authority olamaz, FIX-budget'lı koşuda NO_GO dependant'ı deferTerminalDependencyFailure ile PENDING bekler, auth broker-kopyalı principal-digest zinciri, billingMode fail-closed→runBudgetHold; kalan: B5 api (22/9) + B6 süpürme (7/5) + eski-baseline artıkları (~4); 2026-08-04 FAZ4B-B5 SON SÜPÜRME + SIFIR KİLOMETRE TAŞI: 33/19 → 0/0 — api sınıfı 251/251, tekliler 411/412→tam yeşil (fence'in dürüst kırmızısı MOUNT-BINDING üretim fix'iyle kapandı), bayat-sanılan 4 CLI girdisi gerçekte collect-fail çıktı ve onarıldı; FINAL DOĞRULAMA sınıf-sınıf: core+agents 10121/10121 · orchestra 8770/8770 · cli 7477/7477 · mcp+api+kalan 5720'de yalnız 2 dilim-durumu meta-testi (settlement'la söner); scripts/test-failure-baseline.json BOŞALDI → lint:test-baseline artık borç-defteri değil GERÇEK her-kırık-FAIL kapısıdır (Type-Check-maskesi sınıfı yapısal olarak kapandı); toplam yay: 539/113 → 0/0, üretime 4 gerçek-bug fix'i (PREFIX-PAD, exec-authority registry, binary-identity eager, mount-binding) + 2 açık P0/P1 kayıt (LANDED-fence, SSE-onEvent)",
-      "updated": "2026-08-04"
+      "evidence": "Handover ve legacy baseline'ları çelişkili; 2026-08-03 ölçüm: per-file test-failure ratchet kuruldu (`scripts/test-failure-baseline.json` + `scripts/check-test-failures.mjs` + `npm run lint:test-baseline`); yeni kırık FAIL, azalma `--update` ile ratchet'lenir; kapı sahte gerileme enjekte edilerek doğrulandı. Baseline 118 dosya/598 → 113/539 (Orchestra 346 · MCP 70 · CLI 95 · Core 2 · Docs+Scripts 1). codex-analysis 115/591 rakamı aynı günün daha eski snapshot'ıdır. Kanıtlamadığı: suite yeşil değildir; bu yalnız bilinen borcun sabitlenmiş ve yeni kırığa kapalı ölçüsüdür; 2026-08-03 PAZARTESI emilimi — test-borcu paket ölçümleri ve CANONICAL KRİTİK YOL (Alperen kararı, OQ-XV-06): sıra P6 → P1 → P3+P4 → P2'dir ve tek geçerli okumadır. Ölçülmüş dağılım (2026-08-03): toplam 564 kırık — P1 durable-yazım authority'si 211/19 dosya (atomik yazım + finalizer terminal-evidence + heartbeat-authority üç halkalı zincir; iki mock denemesi başarısız kaydedildi, doğru yaklaşım muhtemelen gerçek tmpdir izolasyonu), P2 orchestra 135/38, P3 CLI 116/30, P4 MCP 96/24, P6 core+agents KAPANDI (aeb60c6b7). P1 FAZ-4a ile AYNI dilimde koşar — aynı üretim modüllerine (sprint-controller · finalizer · brain · spawn-backend-docker · auditor · debt-manager) dokunuyorlar ve ayrı koşulursa 211 test iki kez yazılır. Sinyal koruması: scripts/test-failure-baseline.json + lint:test-baseline (dosya-dosya ratchet; yeni kırık FAIL). Kalıcı ders (Type Check maskesi): tüm test işleri Type Check'e bağlı olduğu için 2026-08-01/02'de ~650 kırık günlerce görünmedi; Type Check bir daha kırmızı bırakılamaz; 2026-08-03 execution-hazır dilim planı: FAZ4A-SLICE-PLAN.md (versioned plan artifact, Alperen onaylı) — 7 alt-dilim (S1 atomik-result → S2 finalizer → S3 controller/pause-resume zorunlu ardışık; S4-S6 §10.1 runtime-slot bütçesiyle paralel; S7 son), her biri tek PR + parent-anchor'a tabi kendi consumed receipt'i; doğrulama sözleşmesi ve stop koşulları planda; 2026-08-04 FAZ4A-S2 ratchet düşüşü: 539/113 → 476/111 (−63; sprint-finalizer + finalize-sprint kümeleri sıfırlandı). S1 ölçümle kapalı, S2 tamam; 2026-08-04 FAZ4A-S3 ratchet düşüşü: 476/111 → 381/108 (−95; brain-pause-resume + pause-resume + sprint-controller kümeleri sıfırlandı, birleşik 236/236) — S3 pre-work admission rejimiyle koştu (receipt implementasyondan önce kendi commit'inde, parent 718c27f80); kritik yolda sıradaki: S4/S5/S6 (§10.1 slot bütçesiyle paralellenebilir), S7 en son; 2026-08-04 FAZ4A-S4 ratchet düşüşü: 381/108 → 354/105 (−27; runsprint-debt-integration + fix-phase-map + avgcoverage-repair sıfırlandı, birleşik 31/31) ve ÖLÇÜM-KAPANIŞI: S6 skill kümesi + S4 evaluator yarısı zaten settle (212/212, 7 suite) — S1 emsali, iş uydurulmadı; kalan: S5 brain dörtlüsü (35) sonra S7; 2026-08-04 FAZ4A-S5 ratchet düşüşü: 354/105 → 319/101 (−35; brain + brain-rollback + brain-ipc + brain-provider sıfırlandı, birleşik 262/262) — brain.test hibrit useRealFileSystem, rollback/ipc tam dönüşüm; S5a gerçek üretim bug'ı buldu (PROD-SPRINT-PREFIX-PAD-001 satırı); kalan tek dilim: S7 (refill/heartbeat); 2026-08-04 FAZ4A-S7 ratchet düşüşü + FAZ4A KAPANIŞI: 319/101 → 300/98 (−19; wrapper-hb + fix-dispatch-continuation + postfix-pending-scan sıfırlandı, birleşik 35/35) — FAZ4A yedi diliminin tamamı settle: S1+S6+evaluator ölçümle (iş uydurulmadı), S2-S5+S7 gerçek-tmpdir dönüşümüyle; kümülatif 539/113 → 300/98 (−239 kırık, −15 dosya), üretim koduna sıfır dokunuş, 1 gerçek üretim bug'ı kayda girdi (PROD-SPRINT-PREFIX-PAD-001); kalan borç FAZ4B+ işi: orchestra dağınık (~60: docker ~16 · auth-isolation ~12 · moat3 6 · memory-limit 7 · diğer) + CLI 116 + MCP 96 sınıflarının güncel karşılıkları; 2026-08-04 FAZ4B-B1 ratchet düşüşü: 300/98 → 231/86 (−69; MCP SINIFININ TAMAMI SIFIRLANDI — tests/mcp 1031/1031, 12 dosya) — kök nedenler: eşzamanlı-import deadlock'u + 5 bayat mock'ta 7 eksik export (annotations), ADR-G-037 final-only-usage owner-grant'ının fixture'larda olmaması, deckent_plan'ın planRunFlow seam'ine geçişi, authority-first status (yanlış-derinlik mock path'leri sessiz ölüydü), lifecycle metninde CLEANUP fazının kaldırılması; hepsi test-taraflı drift, üretim bug'ı yok; kalan: B2 CLI çekirdeği (~60) → B3 CLI smoke (~20) → B4 api+orchestra dağınık (~136); 2026-08-04 FAZ4B-B2 ratchet düşüşü: 231/86 → 169/75 (−62; CLI çekirdeğinin 12 dosyası sıfırlandı — tam-sınıf koşu 7477 testte 29 kırık kaldı: B3 smoke 12 + command-registry 2 GERÇEK-POZİTİF + 15 tekli, 2 tekli kendiliğinden iyileşti); üretim bug'ı yok, 1 gerçek üretim drift'i typed bulgu olarak CLI-VOCAB-001'e taşındı (execution-authority registry satırı eksik); kalan: B3 CLI smoke+tekliler (~31) → B4 api+orchestra (~136); 2026-08-04 FAZ4B-B3 ratchet düşüşü: 167/74 → 140/56 (−27; CLI sınıfı MCP gibi TAMAMEN sıfır — 7477/7477) — B3a yeni gerçek üretim-bug adayı kayda geçirdi (PROD-BINARY-IDENTITY-EAGER-CRASH-001, satır 3335: src'siz kullanıcı projesinde ham-stack çökme); kalan borç yalnız: orchestra 107/37 + api 22/9 + süpürme 7/5 + eski-baseline artıkları; 2026-08-04 FAZ4B-B4 ratchet düşüşü: 140/56 → 33/19 (−107; ORCHESTRA SINIFI TAMAMEN SIFIR — tests/orchestra 8770/8770, 37 dosya + PREFIX-PAD fixture yan-etkisi ek-receipt'le) — B4a P0 üretim regresyonu kayda geçirdi (PROD-LANDED-FENCE-ORDER-001, satır 3340: LANDED heartbeat+continuation sessiz kaybı) ve iki testte bilinçli REGRESSION-PIN bıraktı; pinlenen yeni gerçekler: worker prose asla scope authority olamaz, FIX-budget'lı koşuda NO_GO dependant'ı deferTerminalDependencyFailure ile PENDING bekler, auth broker-kopyalı principal-digest zinciri, billingMode fail-closed→runBudgetHold; kalan: B5 api (22/9) + B6 süpürme (7/5) + eski-baseline artıkları (~4); 2026-08-04 FAZ4B-B5 SON SÜPÜRME + SIFIR KİLOMETRE TAŞI: 33/19 → 0/0 — api sınıfı 251/251, tekliler 411/412→tam yeşil (fence'in dürüst kırmızısı MOUNT-BINDING üretim fix'iyle kapandı), bayat-sanılan 4 CLI girdisi gerçekte collect-fail çıktı ve onarıldı; FINAL DOĞRULAMA sınıf-sınıf: core+agents 10121/10121 · orchestra 8770/8770 · cli 7477/7477 · mcp+api+kalan 5720'de yalnız 2 dilim-durumu meta-testi (settlement'la söner); scripts/test-failure-baseline.json BOŞALDI → lint:test-baseline artık borç-defteri değil GERÇEK her-kırık-FAIL kapısıdır (Type-Check-maskesi sınıfı yapısal olarak kapandı); toplam yay: 539/113 → 0/0, üretime 4 gerçek-bug fix'i (PREFIX-PAD, exec-authority registry, binary-identity eager, mount-binding) + 2 açık P0/P1 kayıt (LANDED-fence, SSE-onEvent). 2026-08-11: onaylı tasarım .analysis/audits/project-inventory-scope-admission-authority-design-2026-08-06.md bu satıra bağlandı (ORPHAN'dı, SSOT §1 gereği; doküman truth/evidence owner olarak TRUTH-BASELINE-001 order 40'ı açıkça beyan ediyor). Tasarım Git'i VCS-neutral Project Inventory Authority'nin adapter'ı yapmayı ve unavailable/empty/non-Git/stale/drifted durumlarını tipli ayırmayı öneriyor. Bu bağlama satırın BASELINE_CONFLICT blocker'ını ÇÖZMEZ",
+      "updated": "2026-08-11"
     },
     {
       "order": 50,
@@ -17947,7 +18013,9 @@
         "APPROVAL-QOL-001",
         "TRUST-HANDOFF-001",
         "SEC-OWASP-ASI-001",
-        "SEC-ENFORCE-WIRE-001"
+        "SEC-ADR-CROSSWALK-001",
+        "SEC-ENFORCE-WIRE-001",
+        "CONFIG-AUTHORITY-CONSOLIDATION-001"
       ],
       "gates": [
         "G2",
@@ -17984,7 +18052,9 @@
         "APPROVAL-QOL-001",
         "TRUST-HANDOFF-001",
         "SEC-OWASP-ASI-001",
-        "SEC-ENFORCE-WIRE-001"
+        "SEC-ADR-CROSSWALK-001",
+        "SEC-ENFORCE-WIRE-001",
+        "CONFIG-AUTHORITY-CONSOLIDATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Every operation binds principal, tenant, capability, approval, budget, receipt and audit",
@@ -18424,7 +18494,9 @@
         "TRUST-HANDOFF-001",
         "WORKER-ENV-TMPFS-001"
       ],
-      "children": [],
+      "children": [
+        "WRITE-SCOPE-BACKEND-PARITY-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -18442,7 +18514,8 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "CAPABILITY-001",
-        "APPROVAL-001"
+        "APPROVAL-001",
+        "WRITE-SCOPE-BACKEND-PARITY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-08-08-TOOLAUTH-T1-01",
@@ -18450,8 +18523,39 @@
         "GR-2026-08-08-TOOLAUTH-WRITEGUARD-SUPP-01"
       ],
       "acceptance": "Least privilege, progressive disclosure, explicit escape hatch and no hidden full surface",
-      "evidence": "Legacy 559; terminal tool foundations; 2026-08-05 kod-truth: runtime write-scope yalnız claude worker'da (`--allowedTools`), codex/gemini `allowedToolsFlag: null` (`provider-command-spec.ts:129,145`) ve üç provider da kendi guardrail'leri kapalı spawn ediliyor (`:113,128,143`); `tools.allowlist_enabled` açıkken bile allowlist yalnız prompt-metni üretiyor, gerçek grant değil (`task-builder.ts:2098`); claude'a verilen `Bash` grant'i `Write()` path-scoping'ini fiilen boşa düşürüyor; `receipt=GR-2026-08-08-TOOLAUTH-T1-01`; T1 SETTLEMENT 2026-08-08: silent-full-surface açığı typed+auditable yapıldı — resolveToolScopeEnforcement predicate (write-scope var VE allowedToolsFlag null ise RUNTIME_TOOL_SCOPE_UNENFORCED), spawn'da TASK_ASSIGN payload'una toolScope eklenir (Auditor+watch zaten tüketiyor, wired-by-construction), advisory-only fail-closed değil; `proof=toolauth-t1-5predicate-plus-2wiring-pins-core-orchestra-1170files-17944-green`; 7 pin. AÇIK typed-residual satır VERIFY: Bash-escape Write-scoping'i advisory'ye düşürür (filesystem-write-guard ayrı tasarım), flag-seviye enforcement + real-grant tam kapanış CAPABILITY-001+APPROVAL-001 bağımlı — bu dilim yalnız no-hidden-full-surface clause'unu kapatır; `receipt=GR-2026-08-08-TOOLAUTH-WRITEGUARD-01`; `receipt=GR-2026-08-08-TOOLAUTH-WRITEGUARD-SUPP-01`; WRITE-GUARD SETTLEMENT 2026-08-08: T1'in named Bash-defeats-Write residual'ı typed+surfaced yapıldı — worker allowlist path-scoped Write/Edit'in yanına KOŞULSUZ unscoped Bash veriyor (shell scope dışına yazar, ADR-G-020 write-scope fiilen advisory); resolveWriteScopeShellEscape predicate grant string'ini paren-aware ayrıştırır (WRITE_SCOPE_DEFEATED_BY_SHELL / WRITE_GRANT_UNSCOPED / WRITE_SCOPE_TOOL_BOUND / NO_WRITE_GRANT), TASK_ASSIGN payload'una writeScopeShellEscape T1 toolScope yanına eklenir advisory debugLog, verdict derivation-robust (spawner+docker koşulsuz unscoped Bash). `proof=writeguard-escape-predicate-plus-taskassign-wiring-41-green`; 8 pin artı 1 mekanik-baseline-supp. AÇIK typed-residual advisory-only kalır: gerçek enforcement (Bash grant kaldırma veya command-scope veya container fs-guard), docker last-hop write-target divergence artı non-docker backend surface, tam kapanış CAPABILITY-001 bağımlı",
-      "updated": "2026-08-08"
+      "evidence": "Legacy 559; terminal tool foundations; 2026-08-05 kod-truth: runtime write-scope yalnız claude worker'da (`--allowedTools`), codex/gemini `allowedToolsFlag: null` (`provider-command-spec.ts:129,145`) ve üç provider da kendi guardrail'leri kapalı spawn ediliyor (`:113,128,143`); `tools.allowlist_enabled` açıkken bile allowlist yalnız prompt-metni üretiyor, gerçek grant değil (`task-builder.ts:2098`); claude'a verilen `Bash` grant'i `Write()` path-scoping'ini fiilen boşa düşürüyor; `receipt=GR-2026-08-08-TOOLAUTH-T1-01`; T1 SETTLEMENT 2026-08-08: silent-full-surface açığı typed+auditable yapıldı — resolveToolScopeEnforcement predicate (write-scope var VE allowedToolsFlag null ise RUNTIME_TOOL_SCOPE_UNENFORCED), spawn'da TASK_ASSIGN payload'una toolScope eklenir (Auditor+watch zaten tüketiyor, wired-by-construction), advisory-only fail-closed değil; `proof=toolauth-t1-5predicate-plus-2wiring-pins-core-orchestra-1170files-17944-green`; 7 pin. AÇIK typed-residual satır VERIFY: Bash-escape Write-scoping'i advisory'ye düşürür (filesystem-write-guard ayrı tasarım), flag-seviye enforcement + real-grant tam kapanış CAPABILITY-001+APPROVAL-001 bağımlı — bu dilim yalnız no-hidden-full-surface clause'unu kapatır; `receipt=GR-2026-08-08-TOOLAUTH-WRITEGUARD-01`; `receipt=GR-2026-08-08-TOOLAUTH-WRITEGUARD-SUPP-01`; WRITE-GUARD SETTLEMENT 2026-08-08: T1'in named Bash-defeats-Write residual'ı typed+surfaced yapıldı — worker allowlist path-scoped Write/Edit'in yanına KOŞULSUZ unscoped Bash veriyor (shell scope dışına yazar, ADR-G-020 write-scope fiilen advisory); resolveWriteScopeShellEscape predicate grant string'ini paren-aware ayrıştırır (WRITE_SCOPE_DEFEATED_BY_SHELL / WRITE_GRANT_UNSCOPED / WRITE_SCOPE_TOOL_BOUND / NO_WRITE_GRANT), TASK_ASSIGN payload'una writeScopeShellEscape T1 toolScope yanına eklenir advisory debugLog, verdict derivation-robust (spawner+docker koşulsuz unscoped Bash). `proof=writeguard-escape-predicate-plus-taskassign-wiring-41-green`; 8 pin artı 1 mekanik-baseline-supp. AÇIK typed-residual advisory-only kalır: gerçek enforcement (Bash grant kaldırma veya command-scope veya container fs-guard), docker last-hop write-target divergence artı non-docker backend surface, tam kapanış CAPABILITY-001 bağımlı. 2026-08-11 yeniden doğrulama (b5fca0039): satırın kendi adlandırdığı docker last-hop write-target divergence artı non-docker backend surface residual'ı SÜRÜYOR — spawn-backend-docker.ts:3627-3628 (inspectionOnly ? [] : directories) ile sprint-spawner.ts:515 (koşulsuz task.scope.directories) farklı write-target türetiyor; docker implementation worker'ı proje RW mount alıyor (:5762). codex/gemini allowedToolsFlag: null src/core/provider-command-spec.ts:129,145'te sabit (2026-08-05 kanıtındaki provider-command-spec.ts yolu src/core/ altındadır). Closure child: WRITE-SCOPE-BACKEND-PARITY-001. Onaylı tasarım: .analysis/audits/provider-neutral-worker-execution-authority-design-2026-08-06.md Not: bu satırın DependsOn hücresi definitionDigest'in parçası olduğu için değiştirilemedi (validator IDENTITY_DEFINITION_DRIFT); önkoşul/closure edge'i child satırın Parent'ı (§3.3 aggregate closure) ve bu prose kaydıyla taşınır",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 4061,
+      "id": "WRITE-SCOPE-BACKEND-PARITY-001",
+      "parent": "TOOL-AUTHORITY-001",
+      "program": "AUTHORITY",
+      "outcome": "Worker write-target türetimi tüm spawn backend'lerinde tek authority'den gelir",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "`sprint-spawner` ve `spawn-backend-docker` (ve declared her ek backend) aynı canonical write-target türeticisini tüketir; `directories`'in write-scope'a katılması tek yerde ve tipli koşulla olur; inspection-only task her backend'de aynı boş write-scope'u alır; divergence CI'da regression-gate edilir; kapanmayan backend dürüst `unsupported/HOLD` verir",
+      "evidence": "Açılış: 2026-08-11 yeniden doğrulama — `TOOL-AUTHORITY-001`'in kendi adlandırdığı residual: `spawn-backend-docker.ts:3627-3628` `inspectionOnly ? [] : directories` ile `sprint-spawner.ts:515` `['.tasks/', ...task.scope.directories, ...task.scope.filesWrite]` farklı write-target üretiyor; docker implementation worker'ı ayrıca proje RW mount alıyor (`:5762`). Parent `VERIFY` olduğu için residual child'a taşındı (§3.3 invariant). Kanıt yeniden doğrulanmış kod okumasıdır, hiçbir enforcement kanıtı değildir",
+      "updated": "2026-08-11"
     },
     {
       "order": 4070,
@@ -18639,7 +18743,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Pre-spawn'da kümülatif spend aşımı typed block üretir; aşım anındaki aktif sprint kesilmez — graceful-landing, yalnız yeni admission durur (owner ilkesi: akış-engellememe); default davranış değişimi flag-gated + owner-onaylı; config-key adı davranışla birebir örtüşür",
-      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `sprint-finalizer.ts:1886-1889` \"HARD spend gate ... NOT implemented\", `start.ts:951` TODO(post-beta); `cost_limits.enforce_spend_gate` bugün yalnız uyarı emisyonunu açıyor. 2026-08-11 RCA enforcement'ın önce canonical actual-spend producer/ledger authority'sine bağımlı olduğunu kanıtladı; exact prerequisite SPEND-LEDGER-AUTHORITY-001",
+      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `sprint-finalizer.ts:1886-1889` \"HARD spend gate ... NOT implemented\", `start.ts:951` TODO(post-beta); `cost_limits.enforce_spend_gate` bugün yalnız uyarı emisyonunu açıyor. 2026-08-11 RCA enforcement'ın önce canonical actual-spend producer/ledger authority'sine bağımlı olduğunu kanıtladı; exact prerequisite SPEND-LEDGER-AUTHORITY-001. 2026-08-11 yeniden doğrulama (b5fca0039): warn-only SABİT — cost-gate.ts:254 if (!limits.enforce_spend_gate) return null;, :325 WARN-ONLY never blocks; key cost-config-loader.ts:90. resource-monitor.ts'te costUsd 0 eşleşme → gerçek harcama üreticisi yok, SPEND-LEDGER-AUTHORITY-001 önkoşulu doğrulandı. Onaylı tasarım: .analysis/audits/rolling-spend-budget-authority-design-2026-08-05.md — ADR-G-037 (Enforcement-Level hard, Immutable no) landing/budget authority'siyle doğrudan çakışıyor, amendment yeterlidir, SEC-ADR-CROSSWALK-001 önkoşuldur Not: bu satırın DependsOn hücresi definitionDigest'in parçası olduğu için değiştirilemedi (validator IDENTITY_DEFINITION_DRIFT); önkoşul/closure edge'i child satırın Parent'ı (§3.3 aggregate closure) ve bu prose kaydıyla taşınır",
       "updated": "2026-08-11"
     },
     {
@@ -18925,7 +19029,8 @@
       "children": [
         "NERVOUS-EFFECT-OUTCOME-TRUTH-001",
         "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
-        "PROVENANCE-CONTEXT-001"
+        "PROVENANCE-CONTEXT-001",
+        "AUDIT-SECRET-CUSTODY-001"
       ],
       "gates": [
         "G1"
@@ -18947,12 +19052,13 @@
         "OPERATION-001",
         "NERVOUS-EFFECT-OUTCOME-TRUTH-001",
         "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
-        "PROVENANCE-CONTEXT-001"
+        "PROVENANCE-CONTEXT-001",
+        "AUDIT-SECRET-CUSTODY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Every decision/effect/settlement traceable; redaction schema and bounded retention",
-      "evidence": "Existing audit systems fragmented; 2026-08-05 kod-truth: `AUDIT_HMAC_SECRET` sabit string (`audit-writer.ts:35`) — ana zincir kaynak-sahibi adversary'ye karşı sahtelenebilir, terminal zincirindeki makine-lokal rastgele anahtar deseni (`api/terminal/audit-integrity.ts`, 0600) ana zincire taşınmalı; redaction sink-level chokepoint değil call-site-bazlı — worker `.log`/`.result` yakalaması ve genel `writeEvent` payload'ları kapsam dışı kalıyor; 2026-08-10 autonomous RCA: writer canonical `recently-works/autonomous-events.jsonl` kullanırken API ve broad MCP mevcut olmayan `.deckent/autonomous-events.jsonl` okuyor; 10 MiB rotation `.1`i overwrite ediyor ve readers rotated partitionı okumadığından history/HMAC continuity kaybolabiliyor; exact read-model/retention closure AUTONOMOUS-OBSERVABILITY-001 childındadır. 2026-08-10 prompt injection RCA: ignored JSONL geçerli satırlar taşısa da test/live/run/attempt/project/tenant provenance yok, zero-selection kararları yazılmıyor, `process.cwd()` project-root authority'sini bypass edebiliyor ve production reader bulunmuyor; bu artefakt causal audit veya training truth sayılmaz, exact closure PROMPT-INJECTION-TRACE-001 childındadır",
-      "updated": "2026-08-10"
+      "evidence": "Existing audit systems fragmented; 2026-08-05 kod-truth: `AUDIT_HMAC_SECRET` sabit string (`audit-writer.ts:35`) — ana zincir kaynak-sahibi adversary'ye karşı sahtelenebilir, terminal zincirindeki makine-lokal rastgele anahtar deseni (`api/terminal/audit-integrity.ts`, 0600) ana zincire taşınmalı; redaction sink-level chokepoint değil call-site-bazlı — worker `.log`/`.result` yakalaması ve genel `writeEvent` payload'ları kapsam dışı kalıyor; 2026-08-10 autonomous RCA: writer canonical `recently-works/autonomous-events.jsonl` kullanırken API ve broad MCP mevcut olmayan `.deckent/autonomous-events.jsonl` okuyor; 10 MiB rotation `.1`i overwrite ediyor ve readers rotated partitionı okumadığından history/HMAC continuity kaybolabiliyor; exact read-model/retention closure AUTONOMOUS-OBSERVABILITY-001 childındadır. 2026-08-10 prompt injection RCA: ignored JSONL geçerli satırlar taşısa da test/live/run/attempt/project/tenant provenance yok, zero-selection kararları yazılmıyor, `process.cwd()` project-root authority'sini bypass edebiliyor ve production reader bulunmuyor; bu artefakt causal audit veya training truth sayılmaz, exact closure PROMPT-INJECTION-TRACE-001 childındadır. 2026-08-11 yeniden doğrulama (b5fca0039): AUDIT_HMAC_SECRET = deckent-audit src/core/audit-writer.ts:35'te DEĞİŞMEDİ (243 commit boyunca); dosyanın kendi docstring'i bunu tracked follow-up olarak kaydediyor. Closure child: AUDIT-SECRET-CUSTODY-001. Onaylı tasarım: .analysis/audits/audit-authority-integrity-design-2026-08-06.md — DİKKAT: ADR-G-039 (hard, Immutable no) HMAC artı tek-aktif-imza-anahtarını KABUL EDİLMİŞ tasarım olarak bağlamış; tasarım bunu kaza sayıyor, SEC-ADR-CROSSWALK-001 önkoşuldur Not: bu satırın DependsOn hücresi definitionDigest'in parçası olduğu için değiştirilemedi (validator IDENTITY_DEFINITION_DRIFT); önkoşul/closure edge'i child satırın Parent'ı (§3.3 aggregate closure) ve bu prose kaydıyla taşınır",
+      "updated": "2026-08-11"
     },
     {
       "order": 4121,
@@ -19061,8 +19167,44 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "docs/audits/content-provenance-context-integrity-authority-design-2026-08-06.md onaylı tasarımı üretim zincirine bağlanır: goal-hijack/memory-poisoning karşı koruması + instruction authority isolation",
-      "evidence": "2026-08-08 envanter: onaylı tasarım dokümanı ORPHAN'dı, hiçbir ledger satırı referans vermiyordu — SSOT kuralı gereği açıldı",
-      "updated": "2026-08-08"
+      "evidence": "2026-08-08 envanter: onaylı tasarım dokümanı ORPHAN'dı, hiçbir ledger satırı referans vermiyordu — SSOT kuralı gereği açıldı. 2026-08-11 yeniden doğrulama (b5fca0039): YOL DÜZELTMESİ — Acceptance hücresindeki docs/audits/content-provenance-context-integrity-authority-design-2026-08-06.md yolu 2026-08-11 topoloji taşınmasıyla (commit b5fca0039, docs/ ürün-only) KIRILDI; dosyanın çözülen güncel yolu .analysis/audits/content-provenance-context-integrity-authority-design-2026-08-06.md'dir (tracked). Acceptance definitionDigest'in parçası olduğu için in-place düzeltilemez (validator IDENTITY_DEFINITION_DRIFT); düzeltme burada kayıtlıdır ve Acceptance metnindeki yol yalnız historical citation olarak okunmalıdır. Kod-truth sabit — planner memory enjeksiyonu source'u düşürüyor (sprint-planner.ts:179), retro yazarı 6 kaydı koşulsuz source:'brain' etiketliyor, identity katmanları ayrımsız birleşiyor (identity.ts:68), prompt-segmentation stablePrefixKey (prompt-segmentation.ts:232) 0 production caller. Bu satır kanıtın enforcement üretmediğini kanıtlar, provenance authority'sinin var olduğunu kanıtlamaz",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 4126,
+      "id": "AUDIT-SECRET-CUSTODY-001",
+      "parent": "AUDIT-001",
+      "program": "AUTHORITY",
+      "outcome": "Audit zinciri HMAC anahtarı sabit kaynak-görünür string yerine config/secret-manager authority'sinden gelir",
+      "priority": "P0",
+      "dependsOn": [
+        "SEC-ADR-CROSSWALK-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SEC-ADR-CROSSWALK-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "`AUDIT_HMAC_SECRET` sabiti üretim yolundan kalkar; anahtar materyali tek config/secret authority'sinden çözülür; anahtar yok/güvensizse typed `HOLD` (sessiz sabit fallback yok); bağımsız verifier zinciri anahtar-sahibi olmadan yeniden hesaplayamaz; `ADR-G-039` HKDF-SHA256 domain-separation ve rotation contract'ı ile uyum kanıtlanır",
+      "evidence": "Açılış: 2026-08-11 yeniden doğrulama — `src/core/audit-writer.ts:35` `export const AUDIT_HMAC_SECRET = 'deckent-audit'` 243 commit boyunca değişmedi; dosyanın kendi docstring'i \"a production deployment should thread a single config/secret-manager-sourced secret\" diyor. Kaynak-sahibi adversary audit zincirini sahteleyebilir. `ADR-G-039` (Enforcement-Level hard, Immutable no) bu alanı zaten bağladığı için `SEC-ADR-CROSSWALK-001` önkoşuldur",
+      "updated": "2026-08-11"
     },
     {
       "order": 4130,
@@ -19081,7 +19223,8 @@
         "DESKTOP-SECURITY-001"
       ],
       "children": [
-        "RUNTIME-CREDENTIAL-LIFECYCLE-001"
+        "RUNTIME-CREDENTIAL-LIFECYCLE-001",
+        "TERMINAL-SESSION-AUTHORITY-001"
       ],
       "gates": [
         "G1"
@@ -19101,7 +19244,8 @@
       "closureBlockedBy": [
         "TENANT-001",
         "APPROVAL-001",
-        "RUNTIME-CREDENTIAL-LIFECYCLE-001"
+        "RUNTIME-CREDENTIAL-LIFECYCLE-001",
+        "TERMINAL-SESSION-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "No raw config disclosure, IDOR, query-token persistence or unscoped admin action",
@@ -19138,6 +19282,43 @@
       "evidenceReceipts": [],
       "acceptance": "API/terminal token ve serve descriptor creation→publication→rotation→revocation→shutdown/crash retirement zinciri tek service üzerinden atomik ve least-privilege işler; credential project+tenant+principal+server generation/endpoint/expiry ile bind edilir; dead PID, port reuse, restart, concurrent daemon ve partial-write durumları stale descriptor/tokenı authorize etmez; normal close tokenları emekli eder, crash recovery explicit reconcile/dry-run receipt'i üretir; secrets log/git/support bundle dışı kalır; OS credential-store/platform adapter ve Linux/macOS/Windows-native/WSL multi-project proof'u pass olur",
       "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: `api-token`, `terminal-token` ve `serve-daemon.json` 0600 ve atomik yazılıyor; olumlu sınır budur. Mevcut serve descriptorındaki PID canlı değil ve port 3100 health bağlantısı reddedildi, yani projection stale. Desktop reader dead-process descriptorını temizleyebiliyor ve normal serve shutdown descriptorı kaldırıyor; API server close ise token dosyalarını unlink/revoke etmiyor, credentiallar process ömründen sonra kalıyor. Bu veri aktif bypass kanıtı değildir; kök sorun creation güçlü iken retirement/revocation ownershipinin kapanmamasıdır. Canlı token/descriptor bu satırın owner-approved reconcile akışından önce manuel silinmez",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 4132,
+      "id": "TERMINAL-SESSION-AUTHORITY-001",
+      "parent": "API-SECURITY-001",
+      "program": "AUTHORITY",
+      "outcome": "Terminal session execution authority: kind-bağımsız command guard, host-bağımsız yetki sınırı ve principal-bound session kimliği",
+      "priority": "P0",
+      "dependsOn": [
+        "PRINCIPAL-001",
+        "SEC-ADR-CROSSWALK-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SEC-ADR-CROSSWALK-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Command/prompt guard her `SessionKind` için çalışır (`shell` özel-durumu kalkar); yetki sınırı network binding'den bağımsızdır (loopback authority üretmez); session kimliği principal/owner/project taşır ve tenant-scoped fail-closed okunur; auth provider async/rotating credential contract'ını taşır; owner-onaylı `ADR-G-029` successor'ı olmadan `DONE` olamaz",
+      "evidence": "Açılış: 2026-08-11 yeniden doğrulama — onaylı tasarım `.analysis/audits/terminal-session-execution-authority-design-2026-08-06.md` ORPHAN'dı, hiçbir ledger satırı referans vermiyordu (SSOT §1 gereği açıldı); doküman kendi authority owner'ları arasında `API-SECURITY-001` (4130) sayıyor. Kod-truth: `src/api/terminal/command-guard.ts:55` `if (ctx.kind !== 'shell') return [];` → `ai`/`deckent` session'ları guard'sız; `session-manager.ts:120` `host: this.opts.host ?? 'localhost'` → üçüncü bypass; `types.ts` session kimliği `tenantId?` (default `local`) dışında principal taşımıyor. `ADR-G-029` `Immutable: yes` ve command/prompt guard'ı \"delivered\" sayıyor (AUDIT-WIRE ve TERM-CONFIG-WIRE boşluklarını kendisi kaydediyor) → `SEC-ADR-CROSSWALK-001` önkoşuldur",
       "updated": "2026-08-11"
     },
     {
@@ -19335,8 +19516,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Owner G2 kapsam kararı: agent'ın görebildiği/kapatabildiği monitoring güvenlik kontrolü sayılmaz — worker-bağımsız heartbeat + append-only dış ledger; sandbox-dışı privileged yardımcılar (git helper/hook, IDE extension, daemon) Brain policy kapsamına alınır; yüksek-riskli config mutation'ları (workspace-trust sınıfı) admission gate'ten geçer; enforcement modu (advisory/enforce) tiplenir; karar kapsam daraltmaya da çıkabilir",
-      "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07-23 coding-agent sandbox güvenlik sınıfı raporu (Cursor/Codex/Gemini CLI ortak hata sınıfları: denylist sandbox, komut-adına güven, Docker socket, config-üzerinden-executable davranış) + RepoComplianceBench (agent'lar repo policy'sini kendiliğinden okumuyor; stop/handoff davranışı güvenilmez). İlke: agent'ın güvenlik sınırı, agent prosesinin sınırı değildir. PLUGIN-SANDBOX-001 plugin/skill sandbox'ını, bu satır sandbox-sonrası host-etki zincirini kapsar; 2026-08-05 kod-truth: BOUNDARY_VIOLATION honest-gate worker'ın kendi `filesChanged` beyanına güveniyor (`result-evaluator.ts:2380-2430`) — beyan-dışı dosya hiç yakalanmıyor; bağımsız auditor git-diff kontrolü alert-only + tüm dirty dosyaları tüm aktif worker'lara atfediyor + untracked yeni dosyaları kaçırıyor (`auditor.ts:752-791`); worker-bağımsız dosya-provenance bu satırın kapsamındadır",
-      "updated": "2026-08-05"
+      "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07-23 coding-agent sandbox güvenlik sınıfı raporu (Cursor/Codex/Gemini CLI ortak hata sınıfları: denylist sandbox, komut-adına güven, Docker socket, config-üzerinden-executable davranış) + RepoComplianceBench (agent'lar repo policy'sini kendiliğinden okumuyor; stop/handoff davranışı güvenilmez). İlke: agent'ın güvenlik sınırı, agent prosesinin sınırı değildir. PLUGIN-SANDBOX-001 plugin/skill sandbox'ını, bu satır sandbox-sonrası host-etki zincirini kapsar; 2026-08-05 kod-truth: BOUNDARY_VIOLATION honest-gate worker'ın kendi `filesChanged` beyanına güveniyor (`result-evaluator.ts:2380-2430`) — beyan-dışı dosya hiç yakalanmıyor; bağımsız auditor git-diff kontrolü alert-only + tüm dirty dosyaları tüm aktif worker'lara atfediyor + untracked yeni dosyaları kaçırıyor (`auditor.ts:752-791`); worker-bağımsız dosya-provenance bu satırın kapsamındadır. 2026-08-11: onaylı tasarım .analysis/audits/attempt-effect-attribution-authority-design-2026-08-06.md bu satıra bağlandı (ORPHAN'dı, SSOT §1 gereği; doküman kendi canonical owner'ı olarak TRUST-HANDOFF-001 order 4180'i beyan ediyor). Kod-truth sabit: honest-gate worker beyanına güveniyor (result-evaluator.ts:2402 fail-open, :2434 .md muafiyeti), auditor git diff --stat alert-only artı untracked-körü (auditor.ts:752 → :1351 → :1435), gate hatası treat-as-honest düşüyor (sprint-phases.ts:1760-1778). ASI07 (agent-arası mesaj authentication/integrity/replay) için owner kararı bekliyor: bu satırın kapsamına katılması önerildi, henüz onaylanmadı",
+      "updated": "2026-08-11"
     },
     {
       "order": 4190,
@@ -19367,8 +19548,43 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "10 ASI riskinin tamamı kod-referanslı (file:line) enforcement sınıfıyla haritalanır; her gap ya mevcut bir ledger satırına bağlanır ya yeni satır önerisi olur; sonuç ASSURANCE-PACK-001 evidence formatına uyumlu; advisory→enforce geçişleri flag-gated + akışı-bloklamayan rollout ilkesiyle tiplenir (owner ilkesi: katman açık ve kontrollü, doğruluk ve akış-engellememe önce gelir)",
-      "evidence": "Açılış: Alperen 2026-08-05 onayı (\"2 numaralı işi değerlendirelim\"). İlk kod-truth taraması 2026-08-05 tamamlandı: 14-alan envanter; kritik bulgular — plugin-hook security pipeline'ı sprint yolundan erişilemez (sprint-controller loadPluginHooks opsiyonsuz), spend-gate warn-only (enforce_spend_gate adı-enforce-davranışı-log), AUDIT_HMAC_SECRET sabit string, codex/gemini worker'larında runtime write-scope yok, 4 enforcement modülü unwired (tool-scope-gate, checkWorkerAuthority, enforceSelfModifyingTask, SkillSandbox.requireSafe). İş-1 (security-event egress adapter — dış SIEM/agent-security platformlarına webhook audit yayını) owner kararıyla talep-gelirse plana alınır; satır açılmadı",
-      "updated": "2026-08-05"
+      "evidence": "Açılış: Alperen 2026-08-05 onayı (\"2 numaralı işi değerlendirelim\"). İlk kod-truth taraması 2026-08-05 tamamlandı: 14-alan envanter; kritik bulgular — plugin-hook security pipeline'ı sprint yolundan erişilemez (sprint-controller loadPluginHooks opsiyonsuz), spend-gate warn-only (enforce_spend_gate adı-enforce-davranışı-log), AUDIT_HMAC_SECRET sabit string, codex/gemini worker'larında runtime write-scope yok, 4 enforcement modülü unwired (tool-scope-gate, checkWorkerAuthority, enforceSelfModifyingTask, SkillSandbox.requireSafe). İş-1 (security-event egress adapter — dış SIEM/agent-security platformlarına webhook audit yayını) owner kararıyla talep-gelirse plana alınır; satır açılmadı. 2026-08-11: follow-up-works/owasp-asi-baseline-2026-08-11.md üretildi ama bu satırın acceptance'ını KARŞILAMIYOR — 10/10 verdict open, 0 enforcement sınıfı atanmış, 8/10 satırda MASTER row Not identified; dokümanın kendisi hiçbir kontrolü covered/partially-covered sınıflamadığını beyan ediyor. Ayrıca 10 kanıt yolundan 6'sı VAR OLMAYAN dizin öneki taşıyor (owner prompt'u yalnız çıplak dosya adı verdiği için önekler tahmin edilmiş): src/orchestra/audit-writer.ts, src/orchestra/plugin-hooks.ts, src/orchestra/plugin-loader.ts, src/orchestra/command-guard.ts, src/orchestra/tool-scope-gate.ts ve src/providers/provider-command-spec.ts → gerçekleri src/core/* ve src/api/terminal/command-guard.ts. Doküman dürüst bir ön-nottur, baseline değildir. Acceptance'ın kod-truth yarısı 2026-08-11 yeniden doğrulamasıyla üretildi: 38 iddia — 2 DÖNDÜ (plugin-hook kablolaması landi, checkWorkerAuthority isim çakışması), 15 satır KAYDI, 21 SABİT, 0 çürütüldü; enforcement sınıfları ASI bazında 4125, 4060, 7031+7034, 4120+4126, 4200, 4091, 4050/4054, 4132 ve 7040 evidence'ına dağıtıldı. Ayrıntı: follow-up-works/OWASP-ASI-REVERIFY-2026-08-11.md. Kalan yarı ASI07'nin sahibi atanmasıdır — HÂLÂ SAHİPSİZ, owner kararı bekliyor. Bu kanıt hiçbir enforcement'ın gerçekten bloke ettiğini kanıtlamaz; L boyutu ölçülmedi",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 4191,
+      "id": "SEC-ADR-CROSSWALK-001",
+      "parent": "AUTHORITY-001",
+      "program": "AUTHORITY",
+      "outcome": "9 onaylı güvenlik tasarımının ADR crosswalk'ı ve 4 doğrudan-alan çakışmasının owner-kararlı reconciliation'ı",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "AUDIT-SECRET-CUSTODY-001",
+        "CONFIG-AUTHORITY-CONSOLIDATION-001",
+        "TERMINAL-SESSION-AUTHORITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "9 tasarımın her biri için governing ADR listesi üretilir; 4 doğrudan-alan çakışması iki ayrı yola tiplenir — SUCCESSOR gerektiren `Immutable: yes` çifti (`ADR-G-021` self-modifying ↔ A6 D11 retire önerisi · `ADR-G-029` embedded-terminal ↔ A7, çatışma yalnız \"command/prompt guard = delivered\" iddiasında) ve AMENDMENT yeterli olan `Immutable: no` çifti (`ADR-G-037` execution-budget hard ↔ A2 · `ADR-G-039` key-custody hard ↔ A3); her biri için kanıtlı ÖNERİ Alperen'e sunulur; satır KARAR VERMEZ, `Immutable: yes` ADR'ye in-place dokunulmaz, `ADR-G-019` prosedürü izlenir; owner kararı alınmadan bağlı hiçbir satır implementation'a geçmez",
+      "evidence": "Açılış: 2026-08-11 yeniden doğrulama — 9 tasarımın 8'i SIFIR ADR atıfı taşıyor (Yasa-2 ihlali: spec yazmadan önce alan-ADR-recall zorunlu). `ADR-G-039` decision metni zaten \"Approval ingress, recurring-trigger occurrence ledger, and sealed evidence archive remain separate dependent slices under their already approved contracts\" diyor — approval işi sıfırdan tasarlanmaz, o contract'a bağlanır; A3 ise HMAC artı tek-aktif-imza-anahtarı artı zorunlu HKDF-SHA256 domain separation'ı kaza sayıyor, oysa ADR onu kabul edilmiş tasarım olarak bağlamış. Bu satır implementation'ın önündeki gerçek kapıdır; hiçbir ADR mutation'ı bu satırla yetkilenmez",
+      "updated": "2026-08-11"
     },
     {
       "order": 4200,
@@ -19399,8 +19615,44 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Kapsam ve tek tek settle edilecek maddeler: `tool-scope-gate` (`src/core/tool-scope-gate.ts`, 0 production caller, default advisory) · `checkWorkerAuthority(enforceRbac)` (`src/agents/worker.ts:795`, 0 caller) · `enforceSelfModifyingTask` (`self-modifying-detector.ts:203`, 0 caller; `self_mod_enforce` key config-types'ta tanımsız) · `SkillSandbox.requireSafe` (marketplace yolu report-only variant çağırıyor) · scope-gate git-failure fail-open (`sprint-controller.ts:1922`) · terminal command-guard loopback-inert (`command-guard.ts:54-55` + `session-manager.ts:13` host default localhost) · pre-commit/detect-secrets hook kurulu değil + `.secrets.baseline` ad uyumsuzluğu. Her madde için karar tiplenir: wire (hangi authority satırına bağlandığı) / retire (kod kaldırılır) / ratchet (advisory→enforce flag tanımı, default-off, akışı-bloklamayan rollout) — kanıtla settle olur",
-      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001, 14-alan envanter). İlke: production-wiring-closure (quality bar) — test-only import/unwired modül DONE sayılmaz",
-      "updated": "2026-08-05"
+      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001, 14-alan envanter). İlke: production-wiring-closure (quality bar) — test-only import/unwired modül DONE sayılmaz. 2026-08-11 yeniden doğrulama (b5fca0039) — ACCEPTANCE'A 3 DÜZELTME (Acceptance definitionDigest'in parçası olduğu için in-place değiştirilemez, validator IDENTITY_DEFINITION_DRIFT; düzeltmeler burada bağlayıcıdır ve Acceptance metnindeki karşılıkları supersede eder): (1) checkWorkerAuthority İKİ AYRI FONKSİYONDUR, tek madde sayılamaz — (a) ADR-037 file-scope sürümü src/agents/worker.ts:795, 0 production caller (yalnız tests/agents/worker-authority.test.ts) = UNWIRED, wire-or-retire kararı hâlâ gerekli; (b) RBAC sürümü src/nervous/authority-matrix.ts, artık WIRED — backlog-trigger.ts:32 ve sprint-runtime.ts:33 → autonomous/runtime-loop.ts:49-50 ve sprint-spawner.ts:377, flag enforce_rbac (config-types.ts:1699), permissive default korunuyor (authority-matrix.ts:307 no actor/no role/unknown role → permit); (b)'nin kapanması (a)'yı KAPATMAZ ve bu satır (a) için açık kalır. (2) Satır kaymaları: tool-scope-gate export'u src/core/tool-scope-gate.ts:117 createScopeGate; self-modifying-detector.ts:203 → :201; sprint-controller.ts:1922 → :1940; command-guard.ts:54-55 → src/api/terminal/command-guard.ts:55; session-manager.ts:13 yalnız docstring, etkin default :120. (3) detect-secrets ÇİFTE inert: .pre-commit-config.yaml .secrets.baseline'a işaret ediyor ama o dosya YOK, ayrıca .git/hooks/pre-commit kurulu değil. Değişmeyen: 3 modül hâlâ 0 production caller (createScopeGate, worker.ts:795, enforceSelfModifyingTask, SkillSandbox.requireSafe skill-sandbox.ts:297 — plugin-loader.ts:92 farklı giriş kullanıyor); self_mod_enforce config-types.ts'te hâlâ tanımsız. Onaylı tasarım: .analysis/audits/enforcement-module-disposition-authority-design-2026-08-06.md — ADR-G-021 (Immutable: yes) ile doğrudan çakışıyor, successor gerekir; ÖNKOŞUL SEC-ADR-CROSSWALK-001 (dependency edge Acceptance/DependsOn immutable olduğu için prose olarak kayıtlı)",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 4210,
+      "id": "CONFIG-AUTHORITY-CONSOLIDATION-001",
+      "parent": "AUTHORITY-001",
+      "program": "AUTHORITY",
+      "outcome": "9 güvenlik tasarımının config yüzeyi tek authority contract'ında uzlaştırılır ve paralel yazım serialize edilir",
+      "priority": "P1",
+      "dependsOn": [
+        "SEC-ADR-CROSSWALK-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SEC-ADR-CROSSWALK-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "9 tasarımın `config-types.ts` ve `config.ts` yazımları tek merge contract'ında toplanır; hangi satırın hangi key'i tanımladığı ID-exact atanır; aynı dosyaya yazan satırlar DAG'da serialize edilir (paralel admission reddedilir); her yeni security key typed default artı i18n'li diagnostic taşır; typed olmayan cast ile config okuma production yolunda kalmaz",
+      "evidence": "Açılış: 2026-08-11 yeniden doğrulama — 9 tasarımdan 6'sı `config-types.ts`, 6'sı `config.ts` yazıyor (inter-document file collision matrisi ölçüldü). Alperen 2026-08-06 kararı K7: dar-tanımlı erken uzlaştırma REDDEDİLDİ (\"dar tanım şimdiyi kurtarsa sonra bize teknik borç oluşturur ... sonradan bu turu borç olarak master plandan ele alır güncelleriz\") — bu satır o kabul edilmiş borcun kaydıdır. Halihazırda iki somut örnek: `plugins.security_enforcement` typed değil, tipsiz cast ile okunuyor (`plugin-hooks.ts:167`); `self_mod_enforce` hiç tanımlı değil",
+      "updated": "2026-08-11"
     },
     {
       "order": 5000,
@@ -21234,8 +21486,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "ID ve bütün source/destination path'ler canonical realpath containment ile doğrulanır; symlink ve junction policy explicit fail-closed olur; unique staged transaction manifest, entrypoint ve referenced files için publisher/signature/digest/SBOM/sandbox evidence üretir; per-skill ve install-workspace lock concurrent operationı serialize eder; activation yalnız atomic commit sonrası olur; failure eski sürümü korur; quarantine, revoke, restore ve audit trail tenant-bound çalışır; Linux, macOS, Windows native ve WSL adversarial testleri path traversal, archive escape, link escape ve interrupted update sınıflarını kapsar",
-      "evidence": "2026-08-10 code-truth: CLI/MCP ID doğrulaması root containment sağlamıyor ve `join(skillsDir,id)` `../` ile root dışına çıkıyor; CLI `--force`, update ve delete hedefi backup/transaction olmadan recursive kaldırıyor; bütün Git install'lar ortak `.tmp-clone` kullanıyor; publish safety scan çalıştırırken install/update `requireSafe` çağırmıyor; reader'larda realpath/symlink containment yok",
-      "updated": "2026-08-10"
+      "evidence": "2026-08-10 code-truth: CLI/MCP ID doğrulaması root containment sağlamıyor ve `join(skillsDir,id)` `../` ile root dışına çıkıyor; CLI `--force`, update ve delete hedefi backup/transaction olmadan recursive kaldırıyor; bütün Git install'lar ortak `.tmp-clone` kullanıyor; publish safety scan çalıştırırken install/update `requireSafe` çağırmıyor; reader'larda realpath/symlink containment yok. 2026-08-11 kod-truth: src/cli/commands/skill.ts:384,459 kopyalamadan ÖNCE rmSync(targetDir, recursive+force) yapıyor — kopya başarısız olursa hedef geri dönülemez; checksum cpSync SONRASI ve optional-skip-on-failure. result-collector.ts:1005 resolveSkillPrompts SKILL.md içeriğini digest/provenance olmadan prompt'a veriyor",
+      "updated": "2026-08-11"
     },
     {
       "order": 7030,
@@ -21294,7 +21546,9 @@
         "PLUGIN-PACKAGE-RUNTIME-TRUTH-001",
         "PLUGIN-SUPPLY-CHAIN-INGRESS-001"
       ],
-      "children": [],
+      "children": [
+        "PLUGIN-SECURITY-CONFIG-AUTHORITY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -21302,8 +21556,8 @@
       "state": "OPEN",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
+        "W": "1",
+        "E": "~",
         "H": "?",
         "L": "0",
         "X": "?",
@@ -21311,11 +21565,13 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "PLUGIN-SECURITY-CONFIG-AUTHORITY-001"
+      ],
       "evidenceReceipts": [],
       "acceptance": "`sprint-controller` plugin yüklemesi securityConfig'siz çalışamaz; ihlal stderr'e düşürülmez — typed fail-closed (advisory→enforce ratchet'i flag-gated, default'u owner kararı; akışı-bloklamayan rollout); `plugin_require_signature` + `plugins.trusted_publisher_keys` production yolundan erişilebilir olur; negative test: imzasız/scope-dışı hook sprint'i bloklar",
-      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `src/orchestra/sprint-controller.ts:1654` opsiyonsuz `loadPluginHooks` → `securityConfig undefined` → pipeline production'dan hiç koşmuyor; `plugin-hooks.ts:225-238` PluginSecurityError'ı stderr'e düşürüyor (\"Non-fatal — log and continue\"). Envanterin 1 numaralı gerçek riski. 2026-08-10 local plugin RCA: üç ignored package (`code-reviewer`, `doc-writer`, `test-runner`) null hook alanları nedeniyle validator'dan geçmiyor ve `scanPlugins` boş dönüyor; null'lar çıkarılınca legacy model aliasları canonical registry admissionında reddediliyor. Security options production compositiona verilmediği, loader `PluginSecurityError` dahil hataları continue ettiği ve invalid directory inventorysi sessiz atlandığı için green tests gerçek fail-closed admissionı kanıtlamıyor",
-      "updated": "2026-08-10"
+      "evidence": "Açılış: 2026-08-05 kod-truth taraması (SEC-OWASP-ASI-001) — `src/orchestra/sprint-controller.ts:1654` opsiyonsuz `loadPluginHooks` → `securityConfig undefined` → pipeline production'dan hiç koşmuyor; `plugin-hooks.ts:225-238` PluginSecurityError'ı stderr'e düşürüyor (\"Non-fatal — log and continue\"). Envanterin 1 numaralı gerçek riski. 2026-08-10 local plugin RCA: üç ignored package (`code-reviewer`, `doc-writer`, `test-runner`) null hook alanları nedeniyle validator'dan geçmiyor ve `scanPlugins` boş dönüyor; null'lar çıkarılınca legacy model aliasları canonical registry admissionında reddediliyor. Security options production compositiona verilmediği, loader `PluginSecurityError` dahil hataları continue ettiği ve invalid directory inventorysi sessiz atlandığı için green tests gerçek fail-closed admissionı kanıtlamıyor. 2026-08-11 yeniden doğrulama (b5fca0039): kablolama LANDI — sprint-controller.ts:1667 gerçek plugin-security config'iyle loadPluginHooks çağırıyor, resolvePluginSecurityEnforcement :165'te import, plugin-hooks.ts:322-328 registerPluginHooks(plugin, securityConfig, enforcement)'a veriyor. AÇIK typed residual: (1) plugins.security_enforcement config-types.ts'te TANIMLI DEĞİL, tipsiz cast ile okunuyor (plugin-hooks.ts:159,167 — kodun kendi notu), (2) default advisory, ihlalde PLUGIN_SECURITY_ADVISORY basıp yükleniyor (plugin-hooks.ts:278) — fail-closed değil. Closure child: PLUGIN-SECURITY-CONFIG-AUTHORITY-001. Onaylı tasarım: .analysis/audits/plugin-admission-authority-design-2026-08-05.md. State OPEN kalır: VERIFY scope-exact receipt gerektirir (§3.4), bu tur receipt üretmedi. H=? korunur — hiçbir test koşulmadı. Bu kanıt pipeline'ın koştuğunu kanıtlar, bloke ettiğini kanıtlamaz Not: bu satırın DependsOn hücresi definitionDigest'in parçası olduğu için değiştirilemedi (validator IDENTITY_DEFINITION_DRIFT); önkoşul/closure edge'i child satırın Parent'ı (§3.3 aggregate closure) ve bu prose kaydıyla taşınır",
+      "updated": "2026-08-11"
     },
     {
       "order": 7032,
@@ -21397,6 +21653,38 @@
       "updated": "2026-08-10"
     },
     {
+      "order": 7034,
+      "id": "PLUGIN-SECURITY-CONFIG-AUTHORITY-001",
+      "parent": "PLUGIN-SANDBOX-WIRE-001",
+      "program": "SECURITY",
+      "outcome": "Plugin güvenlik enforcement'ının typed config authority'si ve owner-kararlı ratchet default'u",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "`plugins.security_enforcement` `config-types.ts`'te typed key olarak tanımlanır ve `plugin-hooks.ts:167`'deki tipsiz cast retire edilir; advisory→enforce ratchet'i owner-set default taşır; enforce modunda imzasız/scope-dışı hook typed `PluginSecurityError` ile sprint'i bloklar (advisory log ile devam etmez); negatif test her iki modu ayrı kanıtlar",
+      "evidence": "Açılış: 2026-08-11 yeniden doğrulama — 7031 kablolaması landi (`sprint-controller.ts:1667`) ama enablement authority'si typed değil: `plugin-hooks.ts:159` kodun kendi notu \"`plugins.security_enforcement` is not declared in config-types.ts yet\", `:167` tipsiz cast ile okuyor, `:278` ihlalde `PLUGIN_SECURITY_ADVISORY` basıp yüklemeye devam ediyor. Bu satır `E=1`'i üretir; `W=1`'i 7031 üretti. Hiçbir test koşulmadı, `H=?`",
+      "updated": "2026-08-11"
+    },
+    {
       "order": 7040,
       "id": "MCP-TRUST-001",
       "parent": "ECOSYSTEM-001",
@@ -21432,8 +21720,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Server provenance, tool risk, user consent, egress policy, schema/version and revoke",
-      "evidence": "Code-truth audit P0; 2026-08-05 kod-truth: `includeProjectScope` default true (`mcp-client/config.ts:46,57`) — REPL-dışı her caller klonlanmış reponun git-tracked `.mcp.json`'ını güvenilir sayıp server spawn ediyor (opt-in yalnız REPL bridge'de); üçüncü-parti MCP server'lar için allowlist/imza/provenance/per-tool consent kaydı yok; env passthrough sınırsız (`broker.ts:169`)",
-      "updated": "2026-08-05"
+      "evidence": "Code-truth audit P0; 2026-08-05 kod-truth: `includeProjectScope` default true (`mcp-client/config.ts:46,57`) — REPL-dışı her caller klonlanmış reponun git-tracked `.mcp.json`'ını güvenilir sayıp server spawn ediyor (opt-in yalnız REPL bridge'de); üçüncü-parti MCP server'lar için allowlist/imza/provenance/per-tool consent kaydı yok; env passthrough sınırsız (`broker.ts:169`). 2026-08-11 kod-truth: src/mcp-client/config.ts:43,46,57 — git-tracked .mcp.json includeProjectScope default true, yani klonlanan reponun MCP sunucuları non-REPL her caller'da güvenilir. Owner kararı: MCP değerlendirmesi MCPV2 cutover SONRASINA DEFERRED (2026-08-06); bu not yalnız kanıt kaydıdır, iş açmaz",
+      "updated": "2026-08-11"
     },
     {
       "order": 7050,
@@ -21690,8 +21978,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Owner değerlendirmesi: kapsam ve tasarım kararı verilir; kabul kriterleri, platform matrisi ve enforcement modu (advisory/enforce) değerlendirme sonucunda tiplenir; karar redde de çıkabilir",
-      "evidence": "Açılış: Alperen 2026-08-04 talebi (\"değerlendirilecek madde\"). Tetikleyici: 2026-08-04 \"Shai-Hulud: Here We Go Again\" npm worm'u — keyv@6.0.0 başlangıç, ~1.684 zehirli versiyon/420 paket adı, preinstall `setup.mjs` + Bun-derlenmiş payload, repo'lara `.claude/settings.json` SessionStart ve `.vscode/tasks.json` folderOpen hook'ları, `gh-token-monitor` persistence ve dead-man's-switch token izleyicisi. Bu repo aynı gün denetlendi ve TEMİZ: hiçbir lockfile'da etkilenen versiyon yok (desktop `keyv@4.5.4` integrity-pinli, saldırı öncesi sürüm), IOC dosyası/persistence/editör-hook izi yok, o gün install koşmadı. Değerlendirme sorusu (Dual-Lens): deckent worker'ları kullanıcı projelerinde bağımlılık kurabildiği için bu savunma katmanı hem dogfood hem son-kullanıcı ürünü olarak hangi kapsamda inşa edilmeli. Kaynaklar: safedep.io/keyv-npm-supply-chain-compromise, thehackernews.com/2026/08/keyv-linked-npm-worm-poisons-hundreds.html",
-      "updated": "2026-08-04"
+      "evidence": "Açılış: Alperen 2026-08-04 talebi (\"değerlendirilecek madde\"). Tetikleyici: 2026-08-04 \"Shai-Hulud: Here We Go Again\" npm worm'u — keyv@6.0.0 başlangıç, ~1.684 zehirli versiyon/420 paket adı, preinstall `setup.mjs` + Bun-derlenmiş payload, repo'lara `.claude/settings.json` SessionStart ve `.vscode/tasks.json` folderOpen hook'ları, `gh-token-monitor` persistence ve dead-man's-switch token izleyicisi. Bu repo aynı gün denetlendi ve TEMİZ: hiçbir lockfile'da etkilenen versiyon yok (desktop `keyv@4.5.4` integrity-pinli, saldırı öncesi sürüm), IOC dosyası/persistence/editör-hook izi yok, o gün install koşmadı. Değerlendirme sorusu (Dual-Lens): deckent worker'ları kullanıcı projelerinde bağımlılık kurabildiği için bu savunma katmanı hem dogfood hem son-kullanıcı ürünü olarak hangi kapsamda inşa edilmeli. Kaynaklar: safedep.io/keyv-npm-supply-chain-compromise, thehackernews.com/2026/08/keyv-linked-npm-worm-poisons-hundreds.html. 2026-08-11: onaylı değerlendirme follow-up-works/dep-supply-defense-2026-08-11.md bu satıra bağlandı (ORPHAN'dı, SSOT §1 gereği). Doküman evaluation-only sınıfındadır ve hiçbir runtime/CI/dependency değişikliği yetkilendirmez; Dependency Execution Broker'ı worker (tenant/project ingress: npm ci project-controlled manifest'e karşı) ve CI (Deckent release ingress) olmak üzere iki trust domain'inde staged artı fail-closed öneriyor, Phase 0'ı machine-derived kanıt üretimi olarak tiplemiş ve global ignore-scripts'i nihai tasarım olarak REDDEDİYOR (native/build-time paketlerin meşru script'leri sınıflandırılıp bilinçli admit edilmeli). Bağlı açık envanter boşlukları: DOCS-DEPS-HOME ve nested docs npm project'in ownership/install policy'si. Bu kanıt bir tasarım yönü kanıtlar, hiçbir enforcement'ın var olduğunu kanıtlamaz; ADR-D-005 bugün npm audit'i advisory/continue-on-error bırakıyor",
+      "updated": "2026-08-11"
     },
     {
       "order": 7110,
@@ -22849,8 +23137,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Canonical acceptance, authority, context budget and role sections; no append-only contradiction; representative 10-task golden set",
-      "evidence": "Legacy 573/580; residual from historical closed 442. 2026-08-10 code-truth: primary `buildWorkerPrompt(..., projectRoot)` canonical rootla diğer contexti çözüp `buildTaskPrompt` çağırıyor, fakat ADR injection audit prompt-god-template içinde `process.cwd()` ile yazılıyor; ayrı `queryRelevantADRs` yolu caller rootu kullanıyor. Prompt composition ve trace aynı canonical compile boundary/root authoritysine indirgenmeden audit provenanceı prompt contractını kanıtlamaz; exact trace closure PROMPT-INJECTION-TRACE-001",
-      "updated": "2026-08-10"
+      "evidence": "Legacy 573/580; residual from historical closed 442. 2026-08-10 code-truth: primary `buildWorkerPrompt(..., projectRoot)` canonical rootla diğer contexti çözüp `buildTaskPrompt` çağırıyor, fakat ADR injection audit prompt-god-template içinde `process.cwd()` ile yazılıyor; ayrı `queryRelevantADRs` yolu caller rootu kullanıyor. Prompt composition ve trace aynı canonical compile boundary/root authoritysine indirgenmeden audit provenanceı prompt contractını kanıtlamaz; exact trace closure PROMPT-INJECTION-TRACE-001. 2026-08-11 kod-truth: prompt-segmentation.ts:232 stablePrefixKey 0 production caller (yalnız tests/orchestra/prompt-segmentation.test.ts) — cache-prefix stability yazılmış ama devrede değil. İlgili onaylı tasarım .analysis/audits/content-provenance-context-integrity-authority-design-2026-08-06.md bu satırı kendi owner'ları arasında sayıyor",
+      "updated": "2026-08-11"
     },
     {
       "order": 9022,
@@ -23994,6 +24282,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "adbfe10ef1165b8a7f0d3a3ac129561fe19f74f1dd929ca627af39d48bea4275"
+    "value": "5e8c4dbaecb4c352f4b31001eced7fcec659ebc78e53f5df341bdd3211937ff2"
   }
 }

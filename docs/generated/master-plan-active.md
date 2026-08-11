@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):5f0b12efeadad157b80e10823d0040d1233ed2461d4502d1ea6fae92dcae1277`
+**Source digest:** `sha256(normalized-lf-utf8):f510d8ce3caf55cd21bf1691c8a4fb14fb456556fa4e840ecf31f1ab6a42868d`
 
-**Rows:** 454 total · 407 active · 47 terminal
+**Rows:** 460 total · 413 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 314 |
+| OPEN | 320 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -300,6 +300,7 @@
 | 4054 | `APPROVAL-DECISION-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `CAPABILITY-001` | — | Protected approval decisionları için worker-dışı, zorunlu ve doğrulanmış human authority chain |
 | 4055 | `NERVOUS-APPROVAL-SETTLEMENT-001` | OPEN | P0 | AUTHORITY | `APPROVAL-DECISION-AUTHORITY-001`, `PRINCIPAL-001`, `TENANT-001` | — | Nervous proposal, approval ve effect için tek runtime-wide first-writer-wins settlement authority |
 | 4060 | `TOOL-AUTHORITY-001` | VERIFY | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
+| 4061 | `WRITE-SCOPE-BACKEND-PARITY-001` | OPEN | P0 | AUTHORITY | — | — | Worker write-target türetimi tüm spawn backend'lerinde tek authority'den gelir |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
 | 4090 | `LIMIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001` | — | Unified provider/account/tenant/project budget and limit ledger |
@@ -314,15 +315,19 @@
 | 4121 | `NERVOUS-EFFECT-OUTCOME-TRUTH-001` | OPEN | P0 | AUTHORITY | `NERVOUS-APPROVAL-SETTLEMENT-001`, `RECEIPT-001` | — | Nervous finding→proposal→decision→effect→settlement ve compensation outcome'ları için causal audit truth |
 | 4122 | `GROUND-TRUTH-OVERRIDE-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `APPROVAL-DECISION-AUTHORITY-001`, `RECEIPT-001` | — | Ground-truth override için verified exception authority, bounded scope, expiry ve causal audit |
 | 4125 | `PROVENANCE-CONTEXT-001` | OPEN | P1 | AUTHORITY | `RECEIPT-001` | — | Content provenance and context integrity authority wiring |
+| 4126 | `AUDIT-SECRET-CUSTODY-001` | OPEN | P0 | AUTHORITY | `SEC-ADR-CROSSWALK-001` | — | Audit zinciri HMAC anahtarı sabit kaynak-görünür string yerine config/secret-manager authority'sinden gelir |
 | 4130 | `API-SECURITY-001` | BLOCKED | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `APPROVAL-001` | `DEPENDENCY_UNSATISFIED` | API authentication, authorization and config-secret containment |
 | 4131 | `RUNTIME-CREDENTIAL-LIFECYCLE-001` | OPEN | P0 | AUTHORITY | — | — | Runtime API/terminal credential ve daemon descriptor lifecycle, revocation ve stale-state authority |
+| 4132 | `TERMINAL-SESSION-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `SEC-ADR-CROSSWALK-001` | — | Terminal session execution authority: kind-bağımsız command guard, host-bağımsız yetki sınırı ve principal-bound session kimliği |
 | 4140 | `ENTERPRISE-AUTH-001` | OPEN | P0 | AUTHORITY | `TENANT-001`, `CAPABILITY-001`, `APPROVAL-001`, `AUDIT-001` | — | Community-safe and enterprise fail-closed profiles |
 | 4150 | `ALP-RUNTIME-001` | OPEN | P1 | AUTHORITY | `OPERATION-001`, `APPROVAL-001` | — | Alp Discipline decision anchor in runtime agents and planners |
 | 4160 | `MCP-LEASE-001` | VERIFY | P1 | AUTHORITY | `PRINCIPAL-001`, `OPERATION-001` | — | Multi-window MCP writer lease and authority-safe read/write split |
 | 4170 | `APPROVAL-QOL-001` | BLOCKED | P1 | AUTHORITY | `APPROVAL-001`, `MCP-LEASE-001` | `DEPENDENCY_UNSATISFIED` | Approval classifier, cross-process expiry and notification dedupe closure |
 | 4180 | `TRUST-HANDOFF-001` | OPEN | P1 | AUTHORITY | `TOOL-AUTHORITY-001`, `AUDIT-001` | — | Agent-çıktısından host-etkisine güven-aktarım zinciri: out-of-band telemetry, monitoring-loss=authority-suspension, egress gateway, Docker-socket default-deny, agent-üretimi dosya provenance'ı ve execution-capable config-mutation admission'ı |
 | 4190 | `SEC-OWASP-ASI-001` | OPEN | P1 | AUTHORITY | — | — | OWASP Agentic Top 10 (ASI01–ASI10, 2026) öz-değerlendirme baseline'ı: her ASI riski için mevcut mekanizma → enforcement sınıfı (ENFORCED/ADVISORY/CONFIG-GATED/UNWIRED) haritası, gap register ve ilgili ledger satırlarına kanıt-bağlaması |
+| 4191 | `SEC-ADR-CROSSWALK-001` | OPEN | P0 | AUTHORITY | — | — | 9 onaylı güvenlik tasarımının ADR crosswalk'ı ve 4 doğrudan-alan çakışmasının owner-kararlı reconciliation'ı |
 | 4200 | `SEC-ENFORCE-WIRE-001` | OPEN | P1 | AUTHORITY | — | — | Unwired/inert enforcement envanterinin tipli disposition'ı: yazılmış-ama-devrede-olmayan her güvenlik modülü wire-or-retire kararına bağlanır, sessiz-ölü enforcement kodu kalmaz |
+| 4210 | `CONFIG-AUTHORITY-CONSOLIDATION-001` | OPEN | P1 | AUTHORITY | `SEC-ADR-CROSSWALK-001` | — | 9 güvenlik tasarımının config yüzeyi tek authority contract'ında uzlaştırılır ve paralel yazım serialize edilir |
 | 5000 | `TERMINAL-001` | BLOCKED | P0 | TERMINAL | `KERNEL-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Terminal as canonical management and usage surface |
 | 5010 | `TERMINAL-TOOLS-001` | OPEN | P0 | TERMINAL | `TOOL-AUTHORITY-001`, `SURFACE-CUTOVER-001` | — | Role-model tool surface and progressive disclosure |
 | 5020 | `TERMINAL-DEV-001` | OPEN | P0 | TERMINAL | `DO-CUTOVER-001`, `TERMINAL-TOOLS-001` | — | Full codebase development loop inside Deckent terminal |
@@ -370,6 +375,7 @@
 | 7031 | `PLUGIN-SANDBOX-WIRE-001` | OPEN | P0 | SECURITY | — | — | Sprint yolundaki plugin-hook güvenlik kablolaması: `validatePluginSecurity` 4-adım pipeline'ı (allowed-path containment + AST tarama + SHA-256 integrity + Ed25519 publisher imzası) production `loadPluginHooks` çağrısına bağlanır ve `PluginSecurityError` fail-closed olur |
 | 7032 | `PLUGIN-SUPPLY-CHAIN-INGRESS-001` | OPEN | P0 | SECURITY | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-WIRE-001` | — | Plugin create/install/update/enable/disable/remove ingress'i path-safe, provenance-bound, transactional ve recoverable tek authority olur |
 | 7033 | `PLUGIN-PACKAGE-RUNTIME-TRUTH-001` | OPEN | P0 | ECOSYSTEM | `PLUGIN-SUPPLY-CHAIN-INGRESS-001`, `PLUGIN-SANDBOX-WIRE-001` | — | Plugin manifest, complete package, capability runtimeı ve bütün kullanıcı/AI yüzeyleri tek canonical truth üretir |
+| 7034 | `PLUGIN-SECURITY-CONFIG-AUTHORITY-001` | OPEN | P0 | SECURITY | — | — | Plugin güvenlik enforcement'ının typed config authority'si ve owner-kararlı ratchet default'u |
 | 7040 | `MCP-TRUST-001` | OPEN | P0 | SECURITY | `PRINCIPAL-001`, `CAPABILITY-001`, `SUPPLY-CHAIN-001` | — | Outgoing MCP trust, identity and data-boundary authority |
 | 7050 | `HUB-001` | BLOCKED | P1 | ECOSYSTEM | `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | `OWNER_DECISION_REQUIRED` | Production-ready Deckent Hub and signed distribution |
 | 7060 | `TOOL-COMPUTER-001` | OPEN | P2 | TOOL | `TOOL-AUTHORITY-001`, `PLUGIN-SANDBOX-001` | — | Optional computer-use/browser automation pack |
