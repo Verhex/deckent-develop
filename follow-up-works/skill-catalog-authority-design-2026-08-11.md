@@ -351,3 +351,22 @@ All anchors observed 2026-08-11 in the working tree; line numbers are for that s
 - **D8:** başlangıç bütçeleri YÜKSEK ve blocker-olmayan; sonradan kullanıcı/admin'e öneri yüzeyi.
 - **D9 ALTERNATİF KABUL:** flat-id + registry-mapping (publisher/id nitelemesi değil).
 - **D10 KABUL:** kaçak resolver = lint FAILURE (warning yok).
+
+---
+
+## IMPLEMENTATION LOG — S3 landed (task 522-010, 2026-08-11)
+
+Slice **S3** (§7 table — *entrypoint + referenced-file authority; `resolveBody()`; containment + budget enforcement*) is implemented in `src/core/skill-pool.ts` on top of the S1/S2 read model, with `SkillReferencedFile` + `SkillDefinition.referencedFiles?` added in `src/core/skill-types.ts`. Proof: `tests/core/skill-body-resolution.test.ts` (hermetic, `node:fs` mocked including symlinks).
+
+What the code now owns:
+
+- **G1 closed at the catalog.** `resolveSkillBody()` / `SkillPoolManager.resolveBody(id)` load the **declared** entrypoint. Both manifest shapes are honoured — today's bare string and the schema-v1 `{ path, format, contentDigest }` block (§3.3) — and an absent/empty declaration keeps defaulting to `SKILL.md`, so no existing manifest changes meaning. The skill root is the directory the winning record's content came from, so a project/generated manifest and a package-only builtin travel one code path.
+- **G2 closed as an atomic package.** `{entrypoint} ∪ referencedFiles` resolves whole or not at all. Every failure returns a typed HOLD carrying a distinct `reasonCode` (`unknown-skill`, `withdrawn`, `invalid-declaration`, `path-escape`, `symlink-escape`, `missing-file`, `unreadable-file`, `budget-exceeded`) and **no file content** — there is deliberately no branch that can emit a partial prompt.
+- **Containment on read, twice.** A declared path is parsed segment-wise and separator-agnostically (`parseDeclaredSkillPath`), so `a\..\..\b` is an escape on Linux as well as on Windows (Law 2); the resolved path is then re-checked after `realpathSync`, which is what makes a symlink escape a HOLD rather than an arbitrary-file read into a worker prompt.
+- **Budget per D8.** `DEFAULT_SKILL_PACKAGE_BUDGET` = 64 files / 1 MiB per file / 4 MiB total — high and non-blocking, refused **before** the bytes are read (count check up front, size from `statSync`), so an over-budget package never becomes a provider bill.
+
+Deliberately still open, and NOT decided here:
+
+- The consumers remain unmigrated: `result-collector.ts`, `skill-cache.ts` and `native-tool-registry.ts` still hardcode `SKILL.md`. That is **S4**, and it carries the byte-comparison proof obligation — S3 only provides the authority they will call.
+- A *declared* `entrypoint.contentDigest` / `referencedFiles[].digest` is not enforced against the bytes read; the resolver reports the computed `sha256:…` instead. Digest **admission** is supply-chain ingress (§9), not S3.
+- HOLD `detail` strings follow this module's existing English-diagnostic convention (`validateSkillDefinition`, `parseSkillId`); they are typed operator diagnostics, and the surface that renders them owns i18n (D7).

@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0-beta.1-sprint521] - 2026-08-11
+
+### Added
+
+- Fail-closed tenant authority for autonomous approval ingress (row 4021, rerun)
+- Agent catalog S1 — schema and state model, types only (row 7011)
+- Agent catalog S2 — the resolver behind the existing API (row 7011)
+- Crash artifacts gain retention and a bounded reader (row 121 second slice)
+
+### Changed
+
+- Skill catalog S1 — one effective read model behind the existing API (row 7012) (completed with tech debt)
+- Skill catalog S2 — V3 profile state carried as data (row 7012) (completed with tech debt)
+- Agent catalog S0 — the discovery census gate (row 7011) (completed with tech debt)
+- The plan gate learns read-satisfiability (born from two honest refusals) (completed with tech debt)
+
+
+_Tasks: 8 total, 8 done, 4 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint518] - 2026-08-11
 
 ### Added

@@ -4,7 +4,7 @@
 // Sprint 076: God Object Split Phase 3
 
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // ─── Observability (Sprint 134) ───────────────────────────────────
@@ -18,6 +18,7 @@ import type {
 // ─── Core (value imports — TaskStatus used at runtime for in-memory sync) ─
 import { TaskStatus } from '../core/types.js';
 import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
+import { resolveSkillPromptBodies } from '../core/skill-loading.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveTaskProvider } from './sprint-utils.js';
@@ -1009,38 +1010,42 @@ export async function resolveSkillPrompts(
   const skillIds = task.assignedSkills;
   if (!skillIds || skillIds.length === 0) return [];
   const results: Array<{ name: string; content: string }> = [];
-  for (const skillId of skillIds) {
-    const skillPath = join(projectRoot, '.deckent', 'skills', skillId, 'SKILL.md');
-    try {
-      const content = await readFile(skillPath, 'utf-8');
-      results.push({ name: skillId, content });
-    } catch (e) {
-      if (skillId === 'project-conventions') {
-        try {
-          const generated = generateProjectConventionsSkill(detectProjectStack(projectRoot));
-          const content = getGeneratedContent(generated);
-          if (content) {
-            results.push({ name: skillId, content });
-            metric('skill.prompt_generated', 1, { skillId, taskId: task.id });
-            continue;
-          }
-        } catch (generationError) {
-          debugLog('resolveSkillPrompts:generateProjectConventions', generationError);
-        }
-      }
-      // A skill assigned to the task whose SKILL.md could not be loaded is NOT
-      // injected into the worker prompt — yet downstream outcome tracking still
-      // credits it. Surface it (observability) rather than dropping it silently so
-      // a missing/unsynced skill file is visible, not an invisible phantom credit.
-      // (Phantom/typo'd ids are already stopped upstream at routing-engine's
-      // forceSkills validation; this catches the residual "valid id, missing file".)
-      metric('skill.prompt_load_failed', 1, { skillId, taskId: task.id });
-      debugLog('resolveSkillPrompts:readSkillFile', e);
-      // Outcome learning may only credit prompts actually delivered to the
-      // worker. Remove an unreadable assignment from the persisted in-memory
-      // task contract at this single resolution choke point.
-      task.assignedSkills = task.assignedSkills?.filter(id => id !== skillId);
+  // 522-011 S4 switch: the prompt route resolves skill bodies through the
+  // catalog authority (SkillPoolManager.resolveBody via skill-loading's ordered
+  // projection) instead of a hardcoded SKILL.md read — declared entrypoints,
+  // containment and budget enforcement now hold on this route too. Byte parity
+  // with the old reader is pinned by tests/core/skill-prompt-parity.test.ts.
+  for (const resolution of resolveSkillPromptBodies(projectRoot, skillIds)) {
+    if (resolution.ok) {
+      results.push({ name: resolution.skillId, content: resolution.content });
+      continue;
     }
+    const skillId = resolution.skillId;
+    if (skillId === 'project-conventions') {
+      try {
+        const generated = generateProjectConventionsSkill(detectProjectStack(projectRoot));
+        const content = getGeneratedContent(generated);
+        if (content) {
+          results.push({ name: skillId, content });
+          metric('skill.prompt_generated', 1, { skillId, taskId: task.id });
+          continue;
+        }
+      } catch (generationError) {
+        debugLog('resolveSkillPrompts:generateProjectConventions', generationError);
+      }
+    }
+    // A skill assigned to the task whose body could not be resolved is NOT
+    // injected into the worker prompt — yet downstream outcome tracking still
+    // credits it. Surface it (observability) rather than dropping it silently so
+    // a missing/unsynced skill file is visible, not an invisible phantom credit.
+    // (Phantom/typo'd ids are already stopped upstream at routing-engine's
+    // forceSkills validation; this catches the residual "valid id, held body".)
+    metric('skill.prompt_load_failed', 1, { skillId, taskId: task.id });
+    debugLog('resolveSkillPrompts:resolveBody', resolution.reasonCode);
+    // Outcome learning may only credit prompts actually delivered to the
+    // worker. Remove an unresolvable assignment from the persisted in-memory
+    // task contract at this single resolution choke point.
+    task.assignedSkills = task.assignedSkills?.filter(id => id !== skillId);
   }
 
   // born-593 DNA-FILTER-STAT-CREDIT (kök-neden-4c): buildWorkerPrompt (task-builder.ts)

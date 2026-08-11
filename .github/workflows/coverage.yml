@@ -32,7 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Install dashboard dependencies (for build:all → dashboard bundle)
-        run: npm install --prefix src/dashboard --ignore-scripts 2>/dev/null || true
+        run: npm install --prefix src/dashboard --ignore-scripts
       - name: Build dist + dashboard (required by dist-dependent e2e/smoke tests)
         # The coverage job runs the FULL suite (vitest run --coverage over all
         # tests/**), which includes dist-dependent e2e tests — npm-pack-smoke

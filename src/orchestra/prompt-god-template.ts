@@ -711,8 +711,12 @@ function dedupeAgentNamedSkills(
  * Sprint 182 PQ-2 (F2): per `feedback_prompt_completeness_over_brevity` anchor,
  * skill content is injected verbatim. The previous EFFORT_TOKEN_MAP /
  * `truncateAtParagraph` / `sectionMax` break logic was removed.
+ *
+ * Exported (522-011, design S4) so the skill-catalog migration's byte-comparison
+ * proof renders the REAL worker-prompt skill section from each body-read path
+ * instead of a test-local re-implementation of it. Behaviour is unchanged.
  */
-function buildSkillBlock(
+export function buildSkillBlock(
   skillPrompts: Array<{ name: string; content: string }> | undefined,
   outNames: string[],
 ): string {

@@ -4,7 +4,14 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { AgentDefinition, AgentPool, AgentStats } from './agent-types.js';
+import type {
+  AgentCatalogLayer,
+  AgentDefinition,
+  AgentPool,
+  AgentPromptAvailability,
+  AgentRoutabilityBlocker,
+  AgentStats,
+} from './agent-types.js';
 import { createDefaultStats, resolveDefaultAgentModel } from './agent-types.js';
 import type { ActivationRule } from './routing-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
@@ -99,18 +106,19 @@ function parseMarkdownTitleAndLead(markdown: string): { title: string; lead: str
 /**
  * Synthesize a minimal, valid AgentDefinition (raw JSON-shaped record) from a
  * builtin PROMPT.md that has no accompanying agent.json. `systemPrompt` is
- * left empty — the real content is served through getAgentPrompt()'s own
- * builtin-tree fallback (PROMPT.md stays the single canonical source, per
- * ADR-048); duplicating it into systemPrompt here would violate that
- * single-source contract. Returns null if the file cannot be read.
+ * left empty — the real content is served through the resolver's own
+ * builtin-tree fallback ({@link resolvePrompt}; PROMPT.md stays the single
+ * canonical source, per ADR-048); duplicating it into systemPrompt here would
+ * violate that single-source contract. Returns null if the file cannot be read.
+ *
+ * Reads through {@link readPromptFile} — the module's single prompt-content read
+ * (row 7011 slice S3): this synthesis path used to own a second `fs.readFileSync`
+ * of the very same PROMPT.md the resolver reads, so the two could disagree about
+ * what a builtin's prompt bytes are.
  */
 function synthesizeAgentDefinition(id: string, promptMdPath: string): Record<string, unknown> | null {
-  let content: string;
-  try {
-    content = fs.readFileSync(promptMdPath, 'utf8');
-  } catch {
-    return null;
-  }
+  const content = readPromptFile(promptMdPath);
+  if (content === undefined) return null;
 
   const { title, lead } = parseMarkdownTitleAndLead(content);
   const name = (title ? title.replace(/\s+Agent$/i, '').trim() : '') || titleCaseFromId(id);
@@ -829,6 +837,24 @@ export class AgentPoolManager {
     return ids;
   }
 
+  /**
+   * Resolve `id`'s persona through the pool's own resolver, against THIS manager's
+   * projectRoot (row 7011 slice S3). Consumers that already hold a pool entry call this
+   * instead of re-deriving prompt truth from a path literal — one resolution path, one
+   * layer precedence, one typed degraded classification for every surface.
+   *
+   * NOTE — not eager: prompt content is deliberately NOT attached inside loadAgents().
+   * The builtin tier's `hasPersistentRecord` gate needs an `existsSync` on each id's
+   * agent.json, which tests/core/agent-pool.test.ts pins as never happening during a load
+   * ("does NOT call existsSync for individual agent.json files"). That file is outside this
+   * slice's write authority, the same constraint the S2 slice honored (see the born-605
+   * note in loadAgents). The single-path fold is delivered here; eager per-entry attachment
+   * belongs to the slice allowed to re-pin those syscall assertions.
+   */
+  resolvePrompt(id: string): ResolvedAgentPrompt {
+    return resolvePrompt(id, this.projectRoot);
+  }
+
   // ─── Temp Agents ─────────────────────────────────────────────────────────────
 
   /**
@@ -1129,7 +1155,23 @@ export class AgentPoolManager {
   }
 }
 
-// ─── Agent Prompt Resolution (single source — PROMPT.md canonical) ─────
+// ─── Agent Prompt Resolution (row 7011 slice S3 — one path, behind the resolver) ──
+//
+// follow-up-works/agent-catalog-authority-design-2026-08-11.md §1.3 measured the defect
+// this section closes: prompt resolution was a SECOND chain, structurally independent of
+// the pool's own layered resolution, so an agent could be "present in the pool but
+// prompt-less" or "prompt-resolvable but absent from the pool", and the builtin-fallback
+// condition differed between the two. §6 S3 is the fold: one resolution path, the D1 layer
+// precedence the owner approved (L1 project > L2 runtime > L0 builtin — addendum "D1 KABUL",
+// already the order this chain walked), and the prompt facet expressed in the SAME typed
+// vocabulary slice S1 landed in agent-types.ts rather than a private second one.
+//
+// What is deliberately preserved byte-for-byte: the step order, the trim()-based emptiness
+// rule, the builtin tier's `hasPersistentRecord` + initialized-project gate, the degraded
+// console.warn, and the exact {content, source, degraded, resolvedFrom} shape every current
+// consumer sees ({@link getAgentPrompt} projects down to it). S3's proof obligation is that
+// standalone resolution and pool-side resolution return identical values — which is trivially
+// true once there is only one implementation of it.
 
 /** Source of the resolved agent prompt content. */
 export type AgentPromptSource = 'prompt-md' | 'prompt-md-builtin' | 'system-prompt' | 'none';
@@ -1148,9 +1190,42 @@ export interface AgentPromptResolution {
   resolvedFrom?: string;
 }
 
+/**
+ * What {@link resolvePrompt} actually produces: the legacy resolution PLUS the typed
+ * classification the S1 state model (agent-types.ts §3.4) already defines. The extra facets
+ * ride on this type rather than on {@link AgentPromptResolution} so that no current consumer
+ * of `getAgentPrompt()` observes a changed object — the migration of those consumers onto
+ * the richer record is slice S4's work, not this one's.
+ */
+export interface ResolvedAgentPrompt extends AgentPromptResolution {
+  /**
+   * D4's persona-availability facet, verbatim from agent-types.ts: a PROMPT.md hit is
+   * `'prompt-file'`, the systemPrompt fallback is `'system-prompt'`, and nothing usable is
+   * `'none'`. This is the same value `classifyAgentManifest()` derives from a manifest's
+   * sibling-file evidence, so a catalog entry and its resolved prompt can no longer disagree
+   * about whether a persona exists.
+   */
+  readonly availability: AgentPromptAvailability;
+  /** The catalog layer the content came from (§3.1), or null when nothing resolved. */
+  readonly layer: AgentCatalogLayer | null;
+  /**
+   * The routability blocker this resolution implies, or null when the persona is obtainable.
+   * Only `'none'` blocks: per D4 a degraded-but-present systemPrompt is still a persona, and
+   * whether a *broken* one is machine-detectable is an open owner question — so this mirrors
+   * agent-types.ts `finalize()` exactly instead of guessing a stricter rule.
+   */
+  readonly blocker: AgentRoutabilityBlocker | null;
+}
+
 const PROMPT_MD_FILENAME = 'PROMPT.md';
 
-function readFileIfExists(filePath: string): string | undefined {
+/**
+ * The module's single prompt-content read (S3). Every PROMPT.md byte any surface sees —
+ * resolver tiers and builtin synthesis alike — passes through here; a second reader is
+ * exactly the drift this slice removes. Absent, unreadable and directory paths all degrade
+ * to `undefined`, never a throw.
+ */
+function readPromptFile(filePath: string): string | undefined {
   try {
     if (!fs.existsSync(filePath)) return undefined;
     return fs.readFileSync(filePath, 'utf8');
@@ -1159,13 +1234,39 @@ function readFileIfExists(filePath: string): string | undefined {
   }
 }
 
+/** A PROMPT.md tier: the directory to look in, and how a hit there is reported. */
+interface PromptFileTier {
+  readonly layer: AgentCatalogLayer;
+  readonly dir: string;
+  readonly source: AgentPromptSource;
+}
+
+function promptFileResolution(
+  content: string,
+  tier: PromptFileTier,
+  resolvedFrom: string,
+): ResolvedAgentPrompt {
+  return {
+    content,
+    source: tier.source,
+    degraded: false,
+    resolvedFrom,
+    availability: 'prompt-file',
+    layer: tier.layer,
+    blocker: null,
+  };
+}
+
 /**
- * Resolve a single canonical agent prompt for `agentId` from `projectRoot`.
+ * Resolve a single canonical agent prompt for `agentId` from `projectRoot` — the ONE prompt
+ * resolution path in the runtime (S3). {@link getAgentPrompt} and
+ * {@link AgentPoolManager.resolvePrompt} are both thin delegates over it.
  *
- * Lookup order:
- *   1. `<root>/.deckent/agents/<id>/PROMPT.md` (canonical)
- *   2. `<root>/.tasks/agents/<id>/PROMPT.md`  (temp scope)
- *   2.5. `src/core/builtins/agents/<id>/PROMPT.md` (builtin fallback, 371-001) —
+ * Lookup order (D1 precedence — L1 project > L2 runtime > L0 builtin, then the degraded
+ * tier in the same layer order):
+ *   1. `<root>/.deckent/agents/<id>/PROMPT.md` (canonical, L1)
+ *   2. `<root>/.tasks/agents/<id>/PROMPT.md`  (temp scope, L2)
+ *   2.5. `src/core/builtins/agents/<id>/PROMPT.md` (builtin fallback, 371-001, L0) —
  *        ONLY when neither .deckent/agents/<id>/ nor .tasks/agents/<id>/ has
  *        ANY record for this id (not even an agent.json). If a persistent or
  *        temp agent.json exists, that id already went through the sync/
@@ -1178,63 +1279,49 @@ function readFileIfExists(filePath: string): string | undefined {
  * routing scoring and UI display, but it never co-exists with PROMPT.md in
  * the worker prompt block. ADR-048 (Prompt Lifecycle Contract) — Sprint 182.
  */
-export function getAgentPrompt(
+export function resolvePrompt(
   agentId: string,
   projectRoot: string,
-): AgentPromptResolution {
-  // 1. PROMPT.md (canonical) — persistent agents
-  const persistentPromptPath = path.join(projectRoot, AGENTS_DIR, agentId, PROMPT_MD_FILENAME);
-  const persistentPrompt = readFileIfExists(persistentPromptPath);
-  if (persistentPrompt !== undefined && persistentPrompt.trim().length > 0) {
-    return {
-      content: persistentPrompt,
-      source: 'prompt-md',
-      degraded: false,
-      resolvedFrom: persistentPromptPath,
-    };
+): ResolvedAgentPrompt {
+  // 1 + 2. PROMPT.md — L1 project override, then L2 learned/runtime.
+  const fileTiers: readonly PromptFileTier[] = [
+    { layer: 'project', dir: path.join(projectRoot, AGENTS_DIR, agentId), source: 'prompt-md' },
+    { layer: 'runtime', dir: path.join(projectRoot, TEMP_AGENTS_DIR, agentId), source: 'prompt-md' },
+  ];
+  for (const tier of fileTiers) {
+    const promptPath = path.join(tier.dir, PROMPT_MD_FILENAME);
+    const content = readPromptFile(promptPath);
+    if (content !== undefined && content.trim().length > 0) {
+      return promptFileResolution(content, tier, promptPath);
+    }
   }
 
-  // 2. PROMPT.md (temp scope)
-  const tempPromptPath = path.join(projectRoot, TEMP_AGENTS_DIR, agentId, PROMPT_MD_FILENAME);
-  const tempPrompt = readFileIfExists(tempPromptPath);
-  if (tempPrompt !== undefined && tempPrompt.trim().length > 0) {
-    return {
-      content: tempPrompt,
-      source: 'prompt-md',
-      degraded: false,
-      resolvedFrom: tempPromptPath,
-    };
-  }
-
-  // 2.5. PROMPT.md (builtin fallback) — only when this id has no .deckent/
+  // 2.5. PROMPT.md (L0 builtin fallback) — only when this id has no .deckent/
   // .tasks record at all (neither PROMPT.md nor agent.json anywhere for it),
   // AND projectRoot is an actual initialized deckent project (has
   // .deckent/config.json — see _loadBuiltinFallback for why this gate
   // matters: resolveBuiltinAgentsDir() intentionally reaches outside
   // projectRoot, into the running installation's own location).
-  const hasPersistentRecord =
-    fs.existsSync(path.join(projectRoot, AGENTS_DIR, agentId, AGENT_FILENAME)) ||
-    fs.existsSync(path.join(projectRoot, TEMP_AGENTS_DIR, agentId, AGENT_FILENAME));
+  const hasPersistentRecord = fileTiers.some((tier) =>
+    fs.existsSync(path.join(tier.dir, AGENT_FILENAME)),
+  );
   const isInitializedProject = fs.existsSync(path.join(projectRoot, CONFIG_FILENAME));
   if (!hasPersistentRecord && isInitializedProject) {
-    const builtinPromptPath = path.join(resolveBuiltinAgentsDir(), agentId, PROMPT_MD_FILENAME);
-    const builtinPrompt = readFileIfExists(builtinPromptPath);
+    const builtinTier: PromptFileTier = {
+      layer: 'builtin',
+      dir: path.join(resolveBuiltinAgentsDir(), agentId),
+      source: 'prompt-md-builtin',
+    };
+    const builtinPromptPath = path.join(builtinTier.dir, PROMPT_MD_FILENAME);
+    const builtinPrompt = readPromptFile(builtinPromptPath);
     if (builtinPrompt !== undefined && builtinPrompt.trim().length > 0) {
-      return {
-        content: builtinPrompt,
-        source: 'prompt-md-builtin',
-        degraded: false,
-        resolvedFrom: builtinPromptPath,
-      };
+      return promptFileResolution(builtinPrompt, builtinTier, builtinPromptPath);
     }
   }
 
-  // 3. Degraded fallback: agent.json::systemPrompt
-  const candidates = [
-    path.join(projectRoot, AGENTS_DIR, agentId, AGENT_FILENAME),
-    path.join(projectRoot, TEMP_AGENTS_DIR, agentId, AGENT_FILENAME),
-  ];
-  for (const jsonPath of candidates) {
+  // 3. Degraded fallback: agent.json::systemPrompt, same layer precedence.
+  for (const tier of fileTiers) {
+    const jsonPath = path.join(tier.dir, AGENT_FILENAME);
     const raw = readJsonSafe<Record<string, unknown>>(jsonPath);
     if (!raw) continue;
     const sp = raw['systemPrompt'];
@@ -1248,10 +1335,41 @@ export function getAgentPrompt(
         source: 'system-prompt',
         degraded: true,
         resolvedFrom: jsonPath,
+        availability: 'system-prompt',
+        layer: tier.layer,
+        blocker: null,
       };
     }
   }
 
-  // 4. Nothing usable
-  return { content: '', source: 'none', degraded: true };
+  // 4. Nothing usable — the one case D4 calls definitively non-routable.
+  return {
+    content: '',
+    source: 'none',
+    degraded: true,
+    availability: 'none',
+    layer: null,
+    blocker: 'prompt-unresolvable',
+  };
+}
+
+/**
+ * Thin delegate over {@link resolvePrompt}, kept for every existing consumer (S3: "keep
+ * `getAgentPrompt()` as a thin delegate"). It projects the resolver's record down to the
+ * historical four-field shape — including omitting `resolvedFrom` entirely when nothing
+ * resolved — so the object handed to callers is byte-identical to the pre-S3 one and the
+ * richer facets cannot leak into a serialized payload that never declared them.
+ */
+export function getAgentPrompt(
+  agentId: string,
+  projectRoot: string,
+): AgentPromptResolution {
+  const resolved = resolvePrompt(agentId, projectRoot);
+  const projected: AgentPromptResolution = {
+    content: resolved.content,
+    source: resolved.source,
+    degraded: resolved.degraded,
+  };
+  if (resolved.resolvedFrom !== undefined) projected.resolvedFrom = resolved.resolvedFrom;
+  return projected;
 }

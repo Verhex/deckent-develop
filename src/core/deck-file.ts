@@ -301,12 +301,41 @@ export function ensureDeckGitignore(projectRoot: string): void {
 }
 
 /**
+ * Environment variables that redirect git away from the directory it is invoked in. When any of
+ * these is inherited, git honours it over `cwd` and resolves against the ambient repository —
+ * git sets them for every hook it runs, and CI/worker sandboxes commonly export them process-wide.
+ */
+const GIT_LOCATION_ENV_KEYS = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_COMMON_DIR',
+  'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_NAMESPACE',
+] as const;
+
+/**
+ * A copy of the environment with git's location overrides stripped, so that the `cwd` handed to a
+ * git child process is the authoritative repository selector. Everything else (credentials, proxy,
+ * locale, GIT_CONFIG_*) is preserved.
+ */
+function projectScopedGitEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of GIT_LOCATION_ENV_KEYS) delete env[key];
+  return env;
+}
+
+/**
  * Check if .deck file is committed to git (tracked). Returns true if tracked — this is a security risk.
  */
 export function isDeckFileCommitted(projectRoot: string): boolean {
   try {
     const result = execSync('git ls-files --error-unmatch .deck', {
       cwd: projectRoot,
+      // Without this an inherited GIT_DIR/GIT_WORK_TREE overrides `cwd` and we would answer for
+      // the wrong repository — a false "not committed" for a .deck that really is tracked.
+      env: projectScopedGitEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
       encoding: 'utf-8',
     });

@@ -216,3 +216,52 @@ Bug: tests/connectors/bot-lifecycle-hones… (PAUSED)
 - 521-008: The plan gate learns read-satisfiability (born from two honest refusals) (DONE)
 
 ---
+## Sprint 522 — sprint-522
+
+**Status:** ABORTED
+**Date:** 2026-08-11
+**Duration:** 5812s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 21 |
+| Completed | 20 |
+| Tech Debt | 3 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 5811981ms |
+
+### Tasks
+
+- 522-001: Authoritative ADR recall for the five reverify designs (crosswalk packet §3) (DONE)
+- 522-002-fix-fix-fix: Fix: Fix: Fix: C1 normative-field-diff matrix — ADR-G-021 vs A6 D11 (PAUSED)
+- 522-002-fix-fix: Fix: Fix: C1 normative-field-diff matrix — ADR-G-021 vs A6 D11 (NO_GO)
+- 522-002-fix: Fix: C1 normative-field-diff matrix — ADR-G-021 vs A6 D11 (NO_GO)
+- 522-002: C1 normative-field-diff matrix — ADR-G-021 vs A6 D11 (GO_WITH_TECH_DEBT)
+- 522-003: C2 normative-field-diff matrix — ADR-G-029 vs A7 (DONE)
+- 522-004: C3 normative-field-diff matrix — ADR-G-037 vs A2 rolling budget (DONE)
+- 522-005: C4 normative-field-diff matrix — ADR-G-039 vs A3 audit integrity (DONE)
+- 522-006-fix: Fix: Persona S0 — provider system-channel capability census with behaviour verification (DONE)
+- 522-006: Persona S0 — provider system-channel capability census with behaviour verification (DONE)
+- 522-007: Persona S1 — capability seam types with D-H carried as data (DONE)
+- 522-008: Agent catalog S3 — prompt resolution folded into the resolver (DONE)
+- 522-009: Agent catalog S4 — CLI and MCP surfaces consume the read model (GO_WITH_TECH_DEBT)
+- 522-010: Skill catalog S3 — entrypoint and referenced-file authority (DONE)
+- 522-011-fix-fix: Fix: Fix: Skill catalog S4 — worker prompt path migrates to the read model (PAUSED)
+- 522-011-fix: Fix: Skill catalog S4 — worker prompt path migrates to the read model (NO_GO)
+- 522-011: Skill catalog S4 — worker prompt path migrates to the read model (NO_GO)
+- 522-012: Dep-supply Phase 0a — install-ingress census script, receipt-only (GO_WITH_TECH_DEBT)
+- 522-013: CI install fail-open closure — the three fail-open installs and floating npx (DONE)
+- 522-014: Trust-anchor design revision under the six codex conditions (DONE)
+- 522-015: CI required-checks architecture — closing the broken-main ingress (DONE)
+- 522-016: Estimator and worker-budget ratification — config truth with receipts (DONE)
+- 522-017: XVerify provider-authority RCA — why a provisioned keyring still holds (DONE)
+- 522-018: CLI test-harness silent-swallow closure (DONE)
+- 522-019-fix: Fix: Desktop Node-floor message derives from engines (DONE)
+- 522-019: Desktop Node-floor message derives from engines (DONE)
+- 522-020: Docs+Scripts vitest onTaskUpdate flake RCA (DONE)
+- 522-021: MASTER settlement notes for the 2026-08-11 decision day (DONE)
+
+---

@@ -2203,8 +2203,8 @@ const MESSAGES: MessageMap = {
     tr: 'git bulunamadi. deckent kullanmak icin git kurun.',
   },
   'error.node_version_low': {
-    en: 'Node.js version too low. Upgrade to >=24.0.0.',
-    tr: 'Node.js sürümü çok düşük. >=24.0.0 sürümüne yükseltin.',
+    en: 'Node.js version too low. Upgrade to {floor}.',
+    tr: 'Node.js sürümü çok düşük. {floor} sürümüne yükseltin.',
   },
   'tui.intro': {
     en: 'deckent — pinned-bottom TUI (experimental). Type /exit to quit.',
@@ -5005,8 +5005,8 @@ const MESSAGES: MessageMap = {
     tr: 'Bağlantı yeniden deneniyor…',
   },
   'desktop.error.node_not_found': {
-    en: 'Node.js was not found on the target. Install Node.js 18+ to run deckent.',
-    tr: "Hedefte Node.js bulunamadı. deckent'i çalıştırmak için Node.js 18+ yükleyin.",
+    en: 'Node.js was not found on the target. Install Node.js {floor} to run deckent.',
+    tr: "Hedefte Node.js bulunamadı. deckent'i çalıştırmak için Node.js {floor} yükleyin.",
   },
   'desktop.error.deckent_not_found': {
     en: 'deckent was not found on the target. Install it with `npm install -g deckent`.',
@@ -5311,6 +5311,29 @@ const MESSAGES: MessageMap = {
   'desktop.theme.watch.open-sea': { en: 'Open sea', tr: 'Açık deniz' },
 };
 
+/** All catalog keys — lets tests/tools enumerate keys without re-parsing this source file. */
+export const MESSAGE_KEYS: readonly string[] = Object.freeze(Object.keys(MESSAGES));
+
+// Row 450 twin (508-001 for `deckent doctor` -> 522-019 for the desktop
+// surface): the Node.js runtime floor comes from package.json's own
+// `engines.node`, never a source literal. A top-level-await DYNAMIC JSON
+// import (not createRequire/readFileSync, and not a static import — the
+// project's root tsconfig module target rejects import-attribute syntax on
+// static import declarations) is required here specifically because this
+// module is bundled directly into the Electron renderer (see
+// src/desktop/src/renderer/i18n-fallback.ts's "dependency-free" contract) —
+// a Node-only fs/module read would break in that sandboxed browser context.
+// A JSON import resolves live in Node (main process, CLI) and gets inlined
+// as plain data by Rollup at renderer build time; Node's own ESM loader
+// resolves this await before any importer's synchronous code runs, so no
+// caller of getMessage() needs to change.
+const NODE_ENGINE_FLOOR: string =
+  ((await import('../../../package.json', { with: { type: 'json' } })).default as { engines?: { node?: string } })
+    .engines?.node ?? '';
+
+/** Keys whose {floor} placeholder is filled from NODE_ENGINE_FLOOR when the caller omits it. */
+const NODE_FLOOR_MESSAGE_KEYS = new Set<string>(['desktop.error.node_not_found', 'error.node_version_low']);
+
 /**
  * Get a localized message by key.
  * Supports variable interpolation with {varName} placeholders.
@@ -5332,10 +5355,17 @@ export function getMessage(
   const normalizedLang = lang === 'tr' ? 'tr' : 'en';
   const template = entry[normalizedLang] ?? entry['en'] ?? key;
 
-  if (!vars) return template;
+  // node-floor keys always resolve {floor} from the manifest, even when the
+  // caller (e.g. the desktop getStrings()/fallback paths, which never pass
+  // vars) supplies none — caller-supplied vars still win via spread order.
+  const effectiveVars = NODE_FLOOR_MESSAGE_KEYS.has(key)
+    ? { floor: NODE_ENGINE_FLOOR, ...vars }
+    : vars;
+
+  if (!effectiveVars) return template;
 
   return template.replace(/\{(\w+)\}/g, (_, varName: string) => {
-    return vars[varName] ?? `{${varName}}`;
+    return effectiveVars[varName] ?? `{${varName}}`;
   });
 }
 

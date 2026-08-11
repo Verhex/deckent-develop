@@ -69,6 +69,16 @@
       "notes": "Sprint 224 T-224-027 run-proven smoke harness."
     },
     {
+      "file": "scripts/audit-install-ingress.mjs",
+      "class": "recurring-proof",
+      "owner": "install-ingress-census",
+      "npmScript": null,
+      "input": "workflow files, package.json scripts, docker spawn backend install call sites, nested npm roots (static enumeration only)",
+      "output": "report-only per-site records with typed unknownIngressClasses; --write refreshes the committed baseline; never fails the build, never executes an install",
+      "expiry": "none — Phase 0 census (row 7100); enforcement wiring is a later owner-gated phase",
+      "notes": "Sprint-522 task 12 (dep-supply Phase 0a, owner GO 2026-08-11). Explicitly NOT closed-world: 12 unknown-ingress classes documented in the report."
+    },
+    {
       "file": "scripts/audit-operation-ingress.mjs",
       "class": "recurring-proof",
       "owner": "operation-ingress-audit",

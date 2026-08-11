@@ -214,6 +214,45 @@ export type ProviderPlannerInvocation =
       readonly executionBackend: 'in-process';
     });
 
+// ─── System-Prompt Channel Capability (Persona S1 — types + data only) ─
+/**
+ * Capability descriptor for a provider's system-prompt channel — declared as
+ * plain adapter data, never keyed by provider name (ADR-D-004 C4). Absent on
+ * `ProviderAdapter.systemPromptChannel` means unsupported (owner D-D). Only a
+ * `verified` `'append'` channel is a native-eligible candidate; `'replace'`
+ * and `'unknown'` are typed HOLD candidates (owner D-H). See
+ * follow-up-works/persona-s0-provider-channel-census-2026-08-12.md and
+ * follow-up-works/persona-systemprompt-spawn-analysis-2026-08-11.md for the
+ * evidence and design this descriptor implements slice S1 of.
+ */
+export interface ProviderSystemPromptChannel {
+  readonly supported: boolean;
+  readonly semantics: 'append' | 'replace' | 'unknown';
+  readonly maxBytes?: number;
+  readonly verified: boolean;
+}
+
+/**
+ * Spawn disposition a `ProviderSystemPromptChannel` resolves to. Pure data
+ * mapping only — no call site consumes this in this slice; wiring the spawn
+ * path to read it is a later, owner-gated slice (S2+ in the design doc above).
+ */
+export type SystemPromptChannelDisposition = 'eligible' | 'hold-candidate' | 'degrade';
+
+/**
+ * Maps a channel descriptor to its spawn disposition (Persona S1, D-H/D-D).
+ * Verified `'append'` is the only eligible outcome; `'replace'` and
+ * `'unknown'` are HOLD candidates (D-H); an absent or explicitly unsupported
+ * descriptor degrades to today's user-prompt persona path (D-D).
+ */
+export function resolveSystemPromptChannelDisposition(
+  channel: ProviderSystemPromptChannel | undefined,
+): SystemPromptChannelDisposition {
+  if (!channel || !channel.supported) return 'degrade';
+  if (channel.verified && channel.semantics === 'append') return 'eligible';
+  return 'hold-candidate';
+}
+
 // ─── ProviderAdapter Interface ───────────────────────────────────────
 /**
  * ProviderAdapter — abstract interface for AI provider backends.
@@ -230,6 +269,11 @@ export interface ProviderAdapter {
   readonly liveUsageBudgetSupport?: LiveUsageBudgetSupport;
   /** Independent from metering; absent means semantic landing is unsupported. */
   readonly executionLandingCapability?: ExecutionLandingCapability;
+  /**
+   * Persona S1 (types + data only). Absent means unsupported/degrade (D-D).
+   * No spawn call site reads this field in this slice.
+   */
+  readonly systemPromptChannel?: ProviderSystemPromptChannel;
 
   /**
    * Economic execution class used by the mandatory admission gate. Missing is

@@ -2,9 +2,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { SkillDefinition, SkillCategory, SkillStats } from './skill-types.js';
+import type { SkillDefinition, SkillCategory, SkillStats, SkillReferencedFile } from './skill-types.js';
 import { createDefaultSkillStats } from './skill-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
@@ -632,6 +632,365 @@ export function resolveSkillCatalog(projectRoot: string): SkillCatalogResolution
   return { entries, invalid };
 }
 
+// ─── Entrypoint + referenced-file authority (522-010, design S3 / §3.4) ─────
+//
+// G1 measured: `entrypoint` is declared by every manifest and read by NO reader —
+// the prompt path, the body cache and the builtin synthesiser each hardcode
+// `SKILL.md`, so a skill whose body is `GUIDE.md` loads and injects nothing.
+// G2 measured: referenced helper files have no owner at all.
+//
+// This is the single body reader. Two invariants make it an authority rather
+// than a convenience:
+//
+//   1. **Containment.** The resolved absolute path must stay under the skill root
+//      after normalisation AND after symlink resolution. Without both, a manifest
+//      is an arbitrary-file-read primitive into a worker prompt.
+//   2. **All-or-nothing.** `{entrypoint} ∪ referencedFiles` is one atomic package.
+//      Every failure returns a typed HOLD carrying a reason code and NO content —
+//      there is deliberately no branch that returns a body whose package is
+//      incomplete, because a partial prompt is a silently wrong provider call.
+
+/** Package budget dimensions — count, per-file bytes, total bytes (design §3.4). */
+export interface SkillPackageBudget {
+  maxFiles: number;
+  maxFileBytes: number;
+  maxTotalBytes: number;
+}
+
+/**
+ * OWNER DECISION D8 (2026-08-11, Alperen): initial budgets are HIGH and
+ * non-blocking, with a later surface for a user/admin recommendation. These
+ * bound the pathological case (a package that would reach a provider prompt and
+ * therefore a provider bill), not normal authoring — the largest shipped skill
+ * body is three orders of magnitude below the per-file bound. The 500 KB cache
+ * budget (`skill-cache.ts`) is the precedent, explicitly not the ceiling.
+ */
+export const DEFAULT_SKILL_PACKAGE_BUDGET: SkillPackageBudget = {
+  maxFiles: 64,
+  maxFileBytes: 1024 * 1024,
+  maxTotalBytes: 4 * 1024 * 1024,
+};
+
+/**
+ * Why a body could not be resolved. Distinct codes on purpose (design §3.1): the
+ * operator has to be able to tell a typo from a containment violation from a
+ * security withdrawal without reading the source.
+ */
+export type SkillBodyHoldReason =
+  | 'unknown-skill'
+  | 'withdrawn'
+  | 'invalid-declaration'
+  | 'path-escape'
+  | 'symlink-escape'
+  | 'missing-file'
+  | 'unreadable-file'
+  | 'budget-exceeded';
+
+/** A typed refusal. Carries no file content, by construction. */
+export interface SkillBodyHold {
+  ok: false;
+  skillId: string;
+  reasonCode: SkillBodyHoldReason;
+  /** Operator-facing diagnostic — same English-diagnostic convention as
+   *  {@link SkillPoolManager.validateSkillDefinition}'s `errors` and
+   *  {@link parseSkillId}'s `reason`; the rendering surface owns i18n. */
+  detail: string;
+  /** The declared path that failed, when the failure is path-scoped. */
+  offendingPath: string | null;
+}
+
+/** One resolved package member. */
+export interface ResolvedSkillFile {
+  /** As declared in the manifest, normalised to a relative POSIX-ish path. */
+  declaredPath: string;
+  absolutePath: string;
+  content: string;
+  sizeBytes: number;
+  /** `sha256:…` over the bytes actually read — §5 determinism + §6 cache key. */
+  digest: string;
+}
+
+/** A fully resolved skill package. Its existence means every member passed. */
+export interface SkillBody {
+  ok: true;
+  skillId: string;
+  layer: SkillCatalogLayer;
+  /** The skill root every member was contained in. */
+  root: string;
+  entrypoint: ResolvedSkillFile;
+  referencedFiles: ResolvedSkillFile[];
+  totalBytes: number;
+}
+
+function hold(
+  skillId: string,
+  reasonCode: SkillBodyHoldReason,
+  detail: string,
+  offendingPath: string | null = null,
+): SkillBodyHold {
+  return { ok: false, skillId, reasonCode, detail, offendingPath };
+}
+
+function digestOf(content: string): string {
+  return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`;
+}
+
+/**
+ * The declared-path contract: a package member is a RELATIVE path that cannot
+ * leave its skill root, on every platform (Immutable Law 2).
+ *
+ * Both separators are rejected segment-wise rather than delegated to
+ * `path.normalize`, because `a\..\..\b` is one harmless filename on Linux and a
+ * two-level escape on Windows — a normaliser that answers differently per host
+ * is exactly the silent cross-platform divergence the law forbids.
+ */
+export type DeclaredSkillPathResult =
+  | { ok: true; relativePath: string }
+  /** `escape: true` marks a declaration that would LEAVE the skill root, so the
+   *  caller can report it as a containment violation rather than as a typo. */
+  | { ok: false; reason: string; escape: boolean };
+
+export function parseDeclaredSkillPath(raw: unknown): DeclaredSkillPathResult {
+  if (typeof raw !== 'string' || raw.trim() === '') {
+    return { ok: false, reason: 'path must be a non-empty string', escape: false };
+  }
+  if (raw.includes('\0')) {
+    return { ok: false, reason: 'path must not contain a NUL byte', escape: false };
+  }
+  if (path.isAbsolute(raw) || raw.startsWith('/') || raw.startsWith('\\')) {
+    return { ok: false, reason: 'path must be relative to the skill root', escape: true };
+  }
+  if (/^[a-zA-Z]:/.test(raw)) {
+    return { ok: false, reason: 'path must not be drive-qualified', escape: true };
+  }
+  const segments = raw.split(/[\\/]/).filter((segment) => segment !== '' && segment !== '.');
+  if (segments.length === 0) {
+    return { ok: false, reason: 'path must name a file', escape: false };
+  }
+  if (segments.includes('..')) {
+    return { ok: false, reason: 'path must not contain a ".." segment', escape: true };
+  }
+  return { ok: true, relativePath: segments.join('/') };
+}
+
+/** True when `candidate` is `root` itself or lives under it — separator-exact. */
+function isContained(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+/**
+ * Read the DECLARED entrypoint path, accepting both manifest shapes: today's
+ * bare string and the schema-v1 `{ path, format, contentDigest }` block
+ * (design §3.3). Absent or empty keeps defaulting to `SKILL.md` — that is what
+ * every hardcoded reader does today, so back-compat is preserved rather than
+ * newly decided.
+ */
+function readDeclaredEntrypoint(definition: SkillDefinition): unknown {
+  const declared: unknown = definition.entrypoint;
+  if (declared === undefined || declared === null) return SKILL_MD_FILENAME;
+  if (declared && typeof declared === 'object' && !Array.isArray(declared)) {
+    return (declared as Record<string, unknown>)['path'];
+  }
+  return declared;
+}
+
+/**
+ * Resolve, contain, bound and read ONE package member.
+ * Returns a HOLD rather than throwing — every caller here is fail-closed.
+ */
+function resolvePackageFile(
+  skillId: string,
+  root: string,
+  realRoot: string,
+  declaredRaw: unknown,
+  budget: SkillPackageBudget,
+  label: string,
+): ResolvedSkillFile | SkillBodyHold {
+  const parsed = parseDeclaredSkillPath(declaredRaw);
+  if (!parsed.ok) {
+    const shown = typeof declaredRaw === 'string' ? declaredRaw : null;
+    return hold(
+      skillId,
+      parsed.escape ? 'path-escape' : 'invalid-declaration',
+      `${label}: ${parsed.reason}`,
+      shown,
+    );
+  }
+  const relativePath = parsed.relativePath;
+  const absolutePath = path.resolve(root, relativePath);
+
+  // Defence in depth: the segment contract above already forbids an escape, so a
+  // failure here means the two disagreed — refuse rather than trust either.
+  if (!isContained(root, absolutePath)) {
+    return hold(skillId, 'path-escape', `${label}: resolves outside the skill root`, relativePath);
+  }
+
+  let realPath: string;
+  try {
+    realPath = fs.realpathSync(absolutePath);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException | undefined)?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return hold(skillId, 'missing-file', `${label}: declared file does not exist`, relativePath);
+    }
+    return hold(skillId, 'unreadable-file', `${label}: cannot be resolved on disk`, relativePath);
+  }
+  if (!isContained(realRoot, realPath)) {
+    return hold(
+      skillId,
+      'symlink-escape',
+      `${label}: resolves through a link to a target outside the skill root`,
+      relativePath,
+    );
+  }
+
+  // Size is checked BEFORE the read so an over-budget file is refused rather
+  // than pulled into memory first.
+  let sizeBytes: number;
+  try {
+    const stat = fs.statSync(realPath);
+    if (!stat.isFile()) {
+      return hold(skillId, 'missing-file', `${label}: declared path is not a file`, relativePath);
+    }
+    sizeBytes = stat.size;
+  } catch {
+    return hold(skillId, 'unreadable-file', `${label}: cannot be inspected on disk`, relativePath);
+  }
+  if (sizeBytes > budget.maxFileBytes) {
+    return hold(
+      skillId,
+      'budget-exceeded',
+      `${label}: ${sizeBytes} bytes exceeds the ${budget.maxFileBytes}-byte per-file budget`,
+      relativePath,
+    );
+  }
+
+  let content: string;
+  try {
+    content = fs.readFileSync(realPath, 'utf8');
+  } catch {
+    return hold(skillId, 'unreadable-file', `${label}: cannot be read`, relativePath);
+  }
+
+  const actualBytes = Buffer.byteLength(content, 'utf8');
+  if (actualBytes > budget.maxFileBytes) {
+    return hold(
+      skillId,
+      'budget-exceeded',
+      `${label}: ${actualBytes} bytes exceeds the ${budget.maxFileBytes}-byte per-file budget`,
+      relativePath,
+    );
+  }
+
+  return {
+    declaredPath: relativePath,
+    absolutePath: realPath,
+    content,
+    sizeBytes: actualBytes,
+    digest: digestOf(content),
+  };
+}
+
+/** Read the declared package members, tolerating an absent list. */
+function readDeclaredReferencedFiles(definition: SkillDefinition): unknown[] {
+  const declared: unknown = (definition as { referencedFiles?: unknown }).referencedFiles;
+  return Array.isArray(declared) ? declared : [];
+}
+
+/**
+ * Resolve one catalog record's complete body package — the design's
+ * `resolveBody()` contract point (§4 point 2), the ONLY body reader.
+ *
+ * The skill root is the directory the record's content came from, so a project
+ * manifest and a package-only builtin travel the same path. Masking is the
+ * caller's concern ({@link SkillPoolManager.resolveBody}) because this function
+ * takes an already-resolved record.
+ */
+export function resolveSkillBody(
+  record: EffectiveSkill,
+  budget: SkillPackageBudget = DEFAULT_SKILL_PACKAGE_BUDGET,
+): SkillBody | SkillBodyHold {
+  const skillId = record.id;
+  const root = path.dirname(record.sourcePath);
+
+  let realRoot: string;
+  try {
+    realRoot = fs.realpathSync(root);
+  } catch {
+    return hold(skillId, 'missing-file', 'skill root does not exist on disk', null);
+  }
+
+  const declaredReferenced = readDeclaredReferencedFiles(record.definition);
+  const fileCount = 1 + declaredReferenced.length;
+  if (fileCount > budget.maxFiles) {
+    return hold(
+      skillId,
+      'budget-exceeded',
+      `package declares ${fileCount} files, exceeding the ${budget.maxFiles}-file budget`,
+      null,
+    );
+  }
+
+  const entrypoint = resolvePackageFile(
+    skillId,
+    root,
+    realRoot,
+    readDeclaredEntrypoint(record.definition),
+    budget,
+    'entrypoint',
+  );
+  if (!('declaredPath' in entrypoint)) return entrypoint;
+
+  let totalBytes = entrypoint.sizeBytes;
+  if (totalBytes > budget.maxTotalBytes) {
+    return hold(
+      skillId,
+      'budget-exceeded',
+      `package exceeds the ${budget.maxTotalBytes}-byte total budget`,
+      entrypoint.declaredPath,
+    );
+  }
+  const referencedFiles: ResolvedSkillFile[] = [];
+
+  for (const [index, declared] of declaredReferenced.entries()) {
+    const label = `referencedFiles[${index}]`;
+    if (!declared || typeof declared !== 'object' || Array.isArray(declared)) {
+      return hold(skillId, 'invalid-declaration', `${label}: must be an object with a "path"`, null);
+    }
+    const resolved = resolvePackageFile(
+      skillId,
+      root,
+      realRoot,
+      (declared as SkillReferencedFile).path,
+      budget,
+      label,
+    );
+    if (!('declaredPath' in resolved)) return resolved;
+
+    totalBytes += resolved.sizeBytes;
+    if (totalBytes > budget.maxTotalBytes) {
+      return hold(
+        skillId,
+        'budget-exceeded',
+        `package exceeds the ${budget.maxTotalBytes}-byte total budget`,
+        resolved.declaredPath,
+      );
+    }
+    referencedFiles.push(resolved);
+  }
+
+  return {
+    ok: true,
+    skillId,
+    layer: record.layer,
+    root: realRoot,
+    entrypoint,
+    referencedFiles,
+    totalBytes,
+  };
+}
+
 // ─── Skill Pool Manager ────────────────────────────────────────────────────
 
 export class SkillPoolManager {
@@ -708,6 +1067,34 @@ export class SkillPoolManager {
     const parsedId = parseSkillId(id);
     if (!parsedId.ok) return undefined;
     return this._resolveCatalog().entries.find((entry) => entry.id === parsedId.id);
+  }
+
+  /**
+   * Resolve a skill's complete body package — the single body reader
+   * (522-010, design §4 contract point 2).
+   *
+   * Fail-closed at three gates before a byte is read: an unknown id, a
+   * quarantined/retired id (§3.1 — withdrawn is never resolvable by ANY surface,
+   * including a forced-skill request), and then per-file containment + budget in
+   * {@link resolveSkillBody}. Every refusal is a typed HOLD carrying a distinct
+   * reason code and no content, so a caller can never assemble a partial prompt.
+   */
+  resolveBody(id: string, budget?: SkillPackageBudget): SkillBody | SkillBodyHold {
+    const parsedId = parseSkillId(id);
+    if (!parsedId.ok) return hold(id, 'unknown-skill', parsedId.reason, null);
+
+    const record = this.getEffective(parsedId.id);
+    if (!record) return hold(parsedId.id, 'unknown-skill', 'no skill is installed under this id', null);
+    if (record.masked) {
+      const reason = record.disposition.reasonCode ? ` (${record.disposition.reasonCode})` : '';
+      return hold(
+        parsedId.id,
+        'withdrawn',
+        `skill is ${record.disposition.state}${reason} and is not resolvable`,
+        null,
+      );
+    }
+    return resolveSkillBody(record, budget);
   }
 
   /**
@@ -901,9 +1288,40 @@ export class SkillPoolManager {
     }
 
     // Optional string fields that must be strings if present
-    for (const field of ['version', 'description', 'entrypoint'] as const) {
+    for (const field of ['version', 'description'] as const) {
       if (obj[field] !== undefined && typeof obj[field] !== 'string') {
         errors.push(`"${field}" must be a string`);
+      }
+    }
+
+    // entrypoint: today's bare string, or the schema-v1 `{ path, … }` block
+    // (design §3.3) — both name the same declared body, so both are admitted
+    // and `resolveSkillBody` reads either shape (522-010).
+    if (obj['entrypoint'] !== undefined) {
+      const entrypoint = obj['entrypoint'];
+      if (entrypoint && typeof entrypoint === 'object' && !Array.isArray(entrypoint)) {
+        if (typeof (entrypoint as Record<string, unknown>)['path'] !== 'string') {
+          errors.push('"entrypoint.path" must be a string');
+        }
+      } else if (typeof entrypoint !== 'string') {
+        errors.push('"entrypoint" must be a string or an object with a string "path"');
+      }
+    }
+
+    // referencedFiles: the declared package members beside the entrypoint
+    // (522-010, design §3.4 G2). Shape only — existence, containment and budget
+    // are resolution-time authority, because they depend on the filesystem.
+    if (obj['referencedFiles'] !== undefined) {
+      if (!Array.isArray(obj['referencedFiles'])) {
+        errors.push('"referencedFiles" must be an array');
+      } else {
+        for (const item of obj['referencedFiles'] as unknown[]) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)
+            || typeof (item as Record<string, unknown>)['path'] !== 'string') {
+            errors.push('"referencedFiles" must be an array of objects with a string "path"');
+            break;
+          }
+        }
       }
     }
 

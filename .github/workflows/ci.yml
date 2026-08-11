@@ -10,9 +10,15 @@ on:
   # dinlenmezse kuyruk check sonucu alamaz ve hiçbir PR merge olamaz.
   merge_group:
 
+# Option E / Hole 3.2 (owner-approved 2026-08-12): for a push to main every run
+# shared the group `ci-refs/heads/main`, so back-to-back merges cancelled the
+# previous main run mid-flight — under an active merge queue, main-push shard
+# results were systematically destroyed before they concluded. Main pushes now
+# get a per-SHA group (no mutual cancellation); PR/queue refs keep the stale-run
+# cancellation that saves compute there.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   lockfile-sync:
@@ -240,7 +246,7 @@ jobs:
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Install dashboard dependencies
-        run: npm install --prefix src/dashboard --ignore-scripts 2>/dev/null || true
+        run: npm install --prefix src/dashboard --ignore-scripts
       - name: Run dashboard tests
         run: npm run test:dashboard
         timeout-minutes: 5
@@ -288,7 +294,7 @@ jobs:
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Install dashboard dependencies
-        run: npm install --prefix src/dashboard --ignore-scripts 2>/dev/null || true
+        run: npm install --prefix src/dashboard --ignore-scripts
       - run: npm run build
       - name: Verify dist
         run: |

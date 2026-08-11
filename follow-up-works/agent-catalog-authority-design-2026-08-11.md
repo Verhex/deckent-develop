@@ -539,3 +539,49 @@ node scripts/lint-links.mjs      # exit 0
 - **D6:** read-only catalog view eklenir.
 - **D7:** **deckent-hub** canlı yapı — beğenilen ve OWNER-ONAYINDAN geçen agent'lar promote edilir; hiçbir otonomluk yok, olmayacak.
 - **D8:** PROMPT.md formatı sorgulanacak — skill için SKILL.md klasik/şema; agent-persona tarafı D4-EK'teki injection tasarımıyla birlikte yeniden biçimlenebilir.
+
+---
+
+## IMPLEMENTATION NOTES — landed slices
+
+Appended as slices land. Everything above this line stays the proposal as written on
+2026-08-11; this section records what the tree actually does, so a later reader can tell a
+design intent apart from a shipped behavior without re-measuring.
+
+### S3 — prompt resolution folded into the resolver (task 522-008)
+
+**Landed** in `src/core/agent-pool.ts`, proven by `tests/core/agent-prompt-resolution.test.ts`
+(hermetic tmpdir fixtures for all three layers, including the "builtin" tree).
+
+- `resolvePrompt(agentId, projectRoot)` is now the **single** prompt resolution path. It walks
+  the D1 order — L1 project `.deckent/agents/` > L2 runtime `.tasks/agents/` > L0 builtin — and
+  then the degraded `agent.json::systemPrompt` tier in that **same** layer order. That order is
+  the one §1.3 documented; S3 changed the *structure*, not the precedence, so no currently
+  resolving case moved.
+- The prompt facet is now expressed in S1's own vocabulary (`agent-types.ts`):
+  `availability: AgentPromptAvailability`, `layer: AgentCatalogLayer | null`, and
+  `blocker: AgentRoutabilityBlocker | null`. Per **D4**, only `availability: 'none'` yields
+  `'prompt-unresolvable'` — a degraded-but-present `systemPrompt` still routes, mirroring
+  `classifyAgentManifest`'s `finalize()` rather than inventing a stricter rule. The open D4
+  sub-question (is a *broken* system prompt machine-detectable?) is still open and is
+  deliberately not answered by this slice.
+- `getAgentPrompt()` is a thin delegate that projects down to the historical
+  `{content, source, degraded, resolvedFrom}` shape — `resolvedFrom` still absent entirely for
+  `source: 'none'` — so no existing consumer observes a changed object. Consumer migration onto
+  the richer record remains **S4** work.
+- The second prompt-content reader is gone: `synthesizeAgentDefinition()`'s own
+  `fs.readFileSync` of a builtin `PROMPT.md` now goes through the same `readPromptFile()`
+  primitive the resolver uses, so pool synthesis and prompt resolution can no longer disagree
+  about a builtin's bytes.
+- `AgentPoolManager.resolvePrompt(id)` gives pool-side consumers the same resolution bound to
+  the manager's own `projectRoot`.
+
+**Recorded limitation — S3 is not yet the "same pass" §4 contract 1 asks for.** Prompt content
+is resolved on demand, not attached eagerly to every entry inside `loadAgents()`. The builtin
+tier's `hasPersistentRecord` gate needs an `existsSync` on each id's `agent.json`, and
+`tests/core/agent-pool.test.ts` pins that this never happens during a load ("does NOT call
+existsSync for individual agent.json files"). That file is outside this slice's write
+authority — the same constraint the S2 slice honored. Eager per-entry attachment therefore
+belongs to the slice that is allowed to re-pin those syscall assertions, and until then the
+"once per resolution, not once per consumer" half of S3's proof obligation holds only per
+resolution call, not per pool load.
