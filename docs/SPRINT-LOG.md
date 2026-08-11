@@ -57,3 +57,52 @@ Bug: tests/connectors/bot-lifecycle-hones… (NO_GO)
 - 513-006: OWASP Agentic Top 10 self-assessment baseline (row 4190) (DONE)
 
 ---
+## Sprint 512 — sprint-512
+
+**Status:** ABORTED
+**Date:** 2026-08-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 512-001-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Bug Fix Report
+Bug: tests/connectors/bot-lifecycle-hones… (PAUSED)
+
+---
+## Sprint 516 — sprint-516
+
+**Status:** ABORTED
+**Date:** 2026-08-11
+**Duration:** 635s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 634979ms |
+
+### Tasks
+
+- 516-001: The `.deck` Docker-context exclusion gains its hermetic proof (row 100) (DONE)
+- 516-002: Force-finalize is an evidence-honest, tested contract (row 3162) (DONE)
+- 516-003: One canonical lifecycle phase vocabulary (row 3305) (DONE)
+- 516-004-fix: Fix: Script lifecycle and proof-harness registry (row 270) (PENDING)
+- 516-004: Script lifecycle and proof-harness registry (row 270) (NO_GO)
+
+---

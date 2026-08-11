@@ -1,7 +1,7 @@
 import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import type { Task, TaskResult } from '../../core/types.js';
+import type { Sprint, Task, TaskResult } from '../../core/types.js';
 import {
   TaskEvaluation,
   TaskStatus,
@@ -32,6 +32,36 @@ import {
 import { DeckentError } from '../../core/errors.js';
 
 /**
+ * Project the task record a surviving `.result` proves must have existed, for
+ * the force-finalize recovery path only (row 3162).
+ *
+ * The plan record is gone, so every descriptive field stays empty instead of
+ * inventing prose the sprint log would present as planned intent; `title`
+ * repeats the id so the log line still identifies the attempt. `status` mirrors
+ * the recorded verdict and carries no authority of its own — the evaluation is
+ * derived from the result exactly like a task whose JSON survived.
+ */
+function recoveredTaskFromResult(result: TaskResult, sprintId: string): Task {
+  const recorded = result.evaluationDecision ?? result.selfAssessment;
+  const resolved = recorded === 'DONE' || recorded === 'GO_WITH_TECH_DEBT';
+  return {
+    id: result.taskId,
+    title: result.taskId,
+    description: '',
+    model: result.tokenUsage?.model ?? '',
+    effort: 'normal',
+    priority: 'NORMAL',
+    reason: '',
+    scope: { directories: [], filesRead: [], filesWrite: [] },
+    dependencies: [],
+    goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+    status: resolved ? TaskStatus.DONE : TaskStatus.NO_GO,
+    sprintId,
+    ...(result.completedAt ? { createdAt: result.completedAt } : {}),
+  };
+}
+
+/**
  * Build a Sprint object and evaluations from .tasks/ directory contents.
  * Reads task JSON files and .result files, evaluates each result.
  * Integrates review state: rejected tasks are evaluated as NO_GO.
@@ -46,8 +76,14 @@ import { DeckentError } from '../../core/errors.js';
  * the sprint ID is known (via `--sprint` or derivable from `.tasks/`).
  *
  * Exported for tests (Sprint 268).
+ *
+ * `recoverOrphanResults` (row 3162) is the force-finalize-only evidence
+ * recovery described on {@link recoveredTaskFromResult}; it is off for every
+ * normal finalize.
  */
-export function buildSprintFromTasks(root: string, sprintFilter?: string): {
+export function buildSprintFromTasks(root: string, sprintFilter?: string, options: {
+  readonly recoverOrphanResults?: boolean;
+} = {}): {
   sprintId: string;
   tasks: Task[];
   results: TaskResult[];
@@ -129,6 +165,38 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
     for (const file of archivedResultFiles) {
       const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(archiveTasksDir, file)));
       if (result && seenTaskIds.has(result.taskId) && !seenResultIds.has(result.taskId)) {
+        results.push(result);
+        seenResultIds.add(result.taskId);
+      }
+    }
+  }
+
+  // Force-only evidence recovery (row 3162). A sprint whose task projection was
+  // lost — deleted, partially archived, or never re-materialised after a crash —
+  // still has the `.result` files its attempts wrote. Normal finalize must keep
+  // ignoring them (a COMPLETE run may only count planned work), but a forced
+  // abort has to settle whatever truth survived: without this the CLI reported
+  // `no_tasks` and left the sprint stuck ACTIVE with no terminal state, no
+  // receipt and no log section. A recovered record only asserts that an attempt
+  // EXISTED — its verdict still comes from the result's own recorded decision in
+  // the evaluation loop below, so nothing unresolved is ever promoted.
+  if (options.recoverOrphanResults && sprintId !== 'sprint-unknown') {
+    const sprintSegment = sprintId.replace(/^sprint-/u, '');
+    const resultPrefix = `task-${sprintSegment}-`;
+    const recoveryDirs = [
+      ...(tasksDirExists ? [tasksDir] : []),
+      ...(archiveDirExists ? [archiveTasksDir] : []),
+    ];
+    for (const dir of recoveryDirs) {
+      const orphanFiles = readdirSync(dir)
+        .filter(f => f.startsWith(resultPrefix) && f.endsWith('.result'));
+      for (const file of orphanFiles) {
+        const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(dir, file)));
+        if (!result || typeof result.taskId !== 'string') continue;
+        if (!result.taskId.startsWith(`${sprintSegment}-`)) continue;
+        if (seenTaskIds.has(result.taskId)) continue;
+        tasks.push(recoveredTaskFromResult(result, sprintId));
+        seenTaskIds.add(result.taskId);
         results.push(result);
         seenResultIds.add(result.taskId);
       }
@@ -235,6 +303,59 @@ export function detectMixedSprints(tasks: Task[]): string[] {
   return [...ids];
 }
 
+/**
+ * Build the Sprint projection the finalize command settles.
+ *
+ * FINALIZE Duration fix (Sprint 268): the CLI-built sprint object had no
+ * startedAt, so calculateMetrics fell back to Date.now() for the start time and
+ * wrote Duration=0ms (sprint-267 live bug). Recover the real start from
+ * `.deckent/sprint-state.json` (only when it belongs to THIS sprint), falling
+ * back to the coordinator PID record. When neither exists, startedAt stays
+ * undefined and the job summary honestly reports the duration as 'unknown'.
+ *
+ * Exported (row 3162) so the force-finalize contract test drives the exact
+ * production composition — evidence read → projection → settlement — instead of
+ * restating the projection in a fixture.
+ */
+export function buildFinalizeSprintProjection(
+  root: string,
+  sprintId: string,
+  tasks: readonly Task[],
+  force: boolean,
+): Sprint {
+  let startedAt: string | undefined;
+  const sprintState = readJsonSafe<{
+    sprintId?: string;
+    startedAt?: string;
+    phase?: SprintPhase;
+  }>(
+    join(root, DECKENT_DIR, 'sprint-state.json'),
+  );
+  if (sprintState?.startedAt && sprintState.sprintId === sprintId) {
+    startedAt = sprintState.startedAt;
+  } else {
+    const pidRecord = readJsonSafe<{ sprintId?: string; startedAt?: string }>(
+      join(root, DECKENT_DIR, 'pids', `${sprintId}.pid`),
+    );
+    if (pidRecord?.startedAt) startedAt = pidRecord.startedAt;
+  }
+
+  return {
+    id: sprintId,
+    number: parseInt(sprintId.replace('sprint-', ''), 10) || 0,
+    status: force ? SprintStatus.ABORTED : SprintStatus.COMPLETE,
+    phase: force
+      ? sprintState?.sprintId === sprintId
+        ? sprintState.phase ?? SprintPhase.TRANSITION
+        : SprintPhase.TRANSITION
+      : SprintPhase.COMPLETE,
+    tasks: [...tasks],
+    workers: tasks.map(t => `w-${t.id}`),
+    startedAt,
+    completedAt: new Date().toISOString(),
+  };
+}
+
 export function registerFinalize(program: Command): void {
   program
     .command('finalize')
@@ -248,7 +369,11 @@ export function registerFinalize(program: Command): void {
       const lang = getLangFromConfig(root);
 
       try {
-        const { sprintId, tasks, results, evaluations } = buildSprintFromTasks(root, opts.sprint);
+        const { sprintId, tasks, results, evaluations } = buildSprintFromTasks(
+          root,
+          opts.sprint,
+          { recoverOrphanResults: opts.force === true },
+        );
 
         if (tasks.length === 0) {
           print(getMessage('finalize.no_tasks', lang));
@@ -307,44 +432,12 @@ export function registerFinalize(program: Command): void {
           return;
         }
 
-        // FINALIZE Duration fix (Sprint 268): the CLI-built sprint object had
-        // no startedAt, so calculateMetrics fell back to Date.now() for the
-        // start time and wrote Duration=0ms (sprint-267 live bug). Recover
-        // the real start from .deckent/sprint-state.json (only when it
-        // belongs to THIS sprint), falling back to the coordinator PID
-        // record. When neither exists, startedAt stays undefined and the
-        // job summary honestly reports the duration as 'unknown'.
-        let startedAt: string | undefined;
-        const sprintState = readJsonSafe<{
-          sprintId?: string;
-          startedAt?: string;
-          phase?: SprintPhase;
-        }>(
-          join(root, DECKENT_DIR, 'sprint-state.json'),
-        );
-        if (sprintState?.startedAt && sprintState.sprintId === sprintId) {
-          startedAt = sprintState.startedAt;
-        } else {
-          const pidRecord = readJsonSafe<{ sprintId?: string; startedAt?: string }>(
-            join(root, DECKENT_DIR, 'pids', `${sprintId}.pid`),
-          );
-          if (pidRecord?.startedAt) startedAt = pidRecord.startedAt;
-        }
-
-        const sprint = {
-          id: sprintId,
-          number: parseInt(sprintId.replace('sprint-', ''), 10) || 0,
-          status: opts.force ? SprintStatus.ABORTED : SprintStatus.COMPLETE,
-          phase: opts.force
-            ? sprintState?.sprintId === sprintId
-              ? sprintState.phase ?? SprintPhase.TRANSITION
-              : SprintPhase.TRANSITION
-            : SprintPhase.COMPLETE,
+        const sprint = buildFinalizeSprintProjection(
+          root,
+          sprintId,
           tasks,
-          workers: tasks.map(t => `w-${t.id}`),
-          startedAt,
-          completedAt: new Date().toISOString(),
-        };
+          opts.force === true,
+        );
 
         // Normal finalization may run inside the coordinator itself; in that
         // one case containment reports `self` and the coordinator retires its

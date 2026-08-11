@@ -1,11 +1,13 @@
-# DIRECTIVES — Sprint-B6: five slices, codex at scale
+# DIRECTIVES — Sprint-B7: four slices on the fully-repaired build
 
 ## Goal
 
-Five MASTER-PLAN rows advance: FIX-spawn observability (3309), provider-observation
-retirement (3296), the bot-stop HOLD exemption debt (3320 residue), dependency
-supply-chain defense evaluation (7100), and the OWASP agentic-security baseline (4190).
-Every slice is scope-disjoint; none touches provider auth or runs build tooling.
+Four MASTER-PLAN rows advance: the bot-stop HOLD exemption debt (3320 residue,
+rescheduled after the aborted 513 wave never spawned it), the evidence-honest
+force-finalize contract (3162), the lifecycle phase vocabulary (3305), and the script
+lifecycle registry (270). Every slice is scope-disjoint; none touches provider auth or
+runs build tooling. Analysis artifacts, if any task produces one, belong under
+follow-up-works/ — docs/ is product documentation only.
 
 Provider, model, effort and effective concurrency are resolved from effective config,
 registry, role policy, auth/reachability evidence, usage/limit authority and host admission.
@@ -16,8 +18,8 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
   today still passes, unchanged.
 - Do not weaken or delete an existing assertion to make new behaviour pass; report the
   conflict in result notes instead.
-- Read the existing mechanism before designing; every code task EXTENDS something
-  present. A second parallel mechanism is a NO-GO.
+- Read the existing mechanism before designing; every task EXTENDS something present.
+  A second parallel mechanism is a NO-GO in all four.
 - Fail closed on ambiguity; nothing may make a destructive action easier to trigger.
 - Workers must not run `npm run build`, full `npm test`, provider login/auth mutation,
   sprint lifecycle commands, git commit, or cleanup. Scoped vitest runs only.
@@ -29,149 +31,126 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
 
 ---
 
-## Task 1: A queued FIX task spawns observably or publishes a typed reason (row 3309)
+## Task 1: The `.deck` Docker-context exclusion gains its hermetic proof (row 100)
 
-- Files: src/orchestra/sprint-phases.ts, src/orchestra/scheduler-effects.ts, tests/orchestra/fix-spawn-observability.test.ts
-- Scope: src/orchestra/sprint-phases.ts, src/orchestra/scheduler-effects.ts, src/orchestra/sprint-spawner.ts, tests/orchestra/fix-spawn-observability.test.ts
-- Model: claude-opus-5
-- Dependencies: none
-
-Measured (row 3309, sprint-507 disk evidence): 507-002-fix sat Queued while the
-scheduler-shadow journal recorded 92 consecutive watcher decisions with empty
-spawnedTaskIds between 00:38 and 00:43 — the FIX worker's heartbeat, pid and log never
-came into existence, and nothing anywhere said why. Sprints 508 and later DID spawn
-their FIX workers, so the gap is conditional, not constant.
-
-Required: root-cause first — trace the path from a FIX task being enqueued to a worker
-being spawned, and identify every condition under which the scheduler loop can skip a
-queued FIX task silently (admission, concurrency, dependency, phase state — whatever
-the code shows); record the inventory in the result notes. Then: any skip of a
-spawnable queued task on a scheduler pass publishes a typed reason into the existing
-scheduler journal (extend the journal record, no new file family), so a stuck queue is
-diagnosable from disk. A regression test drives a fixture scheduler pass with a queued
-FIX task and asserts either a spawn decision or a typed skip reason — never a silent
-empty pass.
-
-**Test:** `npx vitest run tests/orchestra/fix-spawn-observability.test.ts`
-
-**NO-GO:** changing spawn admission semantics themselves (this slice makes skips
-VISIBLE, not different), a new journal file family, or forcing a spawn that admission
-legitimately refuses.
-
----
-
-## Task 2: Terminal retirement closes or scopes historical provider execution intervals (row 3296)
-
-- Files: src/core/provider-execution-observation-store.ts, src/orchestra/sprint-finalizer.ts, tests/core/provider-observation-retirement.test.ts
-- Scope: src/core/provider-execution-observation-store.ts, src/orchestra/sprint-finalizer.ts, tests/core/provider-observation-retirement.test.ts
-- Model: claude-opus-5
-- Dependencies: none
-
-Measured (row 3296): sprint-490's COMPLETE and exact cleanup correctly projected
-currentAttained=0, but the canonical read-model retained four open intervals outside
-the exact current task set as unresolved-provider-observation. The evidence is
-truthful; the ownership/retirement policy is incomplete. The live store today carries
-50+ legacy intervals across ten days. Negative scope (binding, from the row): never
-erase provider history, never infer closure from USD=0, and the v1-to-v2 schema
-migration is owner-gated and OUT of this slice.
-
-Required: COMPLETE and cleanup reconcile every interval owned by the exact run/attempt
-generation being settled — close them with a typed retirement reason; foreign or
-historical intervals remain forensic and MUST NOT impose an admission HOLD on an
-unrelated IDLE or current run; reconciliation is idempotent and tenant/provider
-fenced. Hermetic test drives a tmpdir store through settle-with-open-intervals and
-asserts owned intervals retire, foreign intervals survive untouched, and a second
-reconciliation is a no-op.
-
-**Test:** `npx vitest run tests/core/provider-observation-retirement.test.ts`
-
-**NO-GO:** deleting observation rows, touching the schema version or migration,
-retiring an interval the settling generation does not own, or closure inferred from
-cost values.
-
----
-
-## Task 3: Recovery-class bot stop runs under the binary-identity HOLD (row 3320 residue)
-
-- Files: src/cli/worktree-binary-authority.ts, src/cli/commands/bot.ts, tests/cli/bot-stop-hold-exemption.test.ts
-- Scope: src/cli/worktree-binary-authority.ts, src/cli/commands/bot.ts, tests/cli/bot-stop-hold-exemption.test.ts
+- Files: tests/security/docker-context-deck.test.ts
+- Scope: tests/security/docker-context-deck.test.ts, tests/security/
 - Model: gpt-5.6-sol
 - Dependencies: none
 
-Measured (row 3320's remaining debt, carried honestly through two sprints): the
-build-source-mismatch HOLD lives in src/cli/worktree-binary-authority.ts and blocked
-the very `deckent bot stop` that would resolve the drift — the live workaround on
-2026-08-01 was an OS signal. The sprint-512 debt attempt correctly refused to touch
-this file because it was outside its granted scope; it is IN scope now.
+Measured (row 100): the `.deck` and `.deck.*` exclusions landed in the tracked
+.dockerignore as the owner-side mechanical half (receipt
+GR-2026-08-10-DECK-DOCKERIGNORE-01) after the sprint-507 worker was blocked by the
+render-scope defect — that defect is fixed (row 3312 DONE), but the row's remaining
+acceptance is unproven: a build-context negative test. The root Dockerfile uses a
+generic COPY of the tree, so the ignore file is the only thing standing between the
+per-project secret family and the image layers.
 
-Required: the binary-identity authority gains a typed recovery-class exemption seam —
-an explicit allowlist of recovery-class operations (bot stop at minimum) that may
-proceed under the mismatch HOLD with a typed warning instead of a block. The seam is
-narrow and declarative: an operation must declare itself recovery-class at its call
-site; nothing becomes exempt implicitly, and start-class operations stay guarded
-exactly as today. Regression test pins: bot stop proceeds-with-typed-warning under a
-simulated mismatch, bot start stays blocked, and an undeclared operation stays blocked.
+Required: a hermetic test (the file named in Files — NEW) that proves the exclusion
+WITHOUT any Docker daemon: parse the REAL repository .dockerignore with the documented
+dockerignore matching semantics (last-match-wins, dir vs file patterns) and assert that
+`.deck`, `.deck.*` sibling names, and the `.tasks`/`.deckent`/`.brain` state
+directories are excluded from the build context, while files the Dockerfile genuinely
+needs (package manifests, src, dist inputs it copies) are NOT excluded. The matcher
+helper lives inside the test file — no production code. If the assertion sweep finds a
+path the Dockerfile needs but the ignore file blocks, that is a typed finding for the
+result notes, not a silent ignore-file edit.
 
-**Test:** `npx vitest run tests/cli/bot-stop-hold-exemption.test.ts`
+**Test:** `npx vitest run tests/security/docker-context-deck.test.ts`
 
-**NO-GO:** weakening the guard for any non-declared operation, an implicit or
-pattern-based exemption, or removing the mismatch warning from the exempted path.
+**NO-GO:** invoking a Docker daemon, editing .dockerignore or any Dockerfile, or a
+matcher that diverges from documented dockerignore semantics.
 
 ---
 
-## Task 4: Evaluate npm supply-chain defense as a product feature (row 7100)
+## Task 2: Force-finalize is an evidence-honest, tested contract (row 3162)
 
-- Files: docs/analysis/dep-supply-defense-2026-08-11.md
-- Scope: docs/analysis/dep-supply-defense-2026-08-11.md, docs/analysis/
-- Model: gpt-5.6-sol
+- Files: src/cli/commands/finalize.ts, tests/cli/force-finalize-contract.test.ts
+- Scope: src/cli/commands/finalize.ts, src/orchestra/sprint-finalizer.ts, tests/cli/force-finalize-contract.test.ts
+- Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 7100): deckent spawns workers that run `npm ci` and arbitrary provider
-CLIs inside containers, and its own CI installs hundreds of packages; the row asks for
-a product-level evaluation of npm dependency supply-chain defense across the worker
-and CI ingress surfaces.
+Measured (row 3162, exercised live twice today): `deckent finalize --sprint <id>
+--force` closed the stuck sprint-513 as ABORTED with the truthful summary "4 of 6
+complete, 2 unresolved — no unresolved lineage promoted to COMPLETE", and the
+force-abort path wrote its SPRINT-LOG section. The behaviour exists; the CONTRACT does
+not: no test pins that force-finalize never promotes unresolved work, that it works
+when the task projection is missing or partial (the row's core case), or what its
+terminal state and receipts must look like.
 
-Required: a single analysis document (the file named in Files — NEW) that inventories
-the ACTUAL ingress surfaces from the repo (worker container npm usage, CI workflows'
-install steps, the allowScripts posture visible in the build logs, the dependency
-policy in ADR-D-005), maps concrete threat classes (install-script execution, typo-
-squat/update-hijack, lockfile drift, transitive compromise) to those surfaces, and
-proposes a phased defense design with decision points for the owner — each phase named,
-bounded and justified from the codebase reality, not generic advice. No production
-code, no config changes, no new dependencies — analysis artifact only.
+Required: root-cause first — read the force path in the finalize command and the
+finalizer and inventory in the result notes what force-finalize does today for: all
+results present, some results missing, task projection entirely absent, and an
+already-finalized sprint. Then pin the contract with hermetic tests: unresolved
+lineages settle as ABORTED/unresolved and are NEVER promoted, a lost-projection sprint
+still reaches a truthful terminal state from whatever evidence exists (results,
+evaluations, receipts), the operation is idempotent, and the SPRINT-LOG section is
+written exactly once. Fix any gap the inventory reveals at its root — but behaviour
+that is already honest stays byte-identical.
 
-**Test:** the document exists at the exact path with every section above present;
-`npm run lint:links` passes if the repo exposes it.
+**Test:** `npx vitest run tests/cli/force-finalize-contract.test.ts`
 
-**NO-GO:** generic security boilerplate unanchored to this repo's real surfaces,
-production or config edits, or recommendations without owner decision points.
+**NO-GO:** promoting unresolved work under any input, force-finalize acquiring
+destructive deletion powers, or a contract test that mocks away the evidence reads it
+claims to prove.
 
 ---
 
-## Task 5: OWASP Agentic Top 10 self-assessment baseline (row 4190)
+## Task 3: One canonical lifecycle phase vocabulary (row 3305)
 
-- Files: docs/security/owasp-asi-baseline-2026-08-11.md
-- Scope: docs/security/owasp-asi-baseline-2026-08-11.md, docs/security/
+- Files: src/core/types.ts, src/orchestra/sprint-controller.ts, tests/orchestra/lifecycle-vocabulary.test.ts
+- Scope: src/core/types.ts, src/orchestra/sprint-controller.ts, src/orchestra/, tests/orchestra/lifecycle-vocabulary.test.ts
+- Model: claude-sonnet-5
+- Dependencies: none
+
+Measured (row 3305, CODE-DOC-DIFF ARCH-01): the executable controller genuinely runs a
+CLEANUP stage after RETRO/DECAY, but the SprintPhase enum has no CLEANUP member and the
+emitted transition records DECAY→COMPLETE — the enum, the emitted events, the host
+guide documentation and the terminal projection each tell a different phase story.
+
+Required: one phase vocabulary — the SprintPhase enum, the transitions the controller
+emits, and the read-model/terminal projection all carry the same phase set, closing
+the CLEANUP contradiction in whichever direction the CODE truth supports (read the
+controller first and state the direction in the result notes: either CLEANUP becomes a
+real enum member with a real emitted transition, or the post-terminal cleanup is
+explicitly documented as a non-phase maintenance step and nothing pretends otherwise).
+Every consumer of the phase set found in src/orchestra is updated to the single
+vocabulary; a test pins enum ↔ emitted-transition parity so the drift cannot silently
+return. Documentation strings updated through the existing i18n/doc surfaces only
+where they contradict the chosen truth.
+
+**Test:** `npx vitest run tests/orchestra/lifecycle-vocabulary.test.ts`
+
+**NO-GO:** changing actual lifecycle BEHAVIOUR (order or side effects of stages),
+leaving any emitted transition outside the enum vocabulary, or a doc-only fix that
+leaves the enum contradiction alive.
+
+---
+
+## Task 4: Script lifecycle and proof-harness registry (row 270)
+
+- Files: scripts/script-registry.json, scripts/lint-script-registry.mjs, tests/scripts/script-registry.test.ts
+- Scope: scripts/script-registry.json, scripts/lint-script-registry.mjs, tests/scripts/script-registry.test.ts, scripts/
 - Model: gpt-5.6-terra
 - Dependencies: none
 
-Measured (row 4190): the 2026-08-05 code-truth scan opened this row for an OWASP
-Agentic Security (ASI01-ASI10, 2026) self-assessment; the repo already carries the
-owner's prompt material for it at CODEX-OWASP-ASI-PROMPT.md (read it first) and the
-scan's two concrete findings landed as rows 7031 (plugin sandbox — since wired,
-flag-gated) and 4091 (spend gate — since enforced, flag-gated).
+Measured (row 270, from the 2026-07-21 scripts analysis): the scripts/ directory holds
+dozens of .mjs tools with no lifecycle registry — nothing states which are CI gates,
+which are recurring proof harnesses, which are one-shot admin migrations, and which
+are retired; consumers discover them by grep.
 
-Required: a single baseline document (the file named in Files — NEW; create the
-directory if absent) that assesses each ASI risk class against deckent's ACTUAL
-mechanisms with file-level evidence — the capability/tool authority chain, scope
-enforcement, plugin pipeline, spend gates, approval flows, memory/audit chains —
-stating per risk: covered / partially covered / open, the evidence path, and the
-existing MASTER row that owns the gap where one exists. Honest OPEN verdicts are
-required where coverage is missing; inventing coverage is the one unforgivable
-failure. No production code or config edits — assessment artifact only.
+Required: a tracked registry (the JSON named in Files — NEW) classifying EVERY
+scripts/*.mjs file into the row's classes — gate, recurring-proof, admin-migration,
+one-shot, retired — with owner, input, output and expiry fields per entry, derived by
+READING each script's header and package.json wiring (not guessed); a fail-closed lint
+(the .mjs named in Files — NEW) that verifies the registry covers exactly the real
+directory contents (a new script without a registry entry fails, a registry entry
+without a file fails) and validates the class enum and required fields; and a test
+that runs the lint against the real repo plus fixture violations. Do NOT add the lint
+to any npm chain in this slice — wiring it into lint:gates is a follow-up owner
+decision recorded in the result notes.
 
-**Test:** the document exists at the exact path with a verdict row per ASI01-ASI10;
-`npm run lint:links` passes if the repo exposes it.
+**Test:** `npx vitest run tests/scripts/script-registry.test.ts`
 
-**NO-GO:** claiming coverage without a file-level evidence path, production or config
-edits, or softening an open gap into partially-covered without evidence.
+**NO-GO:** guessing classifications without reading the script, editing any existing
+script, or wiring the new lint into CI chains inside this slice.

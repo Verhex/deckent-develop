@@ -1394,8 +1394,10 @@ const SPRINT_EXIT_LINGER_PROBE_MS = 10_000;
 // The finalizer publishes ONE generation-fenced terminal receipt at the
 // archive boundary (487-002, `publishFencedSprintTerminalReceipt`). This
 // section is the controller-side consumer of that receipt: it decides whether
-// the sprint may cross RETRO → CLEANUP → COMPLETE, and it lets that crossing
-// happen exactly once.
+// the sprint may perform post-RETRO CLEANUP maintenance and cross the DECAY →
+// COMPLETE phase transition, and it lets that crossing happen exactly once.
+// CLEANUP itself is not a `SprintPhase` member (see `runSprint`'s docstring
+// above) — it is the non-phase maintenance step this receipt gates.
 //
 // Authority direction is strictly one-way — receipt authorizes CLEANUP,
 // CLEANUP authorizes COMPLETE. A missing, malformed, foreign or
@@ -1593,7 +1595,13 @@ export function sprintTerminalHandoffHoldError(held: SprintTerminalHandoffHold):
 }
 
 /**
- * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE (cleanup ayrı komuttur).
+ * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE.
+ * This is the complete `SprintPhase` vocabulary — every `emitPhaseChange` call below transitions
+ * between these eight members, in this order, and no other. CLEANUP is NOT a `SprintPhase` member:
+ * it is non-phase post-terminal maintenance (clear scan interval, remove task/lock files) that runs
+ * inline between the DECAY and COMPLETE transitions, gated by the terminal receipt authority — see
+ * "Terminal Handoff Authority" below and `runCleanupPhase` (sprint-phases.ts). It never changes
+ * `sprint.phase` and never appears as an emitted phase transition.
  * Supports human checkpoints, configurable timeout, and provider routing.
  */
 export async function runSprint(
@@ -2820,7 +2828,8 @@ export async function runSprint(
 
   // Outer staged-settlement barrier (487-030). Consumed BEFORE RETRO, so a
   // staged foundation whose exact closure is NO_GO/PAUSED/HOLD/unsettled can
-  // never reach finalize → CLEANUP → COMPLETE. The verdict is computed from
+  // never reach the finalizer, the non-phase CLEANUP maintenance, or the
+  // COMPLETE transition. The verdict is computed from
   // already-collected evaluations/results (no wait loop, no synthetic
   // settlement); the sprint parks as PAUSED with its state + PID left on disk
   // so `deckent resume <sprintId>` continues exactly this lifecycle, and the
@@ -2898,7 +2907,7 @@ export async function runSprint(
     true,
   );
 
-  // Nervous System: RETRO complete + RETRO→CLEANUP
+  // Nervous System: RETRO complete + RETRO→DECAY
   emitSprintEvent('SPRINT_RETRO_COMPLETE', { sprintId: sprint.id });
   emitPhaseChange(SprintPhase.RETRO, SprintPhase.DECAY, sprint.id);
 
@@ -2914,10 +2923,10 @@ export async function runSprint(
   resourceMonitor = null;
 
   // Terminal handoff step 1 (487-003): the finalizer's fenced receipt is what
-  // authorizes CLEANUP. Resolving BEFORE the phase runs is the contract — an
-  // unpublished/held terminal authority must not get archive+retention work
-  // done on its behalf, and must never reach COMPLETE. The throw leaves the
-  // PID file and sprint state on disk, so this is a recoverable HOLD.
+  // authorizes CLEANUP. Resolving BEFORE the maintenance runs is the contract
+  // — an unpublished/held terminal authority must not get archive+retention
+  // work done on its behalf, and must never reach COMPLETE. The throw leaves
+  // the PID file and sprint state on disk, so this is a recoverable HOLD.
   const terminalHandoff = resolveSprintTerminalHandoff({
     projectRoot,
     sprintId: sprint.id,
@@ -2932,7 +2941,9 @@ export async function runSprint(
     throw sprintTerminalHandoffHoldError(terminalHandoff);
   }
 
-  // Phase 8: CLEANUP — runs only under a published terminal receipt.
+  // Post-terminal maintenance: CLEANUP — not a SprintPhase (clear scan
+  // interval, remove task/lock files); runs only under a published terminal
+  // receipt, inline between the DECAY and COMPLETE transitions below.
   scanInterval = await runCleanupPhase(projectRoot, sprint, config, opts, scanInterval, spawnBackend);
 
   // Terminal handoff step 2: claim the single publication for this receipt.
@@ -2950,7 +2961,8 @@ export async function runSprint(
     projectRoot, sprint, terminalPublication.metrics, config.language ?? 'en',
   );
 
-  // Nervous System: CLEANUP→COMPLETE
+  // Nervous System: DECAY→COMPLETE (the CLEANUP maintenance above is
+  // non-phase and is not itself an emitted phase transition).
   emitPhaseChange(SprintPhase.DECAY, SprintPhase.COMPLETE, sprint.id);
 
   sprint.status = SprintStatus.COMPLETE;
