@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-518 Learnings
+- Sprint sprint-518 Learnings: ## Sprint sprint-518 Learnings
+
+## Gains
+- 518-001 — Agent catalog authority — design and owner decision points (row 7011) — Created follow-up-works/agent-catalog-authority-design-2026-08-11.md (NEW, the only file written).
+- 518-002 — Skill catalog authority — design and owner decision points (row 7012) — Created follow-up-works/skill-catalog-authority-design-2026-08-11.md (338 lines) — proposal-only ...
+
+## Sprint sprint-517 Learnings
+- Sprint sprint-517 Learnings: ## Sprint sprint-517 Learnings
+- Find and close the fail-loud root cause of the dist-clean call in test runs (row 60): GO_WITH_TECH_DEBT — ROOT CAUSE / CALLER INVENTORY (row 60) — the destructive authority is cleanDist() in scripts/clean.mjs (SOURCE_ROOT boun
+- Worker write-target derivation comes from one authority in every backend (row 4061): GO_WITH_TECH_DEBT — CANONICAL SEMANTICS CHOSEN: the docker ALLOWLIST-SSOT rule (born-471), now hosted as deriveWorkerWriteTargets() in spawn
+- The security ADR crosswalk with typed conflict routes (row 4191): GO_WITH_TECH_DEBT — Created and verified the exact-path owner-decision proposal; it has 9 design rows, 4 typed conflict routes, and node scr
+
+## Gains
+- 517-003 — Plugin security enforcement gains its typed config authority (row 7034) — Added typed plugins.security_enforcement authority while preserving the advisory default and the ...
+- 517-005 — Crash artifacts gain schema, provenance and collision-free naming (row 121 first slice) — Crash writer (formatFatalAndExit) now emits a versioned CrashArtifactV1 JSON record: schemaVersio...
+- 517-006 — Script lifecycle and proof-harness registry (row 270, rerouted) — Classified all 95 top-level scripts/*.mjs files (94 pre-existing + lint-script-registry.mjs itsel...
+
 ## Sprint sprint-515 Learnings
 - Sprint sprint-515 Learnings: ## Sprint sprint-515 Learnings
 - Supported trace migrate and corpus CLI wiring with i18n: NO_GO — Bounded-discovery blocker: the granted read scope (src/cli/commands, src/cli/helpers, tests/cli, tests/cli/commands, tes

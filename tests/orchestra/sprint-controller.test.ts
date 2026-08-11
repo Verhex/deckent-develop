@@ -1380,7 +1380,9 @@ describe('spawnWorkers — provider routing', () => {
     await spawnWorkers('/tmp/test', sprint, config);
 
     const spawnCall = mockCodexAdapter.spawn.mock.calls[0];
-    expect(spawnCall[3].allowedTools).toBe('Read,Write(.tasks/,src/test/,src/test/file.ts),Edit(.tasks/,src/test/,src/test/file.ts),Bash,Glob,Grep');
+    // born-471 (sprint-517): exact filesWrite narrows the grant — the directory
+    // is the fallback for tasks with no exact file scope, never a union.
+    expect(spawnCall[3].allowedTools).toBe('Read,Write(.tasks/,src/test/file.ts),Edit(.tasks/,src/test/file.ts),Bash,Glob,Grep');
   });
 
   it('passes autoApprove option to non-Claude adapter', async () => {

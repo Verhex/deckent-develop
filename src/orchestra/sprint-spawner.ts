@@ -123,6 +123,8 @@ import {
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
+// Row 4061 WRITE-SCOPE-SSOT — the single write-target authority (see below).
+import { deriveWorkerWriteTargets, formatAllowedToolsFlag } from './spawn-backend-docker.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { bootstrapProviders } from '../core/provider.js';
 
@@ -436,31 +438,16 @@ import { SkillPoolManager } from '../core/skill-pool.js';
 
 // ═══ Scope Path Utilities ══════════════════════════════════════════
 
-/**
- * ADR-013 protected paths — workers must NEVER write these files.
- * CLAUDE.md and DECKENT.md are adapter files managed exclusively by Brain/init.
- */
-const ADR013_PROTECTED_PATHS = new Set(['CLAUDE.md', 'DECKENT.md']);
+// Row 4061 (WRITE-SCOPE-SSOT): the scope-path normalizer and the write-target
+// deriver used to live here AND in spawn-backend-docker.ts with divergent rules
+// (this side merged scope.directories into the write list unconditionally, the
+// docker side treated an explicit filesWrite list as the sole write authority),
+// so the same task got a different write scope depending on the backend that ran
+// it. Both now come from the single authority in spawn-backend-docker.ts — see
+// the WRITE-SCOPE AUTHORITY block there for the canonical rule and for why that
+// module hosts it (the reverse import direction is a cycle).
+export { normalizeScopePath } from './spawn-backend-docker.js';
 
-/**
- * File extension pattern — matches bare extension entries like `.json`, `.ts`, `.md`.
- * Must have NO path separators (so `.tasks/` is not matched), and the dot must be followed
- * by only short word characters typical of file extensions (max 5 chars).
- * Examples that match (invalid scope entries): `.json`, `.ts`, `.md`, `.mjs`
- * Examples that do NOT match (valid): `.tasks/`, `.deckent/`, `.tasks`, `src/core/`
- */
-const EXTENSION_ONLY_RE = /^\.[a-z]{1,5}$/i;
-
-/**
- * Normalize a single scope path:
- * - Trims whitespace
- * - Rejects bare file-extension entries (e.g. `.json`, `.ts`, `.md`) — not valid paths
- * - Removes trailing slash ONLY from file paths (basename has a non-leading-dot extension)
- *   e.g. `DECKENT.md/` → `DECKENT.md`, but `src/core/` stays `src/core/`, `.tasks/` stays `.tasks/`
- * - Rejects ADR-013 protected paths (`CLAUDE.md`, `DECKENT.md`)
- *
- * @returns The normalized path, or null if the path should be excluded
- */
 // FIX-5 (B-COLLISION-HANG re-notify debounce): tracks the last-emitted scope
 // collision signature so a persisting collision (re-detected every dispatch tick)
 // emits its SCOPE_COLLISION_DETECTED / SPAWN_BLOCKED events — and thus triggers a
@@ -473,58 +460,21 @@ export function resetCollisionDebounce(): void {
   lastCollisionSignature = null;
 }
 
-export function normalizeScopePath(rawPath: string): string | null {
-  const trimmed = rawPath.trim();
-  if (!trimmed) return null;
-
-  // Reject bare extension entries like ".json", ".ts" — they have no slash and match
-  // the extension pattern. Must check trimmed (not without-slash) to avoid catching ".tasks/".
-  if (EXTENSION_ONLY_RE.test(trimmed)) return null;
-
-  // Compute the basename (without trailing slash) for extension detection
-  const basenameForCheck = trimmed.replace(/\/$/, '').split('/').pop() ?? '';
-
-  // Remove trailing slash only when the basename looks like a file:
-  // it has an extension (dot that is NOT the first character of the basename).
-  // This keeps directory entries like `src/core/`, `.tasks/`, `.deckent/` unchanged.
-  const hasFileExtension = basenameForCheck.includes('.') && !basenameForCheck.startsWith('.');
-  const normalized = (trimmed.endsWith('/') && hasFileExtension)
-    ? trimmed.slice(0, -1)
-    : trimmed;
-
-  // Compute final basename for ADR-013 check
-  const basename = normalized.replace(/\/$/, '').split('/').pop() ?? normalized;
-
-  // Reject ADR-013 protected adapter files (full basename match)
-  if (ADR013_PROTECTED_PATHS.has(basename)) return null;
-
-  return normalized;
-}
-
 /**
- * Build and normalize the list of write targets for a worker's --allowedTools scope.
- * Applies path normalization rules: trailing slash removal on files, extension-only
- * path rejection, and ADR-013 protected path exclusion.
+ * Build the list of write targets for a worker's --allowedTools scope.
  *
- * Always prepends `.tasks/` so workers can write heartbeat and result files.
+ * Shape adapter only: it unwraps `task.scope` and hands it to the canonical
+ * deriver (`deriveWorkerWriteTargets`, spawn-backend-docker.ts). It makes NO
+ * scope decision of its own — the directories-into-write-scope rule, `.tasks/`
+ * prepending, normalization and dedup all live in that one authority, so this
+ * path and the docker backend derive byte-identical targets for a given task
+ * (row 4061; parity asserted by tests/orchestra/write-scope-backend-parity.test.ts).
  *
  * @param task - The task whose scope is being resolved
  * @returns Deduplicated, normalized write target paths
  */
 export function buildAllowedWriteTargets(task: Pick<Task, 'scope'>): string[] {
-  const raw = ['.tasks/', ...task.scope.directories, ...task.scope.filesWrite];
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  for (const path of raw) {
-    const normalized = normalizeScopePath(path);
-    if (normalized !== null && !seen.has(normalized)) {
-      seen.add(normalized);
-      result.push(normalized);
-    }
-  }
-
-  return result;
+  return deriveWorkerWriteTargets(task.scope);
 }
 
 // ═══ Scope Equivalence Normalization (Sprint 169 W3.1) ════════════
@@ -1087,10 +1037,12 @@ export async function spawnWorkers(
       spawnOpts?.exactPlanAuthority,
     );
     const model = task.model;
+    // Row 4061: same authority, same formatter as every other backend. The
+    // canonical deriver always returns at least `.tasks/`, so the historical
+    // "empty targets → unrestricted Write/Edit" fall-open branch is gone: a
+    // scope-less task narrows to `.tasks/` instead of getting the widest grant.
     const writeTargets = buildAllowedWriteTargets(task);
-    const allowedTools = writeTargets.length > 0
-      ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
-      : 'Read,Write,Edit,Bash,Glob,Grep';
+    const allowedTools = formatAllowedToolsFlag(writeTargets);
 
     const taskProvider = resolveTaskProvider(task);
 

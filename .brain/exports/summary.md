@@ -55,6 +55,12 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-518 Learnings** (sprint-518): ## Sprint sprint-518 Learnings
+
+## Gains
+- 518-001 — Agent catalog authority — design and owner decision points (row ...
+- **Sprint sprint-517 Learnings** (sprint-517): ## Sprint sprint-517 Learnings
+- Find and close the fail-loud root cause of the dist-clean call in test runs (row 60)...
 - **Sprint sprint-515 Learnings** (sprint-515): ## Sprint sprint-515 Learnings
 - Supported trace migrate and corpus CLI wiring with i18n: NO_GO — Bounded-discovery b...
 - **Sprint sprint-511 Learnings** (sprint-511): ## Sprint sprint-511 Learnings
@@ -79,14 +85,6 @@
 
 ## Gains
 - 501-001 — Address any run-flow directly and page the inbox — Implemented c...
-- **Sprint sprint-499 Learnings** (sprint-499): ## Sprint sprint-499 Learnings
-
-## Gains
-- 499-001 — Escape Unicode line separators in the structured-criteria projec...
-- **Sprint sprint-498 Learnings** (sprint-498): ## Sprint sprint-498 Learnings
-
-## Gains
-- 498-001 — Document the run-flow inbox surface — Created docs/reference/run...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -94,7 +92,7 @@ _No active technical debt._
 ## Active Patterns
 - Violation pattern: stale_heartbeat (×46 sprints)
 - Violation pattern: file_outside_scope (×21 sprints)
-- Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
+- Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1827 | Generated: 2026-08-11_
+_Total entries: 1837 | Generated: 2026-08-11_

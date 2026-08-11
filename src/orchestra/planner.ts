@@ -58,6 +58,15 @@ import {
 // isPlanSlotId classifies dropped refs. No import cycle — only sprint-planner
 // imports planner.js, so task-builder never re-enters this module.
 import { resolveDependencyRef, isPlanSlotId } from './task-builder.js';
+// 519-004: the built-binary classification + post-settlement restatement primitives
+// live with the Task producer (task-builder); planner owns the validation STAGE.
+import {
+  classifyBuiltBinaryProofDemand,
+  stageBuiltBinaryProofObligation,
+  type ProofStagingFinding,
+  type ProofStagingSurface,
+} from './task-builder.js';
+import type { PostSettlementPlanProjection } from '../core/types.js';
 import { normalizePlannerResult } from './planner-normalize.js';
 
 // ─── Zod Schemas ──────────────────────────────────────────────────
@@ -1914,4 +1923,102 @@ export function preflightTaskScopes(
   }
 
   return { entries, reportLines };
+}
+
+// ─── Proof-Staging Validation Stage (519-004, row 3275) ───────────────
+//
+// Source verification and built-binary proof are SEPARATE authority stages.
+// A sprint never builds, so anything that can only run against a freshly built
+// artifact belongs on the post-settlement obligation (`postSettlementProjection`),
+// never on an in-sprint surface. This pass is pure (mirrors lintScopeSatisfiability:
+// findings only, no mutation) and reports — it never drops a demand:
+//   - executable in-sprint surfaces (`smoke`, `testTarget`) → BLOCK, with the typed
+//     post-settlement restatement attached as `stagedObligation`;
+//   - free-text criteria (`goCriteria`/`noGoCriteria`) → WARN (prose is not argv, so
+//     no command is synthesized), negation-guarded so a criterion that FORBIDS
+//     building ("no dist/ mutation") is never mistaken for a demand to build.
+// A task that already carries a post-settlement obligation and no in-sprint demand
+// produces no findings at all.
+
+/** Minimal task read-shape for the proof-staging lint. */
+export interface ProofStagingLintTask {
+  id: string;
+  scope?: TaskScope;
+  testTarget?: string;
+  goNogo?: { goCriteria?: string; noGoCriteria?: string };
+  smoke?: { command: string; expect: string };
+  postSettlementProjection?: PostSettlementPlanProjection;
+}
+
+/** A mention wrapped in negation ("no dist/ writes") states a prohibition, not a demand. */
+const NEGATED_PROOF_MENTION_RE =
+  /\b(?:no|not|never|without|forbidden|must not|cannot|yasak|olmadan|asla|değil)\b/i;
+
+/** The line of `text` containing `token` — the negation guard's evaluation window. */
+function proofMentionLine(text: string, token: string): string {
+  const line = text.split('\n').find(l => l.includes(token));
+  return line ?? text;
+}
+
+const EMPTY_LINT_SCOPE: TaskScope = { directories: [], filesRead: [], filesWrite: [] };
+
+/**
+ * Plan-time validation stage: reject in-sprint built-binary proof demands with a
+ * typed finding. Pure — returns findings, mutates nothing.
+ */
+export function lintProofStaging(tasks: readonly ProofStagingLintTask[]): ProofStagingFinding[] {
+  const findings: ProofStagingFinding[] = [];
+
+  for (const task of tasks) {
+    const scope = task.scope ?? EMPTY_LINT_SCOPE;
+
+    const executableSurfaces: Array<{ surface: ProofStagingSurface; text: string | undefined }> = [
+      { surface: 'smoke', text: task.smoke?.command },
+      { surface: 'testTarget', text: task.testTarget },
+    ];
+    for (const { surface, text } of executableSurfaces) {
+      if (!text) continue;
+      const demand = classifyBuiltBinaryProofDemand(text);
+      if (!demand) continue;
+      const stagedObligation = stageBuiltBinaryProofObligation({ commandText: text, scope });
+      findings.push({
+        severity: 'BLOCK',
+        code: stagedObligation ? 'IN_SPRINT_BUILT_BINARY_DEMAND' : 'BUILT_BINARY_PROOF_UNSTAGEABLE',
+        surface,
+        signal: demand.signal,
+        demand: text,
+        taskRef: task.id,
+        ...(stagedObligation ? { stagedObligation } : {}),
+        message: stagedObligation
+          ? `in-sprint ${surface} needs the built binary (${demand.signal}: "${demand.token}"); a sprint never `
+            + 'builds — restate it as a post-settlement proof obligation (`- PromotionProof:`).'
+          : `in-sprint ${surface} needs the built binary (${demand.signal}: "${demand.token}") and exceeds the `
+            + 'bounded post-settlement command limits — it must be restated by hand.',
+      });
+    }
+
+    const proseSurfaces: Array<{ surface: ProofStagingSurface; text: string | undefined }> = [
+      { surface: 'goCriteria', text: task.goNogo?.goCriteria },
+      { surface: 'noGoCriteria', text: task.goNogo?.noGoCriteria },
+    ];
+    for (const { surface, text } of proseSurfaces) {
+      if (!text) continue;
+      const demand = classifyBuiltBinaryProofDemand(text);
+      if (!demand) continue;
+      if (NEGATED_PROOF_MENTION_RE.test(proofMentionLine(text, demand.token))) continue;
+      findings.push({
+        severity: 'WARN',
+        code: 'IN_SPRINT_BUILT_BINARY_DEMAND',
+        surface,
+        signal: demand.signal,
+        demand: demand.token,
+        taskRef: task.id,
+        message:
+          `${surface} states a built-binary proof (${demand.signal}: "${demand.token}"); a sprint never builds — `
+          + 'move the obligation to the post-settlement stage (`- PromotionProof:`) instead of an in-sprint criterion.',
+      });
+    }
+  }
+
+  return findings;
 }

@@ -1,6 +1,14 @@
+import { createRequire } from 'node:module';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+
+// Row 450: the doctor's Node floor derives from package.json engines.node, so
+// the passing fixture derives the same way instead of pinning a version literal.
+const enginesNode = (createRequire(import.meta.url)('../../../package.json') as {
+  engines: { node: string };
+}).engines.node;
+const PASSING_NODE_VERSION = `v${parseInt(enginesNode.match(/(\d+)/)?.[1] ?? '0', 10)}.0.0`;
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
@@ -101,7 +109,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -114,12 +122,12 @@ describe('MCP Tool: deckent_doctor', () => {
       expect(parsed.checks.length).toBeGreaterThan(0);
     });
 
-    it('reports node check passing when version >= 18', async () => {
+    it('reports node check passing when the version meets the engines floor', async () => {
       const { registerDoctorTool } = await import('../../../src/mcp/tools/doctor.js');
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -140,7 +148,7 @@ describe('MCP Tool: deckent_doctor', () => {
 
       vi.mocked(spawnSync).mockImplementation((cmd: string) => {
         if (cmd === 'git') return makeSpawnResult(0, 'git version 2.39.0');
-        return makeSpawnResult(0, 'v20.0.0');
+        return makeSpawnResult(0, PASSING_NODE_VERSION);
       });
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
@@ -162,7 +170,7 @@ describe('MCP Tool: deckent_doctor', () => {
 
       vi.mocked(spawnSync).mockImplementation((cmd: string) => {
         if (cmd === 'tmux') return makeSpawnResult(1, '');
-        return makeSpawnResult(0, 'v20.0.0');
+        return makeSpawnResult(0, PASSING_NODE_VERSION);
       });
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
@@ -184,7 +192,7 @@ describe('MCP Tool: deckent_doctor', () => {
 
       vi.mocked(spawnSync).mockImplementation((cmd: string) => {
         if (cmd === 'claude') return makeSpawnResult(1, '');
-        return makeSpawnResult(0, 'v20.0.0');
+        return makeSpawnResult(0, PASSING_NODE_VERSION);
       });
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
@@ -208,7 +216,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -223,7 +231,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -242,7 +250,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -259,7 +267,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -279,7 +287,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -303,7 +311,7 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(spawnSync).mockImplementation((cmd: string) => {
         if (cmd === 'tmux') return makeSpawnResult(1, '');
         if (cmd === 'claude') return makeSpawnResult(1, '');
-        return makeSpawnResult(0, 'v20.0.0');
+        return makeSpawnResult(0, PASSING_NODE_VERSION);
       });
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
@@ -343,7 +351,7 @@ describe('MCP Tool: deckent_doctor', () => {
 
       vi.mocked(spawnSync).mockImplementation((cmd: string) => {
         if (cmd === 'tmux') return makeSpawnResult(1, '');
-        return makeSpawnResult(0, 'v20.0.0');
+        return makeSpawnResult(0, PASSING_NODE_VERSION);
       });
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
@@ -365,7 +373,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -385,7 +393,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);
@@ -402,7 +410,7 @@ describe('MCP Tool: deckent_doctor', () => {
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
 
-      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v20.0.0'));
+      vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION));
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue('# content');
       vi.mocked(readdirSync).mockReturnValue([]);

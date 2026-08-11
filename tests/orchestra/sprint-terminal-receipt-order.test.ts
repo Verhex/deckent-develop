@@ -309,7 +309,9 @@ describe('fenced sprint terminal receipt archive boundary', () => {
     const archiveIndex = finalizeSource.indexOf(
       "archiveDirectives(projectRoot, sprint.id, 'CLEANUP'",
     );
-    const cleanupIndex = finalizeSource.indexOf('archiveOrphanTasks(projectRoot, sprint.id)');
+    // Sprint-512 (archive authority) retired the blanket archiveOrphanTasks
+    // step — orphan artifacts settle through the archive authority instead.
+    const retiredOrphanIndex = finalizeSource.indexOf('archiveOrphanTasks(');
 
     expect(finalizeSource.match(/publishFencedSprintTerminalReceipt\(\{/gu)).toHaveLength(1);
     expect(finalizeSource).toContain(
@@ -324,6 +326,6 @@ describe('fenced sprint terminal receipt archive boundary', () => {
     expect(publishIndex).toBeGreaterThan(0);
     expect(guardIndex).toBeGreaterThan(publishIndex);
     expect(archiveIndex).toBeGreaterThan(guardIndex);
-    expect(cleanupIndex).toBeGreaterThan(archiveIndex);
+    expect(retiredOrphanIndex).toBe(-1);
   });
 });

@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0-beta.1-sprint518] - 2026-08-11
+
+### Added
+
+- Agent catalog authority — design and owner decision points (row 7011)
+- Skill catalog authority — design and owner decision points (row 7012)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint517] - 2026-08-11
+
+### Added
+
+- Plugin security enforcement gains its typed config authority (row 7034)
+- Crash artifacts gain schema, provenance and collision-free naming (row 121 first slice)
+- Script lifecycle and proof-harness registry (row 270, rerouted)
+
+### Changed
+
+- Find and close the fail-loud root cause of the dist-clean call in test runs (row 60) (completed with tech debt)
+- Worker write-target derivation comes from one authority in every backend (row 4061) (completed with tech debt)
+- The security ADR crosswalk with typed conflict routes (row 4191) (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 3 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint515] - 2026-08-11
+
+### Added
+
+- Canonical historical trace envelope and classification contract
+- Immutable and idempotent historical trace migration engine
+- Corpus pipeline structured-content and per-record fault isolation
+
+
+_Tasks: 4 total, 3 done, 0 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint511] - 2026-08-11
 
 ### Added

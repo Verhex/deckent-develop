@@ -69,7 +69,10 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
   readContext: vi.fn(),
   planSprint: vi.fn(),
   writeSprintState: vi.fn(),
-  spawnWorkers: vi.fn(),
+  // Row 3309 made the overflow-queue return value load-bearing (runFixPhase
+  // publishes it as spawn-skip observability) — a bare vi.fn() resolving
+  // undefined kills the whole phase with `undefined.map`.
+  spawnWorkers: vi.fn(async () => []),
   buildSpawnRetryHint: vi.fn(() => ''),
   waitForResults: vi.fn(async () => []),
   finalizeSprint: vi.fn(),

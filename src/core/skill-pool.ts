@@ -276,6 +276,362 @@ function writeSkillStatsToSidecar(projectRoot: string, id: string, stats: SkillS
   }
 }
 
+// ─── Effective Skill Catalog — the single read model (521-004, design S1) ───
+//
+// follow-up-works/skill-catalog-authority-design-2026-08-11.md §3.1/§3.6/§4/§5.
+// Before this slice there were two directory-scan paths inside this module
+// (loadSkills' project scan and _loadBuiltinFallback's private builtin rescan),
+// each with its own layer coverage, and neither could express "this id exists
+// but is withdrawn". Now there is ONE resolver: it collects every content layer,
+// applies the D1 precedence, masks the disposition layers and reports invalid
+// manifests — every public method on SkillPoolManager is a projection of it.
+
+/**
+ * Layers that can supply skill CONTENT (§3.1 L1–L3), ordered by
+ * {@link SKILL_LAYER_RANK}. L4 (quarantined) and L5 (retired) are deliberately
+ * NOT layers here: they are dispositions that mask content, because absence on
+ * disk is indistinguishable from "never installed" (§3.1).
+ */
+export type SkillCatalogLayer = 'builtin' | 'project' | 'generated';
+
+/**
+ * Content-layer precedence — OWNER DECISION D1 (2026-08-11, Alperen):
+ * generated/learned sits BELOW a hand-authored project override, so the
+ * learning loop can never silently overwrite operator intent. Both outrank the
+ * shipped builtin package.
+ */
+export const SKILL_LAYER_RANK: Record<SkillCatalogLayer, number> = {
+  project: 3,
+  generated: 2,
+  builtin: 1,
+};
+
+/** §3.1 L4/L5 + the existing `enabled` boolean, expressed as one typed state. */
+export type SkillDispositionState = 'active' | 'disabled' | 'quarantined' | 'retired';
+
+/** §3.3 `provenance.kind` — typed, never inferred from directory position alone. */
+export type SkillProvenanceKind = 'builtin' | 'project' | 'generated' | 'imported' | 'marketplace';
+
+export interface SkillDisposition {
+  state: SkillDispositionState;
+  reasonCode: string | null;
+  since: string | null;
+  supersededBy: string | null;
+}
+
+/** One resolved catalog row — what "this skill, right now, for this project" means. */
+export interface EffectiveSkill {
+  id: string;
+  /** Which content layer won the precedence contest. */
+  layer: SkillCatalogLayer;
+  provenance: { kind: SkillProvenanceKind };
+  disposition: SkillDisposition;
+  /** Quarantined/retired ids are never resolvable by any surface (§3.1 fail-closed). */
+  masked: boolean;
+  definition: SkillDefinition;
+  /** The file this record's content came from (manifest.json, or a builtin SKILL.md). */
+  sourcePath: string;
+  /** Layer trail of the records this one shadowed, e.g. `['builtin@0.1.0']` (§3.6). */
+  overrides: string[];
+  statsSource: 'sidecar' | 'manifest' | 'defaults';
+}
+
+export interface SkillCatalogResolution {
+  /** Every known id, sorted byte-wise by id (§5 rule 1), INCLUDING masked records. */
+  entries: EffectiveSkill[];
+  /** Manifests excluded from the catalog — reported, never silently skipped (§4 point 3). */
+  invalid: InvalidManifestEntry[];
+}
+
+// ─── Flat skill-id contract (§3.2 + OWNER DECISION D9) ──────────────────────
+//
+// D9 ALTERNATİF KABUL: flat ids + registry mapping — a `publisher/id` qualified
+// id is NOT a skill id. Path-safety is normative, not incidental: this string is
+// used as a directory name by every writer, so it must be safe on the whole
+// platform matrix (Immutable Law 2), not on Linux only.
+
+const SKILL_ID_MAX_LENGTH = 64;
+const FLAT_SKILL_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+
+/** Windows reserved device names — unusable as a directory on the whole matrix. */
+const WINDOWS_RESERVED_IDS: ReadonlySet<string> = new Set([
+  'con', 'prn', 'aux', 'nul',
+  ...Array.from({ length: 9 }, (_, i) => `com${i + 1}`),
+  ...Array.from({ length: 9 }, (_, i) => `lpt${i + 1}`),
+]);
+
+export type SkillIdParseResult = { ok: true; id: string } | { ok: false; reason: string };
+
+/**
+ * The single skill-id contract. Fail-closed: an id that cannot be a safe
+ * directory name on every supported platform is rejected with a typed reason
+ * rather than becoming a second catalog entry (or a path-traversal primitive).
+ */
+export function parseSkillId(raw: unknown): SkillIdParseResult {
+  if (typeof raw !== 'string' || raw.trim() === '') {
+    return { ok: false, reason: '"id" must be a non-empty string' };
+  }
+  if (raw.length > SKILL_ID_MAX_LENGTH) {
+    return { ok: false, reason: `"id" must be at most ${SKILL_ID_MAX_LENGTH} characters` };
+  }
+  if (raw.includes('/') || raw.includes('\\')) {
+    return {
+      ok: false,
+      reason: '"id" must be a flat id — publisher-qualified or path-bearing ids are rejected (D9: flat-id + registry mapping)',
+    };
+  }
+  if (!FLAT_SKILL_ID_PATTERN.test(raw)) {
+    return {
+      ok: false,
+      reason: '"id" must match the flat skill-id grammar: lowercase ASCII letters/digits with interior hyphens, no leading or trailing hyphen',
+    };
+  }
+  if (WINDOWS_RESERVED_IDS.has(raw)) {
+    return { ok: false, reason: `"id" must not be a reserved filesystem device name ("${raw}")` };
+  }
+  return { ok: true, id: raw };
+}
+
+// ─── Disposition ledger (§3.1 L4/L5, read-only in this slice) ───────────────
+//
+// Quarantine and retirement become DATA here. Writing the ledger (wrapping
+// SkillSandbox.quarantine's directory move, retire + id-lock, the spawner's
+// typed HOLD extension) is slice S7 and lives outside this module — this slice
+// only guarantees that when the ledger says an id is withdrawn, no surface can
+// resolve it, and that `getEffective()` still returns its tombstone.
+
+const DISPOSITION_LEDGER_RELATIVE_PATH = path.join('.deckent', 'catalog', 'skill-dispositions.json');
+// `active` is deliberately absent: an active ledger row carries no information
+// the manifest does not already carry, and letting it win would let the ledger
+// silently contradict a manifest's own `enabled: false`.
+const DISPOSITION_LEDGER_STATES: ReadonlySet<string> = new Set(['disabled', 'quarantined', 'retired']);
+const MASKING_STATES: ReadonlySet<string> = new Set(['quarantined', 'retired']);
+
+/** Defensive read — a missing/corrupt/malformed ledger degrades to "no dispositions", never throws. */
+function readDispositionLedger(projectRoot: string): Map<string, SkillDisposition> {
+  const dispositions = new Map<string, SkillDisposition>();
+  const raw = readJsonSafe<{ entries?: unknown }>(
+    path.join(projectRoot, DISPOSITION_LEDGER_RELATIVE_PATH),
+  );
+  const entries = raw?.entries;
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries)) return dispositions;
+
+  for (const [rawId, value] of Object.entries(entries as Record<string, unknown>)) {
+    const parsedId = parseSkillId(rawId);
+    if (!parsedId.ok) continue;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const record = value as Record<string, unknown>;
+    const state = record['state'];
+    if (typeof state !== 'string' || !DISPOSITION_LEDGER_STATES.has(state)) continue;
+    dispositions.set(parsedId.id, {
+      state: state as SkillDispositionState,
+      reasonCode: typeof record['reasonCode'] === 'string' ? record['reasonCode'] : null,
+      since: typeof record['since'] === 'string' ? record['since'] : null,
+      supersededBy: typeof record['supersededBy'] === 'string' ? record['supersededBy'] : null,
+    });
+  }
+  return dispositions;
+}
+
+// ─── Resolver internals ─────────────────────────────────────────────────────
+
+/**
+ * The single directory-scan primitive for the skill catalog.
+ * {@link resolveSkillCatalog} is its ONLY caller — that is what makes the D10
+ * enforcement ratchet (a surviving private `readdirSync` over the catalog roots
+ * becomes a lint failure) mechanically possible in a later slice.
+ */
+function scanCatalogDirectory(dir: string): fs.Dirent[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return Array.isArray(entries) ? entries : [];
+}
+
+/** Values that mark a manifest as machine-produced (`source` today, `provenance.kind` in schema v1). */
+const GENERATED_PROVENANCE_VALUES: ReadonlySet<string> = new Set(['generated', 'learned']);
+
+/** Read the declared provenance kind, preferring the typed block over the legacy `source` string. */
+function readDeclaredProvenance(raw: Record<string, unknown>): string | undefined {
+  const provenance = raw['provenance'];
+  if (provenance && typeof provenance === 'object' && !Array.isArray(provenance)) {
+    const kind = (provenance as Record<string, unknown>)['kind'];
+    if (typeof kind === 'string') return kind;
+  }
+  const source = raw['source'];
+  return typeof source === 'string' ? source : undefined;
+}
+
+/**
+ * L2 vs L3 for a project-tree manifest: both live in `.deckent/skills/<id>/`,
+ * so the layer follows the manifest's own declared provenance, never its path.
+ */
+function classifyProjectLayer(raw: Record<string, unknown>): SkillCatalogLayer {
+  const declared = readDeclaredProvenance(raw);
+  return declared !== undefined && GENERATED_PROVENANCE_VALUES.has(declared) ? 'generated' : 'project';
+}
+
+function classifyProvenanceKind(raw: Record<string, unknown>, layer: SkillCatalogLayer): SkillProvenanceKind {
+  const declared = readDeclaredProvenance(raw);
+  switch (declared) {
+    case 'builtin':
+    case 'project':
+    case 'generated':
+    case 'imported':
+    case 'marketplace':
+      return declared;
+    case 'learned':
+      return 'generated';
+    default:
+      return layer;
+  }
+}
+
+/**
+ * Apply the D1 precedence to the candidates collected for ONE id: highest
+ * {@link SKILL_LAYER_RANK} wins; a tie keeps the first candidate, so resolution
+ * is a pure function of the candidate list and never of scan order.
+ */
+export function pickEffectiveLayer<T extends { layer: SkillCatalogLayer }>(
+  candidates: readonly T[],
+): T | undefined {
+  let winner: T | undefined;
+  for (const candidate of candidates) {
+    if (!winner || SKILL_LAYER_RANK[candidate.layer] > SKILL_LAYER_RANK[winner.layer]) {
+      winner = candidate;
+    }
+  }
+  return winner;
+}
+
+/**
+ * Resolve the effective skill catalog for one project root — the single
+ * resolution path behind every skill-pool read.
+ *
+ * Layer coverage is the union of what the two previous scan paths saw:
+ * `.deckent/skills/<id>/manifest.json` (L2 hand-authored / L3 generated, split
+ * by declared provenance) and the shipped builtin package (L1), synthesised
+ * in-memory from `SKILL.md` under exactly the pre-existing gates — the project
+ * must have been through `deckent init` (`.deckent/config.json` exists), and a
+ * builtin directory that ships its own `manifest.json` is left to the normal
+ * override path. Dispositions mask; sidecar stats overlay; invalid manifests
+ * are reported rather than dropped; entries come back sorted by id.
+ */
+export function resolveSkillCatalog(projectRoot: string): SkillCatalogResolution {
+  const invalid: InvalidManifestEntry[] = [];
+  const candidates = new Map<string, EffectiveSkill[]>();
+
+  const addCandidate = (
+    raw: Record<string, unknown>,
+    sourcePath: string,
+    layer: SkillCatalogLayer,
+    fallbackId: string,
+  ): void => {
+    const validation = SkillPoolManager.validateSkillDefinition(raw);
+    if (!validation.valid) {
+      invalid.push({ id: fallbackId, path: sourcePath, errors: validation.errors });
+      return;
+    }
+    const parsedId = parseSkillId(raw['id']);
+    if (!parsedId.ok) {
+      invalid.push({ id: fallbackId, path: sourcePath, errors: [parsedId.reason] });
+      return;
+    }
+    normalizeSkillManifest(raw);
+    const definition = raw as unknown as SkillDefinition;
+    const record: EffectiveSkill = {
+      id: parsedId.id,
+      layer,
+      provenance: { kind: classifyProvenanceKind(raw, layer) },
+      disposition: {
+        state: definition.enabled === false ? 'disabled' : 'active',
+        reasonCode: null,
+        since: null,
+        supersededBy: null,
+      },
+      masked: false,
+      definition,
+      sourcePath,
+      overrides: [],
+      statsSource: raw['stats'] !== undefined ? 'manifest' : 'defaults',
+    };
+    const group = candidates.get(record.id);
+    if (group) group.push(record);
+    else candidates.set(record.id, [record]);
+  };
+
+  // ── L2 / L3 — project tree ────────────────────────────────────────────────
+  const skillsDir = path.join(projectRoot, SKILLS_DIR);
+  if (fs.existsSync(skillsDir)) {
+    for (const entry of scanCatalogDirectory(skillsDir)) {
+      if (!entry.isDirectory()) continue;
+      const manifestPath = path.join(skillsDir, entry.name, MANIFEST_FILENAME);
+      if (!fs.existsSync(manifestPath)) continue;
+      const raw = readJsonSafe<Record<string, unknown>>(manifestPath);
+      if (!raw) {
+        invalid.push({
+          id: entry.name,
+          path: manifestPath,
+          errors: ['manifest.json exists but is unreadable or contains invalid JSON'],
+        });
+        continue;
+      }
+      addCandidate(raw, manifestPath, classifyProjectLayer(raw), entry.name);
+    }
+  }
+
+  // ── L1 — shipped builtin package ──────────────────────────────────────────
+  if (fs.existsSync(path.join(projectRoot, CONFIG_FILENAME))) {
+    const builtinDir = resolveBuiltinSkillsDir();
+    if (fs.existsSync(builtinDir)) {
+      for (const entry of scanCatalogDirectory(builtinDir)) {
+        if (!entry.isDirectory()) continue;
+        const entryDir = path.join(builtinDir, entry.name);
+        const files = scanCatalogDirectory(entryDir);
+        if (files.some((f) => f.name === MANIFEST_FILENAME)) continue;
+        if (!files.some((f) => f.name === SKILL_MD_FILENAME)) continue;
+        const skillMdPath = path.join(entryDir, SKILL_MD_FILENAME);
+        const raw = synthesizeSkillManifest(entry.name, skillMdPath);
+        if (!raw) continue;
+        addCandidate(raw, skillMdPath, 'builtin', entry.name);
+      }
+    }
+  }
+
+  // ── Merge: precedence → disposition → effective stats ─────────────────────
+  const statsLedger = readStatsSidecarLedger(projectRoot);
+  const dispositions = readDispositionLedger(projectRoot);
+  const entries: EffectiveSkill[] = [];
+
+  for (const [id, group] of candidates) {
+    const winner = pickEffectiveLayer(group);
+    if (!winner) continue;
+
+    winner.overrides = group
+      .filter((candidate) => candidate !== winner)
+      .map((candidate) => `${candidate.layer}@${candidate.definition.version || '0.0.0'}`)
+      .sort();
+
+    const declared = dispositions.get(id);
+    if (declared) winner.disposition = declared;
+    winner.masked = MASKING_STATES.has(winner.disposition.state);
+
+    const sidecarStats = statsLedger.skills[id];
+    if (sidecarStats && typeof sidecarStats === 'object') {
+      winner.definition.stats = sidecarStats;
+      winner.statsSource = 'sidecar';
+    }
+
+    entries.push(winner);
+  }
+
+  entries.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return { entries, invalid };
+}
+
 // ─── Skill Pool Manager ────────────────────────────────────────────────────
 
 export class SkillPoolManager {
@@ -285,14 +641,19 @@ export class SkillPoolManager {
   private invalidManifests: InvalidManifestEntry[] = [];
 
   /**
-   * Record a manifest that failed load-time validation or JSON parsing, and
-   * emit a visible signal via the existing debugLog primitive (stderr when
-   * DECKENT_DEBUG is set, always persisted to .brain/ERRORS.md) — replacing
-   * the previous fully-silent skip (born-590).
+   * Run the single resolver, publish its invalid-manifest report, and emit a
+   * visible signal per skipped manifest via the existing debugLog primitive
+   * (stderr when DECKENT_DEBUG is set, always persisted to .brain/ERRORS.md) —
+   * the never-silent-skip contract from born-590, now sourced from the one
+   * resolution path instead of from two private scans.
    */
-  private _recordInvalidManifest(id: string, manifestPath: string, errors: string[]): void {
-    this.invalidManifests.push({ id, path: manifestPath, errors });
-    debugLog('skill-pool:invalid-manifest', `${id} (${manifestPath}): ${errors.join('; ')}`);
+  private _resolveCatalog(): SkillCatalogResolution {
+    const resolution = resolveSkillCatalog(this.projectRoot);
+    this.invalidManifests = resolution.invalid;
+    for (const entry of resolution.invalid) {
+      debugLog('skill-pool:invalid-manifest', `${entry.id} (${entry.path}): ${entry.errors.join('; ')}`);
+    }
+    return resolution;
   }
 
   /** Manifests skipped during the most recent loadSkills() call because they failed validation or JSON parsing (born-590). */
@@ -308,63 +669,45 @@ export class SkillPoolManager {
   // ─── Load ───────────────────────────────────────────────────────────────────
 
   /**
-   * Load all skills from .deckent/skills/ directory.
-   * Returns a Map<string, SkillDefinition>.
-   * Skips directories with invalid manifest.json files — visibly (born-590):
-   * see getInvalidManifests()/getInvalidCount() for what was skipped and why.
+   * Load the resolvable skills for this project as a Map<string, SkillDefinition>.
+   *
+   * A projection of the single resolver (see {@link resolveSkillCatalog}): the
+   * pool is every effective record whose disposition does not mask it. A
+   * `disabled` skill still loads — `enabled` has always been enforced by the
+   * consumer (listEnabled/the spawner's forced-skill HOLD), not by the loader —
+   * while a quarantined or retired id is unresolvable here by construction.
+   * Manifests that fail validation or JSON parsing are excluded visibly
+   * (born-590): see getInvalidManifests()/getInvalidCount().
    */
   loadSkills(): Map<string, SkillDefinition> {
     const pool = new Map<string, SkillDefinition>();
-    this.invalidManifests = [];
-    const skillsDir = path.join(this.projectRoot, SKILLS_DIR);
-    // Read once — overlaid onto every skill as it's constructed (unified read,
-    // born-605): sidecar value wins when present, else the manifest-loaded
-    // `stats` is left as-is.
-    const statsLedger = readStatsSidecarLedger(this.projectRoot);
-
-    if (fs.existsSync(skillsDir)) {
-      let entries: fs.Dirent[] = [];
-      try {
-        entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      } catch {
-        entries = [];
-      }
-
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const manifestPath = path.join(skillsDir, entry.name, MANIFEST_FILENAME);
-        if (!fs.existsSync(manifestPath)) continue;
-        const raw = readJsonSafe<Record<string, unknown>>(manifestPath);
-        if (raw) {
-          const validation = SkillPoolManager.validateSkillDefinition(raw);
-          if (validation.valid) {
-            normalizeSkillManifest(raw);
-            const skill = raw as unknown as SkillDefinition;
-            this._overlayStats(skill, statsLedger);
-            pool.set(skill.id, skill);
-          } else {
-            this._recordInvalidManifest(entry.name, manifestPath, validation.errors);
-          }
-        } else {
-          this._recordInvalidManifest(entry.name, manifestPath, ['manifest.json exists but is unreadable or contains invalid JSON']);
-        }
-      }
+    for (const entry of this._resolveCatalog().entries) {
+      if (entry.masked) continue;
+      pool.set(entry.id, entry.definition);
     }
-
-    this._loadBuiltinFallback(pool, statsLedger);
-
     return pool;
   }
 
+  // ─── Effective read model (521-004) ─────────────────────────────────────────
+
   /**
-   * Overlay sidecar stats onto `skill` when present for its id — sidecar wins,
-   * else the manifest-loaded `stats` value is left as-is (unified read, born-605).
+   * Every id this catalog knows, sorted by id and INCLUDING masked
+   * (quarantined/retired) records with their disposition.
    */
-  private _overlayStats(skill: SkillDefinition, statsLedger: StatsSidecarLedger): void {
-    const sidecarStats = statsLedger.skills[skill.id];
-    if (sidecarStats && typeof sidecarStats === 'object') {
-      skill.stats = sidecarStats;
-    }
+  listEffective(): EffectiveSkill[] {
+    return this._resolveCatalog().entries;
+  }
+
+  /**
+   * The effective record for one id — returned even when the id is quarantined
+   * or retired (design §4 contract point 1: "unknown id" and "withdrawn id"
+   * must be distinguishable, the operator-facing difference between a typo and
+   * a security action). `undefined` means the id is genuinely unknown.
+   */
+  getEffective(id: string): EffectiveSkill | undefined {
+    const parsedId = parseSkillId(id);
+    if (!parsedId.ok) return undefined;
+    return this._resolveCatalog().entries.find((entry) => entry.id === parsedId.id);
   }
 
   /**
@@ -378,74 +721,15 @@ export class SkillPoolManager {
     writeSkillStatsToSidecar(this.projectRoot, id, stats);
   }
 
-  /**
-   * Fallback layer (371-001): make builtin skills pool-visible even when
-   * .deckent/skills/<id>/manifest.json has never been materialized. D-004
-   * precedence — any id already present (a .deckent override) is left
-   * untouched; only ids absent from `pool` are considered here.
-   *
-   * Gated on .deckent/config.json existing — i.e. this projectRoot has
-   * actually been through `deckent init`, not merely a directory that
-   * happens to contain a `.deckent/skills/<id>/` subdirectory (e.g. a
-   * narrow test fixture). Without this gate, any project/fixture lacking
-   * .deckent/skills entirely would inherit this INSTALLATION's full builtin
-   * catalog, since resolveBuiltinSkillsDir() intentionally resolves relative
-   * to the running module's own location (not `this.projectRoot`) — that
-   * part is required for real npm-installed usage, where builtins live
-   * under node_modules/deckent/, never under the user's own project root.
-   */
-  private _loadBuiltinFallback(pool: Map<string, SkillDefinition>, statsLedger: StatsSidecarLedger): void {
-    if (!fs.existsSync(path.join(this.projectRoot, CONFIG_FILENAME))) return;
-
-    const builtinDir = resolveBuiltinSkillsDir();
-    if (!fs.existsSync(builtinDir)) return;
-
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(builtinDir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    if (!Array.isArray(entries)) return;
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      if (pool.has(entry.name)) continue;
-
-      const entryDir = path.join(builtinDir, entry.name);
-      let files: fs.Dirent[];
-      try {
-        files = fs.readdirSync(entryDir, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      if (!Array.isArray(files)) continue;
-
-      // Only the "SKILL.md with no manifest anywhere" gap is this task's actual
-      // scope (368-001's 3 new skills). A builtin that already ships its OWN
-      // manifest.json is deliberately NOT read here — trusting arbitrary builtin
-      // manifest content as complete is unnecessary generality this task's
-      // goCriteria never requires, and at least one shipped manifest
-      // (secure-coding) omits the required `stackDetection` field, which crashes
-      // routing-engine.ts's stack-bonus scoring when read verbatim. If `id`
-      // already has a manifest.json in the builtin tree, it belongs in
-      // .deckent/skills/<id>/ via the normal override path, not this fallback.
-      if (files.some((f) => f.name === MANIFEST_FILENAME)) continue;
-      if (!files.some((f) => f.name === SKILL_MD_FILENAME)) continue;
-
-      const raw = synthesizeSkillManifest(entry.name, path.join(entryDir, SKILL_MD_FILENAME));
-      if (!raw) continue;
-      const validation = SkillPoolManager.validateSkillDefinition(raw);
-      if (!validation.valid) {
-        this._recordInvalidManifest(entry.name, path.join(entryDir, SKILL_MD_FILENAME), validation.errors);
-        continue;
-      }
-      normalizeSkillManifest(raw);
-      const skill = raw as unknown as SkillDefinition;
-      this._overlayStats(skill, statsLedger);
-      pool.set(skill.id, skill);
-    }
-  }
+  // NOTE (521-004): the private builtin rescan `_loadBuiltinFallback` is RETIRED.
+  // Its layer coverage — the 371-001 gap where a builtin ships only a SKILL.md
+  // and was invisible to routing until someone hand-authored a manifest — now
+  // lives in resolveSkillCatalog()'s L1 branch, with its two gates preserved
+  // verbatim (`.deckent/config.json` must exist; a builtin dir that ships its
+  // own manifest.json is left to the normal override path). What changes is
+  // only that the builtin layer is now DECLARED (`layer: 'builtin'`) instead of
+  // silently synthesised behind a second scan, so the same id is the same entry
+  // on a clean checkout and on a long-lived tree (design §5 rule 3).
 
   // ─── Get / List ─────────────────────────────────────────────────────────────
 

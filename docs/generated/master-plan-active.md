@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):0fcc856afacdf33d5ba9fb49eab65324db303808cae6b9f8bbf5e99d13fa8475`
+**Source digest:** `sha256(normalized-lf-utf8):5596fa49047e036568044773a68c3b76729e0e87f431fa8d5eddf9c3937d8d63`
 
-**Rows:** 469 total · 409 active · 60 terminal
+**Rows:** 470 total · 410 active · 60 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 316 |
+| OPEN | 317 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -61,6 +61,7 @@
 | 305 | `STATE-ARCHIVE-RESTORE-001` | OPEN | P0 | TRUTH | `RECOVERY-COMMAND-SERVICE-001`, `DOCS-TOPOLOGY-001` | — | Warm ve cold archive için lossless restore, lineage-reader ve integrity authority |
 | 306 | `RESOURCE-TELEMETRY-LIFECYCLE-001` | OPEN | P1 | OBS | `AUDIT-001` | — | Resource telemetry schema, provenance, bounded lifecycle ve financial-ledger separation authority |
 | 307 | `RUNTIME-ARTIFACT-CATALOG-001` | OPEN | P0 | TRUTH | `AUDIT-001` | — | `.deckent/runtime` için typed artifact catalog, ownership, confidentiality ve lifecycle authority |
+| 308 | `RECOVERY-SNAPSHOT-AUTHORITY-001` | OPEN | P0 | TRUTH | `RECOVERY-COMMAND-SERVICE-001`, `RUNTIME-ARTIFACT-CATALOG-001` | — | Project/host-scoped emergency worktree, runtime ve database snapshotları için tek capture/import/restore/lifecycle authority |
 | 310 | `ERROR-SEVERITY-001` | OPEN | P2 | TRUTH | `STATE-RETENTION-001` | — | Operational breadcrumb and error forensic severity truth |
 | 320 | `OPS-BRANCH-001` | OPEN | P1 | TRUTH | `SSOT-001` | — | Branch, worktree, remote and unpushed-commit authority inventory |
 | 330 | `OPS-RETIRE-001` | BLOCKED | P2 | TRUTH | `OPS-BRANCH-001` | `FRESH_REMOTE_APPROVAL_REQUIRED` | Approved branch and remote retirement |

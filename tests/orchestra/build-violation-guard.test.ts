@@ -332,7 +332,7 @@ describe('DockerSpawnBackend.monitorContainer — dist-mutation wiring', () => {
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  it('flags .result.distMutated + warns when dist/ was mutated during the container run', () => {
+  it('flags .result.distMutated + warns when dist/ was mutated during the container run', async () => {
     const projectDir = freshTmp();
     const tasksDir = join(projectDir, '.tasks');
     mkdirSync(tasksDir, { recursive: true });
@@ -352,10 +352,15 @@ describe('DockerSpawnBackend.monitorContainer — dist-mutation wiring', () => {
     const backend = new DockerSpawnBackend(projectDir);
     invokeMonitor(backend, { taskId, tasksDir, projectDir, distFingerprintBefore: before, settlementRef });
 
-    const written = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
-    expect(written.distMutated).toBe(true);
-    // Advisory-only: the worker's own honest self-assessment is untouched — never blocked.
-    expect(written.selfAssessment).toBe('DONE');
+    // The advisory runs after the (sprint-511, now-async) attribution
+    // reconcile inside monitorContainer's flow — wait on the durable write
+    // instead of racing it.
+    await vi.waitFor(() => {
+      const written = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+      expect(written.distMutated).toBe(true);
+      // Advisory-only: the worker's own honest self-assessment is untouched — never blocked.
+      expect(written.selfAssessment).toBe('DONE');
+    });
     expect(warnSpy).toHaveBeenCalled();
     expect(String(warnSpy.mock.calls[0]?.[0])).toMatch(/BUILD-VIOLATION-GUARD/);
   });

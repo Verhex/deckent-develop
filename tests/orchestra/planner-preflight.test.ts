@@ -77,14 +77,23 @@ describe('born-653 — scope derivation phantom paths', () => {
 
   // 411-001 real case: a Scope label carrying a FILE path — the real derivation appends
   // a slash and mints the `src/core/deck-file.ts/` phantom directory.
-  it('RED: real extractScopeFromDirective mints the 411-001 file-as-directory phantom', () => {
+  it('the 411-001 file-as-directory phantom is no longer minted at source (row 3312c)', () => {
+    // born-653 originally pinned the mint RED; sprint-519's isFileScopeToken
+    // fix closed it at extraction time, so the pin now guards the closure.
     const scope = extractScopeFromDirective('- Scope: src/core/deck-file.ts');
-    expect(scope.directories).toContain('src/core/deck-file.ts/');
+    expect(scope.directories).not.toContain('src/core/deck-file.ts/');
+    expect(scope.filesWrite).toContain('src/core/deck-file.ts');
   });
 
-  it('GREEN: stripPhantomScope drops the file-as-directory phantom (extension-detected)', () => {
+  it('GREEN: stripPhantomScope drops a file-as-directory phantom that reaches it (extension-detected)', () => {
+    // The mint is closed upstream (row 3312c), but strip stays as defense in
+    // depth for phantom tokens arriving from older task JSON on disk.
     const declared = ['src/core/deck-file.ts', 'tests/core/deck-file.test.ts'];
-    const scope = extractScopeFromDirective('- Scope: src/core/deck-file.ts');
+    const scope = {
+      directories: ['src/core/deck-file.ts/'],
+      filesRead: [],
+      filesWrite: ['src/core/deck-file.ts'],
+    };
     const { scope: clean, removed } = stripPhantomScope(scope, declared);
     expect(clean.directories).not.toContain('src/core/deck-file.ts/');
     expect(removed).toContain('src/core/deck-file.ts/');

@@ -53,6 +53,9 @@ function fakeCatalogResponse(id = 'test-model-01'): RemoteCatalogResponse {
 function mockFetch(response: RemoteCatalogResponse): typeof fetch {
   return vi.fn().mockResolvedValue({
     ok: true,
+    // fetchRemoteCatalog gates on the response content-type (sprint-510) — a
+    // header-less stub silently downgrades every load to 'bundled'.
+    headers: new Headers({ 'content-type': 'application/json' }),
     json: async () => response,
   }) as unknown as typeof fetch;
 }

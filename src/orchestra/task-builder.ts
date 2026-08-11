@@ -482,6 +482,21 @@ export function extractPromotionProofDeclaration(
   const platformCapability = (platformRaw ?? 'any') as PostSettlementPlatformCapability;
   if (!POST_SETTLEMENT_PLATFORM_VALUES.includes(platformCapability)) return undefined;
 
+  return boundedProofProjection(commandText, scope, ingress, platformCapability);
+}
+
+/**
+ * Tokenize `commandText` into the bounded argv a post-settlement projection
+ * accepts and build the projection. Returns undefined (never throws) when the
+ * command is empty or violates the bounded-command limits shared with the
+ * runtime reducer (post-settlement-verification.ts).
+ */
+function boundedProofProjection(
+  commandText: string,
+  scope: TaskScope,
+  ingress: PostSettlementIngress,
+  platformCapability: PostSettlementPlatformCapability,
+): PostSettlementPlanProjection | undefined {
   const argv = shellSplit(commandText);
   if (argv.length === 0) return undefined;
   const [executable, ...args] = argv;
@@ -499,6 +514,208 @@ export function extractPromotionProofDeclaration(
     platformCapability,
     command: { executable, args, cwdRef },
   });
+}
+
+// ─── 519-004: source verification vs built-binary proof staging ───────
+//
+// Root cause (row 3275, sprint-487): a plan could express a proof obligation
+// that only the BUILT artifact can satisfy — a `Smoke:` directive is documented
+// as a "real-binary command" and free-text goCriteria are prose — while a sprint
+// is forbidden from building (BUILD-VIOLATION-GUARD, born-644). Both stages
+// already existed (`smoke` = in-sprint, `postSettlementProjection` = after
+// settlement); what was missing is the plan-time CLASSIFICATION between them, so
+// a built-CLI demand was accepted verbatim as an in-sprint criterion and every
+// retry burned against a stale dist/ by construction.
+//
+// The detector below is deliberately conservative: only signals that cannot be
+// satisfied without a fresh build count. A type check (`tsc --noEmit`, and the
+// project's bare `npx tsc` check line) is SOURCE verification and never matches.
+
+/** Why a proof command can only run against a freshly built artifact. */
+export type BuiltBinaryProofSignal =
+  | 'build-command'
+  | 'dist-artifact'
+  | 'package-artifact'
+  | 'global-install';
+
+/** A matched built-binary demand: the signal plus the exact matched evidence text. */
+export interface BuiltBinaryProofDemand {
+  readonly signal: BuiltBinaryProofSignal;
+  readonly token: string;
+}
+
+const BUILT_BINARY_PROOF_PATTERNS: ReadonlyArray<{
+  readonly signal: BuiltBinaryProofSignal;
+  readonly re: RegExp;
+}> = [
+  // Package-script build invocation (`npm|yarn|pnpm [run] build|rebuild|prepack`).
+  { signal: 'build-command', re: /\b(?:npm|yarn|pnpm)\s+(?:run\s+)?(?:build|rebuild|prepack|prepublishOnly)\b/i },
+  // Built-artifact path: `dist/cli/index.js`, `./dist/…`, `node dist/index.js`.
+  { signal: 'dist-artifact', re: /(?:^|[\s"'`(=])\.{0,2}\/?dist\/[A-Za-z0-9._/-]+/ },
+  // Tarball/pack artifact.
+  { signal: 'package-artifact', re: /\bnpm\s+pack\b/i },
+  // Globally installed / linked binary.
+  { signal: 'global-install', re: /\bnpm\s+(?:install|i|link)\s+(?:-g\b|--global\b)/i },
+];
+
+/**
+ * Classify whether `text` demands the BUILT binary. Returns the first matching
+ * signal, or undefined when the text is satisfiable from source alone.
+ * Pure — no filesystem, no spawn.
+ */
+export function classifyBuiltBinaryProofDemand(text: string): BuiltBinaryProofDemand | undefined {
+  if (!text) return undefined;
+  for (const { signal, re } of BUILT_BINARY_PROOF_PATTERNS) {
+    const m = re.exec(text);
+    if (m) return { signal, token: m[0].trim() };
+  }
+  return undefined;
+}
+
+/**
+ * Restate a built-binary proof command as the typed post-settlement obligation
+ * it actually is. This is the ONLY sanctioned home for such a demand: it never
+ * becomes a Task of its own and never becomes an in-sprint criterion.
+ * Returns undefined when the command exceeds the bounded-argv limits — callers
+ * must then surface the demand instead of dropping it.
+ */
+export function stageBuiltBinaryProofObligation(params: {
+  readonly commandText: string;
+  readonly scope: TaskScope;
+  readonly ingress?: PostSettlementIngress;
+  readonly platformCapability?: PostSettlementPlatformCapability;
+}): PostSettlementPlanProjection | undefined {
+  const commandText = params.commandText.trim();
+  if (!commandText) return undefined;
+  return boundedProofProjection(
+    commandText,
+    params.scope,
+    params.ingress ?? 'sprint',
+    params.platformCapability ?? 'any',
+  );
+}
+
+export type ProofStagingFindingCode =
+  /** An in-sprint proof surface demands the built binary — impossible by construction. */
+  | 'IN_SPRINT_BUILT_BINARY_DEMAND'
+  /** The demand could not be bounded into a post-settlement obligation; it is kept, not dropped. */
+  | 'BUILT_BINARY_PROOF_UNSTAGEABLE';
+
+/** Which proof surface the demand was authored on. */
+export type ProofStagingSurface = 'smoke' | 'testTarget' | 'goCriteria' | 'noGoCriteria';
+
+/**
+ * Typed plan-time finding for the source-verification / built-binary boundary.
+ * `stagedObligation` carries the post-settlement restatement of the rejected
+ * demand — a finding never means the demand was dropped.
+ */
+export interface ProofStagingFinding {
+  readonly severity: 'BLOCK' | 'WARN';
+  readonly code: ProofStagingFindingCode;
+  readonly surface: ProofStagingSurface;
+  readonly signal: BuiltBinaryProofSignal;
+  /** The offending text as authored. */
+  readonly demand: string;
+  readonly message: string;
+  /** Task id (planner lint) or title (directive parse) the finding belongs to. */
+  readonly taskRef?: string;
+  readonly stagedObligation?: PostSettlementPlanProjection;
+}
+
+/** Proof obligations of one directive block, split across the two authority stages. */
+export interface DirectiveProofStaging {
+  /** In-sprint Tier-1 smoke — absent once a built-binary demand has been rejected. */
+  readonly smoke?: { command: string; expect: string };
+  /** Post-settlement obligation: an explicit PromotionProof, or a restaged binary demand. */
+  readonly postSettlementProjection?: PostSettlementPlanProjection;
+  readonly findings: readonly ProofStagingFinding[];
+  /** True when a finding actually changed the returned obligations (hard-flip applied). */
+  readonly enforced: boolean;
+}
+
+export interface ProofStagingOptions {
+  /**
+   * Apply the rejection to the returned obligations instead of only reporting it.
+   *
+   * Defaults to FALSE, matching the ADR-G-020 V1.0 posture this repo uses to land
+   * a new authority gate: warn + emit first, hard-block once the tree has migrated.
+   * Two fixtures still author an in-sprint `dist/` smoke as the expected shape
+   * (tests/orchestra/planner-smoke-wire.test.ts, planner-smoke-e2e.test.ts) and
+   * they are outside this task's write authority — flipping the default before
+   * they are restaged would break a contract this task may not edit. The finding
+   * is raised and warned in BOTH modes, so the demand is never silent.
+   */
+  readonly enforce?: boolean;
+}
+
+/**
+ * Split a directive block's proof obligations into the two authority stages.
+ *
+ * A `Smoke:` command that needs the built binary is rejected from the in-sprint
+ * stage with a typed finding and restated as a post-settlement obligation (an
+ * explicitly authored `PromotionProof:` always wins). Under the default advisory
+ * mode the returned obligations are left as authored; under `enforce` the
+ * rejection is applied. A smoke satisfiable from source, and a block with no
+ * smoke at all, are returned exactly as before in both modes — normal tasks plan
+ * byte-identically.
+ */
+export function stageDirectiveProofObligations(
+  block: string,
+  scope: TaskScope,
+  taskTitle?: string,
+  options: ProofStagingOptions = {},
+): DirectiveProofStaging {
+  const smoke = extractSmoke(block);
+  const declared = extractPromotionProofDeclaration(block, scope);
+  const asAuthored = { smoke, postSettlementProjection: declared, findings: [], enforced: false } as const;
+  if (!smoke) return asAuthored;
+
+  const demand = classifyBuiltBinaryProofDemand(smoke.command);
+  if (!demand) return asAuthored;
+
+  const staged = declared ?? stageBuiltBinaryProofObligation({ commandText: smoke.command, scope });
+  if (!staged) {
+    // Bounds-unstageable: keep the demand visible rather than losing it.
+    const finding: ProofStagingFinding = {
+      severity: 'BLOCK',
+      code: 'BUILT_BINARY_PROOF_UNSTAGEABLE',
+      surface: 'smoke',
+      signal: demand.signal,
+      demand: smoke.command,
+      taskRef: taskTitle,
+      message:
+        `Smoke command needs the built binary (${demand.signal}: "${demand.token}") but exceeds the `
+        + 'bounded post-settlement command limits — the demand is kept as authored and must be restated by hand.',
+    };
+    warnProofStaging(finding);
+    return { smoke, postSettlementProjection: declared, findings: [finding], enforced: false };
+  }
+
+  const finding: ProofStagingFinding = {
+    severity: 'BLOCK',
+    code: 'IN_SPRINT_BUILT_BINARY_DEMAND',
+    surface: 'smoke',
+    signal: demand.signal,
+    demand: smoke.command,
+    taskRef: taskTitle,
+    stagedObligation: staged,
+    message:
+      `Smoke command needs the built binary (${demand.signal}: "${demand.token}"); a sprint never builds, so this `
+      + 'in-sprint criterion belongs on the post-settlement proof stage'
+      + (options.enforce ? ' — rejected and restaged.' : ' (advisory: obligations left as authored).'),
+  };
+  warnProofStaging(finding);
+  return options.enforce
+    ? { smoke: undefined, postSettlementProjection: staged, findings: [finding], enforced: true }
+    : { smoke, postSettlementProjection: declared, findings: [finding], enforced: false };
+}
+
+/** Loud, typed operator signal — a restaged proof obligation is never silent. */
+function warnProofStaging(finding: ProofStagingFinding): void {
+  process.stderr.write(
+    `[deckent] ${finding.severity}: ${finding.code} (${finding.surface}`
+    + `${finding.taskRef ? `, task "${finding.taskRef}"` : ''}) — ${finding.message}\n`,
+  );
 }
 
 // ═══ Functions ════════════════════════════════════════════════════
@@ -1557,7 +1774,13 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       .trim();
 
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description, meta: parsedMeta, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: extractSmoke(block), postSettlementProjection: extractPromotionProofDeclaration(block, enrichedScope) });
+    // 519-004: source verification and built-binary proof are separate authority
+    // stages. A Smoke that needs the built binary belongs on postSettlementProjection,
+    // never on an in-sprint criterion a sprint can't possibly satisfy. Advisory here
+    // (warn + emit, obligations as authored) until the two fixtures that still encode
+    // the in-sprint dist/ shape are restaged — see ProofStagingOptions.enforce.
+    const proofStaging = stageDirectiveProofObligations(block, enrichedScope, title);
+    tasks.push({ title, description, meta: parsedMeta, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: proofStaging.smoke, postSettlementProjection: proofStaging.postSettlementProjection });
   }
   return tasks;
 }

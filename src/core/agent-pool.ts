@@ -305,6 +305,31 @@ export function isTempAgentStale(
   return currentNum - lastNum > maxAge;
 }
 
+// ─── Layer Precedence (row 7011 D1 — owner-approved 2026-08-11) ─────────────
+//
+// follow-up-works/agent-catalog-authority-design-2026-08-11.md §3.1 + addendum "D1 KABUL":
+// L1 project override (.deckent/agents/) > L2 learned/runtime (.tasks/agents/) > L0 shipped
+// builtin, with L2 limited to a field-level exception: on an id collision with L1, L2 may only
+// carry across the RUNTIME-DERIVED fields (`stats` — including `lastUsedInSprint` — and
+// `capabilitiesProvisional`), never identity, prompt, tool grants or routing declarations.
+// This reverses the previous whole-record L2-wins collision behavior (an approved behavior
+// change, D1). L0 already only fills genuine gaps (_loadBuiltinFallback's `pool.has` check
+// below) and needs no change — that already matches L1 > L2 > L0.
+
+/**
+ * Compose a colliding L2 (learned/runtime) record onto its L1 (project override) counterpart
+ * per D1's field-level exception. Returns `l1Agent` with `stats` replaced by `l2Agent.stats`,
+ * and `capabilitiesProvisional` replaced when `l2Agent` declares one. Every other field —
+ * identity, prompt, tool grants, routing declarations — stays L1's.
+ */
+function composeL1WithL2RuntimeFields(l1Agent: AgentDefinition, l2Agent: AgentDefinition): AgentDefinition {
+  const composed: AgentDefinition = { ...l1Agent, stats: l2Agent.stats };
+  if (l2Agent.capabilitiesProvisional !== undefined) {
+    composed.capabilitiesProvisional = l2Agent.capabilitiesProvisional;
+  }
+  return composed;
+}
+
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 const VALID_SOURCES = ['builtin', 'user', 'learned'] as const;
@@ -547,6 +572,9 @@ export class AgentPoolManager {
    * see getInvalidManifests()/getInvalidCount() for what was skipped and why.
    * Applies LRU eviction: keeps only the most-recently-used temp agents
    * up to `maxTempAgents` (default 50).
+   * Layer precedence (row 7011 D1): L1 project override > L2 learned/runtime > L0 shipped
+   * builtin. A colliding L2 record composes only its runtime-derived fields onto the L1
+   * record — see composeL1WithL2RuntimeFields().
    */
   loadAgents(): AgentPool {
     const pool: AgentPool = new Map();
@@ -578,11 +606,13 @@ export class AgentPoolManager {
       });
       const kept = sorted.slice(0, this.maxTempAgents);
       for (const agent of kept) {
-        pool.set(agent.id, agent);
+        const l1Agent = pool.get(agent.id);
+        pool.set(agent.id, l1Agent ? composeL1WithL2RuntimeFields(l1Agent, agent) : agent);
       }
     } else {
       for (const [id, agent] of tempPool) {
-        pool.set(id, agent);
+        const l1Agent = pool.get(id);
+        pool.set(id, l1Agent ? composeL1WithL2RuntimeFields(l1Agent, agent) : agent);
       }
     }
 

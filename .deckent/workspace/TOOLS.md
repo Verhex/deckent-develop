@@ -140,6 +140,7 @@ _Total: 40 MCP tools_
 | `rbac` | deckent rbac |
 | `recall` | deckent recall |
 | `recover` | deckent recover |
+| `recover-helpers` | deckent recover-helpers |
 | `remember` | deckent remember |
 | `resources` | deckent resources |
 | `resume` | deckent resume |
@@ -167,4 +168,4 @@ _Total: 40 MCP tools_
 | `web` | deckent web |
 | `xverify` | deckent xverify |
 
-_Total: 106 CLI command modules_
+_Total: 107 CLI command modules_

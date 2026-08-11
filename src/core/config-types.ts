@@ -826,6 +826,9 @@ export const DEFAULT_LIFECYCLE_RECOVERY_CONFIG: Readonly<LifecycleRecoveryConfig
   forced_termination_verify_ms: 5_000,
 });
 
+/** Plugin-security rejection stance. The default remains advisory until an owner-approved flip. */
+export type PluginSecurityEnforcement = 'advisory' | 'enforce';
+
 export interface DeckentConfig {
   mode: PlanMode;
   modes: Record<string, PlanModeConfig>;
@@ -1441,6 +1444,8 @@ export interface DeckentConfig {
    *  Shape mirrors PluginsRawConfig (src/core/plugin-loader.ts) — resolved
    *  there via resolvePluginSecurityConfig(). */
   plugins?: {
+    /** Whether security findings warn-and-load or fail closed. Default: 'advisory'. */
+    security_enforcement?: PluginSecurityEnforcement;
     /** When true, unsigned plugins are rejected (fail-closed). Default false = load + loud-warn. */
     require_signature?: boolean;
     /** Trusted publisher keys ({ keyId, publicKey } records) — the signature trust-root. */

@@ -229,7 +229,13 @@ describe('getLangFromRoot', () => {
 
 // ─── start command i18n integration ──────────────────────────────────
 
-vi.mock('../../../src/core/config.js', () => ({ loadConfig: vi.fn() }));
+// Spread the real module first: command modules keep growing new config imports
+// (DEFAULT_HEARTBEAT_TIMEOUT_MS landed via sprint-512) and a closed factory
+// turns each one into a strict-ESM mock crash.
+vi.mock('../../../src/core/config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/config.js')>()),
+  loadConfig: vi.fn(),
+}));
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),

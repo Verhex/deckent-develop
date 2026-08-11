@@ -1,11 +1,18 @@
-# DIRECTIVES — Sprint-B6: five slices, codex at scale
+# DIRECTIVES — Sprint-B12: factory wave three, the catalog implementation begins
 
 ## Goal
 
-Five MASTER-PLAN rows advance: FIX-spawn observability (3309), provider-observation
-retirement (3296), the bot-stop HOLD exemption debt (3320 residue), dependency
-supply-chain defense evaluation (7100), and the OWASP agentic-security baseline (4190).
-Every slice is scope-disjoint; none touches provider auth or runs build tooling.
+Eight tasks: the tenant-authority rerun with corrected scope (4021), the first three
+catalog implementation slices executing the owner's recorded decisions (agent census,
+agent schema S1, agent resolver S2, skill resolver S1, skill V3-state S2 — rows 7011
+and 7012), the crash retention slice (121), and the read-satisfiability plan gate born
+from this week's two honest BOUNDARY_BLOCKED refusals. Tasks 3 and 5 declare
+dependencies. The catalog tasks MUST read their governing design documents and the
+OWNER DECISIONS addenda in follow-up-works — the decisions there are binding.
+
+Read visibility note for every task: reading repository sources and the design
+documents for evidence is expected and permitted — the write authority is what the
+Files line constrains.
 
 Provider, model, effort and effective concurrency are resolved from effective config,
 registry, role policy, auth/reachability evidence, usage/limit authority and host admission.
@@ -20,7 +27,7 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
   present. A second parallel mechanism is a NO-GO.
 - Fail closed on ambiguity; nothing may make a destructive action easier to trigger.
 - Workers must not run `npm run build`, full `npm test`, provider login/auth mutation,
-  sprint lifecycle commands, git commit, or cleanup. Scoped vitest runs only.
+  sprint lifecycle commands, git commit, npm publish, or cleanup. Scoped vitest runs only.
 - Tests are hermetic: tmpdir-based, no network, no live `.tasks`/`.deckent` writes,
   async spawn only (ADR-D-002).
 - New user-facing text goes through the i18n message authority (`getMessage`, en+tr);
@@ -29,149 +36,221 @@ registry, role policy, auth/reachability evidence, usage/limit authority and hos
 
 ---
 
-## Task 1: A queued FIX task spawns observably or publishes a typed reason (row 3309)
+## Task 1: Fail-closed tenant authority for autonomous approval ingress (row 4021, rerun)
 
-- Files: src/orchestra/sprint-phases.ts, src/orchestra/scheduler-effects.ts, tests/orchestra/fix-spawn-observability.test.ts
-- Scope: src/orchestra/sprint-phases.ts, src/orchestra/scheduler-effects.ts, src/orchestra/sprint-spawner.ts, tests/orchestra/fix-spawn-observability.test.ts
-- Model: claude-opus-5
-- Dependencies: none
-
-Measured (row 3309, sprint-507 disk evidence): 507-002-fix sat Queued while the
-scheduler-shadow journal recorded 92 consecutive watcher decisions with empty
-spawnedTaskIds between 00:38 and 00:43 — the FIX worker's heartbeat, pid and log never
-came into existence, and nothing anywhere said why. Sprints 508 and later DID spawn
-their FIX workers, so the gap is conditional, not constant.
-
-Required: root-cause first — trace the path from a FIX task being enqueued to a worker
-being spawned, and identify every condition under which the scheduler loop can skip a
-queued FIX task silently (admission, concurrency, dependency, phase state — whatever
-the code shows); record the inventory in the result notes. Then: any skip of a
-spawnable queued task on a scheduler pass publishes a typed reason into the existing
-scheduler journal (extend the journal record, no new file family), so a stuck queue is
-diagnosable from disk. A regression test drives a fixture scheduler pass with a queued
-FIX task and asserts either a spawn decision or a typed skip reason — never a silent
-empty pass.
-
-**Test:** `npx vitest run tests/orchestra/fix-spawn-observability.test.ts`
-
-**NO-GO:** changing spawn admission semantics themselves (this slice makes skips
-VISIBLE, not different), a new journal file family, or forcing a spawn that admission
-legitimately refuses.
-
----
-
-## Task 2: Terminal retirement closes or scopes historical provider execution intervals (row 3296)
-
-- Files: src/core/provider-execution-observation-store.ts, src/orchestra/sprint-finalizer.ts, tests/core/provider-observation-retirement.test.ts
-- Scope: src/core/provider-execution-observation-store.ts, src/orchestra/sprint-finalizer.ts, tests/core/provider-observation-retirement.test.ts
-- Model: claude-opus-5
-- Dependencies: none
-
-Measured (row 3296): sprint-490's COMPLETE and exact cleanup correctly projected
-currentAttained=0, but the canonical read-model retained four open intervals outside
-the exact current task set as unresolved-provider-observation. The evidence is
-truthful; the ownership/retirement policy is incomplete. The live store today carries
-50+ legacy intervals across ten days. Negative scope (binding, from the row): never
-erase provider history, never infer closure from USD=0, and the v1-to-v2 schema
-migration is owner-gated and OUT of this slice.
-
-Required: COMPLETE and cleanup reconcile every interval owned by the exact run/attempt
-generation being settled — close them with a typed retirement reason; foreign or
-historical intervals remain forensic and MUST NOT impose an admission HOLD on an
-unrelated IDLE or current run; reconciliation is idempotent and tenant/provider
-fenced. Hermetic test drives a tmpdir store through settle-with-open-intervals and
-asserts owned intervals retire, foreign intervals survive untouched, and a second
-reconciliation is a no-op.
-
-**Test:** `npx vitest run tests/core/provider-observation-retirement.test.ts`
-
-**NO-GO:** deleting observation rows, touching the schema version or migration,
-retiring an interval the settling generation does not own, or closure inferred from
-cost values.
-
----
-
-## Task 3: Recovery-class bot stop runs under the binary-identity HOLD (row 3320 residue)
-
-- Files: src/cli/worktree-binary-authority.ts, src/cli/commands/bot.ts, tests/cli/bot-stop-hold-exemption.test.ts
-- Scope: src/cli/worktree-binary-authority.ts, src/cli/commands/bot.ts, tests/cli/bot-stop-hold-exemption.test.ts
+- Files: src/orchestra/autonomous/approval-adapter.ts, tests/orchestra/autonomous-tenant-authority.test.ts
+- Scope: src/orchestra/autonomous/approval-adapter.ts, src/orchestra/autonomous/, src/core/principal.ts, src/core/, tests/orchestra/autonomous-tenant-authority.test.ts
 - Model: gpt-5.6-sol
 - Dependencies: none
 
-Measured (row 3320's remaining debt, carried honestly through two sprints): the
-build-source-mismatch HOLD lives in src/cli/worktree-binary-authority.ts and blocked
-the very `deckent bot stop` that would resolve the drift — the live workaround on
-2026-08-01 was an OS signal. The sprint-512 debt attempt correctly refused to touch
-this file because it was outside its granted scope; it is IN scope now.
+Measured (row 4021; the first attempt refused honestly because the principal
+machinery was outside its read scope — src/core/principal.ts is IN scope now): the
+approval ingress accepts callers without a single fail-closed tenant resolution.
 
-Required: the binary-identity authority gains a typed recovery-class exemption seam —
-an explicit allowlist of recovery-class operations (bot stop at minimum) that may
-proceed under the mismatch HOLD with a typed warning instead of a block. The seam is
-narrow and declarative: an operation must declare itself recovery-class at its call
-site; nothing becomes exempt implicitly, and start-class operations stay guarded
-exactly as today. Regression test pins: bot stop proceeds-with-typed-warning under a
-simulated mismatch, bot start stays blocked, and an undeclared operation stays blocked.
+Required: root-cause first — inventory in the result notes which autonomous ingress
+surfaces resolve tenant scope today. Then the FIRST slice: approve/reject/pending
+resolve exactly one tenant/project scope from the verified principal via the existing
+principal machinery in src/core/principal.ts (PRINCIPAL-001 is DONE — consume, never
+reimplement), fail closed typed for foreign or tenant-less strict callers WITHOUT
+leaking existence, and keep solo-mode default-tenant behaviour byte-identical.
+Hermetic tests pin solo-unchanged, foreign-refused-no-metadata, tenantless-strict-
+refused.
 
-**Test:** `npx vitest run tests/cli/bot-stop-hold-exemption.test.ts`
+**Test:** `npx vitest run tests/orchestra/autonomous-tenant-authority.test.ts`
 
-**NO-GO:** weakening the guard for any non-declared operation, an implicit or
-pattern-based exemption, or removing the mismatch warning from the exempted path.
+**NO-GO:** changing solo-mode behaviour, a second resolver, or existence-leaking
+refusals.
 
 ---
 
-## Task 4: Evaluate npm supply-chain defense as a product feature (row 7100)
+## Task 2: Agent catalog S1 — schema and state model, types only (row 7011)
 
-- Files: docs/analysis/dep-supply-defense-2026-08-11.md
-- Scope: docs/analysis/dep-supply-defense-2026-08-11.md, docs/analysis/
-- Model: gpt-5.6-sol
+- Files: src/core/agent-types.ts, tests/core/agent-catalog-schema.test.ts
+- Scope: src/core/agent-types.ts, src/core/, .deckent/agents/, .claude/agents/, tests/core/agent-catalog-schema.test.ts, follow-up-works/
+- Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 7100): deckent spawns workers that run `npm ci` and arbitrary provider
-CLIs inside containers, and its own CI installs hundreds of packages; the row asks for
-a product-level evaluation of npm dependency supply-chain defense across the worker
-and CI ingress surfaces.
+Measured: the design at
+follow-up-works/agent-catalog-authority-design-2026-08-11.md (READ IT and its OWNER
+DECISIONS addendum — binding) defines S1 as schema and state model, types only,
+consuming decision D2 (schemaVersion required-on-write, defaulted-on-read,
+unknown-future = typed invalid) and D4 (capabilities missing = definitively
+non-routable; unresolvable preferredModel never blocks).
 
-Required: a single analysis document (the file named in Files — NEW) that inventories
-the ACTUAL ingress surfaces from the repo (worker container npm usage, CI workflows'
-install steps, the allowScripts posture visible in the build logs, the dependency
-policy in ADR-D-005), maps concrete threat classes (install-script execution, typo-
-squat/update-hijack, lockfile drift, transitive compromise) to those surfaces, and
-proposes a phased defense design with decision points for the owner — each phase named,
-bounded and justified from the codebase reality, not generic advice. No production
-code, no config changes, no new dependencies — analysis artifact only.
+Required: exactly the design's S1 — the versioned manifest schema and the
+validity/provenance/routability state model as TYPES plus a pure classification
+function, no resolver change yet. The design's S1 proof obligation is the acceptance:
+every current live manifest (21 builtin, 21 shadow, 2 learned, 3 archived — read them
+from the real directories) classifies to an explicit validity and provenance with
+zero silent skips, and the known id/directory-mismatch case classifies as a warning
+rather than loading clean. Tests pin the classification table against real-manifest
+fixtures copied into tmpdir.
 
-**Test:** the document exists at the exact path with every section above present;
-`npm run lint:links` passes if the repo exposes it.
+**Test:** `npx vitest run tests/core/agent-catalog-schema.test.ts`
 
-**NO-GO:** generic security boilerplate unanchored to this repo's real surfaces,
-production or config edits, or recommendations without owner decision points.
+**NO-GO:** touching the resolver or any consumer surface (that is S2), silent skips,
+or deviating from the recorded D2/D4 decisions.
 
 ---
 
-## Task 5: OWASP Agentic Top 10 self-assessment baseline (row 4190)
+## Task 3: Agent catalog S2 — the resolver behind the existing API (row 7011)
 
-- Files: docs/security/owasp-asi-baseline-2026-08-11.md
-- Scope: docs/security/owasp-asi-baseline-2026-08-11.md, docs/security/
+- Files: src/core/agent-pool.ts, tests/core/agent-layer-precedence.test.ts
+- Scope: src/core/agent-pool.ts, src/core/, tests/core/agent-layer-precedence.test.ts, follow-up-works/
+- Model: claude-sonnet-5
+- Dependencies: schema and state model
+
+Measured: the design's S2 (READ the design and addendum) puts the layered resolver
+behind the existing AgentPoolManager API, consuming S1's types and decision D1 — the
+owner-approved precedence inversion: L1 project-override above L2 learned/runtime
+above L0 builtin, with field-level L2 override restricted to runtime-derived fields
+(today L2 whole-record-wins at agent-pool.ts:585-586; that behaviour change is
+APPROVED).
+
+Required: exactly the design's S2 with its proof obligations — the existing
+tests/core/agent-pool.test.ts stays green UNMODIFIED (its exact-call-count and
+ordered-mock assertions are documented constraints), a layer-precedence table test
+covers every L0/L1/L2 collision combination under the new order, and syscall count
+does not regress.
+
+**Test:** `npx vitest run tests/core/agent-layer-precedence.test.ts tests/core/agent-pool.test.ts`
+
+**NO-GO:** modifying the existing agent-pool test file, a precedence other than the
+recorded D1, or consumer-surface changes (S3+ territory).
+
+---
+
+## Task 4: Skill catalog S1 — one effective read model behind the existing API (row 7012)
+
+- Files: src/core/skill-pool.ts, tests/core/skill-catalog-readmodel.test.ts
+- Scope: src/core/skill-pool.ts, src/core/skill-registry.ts, src/core/, tests/core/skill-catalog-readmodel.test.ts, follow-up-works/
+- Model: claude-opus-5
+- Dependencies: none
+
+Measured: the design at
+follow-up-works/skill-catalog-authority-design-2026-08-11.md (READ IT and its OWNER
+DECISIONS addendum — binding) defines the first implementation slice as the single
+effective read model: shipped, project-override, generated/learned, quarantined and
+retired layers resolving through one resolver behind the existing skill-pool API,
+with generated BELOW hand-authored (decision D1) and flat ids (decision D9).
+
+Required: the design's first slice with its stated proof obligations — every current
+consumer keeps its observable behaviour for today's non-conflicting catalogs, layer
+collisions resolve per D1 with a precedence table test, and the resolver is the ONLY
+directory-scan path inside skill-pool/skill-registry (private rescans retired; the
+D10 lint ratchet is a LATER slice — here the structure just makes it possible).
+
+**Test:** `npx vitest run tests/core/skill-catalog-readmodel.test.ts`
+
+**NO-GO:** generated-above-human precedence, publisher-qualified ids, or a surviving
+second scan path inside the two scoped modules.
+
+---
+
+## Task 5: Skill catalog S2 — V3 profile state carried as data (row 7012)
+
+- Files: src/core/skill-types.ts, tests/core/skill-profile-state.test.ts
+- Scope: src/core/skill-types.ts, src/core/, tests/core/skill-profile-state.test.ts, follow-up-works/
+- Model: claude-opus-5
+- Dependencies: one effective read model
+
+Measured: the design (and owner decision D6) requires the catalog to CARRY V3
+profile state as data — present-valid, present-invalid, absent — while the
+reconciliation DECISION stays with row 7121. Today 30 of 31 project skills carry no
+profile and are silently never V3-routed while every surface shows them available
+(decision D5: visible installed-but-unroutable).
+
+Required: typed profileState on the effective record (consuming task 4's read model —
+the declared dependency guarantees ordering), derived per skill from the real
+manifest/profile files, with the D5 visibility contract expressed in the read model
+(a surface CAN now render installed-but-unroutable; surface wiring itself is a later
+slice). Tests pin the three states against fixtures and the real-tree count truth
+recorded in the result notes.
+
+**Test:** `npx vitest run tests/core/skill-profile-state.test.ts`
+
+**NO-GO:** deciding any profile reconciliation (7121's authority), hiding unroutable
+skills, or a second derivation path.
+
+---
+
+## Task 6: Crash artifacts gain retention and a bounded reader (row 121 second slice)
+
+- Files: src/cli/helpers/error-handler.ts, tests/cli/crash-retention-reader.test.ts
+- Scope: src/cli/helpers/error-handler.ts, src/cli/helpers/, tests/cli/crash-retention-reader.test.ts
+- Model: claude-sonnet-5
+- Dependencies: none
+
+Measured (row 121; the schema slice landed in sprint-517 as CrashArtifactV1): the
+crashes directory still has no retention policy and no bounded production reader —
+six legacy logs sit unreadable-by-contract, and nothing prunes by age/count/size.
+
+Required: age+count+size retention for crash artifacts applied ONLY at write time by
+the crash writer itself (never a background job), with config-resolved limits
+following the existing retention-family config patterns (no new literals); a bounded
+reader that lists/reads artifacts newest-first with a hard cap and typed handling of
+legacy pre-schema files (classified legacy, never parsed as V1, NEVER deleted —
+legacy prune stays receipt-gated per the row). The never-mask property is preserved:
+retention failures cannot obscure the original fatal. Hermetic tests pin retention
+boundaries, legacy classification and never-mask.
+
+**Test:** `npx vitest run tests/cli/crash-retention-reader.test.ts`
+
+**NO-GO:** deleting legacy artifacts, a background pruner, retention literals in
+code, or masking the original fatal.
+
+---
+
+## Task 7: Agent catalog S0 — the discovery census gate (row 7011)
+
+- Files: tests/governance/agent-discovery-census.test.ts
+- Scope: tests/governance/agent-discovery-census.test.ts, tests/governance/, follow-up-works/
 - Model: gpt-5.6-terra
 - Dependencies: none
 
-Measured (row 4190): the 2026-08-05 code-truth scan opened this row for an OWASP
-Agentic Security (ASI01-ASI10, 2026) self-assessment; the repo already carries the
-owner's prompt material for it at CODEX-OWASP-ASI-PROMPT.md (read it first) and the
-scan's two concrete findings landed as rows 7031 (plugin sandbox — since wired,
-flag-gated) and 4091 (spend gate — since enforced, flag-gated).
+Measured: the design's census slice (READ the design §1) inventories every current
+agent-discovery call site — including the eleven AGENTS_DIR definition sites — and
+demands a generated census that reproduces every inventoried row, where a
+deliberately added twelfth raw scan makes the check fail.
 
-Required: a single baseline document (the file named in Files — NEW; create the
-directory if absent) that assesses each ASI risk class against deckent's ACTUAL
-mechanisms with file-level evidence — the capability/tool authority chain, scope
-enforcement, plugin pipeline, spend gates, approval flows, memory/audit chains —
-stating per risk: covered / partially covered / open, the evidence path, and the
-existing MASTER row that owns the gap where one exists. Honest OPEN verdicts are
-required where coverage is missing; inventing coverage is the one unforgivable
-failure. No production code or config edits — assessment artifact only.
+Required: a governance test (the file named in Files — NEW, following the
+orphan-deliverables sweep pattern in the same directory) that walks src/ for
+agent-directory scan sites (AGENTS_DIR usages and raw directory reads over the agent
+layers), pins the current census as the known-set, and fails loudly when a new
+unregistered scan site appears OR a known one disappears — the same
+drift-visible-both-ways contract the orphan sweep uses. Read-only over src; the
+census constant lives in the test.
 
-**Test:** the document exists at the exact path with a verdict row per ASI01-ASI10;
-`npm run lint:links` passes if the repo exposes it.
+**Test:** `npx vitest run tests/governance/agent-discovery-census.test.ts`
 
-**NO-GO:** claiming coverage without a file-level evidence path, production or config
-edits, or softening an open gap into partially-covered without evidence.
+**NO-GO:** editing any production file, a census that samples instead of walking, or
+a pin that only fails in one direction.
+
+---
+
+## Task 8: The plan gate learns read-satisfiability (born from two honest refusals)
+
+- Files: src/orchestra/scope-satisfiability.ts, tests/orchestra/read-satisfiability-gate.test.ts
+- Scope: src/orchestra/scope-satisfiability.ts, src/orchestra/, tests/orchestra/read-satisfiability-gate.test.ts
+- Model: claude-sonnet-5
+- Dependencies: none
+
+Measured (sprints 519 and 520, two honest BOUNDARY_BLOCKED refusals): a task whose
+description demands consuming machinery outside its read scope reaches a worker and
+fails only at execution time — the 2030 taxonomy task could not read the providers it
+had to classify, and the 4021 tenant task could not read the principal resolver it
+was ordered to consume. The plan-time gate already warns on write-side
+MENTIONED_NOT_WRITABLE; the read side is blind.
+
+Required: extend the existing scope-satisfiability analysis with a read-side check —
+when a task description names concrete source paths or modules to READ/consume and
+none of the scope entries makes them visible, the gate emits a typed
+MENTIONED_NOT_READABLE finding (warning-class like its write sibling, with the same
+remedy text pattern). No new gate mechanism — extend the existing one; the finding
+must have fired for both measured cases, pinned by fixtures reproducing each. Today's
+passing plans stay finding-free (no false positives on prose that names no path).
+
+**Test:** `npx vitest run tests/orchestra/read-satisfiability-gate.test.ts`
+
+**NO-GO:** blocking-class findings (warning only — the owner decides escalation), a
+second gate, or false positives on path-free prose.

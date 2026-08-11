@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "0fcc856afacdf33d5ba9fb49eab65324db303808cae6b9f8bbf5e99d13fa8475"
+    "value": "5596fa49047e036568044773a68c3b76729e0e87f431fa8d5eddf9c3937d8d63"
   },
   "summary": {
-    "total": 469,
-    "active": 409,
+    "total": 470,
+    "active": 410,
     "terminal": 60,
     "receipts": 184,
     "byState": {
-      "OPEN": 316,
+      "OPEN": 317,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 305,
+      "P0": 306,
       "P1": 127,
       "P2": 37
     },
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 13,
       "TOOL": 1,
-      "TRUTH": 86,
+      "TRUTH": 87,
       "XPLAT": 3
     }
   },
@@ -235,9 +235,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-11",
       "definitionDigest": "e16b6c95a5c04fd2c27a8c2e77dacd96df6e2da1d3aed400545feec6bc2c6b00",
-      "progressDigest": "c133e1f6d952adace6f8237aba082f01a8dddabc99f49edd93b336c2299ec130",
+      "progressDigest": "21192dc98bfe9cd90f52dad7d9c57bac1aa693db01c84b981fe92e0c9a390754",
       "terminalClosureDigest": null
     },
     {
@@ -499,9 +499,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-11",
       "definitionDigest": "4171048871ae812f8f1a1440c6193f2370d477bc0d688777a1ae8dc1519d7da2",
-      "progressDigest": "54ee5d2338e04a873a02aa3470440f6e588f105fdc2f072224b4730a44281818",
+      "progressDigest": "4bfeb90089c9d6a1d9bb01d7e325f10dbb0b37ada2227221e2e835d1793218c9",
       "terminalClosureDigest": null
     },
     {
@@ -524,6 +524,17 @@
       "updated": "2026-08-11",
       "definitionDigest": "54ecd651eff65ab8a696b6ab8a92f0d1a5ef9dba117c96098047a9fef5d128c9",
       "progressDigest": "eaa9d6377f7876f24296e1dcfbf233e47c45b152d1575d27c5c89d74eccc7e2e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 308,
+      "id": "RECOVERY-SNAPSHOT-AUTHORITY-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "ab425acd6789ccfb73d817d163547da8d1383f4e197d1fe231ee0f12ce980ffb",
+      "progressDigest": "2b60632b6cc72908aeb0c0779d3a610e87ba394ce5dd8278ef98c4b7045bd2ad",
       "terminalClosureDigest": null
     },
     {
@@ -7438,8 +7449,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Tenant-aware age/count/size policies; bounded readers; atomic rotation",
-      "evidence": "2026-07-21 `.deckent` analysis; current files remeasured; 2026-08-10 disk/code truth: `.deckent/archive` 2,849 dosya ve 98.2 MiB; sprint ve scheduler archive için archive-side retention yok; dizinler 0755 ve 2,814 dosya 0644; metrics `maxSizeMB` productionda tüketilmiyor, lexicographic generation sırası digit-width değişiminde bozuluyor ve same-sprint rotate overwrite riski taşıyor; expanded closure STATE-ARCHIVE-RESTORE-001 childındadır. 2026-08-10 cache/crash RCA: `.deckent/crashes` altında 6 ignored log var (3 tarihsel EPIPE false-positive, 3 EADDRINUSE); writer `formatFatalAndExit`, production reader/rotation/retention/support-bundle consumer yok; dosyalar 0644, dizin 0755, timestamp-only ad aynı milisaniyede overwrite edebilir ve artifact command/version/process/project/tenant provenance taşımadığı için EADDRINUSE ingress'i kanıtlanamıyor. Mevcut loglarda credential pattern bulunmadı; silme ancak typed retention/prune receipt'iyle; exact expansion CRASH-FORENSICS-AUTHORITY-001 childındadır. 2026-08-10 PID/prompt RCA: `.deckent/pids` bugün boş ve silme hedefi yok; PID/snapshot producerı explicit least-privilege mode/ACL tanımlamıyor. `.deckent/prompts/injection-audit.jsonl` 12214382 byte/30947 valid JSON kayıt taşıyor; 13053 kayıt 30 günden eski, rotation/retention/legal-hold readerı yok ve 0644 dosya/0755 dizin task+ADR metadata disclosure yaratıyor. Test ve live provenance karıştığı için toplu prune/delete yapılmaz; exact trace/lifecycle closure PROMPT-INJECTION-TRACE-001 childındadır",
-      "updated": "2026-08-10"
+      "evidence": "2026-07-21 `.deckent` analysis; current files remeasured; 2026-08-10 disk/code truth: `.deckent/archive` 2,849 dosya ve 98.2 MiB; sprint ve scheduler archive için archive-side retention yok; dizinler 0755 ve 2,814 dosya 0644; metrics `maxSizeMB` productionda tüketilmiyor, lexicographic generation sırası digit-width değişiminde bozuluyor ve same-sprint rotate overwrite riski taşıyor; expanded closure STATE-ARCHIVE-RESTORE-001 childındadır. 2026-08-10 cache/crash RCA: `.deckent/crashes` altında 6 ignored log var (3 tarihsel EPIPE false-positive, 3 EADDRINUSE); writer `formatFatalAndExit`, production reader/rotation/retention/support-bundle consumer yok; dosyalar 0644, dizin 0755, timestamp-only ad aynı milisaniyede overwrite edebilir ve artifact command/version/process/project/tenant provenance taşımadığı için EADDRINUSE ingress'i kanıtlanamıyor. Mevcut loglarda credential pattern bulunmadı; silme ancak typed retention/prune receipt'iyle; exact expansion CRASH-FORENSICS-AUTHORITY-001 childındadır. 2026-08-10 PID/prompt RCA: `.deckent/pids` bugün boş ve silme hedefi yok; PID/snapshot producerı explicit least-privilege mode/ACL tanımlamıyor. `.deckent/prompts/injection-audit.jsonl` 12214382 byte/30947 valid JSON kayıt taşıyor; 13053 kayıt 30 günden eski, rotation/retention/legal-hold readerı yok ve 0644 dosya/0755 dizin task+ADR metadata disclosure yaratıyor. Test ve live provenance karıştığı için toplu prune/delete yapılmaz; exact trace/lifecycle closure PROMPT-INJECTION-TRACE-001 childındadır. 2026-08-11 recovery-snapshot RCA: ignored repo-local `.deckent/recovery-snapshots` 6 dosya/2,554,361 byte ve iki ayrı manuel format taşıyor; tüm payloadlar 0644, dizinler 0755, retention/legal-hold/prune consumerı yok ve dirty-tree tar'ı önceki sprint snapshotını yeniden içine almış. Legacy byte'lar canonical import+restore+disposition receipt'i olmadan silinmez; exact closure RECOVERY-SNAPSHOT-AUTHORITY-001 childındadır",
+      "updated": "2026-08-11"
     },
     {
       "order": 121,
@@ -8302,7 +8313,9 @@
       "dependents": [
         "AUTONOMOUS-STATE-AUTHORITY-001"
       ],
-      "children": [],
+      "children": [
+        "RECOVERY-SNAPSHOT-AUTHORITY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -8321,12 +8334,13 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "RECOVERY-COMMAND-SERVICE-001",
-        "DOCS-TOPOLOGY-001"
+        "DOCS-TOPOLOGY-001",
+        "RECOVERY-SNAPSHOT-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Versioned manifest/schema registry every archived artifactı tenant/project/run identity, producer, retention class, digest and restore target ile binds; restore hem `recently-works` hem cold archiveı path-safe, hash-verified, no-clobber ve crash-recoverable okur; usage/lineage canonical `.brain/archive` authoritysini tüketir; terminal receipt canonical-location migrationı fallback ile monotonic kalır; confidentiality, legal hold, failure injection ve Linux/macOS/Windows-native/WSL proofs pass",
-      "evidence": "2026-08-10 disk/code truth: 311 tar+sha pair checksum/gzip/path-safe olsa da `restoreFromSnapshot` yalnız `recently-works` okuduğundan cold archive restore dokümanı fiilen yanlış; `usage --lineage` `.deckent/archive` altında mevcut olmayan direct task JSON/result arıyor, gerçek task authority `.brain/archive/sprints/*-tasks`; 448 JSON içinde sprint-168 sonucu invalid; archive 0755/0644; iki ignored analysis corpusunda 662 doküman topology disposition bekliyor",
-      "updated": "2026-08-10"
+      "evidence": "2026-08-10 disk/code truth: 311 tar+sha pair checksum/gzip/path-safe olsa da `restoreFromSnapshot` yalnız `recently-works` okuduğundan cold archive restore dokümanı fiilen yanlış; `usage --lineage` `.deckent/archive` altında mevcut olmayan direct task JSON/result arıyor, gerçek task authority `.brain/archive/sprints/*-tasks`; 448 JSON içinde sprint-168 sonucu invalid; archive 0755/0644; iki ignored analysis corpusunda 662 doküman topology disposition bekliyor. 2026-08-11 recovery-snapshot RCA: repo-local path için production producer/reader/restore ingressi yok; product `restoreFromSnapshot` yalnız `.deckent/recently-works/<sprint>-pre-archive.*` basename formatını tüketiyor ve iki manuel repo-local formatla uyumsuz. Dört kayıtlı digest eşleşti, iki tar gzip/path/link güvenlik taramasından geçti ve main-dirty artifactı exact base üzerinde izole restore edildi; buna rağmen sprint tar'ındaki yalnız 6/60 entry canonical arşivde exact duplicate kanıtlandı, kalan legacy kapsam için silme güvenli değil. Repo-local ve host-global recovery yollarındaki format/authority ayrışmasının exact closure'ı RECOVERY-SNAPSHOT-AUTHORITY-001 childındadır",
+      "updated": "2026-08-11"
     },
     {
       "order": 306,
@@ -8374,7 +8388,9 @@
       "dependsOn": [
         "AUDIT-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-SNAPSHOT-AUTHORITY-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -8398,6 +8414,44 @@
       "evidenceReceipts": [],
       "acceptance": "Her runtime path authority/projection/cache/secret/audit/forensic sınıfı, canonical producer/consumer, schema+migration ownerı, tenant/project/run/attempt identitysi, confidentiality, permission/ACL, git policy, retention+legal hold, archive/restore ve deletion receipt'iyle registryde tanımlanır; unknown artifact ve undocumented writer fail-closed/typed olur; kullanıcı ve AI reference dokümanları registryden generated üretilir, static count taşımaz; Linux/macOS/Windows-native/WSL/OCI, multi-project daemon ve million-artifact scale/chaos proof'u pass olur",
       "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: aktif `.deckent/runtime` snapshotı yaklaşık 2,621 dosya ve 35,607,684 payload byte taşıyor; 77 tracked, 2,431 adet 0644 ve yalnız 190 adet 0600 artifact var. RunFlow DB+legacy JSONL, jobs, evaluations, scheduler shadow, prompt evidence, invocation DB, tokenlar, status projectionı, tool inventory ve tracked `bot-listen.log` aynı convention dizininde farklı authority/lifecycle anlamlarıyla birikiyor. JSON/SQLite integrity semantics doğruluğunu, `.gitignore` confidentialityyi kanıtlamıyor; merkezi artifact catalog/permission/retention/migration ve generated runtime reference bulunmuyor. Canlı dosyalarda migrate/delete/prune bu satırın dry-run manifest+owner-approved receipt kapanışından önce yapılmaz",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 308,
+      "id": "RECOVERY-SNAPSHOT-AUTHORITY-001",
+      "parent": "STATE-ARCHIVE-RESTORE-001",
+      "program": "TRUTH",
+      "outcome": "Project/host-scoped emergency worktree, runtime ve database snapshotları için tek capture/import/restore/lifecycle authority",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RUNTIME-ARTIFACT-CATALOG-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RUNTIME-ARTIFACT-CATALOG-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Tek canonical path resolver ve versioned format registry project ile host scope'unu tenant/project/run/attempt/generation/producer/tool/config kimliğine bağlar; typed worktree/task-runtime/database profilleri source commit/object reachability, SQLite-consistent capture ve complete payload manifesti üretir; restore dry-run-first, path-safe, no-clobber, transactional, crash-recoverable ve receipt-bound çalışır; DATA-GOV-001 policy authoritysine uygun signed/tamper-evident manifest, least-privilege mode/ACL, redaction/encryption/key custody, age+count+size retention, legal hold, dedup ve deletion receipt'i zorunludur; legacy repo-local ve host-global snapshotlar original byte'ları değiştirmeden indexed import/disposition sürecine alınır ve unmappable içerik typed HOLD olur; Linux/macOS/Windows-native/WSL/OCI, concurrent capture/restore, failure injection ve million-artifact scale proof'u pass olur",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: repo-local `.deckent/recovery-snapshots` 6 dosya/2,554,361 byte, iki manuel ve product restore ile uyumsuz format taşıyor; exact production referansı yalnız gitignore ve CI protected-path listesi, product snapshot authoritysi ise `.deckent/recently-works` altında. SHA-256/gzip/path taraması temiz ve main-dirty 74 tracked + 58 untracked artifact izole exact-base restore proof'undan geçti; hash authenticity/completeness veya DB capture consistency sağlamıyor. Sprint-454 tar'ı 60 entry taşıyor, yalnız 6 canonical duplicate digest düzeyinde kanıtlandı; kalanlar migrate/disposition edilmeden silinmez. Dirty-tree snapshot önceki snapshotı recursive içeriyor; repo-local 0755/0644 permissionları task/log/routing/analysis/DB metadata disclosure yaratıyor; host-global recovery ağacında ek formatlar bulunması split authorityyi doğruluyor. Boş nested `.deckent/approvals` yalnız producer/root-resolution audit'i ve prune receipt'i sonrası deletion candidate'tır",
       "updated": "2026-08-11"
     },
     {
@@ -14160,6 +14214,7 @@
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
         "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001",
         "RECOVERY-DO-DOGFOOD-001",
+        "RECOVERY-SNAPSHOT-AUTHORITY-001",
         "STATE-ARCHIVE-RESTORE-001"
       ],
       "children": [],
@@ -24383,6 +24438,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9b9a023a5bca6d230c1384e26dc3c42af23231dc36e20a46f3357a2777a1f89f"
+    "value": "b7fcd6aa02de1fa65b9ff712ef57f3d08d6652e2ecd092567409c3b65b46e736"
   }
 }

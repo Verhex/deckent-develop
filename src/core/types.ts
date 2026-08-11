@@ -13,6 +13,16 @@ export * from './monitoring-types.js';
 export * from './sprint-types.js';
 export * from './invocation-receipt.js';
 
+// ─── Lifecycle Phase Vocabulary (row 3305) ──────────────────────────────────
+// `SprintPhase` (defined in sprint-types.ts, re-exported above) is the single
+// canonical lifecycle vocabulary: DIRECTIVE, PLAN, SPAWN, EXECUTE, EVALUATE,
+// FIX, RETRO, DECAY, TRANSITION, COMPLETE. sprint-controller.ts's `runSprint`
+// emits exactly these members, in this order, via `emitPhaseChange`.
+// CLEANUP is intentionally NOT a member: it is non-phase post-terminal
+// maintenance (clear scan interval, remove task/lock files) that runs inline
+// between the DECAY and COMPLETE transitions — see `runSprint`'s docstring
+// and the "Terminal Handoff Authority" section in sprint-controller.ts.
+
 // ─── Ollama Provider Types (Sprint 190 W-F F-11) ────────────────────────────
 // Additive type surface for the local-LLM provider. Full ProviderName widening
 // lives in task-types.ts (out of scope for task 190-009 — tracked as tech debt);

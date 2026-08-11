@@ -2,7 +2,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SkillDefinition } from './skill-types.js';
+import { parseSkillId } from './skill-pool.js';
 import { readJsonSafe } from './utils.js';
+import { DeckentError } from './errors.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -18,6 +20,15 @@ interface RegistryData {
 /**
  * Central skill registry backed by a JSON file.
  * Provides register, search, getPopular, getAll, and remove operations.
+ *
+ * Catalog authority (521-004): the registry is the id↔metadata MAPPING that
+ * OWNER DECISION D9 chose over `publisher/id` qualification — ids stay flat, a
+ * publisher is recorded as mapped metadata, never encoded into the identifier
+ * (and therefore never into a directory path). It is deliberately NOT a second
+ * catalog reader: it never scans a directory, and the effective read model for
+ * "which skills exist for this project" is resolveSkillCatalog() in
+ * skill-pool.ts. Both consume the SAME id contract — parseSkillId — so an id
+ * admitted here can never be one the catalog resolver would reject.
  */
 export class SkillRegistry {
   constructor(private registryPath: string) {}
@@ -26,8 +37,16 @@ export class SkillRegistry {
 
   /**
    * Register a new skill. If a skill with the same id exists, it is replaced.
+   *
+   * Fail-closed on the flat-id contract (D9): a publisher-qualified or
+   * otherwise path-bearing id is rejected with a typed error rather than
+   * admitted and later used as a directory name by a writer.
    */
   register(skill: SkillDefinition): void {
+    const parsedId = parseSkillId(skill?.id);
+    if (!parsedId.ok) {
+      throw new DeckentError('E_SKILL_ID_INVALID', `SkillRegistry.register: refusing to register skill — ${parsedId.reason}`);
+    }
     const data = this._readData();
     const existingIdx = data.skills.findIndex((s) => s.id === skill.id);
     if (existingIdx >= 0) {
