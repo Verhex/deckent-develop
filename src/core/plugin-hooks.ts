@@ -7,6 +7,7 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import type { Task, TaskResult, Sprint, ResolvedConfig } from './types.js';
+import type { DeckentConfig, PluginSecurityEnforcement } from './config-types.js';
 import { scanPlugins } from './plugin.js';
 import { PluginSecurityError } from './plugin.js';
 import type { Plugin } from './plugin.js';
@@ -135,7 +136,7 @@ const VALID_HOOK_NAMES: readonly PluginHook[] = ['beforeSprint', 'afterSprint', 
  *
  * Flipping the default to 'enforce' is an owner decision, not a code default.
  */
-export type PluginSecurityEnforcement = 'advisory' | 'enforce';
+export type { PluginSecurityEnforcement } from './config-types.js';
 
 /** Default stance — advisory. Do not flip without an explicit owner decision. */
 export const DEFAULT_PLUGIN_SECURITY_ENFORCEMENT: PluginSecurityEnforcement = 'advisory';
@@ -156,15 +157,15 @@ export interface LoadPluginHooksOptions {
 /**
  * Read the advisory→enforce stance off the effective config's `plugins` block.
  *
- * `plugins.security_enforcement` is not declared in config-types.ts yet (that file is
- * outside this slice's write authority), but `ResolvedConfig.plugins` is a runtime
- * passthrough of the operator's config block, so the field is readable structurally
- * today. Anything unrecognized — including an absent block — resolves to the advisory
- * default; a present-but-unrecognized value additionally emits a typed warning rather
- * than silently degrading a security stance.
+ * `ResolvedConfig.plugins` is the runtime passthrough of this typed operator config.
+ * Anything unrecognized at a runtime boundary resolves to the advisory default; a
+ * present-but-unrecognized value additionally emits a typed warning rather than
+ * silently degrading a security stance.
  */
-export function resolvePluginSecurityEnforcement(plugins: unknown): PluginSecurityEnforcement {
-  const raw = (plugins as { security_enforcement?: unknown } | null | undefined)?.security_enforcement;
+export function resolvePluginSecurityEnforcement(
+  plugins: DeckentConfig['plugins'] | null | undefined,
+): PluginSecurityEnforcement {
+  const raw = plugins?.security_enforcement;
   if (raw === undefined || raw === null) return DEFAULT_PLUGIN_SECURITY_ENFORCEMENT;
   if (raw === 'enforce') return 'enforce';
   if (raw === 'advisory') return 'advisory';

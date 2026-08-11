@@ -106,3 +106,30 @@ Bug: tests/connectors/bot-lifecycle-hones… (PAUSED)
 - 516-004: Script lifecycle and proof-harness registry (row 270) (NO_GO)
 
 ---
+## Sprint 517 — sprint-517
+
+**Status:** COMPLETE
+**Date:** 2026-08-11
+**Duration:** 797s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 797379ms |
+
+### Tasks
+
+- 517-001: Find and close the fail-loud root cause of the dist-clean call in test runs (row 60) (DONE)
+- 517-002: Worker write-target derivation comes from one authority in every backend (row 4061) (DONE)
+- 517-003: Plugin security enforcement gains its typed config authority (row 7034) (DONE)
+- 517-004: The security ADR crosswalk with typed conflict routes (row 4191) (DONE)
+- 517-005: Crash artifacts gain schema, provenance and collision-free naming (row 121 first slice) (DONE)
+- 517-006: Script lifecycle and proof-harness registry (row 270, rerouted) (DONE)
+
+---

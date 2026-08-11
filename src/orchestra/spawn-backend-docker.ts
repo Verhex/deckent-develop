@@ -3582,66 +3582,151 @@ function workerTaskVerdictFromDockerResult(resultPath: string): WorkerHeartbeatA
   }
 }
 
-// ─── born-471: ALLOWLIST-SSOT ───────────────────────────────────────────────
-// sprint-spawner.ts's buildAllowedWriteTargets merges scope.directories into
-// the SAME Write()/Edit() target list as scope.filesWrite unconditionally.
-// The worker PROMPT disagrees (prompt-god-template.ts PCOMP-W1, "single write
-// authority"): once an explicit filesWrite list exists it is the SOLE write
+// ─── born-471 → row 4061: WRITE-SCOPE AUTHORITY (single deriver) ────────────
+// The worker PROMPT (prompt-god-template.ts PCOMP-W1, "single write authority")
+// states that once an explicit filesWrite list exists it is the SOLE write
 // authority and the directory list is READ/context scope only — a worker told
 // "you may only write these N files" must not simultaneously hold a
-// --allowedTools grant of Write()/Edit() over an entire read-context
-// directory (e.g. docs/adr/ listed for read-context, with no matching docs/
-// entry in filesWrite, would otherwise still be writable). The docker backend
-// is the last hop before the flag reaches the CLI, so it re-derives the
-// allowlist HERE from the task's own on-disk scope, applying the same
-// canonical rule as the prompt — independent of whatever opts.allowedTools
-// the caller computed. (sprint-spawner.ts itself is out of this task's write
-// scope; importing its helpers here would also create an import cycle —
-// sprint-spawner → spawn-backend → spawn-backend-docker → sprint-spawner.)
+// --allowedTools grant of Write()/Edit() over an entire read-context directory
+// (e.g. docs/adr/ listed for read-context, with no matching docs/ entry in
+// filesWrite, would otherwise still be writable).
+//
+// Row 4061 measured that this rule lived HERE only, while sprint-spawner.ts
+// derived `['.tasks/', ...directories, ...filesWrite]` unconditionally — two
+// backends, two divergent derivations of the same authority, so an
+// inspection-only task got a different write scope depending on which backend
+// ran it. `deriveWorkerWriteTargets` below is now the ONE typed place where the
+// directories-into-write-scope decision is made; sprint-spawner.ts imports it
+// (and `formatAllowedToolsFlag`) instead of re-deriving.
+//
+// Why the authority is hosted in this module rather than in sprint-spawner.ts:
+// the reverse import direction is a real cycle
+// (sprint-spawner → spawn-backend → spawn-backend-docker → sprint-spawner),
+// while sprint-spawner → spawn-backend-docker is an edge that already exists
+// transitively. A backend-neutral home would be nicer still, but creating one
+// is outside row 4061's write authority.
 
-/** Pure scope shape this module needs — subset of `TaskScope` (core/task-types.ts). */
-export interface DockerAllowedToolsScope {
+/**
+ * ADR-013 protected paths — workers must NEVER write these files.
+ * CLAUDE.md and DECKENT.md are adapter files managed exclusively by Brain/init.
+ */
+const ADR013_PROTECTED_PATHS = new Set(['CLAUDE.md', 'DECKENT.md']);
+
+/**
+ * File extension pattern — matches bare extension entries like `.json`, `.ts`, `.md`.
+ * Must have NO path separators (so `.tasks/` is not matched), and the dot must be followed
+ * by only short word characters typical of file extensions (max 5 chars).
+ * Examples that match (invalid scope entries): `.json`, `.ts`, `.md`, `.mjs`
+ * Examples that do NOT match (valid): `.tasks/`, `.deckent/`, `.tasks`, `src/core/`
+ */
+const EXTENSION_ONLY_RE = /^\.[a-z]{1,5}$/i;
+
+/**
+ * Normalize a single scope path:
+ * - Trims whitespace
+ * - Rejects bare file-extension entries (e.g. `.json`, `.ts`, `.md`) — not valid paths
+ * - Removes trailing slash ONLY from file paths (basename has a non-leading-dot extension)
+ *   e.g. `DECKENT.md/` → `DECKENT.md`, but `src/core/` stays `src/core/`, `.tasks/` stays `.tasks/`
+ * - Rejects ADR-013 protected paths (`CLAUDE.md`, `DECKENT.md`)
+ *
+ * @returns The normalized path, or null if the path should be excluded
+ */
+export function normalizeScopePath(rawPath: string): string | null {
+  const trimmed = rawPath.trim();
+  if (!trimmed) return null;
+
+  // Reject bare extension entries like ".json", ".ts" — they have no slash and match
+  // the extension pattern. Must check trimmed (not without-slash) to avoid catching ".tasks/".
+  if (EXTENSION_ONLY_RE.test(trimmed)) return null;
+
+  // Compute the basename (without trailing slash) for extension detection
+  const basenameForCheck = trimmed.replace(/\/$/, '').split('/').pop() ?? '';
+
+  // Remove trailing slash only when the basename looks like a file:
+  // it has an extension (dot that is NOT the first character of the basename).
+  // This keeps directory entries like `src/core/`, `.tasks/`, `.deckent/` unchanged.
+  const hasFileExtension = basenameForCheck.includes('.') && !basenameForCheck.startsWith('.');
+  const normalized = (trimmed.endsWith('/') && hasFileExtension)
+    ? trimmed.slice(0, -1)
+    : trimmed;
+
+  // Compute final basename for ADR-013 check
+  const basename = normalized.replace(/\/$/, '').split('/').pop() ?? normalized;
+
+  // Reject ADR-013 protected adapter files (full basename match)
+  if (ADR013_PROTECTED_PATHS.has(basename)) return null;
+
+  return normalized;
+}
+
+/** Pure scope shape the write-scope authority needs — subset of `TaskScope` (core/task-types.ts). */
+export interface WorkerWriteScopeInput {
   directories?: readonly string[];
   filesRead?: readonly string[];
   filesWrite?: readonly string[];
 }
 
 /**
- * Derive the docker backend's `--allowedTools` string from a task's scope.
- * `filesWrite` present → SOLE write authority (directories excluded — they
- * stay read-only context, reachable only via the unscoped Read/Glob/Grep).
- * An exact `filesRead` list with no `filesWrite` targets is inspection-only:
- * directories remain read context and Write/Edit is narrowed to `.tasks/`.
- * When both file lists are absent/empty, directories remain the legacy
- * write-fallback target. `.tasks/` is always included
- * so the worker can write its own heartbeat/result files — this also means
- * a task with neither directories nor filesWrite still narrows Write/Edit to
- * `.tasks/` only, never falls open to unrestricted Write/Edit (a scope-less
- * task must not silently get the widest possible grant). Pure — exported for
- * unit tests.
+ * THE canonical write-target deriver — every backend's `--allowedTools`
+ * Write()/Edit() target list comes from here and nowhere else.
+ *
+ * The directories-into-write-scope decision is made in exactly one place below:
+ * - `filesWrite` present → SOLE write authority (directories excluded — they
+ *   stay read-only context, reachable only via the unscoped Read/Glob/Grep).
+ * - An exact `filesRead` list with no `filesWrite` targets is inspection-only:
+ *   directories remain read context and the write scope narrows to `.tasks/`.
+ * - When both file lists are absent/empty, directories remain the legacy
+ *   write-fallback target.
+ *
+ * `.tasks/` is always the first target so the worker can write its own
+ * heartbeat/result files — this also means a task with neither directories nor
+ * filesWrite still narrows Write/Edit to `.tasks/` only, never falls open to
+ * unrestricted Write/Edit (a scope-less task must not silently get the widest
+ * possible grant). Entries are normalized (`normalizeScopePath`: ADR-013
+ * protection, extension-only rejection, file trailing-slash strip) and deduped.
+ *
+ * Pure — exported for unit tests and for sprint-spawner.ts.
  */
-export function buildDockerAllowedTools(scope: DockerAllowedToolsScope): string {
-  const directories = normalizeNonEmptyStrings(scope.directories);
-  const filesRead = normalizeNonEmptyStrings(scope.filesRead);
-  const filesWrite = normalizeNonEmptyStrings(scope.filesWrite);
+export function deriveWorkerWriteTargets(scope: WorkerWriteScopeInput | undefined): string[] {
+  const directories = normalizeNonEmptyStrings(scope?.directories);
+  const filesRead = normalizeNonEmptyStrings(scope?.filesRead);
+  const filesWrite = normalizeNonEmptyStrings(scope?.filesWrite);
   const inspectionOnly = filesWrite.length === 0 && filesRead.length > 0;
   const writeSource = filesWrite.length > 0 ? filesWrite : inspectionOnly ? [] : directories;
-  const writeTargets = dedupeTrimmed(['.tasks/', ...writeSource]);
-  return `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`;
+  return dedupeNormalized(['.tasks/', ...writeSource]);
+}
+
+/**
+ * Render the provider CLI `--allowedTools` flag value for a derived write-target
+ * list. Formatting only — it makes no scope decision, so both call sites emit a
+ * byte-identical flag for a byte-identical target list.
+ */
+export function formatAllowedToolsFlag(writeTargets: readonly string[]): string {
+  const targets = writeTargets.join(',');
+  return `Read,Write(${targets}),Edit(${targets}),Bash,Glob,Grep`;
+}
+
+/**
+ * Derive the docker backend's `--allowedTools` string from a task's scope.
+ * Thin formatter over the canonical deriver — kept as the backend's named entry
+ * point (and for its existing unit tests). Pure.
+ */
+export function buildDockerAllowedTools(scope: WorkerWriteScopeInput): string {
+  return formatAllowedToolsFlag(deriveWorkerWriteTargets(scope));
 }
 
 function normalizeNonEmptyStrings(values: readonly string[] | undefined): string[] {
   return (values ?? []).filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
 }
 
-function dedupeTrimmed(paths: string[]): string[] {
+function dedupeNormalized(paths: readonly string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const raw of paths) {
-    const trimmed = raw.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    result.push(trimmed);
+    const normalized = normalizeScopePath(raw);
+    if (normalized === null || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
   }
   return result;
 }
