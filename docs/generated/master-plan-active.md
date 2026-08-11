@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):1ecb745bff8f64b25119911e709fb977e728505000749cc5cf8139efed805f27`
+**Source digest:** `sha256(normalized-lf-utf8):2e35f8aa88680beea99f01c162b158fa99e2e98e8fdf9800057de5cc1df8944c`
 
-**Rows:** 433 total · 386 active · 47 terminal
+**Rows:** 438 total · 391 active · 47 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 293 |
+| OPEN | 298 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -269,7 +269,12 @@
 | 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |
 | 3307 | `RECOVERY-LIVE-CONTINUATION-PROOF-001` | OPEN | P2 | KERNEL | — | — | Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı |
 | 3308 | `RECOVERY-BORN-507-CODEX-CONTINUATION-001` | OPEN | P0 | KERNEL | — | — | Codex-provider attempt'leri landing-checkpoint continuation admission'ından geçebilir: cumulative-mode startup observation ile incremental-şartı tek doğru kontrata bağlanır |
+| 3309 | `RECOVERY-BORN-507-FIX-SPAWN-001` | OPEN | P0 | KERNEL | — | — | NO_GO sonrası kuyruğa giren FIX task'ı gerçek worker olarak spawn edilir veya spawn edilemiyorsa typed neden yayınlanır — sessiz boş-döngü imkânsızlaşır |
 | 3310 | `SKILL-DURABILITY-001` | OPEN | P0 | KERNEL | — | — | PLAN'da üretilen skill FIX turlarında kaybolmaz: generated-skill durability |
+| 3311 | `RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001` | OPEN | P0 | KERNEL | — | — | Sprint runner'ı hiçbir ölüm yolunda kayıtsız ölemez: fatal handler + runner-liveness kanıtı her kesintiyi typed crash/exit kaydına bağlar |
+| 3312 | `PLAN-SCOPE-PARSER-PHANTOM-001` | OPEN | P0 | KERNEL | — | — | DIRECTIVES scope zinciri phantom üretemez ve yetkiyi sessizce daraltamaz: tek sanitize authority, çok-noktalı/kök dosya desteği, render plan-time sonucunu yeniden daraltamaz |
+| 3313 | `RUN-STATUS-LIVENESS-TRUTH-001` | OPEN | P1 | OBS | — | — | Status yüzeyi liveness-kanıtsız satırı aktif gösteremez: taze heartbeat/pid kanıtı olmayan worker satırı typed stale/unproven işaretlenir |
+| 3314 | `ARCHIVE-PATH-AUTHORITY-001` | OPEN | P1 | KERNEL | — | — | Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı |
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3325 | `CLEAN-DASHBOARD-POLICY-001` | OPEN | P1 | ASSURANCE | — | — | `clean`'in dashboard-koru policy'si ile `build:dashboard`'ın boş-çıktı beklentisi tek kararda uzlaşır |

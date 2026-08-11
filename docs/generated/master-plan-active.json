@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "1ecb745bff8f64b25119911e709fb977e728505000749cc5cf8139efed805f27"
+    "value": "2e35f8aa88680beea99f01c162b158fa99e2e98e8fdf9800057de5cc1df8944c"
   },
   "summary": {
-    "total": 433,
-    "active": 386,
+    "total": 438,
+    "active": 391,
     "terminal": 47,
     "receipts": 183,
     "byState": {
-      "OPEN": 293,
+      "OPEN": 298,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,8 +21,8 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 276,
-      "P1": 119,
+      "P0": 279,
+      "P1": 121,
       "P2": 38
     },
     "byProgram": {
@@ -41,9 +41,9 @@
       "ENTERPRISE": 1,
       "EVAL": 4,
       "EVOLUTION": 4,
-      "KERNEL": 100,
+      "KERNEL": 104,
       "LEARNING": 5,
-      "OBS": 3,
+      "OBS": 4,
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
@@ -3123,6 +3123,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3309,
+      "id": "RECOVERY-BORN-507-FIX-SPAWN-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "5f183f4784b0cf1d5f240bca05bfa324979a97e87a5b75c08c703b73230450e3",
+      "progressDigest": "7e36e2dd48e2c869c34b986d3c2facd419fabedecc85c2124c450abec92289f3",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3310,
       "id": "SKILL-DURABILITY-001",
       "program": "KERNEL",
@@ -3131,6 +3142,50 @@
       "updated": "2026-08-03",
       "definitionDigest": "0ed918c72bb795c3cc2c2dd6fc4ef6df868dba1cfe666e01f7f9f6e5aefd3c9c",
       "progressDigest": "1c1407fe7319ca066265a5385ccaa4625576b31c57c8509fb7329fa631dfd7b7",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3311,
+      "id": "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "8154f0544a9f5139dc748673285d6638ef1168a63ab70d7739331ccb3e740a9a",
+      "progressDigest": "626c9d4006bfe076693cfdc3418e570f5301eb453be088a30aa8f503bd1a3d75",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3312,
+      "id": "PLAN-SCOPE-PARSER-PHANTOM-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "6d97dcfb46772765d24c27251669e57baa7c4bb5bea1441946bcd7ab53af8c52",
+      "progressDigest": "7043584decf643420b9190ac555fc4f2d28398ae6730d66d2bcd2d80c7f94888",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3313,
+      "id": "RUN-STATUS-LIVENESS-TRUTH-001",
+      "program": "OBS",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "5d246ced32015f6416b45826d0ac3fe37a0cd5af4d4dbe7eac0650bdb2753708",
+      "progressDigest": "ca945b73d5e211a3091911ce0fac28a686e53f580dc9a6ba25c41da1b22ec911",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3314,
+      "id": "ARCHIVE-PATH-AUTHORITY-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "83795f31cdf8bfbbd8fe65aee317d73f967715e1b35b2947dcf52f9e19fcb12c",
+      "progressDigest": "ae2912c29cfde271abdfa9560feaf44c6185ce34a406df3ff453c821e0031165",
       "terminalClosureDigest": null
     },
     {
@@ -12592,6 +12647,7 @@
         "WORKER-DISCOVERY-001",
         "RESULT-INGEST-001",
         "SKILL-DURABILITY-001",
+        "PLAN-SCOPE-PARSER-PHANTOM-001",
         "PROD-SPAWNSYNC-ASYNC-001",
         "PROD-SPRINT-PREFIX-PAD-001",
         "PROD-BINARY-IDENTITY-EAGER-CRASH-001",
@@ -12654,6 +12710,7 @@
         "WORKER-DISCOVERY-001",
         "RESULT-INGEST-001",
         "SKILL-DURABILITY-001",
+        "PLAN-SCOPE-PARSER-PHANTOM-001",
         "PROD-SPAWNSYNC-ASYNC-001",
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "COMPOSITE-WORKER-001",
@@ -13848,6 +13905,8 @@
         "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
         "RECOVERY-LIVE-CONTINUATION-PROOF-001",
         "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
+        "RECOVERY-BORN-507-FIX-SPAWN-001",
+        "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "gates": [
@@ -13911,6 +13970,8 @@
         "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
         "RECOVERY-LIVE-CONTINUATION-PROOF-001",
         "RECOVERY-BORN-507-CODEX-CONTINUATION-001",
+        "RECOVERY-BORN-507-FIX-SPAWN-001",
+        "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "evidenceReceipts": [
@@ -15970,7 +16031,9 @@
         "RUN-STATUS-AUTHORITY-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "ARCHIVE-PATH-AUTHORITY-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -15987,7 +16050,8 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001"
+        "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
+        "ARCHIVE-PATH-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Cleanup never routes landing proposals, partial results or temp residue as executable Task records; terminal cleanup removes only the settled sprint's process-suffixed residue and preserves foreign-run evidence",
@@ -16391,7 +16455,8 @@
       "dependents": [],
       "children": [
         "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001",
-        "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001"
+        "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001",
+        "RUN-STATUS-LIVENESS-TRUTH-001"
       ],
       "gates": [
         "G1"
@@ -16413,7 +16478,8 @@
         "RECOVERY-BORN-488-RECOVERY-TERMINAL-001",
         "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001",
         "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001",
-        "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001"
+        "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001",
+        "RUN-STATUS-LIVENESS-TRUTH-001"
       ],
       "evidenceReceipts": [
         "GR-2026-08-01-LIFECYCLE-RECOVERY-01",
@@ -16950,6 +17016,37 @@
       "updated": "2026-08-10"
     },
     {
+      "order": 3309,
+      "id": "RECOVERY-BORN-507-FIX-SPAWN-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "NO_GO sonrası kuyruğa giren FIX task'ı gerçek worker olarak spawn edilir veya spawn edilemiyorsa typed neden yayınlanır — sessiz boş-döngü imkânsızlaşır",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "NO_GO'lu task için FIX kararı (retry/revise) admission uygunsa gözlemlenebilir worker doğumuyla sonuçlanır (hb + pid + log); spawn engellendiyse typed engel kaydı scheduler journal'a düşer; regresyon testi kuyruk-ama-spawn-yok durumunu pinler",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-507'de 507-002-fix Queued görünürken scheduler-shadow 00:38→00:43 arası 92 kayıt boyunca spawnedTaskIds bos kaldı, fix worker'ın hb/pid/log'u hiç oluşmadı; olası bağlantı PR-116 FIX-karar dilimleri (classifyFixFailure/buildReplanProposal) — Alperen: o gün FIX-faz başlangıcında çalışma yapılmıştı",
+      "updated": "2026-08-11"
+    },
+    {
       "order": 3310,
       "id": "SKILL-DURABILITY-001",
       "parent": "KERNEL-001",
@@ -16981,6 +17078,130 @@
       "acceptance": "PLAN fazında üretilen skill, FIX/XFIX lineage'ı boyunca worker prompt'una aynı içerikle ulaşır; `FORCED_SKILL_UNAVAILABLE` sınıfı hata fail-closed yakalanır ve regresyon testi taşır",
       "evidence": "PAZARTESI FAZ-4a maddesinin transkripsiyonu (owner-kayıtlı, 2026-08-01 Codex denetimi): sprint-491 vakalarında PLAN'da üretilen skill FIX'lerde kayboldu ve `FORCED_SKILL_UNAVAILABLE` üretti; crosswalk turunda satırı olmayan tek 4a maddesi buydu — diğer beşi RESULT-RECONCILIATION-001, RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001, RECOVERY-BORN-485/488-FIX-AUTHORITY/REPAIR-CAPABILITY-001, RECOVERY-BORN-488-STATUS-PROJECTION-001 ve RECOVERY-BORN-488-CONTINUOUS-REFILL-001 ile kapsanıyor",
       "updated": "2026-08-03"
+    },
+    {
+      "order": 3311,
+      "id": "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Sprint runner'ı hiçbir ölüm yolunda kayıtsız ölemez: fatal handler + runner-liveness kanıtı her kesintiyi typed crash/exit kaydına bağlar",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Runner'ın her çıkışı (normal terminal, hata, sinyal, OOM-sonrası yeniden bakış) typed kayıt üretir; kayıtsız kesinti regresyon testiyle imkânsız pinlenir; ölü runner'ın pid dosyası ve read-model'i bir sonraki CLI komutunda dürüst raporlanır",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-507 runner PID 55905 scheduler-shadow seq-92 kaydından (00:43:21.595Z) sonra günlük ortasında kesildi, .deckent/crashes'e hiçbir kayıt düşmedi; aynı gece status read-model HOLD'a düştü (RUN_STATUS_READ_MODEL_UNAVAILABLE) ve cleanup run-orphaned HOLD verdi — zincir recover ile elle kapatıldı",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 3312,
+      "id": "PLAN-SCOPE-PARSER-PHANTOM-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "DIRECTIVES scope zinciri phantom üretemez ve yetkiyi sessizce daraltamaz: tek sanitize authority, çok-noktalı/kök dosya desteği, render plan-time sonucunu yeniden daraltamaz",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Files/Scope/prose'daki çok-noktalı ve kök dosya adları (README.tr.md, tests/PLATFORM.md, .dockerignore, Dockerfile) phantom token üretmeden ve sessiz düşmeden yazma yetkisine ulaşır; plan-time'da korunmuş bir filesWrite girdisi render/prompt aşamasında kaybolamaz (tek-sanitize kontratı); Scope satırı dosyayı dizine çevirmez; bare-name discoverability false-BLOCK üretmez; her vaka regresyon-pinli",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı), beş kanıtlı vaka: (a) task-builder docFile regex kuyruk-token — README.tr.md'den tr.md phantom'ı, gate BLOCK; (b) tests/PLATFORM.md nitelikli yazımda bile render'da phantom BLOCK; (c) Scope-satırı her girdiye '/' ekleyip file-as-directory phantom'ı üretiyor (task-507-004 scope.directories kanıtı); (d) render-time yeniden-sanitize plan-time trackedRootFiles korumasını bilmiyor — 507-002'de .dockerignore filesWrite'ta VARKEN worker'ın canonical görünümünden sessizce düştü, dürüst NO_GO'ya yol açtı; (e) prose'daki bare sprint-controller.test.ts mention'ı test-discoverability false-BLOCK üretti",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 3313,
+      "id": "RUN-STATUS-LIVENESS-TRUTH-001",
+      "parent": "RECOVERY-BORN-488-STATUS-PROJECTION-001",
+      "program": "OBS",
+      "outcome": "Status yüzeyi liveness-kanıtsız satırı aktif gösteremez: taze heartbeat/pid kanıtı olmayan worker satırı typed stale/unproven işaretlenir",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "deckent status bir worker'ı ancak taze hb (yaş eşiği config-resolved) + doğrulanabilir process kanıtıyla aktif gösterir; kanıt bayatsa satır typed stale görünür ve öneri (recover/inspect) basılır; Writing-code-iken-ölü senaryosu regresyon testiyle pinlenir",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-507'de 00:44+ status çıktısı 507-001/003'ü Writing code [codex] gösterdi; disk gerçeği son hb 00:41:37, worker processleri ve runner (PID 55905) ölüydü — projection kurgusu asistan raporuna taşındı ve owner tarafından yakalandı (core-memory kanun-15'in doğuş vakası)",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 3314,
+      "id": "ARCHIVE-PATH-AUTHORITY-001",
+      "parent": "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001",
+      "program": "KERNEL",
+      "outcome": "Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Tüm yollar (normal settlement, force-abort, recover, cleanup) aynı kanonik arşiv konumuna yazar; hiçbir yol .tasks kökünde kalıntı bırakmaz; konum ve retention effective config'ten çözülür; split-arşiv regresyon testiyle pinlenir",
+      "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-508 settlement'ı sonuçları .brain/archive/sprints/sprint-508-tasks/'a taşıdı ama .tasks/archive/sprint-508/ altına yalnız worker script'leri düştü; sprint-507 recover'ı 6 dosyayı .tasks/archive/sprint-507/'ye arşivleyip 9 dosyayı .tasks kökünde bıraktı; 15 kalıntı owner talimatıyla elle .brain/archive/sprints/sprint-507-tasks/'a taşındı",
+      "updated": "2026-08-11"
     },
     {
       "order": 3315,
@@ -22929,6 +23150,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "983964d0eb4be6514b9320cf5583fefca2b46df2bdf0555fc4d598697fbe0244"
+    "value": "de5cd20ade37db39e97092e41a956a6fd62fa43d4bdf44364150340e84001e2c"
   }
 }
