@@ -2,37 +2,37 @@
 # Boot
 
 ## Boot Sequence
-<!-- DECKENT:CONTRACT id="boot" schema="1" sha256="b2c402d70097f4cffdca94bd949202f9df09a2ce3688cde161cfd378da425240" -->
-1. **Load authority** — Brain reads `DIRECTIVES.md`, effective config and `.brain/memory.db`; generated projections never create policy.
-2. **Plan and admit** — the exact DAG, provider/model/auth/budget/reachability and write scope are resolved before dispatch.
-3. **Spawn** — the configured platform adapter launches only admitted workers.
-4. **Execute** — workers publish host-observed heartbeat, activity and result-ingress artifacts.
-5. **Evaluate** — Brain reconciles disk truth, tests, scope, cost and policy evidence into GO, FIX or typed HOLD/NO_GO.
-6. **Fix** — eligible failures enter the bounded FIX DAG; `processQueue` never fabricates dependency completion.
-7. **Finalize and archive** — terminal settlement, Retrospective, memory, trace and projections are published before canonical retention runs.
+<!-- DECKENT:CONTRACT id="boot" schema="1" sha256="8cf3e3b3e4336544b75e4e798069912b95e3cfefea62ea9f9b9d04f750d37cc3" -->
+1. **Authority yükle** — Brain `DIRECTIVES.md`, effective config ve `.brain/memory.db` kaynaklarını okur; generated projectionlar policy üretmez.
+2. **Planla ve admit et** — exact DAG, provider/model/auth/budget/reachability ve write scope dispatch öncesi çözülür.
+3. **Spawn** — yapılandırılmış platform adapterı yalnız admitted workerları başlatır.
+4. **Execute** — workerlar host-observed heartbeat, activity ve result-ingress artefaktlarını yayımlar.
+5. **Evaluate** — Brain disk truth, test, scope, cost ve policy kanıtını GO, FIX veya typed HOLD/NO_GO kararına uzlaştırır.
+6. **Fix** — uygun hatalar bounded FIX DAG’a girer; `processQueue` dependency completion uydurmaz.
+7. **Finalize ve archive** — canonical retention çalışmadan önce terminal settlement, Retrospective, memory, trace ve projectionlar yayımlanır.
 <!-- DECKENT:CONTRACT:END id="boot" -->
 
 ## Manual Recovery Chain
-<!-- DECKENT:CONTRACT id="boot" schema="1" sha256="81120e8d9e25809bb2969357eb95df4002eeade2fd0d9504c3f001106669f7f7" -->
-Recovery is diagnostics-first and fail-closed. Never start with kill or cleanup.
+<!-- DECKENT:CONTRACT id="boot" schema="1" sha256="6d02c5c3a67033513b0d8522559ff4d038142a5b9da01fb6f8d6a1ce2cf721a6" -->
+Recovery diagnostics-first ve fail-closed çalışır. Asla kill veya cleanup ile başlama.
 
 ```bash
-# 1. Inspect without mutation
+# 1. Mutation yapmadan incele
 deckent status --json
 deckent doctor
 
-# 2. Preview the canonical recovery operation
+# 2. Canonical recovery operationı önizle
 deckent recover <sprint-id> --dry-run
 
-# 3. Resume only a canonically PAUSED/ORPHANED run
+# 3. Yalnız canonical PAUSED/ORPHANED runı sürdür
 deckent recover <sprint-id> --resume
 
-# 4. Execute mutating recovery only after exact owner approval
+# 4. Mutating recoveryyi ancak exact owner onayı sonrası çalıştır
 deckent recover <sprint-id>
 
-# 5. Run a new one-shot description; this is not a historical task-id replay
+# 5. Yeni bir one-shot açıklama çalıştır; bu historical task-id replay değildir
 deckent run "<description>"
 ```
 
-MCP parity: `deckent_status {}` then `deckent_recover { sprintId, dryRun: true }`. A mutating MCP recovery additionally requires an exact identity/generation/fence-bound `approval`. `deckent_run` accepts `{ description }`, never `{ taskId }`. `kill` and `cleanup` are separate destructive operations and require their own live owner decision.
+MCP paritesi: önce `deckent_status {}`, sonra `deckent_recover { sprintId, dryRun: true }`. Mutating MCP recovery ayrıca exact identity/generation/fence-bound `approval` ister. `deckent_run` `{ description }` kabul eder; `{ taskId }` kabul etmez. `kill` ve `cleanup` ayrı destructive operationlardır ve kendi canlı owner kararlarını gerektirir.
 <!-- DECKENT:CONTRACT:END id="boot" -->

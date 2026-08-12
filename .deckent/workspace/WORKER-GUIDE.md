@@ -2,39 +2,39 @@
 # Worker Guide
 
 ## Worker Contract
-<!-- DECKENT:CONTRACT id="worker-guide" schema="1" sha256="1579f343478f2afa488ac03b69bf42735e4ee47c464db8b583b9a5467095ed4e" -->
-This contract is generated from worker runtime schemas and prompt policy. It is supporting context; the compiled, digest-bound task prompt remains the attempt authority.
+<!-- DECKENT:CONTRACT id="worker-guide" schema="1" sha256="5ca844af5773a4cfc28dca9e15e5832b15db1211747829580b88eb04d87f8718" -->
+Bu contract worker runtime schemaları ve prompt policy üzerinden üretilir. Supporting contexttir; compiled ve digest-bound task prompt attempt authority olarak kalır.
 
-### Result ingress vs canonical result
+### Result ingress ve canonical result
 
-Workers write `.tasks/task-{id}.result` ingress claims: `taskId`, `workerId`, `filesChanged` (string array), `linesAdded`, `linesRemoved`, `testsPassed` (boolean), `coverage` (0–100), `selfAssessment` and `notes` (single string). Do not estimate token usage. Provider/model, token/cost, disk diff, tests and TypeScript evidence are host-authored in the canonical schema `1.0` result.
+Worker `.tasks/task-{id}.result` ingress claimlerini yazar: `taskId`, `workerId`, `filesChanged` (string array), `linesAdded`, `linesRemoved`, `testsPassed` (boolean), `coverage` (0–100), `selfAssessment` ve `notes` (tek string). Token usage tahmini yapma. Provider/model, token/cost, disk diff, test ve TypeScript kanıtı canonical schema `1.0` sonucunda host tarafından yazılır.
 
-Canonical schema-required fields (derived at runtime): `cost, filesChanged, model, provider, selfAssessment, taskId, tests, tokenUsage, totalLinesAdded, totalLinesRemoved, tsc, workerId`.
+Canonical schema-required alanlar (runtime’da türetilir): `cost, filesChanged, model, provider, selfAssessment, taskId, tests, tokenUsage, totalLinesAdded, totalLinesRemoved, tsc, workerId`.
 
 ### Heartbeat
 
-Create `.tasks/task-{id}.hb` before work. Increment `sequence`; use a fresh UTC ISO timestamp; keep `currentAction` concise. Heartbeat content is activity context—not standalone process-liveness or terminal authority.
+İşe başlamadan `.tasks/task-{id}.hb` oluştur. `sequence` değerini artır; taze UTC ISO timestamp kullan; `currentAction` kısa olsun. Heartbeat içeriği activity contexttir—tek başına process-liveness veya terminal authority değildir.
 
 ### Objective Definition of Done
 
-- DONE — Every Definition-of-Done item is verified with evidence.
-- GO_WITH_TECH_DEBT — Core items are verified; each minor open item is named explicitly.
-- NO_GO — At least one critical item is unverified; the exact blocker is named.
+- DONE — Her Definition-of-Done maddesi kanıtla doğrulandı.
+- GO_WITH_TECH_DEBT — Core maddeler doğrulandı; her minor açık madde exact olarak adlandırıldı.
+- NO_GO — En az bir critical madde doğrulanmadı; exact blocker adlandırıldı.
 
-There is no percentage threshold. Evidence for each criterion decides the verdict.
+Percentage threshold yoktur. Verdicti her kriterin kanıtı belirler.
 
-### Verification and honest-result gate
+### Verification ve honest-result gate
 
-The `.verify-ran` marker is verifier-authored evidence; never create or claim it manually. Before DONE, compare baseline, end state and the actual criterion evidence. If a dependency has not settled, do not busy-wait or infer success from `processQueue`; report the exact NO_GO/HOLD condition.
+`.verify-ran` marker verifier-authored kanıttır; elle oluşturma veya varmış gibi claim etme. DONE öncesi baseline, end state ve gerçek kriter kanıtını karşılaştır. Bir dependency settle olmadıysa busy-wait yapma veya `processQueue` üzerinden başarı varsayma; exact NO_GO/HOLD koşulunu bildir.
 
-### Scope, ADR-037 authority and forbidden anti-patterns
+### Scope, ADR-037 authority ve yasak anti-patternler
 
-`scope.filesWrite` is the exact write allow-list; protocol artifacts under `.tasks/` are the only lifecycle exception. Do not mutate dependencies or run project-wide build from a worker. If a required capability or authority is unavailable, write a concrete NO_GO/HOLD reason instead of fabricating completion.
+`scope.filesWrite` exact write allow-listtir; `.tasks/` altındaki protocol artefaktları tek lifecycle istisnasıdır. Worker içinden dependency mutation veya project-wide build çalıştırma. Gerekli capability veya authority unavailable ise completion uydurmak yerine concrete NO_GO/HOLD nedeni yaz.
 
-| Anti-pattern | Status | Reason |
+| Anti-pattern | Durum | Neden |
 |---|---|---|
-| `it.skip(...)` without a justification | forbidden | hides failed evidence |
-| `stub()` or a hardcoded empty implementation | forbidden | creates a false GO |
-| writing outside `scope.filesWrite` | forbidden | violates ADR-037 authority |
-| claiming DONE without verifier evidence | forbidden | violates the honest-result gate |
+| Gerekçesiz `it.skip(...)` | yasak | başarısız kanıtı gizler |
+| `stub()` veya hardcoded boş implementation | yasak | false GO üretir |
+| `scope.filesWrite` dışına yazma | yasak | ADR-037 authority ihlalidir |
+| verifier kanıtı olmadan DONE claim etme | yasak | honest-result gate ihlalidir |
 <!-- DECKENT:CONTRACT:END id="worker-guide" -->
