@@ -190,6 +190,32 @@ Operasyon semantiği:
 - Bir karar bağımlılığının tüm filoyu boşta bırakmaması için scheduler, aynı closure outcome içindeki bağımsız lane'leri ve sonraki admitted, collision-free işleri hazır tutar.
 - Toplantı/acil durum sapmaları actual owner-latency metriğine yazılır; plan bu istisnaları sahte SLA ihlali veya otomatik scope gerekçesi yapmaz.
 
+### 4.5 Brain rolü geçişi aceleye getirilmeyecek
+
+Owner kararı (2026-08-12): Fable-5 bir süre daha yürütücü Brain olarak kullanılacak; Codex henüz
+projenin birincil Brain koltuğuna geçirilmeyecek. Bu karar Codex'in başarısız olduğu anlamına gelmez.
+Mevcut gözlemde Codex scope'a bağlılık, kurallara uyum ve deterministik yapıyı koruma konusunda
+Fable-5'ten daha tutarlı kanıt üretmiştir. Buna karşılık geçmiş Codex Brain deneyimleri kötü olduğu
+için tek bir başarılı dönem doğrudan tam yetki terfisi sağlamaz. Fable/Opus tarafında gözlenen
+yavaşlık ve varsayımsal çalışma da ölçülmeden normal kabul edilmez.
+
+Geçici rol dağılımı:
+
+| Rol | Geçici sorumluluk |
+|---|---|
+| Fable-5 | Deckent dogfood üzerinden planlama, yürütme ve settlement'a taşıma |
+| Codex | Kapsam analizi, plan çelişkisi bulma, owner karar masası hazırlama ve farklı-provider doğrulama |
+| Sol | Registry amendment sonrasında Fable çıktılarının bağımsız verifier'ı |
+| Alperen | Admission, yön, approval, promotion ve nihai settlement authority |
+
+Brain terfisi model adına veya genel itibara göre değil, settlement kanıtına göre yapılır. İzlenecek
+ölçüler: scope ihlali, varsayıma dayalı karar, preventable third pass, owner müdahalesi, plan→disk
+uyumu, production-wiring completeness, typed HOLD dürüstlüğü, kapanış süresi ve gece otonomi
+başarısıdır. Codex için olası geçiş sırası `analist/verifier → yazmayan shadow planner → düşük-riskli
+attended package → çok-lane package → gece otonomi canary → primary Brain` olacaktır. Her basamak
+ayrı owner promotion kararı gerektirir; sessiz rol genişlemesi yoktur. Exact değerlendirme dönemi ve
+terfi eşiği yeterli Closure Health verisi görüldükten sonra karara bağlanır.
+
 ## 5. UI/UX backend ile paralel, fakat bağımsız olmayacak
 
 `d45360713` (`docs(product): persist desktop and terminal north star`) ürün yönünü kalıcılaştırdı; UI implementation'ını tamamlamadı. Mevcut Electron/React Desktop, classic/NOVA shell'leri, token pipeline, typed renderer client'ı, terminal RPC ve smoke test altyapısı paralel uygulamayı mümkün kılıyor. Risk, bu temelin ikinci bir runtime/state authority'ye dönüşmesidir.
@@ -370,6 +396,7 @@ Sol çapraz-analizi + owner onayıyla bağlanan sıra (önceki taslak sıranın 
 | Gate authority Deckent'in çok-domain ürün kapsamına göre baştan tasarlanacak | Kabul edildi, ileriki closure | Code-only gate değil; task-kind/capability evidence adapterları + universal governance kernel; önce mevcut ürün closure hedefleri |
 | Sidecar karar-defteri revizyon 2 kontratı | Kabul edildi | Owner, 2026-08-12; `docs/governance/closure-dispositions.jsonl`, typed event/authority proof/external anchor/append-only gate (§12.1) |
 | 13–26 Ağustos owner karar-servis kontratı | Kabul edildi | 08:00–00:00 UTC+3, Telegram sonrası 45 dk garanti SLA, dört saatlik batch cadence; 00:00–08:00 otonom execution zorunlu (§4.4) |
+| Codex primary Brain terfisi ertelendi; Fable-5 ile gözlem sürer | Kabul edildi | Codex analist/verifier olarak kalır; terfi yalnız ölçülen settlement ve kademeli canary kanıtıyla (§4.5) |
 
 ## 12. Açık maddeler
 
@@ -407,6 +434,94 @@ kontratı eksiksiz uygular; daha zayıf bir şema canonical sayılamaz:
 - **Projection semantiği:** producer eventleri `seq` sırasında uygular. Bilinmeyen row, definition/source digest drift'i, sequence gap, kırık chain, authority-proof eksikliği veya çakışan active decision ilgili satırı typed `HOLD` yapar; sessiz atlama/fallback yoktur.
 - **Priority uygulaması:** yalnız açık satırlar owner-reviewed batch ile MASTER Priority kolonuna taşınır; terminal satırlara dokunulmaz. Commit ve settlement receipt uygulanan exact `seq` aralığını ve head digest'i taşır.
 - **Makine-gate:** `scripts/lint-closure-dispositions.mjs`; schema/enum, canonical digest, chain, row/source identity, authority proof, active-decision conflict ve merge-base'e göre byte-prefix append-only diff'i doğrular. Bypass/unknown environment açık typed HOLD verir.
+
+### 12.2 Fable→Sol doğrulama kapanışı — Plan v3 execution contract
+
+`[PLAN-V3:FABLE-SOL-XVERIFY]` — Owner yönü (2026-08-12): plan turu kullanıcıyı
+ajanlar arasında mesaj taşıyıcısına çevirmeden disk authority üzerinden yürür. Bu bölüm Plan v1/v2
+metinlerinin yerine geçen tek devir kaynağıdır; geçmiş konuşma veya provider session günlüğü yeniden
+okunarak plan kurulmaz. Uygulama admission'ı için bu bölüm yeni, approved `DIRECTIVES.md` görevlerine
+ve Deckent Goal→Mission→Flow→Run zincirine çevrilir; eldeki B15 `DIRECTIVES.md` yeniden kullanılamaz.
+
+Kapanış hükümleri:
+
+1. **Approval:** CLI komutunun verilmesi self-approval değildir. Probe ve dispatch yalnız mevcut
+   runtime-wide `ApprovalBroker` üzerinde live re-authenticated local-terminal, connector veya OIDC
+   `request → decision → verify/claim` zinciriyle yetkilendirilir. Mevcut approval authority typed
+   operation-subject desteğiyle genişletilir; `provider-evidence-probe` bunun dar bir subject kind'ıdır,
+   ayrı `ProbeApprovalAuthority` veya ikinci claim/decision protokolü değildir. Mevcut
+   `LiveApprovalAuthenticator` platform-adapter sınırı korunur. Bugün production re-auth sağlayan tek
+   adapter OIDC'dir; local-terminal/connector adapterı uygulanmadan o kanallar yetki kanıtı sayılmaz.
+   Sahte ref, `--force` veya paralel authority yasaktır. Authority eksikliği dürüst resumable
+   `HOLD/NO_GO` üretir; capability closure veya package `COMPLETE` sayılmaz.
+2. **Budget:** seçenek ayrımı kaldırıldı; iki düzeltme birlikte zorunludur fakat repo-geneli
+   `ExecutionBudget` persisted contractı bu paket uğruna discriminated-union migration'ına sokulmaz.
+   Bunun yerine canonical `ExecutionBudget` + resolved billing context'ten billing-mode-discriminated
+   `ReachabilityProbeBudget` projeksiyonu üretilir. Exact probe ceiling aynı owner-authored
+   `execution_budget` authority'sindeki amaç-profilden gelir. Subscription/free/local çalışmada USD
+   authority üretilmez; metered API çalışmada owner-authored USD ceiling ayrıca bağlanır. Hardcoded
+   probe bütçesi, ikinci budget authority veya `maxTokens` alanından kanıtsız türetme yoktur.
+3. **Freshness/replay:** stable-forever scope-digest ve her yarışmacının bağımsız rastgele
+   `attemptRevision` üretmesi yasaktır. Hazırlık exact-scope latest-evidence sorgusuyla taze kanıtı
+   yeniden kullanır; stale/absent durumda `scopeDigest + freshnessEpoch` ortak invocation identity'si
+   üretir. Aynı epoch'taki eşzamanlı süreçler aynı receipt declaration üzerinde first-writer-wins
+   singleflight olur; takipçiler bounded bekleyip exact-scope evidence'ı yeniden okur. Negatif kanıtın
+   TTL/cooldown'u dolmadan yeni epoch açılamaz; süre dolunca immutable yeni kayıt üretilir. Bounded
+   retry/backoff ve typed cooldown kanıtı taşır; eski receipt veya truth satırı yeniden yazılmaz.
+4. **Docker transport:** reachability source ham `docker run`/raw argv yolu kuramaz.
+   Provider-neutral bounded probe seam'i canonical `DockerSpawnBackend` image identity, credential
+   mount/env scrub, network policy, prompt feed, timeout/output ceiling, termination ve containment
+   builder'larını kullanır. Probe network davranışı exact provider dispatch'in effective backend
+   davranışını miras alır: offline identity inspect'in `--network none` ayarı provider çağrısına
+   taşınmaz, fakat ayrı bir blanket `unrestricted` sabiti de icat edilmez. Source yalnız
+   provider-native observation üretir; `reachable/liveProven`
+   terfisini canonical core yapar. Unsupported platform/backend dürüst typed sonuçtur; dört-platform
+   adapter matrisi tasarım ve hermetik testte baştan tanımlanır.
+5. **Tier:** `gpt-5.6-sol → premium_plus`; `gpt-5.5`, Codex premium için explicit preferred;
+   Sol, Codex premium_plus için explicit preferred olur. `gpt-5.6` alias ve `gpt-5.6-sol` pricing
+   satırları `premium_plus` ile hizalanır; registry↔pricing invariant testi vacuous-green olamaz.
+   `CONFIG_MIGRATION_TIER_OVERRIDES` tablosuna Sol istisnası eklenmez; Sol tier'ını doğrudan okuyan
+   beklentiler güncellenir. Etki dosyası sayısı metinde sabitlenmez; machine-generated impacted
+   manifest ve host geniş regression gate ground truth'tur.
+6. **Balanced mode:** bu pakette config/preset değişikliği yapılmaz. `gpt-5.5` owner activation
+   store'da kapalı, balanced dormant ve `max_tier` enforcement'ı eksiktir; bulgu
+   `MODEL-ACTIVATION-001` altında disposition'a gider.
+7. **Terminal proof:** gerçek Fable→Sol provider dispatch, terminal verdict, invocation/usage ve
+   settlement receipt zinciri olmadan kapanış yoktur. Typed HOLD tanıdır fakat success değildir;
+   exact authority eksikliğiyle run resumable `NO_GO/HOLD` kalır. Test claim'i deterministik seçilir.
+
+Yürütme DAG'ı:
+
+```text
+W0  transition brief'in ayrı branch/PR ile sabitlenmesi (fresh owner git onayı)
+T0  approval + budget + freshness + transport sözleşme freeze'i
+T1  tier/pricing/invariant + machine-generated impacted manifest     (T0 ile paralel)
+T2a provider-neutral approval/budget/freshness/probe transport seam
+T3  canonical DockerSpawnBackend bounded probe adapterı              (T2a sonrası)
+T2b CLI pre-compose evidence preparation + provider registry wiring   (T3 sonrası)
+T4  composition progression, replay/expiry/concurrency ve en/tr remedy testleri
+T5  host build + gerçek binary Fable→Sol proof + receipt settlement
+```
+
+Her görev önce exact `filesWrite`, dependency, single-writer ve task-specific GO/NO-GO ölçütüyle
+DIRECTIVES'e yazılır. T1 worker scoped suite'inden sonra host model/routing/provider/xverify geniş
+regression gate'i çalıştırır. T5'e kadar build/provider call yoktur; aktif sprint varken build her
+durumda yasaktır. T5 `HOLD` olursa outer package `COMPLETE` olamaz.
+
+### 12.3 Ajanlar arası devir ve plan-turu verimlilik kontratı
+
+Owner talimatı (2026-08-12): Alperen, Codex ve Fable arasında prompt kopyalayan insan message bus
+değildir. Bundan sonraki analiz/verifier devri şu kuralla yürür:
+
+- Tek devir authority'si bu brief'teki sürümlü bölüm veya active run'ın result notes/receipt'idir.
+- Gönderen ajan yalnız section marker + source digest + exact açık kararları iletir; bütün sohbeti
+  yeniden okutmaz ve uzun provider session transcriptini authority yapmaz.
+- Alıcı aynı dosyaya yeni plan varyantı eklemez; kanıtla refute ettiği exact hükmü revision olarak
+  supersede eder. Üçüncü analiz geçişi istisnadır ve yalnız yeni disk kanıtıyla açılır.
+- Owner'a yalnız ürün yönünü veya authority'yi gerçekten değiştiren karar sorulur. Dosya/ref/test
+  keşfi ve ajanlar arası taşıma owner işi değildir.
+- Plan kabul edilince sonraki tur yeni plan yazmak değil, approved DIRECTIVES + dogfood admission ve
+  yürütmedir. İlerleme plan sayısıyla değil closure receipt'leriyle ölçülür.
 
 ## 13. İncelenen canonical girdiler
 
