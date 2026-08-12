@@ -335,7 +335,7 @@ export function registerAgent(program: Command): void {
           a.displayType ?? 'custom',
           a.enabled ? 'enabled' : 'disabled',
           String(a.uses),
-          `${a.successRate}%`,
+          `${Math.round(a.successRate)}%`,
           a.model ?? '-',
         ]);
         print(formatTable(headers, rows));

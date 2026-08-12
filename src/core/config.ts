@@ -2196,7 +2196,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Authored input only. The production authority must resolve the separately
     // loaded parent/project layers through provider-limit-policy.ts.
     provider_limits: config.provider_limits,
-    persona_integrity: config.persona_integrity,
+    persona_integrity: {
+      min_bytes: config.persona_integrity?.min_bytes ?? DEFAULT_PERSONA_INTEGRITY_MIN_BYTES,
+    },
     provider_limit_authority: createProviderLimitPolicyAuthoritySnapshot({
       parent: globalConfig?.provider_limits,
       project: projectConfig?.provider_limits,
@@ -3031,7 +3033,9 @@ export function mergeConfigs(
     execution_budget: config.execution_budget,
     // Authored input only; never an effective policy authority.
     provider_limits: config.provider_limits,
-    persona_integrity: config.persona_integrity,
+    persona_integrity: {
+      min_bytes: config.persona_integrity?.min_bytes ?? DEFAULT_PERSONA_INTEGRITY_MIN_BYTES,
+    },
     provider_limit_authority: createProviderLimitPolicyAuthoritySnapshot({
       parent: globalConfig?.provider_limits,
       project: projectConfig?.provider_limits,

@@ -5,6 +5,8 @@ import { spawn as nodeSpawn } from 'node:child_process';
 import type { Command } from 'commander';
 import { planInstall } from '../../core/provisioner.js';
 import { resolveGlobalConfigReadPath } from '../../core/global-scope-resolver.js';
+import { createProviderLimitPolicyAuthoritySnapshot } from '../../core/provider-limit-policy.js';
+import type { ProviderLimitsConfig } from '../../core/config-types.js';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import type { DetectedProvider, ProviderAvailabilityDetail } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
@@ -725,12 +727,23 @@ function readGlobalProviderLimitsState(): { state: 'absent' } | { state: 'author
     const path = resolveGlobalConfigReadPath();
     if (!existsSync(path)) return { state: 'absent' };
     const parsed = JSON.parse(readFileSync(path, 'utf-8')) as {
-      provider_limits?: { policies?: unknown[] };
+      provider_limits?: ProviderLimitsConfig & { policies?: unknown[] };
     };
     const block = parsed.provider_limits;
     if (!block) return { state: 'absent' };
-    const policies = Array.isArray(block.policies) ? block.policies.length : 0;
-    return policies > 0 ? { state: 'present', policies } : { state: 'authored-empty' };
+    // SAME composition surface as the xverify path (sol cross-review: a raw
+    // field-count probe was a parallel state source — the exact class born
+    // 3322 exists to kill). The canonical composer accepts the block only if
+    // the validator would; a block it refuses is authored-but-unusable.
+    try {
+      const snapshot = createProviderLimitPolicyAuthoritySnapshot({ parent: block, project: null });
+      if (snapshot.parent) {
+        return { state: 'present', policies: snapshot.parent.config.policies.length };
+      }
+      return { state: 'authored-empty' };
+    } catch {
+      return { state: 'authored-empty' };
+    }
   } catch {
     return { state: 'absent' };
   }

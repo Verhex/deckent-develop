@@ -109,7 +109,9 @@ export function buildAgentCatalogEntries(root: string): AgentCatalogSurfaceEntry
       prompt: { availability: prompt.availability, degraded: prompt.degraded },
       model: agent.preferredModel ?? null,
       uses: agent.stats?.totalUses ?? 0,
-      successRate: Math.round(agent.stats?.successRate ?? 0),
+      // RAW ratio — rounding is a DISPLAY concern (sol cross-review: rounding here
+      // changed the existing API payload semantics, a banned break).
+      successRate: agent.stats?.successRate ?? 0,
       diagnostics: [],
       displayType: agent.source ?? null,
     });
@@ -140,7 +142,7 @@ export function buildAgentCatalogEntries(root: string): AgentCatalogSurfaceEntry
       prompt: { availability: 'none', degraded: false },
       model: readCatalogModelField(raw),
       uses: readCatalogStatNumber(raw, 'totalUses', 'uses'),
-      successRate: Math.round(readCatalogStatNumber(raw, 'successRate', 'successRate')),
+      successRate: readCatalogStatNumber(raw, 'successRate', 'successRate'),
       diagnostics: record.errors,
       displayType: readCatalogDisplayType(raw),
     });

@@ -993,12 +993,11 @@ function persistEnrichedResult(projectRoot: string, result: TaskResult): void {
  * PROMPT.md in the worker prompt block.
  */
 export async function resolveAgentPrompt(projectRoot: string, task: Task): Promise<string | undefined> {
-  const agentId = task.assignedAgent;
-  if (!agentId || agentId === 'generic') return undefined;
-
-  const resolution = getAgentPrompt(agentId, projectRoot);
-  if (resolution.source === 'none') return undefined;
-  return resolution.content;
+  // D-F(a): EVERY production ingress funnels through the integrity gate below —
+  // this legacy signature is now a thin projection of it (advisory default is
+  // byte-identical to the pre-gate behaviour; sol cross-review caught the
+  // first draft leaving the gate as a second unused path).
+  return resolveAgentPromptWithIntegrity(projectRoot, task).content;
 }
 
 /**

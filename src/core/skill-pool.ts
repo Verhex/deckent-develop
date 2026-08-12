@@ -371,9 +371,9 @@ function snapshotEntryKey(entry: EffectiveSkill): string {
 /** Resolve the catalog and stamp the canonical snapshot digest. */
 export function snapshotSkillCatalog(projectRoot: string): SkillCatalogSnapshot {
   const resolution = resolveSkillCatalog(projectRoot);
-  const digest = `sha256:${createHash('sha256')
-    .update(resolution.entries.map(snapshotEntryKey).join('\n'), 'utf8')
-    .digest('hex')}`;
+  // The ONE digest primitive (sol cross-review: an inline createHash here was
+  // itself the second-mechanism violation the task bans).
+  const digest = digestOf(resolution.entries.map(snapshotEntryKey).join('\n'));
   return { entries: resolution.entries, invalid: resolution.invalid, digest };
 }
 
