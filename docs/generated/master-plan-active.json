@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "78f23fdc5750eac829e3cb2f7c5cab41e784721d5a9c35006f763dcd16365557"
+    "value": "b67e40522a35d7f5b1405d72dbcbafee04945cbf65a659b9a2b23b4ce3eac43a"
   },
   "summary": {
     "total": 486,
@@ -3392,9 +3392,9 @@
       "program": "OBS",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-12",
       "definitionDigest": "0ecd6a72c6520ddf6c46f3ce38d0a8153737ef7f10e9fc2a9effec4a39230386",
-      "progressDigest": "74056448faa347e74daf25c33c503f1fd026dbbd05e65722801435b5b904aefa",
+      "progressDigest": "bd3a1b196199901bc0f703030569c99396eadc7c7e5a28d4431f37ff25ab5aab",
       "terminalClosureDigest": null
     },
     {
@@ -4459,9 +4459,9 @@
       "program": "ECOSYSTEM",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-12",
       "definitionDigest": "2e6d3ec95440989741b7ea50752358f60e839f080301a8dbf62d28647b68a652",
-      "progressDigest": "4ed8bb0dbfb06f7ba4fd5f51836f29a24341075f1aca5133e597fbea0b20ceb8",
+      "progressDigest": "2206417738138231bd9577856dca590360afbc493916b705b120fb304e1182de",
       "terminalClosureDigest": null
     },
     {
@@ -4470,9 +4470,9 @@
       "program": "ECOSYSTEM",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-12",
       "definitionDigest": "b185ab2e06411c755d867ab1762c4f7aa2cd0a8e85ac1cbf4505c0c09debfcc1",
-      "progressDigest": "a16b23cb583de71724c38fcaa12d9efff81670fcab1c542c9e1bad8875e88f2c",
+      "progressDigest": "57839d801416276e1fbd34dc8acff11b3fb113d22b0b843298dd42929ac8c35b",
       "terminalClosureDigest": null
     },
     {
@@ -5086,9 +5086,9 @@
       "program": "PROMPT",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-12",
       "definitionDigest": "f69e22309979f1d8c6846eb804ccf21476b0382828cf40dfe2be5e856343d419",
-      "progressDigest": "c5dedd7047b31a5bf062467241b5490699390dfda974b45a9b910c0d6fd05d19",
+      "progressDigest": "32f9eb83c693b587fbf1a8884d06f2454316dbcee8ec735d9cd34906b545965f",
       "terminalClosureDigest": null
     },
     {
@@ -18021,8 +18021,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "doctor provider-limit-authority zarfını birinci-sınıf required check olarak raporlar; absent / authored-empty / present durumlarını ayırt eder; remedy metni gerçek eksik artifact'i söyler (global config provider_limits bloğu), keyring'e yönlendirmez; doctor ile composition aynı authority state hakkında çelişemez",
-      "evidence": "Açılış: 2026-08-11 sprint-522 task 17 RCA — 4 xverify typed HOLD (xverify_provider_authority_unavailable) attı; kök-neden keyring DEĞİL, GLOBAL config katmanında owner-yazarı provider_limits bloğunun yokluğu (config.ts:2192-2195 parent, provider-limit-policy.ts:572-602 snapshot, global-scope-resolver.ts:329-335 read path); doctor keyring-probe'u ise farklı yüzeyi ölçüp 'keyring init' öneriyor — init 'already exists' ile reddediyor (par-60a10a69 rev 1). İki yüzey aynı authority hakkında çelişiyor; intake draft check-born-intake.mjs'den 11/11 geçti (RCA dokümanı delete-on-consume) 2026-08-11 canlı remedy denemesi (owner-onaylı): global provider_limits bloğu yazıldı — validator zinciri sırayla (1) authorityRef opaque-ref formatı, (2) 'policies must contain at least one entry' ile reddetti; selector gerçek accountRefHash/quotaScopeRefHash ister ve elle türetilemez (uydurma yasak) → blok geri alındı, config yeşil. SONUÇ: remedy bir authoring yüzeyi gerektiriyor (canlı hesap kimliğinden hash türeten owner-akışı) — bu satırın acceptance'ına ek: doctor düzeltmesi + provider-limits authoring yüzeyi birlikte kapanır",
-      "updated": "2026-08-11"
+      "evidence": "Açılış: 2026-08-11 sprint-522 task 17 RCA — 4 xverify typed HOLD (xverify_provider_authority_unavailable) attı; kök-neden keyring DEĞİL, GLOBAL config katmanında owner-yazarı provider_limits bloğunun yokluğu (config.ts:2192-2195 parent, provider-limit-policy.ts:572-602 snapshot, global-scope-resolver.ts:329-335 read path); doctor keyring-probe'u ise farklı yüzeyi ölçüp 'keyring init' öneriyor — init 'already exists' ile reddediyor (par-60a10a69 rev 1). İki yüzey aynı authority hakkında çelişiyor; intake draft check-born-intake.mjs'den 11/11 geçti (RCA dokümanı delete-on-consume) 2026-08-11 canlı remedy denemesi (owner-onaylı): global provider_limits bloğu yazıldı — validator zinciri sırayla (1) authorityRef opaque-ref formatı, (2) 'policies must contain at least one entry' ile reddetti; selector gerçek accountRefHash/quotaScopeRefHash ister ve elle türetilemez (uydurma yasak) → blok geri alındı, config yeşil. SONUÇ: remedy bir authoring yüzeyi gerektiriyor (canlı hesap kimliğinden hash türeten owner-akışı) — bu satırın acceptance'ına ek: doctor düzeltmesi + provider-limits authoring yüzeyi birlikte kapanır 2026-08-12 sprint-523: doctor kapsaması LANDED — provider-limit-authority birinci-sınıf required check, absent/authored-empty/present üçlüsü, probe composition'ın KENDİ composer'ından (createProviderLimitPolicyAuthoritySnapshot; sol'un yakaladığı paralel-probe ihlali düzeltildi), remedy authoring-akışını gösteriyor (keyring'e yönlendirme kalktı) — canlı binary'de kanıtlandı. Authoring akışı da landed (provider-limit-authoring, 12 test) fakat sourceResolver canlı producer'a bağlı değil (fail-closed HOLD: 'register a live evidence source bundle first') — satırın kalan acceptance'ı bu wiring: xverify-CLI kilidi o zaman açılır",
+      "updated": "2026-08-12"
     },
     {
       "order": 3323,
@@ -21699,8 +21699,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Reviewed source-of-truth ve precedence kararı; stable agent ID; versioned schema; enabled, routability, invalid ve provenance durumu; clean checkout ile machine-local runtime arasında deterministic catalog; CLI, MCP, API, Terminal, dashboard ve docs aynı read model tüketir",
-      "evidence": "2026-08-10 code-truth: AgentPoolManager effective fallback sağlıyor fakat CLI, MCP ve docs raw directory scan ediyor; 18 agent-specific built-in/project drift var; capabilitiesProvisional reader yok; role/domain vocabularies ayrışmış. 2026-08-11 stats RCA: 20/20 sidecar agent satırı manifestten ayrışıyor; API effective pool'u tüketirken CLI/MCP raw manifest okuyor. Finalizer bütün tarihsel agentların `lastUsedInSprint` değerini koşulsuz sprint-521'e çekmiş; 17/20 satır outcome+cell kanıtıyla kesin olarak gerçek son kullanımdan ileride 2026-08-11 owner-karar seti (kod+iş): agent-catalog yönü settle — precedence L1 project > L2 runtime > L0 builtin (alan-sınırlı runtime istisnalarıyla); şema yazımda zorunlu/okumada default'lu, bilinmeyen gelecek versiyon typed invalid; capability'siz VE makine-tespitli bozuk-persona agent non-routable (çözülmemiş preferredModel bloklamaz); read-only catalog view zorunlu; hub promotion owner-onaylı, asla otonom değil. Persona kararları: ladder kabul (D-A); preamble YALNIZ flag-gated adversarial canary, native system-channel default'u P1 yapısal identity/procedure ayrımı + kanıtlı append-semantics şartına bağlı (D-C revize); kanal yoksa degrade-fold (D-D); bozuk persona spawn sınırında da non-routable (D-F); boş/undersized/digest-mismatch makine-tespit + provider-channel davranış doğrulaması ignore/transform/truncate yakalar (D-G geniş); replace-semantics kanal typed HOLD, yalnız kanıtlı append/preserve-provider-default default adayı (D-H). Sprint-522 kanıtı: S3 prompt-resolution resolver'a katlandı (522-008 DONE), S4 CLI+MCP read-model migrasyonu (522-009 GO_WITH_TECH_DEBT — ölçülü düzeltmeyle)",
-      "updated": "2026-08-11"
+      "evidence": "2026-08-10 code-truth: AgentPoolManager effective fallback sağlıyor fakat CLI, MCP ve docs raw directory scan ediyor; 18 agent-specific built-in/project drift var; capabilitiesProvisional reader yok; role/domain vocabularies ayrışmış. 2026-08-11 stats RCA: 20/20 sidecar agent satırı manifestten ayrışıyor; API effective pool'u tüketirken CLI/MCP raw manifest okuyor. Finalizer bütün tarihsel agentların `lastUsedInSprint` değerini koşulsuz sprint-521'e çekmiş; 17/20 satır outcome+cell kanıtıyla kesin olarak gerçek son kullanımdan ileride 2026-08-11 owner-karar seti (kod+iş): agent-catalog yönü settle — precedence L1 project > L2 runtime > L0 builtin (alan-sınırlı runtime istisnalarıyla); şema yazımda zorunlu/okumada default'lu, bilinmeyen gelecek versiyon typed invalid; capability'siz VE makine-tespitli bozuk-persona agent non-routable (çözülmemiş preferredModel bloklamaz); read-only catalog view zorunlu; hub promotion owner-onaylı, asla otonom değil. Persona kararları: ladder kabul (D-A); preamble YALNIZ flag-gated adversarial canary, native system-channel default'u P1 yapısal identity/procedure ayrımı + kanıtlı append-semantics şartına bağlı (D-C revize); kanal yoksa degrade-fold (D-D); bozuk persona spawn sınırında da non-routable (D-F); boş/undersized/digest-mismatch makine-tespit + provider-channel davranış doğrulaması ignore/transform/truncate yakalar (D-G geniş); replace-semantics kanal typed HOLD, yalnız kanıtlı append/preserve-provider-default default adayı (D-H). Sprint-522 kanıtı: S3 prompt-resolution resolver'a katlandı (522-008 DONE), S4 CLI+MCP read-model migrasyonu (522-009 GO_WITH_TECH_DEBT — ölçülü düzeltmeyle) 2026-08-12 sprint-523 kapanışı (5 worker + 6 el-tamamlama, sol round-2 SOUND): agent S5 landed — TEK kanonik projection core'da (agent-catalog-projection), CLI/MCP re-export + API handler tüketiyor, duplicate builder'lar silindi, legacy payload alanları ham-değerle korundu; persona D-G(a) integrity classifier (config-çözümlü floor, fabricated-mismatch yok) + D-F(a) gate GERÇEK boğaz noktasında (resolveAgentPrompt gate'in projeksiyonu, advisory default, D-D untouched, enforce→PERSONA_INTEGRITY_HOLD)",
+      "updated": "2026-08-12"
     },
     {
       "order": 7012,
@@ -21741,8 +21741,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Reviewed source-of-truth ve precedence kararı; path-safe stable skill ID; versioned schema; declared entrypoint ve referenced-file authority; V3 profile, enabled, routability, invalid, provenance ve effective sidecar stats durumu; clean checkout ile long-lived project deterministic olur; CLI, MCP, API, Terminal, dashboard, worker prompt ve docs aynı read model tüketir; 1000-skill/çok-tenant katalog lookup ve cache invalidation ölçülür",
-      "evidence": "2026-08-10 code-truth: project raw catalog 30 iken SkillPoolManager package-only observability fallback'ıyla 31 yükler ve valid V3 profile sayısı 0'dır; CLI/MCP ayrı raw scanner ile 30 gösterir; prompt resolver manifest entrypoint ve package fallback'i bypass ederek yalnız `.deckent/skills/<id>/SKILL.md` okur; CLI raw stats gösterirken sidecar farklı effective state taşır. 2026-08-11 stats RCA: 28/28 sidecar skill satırı manifestten ayrışıyor; finalizer tamamını koşulsuz sprint-521 `lastUsedInSprint` ile damgalıyor ve accepted V3 skill-outcome authoritysi bulunmuyor. `ci-testing` satırı `avgCoverage` yerine `avgScore`, `system-architect` ise iki alanı birlikte taşıyarak live schema drift gösteriyor 2026-08-11 owner-karar seti: generated içerik human-authored project override'ın altında; promotion owner-onaylı review receipt ister, stats yalnız önerir; retired ID'ler kalıcı okunabilir tombstone; quarantine'i otomasyon önerir insan karar verir; installed-ama-unroutable görünür etiketli; locale-map alanlar (çıplak string=EN); başlangıç paket bütçeleri yüksek + non-blocking; ID'ler flat + registry mapping; resolver bypass lint failure. Sprint-522 kanıtı: S3 entrypoint/referenced-file authority + resolveBody containment (522-010 DONE); S4 worker-prompt rotası kısmi — ikinci body-read yolu result-collector.ts'te yaşıyor, 522-011 hattı 3 attempt'te dürüst NO_GO (yazma yetkisi dışı), kalan tek call-site swap açık",
-      "updated": "2026-08-11"
+      "evidence": "2026-08-10 code-truth: project raw catalog 30 iken SkillPoolManager package-only observability fallback'ıyla 31 yükler ve valid V3 profile sayısı 0'dır; CLI/MCP ayrı raw scanner ile 30 gösterir; prompt resolver manifest entrypoint ve package fallback'i bypass ederek yalnız `.deckent/skills/<id>/SKILL.md` okur; CLI raw stats gösterirken sidecar farklı effective state taşır. 2026-08-11 stats RCA: 28/28 sidecar skill satırı manifestten ayrışıyor; finalizer tamamını koşulsuz sprint-521 `lastUsedInSprint` ile damgalıyor ve accepted V3 skill-outcome authoritysi bulunmuyor. `ci-testing` satırı `avgCoverage` yerine `avgScore`, `system-architect` ise iki alanı birlikte taşıyarak live schema drift gösteriyor 2026-08-11 owner-karar seti: generated içerik human-authored project override'ın altında; promotion owner-onaylı review receipt ister, stats yalnız önerir; retired ID'ler kalıcı okunabilir tombstone; quarantine'i otomasyon önerir insan karar verir; installed-ama-unroutable görünür etiketli; locale-map alanlar (çıplak string=EN); başlangıç paket bütçeleri yüksek + non-blocking; ID'ler flat + registry mapping; resolver bypass lint failure. Sprint-522 kanıtı: S3 entrypoint/referenced-file authority + resolveBody containment (522-010 DONE); S4 worker-prompt rotası kısmi — ikinci body-read yolu result-collector.ts'te yaşıyor, 522-011 hattı 3 attempt'te dürüst NO_GO (yazma yetkisi dışı), kalan tek call-site swap açık 2026-08-12 sprint-523 kapanışı (sol round-2 SOUND): skill S5 landed — snapshotSkillCatalog (sıralı entries + digestOf-türevli sha256, ikinci hash mekanizması yok) CLI+MCP tarafından tüketiliyor, raw scan'ler silindi; S8 determinism gate landed + registry'li + canlı IN_SYNC kanıtı (bilinen residual: catalog-only vs sidecar-state ayrık çözümü — çift-resolution nondeterminizm kontrolü olarak koşuyor)",
+      "updated": "2026-08-12"
     },
     {
       "order": 7013,
@@ -23954,8 +23954,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Altı prompt driftinin guidance slice ve frontmatter içeriği review edilir; 12 provisional manifest farkı versioned migrationla settle olur; sync baseline eksiksiz ve three-way conflict açıklanabilir olur; project override korunur; guidance/full render parity ve token-quality golden kanıtı alınır",
-      "evidence": "2026-08-10 code-truth: bug-fixer, ci-guardian, devops-engineer, migration-specialist, refactorer ve security-auditor project promptları shipped Guidance Slices gerisinde; sync baseline yokluğu keptLocal conflict üretiyor; 18 agent drift grandfathered 2026-08-11 owner-karar seti (persona): native system-channel default'u yalnız model-compliance kanıtıyla OLAMAZ — P1 yapısal ayrım + append davranış kanıtı şart; preamble canary-only; prompt artifact'leri makine-tespitli bütünlük + provider-channel davranış kanıtı taşır; replace delivery provider default'unu sessizce ezemez, typed HOLD'da sonlanır. Sprint-522: S1 capability seam types+data landed (522-007 DONE — ProviderSystemPromptChannel descriptor, D-H HOLD mapping'i pure helper'da, spawn-path davranışı değişmedi)",
-      "updated": "2026-08-11"
+      "evidence": "2026-08-10 code-truth: bug-fixer, ci-guardian, devops-engineer, migration-specialist, refactorer ve security-auditor project promptları shipped Guidance Slices gerisinde; sync baseline yokluğu keptLocal conflict üretiyor; 18 agent drift grandfathered 2026-08-11 owner-karar seti (persona): native system-channel default'u yalnız model-compliance kanıtıyla OLAMAZ — P1 yapısal ayrım + append davranış kanıtı şart; preamble canary-only; prompt artifact'leri makine-tespitli bütünlük + provider-channel davranış kanıtı taşır; replace delivery provider default'unu sessizce ezemez, typed HOLD'da sonlanır. Sprint-522: S1 capability seam types+data landed (522-007 DONE — ProviderSystemPromptChannel descriptor, D-H HOLD mapping'i pure helper'da, spawn-path davranışı değişmedi) 2026-08-12 sprint-523: D-G(a)+D-F(a) landed advisory-default — integrity verdict'leri tek boğaz noktasından her spawn ingress'ine akıyor; enforce modu typed HOLD; native-channel default'u P1+append-kanıt şartında bekliyor (değişmedi)",
+      "updated": "2026-08-12"
     },
     {
       "order": 9024,
@@ -25174,6 +25174,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6800add5a00969e7d89188a34d6385129c68c23f272717b00631a58a173be435"
+    "value": "ea0469ef7e8be7f660d6d206e10cb96785f5030749df403c881d7b9e95133ed4"
   }
 }
