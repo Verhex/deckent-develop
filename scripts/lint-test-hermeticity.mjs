@@ -146,13 +146,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-11 (B10+B11 hasadı): +339 — born-intake, binary-staging, adr-sync,
   // npm-pack, capability-resolution ve config-truth suite'lerinin tmpdir yazım
   // siteleri. Temiz HEAD worktree (0f951956d).
-  count: 12685,
+  count: 12694,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: 'cb74986544302ac4e75d2071125f355119b0ee48563d1595bd8a6b1081d22537',
+  digest: 'cff34808c2fdfbcb2b0221b2f553400b872e548db895e7b83578d6cf9f5d6005',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -185,7 +185,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // envantere girdi. Temiz HEAD worktree (a8c6c0d8d).
   // 2026-08-11 (B10+B11): +4 — census/registry/lint modülleri yeni suite'lerin
   // test-support bağımlılığı olarak envantere girdi. Temiz worktree (0f951956d).
-  count: 1215,
+  count: 1217,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
@@ -204,7 +204,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-11 (sprint-510 harvest): edits to already-inventoried modules only
   // (parser, verify, controller, finalizer, plugin, catalog) — same 1207 count,
   // content digest only. Measured on a clean HEAD worktree (27d9bdec4).
-  digest: '091c3a13a9bd6b13ad3946c707f9f14a359a20bc53f228693a67b33bd4cc354a',
+  digest: '592c2cd074a7bcf3dd9e3a2195c20f34300e2b012570398a0876884e59fbeb15',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

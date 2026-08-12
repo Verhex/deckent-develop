@@ -1,21 +1,19 @@
-# DIRECTIVES — Sprint-B14: authority-authoring + catalog S5 + persona detection, 12-task Kahn wave
+# DIRECTIVES — Sprint-B15: the xverify unlock chain + the three born closures, 13-task wave
 
 ## Goal
 
-Twelve tasks advance across five dependency chains and four parallel independents,
-re-authored after the sol (gpt-5.6-sol, xhigh) adversarial cross-review refuted the
-first draft UNSOUND — every under-scoped write list widened to the verified call
-sites, both phantom artifacts (the skill snapshot, the GWTD-defect premise) replaced
-with code truth. Result-notes-first binds this wave: exactly ONE standalone document
-(Task 12, the ADR-G-019 amendment draft) with its delete trigger in its header.
+Thirteen tasks across four dependency chains and five parallel independents,
+re-authored after the sol adversarial round refuted two premises (the resume-
+baseline theory and the envelope-stamp claim) and named thirteen scope gaps —
+every write list below carries the sol-verified call sites. Result-notes-first:
+ZERO standalone documents.
 
-Chains: 1→2 (authoring feeds doctor, shared message authority) · 3→4 (aggregate
-lands, then canary wiring on the same workflow) · 5→6 (integrity verdict feeds the
-shared prompt-resolution boundary) · 5→9 (agent projection consumes the same
-resolver surface) · 7→8 (the snapshot artifact is CREATED, then gated).
-Independents: doc-task verification isolation (10) · FIX-admission truth pin (11) ·
-ADR-G-019 amendment draft (12) · with 1 and 7 sharing the message authority — the
-planner's collision edges serialize them.
+Chains: 1→2→3 (codex evidence sources → authoring wire → unlock proof, with the
+bootstrap file writable inside the chain) · 4→3 (the unlock proof consumes the
+final tier-floor semantics) · 4→5 (shared cross-verify authority file) · 6→9
+(limit-death typing feeds the fix-budget pin) · 6→7 (shared spawn-backend file).
+Independents: KN3 parser fix (8) · init-rot mock repair (10) · determinism
+sidecar distinction (11) · persona declared-digest (12) · runs-inbox hygiene (13).
 
 Workers may READ any path named in their Scope, including src/ directories listed
 purely for context; reading beyond Scope is not required by any task here.
@@ -36,328 +34,364 @@ admission.
 - Workers must not run `npm run build`, full `npm test`, provider login/auth mutation,
   sprint lifecycle commands, git commit, npm publish, or cleanup. Scoped vitest runs only.
 - Tests are hermetic: tmpdir-based, no network, no live `.tasks`/`.deckent` writes,
-  async spawn only (ADR-D-002). No live provider calls from any task.
+  async spawn only (ADR-D-002). No live provider calls from any task — the ONE
+  exception is Task 3's declared real-binary smoke, which the HOST runs post-settlement,
+  not the worker.
 - New user-facing text goes through the i18n message authority (`getMessage`, en+tr).
 - Zero hardcode (ADR-G-036): no model name or flow value literal on a code path.
-- Findings default to result notes; only Task 12 produces a standalone document.
 
 ---
 
-## Task 1: Provider-limits authoring flow — derive the policy from live provider truth
+## Task 1: Codex evidence-source registrations + bootstrap consumption
 
-- Files: src/cli/commands/provider-authority.ts, src/core/provider-limit-authoring.ts, src/core/provider-evidence-producer.ts, src/core/provider-authority-composition.ts, src/core/config.ts, src/cli/helpers/messages.ts, tests/core/provider-limit-authoring.test.ts
-- Scope: src/cli/commands/provider-authority.ts, src/cli/commands/, src/core/provider-limit-authoring.ts, src/core/, src/cli/helpers/, tests/core/provider-limit-authoring.test.ts
+- Files: src/providers/codex-provider-evidence-sources.ts, src/providers/provider-authority-runtime-bootstrap.ts, tests/providers/codex-provider-evidence-sources.test.ts
+- Scope: src/providers/codex-provider-evidence-sources.ts, src/providers/provider-authority-runtime-bootstrap.ts, src/providers/, src/core/, tests/providers/codex-provider-evidence-sources.test.ts
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured (row 3322 + live remedy attempt + sol cross-review): the xverify composition
-holds with a typed authority-unavailable because no owner-authored `provider_limits`
-block exists in the global config layer; hand-authoring is impossible — the selector
-demands real account/quota hashes. Sol code-truth: current account identity resolves
-PRIVATELY inside the provider evidence producer; sound reuse requires exporting from
-that path or the authority composition module; global persistence lives in the core
-config module's write path; user-facing confirmation strings need the message
-authority — all four now in write authority.
+Measured: the runtime bootstrap registers ONLY claude evidence sources
+(provider-authority-runtime-bootstrap imports the claude registrations at its
+head — sol-verified line 7); the authoring flow holds for codex with the typed
+source-unavailable refusal (measured live 2026-08-12).
 
-Required: root-cause read of the composition path first. Then the smallest sound
-authoring surface: a `provider-authority limits init` sub-flow that reuses the SAME
-identity resolution the composition reads (export the existing private helper — no
-second derivation), derives selector hashes with the consuming resolver's own code,
-writes a validator-green `provider_limits` block to the global config layer behind an
-owner-confirmation prompt (i18n en+tr via getMessage), and refuses typed when live
-identity is unresolvable. Hermetic tests pin: validator-green output, refusal on
-unresolvable identity, hash equality with the consumer's derivation.
+Required: the codex mirror of the claude registrations module — the FULL source
+set the claude module registers (account identity AND the limit-window evidence
+source, mirroring claude-subscription-limit-evidence — sol round-2: auth state
+alone leaves the chain holding on limit_windows_unavailable), from the codex
+CLI's durable on-disk auth/usage state, read-only, no network, typed
+unavailable per-source on absent/corrupt state — AND the bootstrap consuming
+it beside the claude set (its file is in write authority per
+sol's under-scoping finding). Hermetic tests: fixture auth-state present →
+stable hashes; absent/corrupt → typed unavailable; bootstrap registers both
+provider sets.
 
-**Test:** `npx vitest run tests/core/provider-limit-authoring.test.ts`
+**Test:** `npx vitest run tests/providers/codex-provider-evidence-sources.test.ts`
 
-**NO-GO:** a second hash derivation, fabricated selector values, writing without
-confirmation, or touching provider credentials.
+**NO-GO:** network calls, credential mutation, fabricated identity values, or a
+registration contract diverging from the bootstrap's existing one.
 
-## Task 2: Doctor provider-limit-authority coverage — the misdirection ends
+## Task 2: Authoring flow sourceResolver — the bootstrap exposes, the CLI consumes
 
-- Files: src/cli/commands/doctor-checks.ts, src/cli/commands/doctor.ts, src/cli/helpers/messages.ts, tests/cli/doctor-provider-authority.test.ts
-- Scope: src/cli/commands/doctor-checks.ts, src/cli/commands/doctor.ts, src/cli/commands/, src/cli/helpers/, src/core/, tests/cli/doctor-provider-authority.test.ts
-- Model: claude-sonnet-5
+- Files: src/cli/commands/provider-authority.ts, src/providers/provider-authority-runtime-bootstrap.ts, tests/cli/provider-limits-authoring-wire.test.ts
+- Scope: src/cli/commands/provider-authority.ts, src/cli/commands/, src/providers/provider-authority-runtime-bootstrap.ts, src/providers/, src/core/, tests/cli/provider-limits-authoring-wire.test.ts
+- Model: claude-opus-5
 - Dependencies: Task 1
 
-Measured (row 3322 + sol cross-review): doctor suggested `keyring init` while the
-composition held on a different missing artifact; sol code-truth — the production
-authority injection lives in the doctor command module (not only doctor-checks) and
-new remedy keys need the message authority; both now in write authority.
+Measured (sol code-truth): production registers the provider-authority command
+with NO injected resolver while runLimitsInit refuses when deps.sourceResolver is
+absent — and the bootstrap exposes no resolver, so the first draft was
+impossible inside its own write authority. The bootstrap file is now writable.
 
-Required: doctor reports the provider-limit-authority envelope as a first-class check
-distinguishing absent / authored-empty / present by reading the SAME composition
-surface the xverify path reads (no parallel probe); remedy text names the Task 1
-authoring flow via getMessage (en+tr). The keyring check stays but may no longer
-claim to fix the limit-authority hold. Hermetic tests pin the three states and the
-remedy key.
+Required: the bootstrap EXPOSES a resolver view over its registered sources (one
+registry — the same registrations object it already builds, no parallel list);
+the CLI's limits-init resolves its sourceResolver from that exposure when no
+injection is supplied. The injectable seam stays for tests; the typed hold text
+stays byte-identical when no source resolves. Hermetic tests: fixture bootstrap
+source → flow reaches the proposal stage; none → unchanged hold.
 
-**Test:** `npx vitest run tests/cli/doctor-provider-authority.test.ts`
+**Test:** `npx vitest run tests/cli/provider-limits-authoring-wire.test.ts tests/core/provider-limit-authoring.test.ts`
 
-**NO-GO:** a doctor probe reading different state than the composition, or a remedy
-string outside the message authority.
+**NO-GO:** a second resolver registry, changing the hold message, or authoring
+without the owner-confirmation prompt.
 
-## Task 3: CI D5 — the aggregate required-check lands
+## Task 3: The live unlock proof — authored policy, first healthy xverify
 
-- Files: .github/workflows/ci.yml, tests/scripts/ci-aggregate-gate.test.ts
-- Scope: .github/workflows/ci.yml, .github/workflows/, tests/scripts/ci-aggregate-gate.test.ts, tests/scripts/
+- Files: tests/cli/xverify-authority-unlock.test.ts
+- Scope: tests/cli/xverify-authority-unlock.test.ts, tests/cli/, src/cli/commands/, src/core/, src/orchestra/, src/providers/
+- Model: claude-sonnet-5
+- Dependencies: Task 2, Task 4
+
+Measured: every manual xverify since 2026-08-11 returned the authority-unavailable
+hold; this proof consumes the FINAL semantics — the Task 2 wiring AND the Task 4
+tier floor (sol's missing 4→3 edge, now declared).
+
+Required: a hermetic test driving the FULL composition against a tmpdir global
+config carrying a validator-green authored policy (built through the Task 2 flow
+with a fixture source) pinning: verifier scope resolves (no authority-unavailable),
+tier-equivalence still selects the configured verifier model under the Task 4
+floor, an absent policy still holds typed, and a below-floor verifier request
+refuses typed. Result notes DECLARE the host-run real-binary smoke: live
+`provider-authority limits init` then one live `deckent xverify` whose outcome
+must not be `unavailable` — host-run post-settlement, never worker-run.
+
+**Test:** `npx vitest run tests/cli/xverify-authority-unlock.test.ts`
+
+**NO-GO:** live provider calls from the worker, weakening any fail-closed hold,
+or a fixture bypassing the validator.
+
+## Task 4: XVerify tier floor — an authoritative author-model input, enforced in the resolver
+
+- Files: src/cli/commands/xverify.ts, src/orchestra/cross-verify-runner.ts, src/cli/helpers/messages.ts, tests/cli/xverify-tier-floor.test.ts
+- Scope: src/cli/commands/xverify.ts, src/cli/commands/, src/orchestra/cross-verify-runner.ts, src/orchestra/, src/cli/helpers/, src/core/, tests/cli/xverify-tier-floor.test.ts
 - Model: claude-opus-5
 - Dependencies: none
 
-Measured (required-checks design, owner decision 2026-08-11 "E now + D5 B14"): the
-2026-08-11 incident class — PR #120 merged with red shards because only Type Check
-and the three Validator legs are ruleset-required; the design's recommended shape is
-D5, one aggregate job that fans in every shard result with a minimum-count
-assertion, so the ruleset needs exactly ONE new required context and never breaks on
-matrix changes.
+Measured (owner rule 2026-08-12 + sol code-truth): verification must run on a
+tier equal-or-above the author's, and nothing enforces it. CORRECTED premises
+per sol: the xv claim envelope's author-model stamp is INTENTIONAL (verifier
+selection excludes task.provider — it must not change), the verifier task
+already stamps its resolved identity correctly, and tier resolution lives in
+cross-verify-runner (not only the ingress authority). The REAL gap: the CLI
+accepts only `--author` (provider) and substitutes resolveDefaultModel for the
+author model, so the floor has no authoritative author-model input.
 
-Required: a new `Shards Green` aggregate job in the CI workflow: `needs` every test
-shard, runs on pull_request (not merge_group — row 535's exclusion is preserved),
-fails if any needed job failed or was cancelled, and asserts a minimum needed-job
-count so a silently-dropped shard cannot pass the gate; jobs that legitimately skip
-(merge_group guards) are counted from their event context, not hardcoded. The
-Docs+Scripts shard joins the aggregate ONLY through its current continue-on-error
-state (Task 4 decides its hard status). A hermetic test parses the workflow and pins:
-the aggregate exists, needs-list covers every `Tests —` job, and the minimum count
-matches the live job inventory. Result notes list the exact owner-manual ruleset
-change (add one context), unexecuted.
+Required: the CLI gains `--author-model <apiId>` (registry-validated; when
+omitted, the resolved default is used AND recorded as low-confidence in the
+receipt); the tier floor lives in cross-verify-runner's verifier resolution:
+tiers come from the model registry (zero hardcode), a requested or resolved
+verifier tier below the author model's tier refuses typed
+(`xverify_verifier_tier_below_author`) and `--verifier-model` cannot bypass it;
+refusal/option strings via getMessage (en+tr). The claim envelope is UNTOUCHED.
+Hermetic tests: below-tier explicit request refuses; equal/above passes;
+same-provider prohibition unchanged; author-model flag validated against the
+registry.
 
-**Test:** `npx vitest run tests/scripts/ci-aggregate-gate.test.ts`
+**Test:** `npx vitest run tests/cli/xverify-tier-floor.test.ts`
 
-**NO-GO:** editing the ruleset, changing what any shard runs, or an aggregate that
-passes when a needed job is missing.
+**NO-GO:** a tier table outside the model registry, touching the claim
+envelope's author stamp, or weakening the same-provider prohibition.
+
+## Task 5: Born 3323 — producer fencing compares the pre-enrichment core
+
+- Files: src/orchestra/cross-verify-production-ingress-authority.ts, tests/orchestra/xverify-producer-fencing.test.ts
+- Scope: src/orchestra/cross-verify-production-ingress-authority.ts, src/orchestra/, src/core/, .brain/archive/, tests/orchestra/xverify-producer-fencing.test.ts
+- Model: claude-opus-5
+- Dependencies: Task 4
+
+Measured (born 3323; sol-verified): the fencing byte-compares the CLOSED
+settlement's raw result against the evaluate-phase's post-settlement-ENRICHED
+copy — the enrichment classes are real (attribution fields, distMutated
+advisory, token backfill, all written in spawn-backend-docker's monitor path) —
+structural inequality, zero healthy in-sprint verifies across three sprints.
+The three archived result pairs are readable in scope (.brain/archive/).
+
+Required: root-cause note listing the EXACT diverging fields from the archived
+pairs. Then: both sides canonicalize through a typed enrichment allowlist —
+enrichment-class fields excluded, every other field byte-compared, an UNKNOWN
+extra field still mismatches (fail-closed against tampering). Hermetic tests:
+raw-vs-enriched real archived shape passes; tampered core field holds; unknown
+field holds.
+
+**Test:** `npx vitest run tests/orchestra/xverify-producer-fencing.test.ts`
+
+**NO-GO:** dropping the byte-comparison, an allowlist carrying any
+worker-authorable field, or weakening the same-provider prohibition.
+
+## Task 6: Born 3324 — provider-limit death is its own typed class, lineage-visible
+
+- Files: src/orchestra/spawn-backend-docker.ts, src/core/task-types.ts, src/core/task-result-schema.ts, src/orchestra/result-evaluator.ts, src/orchestra/fix-failure-classification.ts, tests/orchestra/attribution-limit-death.test.ts
+- Scope: src/orchestra/spawn-backend-docker.ts, src/orchestra/, src/core/task-types.ts, src/core/task-result-schema.ts, src/core/, tests/orchestra/attribution-limit-death.test.ts
+- Model: claude-opus-5
+- Dependencies: none
+
+Measured (born 3324 + sol code-truth): a provider-limit-killed zero-write worker
+settles as ATTRIBUTION_DIFF_UNMEASURABLE; the reasonCode is an unrestricted
+string in the task types AND every attribution HOLD is downgraded in
+result-evaluator with lineage routing interpreted in fix-failure-classification
+— so the classification must travel through all four layers, not only the
+spawn backend (sol's under-scoping finding, now in write authority).
+
+Required: the typed `PROVIDER_LIMIT_DEATH_ZERO_WRITE` class minted where the
+reconcile observes limit-death evidence with zero writes; the reasonCode
+narrows to a typed union in task-types/schema (unknown strings still parse as
+legacy — additive); result-evaluator routes the new class as a clean-restart
+lineage signal instead of the attribution-hold downgrade;
+fix-failure-classification names it so the FIX worker is born knowing the death
+class. A genuinely unmeasurable diff keeps today's hold; a MEASURED zero-write
+with live provider stays the honest no-work NO_GO. Hermetic tests pin all three
+classes through evaluator routing.
+
+**Test:** `npx vitest run tests/orchestra/attribution-limit-death.test.ts`
+
+**NO-GO:** weakening the honest-gate, promoting any unmeasured claim, or a
+classification read from worker-authored fields.
+
+## Task 7: The 523-001-fix unmeasurable-diff RCA — evidence over theory
+
+- Files: tests/orchestra/attribution-unmeasurable-rca.test.ts
+- Scope: tests/orchestra/attribution-unmeasurable-rca.test.ts, tests/orchestra/, src/orchestra/, src/core/, src/cli/commands/, .brain/archive/
+- Model: claude-opus-5
+- Dependencies: Task 6
+
+Measured (sol REFUTATION of the first draft): the resume-baseline theory is
+wrong — the archived result and landing proposal carry the SAME attempt id
+(319be0ff…), and an old-baseline bind would have emitted
+ATTRIBUTION_AUTHORITY_MISMATCH, not ATTRIBUTION_DIFF_UNMEASURABLE. The true
+mechanism of "real work on disk, filesChanged:[] claim" is UNKNOWN — this task
+finds it instead of guessing.
+
+Required: read-only RCA against the archived 523 artifacts and the reconcile
+code path: reproduce the DIFF_UNMEASURABLE branch conditions in a hermetic
+fixture (which input state makes the diff unmeasurable while scoped files
+changed on disk), record the exact predicate with file-and-line evidence in
+result notes, and pin the found mechanism in a regression test. If the RCA
+lands on a fixable defect, the fix is a NAMED follow-up admission — this slice
+changes no production behaviour.
+
+**Test:** `npx vitest run tests/orchestra/attribution-unmeasurable-rca.test.ts`
+
+**NO-GO:** changing production behaviour, or an RCA that stops without
+reproducing the branch in a fixture.
+
+## Task 8: KN3 projection-parity guard — landing-proposal artifacts are not task ids
+
+- Files: src/orchestra/sprint-spawner.ts, tests/orchestra/projection-parity-artifacts.test.ts
+- Scope: src/orchestra/sprint-spawner.ts, src/orchestra/, src/core/, tests/orchestra/projection-parity-artifacts.test.ts
+- Model: claude-sonnet-5
+- Dependencies: none
+
+Measured (sprint-523 live resume): the parity guard refused resume with "on disk
+but NOT in this plan: [523-001.landing-proposal, …]" — its file classifier
+derives phantom task ids from `task-<id>.landing-proposal.json` artifacts of
+ALREADY-SETTLED tasks; the operator remedy (re-plan) does not fit a paused-resume
+and the artifacts had to be hand-archived to proceed.
+
+Required: root-cause the id-derivation in the guard (the diverged-projection
+error path in the spawner) and classify task-artifact suffixes through the
+EXISTING task-artifact-classifier authority (sprint-512's archive-authority
+module — no second suffix list). Settled-task artifacts (landing-proposal,
+partial-result, scope-baseline and classifier-known siblings) are never plan
+members; a genuinely unknown task JSON still refuses. Hermetic tests: resume
+fixture with settled-task landing-proposals passes parity; an actually-foreign
+task file still refuses typed.
+
+**Test:** `npx vitest run tests/orchestra/projection-parity-artifacts.test.ts`
+
+**NO-GO:** a suffix list parallel to the artifact classifier, or weakening the
+genuine-divergence refusal.
 
 ---
 
-## Task 4: Docs+Scripts canary wiring — measure, then decide continue-on-error
+## Task 9: Fix-budget contract pin — admitted rounds are the documented truth
 
-- Files: .github/workflows/ci.yml, tests/github/ci-workflow.test.ts, tests/scripts/docs-scripts-canary.test.ts
-- Scope: .github/workflows/ci.yml, .github/workflows/, vitest.config.ts, tests/github/, tests/scripts/docs-scripts-canary.test.ts, tests/scripts/
-- Model: claude-sonnet-5
-- Dependencies: Task 3
-
-Measured (flake RCA + sol cross-review): the serialization canary exists in vitest
-config but no CI step exercises it; sol code-truth — the real workflow-hygiene
-authority whose pins must change is the github workflow test suite, now in write
-authority.
-
-Required: the Docs+Scripts job runs the canary env on its existing step (serial, dot
-reporter); no bounded retry (the RCA rejected it). continue-on-error stays UNTIL the
-RCA's acceptance series is met — result notes state how many green runs and where the
-evidence is read. The existing workflow test suite gains the pin that the canary env
-is present so it cannot silently drop.
-
-**Test:** `npx vitest run tests/scripts/docs-scripts-canary.test.ts`
-
-**NO-GO:** removing continue-on-error in this slice, adding a retry, or changing
-which tests the shard runs.
-
-## Task 5: Persona D-G(a) — machine-detectable broken persona in the catalog
-
-- Files: src/core/agent-pool.ts, src/core/agent-types.ts, src/core/config-types.ts, src/core/config.ts, tests/core/persona-integrity-detection.test.ts
-- Scope: src/core/agent-pool.ts, src/core/agent-types.ts, src/core/config-types.ts, src/core/config.ts, src/core/, tests/core/persona-integrity-detection.test.ts
+- Files: tests/orchestra/fix-budget-counting.test.ts
+- Scope: tests/orchestra/fix-budget-counting.test.ts, tests/orchestra/, src/orchestra/, src/core/task-lineage.ts, src/core/, .brain/archive/
 - Model: claude-opus-5
-- Dependencies: Task 1
+- Dependencies: Task 6
 
-Measured (owner D-G(a) + sol cross-review): the catalog classifies prompt-degraded
-records but no typed integrity verdict exists; sol code-truth — a genuinely
-config-resolved floor needs the typed config surface (config-types + config default
-resolution), now in write authority; the manifest-declared digest field needs schema
-treatment in agent-types.
+Measured (sol code-truth, correcting the first draft): the phase marks every
+selected FIX id attempted BEFORE spawnWorkers and its own comment defines the
+budget as "admitted FIX rounds" — the observed one-real-run exhaustion is the
+DOCUMENTED contract (deferred admissions consume slots), not a counting bug;
+depth selection lives in task-lineage (now in read scope).
 
-Required: extend the resolver's prompt resolution with a typed persona-integrity
-verdict: intact / empty / undersized (config-resolved floor with typed default, no
-literal) / digest-mismatch (against a manifest-declared digest when present — schema
-field added additive-warning per the D2 contract) / unreadable. Verdict is data —
-no routing change in this slice (Task 6 consumes). Existing suites stay green
-unmodified. Tests pin every class including no-declared-digest (no fabricated
-mismatch).
+Required: pin the ACTUAL contract in a hermetic test: an admitted-but-deferred
+fix consumes a slot, depth selection follows task-lineage's rule, and the pause
+fires when admitted rounds exhaust config. Result notes state plainly that the
+owner's %-based recollection does not match any config surface and record
+whether admitted-vs-executed counting deserves an owner decision row — with the
+Task 6 limit-death class noted as the input that would make executed-only
+counting safe. No production change.
 
-**Test:** `npx vitest run tests/core/persona-integrity-detection.test.ts tests/core/agent-prompt-resolution.test.ts`
+**Test:** `npx vitest run tests/orchestra/fix-budget-counting.test.ts`
 
-**NO-GO:** modifying existing suites, a hardcoded floor, or any routing/spawn
-behaviour change.
+**NO-GO:** changing budget behaviour, or a pin that contradicts the in-code
+documented contract without flagging it as an owner decision.
 
-## Task 6: Persona D-F(a) — the shared prompt-resolution boundary refuses broken personas
+## Task 10: Init-rot — the closed fs mocks meet initializeWorkspaceArtifacts
 
-- Files: src/orchestra/result-collector.ts, src/orchestra/sprint-spawner.ts, tests/orchestra/persona-spawn-gate.test.ts
-- Scope: src/orchestra/result-collector.ts, src/orchestra/sprint-spawner.ts, src/orchestra/, src/core/, tests/orchestra/persona-spawn-gate.test.ts
-- Model: claude-opus-5
-- Dependencies: Task 5
-
-Measured (owner D-F(a) + sol cross-review): the plan's single-file version could not
-enforce the boundary — sol code-truth: the COMMON agent-prompt resolver in the
-result-collector module collapses resolution to a bare string and five other spawn
-ingresses (run, spawn, mcp run, task-mode-runner, scheduler-effects) all funnel
-through it. Enforcing at that shared choke point covers every ingress with one
-change — the same single-choke-point pattern the 522-011 skill switch proved.
-
-Required: the shared resolver carries Task 5's integrity verdict instead of
-discarding it; at the sprint-spawner admission point AND through the shared
-resolver's return contract, a non-intact persona produces a typed refusal consistent
-with the established honest-NO-GO artifact — never a silent personaless spawn.
-Owner D-D degrade (absent system-channel) stays untouched — it is not a broken
-persona. Config-resolved enforcement mode, advisory default, warn-only emit — no
-default flip. Tests pin: broken+enforce → typed refusal; broken+advisory → spawn
-with warning; intact → byte-identical.
-
-**Test:** `npx vitest run tests/orchestra/persona-spawn-gate.test.ts`
-
-**NO-GO:** flipping the enforcement default, blocking D-D degrade, a refusal without
-the honest artifact, or a second resolution path beside the shared choke point.
-
-## Task 7: Skill catalog S5 — the canonical snapshot artifact + CLI/MCP migration
-
-- Files: src/core/skill-pool.ts, src/cli/commands/skill.ts, src/mcp/tools/skill-list.ts, src/cli/helpers/messages.ts, tests/cli/skill-surface-readmodel.test.ts
-- Scope: src/core/skill-pool.ts, src/core/, src/cli/commands/skill.ts, src/cli/commands/, src/mcp/tools/skill-list.ts, src/mcp/tools/, src/cli/helpers/, tests/cli/skill-surface-readmodel.test.ts
-- Model: claude-opus-5
-- Dependencies: Task 2
-
-Measured (design S5 + sol cross-review): the design's `snapshot()` DOES NOT EXIST —
-the real catalog API is `resolveSkillCatalog()` and `listEffective()` on the skill
-pool (sol-verified); CLI and MCP scan independently. The snapshot artifact must be
-CREATED here, not assumed.
-
-Required: first the core artifact — a canonical `snapshot()` on the skill pool
-built over `resolveSkillCatalog()`: ordered entries + a stable content digest
-(reusing the pool's existing per-entry digest primitive, no second hash mechanism).
-Then migrate CLI `skill` and MCP `skill_list` onto it: identical counts/ids across
-CLI, MCP and snapshot on one tree; disposition/validity/profileState visible in both
-payloads; new user-facing labels via getMessage. Hermetic tmpdir fixtures.
-
-**Test:** `npx vitest run tests/cli/skill-surface-readmodel.test.ts`
-
-**NO-GO:** a raw scan surviving on the migrated surfaces, a second digest mechanism,
-or payload/snapshot disagreement.
-
-## Task 8: Skill catalog S8 — the determinism gate over the real snapshot
-
-- Files: scripts/lint-skill-catalog-determinism.mjs, scripts/script-registry.json, tests/scripts/skill-catalog-determinism.test.ts
-- Scope: scripts/lint-skill-catalog-determinism.mjs, scripts/script-registry.json, scripts/, src/core/, tests/scripts/skill-catalog-determinism.test.ts
-- Model: claude-sonnet-5
-- Dependencies: Task 7
-
-Measured (design S8 + sol cross-review): the gate consumes Task 7's snapshot digest —
-which exists only after Task 7 (the chain is now real); the script registry is
-exhaustively enforced by its governance test, so the registry file is in write
-authority (sol-caught omission).
-
-Required: a lint script (NEW, registered in the script registry IN THIS TASK) that
-computes Task 7's catalog snapshot digest of the real tree twice — catalog-only and
-with machine-local sidecar state — failing typed on undeclared divergence, honoring
-the grandfathered-drift baseline's canonical-side disposition (a disposition, not a
-bare allowlist). Not wired into lint:gates — that wiring is a named follow-up owner
-decision in result notes. Hermetic tmpdir fixtures: in-sync pass, undeclared-drift
-fail, declared-drift pass.
-
-**Test:** `npx vitest run tests/scripts/skill-catalog-determinism.test.ts`
-
-**NO-GO:** wiring into CI gates here, a second digest mechanism, a bare allowlist,
-or writing real catalog state.
-
-## Task 9: Agent catalog S5 — ONE shared projection for CLI, MCP and API
-
-- Files: src/core/agent-pool.ts, src/cli/commands/agent.ts, src/mcp/tools/agent-list.ts, src/api/server.ts, tests/api/agent-surface-readmodel.test.ts
-- Scope: src/core/agent-pool.ts, src/core/, src/cli/commands/agent.ts, src/cli/commands/, src/mcp/tools/agent-list.ts, src/mcp/tools/, src/api/server.ts, src/api/, tests/api/agent-surface-readmodel.test.ts
-- Model: claude-opus-5
-- Dependencies: Task 5
-
-Measured (sol cross-review, superseding both earlier drafts): no shared agent
-projection exists — CLI and MCP each BUILD their own payload over the resolver
-(duplicate builders, sol-cited), and the API's inline `/api/agents` handler is a
-third independent shape; the dashboard does NOT consume `/api/agents` (its worker
-grid reads status data), so the transitive claim was false. Depends on Task 5
-because both mutate the resolver surface (sol-caught missing edge).
-
-Required: ONE canonical projection helper on the agent pool (the same
-single-choke-point pattern as skill S5): ordered entries with enabled/routability/
-validity/provenance and the invalid-manifest records. CLI, MCP and the API handler
-all consume it — the duplicate builders are deleted, payload compatibility for
-existing consumers preserved field-for-field. Identical counts/ids across all three
-surfaces and the projection on one tree. Result notes record the dashboard truth
-(no `/api/agents` consumer) instead of claiming transitivity. Touches `src/api/` —
-the result carries the declared real-binary smoke line.
-
-**Test:** `npx vitest run tests/api/agent-surface-readmodel.test.ts`
-
-**NO-GO:** any surface keeping its own builder, breaking an existing payload field,
-or payload/projection disagreement.
-
-## Task 10: Doc-task verification isolation — fix it at the rendering layer
-
-- Files: src/orchestra/prompt-god-template.ts, src/orchestra/rubric-registry.ts, src/orchestra/task-builder.ts, tests/orchestra/doc-task-verification-scope.test.ts
-- Scope: src/orchestra/prompt-god-template.ts, src/orchestra/rubric-registry.ts, src/orchestra/task-builder.ts, src/orchestra/, tests/orchestra/doc-task-verification-scope.test.ts
+- Files: tests/cli/commands.test.ts, tests/mcp/tools.test.ts, tests/mcp/branch-coverage.test.ts, tests/mcp/tools-enrichment.test.ts
+- Scope: tests/cli/commands.test.ts, tests/cli/, tests/mcp/, src/cli/commands/, src/mcp/tools/, src/orchestra/
 - Model: claude-sonnet-5
 - Dependencies: none
 
-Measured (sprint-522 live evidence + sol cross-review): a doc-only worker ran
-repo-wide tsc and raced parallel workers' in-flight state; sol code-truth — the
-verification guidance is RENDERED in the prompt template module (not task-builder),
-and doc/code classification already exists in the rubric registry; all three layers
-now in write authority.
+Measured (sol root cause — commit 83a1eebd2): initializeWorkspaceArtifacts
+(wired through init-steps and mcp/tools/init) calls `realpathSync.native` and
+`lstatSync`; the failing suites' closed node:fs mock factories omit BOTH
+exports, so init dies early and the suites fail on missing output — the exact
+closed-factory rot class this campaign fixed for config mocks.
 
-Required: root-cause note first (where the guidance text originates). Then: reuse
-the rubric registry's existing doc/code classification — a task classified
-documentation-class gets verification guidance naming ONLY its task-declared checks
-(document existence, link lint, declared test command), never repo-wide tsc/vitest;
-source-writing tasks keep today's guidance byte-identical. NOTE: this changes the
-worker-prompt contract for future waves — result notes must flag it for the wave
-admission checklist. Hermetic test pins both prompt classes.
+Required: the four test files' fs mock factories gain the missing exports with
+behaviour consistent with each suite's existing mock style (realpathSync.native
+echoing its input path, lstatSync consistent with the suite's statSync); every
+listed suite returns green; NO production edit unless the RCA disproves the
+mock theory — in which case the conflict goes to result notes with the smallest
+production fix named, not silently applied.
 
-**Test:** `npx vitest run tests/orchestra/doc-task-verification-scope.test.ts`
+**Test:** `npx vitest run tests/cli/commands.test.ts tests/mcp/tools.test.ts tests/mcp/branch-coverage.test.ts tests/mcp/tools-enrichment.test.ts`
 
-**NO-GO:** changing guidance for source-writing tasks, a second classification
-mechanism beside the rubric registry's, or removing a task-declared check.
+**NO-GO:** weakening/deleting assertions, or editing production init paths on
+the mock theory without disproof.
 
-## Task 11: FIX-admission truth pin — Brain downgrade is the authority, and it stays that way
+## Task 11: Determinism gate S8 residual — sidecar state genuinely differenced
 
-- Files: tests/orchestra/gwtd-fix-trigger.test.ts
-- Scope: tests/orchestra/gwtd-fix-trigger.test.ts, tests/orchestra/, src/orchestra/, .brain/archive/, .deckent/runtime/evaluations/
+- Files: src/core/skill-pool.ts, scripts/lint-skill-catalog-determinism.mjs, tests/scripts/skill-catalog-determinism.test.ts
+- Scope: src/core/skill-pool.ts, src/core/, scripts/lint-skill-catalog-determinism.mjs, scripts/, tests/scripts/skill-catalog-determinism.test.ts, tests/cli/skill-surface-readmodel.test.ts, tests/cli/
+- Model: claude-sonnet-5
+- Dependencies: none
+
+Measured (sol round-1 on sprint-523): the gate's two passes call the same
+snapshot on the same inputs — a nondeterminism probe, not the catalog-vs-sidecar
+difference §S8 demands; the current snapshot digest omits stats entirely.
+
+Required: `snapshotSkillCatalog` gains a typed option excluding machine-local
+sidecar/stats overlays (the pool already tracks statsSource per entry — the
+option suppresses the sidecar layer, no second resolver) and the with-sidecar
+digest incorporates the sidecar-affected fields it currently omits; the gate's
+pass 1 runs catalog-only, pass 2 full-state; baseline disposition contract
+unchanged; default snapshot behaviour for existing consumers unchanged (their
+regression suite is in scope to prove it). Tests: a sidecar overlay changing an
+entry yields stable catalog-only digest, differing full digest, declared
+disposition passes.
+
+**Test:** `npx vitest run tests/scripts/skill-catalog-determinism.test.ts tests/cli/skill-surface-readmodel.test.ts`
+
+**NO-GO:** a second resolver, changing default snapshot output for existing
+consumers, or a bare allowlist.
+
+## Task 12: Persona declared-digest — schema field, resolver carry, production reach
+
+- Files: src/core/agent-types.ts, src/core/agent-pool.ts, src/orchestra/result-collector.ts, tests/core/persona-integrity-detection.test.ts
+- Scope: src/core/agent-types.ts, src/core/agent-pool.ts, src/core/, src/orchestra/result-collector.ts, src/orchestra/, tests/core/persona-integrity-detection.test.ts, tests/core/agent-catalog-schema.test.ts, tests/core/agent-pool.test.ts, tests/core/
+- Model: claude-sonnet-5
+- Dependencies: none
+
+Measured (sol round-1 gap + code-truth corrections): the classifier supports
+digest-mismatch but no manifest field declares a digest AND the production
+call site (the integrity gate in result-collector) never passes digests, so the
+class is unreachable; agent-pool has NO existing sha256 primitive (crypto
+import is randomUUID only) — the digest primitive must be introduced, once.
+
+Required: additive `promptSha256` manifest field in the additive-warning set
+(agent-types); prompt resolution computes the actual digest with ONE new
+createHash-based helper in agent-pool and carries declared+actual to consumers;
+the result-collector gate passes both to the classifier so the verdict class is
+production-reachable; absence never fabricates. Existing manifests load
+unchanged; the existing agent-pool suite stays green UNMODIFIED (it is in scope for proof,
+not for editing). Tests extend the integrity suite with declared-digest
+fixtures on real tmpdir manifests.
+
+**Test:** `npx vitest run tests/core/persona-integrity-detection.test.ts tests/core/agent-catalog-schema.test.ts tests/core/agent-pool.test.ts`
+
+**NO-GO:** a required (non-additive) field, modifying the existing agent-pool suite, or
+more than one digest helper.
+
+## Task 13: Runs-inbox hygiene — typed supersession through the flow authority
+
+- Files: src/cli/commands/runs.ts, src/core/run-flow-contract.ts, src/core/run-flow-store.ts, src/orchestra/run-flow-reducer.ts, src/orchestra/run-flow-coordinator.ts, src/cli/helpers/messages.ts, tests/cli/runs-inbox-hygiene.test.ts
+- Scope: src/cli/commands/runs.ts, src/cli/commands/, src/core/run-flow-contract.ts, src/core/run-flow-store.ts, src/core/, src/orchestra/run-flow-reducer.ts, src/orchestra/run-flow-coordinator.ts, src/orchestra/, src/cli/helpers/, tests/cli/runs-inbox-hygiene.test.ts
 - Model: claude-opus-5
-- Dependencies: none
+- Dependencies: Task 4
 
-Measured (CORRECTED premise — sol cross-review + disk verification): sprint-522's
-002 lineage did NOT settle Brain-GWTD: the worker claimed GO_WITH_TECH_DEBT but the
-Brain rubric scored correctness 20 against threshold 60 and settled NO_GO (the
-evaluation artifact proves it) — so the FIX spawns were CORRECT authority behaviour,
-not a defect. The debt manager creates debt for Brain-GWTD and FIX for Brain-NO_GO.
-What is missing is a REGRESSION PIN of that contract.
+Measured (2026-08-12 + sol code-truth): 7+ stale "onay bekliyor" duplicates of
+superseded plan attempts pollute the inbox; the CLI is NOT the state authority
+(runs delegates to orchestra services) and the durable contract only knows
+cancelReason rejected|aborted with the reducer discarding reason detail — an
+honest typed supersession needs contract+reducer authority (sol's wrong-layer
+finding, now in write authority).
 
-Required: a hermetic test pinning the FIX-admission contract from the real modules:
-a lineage whose BRAIN evaluation settles GO_WITH_TECH_DEBT enters the debt path and
-never the FIX spawn set; a lineage whose Brain evaluation settles NO_GO enters FIX;
-a worker self-claim alone moves neither. Result notes record the corrected 522-002
-chronology (worker-GWTD → Brain-NO_GO → three FIX attempts, all evaluated) with the
-artifact paths as evidence, retiring the earlier mischaracterization.
+Required: the flow contract gains the additive `superseded` cancel reason with
+a `supersededBy` flow reference the reducer PERSISTS; the run-flow COORDINATOR computes the superseded set using the digest the flow
+record ALREADY persists (its plan/directives digest — no new digest authority):
+a pending-approval flow whose persisted digest source matches a newer pending
+flow is superseded, newest survives, started/terminal untouched; the CLI's
+`runs --retire-superseded` consumes the service with dry-run default and `--yes`
+apply, strings via getMessage (en+tr). Hermetic tests: fixture inbox retires
+exactly the superseded set with persisted supersededBy; newest survives;
+started flows untouched; legacy records still parse.
 
-**Test:** `npx vitest run tests/orchestra/gwtd-fix-trigger.test.ts`
+**Test:** `npx vitest run tests/cli/runs-inbox-hygiene.test.ts`
 
-**NO-GO:** changing FIX admission behaviour, or a pin that trusts worker
-self-assessment as the settling verdict.
+**NO-GO:** retiring a started/terminal flow, auto-applying without --yes,
+deleting flow records, or a CLI-side state mutation bypassing the reducer.
 
-## Task 12: ADR-G-019 successor-procedure amendment draft (row 4212)
-
-- Files: follow-up-works/adr-g019-procedure-amendment-2026-08-12.md
-- Scope: follow-up-works/adr-g019-procedure-amendment-2026-08-12.md, follow-up-works/, .brain/exports/
-- Model: gpt-5.6-sol
-- Dependencies: none
-
-Measured (row 4212, C1/C4 matrices): ADR-G-019 never uses the word "successor" — the
-route for an Immutable:yes ADR is forced by elimination but unwritten; and the owner
-recorded 2026-08-11 that the class declaration (immutable=yes) governs over a
-per-ADR header. Delete trigger (this document's header must carry it): consumed when
-the owner approves the amendment text into the ADR store, then deleted.
-
-Required: the amendment draft, quoting current ADR-G-019 normative text verbatim
-from the exported decisions projection and proposing the exact new procedure
-sections: who may draft an ADR-G successor (owner-only vs owner-delegated), what
-evidence closes the equivalence proof, predecessor archive semantics (the MADR-v3
-Supersedes field), the class-immutability rule as decided, and the amendment path
-for Immutable:no ADR-G entries (the C4 landing dependency). Proposes only — the ADR
-store is untouched; the draft ends with the owner decision checklist.
-
-**Test:** the document exists at the exact path with every section and the delete
-trigger in its header; `node scripts/lint-links.mjs` stays green.
-
-**NO-GO:** writing to the ADR store or memory db, paraphrasing instead of quoting
-G-019, or omitting the delete trigger.

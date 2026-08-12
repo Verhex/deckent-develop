@@ -112,7 +112,7 @@ import {
 } from './temp-skill-generator.js';
 
 // ─── Agent prompt single-source resolution (ADR-048, Sprint 182 F4) ──
-import { getAgentPrompt } from '../core/agent-pool.js';
+import { resolvePrompt } from '../core/agent-pool.js';
 
 // ─── tmux ─────────────────────────────────────────────────────────
 import { killWorker } from './tmux.js';
@@ -1030,7 +1030,7 @@ export function resolveAgentPromptWithIntegrity(
   if (!agentId || agentId === 'generic') {
     return { content: undefined, integrity: 'absent', refusal: null };
   }
-  const resolution = getAgentPrompt(agentId, projectRoot);
+  const resolution = resolvePrompt(agentId, projectRoot);
   if (resolution.source === 'none') {
     // D-D: absent persona degrades (personaless spawn) — never a gate matter.
     return { content: undefined, integrity: 'absent', refusal: null };
@@ -1041,6 +1041,8 @@ export function resolveAgentPromptWithIntegrity(
       : 'system-prompt',
     content: resolution.content,
     minBytes: options?.minBytes ?? DEFAULT_PERSONA_INTEGRITY_MIN_BYTES,
+    declaredDigest: resolution.declaredDigest,
+    actualDigest: resolution.actualDigest,
   });
   if (verdict === 'intact') {
     return { content: resolution.content, integrity: verdict, refusal: null };

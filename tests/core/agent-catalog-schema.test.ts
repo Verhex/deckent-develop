@@ -452,4 +452,11 @@ describe('agent manifest identity and provenance', () => {
     expect(additive.validity).toBe('warning');
     expect(additive.routable.value).toBe(true);
   });
+
+  it('classifies a malformed promptSha256 as additive-field-invalid, still loading (524-012)', () => {
+    const entry = classifyAgentManifest(observe(baseManifest({ promptSha256: 12345 })));
+    expect(codesOf(entry)).toContain('additive-field-invalid');
+    expect(entry.validity).toBe('warning');
+    expect(entry.routable.value).toBe(true);
+  });
 });

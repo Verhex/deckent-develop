@@ -37,11 +37,15 @@ import type {
   InvocationExecutionBackend,
   InvocationTransport,
 } from '../../core/invocation-receipt.js';
-import type { ProviderEvidenceSourceResolver } from '../../core/provider-evidence-producer.js';
+import type {
+  ProviderEvidenceSourceResolver,
+  ProviderEvidenceSourceScope,
+} from '../../core/provider-evidence-producer.js';
 import {
   proposeProviderLimitsAuthoring,
   writeProviderLimitsAuthority,
 } from '../../core/provider-limit-authoring.js';
+import { createLocalProviderEvidenceSourceResolver } from '../../providers/provider-authority-runtime-bootstrap.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
@@ -219,9 +223,11 @@ export function runKeyringRotate(
 
 export interface ProviderAuthorityLimitsDeps extends ProviderAuthorityKeyringDeps {
   /**
-   * Live host-registered provider evidence sources. Absent means this host has
-   * no account/quota authority to observe — a typed refusal, never a fallback
-   * to fabricated selector values.
+   * Overrides the live host-registered provider evidence sources. Absent means
+   * the host's own runtime registrations are read (see
+   * {@link createLocalProviderEvidenceSourceResolver}); a scope no source
+   * answers for is a typed refusal, never a fallback to fabricated selector
+   * values.
    */
   sourceResolver?: ProviderEvidenceSourceResolver;
   /** Hermetic seam: the global config path the authored block is written to. */
@@ -247,6 +253,22 @@ export interface ProviderAuthorityLimitsInitOptions {
 
 function isRatio(value: number): boolean {
   return Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+/**
+ * A resolver that throws on a scope it cannot even parse is answering "no
+ * source here" — the same typed refusal an unregistered scope gets, never a
+ * stack trace at the operator.
+ */
+function hasLiveSourceForScope(
+  resolver: ProviderEvidenceSourceResolver,
+  scope: ProviderEvidenceSourceScope,
+): boolean {
+  try {
+    return resolver.resolve(scope) !== null;
+  } catch {
+    return false;
+  }
 }
 
 function resolveProjectId(scope: ResolvedKeyringScope, deps: ProviderAuthorityLimitsDeps): string {
@@ -289,7 +311,28 @@ export async function runLimitsInit(
     process.exitCode = 1;
     return;
   }
-  if (!deps.sourceResolver) {
+  const scope = resolveScope(deps);
+  const transport = opts.transport as InvocationTransport;
+  const executionBackend = opts.executionBackend as InvocationExecutionBackend;
+  const authMode = opts.authMode as InvocationAuthMode;
+  const provider = opts.provider!;
+  // Production injects nothing here, so the host's OWN registered evidence
+  // sources — the same registrations the provider-authority runtime opens with —
+  // are the one authority to ask. The injected seam still wins when supplied.
+  const sourceResolver = deps.sourceResolver
+    ?? createLocalProviderEvidenceSourceResolver(scope.projectRoot, {
+      env: process.env,
+      nodePlatform: process.platform,
+    });
+  // A non-exact scope is the authoring module's typed `scope_not_exact` refusal;
+  // asking a source registry about `unknown` would answer a different question.
+  const exactScope = authMode !== 'unknown' && executionBackend !== 'unknown';
+  if (exactScope && !hasLiveSourceForScope(sourceResolver, {
+    provider,
+    authMode,
+    transport,
+    executionBackend,
+  })) {
     print(getMessage('provider_authority.limits.sources_unavailable', lang));
     process.exitCode = 1;
     return;
@@ -306,12 +349,7 @@ export async function runLimitsInit(
     return;
   }
 
-  const scope = resolveScope(deps);
   const keyring = ProviderAuthorityKeyring.open(openOptions(scope));
-  const transport = opts.transport as InvocationTransport;
-  const executionBackend = opts.executionBackend as InvocationExecutionBackend;
-  const authMode = opts.authMode as InvocationAuthMode;
-  const provider = opts.provider!;
   const executionProfileRef = opts.executionProfileRef!;
   const tenantId = opts.tenant?.trim() || 'local';
   const proposal = await proposeProviderLimitsAuthoring({
@@ -333,7 +371,7 @@ export async function runLimitsInit(
       allowed: [{ authMode, transport, executionBackend }],
     },
     values: { warnAtRatio, blockAtRatio },
-    sourceResolver: deps.sourceResolver,
+    sourceResolver,
     keyring,
   });
   if (proposal.state === 'hold') {

@@ -52,4 +52,14 @@ describe('skill catalog determinism gate (S8)', () => {
     expect(src).toContain('snapshotSkillCatalog');
     expect(src).not.toMatch(/createHash|crypto/);
   });
+
+  it('pass 1 runs catalog-only (sidecar overlay excluded), pass 2 runs full-state — a real diff, not two identical resolutions', () => {
+    const src = readFileSync('scripts/lint-skill-catalog-determinism.mjs', 'utf-8');
+    expect(src).toMatch(/snapshotSkillCatalog\(root,\s*\{\s*excludeSidecarStats:\s*true\s*\}\)/);
+    // Pass 2 must be the plain, option-free call (full state) — a second
+    // `excludeSidecarStats` call anywhere would collapse the gate back to
+    // comparing the catalog against itself.
+    const withoutOptionsCalls = src.match(/snapshotSkillCatalog\(root\)/g) ?? [];
+    expect(withoutOptionsCalls.length).toBe(1);
+  });
 });

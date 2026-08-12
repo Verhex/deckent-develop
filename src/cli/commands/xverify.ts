@@ -36,6 +36,7 @@ import type {
 import { TaskStatus, TaskEvaluation, ALL_PROVIDER_NAMES } from '../../core/types.js';
 import { loadConfig, readAuthMode, resolveDefaultModel } from '../../core/config.js';
 import { createGoNoGoCriterionItem } from '../../core/task-types.js';
+import { modelRegistry } from '../../core/model-registry.js';
 import { registerOpenRouterModelFromCache, readFreeModelCache } from '../../core/openrouter-models.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -56,6 +57,14 @@ import { DockerSpawnBackend } from '../../orchestra/spawn-backend-docker.js';
 export interface XverifyCommandOpts {
   /** Provider that authored the claimed work — the verifier must differ. */
   author?: string;
+  /**
+   * Exact model id that authored the claimed work (canonical provider API id).
+   * This is the authoritative input to the verifier capability-tier floor: the
+   * verifier may never judge from below it. Omitted, the resolved default is
+   * substituted and the receipt records that substitution as low-confidence —
+   * the floor is only as trustworthy as the author model it compares against.
+   */
+  authorModel?: string;
   /** Explicit verifier provider (optional; must differ from --author). */
   verifier?: string;
   /** Include `git diff` output as evidence context for the verifier. */
@@ -240,6 +249,14 @@ function resolveTarget(root: string, spec: string): ResolvedTarget {
 export interface XverifyResult {
   id: string;
   author: ProviderName;
+  /** Author model the capability-tier floor was enforced against. */
+  authorModel: string;
+  /**
+   * `'authoritative'` when the operator stated `--author-model`;
+   * `'resolved-default'` when the host substituted the resolved default — the
+   * floor still applies, but its input was assumed rather than declared.
+   */
+  authorModelConfidence: 'authoritative' | 'resolved-default';
   verifier: string | null;
   /** Exact canonical API id evidenced by the dispatched verifier advisory. */
   verifierModel: string | null;
@@ -273,6 +290,40 @@ export interface XverifyResult {
    * logical claim, so this is guidance, not a refusal.
    */
   remedy: string | null;
+}
+
+// ─── Typed tier-floor refusal → operator language ───────────────────────────
+//
+// `cross-verify-runner` refuses a below-tier verifier with a typed CODE, never
+// prose: orchestra must not import this surface's i18n catalog (ADR-D-004 C2).
+// The codes are re-stated here as literals rather than value-imported so the
+// heavy runner module keeps its deferred-import seam; the drift risk that
+// creates is pinned by `tests/cli/xverify-tier-floor.test.ts`, which asserts
+// these literals equal the runner's exported constants.
+
+const VERIFIER_TIER_BELOW_AUTHOR_CODE = 'xverify_verifier_tier_below_author';
+const VERIFIER_TIER_FLOOR_UNRESOLVABLE_CODE = 'xverify_verifier_tier_floor_unresolvable';
+const TIER_BELOW_AUTHOR_RE =
+  /^xverify_verifier_tier_below_author:verifier=(.+?)\(([a-z_]+)\) < author=(.+?)\(([a-z_]+)\)$/u;
+
+/** Renders a typed tier-floor refusal; `null` when this outcome is not one. */
+function localizeTierFloorRefusal(skippedReason: string | null, lang: string): string | null {
+  if (!skippedReason) return null;
+  if (skippedReason.startsWith(VERIFIER_TIER_FLOOR_UNRESOLVABLE_CODE)) {
+    return getMessage('xverify.err.verifier_tier_floor_unresolvable', lang, {
+      detail: skippedReason.slice(VERIFIER_TIER_FLOOR_UNRESOLVABLE_CODE.length + 1),
+    });
+  }
+  if (!skippedReason.startsWith(VERIFIER_TIER_BELOW_AUTHOR_CODE)) return null;
+  const parsed = TIER_BELOW_AUTHOR_RE.exec(skippedReason);
+  // An unparsed code still names the refusal honestly — never swallow it.
+  if (!parsed) return skippedReason;
+  return getMessage('xverify.err.verifier_tier_below_author', lang, {
+    verifierModel: parsed[1]!,
+    verifierTier: parsed[2]!,
+    authorModel: parsed[3]!,
+    authorTier: parsed[4]!,
+  });
 }
 
 /** Invocation error carrying the ALREADY-LOCALIZED message (CLI prints it,
@@ -313,6 +364,32 @@ export async function runXverifyForResult(
       // Self-verification defeats the entire point — refuse, never silently proceed.
       throw new XverifyInvocationError(getMessage('xverify.err.self_verify', lang, { provider: author }));
     }
+  }
+
+  // ── Author model: the authoritative input to the verifier tier floor ──
+  // Registry-validated here, before any spawn, on the same terms as the
+  // provider flags above. The claim envelope below is NOT changed by this
+  // flag — the floor travels to the runner as its own typed input.
+  const resolvedDefaultModel = resolveDefaultModel(config);
+  const explicitAuthorModel = opts.authorModel?.trim();
+  let authorModel: string = resolvedDefaultModel;
+  let authorModelConfidence: 'authoritative' | 'resolved-default' = 'resolved-default';
+  if (explicitAuthorModel) {
+    if (!modelRegistry.has(explicitAuthorModel)) {
+      throw new XverifyInvocationError(getMessage('xverify.err.unknown_author_model', lang, {
+        model: explicitAuthorModel,
+      }));
+    }
+    const authorModelDefinition = modelRegistry.getOrThrow(explicitAuthorModel);
+    if ((authorModelDefinition.provider as string) !== (author as string)) {
+      throw new XverifyInvocationError(getMessage('xverify.err.author_model_provider_mismatch', lang, {
+        model: authorModelDefinition.id,
+        modelProvider: authorModelDefinition.provider,
+        author,
+      }));
+    }
+    authorModel = authorModelDefinition.id;
+    authorModelConfidence = 'authoritative';
   }
 
   // ── Resolve bounded targets (fail loudly BEFORE any spawn, same contract
@@ -375,7 +452,7 @@ export async function runXverifyForResult(
     // apply its explicit host-truncation contract.
     title: `Session claim ${id}`,
     description: claim,
-    model: resolveDefaultModel(config),
+    model: resolvedDefaultModel,
     // Carrying the AUTHOR here is what enforces verifier≠author:
     // selectVerifierProvider never picks the task's own provider.
     provider: author,
@@ -494,6 +571,10 @@ export async function runXverifyForResult(
     timeoutMs,
     operationClass: 'adjudicate-claim',
     mandatoryInvocationFactory,
+    // The claim envelope carries a host-substituted default model; the floor is
+    // enforced against THIS value instead, so `--author-model` reaches the
+    // resolver without the immutable claim being rewritten.
+    authorModel,
     ...(attendedVerifierCandidates
       ? { availableProviders: attendedVerifierCandidates }
       : {}),
@@ -536,6 +617,11 @@ export async function runXverifyForResult(
   const remedy = (!hasEvidence || outcome.skippedReason === 'verifier-eligibility-evidence-missing')
     ? getMessage('xverify.remedy.no_evidence', lang)
     : null;
+  // A tier-floor refusal is a host decision, not a verifier rationale — but it
+  // is the ONLY thing the operator needs to read, so it takes the rationale slot
+  // whenever no verifier verdict exists to occupy it.
+  const reason = outcome.advisory?.reason
+    ?? localizeTierFloorRefusal(outcome.skippedReason ?? null, lang);
   const executionLines = execution
     ? [
         `- ${getMessage('xverify.report.execution', lang, {
@@ -558,6 +644,15 @@ export async function runXverifyForResult(
     `# xverify host adjudication — ${id}`,
     '',
     `- **Claim author:** ${author}`,
+    `- ${getMessage('xverify.report.author_model', lang, {
+      model: authorModel,
+      confidence: getMessage(
+        authorModelConfidence === 'authoritative'
+          ? 'xverify.report.author_model_authoritative'
+          : 'xverify.report.author_model_low_confidence',
+        lang,
+      ),
+    })}`,
     `- **Verifier:** ${verifier ?? getMessage('xverify.report.none_dispatched', lang)}`,
     `- ${getMessage('xverify.report.verifier_model', lang, {
       model: verifierModel ?? getMessage('xverify.report.none_dispatched', lang),
@@ -579,7 +674,7 @@ export async function runXverifyForResult(
     '',
     '## Verifier rationale',
     '',
-    outcome.advisory?.reason?.trim() || '(none — see outcome above)',
+    reason?.trim() || '(none — see outcome above)',
     '',
     `> Provider output is evidence only. The host-authored disposition is authoritative. Evidence task artifacts: .tasks/task-${id}*`,
     '',
@@ -589,6 +684,8 @@ export async function runXverifyForResult(
   return {
     id,
     author,
+    authorModel,
+    authorModelConfidence,
     verifier,
     verifierModel,
     verdict,
@@ -596,7 +693,7 @@ export async function runXverifyForResult(
     disposition: outcome.disposition,
     blocked: outcome.blocked,
     skippedReason: outcome.skippedReason ?? null,
-    reason: outcome.advisory?.reason ?? null,
+    reason,
     execution,
     assurance: outcome.advisory?.assurance ?? null,
     adjudicationReceiptRef: outcome.advisory?.adjudicationReceiptRef ?? null,
@@ -639,6 +736,12 @@ export async function runXverifyCommand(
       verifier: result.verifier ?? '-',
       report: result.report,
     }));
+    // No verdict + a host reason (e.g. the capability-tier floor) means the run
+    // was refused for a nameable cause — printing only "no verdict" would leave
+    // the operator guessing at a decision the host already made explicit.
+    if (!result.verdict && result.reason) {
+      print(result.reason);
+    }
     if (result.remedy) {
       print(result.remedy);
     }
@@ -656,6 +759,7 @@ export function registerXverifyCommand(program: Command, deps: XverifyDeps = {})
     .command('xverify <claim>')
     .description(getMessage('xverify.cmd_desc', getLanguage(undefined)))
     .option('--author <provider>', getMessage('xverify.opt_author', getLanguage(undefined), { providers: ALL_PROVIDER_NAMES.join('|') }))
+    .option('--author-model <apiId>', getMessage('xverify.opt_author_model', getLanguage(undefined)))
     .option('--verifier <provider>', getMessage('xverify.opt_verifier', getLanguage(undefined)))
     .option('--verifier-model <id>', getMessage('xverify.opt_verifier_model', getLanguage(undefined)))
     .option('--diff', getMessage('xverify.opt_diff', getLanguage(undefined)))

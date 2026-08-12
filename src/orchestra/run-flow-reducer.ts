@@ -238,6 +238,25 @@ export function reduceRunFlow(context: RunFlowContext, event: RunFlowEvent): Run
     case 'FLOW_ABORTED': {
       // Reachable from any non-terminal state — mirrors golden-flow's
       // signal-checkpoint-before-every-stage convention (see file header).
+      //
+      // 524-013 typed supersession: an abort that names a NEWER flow is not the
+      // same fact as a plain operator abort, and the reference is worthless if
+      // the reducer drops it — so it is PERSISTED on the context alongside the
+      // distinct `'superseded'` reason. An event without `supersededBy` (every
+      // legacy record, every operator/system abort) folds byte-identically to
+      // the historical `'aborted'` shape.
+      if (event.supersededBy !== undefined) {
+        if (event.supersededBy === event.flowId) {
+          fail(context, event, 'supersededBy names the flow itself — a flow cannot supersede itself');
+        }
+        return {
+          ...context,
+          state: 'CANCELLED',
+          cancelReason: 'superseded',
+          supersededBy: event.supersededBy,
+          updatedAt: event.timestamp,
+        };
+      }
       return { ...context, state: 'CANCELLED', cancelReason: 'aborted', updatedAt: event.timestamp };
     }
 

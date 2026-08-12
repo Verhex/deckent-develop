@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0-beta.1-sprint524] - 2026-08-12
+
+### Added
+
+- Codex evidence-source registrations + bootstrap consumption
+- Authoring flow sourceResolver — the bootstrap exposes, the CLI consumes
+- The live unlock proof — authored policy, first healthy xverify
+- XVerify tier floor — an authoritative author-model input, enforced in the resolver
+- Born 3323 — producer fencing compares the pre-enrichment core
+- Born 3324 — provider-limit death is its own typed class, lineage-visible
+- Init-rot — the closed fs mocks meet initializeWorkspaceArtifacts
+- Determinism gate S8 residual — sidecar state genuinely differenced
+- Persona declared-digest — schema field, resolver carry, production reach
+- Runs-inbox hygiene — typed supersession through the flow authority
+
+### Changed
+
+- KN3 projection-parity guard — landing-proposal artifacts are not task ids (completed with tech debt)
+
+### Fixed
+
+- The 523-001-fix unmeasurable-diff RCA — evidence over theory
+- Fix-budget contract pin — admitted rounds are the documented truth
+
+
+_Tasks: 13 total, 13 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint522] - 2026-08-12
 
 ### Added

@@ -70,6 +70,47 @@ describe('skill catalog S5 — the canonical snapshot and its surfaces', () => {
     expect(snap.invalid.some((r) => r.id === 'broken-skill' || r.path.includes('broken-skill'))).toBe(true);
   });
 
+  it('S8: excludeSidecarStats keeps the catalog-only digest stable across a sidecar mutation, while the full-state digest moves and diverges from it', () => {
+    installSkill('stats-skill');
+
+    const catalogOnlyBefore = snapshotSkillCatalog(root, { excludeSidecarStats: true }).digest;
+    const fullBefore = snapshotSkillCatalog(root).digest;
+    // No sidecar ledger exists yet — both passes see the same manifest-only state.
+    expect(fullBefore).toBe(catalogOnlyBefore);
+
+    const statsDir = join(root, '.deckent', 'stats');
+    mkdirSync(statsDir, { recursive: true });
+    writeFileSync(
+      join(statsDir, 'catalog-stats.json'),
+      JSON.stringify({
+        agents: {},
+        skills: {
+          'stats-skill': {
+            totalUses: 5,
+            successCount: 5,
+            successRate: 1,
+            avgCoverage: 90,
+            lastUsedInSprint: 'sprint-1',
+          },
+        },
+      }),
+      'utf-8',
+    );
+
+    const catalogOnlyAfter = snapshotSkillCatalog(root, { excludeSidecarStats: true }).digest;
+    const fullAfter = snapshotSkillCatalog(root).digest;
+
+    expect(catalogOnlyAfter).toBe(catalogOnlyBefore);
+    expect(fullAfter).not.toBe(fullBefore);
+    expect(fullAfter).not.toBe(catalogOnlyAfter);
+
+    const fullEntry = snapshotSkillCatalog(root).entries.find((e) => e.id === 'stats-skill')!;
+    expect(fullEntry.statsSource).toBe('sidecar');
+    const catalogOnlyEntry = snapshotSkillCatalog(root, { excludeSidecarStats: true })
+      .entries.find((e) => e.id === 'stats-skill')!;
+    expect(catalogOnlyEntry.statsSource).not.toBe('sidecar');
+  });
+
   it('both read surfaces resolve through the snapshot (no raw scan symbols survive)', async () => {
     const mcpSrc = await import('node:fs').then((fs) =>
       fs.readFileSync('src/mcp/tools/skill-list.ts', 'utf-8'));

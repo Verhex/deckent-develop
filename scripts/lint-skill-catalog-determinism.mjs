@@ -51,12 +51,12 @@ export function compareDeterminism({ catalogDigest, withSidecarDigest, baseline 
 
 export async function runGate(root, baselinePath) {
   const { snapshotSkillCatalog } = await loadSnapshot();
-  // Pass 1 — the catalog as the resolver sees the real tree now.
-  const catalog = snapshotSkillCatalog(root);
-  // Pass 2 — same resolver, same tree: machine-local sidecar/state inputs are
-  // whatever exists on THIS machine. On a clean checkout both passes see the
-  // same inputs by construction; divergence between two immediate resolutions
-  // means non-deterministic resolution (ordering, clock, env leakage).
+  // Pass 1 — catalog-only: manifest layers, machine-local sidecar/stats
+  // overlay suppressed (S8: this is the canonical side the baseline
+  // disposition is written against).
+  const catalog = snapshotSkillCatalog(root, { excludeSidecarStats: true });
+  // Pass 2 — full state: same resolver, same tree, sidecar/stats overlay
+  // included exactly as it exists on THIS machine right now.
   const withSidecar = snapshotSkillCatalog(root);
   let baseline = null;
   if (baselinePath && existsSync(baselinePath)) {

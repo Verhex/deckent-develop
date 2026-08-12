@@ -15,7 +15,14 @@ import {
   assertCrossVerifyEnforcedAttemptContract,
   type CrossVerifyEnforcedAttemptContract,
 } from '../core/cross-verify-execution-contract.js';
-import { getProviderForModel, TaskStatus, type ProviderName, type Task, type TaskResult } from '../core/task-types.js';
+import {
+  getProviderForModel,
+  TaskStatus,
+  type KnownWorkAttributionReasonCode,
+  type ProviderName,
+  type Task,
+  type TaskResult,
+} from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand, type ProviderCommandSpec } from '../core/provider-command-spec.js';
 import { createClaudeAdapter } from '../providers/claude.js';
@@ -2065,6 +2072,12 @@ export interface ReconcileDockerResultWorkAttributionInput {
   readonly baselinePath: string;
   readonly attemptId: string | undefined;
   readonly scopeFilesWrite: readonly string[];
+  /**
+   * Host-owned durable limit-death evidence for THIS attempt (born 3324). Only
+   * a stop record the host itself persisted counts; nothing here is ever read
+   * from the worker's own result fields.
+   */
+  readonly providerLimitDeath?: RuntimeBudgetStopEvidence | null;
 }
 
 export interface DockerResultWorkAttributionOutcome {
@@ -2072,7 +2085,24 @@ export interface DockerResultWorkAttributionOutcome {
   readonly filesChanged: readonly string[];
   readonly linesAdded: number;
   readonly linesRemoved: number;
-  readonly reasonCode?: string;
+  readonly reasonCode?: KnownWorkAttributionReasonCode;
+}
+
+/**
+ * Exactness for the limit-death class: the stop record must belong to the same
+ * attempt the baseline was captured for, and must be a terminal `exceeded`
+ * decision. A foreign or non-terminal marker is not evidence of this attempt's
+ * death, so it never mints the class.
+ */
+function isExactProviderLimitDeath(
+  evidence: RuntimeBudgetStopEvidence | null | undefined,
+  attemptId: string | undefined,
+): boolean {
+  return !!evidence
+    && !!attemptId
+    && evidence.attemptId === attemptId
+    && evidence.state === 'exceeded'
+    && evidence.decision.state === 'exceeded';
 }
 
 /** Default Node child_process maxBuffer (1 MiB) — matches the spawnSync default these calls replace. */
@@ -2248,7 +2278,7 @@ export async function reconcileDockerResultWorkAttribution(
   const baselineSha256 = existsSync(input.baselinePath)
     ? createHash('sha256').update(readFileSync(input.baselinePath)).digest('hex')
     : undefined;
-  const hold = (reasonCode: string): DockerResultWorkAttributionOutcome => {
+  const hold = (reasonCode: KnownWorkAttributionReasonCode): DockerResultWorkAttributionOutcome => {
     const outcome = { state: 'HOLD' as const, filesChanged: [], linesAdded: 0, linesRemoved: 0, reasonCode };
     writeAttributionResult(input, result, outcome, scopeDigest, claimedOutsideScope, [], baselineSha256);
     return outcome;
@@ -2295,6 +2325,18 @@ export async function reconcileDockerResultWorkAttribution(
   } catch (error) {
     debugLog('docker-backend:work-attribution', error);
     return hold('ATTRIBUTION_DIFF_UNMEASURABLE');
+  }
+  // born 3324: the diff IS measured past this point, so a limit-killed attempt
+  // that wrote nothing is not an attribution gap — it is a known death class.
+  // An out-of-scope claim still outranks it: a boundary violation must never be
+  // masked by the way the worker happened to die. A live provider with a
+  // measured empty change set is left alone and stays the honest no-work NO_GO.
+  if (
+    changes.length === 0
+    && claimedOutsideScope.length === 0
+    && isExactProviderLimitDeath(input.providerLimitDeath, input.attemptId)
+  ) {
+    return hold('PROVIDER_LIMIT_DEATH_ZERO_WRITE');
   }
   const outcome: DockerResultWorkAttributionOutcome = {
     state: claimedOutsideScope.length > 0 ? 'HOLD' : 'VERIFIED',
@@ -7098,6 +7140,7 @@ export class DockerSpawnBackend implements SpawnBackend {
             : join(tasksDir, `task-${taskId}.scope-baseline`),
           attemptId: settlementRef?.attemptId,
           scopeFilesWrite: this.readTaskFilesWrite(projectDir, taskId),
+          providerLimitDeath: runtimeBudgetExhaustion,
         });
       } catch (e) {
         debugLog('docker-backend:work-attribution-held', e);

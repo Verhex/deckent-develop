@@ -838,6 +838,46 @@ export type CrossVerifyEvidence =
       authorityEvidenceRef?: string;
     };
 
+/**
+ * Host-minted reason for a claim-time work-attribution outcome (born 3324).
+ *
+ * Ordered by the layer that mints them: authority/baseline gaps first, then the
+ * measurement gap, then the two classes that are MEASURED — an out-of-scope
+ * claim, and a provider-limit death that produced zero writes. The last one
+ * exists because folding it into `ATTRIBUTION_DIFF_UNMEASURABLE` told the
+ * lineage "this attempt could not be measured" when the measured truth was
+ * "the provider died and nothing was written".
+ */
+export const WORK_ATTRIBUTION_REASON_CODES = [
+  'ATTRIBUTION_AUTHORITY_UNAVAILABLE',
+  'ATTRIBUTION_AUTHORITY_MISMATCH',
+  'ATTRIBUTION_BASELINE_INVALID',
+  'ATTRIBUTION_DIFF_UNMEASURABLE',
+  'CLAIM_OUTSIDE_WRITE_SCOPE',
+  'PROVIDER_LIMIT_DEATH_ZERO_WRITE',
+] as const;
+
+/** A reason code this host revision knows how to route. */
+export type KnownWorkAttributionReasonCode = typeof WORK_ATTRIBUTION_REASON_CODES[number];
+
+/**
+ * Additive by contract: a durable result written by an older or newer host may
+ * carry a code this revision does not know, and it must still parse and read
+ * back as legacy rather than invalidate the result. Known codes keep literal
+ * narrowing at every call site that compares them.
+ */
+export type WorkAttributionReasonCode = KnownWorkAttributionReasonCode | (string & {});
+
+/** The measured provider-limit death class — a clean-restart lineage signal. */
+export const PROVIDER_LIMIT_DEATH_ZERO_WRITE = 'PROVIDER_LIMIT_DEATH_ZERO_WRITE';
+
+export function isKnownWorkAttributionReasonCode(
+  value: unknown,
+): value is KnownWorkAttributionReasonCode {
+  return typeof value === 'string'
+    && (WORK_ATTRIBUTION_REASON_CODES as readonly string[]).includes(value);
+}
+
 export interface TaskResult {
   /** born-610: set by cascadeSkipDeadBlocked — this task was NEVER dispatched;
    *  its NO_GO is a synthetic skip (dead upstream), not a worker failure.
@@ -856,7 +896,7 @@ export interface TaskResult {
     baselineRef: string;
     baselineSha256?: string;
     scopeDigest: string;
-    reasonCode?: string;
+    reasonCode?: WorkAttributionReasonCode;
     claimedOutsideScope?: string[];
   };
   /** Exact zero-work authority when dispatch was rejected before worker spawn. */

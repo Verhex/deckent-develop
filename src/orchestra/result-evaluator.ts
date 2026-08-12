@@ -12,7 +12,10 @@ import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, ARCHIVE_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { coerceNotesToString } from '../core/task-result-schema.js';
-import { createProductionWiringPlanEvidence } from '../core/task-types.js';
+import {
+  createProductionWiringPlanEvidence,
+  PROVIDER_LIMIT_DEATH_ZERO_WRITE,
+} from '../core/task-types.js';
 import type { ProductionWiringResultSettlementDecision } from '../core/task-result-settlement.js';
 import { resolveProductionWiringContract } from '../core/production-wiring-contract.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
@@ -2302,7 +2305,13 @@ export type HonestyViolation =
   // ls-files --others) shows real partial work; honest-gate carries the
   // signal so result-evaluator can route it through the same downgrade path.
   | 'MISSING_RESULT_BUT_DISK_HAS_WORK'
-  | 'WORK_ATTRIBUTION_HOLD';
+  | 'WORK_ATTRIBUTION_HOLD'
+  // born 3324 — the host measured this attempt exactly: a provider-limit death
+  // with zero writes. Still a NO_GO (nothing was produced), but it is a
+  // clean-restart lineage signal, not the "we could not measure you" hold that
+  // WORK_ATTRIBUTION_HOLD means. Kept distinct so fix routing can tell an
+  // environment death apart from a broken task definition.
+  | 'PROVIDER_LIMIT_DEATH_ZERO_WRITE';
 
 /**
  * Result of running enforceHonestResultGate.
@@ -2491,6 +2500,21 @@ export function enforceHonestResultGate(
   }
 
   if (result.workAttribution?.state === 'HOLD') {
+    // born 3324: the host-minted limit-death class is measured evidence, so it
+    // carries its own violation code instead of being folded into the generic
+    // "attribution unavailable" downgrade. The verdict is unchanged — a worker
+    // that wrote nothing is still NO_GO — only the class travels, so lineage
+    // routing can restart cleanly rather than re-plan a sound task.
+    if (result.workAttribution.reasonCode === PROVIDER_LIMIT_DEATH_ZERO_WRITE) {
+      const detail = 'host-observed provider-limit death with a measured zero-write diff '
+        + '— clean restart of this lineage, not an attribution gap';
+      debugLog('enforceHonestResultGate', `Task ${task.id}: PROVIDER_LIMIT_DEATH_ZERO_WRITE — ${detail}`);
+      return {
+        result: downgradeToNoGo(result, 'PROVIDER_LIMIT_DEATH_ZERO_WRITE', detail),
+        honest: false,
+        violation: 'PROVIDER_LIMIT_DEATH_ZERO_WRITE',
+      };
+    }
     const detail = `claim-time work attribution unavailable (${result.workAttribution.reasonCode ?? 'unknown'})`;
     return {
       result: downgradeToNoGo(result, 'WORK_ATTRIBUTION_HOLD', detail),

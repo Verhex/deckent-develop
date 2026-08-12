@@ -12629,3 +12629,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 523-012: ADR-G-019 successor-procedure amendment draft (row 4212) (DONE)
 
 ---
+## Sprint 524 — sprint-524
+
+**Status:** COMPLETE
+**Date:** 2026-08-12
+**Duration:** 2333s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 13 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 2332653ms |
+
+### Tasks
+
+- 524-001: Codex evidence-source registrations + bootstrap consumption (DONE)
+- 524-002: Authoring flow sourceResolver — the bootstrap exposes, the CLI consumes (DONE)
+- 524-003: The live unlock proof — authored policy, first healthy xverify (DONE)
+- 524-004: XVerify tier floor — an authoritative author-model input, enforced in the resolver (DONE)
+- 524-005: Born 3323 — producer fencing compares the pre-enrichment core (DONE)
+- 524-006: Born 3324 — provider-limit death is its own typed class, lineage-visible (DONE)
+- 524-007: The 523-001-fix unmeasurable-diff RCA — evidence over theory (DONE)
+- 524-008: KN3 projection-parity guard — landing-proposal artifacts are not task ids (DONE)
+- 524-009: Fix-budget contract pin — admitted rounds are the documented truth (DONE)
+- 524-010: Init-rot — the closed fs mocks meet initializeWorkspaceArtifacts (DONE)
+- 524-011: Determinism gate S8 residual — sidecar state genuinely differenced (DONE)
+- 524-012: Persona declared-digest — schema field, resolver carry, production reach (DONE)
+- 524-013: Runs-inbox hygiene — typed supersession through the flow authority (DONE)
+
+---

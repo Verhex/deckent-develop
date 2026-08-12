@@ -14,6 +14,14 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
   rmSync: vi.fn(),
+  realpathSync: Object.assign(vi.fn((path: string) => path), {
+    native: vi.fn((path: string) => path),
+  }),
+  lstatSync: vi.fn((path: string) => ({
+    isSymbolicLink: () => false,
+    isDirectory: () => !/\.(?:md|json)$/i.test(path),
+    isFile: () => /\.(?:md|json)$/i.test(path),
+  })),
 }));
 
 // fork() must be stubbed to prevent registerStartTool from spawning real

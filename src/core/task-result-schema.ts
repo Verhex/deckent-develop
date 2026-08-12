@@ -12,6 +12,7 @@
 // optional/nullable/default so a freshly-assembled result still validates.
 
 import { z } from 'zod';
+import { WORK_ATTRIBUTION_REASON_CODES } from './task-types.js';
 
 /** Contract version stamped on every `TaskResultV1`. Bump on a breaking shape change. */
 export const TASK_RESULT_SCHEMA_VERSION = '1.0';
@@ -127,13 +128,24 @@ const boundaryViolationSchema = z.object({
   reason: z.string(),
 });
 
+/**
+ * born 3324 (524-006): the work-attribution reason code is a TYPED union of the
+ * codes this host mints, kept ADDITIVE — a non-empty code minted by a different
+ * host revision still parses as a string (legacy carry), an empty one does not.
+ */
+export const workAttributionReasonCodeSchema = z
+  .union([
+    z.enum(WORK_ATTRIBUTION_REASON_CODES),
+    z.string().min(1),
+  ]);
+
 const workAttributionSchema = z.object({
   state: z.enum(['VERIFIED', 'HOLD']),
   attemptId: z.string().min(1),
   baselineRef: z.string().min(1),
   baselineSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   scopeDigest: z.string().regex(/^[a-f0-9]{64}$/),
-  reasonCode: z.string().optional(),
+  reasonCode: workAttributionReasonCodeSchema.optional(),
   claimedOutsideScope: z.array(z.string()).optional(),
 });
 

@@ -777,8 +777,12 @@ const MESSAGES: MessageMap = {
     tr: 'Açık hakem sağlayıcısı (opsiyonel; --author ile aynı olamaz; varsayılan: cross_verify.verifier_priority)',
   },
   'xverify.opt_verifier_model': {
-    en: 'Explicit verifier model id (canonical provider API id, e.g. gpt-5.6-sol) — bypasses tier-equivalence resolution',
-    tr: 'Açık hakem model kimliği (kanonik sağlayıcı API id, örn. gpt-5.6-sol) — tier-eşdeğerlik çözümlemesini atlar',
+    en: 'Explicit verifier model id (canonical provider API id, e.g. gpt-5.6-sol) — bypasses tier-equivalence resolution, never the author tier floor',
+    tr: 'Açık hakem model kimliği (kanonik sağlayıcı API id, örn. gpt-5.6-sol) — tier-eşdeğerlik çözümlemesini atlar, yazar tier tabanını asla atlamaz',
+  },
+  'xverify.opt_author_model': {
+    en: 'Model id that authored the claimed work (canonical provider API id, e.g. claude-opus-5) — the verifier must run at an equal or higher capability tier. Omitted: the resolved default is used and recorded as low-confidence.',
+    tr: 'İddia edilen işi üreten model kimliği (kanonik sağlayıcı API id, örn. claude-opus-5) — hakem eşit veya daha yüksek yetenek tier’ında çalışmak zorundadır. Verilmezse: çözümlenen varsayılan kullanılır ve düşük-güven olarak kaydedilir.',
   },
   'xverify.opt_diff': {
     en: 'Attach `git diff HEAD` as evidence context for the verifier',
@@ -811,6 +815,22 @@ const MESSAGES: MessageMap = {
   'xverify.err.self_verify': {
     en: 'Verifier must differ from --author ("{provider}") — self-verification defeats the purpose of an independent second opinion.',
     tr: 'Hakem --author ("{provider}") ile aynı olamaz — öz-doğrulama bağımsız ikinci görüşün amacını boşa çıkarır.',
+  },
+  'xverify.err.unknown_author_model': {
+    en: 'Unknown --author-model "{model}" — it must be a canonical model id present in the model registry. Omit the flag to fall back to the resolved default (recorded as low-confidence).',
+    tr: 'Bilinmeyen --author-model "{model}" — model kayıt defterinde bulunan kanonik bir model kimliği olmalıdır. Çözümlenen varsayılana dönmek için bayrağı hiç vermeyin (düşük-güven olarak kaydedilir).',
+  },
+  'xverify.err.author_model_provider_mismatch': {
+    en: '--author-model "{model}" belongs to provider "{modelProvider}", not the claim author "{author}" — the author model must be one the author provider can actually run.',
+    tr: '--author-model "{model}" "{modelProvider}" sağlayıcısına aittir, iddia yazarı "{author}" değil — yazar modeli, yazar sağlayıcısının gerçekten çalıştırabildiği bir model olmalıdır.',
+  },
+  'xverify.err.verifier_tier_below_author': {
+    en: 'Verification refused: verifier model {verifierModel} (tier {verifierTier}) sits BELOW the author model {authorModel} (tier {authorTier}). A second opinion is only worth its cost from an equal or higher capability tier. Pass --verifier-model with an equal-or-higher tier model, or state the true author model with --author-model.',
+    tr: 'Doğrulama reddedildi: hakem modeli {verifierModel} (tier {verifierTier}), yazar modeli {authorModel} (tier {authorTier}) tier’ının ALTINDA. İkinci görüş ancak eşit veya daha yüksek yetenek tier’ından geldiğinde maliyetini hak eder. --verifier-model ile eşit-veya-üstü tier bir model verin ya da gerçek yazar modelini --author-model ile bildirin.',
+  },
+  'xverify.err.verifier_tier_floor_unresolvable': {
+    en: 'Verification refused: the author/verifier capability tiers could not be resolved from the model registry ({detail}), so the tier floor cannot be proven. Register the exact model ids or pass --author-model with a canonical registry id.',
+    tr: 'Doğrulama reddedildi: yazar/hakem yetenek tier’ları model kayıt defterinden çözümlenemedi ({detail}), bu yüzden tier tabanı kanıtlanamaz. Tam model kimliklerini kaydedin ya da --author-model ile kanonik bir kayıt kimliği verin.',
   },
   'xverify.err.target_invalid_spec': {
     en: 'Malformed --target entry "{spec}" — expected path:START-END (1-based inclusive line range) or path:symbolName.',
@@ -851,6 +871,20 @@ const MESSAGES: MessageMap = {
   'xverify.report.verifier_model': {
     en: '**Verifier model:** {model}',
     tr: '**Hakem modeli:** {model}',
+  },
+  'xverify.report.author_model': {
+    en: '**Author model:** {model} ({confidence})',
+    tr: '**Yazar modeli:** {model} ({confidence})',
+  },
+  'xverify.report.author_model_authoritative': {
+    en: 'authoritative — stated via --author-model',
+    tr: 'yetkili — --author-model ile bildirildi',
+  },
+  // The tier floor is only as trustworthy as the author-model input it compares
+  // against. A substituted default is recorded as exactly that, never as fact.
+  'xverify.report.author_model_low_confidence': {
+    en: 'LOW CONFIDENCE — resolved default substituted; --author-model was not stated',
+    tr: 'DÜŞÜK GÜVEN — çözümlenen varsayılan konuldu; --author-model bildirilmedi',
   },
   'xverify.report.none_dispatched': {
     en: '(none dispatched)',
@@ -4287,6 +4321,31 @@ const MESSAGES: MessageMap = {
   'runs.close_stale.entry_unverifiable': {
     en: 'unverifiable (no pid recorded) → cancelled',
     tr: 'doğrulanamaz (pid kaydı yok) → iptal',
+  },
+  // 524-013 `deckent runs --retire-superseded` — pending-approval duplicate hygiene.
+  'runs.retire_superseded.none': {
+    en: 'No superseded runs — every plan awaiting approval is the newest for its source.',
+    tr: 'Eskimiş koşu yok — onay bekleyen her plan, kaynağının en yenisi.',
+  },
+  'runs.retire_superseded.dry_header': {
+    en: 'Superseded runs awaiting approval that would be retired ({count}):',
+    tr: 'Emekliye ayrılacak, onay bekleyen eskimiş koşular ({count}):',
+  },
+  'runs.retire_superseded.apply_header': {
+    en: 'Retired {count} superseded run(s):',
+    tr: '{count} eskimiş koşu emekliye ayrıldı:',
+  },
+  'runs.retire_superseded.entry': {
+    en: 'superseded by {by} → cancelled',
+    tr: '{by} tarafından geçildi → iptal',
+  },
+  'runs.retire_superseded.failed': {
+    en: 'not retired: {detail}',
+    tr: 'emekliye ayrılmadı: {detail}',
+  },
+  'runs.retire_superseded.dry_hint': {
+    en: 'Dry-run — nothing was written. Run `deckent runs --retire-superseded --yes` to retire them.',
+    tr: 'Ön-izleme — hiçbir şey yazılmadı. Emekliye ayırmak için `deckent runs --retire-superseded --yes` çalıştır.',
   },
   // SURF-6 `deckent runs <n> --approve|--reject|--start` — cross-surface decide.
   'runs.decide.approved': {

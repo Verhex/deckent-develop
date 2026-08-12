@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import {
   AgentPoolManager,
   getAgentPrompt,
@@ -207,6 +208,9 @@ describe('resolvePrompt — degraded classification (D4 alignment)', () => {
       layer: 'project',
       // D4: a present-but-degraded persona still routes; only 'none' blocks.
       blocker: null,
+      // 524-012: the resolver now carries the declared/actual digest pair.
+      declaredDigest: null,
+      actualDigest: `sha256:${createHash('sha256').update('inline persona', 'utf8').digest('hex')}`,
     } satisfies ResolvedAgentPrompt);
   });
 
@@ -256,6 +260,9 @@ describe('resolvePrompt — absent prompt', () => {
       availability: 'none',
       layer: null,
       blocker: 'prompt-unresolvable',
+      // 524-012: no persona → no digests, and never a fabricated pair.
+      declaredDigest: null,
+      actualDigest: null,
     } satisfies ResolvedAgentPrompt);
     expect(resolved.resolvedFrom).toBeUndefined();
   });

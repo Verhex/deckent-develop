@@ -365,12 +365,35 @@ function snapshotEntryKey(entry: EffectiveSkill): string {
     version: (entry.definition as { version?: unknown }).version ?? null,
     profileState: (entry.definition as { routing?: { profileState?: unknown } }).routing?.profileState ?? null,
     sourcePath: entry.sourcePath,
+    // Sidecar-affected fields (S8): omitting these made the with-sidecar
+    // digest identical to the catalog-only one regardless of machine-local
+    // stats overlay content — they must be part of the canonical key.
+    statsSource: entry.statsSource,
+    stats: entry.definition.stats,
   });
 }
 
+/**
+ * Threaded through both {@link resolveSkillCatalog} and
+ * {@link snapshotSkillCatalog} — never a second resolver/snapshot path.
+ */
+export interface SkillCatalogSnapshotOptions {
+  /**
+   * S8 determinism gate pass 1 (catalog-only): when true, the machine-local
+   * sidecar stats ledger is never read, so no entry's `stats`/`statsSource`
+   * is overlaid — every entry keeps its manifest-declared `statsSource`
+   * (`'manifest'` | `'defaults'`). Default false — every existing caller
+   * keeps today's sidecar-inclusive behavior unchanged.
+   */
+  excludeSidecarStats?: boolean;
+}
+
 /** Resolve the catalog and stamp the canonical snapshot digest. */
-export function snapshotSkillCatalog(projectRoot: string): SkillCatalogSnapshot {
-  const resolution = resolveSkillCatalog(projectRoot);
+export function snapshotSkillCatalog(
+  projectRoot: string,
+  options: SkillCatalogSnapshotOptions = {},
+): SkillCatalogSnapshot {
+  const resolution = resolveSkillCatalog(projectRoot, options);
   // The ONE digest primitive (sol cross-review: an inline createHash here was
   // itself the second-mechanism violation the task bans).
   const digest = digestOf(resolution.entries.map(snapshotEntryKey).join('\n'));
@@ -561,7 +584,10 @@ export function pickEffectiveLayer<T extends { layer: SkillCatalogLayer }>(
  * override path. Dispositions mask; sidecar stats overlay; invalid manifests
  * are reported rather than dropped; entries come back sorted by id.
  */
-export function resolveSkillCatalog(projectRoot: string): SkillCatalogResolution {
+export function resolveSkillCatalog(
+  projectRoot: string,
+  options: SkillCatalogSnapshotOptions = {},
+): SkillCatalogResolution {
   const invalid: InvalidManifestEntry[] = [];
   const candidates = new Map<string, EffectiveSkill[]>();
 
@@ -643,7 +669,12 @@ export function resolveSkillCatalog(projectRoot: string): SkillCatalogResolution
   }
 
   // ── Merge: precedence → disposition → effective stats ─────────────────────
-  const statsLedger = readStatsSidecarLedger(projectRoot);
+  // excludeSidecarStats (S8 gate pass 1): an empty ledger means the merge
+  // loop below finds no sidecarStats for any id, so the overlay branch never
+  // fires — statsSource stays whatever addCandidate already set.
+  const statsLedger = options.excludeSidecarStats
+    ? { agents: {}, skills: {} }
+    : readStatsSidecarLedger(projectRoot);
   const dispositions = readDispositionLedger(projectRoot);
   const entries: EffectiveSkill[] = [];
 

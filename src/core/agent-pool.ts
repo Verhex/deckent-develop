@@ -2,7 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { z } from 'zod';
 import type {
   AgentCatalogLayer,
@@ -1245,6 +1245,16 @@ export interface ResolvedAgentPrompt extends AgentPromptResolution {
    * agent-types.ts `finalize()` exactly instead of guessing a stricter rule.
    */
   readonly blocker: AgentRoutabilityBlocker | null;
+  /**
+   * The manifest-declared `promptSha256` (agent-types.ts, additive) for whichever tier
+   * supplied `content`, or null when the manifest declared none (524-012). Never fabricated.
+   */
+  readonly declaredDigest: string | null;
+  /**
+   * The actual `sha256:<hex>` digest of `content`, computed by {@link computePromptDigest}.
+   * Null only when there is no content to hash (the `'none'` availability case).
+   */
+  readonly actualDigest: string | null;
 }
 
 const PROMPT_MD_FILENAME = 'PROMPT.md';
@@ -1262,6 +1272,26 @@ function readPromptFile(filePath: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The module's single digest primitive (524-012). Every actual-digest value any resolver
+ * tier reports is computed here — a second `createHash` call site is exactly the drift this
+ * helper exists to prevent.
+ */
+function computePromptDigest(content: string): string {
+  return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`;
+}
+
+/**
+ * Author-declared digest for the manifest in `dir`, or null when absent/malformed. A plain
+ * field read — not a digest computation — so it does not count against the single
+ * `computePromptDigest` primitive above.
+ */
+function readDeclaredPromptDigest(dir: string): string | null {
+  const raw = readJsonSafe<Record<string, unknown>>(path.join(dir, AGENT_FILENAME));
+  const declared = raw?.['promptSha256'];
+  return typeof declared === 'string' ? declared : null;
 }
 
 /** A PROMPT.md tier: the directory to look in, and how a hit there is reported. */
@@ -1284,6 +1314,8 @@ function promptFileResolution(
     availability: 'prompt-file',
     layer: tier.layer,
     blocker: null,
+    declaredDigest: readDeclaredPromptDigest(tier.dir),
+    actualDigest: computePromptDigest(content),
   };
 }
 
@@ -1360,6 +1392,7 @@ export function resolvePrompt(
       console.warn(
         `[deckent] Agent "${agentId}" PROMPT.md missing — falling back to agent.json::systemPrompt (degraded).`,
       );
+      const declared = raw['promptSha256'];
       return {
         content: sp,
         source: 'system-prompt',
@@ -1368,6 +1401,8 @@ export function resolvePrompt(
         availability: 'system-prompt',
         layer: tier.layer,
         blocker: null,
+        declaredDigest: typeof declared === 'string' ? declared : null,
+        actualDigest: computePromptDigest(sp),
       };
     }
   }
@@ -1380,6 +1415,8 @@ export function resolvePrompt(
     availability: 'none',
     layer: null,
     blocker: 'prompt-unresolvable',
+    declaredDigest: null,
+    actualDigest: null,
   };
 }
 
