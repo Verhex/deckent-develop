@@ -12595,3 +12595,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 490-013-fix: Fix: Validate right branch (NO_GO)
 
 ---
+## Sprint 523 — sprint-523
+
+**Status:** ABORTED
+**Date:** 2026-08-12
+**Duration:** 842s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 842331ms |
+
+### Tasks
+
+- 523-001-fix: Fix: Provider-limits authoring flow — derive the policy from live provider truth (PAUSED)
+- 523-001: Provider-limits authoring flow — derive the policy from live provider truth (NO_GO)
+- 523-002: Doctor provider-limit-authority coverage — the misdirection ends (PAUSED)
+- 523-003: CI D5 — the aggregate required-check lands (DONE)
+- 523-004: Docs+Scripts canary wiring — measure, then decide continue-on-error (DONE)
+- 523-005: Persona D-G(a) — machine-detectable broken persona in the catalog (PAUSED)
+- 523-006: Persona D-F(a) — the shared prompt-resolution boundary refuses broken personas (PAUSED)
+- 523-007: Skill catalog S5 — the canonical snapshot artifact + CLI/MCP migration (PAUSED)
+- 523-008: Skill catalog S8 — the determinism gate over the real snapshot (PAUSED)
+- 523-009: Agent catalog S5 — ONE shared projection for CLI, MCP and API (PAUSED)
+- 523-010: Doc-task verification isolation — fix it at the rendering layer (DONE)
+- 523-011: FIX-admission truth pin — Brain downgrade is the authority, and it stays that way (DONE)
+- 523-012: ADR-G-019 successor-procedure amendment draft (row 4212) (DONE)
+
+---

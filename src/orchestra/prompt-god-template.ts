@@ -26,7 +26,8 @@ import { renderWorkerDodChecklist } from '../core/worker-dod-contract.js';
 import type { ManagedContractInspection } from '../core/workspace-artifact-contract.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
 import { sanitizeReadScope, sanitizeScope } from './scope-sanitizer.js';
-import { truncateAtParagraph, inferTaskDomains, logInjectionAudit } from './task-builder.js';
+import { truncateAtParagraph, logInjectionAudit } from './task-builder.js';
+import { detectTaskType } from './rubric-registry.js';
 import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
 import {
   reorderLeadingT0,
@@ -2192,13 +2193,24 @@ ${dodBlock}${idempotencyBlock}`);
   // back; every other kind verifies via targeted tests. Defensive fallback to the
   // file-domain heuristic only when task.type is unset (legacy/direct-run path) so a
   // doc task is never forced into code verification by a missing type.
-  const isDocKind = task.type === 'documentation' || task.type === 'design';
+  // 523-010 (sprint-522 live evidence): task.type='audit' (docs/audits/*.md report
+  // tasks) was missing from this set, so an audit-class task fell through to the
+  // default CODE verify-steps branch below and a doc-only worker ran a repo-wide
+  // `tsc`/vitest — racing parallel workers' in-flight state. 'audit' is one of
+  // rubric-registry's own RubricTaskType values (AUDIT_RUBRIC / isAuditTask), so
+  // adding it here closes the gap without inventing a second taxonomy.
+  const isDocKind = task.type === 'documentation' || task.type === 'design' || task.type === 'audit';
   let isDocOnlyTask: boolean;
   if (task.type) {
     isDocOnlyTask = isDocKind;
   } else {
-    const taskDomains = inferTaskDomains(task.scope?.filesWrite ?? [], task.scope?.directories ?? []);
-    isDocOnlyTask = taskDomains.length > 0 && taskDomains.every(d => d === 'doc');
+    // Fallback for tasks with no canonical task.type (legacy/direct-run path):
+    // reuse rubric-registry's own scope-shape classifier — the SAME function
+    // task-builder.ts's createTask() feeds through rubricTypeToKind to derive
+    // task.type in the first place — instead of a second, independently
+    // maintained doc/code heuristic (rubric-registry: audit | document-write |
+    // code-development; non-'code-development' == documentation-class here).
+    isDocOnlyTask = detectTaskType(task) !== 'code-development';
   }
   // PROMPT-W1 (b): a doc-only task verifies by reading its file back; every other
   // task verifies via targeted tests, which is also the mode whose guidance must
@@ -2212,11 +2224,19 @@ This task has no project write authority. Do not run a build, type check, test s
 2. Cite observed command results and exact file/line evidence in the result notes.
 3. Evaluate the single authoritative Definition of Done above. If any required evidence is missing, report GO_WITH_TECH_DEBT or NO_GO; never infer DONE.`);
   } else if (isDocOnlyTask) {
+    // 523-010: a documentation-class task (rubric-registry: audit | document-write)
+    // names ONLY its own task-declared checks — document existence, a doc/markdown
+    // lint if one exists, and an owner-declared `**Test:**` command when present —
+    // NEVER a repo-wide type check or full test runner (that generic guidance
+    // belongs solely to the source-writing branches below, which stay untouched).
+    const declaredCheckBlock = declaredTestCommands.length > 0
+      ? `\n3. Run your task-declared check(s) exactly as written — do not substitute a project-wide type check or test runner:\n${declaredTestCommands.map((command, index) => `   ${index + 1}. \`${command}\``).join('\n')}`
+      : '';
     push('T0', 'verify-steps', `## VERIFY STEPS (doc-only task — DO NOT run the test suite)
-This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite — it is large, unrelated to your file, slow, and produces spurious failures that do NOT reflect your work.
+This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite, and DO NOT run a project-wide type check (\`tsc\`) — they are large, unrelated to your file, slow, and can race other in-flight workers' state without reflecting your own work.
 1. Read your file back from disk (the path in your scope) and confirm its content satisfies the goCriteria above.
-2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.
-Mark selfAssessment = "DONE" when the file exists and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
+2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.${declaredCheckBlock}
+Mark selfAssessment = "DONE" when the file exists (and any check above passes) and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
   } else if (declaredTestCommands.length > 0) {
     const commandList = declaredTestCommands
       .map((command, index) => `${index + 1}. \`${command}\``)

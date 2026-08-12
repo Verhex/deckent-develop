@@ -221,6 +221,15 @@ jobs:
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Run docs and scripts tests
+        # 523-004 (flake RCA + sol cross-review): the shard-scoped canary env
+        # (vitest.config.ts) serializes THIS step and drops it to the dot
+        # reporter, targeting the onTaskUpdate flake this job's
+        # continue-on-error exists for. No retry — the RCA rejected bounded
+        # retry as a fix. continue-on-error above stays on until the RCA's
+        # acceptance series is met; see task 523-004's .result notes for the
+        # green-run count so far.
+        env:
+          VITEST_DOCS_SCRIPTS_SERIAL: '1'
         run: npx vitest run tests/docs/ tests/scripts/ --pool=forks
         # 522 (CI-DOCS-SCRIPTS-STEP-TIMEOUT-001): the suite measured 307.86s on a
         # saturated runner and the old 5-minute cap SIGKILLed it mid-flight
@@ -304,3 +313,63 @@ jobs:
           test -f dist/index.js
           head -1 dist/cli/entry.js | grep -q "#!/usr/bin/env node"
           head -1 dist/mcp/server.js | grep -q "#!/usr/bin/env node"
+
+  shards-green:
+    name: Shards Green
+    # D5 aggregate required check (owner decision 2026-08-11). Incident class:
+    # PR #120 merged with red shards because the ruleset required only Type Check
+    # and the three Validator legs. This job fans in every test shard, so the
+    # ruleset needs exactly ONE new required context and never has to be re-edited
+    # when the matrix changes.
+    #
+    # always() is what makes the gate real: without it a failed shard would leave
+    # this job skipped, and a skipped required check reports as passing.
+    # Row 535 is preserved — the merge queue re-runs Type Check alone and skips
+    # every shard, so the aggregate stays out of merge_group too.
+    if: always() && github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    needs:
+      - test-core
+      - test-orchestra
+      - test-cli
+      - test-remaining
+      - test-docs-scripts
+      - test-dashboard
+      - test-windows
+    steps:
+      - name: Assert every shard concluded green
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          # Minimum fan-in width. A shard silently dropped from the needs list
+          # above shrinks this object, and the gate then fails instead of
+          # reporting green on a matrix that no longer covers the repo.
+          # tests/scripts/ci-aggregate-gate.test.ts pins this number to the live
+          # `Tests —` job inventory.
+          MINIMUM_SHARDS: '7'
+        run: |
+          node -e '
+            const needs = JSON.parse(process.env.NEEDS_JSON || "{}");
+            const minimum = Number(process.env.MINIMUM_SHARDS);
+            const event = process.env.GITHUB_EVENT_NAME || "";
+            const entries = Object.entries(needs);
+            let failed = false;
+            const fail = (message) => { failed = true; console.log("::error::" + message); };
+            console.log("event=" + event + " fanned-in=" + entries.length + " minimum=" + minimum);
+            for (const [id, job] of entries) console.log("  " + id + " => " + job.result);
+            if (!Number.isInteger(minimum) || minimum < 1) {
+              fail("MINIMUM_SHARDS must be a positive integer, got: " + process.env.MINIMUM_SHARDS);
+            } else if (entries.length < minimum) {
+              fail("Shards Green fanned in " + entries.length + " job(s) but " + minimum + " are required. A shard was dropped from the needs list, so the aggregate refuses to report green on partial coverage.");
+            }
+            // A skipped shard is legitimate only under the row-535 merge_group
+            // guard, and that tolerance is read from the event rather than from a
+            // hardcoded per-job allowlist. On pull_request/push a skip means the
+            // shard never ran (upstream failure), which is not green.
+            const skipIsLegitimate = event === "merge_group";
+            const notGreen = entries.filter(([, job]) => job.result !== "success" && !(skipIsLegitimate && job.result === "skipped"));
+            if (notGreen.length > 0) {
+              fail("shard(s) did not conclude green: " + notGreen.map(([id, job]) => id + "=" + job.result).join(", "));
+            }
+            if (failed) process.exit(1);
+            console.log("All " + entries.length + " shards concluded green.");
+          '

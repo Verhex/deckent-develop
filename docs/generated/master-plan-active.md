@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):0aea1690dea45bbbb4cbb62e5d9318c00fcd50cba3f2f706fbfa6a8ab5f2bcb4`
+**Source digest:** `sha256(normalized-lf-utf8):78f23fdc5750eac829e3cb2f7c5cab41e784721d5a9c35006f763dcd16365557`
 
-**Rows:** 485 total · 423 active · 62 terminal
+**Rows:** 486 total · 424 active · 62 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 332 |
+| OPEN | 333 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -362,6 +362,7 @@
 | 6160 | `SURFACE-ADAPTER-001` | OPEN | P1 | PRODUCT | `APP-SERVICE-001`, `SURFACE-CONTRACT-001`, `CAPABILITY-001` | — | Web, mobile, voice, chat, IDE, CI and ERP thin-adapter expansion |
 | 6165 | `DESKTOP-CUSTOMIZE-001` | OPEN | P1 | DESKTOP | `DESKTOP-REBORN-001` | — | User-facing interface personalization: theme/watch, font set and accent selection in the Desktop settings scene |
 | 6170 | `DESIGN-SYSTEM-001` | OPEN | P1 | PRODUCT | — | — | Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity |
+| 6171 | `DESIGN-PRECISION-INSTRUMENT-001` | OPEN | P1 | PRODUCT | `DESKTOP-REBORN-001` | — | Precision Instrument becomes the calm, formal and enterprise-grade default across Desktop and Terminal; NOVA remains only an explicit operator visualization preset |
 | 6180 | `ERP-AGENT-CONTRACT-001` | OPEN | P2 | CONNECTOR | — | — | Enterprise Application Agent Contract: ERP/iş-uygulaması agent'larına (Oracle AI Agent Studio, Fusion/NetSuite sınıfı) karşı discover_capabilities / invoke / stream_status / request_approval / commit_transaction / cancel / compensate_or_rollback / collect_audit sözleşmesi |
 | 7000 | `ECOSYSTEM-001` | OPEN | P0 | ECOSYSTEM | `P02-647`, `SURFACE-CUTOVER-001`, `CAPABILITY-001`, `AUDIT-001` | — | Governed agent, skill, plugin, tool, MCP and extension ecosystem |
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |

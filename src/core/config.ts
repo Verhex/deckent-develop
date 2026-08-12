@@ -293,6 +293,13 @@ export const DEFAULT_OUTBOUND_DAILY_QUOTA_BYTES = 1_073_741_824; // 1 GiB
 /** ms equivalent of config.heartbeat_timeout default (120s × 1000).
  *  Single SSOT: auditor.scanHeartbeats and StaleWorkerDetector both default to this. */
 export const DEFAULT_HEARTBEAT_TIMEOUT_MS = 120_000;
+
+/**
+ * Persona integrity floor default (owner D-G(a)): a resolved persona smaller
+ * than this many bytes is machine-classified `undersized`. Config-resolved via
+ * `persona_integrity.min_bytes`; this constant is the single default source.
+ */
+export const DEFAULT_PERSONA_INTEGRITY_MIN_BYTES = 40;
 /** Default for config key nervous_system.approve_timeout_attended_ms (30s, interactive sessions). */
 export const DEFAULT_APPROVE_TIMEOUT_ATTENDED_MS = 30_000;
 /** Default for config key nervous_system.approve_timeout_unattended_ms (5s, CI/background). */
@@ -2189,6 +2196,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Authored input only. The production authority must resolve the separately
     // loaded parent/project layers through provider-limit-policy.ts.
     provider_limits: config.provider_limits,
+    persona_integrity: config.persona_integrity,
     provider_limit_authority: createProviderLimitPolicyAuthoritySnapshot({
       parent: globalConfig?.provider_limits,
       project: projectConfig?.provider_limits,
@@ -3023,6 +3031,7 @@ export function mergeConfigs(
     execution_budget: config.execution_budget,
     // Authored input only; never an effective policy authority.
     provider_limits: config.provider_limits,
+    persona_integrity: config.persona_integrity,
     provider_limit_authority: createProviderLimitPolicyAuthoritySnapshot({
       parent: globalConfig?.provider_limits,
       project: projectConfig?.provider_limits,

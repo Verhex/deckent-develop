@@ -649,6 +649,16 @@
       "notes": "Task 517-006 (row 270); deliberately NOT wired into any npm script or lint:gates in this slice — that is a follow-up owner decision recorded in the task result notes. Self-registers (this file is itself scripts/*.mjs and required its own entry)."
     },
     {
+      "file": "scripts/lint-skill-catalog-determinism.mjs",
+      "class": "gate",
+      "owner": "skill-catalog-determinism",
+      "npmScript": null,
+      "input": "real-tree skill catalog via snapshotSkillCatalog (S5 canonical digest) + optional scripts/skill-catalog-determinism-baseline.json",
+      "output": "exit 0 IN_SYNC/DECLARED_DRIFT · exit 1 UNDECLARED_DRIFT or bare-allowlist entry · exit 2 infra",
+      "expiry": "none — S8 determinism gate (row 7012); lint:gates wiring is a named follow-up owner decision",
+      "notes": "Sprint-523 task 8. Derives the digest from the S5 snapshot; a second hash mechanism in this script is itself a violation (pinned by its test)."
+    },
+    {
       "file": "scripts/lint-test-hermeticity.mjs",
       "class": "gate",
       "owner": "test-hermeticity-registry",

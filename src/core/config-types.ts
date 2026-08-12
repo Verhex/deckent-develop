@@ -928,6 +928,8 @@ export interface DeckentConfig {
   execution_budget?: ExecutionBudgetPolicyConfig;
   /** Authored provider account/window policy; never trusted from last-wins merge. */
   provider_limits?: ProviderLimitsConfig;
+  /** Persona integrity floor (owner D-G(a)); default resolved in config.ts. */
+  persona_integrity?: PersonaIntegrityConfig;
   /** Per-task-type provider overrides */
   provider_overrides?: Record<string, ProviderName>;
   /** Tier-based model selection strategy. Merged with mode preset defaults.
@@ -1565,6 +1567,12 @@ export interface NervousDetectorConfig {
  * V1→V2 migration). Runtime validation mirroring this interface lives in `core/config.ts`
  * (`NERVOUS_SYSTEM_SCHEMA`).
  */
+/** Persona integrity detection thresholds (owner D-G(a), sprint-523 task 5). */
+export interface PersonaIntegrityConfig {
+  /** Bytes below which a resolved persona is classified `undersized`. */
+  min_bytes?: number;
+}
+
 export interface NervousSystemConfig {
   /** Enable nervous system (default: false — Sprint 148 will set true) */
   enabled: boolean;
@@ -1753,6 +1761,8 @@ export interface ResolvedConfig {
   execution_budget?: ExecutionBudgetPolicyConfig;
   /** Authored provider-limit input only; resolve parent/project layers separately. */
   provider_limits?: ProviderLimitsConfig;
+  /** Persona integrity floor (owner D-G(a)); default resolved in config.ts. */
+  persona_integrity?: PersonaIntegrityConfig;
   /**
    * Separately authored, immutable provider-limit authority layers.
    * Absent on manually constructed/legacy runtime config means unavailable,

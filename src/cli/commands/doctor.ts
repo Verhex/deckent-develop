@@ -4,6 +4,7 @@ import { platform, totalmem } from 'node:os';
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { Command } from 'commander';
 import { planInstall } from '../../core/provisioner.js';
+import { resolveGlobalConfigReadPath } from '../../core/global-scope-resolver.js';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import type { DetectedProvider, ProviderAvailabilityDetail } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
@@ -260,6 +261,8 @@ export interface HumanDoctorInput {
    * result; the production doctor command always supplies it.
    */
   keyringCheck?: DoctorCheck;
+  /** Provider-limit-authority envelope check (born 3322) — beside the keyring, same surface as composition. */
+  limitAuthorityCheck?: DoctorCheck;
   brainLines: number;
   brainBudget: number;
   lastSprintId: string | null;
@@ -678,6 +681,59 @@ export function buildProviderAuthorityKeyringCheck(
       : getMessage('doctor.provider_authority_keyring_unreadable', lang, { code: read.code }),
     required: true,
   };
+}
+
+/**
+ * Pre-flight the provider-limit-authority envelope (born row 3322).
+ *
+ * The xverify composition and the doctor previously DISAGREED about the same
+ * authority state: the composition held with `xverify_provider_authority_unavailable`
+ * while the doctor pointed the operator at `keyring init` — a remedy the keyring
+ * CLI then refused. This check reads the SAME layer surface the composition
+ * reads (the global config's `provider_limits` block through the canonical
+ * global read path) and distinguishes the three states the born row names:
+ * absent / authored-empty / present. The remedy names the authoring flow.
+ */
+export function buildProviderLimitAuthorityCheck(
+  lang: string,
+  readGlobalProviderLimits: () => { state: 'absent' } | { state: 'authored-empty' } | { state: 'present'; policies: number } = readGlobalProviderLimitsState,
+): DoctorCheck {
+  const name = getMessage('doctor.provider_limit_authority_name', lang);
+  const read = readGlobalProviderLimits();
+  if (read.state === 'present') {
+    return {
+      name,
+      passed: true,
+      message: getMessage('doctor.provider_limit_authority_ok', lang, {
+        policies: String(read.policies),
+      }),
+      required: true,
+    };
+  }
+  return {
+    name,
+    passed: false,
+    message: read.state === 'absent'
+      ? getMessage('doctor.provider_limit_authority_absent', lang)
+      : getMessage('doctor.provider_limit_authority_authored_empty', lang),
+    required: true,
+  };
+}
+
+function readGlobalProviderLimitsState(): { state: 'absent' } | { state: 'authored-empty' } | { state: 'present'; policies: number } {
+  try {
+    const path = resolveGlobalConfigReadPath();
+    if (!existsSync(path)) return { state: 'absent' };
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as {
+      provider_limits?: { policies?: unknown[] };
+    };
+    const block = parsed.provider_limits;
+    if (!block) return { state: 'absent' };
+    const policies = Array.isArray(block.policies) ? block.policies.length : 0;
+    return policies > 0 ? { state: 'present', policies } : { state: 'authored-empty' };
+  } catch {
+    return { state: 'absent' };
+  }
 }
 
 function buildProviderAuthDoctorChecks(
@@ -1400,6 +1456,7 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
       ...result.checks,
       ...providerAuthChecks,
       ...(input.keyringCheck ? [input.keyringCheck] : []),
+      ...(input.limitAuthorityCheck ? [input.limitAuthorityCheck] : []),
     ],
   };
   const lines: string[] = [];
@@ -2501,10 +2558,12 @@ export function registerDoctor(program: Command): void {
         }
 
         const keyringCheck = buildProviderAuthorityKeyringCheck(lang);
+        const limitAuthorityCheck = buildProviderLimitAuthorityCheck(lang);
         print(formatHumanDoctor({
           result,
           providers,
           keyringCheck,
+          limitAuthorityCheck,
           brainLines,
           brainBudget,
           lastSprintId,

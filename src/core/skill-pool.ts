@@ -336,6 +336,47 @@ export interface EffectiveSkill {
   statsSource: 'sidecar' | 'manifest' | 'defaults';
 }
 
+/**
+ * The canonical catalog snapshot (design S5, sprint-523 task 7).
+ *
+ * ONE ordered projection + ONE stable content digest for every read surface —
+ * CLI `deckent skill`, MCP `deckent_skill_list` and the S8 determinism gate all
+ * consume THIS shape; a surface keeping its own scan is the drift the design
+ * measured (30-vs-31). The digest reuses the pool's existing sha256 primitive
+ * over a canonical serialization of the entries — no second hash mechanism.
+ */
+export interface SkillCatalogSnapshot {
+  /** Byte-wise id-ordered entries, masked records included (visibility, D5). */
+  entries: EffectiveSkill[];
+  /** Manifests the resolver rejected — reported, never silently skipped. */
+  invalid: InvalidManifestEntry[];
+  /** `sha256:…` over the canonical entry serialization — determinism anchor. */
+  digest: string;
+}
+
+/** Canonical, machine-stable serialization of one entry for the snapshot digest. */
+function snapshotEntryKey(entry: EffectiveSkill): string {
+  return JSON.stringify({
+    id: entry.id,
+    layer: entry.layer,
+    provenance: entry.provenance.kind,
+    disposition: entry.disposition,
+    masked: entry.masked,
+    version: (entry.definition as { version?: unknown }).version ?? null,
+    profileState: (entry.definition as { routing?: { profileState?: unknown } }).routing?.profileState ?? null,
+    sourcePath: entry.sourcePath,
+  });
+}
+
+/** Resolve the catalog and stamp the canonical snapshot digest. */
+export function snapshotSkillCatalog(projectRoot: string): SkillCatalogSnapshot {
+  const resolution = resolveSkillCatalog(projectRoot);
+  const digest = `sha256:${createHash('sha256')
+    .update(resolution.entries.map(snapshotEntryKey).join('\n'), 'utf8')
+    .digest('hex')}`;
+  return { entries: resolution.entries, invalid: resolution.invalid, digest };
+}
+
 export interface SkillCatalogResolution {
   /** Every known id, sorted byte-wise by id (§5 rule 1), INCLUDING masked records. */
   entries: EffectiveSkill[];

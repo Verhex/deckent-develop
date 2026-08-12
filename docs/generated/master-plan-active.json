@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "0aea1690dea45bbbb4cbb62e5d9318c00fcd50cba3f2f706fbfa6a8ab5f2bcb4"
+    "value": "78f23fdc5750eac829e3cb2f7c5cab41e784721d5a9c35006f763dcd16365557"
   },
   "summary": {
-    "total": 485,
-    "active": 423,
+    "total": 486,
+    "active": 424,
     "terminal": 62,
     "receipts": 184,
     "byState": {
-      "OPEN": 332,
+      "OPEN": 333,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 316,
-      "P1": 132,
+      "P1": 133,
       "P2": 37
     },
     "byProgram": {
@@ -47,7 +47,7 @@
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
-      "PRODUCT": 14,
+      "PRODUCT": 15,
       "PROMPT": 5,
       "PROVIDER": 4,
       "RELEASE": 4,
@@ -4173,9 +4173,9 @@
       "program": "PRODUCT",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-12",
       "definitionDigest": "28f6a81929ece822bef8cb9b6ac87c3e681c2955d467d5f4cfd03e816a023d6d",
-      "progressDigest": "085aad1637afd83dee9984c726f2f90c168ac2abb3c13e30c1c4b708e5a53679",
+      "progressDigest": "1fb05d18b3abb2c3d57ee628b9fb9e33f83320c38716362dc69fab3e2139deb0",
       "terminalClosureDigest": null
     },
     {
@@ -4206,9 +4206,9 @@
       "program": "PRODUCT",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "32b651724a69b4b9efbc2cb0dbf4202d3b2496dfb22e96a530c1f988a8efd83a",
-      "progressDigest": "f85619be393bfb672851a1ababa824b853481e996e073586f36a103784877c54",
+      "progressDigest": "41cdbf1ef92f6c409908d9bc115eae9270c770566f38d41200f745f8693db6eb",
       "terminalClosureDigest": null
     },
     {
@@ -4228,9 +4228,9 @@
       "program": "DESKTOP",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "02197f054a67d4f2b2051555dc4bedad588273d2cef7966122f9c9425c2e398b",
-      "progressDigest": "daaab4f66af8d5beb113f83ff180b800aa144f11062eba02589b177a2440b815",
+      "progressDigest": "6f24b544a77f69080d1dd42baa5deadd106b940d206f4ce7444cd70d70c312c2",
       "terminalClosureDigest": null
     },
     {
@@ -4239,9 +4239,9 @@
       "program": "DESKTOP",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "81602e493314d359851dbb81346bc86d4e0e45e42f892f831a114cba94779ca5",
-      "progressDigest": "47046146bdc209f2893adcb1bd2c015adbddeb7923a3a3eb529f98b2ed4aa8d3",
+      "progressDigest": "77524d0e513d381d64a426062d317d9b1c1d081c30220891a8a09d97ba00e8c5",
       "terminalClosureDigest": null
     },
     {
@@ -4261,9 +4261,9 @@
       "program": "DESKTOP",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "08bd8b7751ea7665c5b40f13ea3db05f46cd706789da9ab69e43de617d8a5e8c",
-      "progressDigest": "371e00ccda992a712c0931674276fc5a16b03a8146b1d7f182ad52cce4224265",
+      "progressDigest": "1c72b582bdc34bdb1766c8002cf16d5b335e812082f6f1befb231fc6e0a7383e",
       "terminalClosureDigest": null
     },
     {
@@ -4327,9 +4327,9 @@
       "program": "PRODUCT",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-27",
+      "updated": "2026-08-12",
       "definitionDigest": "c425df79e974805f143c88587312afd78333a78e269baadf76687848049d5966",
-      "progressDigest": "bf0e9c1ca4d3fb57cd598cd479a7b888f41c625e96485892de40030d12d8f1e6",
+      "progressDigest": "6447b789f47bf45471d547593f8f3261dae27d7056418eaa15253ac19773b869",
       "terminalClosureDigest": null
     },
     {
@@ -4404,9 +4404,20 @@
       "program": "PRODUCT",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-12",
       "definitionDigest": "2259a00760ec554081a886e622a4b4c09a4f2db77351a17570d904a61da2878f",
-      "progressDigest": "f96a4ad5fc394c4ebf969b9221564985b7aaf6e2ce4d0b6aef69c3c09bd00e4f",
+      "progressDigest": "6f7ecc2a3e049f51247f2b3e20868a1007cabefd95fee6eee055cdf7274d8c2d",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 6171,
+      "id": "DESIGN-PRECISION-INSTRUMENT-001",
+      "program": "PRODUCT",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-12",
+      "definitionDigest": "7730d91cb672de7edbac15169916be62fe4fa0b9cd14f51f091ddb2a960d30d3",
+      "progressDigest": "1db8072e2fcfb25930622ae9474895a9fb7828313292ba8f7902e5faa63ca0f1",
       "terminalClosureDigest": null
     },
     {
@@ -4712,9 +4723,9 @@
       "program": "XPLAT",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "42bab66e9fcd8fbafb06c6f616a43e2e4bdb4b4d3fdf820744db1ffdccd8e774",
-      "progressDigest": "f8a14176f213f6cd7454b28071dc1a340daa17a18a211f940f7462fd2a08f1ce",
+      "progressDigest": "9c666b71c1c1489ace64db37f76a47b3414de2dec9a1fea5244fdd0cf4071254",
       "terminalClosureDigest": null
     },
     {
@@ -4745,9 +4756,9 @@
       "program": "RELEASE",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "035d2459ae0bc7601f96555c8b5e5ba9a37c0c653cf0146b648ce1f534390bd3",
-      "progressDigest": "fa54cc9ec92f746ee60257dc73361e1045cb08ac0ac89eadf282c7d932e1fb15",
+      "progressDigest": "b39404b78536dcca474523bb9a626afcde6fe80886dad60daf39209d6c6037f0",
       "terminalClosureDigest": null
     },
     {
@@ -20615,8 +20626,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Propose, approve, start, cancel, inspect and settle use cases independent of transport/UI",
-      "evidence": "2026-07-27 code-truth: CLI/REPL RunFlow controller, API coordinator, autonomous v1/v2 control ve Flow queue ayrı services; cancel/settle/status canonical use case değil; 2026-08-10 autonomous RCA: broad MCP CLI helper import ediyor, dedicated MCP aynı backlog işlemlerini farklı schema/annotation ile yeniden implemente ediyor, Dashboard v1 AutonomousPage ve v2 MissionsPage olarak iki read model sunuyor, Process ayrıca v1 JSON writerı; canonical closure AUTONOMOUS-CONTROL-PLANE-001",
-      "updated": "2026-08-10"
+      "evidence": "2026-07-27 code-truth: CLI/REPL RunFlow controller, API coordinator, autonomous v1/v2 control ve Flow queue ayrı services; cancel/settle/status canonical use case değil; 2026-08-10 autonomous RCA: broad MCP CLI helper import ediyor, dedicated MCP aynı backlog işlemlerini farklı schema/annotation ile yeniden implemente ediyor, Dashboard v1 AutonomousPage ve v2 MissionsPage olarak iki read model sunuyor, Process ayrıca v1 JSON writerı; canonical closure AUTONOMOUS-CONTROL-PLANE-001. 2026-08-12 Desktop+Terminal RCA ve owner kabulü: Desktop `deckent serve` tüketirken Ink REPL `src/cli/repl/rpc-client.ts` içinde in-process dispatcher kuruyor; `session.resume` unsupported, `RUN_PAUSED` terminal BLOCKED'a indirgeniyor, RunFlow cancel detached sprinti sonlandırmıyor ve Desktop chat transcripti renderer-local `localStorage` authoritysinde. Yeni umbrella açılmayacak; bu satır canonical use-case/state ownership kapanışıdır",
+      "updated": "2026-08-12"
     },
     {
       "order": 6011,
@@ -20742,8 +20753,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Every response/event carries identity, flow/run/attempt IDs, capability and evidence provenance",
-      "evidence": "Legacy 566,569",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 566,569; 2026-08-12 owner-accepted architecture reconciliation: mixed REST/SSE/WS/term-rpc plus hand-mirrored TS surface types are not one product protocol. Canonical internal `protocol` + `client` package boundaries must precede physical package relocation; Desktop and Terminal consume the same SDK, compatibility handshake and resume stream without a second runtime implementation",
+      "updated": "2026-08-12"
     },
     {
       "order": 6030,
@@ -20836,8 +20847,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No Node/PATH burden in managed-local; version handshake, upgrade, rollback and honest unsupported",
-      "evidence": "Legacy 585",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 585; 2026-08-12 code-truth: Electron main already adopts or detached-spawns `deckent serve` and normally leaves it alive on app exit, so a second `deckentd` rewrite or Tauri migration is not justified. Adoption checks health/projectRoot/PID but not API/protocol compatibility; only local HTTP profile is live while WSL/SSH/container remain honest unavailable. Decision=`KEEP_ELECTRON_AND_DECOUPLE_RUNTIME`; productize existing serve authority",
+      "updated": "2026-08-12"
     },
     {
       "order": 6050,
@@ -20875,8 +20886,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No persistent token in URL; origin/session binding; signed update and renderer isolation",
-      "evidence": "Legacy 586 and code audit",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 586 and code audit; 2026-08-12 code-truth: `contextIsolation=true`, `sandbox=true`, `nodeIntegration=false` ve permission/navigation fail-closed sınırları güçlü temel. Ancak renderer bearer tokenı kullanıyor; EventSource nedeniyle token ve chat message query string'e taşınıyor, credential master key file-temelli ve updater `not-implemented`. Token/session exchange, POST/body veya eşdeğer confidential streaming transport, native OS secret broker ve signed update closure bu satırdadır",
+      "updated": "2026-08-12"
     },
     {
       "order": 6060,
@@ -20931,6 +20942,7 @@
         "SURFACE-CONTRACT-001"
       ],
       "dependents": [
+        "DESIGN-PRECISION-INSTRUMENT-001",
         "DESKTOP-CUSTOMIZE-001",
         "SURFACE-PARITY-001"
       ],
@@ -20958,8 +20970,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Product journeys and visual system approved; no dashboard wrapper; function parity and soak",
-      "evidence": "Legacy 589 supersedes visual direction of 536",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 589 supersedes visual direction of 536; 2026-08-12 owner-accepted RCA: classic shell ve NOVA shell coexist ediyor; embedded terminal `deckent` child process açarak same-runtime unity yerine nested CLI sunuyor; Desktop chat durable shared session taşımıyor. Home/marketplace/enterprise-admin ve extension UI, Golden Workflow kapanmadan öne alınmayacak; raw PTY expert tool olarak kalabilir fakat product control path olamaz",
+      "updated": "2026-08-12"
     },
     {
       "order": 6080,
@@ -21217,8 +21229,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Each use case names canonical service, supported surfaces and reasoned exclusions",
-      "evidence": "2026-07-27 code-truth: start/approve/cancel/status/review/finalize/cleanup/resume semantics CLI, MCP, API, Terminal ve Desktop arasında farklı; dashboard read-only intentional negative-space",
-      "updated": "2026-07-27"
+      "evidence": "2026-07-27 code-truth: start/approve/cancel/status/review/finalize/cleanup/resume semantics CLI, MCP, API, Terminal ve Desktop arasında farklı; dashboard read-only intentional negative-space. 2026-08-12 revalidation: Desktop closes without normally killing its serve daemon, but Terminal is an in-process runtime composition; pause maps to terminal BLOCKED, `session.resume` is unsupported and cancel closes only the Flow record for detached execution. Same-runtime claim therefore remains BLOCKED until shared application-service + protocol/client cutover and real cross-process handoff proof",
+      "updated": "2026-08-12"
     },
     {
       "order": 6130,
@@ -21428,7 +21440,9 @@
       "priority": "P1",
       "dependsOn": [],
       "dependents": [],
-      "children": [],
+      "children": [
+        "DESIGN-PRECISION-INSTRUMENT-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -21445,11 +21459,49 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "DESIGN-PRECISION-INSTRUMENT-001"
+      ],
       "evidenceReceipts": [],
       "acceptance": "Single DTCG token source builds all three surfaces; Claude Design project stays component-synced; design-critic and a11y-contrast gates pass before approval; DT-5 terminal design-language SSOT closed; no AI-template regression",
-      "evidence": "2026-07-31 Alperen approval: identity=A (NOVA-core); Claude-side roster committed (.claude/skills: deckent-design-dna, design-tokens-pipeline, claude-design-sync; .claude/agents: design-critic, a11y-contrast-auditor, component-smith); Claude Design project 7dcf190e created; 2026-08-01 open-ledger round 7/7: accent-bright/border-strong/arc-idle semantic roles (18 total) + 7 measured primitives + 6 validator thresholds; progress-arc tokenized; flip-preconditions (b)+(d) closed at token layer; light-theme=NO closed; role overlaps documented-accepted; restart window executed with 4/4 binary color-gate proof; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
-      "updated": "2026-08-03"
+      "evidence": "2026-07-31 historical direction identity=A (NOVA-core) created the token/critic foundation; that foundation remains valuable. 2026-08-12 latest owner decision supersedes NOVA as default through successor DESIGN-PRECISION-INSTRUMENT-001 because immutable ledger identity cannot be rewritten: current deep-space palette, glow/orbit canvas, sci-fi typography and `DEFAULT_WATCH='nova'` are not sufficiently corporate/formal. `ui-ux-pro-max` spatial/glass/glow output was evaluated as a negative reference, not authority",
+      "updated": "2026-08-12"
+    },
+    {
+      "order": 6171,
+      "id": "DESIGN-PRECISION-INSTRUMENT-001",
+      "parent": "DESIGN-SYSTEM-001",
+      "program": "PRODUCT",
+      "outcome": "Precision Instrument becomes the calm, formal and enterprise-grade default across Desktop and Terminal; NOVA remains only an explicit operator visualization preset",
+      "priority": "P1",
+      "dependsOn": [
+        "DESKTOP-REBORN-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "DESKTOP-REBORN-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Golden Workflow and execution semantics determine hierarchy before aesthetics; one DTCG authority preserves existing tokens/preferences/a11y while default palette, typography, density, motion and component states minimize glow, sci-fi/HUD cues and generic AI-template patterns; color and animation encode meaning rather than decoration; Desktop and Terminal parity, keyboard/screen-reader behavior, contrast, long-session readability and screenshot/interaction critic evidence pass on Linux, macOS, Windows-native and WSL",
+      "evidence": "2026-08-12 owner-approved Desktop+Terminal architecture reconciliation. Immutable DESIGN-SYSTEM-001 identity preserves the historical NOVA foundation, so this atomic successor carries the new default direction without rewriting history or creating a parallel design system. `ui-ux-pro-max` result is negative evidence: spatial/glass/glow/funnel output conflicts with the official instrument character. Implementation follows Golden Workflow → repeated patterns → components → design tokens; no big-bang reskin",
+      "updated": "2026-08-12"
     },
     {
       "order": 6180,
@@ -22604,8 +22656,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No platform branch outside adapter boundary; unsupported fails honestly",
-      "evidence": "Code-truth audit Docker/Desktop gaps",
-      "updated": "2026-07-26"
+      "evidence": "Code-truth audit Docker/Desktop gaps; 2026-08-12 Desktop+Terminal RCA: root CLI carries meaningful platform CI, fakat `process.platform`/WSL/path/process branches remain distributed and Desktop connection-profile schema advertises local/WSL/SSH/container while only local is live. Platform abstraction must be extracted behind the shared runtime/client boundary before physical package relocation; unsupported profiles remain typed, never silently emulated",
+      "updated": "2026-08-12"
     },
     {
       "order": 8020,
@@ -22725,8 +22777,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Reproducible signed artifacts, SBOM, provenance, update channels and rollback",
-      "evidence": "Current npm/release state requires rebaseline",
-      "updated": "2026-07-26"
+      "evidence": "Current npm/release state requires rebaseline; 2026-08-12 code-truth: Desktop package is private v0.1.0 and electron-builder exposes only Linux `dir`; signed macOS/Windows artifacts, updater and rollback do not exist (`auto-update.ts` returns `not-implemented`). CLI cross-platform CI is not Desktop distribution proof. Tauri benchmark is conditional and comes only after UI-independent runtime plus identical Electron scenario metrics; it is not a current migration task",
+      "updated": "2026-08-12"
     },
     {
       "order": 8050,
@@ -25122,6 +25174,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "8b5c1bcd73d2b84e0454f4188c6929721aa47006e30168ddd1e2d50b2bf98083"
+    "value": "6800add5a00969e7d89188a34d6385129c68c23f272717b00631a58a173be435"
   }
 }

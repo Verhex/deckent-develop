@@ -334,6 +334,117 @@ function mapTransportOutcome(observation: ReachabilityProbeObservation): {
   return { outcome: 'failed', reasonCode: 'validation_failed' };
 }
 
+/** The account evidence trio carried alongside a resolved `accountRefHash`. */
+export interface ProviderAccountEvidence {
+  readonly identityEvidenceRef: string;
+  readonly credentialGenerationRef: string;
+  readonly backendScopeRefHash: string;
+}
+
+export type ProviderAccountRefHashResolution =
+  | {
+      readonly state: 'ready';
+      /** Null only for `local` auth, which has no provider account authority. */
+      readonly accountRefHash: string | null;
+      readonly accountEvidence: ProviderAccountEvidence | null;
+    }
+  | { readonly state: 'hold'; readonly detail: string };
+
+function isUsableAccountIdentity(
+  identity: ProviderAccountIdentityReady,
+  request: ProviderAccountIdentityRequest,
+  nowMs: number,
+  maxTtlMs: number,
+): boolean {
+  try {
+    assertCanonicalProviderId(identity.provider);
+    assertOpaqueEvidenceRef('account identity evidence', identity.evidenceRef, true);
+    assertOpaqueEvidenceRef(
+      'account credential generation evidence',
+      identity.credentialGenerationRef,
+      true,
+    );
+    assertOpaqueSha256('account backend scope ref', identity.backendScopeRefHash, true);
+    requireIdentity('account identity issuer', identity.issuer);
+    requireIdentity('account identity stable subject', identity.stableSubject);
+  } catch {
+    return false;
+  }
+  if (identity.provider !== request.provider
+    || identity.authMode !== request.authMode
+    || identity.assurance !== 'provider-verified'
+    || !ACCOUNT_IDENTITY_KINDS.has(identity.identityKind)
+    || identity.backendScopeRefHash !== deriveProviderAccountBackendScopeRefHash(request)) {
+    return false;
+  }
+  const fetchedAt = Date.parse(identity.fetchedAt);
+  const expiresAt = Date.parse(identity.expiresAt);
+  return Number.isFinite(fetchedAt)
+    && Number.isFinite(expiresAt)
+    && new Date(fetchedAt).toISOString() === identity.fetchedAt
+    && new Date(expiresAt).toISOString() === identity.expiresAt
+    && fetchedAt <= nowMs
+    && expiresAt > nowMs
+    && expiresAt - fetchedAt <= maxTtlMs;
+}
+
+/**
+ * The single live account-identity → pseudonymous `accountRefHash` derivation.
+ *
+ * Both the evidence producer's refresh path and the owner-facing provider-limit
+ * authoring flow call THIS function: an authored selector hash that a second
+ * derivation produced would silently stop matching the consuming resolver, so
+ * there is deliberately only one. Raw subject material stays host-memory-only —
+ * it never leaves this function un-pseudonymized.
+ */
+export async function resolveProviderAccountRefHash(input: {
+  readonly account: ProviderAccountIdentityAuthority;
+  readonly keyring: Pick<ProviderAuthorityKeyring, 'pseudonymizeAccount'>;
+  readonly request: ProviderAccountIdentityRequest;
+  readonly now: () => Date;
+  readonly maxTtlMs: number;
+}): Promise<ProviderAccountRefHashResolution> {
+  if (input.request.authMode === 'local') {
+    return { state: 'ready', accountRefHash: null, accountEvidence: null };
+  }
+  let identity: ProviderAccountIdentityResult;
+  try {
+    identity = await input.account.resolve(input.request);
+  } catch (error) {
+    return { state: 'hold', detail: `source:${errorCode(error)}` };
+  }
+  if (identity.state === 'hold') {
+    assertOpaqueEvidenceRef('account authority evidence', identity.evidenceRef, true);
+    return { state: 'hold', detail: identity.evidenceRef };
+  }
+  if (identity.state === 'credential-only') {
+    try {
+      assertOpaqueEvidenceRef('credential generation evidence', identity.credentialGenerationRef, true);
+      assertOpaqueEvidenceRef('credential-only authority evidence', identity.evidenceRef, true);
+    } catch {
+      return { state: 'hold', detail: 'credential-only-evidence-invalid' };
+    }
+    return { state: 'hold', detail: 'credential-only-not-account-authority' };
+  }
+  if (!isUsableAccountIdentity(identity, input.request, input.now().getTime(), input.maxTtlMs)) {
+    return { state: 'hold', detail: 'account-evidence-invalid' };
+  }
+  return {
+    state: 'ready',
+    accountRefHash: input.keyring.pseudonymizeAccount({
+      tenantId: input.request.tenantId,
+      provider: input.request.provider,
+      authMode: input.request.authMode,
+      stableAccountIdentity: identity.stableSubject,
+    }),
+    accountEvidence: {
+      identityEvidenceRef: identity.evidenceRef,
+      credentialGenerationRef: identity.credentialGenerationRef,
+      backendScopeRefHash: identity.backendScopeRefHash,
+    },
+  };
+}
+
 export class ProviderEvidenceProducer {
   readonly authorityRef: string;
   private readonly now: () => Date;
@@ -437,54 +548,22 @@ export class ProviderEvidenceProducer {
     }
     const sources = sourceSelection.sources;
 
-    let accountRefHash: string | null = null;
-    let accountEvidence: {
-      readonly identityEvidenceRef: string;
-      readonly credentialGenerationRef: string;
-      readonly backendScopeRefHash: string;
-    } | null = null;
-    if (request.authMode !== 'local') {
-      const identityRequest: ProviderAccountIdentityRequest = {
+    const account = await resolveProviderAccountRefHash({
+      account: sources.account,
+      keyring: this.options.keyring,
+      request: {
         tenantId: this.options.tenantId,
         provider: request.provider,
         authMode: request.authMode,
         backend: request.backend,
         executionProfile: request.executionProfile,
-      };
-      let identity: ProviderAccountIdentityResult;
-      try {
-        identity = await sources.account.resolve(identityRequest);
-      } catch (error) {
-        return hold('account_authority_hold', `source:${errorCode(error)}`);
-      }
-      if (identity.state === 'hold') {
-        assertOpaqueEvidenceRef('account authority evidence', identity.evidenceRef, true);
-        return hold('account_authority_hold', identity.evidenceRef);
-      }
-      if (identity.state === 'credential-only') {
-        try {
-          assertOpaqueEvidenceRef('credential generation evidence', identity.credentialGenerationRef, true);
-          assertOpaqueEvidenceRef('credential-only authority evidence', identity.evidenceRef, true);
-        } catch {
-          return hold('account_authority_hold', 'credential-only-evidence-invalid');
-        }
-        return hold('account_authority_hold', 'credential-only-not-account-authority');
-      }
-      if (!this.isUsableAccountIdentity(identity, identityRequest)) {
-        return hold('account_authority_hold', 'account-evidence-invalid');
-      }
-      accountRefHash = this.options.keyring.pseudonymizeAccount({
-        tenantId: this.options.tenantId,
-        provider: request.provider,
-        authMode: request.authMode,
-        stableAccountIdentity: identity.stableSubject,
-      });
-      accountEvidence = {
-        identityEvidenceRef: identity.evidenceRef,
-        credentialGenerationRef: identity.credentialGenerationRef,
-        backendScopeRefHash: identity.backendScopeRefHash,
-      };
-    }
+      },
+      now: this.now,
+      maxTtlMs: this.accountIdentityMaxTtlMs,
+    });
+    if (account.state === 'hold') return hold('account_authority_hold', account.detail);
+    const accountRefHash = account.accountRefHash;
+    const accountEvidence = account.accountEvidence;
 
     const limitScope = {
       tenantId: this.options.tenantId,
@@ -742,43 +821,6 @@ export class ProviderEvidenceProducer {
       reachability,
       receiptRef,
     };
-  }
-
-  private isUsableAccountIdentity(
-    identity: ProviderAccountIdentityReady,
-    request: ProviderAccountIdentityRequest,
-  ): boolean {
-    try {
-      assertCanonicalProviderId(identity.provider);
-      assertOpaqueEvidenceRef('account identity evidence', identity.evidenceRef, true);
-      assertOpaqueEvidenceRef(
-        'account credential generation evidence',
-        identity.credentialGenerationRef,
-        true,
-      );
-      assertOpaqueSha256('account backend scope ref', identity.backendScopeRefHash, true);
-      requireIdentity('account identity issuer', identity.issuer);
-      requireIdentity('account identity stable subject', identity.stableSubject);
-    } catch {
-      return false;
-    }
-    if (identity.provider !== request.provider
-      || identity.authMode !== request.authMode
-      || identity.assurance !== 'provider-verified'
-      || !ACCOUNT_IDENTITY_KINDS.has(identity.identityKind)
-      || identity.backendScopeRefHash !== deriveProviderAccountBackendScopeRefHash(request)) {
-      return false;
-    }
-    const fetchedAt = Date.parse(identity.fetchedAt);
-    const expiresAt = Date.parse(identity.expiresAt);
-    const now = this.now().getTime();
-    return Number.isFinite(fetchedAt)
-      && Number.isFinite(expiresAt)
-      && new Date(fetchedAt).toISOString() === identity.fetchedAt
-      && new Date(expiresAt).toISOString() === identity.expiresAt
-      && fetchedAt <= now
-      && expiresAt > now
-      && expiresAt - fetchedAt <= this.accountIdentityMaxTtlMs;
   }
 
   private invocationId(request: ProviderEvidenceRefreshRequest): string {

@@ -1,7 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { snapshotSkillCatalog } from '../../core/skill-pool.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { DECKENT_DIR } from '../../core/constants.js';
 
 interface SkillManifest {
   id?: string;
@@ -11,44 +9,34 @@ interface SkillManifest {
 }
 
 interface SkillEntry {
+  layer?: string;
+  disposition?: unknown;
+  masked?: boolean;
+  profileState?: string | null;
   id: string;
   name: string;
   category: string;
   triggers: string[];
 }
 
+// S5 (sprint-523 task 7): the raw directory scan is deleted — this surface
+// consumes the canonical catalog snapshot, identical to CLI and the S8 gate.
 function readSkills(root: string): SkillEntry[] {
-  const skillsDir = join(root, DECKENT_DIR, 'skills');
-  if (!existsSync(skillsDir)) return [];
-
-  const entries: SkillEntry[] = [];
-
-  try {
-    const dirs = readdirSync(skillsDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name);
-
-    for (const dir of dirs) {
-      const manifestPath = join(skillsDir, dir, 'manifest.json');
-      if (!existsSync(manifestPath)) continue;
-
-      try {
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillManifest;
-        entries.push({
-          id: manifest.id ?? dir,
-          name: manifest.name ?? dir,
-          category: manifest.category ?? 'general',
-          triggers: manifest.triggers ?? [],
-        });
-      } catch {
-        // skip malformed manifest.json
-      }
-    }
-  } catch {
-    // directory read error
-  }
-
-  return entries.sort((a, b) => a.id.localeCompare(b.id));
+  return snapshotSkillCatalog(root).entries.map((entry) => {
+    const manifest = entry.definition as SkillManifest & {
+      routing?: { profileState?: string };
+    };
+    return {
+      id: entry.id,
+      name: manifest.name ?? entry.id,
+      category: manifest.category ?? 'general',
+      triggers: manifest.triggers ?? [],
+      layer: entry.layer,
+      disposition: entry.disposition,
+      masked: entry.masked,
+      profileState: manifest.routing?.profileState ?? null,
+    };
+  });
 }
 
 export function registerSkillListTool(server: McpServer): void {

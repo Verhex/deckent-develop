@@ -18,6 +18,8 @@ import type {
 // ─── Core (value imports — TaskStatus used at runtime for in-memory sync) ─
 import { TaskStatus } from '../core/types.js';
 import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
+import { classifyPersonaIntegrity, type PersonaIntegrityVerdict } from '../core/agent-pool.js';
+import { DEFAULT_PERSONA_INTEGRITY_MIN_BYTES } from '../core/config.js';
 import { resolveSkillPromptBodies } from '../core/skill-loading.js';
 
 import { TASKS_DIR } from '../core/constants.js';
@@ -997,6 +999,62 @@ export async function resolveAgentPrompt(projectRoot: string, task: Task): Promi
   const resolution = getAgentPrompt(agentId, projectRoot);
   if (resolution.source === 'none') return undefined;
   return resolution.content;
+}
+
+/**
+ * D-F(a) spawn-boundary persona gate (sprint-523 task 6) at the SHARED
+ * resolution choke point — the same single-choke-point pattern the 522-011
+ * skill switch proved: every spawn ingress (sprint-spawner, run, spawn,
+ * mcp run, task-mode-runner, scheduler-effects) funnels through
+ * resolveAgentPrompt, so the integrity verdict is computed HERE once.
+ *
+ * Owner rules carried exactly:
+ * - D-D degrade stays untouched: an ABSENT persona (source 'none') is not a
+ *   broken persona — the caller's existing personaless path is preserved.
+ * - Advisory default (quality bar: no blind default-flip): a broken persona
+ *   WARNS and spawns unless `persona_integrity.enforce` is explicitly true.
+ * - Enforce mode returns a typed refusal the spawner writes as an honest
+ *   NO_GO artifact (the provider-unavailable refusal shape).
+ */
+export interface AgentPersonaGateVerdict {
+  content: string | undefined;
+  integrity: PersonaIntegrityVerdict | 'absent';
+  refusal: { reasonCode: 'PERSONA_INTEGRITY_HOLD'; verdict: PersonaIntegrityVerdict } | null;
+}
+
+export function resolveAgentPromptWithIntegrity(
+  projectRoot: string,
+  task: Task,
+  options?: { minBytes?: number; enforce?: boolean },
+): AgentPersonaGateVerdict {
+  const agentId = task.assignedAgent;
+  if (!agentId || agentId === 'generic') {
+    return { content: undefined, integrity: 'absent', refusal: null };
+  }
+  const resolution = getAgentPrompt(agentId, projectRoot);
+  if (resolution.source === 'none') {
+    // D-D: absent persona degrades (personaless spawn) — never a gate matter.
+    return { content: undefined, integrity: 'absent', refusal: null };
+  }
+  const verdict = classifyPersonaIntegrity({
+    availability: resolution.source === 'prompt-md' || resolution.source === 'prompt-md-builtin'
+      ? 'prompt-file'
+      : 'system-prompt',
+    content: resolution.content,
+    minBytes: options?.minBytes ?? DEFAULT_PERSONA_INTEGRITY_MIN_BYTES,
+  });
+  if (verdict === 'intact') {
+    return { content: resolution.content, integrity: verdict, refusal: null };
+  }
+  if (options?.enforce === true) {
+    return {
+      content: undefined,
+      integrity: verdict,
+      refusal: { reasonCode: 'PERSONA_INTEGRITY_HOLD', verdict },
+    };
+  }
+  debugLog('resolveAgentPromptWithIntegrity:advisory', `${agentId}: ${verdict}`);
+  return { content: resolution.content, integrity: verdict, refusal: null };
 }
 
 /**

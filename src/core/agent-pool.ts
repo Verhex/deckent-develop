@@ -1197,6 +1197,36 @@ export interface AgentPromptResolution {
  * of `getAgentPrompt()` observes a changed object — the migration of those consumers onto
  * the richer record is slice S4's work, not this one's.
  */
+/**
+ * Machine-detectable persona integrity (owner D-G(a), sprint-523 task 5).
+ * DATA ONLY in this slice — the spawn boundary (task 6) consumes it; nothing
+ * here changes routing. `digest-mismatch` requires a manifest-declared digest;
+ * absence of a declared digest NEVER fabricates a mismatch.
+ */
+export type PersonaIntegrityVerdict =
+  | 'intact'
+  | 'empty'
+  | 'undersized'
+  | 'digest-mismatch'
+  | 'unreadable';
+
+export function classifyPersonaIntegrity(input: {
+  availability: AgentPromptAvailability;
+  content: string;
+  minBytes: number;
+  declaredDigest?: string | null;
+  actualDigest?: string | null;
+}): PersonaIntegrityVerdict {
+  if (input.availability === 'none') return 'unreadable';
+  const bytes = Buffer.byteLength(input.content ?? '', 'utf8');
+  if (bytes === 0) return 'empty';
+  if (bytes < input.minBytes) return 'undersized';
+  if (input.declaredDigest && input.actualDigest && input.declaredDigest !== input.actualDigest) {
+    return 'digest-mismatch';
+  }
+  return 'intact';
+}
+
 export interface ResolvedAgentPrompt extends AgentPromptResolution {
   /**
    * D4's persona-availability facet, verbatim from agent-types.ts: a PROMPT.md hit is

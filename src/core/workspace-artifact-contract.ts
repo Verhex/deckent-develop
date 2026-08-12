@@ -5,6 +5,7 @@
 // live in the orchestra application service.
 
 import { createHash } from 'node:crypto';
+import { DeckentError } from './errors.js';
 import { z } from 'zod';
 
 export const WORKSPACE_ARTIFACT_SCHEMA_VERSION = 1 as const;
@@ -86,7 +87,7 @@ WorkspaceArtifactDescriptorSchema.array().parse(WORKSPACE_ARTIFACT_REGISTRY);
 
 export function getWorkspaceArtifactDescriptor(id: WorkspaceArtifactId): WorkspaceArtifactDescriptor {
   const descriptor = WORKSPACE_ARTIFACT_REGISTRY.find((entry) => entry.id === id);
-  if (!descriptor) throw new Error(`Unknown workspace artifact: ${id}`);
+  if (!descriptor) throw new DeckentError('E_WORKSPACE_ARTIFACT_UNKNOWN', `Unknown workspace artifact: ${id}`);
   return descriptor;
 }
 

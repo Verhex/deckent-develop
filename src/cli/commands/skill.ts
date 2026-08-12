@@ -8,6 +8,7 @@ import type { SkillDefinition } from '../../core/skill-types.js';
 import { createSkillDefinition } from '../../core/skill-types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { snapshotSkillCatalog } from '../../core/skill-pool.js';
 import { registerSkillMarketplace } from './skill-marketplace.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { analyzeNewSkill, persistSkillActivation } from '../../orchestra/ecosystem-intelligence.js';
@@ -248,7 +249,17 @@ export function registerSkill(program: Command): void {
     .action(async (opts: { json?: boolean; category?: string }) => {
       try {
         const root = resolveProjectRoot();
-        let skills = loadAllSkills(root);
+        // S5 (sprint-523 task 7): the list consumes the canonical catalog
+        // snapshot — same read model as MCP and the S8 determinism gate. The
+        // legacy raw scan (loadAllSkills) stays only for non-catalog commands.
+        const snapshot = snapshotSkillCatalog(root);
+        let skills = snapshot.entries.map((entry) => ({
+          ...normalizeSkillForRender(entry.definition as unknown as SkillDefinition),
+          layer: entry.layer,
+          disposition: entry.disposition,
+          masked: entry.masked,
+          profileState: (entry.definition as { routing?: { profileState?: string } }).routing?.profileState ?? null,
+        }));
 
         if (opts.category) {
           skills = skills.filter((s) => s.category === opts.category);

@@ -642,6 +642,107 @@ const MESSAGES: MessageMap = {
     en: 'Refused: no keyring to rotate. Provision one first with `deckent provider-authority keyring init`.',
     tr: 'Reddedildi: döndürülecek keyring yok. Önce `deckent provider-authority keyring init` ile sağlayın.',
   },
+  // ─── provider-authority limits (owner-authored policy from live truth) ────
+  'provider_authority.limits.cmd_desc': {
+    en: 'Provider-limit authority — author the `provider_limits` policy from live provider truth',
+    tr: 'Provider-limit authority — `provider_limits` politikasını canlı provider gerçeğinden yaz',
+  },
+  'provider_authority.limits.init_desc': {
+    en: 'Derive and write the global `provider_limits` block for one exact provider scope (owner-confirmed)',
+    tr: 'Tek bir kesin provider kapsamı için global `provider_limits` bloğunu türet ve yaz (sahip onaylı)',
+  },
+  'provider_authority.limits.opt_provider': {
+    en: 'Canonical provider id the policy is authored for',
+    tr: 'Politikanın yazılacağı kanonik provider id',
+  },
+  'provider_authority.limits.opt_model': {
+    en: 'Exact model api id the live limit source is asked about',
+    tr: 'Canlı limit kaynağına sorulacak kesin model api id',
+  },
+  'provider_authority.limits.opt_auth_mode': {
+    en: 'Exact auth mode: subscription | api | hybrid | local',
+    tr: 'Kesin auth modu: subscription | api | hybrid | local',
+  },
+  'provider_authority.limits.opt_transport': {
+    en: 'Exact transport: cli | api | http | local-runtime',
+    tr: 'Kesin transport: cli | api | http | local-runtime',
+  },
+  'provider_authority.limits.opt_execution_backend': {
+    en: 'Exact execution backend: host-subprocess | docker | tmux | api | in-process',
+    tr: 'Kesin execution backend: host-subprocess | docker | tmux | api | in-process',
+  },
+  'provider_authority.limits.opt_execution_profile_ref': {
+    en: 'Adapter-owned execution profile reference the account authority is scoped to',
+    tr: 'Account authority kapsamındaki adapter sahipli execution profile referansı',
+  },
+  'provider_authority.limits.opt_endpoint_ref_hash': {
+    en: 'Optional opaque SHA-256 endpoint reference (never a URL)',
+    tr: 'İsteğe bağlı opak SHA-256 endpoint referansı (asla URL değil)',
+  },
+  'provider_authority.limits.opt_tenant': {
+    en: 'Tenant id the policy is authored for (solo hosts use `local`)',
+    tr: 'Politikanın yazılacağı tenant id (tek kullanıcılı host `local` kullanır)',
+  },
+  'provider_authority.limits.opt_warn_at_ratio': {
+    en: 'Consumption ratio (0..1) at which a run is warned',
+    tr: 'Run\'ın uyarılacağı tüketim oranı (0..1)',
+  },
+  'provider_authority.limits.opt_block_at_ratio': {
+    en: 'Consumption ratio (0..1) at which a run is blocked (must be >= warn)',
+    tr: 'Run\'ın bloklanacağı tüketim oranı (0..1; warn değerinden küçük olamaz)',
+  },
+  'provider_authority.limits.needs_scope': {
+    en: 'Refused: an exact scope is required — pass --provider, --model, --auth-mode, --transport, --execution-backend, --execution-profile-ref, --warn-at-ratio and --block-at-ratio. A provider-limit selector is never inferred.',
+    tr: 'Reddedildi: kesin kapsam zorunlu — --provider, --model, --auth-mode, --transport, --execution-backend, --execution-profile-ref, --warn-at-ratio ve --block-at-ratio verin. Provider-limit selector asla tahmin edilmez.',
+  },
+  'provider_authority.limits.invalid_ratio': {
+    en: 'Refused: --warn-at-ratio and --block-at-ratio must be finite numbers between 0 and 1.',
+    tr: 'Reddedildi: --warn-at-ratio ve --block-at-ratio 0 ile 1 arasında sonlu sayılar olmalıdır.',
+  },
+  'provider_authority.limits.sources_unavailable': {
+    en: 'HOLD: no live provider evidence source authority is registered on this host, so account and quota identity cannot be observed. The policy is deliberately NOT authored from placeholder values — register a live evidence source bundle first.',
+    tr: 'HOLD: bu host\'ta kayıtlı canlı provider evidence kaynak yetkisi yok, bu yüzden hesap ve kota kimliği gözlemlenemiyor. Politika bilinçli olarak yer-tutucu değerlerden YAZILMAZ — önce canlı evidence kaynak paketi kaydedin.',
+  },
+  'provider_authority.limits.hold': {
+    en: 'HOLD ({reasonCode}): {detail}\nEvidence: {evidenceRef}\nNothing was written — a provider-limit selector is only ever authored from live provider truth.',
+    tr: 'HOLD ({reasonCode}): {detail}\nKanıt: {evidenceRef}\nHiçbir şey yazılmadı — provider-limit selector yalnızca canlı provider gerçeğinden yazılır.',
+  },
+  'provider_authority.limits.preview': {
+    en: 'Derived from live provider truth:\n  provider={provider} authMode={authMode} transport={transport} backend={executionBackend}\n  tenant={tenantId} accountRefHash={accountRefHash} quotaScopeRefHash={quotaScopeRefHash}\n  windows={windows}\n  warnAtRatio={warnAtRatio} blockAtRatio={blockAtRatio}\n  authorityRef={authorityRef} policyRef={policyRef}',
+    tr: 'Canlı provider gerçeğinden türetildi:\n  provider={provider} authMode={authMode} transport={transport} backend={executionBackend}\n  tenant={tenantId} accountRefHash={accountRefHash} quotaScopeRefHash={quotaScopeRefHash}\n  pencereler={windows}\n  warnAtRatio={warnAtRatio} blockAtRatio={blockAtRatio}\n  authorityRef={authorityRef} policyRef={policyRef}',
+  },
+  'provider_authority.limits.confirm': {
+    en: 'Write this provider_limits block to the global config layer?',
+    tr: 'Bu provider_limits bloğu global config katmanına yazılsın mı?',
+  },
+  'provider_authority.limits.aborted': {
+    en: 'Aborted by owner — nothing was written.',
+    tr: 'Sahibi tarafından iptal edildi — hiçbir şey yazılmadı.',
+  },
+  'provider_authority.limits.written': {
+    en: 'Written: provider_limits authority {authorityRef} at {configPath}. Runs now resolve this scope instead of holding `xverify_provider_scope_unavailable`.',
+    tr: 'Yazıldı: provider_limits authority {authorityRef} — {configPath}. Run\'lar artık `xverify_provider_scope_unavailable` ile beklemek yerine bu kapsamı çözer.',
+  },
+  'provider_authority.limits.refused': {
+    en: 'Refused ({reasonCode}): {detail}. Existing provider-limit authority is never overwritten in place.',
+    tr: 'Reddedildi ({reasonCode}): {detail}. Mevcut provider-limit authority asla yerinde ezilmez.',
+  },
+  'doctor.provider_limit_authority_name': {
+    en: 'Provider limit authority',
+    tr: 'Provider limit authority',
+  },
+  'doctor.provider_limit_authority_ok': {
+    en: 'Authored global provider_limits present ({policies} policy(ies)) — the xverify/execution composition can resolve limit scope.',
+    tr: 'Global provider_limits bloğu mevcut ({policies} policy) — xverify/execution composition limit scope çözebilir.',
+  },
+  'doctor.provider_limit_authority_absent': {
+    en: 'No owner-authored provider_limits block in the global config layer — the composition holds with provider-authority-unavailable. Remedy: `deckent provider-authority limits init` (never `keyring init`; the keyring is a different authority).',
+    tr: "Global config katmanında owner-yazarı provider_limits bloğu yok — composition provider-authority-unavailable ile durur. Çare: `deckent provider-authority limits init` (`keyring init` DEĞİL; keyring farklı bir authority'dir).",
+  },
+  'doctor.provider_limit_authority_authored_empty': {
+    en: 'provider_limits block exists but carries zero policies (authored-empty) — the validator refuses it and the composition still holds. Complete authoring with `deckent provider-authority limits init`.',
+    tr: 'provider_limits bloğu var ama sıfır policy taşıyor (authored-empty) — validator reddeder, composition durmaya devam eder. Authoring akışını `deckent provider-authority limits init` ile tamamlayın.',
+  },
   'doctor.provider_authority_keyring_name': {
     en: 'Provider authority keyring',
     tr: 'Provider authority keyring',
