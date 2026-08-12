@@ -69,6 +69,25 @@ function makeCtx(overrides: Partial<SprintContext> = {}): SprintContext {
 // ─── Tests ─────────────────────────────────────────────────────────────
 
 describe('buildTaskPrompt', () => {
+  it('binds the worker guide by verified digest and fails closed on HOLD', () => {
+    const verified = buildTaskPrompt(makeTask(), makeCtx({
+      workerGuideContract: { state: 'VERIFIED', schemaVersion: 1, digest: 'a'.repeat(64) },
+    })).prompt;
+    expect(verified).toContain(`WORKER_GUIDE_CONTRACT: VERIFIED schema=1 sha256:${'a'.repeat(64)}`);
+
+    const held = buildTaskPrompt(makeTask(), makeCtx({
+      workerGuideContract: { state: 'HOLD', reason: 'digest-mismatch' },
+    })).prompt;
+    expect(held).toContain('WORKER_GUIDE_CONTRACT: HOLD (digest-mismatch)');
+    expect(held).toContain('follow the inline heartbeat, result, scope and Definition-of-Done contracts');
+  });
+
+  it('keeps provider/model out of worker-authored tokenUsage claims', () => {
+    const prompt = buildTaskPrompt(makeTask(), makeCtx()).prompt;
+    expect(prompt).toContain('do not place provider/model inside tokenUsage');
+    expect(prompt).not.toContain('"provider":');
+  });
+
   // Test 1: Core dev task selects correct agent + ADR
   it('should select correct agent for core-dev task', () => {
     const task = makeTask({

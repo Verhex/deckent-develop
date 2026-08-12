@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHash } from 'node:crypto';
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
@@ -397,6 +398,31 @@ describe('isStackStale', () => {
       return { mtimeMs: 1000 } as fs.Stats;
     });
     expect(isStackStale(ROOT)).toBe(false);
+  });
+
+  it('invalidates a versioned cache when workspace authority content changes', () => {
+    const config = JSON.stringify({ language_override: 'typescript' });
+    const identity = 'Language: TypeScript\nLanguage Authority: user\n';
+    const digest = createHash('sha256')
+      .update('.deckent/config.json').update(config)
+      .update('.deckent/workspace/IDENTITY.md').update(identity)
+      .digest('hex');
+    const cache = JSON.stringify({
+      language: 'typescript',
+      cacheContract: { version: 1, workspaceAuthorityDigest: digest },
+    });
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: 2000 } as fs.Stats);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const value = String(p);
+      if (value.endsWith('project-stack.json')) return cache;
+      if (value.endsWith('config.json')) return config;
+      if (value.endsWith('IDENTITY.md')) return identity.replace('TypeScript', 'Rust');
+      throw new Error('ENOENT');
+    });
+
+    expect(isStackStale(ROOT)).toBe(true);
   });
 
   it('does not log statSync failures for absent monitored build files', () => {
@@ -1217,6 +1243,29 @@ describe('IDENTITY.md Language feed', () => {
 
     const stack = detectProjectStack(ROOT);
     expect(stack.language).toBe('typescript');
+  });
+
+  it('detected identity defers to current repository evidence', () => {
+    mockWithIdentity('Language: TypeScript (ESM)\nLanguage Authority: detected\n', ['Cargo.toml']);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('rust');
+  });
+
+  it('explicit config override wins over user identity and repository evidence', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const value = String(p);
+      return value.endsWith('config.json') || value.endsWith('IDENTITY.md') || value.endsWith('Cargo.toml');
+    });
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const value = String(p);
+      if (value.endsWith('config.json')) return JSON.stringify({ language_override: 'go' });
+      if (value.endsWith('IDENTITY.md')) return 'Language: TypeScript\nLanguage Authority: user\n';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('go');
   });
 
   it('falls back to heuristic when IDENTITY.md is absent', () => {

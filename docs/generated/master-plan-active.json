@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2bd7bf990eff62e345db19a63ceab3c2304f9d3508ac6c928d6fe1b8c009160b"
+    "value": "f2245006b537a063558204e99edb50a161a5511cc6e50cc15e66316dbcd65219"
   },
   "summary": {
-    "total": 478,
-    "active": 418,
+    "total": 483,
+    "active": 423,
     "terminal": 60,
     "receipts": 184,
     "byState": {
-      "OPEN": 325,
+      "OPEN": 330,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 311,
+      "P0": 316,
       "P1": 130,
       "P2": 37
     },
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 13,
       "TOOL": 1,
-      "TRUTH": 88,
+      "TRUTH": 93,
       "XPLAT": 3
     }
   },
@@ -348,6 +348,61 @@
       "updated": "2026-08-10",
       "definitionDigest": "3403134ca5eb3c8b6a2235ab4eacad2433d0c9c71c6b143d80ac735e2fde095e",
       "progressDigest": "9ad0704641ba9dc1cedfd9b85c98dab49c0b2179887969afd880720f939558f0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 173,
+      "id": "WORKSPACE-CONTRACT-AUTHORITY-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "c4d80ee8e812a5f4c1a6a458a0fdd24c3adf311213289ae25134c759197895fc",
+      "progressDigest": "c1adb6e2c3fe70c4b2c15ac5c4ddccd8a3664e7c7a4d39e3d7304226a8000516",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 174,
+      "id": "WORKSPACE-IDENTITY-AUTHORITY-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "0da07c74dc56a045d1f502a89296bba6f0f180fd3f0fff237b88a3bd4de1d394",
+      "progressDigest": "5233eb5bc5f9df4503225e50e915d2681cdbfe90a5e4c9d20b8c497061985f2e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 175,
+      "id": "WORKER-GUIDE-PROMPT-AUTHORITY-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "c3389a89121fa1e62d3d01f124b5aa3d988082fd3e2bba70da85659e16ab4538",
+      "progressDigest": "5deeca41c984c2f99d8b9e91fe38d91e9aed2f21afd047546d5128cdcc14c591",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 176,
+      "id": "BOOT-RECOVERY-CONTRACT-AUTHORITY-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "4b171d4a051dac5ac24f6b05abcbf06b37419c1b3e6af72f585e935abaafce42",
+      "progressDigest": "7357b5cfa844410d9a768db57bf871f4081aeb6b2a99c5d1396463eac91ccf44",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 177,
+      "id": "WORKSPACE-TOOL-CATALOG-AUTHORITY-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-11",
+      "definitionDigest": "d69e5f61895e418abc42a1367fa79b64b85592e01e9506276cf9d6d899977314",
+      "progressDigest": "046d42d06cc933ed0de146592f5c474db64e9cf8647adaf3b787ebaa98e62ce1",
       "terminalClosureDigest": null
     },
     {
@@ -7697,7 +7752,8 @@
         "DOCS-RELEASE-TRUTH-001",
         "MANAGED-DOC-CACHE-TRUTH-001",
         "REPO-MIGRATION-001",
-        "STATE-ARCHIVE-RESTORE-001"
+        "STATE-ARCHIVE-RESTORE-001",
+        "WORKSPACE-CONTRACT-AUTHORITY-001"
       ],
       "children": [],
       "gates": [
@@ -7810,7 +7866,8 @@
         "SKILL-DOCS-TRUTH-001"
       ],
       "children": [
-        "MANAGED-DOC-CACHE-TRUTH-001"
+        "MANAGED-DOC-CACHE-TRUTH-001",
+        "WORKSPACE-CONTRACT-AUTHORITY-001"
       ],
       "gates": [
         "G1"
@@ -7829,7 +7886,8 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "DOCS-TOPOLOGY-001",
-        "MANAGED-DOC-CACHE-TRUTH-001"
+        "MANAGED-DOC-CACHE-TRUTH-001",
+        "WORKSPACE-CONTRACT-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One generator registry; CI and release gate enforce exact counts/links",
@@ -7878,7 +7936,9 @@
         "DOCS-TOPOLOGY-001",
         "STATE-RETENTION-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "WORKSPACE-CONTRACT-AUTHORITY-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -7904,6 +7964,203 @@
       "acceptance": "Config active-ID seti target existence ve generator eligibility ile fail-closed doğrulanır; stale cache ID'leri bounded reconcile edilir; malformed cache self-heal olur; write atomic/concurrency-safe ve cache her zaman disposable/non-authoritative kalır; finalization typed drift sonucu yayınlar; CLI/MCP/Nervous invalidation aynı typed cache-kind ve effect receipt'ini tüketir, no-op success yasaktır",
       "evidence": "2026-08-10 disk/code RCA ve Alperen onayı: config 9 entry, yalnız 3 generator-eligible; 5 target yok, identity generator'sız; cache 11 entry ve iki removed ID taşıyor; runner prune/reconcile yapmıyor ve non-fatal reason'lar durable görünmüyor; cache shallow-validated/direct-write; Nervous registry build/routing derken handler yalnız docs/all effecti üretiyor",
       "updated": "2026-08-10"
+    },
+    {
+      "order": 173,
+      "id": "WORKSPACE-CONTRACT-AUTHORITY-001",
+      "parent": "DOCS-RELEASE-TRUTH-001",
+      "program": "TRUTH",
+      "outcome": "`.deckent/workspace` artifact seti için versioned registry, ownership, migration ve projection authority",
+      "priority": "P0",
+      "dependsOn": [
+        "MANAGED-DOC-CACHE-TRUTH-001",
+        "DOCS-TOPOLOGY-001"
+      ],
+      "dependents": [],
+      "children": [
+        "WORKSPACE-IDENTITY-AUTHORITY-001",
+        "WORKER-GUIDE-PROMPT-AUTHORITY-001",
+        "BOOT-RECOVERY-CONTRACT-AUTHORITY-001",
+        "WORKSPACE-TOOL-CATALOG-AUTHORITY-001"
+      ],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "MANAGED-DOC-CACHE-TRUTH-001",
+        "DOCS-TOPOLOGY-001",
+        "WORKSPACE-IDENTITY-AUTHORITY-001",
+        "WORKER-GUIDE-PROMPT-AUTHORITY-001",
+        "BOOT-RECOVERY-CONTRACT-AUTHORITY-001",
+        "WORKSPACE-TOOL-CATALOG-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Exact beş artifact (`IDENTITY.md`, `TOOLS.md`, `BOOT.md`, `WORKER-GUIDE.md`, `stats-snapshot.json`) tek lower-layer registryde schema version, authority, write policy, managed/protected section ve managed-doc projection taşır; CLI init, MCP init ve managed-doc generator aynı application service'i tüketir; re-init user sectionlarını ve volatile snapshotı korur; legacy içerik versioned, idempotent ve lossless migrate olur; unknown/unsupported artifact typed HOLD/disposition ister; Linux/macOS/Windows-native/WSL ve clean-install proof'u pass olur",
+      "evidence": "2026-08-11 kök-neden+implementation: competing CLI/MCP/managed-doc producerları ve version/schema eksikliği workspace driftini görünmez yapıyordu. `src/core/workspace-artifact-contract.ts` registry/header/digest contractını, `src/orchestra/workspace-artifacts.ts` ortak no-clobber service'i kurdu; CLI+MCP init ve managed-doc config/generator aynı zincire bağlandı. Preflight yeni-schema downgrade'ını ve repo-controlled symlink write-through'u mutation öncesi typed fail-closed keser. Targeted workspace/init/MCP/managed-doc testleri green; native cross-platform proof'u açık X boyutudur",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 174,
+      "id": "WORKSPACE-IDENTITY-AUTHORITY-001",
+      "parent": "WORKSPACE-CONTRACT-AUTHORITY-001",
+      "program": "TRUTH",
+      "outcome": "Workspace identity için user authority, detected projection, provenance isolation ve stack-cache invalidation contractı",
+      "priority": "P0",
+      "dependsOn": [
+        "PROVENANCE-CONTEXT-001",
+        "PROJECT-STACK-CACHE-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROVENANCE-CONTEXT-001",
+        "PROJECT-STACK-CACHE-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "User-authored identity ile detector projectionı machine-readable authority/provenance headerıyla ayrılır; prompt ingestion context-only, digest-bound ve tag-injection-safe olur; memory DB file projectionını doğru source/provenance ile taşır; explicit config override detected identityden üstündür; config/identity içerik digesti cache fingerprintine girer ve legacy cache lossless migrate edilir; runtime platform tek host snapshotı gibi hardcode edilmez; multi-root/tenant ve every-environment proof'u pass olur",
+      "evidence": "2026-08-11 kök-neden+implementation: raw identity prompta append ediliyor, DB sync her kaydı `brain` sayıyor, detected identity config overrideı ezebiliyor ve cache authority input deletion/content driftini görmüyordu. `src/agent/identity.ts`, `src/core/identity-generator.ts`, `src/core/stack-detector.ts` ve workspace header contractı provenance/digest/precedence zincirini production-wired yaptı; targeted identity/stack tests green",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 175,
+      "id": "WORKER-GUIDE-PROMPT-AUTHORITY-001",
+      "parent": "WORKSPACE-CONTRACT-AUTHORITY-001",
+      "program": "TRUTH",
+      "outcome": "Worker guide ile compiled prompt arasında schema-derived, digest-bound ve fail-closed authority contractı",
+      "priority": "P0",
+      "dependsOn": [
+        "PROMPT-001",
+        "RESULT-INGEST-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROMPT-001",
+        "RESULT-INGEST-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Fresh init her zaman guide üretir; guide result-ingress ile host-authored canonical resultı ayırır, required field listesini runtime schemadan ve objective DoD'yi ortak policyden üretir; retired yüzde rubric yoktur; worker provider/model veya token/cost uydurmaz; task prompt guide digestini doğrular, eksik/tampered durumda inline authority ile typed HOLD verir; task-builder production rootundan contractı bağlar; verifier-authored `.verify-ran`, heartbeat, scope, ADR-037 ve processQueue failure semantics korunur",
+      "evidence": "2026-08-11 kök-neden+implementation: guide fresh initte yoktu, dangling path taşıyordu, yüzde-rubric ve `tokenUsage.provider` talebi canonical settlementla çelişiyordu. Shared DoD/schema renderer, SHA-256 managed block inspection ve task-builder→prompt wiring eklendi; tamper/HOLD ve provider-model negative tests dahil targeted prompt/workspace seti green",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 176,
+      "id": "BOOT-RECOVERY-CONTRACT-AUTHORITY-001",
+      "parent": "WORKSPACE-CONTRACT-AUTHORITY-001",
+      "program": "TRUTH",
+      "outcome": "BOOT lifecycle ve recovery örneklerinin canonical command/service semantiğinden üretilmesi",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "SURFACE-PARITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "SURFACE-PARITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Boot sequence DIRECTIVES/config/memory authorityden admission, worker heartbeat/result, evaluation, bounded FIX ve terminal retrospective/archivea exact yedi faz taşır; recovery diagnostics-first/fail-closed olur; CLI `recover <sprint-id> --dry-run` ve `--resume`, mutating owner approvalı ve `run \"<description>\"` semantiğini doğru açıklar; MCP parity `{ sprintId, dryRun, approval }` ve `deckent_run { description }` ile eşleşir; kill/cleanup first-response değildir; generator ve init aynı source'u tüketir; executable CLI/MCP contract proofs pass olur",
+      "evidence": "2026-08-11 kök-neden+implementation: eski BOOT destructive kill/cleanup zinciri, argsız recover, task-id replay ve yanlış MCP `{taskId}` örneği yayıyordu. i18n catalog-backed canonical boot/recovery renderer CLI/MCP/managed-doc zincirine bağlandı; stale-pattern negative ve exact command tests green",
+      "updated": "2026-08-11"
+    },
+    {
+      "order": 177,
+      "id": "WORKSPACE-TOOL-CATALOG-AUTHORITY-001",
+      "parent": "WORKSPACE-CONTRACT-AUTHORITY-001",
+      "program": "TRUTH",
+      "outcome": "TOOLS.md için canonical MCP/CLI catalog projectionı, effect/approval truth ve filename-fiction yasağı",
+      "priority": "P0",
+      "dependsOn": [
+        "SURFACE-PARITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SURFACE-PARITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "MCP satırları canonical lower-layer TOOL_CATALOGdan exact annotations/effect/idempotence/approval metadata ile, CLI satırları registered command tree'den üretilir; source filename veya helper modül adı capability sayılmaz; init, MCP, managed docs ve user/AI reference aynı rendererı tüketir; exact parity/count gate driftte fail eder; labels i18n catalogdan gelir; removed/renamed command versioned migration/disposition taşır; clean-package ve every-environment proof'u pass olur",
+      "evidence": "2026-08-11 kök-neden+implementation: filename-derived generator 40 araç gösterirken canonical MCP 49'du; 15 gerçek araç eksik, 6 sahteydi; CLI module sayısı gerçek 75 command yerine 107 gibi sunulabiliyordu. Canonical kataloglar `src/core/{mcp-tool-catalog,command-registry}.ts` lower-layer SSOT'a taşındı, surface compatibility projectionları korundu ve TOOLS renderer exact 49 MCP/75 CLI üretir; annotation/parity/count tests green; runtime locale authority cross-linki I18N-CATALOG-AUTHORITY-001'dir",
+      "updated": "2026-08-11"
     },
     {
       "order": 180,
@@ -14367,6 +14624,7 @@
         "APPROVAL-001"
       ],
       "dependents": [
+        "BOOT-RECOVERY-CONTRACT-AUTHORITY-001",
         "RECOVERY-ASSURANCE-001",
         "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
         "RECOVERY-BORN-480-SCOPE-001",
@@ -16333,7 +16591,9 @@
       "dependsOn": [
         "KERNEL-SETTLEMENT-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "WORKER-GUIDE-PROMPT-AUTHORITY-001"
+      ],
       "children": [
         "RESULT-RECONCILIATION-001"
       ],
@@ -19164,7 +19424,9 @@
       "dependsOn": [
         "RECEIPT-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "WORKSPACE-IDENTITY-AUTHORITY-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -20912,7 +21174,9 @@
       ],
       "dependents": [
         "API-DEVELOPER-001",
-        "DOCS-PRODUCT-001"
+        "BOOT-RECOVERY-CONTRACT-AUTHORITY-001",
+        "DOCS-PRODUCT-001",
+        "WORKSPACE-TOOL-CATALOG-AUTHORITY-001"
       ],
       "children": [
         "STATUS-SURFACE-PARITY-001"
@@ -23520,7 +23784,8 @@
         "RECOVERY-BORN-485-PROMPT-POLICY-001",
         "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001",
         "ROUTING-001",
-        "WORKER-DISCOVERY-001"
+        "WORKER-DISCOVERY-001",
+        "WORKER-GUIDE-PROMPT-AUTHORITY-001"
       ],
       "children": [
         "PROMPT-V3-001",
@@ -23853,7 +24118,9 @@
         "CONFIG-TRUTH-001",
         "KERNEL-STATE-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "WORKSPACE-IDENTITY-AUTHORITY-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -24843,6 +25110,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e66491bea49e93e7d2db429afa319c612a5a0fb2dfeef1a0aa466bfbb8600b67"
+    "value": "e8a889ca35316965a0a389adf73810252f36be149eade0ef99044aaf0d75c9ac"
   }
 }

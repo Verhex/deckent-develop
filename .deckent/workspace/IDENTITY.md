@@ -1,3 +1,4 @@
+<!-- DECKENT:WORKSPACE id="identity" schema="1" authority="user" provenance="user-authored-or-migrated" -->
 # Project Identity
 Name: deckent
 Type: Provider-neutral, local-first Agent OS / AI runtime ecosystem
@@ -17,7 +18,7 @@ Direction (2026-06-29 pivot): Tool-driven, progressive-disclosure, full-control 
 Moat: Deterministik eval-backed orchestration · governance-by-construction · outcome→evidence→routing→promotion→training-trace kapalı öğrenme döngüsü
 SSOT: `docs/MASTER-PLAN.md` · core-memory: `.deckent/docs/core-memory/MEMORY.md` · yön gerekçesi: `.analysis/hermes-vs-deckent-direction-decisions.md`
 <!-- AUTOGEN:START id="identity-tests" -->
-Tests: 34,852 descriptors (parsed from tests/**/*.test.ts(x))
+Tests: 34,960 descriptors (parsed from tests/**/*.test.ts(x))
 Dashboard Tests: 96 descriptors (parsed from src/dashboard/src/**/*.test.tsx)
 Coverage: N/A
 <!-- AUTOGEN:END id="identity-tests" -->

@@ -18,6 +18,8 @@ import {
 import { ensureDeckentImport } from '../../core/utils.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
+import { initializeWorkspaceArtifacts } from '../../orchestra/workspace-artifacts.js';
+import { detectProjectStack } from '../../core/stack-detector.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -27,22 +29,6 @@ function writeIfNotExists(filePath: string, content: string): void {
   if (!existsSync(filePath)) {
     writeFileSync(filePath, content);
   }
-}
-
-function generateToolsContent(root: string): string {
-  const lines = ['# Tools\n'];
-  try {
-    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
-    const scripts = pkg.scripts as Record<string, string> | undefined;
-    if (scripts) {
-      for (const [name, cmd] of Object.entries(scripts)) {
-        lines.push(`- **${name}**: \`${cmd}\``);
-      }
-    }
-  } catch {
-    lines.push('No package.json found. Add your build/test commands here.');
-  }
-  return lines.join('\n') + '\n';
 }
 
 function appendToGitignore(root: string, entries: string[]): void {
@@ -69,7 +55,7 @@ export function registerInitTool(server: McpServer): void {
         projectName: z.string().optional().describe('Project name used in DECKENT.md header and PROJECT-IDENTITY.md. Defaults to current directory name if omitted.'),
         mode: z.enum(['performance', 'balanced', 'economic', 'api', 'max_plan', 'max5x_plan', 'pro_plan']).optional().default('performance').describe('Plan tier mode: performance (Opus, max power), balanced (Sonnet brain + Opus workers), economic (Sonnet, cost-efficient), api (API key, pay-per-use)'),
         language: z.enum(['en', 'tr']).optional().default('en').describe('Language for agent prompt templates (en=English, tr=Turkish)'),
-        force: z.boolean().optional().default(false).describe('Force re-initialization: overwrites existing config.json and workspace files. Does not delete .brain/ or .tasks/ data.'),
+        force: z.boolean().optional().default(false).describe('Force config re-initialization while reconciling only registered managed workspace sections; user-owned workspace content, .brain/ and .tasks/ data are preserved.'),
         auto: z.boolean().optional().default(false).describe('Auto-detection mode: skip interactive wizard, detect project stack automatically and apply defaults.'),
         installMissing: z.boolean().optional().default(false).describe('Install missing provider CLIs (claude/codex/gemini) automatically. MCP has no interactive consent, so this is an explicit opt-in (equivalent to CLI `--yes`). When false, missing tools are only reported.'),
       }),
@@ -174,9 +160,24 @@ Lint: tsc --noEmit
       // .brain/ root .md stubs (MEMORY / RETRO / PATTERNS / DEBT / DECISIONS /
       // PROJECT-IDENTITY). memory.db is the single source of truth.
 
-      // Workspace: TOOLS.md + BOOT.md
-      writeFile(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));
-      writeFile(join(root, WORKSPACE_DIR, 'BOOT.md'), `# Boot Sequence\n\n1. Brain reads DIRECTIVES.md\n2. Brain checks context (MEMORY, RETRO, DEBT, PATTERNS)\n3. Brain plans sprint\n4. Workers spawned, auditor scan loop starts\n5. Workers execute tasks, write heartbeats\n6. Brain waits for results, evaluates\n7. Sprint complete\n`);
+      // Versioned workspace artifacts — same application service as CLI init.
+      let detectedStack: ReturnType<typeof detectProjectStack> | undefined;
+      try {
+        detectedStack = detectProjectStack(root);
+      } catch {
+        // Stack detection is advisory during bootstrap. The versioned
+        // workspace contract records undetected values honestly and the
+        // canonical detector can refresh them after init has created state.
+      }
+      const workspace = initializeWorkspaceArtifacts({
+        projectRoot: root,
+        projectName: resolvedProjectName,
+        language,
+        stack: detectedStack,
+      });
+      created.push(...workspace.actions
+        .filter((action) => action.action !== 'unchanged')
+        .map((action) => action.path));
 
       // Bootstrap docs.json — managed docs automation (template-based)
       try {

@@ -5306,6 +5306,77 @@ const MESSAGES: MessageMap = {
   'desktop.nova.river.tool': { en: 'tool', tr: 'araç' },
   'desktop.nova.focus.empty': { en: 'no narrative yet — the worker is thinking…', tr: 'henüz anlatı yok — worker düşünüyor…' },
 
+  // ─── Versioned `.deckent/workspace` artifact contract ────────────────
+  'workspace.identity.template': {
+    en: '# Project Identity\nName: {projectName}\nLanguage: {language}\nLanguage Authority: detected\nFramework: {framework}\nTest: {testFramework}\nBuild: {buildTool}\nRuntime: {runtime}\nPlatform: runtime-resolved (macOS · Linux · Windows native · WSL)',
+    tr: '# Proje Kimliği\nName: {projectName}\nLanguage: {language}\nLanguage Authority: detected\nFramework: {framework}\nTest: {testFramework}\nBuild: {buildTool}\nRuntime: {runtime}\nPlatform: runtime-resolved (macOS · Linux · Windows native · WSL)',
+  },
+  'workspace.title.environment_tools': { en: 'Environment Tools', tr: 'Ortam Araçları' },
+  'workspace.title.boot': { en: 'Boot', tr: 'Başlatma' },
+  'workspace.title.worker_guide': { en: 'Worker Guide', tr: 'Worker Rehberi' },
+  'workspace.stats.comment': {
+    en: 'Tracked volatile-stat snapshot. Refresh explicitly with docs:stats:refresh; init never derives local runtime values.',
+    tr: 'Takip edilen volatile-stat snapshot. docs:stats:refresh ile açıkça yenile; init local runtime değerleri türetmez.',
+  },
+  'workspace.tools.package_intro': {
+    en: 'Commands declared by this project package:',
+    tr: 'Bu projenin package manifestinde tanımlanan komutlar:',
+  },
+  'workspace.tools.no_package': {
+    en: 'No package.json scripts were detected. Add project-native build, test and lint commands here.',
+    tr: 'package.json scripti algılanmadı. Projeye özgü build, test ve lint komutlarını buraya ekleyin.',
+  },
+  'workspace.tools.mcp_intro': {
+    en: 'This table is generated from the canonical MCP TOOL_CATALOG; filenames are never interpreted as tools.',
+    tr: 'Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla tool olarak yorumlanmaz.',
+  },
+  'workspace.tools.cli_intro': {
+    en: 'This table is generated from the registered cross-surface command tree; helper module filenames are excluded.',
+    tr: 'Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper module dosya adları dışlanır.',
+  },
+  'workspace.tools.header.script': { en: 'Script', tr: 'Script' },
+  'workspace.tools.header.command': { en: 'Command', tr: 'Komut' },
+  'workspace.tools.header.mcp_name': { en: 'MCP Name', tr: 'MCP Adı' },
+  'workspace.tools.header.effect': { en: 'Effect', tr: 'Etki' },
+  'workspace.tools.header.approval': { en: 'Approval', tr: 'Onay' },
+  'workspace.tools.header.idempotent': { en: 'Idempotent', tr: 'Idempotent' },
+  'workspace.tools.header.category': { en: 'Category', tr: 'Kategori' },
+  'workspace.tools.header.risk': { en: 'Risk', tr: 'Risk' },
+  'workspace.tools.header.surfaces': { en: 'Surfaces', tr: 'Yüzeyler' },
+  'workspace.tools.total': { en: 'Total: {count}', tr: 'Toplam: {count}' },
+  'workspace.tools.effect.read_only': { en: 'read-only', tr: 'salt-okunur' },
+  'workspace.tools.effect.mutating': { en: 'mutating', tr: 'değiştirici' },
+  'workspace.tools.effect.destructive': { en: 'destructive', tr: 'yıkıcı' },
+  'workspace.tools.approval.not_required': { en: 'not required by effect class', tr: 'effect class gereği zorunlu değil' },
+  'workspace.tools.approval.required': { en: 'required by runtime policy', tr: 'runtime policy gereği zorunlu' },
+  'workspace.common.yes': { en: 'yes', tr: 'evet' },
+  'workspace.common.no': { en: 'no', tr: 'hayır' },
+  'workspace.common.not_detected': { en: '(not detected)', tr: '(algılanmadı)' },
+  'workspace.boot.sequence': {
+    en: '1. **Load authority** — Brain reads `DIRECTIVES.md`, effective config and `.brain/memory.db`; generated projections never create policy.\n2. **Plan and admit** — the exact DAG, provider/model/auth/budget/reachability and write scope are resolved before dispatch.\n3. **Spawn** — the configured platform adapter launches only admitted workers.\n4. **Execute** — workers publish host-observed heartbeat, activity and result-ingress artifacts.\n5. **Evaluate** — Brain reconciles disk truth, tests, scope, cost and policy evidence into GO, FIX or typed HOLD/NO_GO.\n6. **Fix** — eligible failures enter the bounded FIX DAG; `processQueue` never fabricates dependency completion.\n7. **Finalize and archive** — terminal settlement, Retrospective, memory, trace and projections are published before canonical retention runs.',
+    tr: '1. **Authority yükle** — Brain `DIRECTIVES.md`, effective config ve `.brain/memory.db` kaynaklarını okur; generated projectionlar policy üretmez.\n2. **Planla ve admit et** — exact DAG, provider/model/auth/budget/reachability ve write scope dispatch öncesi çözülür.\n3. **Spawn** — yapılandırılmış platform adapterı yalnız admitted workerları başlatır.\n4. **Execute** — workerlar host-observed heartbeat, activity ve result-ingress artefaktlarını yayımlar.\n5. **Evaluate** — Brain disk truth, test, scope, cost ve policy kanıtını GO, FIX veya typed HOLD/NO_GO kararına uzlaştırır.\n6. **Fix** — uygun hatalar bounded FIX DAG’a girer; `processQueue` dependency completion uydurmaz.\n7. **Finalize ve archive** — canonical retention çalışmadan önce terminal settlement, Retrospective, memory, trace ve projectionlar yayımlanır.',
+  },
+  'workspace.boot.recovery': {
+    en: 'Recovery is diagnostics-first and fail-closed. Never start with kill or cleanup.\n\n```bash\n# 1. Inspect without mutation\ndeckent status --json\ndeckent doctor\n\n# 2. Preview the canonical recovery operation\ndeckent recover <sprint-id> --dry-run\n\n# 3. Resume only a canonically PAUSED/ORPHANED run\ndeckent recover <sprint-id> --resume\n\n# 4. Execute mutating recovery only after exact owner approval\ndeckent recover <sprint-id>\n\n# 5. Run a new one-shot description; this is not a historical task-id replay\ndeckent run "<description>"\n```\n\nMCP parity: `deckent_status {}` then `deckent_recover { sprintId, dryRun: true }`. A mutating MCP recovery additionally requires an exact identity/generation/fence-bound `approval`. `deckent_run` accepts `{ description }`, never `{ taskId }`. `kill` and `cleanup` are separate destructive operations and require their own live owner decision.',
+    tr: 'Recovery diagnostics-first ve fail-closed çalışır. Asla kill veya cleanup ile başlama.\n\n```bash\n# 1. Mutation yapmadan incele\ndeckent status --json\ndeckent doctor\n\n# 2. Canonical recovery operationı önizle\ndeckent recover <sprint-id> --dry-run\n\n# 3. Yalnız canonical PAUSED/ORPHANED runı sürdür\ndeckent recover <sprint-id> --resume\n\n# 4. Mutating recoveryyi ancak exact owner onayı sonrası çalıştır\ndeckent recover <sprint-id>\n\n# 5. Yeni bir one-shot açıklama çalıştır; bu historical task-id replay değildir\ndeckent run "<description>"\n```\n\nMCP paritesi: önce `deckent_status {}`, sonra `deckent_recover { sprintId, dryRun: true }`. Mutating MCP recovery ayrıca exact identity/generation/fence-bound `approval` ister. `deckent_run` `{ description }` kabul eder; `{ taskId }` kabul etmez. `kill` ve `cleanup` ayrı destructive operationlardır ve kendi canlı owner kararlarını gerektirir.',
+  },
+  'workspace.worker.contract': {
+    en: 'This contract is generated from worker runtime schemas and prompt policy. It is supporting context; the compiled, digest-bound task prompt remains the attempt authority.\n\n### Result ingress vs canonical result\n\nWorkers write `.tasks/task-{id}.result` ingress claims: `taskId`, `workerId`, `filesChanged` (string array), `linesAdded`, `linesRemoved`, `testsPassed` (boolean), `coverage` (0–100), `selfAssessment` and `notes` (single string). Do not estimate token usage. Provider/model, token/cost, disk diff, tests and TypeScript evidence are host-authored in the canonical schema `{schemaVersion}` result.\n\nCanonical schema-required fields (derived at runtime): `{requiredFields}`.\n\n### Heartbeat\n\nCreate `.tasks/task-{id}.hb` before work. Increment `sequence`; use a fresh UTC ISO timestamp; keep `currentAction` concise. Heartbeat content is activity context—not standalone process-liveness or terminal authority.\n\n### Objective Definition of Done\n\n- DONE — {done}\n- GO_WITH_TECH_DEBT — {techDebt}\n- NO_GO — {noGo}\n\nThere is no percentage threshold. Evidence for each criterion decides the verdict.\n\n### Verification and honest-result gate\n\nThe `.verify-ran` marker is verifier-authored evidence; never create or claim it manually. Before DONE, compare baseline, end state and the actual criterion evidence. If a dependency has not settled, do not busy-wait or infer success from `processQueue`; report the exact NO_GO/HOLD condition.\n\n### Scope, ADR-037 authority and forbidden anti-patterns\n\n`scope.filesWrite` is the exact write allow-list; protocol artifacts under `.tasks/` are the only lifecycle exception. Do not mutate dependencies or run project-wide build from a worker. If a required capability or authority is unavailable, write a concrete NO_GO/HOLD reason instead of fabricating completion.\n\n| Anti-pattern | Status | Reason |\n|---|---|---|\n| `it.skip(...)` without a justification | forbidden | hides failed evidence |\n| `stub()` or a hardcoded empty implementation | forbidden | creates a false GO |\n| writing outside `scope.filesWrite` | forbidden | violates ADR-037 authority |\n| claiming DONE without verifier evidence | forbidden | violates the honest-result gate |',
+    tr: 'Bu contract worker runtime schemaları ve prompt policy üzerinden üretilir. Supporting contexttir; compiled ve digest-bound task prompt attempt authority olarak kalır.\n\n### Result ingress ve canonical result\n\nWorker `.tasks/task-{id}.result` ingress claimlerini yazar: `taskId`, `workerId`, `filesChanged` (string array), `linesAdded`, `linesRemoved`, `testsPassed` (boolean), `coverage` (0–100), `selfAssessment` ve `notes` (tek string). Token usage tahmini yapma. Provider/model, token/cost, disk diff, test ve TypeScript kanıtı canonical schema `{schemaVersion}` sonucunda host tarafından yazılır.\n\nCanonical schema-required alanlar (runtime’da türetilir): `{requiredFields}`.\n\n### Heartbeat\n\nİşe başlamadan `.tasks/task-{id}.hb` oluştur. `sequence` değerini artır; taze UTC ISO timestamp kullan; `currentAction` kısa olsun. Heartbeat içeriği activity contexttir—tek başına process-liveness veya terminal authority değildir.\n\n### Objective Definition of Done\n\n- DONE — {done}\n- GO_WITH_TECH_DEBT — {techDebt}\n- NO_GO — {noGo}\n\nPercentage threshold yoktur. Verdicti her kriterin kanıtı belirler.\n\n### Verification ve honest-result gate\n\n`.verify-ran` marker verifier-authored kanıttır; elle oluşturma veya varmış gibi claim etme. DONE öncesi baseline, end state ve gerçek kriter kanıtını karşılaştır. Bir dependency settle olmadıysa busy-wait yapma veya `processQueue` üzerinden başarı varsayma; exact NO_GO/HOLD koşulunu bildir.\n\n### Scope, ADR-037 authority ve yasak anti-patternler\n\n`scope.filesWrite` exact write allow-listtir; `.tasks/` altındaki protocol artefaktları tek lifecycle istisnasıdır. Worker içinden dependency mutation veya project-wide build çalıştırma. Gerekli capability veya authority unavailable ise completion uydurmak yerine concrete NO_GO/HOLD nedeni yaz.\n\n| Anti-pattern | Durum | Neden |\n|---|---|---|\n| Gerekçesiz `it.skip(...)` | yasak | başarısız kanıtı gizler |\n| `stub()` veya hardcoded boş implementation | yasak | false GO üretir |\n| `scope.filesWrite` dışına yazma | yasak | ADR-037 authority ihlalidir |\n| verifier kanıtı olmadan DONE claim etme | yasak | honest-result gate ihlalidir |',
+  },
+  'workspace.worker.dod.done': {
+    en: 'Every Definition-of-Done item is verified with evidence.',
+    tr: 'Her Definition-of-Done maddesi kanıtla doğrulandı.',
+  },
+  'workspace.worker.dod.tech_debt': {
+    en: 'Core items are verified; each minor open item is named explicitly.',
+    tr: 'Core maddeler doğrulandı; her minor açık madde exact olarak adlandırıldı.',
+  },
+  'workspace.worker.dod.no_go': {
+    en: 'At least one critical item is unverified; the exact blocker is named.',
+    tr: 'En az bir critical madde doğrulanmadı; exact blocker adlandırıldı.',
+  },
+
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },
   'desktop.theme.watch.night-watch': { en: 'Night watch', tr: 'Gece seyri' },
   'desktop.theme.watch.open-sea': { en: 'Open sea', tr: 'Açık deniz' },

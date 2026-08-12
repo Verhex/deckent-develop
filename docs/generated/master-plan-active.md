@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):2bd7bf990eff62e345db19a63ceab3c2304f9d3508ac6c928d6fe1b8c009160b`
+**Source digest:** `sha256(normalized-lf-utf8):f2245006b537a063558204e99edb50a161a5511cc6e50cc15e66316dbcd65219`
 
-**Rows:** 478 total · 418 active · 60 terminal
+**Rows:** 483 total · 423 active · 60 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 325 |
+| OPEN | 330 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -45,6 +45,11 @@
 | 170 | `DOCS-RELEASE-TRUTH-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `SSOT-003` | — | Generated stats, references and release-doc truth authority |
 | 171 | `DOCS-DEPS-HOME-001` | OPEN | P2 | TRUTH | — | — | Dependency-doku ile gerçek kurulum-ağacının (HOME/global adapterlar dahil) tek-kaynak hizası: docs/reference/dependencies.md kayıtları ile package.json/override gerçeği arasındaki drift sınıfı kapatılır |
 | 172 | `MANAGED-DOC-CACHE-TRUTH-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `STATE-RETENTION-001` | — | Managed-doc config target, generator eligibility, cache lifecycle ve invalidation outcome tek truthful contractta uzlaşır |
+| 173 | `WORKSPACE-CONTRACT-AUTHORITY-001` | OPEN | P0 | TRUTH | `MANAGED-DOC-CACHE-TRUTH-001`, `DOCS-TOPOLOGY-001` | — | `.deckent/workspace` artifact seti için versioned registry, ownership, migration ve projection authority |
+| 174 | `WORKSPACE-IDENTITY-AUTHORITY-001` | OPEN | P0 | TRUTH | `PROVENANCE-CONTEXT-001`, `PROJECT-STACK-CACHE-AUTHORITY-001` | — | Workspace identity için user authority, detected projection, provenance isolation ve stack-cache invalidation contractı |
+| 175 | `WORKER-GUIDE-PROMPT-AUTHORITY-001` | OPEN | P0 | TRUTH | `PROMPT-001`, `RESULT-INGEST-001` | — | Worker guide ile compiled prompt arasında schema-derived, digest-bound ve fail-closed authority contractı |
+| 176 | `BOOT-RECOVERY-CONTRACT-AUTHORITY-001` | OPEN | P0 | TRUTH | `RECOVERY-COMMAND-SERVICE-001`, `SURFACE-PARITY-001` | — | BOOT lifecycle ve recovery örneklerinin canonical command/service semantiğinden üretilmesi |
+| 177 | `WORKSPACE-TOOL-CATALOG-AUTHORITY-001` | OPEN | P0 | TRUTH | `SURFACE-PARITY-001` | — | TOOLS.md için canonical MCP/CLI catalog projectionı, effect/approval truth ve filename-fiction yasağı |
 | 180 | `DOCS-I18N-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `DOCS-RELEASE-TRUTH-001` | — | Documentation i18n contract for en, tr, zh-Hans, es, ja and hi |
 | 190 | `MEMORY-AUTHORITY-001` | OPEN | P0 | TRUTH | `SSOT-002` | — | Repo-local provider-neutral canonical memory; provider HOME surfaces projections only |
 | 200 | `MEMORY-TRUTH-001` | BLOCKED | P1 | TRUTH | `MEMORY-AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Memory index count, stale watch, task-capacity and phantom ledger drift'lerini hükme bağla |

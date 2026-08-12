@@ -4,7 +4,25 @@
     {
       "id": "identity-md",
       "path": ".deckent/workspace/IDENTITY.md",
-      "autoSections": ["Project Status"],
+      "autoSections": [],
+      "protectedSections": ["Project Status"]
+    },
+    {
+      "id": "tools-md",
+      "path": ".deckent/workspace/TOOLS.md",
+      "autoSections": ["MCP Tools", "CLI Commands"],
+      "protectedSections": ["Environment Tools"]
+    },
+    {
+      "id": "boot-md",
+      "path": ".deckent/workspace/BOOT.md",
+      "autoSections": ["Boot Sequence", "Manual Recovery Chain"],
+      "protectedSections": []
+    },
+    {
+      "id": "worker-guide-md",
+      "path": ".deckent/workspace/WORKER-GUIDE.md",
+      "autoSections": ["Worker Contract"],
       "protectedSections": []
     }
   ]

@@ -4,56 +4,114 @@
     {
       "id": "vision-en",
       "path": "docs/vision/VISION.md",
-      "autoSections": ["Deckent by the Numbers", "Sprint History", "Sprint Metrics"],
-      "protectedSections": ["Vision", "Mission", "Competitive Analysis", "Roadmap", "Values", "Technology Decisions", "Target Users"]
+      "autoSections": [
+        "Deckent by the Numbers",
+        "Sprint History",
+        "Sprint Metrics"
+      ],
+      "protectedSections": [
+        "Vision",
+        "Mission",
+        "Competitive Analysis",
+        "Roadmap",
+        "Values",
+        "Technology Decisions",
+        "Target Users"
+      ]
     },
     {
       "id": "vision-tr",
       "path": "docs/vision/VISION-TR.md",
-      "autoSections": ["Sayılarla Deckent", "Sprint History", "Sprint Metrics"],
-      "protectedSections": ["Vizyon", "Misyon", "Rakip Analizi", "Yol Haritası", "Değerler", "Teknoloji Kararları", "Hedef Kullanıcılar"]
+      "autoSections": [
+        "Sayılarla Deckent",
+        "Sprint History",
+        "Sprint Metrics"
+      ],
+      "protectedSections": [
+        "Vizyon",
+        "Misyon",
+        "Rakip Analizi",
+        "Yol Haritası",
+        "Değerler",
+        "Teknoloji Kararları",
+        "Hedef Kullanıcılar"
+      ]
     },
     {
       "id": "beta-tracker-en",
       "path": "docs/release/beta-tracker.md",
-      "autoSections": ["Current Status", "Sprint Metrics", "Sprint History"],
-      "protectedSections": ["Phase Plan", "Competitive Analysis", "Verified Blockers", "Bug Tracker", "Action Plan"]
+      "autoSections": [
+        "Current Status",
+        "Sprint Metrics",
+        "Sprint History"
+      ],
+      "protectedSections": [
+        "Phase Plan",
+        "Competitive Analysis",
+        "Verified Blockers",
+        "Bug Tracker",
+        "Action Plan"
+      ]
     },
     {
       "id": "beta-tracker-tr",
       "path": "docs/release/beta-tracker-tr.md",
-      "autoSections": ["Mevcut Durum", "Sprint Metrics", "Sprint History"],
-      "protectedSections": ["Faz Planı", "Rakip Analizi", "Doğrulanmış Engeller", "Bug Tracker", "Aksiyon Planı"]
+      "autoSections": [
+        "Mevcut Durum",
+        "Sprint Metrics",
+        "Sprint History"
+      ],
+      "protectedSections": [
+        "Faz Planı",
+        "Rakip Analizi",
+        "Doğrulanmış Engeller",
+        "Bug Tracker",
+        "Aksiyon Planı"
+      ]
     },
     {
       "id": "identity-md",
       "path": ".deckent/workspace/IDENTITY.md",
       "autoSections": [],
-      "protectedSections": ["Project Status"]
+      "protectedSections": [
+        "Project Status"
+      ]
     },
     {
       "id": "blueprint-md",
       "path": "docs/vision/blueprint.md",
-      "autoSections": ["Live Metrics"],
+      "autoSections": [
+        "Live Metrics"
+      ],
       "protectedSections": []
     },
     {
       "id": "tools-md",
       "path": ".deckent/workspace/TOOLS.md",
-      "autoSections": ["MCP Tools", "CLI Commands"],
-      "protectedSections": ["Environment Tools"]
+      "autoSections": [
+        "MCP Tools",
+        "CLI Commands"
+      ],
+      "protectedSections": [
+        "Environment Tools"
+      ]
     },
     {
       "id": "boot-md",
       "path": ".deckent/workspace/BOOT.md",
-      "autoSections": ["Boot Sequence", "Manual Recovery Chain"],
+      "autoSections": [
+        "Boot Sequence",
+        "Manual Recovery Chain"
+      ],
       "protectedSections": []
     },
     {
       "id": "worker-guide-md",
       "path": ".deckent/workspace/WORKER-GUIDE.md",
-      "autoSections": ["Anti-Patterns"],
-      "protectedSections": [".plan File", "Heartbeat File", "Result File", "Error Handling", "Scope Rules", "Verify Loop", "Skill & Agent Context"]
+      "autoSections": [
+        "Worker Contract"
+      ],
+      "protectedSections": []
     }
   ]
 }

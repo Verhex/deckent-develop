@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   taskResultSchema,
   validateTaskResult,
+  getRequiredTaskResultFields,
   TASK_RESULT_SCHEMA_VERSION,
   type TaskResultV1,
 } from '../../src/core/task-result-schema.js';
@@ -42,6 +43,13 @@ function validResult(): Record<string, unknown> {
 }
 
 describe('task-result-schema (Worker Output Contract spine)', () => {
+  it('derives the documented top-level required fields from the executable schema', () => {
+    expect(getRequiredTaskResultFields()).toEqual([
+      'cost', 'filesChanged', 'model', 'provider', 'selfAssessment', 'taskId',
+      'tests', 'tokenUsage', 'totalLinesAdded', 'totalLinesRemoved', 'tsc', 'workerId',
+    ]);
+  });
+
   it('rejects an empty object and lists every required field as missing', () => {
     const res = validateTaskResult({});
     expect(res.ok).toBe(false);

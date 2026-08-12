@@ -309,6 +309,18 @@ export const taskResultSchema = z.object({
   auditorValidation: auditorValidationSchema.nullable().default(null),
 });
 
+/**
+ * Required canonical result fields, derived from the executable Zod schema.
+ * Documentation generators consume this function instead of maintaining a
+ * parallel hand-written field list that can drift from runtime validation.
+ */
+export function getRequiredTaskResultFields(): string[] {
+  return Object.entries(taskResultSchema.shape)
+    .filter(([, schema]) => !schema.safeParse(undefined).success)
+    .map(([field]) => field)
+    .sort();
+}
+
 /** The canonical worker-result type — inferred from {@link taskResultSchema}. */
 export type TaskResultV1 = z.infer<typeof taskResultSchema>;
 

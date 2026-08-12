@@ -1,60 +1,40 @@
+<!-- DECKENT:WORKSPACE id="worker-guide" schema="1" authority="managed" provenance="workspace-artifact-registry" -->
 # Worker Guide
 
-> **Canonical location moved.** See [docs/guide/workers.md](../../docs/guide/workers.md) for the complete worker guide.
-> **Fallback:** if that target is archived or removed (docs-reset, 2026-08-03), THIS file is the
-> canonical worker guide — do not follow a dangling pointer.
+## Worker Contract
+<!-- DECKENT:CONTRACT id="worker-guide" schema="1" sha256="1579f343478f2afa488ac03b69bf42735e4ee47c464db8b583b9a5467095ed4e" -->
+This contract is generated from worker runtime schemas and prompt policy. It is supporting context; the compiled, digest-bound task prompt remains the attempt authority.
 
-## Anti-Patterns
-### verify-ran Marker
+### Result ingress vs canonical result
 
-Every task MUST write a `.tasks/task-{id}.result` file before exiting.
-The verify-ran marker ensures Brain can evaluate your work:
+Workers write `.tasks/task-{id}.result` ingress claims: `taskId`, `workerId`, `filesChanged` (string array), `linesAdded`, `linesRemoved`, `testsPassed` (boolean), `coverage` (0–100), `selfAssessment` and `notes` (single string). Do not estimate token usage. Provider/model, token/cost, disk diff, tests and TypeScript evidence are host-authored in the canonical schema `1.0` result.
 
-- **Missing result** → Sprint stalls, task evaluated as NO_GO
-- **Partial result** (missing `tokenUsage.provider`) → generates warnings
-- **Atomic write** — write to `.tmp` first, then `renameSync` to final path (Bug K fix)
+Canonical schema-required fields (derived at runtime): `cost, filesChanged, model, provider, selfAssessment, taskId, tests, tokenUsage, totalLinesAdded, totalLinesRemoved, tsc, workerId`.
 
-### Honest-Result Gate
+### Heartbeat
 
-The honest-result gate requires that before writing `selfAssessment: "DONE"`, you verify:
+Create `.tasks/task-{id}.hb` before work. Increment `sequence`; use a fresh UTC ISO timestamp; keep `currentAction` concise. Heartbeat content is activity context—not standalone process-liveness or terminal authority.
 
-1. **Baseline:** what was the test/code state BEFORE your work?
-2. **End state:** what is it NOW?
-3. **Delta:** how much of the task did you ACTUALLY complete?
+### Objective Definition of Done
 
-Thresholds:
-- ≥80% complete → `"DONE"`
-- 50–79% complete → `"GO_WITH_TECH_DEBT"` with specific gap in notes
-- <50% complete → `"NO_GO"` with explanation
+- DONE — Every Definition-of-Done item is verified with evidence.
+- GO_WITH_TECH_DEBT — Core items are verified; each minor open item is named explicitly.
+- NO_GO — At least one critical item is unverified; the exact blocker is named.
 
-"Code written" ≠ "DONE". Functional outcome must match task spec.
+There is no percentage threshold. Evidence for each criterion decides the verdict.
 
-### processQueue Stall Awareness
+### Verification and honest-result gate
 
-If your task depends on another task's output and it has not arrived:
+The `.verify-ran` marker is verifier-authored evidence; never create or claim it manually. Before DONE, compare baseline, end state and the actual criterion evidence. If a dependency has not settled, do not busy-wait or infer success from `processQueue`; report the exact NO_GO/HOLD condition.
 
-- Check `.tasks/task-{dep-id}.result` exists before proceeding
-- Do NOT busy-wait — write `NO_GO` result explaining the dependency
-- Brain will reschedule via mid-sprint-adapter
+### Scope, ADR-037 authority and forbidden anti-patterns
 
-### RBAC — ADR-037 Authority Matrix
+`scope.filesWrite` is the exact write allow-list; protocol artifacts under `.tasks/` are the only lifecycle exception. Do not mutate dependencies or run project-wide build from a worker. If a required capability or authority is unavailable, write a concrete NO_GO/HOLD reason instead of fabricating completion.
 
-| Role | Write Source Code | Write Docs | Write `.tasks/` | Write `.brain/` |
-|------|:-----------------:|:----------:|:---------------:|:---------------:|
-| Brain | ❌ | ✅ | ✅ | ✅ |
-| Worker | ✅ (scope only) | ✅ (scope only) | ✅ (own files) | ❌ |
-| Auditor | ❌ | ❌ | ❌ | ✅ (patterns) |
-
-Workers MAY ONLY write files listed in `scope.filesWrite`. Auditor detects violations via `git diff --stat`.
-
-### Forbidden Anti-Patterns
-
-| Anti-Pattern | Status | Reason |
-|-------------|--------|--------|
-| `it.skip(...)` without justification comment | YASAK | Hides failing tests — must fix or document why |
-| `stub()` / empty function returning hardcoded value | YASAK | Produces false GO results — implement real logic |
-| `npm run build` in worker | YASAK | dist/ contamination risk — build is a separate gate, not worker responsibility |
-| Writing outside `scope.filesWrite` | YASAK | ADR-037 RBAC violation — auditor will flag |
-| `selfAssessment: "DONE"` without verify-ran marker | YASAK | Sprint evaluator rejects, task → NO_GO |
-| Hardcoded timestamps in `.hb` files | YASAK | Use `new Date().toISOString()` always |
-| Ignoring ADR constraints | YASAK | Violation requires NO_GO + ADR amendment proposal |
+| Anti-pattern | Status | Reason |
+|---|---|---|
+| `it.skip(...)` without a justification | forbidden | hides failed evidence |
+| `stub()` or a hardcoded empty implementation | forbidden | creates a false GO |
+| writing outside `scope.filesWrite` | forbidden | violates ADR-037 authority |
+| claiming DONE without verifier evidence | forbidden | violates the honest-result gate |
+<!-- DECKENT:CONTRACT:END id="worker-guide" -->

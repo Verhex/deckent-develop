@@ -609,11 +609,14 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('orchestrator');
   });
 
-  it('embeds correct provider and model in token tracking instruction', () => {
+  it('keeps plan-time provider/model out of worker-authored tokenUsage', () => {
     const task = makeTask({ provider: 'codex', model: 'gpt-4.1' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('"provider": "codex"');
-    expect(prompt).toContain('"model": "gpt-4.1"');
+    expect(prompt).toContain('Plan-resolved provider: codex');
+    expect(prompt).toContain('Plan-resolved model: gpt-4.1');
+    expect(prompt).not.toContain('"provider": "codex"');
+    expect(prompt).not.toContain('"model": "gpt-4.1"');
+    expect(prompt).toContain('do not place provider/model inside tokenUsage');
   });
 
   it('WP-4: tokenUsage is orchestrator-owned (no stale "missing → NO_GO" demand)', () => {
