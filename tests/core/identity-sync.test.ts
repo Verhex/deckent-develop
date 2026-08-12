@@ -45,6 +45,24 @@ describe('syncIdentityToDb — Memory V2 identity entry refresh (B9)', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]!.type).toBe('identity');
     expect(entries[0]!.content).toBe(IDENTITY_BODY);
+    expect(entries[0]!.source).toBe('user');
+  });
+
+  it('records detector identity as a digest-bound system projection', async () => {
+    const detected = '<!-- DECKENT:WORKSPACE id="identity" schema="1" authority="user" provenance="stack-detector" -->\nLanguage: TypeScript\n';
+    writeFileSync(join(root, WORKSPACE_DIR, 'IDENTITY.md'), detected, 'utf-8');
+
+    const res = await syncIdentityToDb(root);
+    expect(res.success).toBe(true);
+    const [entry] = readIdentity();
+    const metadata = JSON.parse(entry?.metadata ?? '{}') as Record<string, unknown>;
+    expect(entry?.source).toBe('system');
+    expect(metadata).toMatchObject({
+      projectionOf: '.deckent/workspace/IDENTITY.md',
+      workspaceArtifactSchema: 1,
+      workspaceArtifactProvenance: 'stack-detector',
+    });
+    expect(metadata['contentSha256']).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('refreshes an existing (stale) identity entry in place — no duplicate', async () => {

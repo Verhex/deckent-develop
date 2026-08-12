@@ -4,7 +4,7 @@
 // Sprint 076: God Object Split Phase 3
 
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // ─── Observability (Sprint 134) ───────────────────────────────────
@@ -18,6 +18,9 @@ import type {
 // ─── Core (value imports — TaskStatus used at runtime for in-memory sync) ─
 import { TaskStatus } from '../core/types.js';
 import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
+import { classifyPersonaIntegrity, type PersonaIntegrityVerdict } from '../core/agent-pool.js';
+import { DEFAULT_PERSONA_INTEGRITY_MIN_BYTES } from '../core/config.js';
+import { resolveSkillPromptBodies } from '../core/skill-loading.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveTaskProvider } from './sprint-utils.js';
@@ -109,7 +112,7 @@ import {
 } from './temp-skill-generator.js';
 
 // ─── Agent prompt single-source resolution (ADR-048, Sprint 182 F4) ──
-import { getAgentPrompt } from '../core/agent-pool.js';
+import { resolvePrompt } from '../core/agent-pool.js';
 
 // ─── tmux ─────────────────────────────────────────────────────────
 import { killWorker } from './tmux.js';
@@ -990,12 +993,69 @@ function persistEnrichedResult(projectRoot: string, result: TaskResult): void {
  * PROMPT.md in the worker prompt block.
  */
 export async function resolveAgentPrompt(projectRoot: string, task: Task): Promise<string | undefined> {
-  const agentId = task.assignedAgent;
-  if (!agentId || agentId === 'generic') return undefined;
+  // D-F(a): EVERY production ingress funnels through the integrity gate below —
+  // this legacy signature is now a thin projection of it (advisory default is
+  // byte-identical to the pre-gate behaviour; sol cross-review caught the
+  // first draft leaving the gate as a second unused path).
+  return resolveAgentPromptWithIntegrity(projectRoot, task).content;
+}
 
-  const resolution = getAgentPrompt(agentId, projectRoot);
-  if (resolution.source === 'none') return undefined;
-  return resolution.content;
+/**
+ * D-F(a) spawn-boundary persona gate (sprint-523 task 6) at the SHARED
+ * resolution choke point — the same single-choke-point pattern the 522-011
+ * skill switch proved: every spawn ingress (sprint-spawner, run, spawn,
+ * mcp run, task-mode-runner, scheduler-effects) funnels through
+ * resolveAgentPrompt, so the integrity verdict is computed HERE once.
+ *
+ * Owner rules carried exactly:
+ * - D-D degrade stays untouched: an ABSENT persona (source 'none') is not a
+ *   broken persona — the caller's existing personaless path is preserved.
+ * - Advisory default (quality bar: no blind default-flip): a broken persona
+ *   WARNS and spawns unless `persona_integrity.enforce` is explicitly true.
+ * - Enforce mode returns a typed refusal the spawner writes as an honest
+ *   NO_GO artifact (the provider-unavailable refusal shape).
+ */
+export interface AgentPersonaGateVerdict {
+  content: string | undefined;
+  integrity: PersonaIntegrityVerdict | 'absent';
+  refusal: { reasonCode: 'PERSONA_INTEGRITY_HOLD'; verdict: PersonaIntegrityVerdict } | null;
+}
+
+export function resolveAgentPromptWithIntegrity(
+  projectRoot: string,
+  task: Task,
+  options?: { minBytes?: number; enforce?: boolean },
+): AgentPersonaGateVerdict {
+  const agentId = task.assignedAgent;
+  if (!agentId || agentId === 'generic') {
+    return { content: undefined, integrity: 'absent', refusal: null };
+  }
+  const resolution = resolvePrompt(agentId, projectRoot);
+  if (resolution.source === 'none') {
+    // D-D: absent persona degrades (personaless spawn) — never a gate matter.
+    return { content: undefined, integrity: 'absent', refusal: null };
+  }
+  const verdict = classifyPersonaIntegrity({
+    availability: resolution.source === 'prompt-md' || resolution.source === 'prompt-md-builtin'
+      ? 'prompt-file'
+      : 'system-prompt',
+    content: resolution.content,
+    minBytes: options?.minBytes ?? DEFAULT_PERSONA_INTEGRITY_MIN_BYTES,
+    declaredDigest: resolution.declaredDigest,
+    actualDigest: resolution.actualDigest,
+  });
+  if (verdict === 'intact') {
+    return { content: resolution.content, integrity: verdict, refusal: null };
+  }
+  if (options?.enforce === true) {
+    return {
+      content: undefined,
+      integrity: verdict,
+      refusal: { reasonCode: 'PERSONA_INTEGRITY_HOLD', verdict },
+    };
+  }
+  debugLog('resolveAgentPromptWithIntegrity:advisory', `${agentId}: ${verdict}`);
+  return { content: resolution.content, integrity: verdict, refusal: null };
 }
 
 /**
@@ -1009,38 +1069,42 @@ export async function resolveSkillPrompts(
   const skillIds = task.assignedSkills;
   if (!skillIds || skillIds.length === 0) return [];
   const results: Array<{ name: string; content: string }> = [];
-  for (const skillId of skillIds) {
-    const skillPath = join(projectRoot, '.deckent', 'skills', skillId, 'SKILL.md');
-    try {
-      const content = await readFile(skillPath, 'utf-8');
-      results.push({ name: skillId, content });
-    } catch (e) {
-      if (skillId === 'project-conventions') {
-        try {
-          const generated = generateProjectConventionsSkill(detectProjectStack(projectRoot));
-          const content = getGeneratedContent(generated);
-          if (content) {
-            results.push({ name: skillId, content });
-            metric('skill.prompt_generated', 1, { skillId, taskId: task.id });
-            continue;
-          }
-        } catch (generationError) {
-          debugLog('resolveSkillPrompts:generateProjectConventions', generationError);
-        }
-      }
-      // A skill assigned to the task whose SKILL.md could not be loaded is NOT
-      // injected into the worker prompt — yet downstream outcome tracking still
-      // credits it. Surface it (observability) rather than dropping it silently so
-      // a missing/unsynced skill file is visible, not an invisible phantom credit.
-      // (Phantom/typo'd ids are already stopped upstream at routing-engine's
-      // forceSkills validation; this catches the residual "valid id, missing file".)
-      metric('skill.prompt_load_failed', 1, { skillId, taskId: task.id });
-      debugLog('resolveSkillPrompts:readSkillFile', e);
-      // Outcome learning may only credit prompts actually delivered to the
-      // worker. Remove an unreadable assignment from the persisted in-memory
-      // task contract at this single resolution choke point.
-      task.assignedSkills = task.assignedSkills?.filter(id => id !== skillId);
+  // 522-011 S4 switch: the prompt route resolves skill bodies through the
+  // catalog authority (SkillPoolManager.resolveBody via skill-loading's ordered
+  // projection) instead of a hardcoded SKILL.md read — declared entrypoints,
+  // containment and budget enforcement now hold on this route too. Byte parity
+  // with the old reader is pinned by tests/core/skill-prompt-parity.test.ts.
+  for (const resolution of resolveSkillPromptBodies(projectRoot, skillIds)) {
+    if (resolution.ok) {
+      results.push({ name: resolution.skillId, content: resolution.content });
+      continue;
     }
+    const skillId = resolution.skillId;
+    if (skillId === 'project-conventions') {
+      try {
+        const generated = generateProjectConventionsSkill(detectProjectStack(projectRoot));
+        const content = getGeneratedContent(generated);
+        if (content) {
+          results.push({ name: skillId, content });
+          metric('skill.prompt_generated', 1, { skillId, taskId: task.id });
+          continue;
+        }
+      } catch (generationError) {
+        debugLog('resolveSkillPrompts:generateProjectConventions', generationError);
+      }
+    }
+    // A skill assigned to the task whose body could not be resolved is NOT
+    // injected into the worker prompt — yet downstream outcome tracking still
+    // credits it. Surface it (observability) rather than dropping it silently so
+    // a missing/unsynced skill file is visible, not an invisible phantom credit.
+    // (Phantom/typo'd ids are already stopped upstream at routing-engine's
+    // forceSkills validation; this catches the residual "valid id, held body".)
+    metric('skill.prompt_load_failed', 1, { skillId, taskId: task.id });
+    debugLog('resolveSkillPrompts:resolveBody', resolution.reasonCode);
+    // Outcome learning may only credit prompts actually delivered to the
+    // worker. Remove an unresolvable assignment from the persisted in-memory
+    // task contract at this single resolution choke point.
+    task.assignedSkills = task.assignedSkills?.filter(id => id !== skillId);
   }
 
   // born-593 DNA-FILTER-STAT-CREDIT (kök-neden-4c): buildWorkerPrompt (task-builder.ts)

@@ -50,6 +50,13 @@ export interface AgentDefinition {
    * interface. Relocating it out of the git-tracked shadow layer is slice S8, not S1.
    */
   capabilitiesProvisional?: boolean;
+  /**
+   * Author-declared `sha256:<hex>` digest of the persona prompt content (PROMPT.md or
+   * `systemPrompt`, whichever resolves). Additive field: absence never fabricates a
+   * `digest-mismatch` (agent-pool.ts `classifyPersonaIntegrity`) — it only becomes a
+   * comparison input once both this and the actual digest are known (524-012).
+   */
+  promptSha256?: string;
 }
 
 // ─── Agent Pool ──────────────────────────────────────────────────────────────
@@ -328,6 +335,7 @@ export const AGENT_MANIFEST_ADDITIVE_FIELDS = [
   'stats',
   'capabilities',
   'capabilitiesProvisional',
+  'promptSha256',
 ] as const;
 
 /** Identity rule from §3.2 — the existing CLI `agent add` validator, now applied on load too. */
@@ -521,6 +529,14 @@ function checkFieldShapes(raw: Record<string, unknown>, diagnostics: AgentManife
       severity: 'warning',
       message: `"capabilitiesProvisional" must be a boolean, got ${describeType(raw['capabilitiesProvisional'])}`,
       field: 'capabilitiesProvisional',
+    });
+  }
+  if (raw['promptSha256'] !== undefined && typeof raw['promptSha256'] !== 'string') {
+    diagnostics.push({
+      code: 'additive-field-invalid',
+      severity: 'warning',
+      message: `"promptSha256" must be a string, got ${describeType(raw['promptSha256'])}`,
+      field: 'promptSha256',
     });
   }
 

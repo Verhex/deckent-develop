@@ -1,60 +1,40 @@
+<!-- DECKENT:WORKSPACE id="worker-guide" schema="1" authority="managed" provenance="workspace-artifact-registry" -->
 # Worker Guide
 
-> **Canonical location moved.** See [docs/guide/workers.md](../../docs/guide/workers.md) for the complete worker guide.
-> **Fallback:** if that target is archived or removed (docs-reset, 2026-08-03), THIS file is the
-> canonical worker guide — do not follow a dangling pointer.
+## Worker Contract
+<!-- DECKENT:CONTRACT id="worker-guide" schema="1" sha256="5ca844af5773a4cfc28dca9e15e5832b15db1211747829580b88eb04d87f8718" -->
+Bu contract worker runtime schemaları ve prompt policy üzerinden üretilir. Supporting contexttir; compiled ve digest-bound task prompt attempt authority olarak kalır.
 
-## Anti-Patterns
-### verify-ran Marker
+### Result ingress ve canonical result
 
-Every task MUST write a `.tasks/task-{id}.result` file before exiting.
-The verify-ran marker ensures Brain can evaluate your work:
+Worker `.tasks/task-{id}.result` ingress claimlerini yazar: `taskId`, `workerId`, `filesChanged` (string array), `linesAdded`, `linesRemoved`, `testsPassed` (boolean), `coverage` (0–100), `selfAssessment` ve `notes` (tek string). Token usage tahmini yapma. Provider/model, token/cost, disk diff, test ve TypeScript kanıtı canonical schema `1.0` sonucunda host tarafından yazılır.
 
-- **Missing result** → Sprint stalls, task evaluated as NO_GO
-- **Partial result** (missing `tokenUsage.provider`) → generates warnings
-- **Atomic write** — write to `.tmp` first, then `renameSync` to final path (Bug K fix)
+Canonical schema-required alanlar (runtime’da türetilir): `cost, filesChanged, model, provider, selfAssessment, taskId, tests, tokenUsage, totalLinesAdded, totalLinesRemoved, tsc, workerId`.
 
-### Honest-Result Gate
+### Heartbeat
 
-The honest-result gate requires that before writing `selfAssessment: "DONE"`, you verify:
+İşe başlamadan `.tasks/task-{id}.hb` oluştur. `sequence` değerini artır; taze UTC ISO timestamp kullan; `currentAction` kısa olsun. Heartbeat içeriği activity contexttir—tek başına process-liveness veya terminal authority değildir.
 
-1. **Baseline:** what was the test/code state BEFORE your work?
-2. **End state:** what is it NOW?
-3. **Delta:** how much of the task did you ACTUALLY complete?
+### Objective Definition of Done
 
-Thresholds:
-- ≥80% complete → `"DONE"`
-- 50–79% complete → `"GO_WITH_TECH_DEBT"` with specific gap in notes
-- <50% complete → `"NO_GO"` with explanation
+- DONE — Her Definition-of-Done maddesi kanıtla doğrulandı.
+- GO_WITH_TECH_DEBT — Core maddeler doğrulandı; her minor açık madde exact olarak adlandırıldı.
+- NO_GO — En az bir critical madde doğrulanmadı; exact blocker adlandırıldı.
 
-"Code written" ≠ "DONE". Functional outcome must match task spec.
+Percentage threshold yoktur. Verdicti her kriterin kanıtı belirler.
 
-### processQueue Stall Awareness
+### Verification ve honest-result gate
 
-If your task depends on another task's output and it has not arrived:
+`.verify-ran` marker verifier-authored kanıttır; elle oluşturma veya varmış gibi claim etme. DONE öncesi baseline, end state ve gerçek kriter kanıtını karşılaştır. Bir dependency settle olmadıysa busy-wait yapma veya `processQueue` üzerinden başarı varsayma; exact NO_GO/HOLD koşulunu bildir.
 
-- Check `.tasks/task-{dep-id}.result` exists before proceeding
-- Do NOT busy-wait — write `NO_GO` result explaining the dependency
-- Brain will reschedule via mid-sprint-adapter
+### Scope, ADR-037 authority ve yasak anti-patternler
 
-### RBAC — ADR-037 Authority Matrix
+`scope.filesWrite` exact write allow-listtir; `.tasks/` altındaki protocol artefaktları tek lifecycle istisnasıdır. Worker içinden dependency mutation veya project-wide build çalıştırma. Gerekli capability veya authority unavailable ise completion uydurmak yerine concrete NO_GO/HOLD nedeni yaz.
 
-| Role | Write Source Code | Write Docs | Write `.tasks/` | Write `.brain/` |
-|------|:-----------------:|:----------:|:---------------:|:---------------:|
-| Brain | ❌ | ✅ | ✅ | ✅ |
-| Worker | ✅ (scope only) | ✅ (scope only) | ✅ (own files) | ❌ |
-| Auditor | ❌ | ❌ | ❌ | ✅ (patterns) |
-
-Workers MAY ONLY write files listed in `scope.filesWrite`. Auditor detects violations via `git diff --stat`.
-
-### Forbidden Anti-Patterns
-
-| Anti-Pattern | Status | Reason |
-|-------------|--------|--------|
-| `it.skip(...)` without justification comment | YASAK | Hides failing tests — must fix or document why |
-| `stub()` / empty function returning hardcoded value | YASAK | Produces false GO results — implement real logic |
-| `npm run build` in worker | YASAK | dist/ contamination risk — build is a separate gate, not worker responsibility |
-| Writing outside `scope.filesWrite` | YASAK | ADR-037 RBAC violation — auditor will flag |
-| `selfAssessment: "DONE"` without verify-ran marker | YASAK | Sprint evaluator rejects, task → NO_GO |
-| Hardcoded timestamps in `.hb` files | YASAK | Use `new Date().toISOString()` always |
-| Ignoring ADR constraints | YASAK | Violation requires NO_GO + ADR amendment proposal |
+| Anti-pattern | Durum | Neden |
+|---|---|---|
+| Gerekçesiz `it.skip(...)` | yasak | başarısız kanıtı gizler |
+| `stub()` veya hardcoded boş implementation | yasak | false GO üretir |
+| `scope.filesWrite` dışına yazma | yasak | ADR-037 authority ihlalidir |
+| verifier kanıtı olmadan DONE claim etme | yasak | honest-result gate ihlalidir |
+<!-- DECKENT:CONTRACT:END id="worker-guide" -->

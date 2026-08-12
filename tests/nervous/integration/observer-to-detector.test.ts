@@ -12,10 +12,14 @@ import { AgentRoutingHealth } from '../../../src/nervous/detectors/agent-routing
 
 // Mock fs for detectors that read the filesystem
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => true),
+  // Activity-truth (2026-08-12): the stale-worker detector now treats an
+  // existing `.result` as SETTLED (never stale) and reads task-artifact mtimes
+  // as liveness. A blanket `true` would mark every fixture worker settled, so
+  // the mock answers false for settlement/artifact probes and true elsewhere.
+  existsSync: vi.fn((p: string) => !/\.(result|hb|partial-result|landing-proposal\.json|plan|log)$/.test(String(p))),
   readdirSync: vi.fn(() => []),
   readFileSync: vi.fn(() => ''),
-  statSync: vi.fn(() => ({ size: 5000 })),
+  statSync: vi.fn(() => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); }),
   watch: vi.fn(() => ({ close: vi.fn() })),
 }));
 
@@ -59,7 +63,11 @@ function makeContext(overrides: Partial<DetectorContext> = {}): DetectorContext 
 describe('Observer → Detector Integration', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.mocked(existsSync).mockReturnValue(true);
+    // Activity-truth (2026-08-12): settlement/artifact probes answer false so a
+    // fixture worker is never mistaken for settled; everything else stays true.
+    vi.mocked(existsSync).mockImplementation(
+      (p) => !/\.(result|hb|partial-result|landing-proposal\.json|plan|log)$/.test(String(p)),
+    );
   });
 
   afterEach(() => {

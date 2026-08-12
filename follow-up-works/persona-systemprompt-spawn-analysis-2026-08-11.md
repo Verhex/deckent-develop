@@ -425,3 +425,19 @@ sed -n '270,282p' src/providers/bedrock.ts
 # Link gate for this document
 node scripts/lint-links.mjs
 ```
+
+---
+
+## OWNER DECISIONS (Alperen, 2026-08-11 — codex cross-review sonrası)
+
+- **D-A:** yes — ladder kurulur (seam her durumda gerekli).
+- **D-C: REVİZE** — P2 preamble yalnız flag-gated adversarial CANARY; native system-channel
+  DEFAULT'u ancak P1 (D8 restructure ile identity/procedure yapısal ayrımı) + provider'ın
+  kanıtlı `append` capability'siyle açılır. P2-as-default reddedildi (model-compliance yetmez).
+- **D-D:** (a) `degrade` default — system-channel yoksa persona prompt'a katlanır, spawn sürer.
+- **D-F:** (a) — bozuk/eksik persona spawn sınırında da non-routable (D4 ile tutarlı).
+- **D-G:** (a) — boş/undersized/digest-mismatch makine-tespit; VE S0'a provider-channel davranış
+  doğrulaması eklenir (ignore/transform/truncate tespiti — codex bulgusu).
+- **D-H (YENİ, codex bulgusu):** provider system-channel semantiği `replace` ise spawn otomatik
+  typed HOLD; yalnız kanıtlı `append`/`preserve-provider-default` kanal default'a aday olabilir.
+- Codex verdict: SOUND-WITH-GAPS; yukarıdaki revizyonlar boşlukları kapatır.

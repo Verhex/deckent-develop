@@ -24,7 +24,7 @@
 //
 // Pure and side-effect free: callers own persistence, events and task creation.
 
-import type { TaskResult } from '../core/task-types.js';
+import { PROVIDER_LIMIT_DEATH_ZERO_WRITE, type TaskResult } from '../core/task-types.js';
 
 /**
  * What the run should do with a failed task. Ordered from cheapest to most
@@ -133,6 +133,25 @@ export const ZERO_DIFF_FUTILITY_THRESHOLD = 2;
 export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassification {
   const { result, exitCode } = input;
   const notes = notesOf(result);
+
+  // 0. Provider-limit death with a measured zero-write diff (born 3324). This
+  //    runs FIRST for two reasons. It is host-minted into `workAttribution` —
+  //    structural evidence that outranks whatever the notes prose says — and it
+  //    must reach the decision before the zero-diff futility rule below, which
+  //    would otherwise read a lineage the provider kept killing as a task
+  //    definition that cannot be satisfied. The work definition was never
+  //    tested: the provider ran out of allowance before the worker wrote a
+  //    line, so the honest response is a clean restart of the same task.
+  if (result?.workAttribution?.state === 'HOLD'
+    && result.workAttribution.reasonCode === PROVIDER_LIMIT_DEATH_ZERO_WRITE) {
+    return {
+      disposition: 'retrySame',
+      code: 'PROVIDER_LIMIT_DEATH_ZERO_WRITE',
+      reason: 'the provider hit its limit and the attempt died having written nothing, so the '
+        + 'task definition is untested and the same task is restarted cleanly',
+      allowsFixTask: true,
+    };
+  }
 
   // 1. Infrastructure — the environment failed, the work definition did not.
   if (exitCode === SIGKILL_EXIT_CODE || INFRASTRUCTURE_MARKERS.some(m => notes.includes(m))) {

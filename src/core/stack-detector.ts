@@ -1,6 +1,7 @@
 // ─── Stack Detector ─────────────────────────────────────────────────────────
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import type { ProjectStack } from './skill-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
 
@@ -8,6 +9,8 @@ import { readJsonSafe, debugLog } from './utils.js';
 
 const CACHE_FILE = '.deckent/project-stack.json';
 const CACHE_CHECK_FILES = [
+  '.deckent/config.json',
+  '.deckent/workspace/IDENTITY.md',
   'package.json',
   'tsconfig.json',
   'Cargo.toml',
@@ -22,6 +25,27 @@ const CACHE_CHECK_FILES = [
   'Makefile',
   'meson.build',
 ];
+const STACK_CACHE_CONTRACT_VERSION = 1;
+const WORKSPACE_AUTHORITY_INPUTS = ['.deckent/config.json', '.deckent/workspace/IDENTITY.md'] as const;
+
+interface StackCacheContract {
+  version: typeof STACK_CACHE_CONTRACT_VERSION;
+  workspaceAuthorityDigest: string;
+}
+
+function workspaceAuthorityDigest(projectRoot: string): string {
+  const hash = createHash('sha256');
+  for (const relativePath of WORKSPACE_AUTHORITY_INPUTS) {
+    const absolutePath = path.join(projectRoot, relativePath);
+    hash.update(relativePath);
+    try {
+      hash.update(fs.readFileSync(absolutePath));
+    } catch {
+      hash.update('<ABSENT>');
+    }
+  }
+  return hash.digest('hex');
+}
 
 // ─── STACK_COMMANDS ─────────────────────────────────────────────────────────
 
@@ -73,24 +97,33 @@ export function detectProjectStack(projectRoot: string): ProjectStack {
 
   // Try reading from cache first
   if (!isStackStale(projectRoot)) {
-    const cached = readJsonSafe<ProjectStack>(cachePath);
+    const cached = readJsonSafe<ProjectStack & { cacheContract?: StackCacheContract }>(cachePath);
     if (cached && typeof cached === 'object' && cached.language) {
+      if (cached.cacheContract?.version !== STACK_CACHE_CONTRACT_VERSION) {
+        writeStackCache(projectRoot, cachePath, cached);
+      }
       return cached;
     }
   }
 
   const stack = detectFresh(projectRoot);
+  writeStackCache(projectRoot, cachePath, stack);
 
-  // Write cache
+  return stack;
+}
+
+function writeStackCache(projectRoot: string, cachePath: string, stack: ProjectStack): void {
   try {
     const cacheDir = path.dirname(cachePath);
     fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(cachePath, JSON.stringify(stack, null, 2), 'utf8');
+    const cacheContract: StackCacheContract = {
+      version: STACK_CACHE_CONTRACT_VERSION,
+      workspaceAuthorityDigest: workspaceAuthorityDigest(projectRoot),
+    };
+    fs.writeFileSync(cachePath, JSON.stringify({ ...stack, cacheContract }, null, 2), 'utf8');
   } catch (e) {
     debugLog('detectProjectStack:writeCache', e);
   }
-
-  return stack;
 }
 
 // ─── isStackStale ─────────────────────────────────────────────────────────
@@ -113,6 +146,17 @@ export function isStackStale(projectRoot: string): boolean {
   }
 
   const cacheMtime = cacheStat.mtimeMs;
+
+  const cached = readJsonSafe<ProjectStack & { cacheContract?: StackCacheContract }>(cachePath);
+  // Legacy caches remain usable for one read when their monitored mtimes are
+  // fresh; detectProjectStack rewrites them immediately with the versioned
+  // authority digest. Versioned caches fail closed on schema/digest drift.
+  if (cached?.cacheContract) {
+    if (
+      cached.cacheContract.version !== STACK_CACHE_CONTRACT_VERSION
+      || cached.cacheContract.workspaceAuthorityDigest !== workspaceAuthorityDigest(projectRoot)
+    ) return true;
+  }
 
   for (const file of CACHE_CHECK_FILES) {
     const filePath = path.join(projectRoot, file);
@@ -209,12 +253,16 @@ const IDENTITY_LANG_MAP: Record<string, string> = {
 };
 
 /**
- * Read the `Language:` line from `.deckent/workspace/IDENTITY.md` and return
- * the canonical stack language key. Returns undefined when the file is absent,
- * has no Language: line, or names an unrecognized language (fall-through to
- * the next detection layer).
+ * Read the `Language:` line plus its provenance class from workspace identity.
+ * Init-generated values are cache hints; explicit user/legacy declarations may
+ * participate as project authority. Returns undefined for absent/unrecognized data.
  */
-function readIdentityLanguage(projectRoot: string): string | undefined {
+interface IdentityLanguageObservation {
+  language: string;
+  authority: 'user' | 'detected' | 'legacy-user';
+}
+
+function readIdentityLanguage(projectRoot: string): IdentityLanguageObservation | undefined {
   const identityPath = path.join(projectRoot, '.deckent', 'workspace', 'IDENTITY.md');
   if (!fs.existsSync(identityPath)) return undefined;
   try {
@@ -223,7 +271,15 @@ function readIdentityLanguage(projectRoot: string): string | undefined {
     if (!match || !match[1]) return undefined;
     const raw = match[1].trim();
     const first = raw.split(/[\s(]/)[0]?.toLowerCase() ?? '';
-    return IDENTITY_LANG_MAP[first];
+    const language = IDENTITY_LANG_MAP[first];
+    if (!language) return undefined;
+    const authorityMatch = content.match(/^Language Authority:\s*(user|detected)$/mi);
+    const authority = authorityMatch?.[1]?.toLowerCase() === 'detected'
+      ? 'detected'
+      : authorityMatch?.[1]?.toLowerCase() === 'user'
+        ? 'user'
+        : 'legacy-user';
+    return { language, authority };
   } catch (e) {
     debugLog('readIdentityLanguage:readFile', e);
     return undefined;
@@ -356,26 +412,27 @@ function detectFresh(projectRoot: string): ProjectStack {
   const kotlinDir = path.join(projectRoot, 'src', 'main', 'kotlin');
   const hasKotlin = hasBuildGradle && fs.existsSync(kotlinDir);
 
-  // ─── 4-Layer Language Detection ──────────────────────────────────────
+  // ─── Language Authority Stack ────────────────────────────────────────
   //
-  // Layer 0: IDENTITY.md Language: line — SSOT when present (managed-docs)
-  // Layer 1: User override (config.language) — always wins over heuristics
-  // Layer 2: Exclusive framework config (Cargo.toml, go.mod → single-lang)
-  // Layer 3: File-count weighted (when multiple markers → count .py/.ts/.go)
-  // Layer 4: Fallback (insufficient data → "unknown", skip build checks)
+  // Layer 0: explicit config.language_override — current user authority
+  // Layer 1: user-authored/legacy IDENTITY Language declaration
+  // Layer 2: exclusive framework config (Cargo.toml, go.mod → single-lang)
+  // Layer 3: file-count weighted source evidence
+  // Layer 4: init-detected IDENTITY value only as a last-resort cache hint
   //
   const hasTS = fs.existsSync(tsconfigPath) || depNames.includes('typescript');
   const hasJS = fs.existsSync(pkgPath) && depNames.length > 0;
   const identityLanguage = readIdentityLanguage(projectRoot);
   const configLanguage = readConfigLanguageOverride(projectRoot);
 
-  // Layer 0: IDENTITY.md declares Language authoritatively
-  if (identityLanguage) {
-    language = identityLanguage;
-  }
-  // Layer 1: User explicitly set language in config
-  else if (configLanguage) {
+  // Layer 0: explicit config override always wins over projections/caches.
+  if (configLanguage) {
     language = configLanguage;
+  }
+  // Layer 1: user-authored identity is declarative project authority. Identity
+  // created by init's detector is not — it may be stale after a repository move.
+  else if (identityLanguage && identityLanguage.authority !== 'detected') {
+    language = identityLanguage.language;
   }
   // Layer 2: Exclusive framework configs (these are unambiguous single-lang signals)
   else if (hasCargoToml) { language = 'rust'; }
@@ -415,6 +472,10 @@ function detectFresh(projectRoot: string): ProjectStack {
         else if (topLang) { language = topLang; }
       }
     }
+  }
+
+  if (language === 'unknown' && identityLanguage?.authority === 'detected') {
+    language = identityLanguage.language;
   }
 
   // E) Multi-language detection — collect all detected language markers

@@ -85,6 +85,7 @@ import {
   readFlowEventHead,
   listFlowIds,
   loadApprovedSnapshot,
+  loadPlannedSprint,
   loadRunHandle,
   RunFlowStoreError,
 } from '../core/run-flow-store.js';
@@ -205,6 +206,9 @@ export interface AbortFlowCommand {
   flowId: string;
   /** Human/system cancellation narrative (surfaced verbatim on the context). */
   reason?: string;
+  /** 524-013: the NEWER flow that replaced this one. Its presence is what makes
+   *  the reducer fold a typed `superseded` cancellation instead of a plain abort. */
+  supersededBy?: string;
   commandId?: string;
 }
 
@@ -226,6 +230,48 @@ export interface RecordCompletionCommand {
   readonly flowId: string;
   readonly summary?: string;
   readonly commandId?: string;
+}
+
+// ═══ Runs-inbox hygiene: typed supersession (524-013) ══════════════════════
+
+/**
+ * The only state a supersession may ever touch: a plan that is still WAITING
+ * for a human decision. An APPROVED, STARTING, DETACHED_RUNNING or terminal
+ * flow is never a supersession candidate — an operator decision or a real
+ * process already stands behind it.
+ */
+const SUPERSEDABLE_STATE: RunFlowState = 'AWAITING_APPROVAL';
+
+/** One duplicate pending-approval flow and the newer sibling that outran it. */
+export interface SupersededFlowEntry {
+  readonly flowId: string;
+  /** The surviving (newest) flow over the same persisted plan/directives source. */
+  readonly supersededBy: string;
+  /** `sourceKind:contentSha256` of the ALREADY-persisted plan source authority. */
+  readonly sourceKey: string;
+  /** The superseded flow's last durable event timestamp (ordering evidence). */
+  readonly updatedAt?: string;
+}
+
+/** A candidate the apply pass could not retire — reported, never swallowed. */
+export interface SupersededRetireFailure {
+  readonly flowId: string;
+  readonly detail: string;
+}
+
+export interface RetireSupersededOptions {
+  /** false (the default caller contract) = dry-run: classify, write NOTHING. */
+  readonly apply: boolean;
+}
+
+export interface RetireSupersededReport {
+  /** Every superseded candidate — identical in a dry-run and an apply. */
+  readonly superseded: readonly SupersededFlowEntry[];
+  /** flowIds that durably folded to CANCELLED/superseded (empty in a dry-run). */
+  readonly retired: readonly string[];
+  readonly failures: readonly SupersededRetireFailure[];
+  /** True when closures were durably written; false for a dry-run. */
+  readonly applied: boolean;
 }
 
 /** The outcome of one command: either it applied (and its last event landed at
@@ -295,6 +341,30 @@ export interface RunFlowCoordinator {
    * legacy dual-read in {@link getFlow} resolves.
    */
   listFlows(): string[];
+
+  /**
+   * Runs-inbox hygiene (524-013), READ-ONLY: the set of pending-approval flows
+   * that a NEWER pending-approval flow over the SAME persisted plan source has
+   * outrun. The grouping key is the digest the flow record already persists —
+   * the planned-sprint `sourceAuthority`'s `sourceKind:contentSha256` — so this
+   * introduces no new digest authority. Newest survives (last durable event
+   * timestamp, flowId as the deterministic tie-break); a flow with no persisted
+   * source authority is not groupable and is left alone rather than guessed at.
+   * Fail-soft per flow: one unreadable record never aborts the scan.
+   */
+  computeSupersededFlows(): SupersededFlowEntry[];
+
+  /**
+   * The operator sweep over {@link computeSupersededFlows}. `apply: false` is a
+   * pure dry-run — it writes nothing and reports exactly the closures an apply
+   * would write. `apply: true` routes every retirement through this
+   * coordinator's OWN `abortFlow` (event → reducer → durable store), so the
+   * superseded reason and its `supersededBy` reference are persisted by the
+   * state authority. Records are only ever appended to, never deleted, and a
+   * candidate that left AWAITING_APPROVAL between scan and write is skipped
+   * into `failures` instead of being force-closed.
+   */
+  retireSupersededFlows(options: RetireSupersededOptions): RetireSupersededReport;
 }
 
 /** Mutable per-flow cache entry — the SAME object reference stays in the map, so
@@ -560,7 +630,41 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
     return attempt(false);
   }
 
-  return {
+  /**
+   * The supersession grouping key: the plan/directives digest the flow record
+   * ALREADY persists. `savePlannedSprint` stamps a `RunFlowPlanSourceAuthority`
+   * onto every planned flow, whose `contentSha256` is the content-addressed
+   * identity of the exact intent/DIRECTIVES input that produced the plan — so
+   * two attempts over the same source share it even when their plan digests
+   * differ. `sourceKind` is part of the key: an intent hash and a directives
+   * hash are different namespaces and must never collide. `undefined` (a record
+   * that predates the source authority) means "not groupable" — the caller
+   * leaves such a flow untouched instead of guessing.
+   */
+  function resolveSupersessionKey(flowId: string): string | undefined {
+    let planned;
+    try {
+      planned = loadPlannedSprint(root, flowId);
+    } catch {
+      return undefined; // one unreadable record never aborts the scan
+    }
+    const authority = planned?.sourceAuthority;
+    if (authority === undefined) return undefined;
+    return `${authority.sourceKind}:${authority.contentSha256}`;
+  }
+
+  /** Newest-wins ordering: last durable event timestamp (ISO-8601 sorts
+   *  lexicographically), with the flowId as the deterministic tie-break so the
+   *  survivor never depends on scan order. */
+  function isNewer(
+    candidate: { readonly flowId: string; readonly updatedAt: string },
+    incumbent: { readonly flowId: string; readonly updatedAt: string },
+  ): boolean {
+    if (candidate.updatedAt !== incumbent.updatedAt) return candidate.updatedAt > incumbent.updatedAt;
+    return candidate.flowId > incumbent.flowId;
+  }
+
+  const coordinator: RunFlowCoordinator = {
     proposeFlow(cmd) {
       const { proposal, commandId } = cmd;
       return runCommand(proposal.flowId, commandId, () => [
@@ -637,9 +741,13 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
     },
 
     abortFlow(cmd) {
-      const { flowId, reason, commandId } = cmd;
+      const { flowId, reason, supersededBy, commandId } = cmd;
       return runCommand(flowId, commandId, () => [
-        buildEvent(flowId, commandId, { type: 'FLOW_ABORTED', ...(reason !== undefined ? { reason } : {}) }),
+        buildEvent(flowId, commandId, {
+          type: 'FLOW_ABORTED',
+          ...(reason !== undefined ? { reason } : {}),
+          ...(supersededBy !== undefined ? { supersededBy } : {}),
+        }),
       ]);
     },
 
@@ -676,5 +784,86 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
       // this coordinator's root — deduped + cross-platform-sorted by the store.
       return listFlowIds(root);
     },
+
+    computeSupersededFlows() {
+      const groups = new Map<string, { flowId: string; updatedAt: string }[]>();
+      for (const flowId of listFlowIds(root)) {
+        let context: RunFlowContext;
+        try {
+          context = coordinator.getFlow(flowId);
+        } catch {
+          continue; // an unresolvable/unfoldable flow is never a retire candidate
+        }
+        // NO-GO guard, structural: anything already started or terminal is
+        // filtered out HERE, before a key is even computed.
+        if (context.state !== SUPERSEDABLE_STATE) continue;
+        const sourceKey = resolveSupersessionKey(flowId);
+        if (sourceKey === undefined) continue;
+        const entry = { flowId, updatedAt: context.updatedAt ?? '' };
+        const bucket = groups.get(sourceKey);
+        if (bucket) bucket.push(entry);
+        else groups.set(sourceKey, [entry]);
+      }
+
+      const superseded: SupersededFlowEntry[] = [];
+      for (const [sourceKey, bucket] of groups) {
+        if (bucket.length < 2) continue; // a lone pending plan supersedes nothing
+        const survivor = bucket.reduce((newest, candidate) => (isNewer(candidate, newest) ? candidate : newest));
+        for (const candidate of bucket) {
+          if (candidate.flowId === survivor.flowId) continue;
+          superseded.push({
+            flowId: candidate.flowId,
+            supersededBy: survivor.flowId,
+            sourceKey,
+            ...(candidate.updatedAt !== '' ? { updatedAt: candidate.updatedAt } : {}),
+          });
+        }
+      }
+      superseded.sort((a, b) => (a.flowId < b.flowId ? -1 : a.flowId > b.flowId ? 1 : 0));
+      return superseded;
+    },
+
+    retireSupersededFlows(options) {
+      const superseded = coordinator.computeSupersededFlows();
+      const retired: string[] = [];
+      const failures: SupersededRetireFailure[] = [];
+      if (!options.apply) {
+        // Dry-run: the classification IS the whole answer — zero writes.
+        return { superseded, retired, failures, applied: false };
+      }
+
+      for (const entry of superseded) {
+        try {
+          // The durable log, not the scan snapshot, is the state authority: a
+          // flow that was approved/started/closed in between is skipped, never
+          // force-closed.
+          const current = coordinator.getFlow(entry.flowId);
+          if (current.state !== SUPERSEDABLE_STATE) {
+            failures.push({
+              flowId: entry.flowId,
+              detail: `state moved to ${current.state} after the scan — left untouched`,
+            });
+            continue;
+          }
+          // A deterministic commandId makes a repeated sweep (or a concurrent
+          // one from another surface) fold to a duplicate-command no-op instead
+          // of appending a second closure.
+          coordinator.abortFlow({
+            flowId: entry.flowId,
+            supersededBy: entry.supersededBy,
+            commandId: `superseded-${entry.flowId}-by-${entry.supersededBy}`,
+          });
+          retired.push(entry.flowId);
+        } catch (err) {
+          failures.push({
+            flowId: entry.flowId,
+            detail: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      return { superseded, retired, failures, applied: true };
+    },
   };
+
+  return coordinator;
 }

@@ -31,9 +31,25 @@ import {
   normalizeGlobalScopePlatform,
   resolveGlobalScopePaths,
 } from '../../core/global-scope-resolver.js';
+import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
+import type {
+  InvocationAuthMode,
+  InvocationExecutionBackend,
+  InvocationTransport,
+} from '../../core/invocation-receipt.js';
+import type {
+  ProviderEvidenceSourceResolver,
+  ProviderEvidenceSourceScope,
+} from '../../core/provider-evidence-producer.js';
+import {
+  proposeProviderLimitsAuthoring,
+  writeProviderLimitsAuthority,
+} from '../../core/provider-limit-authoring.js';
+import { createLocalProviderEvidenceSourceResolver } from '../../providers/provider-authority-runtime-bootstrap.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { promptConfirm } from '../helpers/prompt.js';
 
 /** Injectable seams so the command is testable without touching a real HOME. */
 export interface ProviderAuthorityKeyringDeps {
@@ -196,9 +212,220 @@ export function runKeyringRotate(
   }));
 }
 
+// ─── `deckent provider-authority limits init` — authored provider policy ────
+//
+// Until this sub-flow existed the `provider_limits` parent block could not be
+// authored at all: its selector demands a pseudonymous account hash and a quota
+// scope hash that only live account authority produces, so every run held
+// `xverify_provider_scope_unavailable` with no operator path forward. This
+// command derives both from the SAME code the consumers use and refuses, typed,
+// whenever live truth is unavailable — it never fills a selector with defaults.
+
+export interface ProviderAuthorityLimitsDeps extends ProviderAuthorityKeyringDeps {
+  /**
+   * Overrides the live host-registered provider evidence sources. Absent means
+   * the host's own runtime registrations are read (see
+   * {@link createLocalProviderEvidenceSourceResolver}); a scope no source
+   * answers for is a typed refusal, never a fallback to fabricated selector
+   * values.
+   */
+  sourceResolver?: ProviderEvidenceSourceResolver;
+  /** Hermetic seam: the global config path the authored block is written to. */
+  configPathOverride?: string;
+  /** Owner-confirmation seam; defaults to the interactive prompt. */
+  confirmFn?: (question: string) => Promise<boolean>;
+  /** Canonical project identity seam; defaults to the invocation receipt ledger. */
+  projectIdFn?: () => string;
+}
+
+export interface ProviderAuthorityLimitsInitOptions {
+  provider?: string;
+  model?: string;
+  authMode?: string;
+  transport?: string;
+  executionBackend?: string;
+  executionProfileRef?: string;
+  endpointRefHash?: string;
+  tenant?: string;
+  warnAtRatio?: string;
+  blockAtRatio?: string;
+}
+
+function isRatio(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+/**
+ * A resolver that throws on a scope it cannot even parse is answering "no
+ * source here" — the same typed refusal an unregistered scope gets, never a
+ * stack trace at the operator.
+ */
+function hasLiveSourceForScope(
+  resolver: ProviderEvidenceSourceResolver,
+  scope: ProviderEvidenceSourceScope,
+): boolean {
+  try {
+    return resolver.resolve(scope) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function resolveProjectId(scope: ResolvedKeyringScope, deps: ProviderAuthorityLimitsDeps): string {
+  if (deps.projectIdFn) return deps.projectIdFn();
+  // The receipt ledger mints the one canonical project identity the provider
+  // authority composition itself reads; deriving a second one here would author
+  // a selector no consumer could match.
+  const store = new InvocationReceiptStore(scope.projectRoot);
+  try {
+    return store.projectId;
+  } finally {
+    store.close();
+  }
+}
+
+export async function runLimitsInit(
+  opts: ProviderAuthorityLimitsInitOptions,
+  deps: ProviderAuthorityLimitsDeps = {},
+): Promise<void> {
+  const lang = getLanguage(undefined);
+  const required = [
+    opts.provider,
+    opts.model,
+    opts.authMode,
+    opts.transport,
+    opts.executionBackend,
+    opts.executionProfileRef,
+    opts.warnAtRatio,
+    opts.blockAtRatio,
+  ];
+  if (required.some(value => !value?.trim())) {
+    print(getMessage('provider_authority.limits.needs_scope', lang));
+    process.exitCode = 1;
+    return;
+  }
+  const warnAtRatio = Number(opts.warnAtRatio);
+  const blockAtRatio = Number(opts.blockAtRatio);
+  if (!isRatio(warnAtRatio) || !isRatio(blockAtRatio)) {
+    print(getMessage('provider_authority.limits.invalid_ratio', lang));
+    process.exitCode = 1;
+    return;
+  }
+  const scope = resolveScope(deps);
+  const transport = opts.transport as InvocationTransport;
+  const executionBackend = opts.executionBackend as InvocationExecutionBackend;
+  const authMode = opts.authMode as InvocationAuthMode;
+  const provider = opts.provider!;
+  // Production injects nothing here, so the host's OWN registered evidence
+  // sources — the same registrations the provider-authority runtime opens with —
+  // are the one authority to ask. The injected seam still wins when supplied.
+  const sourceResolver = deps.sourceResolver
+    ?? createLocalProviderEvidenceSourceResolver(scope.projectRoot, {
+      env: process.env,
+      nodePlatform: process.platform,
+    });
+  // A non-exact scope is the authoring module's typed `scope_not_exact` refusal;
+  // asking a source registry about `unknown` would answer a different question.
+  const exactScope = authMode !== 'unknown' && executionBackend !== 'unknown';
+  if (exactScope && !hasLiveSourceForScope(sourceResolver, {
+    provider,
+    authMode,
+    transport,
+    executionBackend,
+  })) {
+    print(getMessage('provider_authority.limits.sources_unavailable', lang));
+    process.exitCode = 1;
+    return;
+  }
+  const read = readKeyringState(deps);
+  if (read.state !== 'present') {
+    print(read.state === 'absent'
+      ? getMessage('provider_authority.keyring.absent', lang)
+      : getMessage('provider_authority.keyring.unreadable', lang, {
+        code: read.code,
+        message: read.message,
+      }));
+    process.exitCode = 1;
+    return;
+  }
+
+  const keyring = ProviderAuthorityKeyring.open(openOptions(scope));
+  const executionProfileRef = opts.executionProfileRef!;
+  const tenantId = opts.tenant?.trim() || 'local';
+  const proposal = await proposeProviderLimitsAuthoring({
+    tenantId,
+    projectId: resolveProjectId(scope, deps),
+    provider,
+    model: opts.model!,
+    authMode,
+    backend: {
+      transport,
+      executionBackend,
+      endpointRefHash: opts.endpointRefHash?.trim() || null,
+      runtimeFingerprint: null,
+      executionProfileRef,
+    },
+    executionProfile: {
+      profileRef: executionProfileRef,
+      provider,
+      allowed: [{ authMode, transport, executionBackend }],
+    },
+    values: { warnAtRatio, blockAtRatio },
+    sourceResolver,
+    keyring,
+  });
+  if (proposal.state === 'hold') {
+    print(getMessage('provider_authority.limits.hold', lang, {
+      reasonCode: proposal.reasonCode,
+      detail: proposal.detail,
+      evidenceRef: proposal.authorityEvidenceRef,
+    }));
+    process.exitCode = 1;
+    return;
+  }
+
+  print(getMessage('provider_authority.limits.preview', lang, {
+    provider,
+    authMode,
+    transport,
+    executionBackend,
+    tenantId,
+    accountRefHash: proposal.accountRefHash ?? 'none (local auth)',
+    quotaScopeRefHash: proposal.quotaScopeRefHash,
+    windows: proposal.selector.requiredWindowIds.join(', '),
+    warnAtRatio: String(warnAtRatio),
+    blockAtRatio: String(blockAtRatio),
+    authorityRef: proposal.config.authorityRef,
+    policyRef: proposal.policyRef,
+  }));
+  const confirm = deps.confirmFn ?? ((question: string) => promptConfirm(question, false));
+  const confirmed = await confirm(getMessage('provider_authority.limits.confirm', lang));
+  if (!confirmed) {
+    print(getMessage('provider_authority.limits.aborted', lang));
+    return;
+  }
+  const written = await writeProviderLimitsAuthority({
+    proposal,
+    ownerConfirmed: confirmed,
+    configPath: deps.configPathOverride,
+  });
+  if (written.state === 'refused') {
+    print(getMessage('provider_authority.limits.refused', lang, {
+      reasonCode: written.reasonCode,
+      detail: written.detail,
+    }));
+    process.exitCode = 1;
+    return;
+  }
+  print(getMessage('provider_authority.limits.written', lang, {
+    authorityRef: written.authorityRef,
+    configPath: written.configPath,
+  }));
+}
+
 export function registerProviderAuthorityCommand(
   program: Command,
-  deps: ProviderAuthorityKeyringDeps = {},
+  deps: ProviderAuthorityLimitsDeps = {},
 ): void {
   const lang = getLanguage(undefined);
   const group = program
@@ -240,6 +467,32 @@ export function registerProviderAuthorityCommand(
     .action((opts: { expectRevision?: string }) => {
       try {
         runKeyringRotate(opts.expectRevision, deps);
+      } catch (err) {
+        printError(err instanceof Error ? err : new Error(String(err)));
+        process.exitCode = 1;
+      }
+    });
+
+  const limits = group
+    .command('limits')
+    .description(getMessage('provider_authority.limits.cmd_desc', lang));
+
+  limits
+    .command('init')
+    .description(getMessage('provider_authority.limits.init_desc', lang))
+    .option('--provider <id>', getMessage('provider_authority.limits.opt_provider', lang))
+    .option('--model <apiId>', getMessage('provider_authority.limits.opt_model', lang))
+    .option('--auth-mode <mode>', getMessage('provider_authority.limits.opt_auth_mode', lang))
+    .option('--transport <transport>', getMessage('provider_authority.limits.opt_transport', lang))
+    .option('--execution-backend <backend>', getMessage('provider_authority.limits.opt_execution_backend', lang))
+    .option('--execution-profile-ref <ref>', getMessage('provider_authority.limits.opt_execution_profile_ref', lang))
+    .option('--endpoint-ref-hash <hash>', getMessage('provider_authority.limits.opt_endpoint_ref_hash', lang))
+    .option('--tenant <id>', getMessage('provider_authority.limits.opt_tenant', lang))
+    .option('--warn-at-ratio <ratio>', getMessage('provider_authority.limits.opt_warn_at_ratio', lang))
+    .option('--block-at-ratio <ratio>', getMessage('provider_authority.limits.opt_block_at_ratio', lang))
+    .action(async (opts: ProviderAuthorityLimitsInitOptions) => {
+      try {
+        await runLimitsInit(opts, deps);
       } catch (err) {
         printError(err instanceof Error ? err : new Error(String(err)));
         process.exitCode = 1;

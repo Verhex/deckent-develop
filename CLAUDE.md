@@ -55,6 +55,11 @@ Kalite her seferinde kullanıcının prompt'uyla düzeltilmemeli; **ilk seferde 
   closure başarısızken outer run/capability `COMPLETE` olamaz.
 - **Surgical + mevcut-pattern.** Var olan i18n/config/routing sistemlerini kullan, yeniden icat etme.
 - **Riskli/görsel kod kör-default-on edilmez** — flag-gated + doğrula, sonra default.
+- **Result-notes-first (Alperen, 2026-08-11).** Worker bulguları varsayılan olarak `.result`
+  notes + koda gider; standalone `follow-up-works/` dokümanı YALNIZ owner'ın okuyup karar
+  vereceği işe açılır; fabrika dalgası başına ≤3 doküman; her doküman başlığında silinme-tetiği
+  (delete-on-consume koşulu) zorunludur. Tüketilen doküman arşivlenmez, SİLİNİR — kalıcı kayıt
+  MASTER satır-kanıtıdır.
 - Şüphe varsa: "Bu god-level/enterprise mi, i18n-temiz mi, borç bırakıyor mu?" diye sor — sonra yaz.
 </quality_bar>
 

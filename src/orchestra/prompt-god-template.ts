@@ -22,10 +22,12 @@ import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { personaCoreBody, selectGuidanceSlice } from '../core/persona-guidance.js';
 import { evaluateScopeGate } from '../core/scope-gate.js';
 import { mirrorTestPath } from '../core/task-builder-scope.js';
+import { renderWorkerDodChecklist } from '../core/worker-dod-contract.js';
+import type { ManagedContractInspection } from '../core/workspace-artifact-contract.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
 import { sanitizeReadScope, sanitizeScope } from './scope-sanitizer.js';
-import { truncateAtParagraph, inferTaskDomains, logInjectionAudit } from './task-builder.js';
-import { getDefaultProviderName } from './sprint-utils.js';
+import { truncateAtParagraph, logInjectionAudit } from './task-builder.js';
+import { detectTaskType } from './rubric-registry.js';
 import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
 import {
   reorderLeadingT0,
@@ -83,6 +85,8 @@ export interface SprintContext {
   dependencies?: string[];
   /** Directory containing `.tasks/` result files (defaults to `<cwd>/.tasks`). Used for enriching dependency block. */
   tasksDir?: string;
+  /** Host-verified digest state for the managed WORKER-GUIDE contract. */
+  workerGuideContract?: ManagedContractInspection;
   /** Host-evaluated, lineage-aware dependency evidence collected by the prompt caller. */
   dependencyResults?: ReadonlyMap<string, DependencyResultEntry>;
   /**
@@ -595,6 +599,7 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     executionAuthorityBlock,
     runPolicyBlock,
     productionWiringBlock,
+    workerGuideContract: ctx.workerGuideContract,
     task,
     effort,
     idempotencyKey,
@@ -711,8 +716,12 @@ function dedupeAgentNamedSkills(
  * Sprint 182 PQ-2 (F2): per `feedback_prompt_completeness_over_brevity` anchor,
  * skill content is injected verbatim. The previous EFFORT_TOKEN_MAP /
  * `truncateAtParagraph` / `sectionMax` break logic was removed.
+ *
+ * Exported (522-011, design S4) so the skill-catalog migration's byte-comparison
+ * proof renders the REAL worker-prompt skill section from each body-read path
+ * instead of a test-local re-implementation of it. Behaviour is unchanged.
  */
-function buildSkillBlock(
+export function buildSkillBlock(
   skillPrompts: Array<{ name: string; content: string }> | undefined,
   outNames: string[],
 ): string {
@@ -1480,40 +1489,6 @@ Both fields are optional. Only populate them when you have meaningful cross-work
 // ─── Definition-of-Done Checklist (WP-19) ──────────────────────────────
 
 /**
- * Split a goCriteria string into top-level clauses, paren-aware (PROMPT-W1 c).
- *
- * The previous naive `/[;\n]+/` split broke a single criterion apart whenever it
- * contained a `;` or newline INSIDE brackets — e.g. `Run tests (unit; e2e)` was
- * counted as two items, inflating the checklist denominator ("wrong 6/6"). This
- * walks the string tracking bracket depth (`()`, `[]`, `{}`) and splits ONLY on a
- * top-level `;` or newline (depth 0). Separators nested inside brackets — and any
- * internal newline within a bracketed clause — are preserved verbatim.
- */
-function parenAwareSplit(goCriteria: string): string[] {
-  const items: string[] = [];
-  let parenDepth = 0;
-  let buf = '';
-  for (const ch of goCriteria) {
-    if (ch === '(' || ch === '[' || ch === '{') {
-      parenDepth++;
-      buf += ch;
-    } else if (ch === ')' || ch === ']' || ch === '}') {
-      if (parenDepth > 0) parenDepth--;
-      buf += ch;
-    } else if ((ch === ';' || ch === '\n') && parenDepth === 0) {
-      // Top-level separator → end the current clause (empty clauses are dropped
-      // by the caller's length filter, matching the old `+` collapse semantics).
-      items.push(buf);
-      buf = '';
-    } else {
-      buf += ch;
-    }
-  }
-  if (buf.length > 0) items.push(buf);
-  return items;
-}
-
-/**
  * Build the goCriteria-derived self-assessment checklist (WP-19).
  *
  * Splits the task's `goCriteria` into discrete clauses (on `;` / newlines) and
@@ -1524,19 +1499,7 @@ function parenAwareSplit(goCriteria: string): string[] {
  * empty so the section is never stranded.
  */
 export function buildDodChecklist(goCriteria?: string): string {
-  const items = parenAwareSplit(goCriteria ?? '')
-    .map(s => s.trim().replace(/^[-*]\s*/, ''))
-    .filter(s => s.length > 0);
-
-  if (items.length === 0) {
-    return `Assess yourself honestly against the goCriteria above. "Code written" ≠ "DONE": core criteria met with a minor gap → GO_WITH_TECH_DEBT (name the gap); a critical criterion unmet → NO_GO (explain).`;
-  }
-
-  const checklist = items.map(i => `- [ ] ${i}`).join('\n');
-  const n = items.length;
-  return `Self-assessment rubric — "Code written" ≠ "DONE". Tick each Definition-of-Done item only when you verified it WITH EVIDENCE:
-${checklist}
-Verdict: all ${n}/${n} ticked → DONE | core items ticked, a minor item open → GO_WITH_TECH_DEBT (name the open item) | a critical item unticked → NO_GO (explain which and why).`;
+  return renderWorkerDodChecklist(goCriteria);
 }
 
 export function buildExactExecutionAuthorityBlock(
@@ -1744,6 +1707,8 @@ interface RenderInput {
   runPolicyBlock: string;
   /** Digest-bound production-wiring authority (487-026); empty when the task carries none. */
   productionWiringBlock: string;
+  /** Host-verified WORKER-GUIDE managed-contract state. */
+  workerGuideContract?: ManagedContractInspection;
   task: Task;
   effort: string;
   /**
@@ -2077,7 +2042,7 @@ export function resolveTargetedTestPaths(
 }
 
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -2132,8 +2097,13 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   // at the existing blank-line boundary: joined with SEGMENT_SEPARATOR they are
   // byte-identical to the former single block, but the split lets the T0 contract
   // lead in the reordered cache layout without dragging the volatile task body.
+  const workerGuideAuthority = workerGuideContract?.state === 'VERIFIED'
+    ? `WORKER_GUIDE_CONTRACT: VERIFIED schema=${workerGuideContract.schemaVersion} sha256:${workerGuideContract.digest}. Read .deckent/workspace/WORKER-GUIDE.md as the digest-bound supporting contract.`
+    : workerGuideContract?.state === 'HOLD'
+      ? `WORKER_GUIDE_CONTRACT: HOLD (${workerGuideContract.reason}). Do not treat .deckent/workspace/WORKER-GUIDE.md as authority; follow the inline heartbeat, result, scope and Definition-of-Done contracts in this compiled prompt.`
+      : 'WORKER_GUIDE_CONTRACT: UNRESOLVED_BY_CALLER. The inline contracts in this compiled prompt remain authoritative.';
   push('T0', 'worker-contract', `You are a Deckent worker agent.
-See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.`);
+${workerGuideAuthority}`);
   push('T2', 'task', `## Your Task
 ${task.id}: ${task.title}
 
@@ -2223,13 +2193,24 @@ ${dodBlock}${idempotencyBlock}`);
   // back; every other kind verifies via targeted tests. Defensive fallback to the
   // file-domain heuristic only when task.type is unset (legacy/direct-run path) so a
   // doc task is never forced into code verification by a missing type.
-  const isDocKind = task.type === 'documentation' || task.type === 'design';
+  // 523-010 (sprint-522 live evidence): task.type='audit' (docs/audits/*.md report
+  // tasks) was missing from this set, so an audit-class task fell through to the
+  // default CODE verify-steps branch below and a doc-only worker ran a repo-wide
+  // `tsc`/vitest — racing parallel workers' in-flight state. 'audit' is one of
+  // rubric-registry's own RubricTaskType values (AUDIT_RUBRIC / isAuditTask), so
+  // adding it here closes the gap without inventing a second taxonomy.
+  const isDocKind = task.type === 'documentation' || task.type === 'design' || task.type === 'audit';
   let isDocOnlyTask: boolean;
   if (task.type) {
     isDocOnlyTask = isDocKind;
   } else {
-    const taskDomains = inferTaskDomains(task.scope?.filesWrite ?? [], task.scope?.directories ?? []);
-    isDocOnlyTask = taskDomains.length > 0 && taskDomains.every(d => d === 'doc');
+    // Fallback for tasks with no canonical task.type (legacy/direct-run path):
+    // reuse rubric-registry's own scope-shape classifier — the SAME function
+    // task-builder.ts's createTask() feeds through rubricTypeToKind to derive
+    // task.type in the first place — instead of a second, independently
+    // maintained doc/code heuristic (rubric-registry: audit | document-write |
+    // code-development; non-'code-development' == documentation-class here).
+    isDocOnlyTask = detectTaskType(task) !== 'code-development';
   }
   // PROMPT-W1 (b): a doc-only task verifies by reading its file back; every other
   // task verifies via targeted tests, which is also the mode whose guidance must
@@ -2243,11 +2224,19 @@ This task has no project write authority. Do not run a build, type check, test s
 2. Cite observed command results and exact file/line evidence in the result notes.
 3. Evaluate the single authoritative Definition of Done above. If any required evidence is missing, report GO_WITH_TECH_DEBT or NO_GO; never infer DONE.`);
   } else if (isDocOnlyTask) {
+    // 523-010: a documentation-class task (rubric-registry: audit | document-write)
+    // names ONLY its own task-declared checks — document existence, a doc/markdown
+    // lint if one exists, and an owner-declared `**Test:**` command when present —
+    // NEVER a repo-wide type check or full test runner (that generic guidance
+    // belongs solely to the source-writing branches below, which stay untouched).
+    const declaredCheckBlock = declaredTestCommands.length > 0
+      ? `\n3. Run your task-declared check(s) exactly as written — do not substitute a project-wide type check or test runner:\n${declaredTestCommands.map((command, index) => `   ${index + 1}. \`${command}\``).join('\n')}`
+      : '';
     push('T0', 'verify-steps', `## VERIFY STEPS (doc-only task — DO NOT run the test suite)
-This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite — it is large, unrelated to your file, slow, and produces spurious failures that do NOT reflect your work.
+This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite, and DO NOT run a project-wide type check (\`tsc\`) — they are large, unrelated to your file, slow, and can race other in-flight workers' state without reflecting your own work.
 1. Read your file back from disk (the path in your scope) and confirm its content satisfies the goCriteria above.
-2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.
-Mark selfAssessment = "DONE" when the file exists and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
+2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.${declaredCheckBlock}
+Mark selfAssessment = "DONE" when the file exists (and any check above passes) and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
   } else if (declaredTestCommands.length > 0) {
     const commandList = declaredTestCommands
       .map((command, index) => `${index + 1}. \`${command}\``)
@@ -2313,12 +2302,8 @@ At EVERY significant step, also update the \`currentAction\` field to a short hu
   // Result + self-assessment — single authority section. Folds the former
   // separate "## Result File" and "## Honest Self-Assessment" sections so the
   // result/verdict instructions are stated once instead of 4×.
-  // Sprint 202 Task 202-003: registry default before the absolute 'claude' floor
-  // so prompts emitted in pure-Ollama configs don't hard-code 'claude' into
-  // worker token-usage instructions.
-  const provider = task.provider ?? getDefaultProviderName();
   push('T2', 'result-contract', `## Result & Self-Assessment
-Write .tasks/task-${task.id}.result with: taskId, workerId ("w-${task.id}"), filesChanged (string[]), linesAdded (integer), linesRemoved (integer), testsPassed (BOOLEAN), coverage (number; use 0 when not measured), selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes, and tokenUsage { "inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0, "provider": "${provider}", "model": "${task.model}" }. The orchestrator replaces measurable file/line/token/cost fields with host-authoritative evidence; your values are ingress claims, never billing truth. Set provider/model as shown (you know these); leave inputTokens, outputTokens and cacheReadTokens at 0 — do NOT estimate them. An LLM cannot count its own token usage, so any guess only adds noise: the orchestrator fills the real token counts server-side after you finish. tokenUsage is optional — if you omit it the orchestrator still fills it.
+Write .tasks/task-${task.id}.result with: taskId, workerId ("w-${task.id}"), filesChanged (string[]), linesAdded (integer), linesRemoved (integer), testsPassed (BOOLEAN), coverage (number; use 0 when not measured), selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), and notes. These are worker ingress claims, not the canonical settled result. The orchestrator derives top-level provider/model plus measurable file, line, token, cost, test and TypeScript evidence from host-authoritative sources and assembles the versioned canonical result. Workers do NOT estimate token usage and do not place provider/model inside tokenUsage. The optional tokenUsage object must be omitted unless an adapter supplied real values; when supplied, its usage-only fields are inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens, and source.
 Field shapes (strict — a wrong shape here breaks the orchestrator's result parser for the whole sprint):
 - \`notes\`: a SINGLE string, never an array or object. For multiple points, join them into ONE string using \`\\n\` newlines — do NOT write \`["point one", "point two"]\` or \`{"a": "..."}\`.
 - \`selfAssessment\`: exactly one of the three string literals \`"DONE"\`, \`"GO_WITH_TECH_DEBT"\`, \`"NO_GO"\` — never an array, never any other value.

@@ -122,6 +122,25 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
       );
       expect(docsSection).toContain('needs: typecheck');
     });
+
+    it('should run the docs-scripts flake canary env on the existing step (523-004)', () => {
+      // Pin so the canary env cannot silently drop off the step it was wired
+      // onto — the wiring itself is the deliverable, not just the presence of
+      // the flag string somewhere in the job.
+      const docsSection = content.substring(
+        content.indexOf('test-docs-scripts:'),
+        content.indexOf('\n\n  test-dashboard:')
+      );
+      expect(docsSection).toContain('VITEST_DOCS_SCRIPTS_SERIAL');
+    });
+
+    it('test-docs-scripts should keep continue-on-error until the RCA acceptance series is met', () => {
+      const docsSection = content.substring(
+        content.indexOf('test-docs-scripts:'),
+        content.indexOf('\n\n  test-dashboard:')
+      );
+      expect(docsSection).toContain('continue-on-error: true');
+    });
   });
 
   describe('D) Dashboard build verification', () => {

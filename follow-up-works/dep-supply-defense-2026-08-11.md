@@ -200,3 +200,17 @@ This is not an MVP recommendation: Phase 0 must design the full cross-platform, 
 - Existing analysis: `CODE-DOC-DIFF-2026-08.md`, DOC-04, records the unresolved nested docs npm toolchain.
 
 Paths above are repository-relative prose references rather than Markdown links so this scoped artifact does not assert that relocated or unresolved targets are linkable.
+
+---
+
+## OWNER DECISIONS (Alperen, 2026-08-11 — codex cross-review sonrası)
+
+- **Phase 0: GO** (ingress census, receipt-only). Codex şerhi içselleştirildi: "100% of known"
+  closed-world kanıtı sayılmaz; census bilinmeyen-ingress sınıfını açıkça typed bırakır.
+- **Acil fix B13'e:** 3 CI install'daki `|| true` fail-open (ci.yml:243,291; coverage.yml:35)
+  kaldırılır + `npx` floating-acquisition yasağı eklenir (doğrulanmış bulgu).
+- **Phase 1 kabul şartı (codex):** broker bootstrap'ı bağımsız-pinned olmalı (denetleyeceği ilk
+  `npm ci`'dan ÖNCE devrede); tenant `observe/warn` dönemi bile secretsiz + default-deny network
+  install lane şartıyla. Repo gerçeği not: kök `.npmrc` `ignore-scripts=true` + exact
+  `better-sqlite3` rebuild zaten mevcut modeldir; Phase 1 bunu genelleştirir.
+- Codex verdict: SOUND-WITH-GAPS; yukarıdaki şartlar boşlukları kapatır.

@@ -22,6 +22,7 @@ import { clearServeDaemonMeta } from '../src/main/daemon-meta-client.js';
 import type { SpawnedChildLike } from '../src/main/daemon-lifecycle.js';
 import type { ConnectionProfile } from '../src/shared/desktop-api.js';
 import type { ConnectionProfileInput, ConnectionProfileStore } from '../src/main/connection-profile-store.js';
+import { DEFAULT_PREFERENCES, type DesktopPreferences } from '../src/shared/theme-tokens.js';
 import { registerIpcHandlers, type RegisterIpcHandlersDeps } from '../src/main/ipc-handlers.js';
 
 class FakeChildProcess extends EventEmitter implements SpawnedChildLike {
@@ -96,7 +97,7 @@ function makeProfile(projectPath: string, overrides: Partial<ConnectionProfile> 
 /** D4-1 — hermetic preferences store double (tmpdir would also work, but the
  *  tiering suite only cares that the channel reaches the store). */
 function makePreferencesStore(): RegisterIpcHandlersDeps['preferencesStore'] {
-  let current = { version: 1 as const, watch: 'day-watch' as const, customTokens: {} };
+  let current: DesktopPreferences = { ...DEFAULT_PREFERENCES, watch: 'day-watch' };
   return {
     filePath: '/tmp/fake-preferences.json',
     get: vi.fn(() => ({ preferences: current, corrupted: false })),

@@ -1,0 +1,90 @@
+# Persona S0 — provider system-channel capability census
+
+Date: 2026-08-12  
+Scope: design and evidence census only; no provider request was executed.
+
+## Decision boundary
+
+This census distinguishes a channel's **shape** from its **behaviour**. A CLI flag, request field, or accepted message role proves only that a transport can express instructions. It does not prove that the provider preserves its own default, appends the supplied text, replaces a default, ignores it, transforms it, or truncates it. Consequently:
+
+- `repo-verified` means the cited Deckent adapter code itself exposes or emits the exact channel.
+- `needs-live-verification` means behaviour is not established by bounded repo code plus the provider's own documentation. It is not a negative capability claim.
+- Only behaviour-proven `append` or `preserve-provider-default` channels may later become default persona-injection candidates.
+- `replace` is a typed spawn HOLD. `unknown` is also HOLD-candidate until the later live slice resolves it. No provider-name branch or spawn change is proposed here.
+- “No current path” means the adapter's production/planner path does not emit a separate system channel today; it does not assert that the external product lacks one.
+
+There are no first-level adapter directories under `src/providers/`; adapters are source modules. The census therefore covers every class in that directory that implements `ProviderAdapter`, including the two transport backends, and separately expands the three built-in presets of the configurable OpenAI-compatible adapter.
+
+## Census
+
+| Adapter / provider | Current Deckent path | Documented candidate channel | Exact flag / field | Semantics | Byte limit | Shape status | Behaviour status | Default eligibility |
+|---|---|---|---|---|---|---|---|---|
+| Claude (`ClaudeAdapter`) | User prompt is supplied through `claude -p`; the subprocess config explicitly says it never passes `--system-prompt`. | Claude Code documents `--append-system-prompt` as an additional system prompt; `--system-prompt` is a replacement candidate. Neither is currently emitted by this adapter. | `--append-system-prompt <prompt>` / `--system-prompt <prompt>` | `append` by documented flag contract for the former; `replace` candidate for the latter | Not stated in cited CLI reference | Current absence: `repo-verified`; external flags: `needs-live-verification` | `needs-live-verification` | HOLD until append behaviour and preservation are observed; replacement flag remains HOLD |
+| Codex (`CodexAdapter`) | `codex exec --full-auto <user prompt> --model ...`; no separate instruction flag or field is emitted. | No per-invocation system/developer channel was established from the official CLI surface consulted for this census. Repository/config instruction names are not treated as a per-spawn channel. | None established | `unknown` | Unknown | Current absence: `repo-verified` | `needs-live-verification` | HOLD / degrade |
+| Gemini (`GeminiAdapter`) | `-p <prompt>` / `--prompt`; REST fallback emits only `contents[].parts[].text`. | Gemini CLI context files are documented as concatenated into its system prompt, but this is discovery-based context, not a bounded per-spawn flag. No dedicated per-invocation system channel is emitted by Deckent. | Context files selected by Gemini CLI configuration; no exact spawn flag established | `unknown` (documented concatenation does not prove preservation of the built-in provider default) | No prompt-byte limit stated in cited CLI reference | Current absence: `repo-verified`; context mechanism: `needs-live-verification` | `needs-live-verification` | HOLD / degrade |
+| Ollama (`OllamaAdapter`) | Planner uses `/api/generate` with `prompt`; streaming chat hardcodes one `user` message. | Ollama documents chat `messages` and its Modelfile documents `SYSTEM` plus a `system` message role. The current Deckent path does not emit that role. | `/api/chat` → `messages: [{ role: "system", content: ... }]`; Modelfile `SYSTEM` | `unknown` relative to an existing model/template default | No per-field byte limit stated; effective context is model-specific | Current absence: `repo-verified`; candidate role: `needs-live-verification` | `needs-live-verification` | HOLD until model-by-model preservation and truncation behaviour are proven |
+| Amazon Bedrock Anthropic Messages (`BedrockAdapter`) | `send(messages, model, { system })` conditionally writes the top-level request field. Adapter is HTTP-only and cannot spawn. | AWS documents the optional Anthropic Messages `system` request field. | JSON body `system` | `unknown` relative to the provider/model default | No system-field byte ceiling stated in cited AWS request reference; model context limits are not a field-byte guarantee | `repo-verified` | `needs-live-verification` | HTTP candidate only after behaviour proof; any observed replacement is HOLD |
+| OpenAI-compatible generic (`OpenAICompatibleAdapter`) | `ChatMessage.role` accepts `system`; `send()` forwards `messages` unchanged to `/chat/completions`. Spawned agent construction is outside this adapter and currently receives task text through its worker path. | OpenAI Chat Completions documents `developer` and `system` messages; `developer` supersedes the older `system` role for newer reasoning models. Deckent's type does not yet accept `developer`. | `messages[].role = "system"` (repo); `messages[].role = "developer"` (documented, not repo-typed) | `unknown`; role precedence is not the same as preservation of provider defaults | No portable byte limit; configurable vendors may impose different body/field/context ceilings | System role: `repo-verified`; developer role: `needs-live-verification` | `needs-live-verification` per configured endpoint and model | HOLD until endpoint/model behaviour proof |
+| DeepSeek preset | Same generic adapter, configured for DeepSeek. | OpenAI-shaped `messages[].role = "system"` is only a protocol-shape claim here; no DeepSeek-specific behaviour evidence was found in bounded repo material. | `messages[].role = "system"` | `unknown` | Unknown | `repo-verified` transport shape | `needs-live-verification` | HOLD |
+| Qwen preset | Same generic adapter, configured for DashScope compatible mode. | OpenAI-shaped `messages[].role = "system"` is only a protocol-shape claim here; no Qwen-specific behaviour evidence was found in bounded repo material. | `messages[].role = "system"` | `unknown` | Unknown | `repo-verified` transport shape | `needs-live-verification` | HOLD |
+| Zhipu/GLM preset | Same generic adapter, configured for Zhipu's compatible endpoint. | OpenAI-shaped `messages[].role = "system"` is only a protocol-shape claim here; no GLM-specific behaviour evidence was found in bounded repo material. | `messages[].role = "system"` | `unknown` | Unknown | `repo-verified` transport shape | `needs-live-verification` | HOLD |
+| OpenRouter (`OpenRouterProvider`) | `send()` forwards `ChatMessage[]`; planner currently sends only `{ role: "user" }`. | OpenRouter documents `system` and `developer` message types, but it may transform requests for the selected upstream provider and model. | `/chat/completions` → `messages[].role = "system"` or `"developer"` | `unknown`, necessarily provider/model/route-specific | No universal limit; OpenRouter documents provider field-limit and payload-limit error classes rather than one portable ceiling | System transport shape: `repo-verified`; developer shape: `needs-live-verification` | `needs-live-verification` for every routed model/provider pair | HOLD; never infer one result across the gateway catalog |
+| `SubprocessSpawnBackend` | Generic CLI transport; delegates argument construction to `SubprocessProviderConfig`. Its built-in Claude config emits no custom system text. | No independent provider channel: capability belongs to the injected provider config. | Provider-config dependent | `unknown` | Provider-config dependent | Delegation: `repo-verified` | `needs-live-verification` for each config | Not independently eligible |
+| `SandboxSpawnBackend` | Extends `SubprocessSpawnBackend` and changes sandbox/process policy, not prompt-channel construction. | No independent provider channel. | Delegated | `unknown` | Delegated | `repo-verified` | Inherits underlying provider result | Not independently eligible |
+
+## Repo evidence
+
+- Claude: [`src/providers/subprocess.ts`](../src/providers/subprocess.ts) defines `CLAUDE_SUBPROCESS_CONFIG`, sends `-p -`, and records that it never passes `--system-prompt`; [`src/providers/claude.ts`](../src/providers/claude.ts) likewise builds only the print/user-prompt invocation.
+- Codex: [`src/providers/codex.ts`](../src/providers/codex.ts) builds `['exec', '--full-auto', prompt, '--model', wireModel]` and has no system/developer argument.
+- Gemini: [`src/providers/gemini.ts`](../src/providers/gemini.ts) builds `['-p', prompt, ...]`; both retained REST scripts emit `contents` only.
+- Ollama: [`src/providers/ollama.ts`](../src/providers/ollama.ts) emits a user-only `/api/chat` message in `stream()` and a plain `prompt` for `/api/generate` planning.
+- Bedrock: [`src/providers/bedrock.ts`](../src/providers/bedrock.ts) types `BedrockSendOptions.system` and conditionally assigns `requestBody.system`.
+- OpenAI-compatible: [`src/providers/openai-compatible.ts`](../src/providers/openai-compatible.ts) types the `system` role, forwards `messages`, and owns the DeepSeek, Qwen, and Zhipu preset registry.
+- OpenRouter: [`src/providers/openrouter.ts`](../src/providers/openrouter.ts) forwards messages but builds planner input as a single user message.
+- Transport-only adapters: [`src/providers/subprocess.ts`](../src/providers/subprocess.ts) and [`src/providers/sandbox.ts`](../src/providers/sandbox.ts).
+
+## Provider-owned documentation evidence
+
+- [Claude Code CLI reference](https://docs.anthropic.com/en/docs/claude-code/cli-usage) is the authority to re-check immediately before the live slice. Its system-prompt flags are external claims here because Deckent does not emit them.
+- [Gemini CLI configuration and command-line arguments](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/configuration.md) documents `--prompt` and the concatenation of discovered context into the system prompt.
+- [Gemini CLI reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/cli-reference.md) confirms that `--prompt` is ordinary prompt text, not a system channel.
+- [AWS Anthropic Claude Messages request/response](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages-request-response.html) documents the optional top-level `system` field.
+- [OpenAI Chat Completions reference](https://platform.openai.com/docs/api-reference/chat/create) documents `developer` and legacy `system` message roles and their precedence distinction.
+- [Ollama chat API](https://docs.ollama.com/api/chat) documents the message-array request; [Ollama Modelfile reference](https://docs.ollama.com/modelfile) documents `SYSTEM`, the system role, and template mediation.
+- [OpenRouter message formats](https://openrouter.ai/docs/agent-sdk/call-model/message-formats) documents system/developer message types. [OpenRouter errors and debugging](https://openrouter.ai/docs/api/reference/errors-and-debugging) explicitly exposes upstream request transformations and non-universal field-limit failures, which is why gateway behaviour cannot be generalized.
+
+No official per-invocation Codex system-channel contract was established by the evidence pass. A remembered config key or prior CLI version is therefore deliberately not listed as a fact.
+
+## Later live verification protocol
+
+The later slice must be separately authorized, use non-production fixtures/accounts, resolve the exact installed CLI/API version and selected wire model, and record request/response receipts without secrets. It must not mutate provider login state. Each provider/model/version tuple is an independent observation; gateway or configurable-adapter results cannot be inherited by another tuple.
+
+### Common four-probe matrix
+
+Use random, high-entropy sentinels generated for that run, never meaningful instructions:
+
+1. **Baseline/default probe:** user asks for a machine-readable report of the visible instruction markers, without supplying a persona channel. Record provider/model/version, exact transport, exit/HTTP status, token counts, and output digest.
+2. **Positive channel probe:** supply system sentinel `SYS_<nonce>` and user sentinel `USR_<nonce>`. Require a strict JSON response that separately reports both. Absence of the system sentinel detects ignore; alteration detects transformation.
+3. **Conflict probe:** system says output `SYSTEM_<nonce>` while user says output `USER_<nonce>`. Repeat with neutral ordering and at least three fresh nonces. This is behavioural evidence about priority, not by itself proof of append versus replacement.
+4. **Default-preservation probe:** select a provider-native, non-secret default marker observable through an approved debug/echo facility. Compare baseline and injected requests. The supplied system text is `append` only if the native default remains byte/structure present; disappearance is `replace`. If the facility cannot expose this, semantics remains `unknown` and spawn stays HOLD.
+
+For truncation, send UTF-8 payloads containing start/middle/end sentinels at monotonically increasing byte sizes, including multi-byte characters and CRLF/LF variants. Use bounded exponential growth followed by binary search after the first rejection, missing sentinel, or transformed boundary. Record **UTF-8 bytes**, characters, tokens where reported, HTTP/exit outcome, and upstream transformed-request digest. A context-window failure is not a proven per-field byte ceiling. Never publish a number inferred from a single model as a provider-wide limit.
+
+### Provider-specific execution designs (not executed here)
+
+- **Claude CLI:** compare documented `--append-system-prompt` against `--system-prompt` on the same CLI version. Capture structured JSON/stream-json output and an approved debug trace capable of showing default preservation. The append flag becomes eligible only if all four probes preserve the built-in default; the replacement flag is HOLD regardless of task compliance.
+- **Codex CLI:** first capture `codex exec --help` and the official version-matched reference. If no supported per-run channel is present, record `unsupported` for that version and stop; do not smuggle persona text through the user prompt. If a channel appears, run the common matrix before changing this census.
+- **Gemini CLI:** isolate a temporary workspace and user config. Compare baseline, one context file containing the sentinel, and any version-documented system override. Inspect the CLI's generated/debug system prompt where officially supported. Detect concatenation order, built-in-default loss, context discovery leakage, and byte truncation separately.
+- **Ollama:** pin the server version, model digest, and Modelfile digest. Test `/api/chat` with a first `system` message against a baseline model, then a model whose Modelfile already has `SYSTEM`. The second case determines whether request text replaces or composes with the model default. Repeat for every template family admitted for routing.
+- **Bedrock:** use the exact Anthropic model ID and API version. Compare a request without `system`, with one `system` string, and—where accepted—with system content blocks. Cloud request logging must be redacted. Since the adapter is HTTP-only, this verifies `send()` capability, not spawn eligibility.
+- **OpenAI-compatible presets:** test DeepSeek, Qwen, and Zhipu separately with `system`; additionally test `developer` only when that vendor/model's own versioned documentation accepts it. Capture vendor-native request validation and model identity. No result may be copied between presets or custom endpoints.
+- **OpenRouter:** pin both requested model and actual upstream provider, disable fallbacks for the experiment, and use streaming debug `echo_upstream_body` only in the provider-approved test environment. Compare the submitted message array with the transformed upstream body to detect role merging, rewriting, dropping, and truncation. Re-run for every admitted route; one upstream's result never establishes gateway-wide semantics.
+- **Subprocess/Sandbox transports:** do not test as providers. Run the underlying provider protocol through each admitted backend only after provider semantics is known, verifying that argv/stdin/environment transport preserves the exact UTF-8 bytes and does not introduce shell truncation on macOS, Linux, Windows native, and WSL.
+
+## Migration and rollback contract for the next slices
+
+1. **S1 — data only:** add one optional capability descriptor to the canonical provider contract and a pure resolver. Preserve all existing constructors and treat absence as unsupported/degrade. Rollback: remove the unused optional descriptor and helper; no runtime behaviour has changed.
+2. **Owner-gated wiring:** populate descriptors only from versioned live receipts, then let the canonical spawn admission resolver consume them. Backward compatibility: adapters without a descriptor keep the existing path and degrade; `replace`/`unknown` return typed HOLD. Rollback: disable capability records/config without reverting adapter code.
+3. **Promotion:** enable append/default-preserving candidates per provider/model/version policy after cross-platform transport tests. Never add provider-name branches at consumers. Rollback: revoke the evidence-backed capability record, returning immediately to degrade/HOLD.
+
+Verification criteria for those slices: one canonical descriptor type, no duplicate provider-name capability maps, unit assertions for append/replace/unknown/absent dispositions, byte-preservation fixtures across platform adapters, and a live receipt keyed by provider + model + interface version for every promoted record.

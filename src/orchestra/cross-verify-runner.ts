@@ -341,6 +341,16 @@ export interface RunCrossVerifyOptions {
   /** Verifier model override. Default = capability-tier equivalent on the target provider. */
   verifierModel?: string;
   /**
+   * Exact model that authored the work under verification — the authoritative
+   * input to the capability-tier floor ({@link resolveVerifierTierFloorRefusal}).
+   *
+   * Defaults to `task.model`, which is the author's true model on the sprint
+   * path. The standalone claim envelope carries a host-substituted default
+   * there, so an interactive caller that knows the real author model states it
+   * here instead of mutating the immutable claim.
+   */
+  authorModel?: string;
+  /**
    * Injectable entitlement-memory seam (MASTER-PLAN 671(b)). Production passes
    * nothing and the memory resolves under the global state dir; tests point it
    * at a tmpdir so no host state is read or written.
@@ -710,6 +720,51 @@ export async function resolveSettledVerifierOutcome(
   } while (true);
 }
 
+// ─── Capability-tier floor (author ≤ verifier) ──────────────────────────────
+//
+// A second opinion is only worth its cost when it comes from a model at least
+// as capable as the one that authored the claim. Nothing enforced that before:
+// `modelRegistry.getEquivalent` deliberately falls back ONE TIER DOWN when the
+// verifier provider has no same-tier model, and an explicit `verifierModel`
+// override skips tier resolution altogether — so a premium author could be
+// judged by an economy verifier and the result still read as "cross-verified".
+//
+// Tier identity and ordering come from the model registry alone (`getTier` /
+// `compareTiers`); this module holds no tier table of its own. The refusal is a
+// typed CODE, not prose: orchestra never imports the CLI i18n catalog
+// (ADR-D-004 C2), so the surface that owns language localizes these codes.
+
+/** Typed refusal: the verifier's tier sits below the author model's tier. */
+export const VERIFIER_TIER_BELOW_AUTHOR = 'xverify_verifier_tier_below_author';
+/** Typed refusal: the floor itself could not be computed from the registry. */
+export const VERIFIER_TIER_FLOOR_UNRESOLVABLE = 'xverify_verifier_tier_floor_unresolvable';
+
+/**
+ * Returns `null` when the verifier may judge this author, or the typed refusal
+ * reason when it may not.
+ *
+ * Fails CLOSED on an unresolvable identity: a floor that cannot be computed is
+ * not a floor, and silently dispatching would assert a tier guarantee the host
+ * cannot back with evidence.
+ */
+export function resolveVerifierTierFloorRefusal(
+  authorModel: string,
+  verifierModel: string,
+): string | null {
+  let authorTier: ReturnType<typeof modelRegistry.getTier>;
+  let verifierTier: ReturnType<typeof modelRegistry.getTier>;
+  try {
+    authorTier = modelRegistry.getTier(authorModel);
+    verifierTier = modelRegistry.getTier(verifierModel);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return `${VERIFIER_TIER_FLOOR_UNRESOLVABLE}:author=${authorModel} verifier=${verifierModel}: ${detail}`;
+  }
+  if (modelRegistry.compareTiers(verifierTier, authorTier) >= 0) return null;
+  return `${VERIFIER_TIER_BELOW_AUTHOR}:`
+    + `verifier=${verifierModel}(${verifierTier}) < author=${authorModel}(${authorTier})`;
+}
+
 function resolveVerifierModel(
   taskModel: string,
   verifierProvider: ProviderName,
@@ -1061,7 +1116,25 @@ export async function runCrossVerify(
   const verificationRequired = config.cross_verify.enforce_refuted === true
     && ((config.cross_verify.high_stakes_only ?? true) === false || isHighStakesTask(task));
 
+  // Authoritative when the caller states it; otherwise the task's own model,
+  // which is the author's true identity on the sprint path.
+  const authorModel = opts.authorModel ?? task.model;
+
   try {
+    // Floor check #1 — on the REQUESTED verifier model, before either dispatch
+    // branch spends anything. This is the point an explicit `--verifier-model`
+    // would otherwise buy a below-tier judge outright.
+    if (opts.verifierModel) {
+      const requestedRefusal = resolveVerifierTierFloorRefusal(authorModel, opts.verifierModel);
+      if (requestedRefusal) {
+        const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+          outcome: 'unavailable',
+          reason: requestedRefusal,
+        });
+        return skip(requestedRefusal, 'unavailable', evidencePersisted, verificationRequired);
+      }
+    }
+
     // Production verification has exactly one transport authority: the typed,
     // content-addressed invocation composition. Enforcement is a separate
     // config-derived policy: advisory and required verification share the exact
@@ -1135,6 +1208,25 @@ export async function runCrossVerify(
         return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
       }
       const verifierProvider = coordinated.calledProvider as ProviderName;
+      // Floor check #2 — the composition authority resolves the called model
+      // itself, so the requested-model check above cannot speak for it. A
+      // below-tier judge never gains verdict authority, whatever it returned.
+      const calledModelRefusal = resolveVerifierTierFloorRefusal(
+        authorModel,
+        coordinated.calledModel,
+      );
+      if (calledModelRefusal) {
+        dispatchedVerifier = verifierProvider;
+        dispatchedVerifierModel = coordinated.calledModel;
+        const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+          outcome: 'unavailable',
+          verifier: verifierProvider,
+          verifierModel: coordinated.calledModel,
+          reason: calledModelRefusal,
+          invocationReceiptRef: coordinated.invocationReceiptRef,
+        });
+        return skip(calledModelRefusal, 'unavailable', evidencePersisted, verificationRequired);
+      }
       if (mandatory.adjudication) {
         const parsed = parseCrossVerifyAdjudicationOutputV2(coordinated.output);
         const adjudication = deriveCrossVerifyAdjudicationV2({
@@ -1356,6 +1448,20 @@ export async function runCrossVerify(
         evidencePersisted,
         verificationRequired,
       );
+    }
+
+    // Floor check #3 — the resolved identity on the string-spawn branch. This is
+    // where `cross_verify.verifier_model` and `getEquivalent`'s one-tier-down
+    // fallback land, neither of which passed through check #1.
+    const resolvedTierRefusal = resolveVerifierTierFloorRefusal(authorModel, verifierModel);
+    if (resolvedTierRefusal) {
+      const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+        outcome: 'unavailable',
+        verifier: verifierProvider,
+        verifierModel,
+        reason: resolvedTierRefusal,
+      });
+      return skip(resolvedTierRefusal, 'unavailable', evidencePersisted, verificationRequired);
     }
 
     // MASTER-PLAN 671(b) — do not pay twice for the same refusal. If THIS exact

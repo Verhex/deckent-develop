@@ -3038,8 +3038,9 @@ export async function finalizeSprint(
   }
 
   // 5. Legacy identity-file write dropped — Memory V2, B6.
-  // Identity is DB-first: the memory.db `identity` entry is the source of
-  // truth, surfaced via the managed .deckent/workspace/IDENTITY.md doc.
+  // `.deckent/workspace/IDENTITY.md` is the user/project identity source;
+  // memory.db carries its provenance+digest-bound searchable projection. The
+  // finalizer never reverses that direction or overwrites user identity text.
 
   // 5b. Triple-link: sprint-log → memory → retro (depends_on chain)
   try {

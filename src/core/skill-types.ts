@@ -33,6 +33,30 @@ export interface SkillStats {
   lastUsedInSprint: string;
 }
 
+// ─── Referenced Files (522-010, design §3.4 G2) ─────────────────────────────
+//
+// A skill body may point at helper files (`scripts/`, `data/`). Before this they
+// were owned by nobody: nothing resolved, contained, bounded or shipped them.
+// They are part of the package or they do not exist — `{entrypoint} ∪
+// referencedFiles` is ONE atomic unit for resolution (see `resolveSkillBody` in
+// skill-pool.ts), so a missing member is a typed HOLD, never a partial prompt.
+
+/**
+ * One declared package member, as it appears in a manifest.
+ *
+ * `digest`/`sizeBytes` are the schema-v1 integrity fields (design §3.3). They are
+ * reported back by the resolver from the file actually read; admitting or
+ * refusing a *declared* digest is supply-chain ingress authority (design §9),
+ * not this slice's.
+ */
+export interface SkillReferencedFile {
+  /** Relative to the skill root; normalised and containment-checked on read. */
+  path: string;
+  role?: string;
+  digest?: string;
+  sizeBytes?: number;
+}
+
 // ─── Skill Definition ───────────────────────────────────────────────────────
 
 export interface SkillDefinition {
@@ -43,7 +67,11 @@ export interface SkillDefinition {
   name: string;
   version: string;
   description: string;
-  entrypoint: string;       // SKILL.md path
+  /** Declared body path, relative to the skill root — honoured by `resolveSkillBody`
+   *  (522-010, design §3.4 G1). Absent/empty keeps defaulting to `SKILL.md`. */
+  entrypoint: string;
+  /** Declared package members beside the entrypoint (design §3.4 G2). */
+  referencedFiles?: SkillReferencedFile[];
   category: SkillCategory;
   triggers: string[];
   stackDetection: StackDetectionRule;

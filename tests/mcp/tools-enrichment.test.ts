@@ -11,6 +11,14 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  realpathSync: Object.assign(vi.fn((path: string) => path), {
+    native: vi.fn((path: string) => path),
+  }),
+  lstatSync: vi.fn((path: string) => ({
+    isSymbolicLink: () => false,
+    isDirectory: () => !/\.(?:md|json)$/i.test(path),
+    isFile: () => /\.(?:md|json)$/i.test(path),
+  })),
 }));
 
 vi.mock('node:child_process', () => ({

@@ -68,6 +68,17 @@ export function isTerminalRunFlowState(state: RunFlowState): boolean {
   return RUN_FLOW_TERMINAL_STATES.has(state);
 }
 
+/**
+ * Why a flow reached `CANCELLED`. `'superseded'` (524-013) is the additive
+ * runs-inbox-hygiene reason: an unstarted pending-approval flow that a NEWER
+ * plan attempt over the same persisted plan/directives source replaced. It is
+ * distinct from `'rejected'` (an operator said no) and `'aborted'` (an operator
+ * or system cancelled the work itself) — a superseded flow was never judged,
+ * only outrun. A record written before this reason existed still parses: the
+ * field is optional and the older two values are unchanged.
+ */
+export type RunFlowCancelReason = 'rejected' | 'aborted' | 'superseded';
+
 // ═══ Payload types ═══════════════════════════════════════════════════════
 
 /**
@@ -341,7 +352,18 @@ export type RunFlowEvent =
   | (RunFlowEventBase & { readonly type: 'RUN_COMPLETED'; readonly summary?: string })
   | (RunFlowEventBase & { readonly type: 'RUN_PAUSED'; readonly reason: string; readonly resumeCommand?: string })
   | (RunFlowEventBase & { readonly type: 'RUN_FAILED'; readonly error: string })
-  | (RunFlowEventBase & { readonly type: 'FLOW_ABORTED'; readonly reason?: string });
+  | (RunFlowEventBase & {
+      readonly type: 'FLOW_ABORTED';
+      readonly reason?: string;
+      /**
+       * Runs-inbox hygiene (524-013): the NEWER flow that replaced this one.
+       * Present ONLY for a typed supersession abort — its presence is what the
+       * reducer folds into `cancelReason: 'superseded'` + a persisted
+       * `supersededBy`. Absent on every legacy/operator abort, which keeps
+       * folding to the historical `'aborted'`.
+       */
+      readonly supersededBy?: string;
+    });
 
 export type RunFlowEventType = RunFlowEvent['type'];
 
@@ -363,7 +385,13 @@ export interface RunFlowContext {
   readonly approvedSnapshot?: ApprovedPlanSnapshot;
   readonly handle?: RunHandle;
   /** Populated when `state === 'CANCELLED'`. */
-  readonly cancelReason?: 'rejected' | 'aborted';
+  readonly cancelReason?: RunFlowCancelReason;
+  /**
+   * Populated when `cancelReason === 'superseded'` — the flowId of the newer
+   * flow that replaced this one. Persisted by the reducer from the aborting
+   * event, so a retired duplicate always names its survivor.
+   */
+  readonly supersededBy?: string;
   /** Populated when `state === 'BLOCKED'` — human-readable conflict description. */
   readonly blockedReason?: string;
   /** Populated when `state === 'FAILED'`. */

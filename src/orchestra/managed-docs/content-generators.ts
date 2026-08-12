@@ -13,6 +13,13 @@ import type { SectionGenerator } from './types.js';
 import type { MemoryEntryV2 } from '../../core/memory-types.js';
 // Sprint 168 W2.5 — C0d wire: guarded sprint metrics (BUG-FF NaN%/-1dk fix)
 import { computeSprintMetrics } from '../sprint-reporter.js';
+import {
+  renderBootSequenceSection,
+  renderCliCommandsSection,
+  renderManualRecoverySection,
+  renderMcpToolsSection,
+  renderWorkerContractSection,
+} from '../workspace-artifacts.js';
 
 // ─── i18n Strings ────────────────────────────────────────────────────────
 
@@ -400,30 +407,7 @@ register({
   id: 'mcp-tools',
   patterns: ['mcp tools', 'tools list', 'mcp tool list', 'mcp tool reference'],
   generate(ctx: DocUpdateContext): string {
-    const srcDir = join(ctx.projectRoot, 'src');
-    const toolsDir = join(srcDir, 'mcp', 'tools');
-    const EXCLUDED = new Set(['index.ts', 'job-runner.ts']);
-
-    if (!existsSync(toolsDir)) return '_MCP tools directory not found._';
-
-    const tools = readdirSync(toolsDir)
-      .filter(f => f.endsWith('.ts') && !EXCLUDED.has(f))
-      .map(f => f.replace(/\.ts$/, ''))
-      .sort();
-
-    const lines: string[] = [
-      `| Tool | MCP Name |`,
-      `|------|---------|`,
-    ];
-    for (const tool of tools) {
-      const mcpName = `deckent_${tool.replace(/-/g, '_')}`;
-      lines.push(`| ${tool} | \`${mcpName}\` |`);
-    }
-    lines.push('');
-    lines.push(`_Total: ${tools.length} MCP tools_`);
-    lines.push('');
-    lines.push('**Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`');
-    return lines.join('\n');
+    return renderMcpToolsSection(ctx.config?.language ?? 'en');
   },
 });
 
@@ -433,27 +417,7 @@ register({
   id: 'cli-commands',
   patterns: ['cli commands', 'commands list', 'command list', 'cli command list'],
   generate(ctx: DocUpdateContext): string {
-    const srcDir = join(ctx.projectRoot, 'src');
-    const cliDir = join(srcDir, 'cli', 'commands');
-    const EXCLUDED = new Set(['index.ts']);
-
-    if (!existsSync(cliDir)) return '_CLI commands directory not found._';
-
-    const commands = readdirSync(cliDir, { withFileTypes: true })
-      .filter(d => d.isFile() && d.name.endsWith('.ts') && !EXCLUDED.has(d.name))
-      .map(d => d.name.replace(/\.ts$/, ''))
-      .sort();
-
-    const lines: string[] = [
-      `| Command Module | Description |`,
-      `|---------------|-------------|`,
-    ];
-    for (const cmd of commands) {
-      lines.push(`| \`${cmd}\` | deckent ${cmd} |`);
-    }
-    lines.push('');
-    lines.push(`_Total: ${commands.length} CLI command modules_`);
-    return lines.join('\n');
+    return renderCliCommandsSection(ctx.config?.language ?? 'en');
   },
 });
 
@@ -462,16 +426,8 @@ register({
 register({
   id: 'boot-sequence',
   patterns: ['boot sequence', 'startup sequence', 'boot steps'],
-  generate(_ctx: DocUpdateContext): string {
-    return [
-      '1. Brain reads `DIRECTIVES.md`',
-      '2. Brain checks context (MEMORY, RETRO, DEBT, PATTERNS from `.brain/memory.db`)',
-      '3. Brain plans sprint — AI mode (`deckent_plan mode:ai`) with Zod validation',
-      '4. Workers spawned via configured backend (tmux/subprocess/Docker), auditor scan loop starts (in-process)',
-      '5. Workers execute tasks, write heartbeats (`.hb` files), update progress',
-      '6. Brain waits for `.result` files, evaluates GO / NO_GO / GO_WITH_TECH_DEBT',
-      '7. Retrospective written to DB → memory update → decay → sprint complete',
-    ].join('\n');
+  generate(ctx: DocUpdateContext): string {
+    return renderBootSequenceSection(ctx.config?.language ?? 'en');
   },
 });
 
@@ -480,35 +436,8 @@ register({
 register({
   id: 'manual-recovery',
   patterns: ['manual recovery chain', 'manual recovery', 'recovery chain', 'recovery steps'],
-  generate(_ctx: DocUpdateContext): string {
-    return [
-      'If a sprint stalls, follow this chain in order:',
-      '',
-      '```bash',
-      '# Step 1: Kill active workers',
-      'deckent kill --all',
-      '',
-      '# Step 2: Cleanup task files',
-      'deckent cleanup',
-      '',
-      '# Step 3: Recover orphan state (re-evaluates partial results)',
-      'deckent recover',
-      '',
-      '# Step 4: Re-run specific task manually',
-      'deckent run <task-id>',
-      '',
-      '# Step 5: Spawn remaining tasks (auto-approve)',
-      'deckent spawn --auto-approve',
-      '```',
-      '',
-      '**MCP equivalent:**',
-      '```',
-      'deckent_kill    → { target: "all" }',
-      'deckent_cleanup → { root: "." }',
-      'deckent_recover → { root: "." }',
-      'deckent_run     → { taskId: "<task-id>" }',
-      '```',
-    ].join('\n');
+  generate(ctx: DocUpdateContext): string {
+    return renderManualRecoverySection(ctx.config?.language ?? 'en');
   },
 });
 
@@ -516,63 +445,9 @@ register({
 
 register({
   id: 'worker-anti-patterns',
-  patterns: ['anti-patterns', 'worker anti-patterns', 'forbidden patterns', 'antipatterns'],
-  generate(_ctx: DocUpdateContext): string {
-    return [
-      '### verify-ran Marker',
-      '',
-      'Every task MUST write a `.tasks/task-{id}.result` file before exiting.',
-      'The verify-ran marker ensures Brain can evaluate your work:',
-      '',
-      '- **Missing result** → Sprint stalls, task evaluated as NO_GO',
-      '- **Partial result** (missing `tokenUsage.provider`) → generates warnings',
-      '- **Atomic write** — write to `.tmp` first, then `renameSync` to final path (Bug K fix)',
-      '',
-      '### Honest-Result Gate',
-      '',
-      'The honest-result gate requires that before writing `selfAssessment: "DONE"`, you verify:',
-      '',
-      '1. **Baseline:** what was the test/code state BEFORE your work?',
-      '2. **End state:** what is it NOW?',
-      '3. **Delta:** how much of the task did you ACTUALLY complete?',
-      '',
-      'Thresholds:',
-      '- ≥80% complete → `"DONE"`',
-      '- 50–79% complete → `"GO_WITH_TECH_DEBT"` with specific gap in notes',
-      '- <50% complete → `"NO_GO"` with explanation',
-      '',
-      '"Code written" ≠ "DONE". Functional outcome must match task spec.',
-      '',
-      '### processQueue Stall Awareness',
-      '',
-      'If your task depends on another task\'s output and it has not arrived:',
-      '',
-      '- Check `.tasks/task-{dep-id}.result` exists before proceeding',
-      '- Do NOT busy-wait — write `NO_GO` result explaining the dependency',
-      '- Brain will reschedule via mid-sprint-adapter',
-      '',
-      '### RBAC — ADR-037 Authority Matrix',
-      '',
-      '| Role | Write Source Code | Write Docs | Write `.tasks/` | Write `.brain/` |',
-      '|------|:-----------------:|:----------:|:---------------:|:---------------:|',
-      '| Brain | ❌ | ✅ | ✅ | ✅ |',
-      '| Worker | ✅ (scope only) | ✅ (scope only) | ✅ (own files) | ❌ |',
-      '| Auditor | ❌ | ❌ | ❌ | ✅ (patterns) |',
-      '',
-      'Workers MAY ONLY write files listed in `scope.filesWrite`. Auditor detects violations via `git diff --stat`.',
-      '',
-      '### Forbidden Anti-Patterns',
-      '',
-      '| Anti-Pattern | Status | Reason |',
-      '|-------------|--------|--------|',
-      '| `it.skip(...)` without justification comment | YASAK | Hides failing tests — must fix or document why |',
-      '| `stub()` / empty function returning hardcoded value | YASAK | Produces false GO results — implement real logic |',
-      '| `npm run build` in worker | YASAK | dist/ contamination risk — build is a separate gate, not worker responsibility |',
-      '| Writing outside `scope.filesWrite` | YASAK | ADR-037 RBAC violation — auditor will flag |',
-      '| `selfAssessment: "DONE"` without verify-ran marker | YASAK | Sprint evaluator rejects, task → NO_GO |',
-      '| Hardcoded timestamps in `.hb` files | YASAK | Use `new Date().toISOString()` always |',
-      '| Ignoring ADR constraints | YASAK | Violation requires NO_GO + ADR amendment proposal |',
-    ].join('\n');
+  patterns: ['worker contract', 'anti-patterns', 'worker anti-patterns', 'forbidden patterns', 'antipatterns'],
+  generate(ctx: DocUpdateContext): string {
+    return renderWorkerContractSection(ctx.config?.language ?? 'en');
   },
 });
 

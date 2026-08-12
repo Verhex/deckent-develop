@@ -30,6 +30,7 @@ vi.mock('../../src/core/observability.js', () => ({
 
 import { metric } from '../../src/core/observability.js';
 import { resolveSkillPrompts } from '../../src/orchestra/result-collector.js';
+import { createSkillDefinition } from '../../src/core/skill-types.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task } from '../../src/core/types.js';
 import type { TaskDNA } from '../../src/core/routing-types.js';
@@ -41,6 +42,13 @@ let projectRoot: string;
 function writeSkill(id: string, content: string): void {
   const dir = join(projectRoot, '.deckent', 'skills', id);
   mkdirSync(dir, { recursive: true });
+  // 522-011 S4: the prompt route now resolves through the catalog authority, so
+  // a fixture skill must be catalog-visible (manifest + body), not a bare file.
+  writeFileSync(
+    join(dir, 'manifest.json'),
+    JSON.stringify(createSkillDefinition({ id, name: id }), null, 2),
+    'utf-8',
+  );
   writeFileSync(join(dir, 'SKILL.md'), content, 'utf-8');
 }
 

@@ -5,7 +5,7 @@
  *  1. keep_last_n retention trigger
  *  2. Archive path correctness
  *  3. Size cap enforcement
- *  4. Forensic .md migration to docs/audits/
+ *  4. Forensic .md migration to .brain/archive/audits/
  *  5. Counter (-seq, -checkpoint-seq) cleanup
  *  6. runRetention combined pipeline
  */
@@ -204,7 +204,7 @@ describe('migrateForensicFiles', () => {
   beforeEach(() => { tmpDir = createTmpProject('forensic'); });
   afterEach(() => cleanupTmpProject(tmpDir));
 
-  it('moves forensic .md files to docs/audits/sprint-NNN/', () => {
+  it('moves forensic .md files to .brain/archive/audits/sprint-NNN/', () => {
     seedSprintFile(tmpDir, 'sprint-140-layer3-scorecard.md', '# Scorecard');
     seedSprintFile(tmpDir, 'sprint-140-verifier-log.md', '# Verifier');
     seedSprintFile(tmpDir, 'sprint-140-events.jsonl', '{}');  // not forensic
@@ -212,8 +212,8 @@ describe('migrateForensicFiles', () => {
     const moved = migrateForensicFiles(tmpDir);
 
     expect(moved.length).toBe(2);
-    expect(existsSync(join(tmpDir, 'docs', 'audits', 'sprint-140', 'layer3-scorecard.md'))).toBe(true);
-    expect(existsSync(join(tmpDir, 'docs', 'audits', 'sprint-140', 'verifier-log.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.brain', 'archive', 'audits', 'sprint-140', 'layer3-scorecard.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.brain', 'archive', 'audits', 'sprint-140', 'verifier-log.md'))).toBe(true);
 
     // Source removed
     expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-140-layer3-scorecard.md'))).toBe(false);

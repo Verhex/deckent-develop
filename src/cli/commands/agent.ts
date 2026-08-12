@@ -11,6 +11,7 @@ import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { modelRegistry, resolveCanonicalModelIdentity } from '../../core/model-registry.js';
 import { createAgentDefinition } from '../../core/agent-types.js';
+import { buildAgentCatalogEntries } from '../../core/agent-catalog-projection.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -89,26 +90,25 @@ export function loadAgentConfig(agentDir: string): AgentConfig {
   return JSON.parse(readFileSync(configPath, 'utf-8')) as AgentConfig;
 }
 
-export function loadAllAgents(root: string): AgentConfig[] {
-  const agentsDir = getAgentsDir(root);
-  if (!existsSync(agentsDir)) {
-    return [];
-  }
-  const entries = readdirSync(agentsDir, { withFileTypes: true });
-  const agents: AgentConfig[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const configPath = join(agentsDir, entry.name, 'agent.json');
-    if (existsSync(configPath)) {
-      try {
-        agents.push(JSON.parse(readFileSync(configPath, 'utf-8')) as AgentConfig);
-      } catch {
-        // Skip malformed agent configs
-      }
-    }
-  }
-  return agents;
-}
+// ─── Agent catalog read model (row 7011, slice S4) ──────────────────────────
+//
+// `agent list` no longer discovers agents itself: the raw `.deckent/agents` scan
+// this module used to export is gone, and every id, facet and precedence decision comes from
+// the resolver (`AgentPoolManager`) — the same read model `deckent_agent_list`
+// consumes, so the two surfaces cannot report different sets or (D3) different
+// provenance words for the same record.
+//
+// The projection is duplicated in `src/mcp/tools/agent-list.ts` on purpose:
+// ADR-D-004 C3 forbids `cli/ ↔ mcp/` imports, and this slice holds no write
+// authority in `src/core/`, where the shared projection belongs. Parity is held
+// by tests/cli/agent-surface-readmodel.test.ts until that module exists.
+
+/** One catalog record as the read surfaces render it — §3.4's four facets, kept separate. */
+// S5 (sprint-523 task 9): the catalog projection is CANONICAL in core —
+// this surface consumes and re-exports it; the local duplicate builder is gone.
+export { buildAgentCatalogEntries } from '../../core/agent-catalog-projection.js';
+export type { AgentCatalogSurfaceEntry } from '../../core/agent-catalog-projection.js';
+
 
 export function saveAgentConfig(root: string, agent: AgentConfig): void {
   const agentDir = join(getAgentsDir(root), agent.name);
@@ -315,7 +315,7 @@ export function registerAgent(program: Command): void {
     .action(async (opts: { json?: boolean }) => {
       try {
         const root = resolveProjectRoot();
-        const agents = loadAllAgents(root);
+        const agents = buildAgentCatalogEntries(root);
 
         if (agents.length === 0) {
           print('No agents found. Create one with: deckent agent create <name>');
@@ -323,6 +323,8 @@ export function registerAgent(program: Command): void {
         }
 
         if (opts.json) {
+          // The machine payload carries all four facets (§3.4); the table below is the
+          // six-column human view and cannot show them without new i18n keys (see notes).
           print(JSON.stringify(agents, null, 2));
           return;
         }
@@ -330,11 +332,11 @@ export function registerAgent(program: Command): void {
         const headers = ['Name', 'Type', 'Status', 'Uses', 'Success', 'Model'];
         const rows = agents.map((a) => [
           a.name,
-          a.type ?? 'custom',
+          a.displayType ?? 'custom',
           a.enabled ? 'enabled' : 'disabled',
-          String(getAgentUses(a)),
-          `${getAgentSuccessRate(a)}%`,
-          a.preferredModel ?? a.model ?? '-',
+          String(a.uses),
+          `${Math.round(a.successRate)}%`,
+          a.model ?? '-',
         ]);
         print(formatTable(headers, rows));
       } catch (error) {

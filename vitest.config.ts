@@ -5,6 +5,16 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     exclude: ['tests/dashboard/**', 'node_modules'],
     testTimeout: 10000,
+    // Docs+Scripts onTaskUpdate-flake canary (owner-approved 2026-08-12): the
+    // shard-specific env serializes ONLY the problem shard and drops to the
+    // low-output reporter, so a successful canary cannot silently serialize
+    // unrelated suites. Every other run is byte-identical (both expressions
+    // resolve to today's defaults when the env is unset).
+    fileParallelism: process.env['VITEST_DOCS_SCRIPTS_SERIAL'] !== '1',
+    // NOTE: an explicit `reporters: undefined` crashes vitest at startup
+    // (undefined.length in reporter resolution) — the key must be ABSENT
+    // when the canary is off, hence the conditional spread.
+    ...(process.env['VITEST_DOCS_SCRIPTS_SERIAL'] === '1' ? { reporters: ['dot'] as const } : {}),
     // SURF-7: endpoint-behavior specs run with the orchestration-control
     // ratchet open (env twin of the default-off api.control_mutations flag);
     // the gate's real default is pinned by control-mutation-ratchet.test.ts.

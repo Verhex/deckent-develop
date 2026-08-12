@@ -22,6 +22,7 @@ import type { RunFlowPlanSourceAuthority } from '../core/run-flow-contract.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 import { canonicalJson } from '../core/audit-writer.js';
+import { classifyTaskArtifact } from '../core/task-artifact-classifier.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog } from '../core/utils.js';
@@ -2586,6 +2587,36 @@ export class TaskProjectionParityError extends BrainError {
 }
 
 /**
+ * Derive a stray-scan candidate task id from a `task-*.json` filename, or
+ * `null` if it is not a plan-member candidate at all.
+ *
+ * Routes through the shared task-artifact-classifier authority (no second
+ * suffix list here) so that settled-task residue — `task-<id>.landing-proposal.json`
+ * (proposal), `.result`/`.hb`/lock/temp/partial siblings the classifier already
+ * names — is recognized as non-task residue and excluded, even though it also
+ * happens to end in `.json`. When the classifier instead reports that the
+ * content did not parse into a valid task record (`malformed-content`,
+ * `invalid-task-record`, `task-id-mismatch`) or the filename shape itself was
+ * unrecognized (`non-task-filename`), the file is still filename-shaped like a
+ * genuine task record, so this falls back to the prior naive id derivation —
+ * an actually-foreign or corrupt task file must still be able to refuse.
+ */
+function derivePlanCandidateId(tasksPath: string, filename: string): string | null {
+  const content = readFileSafely(join(tasksPath, filename)) ?? '';
+  const classification = classifyTaskArtifact(filename, content);
+  if (classification.kind === 'task-record') return classification.taskId;
+  switch (classification.reason) {
+    case 'malformed-content':
+    case 'invalid-task-record':
+    case 'task-id-mismatch':
+    case 'non-task-filename':
+      return filename.slice('task-'.length, -'.json'.length);
+    default:
+      return null; // known settled-task or transient residue — never a plan member
+  }
+}
+
+/**
  * Compare the planned task-id set against the on-disk task files. Both
  * directions are integrity failures: a planned id with no file means workers
  * have nothing to claim (the vacuous-spawn hollow sprint); a file sharing a
@@ -2611,7 +2642,8 @@ export function assertTaskProjectionParity(projectRoot: string, sprint: Sprint):
   if (existsSync(tasksPath)) {
     strayOnDisk = readdirSync(tasksPath)
       .filter((f) => f.startsWith('task-') && f.endsWith('.json'))
-      .map((f) => f.slice('task-'.length, -'.json'.length))
+      .map((f) => derivePlanCandidateId(tasksPath, f))
+      .filter((id): id is string => id !== null)
       .filter((id) => segments.has(id.split('-')[0]!) && !plannedIds.has(id))
       .sort();
   }

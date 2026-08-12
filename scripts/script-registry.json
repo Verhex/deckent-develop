@@ -69,6 +69,16 @@
       "notes": "Sprint 224 T-224-027 run-proven smoke harness."
     },
     {
+      "file": "scripts/audit-install-ingress.mjs",
+      "class": "recurring-proof",
+      "owner": "install-ingress-census",
+      "npmScript": null,
+      "input": "workflow files, package.json scripts, docker spawn backend install call sites, nested npm roots (static enumeration only)",
+      "output": "report-only per-site records with typed unknownIngressClasses; --write refreshes the committed baseline; never fails the build, never executes an install",
+      "expiry": "none — Phase 0 census (row 7100); enforcement wiring is a later owner-gated phase",
+      "notes": "Sprint-522 task 12 (dep-supply Phase 0a, owner GO 2026-08-11). Explicitly NOT closed-world: 12 unknown-ingress classes documented in the report."
+    },
+    {
       "file": "scripts/audit-operation-ingress.mjs",
       "class": "recurring-proof",
       "owner": "operation-ingress-audit",
@@ -637,6 +647,16 @@
       "output": "exit 0 registry covers exactly the real directory + every entry well-formed / 1 coverage-or-shape violation / 2 missing-or-unparsable registry",
       "expiry": "none — permanent coverage+shape gate for this very registry",
       "notes": "Task 517-006 (row 270); deliberately NOT wired into any npm script or lint:gates in this slice — that is a follow-up owner decision recorded in the task result notes. Self-registers (this file is itself scripts/*.mjs and required its own entry)."
+    },
+    {
+      "file": "scripts/lint-skill-catalog-determinism.mjs",
+      "class": "gate",
+      "owner": "skill-catalog-determinism",
+      "npmScript": null,
+      "input": "real-tree skill catalog via snapshotSkillCatalog (S5 canonical digest) + optional scripts/skill-catalog-determinism-baseline.json",
+      "output": "exit 0 IN_SYNC/DECLARED_DRIFT · exit 1 UNDECLARED_DRIFT or bare-allowlist entry · exit 2 infra",
+      "expiry": "none — S8 determinism gate (row 7012); lint:gates wiring is a named follow-up owner decision",
+      "notes": "Sprint-523 task 8. Derives the digest from the S5 snapshot; a second hash mechanism in this script is itself a violation (pinned by its test)."
     },
     {
       "file": "scripts/lint-test-hermeticity.mjs",

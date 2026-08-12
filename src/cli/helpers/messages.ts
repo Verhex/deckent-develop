@@ -642,6 +642,107 @@ const MESSAGES: MessageMap = {
     en: 'Refused: no keyring to rotate. Provision one first with `deckent provider-authority keyring init`.',
     tr: 'Reddedildi: döndürülecek keyring yok. Önce `deckent provider-authority keyring init` ile sağlayın.',
   },
+  // ─── provider-authority limits (owner-authored policy from live truth) ────
+  'provider_authority.limits.cmd_desc': {
+    en: 'Provider-limit authority — author the `provider_limits` policy from live provider truth',
+    tr: 'Provider-limit authority — `provider_limits` politikasını canlı provider gerçeğinden yaz',
+  },
+  'provider_authority.limits.init_desc': {
+    en: 'Derive and write the global `provider_limits` block for one exact provider scope (owner-confirmed)',
+    tr: 'Tek bir kesin provider kapsamı için global `provider_limits` bloğunu türet ve yaz (sahip onaylı)',
+  },
+  'provider_authority.limits.opt_provider': {
+    en: 'Canonical provider id the policy is authored for',
+    tr: 'Politikanın yazılacağı kanonik provider id',
+  },
+  'provider_authority.limits.opt_model': {
+    en: 'Exact model api id the live limit source is asked about',
+    tr: 'Canlı limit kaynağına sorulacak kesin model api id',
+  },
+  'provider_authority.limits.opt_auth_mode': {
+    en: 'Exact auth mode: subscription | api | hybrid | local',
+    tr: 'Kesin auth modu: subscription | api | hybrid | local',
+  },
+  'provider_authority.limits.opt_transport': {
+    en: 'Exact transport: cli | api | http | local-runtime',
+    tr: 'Kesin transport: cli | api | http | local-runtime',
+  },
+  'provider_authority.limits.opt_execution_backend': {
+    en: 'Exact execution backend: host-subprocess | docker | tmux | api | in-process',
+    tr: 'Kesin execution backend: host-subprocess | docker | tmux | api | in-process',
+  },
+  'provider_authority.limits.opt_execution_profile_ref': {
+    en: 'Adapter-owned execution profile reference the account authority is scoped to',
+    tr: 'Account authority kapsamındaki adapter sahipli execution profile referansı',
+  },
+  'provider_authority.limits.opt_endpoint_ref_hash': {
+    en: 'Optional opaque SHA-256 endpoint reference (never a URL)',
+    tr: 'İsteğe bağlı opak SHA-256 endpoint referansı (asla URL değil)',
+  },
+  'provider_authority.limits.opt_tenant': {
+    en: 'Tenant id the policy is authored for (solo hosts use `local`)',
+    tr: 'Politikanın yazılacağı tenant id (tek kullanıcılı host `local` kullanır)',
+  },
+  'provider_authority.limits.opt_warn_at_ratio': {
+    en: 'Consumption ratio (0..1) at which a run is warned',
+    tr: 'Run\'ın uyarılacağı tüketim oranı (0..1)',
+  },
+  'provider_authority.limits.opt_block_at_ratio': {
+    en: 'Consumption ratio (0..1) at which a run is blocked (must be >= warn)',
+    tr: 'Run\'ın bloklanacağı tüketim oranı (0..1; warn değerinden küçük olamaz)',
+  },
+  'provider_authority.limits.needs_scope': {
+    en: 'Refused: an exact scope is required — pass --provider, --model, --auth-mode, --transport, --execution-backend, --execution-profile-ref, --warn-at-ratio and --block-at-ratio. A provider-limit selector is never inferred.',
+    tr: 'Reddedildi: kesin kapsam zorunlu — --provider, --model, --auth-mode, --transport, --execution-backend, --execution-profile-ref, --warn-at-ratio ve --block-at-ratio verin. Provider-limit selector asla tahmin edilmez.',
+  },
+  'provider_authority.limits.invalid_ratio': {
+    en: 'Refused: --warn-at-ratio and --block-at-ratio must be finite numbers between 0 and 1.',
+    tr: 'Reddedildi: --warn-at-ratio ve --block-at-ratio 0 ile 1 arasında sonlu sayılar olmalıdır.',
+  },
+  'provider_authority.limits.sources_unavailable': {
+    en: 'HOLD: no live provider evidence source authority is registered on this host, so account and quota identity cannot be observed. The policy is deliberately NOT authored from placeholder values — register a live evidence source bundle first.',
+    tr: 'HOLD: bu host\'ta kayıtlı canlı provider evidence kaynak yetkisi yok, bu yüzden hesap ve kota kimliği gözlemlenemiyor. Politika bilinçli olarak yer-tutucu değerlerden YAZILMAZ — önce canlı evidence kaynak paketi kaydedin.',
+  },
+  'provider_authority.limits.hold': {
+    en: 'HOLD ({reasonCode}): {detail}\nEvidence: {evidenceRef}\nNothing was written — a provider-limit selector is only ever authored from live provider truth.',
+    tr: 'HOLD ({reasonCode}): {detail}\nKanıt: {evidenceRef}\nHiçbir şey yazılmadı — provider-limit selector yalnızca canlı provider gerçeğinden yazılır.',
+  },
+  'provider_authority.limits.preview': {
+    en: 'Derived from live provider truth:\n  provider={provider} authMode={authMode} transport={transport} backend={executionBackend}\n  tenant={tenantId} accountRefHash={accountRefHash} quotaScopeRefHash={quotaScopeRefHash}\n  windows={windows}\n  warnAtRatio={warnAtRatio} blockAtRatio={blockAtRatio}\n  authorityRef={authorityRef} policyRef={policyRef}',
+    tr: 'Canlı provider gerçeğinden türetildi:\n  provider={provider} authMode={authMode} transport={transport} backend={executionBackend}\n  tenant={tenantId} accountRefHash={accountRefHash} quotaScopeRefHash={quotaScopeRefHash}\n  pencereler={windows}\n  warnAtRatio={warnAtRatio} blockAtRatio={blockAtRatio}\n  authorityRef={authorityRef} policyRef={policyRef}',
+  },
+  'provider_authority.limits.confirm': {
+    en: 'Write this provider_limits block to the global config layer?',
+    tr: 'Bu provider_limits bloğu global config katmanına yazılsın mı?',
+  },
+  'provider_authority.limits.aborted': {
+    en: 'Aborted by owner — nothing was written.',
+    tr: 'Sahibi tarafından iptal edildi — hiçbir şey yazılmadı.',
+  },
+  'provider_authority.limits.written': {
+    en: 'Written: provider_limits authority {authorityRef} at {configPath}. Runs now resolve this scope instead of holding `xverify_provider_scope_unavailable`.',
+    tr: 'Yazıldı: provider_limits authority {authorityRef} — {configPath}. Run\'lar artık `xverify_provider_scope_unavailable` ile beklemek yerine bu kapsamı çözer.',
+  },
+  'provider_authority.limits.refused': {
+    en: 'Refused ({reasonCode}): {detail}. Existing provider-limit authority is never overwritten in place.',
+    tr: 'Reddedildi ({reasonCode}): {detail}. Mevcut provider-limit authority asla yerinde ezilmez.',
+  },
+  'doctor.provider_limit_authority_name': {
+    en: 'Provider limit authority',
+    tr: 'Provider limit authority',
+  },
+  'doctor.provider_limit_authority_ok': {
+    en: 'Authored global provider_limits present ({policies} policy(ies)) — the xverify/execution composition can resolve limit scope.',
+    tr: 'Global provider_limits bloğu mevcut ({policies} policy) — xverify/execution composition limit scope çözebilir.',
+  },
+  'doctor.provider_limit_authority_absent': {
+    en: 'No owner-authored provider_limits block in the global config layer — the composition holds with provider-authority-unavailable. Remedy: `deckent provider-authority limits init` (never `keyring init`; the keyring is a different authority).',
+    tr: "Global config katmanında owner-yazarı provider_limits bloğu yok — composition provider-authority-unavailable ile durur. Çare: `deckent provider-authority limits init` (`keyring init` DEĞİL; keyring farklı bir authority'dir).",
+  },
+  'doctor.provider_limit_authority_authored_empty': {
+    en: 'provider_limits block exists but carries zero policies (authored-empty) — the validator refuses it and the composition still holds. Complete authoring with `deckent provider-authority limits init`.',
+    tr: 'provider_limits bloğu var ama sıfır policy taşıyor (authored-empty) — validator reddeder, composition durmaya devam eder. Authoring akışını `deckent provider-authority limits init` ile tamamlayın.',
+  },
   'doctor.provider_authority_keyring_name': {
     en: 'Provider authority keyring',
     tr: 'Provider authority keyring',
@@ -676,8 +777,12 @@ const MESSAGES: MessageMap = {
     tr: 'Açık hakem sağlayıcısı (opsiyonel; --author ile aynı olamaz; varsayılan: cross_verify.verifier_priority)',
   },
   'xverify.opt_verifier_model': {
-    en: 'Explicit verifier model id (canonical provider API id, e.g. gpt-5.6-sol) — bypasses tier-equivalence resolution',
-    tr: 'Açık hakem model kimliği (kanonik sağlayıcı API id, örn. gpt-5.6-sol) — tier-eşdeğerlik çözümlemesini atlar',
+    en: 'Explicit verifier model id (canonical provider API id, e.g. gpt-5.6-sol) — bypasses tier-equivalence resolution, never the author tier floor',
+    tr: 'Açık hakem model kimliği (kanonik sağlayıcı API id, örn. gpt-5.6-sol) — tier-eşdeğerlik çözümlemesini atlar, yazar tier tabanını asla atlamaz',
+  },
+  'xverify.opt_author_model': {
+    en: 'Model id that authored the claimed work (canonical provider API id, e.g. claude-opus-5) — the verifier must run at an equal or higher capability tier. Omitted: the resolved default is used and recorded as low-confidence.',
+    tr: 'İddia edilen işi üreten model kimliği (kanonik sağlayıcı API id, örn. claude-opus-5) — hakem eşit veya daha yüksek yetenek tier’ında çalışmak zorundadır. Verilmezse: çözümlenen varsayılan kullanılır ve düşük-güven olarak kaydedilir.',
   },
   'xverify.opt_diff': {
     en: 'Attach `git diff HEAD` as evidence context for the verifier',
@@ -710,6 +815,22 @@ const MESSAGES: MessageMap = {
   'xverify.err.self_verify': {
     en: 'Verifier must differ from --author ("{provider}") — self-verification defeats the purpose of an independent second opinion.',
     tr: 'Hakem --author ("{provider}") ile aynı olamaz — öz-doğrulama bağımsız ikinci görüşün amacını boşa çıkarır.',
+  },
+  'xverify.err.unknown_author_model': {
+    en: 'Unknown --author-model "{model}" — it must be a canonical model id present in the model registry. Omit the flag to fall back to the resolved default (recorded as low-confidence).',
+    tr: 'Bilinmeyen --author-model "{model}" — model kayıt defterinde bulunan kanonik bir model kimliği olmalıdır. Çözümlenen varsayılana dönmek için bayrağı hiç vermeyin (düşük-güven olarak kaydedilir).',
+  },
+  'xverify.err.author_model_provider_mismatch': {
+    en: '--author-model "{model}" belongs to provider "{modelProvider}", not the claim author "{author}" — the author model must be one the author provider can actually run.',
+    tr: '--author-model "{model}" "{modelProvider}" sağlayıcısına aittir, iddia yazarı "{author}" değil — yazar modeli, yazar sağlayıcısının gerçekten çalıştırabildiği bir model olmalıdır.',
+  },
+  'xverify.err.verifier_tier_below_author': {
+    en: 'Verification refused: verifier model {verifierModel} (tier {verifierTier}) sits BELOW the author model {authorModel} (tier {authorTier}). A second opinion is only worth its cost from an equal or higher capability tier. Pass --verifier-model with an equal-or-higher tier model, or state the true author model with --author-model.',
+    tr: 'Doğrulama reddedildi: hakem modeli {verifierModel} (tier {verifierTier}), yazar modeli {authorModel} (tier {authorTier}) tier’ının ALTINDA. İkinci görüş ancak eşit veya daha yüksek yetenek tier’ından geldiğinde maliyetini hak eder. --verifier-model ile eşit-veya-üstü tier bir model verin ya da gerçek yazar modelini --author-model ile bildirin.',
+  },
+  'xverify.err.verifier_tier_floor_unresolvable': {
+    en: 'Verification refused: the author/verifier capability tiers could not be resolved from the model registry ({detail}), so the tier floor cannot be proven. Register the exact model ids or pass --author-model with a canonical registry id.',
+    tr: 'Doğrulama reddedildi: yazar/hakem yetenek tier’ları model kayıt defterinden çözümlenemedi ({detail}), bu yüzden tier tabanı kanıtlanamaz. Tam model kimliklerini kaydedin ya da --author-model ile kanonik bir kayıt kimliği verin.',
   },
   'xverify.err.target_invalid_spec': {
     en: 'Malformed --target entry "{spec}" — expected path:START-END (1-based inclusive line range) or path:symbolName.',
@@ -750,6 +871,20 @@ const MESSAGES: MessageMap = {
   'xverify.report.verifier_model': {
     en: '**Verifier model:** {model}',
     tr: '**Hakem modeli:** {model}',
+  },
+  'xverify.report.author_model': {
+    en: '**Author model:** {model} ({confidence})',
+    tr: '**Yazar modeli:** {model} ({confidence})',
+  },
+  'xverify.report.author_model_authoritative': {
+    en: 'authoritative — stated via --author-model',
+    tr: 'yetkili — --author-model ile bildirildi',
+  },
+  // The tier floor is only as trustworthy as the author-model input it compares
+  // against. A substituted default is recorded as exactly that, never as fact.
+  'xverify.report.author_model_low_confidence': {
+    en: 'LOW CONFIDENCE — resolved default substituted; --author-model was not stated',
+    tr: 'DÜŞÜK GÜVEN — çözümlenen varsayılan konuldu; --author-model bildirilmedi',
   },
   'xverify.report.none_dispatched': {
     en: '(none dispatched)',
@@ -2203,8 +2338,8 @@ const MESSAGES: MessageMap = {
     tr: 'git bulunamadi. deckent kullanmak icin git kurun.',
   },
   'error.node_version_low': {
-    en: 'Node.js version too low. Upgrade to >=24.0.0.',
-    tr: 'Node.js sürümü çok düşük. >=24.0.0 sürümüne yükseltin.',
+    en: 'Node.js version too low. Upgrade to {floor}.',
+    tr: 'Node.js sürümü çok düşük. {floor} sürümüne yükseltin.',
   },
   'tui.intro': {
     en: 'deckent — pinned-bottom TUI (experimental). Type /exit to quit.',
@@ -4187,6 +4322,31 @@ const MESSAGES: MessageMap = {
     en: 'unverifiable (no pid recorded) → cancelled',
     tr: 'doğrulanamaz (pid kaydı yok) → iptal',
   },
+  // 524-013 `deckent runs --retire-superseded` — pending-approval duplicate hygiene.
+  'runs.retire_superseded.none': {
+    en: 'No superseded runs — every plan awaiting approval is the newest for its source.',
+    tr: 'Eskimiş koşu yok — onay bekleyen her plan, kaynağının en yenisi.',
+  },
+  'runs.retire_superseded.dry_header': {
+    en: 'Superseded runs awaiting approval that would be retired ({count}):',
+    tr: 'Emekliye ayrılacak, onay bekleyen eskimiş koşular ({count}):',
+  },
+  'runs.retire_superseded.apply_header': {
+    en: 'Retired {count} superseded run(s):',
+    tr: '{count} eskimiş koşu emekliye ayrıldı:',
+  },
+  'runs.retire_superseded.entry': {
+    en: 'superseded by {by} → cancelled',
+    tr: '{by} tarafından geçildi → iptal',
+  },
+  'runs.retire_superseded.failed': {
+    en: 'not retired: {detail}',
+    tr: 'emekliye ayrılmadı: {detail}',
+  },
+  'runs.retire_superseded.dry_hint': {
+    en: 'Dry-run — nothing was written. Run `deckent runs --retire-superseded --yes` to retire them.',
+    tr: 'Ön-izleme — hiçbir şey yazılmadı. Emekliye ayırmak için `deckent runs --retire-superseded --yes` çalıştır.',
+  },
   // SURF-6 `deckent runs <n> --approve|--reject|--start` — cross-surface decide.
   'runs.decide.approved': {
     en: 'Approved — revision {revision} · digest {digest}',
@@ -5005,8 +5165,8 @@ const MESSAGES: MessageMap = {
     tr: 'Bağlantı yeniden deneniyor…',
   },
   'desktop.error.node_not_found': {
-    en: 'Node.js was not found on the target. Install Node.js 18+ to run deckent.',
-    tr: "Hedefte Node.js bulunamadı. deckent'i çalıştırmak için Node.js 18+ yükleyin.",
+    en: 'Node.js was not found on the target. Install Node.js {floor} to run deckent.',
+    tr: "Hedefte Node.js bulunamadı. deckent'i çalıştırmak için Node.js {floor} yükleyin.",
   },
   'desktop.error.deckent_not_found': {
     en: 'deckent was not found on the target. Install it with `npm install -g deckent`.',
@@ -5306,10 +5466,104 @@ const MESSAGES: MessageMap = {
   'desktop.nova.river.tool': { en: 'tool', tr: 'araç' },
   'desktop.nova.focus.empty': { en: 'no narrative yet — the worker is thinking…', tr: 'henüz anlatı yok — worker düşünüyor…' },
 
+  // ─── Versioned `.deckent/workspace` artifact contract ────────────────
+  'workspace.identity.template': {
+    en: '# Project Identity\nName: {projectName}\nLanguage: {language}\nLanguage Authority: detected\nFramework: {framework}\nTest: {testFramework}\nBuild: {buildTool}\nRuntime: {runtime}\nPlatform: runtime-resolved (macOS · Linux · Windows native · WSL)',
+    tr: '# Proje Kimliği\nName: {projectName}\nLanguage: {language}\nLanguage Authority: detected\nFramework: {framework}\nTest: {testFramework}\nBuild: {buildTool}\nRuntime: {runtime}\nPlatform: runtime-resolved (macOS · Linux · Windows native · WSL)',
+  },
+  'workspace.title.environment_tools': { en: 'Environment Tools', tr: 'Ortam Araçları' },
+  'workspace.title.boot': { en: 'Boot', tr: 'Başlatma' },
+  'workspace.title.worker_guide': { en: 'Worker Guide', tr: 'Worker Rehberi' },
+  'workspace.stats.comment': {
+    en: 'Tracked volatile-stat snapshot. Refresh explicitly with docs:stats:refresh; init never derives local runtime values.',
+    tr: 'Takip edilen volatile-stat snapshot. docs:stats:refresh ile açıkça yenile; init local runtime değerleri türetmez.',
+  },
+  'workspace.tools.package_intro': {
+    en: 'Commands declared by this project package:',
+    tr: 'Bu projenin package manifestinde tanımlanan komutlar:',
+  },
+  'workspace.tools.no_package': {
+    en: 'No package.json scripts were detected. Add project-native build, test and lint commands here.',
+    tr: 'package.json scripti algılanmadı. Projeye özgü build, test ve lint komutlarını buraya ekleyin.',
+  },
+  'workspace.tools.mcp_intro': {
+    en: 'This table is generated from the canonical MCP TOOL_CATALOG; filenames are never interpreted as tools.',
+    tr: 'Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla tool olarak yorumlanmaz.',
+  },
+  'workspace.tools.cli_intro': {
+    en: 'This table is generated from the registered cross-surface command tree; helper module filenames are excluded.',
+    tr: 'Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper module dosya adları dışlanır.',
+  },
+  'workspace.tools.header.script': { en: 'Script', tr: 'Script' },
+  'workspace.tools.header.command': { en: 'Command', tr: 'Komut' },
+  'workspace.tools.header.mcp_name': { en: 'MCP Name', tr: 'MCP Adı' },
+  'workspace.tools.header.effect': { en: 'Effect', tr: 'Etki' },
+  'workspace.tools.header.approval': { en: 'Approval', tr: 'Onay' },
+  'workspace.tools.header.idempotent': { en: 'Idempotent', tr: 'Idempotent' },
+  'workspace.tools.header.category': { en: 'Category', tr: 'Kategori' },
+  'workspace.tools.header.risk': { en: 'Risk', tr: 'Risk' },
+  'workspace.tools.header.surfaces': { en: 'Surfaces', tr: 'Yüzeyler' },
+  'workspace.tools.total': { en: 'Total: {count}', tr: 'Toplam: {count}' },
+  'workspace.tools.effect.read_only': { en: 'read-only', tr: 'salt-okunur' },
+  'workspace.tools.effect.mutating': { en: 'mutating', tr: 'değiştirici' },
+  'workspace.tools.effect.destructive': { en: 'destructive', tr: 'yıkıcı' },
+  'workspace.tools.approval.not_required': { en: 'not required by effect class', tr: 'effect class gereği zorunlu değil' },
+  'workspace.tools.approval.required': { en: 'required by runtime policy', tr: 'runtime policy gereği zorunlu' },
+  'workspace.common.yes': { en: 'yes', tr: 'evet' },
+  'workspace.common.no': { en: 'no', tr: 'hayır' },
+  'workspace.common.not_detected': { en: '(not detected)', tr: '(algılanmadı)' },
+  'workspace.boot.sequence': {
+    en: '1. **Load authority** — Brain reads `DIRECTIVES.md`, effective config and `.brain/memory.db`; generated projections never create policy.\n2. **Plan and admit** — the exact DAG, provider/model/auth/budget/reachability and write scope are resolved before dispatch.\n3. **Spawn** — the configured platform adapter launches only admitted workers.\n4. **Execute** — workers publish host-observed heartbeat, activity and result-ingress artifacts.\n5. **Evaluate** — Brain reconciles disk truth, tests, scope, cost and policy evidence into GO, FIX or typed HOLD/NO_GO.\n6. **Fix** — eligible failures enter the bounded FIX DAG; `processQueue` never fabricates dependency completion.\n7. **Finalize and archive** — terminal settlement, Retrospective, memory, trace and projections are published before canonical retention runs.',
+    tr: '1. **Authority yükle** — Brain `DIRECTIVES.md`, effective config ve `.brain/memory.db` kaynaklarını okur; generated projectionlar policy üretmez.\n2. **Planla ve admit et** — exact DAG, provider/model/auth/budget/reachability ve write scope dispatch öncesi çözülür.\n3. **Spawn** — yapılandırılmış platform adapterı yalnız admitted workerları başlatır.\n4. **Execute** — workerlar host-observed heartbeat, activity ve result-ingress artefaktlarını yayımlar.\n5. **Evaluate** — Brain disk truth, test, scope, cost ve policy kanıtını GO, FIX veya typed HOLD/NO_GO kararına uzlaştırır.\n6. **Fix** — uygun hatalar bounded FIX DAG’a girer; `processQueue` dependency completion uydurmaz.\n7. **Finalize ve archive** — canonical retention çalışmadan önce terminal settlement, Retrospective, memory, trace ve projectionlar yayımlanır.',
+  },
+  'workspace.boot.recovery': {
+    en: 'Recovery is diagnostics-first and fail-closed. Never start with kill or cleanup.\n\n```bash\n# 1. Inspect without mutation\ndeckent status --json\ndeckent doctor\n\n# 2. Preview the canonical recovery operation\ndeckent recover <sprint-id> --dry-run\n\n# 3. Resume only a canonically PAUSED/ORPHANED run\ndeckent recover <sprint-id> --resume\n\n# 4. Execute mutating recovery only after exact owner approval\ndeckent recover <sprint-id>\n\n# 5. Run a new one-shot description; this is not a historical task-id replay\ndeckent run "<description>"\n```\n\nMCP parity: `deckent_status {}` then `deckent_recover { sprintId, dryRun: true }`. A mutating MCP recovery additionally requires an exact identity/generation/fence-bound `approval`. `deckent_run` accepts `{ description }`, never `{ taskId }`. `kill` and `cleanup` are separate destructive operations and require their own live owner decision.',
+    tr: 'Recovery diagnostics-first ve fail-closed çalışır. Asla kill veya cleanup ile başlama.\n\n```bash\n# 1. Mutation yapmadan incele\ndeckent status --json\ndeckent doctor\n\n# 2. Canonical recovery operationı önizle\ndeckent recover <sprint-id> --dry-run\n\n# 3. Yalnız canonical PAUSED/ORPHANED runı sürdür\ndeckent recover <sprint-id> --resume\n\n# 4. Mutating recoveryyi ancak exact owner onayı sonrası çalıştır\ndeckent recover <sprint-id>\n\n# 5. Yeni bir one-shot açıklama çalıştır; bu historical task-id replay değildir\ndeckent run "<description>"\n```\n\nMCP paritesi: önce `deckent_status {}`, sonra `deckent_recover { sprintId, dryRun: true }`. Mutating MCP recovery ayrıca exact identity/generation/fence-bound `approval` ister. `deckent_run` `{ description }` kabul eder; `{ taskId }` kabul etmez. `kill` ve `cleanup` ayrı destructive operationlardır ve kendi canlı owner kararlarını gerektirir.',
+  },
+  'workspace.worker.contract': {
+    en: 'This contract is generated from worker runtime schemas and prompt policy. It is supporting context; the compiled, digest-bound task prompt remains the attempt authority.\n\n### Result ingress vs canonical result\n\nWorkers write `.tasks/task-{id}.result` ingress claims: `taskId`, `workerId`, `filesChanged` (string array), `linesAdded`, `linesRemoved`, `testsPassed` (boolean), `coverage` (0–100), `selfAssessment` and `notes` (single string). Do not estimate token usage. Provider/model, token/cost, disk diff, tests and TypeScript evidence are host-authored in the canonical schema `{schemaVersion}` result.\n\nCanonical schema-required fields (derived at runtime): `{requiredFields}`.\n\n### Heartbeat\n\nCreate `.tasks/task-{id}.hb` before work. Increment `sequence`; use a fresh UTC ISO timestamp; keep `currentAction` concise. Heartbeat content is activity context—not standalone process-liveness or terminal authority.\n\n### Objective Definition of Done\n\n- DONE — {done}\n- GO_WITH_TECH_DEBT — {techDebt}\n- NO_GO — {noGo}\n\nThere is no percentage threshold. Evidence for each criterion decides the verdict.\n\n### Verification and honest-result gate\n\nThe `.verify-ran` marker is verifier-authored evidence; never create or claim it manually. Before DONE, compare baseline, end state and the actual criterion evidence. If a dependency has not settled, do not busy-wait or infer success from `processQueue`; report the exact NO_GO/HOLD condition.\n\n### Scope, ADR-037 authority and forbidden anti-patterns\n\n`scope.filesWrite` is the exact write allow-list; protocol artifacts under `.tasks/` are the only lifecycle exception. Do not mutate dependencies or run project-wide build from a worker. If a required capability or authority is unavailable, write a concrete NO_GO/HOLD reason instead of fabricating completion.\n\n| Anti-pattern | Status | Reason |\n|---|---|---|\n| `it.skip(...)` without a justification | forbidden | hides failed evidence |\n| `stub()` or a hardcoded empty implementation | forbidden | creates a false GO |\n| writing outside `scope.filesWrite` | forbidden | violates ADR-037 authority |\n| claiming DONE without verifier evidence | forbidden | violates the honest-result gate |',
+    tr: 'Bu contract worker runtime schemaları ve prompt policy üzerinden üretilir. Supporting contexttir; compiled ve digest-bound task prompt attempt authority olarak kalır.\n\n### Result ingress ve canonical result\n\nWorker `.tasks/task-{id}.result` ingress claimlerini yazar: `taskId`, `workerId`, `filesChanged` (string array), `linesAdded`, `linesRemoved`, `testsPassed` (boolean), `coverage` (0–100), `selfAssessment` ve `notes` (tek string). Token usage tahmini yapma. Provider/model, token/cost, disk diff, test ve TypeScript kanıtı canonical schema `{schemaVersion}` sonucunda host tarafından yazılır.\n\nCanonical schema-required alanlar (runtime’da türetilir): `{requiredFields}`.\n\n### Heartbeat\n\nİşe başlamadan `.tasks/task-{id}.hb` oluştur. `sequence` değerini artır; taze UTC ISO timestamp kullan; `currentAction` kısa olsun. Heartbeat içeriği activity contexttir—tek başına process-liveness veya terminal authority değildir.\n\n### Objective Definition of Done\n\n- DONE — {done}\n- GO_WITH_TECH_DEBT — {techDebt}\n- NO_GO — {noGo}\n\nPercentage threshold yoktur. Verdicti her kriterin kanıtı belirler.\n\n### Verification ve honest-result gate\n\n`.verify-ran` marker verifier-authored kanıttır; elle oluşturma veya varmış gibi claim etme. DONE öncesi baseline, end state ve gerçek kriter kanıtını karşılaştır. Bir dependency settle olmadıysa busy-wait yapma veya `processQueue` üzerinden başarı varsayma; exact NO_GO/HOLD koşulunu bildir.\n\n### Scope, ADR-037 authority ve yasak anti-patternler\n\n`scope.filesWrite` exact write allow-listtir; `.tasks/` altındaki protocol artefaktları tek lifecycle istisnasıdır. Worker içinden dependency mutation veya project-wide build çalıştırma. Gerekli capability veya authority unavailable ise completion uydurmak yerine concrete NO_GO/HOLD nedeni yaz.\n\n| Anti-pattern | Durum | Neden |\n|---|---|---|\n| Gerekçesiz `it.skip(...)` | yasak | başarısız kanıtı gizler |\n| `stub()` veya hardcoded boş implementation | yasak | false GO üretir |\n| `scope.filesWrite` dışına yazma | yasak | ADR-037 authority ihlalidir |\n| verifier kanıtı olmadan DONE claim etme | yasak | honest-result gate ihlalidir |',
+  },
+  'workspace.worker.dod.done': {
+    en: 'Every Definition-of-Done item is verified with evidence.',
+    tr: 'Her Definition-of-Done maddesi kanıtla doğrulandı.',
+  },
+  'workspace.worker.dod.tech_debt': {
+    en: 'Core items are verified; each minor open item is named explicitly.',
+    tr: 'Core maddeler doğrulandı; her minor açık madde exact olarak adlandırıldı.',
+  },
+  'workspace.worker.dod.no_go': {
+    en: 'At least one critical item is unverified; the exact blocker is named.',
+    tr: 'En az bir critical madde doğrulanmadı; exact blocker adlandırıldı.',
+  },
+
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },
   'desktop.theme.watch.night-watch': { en: 'Night watch', tr: 'Gece seyri' },
   'desktop.theme.watch.open-sea': { en: 'Open sea', tr: 'Açık deniz' },
 };
+
+/** All catalog keys — lets tests/tools enumerate keys without re-parsing this source file. */
+export const MESSAGE_KEYS: readonly string[] = Object.freeze(Object.keys(MESSAGES));
+
+// Row 450 twin (508-001 for `deckent doctor` -> 522-019 for the desktop
+// surface): the Node.js runtime floor comes from package.json's own
+// `engines.node`, never a source literal. A top-level-await DYNAMIC JSON
+// import (not createRequire/readFileSync, and not a static import — the
+// project's root tsconfig module target rejects import-attribute syntax on
+// static import declarations) is required here specifically because this
+// module is bundled directly into the Electron renderer (see
+// src/desktop/src/renderer/i18n-fallback.ts's "dependency-free" contract) —
+// a Node-only fs/module read would break in that sandboxed browser context.
+// A JSON import resolves live in Node (main process, CLI) and gets inlined
+// as plain data by Rollup at renderer build time; Node's own ESM loader
+// resolves this await before any importer's synchronous code runs, so no
+// caller of getMessage() needs to change.
+const NODE_ENGINE_FLOOR: string =
+  ((await import('../../../package.json', { with: { type: 'json' } })).default as { engines?: { node?: string } })
+    .engines?.node ?? '';
+
+/** Keys whose {floor} placeholder is filled from NODE_ENGINE_FLOOR when the caller omits it. */
+const NODE_FLOOR_MESSAGE_KEYS = new Set<string>(['desktop.error.node_not_found', 'error.node_version_low']);
 
 /**
  * Get a localized message by key.
@@ -5332,10 +5586,17 @@ export function getMessage(
   const normalizedLang = lang === 'tr' ? 'tr' : 'en';
   const template = entry[normalizedLang] ?? entry['en'] ?? key;
 
-  if (!vars) return template;
+  // node-floor keys always resolve {floor} from the manifest, even when the
+  // caller (e.g. the desktop getStrings()/fallback paths, which never pass
+  // vars) supplies none — caller-supplied vars still win via spread order.
+  const effectiveVars = NODE_FLOOR_MESSAGE_KEYS.has(key)
+    ? { floor: NODE_ENGINE_FLOOR, ...vars }
+    : vars;
+
+  if (!effectiveVars) return template;
 
   return template.replace(/\{(\w+)\}/g, (_, varName: string) => {
-    return vars[varName] ?? `{${varName}}`;
+    return effectiveVars[varName] ?? `{${varName}}`;
   });
 }
 

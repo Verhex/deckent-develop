@@ -1,36 +1,38 @@
-# Boot Sequence
-1. Brain reads `DIRECTIVES.md`
-2. Brain checks context (MEMORY, RETRO, DEBT, PATTERNS from `.brain/memory.db`)
-3. Brain plans sprint — AI mode (`deckent_plan mode:ai`) with Zod validation
-4. Workers spawned via configured backend (tmux/subprocess/Docker), auditor scan loop starts (in-process)
-5. Workers execute tasks, write heartbeats (`.hb` files), update progress
-6. Brain waits for `.result` files, evaluates GO / NO_GO / GO_WITH_TECH_DEBT
-7. Retrospective written to DB → memory update → decay → sprint complete
+<!-- DECKENT:WORKSPACE id="boot" schema="1" authority="managed" provenance="workspace-artifact-registry" -->
+# Boot
+
+## Boot Sequence
+<!-- DECKENT:CONTRACT id="boot" schema="1" sha256="8cf3e3b3e4336544b75e4e798069912b95e3cfefea62ea9f9b9d04f750d37cc3" -->
+1. **Authority yükle** — Brain `DIRECTIVES.md`, effective config ve `.brain/memory.db` kaynaklarını okur; generated projectionlar policy üretmez.
+2. **Planla ve admit et** — exact DAG, provider/model/auth/budget/reachability ve write scope dispatch öncesi çözülür.
+3. **Spawn** — yapılandırılmış platform adapterı yalnız admitted workerları başlatır.
+4. **Execute** — workerlar host-observed heartbeat, activity ve result-ingress artefaktlarını yayımlar.
+5. **Evaluate** — Brain disk truth, test, scope, cost ve policy kanıtını GO, FIX veya typed HOLD/NO_GO kararına uzlaştırır.
+6. **Fix** — uygun hatalar bounded FIX DAG’a girer; `processQueue` dependency completion uydurmaz.
+7. **Finalize ve archive** — canonical retention çalışmadan önce terminal settlement, Retrospective, memory, trace ve projectionlar yayımlanır.
+<!-- DECKENT:CONTRACT:END id="boot" -->
 
 ## Manual Recovery Chain
-If a sprint stalls, follow this chain in order:
+<!-- DECKENT:CONTRACT id="boot" schema="1" sha256="6d02c5c3a67033513b0d8522559ff4d038142a5b9da01fb6f8d6a1ce2cf721a6" -->
+Recovery diagnostics-first ve fail-closed çalışır. Asla kill veya cleanup ile başlama.
 
 ```bash
-# Step 1: Kill active workers
-deckent kill --all
+# 1. Mutation yapmadan incele
+deckent status --json
+deckent doctor
 
-# Step 2: Cleanup task files
-deckent cleanup
+# 2. Canonical recovery operationı önizle
+deckent recover <sprint-id> --dry-run
 
-# Step 3: Recover orphan state (re-evaluates partial results)
-deckent recover
+# 3. Yalnız canonical PAUSED/ORPHANED runı sürdür
+deckent recover <sprint-id> --resume
 
-# Step 4: Re-run specific task manually
-deckent run <task-id>
+# 4. Mutating recoveryyi ancak exact owner onayı sonrası çalıştır
+deckent recover <sprint-id>
 
-# Step 5: Spawn remaining tasks (auto-approve)
-deckent spawn --auto-approve
+# 5. Yeni bir one-shot açıklama çalıştır; bu historical task-id replay değildir
+deckent run "<description>"
 ```
 
-**MCP equivalent:**
-```
-deckent_kill    → { target: "all" }
-deckent_cleanup → { root: "." }
-deckent_recover → { root: "." }
-deckent_run     → { taskId: "<task-id>" }
-```
+MCP paritesi: önce `deckent_status {}`, sonra `deckent_recover { sprintId, dryRun: true }`. Mutating MCP recovery ayrıca exact identity/generation/fence-bound `approval` ister. `deckent_run` `{ description }` kabul eder; `{ taskId }` kabul etmez. `kill` ve `cleanup` ayrı destructive operationlardır ve kendi canlı owner kararlarını gerektirir.
+<!-- DECKENT:CONTRACT:END id="boot" -->

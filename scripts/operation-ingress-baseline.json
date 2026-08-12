@@ -13,10 +13,10 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 692,
+  "total": 691,
   "mediated": 0,
-  "unmediated": 692,
-  "fileCount": 235,
+  "unmediated": 691,
+  "fileCount": 236,
   "byFile": {
     "src/agent/permission-store.ts": {
       "count": 1,
@@ -631,7 +631,7 @@
       "mediated": false
     },
     "src/mcp/tools/init.ts": {
-      "count": 10,
+      "count": 8,
       "mediated": false
     },
     "src/mcp/tools/job-runner.ts": {
@@ -926,6 +926,10 @@
       "count": 4,
       "mediated": false
     },
+    "src/orchestra/workspace-artifacts.ts": {
+      "count": 1,
+      "mediated": false
+    },
     "src/providers/codex.ts": {
       "count": 1,
       "mediated": false
@@ -959,5 +963,5 @@
       "mediated": false
     }
   },
-  "digest": "f656b4789198658431fa3b57142e4c3d4eec3d7cd3bd4dd710be4dfd4ed23d3c"
+  "digest": "a007c0006444991ed1a4002ebbc4a8d437067b63cb7f1d0a481bb5b91efa70a3"
 }

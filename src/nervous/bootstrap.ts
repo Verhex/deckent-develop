@@ -211,6 +211,14 @@ export function createNervousSystemIfEnabled(
   const proposer = new Proposer(nervousConfig);
   const dispatcher = new NervousDispatcher(nervousConfig, projectRoot);
   const history = new NervousHistory(projectRoot);
+  // Retention wiring (Alperen, 2026-08-12): prune() existed with ZERO callers —
+  // the history JSONL grew unboundedly (375 kayıt/160K measured after the
+  // stale-worker false-positive flood). Config-resolved days, fire-and-forget:
+  // retention must never delay or fail bootstrap.
+  const retentionDays = (nervousConfig as { history_retention_days?: number }).history_retention_days;
+  if (typeof history.prune === 'function') {
+    void history.prune(retentionDays).catch(() => {});
+  }
   // W3: wrap the durable store so every park tees a live NERVOUS_NOTIFICATION
   // event (deckent_watch / status --follow) without touching the executor.
   const baseStore = deps.pendingStore ?? makeFilePendingStore(projectRoot);

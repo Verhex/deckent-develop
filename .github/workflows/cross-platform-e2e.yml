@@ -11,9 +11,11 @@ on:
   # 535: tren-dalı platform-kanıtı için açık tetik (gh workflow run -r <branch>)
   workflow_dispatch:
 
+# Option E / Hole 3.2 (owner-approved 2026-08-12): same main-push mutual-cancellation
+# defect as ci.yml — per-SHA group for main, stale-run cancellation kept elsewhere.
 concurrency:
-  group: cross-platform-${{ github.ref }}
-  cancel-in-progress: true
+  group: cross-platform-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   e2e:

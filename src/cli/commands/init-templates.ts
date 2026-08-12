@@ -7,9 +7,14 @@
  * Split from init.ts (Sprint 144 Task 1).
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { FullStackResult } from '../../core/stack-detector.js';
+import {
+  renderBootSequenceSection,
+  renderCliCommandsSection,
+  renderEnvironmentToolsSection,
+  renderManualRecoverySection,
+  renderMcpToolsSection,
+} from '../../orchestra/workspace-artifacts.js';
 
 // Template docs intentionally avoid freezing the live provider/model catalog.
 // Exact identities are selected from effective config + runtime capability.
@@ -555,58 +560,13 @@ CLI read/write: \`deckent config read\` / \`deckent config set key value\`
 // ─── BOOT.md Template ───────────────────────────────────────────────
 
 export function generateBootContent(lang: string): string {
-  if (lang === 'tr') {
-    return `# Sprint Başlatma Süreci
-
-Bir sprint başlatıldığında (\`deckent start\`) şu adımlar otomatik çalışır:
-
-1. **Plan** — Brain DIRECTIVES.md'yi okur, task'ları planlar
-2. **Spawn** — Worker'lar başlatılır (tmux veya subprocess)
-3. **Execute** — Worker'lar task'ları uygular, heartbeat yazar
-4. **Evaluate** — Brain sonuçları değerlendirir (GO / NO_GO / TECH_DEBT)
-5. **Fix** — Başarısız task'lar yeniden denenir
-6. **Retro** — Retrospektif yazılır (RETRO.md)
-7. **Decay** — Bellek bütçesi kontrol edilir
-8. **Cleanup** — Task dosyaları arşivlenir
-
-> İpucu: \`deckent status --watch\` ile süreci canlı izleyebilirsiniz.
-> Sorun olursa: \`deckent kill --all\` → \`deckent cleanup\` → \`deckent doctor\`
-`;
-  }
-  return `# Sprint Boot Sequence
-
-When a sprint starts (\`deckent start\`), these steps run automatically:
-
-1. **Plan** — Brain reads DIRECTIVES.md, plans tasks
-2. **Spawn** — Workers launched (tmux or subprocess)
-3. **Execute** — Workers implement tasks, write heartbeats
-4. **Evaluate** — Brain evaluates results (GO / NO_GO / TECH_DEBT)
-5. **Fix** — Failed tasks retried
-6. **Retro** — Retrospective written (RETRO.md)
-7. **Decay** — Memory budget checked
-8. **Cleanup** — Task files archived
-
-> Tip: Use \`deckent status --watch\` to monitor in real-time.
-> If stuck: \`deckent kill --all\` → \`deckent cleanup\` → \`deckent doctor\`
-`;
+  return `# Boot Sequence\n${renderBootSequenceSection(lang)}\n\n## Manual Recovery Chain\n${renderManualRecoverySection(lang)}\n`;
 }
 
 // ─── TOOLS.md Template ──────────────────────────────────────────────
 
 export function generateToolsContent(root: string): string {
-  const lines = ['# Tools\n'];
-  try {
-    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
-    const scripts = pkg.scripts as Record<string, string> | undefined;
-    if (scripts) {
-      for (const [name, cmd] of Object.entries(scripts)) {
-        lines.push(`- **${name}**: \`${cmd}\``);
-      }
-    }
-  } catch {
-    lines.push('No package.json found. Add your build/test commands here.');
-  }
-  return lines.join('\n') + '\n';
+  return `# Environment Tools\n${renderEnvironmentToolsSection(root, 'en')}\n\n## MCP Tools\n${renderMcpToolsSection('en')}\n\n## CLI Commands\n${renderCliCommandsSection('en')}\n`;
 }
 
 // ─── IDE Adapter Content ────────────────────────────────────────────

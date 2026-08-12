@@ -5,6 +5,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { DOCS_CONFIG_FILE } from '../../core/constants.js';
 import { debugLog } from '../../core/utils.js';
+import { workspaceManagedDocEntries } from '../../core/workspace-artifact-contract.js';
 import type { DocsConfig, ManagedDocEntry } from './types.js';
 
 // ─── ID Generation ────────────────────────────────────────────────────────
@@ -82,7 +83,17 @@ export function validateDocPath(projectRoot: string, docPath: string): void {
  * Called during `deckent init` to bootstrap managed-docs config.
  */
 export function seedDocsConfig(projectRoot: string): void {
-  if (loadDocsConfig(projectRoot)) return; // already exists — don't overwrite
+  const existingConfig = loadDocsConfig(projectRoot);
+  if (existingConfig) {
+    const before = JSON.stringify(existingConfig);
+    for (const managed of workspaceManagedDocEntries()) {
+      const index = existingConfig.docs.findIndex((entry) => entry.id === managed.id || entry.path === managed.path);
+      if (index >= 0) existingConfig.docs[index] = managed;
+      else existingConfig.docs.push(managed);
+    }
+    if (JSON.stringify(existingConfig) !== before) saveDocsConfig(projectRoot, existingConfig);
+    return;
+  }
 
   // Read template from package (dist or src depending on runtime)
   const templatePaths = [
@@ -100,20 +111,19 @@ export function seedDocsConfig(projectRoot: string): void {
     }
   }
 
-  // Fallback: inline default if template file not found. Mirrors the
-  // docs.json.template — host instruction files (CLAUDE.md/AGENTS.md/…) are
-  // NOT managed-docs under the pure-adapter law (ADR-G-004 / DOCS-PURE-ADAPTER),
-  // so the only seeded entry is the deckent-owned IDENTITY.md surface.
+  // Fallback is registry-derived. Host instruction files
+  // (CLAUDE.md/AGENTS.md/…) are not managed-docs under the pure-adapter law.
   if (!template) {
     template = {
       version: 1,
-      docs: [{
-        id: 'identity-md',
-        path: '.deckent/workspace/IDENTITY.md',
-        autoSections: ['Project Status'],
-        protectedSections: [],
-      }],
+      docs: workspaceManagedDocEntries(),
     };
+  } else {
+    for (const managed of workspaceManagedDocEntries()) {
+      const index = template.docs.findIndex((entry) => entry.id === managed.id || entry.path === managed.path);
+      if (index >= 0) template.docs[index] = managed;
+      else template.docs.push(managed);
+    }
   }
 
   saveDocsConfig(projectRoot, template);

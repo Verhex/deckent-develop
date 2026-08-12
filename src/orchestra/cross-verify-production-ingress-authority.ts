@@ -87,6 +87,116 @@ type ProducerSettlementBinding =
   | { readonly state: 'hold'; readonly reasonCode: string; readonly detail: unknown };
 
 /**
+ * Host-authored fields the runtime writes onto a `.result` that the producer's
+ * immutable settlement receipt cannot contain. `distMutated` and the
+ * attribution totals are patched onto the result object rather than declared on
+ * {@link TaskResult}, so they are typed here to keep the allowlist below bound
+ * to a real key space at compile time.
+ */
+interface HostEnrichedResultExtras {
+  totalLinesAdded?: number;
+  totalLinesRemoved?: number;
+  distMutated?: boolean;
+}
+
+type HostEnrichableResult = TaskResult & HostEnrichedResultExtras;
+
+/**
+ * born 3323 — the post-settlement enrichment classes, and ONLY those.
+ *
+ * The producer's receipt freezes the `.result` bytes at settlement time; the
+ * EVALUATE-phase copy is the same result after the host re-wrote it. Every
+ * member below is authored by the host after (or independently of) the receipt:
+ * `workAttribution` + `totalLines*` by the docker monitor's claim-time
+ * attribution reconcile, `distMutated` by the advisory build-violation patch,
+ * and `tokenUsage`/`cost`/`providerBilling` by the collector's token backfill
+ * and billing reconciliation. A worker's own pre-settlement claim in these
+ * fields carries no verdict authority — the host overwrites it by construction.
+ *
+ * NOTHING worker-authorable belongs here. `selfAssessment`, `notes`,
+ * `testsPassed`, `coverage`, `filesChanged`, `linesAdded`, `linesRemoved`,
+ * `taskId` and `workerId` stay byte-compared, and so does every field not
+ * listed — including a field neither side is supposed to have.
+ *
+ * `Extract<keyof HostEnrichableResult, …>` is the compile-time binding: a name
+ * that is not a real result key drops out of the union and fails `tsc` at the
+ * literal below.
+ */
+type HostEnrichmentField = Extract<
+  keyof HostEnrichableResult,
+  | 'workAttribution'
+  | 'totalLinesAdded'
+  | 'totalLinesRemoved'
+  | 'distMutated'
+  | 'tokenUsage'
+  | 'cost'
+  | 'providerBilling'
+>;
+
+export const XVERIFY_PRODUCER_ENRICHMENT_FIELDS: readonly HostEnrichmentField[] =
+  Object.freeze([
+    'workAttribution',
+    'totalLinesAdded',
+    'totalLinesRemoved',
+    'distMutated',
+    'tokenUsage',
+    'cost',
+    'providerBilling',
+  ]);
+
+const ENRICHMENT_FIELDS: ReadonlySet<string> =
+  new Set<string>(XVERIFY_PRODUCER_ENRICHMENT_FIELDS);
+
+export type CrossVerifyProducerFencingComparison =
+  | { readonly state: 'equal' }
+  | { readonly state: 'diverged'; readonly divergingFields: readonly string[] };
+
+/**
+ * Canonicalize one side of the fence: drop the enrichment classes, and drop
+ * `undefined`-valued keys so an in-memory result compares identically to the
+ * same result after a JSON round-trip. Nothing else is normalized — a value is
+ * carried through verbatim for the byte-comparison.
+ */
+function producerFencedCore(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const core: Record<string, unknown> = {};
+  for (const [field, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (entry === undefined || ENRICHMENT_FIELDS.has(field)) continue;
+    core[field] = entry;
+  }
+  return core;
+}
+
+/**
+ * Byte-compare the producer's CLOSED settlement result against the
+ * evaluate-phase copy over the pre-enrichment core.
+ *
+ * The comparison walks the UNION of both sides' remaining keys, so a field that
+ * exists on only one side canonicalizes against `undefined` and diverges. An
+ * unknown extra field is therefore a mismatch, not a silent pass: the allowlist
+ * is an exclusion list, never a "trust everything else the host might add" rule.
+ */
+export function compareProducerFencedResult(
+  settled: unknown,
+  evaluated: unknown,
+): CrossVerifyProducerFencingComparison {
+  const settledCore = producerFencedCore(settled);
+  const evaluatedCore = producerFencedCore(evaluated);
+  if (!settledCore || !evaluatedCore) {
+    return { state: 'diverged', divergingFields: ['<result-is-not-a-json-object>'] };
+  }
+  const fields = [...new Set([
+    ...Object.keys(settledCore),
+    ...Object.keys(evaluatedCore),
+  ])].sort();
+  const divergingFields = fields.filter(field =>
+    canonicalJson(settledCore[field]) !== canonicalJson(evaluatedCore[field]));
+  return divergingFields.length === 0
+    ? { state: 'equal' }
+    : { state: 'diverged', divergingFields };
+}
+
+/**
  * Bind semantic evidence capture to the producer's immutable settlement, not
  * to whatever bytes happen to exist when EVALUATE later starts. Standalone
  * attended claim adjudication has no implementation worker, so its wx-created
@@ -124,11 +234,12 @@ function resolveProducerSettlementBinding(input: {
       detail: ref,
     };
   }
-  if (canonicalJson(closed.result) !== canonicalJson(input.result)) {
+  const fenced = compareProducerFencedResult(closed.result, input.result);
+  if (fenced.state === 'diverged') {
     return {
       state: 'hold',
       reasonCode: 'xverify_producer_result_mismatch',
-      detail: ref,
+      detail: { ref, divergingFields: fenced.divergingFields },
     };
   }
   return {

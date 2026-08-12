@@ -44,7 +44,7 @@ import {
 import { readSprintLive, readSprintTaskDetail, SPRINT_TASK_ID_RE } from '../orchestra/sprint-live-service.js';
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
-import { AgentPoolManager } from '../core/agent-pool.js';
+import { buildAgentCatalogEntries } from '../core/agent-catalog-projection.js';
 import { readContext, cleanup } from '../orchestra/brain.js';
 import { planRunFlow } from '../orchestra/run-flow-plan-service.js';
 import {
@@ -967,16 +967,24 @@ async function handleRequest(
       return;
     }
 
-    // GET /api/agents — list enabled agents from agent pool
+    // GET /api/agents — the canonical catalog projection (S5, sprint-523 task 9).
+    // Same read model as CLI `deckent agent` and MCP `deckent_agent_list`; the
+    // pre-S5 payload fields (id/name/source/enabled/totalUses/successRate) are
+    // preserved field-for-field for existing consumers, with the read-model
+    // truth (validity/routability/provenance/prompt) added alongside.
     if (url === '/api/agents') {
-      const agentPool = new AgentPoolManager(projectRoot);
-      const agents = agentPool.listEnabled().map((a) => ({
-        id: a.id,
-        name: a.name,
-        source: a.source,
-        enabled: a.enabled,
-        totalUses: a.stats?.totalUses ?? 0,
-        successRate: a.stats?.successRate ?? 0,
+      const agents = buildAgentCatalogEntries(projectRoot).map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        source: entry.provenance.declared,
+        enabled: entry.enabled,
+        totalUses: entry.uses,
+        successRate: entry.successRate,
+        validity: entry.validity,
+        routable: entry.routable,
+        provenance: entry.provenance,
+        prompt: entry.prompt,
+        diagnostics: entry.diagnostics,
       }));
       sendJson(res, agents);
       return;

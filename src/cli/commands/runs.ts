@@ -24,6 +24,7 @@ import { computeRunDiff } from '../../orchestra/run-diff-service.js';
 import { buildRunCommitProposal, gitWorkflowAdd, gitWorkflowCommit } from '../../orchestra/git-workflow-service.js';
 import { isRowTerminal } from '../repl/run-flow-inbox.js';
 import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-registry.js';
+import type { RetireSupersededReport } from '../../orchestra/run-flow-coordinator.js';
 import { buildFlowStartSpawn } from '../helpers/detached-start.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -244,6 +245,30 @@ export function buildCloseStaleLines(report: StaleRunSweepReport, lang: string):
   return lines;
 }
 
+/**
+ * Render the `--retire-superseded` report (dry-run or applied) as printable
+ * lines. Mirror of {@link buildCloseStaleLines}: the CLI only formats what the
+ * coordinator already decided — it never classifies and never writes.
+ */
+export function buildRetireSupersededLines(report: RetireSupersededReport, lang: string): string[] {
+  if (report.superseded.length === 0) return [getMessage('runs.retire_superseded.none', lang)];
+
+  const header = report.applied
+    ? getMessage('runs.retire_superseded.apply_header', lang, { count: String(report.retired.length) })
+    : getMessage('runs.retire_superseded.dry_header', lang, { count: String(report.superseded.length) });
+  const failureByFlowId = new Map(report.failures.map((f) => [f.flowId, f.detail]));
+  const lines = [header];
+  for (const entry of report.superseded) {
+    const detail = failureByFlowId.get(entry.flowId);
+    const suffix = detail !== undefined
+      ? getMessage('runs.retire_superseded.failed', lang, { detail })
+      : getMessage('runs.retire_superseded.entry', lang, { by: entry.supersededBy.slice(0, SHORT_ID_LEN) });
+    lines.push(`  ${entry.flowId.slice(0, SHORT_ID_LEN)} · ${suffix}`);
+  }
+  if (!report.applied) lines.push(getMessage('runs.retire_superseded.dry_hint', lang));
+  return lines;
+}
+
 export function registerRuns(program: Command): void {
   program
     .command('runs')
@@ -251,7 +276,8 @@ export function registerRuns(program: Command): void {
     .argument('[n]', 'Run to target: the list number, or (for decide flags) a unique flowId prefix')
     .option('--limit <n>', 'Show up to n inbox rows (default: the recent window; a flow-id prefix always resolves against every flow)', Number)
     .option('--close-stale', 'Classify stale runs (dead process / unverifiable record); dry-run unless --yes')
-    .option('--yes', 'With --close-stale: durably close the stale runs (failed/cancelled)')
+    .option('--retire-superseded', 'Classify pending-approval runs a newer plan over the same source replaced; dry-run unless --yes')
+    .option('--yes', 'With --close-stale/--retire-superseded: durably write the closures')
     .option('--approve', 'Approve run #n (SLOW AHEAD; add --start for FULL AHEAD)')
     .option('--reject', 'Reject run #n (STOP)')
     .option('--retire', 'Retire an unstarted approved run #n (CANCELLED)')
@@ -260,7 +286,7 @@ export function registerRuns(program: Command): void {
     .option('--diff', "Show run #n's real footprint as a unified diff (583/N1)")
     .option('--commit', "Review-then-commit run #n's changes (583/N4; shows the proposal, prompts unless --yes)")
     .option('--message <text>', 'With --commit: use this commit message instead of the suggested one')
-    .action(async (n: string | undefined, opts: { closeStale?: boolean; yes?: boolean; diff?: boolean; commit?: boolean; limit?: number; message?: string } & DecideFlags) => {
+    .action(async (n: string | undefined, opts: { closeStale?: boolean; retireSuperseded?: boolean; yes?: boolean; diff?: boolean; commit?: boolean; limit?: number; message?: string } & DecideFlags) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       try {
@@ -405,6 +431,15 @@ export function registerRuns(program: Command): void {
           print('');
         }
 
+        // 524-013 — pending-approval duplicate hygiene. The coordinator is the
+        // state authority: it classifies AND (only with --yes) writes through
+        // the reducer. Without --yes this is a report, zero writes.
+        if (opts.retireSuperseded) {
+          const report = getRunFlowCoordinator(root).retireSupersededFlows({ apply: opts.yes === true });
+          for (const line of buildRetireSupersededLines(report, lang)) print(line);
+          print('');
+        }
+
         const rows = opts.limit === undefined
           ? collectInboxRows(root)
           : collectInboxRows(root, { limit: opts.limit });
@@ -412,7 +447,7 @@ export function registerRuns(program: Command): void {
         // `deckent runs <n>` — rich single-run detail, same numbering as the
         // list (parity with the REPL's `/runs <n>`); SURF-6: a unique flowId
         // PREFIX works too (the stable handle a cross-surface handoff carries).
-        if (n !== undefined && !opts.closeStale) {
+        if (n !== undefined && !opts.closeStale && !opts.retireSuperseded) {
           const selection = resolveInboxSelection(n, rows);
           if (selection.kind === 'detail') {
             for (const line of buildRunDetailLines(collectRunDetail(root, selection.row), labels)) print(line);

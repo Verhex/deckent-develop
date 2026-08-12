@@ -47,7 +47,7 @@ The CLI, MCP, API, terminal, dashboard, desktop, connector, worker, memory, and 
 - Run-flow router comments say four routes and no start, while the dispatcher implements eight action routes including start/cancel/diff. [Evidence: `src/api/run-flow-routes.ts`; `docs/en/reference/api-surface.md`]
 - Config metadata covers only a subset of 164 effective default leaves and contains default disagreements. [Evidence: `src/core/config.ts:2674-2850`; built `createDefaultConfig` leaf inventory]
 
-The detailed disposition, correct-side judgment, recommended direction, and evidence for each item live in [CODE-DOC-DIFF-2026-08](../../analysis/CODE-DOC-DIFF-2026-08.md).
+The detailed disposition, correct-side judgment, recommended direction, and evidence for each item live in `CODE-DOC-DIFF-2026-08` (retired to git history; dispositions live in MASTER-PLAN row evidence).
 
 ### Certification ladder
 

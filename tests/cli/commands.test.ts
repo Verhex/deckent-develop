@@ -17,6 +17,14 @@ vi.mock('node:fs', () => ({
   accessSync: vi.fn(),
   constants: { W_OK: 2, R_OK: 4, F_OK: 0 },
   unlinkSync: vi.fn(),
+  realpathSync: Object.assign(vi.fn((path: string) => path), {
+    native: vi.fn((path: string) => path),
+  }),
+  lstatSync: vi.fn((path: string) => ({
+    isSymbolicLink: () => false,
+    isDirectory: () => !/\.(?:md|json)$/i.test(path),
+    isFile: () => /\.(?:md|json)$/i.test(path),
+  })),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -381,17 +389,32 @@ function makeTask(overrides?: Partial<Task>): Task {
   };
 }
 
-async function runCommand(registerFn: (p: Command) => void, args: string[]): Promise<void> {
+/**
+ * Opt-in for tests that intentionally drive an error out of the command
+ * action (e.g. a mocked dependency throws and the command has no internal
+ * catch for it). Any OTHER unexpected error rethrows instead of vanishing —
+ * a strict-ESM mock crash used to produce empty stdout and hide a whole rot
+ * family for weeks (measured 2026-08-11 repair session).
+ */
+async function runCommand(
+  registerFn: (p: Command) => void,
+  args: string[],
+  opts: { expectCommandError?: boolean } = {},
+): Promise<void> {
   const program = new Command();
   program.exitOverride();
   registerFn(program);
   try {
     await program.parseAsync(['node', 'test', ...args]);
   } catch (err) {
-    // Commander throws on exitOverride — ignore
+    // Commander throws on exitOverride — always expected.
     if (err instanceof Error && err.message.includes('commander.')) {
-      // expected
+      return;
     }
+    if (opts.expectCommandError) {
+      return;
+    }
+    throw err;
   }
 }
 
@@ -583,7 +606,7 @@ describe('kill command', () => {
 
   it('does not show Worker not found for non-TmuxError', async () => {
     vi.mocked(killWorker).mockImplementation(() => { throw new TypeError('bad'); });
-    await runCommand(registerKill, ['kill', 'task-001']);
+    await runCommand(registerKill, ['kill', 'task-001'], { expectCommandError: true });
     expect(stderr()).not.toContain('Worker not found');
   });
 });

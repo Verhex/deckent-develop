@@ -1,3 +1,4 @@
+<!-- DECKENT:WORKSPACE id="tools" schema="1" authority="managed" provenance="workspace-artifact-registry" -->
 <!-- Bu dosya elle güncellenmiştir (2026-08-01); kalıcı çözüm AUTOGEN üretimidir — bkz. IDENTITY.md AUTOGEN blokları -->
 
 # Environment Tools
@@ -10,162 +11,145 @@ Coverage: npx vitest run --coverage
 Dashboard: deckent web
 
 ## MCP Tools
-| Tool | MCP Name |
-|------|---------|
-| agent-list | `deckent_agent_list` |
-| analyze | `deckent_analyze` |
-| audit | `deckent_audit` |
-| autonomous | `deckent_autonomous` |
-| autonomous-approval | `deckent_autonomous_approval` |
-| autonomous-surface | `deckent_autonomous_surface` |
-| catalog-parity | `deckent_catalog_parity` |
-| checkpoint | `deckent_checkpoint` |
-| cleanup | `deckent_cleanup` |
-| config | `deckent_config` |
-| cost | `deckent_cost` |
-| directives | `deckent_directives` |
-| docs | `deckent_docs` |
-| doctor | `deckent_doctor` |
-| execution-authority | `deckent_execution_authority` |
-| explain | `deckent_explain` |
-| feature-query | `deckent_feature_query` |
-| help | `deckent_help` |
-| history | `deckent_history` |
-| init | `deckent_init` |
-| kill | `deckent_kill` |
-| kpi | `deckent_kpi` |
-| memory-query | `deckent_memory_query` |
-| models | `deckent_models` |
-| nervous | `deckent_nervous` |
-| nervous-edit | `deckent_nervous_edit` |
-| plan | `deckent_plan` |
-| process | `deckent_process` |
-| recover | `deckent_recover` |
-| retro | `deckent_retro` |
-| review | `deckent_review` |
-| run | `deckent_run` |
-| skill-list | `deckent_skill_list` |
-| start | `deckent_start` |
-| status | `deckent_status` |
-| sync | `deckent_sync` |
-| truth | `deckent_truth` |
-| usage | `deckent_usage` |
-| watch | `deckent_watch` |
-| xverify | `deckent_xverify` |
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="7040f3ee4c57fdb1ecced07dd9e7c411d7dd05aaea63868b5576eeea842d819a" -->
+Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla tool olarak yorumlanmaz.
 
-_Total: 40 MCP tools_
+| MCP Adı | Etki | Onay | Idempotent |
+|---|---|---|---|
+| `deckent_init` | değiştirici | runtime policy gereği zorunlu | evet |
+| `deckent_set_directives` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_plan` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_start` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_status` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_doctor` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_retro` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_history` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_analyze_project` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_sync` | değiştirici | runtime policy gereği zorunlu | evet |
+| `deckent_config` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_review` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_run` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_kill` | yıkıcı | runtime policy gereği zorunlu | hayır |
+| `deckent_cleanup` | yıkıcı | runtime policy gereği zorunlu | hayır |
+| `deckent_help` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_agent_list` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_skill_list` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_checkpoint` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_docs` | değiştirici | runtime policy gereği zorunlu | evet |
+| `deckent_explain` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_memory_query` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_watch` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_nervous_subscribe` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_nervous_accept` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_nervous_reject` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_nervous_status` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_nervous_config` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_feature_query` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_truth` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_audit` | yıkıcı | runtime policy gereği zorunlu | hayır |
+| `deckent_recover` | yıkıcı | runtime policy gereği zorunlu | hayır |
+| `deckent_models` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_autonomous` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_process` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_usage` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_xverify` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_kpi` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_cost` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_agent_manage` | yıkıcı | runtime policy gereği zorunlu | hayır |
+| `deckent_skill_manage` | yıkıcı | runtime policy gereği zorunlu | hayır |
+| `deckent_memory_manage` | yıkıcı | runtime policy gereği zorunlu | hayır |
+| `deckent_autonomous_backlog` | yıkıcı | runtime policy gereği zorunlu | hayır |
+| `deckent_autonomous_status` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_nervous_edit` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_nervous_undo` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_autonomous_approve` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_autonomous_reject` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_execution_authority` | değiştirici | runtime policy gereği zorunlu | evet |
 
-**Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`
+Toplam: 49
+<!-- DECKENT:CONTRACT:END id="tools" -->
 
 ## CLI Commands
-| Command Module | Description |
-|---------------|-------------|
-| `agent` | deckent agent |
-| `agentic-confirm` | deckent agentic-confirm |
-| `agentic-session` | deckent agentic-session |
-| `analyze` | deckent analyze |
-| `archive-debt` | deckent archive-debt |
-| `attach` | deckent attach |
-| `audit` | deckent audit |
-| `audit-verify` | deckent audit-verify |
-| `autonomous` | deckent autonomous |
-| `autonomous-mission` | deckent autonomous-mission |
-| `bot` | deckent bot |
-| `chat` | deckent chat |
-| `chat-agentic-dispatch` | deckent chat-agentic-dispatch |
-| `chat-banner` | deckent chat-banner |
-| `chat-enterprise-bridge` | deckent chat-enterprise-bridge |
-| `chat-layout` | deckent chat-layout |
-| `chat-mcp-bridge` | deckent chat-mcp-bridge |
-| `chat-mode` | deckent chat-mode |
-| `chat-native` | deckent chat-native |
-| `chat-nervous-bridge` | deckent chat-nervous-bridge |
-| `chat-permissions` | deckent chat-permissions |
-| `chat-provider-parity` | deckent chat-provider-parity |
-| `chat-render` | deckent chat-render |
-| `chat-render-region` | deckent chat-render-region |
-| `chat-repl-ux` | deckent chat-repl-ux |
-| `chat-resume` | deckent chat-resume |
-| `chat-session` | deckent chat-session |
-| `chat-slash-menu` | deckent chat-slash-menu |
-| `chat-slash-registry` | deckent chat-slash-registry |
-| `chat-spinner` | deckent chat-spinner |
-| `chat-status-line` | deckent chat-status-line |
-| `chat-tool-bridge` | deckent chat-tool-bridge |
-| `chat-tool-exec` | deckent chat-tool-exec |
-| `checkpoint` | deckent checkpoint |
-| `cleanup` | deckent cleanup |
-| `config` | deckent config |
-| `config-nervous` | deckent config-nervous |
-| `connect` | deckent connect |
-| `cost` | deckent cost |
-| `cu-status` | deckent cu-status |
-| `dashboard` | deckent dashboard |
-| `do` | deckent do |
-| `docs` | deckent docs |
-| `doctor` | deckent doctor |
-| `doctor-checks` | deckent doctor-checks |
-| `evolve` | deckent evolve |
-| `execution-authority` | deckent execution-authority |
-| `explain` | deckent explain |
-| `features` | deckent features |
-| `finalize` | deckent finalize |
-| `flow` | deckent flow |
-| `gateway` | deckent gateway |
-| `heartbeat` | deckent heartbeat |
-| `help` | deckent help |
-| `history` | deckent history |
-| `image` | deckent image |
-| `init` | deckent init |
-| `init-steps` | deckent init-steps |
-| `init-templates` | deckent init-templates |
-| `init-wizard` | deckent init-wizard |
-| `kill` | deckent kill |
-| `kpi` | deckent kpi |
-| `limits` | deckent limits |
-| `mcp` | deckent mcp |
-| `memory` | deckent memory |
-| `mode` | deckent mode |
-| `models` | deckent models |
-| `nervous` | deckent nervous |
-| `onboard` | deckent onboard |
-| `openrouter-probe` | deckent openrouter-probe |
-| `output` | deckent output |
-| `plan` | deckent plan |
-| `plan-nl` | deckent plan-nl |
-| `plugin` | deckent plugin |
-| `process` | deckent process |
-| `provider-authority` | deckent provider-authority |
-| `quick-start` | deckent quick-start |
-| `rbac` | deckent rbac |
-| `recall` | deckent recall |
-| `recover` | deckent recover |
-| `recover-helpers` | deckent recover-helpers |
-| `remember` | deckent remember |
-| `resources` | deckent resources |
-| `resume` | deckent resume |
-| `retro` | deckent retro |
-| `retro-formatter` | deckent retro-formatter |
-| `retro-parser` | deckent retro-parser |
-| `review` | deckent review |
-| `run` | deckent run |
-| `runs` | deckent runs |
-| `serve` | deckent serve |
-| `set-directives` | deckent set-directives |
-| `skill` | deckent skill |
-| `skill-marketplace` | deckent skill-marketplace |
-| `spawn` | deckent spawn |
-| `start` | deckent start |
-| `status` | deckent status |
-| `sync` | deckent sync |
-| `task-settlement` | deckent task-settlement |
-| `test-run` | deckent test-run |
-| `trace-extract` | deckent trace-extract |
-| `truth` | deckent truth |
-| `upgrade` | deckent upgrade |
-| `usage` | deckent usage |
-| `watch` | deckent watch |
-| `web` | deckent web |
-| `xverify` | deckent xverify |
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="ae1ca9ed5ad7e12d1abe86e93643f459b661da046beb62e58a90546f949ae0c2" -->
+Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper module dosya adları dışlanır.
 
-_Total: 107 CLI command modules_
+| Komut | Kategori | Risk | Yüzeyler |
+|---|---|---|---|
+| `deckent agent` | Core | Değiştir | cli, mcp, repl |
+| `deckent analyze` | Core | Oku | cli, mcp, repl |
+| `deckent archive-debt` | Core | Oku | cli |
+| `deckent attach` | Run | Çalıştır | cli |
+| `deckent audit` | Core | Çalıştır | cli, mcp, repl |
+| `deckent audit-verify` | Core | Oku | cli |
+| `deckent autonomous` | Enterprise | Otonom | cli, mcp, repl |
+| `deckent autonomous-mission` | Enterprise | Otonom | cli |
+| `deckent bot` | Enterprise | Çalıştır | cli |
+| `deckent chat` | Run | Çalıştır | cli |
+| `deckent checkpoint` | Run | Değiştir | cli, mcp, repl |
+| `deckent cleanup` | Danger | Değiştir | cli, mcp, repl |
+| `deckent config` | Core | Değiştir | cli, mcp, repl |
+| `deckent connect` | Core | Oku | cli |
+| `deckent cost` | Enterprise | Değiştir | cli, mcp |
+| `deckent cu-status` | Core | Oku | cli |
+| `deckent dashboard` | Core | Oku | cli |
+| `deckent do` | Run | Çalıştır | cli, repl |
+| `deckent docs` | Core | Değiştir | cli, mcp |
+| `deckent doctor` | Core | Oku | cli, mcp, repl |
+| `deckent evolve` | Enterprise | Oku | cli |
+| `deckent execution-authority` | Enterprise | Değiştir | cli, mcp |
+| `deckent explain` | Memory | Oku | cli, mcp, repl |
+| `deckent features` | Core | Oku | cli, mcp, repl |
+| `deckent finalize` | Run | Değiştir | cli |
+| `deckent flow` | Enterprise | Çalıştır | cli |
+| `deckent gateway` | Enterprise | Çalıştır | cli |
+| `deckent gateway-runtime` | Enterprise | Otonom | cli |
+| `deckent heartbeat` | Run | Çalıştır | cli |
+| `deckent help-info` | Core | Oku | cli, mcp, repl |
+| `deckent history` | Memory | Oku | cli, mcp, repl |
+| `deckent image` | Core | Değiştir | cli |
+| `deckent init` | Core | Değiştir | cli, mcp |
+| `deckent kill` | Danger | Çalıştır | cli, mcp, repl |
+| `deckent kpi` | Core | Oku | cli, mcp, repl |
+| `deckent limits` | Core | Oku | cli |
+| `deckent mcp` | MCP | Değiştir | cli |
+| `deckent memory` | Memory | Değiştir | cli, mcp |
+| `deckent mode` | Core | Değiştir | cli |
+| `deckent models` | Core | Değiştir | cli, mcp, repl |
+| `deckent nervous` | Enterprise | Değiştir | cli, mcp, repl |
+| `deckent onboard` | Core | Değiştir | cli |
+| `deckent openrouter-probe` | Core | Oku | cli |
+| `deckent output` | Core | Oku | cli |
+| `deckent plan` | Run | Değiştir | cli, mcp, repl |
+| `deckent plan-nl` | Run | Oku | cli |
+| `deckent plugin` | Core | Değiştir | cli |
+| `deckent process` | Enterprise | Çalıştır | cli, mcp |
+| `deckent provider-authority` | Enterprise | Değiştir | cli |
+| `deckent rbac` | Enterprise | Değiştir | cli |
+| `deckent recall` | Memory | Oku | cli, mcp, repl |
+| `deckent recover` | Danger | Değiştir | cli, mcp, repl |
+| `deckent remember` | Memory | Değiştir | cli |
+| `deckent resources` | Core | Oku | cli, repl |
+| `deckent resume` | Run | Çalıştır | cli, repl |
+| `deckent retro` | Memory | Oku | cli, mcp, repl |
+| `deckent review` | Run | Değiştir | cli, mcp, repl |
+| `deckent run` | Run | Çalıştır | cli, mcp |
+| `deckent runs` | Run | Oku | cli, repl |
+| `deckent serve` | Run | Çalıştır | cli |
+| `deckent set-directives` | Run | Değiştir | cli, mcp, repl |
+| `deckent skill` | Core | Değiştir | cli, mcp, repl |
+| `deckent spawn` | Run | Çalıştır | cli |
+| `deckent start` | Run | Çalıştır | cli, mcp |
+| `deckent status` | Core | Oku | cli, mcp, repl |
+| `deckent sync` | Core | Değiştir | cli, mcp, repl |
+| `deckent task` | Run | Değiştir | cli |
+| `deckent test` | Run | Çalıştır | cli |
+| `deckent trace` | Core | Değiştir | cli |
+| `deckent truth` | Core | Oku | cli, mcp |
+| `deckent upgrade` | Core | Çalıştır | cli |
+| `deckent usage` | Core | Oku | cli, mcp, repl |
+| `deckent watch` | Run | Oku | cli, mcp |
+| `deckent web` | Run | Çalıştır | cli |
+| `deckent xverify` | Core | Oku | cli, mcp |
+
+Toplam: 75
+<!-- DECKENT:CONTRACT:END id="tools" -->

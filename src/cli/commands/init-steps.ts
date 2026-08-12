@@ -9,8 +9,8 @@
 
 import { writeFileSync, mkdirSync, readFileSync, existsSync, readdirSync, cpSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { platform } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { platform } from 'node:os';
 import type { PlanMode } from '../../core/types.js';
 import type { FullStackResult } from '../../core/stack-detector.js';
 import type { DetectedEnv } from '../../core/environment.js';
@@ -37,6 +37,7 @@ import { getModePreset } from '../../core/mode-presets.js';
 import { detectSystemCapacity, suggestMaxWorkers, decideSpawnBackendTransaction, probeDockerDaemon } from '../../core/system-capacity.js';
 import { generateProjectConventionsSkill, getGeneratedContent, generateTempAgents } from '../../orchestra/temp-skill-generator.js';
 import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
+import { initializeWorkspaceArtifacts } from '../../orchestra/workspace-artifacts.js';
 import { ADR_SEED_DATA, createIdentitySeed } from '../../core/adr-seed.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
@@ -57,8 +58,6 @@ import {
   generateDeckentContentEN,
   generateDirectivesTemplateTR,
   generateDirectivesTemplateEN,
-  generateToolsContent,
-  generateBootContent,
   generateQuickStartDoc,
   generateDirectivesGuideDoc,
   generateConfigReferenceDoc,
@@ -451,25 +450,6 @@ export function writeBrainFiles(
   const identityTestFramework = detectedAnalysis?.testFramework ?? stackResult.testFramework ?? 'unknown';
   const identityBuildTool = detectedAnalysis?.buildTool ?? stackResult.buildTool ?? 'unknown';
 
-  // 10a2. Workspace IDENTITY.md
-  const runtimeName = identityLanguage.toLowerCase().includes('typescript') || identityLanguage.toLowerCase().includes('javascript')
-    ? 'Node.js' : identityLanguage.toLowerCase().includes('python')
-    ? 'Python' : identityLanguage.toLowerCase().includes('go')
-    ? 'Go' : identityLanguage.toLowerCase().includes('rust')
-    ? 'Rust' : identityLanguage.toLowerCase().includes('java')
-    ? 'Java' : identityLanguage.toLowerCase().includes('c#') || identityLanguage.toLowerCase().includes('csharp')
-    ? '.NET' : identityLanguage !== 'unknown' ? identityLanguage : 'unknown';
-  const identityContent = `# Project Identity
-Name: ${projectName}
-Language: ${identityLanguage !== 'unknown' ? identityLanguage : '(not detected — update manually)'}
-Framework: ${identityFramework !== 'unknown' && identityFramework !== 'none' ? identityFramework : '(not detected)'}
-Test: ${identityTestFramework !== 'unknown' ? identityTestFramework : '(not detected)'}
-Build: ${identityBuildTool !== 'unknown' ? identityBuildTool : '(not detected)'}
-Runtime: ${runtimeName !== 'unknown' ? runtimeName : '(not detected)'}
-Platform: ${platform() === 'win32' ? 'Windows' : platform() === 'darwin' ? 'macOS' : 'Linux'}
-`;
-  writeIfNotExists(join(root, WORKSPACE_DIR, 'IDENTITY.md'), identityContent);
-
   // 10a2b. Seed built-in agents + skills from bundled builtins (Sprint 150 T-031)
   seedBuiltins(root);
 
@@ -521,9 +501,18 @@ Platform: ${platform() === 'win32' ? 'Windows' : platform() === 'darwin' ? 'macO
     } catch { /* non-fatal — temp skills/agents are best-effort */ }
   }
 
-  // 10b. Workspace: TOOLS.md + BOOT.md
-  writeIfNotExists(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));
-  writeIfNotExists(join(root, WORKSPACE_DIR, 'BOOT.md'), generateBootContent(language));
+  // 10b. Versioned workspace artifacts — shared with MCP init and managed docs.
+  initializeWorkspaceArtifacts({
+    projectRoot: root,
+    projectName,
+    language,
+    stack: {
+      language: identityLanguage,
+      framework: identityFramework,
+      testFramework: identityTestFramework,
+      buildTool: identityBuildTool,
+    },
+  });
 
   // 10b2. .deckent/docs/ — user guides
   const docsDir = join(root, DECKENT_DIR, 'docs');

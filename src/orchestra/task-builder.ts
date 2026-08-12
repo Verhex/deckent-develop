@@ -84,6 +84,7 @@ import type {
 import { readAuthoritativeTaskResult } from './task-result-authority.js';
 import { SharedMemory } from './shared-memory.js';
 import { HandoffProtocol } from './handoff-protocol.js';
+import { inspectWorkerGuideContract } from './workspace-artifacts.js';
 import type { WorkerCommsConfig, ToolsConfig } from '../core/config-types.js';
 import { deriveTestScope } from './scope-deriver.js';
 import type { AgentDefinition } from '../core/agent-types.js';
@@ -2425,6 +2426,7 @@ export function buildWorkerPrompt(
     effort,
     dependencies: [...promptDependencyIds],
     tasksDir: join(projectRoot, TASKS_DIR),
+    workerGuideContract: inspectWorkerGuideContract(projectRoot),
     dependencyResults,
     sharedContext,
     upstreamHandoffs,

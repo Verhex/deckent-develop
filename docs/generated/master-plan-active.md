@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):5596fa49047e036568044773a68c3b76729e0e87f431fa8d5eddf9c3937d8d63`
+**Source digest:** `sha256(normalized-lf-utf8):9553e561e016dd826248714df1144a8d7ff8f0664c5674a98f2cdd0f7e6612fe`
 
-**Rows:** 470 total · 410 active · 60 terminal
+**Rows:** 491 total · 429 active · 62 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 317 |
+| OPEN | 338 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
-| VERIFY | 25 |
-| DONE | 60 |
+| VERIFY | 23 |
+| DONE | 62 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -37,6 +37,7 @@
 | 120 | `STATE-RETENTION-001` | OPEN | P1 | TRUTH | `SSOT-002` | — | Runtime state/log retention, rotation, legal hold ve crash recovery contract |
 | 121 | `CRASH-FORENSICS-AUTHORITY-001` | OPEN | P1 | TRUTH | — | — | Crash artifact schema, privacy, collision-free retention, typed classification ve support/recovery consumption authority |
 | 122 | `NERVOUS-STATE-LIFECYCLE-001` | OPEN | P1 | TRUTH | `AUDIT-001`, `APPROVAL-001` | — | Nervous durable state, proposal, history ve IPC artefaktları için tenant-aware lifecycle, privacy ve recovery authority |
+| 123 | `RECENT-WORKS-ARTIFACT-AUTHORITY-001` | OPEN | P0 | TRUTH | — | — | `.deckent/recently-works` için typed artifact catalog, live-set sınırı, lifecycle, reconciliation ve disposition authority |
 | 130 | `STATE-PRUNE-001` | BLOCKED | P2 | TRUTH | `STATE-RETENTION-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Exact dry-run state prune manifest ve recoverable apply flow |
 | 140 | `DOCS-TOPOLOGY-001` | OPEN | P1 | TRUTH | `SSOT-002` | — | `docs`, `docs1`, `.analysis` ve generated-doc topology kararını current consumer graph ile yeniden ver |
 | 150 | `DOCS-ARCHIVE-001` | BLOCKED | P2 | TRUTH | `DOCS-TOPOLOGY-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Approved exact archive/git-mv manifestini uygulayıp links ve writers'ı güncelle |
@@ -44,6 +45,11 @@
 | 170 | `DOCS-RELEASE-TRUTH-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `SSOT-003` | — | Generated stats, references and release-doc truth authority |
 | 171 | `DOCS-DEPS-HOME-001` | OPEN | P2 | TRUTH | — | — | Dependency-doku ile gerçek kurulum-ağacının (HOME/global adapterlar dahil) tek-kaynak hizası: docs/reference/dependencies.md kayıtları ile package.json/override gerçeği arasındaki drift sınıfı kapatılır |
 | 172 | `MANAGED-DOC-CACHE-TRUTH-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `STATE-RETENTION-001` | — | Managed-doc config target, generator eligibility, cache lifecycle ve invalidation outcome tek truthful contractta uzlaşır |
+| 173 | `WORKSPACE-CONTRACT-AUTHORITY-001` | OPEN | P0 | TRUTH | `MANAGED-DOC-CACHE-TRUTH-001`, `DOCS-TOPOLOGY-001` | — | `.deckent/workspace` artifact seti için versioned registry, ownership, migration ve projection authority |
+| 174 | `WORKSPACE-IDENTITY-AUTHORITY-001` | OPEN | P0 | TRUTH | `PROVENANCE-CONTEXT-001`, `PROJECT-STACK-CACHE-AUTHORITY-001` | — | Workspace identity için user authority, detected projection, provenance isolation ve stack-cache invalidation contractı |
+| 175 | `WORKER-GUIDE-PROMPT-AUTHORITY-001` | OPEN | P0 | TRUTH | `PROMPT-001`, `RESULT-INGEST-001` | — | Worker guide ile compiled prompt arasında schema-derived, digest-bound ve fail-closed authority contractı |
+| 176 | `BOOT-RECOVERY-CONTRACT-AUTHORITY-001` | OPEN | P0 | TRUTH | `RECOVERY-COMMAND-SERVICE-001`, `SURFACE-PARITY-001` | — | BOOT lifecycle ve recovery örneklerinin canonical command/service semantiğinden üretilmesi |
+| 177 | `WORKSPACE-TOOL-CATALOG-AUTHORITY-001` | OPEN | P0 | TRUTH | `SURFACE-PARITY-001` | — | TOOLS.md için canonical MCP/CLI catalog projectionı, effect/approval truth ve filename-fiction yasağı |
 | 180 | `DOCS-I18N-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `DOCS-RELEASE-TRUTH-001` | — | Documentation i18n contract for en, tr, zh-Hans, es, ja and hi |
 | 190 | `MEMORY-AUTHORITY-001` | OPEN | P0 | TRUTH | `SSOT-002` | — | Repo-local provider-neutral canonical memory; provider HOME surfaces projections only |
 | 200 | `MEMORY-TRUTH-001` | BLOCKED | P1 | TRUTH | `MEMORY-AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Memory index count, stale watch, task-capacity and phantom ledger drift'lerini hükme bağla |
@@ -184,11 +190,11 @@
 | 3130 | `RUNFLOW-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `KERNEL-SETTLEMENT-001` | — | Durable RunFlow coordinator as sole proposal/approval/run authority |
 | 3131 | `RUNFLOW-STORE-RECONCILIATION-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `STATE-RETENTION-001` | — | Canonical RunFlow store için read-purity, complete legacy reconciliation ve versioned migration authority |
 | 3132 | `RUN-JOB-AUTHORITY-001` | OPEN | P0 | KERNEL | `RECOVERY-STALE-PROJECTION-001`, `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001`, `STATE-RETENTION-001` | — | Cross-process RunJob execution truth için versioned state machine, bounded read model ve terminal-receipt adoption |
+| 3133 | `DETACHED-RUN-LOG-AUTHORITY-001` | OPEN | P1 | KERNEL | — | — | Detached CLI/API run logları için immutable identity, terminal capture-health ve bounded lifecycle authority |
 | 3140 | `SCHEDULER-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001` | — | Pure reducer and typed effect executor scheduler cutover |
 | 3141 | `SCHEDULER-SHADOW-EVIDENCE-001` | OPEN | P0 | KERNEL | `AUDIT-001`, `STATE-RETENTION-001` | — | Scheduler shadow evidence için generation-bound sequence, engine provenance ve bounded differential lifecycle |
 | 3150 | `RUNNER-PROTOCOL-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `FO-06` | — | SpawnBackend protocol v2 |
 | 3160 | `RECOVERY-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RUNNER-PROTOCOL-001` | — | Cross-surface recovery leadership and orphan containment |
-| 3161 | `RECOVERY-RESUME-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Durable pause notification, approval and lease-safe resume continuation |
 | 3162 | `PAUSED-FINALIZE-001` | OPEN | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Task projection'ı kayıp paused sprint için evidence-honest force-finalize settlement |
 | 3163 | `RECOVERY-DECISION-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001` | — | Provider-neutral cold-lane recovery decision engine |
 | 3164 | `RECOVERY-MODE-ADAPTERS-001` | OPEN | P0 | KERNEL | `RECOVERY-DECISION-001`, `MISSION-KIND-001`, `RUNFLOW-001` | — | Sprint, Run, Flow, Do, Autonomous, Mission and Process recovery adapters |
@@ -227,7 +233,6 @@
 | 3198 | `RECOVERY-BORN-485-USAGE-BILLING-001` | OPEN | P0 | COST | `LIMIT-001`, `RECEIPT-001`, `SPRINT-HONESTY-001` | — | FIX lineage usage, billing and KPI projections resolve through logical task authority |
 | 3199 | `RECOVERY-BORN-485-PROMPT-POLICY-001` | OPEN | P0 | AUTHORITY | `PROMPT-001`, `ROUTING-V3-CUTOVER-001` | — | Exact worker prompt preserves global run policy, forced skills and monotonic lifecycle instructions |
 | 3200 | `PROCESS-CUTOVER-001` | OPEN | P1 | KERNEL | `MISSION-KIND-001`, `RECOVERY-001` | — | Process mode through canonical WorkItem and Attempt authority |
-| 3201 | `RECOVERY-PAUSE-STATUS-001` | VERIFY | P1 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Paused run publishes a readable canonical status read model |
 | 3202 | `EVAL-NOCHANGE-VERDICT-001` | VERIFY | P1 | KERNEL | `EVALUATION-001` | — | No-change-needed honest worker result evaluates deterministically by goCriteria |
 | 3203 | `WORKER-ENV-TMPFS-001` | VERIFY | P2 | KERNEL | `TOOL-AUTHORITY-001` | — | Worker containment HOME sizing and cache routing policy |
 | 3210 | `SURFACE-CUTOVER-001` | BLOCKED | P0 | KERNEL | `DO-CUTOVER-001`, `AUTONOMY-CUTOVER-001`, `PROCESS-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | CLI, MCP, API, terminal, Desktop and connector adapters share use cases |
@@ -274,6 +279,9 @@
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3316 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | OPEN | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001` | — | Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
+| 3322 | `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | OPEN | P1 | OBS | — | — | `deckent doctor` provider-limit-authority kapısını görmüyor ve operatörü yanlış remedy'ye (`keyring init`) yönlendiriyor |
+| 3323 | `RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001` | OPEN | P1 | OBS | — | — | Sprint-içi mandatory cross-verify üç nesildir hiç çalışmadı: settlement-sonrası result-zenginleştirme producer-fencing'i sistemik kırıyor |
+| 3324 | `RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001` | OPEN | P1 | OBS | — | — | Provider-limit ölümüyle sıfır-yazım attempt'te claim-time attribution ölçülemiyor; lineage FIX'e ham teşhisle düşüyor |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
@@ -303,6 +311,7 @@
 | 4120 | `AUDIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `OPERATION-001` | — | Tamper-evident, tenant-scoped causal audit |
 | 4121 | `NERVOUS-EFFECT-OUTCOME-TRUTH-001` | OPEN | P0 | AUTHORITY | `NERVOUS-APPROVAL-SETTLEMENT-001`, `RECEIPT-001` | — | Nervous finding→proposal→decision→effect→settlement ve compensation outcome'ları için causal audit truth |
 | 4122 | `GROUND-TRUTH-OVERRIDE-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `APPROVAL-DECISION-AUTHORITY-001`, `RECEIPT-001` | — | Ground-truth override için verified exception authority, bounded scope, expiry ve causal audit |
+| 4123 | `SPRINT-EVENT-STREAM-AUTHORITY-001` | OPEN | P0 | AUTHORITY | — | — | Sprint lifecycle ve worker activity eventleri için causal, concurrent-safe, tamper-evident canonical stream authority |
 | 4125 | `PROVENANCE-CONTEXT-001` | OPEN | P1 | AUTHORITY | `RECEIPT-001` | — | Content provenance and context integrity authority wiring |
 | 4126 | `AUDIT-SECRET-CUSTODY-001` | OPEN | P0 | AUTHORITY | `SEC-ADR-CROSSWALK-001` | — | Audit zinciri HMAC anahtarı sabit kaynak-görünür string yerine config/secret-manager authority'sinden gelir |
 | 4130 | `API-SECURITY-001` | BLOCKED | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `APPROVAL-001` | `DEPENDENCY_UNSATISFIED` | API authentication, authorization and config-secret containment |
@@ -317,6 +326,7 @@
 | 4191 | `SEC-ADR-CROSSWALK-001` | OPEN | P0 | AUTHORITY | — | — | 9 onaylı güvenlik tasarımının ADR crosswalk'ı ve 4 doğrudan-alan çakışmasının owner-kararlı reconciliation'ı |
 | 4200 | `SEC-ENFORCE-WIRE-001` | OPEN | P1 | AUTHORITY | — | — | Unwired/inert enforcement envanterinin tipli disposition'ı: yazılmış-ama-devrede-olmayan her güvenlik modülü wire-or-retire kararına bağlanır, sessiz-ölü enforcement kodu kalmaz |
 | 4210 | `CONFIG-AUTHORITY-CONSOLIDATION-001` | OPEN | P1 | AUTHORITY | `SEC-ADR-CROSSWALK-001` | — | 9 güvenlik tasarımının config yüzeyi tek authority contract'ında uzlaştırılır ve paralel yazım serialize edilir |
+| 4212 | `ADR-GOVERNANCE-PROCEDURE-001` | OPEN | P1 | AUTHORITY | — | — | ADR-G-019'a successor+amendment prosedürü yazan amendment: Immutable:yes ADR için kim taslaklar, denklik kanıtını ne kapatır, öncül nasıl arşivlenir |
 | 5000 | `TERMINAL-001` | BLOCKED | P0 | TERMINAL | `KERNEL-001`, `AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Terminal as canonical management and usage surface |
 | 5010 | `TERMINAL-TOOLS-001` | OPEN | P0 | TERMINAL | `TOOL-AUTHORITY-001`, `SURFACE-CUTOVER-001` | — | Role-model tool surface and progressive disclosure |
 | 5020 | `TERMINAL-DEV-001` | OPEN | P0 | TERMINAL | `DO-CUTOVER-001`, `TERMINAL-TOOLS-001` | — | Full codebase development loop inside Deckent terminal |
@@ -334,12 +344,16 @@
 | 6010 | `APP-SERVICE-001` | OPEN | P0 | PRODUCT | `SURFACE-CUTOVER-001` | — | Typed application-service layer |
 | 6011 | `AGENT-CUSTOM-MANAGEMENT-001` | OPEN | P0 | PRODUCT | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-ROUTING-ELIGIBILITY-001` | — | User-defined agent CRUD ve lifecycle bütün mutating yüzeylerde V3-routable, stable-ID ve i18n-clean olur |
 | 6012 | `SKILL-CUSTOM-MANAGEMENT-001` | OPEN | P0 | PRODUCT | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | User-defined skill create/install/update ve lifecycle bütün mutating yüzeylerde content-complete, V3-routable, transactional ve i18n-clean olur |
+| 6013 | `CONVERSATION-RUN-001` | OPEN | P0 | PRODUCT | `RUNFLOW-001`, `MEMORY-AUTHORITY-001`, `APPROVAL-001` | — | Durable conversation/context aggregateinden logical run'a kayıpsız ve cross-surface continuation |
 | 6020 | `SURFACE-CONTRACT-001` | OPEN | P0 | PRODUCT | `APP-SERVICE-001`, `RECEIPT-001` | — | Versioned surface capability and truth receipts |
 | 6030 | `DESKTOP-001` | OPEN | P0 | DESKTOP | `APP-SERVICE-001`, `ENV-ADAPTER-001` | — | First-class Desktop architecture and product foundation |
 | 6040 | `DESKTOP-RUNTIME-001` | OPEN | P0 | DESKTOP | `APP-SERVICE-001`, `ENV-ADAPTER-001`, `RUNNER-PROTOCOL-001` | — | Managed-local, attach-local and remote managed runtime profiles |
+| 6041 | `PROVIDER-CONNECTION-001` | OPEN | P0 | PROVIDER | `CONFIG-AUTHORITY-001`, `PROVIDER-INGRESS-001`, `RUNTIME-CREDENTIAL-LIFECYCLE-001` | — | Provider→Connection→Model→Profile aggregatei, credential reference, entitlement, health, policy ve cost attribution authoritysi |
 | 6050 | `DESKTOP-SECURITY-001` | OPEN | P0 | DESKTOP | `PRINCIPAL-001`, `API-SECURITY-001` | — | Desktop session, IPC, deep-link, update and event-stream security |
 | 6060 | `DESKTOP-ENTERPRISE-001` | OPEN | P1 | DESKTOP | `DESKTOP-RUNTIME-001`, `DESKTOP-SECURITY-001`, `ENTERPRISE-AUTH-001` | — | Enterprise Desktop governance and fleet operation |
 | 6070 | `DESKTOP-REBORN-001` | OPEN | P0 | DESKTOP | `DESKTOP-RUNTIME-001`, `DESKTOP-SECURITY-001`, `SURFACE-CONTRACT-001` | — | Unique, accessible and function-complete Desktop experience |
+| 6071 | `RUN-INSPECTOR-001` | OPEN | P0 | PRODUCT | `TERMINAL-LIVE-001`, `SURFACE-CONTRACT-001`, `RUN-STATUS-AUTHORITY-001` | — | Desktop ve Terminal için aynı logical run'ın execution graph, timeline ve evidence inspectorı |
+| 6072 | `MCP-HUB-001` | OPEN | P0 | PRODUCT | `MCP-TRUST-001`, `CAPABILITY-001`, `SURFACE-CONTRACT-001` | — | Governed MCP client+server Hub: connections, discovery, tool risk, permissions, health ve expose lifecycle |
 | 6080 | `API-CONTRACT-001` | OPEN | P0 | API | `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | Versioned public/internal API and event contracts |
 | 6090 | `API-IDENTITY-001` | OPEN | P0 | API | `PRINCIPAL-001`, `TENANT-001`, `API-SECURITY-001` | — | OIDC, workload identity, tenant authorization and rate enforcement |
 | 6100 | `CONNECTOR-IDENTITY-001` | OPEN | P0 | CONNECTOR | `PRINCIPAL-001`, `APPROVAL-001`, `APP-SERVICE-001` | — | Gateway and connector session identity, pairing and approval authority |
@@ -351,13 +365,16 @@
 | 6150 | `API-OPERATIONS-001` | OPEN | P1 | API | `API-IDENTITY-001`, `LIMIT-001`, `API-EVENT-001` | — | Quotas, pagination, bulk operations, idempotency and regional operations |
 | 6160 | `SURFACE-ADAPTER-001` | OPEN | P1 | PRODUCT | `APP-SERVICE-001`, `SURFACE-CONTRACT-001`, `CAPABILITY-001` | — | Web, mobile, voice, chat, IDE, CI and ERP thin-adapter expansion |
 | 6165 | `DESKTOP-CUSTOMIZE-001` | OPEN | P1 | DESKTOP | `DESKTOP-REBORN-001` | — | User-facing interface personalization: theme/watch, font set and accent selection in the Desktop settings scene |
+| 6166 | `DESKTOP-WORKSPACE-LAYOUT-001` | OPEN | P1 | DESKTOP | `DESKTOP-REBORN-001`, `SURFACE-CONTRACT-001` | — | Versioned dock/split/tab/panel/preset workspace layout authority and migration |
 | 6170 | `DESIGN-SYSTEM-001` | OPEN | P1 | PRODUCT | — | — | Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity |
+| 6171 | `DESIGN-PRECISION-INSTRUMENT-001` | OPEN | P1 | PRODUCT | `DESKTOP-REBORN-001` | — | Precision Instrument becomes the calm, formal and enterprise-grade default across Desktop and Terminal; NOVA remains only an explicit operator visualization preset |
 | 6180 | `ERP-AGENT-CONTRACT-001` | OPEN | P2 | CONNECTOR | — | — | Enterprise Application Agent Contract: ERP/iş-uygulaması agent'larına (Oracle AI Agent Studio, Fusion/NetSuite sınıfı) karşı discover_capabilities / invoke / stream_status / request_approval / commit_transaction / cancel / compensate_or_rollback / collect_audit sözleşmesi |
 | 7000 | `ECOSYSTEM-001` | OPEN | P0 | ECOSYSTEM | `P02-647`, `SURFACE-CUTOVER-001`, `CAPABILITY-001`, `AUDIT-001` | — | Governed agent, skill, plugin, tool, MCP and extension ecosystem |
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
 | 7011 | `AGENT-CATALOG-AUTHORITY-001` | OPEN | P0 | ECOSYSTEM | — | — | Shipped built-in, project override, learned/runtime ve archive katmanları için tek effective agent catalog authority |
 | 7012 | `SKILL-CATALOG-AUTHORITY-001` | OPEN | P0 | ECOSYSTEM | — | — | Shipped built-in, project override, generated/learned, quarantined ve retired katmanları için tek effective skill catalog authority |
 | 7013 | `SKILL-SYNC-CANONICALITY-001` | OPEN | P1 | ECOSYSTEM | `SKILL-CATALOG-AUTHORITY-001` | — | Built-in skill package ile project override arasındaki init/sync/update canonicalitysi user içeriğini ezmeden deterministic ve conflict-açıklanabilir olur |
+| 7014 | `CATALOG-STATS-AUTHORITY-001` | OPEN | P0 | ECOSYSTEM | `AGENT-CATALOG-AUTHORITY-001`, `SKILL-CATALOG-AUTHORITY-001`, `ROUTING-OUTCOME-LEARNING-AUTHORITY-001`, `STATE-RETENTION-001` | — | Agent ve skill kullanım istatistikleri için settlement-bound, yeniden üretilebilir ve bütün yüzeylerde tek effective projection authority |
 | 7020 | `SUPPLY-CHAIN-001` | OPEN | P0 | SECURITY | `AGENT-SKILL-001`, `P02-650` | — | Signed agent, skill and plugin provenance |
 | 7021 | `SKILL-SUPPLY-CHAIN-INGRESS-001` | OPEN | P0 | SECURITY | `SKILL-CATALOG-AUTHORITY-001`, `SUPPLY-CHAIN-001`, `PLUGIN-SANDBOX-001` | — | Skill create/import/install/update ingress'i path containment, complete-package provenance, concurrency isolation ve rollback ile fail-closed olur |
 | 7030 | `PLUGIN-SANDBOX-001` | OPEN | P0 | SECURITY | `SUPPLY-CHAIN-001`, `TOOL-AUTHORITY-001` | — | Plugin/skill runtime sandbox and capability enforcement |
@@ -416,6 +433,8 @@
 | 9033 | `AGENT-ROUTING-ELIGIBILITY-001` | OPEN | P0 | ROUTING | `AGENT-CATALOG-AUTHORITY-001` | — | Routing V3 bütün candidate ve force yollarında tek effective agent eligibility policy uygular |
 | 9034 | `SKILL-ROUTING-ELIGIBILITY-001` | OPEN | P0 | ROUTING | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-SYNC-CANONICALITY-001` | — | Routing V3 bütün automatic, force, exclude, retry ve fallback yollarında tek effective skill eligibility ve prompt-delivery policy uygular |
 | 9035 | `PROJECT-STACK-CACHE-AUTHORITY-001` | OPEN | P1 | ROUTING | `CONFIG-TRUTH-001`, `KERNEL-STATE-001` | — | Project stack detection inputs, cache invalidation ve bounded multi-root scan için canonical authority |
+| 9036 | `ROUTING-JOURNAL-AUTHORITY-001` | OPEN | P0 | ROUTING | `TRACE-AUTHORITY-SCHEMA-001`, `STATE-RETENTION-001`, `AGENT-CATALOG-AUTHORITY-001`, `SKILL-CATALOG-AUTHORITY-001` | — | Plan, retry, FIX ve spawn fallback kararları için tek versioned, replayable ve lifecycle-bound routing journal authority |
+| 9037 | `ROUTING-OUTCOME-LEARNING-AUTHORITY-001` | OPEN | P0 | ROUTING | `ROUTING-JOURNAL-AUTHORITY-001`, `EVALUATION-EVIDENCE-AUTHORITY-001`, `KERNEL-SETTLEMENT-001`, `TRACE-AUTHORITY-SCHEMA-001` | — | Accepted settlement outcome, V3 learning projectionı ve evolved-rule promotionı için yeniden üretilebilir tek authority |
 | 9040 | `EVALUATION-001` | OPEN | P0 | EVAL | `KERNEL-SETTLEMENT-001`, `CM-04` | — | Canonical evaluator, adversarial verification and proof boundary |
 | 9041 | `EVALUATION-EVIDENCE-AUTHORITY-001` | OPEN | P0 | EVAL | `KERNEL-SETTLEMENT-001`, `RECEIPT-001`, `AUDIT-001`, `STATE-RETENTION-001` | — | Evaluation artifactlarını production input yapan versioned, immutable ve outcome-bound evidence authority |
 | 9050 | `PROMOTION-001` | OPEN | P0 | EVOLUTION | `TRAINING-TRACE-001`, `ROUTING-001`, `EVALUATION-001` | — | Outcome→routing→agent/skill/model promotion and rollback |

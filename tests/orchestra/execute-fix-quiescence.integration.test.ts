@@ -49,6 +49,14 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 vi.mock('../../src/core/agent-pool.js', () => ({
   AgentPoolManager: vi.fn(() => ({ loadAgents: () => [] })),
   getAgentPrompt: vi.fn(() => ({ source: 'none', content: undefined })),
+  // 524-012 moved the integrity gate onto resolvePrompt — a closed factory
+  // missing it hangs the whole replay on a swallowed missing-export throw
+  // (the same rot class the init-rot fix closed for node:fs mocks).
+  resolvePrompt: vi.fn(() => ({
+    content: '', source: 'none', degraded: true, availability: 'none',
+    layer: null, blocker: 'prompt-unresolvable', declaredDigest: null, actualDigest: null,
+  })),
+  classifyPersonaIntegrity: vi.fn(() => 'unreadable'),
 }));
 vi.mock('../../src/core/skill-pool.js', () => ({ SkillPoolManager: vi.fn(() => ({ loadSkills: () => [] })) }));
 vi.mock('../../src/core/stack-detector.js', () => ({ detectProjectStack: vi.fn(() => ({})) }));

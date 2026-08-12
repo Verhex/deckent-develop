@@ -20,6 +20,7 @@ import {
   BRAIN_DIR, PROJECT_IDENTITY_FILE, SPRINTS_DIR, MEMORY_DB_FILE, WORKSPACE_DIR,
 } from './constants.js';
 import { debugLog } from './utils.js';
+import { parseWorkspaceArtifactHeader, workspaceArtifactDigest } from './workspace-artifact-contract.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -323,6 +324,9 @@ export async function syncIdentityToDb(projectRoot: string): Promise<IdentitySyn
 
   try {
     const content = readFileSync(identityPath, 'utf-8');
+    const header = parseWorkspaceArtifactHeader(content);
+    const source = header?.provenance === 'stack-detector' ? 'system' : 'user';
+    const changedBy = `workspace-identity-sync:${source}`;
     const { MemoryStore } = await import('./memory-store.js');
     const store = new MemoryStore(dbPath);
     try {
@@ -333,11 +337,17 @@ export async function syncIdentityToDb(projectRoot: string): Promise<IdentitySyn
         type: 'identity',
         title: 'Project Identity',
         content,
-        source: 'brain',
+        source,
         status: 'active',
         decay_exempt: true,
         tags: ['identity', 'project'],
-      }, 'brain');
+        metadata: {
+          projectionOf: '.deckent/workspace/IDENTITY.md',
+          workspaceArtifactSchema: header?.schemaVersion ?? 0,
+          workspaceArtifactProvenance: header?.provenance ?? 'legacy-unversioned',
+          contentSha256: workspaceArtifactDigest(content),
+        },
+      }, changedBy);
       return { success: true, entryId, reason: existing ? 'updated' : 'created' };
     } finally {
       store.close();

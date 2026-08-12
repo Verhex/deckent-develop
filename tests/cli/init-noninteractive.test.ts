@@ -133,6 +133,16 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readFileSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(false),
+  // 524-010 sınıfı: initializeWorkspaceArtifacts realpathSync.native + lstatSync
+  // kullanır; kapalı factory bu export'ları taşımayınca init erken ölür.
+  realpathSync: Object.assign(vi.fn((path: string) => path), {
+    native: vi.fn((path: string) => path),
+  }),
+  lstatSync: vi.fn((path: string) => ({
+    isSymbolicLink: () => false,
+    isDirectory: () => !/\.(?:md|json)$/i.test(path),
+    isFile: () => /\.(?:md|json)$/i.test(path),
+  })),
 }));
 
 vi.mock('node:child_process', () => ({

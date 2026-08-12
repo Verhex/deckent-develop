@@ -1,69 +1,26 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { DECKENT_DIR } from '../../core/constants.js';
+import { buildAgentCatalogEntries } from '../../core/agent-catalog-projection.js';
 
-interface AgentStats {
-  totalUses?: number;
-  successRate?: number;
-}
+// ─── Agent catalog read model (row 7011, slice S4) ──────────────────────────
+//
+// This tool no longer discovers agents itself. Every id, every facet and every
+// precedence decision comes from the resolver (`AgentPoolManager`) — the same
+// resolver `deckent agent list` consumes — so the two surfaces can no longer
+// report different sets, different counts, or (D3) different provenance words
+// for the same record. The deleted `readAgents()` scanned `.deckent/agents`
+// directly and re-derived a `'built-in' | 'temp'` vocabulary from
+// `source`/`persistent`, which is exactly the divergence D3 rules out.
+//
+// The projection below is duplicated in `src/cli/commands/agent.ts` on purpose:
+// ADR-D-004 C3 forbids `mcp/ ↔ cli/` imports, and this slice holds no write
+// authority in `src/core/`, where the shared projection belongs. Parity is held
+// by tests/cli/agent-surface-readmodel.test.ts until that module exists.
 
-interface AgentManifest {
-  id?: string;
-  name?: string;
-  source?: string;
-  persistent?: boolean;
-  stats?: AgentStats;
-}
-
-interface AgentEntry {
-  id: string;
-  name: string;
-  type: 'built-in' | 'temp';
-  uses: number;
-  successRate: number;
-}
-
-function resolveAgentType(manifest: AgentManifest): 'built-in' | 'temp' {
-  if (manifest.source === 'builtin') return 'built-in';
-  if (manifest.persistent === true) return 'built-in';
-  return 'temp';
-}
-
-function readAgents(root: string): AgentEntry[] {
-  const agentsDir = join(root, DECKENT_DIR, 'agents');
-  if (!existsSync(agentsDir)) return [];
-
-  const entries: AgentEntry[] = [];
-
-  try {
-    const dirs = readdirSync(agentsDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name);
-
-    for (const dir of dirs) {
-      const agentPath = join(agentsDir, dir, 'agent.json');
-      if (!existsSync(agentPath)) continue;
-
-      try {
-        const manifest = JSON.parse(readFileSync(agentPath, 'utf-8')) as AgentManifest;
-        entries.push({
-          id: manifest.id ?? dir,
-          name: manifest.name ?? dir,
-          type: resolveAgentType(manifest),
-          uses: manifest.stats?.totalUses ?? 0,
-          successRate: manifest.stats?.successRate ?? 0,
-        });
-      } catch {
-        // skip malformed agent.json
-      }
-    }
-  } catch {
-    // directory read error
-  }
-
-  return entries.sort((a, b) => a.id.localeCompare(b.id));
-}
+/** One catalog record as the read surfaces render it — §3.4's four facets, kept separate. */
+// S5 (sprint-523 task 9): canonical projection lives in core; the local
+// duplicate builder + helpers are deleted and this surface re-exports the truth.
+export { buildAgentCatalogEntries } from '../../core/agent-catalog-projection.js';
+export type { AgentCatalogSurfaceEntry } from '../../core/agent-catalog-projection.js';
 
 export function registerAgentListTool(server: McpServer): void {
   server.registerTool(
@@ -71,10 +28,15 @@ export function registerAgentListTool(server: McpServer): void {
     {
       title: 'Agent List',
       description:
-        'List all registered agents in the Deckent project — both built-in and dynamically generated temp agents. ' +
-        'Returns id, name, type (built-in/temp), total uses, and success rate for each agent. ' +
-        'Reads from .deckent/agents/ directory. ' +
-        'Use to audit agent pool health, check which agents are active, or understand routing assignments.',
+        'List every agent the Deckent agent-catalog resolver resolves for this project — ' +
+        'the same read model `deckent agent list` renders, so both surfaces always agree. ' +
+        'Each record carries the four catalog facets kept separate: enabled (owner intent), ' +
+        'routable (dispatchable now, with typed reasons), validity (schema conformance) and ' +
+        'provenance (declared source, observed layer, resolved path). ' +
+        'Records the resolver rejected are reported as validity "invalid" with the resolver ' +
+        'diagnostics rather than silently dropped; archived records are never listed. ' +
+        'Use to audit agent pool health, check which agents are actually dispatchable, or ' +
+        'understand routing assignments.',
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -82,18 +44,16 @@ export function registerAgentListTool(server: McpServer): void {
       },
     },
     async () => {
-      const root = process.cwd();
-
       try {
-        const agents = readAgents(root);
-        const builtInCount = agents.filter((a) => a.type === 'built-in').length;
-        const tempCount = agents.filter((a) => a.type === 'temp').length;
+        const entries = buildAgentCatalogEntries(process.cwd());
+        const agents = entries.map(({ displayType: _displayType, ...entry }) => entry);
 
         const response = {
           agents,
           total: agents.length,
-          builtIn: builtInCount,
-          temp: tempCount,
+          enabled: agents.filter((a) => a.enabled).length,
+          routable: agents.filter((a) => a.routable.value).length,
+          invalid: agents.filter((a) => a.validity === 'invalid').length,
         };
 
         return {
