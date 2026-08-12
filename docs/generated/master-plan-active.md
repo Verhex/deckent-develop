@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):5955677dea66bed66cbfcf86e32aac78661cfabeee935ba5d44b0f82db07c962`
+**Source digest:** `sha256(normalized-lf-utf8):0aea1690dea45bbbb4cbb62e5d9318c00fcd50cba3f2f706fbfa6a8ab5f2bcb4`
 
-**Rows:** 485 total · 425 active · 60 terminal
+**Rows:** 485 total · 423 active · 62 terminal
 
 ## State summary
 
@@ -17,8 +17,8 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
-| VERIFY | 25 |
-| DONE | 60 |
+| VERIFY | 23 |
+| DONE | 62 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -195,7 +195,6 @@
 | 3141 | `SCHEDULER-SHADOW-EVIDENCE-001` | OPEN | P0 | KERNEL | `AUDIT-001`, `STATE-RETENTION-001` | — | Scheduler shadow evidence için generation-bound sequence, engine provenance ve bounded differential lifecycle |
 | 3150 | `RUNNER-PROTOCOL-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `FO-06` | — | SpawnBackend protocol v2 |
 | 3160 | `RECOVERY-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RUNNER-PROTOCOL-001` | — | Cross-surface recovery leadership and orphan containment |
-| 3161 | `RECOVERY-RESUME-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Durable pause notification, approval and lease-safe resume continuation |
 | 3162 | `PAUSED-FINALIZE-001` | OPEN | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Task projection'ı kayıp paused sprint için evidence-honest force-finalize settlement |
 | 3163 | `RECOVERY-DECISION-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001` | — | Provider-neutral cold-lane recovery decision engine |
 | 3164 | `RECOVERY-MODE-ADAPTERS-001` | OPEN | P0 | KERNEL | `RECOVERY-DECISION-001`, `MISSION-KIND-001`, `RUNFLOW-001` | — | Sprint, Run, Flow, Do, Autonomous, Mission and Process recovery adapters |
@@ -234,7 +233,6 @@
 | 3198 | `RECOVERY-BORN-485-USAGE-BILLING-001` | OPEN | P0 | COST | `LIMIT-001`, `RECEIPT-001`, `SPRINT-HONESTY-001` | — | FIX lineage usage, billing and KPI projections resolve through logical task authority |
 | 3199 | `RECOVERY-BORN-485-PROMPT-POLICY-001` | OPEN | P0 | AUTHORITY | `PROMPT-001`, `ROUTING-V3-CUTOVER-001` | — | Exact worker prompt preserves global run policy, forced skills and monotonic lifecycle instructions |
 | 3200 | `PROCESS-CUTOVER-001` | OPEN | P1 | KERNEL | `MISSION-KIND-001`, `RECOVERY-001` | — | Process mode through canonical WorkItem and Attempt authority |
-| 3201 | `RECOVERY-PAUSE-STATUS-001` | VERIFY | P1 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Paused run publishes a readable canonical status read model |
 | 3202 | `EVAL-NOCHANGE-VERDICT-001` | VERIFY | P1 | KERNEL | `EVALUATION-001` | — | No-change-needed honest worker result evaluates deterministically by goCriteria |
 | 3203 | `WORKER-ENV-TMPFS-001` | VERIFY | P2 | KERNEL | `TOOL-AUTHORITY-001` | — | Worker containment HOME sizing and cache routing policy |
 | 3210 | `SURFACE-CUTOVER-001` | BLOCKED | P0 | KERNEL | `DO-CUTOVER-001`, `AUTONOMY-CUTOVER-001`, `PROCESS-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | CLI, MCP, API, terminal, Desktop and connector adapters share use cases |

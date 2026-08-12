@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5955677dea66bed66cbfcf86e32aac78661cfabeee935ba5d44b0f82db07c962"
+    "value": "0aea1690dea45bbbb4cbb62e5d9318c00fcd50cba3f2f706fbfa6a8ab5f2bcb4"
   },
   "summary": {
     "total": 485,
-    "active": 425,
-    "terminal": 60,
+    "active": 423,
+    "terminal": 62,
     "receipts": 184,
     "byState": {
       "OPEN": 332,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 25,
-      "DONE": 60,
+      "VERIFY": 23,
+      "DONE": 62,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -2280,11 +2280,11 @@
       "id": "RECOVERY-RESUME-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
-      "updated": "2026-08-04",
+      "state": "DONE",
+      "updated": "2026-08-12",
       "definitionDigest": "7c70dcccece8522974e6a127516e04707cfb0981ea513b8b50ee7200876e12db",
-      "progressDigest": "c80f8006787db815ccc0a83853e748167ef1e438e0f4930c9399e0e3e653d8ca",
-      "terminalClosureDigest": null
+      "progressDigest": "ce2b6df74b321d7fc52e38d8f307c3e01e8f4231748b3f7a558d4a7dcc1e6373",
+      "terminalClosureDigest": "24603a4847d171e12f9e3301f80080d9b35b45e98af6be0c5eff8de343877cc1"
     },
     {
       "order": 3162,
@@ -2720,11 +2720,11 @@
       "id": "RECOVERY-PAUSE-STATUS-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
-      "updated": "2026-08-08",
+      "state": "DONE",
+      "updated": "2026-08-12",
       "definitionDigest": "a352f02a35e76c50d01f9f5eda8fdd3605d9eec1560f26c7af3e2347aa449b4c",
-      "progressDigest": "1be2eb0895f8e7306bc9d970667cce0d41dffdc1e39d3568a600cc6c28e3a822",
-      "terminalClosureDigest": null
+      "progressDigest": "e753e372e9833beddca9c677feb394aa9b26b2c345b417a9038cb4ae012b04ed",
+      "terminalClosureDigest": "369fab6eac2930339300d27fbab1d7aecfa7e49667178de82c7f278d030bfaa3"
     },
     {
       "order": 3202,
@@ -3821,9 +3821,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-12",
       "definitionDigest": "5363d6b4b7044b6bcd0f833edf90511615439ae50067aa1cfcd3e04f0473478a",
-      "progressDigest": "f551c30f9626d6fa15e30eafaaa4c5ec1c0b72ed3a70e746bbc70e6fa56ed0c3",
+      "progressDigest": "aef6af7a2a1d104526d97f6f6799812810a735b343ca9ea2e13c093579b08b44",
       "terminalClosureDigest": null
     },
     {
@@ -14452,7 +14452,6 @@
       "closureBlockedBy": [
         "KERNEL-ATTEMPT-001",
         "RUNNER-PROTOCOL-001",
-        "RECOVERY-RESUME-001",
         "PAUSED-FINALIZE-001",
         "RECOVERY-DECISION-001",
         "RECOVERY-MODE-ADAPTERS-001",
@@ -14469,44 +14468,6 @@
       "acceptance": "Single leader per project/process realm; exact adoption or kill; no duplicate call",
       "evidence": "`receipt=GR-2026-07-28-BUILD-RECOVERY-01`; `receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; ADR-G-025 2026-07-30 Universal Execution Recovery Lane amendment is accepted; transactional build recovery validates exact journal/disk/quarantine evidence and requires an injected recovery verifier; Sprint finalize/cleanup/status containment foundations exist, but runtime-wide decision authority, mode adapters, Nervous continuation, stale projection settlement, every-environment assurance and scale proof remain open; dogfood findings may only expand work through RECOVERY-DOGFOOD-BORN-001",
       "updated": "2026-07-30"
-    },
-    {
-      "order": 3161,
-      "id": "RECOVERY-RESUME-001",
-      "parent": "RECOVERY-001",
-      "program": "KERNEL",
-      "outcome": "Durable pause notification, approval and lease-safe resume continuation",
-      "priority": "P0",
-      "dependsOn": [
-        "RUN-STATUS-AUTHORITY-001"
-      ],
-      "dependents": [
-        "RECOVERY-COMMAND-SERVICE-001"
-      ],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "~",
-        "E": "1",
-        "H": "1",
-        "L": "~",
-        "X": "0",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01",
-        "GR-2026-08-04-FAZ4A-S3-01"
-      ],
-      "acceptance": "Pause persists checkpoint, sprint state, dashboard and Nervous event; recover/resume restores or clears only matching holds and never loses the prior pause on failed continuation",
-      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=pause-resume-targeted-and-dry-run`; targeted pause/resume and recover tests pass; real binary `recover sprint-467 --resume --dry-run` reads the checkpoint without spawning a worker; authenticated mixed-provider resume through second wave, FIX and terminal settlement remains unproven; `receipt=GR-2026-08-04-FAZ4A-S3-01`; 2026-08-04 FAZ4A-S3 settlement: pause/resume test kümeleri (pause-resume 31 + brain-pause-resume 39) fs-mock'tan gerçek-tmpdir'e taşındı, 70/70 yeşil — iki ajan bağımsız aynı üretim-sözleşmesini pinledi: resumeSprint TRANSACTIONAL'dır (publish edilen read-model lifecycle=ACTIVE doğrulanamazsa marker'lar + pause-state geri yazılır ve throw edilir) ve ACTIVE authority CANLI coordinator PID'i (.deckent/pids/<sprintId>.pid) ister — yoksa run dürüstçe ORPHANED; hata-enjeksiyon vakaları gerçek-fs ile (EISDIR/unlink-dizin) yeniden kuruldu, üretim koduna dokunulmadı",
-      "updated": "2026-08-04"
     },
     {
       "order": 3162,
@@ -14674,7 +14635,6 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "RECOVERY-DECISION-001",
-        "RECOVERY-RESUME-001",
         "APPROVAL-001"
       ],
       "evidenceReceipts": [],
@@ -15305,7 +15265,6 @@
         "RECOVERY-COMMAND-SERVICE-001",
         "DO-CUTOVER-001",
         "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
-        "RECOVERY-PAUSE-STATUS-001",
         "EVAL-NOCHANGE-VERDICT-001",
         "WORKER-ENV-TMPFS-001"
       ],
@@ -16196,41 +16155,6 @@
       "acceptance": "Sequential, parallel, rollback and compensation semantics explicit; all surfaces parity",
       "evidence": "Legacy process mode is partial",
       "updated": "2026-07-26"
-    },
-    {
-      "order": 3201,
-      "id": "RECOVERY-PAUSE-STATUS-001",
-      "parent": "RECOVERY-DO-DOGFOOD-001",
-      "program": "KERNEL",
-      "outcome": "Paused run publishes a readable canonical status read model",
-      "priority": "P1",
-      "dependsOn": [
-        "RUN-STATUS-AUTHORITY-001"
-      ],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "0",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-08-PAUSE-STATUS-01"
-      ],
-      "acceptance": "`deckent status` after a typed PAUSE renders the paused state and the recover remedy instead of RUN_STATUS_READ_MODEL_UNAVAILABLE",
-      "evidence": "2026-08-07 smoke gözlemi (audit Ek-2): PAUSE sonrası read-model republish edilmiyor, durum görünmez; temiz-oda-3'te ölçüldü; `receipt=GR-2026-08-08-PAUSE-STATUS-01`; PAUSE-STATUS admission+VERIFY 2026-08-08: typed PAUSE sonrası deckent status artık duraklamış-durumu ve recover komutunu basar. Kök neden PAUSED authority requiresPersistedRunStatusReadModel true yapıyordu ama pause read-model'i republish etmiyordu, oysa authority zaten recoveryCommand taşıyor. İki parça: gate'ten PAUSED çıkarıldı (ACTIVE+ORPHANED korundu, ORPHANED contested born-688 güvenliği orada durur) + insan render'ında action başına PAUSED guard (dashboard/task dallanmasından önce, .dashboard yokken de banner). `proof=pause-status-5pins-plus-real-binary-human-and-json-recover-command`; Tier-1 gerçek-binary: gerçek pause-state fixture'ına karşı dist status insan 'deckent recover sprint-001 --resume' (exit=0) ve JSON lifecycle PAUSED+recoveryCommand+error yok; cli 530 dosya/7704 test yeşil",
-      "updated": "2026-08-08"
     },
     {
       "order": 3202,
@@ -19429,8 +19353,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Finding observed, proposal recorded, accepted, rejected, expired, orphaned, effect applied, failed, compensated ve unsupported ayrı terminal/non-terminal durumlar taşır; recommendation hiçbir zaman success/executed sayılmaz; detector'ın önerdiği her action canonical registry effectine bağlanır veya typed unsupported olur; edit/undo gerçek compensating action yürütür ya da dürüst unavailable döner; stale recommendation resume/finalize/abort/cleanup sırasında exact source authority ile reconcile edilir; audit tenant-scoped, tamper-evident, redacted ve bounded olur",
-      "evidence": "2026-08-10 disk/code RCA ve Alperen onayı: history'deki 188 success kaydın tamamı 143 scope-collision +45 worker-respawn recommendation append'idir, effect kanıtı değildir; reject terminal kararları `outcome=pending` taşır. Executor proposal successini decision-memory'de `executed` işaretleyebilir. Detectorların ürettiği `BUILD_FAILURE_INVESTIGATE`, `INVESTIGATE_STALL`, `FORCE_EVALUATE`, `KILL_WORKERS`, `NOTIFICATION_BRIDGE_REPAIR` canonical registryde yok ve kabul sonrası unimplemented olur. 11 open recommendationın 10'u artık pause-state taşımayan eski sprint recovery kaydı, biri olmayan task için respawn; CLI edit/undo history success yazabildiği hâlde effect/compensation yürütmeyebilir, MCP yolları plan-onlydir. Hedefli mevcut davranış testleri toplam 160 pass olsa da production effect settlementını sınamıyor",
-      "updated": "2026-08-10"
+      "evidence": "2026-08-10 disk/code RCA ve Alperen onayı: history'deki 188 success kaydın tamamı 143 scope-collision +45 worker-respawn recommendation append'idir, effect kanıtı değildir; reject terminal kararları `outcome=pending` taşır. Executor proposal successini decision-memory'de `executed` işaretleyebilir. Detectorların ürettiği `BUILD_FAILURE_INVESTIGATE`, `INVESTIGATE_STALL`, `FORCE_EVALUATE`, `KILL_WORKERS`, `NOTIFICATION_BRIDGE_REPAIR` canonical registryde yok ve kabul sonrası unimplemented olur. 11 open recommendationın 10'u artık pause-state taşımayan eski sprint recovery kaydı, biri olmayan task için respawn; CLI edit/undo history success yazabildiği hâlde effect/compensation yürütmeyebilir, MCP yolları plan-onlydir. Hedefli mevcut davranış testleri toplam 160 pass olsa da production effect settlementını sınamıyor 2026-08-12 VERIFY-taraması bulgusu: kardeş satır 3273 (RECOVERY-BORN-486-NERVOUS-COLLISION-001, VERIFY) 'scheduler'a wire edildi + serialization kanıtlandı' diyor fakat disk çelişiyor — SCOPE_COLLISION_REORDER maintenance setinde değil (action-handlers 78-99/314-316), inert recommendation append'ine düşüyor (recommendation-log 37-38 never-auto-executes), feed'in scheduler tüketicisi yok, executor 325-327 inert öneriyi executed damgalıyor; 3273 bu satırın wire işi kapanmadan DONE'a yürüyemez ve verify-iddiası bu kanıtla süpersededir",
+      "updated": "2026-08-12"
     },
     {
       "order": 4122,
@@ -25198,6 +25122,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b0388332dd183b78b6ae34770743f50418f054bc574a9f155d41be2772527b22"
+    "value": "8b5c1bcd73d2b84e0454f4188c6929721aa47006e30168ddd1e2d50b2bf98083"
   }
 }
