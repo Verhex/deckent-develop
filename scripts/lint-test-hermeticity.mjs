@@ -204,7 +204,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-11 (sprint-510 harvest): edits to already-inventoried modules only
   // (parser, verify, controller, finalizer, plugin, catalog) — same 1207 count,
   // content digest only. Measured on a clean HEAD worktree (27d9bdec4).
-  digest: 'bc98d4a825884540777ee2f803def71388e4b97c6fbc24c7c4f087820367cce8',
+  digest: '1a8d44b97f95b446cdc105b4682c45e7c8765287ebd0e487888ebccd1aca7597',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
