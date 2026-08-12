@@ -47,7 +47,7 @@ CLI, MCP, API, terminal, dashboard, desktop, connector, worker, memory ve Nervou
 - Run-flow router comment'i dört route ve start yok derken dispatcher start/cancel/diff dahil sekiz action route implement eder. [Kanıt: `src/api/run-flow-routes.ts`; `docs/tr/reference/api-surface.md`]
 - Config metadata, 164 effective default leaf'in yalnız bir alt kümesini kapsar ve default disagreement içerir. [Kanıt: `src/core/config.ts:2674-2850`; built `createDefaultConfig` leaf inventory]
 
-Her item'ın ayrıntılı disposition, correct-side judgment, recommended direction ve evidence'ı [CODE-DOC-DIFF-2026-08](../../analysis/CODE-DOC-DIFF-2026-08.md) içindedir.
+Her item'ın ayrıntılı disposition, correct-side judgment, recommended direction ve evidence'ı `CODE-DOC-DIFF-2026-08` (retired to git history; dispositions live in MASTER-PLAN row evidence) içindedir.
 
 ### Certification ladder
 

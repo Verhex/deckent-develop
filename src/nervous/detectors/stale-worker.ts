@@ -8,8 +8,35 @@
 
 import type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../../core/config.js';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+
+/**
+ * Activity-truth (Alperen, 2026-08-12 — nervous false-positive seli düzeltmesi):
+ * worker kontratı hb'yi DOSYA DEĞİŞİMİNDE yazar; uzun okuma/analiz turlarında
+ * `.hb` meşru olarak sessizdir ama worker `.partial-result`, `.landing-proposal.json`,
+ * `.plan` ve `.log` artefaktlarına yazmaya devam eder. Staleness kararı hb-dosyası
+ * tek başına değil, bu artefakt kümesinin EN TAZE mtime'ı üzerinden verilir;
+ * `.result` varsa worker settle olmuştur ve hiç aday değildir (projection lag).
+ */
+const ACTIVITY_SUFFIXES = ['.hb', '.partial-result', '.landing-proposal.json', '.plan', '.log'] as const;
+
+function lastActivityMs(projectRoot: string, taskId: string, reportedHbIso: string): number | null {
+  if (!projectRoot) return new Date(reportedHbIso).getTime();
+  const base = join(projectRoot, '.tasks', `task-${taskId}`);
+  if (existsSync(`${base}.result`)) return null; // settled — asla stale adayı değil
+  let latest = new Date(reportedHbIso).getTime();
+  if (!Number.isFinite(latest)) latest = 0;
+  for (const suffix of ACTIVITY_SUFFIXES) {
+    try {
+      const m = statSync(`${base}${suffix}`).mtimeMs;
+      if (m > latest) latest = m;
+    } catch {
+      // artefakt yoksa sinyal de yok — sessizce geç
+    }
+  }
+  return latest;
+}
 
 /**
  * Per-scope adaptive threshold hesaplama.
@@ -54,6 +81,15 @@ function countUniqueDirs(filesWrite: string[]): number {
 export class StaleWorkerDetector {
   readonly detectorId = 'stale-worker';
 
+  /**
+   * Episode-dedupe (Alperen, 2026-08-12): aynı worker aynı sessizlik-episodu
+   * içinde yalnız BİR kez bildirilir — anahtar, bildirim anındaki en-taze
+   * aktivite zaman damgasıdır; aktivite tazelenirse episode sıfırlanır ve
+   * yeni bir sessizlik yeniden bildirilebilir. Cron her tick'te yeniden
+   * bildirim basamaz.
+   */
+  private readonly notifiedEpisodes = new Map<string, number>();
+
   constructor(private readonly staleThresholdMs = DEFAULT_HEARTBEAT_TIMEOUT_MS) {}
 
   detect(ctx: DetectorContext): DetectorResult | null {
@@ -68,13 +104,25 @@ export class StaleWorkerDetector {
       return null;
     }
 
-    // Heartbeat'i stale olan worker'ları filtrele (per-scope adaptive threshold)
+    // Activity-truth staleness (hb + partial-result/landing/plan/log artefaktları)
+    // + settle-edilmiş worker'ı hiç aday saymama + episode-dedupe.
     const staleWorkers = ctx.sprintState.activeWorkers.filter(w => {
-      const lastHbMs = new Date(w.lastHeartbeat).getTime();
+      const activityMs = lastActivityMs(ctx.projectRoot, w.taskId, w.lastHeartbeat);
+      if (activityMs === null) {
+        this.notifiedEpisodes.delete(w.id); // settled — episode kapandı
+        return false;
+      }
       const scope = readTaskScope(ctx.projectRoot, w.taskId);
       const dirCount = countUniqueDirs(scope.filesWrite);
       const threshold = computeAdaptiveThreshold(this.staleThresholdMs, scope.filesWrite.length, dirCount);
-      return ctx.now.getTime() - lastHbMs > threshold;
+      if (ctx.now.getTime() - activityMs <= threshold) {
+        this.notifiedEpisodes.delete(w.id); // aktivite tazelendi — episode sıfırla
+        return false;
+      }
+      // Stale — ama bu episode zaten bildirildiyse tekrar basma.
+      if (this.notifiedEpisodes.get(w.id) === activityMs) return false;
+      this.notifiedEpisodes.set(w.id, activityMs);
+      return true;
     });
 
     if (staleWorkers.length === 0) {

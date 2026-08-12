@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f2245006b537a063558204e99edb50a161a5511cc6e50cc15e66316dbcd65219`
+**Source digest:** `sha256(normalized-lf-utf8):5955677dea66bed66cbfcf86e32aac78661cfabeee935ba5d44b0f82db07c962`
 
-**Rows:** 483 total · 423 active · 60 terminal
+**Rows:** 485 total · 425 active · 60 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 330 |
+| OPEN | 332 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -282,6 +282,8 @@
 | 3316 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | OPEN | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001` | — | Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3322 | `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | OPEN | P1 | OBS | — | — | `deckent doctor` provider-limit-authority kapısını görmüyor ve operatörü yanlış remedy'ye (`keyring init`) yönlendiriyor |
+| 3323 | `RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001` | OPEN | P1 | OBS | — | — | Sprint-içi mandatory cross-verify üç nesildir hiç çalışmadı: settlement-sonrası result-zenginleştirme producer-fencing'i sistemik kırıyor |
+| 3324 | `RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001` | OPEN | P1 | OBS | — | — | Provider-limit ölümüyle sıfır-yazım attempt'te claim-time attribution ölçülemiyor; lineage FIX'e ham teşhisle düşüyor |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |

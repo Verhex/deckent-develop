@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f2245006b537a063558204e99edb50a161a5511cc6e50cc15e66316dbcd65219"
+    "value": "5955677dea66bed66cbfcf86e32aac78661cfabeee935ba5d44b0f82db07c962"
   },
   "summary": {
-    "total": 483,
-    "active": 423,
+    "total": 485,
+    "active": 425,
     "terminal": 60,
     "receipts": 184,
     "byState": {
-      "OPEN": 330,
+      "OPEN": 332,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 316,
-      "P1": 130,
+      "P1": 132,
       "P2": 37
     },
     "byProgram": {
@@ -43,7 +43,7 @@
       "EVOLUTION": 4,
       "KERNEL": 109,
       "LEARNING": 9,
-      "OBS": 7,
+      "OBS": 9,
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
@@ -3249,9 +3249,9 @@
       "program": "KERNEL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-12",
       "definitionDigest": "b7962ee26001db1c89dec587f1605fd52e7220864e8dde4ff4af551e769e4709",
-      "progressDigest": "2fe92f1ba250be11db6380e05443bff5303b970d720adea6663c2c66ebd9d57d",
+      "progressDigest": "52b27dc9bfce414fedae4a9797a62ecc3364ad1b4ff6b812f40dfcc5041b2ed8",
       "terminalClosureDigest": null
     },
     {
@@ -3398,6 +3398,28 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3323,
+      "id": "RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001",
+      "program": "OBS",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-12",
+      "definitionDigest": "d11a5469dca100fc1530c0b264c0bef37f5f15e3f4fe280ae5cd30810c083c92",
+      "progressDigest": "965b11fda8a56dc1990145c664e66d11a8b93479198c24fc6c90587c81246dc5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3324,
+      "id": "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001",
+      "program": "OBS",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-12",
+      "definitionDigest": "cd930364bf108161ad3c456a2b6527e03a0a11038440dee2ab11019cae116a05",
+      "progressDigest": "427cab24f0d481eb4702f595221befdf5cd8221191c73c94f9b1853ab4d07dc5",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3325,
       "id": "CLEAN-DASHBOARD-POLICY-001",
       "program": "ASSURANCE",
@@ -3458,9 +3480,9 @@
       "program": "KERNEL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-05",
+      "updated": "2026-08-12",
       "definitionDigest": "377b68bf72f3c05a5f3ee4e710ea0cbb9440fb38fa026b26174f158e2df66afc",
-      "progressDigest": "0e873e1e97d43a7174a45dded05eada85f7ce7497794ea3435f41e9116b51bd5",
+      "progressDigest": "f3d782c2beae56352cf43cb9a8ced717b08b2175e6266e0bdb0cb42de830f5ad",
       "terminalClosureDigest": null
     },
     {
@@ -3568,9 +3590,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-08",
+      "updated": "2026-08-12",
       "definitionDigest": "80cb5e3f81853ae422cae53f38582ab95f0be6ba938af204223f2a8e20124913",
-      "progressDigest": "231b63e440c885ccd252e48328ce969ee8733937da37879a4b88a1fbd95d6471",
+      "progressDigest": "cfe75388bd052608fd47d4aee500d429275afd07b6227daeec1dfe83bf3f4323",
       "terminalClosureDigest": null
     },
     {
@@ -14857,6 +14879,8 @@
         "RECOVERY-BORN-507-RUNNER-SILENT-DEATH-001",
         "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
         "RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001",
+        "RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001",
+        "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001",
         "CLEAN-DASHBOARD-POLICY-001"
       ],
       "gates": [
@@ -14919,7 +14943,9 @@
         "RECOVERY-NATIVE-PLATFORM-MATRIX-001",
         "RECOVERY-LIVE-CONTINUATION-PROOF-001",
         "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
-        "RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001"
+        "RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001",
+        "RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001",
+        "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
@@ -17834,8 +17860,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`SprintPhase` enum, emitted transition, host guide ve read-model aynı phase kümesini taşır; CLEANUP çelişkisi kapanır",
-      "evidence": "CODE-DOC-DIFF-2026-08 ARCH-01; codex-analysis 06: executable controller RETRO/DECAY sonrası gerçek CLEANUP koşuyor fakat enum'da CLEANUP yok ve emitted transition DECAY→COMPLETE kaydediyor",
-      "updated": "2026-08-03"
+      "evidence": "CODE-DOC-DIFF-2026-08 ARCH-01; codex-analysis 06: executable controller RETRO/DECAY sonrası gerçek CLEANUP koşuyor fakat enum'da CLEANUP yok ve emitted transition DECAY→COMPLETE kaydediyor 2026-08-12 owner kararı (agresif eritme): bu satırın atıf verdiği analiz dosyası CODE-DOC-DIFF-2026-08.md delete-on-consume ile silindi; içeriğin özü bu satırın kendi kanıt zincirinde yaşıyor, tam metin git-history'de (follow-up-works/CODE-DOC-DIFF-2026-08.md)",
+      "updated": "2026-08-12"
     },
     {
       "order": 3306,
@@ -18064,6 +18090,68 @@
       "updated": "2026-08-11"
     },
     {
+      "order": 3323,
+      "id": "RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "OBS",
+      "outcome": "Sprint-içi mandatory cross-verify üç nesildir hiç çalışmadı: settlement-sonrası result-zenginleştirme producer-fencing'i sistemik kırıyor",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Fencing zenginleştirme-öncesi canonical producer-çekirdeğini karşılaştırır (zenginleştirme alanları typed allowlist) VEYA zenginleştirme settlement-öncesine alınır; sonraki sprintte ≥1 mandatory crossVerify sağlıklı outcome üretir; mismatch regresyon-pinli; fail-closed karakter korunur",
+      "evidence": "Açılış: 2026-08-12 yüzey taraması — sprint-520/522/523'ün HER mandatory crossVerify'ı outcome=unavailable reason=xverify_producer_result_mismatch (520-007, 522-013, 523-012 result'ları); kök: cross-verify-production-ingress-authority.ts ~127 canonicalJson(closed.result)!==canonicalJson(input.result) — kapalı settlement ham result'ken evaluate elindeki kopya settlement-sonrası zenginleştirilmiş (attribution/distMutated/tokenUsage sınıfı), bayt eşitliği yapısal imkânsız; intake 11/11 geçti",
+      "updated": "2026-08-12"
+    },
+    {
+      "order": 3324,
+      "id": "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "OBS",
+      "outcome": "Provider-limit ölümüyle sıfır-yazım attempt'te claim-time attribution ölçülemiyor; lineage FIX'e ham teşhisle düşüyor",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Sıfır-yazım+limit-ölümü attempt'i typed provider-limit-death sınıfına ayrışır (ölçülemedi ≠ hiç-iş-yapmadı); FIX bu sınıfta temiz yeniden-doğum bilgisiyle doğar; hermetik test iki sınıfı pinler; honest-gate fail-closed korunur",
+      "evidence": "Açılış: 2026-08-12 sprint-523 canlı — 523-001 provider-limit tükenmesiyle sıfır dosya yazıp öldü; workAttribution HOLD reasonCode=ATTRIBUTION_DIFF_UNMEASURABLE (attempt 85cef2f7, baseline a85a8995…), honest-gate NO_GO; FIX json yazıldı fakat aynı limitte spawn edilemedi, runner typed self-pause + 6 bağımlı task park (runner log recover --resume tarifi); intake 11/11 geçti",
+      "updated": "2026-08-12"
+    },
+    {
       "order": 3343,
       "id": "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
       "parent": "KERNEL-001",
@@ -18093,8 +18181,8 @@
         "GR-2026-08-05-CLEAN-OBSERVE-01"
       ],
       "acceptance": "Darwin adapter'ı (/dev/fd + mnt_id'siz mount-boundary eşdeğeri) ve Windows adapter'ı (handle-tabanlı identity pin veya typed policy-kararı) ayrı tasarımla gelir; her platform kendi real-binary clean kanıtıyla kapanır; o zamana dek HOLD dürüst kalır, sessiz bypass yok",
-      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla; 2026-08-05 CANLI-KOŞU DÜZELTMESİ (PR #51 job 92224891165): observe-dilimi ilk kapıyı geçirdi ama beklenen macos/windows yeşili GELMEDİ — HOLD bir sonraki mimari katmana taşındı (E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED: cleanExecutionAuthorityPlatformAdapter /proc-tabanlı, clean.mjs:4025); gerçek kalan kapsam execution-authority non-Linux adapter PAKETİdir (KERNEL-STATE-001'in bilinen 'native macOS/Windows adapters open' açığıyla aynı aile); katman-katman PR soymak yerine paket-tasarımı owner-kararı bekler; 2026-08-05 TASARIM-ÖNERİSİ: docs/analysis/platform-execution-authority-adapters-2026-08-05.md — 4-yetenek ayrıştırması (fd-traversal/mount-pin/host-boot-id/liveness), Darwin+Windows adapter tasarımları, tek native N-API capability modülü + W1-W4 faz planı; Alperen karar noktaları D1 (native-addon admission, ADR-D-005) · D2 (Windows Win10-1607/NTFS tabanı) · D3 (adapter'a dek fail-closed korunumu — önerilen); 2026-08-05 KARAR: D1+D2+D3 ONAYLANDI (Alperen) — native N-API capability modülü admission'lı, Windows tabanı Win10-1607+/NTFS, adapter'lara dek non-Linux fail-closed korunur; uygulama W1 (adapter-arayüz çıkarımı) + W2 (mac/win capability-probe CI) satırlarıyla başlar",
-      "updated": "2026-08-05"
+      "evidence": "Açılış 2026-08-05: scripts/clean.mjs identityStableDirectoryAdapterBase() bilinçli null döner (kod-içi yorum belgeli); macos E2E job 92203369155 + windows Packed Install 92203369117 logları kanıt; `receipt=GR-2026-08-05-CLEAN-OBSERVE-01`; 2026-08-05 ALT-DİLİM SETTLEMENT (03eb23138): mutation-gated adapter şartı — adapter'sız platformda cleanDist observe-only (root-kimlik + maintenance-lock + çift admission aynen; dist yoksa removed:0 ALLOW, dist varsa typed HOLD DEĞİŞMEDEN); silme yetkisi hâlâ yalnız Linux fd-adapter'ında, Linux yolu bayt-bayt aynı; `proof=no-adapter-pins-fail-closed-then-green`: dist-present pin seam'siz üretimde gerçek silmeyi yakalayıp DÜŞTÜ, fix'le 72/73 clean-suite yeşil; kalan kapsam: Darwin (/dev/fd traversal semantiği doğrulanmalı veya native openat) + Windows (handle-tabanlı pin / typed policy — owner tasarım kararı) GERÇEK silme-adapter'ları, her biri kendi platformunda real-binary kanıtla; 2026-08-05 CANLI-KOŞU DÜZELTMESİ (PR #51 job 92224891165): observe-dilimi ilk kapıyı geçirdi ama beklenen macos/windows yeşili GELMEDİ — HOLD bir sonraki mimari katmana taşındı (E_CLEAN_MAINTENANCE_SECURE_OPEN_UNSUPPORTED: cleanExecutionAuthorityPlatformAdapter /proc-tabanlı, clean.mjs:4025); gerçek kalan kapsam execution-authority non-Linux adapter PAKETİdir (KERNEL-STATE-001'in bilinen 'native macOS/Windows adapters open' açığıyla aynı aile); katman-katman PR soymak yerine paket-tasarımı owner-kararı bekler; 2026-08-05 TASARIM-ÖNERİSİ: docs/analysis/platform-execution-authority-adapters-2026-08-05.md — 4-yetenek ayrıştırması (fd-traversal/mount-pin/host-boot-id/liveness), Darwin+Windows adapter tasarımları, tek native N-API capability modülü + W1-W4 faz planı; Alperen karar noktaları D1 (native-addon admission, ADR-D-005) · D2 (Windows Win10-1607/NTFS tabanı) · D3 (adapter'a dek fail-closed korunumu — önerilen); 2026-08-05 KARAR: D1+D2+D3 ONAYLANDI (Alperen) — native N-API capability modülü admission'lı, Windows tabanı Win10-1607+/NTFS, adapter'lara dek non-Linux fail-closed korunur; uygulama W1 (adapter-arayüz çıkarımı) + W2 (mac/win capability-probe CI) satırlarıyla başlar 2026-08-12 owner kararı (agresif eritme): bu satırın atıf verdiği analiz dosyası platform-execution-authority-adapters-2026-08-05.md delete-on-consume ile silindi; içeriğin özü bu satırın kendi kanıt zincirinde yaşıyor, tam metin git-history'de (follow-up-works/platform-execution-authority-adapters-2026-08-05.md)",
+      "updated": "2026-08-12"
     },
     {
       "order": 3345,
@@ -18438,8 +18526,8 @@
         "GR-2026-08-08-OPERATION-O3-01"
       ],
       "acceptance": "Every mutation/read/tool action maps to stable operation ID, risk and effect class",
-      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir; `receipt=GR-2026-08-07-OPERATION-O1-01`; O1 admission 2026-08-07 (Dalga-3 başlangıcı — PRINCIPAL DONE ile dependency-veto düştü); 2026-08-07 O1 SETTLEMENT: kanonik katalog kuruldu — sekiz alanlı şema izlenen catalog.v1.json'da (ilk aile fs+memory, 6 operasyon), typed okuyucu + Op.* üretilen sabitleri (0-hardcode), yeni lint-operation-catalog fail-closed doğrular (benzersiz dot-hiyerarşik id, enum üyelikleri, effect→gate MİNİMUM matrisi, capabilities'in work-model sözlüğünde varlığı, i18n tamlığı, sabit-katalog birebir örtüşmesi) ve lint:gates zincirine eklendi; bilinmeyen op id'si typed UnknownOperationError ile fail-closed; `proof=operation-catalog-suite-9of9-and-lint-green`; katalog suite 9/9, lint yeşil, tsc temiz; ingress-kapsam zorlaması (sayaç-ratchet) O3, capability/tool-scope tüketimi O4 dilimidir; `receipt=GR-2026-08-08-OPERATION-O3-01`; O3 SETTLEMENT 2026-08-08 (owner Q&A: report-only baseline, fs-write/delete tanımı): ingress-açığı ÖLÇÜLDÜ — 673 fs-write/delete site / 233 dosya / 0 katalog-aracılı (resolveOperation'ın hiç üretim tüketicisi yoktu); scripts/audit-operation-ingress report-only (lint:gates'e EKLENMEDİ), operation-ingress-baseline.json frozen zemin, npm audit script'i; `proof=operation-o3-673sites-0mediated-4pins-report-only`; AÇIK typed-residual (satır VERIFY): CI-blocking ratchet enablement, op.memory + op.fs.read aileleri, gerçek resolveOperation ingress-tüketimi = real grant",
-      "updated": "2026-08-08"
+      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir; `receipt=GR-2026-08-07-OPERATION-O1-01`; O1 admission 2026-08-07 (Dalga-3 başlangıcı — PRINCIPAL DONE ile dependency-veto düştü); 2026-08-07 O1 SETTLEMENT: kanonik katalog kuruldu — sekiz alanlı şema izlenen catalog.v1.json'da (ilk aile fs+memory, 6 operasyon), typed okuyucu + Op.* üretilen sabitleri (0-hardcode), yeni lint-operation-catalog fail-closed doğrular (benzersiz dot-hiyerarşik id, enum üyelikleri, effect→gate MİNİMUM matrisi, capabilities'in work-model sözlüğünde varlığı, i18n tamlığı, sabit-katalog birebir örtüşmesi) ve lint:gates zincirine eklendi; bilinmeyen op id'si typed UnknownOperationError ile fail-closed; `proof=operation-catalog-suite-9of9-and-lint-green`; katalog suite 9/9, lint yeşil, tsc temiz; ingress-kapsam zorlaması (sayaç-ratchet) O3, capability/tool-scope tüketimi O4 dilimidir; `receipt=GR-2026-08-08-OPERATION-O3-01`; O3 SETTLEMENT 2026-08-08 (owner Q&A: report-only baseline, fs-write/delete tanımı): ingress-açığı ÖLÇÜLDÜ — 673 fs-write/delete site / 233 dosya / 0 katalog-aracılı (resolveOperation'ın hiç üretim tüketicisi yoktu); scripts/audit-operation-ingress report-only (lint:gates'e EKLENMEDİ), operation-ingress-baseline.json frozen zemin, npm audit script'i; `proof=operation-o3-673sites-0mediated-4pins-report-only`; AÇIK typed-residual (satır VERIFY): CI-blocking ratchet enablement, op.memory + op.fs.read aileleri, gerçek resolveOperation ingress-tüketimi = real grant 2026-08-12 owner kararı (agresif eritme): bu satırın atıf verdiği analiz dosyası operation-catalog-authority-design-2026-08-06.md delete-on-consume ile silindi; içeriğin özü bu satırın kendi kanıt zincirinde yaşıyor, tam metin git-history'de (follow-up-works/operation-catalog-authority-design-2026-08-06.md)",
+      "updated": "2026-08-12"
     },
     {
       "order": 4040,
@@ -25110,6 +25198,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e8a889ca35316965a0a389adf73810252f36be149eade0ef99044aaf0d75c9ac"
+    "value": "b0388332dd183b78b6ae34770743f50418f054bc574a9f155d41be2772527b22"
   }
 }

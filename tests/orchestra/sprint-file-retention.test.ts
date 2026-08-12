@@ -5,7 +5,7 @@
  * - keep_last_n threshold archiving
  * - size_cap_mb enforcement
  * - Counter cleanup (-seq, -checkpoint-seq)
- * - Forensic file migration to docs/audits/
+ * - Forensic file migration to .brain/archive/audits/
  * - Config override (custom keep_last_n)
  * - Edge cases (empty dir, single sprint, no .deckent)
  * - Combined runRetention pipeline
@@ -166,12 +166,12 @@ describe('cleanupCounters', () => {
 // ─── migrateForensicFiles ─────────────────────────────────────────────
 
 describe('migrateForensicFiles', () => {
-  it('should move forensic files to docs/audits/sprint-NNN/', () => {
+  it('should move forensic files to .brain/archive/audits/sprint-NNN/', () => {
     createForensicFiles(testRoot, 'sprint-138');
     const moved = migrateForensicFiles(testRoot);
     expect(moved.length).toBe(2);
-    expect(existsSync(join(testRoot, 'docs', 'audits', 'sprint-138', 'layer3-scorecard.md'))).toBe(true);
-    expect(existsSync(join(testRoot, 'docs', 'audits', 'sprint-138', 'verifier-log.md'))).toBe(true);
+    expect(existsSync(join(testRoot, '.brain', 'archive', 'audits', 'sprint-138', 'layer3-scorecard.md'))).toBe(true);
+    expect(existsSync(join(testRoot, '.brain', 'archive', 'audits', 'sprint-138', 'verifier-log.md'))).toBe(true);
     // Source removed
     expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-138-layer3-scorecard.md'))).toBe(false);
   });

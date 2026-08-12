@@ -63,10 +63,10 @@ English under `docs/en/` is canonical. Turkish under `docs/tr/` is a full-parity
 
 ## Audit and planning ledgers
 
-- [Coverage matrix](./analysis/COVERAGE-MATRIX-2026-08.md)
-- [Code–documentation difference report (TR)](./analysis/CODE-DOC-DIFF-2026-08.md)
-- [Open questions (TR)](./analysis/OPEN-QUESTIONS-2026-08.md)
-- [Vision–documentation difference report (TR)](./analysis/VISION-DOC-DIFF-2026-08-03.md)
 - [Master Plan — read-only SSOT](./MASTER-PLAN.md)
+
+Situational analyses moved to the owner-tracked `follow-up-works/` staging area
+(delete-on-consume — Alperen, 2026-08-12); finished doc-reset audit artifacts were
+retired. docs/ carries product documentation only.
 
 The pre-reset snapshot is preserved under `docs/archive/docs-pre-reset-2026-08-03/`; it is historical evidence and a coverage baseline, not current product authority. [Evidence: read-only archive inventory, 2026-08-01]

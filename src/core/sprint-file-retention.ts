@@ -7,7 +7,7 @@
  *  1. keep_last_n: keep the N most-recent sprints, archive older ones
  *  2. size_cap_mb: if total sprint file size exceeds cap, archive oldest first
  *  3. Counter cleanup: -seq and -checkpoint-seq files are deleted on sprint DONE
- *  4. Forensic files: -layer3-scorecard.md etc. moved to docs/audits/sprint-NNN/
+ *  4. Forensic files: -layer3-scorecard.md etc. moved to .brain/archive/audits/sprint-NNN/
  *
  * @module sprint-file-retention
  * @since Sprint 150
@@ -25,7 +25,7 @@ import type { SprintFileRetentionConfig } from './config-types.js';
  * Directory scanned for sprint-prefixed machine artifacts. Sprint-NNN-*.jsonl /
  * -seq / -gate.json / -pre-archive.* now live under `.deckent/recently-works/`
  * (purpose-folder de-scatter). The archive TARGET (`archive_path`) and forensic
- * TARGET (`docs/audits/`) are unchanged.
+ * TARGET (`.brain/archive/audits/`) are unchanged.
  */
 function sprintArtifactsDir(root: string): string {
   return join(root, RECENT_WORKS_DIR);
@@ -59,7 +59,7 @@ const COUNTER_PATTERNS = [
   /-checkpoint-seq$/,
 ] as const;
 
-/** Forensic/human-generated files that should move to docs/audits/ */
+/** Forensic/human-generated files that should move to .brain/archive/audits/ */
 const FORENSIC_PATTERNS = [
   /-layer3-scorecard\.md$/,
   /-verifier-log\.md$/,
@@ -76,7 +76,7 @@ export interface RetentionResult {
   kept: string[];
   /** Counter files deleted */
   countersDeleted: string[];
-  /** Forensic files moved to docs/audits/ */
+  /** Forensic files moved to .brain/archive/audits/ */
   forensicMoved: string[];
   /** Total bytes freed */
   bytesFreed: number;
@@ -188,8 +188,10 @@ export function cleanupCounters(root: string, sprintId: string): string[] {
 // ─── Forensic File Migration ──────────────────────────────────────────
 
 /**
- * Move forensic/human-generated sprint files to docs/audits/sprint-NNN/.
- * These are git-tracked artifacts that should not stay in the runtime .deckent/ dir.
+ * Move forensic/human-generated sprint files to .brain/archive/audits/sprint-NNN/.
+ * Owner decision (Alperen, 2026-08-12): docs/ is PRODUCT documentation only —
+ * forensic sprint evidence belongs with the other sprint archives under
+ * .brain/archive/, never under docs/audits (that directory must not exist).
  */
 export function migrateForensicFiles(root: string): string[] {
   const forensicFiles = listForensicFiles(root);
@@ -199,7 +201,7 @@ export function migrateForensicFiles(root: string): string[] {
     const sprintId = extractSprintId(f);
     if (!sprintId) continue;
 
-    const targetDir = join(root, 'docs', 'audits', sprintId);
+    const targetDir = join(root, '.brain', 'archive', 'audits', sprintId);
     mkdirSync(targetDir, { recursive: true });
 
     const srcPath = join(sprintArtifactsDir(root), f);
@@ -334,7 +336,7 @@ export function enforceRetention(
 /**
  * Run full retention pipeline:
  * 1. Clean counters for the completed sprint
- * 2. Migrate forensic files to docs/audits/
+ * 2. Migrate forensic files to .brain/archive/audits/
  * 3. Enforce retention policy (keep_last_n + size_cap)
  */
 export function runRetention(
