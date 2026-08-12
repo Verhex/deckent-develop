@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b67e40522a35d7f5b1405d72dbcbafee04945cbf65a659b9a2b23b4ce3eac43a"
+    "value": "9553e561e016dd826248714df1144a8d7ff8f0664c5674a98f2cdd0f7e6612fe"
   },
   "summary": {
-    "total": 486,
-    "active": 424,
+    "total": 491,
+    "active": 429,
     "terminal": 62,
     "receipts": 184,
     "byState": {
-      "OPEN": 333,
+      "OPEN": 338,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,8 +21,8 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 316,
-      "P1": 133,
+      "P0": 320,
+      "P1": 134,
       "P2": 37
     },
     "byProgram": {
@@ -34,7 +34,7 @@
       "COST": 5,
       "DASHBOARD": 2,
       "DATA": 3,
-      "DESKTOP": 6,
+      "DESKTOP": 7,
       "DOCS": 6,
       "DURABILITY": 2,
       "ECOSYSTEM": 11,
@@ -47,9 +47,9 @@
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
-      "PRODUCT": 15,
+      "PRODUCT": 18,
       "PROMPT": 5,
-      "PROVIDER": 4,
+      "PROVIDER": 5,
       "RELEASE": 4,
       "REPO": 1,
       "RESILIENCE": 1,
@@ -4019,9 +4019,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "4ed4e88c4b35112f77a4a653f7b65206bb21eb4d524a507ec0b48bb88a82ce50",
-      "progressDigest": "d40439e8fc854e0865af8888e5c36e8d127804af4df617775654cb4f151fa916",
+      "progressDigest": "4174e239d46d893248225bf283f4bcafdc932e196e95ca0f3304f0a4cd9dffa5",
       "terminalClosureDigest": null
     },
     {
@@ -4030,9 +4030,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "c85936108747080f727f053212f2658757e133807f95c13a5ac1b3c9c3fcf8f1",
-      "progressDigest": "e349703e6cc5628a2179eedae393d57ccdba263f5769a84f638343458dacf1cd",
+      "progressDigest": "112218f259ae5ce03fd5c10dfc4ac453e7c1351f910de46fb69341bcab6b433e",
       "terminalClosureDigest": null
     },
     {
@@ -4041,9 +4041,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "ea064b2dbb40a72ed7261d4fe82d038e34f8dd0916c427782c3ecb94aca5a1ae",
-      "progressDigest": "d2449794e30d825281ed8163a63e23d5c20f95b2001fd796a0a068cc5efc5337",
+      "progressDigest": "3d1b5c81926b191102f1a2bf7404e523b5d7c66c7acb2bf10816aa6b8c2b3ba9",
       "terminalClosureDigest": null
     },
     {
@@ -4052,9 +4052,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "2b19b6ad8233d5a000404149980f69de76000d9e7bfd13054a27281c6b946bd7",
-      "progressDigest": "c64d0c166287ec76a6292c52a532f190361634c1c43566496b73a43151b174c0",
+      "progressDigest": "0c1c56c78cd6daad433a766e6141b4de51ba79b3d2fb7faac671784ad422cadb",
       "terminalClosureDigest": null
     },
     {
@@ -4063,9 +4063,9 @@
       "program": "TERMINAL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-12",
       "definitionDigest": "e1f3b90cef487b9e480e6f3881a08110125fa219e192b432d8b0889d3d87b3b8",
-      "progressDigest": "56ac871fc1f8c6c7d26cc3373a0b2337ed400efc44b4f6a39ff9a44c12601cd4",
+      "progressDigest": "6aad4cf687f1f608b8673ea673d04540f27cf87f08184198d21cc44e00f1ad53",
       "terminalClosureDigest": null
     },
     {
@@ -4107,9 +4107,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "88ebef1b2376faa9cae6e43f45fafb729857f5289ac8814de61c32b0bcf5e817",
-      "progressDigest": "5836dbeca5033e9f9c49bcad493f271c2e4a975d9f2386f6915d6bc83534d581",
+      "progressDigest": "6e94a4d07e678dfddf8677a6824fca4a5569f43a4c552545e5baf9202bf21457",
       "terminalClosureDigest": null
     },
     {
@@ -4118,9 +4118,9 @@
       "program": "TERMINAL",
       "priority": "P1",
       "state": "BLOCKED",
-      "updated": "2026-08-03",
+      "updated": "2026-08-12",
       "definitionDigest": "72560c1ffa0155afd8d139d9dba6afa4f72c8f4482224c4c688ec3e38832f2a7",
-      "progressDigest": "e7e950ce43954b8ac660e8ca763776488ce995723e9c267a4fa3bb2a7b4234ab",
+      "progressDigest": "7df11f01fd96b78e419f1dd19ecd04276ddee5e1a822a764eb868fd481077d3a",
       "terminalClosureDigest": null
     },
     {
@@ -4129,9 +4129,9 @@
       "program": "TERMINAL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-12",
       "definitionDigest": "19482a88ef3c23c7b03a6752d1d71e7c6313a9120745b39fcd129a07f07de558",
-      "progressDigest": "36e7c24e88ff71cf6765fed03fdf946130f9036cf2548e87bab4d3ea96a38069",
+      "progressDigest": "ca0804bad682cd49edb059a919a7ec0cee9bb8885edadc9814cf7606fb501ea4",
       "terminalClosureDigest": null
     },
     {
@@ -4140,9 +4140,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "e05451610872a8c8209b666517b795b403002cc48741661661626b006185fa57",
-      "progressDigest": "60b8325d2bd32db222f650e561389dd4711e520bccfaed190c37078e52d8d6b8",
+      "progressDigest": "56d028e48a88239d75cb28fd2e93acfec40b154a616a0f6ea996d10dc51ed10d",
       "terminalClosureDigest": null
     },
     {
@@ -4151,9 +4151,9 @@
       "program": "TERMINAL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "f3a4f1cfefa9de199e371323828b21537f83f0531651fcec353b26b68ccd380b",
-      "progressDigest": "c33c4c4bebbdc1e1c157cbcececbbfa36d9ea786be2236800647287c5078b36a",
+      "progressDigest": "4dee711d489d04b0e351f807388e0449be90f80ab1a7ffc22b5d7897fc4f8a2d",
       "terminalClosureDigest": null
     },
     {
@@ -4175,7 +4175,7 @@
       "state": "OPEN",
       "updated": "2026-08-12",
       "definitionDigest": "28f6a81929ece822bef8cb9b6ac87c3e681c2955d467d5f4cfd03e816a023d6d",
-      "progressDigest": "1fb05d18b3abb2c3d57ee628b9fb9e33f83320c38716362dc69fab3e2139deb0",
+      "progressDigest": "36a58534e1ffc5893f32fd54c4c2ef4f5aab70d67ff8f5e8f7a99db3c7c08684",
       "terminalClosureDigest": null
     },
     {
@@ -4201,6 +4201,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 6013,
+      "id": "CONVERSATION-RUN-001",
+      "program": "PRODUCT",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-12",
+      "definitionDigest": "943cfa56894d66a839f675dfdf03e50f968a7c33305e792230b42a86cb891b04",
+      "progressDigest": "8bddb603143662198dc021be8bfeba0318f1e09c27318be7a0db46914b07feb5",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 6020,
       "id": "SURFACE-CONTRACT-001",
       "program": "PRODUCT",
@@ -4208,7 +4219,7 @@
       "state": "OPEN",
       "updated": "2026-08-12",
       "definitionDigest": "32b651724a69b4b9efbc2cb0dbf4202d3b2496dfb22e96a530c1f988a8efd83a",
-      "progressDigest": "41cdbf1ef92f6c409908d9bc115eae9270c770566f38d41200f745f8693db6eb",
+      "progressDigest": "4255b64b9fc62df79077fffd0ba17ba5fca78fd89891d9173b022edf0e972c3b",
       "terminalClosureDigest": null
     },
     {
@@ -4230,7 +4241,18 @@
       "state": "OPEN",
       "updated": "2026-08-12",
       "definitionDigest": "02197f054a67d4f2b2051555dc4bedad588273d2cef7966122f9c9425c2e398b",
-      "progressDigest": "6f24b544a77f69080d1dd42baa5deadd106b940d206f4ce7444cd70d70c312c2",
+      "progressDigest": "64df9554448daa5b74c4c17824f2c8fa3dafff77a411db5d2138ca3b2768c417",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 6041,
+      "id": "PROVIDER-CONNECTION-001",
+      "program": "PROVIDER",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-12",
+      "definitionDigest": "fad4d091d4ca113206792e8a2d49ff600d8ef59c0add6118c15980077f2d7537",
+      "progressDigest": "b0af94e28d214f0c44ed6e51db2f90f5071a0ca80058725de683a6b0434ddb02",
       "terminalClosureDigest": null
     },
     {
@@ -4241,7 +4263,7 @@
       "state": "OPEN",
       "updated": "2026-08-12",
       "definitionDigest": "81602e493314d359851dbb81346bc86d4e0e45e42f892f831a114cba94779ca5",
-      "progressDigest": "77524d0e513d381d64a426062d317d9b1c1d081c30220891a8a09d97ba00e8c5",
+      "progressDigest": "9a19f83db93b76a8557695bb7b789145366290db0c057d9461f75c415a4946e1",
       "terminalClosureDigest": null
     },
     {
@@ -4263,7 +4285,29 @@
       "state": "OPEN",
       "updated": "2026-08-12",
       "definitionDigest": "08bd8b7751ea7665c5b40f13ea3db05f46cd706789da9ab69e43de617d8a5e8c",
-      "progressDigest": "1c72b582bdc34bdb1766c8002cf16d5b335e812082f6f1befb231fc6e0a7383e",
+      "progressDigest": "dfabbd665d0e23f524e05d01403c834111c19ead0f21f61b8566f37819371690",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 6071,
+      "id": "RUN-INSPECTOR-001",
+      "program": "PRODUCT",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-12",
+      "definitionDigest": "4c5f2574c3a2e5493312ef819064e0e0f949b93dcfd420d51f3da8a0199ca432",
+      "progressDigest": "a1ab05dcc4517e3bc3f7a1a6c37005cec41b04dbf63489d7c7df7cd3ff40fa74",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 6072,
+      "id": "MCP-HUB-001",
+      "program": "PRODUCT",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-12",
+      "definitionDigest": "3a3ebcb3c4dfc0b4a30ce9338a968f43c45327ad39c0e2f3d045cfcdc13cd5fd",
+      "progressDigest": "41266a8d2be574fcc4f3cb6ac7498eb5983f1b8d7b62dd1de55db3d761e85dfc",
       "terminalClosureDigest": null
     },
     {
@@ -4329,7 +4373,7 @@
       "state": "BLOCKED",
       "updated": "2026-08-12",
       "definitionDigest": "c425df79e974805f143c88587312afd78333a78e269baadf76687848049d5966",
-      "progressDigest": "6447b789f47bf45471d547593f8f3261dae27d7056418eaa15253ac19773b869",
+      "progressDigest": "0bac4ce126722b4dd572e673092966735e773c81671b0b956292892f53ce1e66",
       "terminalClosureDigest": null
     },
     {
@@ -4399,6 +4443,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 6166,
+      "id": "DESKTOP-WORKSPACE-LAYOUT-001",
+      "program": "DESKTOP",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-12",
+      "definitionDigest": "92940ca669b505f5688466a16dae2911c8b706d91101a470b2de5462c88f497e",
+      "progressDigest": "55b260e2d92a0f1d76a6a9bf3ce7dc3f3cd6c25035b64fb55ce9928133bd59f4",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 6170,
       "id": "DESIGN-SYSTEM-001",
       "program": "PRODUCT",
@@ -4417,7 +4472,7 @@
       "state": "OPEN",
       "updated": "2026-08-12",
       "definitionDigest": "7730d91cb672de7edbac15169916be62fe4fa0b9cd14f51f091ddb2a960d30d3",
-      "progressDigest": "1db8072e2fcfb25930622ae9474895a9fb7828313292ba8f7902e5faa63ca0f1",
+      "progressDigest": "38456d03c9aa687a8e587a91874f7f3073db2628899299256804f8817f510c81",
       "terminalClosureDigest": null
     },
     {
@@ -4580,9 +4635,9 @@
       "program": "SECURITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-12",
       "definitionDigest": "19a8088ac5887b8af0757125a21a737802e64fe9326aee3d2ea9e32d5c3fb9f3",
-      "progressDigest": "ca07eba1bf9736a3bd33b0f52a2c5682a4c51d6d4d7e0c1823efc7612332e625",
+      "progressDigest": "f3aa3985b29f0dd3e1853aa36d5ac4b947fe4dae7b1d1ed2a24978a771edf75a",
       "terminalClosureDigest": null
     },
     {
@@ -4767,9 +4822,9 @@
       "program": "DOCS",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-12",
       "definitionDigest": "1239cb89acaac639549b751a950ab192669dcd78bc4dc6d94e99a4e68b3e3daa",
-      "progressDigest": "52d4c15f803ca887c7b070dfa970e923a8eea709fd047ad4c6a5319861c97334",
+      "progressDigest": "b8886be1d11a543200b427859569f56140757a075931fc3a5a5cf56dd3375168",
       "terminalClosureDigest": null
     },
     {
@@ -8248,6 +8303,7 @@
         "SSOT-002"
       ],
       "dependents": [
+        "CONVERSATION-RUN-001",
         "HOST-STATE-001",
         "INSTALL-SCOPE-001",
         "MEMORY-DB-001",
@@ -9346,7 +9402,9 @@
       "dependsOn": [
         "KERNEL-STATE-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "PROVIDER-CONNECTION-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -14137,6 +14195,7 @@
         "KERNEL-SETTLEMENT-001"
       ],
       "dependents": [
+        "CONVERSATION-RUN-001",
         "DO-CUTOVER-001",
         "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
         "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
@@ -18481,6 +18540,7 @@
         "APPROVAL-DECISION-AUTHORITY-001",
         "ECOSYSTEM-001",
         "ENTERPRISE-AUTH-001",
+        "MCP-HUB-001",
         "MCP-TRUST-001",
         "P02-634",
         "PERMISSION-MEMORY-AUTHORITY-001",
@@ -18535,6 +18595,7 @@
         "ATTENDED-STOP-001",
         "CODEX-MAIN-001",
         "CONNECTOR-IDENTITY-001",
+        "CONVERSATION-RUN-001",
         "ENTERPRISE-AUTH-001",
         "GOAL-POLICY-001",
         "KERNEL-001",
@@ -19107,6 +19168,7 @@
       ],
       "dependents": [
         "CODEX-ADMISSION-001",
+        "PROVIDER-CONNECTION-001",
         "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001",
         "XVERIFY-WIRE-001"
       ],
@@ -19564,7 +19626,9 @@
       "outcome": "Runtime API/terminal credential ve daemon descriptor lifecycle, revocation ve stale-state authority",
       "priority": "P0",
       "dependsOn": [],
-      "dependents": [],
+      "dependents": [
+        "PROVIDER-CONNECTION-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -20047,8 +20111,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Solo through enterprise journeys complete without CLI knowledge; full control and low cognitive load",
-      "evidence": "Active direction; terminal code substantial",
-      "updated": "2026-07-26"
+      "evidence": "Active direction; terminal code substantial. 2026-08-12 owner-approved Desktop+Terminal north-star kayıpsız olarak `docs/design/DECKENT-DESKTOP-TERMINAL-NORTH-STAR.md`, repo dispositionı ve executable crosswalk `docs/design/DECKENT-DESKTOP-TERMINAL-RECONCILIATION.md` altında kalıcılaştırıldı. Terminal uzman/canonical kullanım yüzeyi kalır fakat same-runtime claim'i ancak in-process REPL composition versioned protocol/client boundary'sine geçirilip Desktop ile aynı persisted conversation/run authority'sini gerçek handoff kanıtıyla tüketince kapanır",
+      "updated": "2026-08-12"
     },
     {
       "order": 5010,
@@ -20088,8 +20152,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Intent shows the smallest safe tool set; catalog/help explain capability and consequence",
-      "evidence": "Existing registry and disclosure partial",
-      "updated": "2026-07-26"
+      "evidence": "Existing registry and disclosure partial; north-star §3/22/23 ve reconciliation §7/8 progressive agency, command palette, run tree, approvals ve smallest-safe-tool-set'i aynı Golden Workflow içinde bağlar",
+      "updated": "2026-08-12"
     },
     {
       "order": 5020,
@@ -20128,8 +20192,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Inspect, plan, approve, edit, test, diff, review, commit handoff and resume journeys",
-      "evidence": "Legacy 511 and 541",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 511 and 541; reconciliation §7/8 bu loop'u canonical conversation→plan→run→observe→approve→verify→result→resume zincirine bağlar, raw PTY yalnız explicit expert tool kalır",
+      "updated": "2026-08-12"
     },
     {
       "order": 5030,
@@ -20143,6 +20207,7 @@
         "KERNEL-SETTLEMENT-001"
       ],
       "dependents": [
+        "RUN-INSPECTOR-001",
         "TERMINAL-REPL-001"
       ],
       "children": [],
@@ -20167,8 +20232,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Short human trace plus click-through detail, backpressure, resume and redaction",
-      "evidence": "Legacy 582",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 582; north-star §11/23 ve reconciliation §7/8/17 same-run graph/timeline/log/cost/token/approval/verifier/evidence projectionını RUN-INSPECTOR-001 ile paylaşır",
+      "updated": "2026-08-12"
     },
     {
       "order": 5040,
@@ -20208,8 +20273,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Long-session soak, Unicode, resize, pipe/EPIPE, cancellation and recovery",
-      "evidence": "Legacy F11-016; 2026-08-11 persisted command/prompt history privacy ve physical-retention closure'ı REPL-HISTORY-PRIVACY-001 childına ayrıldı",
-      "updated": "2026-08-11"
+      "evidence": "Legacy F11-016; 2026-08-11 persisted command/prompt history privacy ve physical-retention closure'ı REPL-HISTORY-PRIVACY-001 childına ayrıldı. 2026-08-12 reconciliation §3/8 Terminal'ın in-process composition ve local RPC debug gerçeğini kaydeder; reconnect/cursor replay/cross-process resume aynı shared client boundary'sine taşınmadan surface parity kapanmaz",
+      "updated": "2026-08-12"
     },
     {
       "order": 5041,
@@ -20356,8 +20421,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No hidden login mutation; exact account authority, expiry, revoke and doctor proof",
-      "evidence": "Legacy 206,576",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 206,576; north-star §12/13 ve reconciliation §10 Provider→Connection→Model→Profile aggregate'ini, exact connection/credential authority ve truthful reachability/entitlement ile PROVIDER-CONNECTION-001'e bağlar",
+      "updated": "2026-08-12"
     },
     {
       "order": 5080,
@@ -20394,8 +20459,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Five-day real dogfood, recovery, performance, accessibility and fallback evidence",
-      "evidence": "Legacy 583; no premature VS Code removal; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi",
-      "updated": "2026-08-03"
+      "evidence": "Legacy 583; no premature VS Code removal; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi. 2026-08-12 reconciliation §7–9 dogfood başarı ölçütünü aynı durable conversation/run'ın Terminal↔Desktop handoff, recovery, performance, accessibility ve honest fallback kanıtı olarak kesinleştirir",
+      "updated": "2026-08-12"
     },
     {
       "order": 5090,
@@ -20431,8 +20496,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Linux/macOS/Win-native/WSL shells, screen readers, keyboard, contrast and locale",
-      "evidence": "Every-environment law; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi; 2026-08-03 xverify netleştirmesi (Alperen onayı): P1 etiketi ürün öneminin indirimi DEĞİLDİR — yorum açıkça şudur: bu satır Gate-0'dan itibaren PARALEL proof-track olarak yürür (codex-analysis 14 şartı), admission önceliği ayrı eksendir; Every-Environment yasası priority etiketiyle zayıflatılamaz",
-      "updated": "2026-08-03"
+      "evidence": "Every-environment law; 2026-08-03 P0→P1 (owner onaylı, codex-analysis 14-critical-path politikası): bu satır dört P0 sorusunun hiçbirini geçmiyor — ledger'da hiçbir işi bloke etmiyor (transitive dependents=0, açık child yok), güvenlik/tenant/authority sınırı taşımıyor, gözlenmiş bir execution hatasından doğmadı ve truth/CI sinyali üretmiyor. Öncelik düşürüldü; outcome ve acceptance değişmedi; 2026-08-03 xverify netleştirmesi (Alperen onayı): P1 etiketi ürün öneminin indirimi DEĞİLDİR — yorum açıkça şudur: bu satır Gate-0'dan itibaren PARALEL proof-track olarak yürür (codex-analysis 14 şartı), admission önceliği ayrı eksendir; Every-Environment yasası priority etiketiyle zayıflatılamaz. North-star §7/23/32 ve reconciliation §5/8 Linux/macOS/Windows-native/WSL adapter, keyboard/screen-reader, locale, reconnect ve honest unsupported matrisini aynı protocol semantics'e bağlar",
+      "updated": "2026-08-12"
     },
     {
       "order": 5100,
@@ -20472,8 +20537,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Context always visible; project/account/provider mix-ups impossible; crash-safe resume and handoff",
-      "evidence": "Solo and enterprise dual lens",
-      "updated": "2026-07-26"
+      "evidence": "Solo and enterprise dual lens; reconciliation §5/7/8 context digest, conversation ID, logical run ID, connection ID ve principal/tenant scope'un cross-surface tek authority olmasını CONVERSATION-RUN-001 ile bağlar",
+      "updated": "2026-08-12"
     },
     {
       "order": 5110,
@@ -20512,8 +20577,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Presence, ownership, approvals, handoff, review and policy are role-aware and progressively disclosed",
-      "evidence": "Million-user product requirement",
-      "updated": "2026-07-26"
+      "evidence": "Million-user product requirement; north-star §26–28 ve reconciliation §5/14 fork değil progressive disclosure/preset, same identity/policy/audit contractı ve solo→enterprise büyümesini bağlar",
+      "updated": "2026-08-12"
     },
     {
       "order": 6000,
@@ -20531,6 +20596,8 @@
         "APP-SERVICE-001",
         "SURFACE-CONTRACT-001",
         "DESKTOP-001",
+        "RUN-INSPECTOR-001",
+        "MCP-HUB-001",
         "API-CONTRACT-001",
         "API-IDENTITY-001",
         "CONNECTOR-IDENTITY-001",
@@ -20564,6 +20631,8 @@
         "APP-SERVICE-001",
         "SURFACE-CONTRACT-001",
         "DESKTOP-001",
+        "RUN-INSPECTOR-001",
+        "MCP-HUB-001",
         "API-CONTRACT-001",
         "API-IDENTITY-001",
         "CONNECTOR-IDENTITY-001",
@@ -20601,7 +20670,9 @@
       ],
       "children": [
         "AGENT-CUSTOM-MANAGEMENT-001",
-        "SKILL-CUSTOM-MANAGEMENT-001"
+        "SKILL-CUSTOM-MANAGEMENT-001",
+        "CONVERSATION-RUN-001",
+        "PROVIDER-CONNECTION-001"
       ],
       "gates": [
         "G2",
@@ -20622,11 +20693,13 @@
       "closureBlockedBy": [
         "SURFACE-CUTOVER-001",
         "AGENT-CUSTOM-MANAGEMENT-001",
-        "SKILL-CUSTOM-MANAGEMENT-001"
+        "SKILL-CUSTOM-MANAGEMENT-001",
+        "CONVERSATION-RUN-001",
+        "PROVIDER-CONNECTION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Propose, approve, start, cancel, inspect and settle use cases independent of transport/UI",
-      "evidence": "2026-07-27 code-truth: CLI/REPL RunFlow controller, API coordinator, autonomous v1/v2 control ve Flow queue ayrı services; cancel/settle/status canonical use case değil; 2026-08-10 autonomous RCA: broad MCP CLI helper import ediyor, dedicated MCP aynı backlog işlemlerini farklı schema/annotation ile yeniden implemente ediyor, Dashboard v1 AutonomousPage ve v2 MissionsPage olarak iki read model sunuyor, Process ayrıca v1 JSON writerı; canonical closure AUTONOMOUS-CONTROL-PLANE-001. 2026-08-12 Desktop+Terminal RCA ve owner kabulü: Desktop `deckent serve` tüketirken Ink REPL `src/cli/repl/rpc-client.ts` içinde in-process dispatcher kuruyor; `session.resume` unsupported, `RUN_PAUSED` terminal BLOCKED'a indirgeniyor, RunFlow cancel detached sprinti sonlandırmıyor ve Desktop chat transcripti renderer-local `localStorage` authoritysinde. Yeni umbrella açılmayacak; bu satır canonical use-case/state ownership kapanışıdır",
+      "evidence": "2026-07-27 code-truth: CLI/REPL RunFlow controller, API coordinator, autonomous v1/v2 control ve Flow queue ayrı services; cancel/settle/status canonical use case değil; 2026-08-10 autonomous RCA: broad MCP CLI helper import ediyor, dedicated MCP aynı backlog işlemlerini farklı schema/annotation ile yeniden implemente ediyor, Dashboard v1 AutonomousPage ve v2 MissionsPage olarak iki read model sunuyor, Process ayrıca v1 JSON writerı; canonical closure AUTONOMOUS-CONTROL-PLANE-001. 2026-08-12 Desktop+Terminal RCA ve owner kabulü: Desktop `deckent serve` tüketirken Ink REPL `src/cli/repl/rpc-client.ts` içinde in-process dispatcher kuruyor; `session.resume` unsupported, `RUN_PAUSED` terminal BLOCKED'a indirgeniyor, RunFlow cancel detached sprinti sonlandırmıyor ve Desktop chat transcripti renderer-local `localStorage` authoritysinde. Yeni umbrella açılmayacak; bu satır canonical use-case/state ownership kapanışıdır. Kayıpsız owner north-star `docs/design/DECKENT-DESKTOP-TERMINAL-NORTH-STAR.md`, repo reconciliation `docs/design/DECKENT-DESKTOP-TERMINAL-RECONCILIATION.md`",
       "updated": "2026-08-12"
     },
     {
@@ -20713,6 +20786,46 @@
       "updated": "2026-08-10"
     },
     {
+      "order": 6013,
+      "id": "CONVERSATION-RUN-001",
+      "parent": "APP-SERVICE-001",
+      "program": "PRODUCT",
+      "outcome": "Durable conversation/context aggregateinden logical run'a kayıpsız ve cross-surface continuation",
+      "priority": "P0",
+      "dependsOn": [
+        "RUNFLOW-001",
+        "MEMORY-AUTHORITY-001",
+        "APPROVAL-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUNFLOW-001",
+        "MEMORY-AUTHORITY-001",
+        "APPROVAL-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Versioned Conversation aggregate principal+tenant+project+provider-connection ve bounded context refs taşır; plan/run conversion exact conversation revision+context digest ile idempotent logical run üretir; Desktop ve Terminal aynı transcript, plan, approval, result, checkpoint ve resume authority'sini tüketir; mevcut Terminal memory records ile Desktop profile-keyed localStorage transcriptleri explicit inventory+versioned migration+coverage receipt ile gerçek içerik kaybetmeden reconcile edilir, missing fields uydurulmaz ve unverifiable legacy records typed HOLD/quarantine olur; disconnect/restart/cross-process handoff, concurrent edit/CAS, retention/privacy ve Linux/macOS/Windows-native/WSL proof'u pass olur",
+      "evidence": "2026-08-12 owner north-star §4/9/10/53 ve reconciliation §4/5/7/17; code-truth: Terminal chat memory persistence, RunFlow store ve Desktop localStorage transcript bugün competing authoritiesdir",
+      "updated": "2026-08-12"
+    },
+    {
       "order": 6020,
       "id": "SURFACE-CONTRACT-001",
       "parent": "SURFACES-001",
@@ -20727,7 +20840,10 @@
         "API-CONTRACT-001",
         "DASHBOARD-OBS-001",
         "DESKTOP-REBORN-001",
+        "DESKTOP-WORKSPACE-LAYOUT-001",
         "IDE-ADAPTER-001",
+        "MCP-HUB-001",
+        "RUN-INSPECTOR-001",
         "SLO-001",
         "SURFACE-ADAPTER-001"
       ],
@@ -20753,7 +20869,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Every response/event carries identity, flow/run/attempt IDs, capability and evidence provenance",
-      "evidence": "Legacy 566,569; 2026-08-12 owner-accepted architecture reconciliation: mixed REST/SSE/WS/term-rpc plus hand-mirrored TS surface types are not one product protocol. Canonical internal `protocol` + `client` package boundaries must precede physical package relocation; Desktop and Terminal consume the same SDK, compatibility handshake and resume stream without a second runtime implementation",
+      "evidence": "Legacy 566,569; 2026-08-12 owner-accepted architecture reconciliation: mixed REST/SSE/WS/term-rpc plus hand-mirrored TS surface types are not one product protocol. Canonical internal `protocol` + `client` package boundaries must precede physical package relocation; Desktop and Terminal consume the same SDK, compatibility handshake and resume stream without a second runtime implementation. Exact logical-first/physical-later topology, state ownership ve Golden Workflow wire chain: `docs/design/DECKENT-DESKTOP-TERMINAL-RECONCILIATION.md` §5–7",
       "updated": "2026-08-12"
     },
     {
@@ -20847,7 +20963,47 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No Node/PATH burden in managed-local; version handshake, upgrade, rollback and honest unsupported",
-      "evidence": "Legacy 585; 2026-08-12 code-truth: Electron main already adopts or detached-spawns `deckent serve` and normally leaves it alive on app exit, so a second `deckentd` rewrite or Tauri migration is not justified. Adoption checks health/projectRoot/PID but not API/protocol compatibility; only local HTTP profile is live while WSL/SSH/container remain honest unavailable. Decision=`KEEP_ELECTRON_AND_DECOUPLE_RUNTIME`; productize existing serve authority",
+      "evidence": "Legacy 585; 2026-08-12 code-truth: Electron main already adopts or detached-spawns `deckent serve` and normally leaves it alive on app exit, so a second `deckentd` rewrite or Tauri migration is not justified. Adoption checks health/projectRoot/PID but not API/protocol compatibility; only local HTTP profile is live while WSL/SSH/container remain honest unavailable. Decision=`KEEP_ELECTRON_AND_DECOUPLE_RUNTIME`; productize existing serve authority. Target state, logical-package-first migration ve M11 benchmark HOLD: `docs/design/DECKENT-DESKTOP-TERMINAL-RECONCILIATION.md` §5/6/15",
+      "updated": "2026-08-12"
+    },
+    {
+      "order": 6041,
+      "id": "PROVIDER-CONNECTION-001",
+      "parent": "APP-SERVICE-001",
+      "program": "PROVIDER",
+      "outcome": "Provider→Connection→Model→Profile aggregatei, credential reference, entitlement, health, policy ve cost attribution authoritysi",
+      "priority": "P0",
+      "dependsOn": [
+        "CONFIG-AUTHORITY-001",
+        "PROVIDER-INGRESS-001",
+        "RUNTIME-CREDENTIAL-LIFECYCLE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "CONFIG-AUTHORITY-001",
+        "PROVIDER-INGRESS-001",
+        "RUNTIME-CREDENTIAL-LIFECYCLE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Subscription/CLI, direct API ve local/OpenAI-compatible endpointler aynı versioned connection contractıyla owner principal+tenant+environment+auth-kind+endpoint+credentialRef+reachability+entitlement+limits+cost-center taşır; model registry identity credential/connection identityden ayrılır, profile role/effort/routing/admission policyyi bağlar; UI/CLI/MCP/API/Terminal yalnız opaque refs ve redacted health gösterir; legacy config kayıpsız migrator+coverage receipt ile okunur, missing connection/model/provider data uydurulmaz; revoke/rotate/expiry, multiple accounts, offline/local, Linux/macOS/Windows-native/WSL ve million-connection proof'u pass olur",
+      "evidence": "2026-08-12 owner north-star §12/13/24 ve reconciliation §4/10/17; mevcut provider adapters/registry/evidence güçlü foundation, birleşik product aggregate ve native secret custody closure yok",
       "updated": "2026-08-12"
     },
     {
@@ -20886,7 +21042,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No persistent token in URL; origin/session binding; signed update and renderer isolation",
-      "evidence": "Legacy 586 and code audit; 2026-08-12 code-truth: `contextIsolation=true`, `sandbox=true`, `nodeIntegration=false` ve permission/navigation fail-closed sınırları güçlü temel. Ancak renderer bearer tokenı kullanıyor; EventSource nedeniyle token ve chat message query string'e taşınıyor, credential master key file-temelli ve updater `not-implemented`. Token/session exchange, POST/body veya eşdeğer confidential streaming transport, native OS secret broker ve signed update closure bu satırdadır",
+      "evidence": "Legacy 586 and code audit; 2026-08-12 code-truth: `contextIsolation=true`, `sandbox=true`, `nodeIntegration=false` ve permission/navigation fail-closed sınırları güçlü temel. Ancak renderer bearer tokenı kullanıyor; EventSource nedeniyle token ve chat message query string'e taşınıyor, credential master key file-temelli ve updater `not-implemented`. Token/session exchange, POST/body veya eşdeğer confidential streaming transport, native OS secret broker ve signed update closure bu satırdadır. Platform custody/failure matrix ve query-transport disposition: reconciliation §4/12",
       "updated": "2026-08-12"
     },
     {
@@ -20944,6 +21100,7 @@
       "dependents": [
         "DESIGN-PRECISION-INSTRUMENT-001",
         "DESKTOP-CUSTOMIZE-001",
+        "DESKTOP-WORKSPACE-LAYOUT-001",
         "SURFACE-PARITY-001"
       ],
       "children": [],
@@ -20970,7 +21127,86 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Product journeys and visual system approved; no dashboard wrapper; function parity and soak",
-      "evidence": "Legacy 589 supersedes visual direction of 536; 2026-08-12 owner-accepted RCA: classic shell ve NOVA shell coexist ediyor; embedded terminal `deckent` child process açarak same-runtime unity yerine nested CLI sunuyor; Desktop chat durable shared session taşımıyor. Home/marketplace/enterprise-admin ve extension UI, Golden Workflow kapanmadan öne alınmayacak; raw PTY expert tool olarak kalabilir fakat product control path olamaz",
+      "evidence": "Legacy 589 supersedes visual direction of 536; 2026-08-12 owner-accepted RCA: classic shell ve NOVA shell coexist ediyor; embedded terminal `deckent` child process açarak same-runtime unity yerine nested CLI sunuyor; Desktop chat durable shared session taşımıyor. Home/marketplace/enterprise-admin ve extension UI, Golden Workflow kapanmadan öne alınmayacak; raw PTY expert tool olarak kalabilir fakat product control path olamaz. Kayıpsız Desktop IA/Golden Workflow planı north-star §4/8–21, repo-bound implementation contractı reconciliation §7/9/15'tedir",
+      "updated": "2026-08-12"
+    },
+    {
+      "order": 6071,
+      "id": "RUN-INSPECTOR-001",
+      "parent": "SURFACES-001",
+      "program": "PRODUCT",
+      "outcome": "Desktop ve Terminal için aynı logical run'ın execution graph, timeline ve evidence inspectorı",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-LIVE-001",
+        "SURFACE-CONTRACT-001",
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-LIVE-001",
+        "SURFACE-CONTRACT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Versioned inspector read model logical run/attempt/agent/worker/tool/MCP/context/prompt-skill/token/cost/latency/log/checkpoint/approval/policy/verifier/result/evidence lineageını tek revision+cursor contractında taşır; Desktop graph/timeline/panels ve Terminal run-tree/detail aynı IDs, denominators, reason codes ve redactionı gösterir; reconnect/backfill/order/dedupe/backpressure, million-event virtualization, tenant isolation, a11y ve Linux/macOS/Windows-native/WSL proof'u pass olur; hiçbir surface lifecycle veya cost/evidence stateini yeniden infer etmez",
+      "evidence": "2026-08-12 owner north-star §11/23/32/33/43 ve reconciliation §7/17; mevcut worker/log/read-model parçaları foundationdır, birleşik cross-surface inspector product outcome'u daha önce atomik sahipliğe sahip değildi",
+      "updated": "2026-08-12"
+    },
+    {
+      "order": 6072,
+      "id": "MCP-HUB-001",
+      "parent": "SURFACES-001",
+      "program": "PRODUCT",
+      "outcome": "Governed MCP client+server Hub: connections, discovery, tool risk, permissions, health ve expose lifecycle",
+      "priority": "P0",
+      "dependsOn": [
+        "MCP-TRUST-001",
+        "CAPABILITY-001",
+        "SURFACE-CONTRACT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "MCP-TRUST-001",
+        "CAPABILITY-001",
+        "SURFACE-CONTRACT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "STDIO ve Streamable HTTP connections principal+tenant+environment+auth/credentialRef+provenance+schema/version+health+revoke taşır; configured/connecting/connected/degraded/restricted/disabled states, discovered canonical tool catalog ve per-tool risk/consent/audit Desktop ile Terminal'da aynı read modelden görünür; Deckent-as-server expose listesi canonical capability catalog+policyden üretilir, secrets/filesystem default exposed olmaz; project `.mcp.json` trust opt-in, egress, env passthrough, reconnect, multi-connection, every-environment ve million-connection proof'u pass olur",
+      "evidence": "2026-08-12 owner north-star §14–16 ve reconciliation §4/11/17; MCP server ve opt-in external client production foundationları vardır, first-class governed Hub lifecycle yoktur; MCPV2 cutover dependency authoritysi MCP-TRUST-001 evidence'ında korunur",
       "updated": "2026-08-12"
     },
     {
@@ -21229,7 +21465,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Each use case names canonical service, supported surfaces and reasoned exclusions",
-      "evidence": "2026-07-27 code-truth: start/approve/cancel/status/review/finalize/cleanup/resume semantics CLI, MCP, API, Terminal ve Desktop arasında farklı; dashboard read-only intentional negative-space. 2026-08-12 revalidation: Desktop closes without normally killing its serve daemon, but Terminal is an in-process runtime composition; pause maps to terminal BLOCKED, `session.resume` is unsupported and cancel closes only the Flow record for detached execution. Same-runtime claim therefore remains BLOCKED until shared application-service + protocol/client cutover and real cross-process handoff proof",
+      "evidence": "2026-07-27 code-truth: start/approve/cancel/status/review/finalize/cleanup/resume semantics CLI, MCP, API, Terminal ve Desktop arasında farklı; dashboard read-only intentional negative-space. 2026-08-12 revalidation: Desktop closes without normally killing its serve daemon, but Terminal is an in-process runtime composition; pause maps to terminal BLOCKED, `session.resume` is unsupported and cancel closes only the Flow record for detached execution. Same-runtime claim therefore remains BLOCKED until shared application-service + protocol/client cutover and real cross-process handoff proof. Capability matrix ve exact cross-process Golden Workflow proof chain reconciliation §5/7/15'tedir",
       "updated": "2026-08-12"
     },
     {
@@ -21406,7 +21642,9 @@
         "DESKTOP-REBORN-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "DESKTOP-WORKSPACE-LAYOUT-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -21424,12 +21662,51 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "DESKTOP-REBORN-001"
+        "DESKTOP-REBORN-001",
+        "DESKTOP-WORKSPACE-LAYOUT-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Settings scene offers theme + font + accent choices; every identity choice (fonts included) is runtime-switchable through the token layer; choices persist via preferences store; no hardcoded font-family or color on any surface",
       "evidence": "Alperen requirement 2026-07-31 (\"app customize edilebilmeli — tema, font seçimi; arayüz ayarı sekmesi\"); token architecture: design/tokens/ + theme-tokens.ts customTokens seam; 2026-08-01 prefs-v2 LANDED (owner-approved manual seam): DESKTOP_PREFERENCES_VERSION 2 + fontSet field + lossless v1→v2 migration + FONT_SETS/GEN_FONT_SETS drift lock + applyWatch font vars + envanter-legacy @font-face; desktop 205/205; settings-UI selector remains the productization slice",
       "updated": "2026-08-01"
+    },
+    {
+      "order": 6166,
+      "id": "DESKTOP-WORKSPACE-LAYOUT-001",
+      "parent": "DESKTOP-CUSTOMIZE-001",
+      "program": "DESKTOP",
+      "outcome": "Versioned dock/split/tab/panel/preset workspace layout authority and migration",
+      "priority": "P1",
+      "dependsOn": [
+        "DESKTOP-REBORN-001",
+        "SURFACE-CONTRACT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "DESKTOP-REBORN-001",
+        "SURFACE-CONTRACT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Dock, split, resize, collapse, tab reorder, hide/show ve supported popout bir versioned schema ile persist edilir; Chat/Developer/Research/Operator/Enterprise/Custom presets capability+role-aware progressive disclosure uygular fakat authorization üretmez; layout project/profile/monitor identityye doğru scope edilir, unknown panel ve extension removal kayıpsız quarantine/migration taşır; execution truth layout store'a girmez; keyboard/screen-reader, multi-monitor/DPI, crash/partial-write, Linux/macOS/Windows-native/WSL ve scale proof'u pass olur",
+      "evidence": "2026-08-12 owner north-star §20/21 ve reconciliation §5/9/17; DESKTOP-CUSTOMIZE appearance authoritysini korur, workspace composition ayrı atomic successor olarak açıldı",
+      "updated": "2026-08-12"
     },
     {
       "order": 6170,
@@ -21500,7 +21777,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Golden Workflow and execution semantics determine hierarchy before aesthetics; one DTCG authority preserves existing tokens/preferences/a11y while default palette, typography, density, motion and component states minimize glow, sci-fi/HUD cues and generic AI-template patterns; color and animation encode meaning rather than decoration; Desktop and Terminal parity, keyboard/screen-reader behavior, contrast, long-session readability and screenshot/interaction critic evidence pass on Linux, macOS, Windows-native and WSL",
-      "evidence": "2026-08-12 owner-approved Desktop+Terminal architecture reconciliation. Immutable DESIGN-SYSTEM-001 identity preserves the historical NOVA foundation, so this atomic successor carries the new default direction without rewriting history or creating a parallel design system. `ui-ux-pro-max` result is negative evidence: spatial/glass/glow/funnel output conflicts with the official instrument character. Implementation follows Golden Workflow → repeated patterns → components → design tokens; no big-bang reskin",
+      "evidence": "2026-08-12 owner-approved Desktop+Terminal architecture reconciliation. Immutable DESIGN-SYSTEM-001 identity preserves the historical NOVA foundation, so this atomic successor carries the new default direction without rewriting history or creating a parallel design system. `ui-ux-pro-max` result is negative evidence: spatial/glass/glow/funnel output conflicts with the official instrument character. Implementation follows Golden Workflow → repeated patterns → components → design tokens; no big-bang reskin. Full design constitution input north-star §29–36, repo disposition reconciliation §13/14'tedir",
       "updated": "2026-08-12"
     },
     {
@@ -22123,7 +22400,9 @@
         "CAPABILITY-001",
         "SUPPLY-CHAIN-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "MCP-HUB-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -22147,8 +22426,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Server provenance, tool risk, user consent, egress policy, schema/version and revoke",
-      "evidence": "Code-truth audit P0; 2026-08-05 kod-truth: `includeProjectScope` default true (`mcp-client/config.ts:46,57`) — REPL-dışı her caller klonlanmış reponun git-tracked `.mcp.json`'ını güvenilir sayıp server spawn ediyor (opt-in yalnız REPL bridge'de); üçüncü-parti MCP server'lar için allowlist/imza/provenance/per-tool consent kaydı yok; env passthrough sınırsız (`broker.ts:169`). 2026-08-11 kod-truth: src/mcp-client/config.ts:43,46,57 — git-tracked .mcp.json includeProjectScope default true, yani klonlanan reponun MCP sunucuları non-REPL her caller'da güvenilir. Owner kararı: MCP değerlendirmesi MCPV2 cutover SONRASINA DEFERRED (2026-08-06); bu not yalnız kanıt kaydıdır, iş açmaz",
-      "updated": "2026-08-11"
+      "evidence": "Code-truth audit P0; 2026-08-05 kod-truth: `includeProjectScope` default true (`mcp-client/config.ts:46,57`) — REPL-dışı her caller klonlanmış reponun git-tracked `.mcp.json`'ını güvenilir sayıp server spawn ediyor (opt-in yalnız REPL bridge'de); üçüncü-parti MCP server'lar için allowlist/imza/provenance/per-tool consent kaydı yok; env passthrough sınırsız (`broker.ts:169`). 2026-08-11 kod-truth: src/mcp-client/config.ts:43,46,57 — git-tracked .mcp.json includeProjectScope default true, yani klonlanan reponun MCP sunucuları non-REPL her caller'da güvenilir. Owner kararı: MCP değerlendirmesi MCPV2 cutover SONRASINA DEFERRED (2026-08-06); bu not yalnız kanıt kaydıdır, iş açmaz. North-star §14–18 kayıpsız korunur; MCP-HUB-001 bu defer kararını bypass etmez, MCPV2/trust closure sonrasında governed product projectionıdır",
+      "updated": "2026-08-12"
     },
     {
       "order": 7050,
@@ -22823,8 +23102,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Six-language, generated where safe, examples executable, stale counts absent",
-      "evidence": "Legacy 489,495,507",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 489,495,507; 2026-08-12 owner Desktop+Terminal taslağı `docs/design/DECKENT-DESKTOP-TERMINAL-NORTH-STAR.md` içinde 55/55 bölüm kayıpsız ve açıkça non-SSOT tutuldu; repo evidence/disposition/package+wire planı/19-decision ledger/1–55 crosswalk ayrı `...-RECONCILIATION.md` belgesinde canonical MASTER işlerine bağlandı",
+      "updated": "2026-08-12"
     },
     {
       "order": 8051,
@@ -25174,6 +25453,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ea0469ef7e8be7f660d6d206e10cb96785f5030749df403c881d7b9e95133ed4"
+    "value": "de49a6acc109c570a024af33c471bb10d3b19e739c69d5ba71cd703333325e7f"
   }
 }

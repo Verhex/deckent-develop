@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):b67e40522a35d7f5b1405d72dbcbafee04945cbf65a659b9a2b23b4ce3eac43a`
+**Source digest:** `sha256(normalized-lf-utf8):9553e561e016dd826248714df1144a8d7ff8f0664c5674a98f2cdd0f7e6612fe`
 
-**Rows:** 486 total · 424 active · 62 terminal
+**Rows:** 491 total · 429 active · 62 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 333 |
+| OPEN | 338 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -344,12 +344,16 @@
 | 6010 | `APP-SERVICE-001` | OPEN | P0 | PRODUCT | `SURFACE-CUTOVER-001` | — | Typed application-service layer |
 | 6011 | `AGENT-CUSTOM-MANAGEMENT-001` | OPEN | P0 | PRODUCT | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-ROUTING-ELIGIBILITY-001` | — | User-defined agent CRUD ve lifecycle bütün mutating yüzeylerde V3-routable, stable-ID ve i18n-clean olur |
 | 6012 | `SKILL-CUSTOM-MANAGEMENT-001` | OPEN | P0 | PRODUCT | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | User-defined skill create/install/update ve lifecycle bütün mutating yüzeylerde content-complete, V3-routable, transactional ve i18n-clean olur |
+| 6013 | `CONVERSATION-RUN-001` | OPEN | P0 | PRODUCT | `RUNFLOW-001`, `MEMORY-AUTHORITY-001`, `APPROVAL-001` | — | Durable conversation/context aggregateinden logical run'a kayıpsız ve cross-surface continuation |
 | 6020 | `SURFACE-CONTRACT-001` | OPEN | P0 | PRODUCT | `APP-SERVICE-001`, `RECEIPT-001` | — | Versioned surface capability and truth receipts |
 | 6030 | `DESKTOP-001` | OPEN | P0 | DESKTOP | `APP-SERVICE-001`, `ENV-ADAPTER-001` | — | First-class Desktop architecture and product foundation |
 | 6040 | `DESKTOP-RUNTIME-001` | OPEN | P0 | DESKTOP | `APP-SERVICE-001`, `ENV-ADAPTER-001`, `RUNNER-PROTOCOL-001` | — | Managed-local, attach-local and remote managed runtime profiles |
+| 6041 | `PROVIDER-CONNECTION-001` | OPEN | P0 | PROVIDER | `CONFIG-AUTHORITY-001`, `PROVIDER-INGRESS-001`, `RUNTIME-CREDENTIAL-LIFECYCLE-001` | — | Provider→Connection→Model→Profile aggregatei, credential reference, entitlement, health, policy ve cost attribution authoritysi |
 | 6050 | `DESKTOP-SECURITY-001` | OPEN | P0 | DESKTOP | `PRINCIPAL-001`, `API-SECURITY-001` | — | Desktop session, IPC, deep-link, update and event-stream security |
 | 6060 | `DESKTOP-ENTERPRISE-001` | OPEN | P1 | DESKTOP | `DESKTOP-RUNTIME-001`, `DESKTOP-SECURITY-001`, `ENTERPRISE-AUTH-001` | — | Enterprise Desktop governance and fleet operation |
 | 6070 | `DESKTOP-REBORN-001` | OPEN | P0 | DESKTOP | `DESKTOP-RUNTIME-001`, `DESKTOP-SECURITY-001`, `SURFACE-CONTRACT-001` | — | Unique, accessible and function-complete Desktop experience |
+| 6071 | `RUN-INSPECTOR-001` | OPEN | P0 | PRODUCT | `TERMINAL-LIVE-001`, `SURFACE-CONTRACT-001`, `RUN-STATUS-AUTHORITY-001` | — | Desktop ve Terminal için aynı logical run'ın execution graph, timeline ve evidence inspectorı |
+| 6072 | `MCP-HUB-001` | OPEN | P0 | PRODUCT | `MCP-TRUST-001`, `CAPABILITY-001`, `SURFACE-CONTRACT-001` | — | Governed MCP client+server Hub: connections, discovery, tool risk, permissions, health ve expose lifecycle |
 | 6080 | `API-CONTRACT-001` | OPEN | P0 | API | `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | Versioned public/internal API and event contracts |
 | 6090 | `API-IDENTITY-001` | OPEN | P0 | API | `PRINCIPAL-001`, `TENANT-001`, `API-SECURITY-001` | — | OIDC, workload identity, tenant authorization and rate enforcement |
 | 6100 | `CONNECTOR-IDENTITY-001` | OPEN | P0 | CONNECTOR | `PRINCIPAL-001`, `APPROVAL-001`, `APP-SERVICE-001` | — | Gateway and connector session identity, pairing and approval authority |
@@ -361,6 +365,7 @@
 | 6150 | `API-OPERATIONS-001` | OPEN | P1 | API | `API-IDENTITY-001`, `LIMIT-001`, `API-EVENT-001` | — | Quotas, pagination, bulk operations, idempotency and regional operations |
 | 6160 | `SURFACE-ADAPTER-001` | OPEN | P1 | PRODUCT | `APP-SERVICE-001`, `SURFACE-CONTRACT-001`, `CAPABILITY-001` | — | Web, mobile, voice, chat, IDE, CI and ERP thin-adapter expansion |
 | 6165 | `DESKTOP-CUSTOMIZE-001` | OPEN | P1 | DESKTOP | `DESKTOP-REBORN-001` | — | User-facing interface personalization: theme/watch, font set and accent selection in the Desktop settings scene |
+| 6166 | `DESKTOP-WORKSPACE-LAYOUT-001` | OPEN | P1 | DESKTOP | `DESKTOP-REBORN-001`, `SURFACE-CONTRACT-001` | — | Versioned dock/split/tab/panel/preset workspace layout authority and migration |
 | 6170 | `DESIGN-SYSTEM-001` | OPEN | P1 | PRODUCT | — | — | Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity |
 | 6171 | `DESIGN-PRECISION-INSTRUMENT-001` | OPEN | P1 | PRODUCT | `DESKTOP-REBORN-001` | — | Precision Instrument becomes the calm, formal and enterprise-grade default across Desktop and Terminal; NOVA remains only an explicit operator visualization preset |
 | 6180 | `ERP-AGENT-CONTRACT-001` | OPEN | P2 | CONNECTOR | — | — | Enterprise Application Agent Contract: ERP/iş-uygulaması agent'larına (Oracle AI Agent Studio, Fusion/NetSuite sınıfı) karşı discover_capabilities / invoke / stream_status / request_approval / commit_transaction / cancel / compensate_or_rollback / collect_audit sözleşmesi |

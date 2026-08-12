@@ -65,6 +65,11 @@ English under `docs/en/` is canonical. Turkish under `docs/tr/` is a full-parity
 
 - [Master Plan — read-only SSOT](./MASTER-PLAN.md)
 
+## Product design north-star
+
+- [Desktop & Terminal Product Design Strategy](./design/DECKENT-DESKTOP-TERMINAL-NORTH-STAR.md) — owner-approved 55-section north-star; implementation SSOT değildir.
+- [Desktop & Terminal Repository Reconciliation](./design/DECKENT-DESKTOP-TERMINAL-RECONCILIATION.md) — repository evidence, decision dispositions and `MASTER-PLAN` execution crosswalk.
+
 Situational analyses moved to the owner-tracked `follow-up-works/` staging area
 (delete-on-consume — Alperen, 2026-08-12); finished doc-reset audit artifacts were
 retired. docs/ carries product documentation only.
