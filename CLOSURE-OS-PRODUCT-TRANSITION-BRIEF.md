@@ -85,9 +85,47 @@ Fable değerlendirmesiyle uzlaşılan düzeltmeler:
 
 1. Level × Lane önce generated side projection'da tutulacak; identity-definition toplu drift'i yaratılmayacak.
 2. Planner/settlement motorunun riskli yeniden yazımı ilk 14 günlük bootstrap'a alınmayacak; önce DIRECTIVES/package convention ile gerçek kanıt toplanacak.
-3. Priority adı mevcut `P00–P04` program kodlarıyla çakışmayacak; önerilen tier namespace'i `T00–T99` olacak. Exact mapping owner kararına tabidir.
+3. Ayrı bir priority namespace'i açılmayacak; `T00–T99` önerisi reddedildi. Canonical `P0/P1/P2` korunacak ve yalnız açık satırlar owner-reviewed disposition turunda dürüst re-triage görecek; terminal satırlar değişmeyecek.
 4. Doğrulama plan öncesine ve ilk üretim geçişine yaklaştırılacak; “preventable third pass” ayrı KPI olacaktır.
 5. İlk Closure Health/KPI projection'ı mevcut generated kaynaklardan script ile üretilecek; KPI takibi kendi başına manuel scope'a dönüşmeyecektir.
+
+### 3.5 Gate sistemi ürünün tamamını temsil edecek şekilde yeniden tasarlanacak
+
+Owner adjudication (2026-08-12): Sprint 524'te üretilen generic `GATE_FAILURE`, ürün-geneli
+settlement hükmü olarak geçerli değildir. Mevcut gate code-centric ve yüzeyseldir; scoped code
+testindeki bir honesty-trigger ifadesini global ürün başarısızlığına yükseltirken Deckent'in gerçek
+ürün kapsamını değerlendirmez. Sprint 524 terminal receipt'i owner tarafından `COMPLETE` kabul
+edilmiştir; mevcut gate kaydı yalnız legacy/code-audit sinyali olarak korunur.
+
+Deckent yalnız kod üreten bir developer tool değildir. Aynı ürün yüzeyi:
+
+- bireysel asistan olarak araştırma, iletişim ve e-posta işlerini;
+- pazar, rekabet, ürün ve veri analizini;
+- sipariş, üretim, operasyon ve agentic süreç yönetimini;
+- finansal analiz, nakit akışı ve kontrollü karar desteğini;
+- solo geliştirici, team, şirket ve enterprise ölçeğini;
+- milyonlarca kullanıcı, proje, tenant, dil ve environment'ı
+
+aynı governance-by-construction altında taşımalıdır. Bu nedenle gelecek gate authority'si tek bir
+`tsc + vitest + honesty-regex` sonucunu ürün hükmü sayamaz. Evrensel kernel; identity, authority,
+scope, consent/approval, provenance, evidence, side-effect, persistence, recovery ve settlement
+invariantlarını enforce eder. Task-kind/capability adapterları ise kendi domain kanıtlarını sağlar:
+
+| Capability ailesi | Örnek acceptance evidence |
+|---|---|
+| Code/development | Build, test, static analysis, security, runtime wiring, cross-platform binary proof |
+| Research/market | Kaynak authority, freshness, coverage, contradiction, methodology ve citation integrity |
+| Communication/email | Principal, recipient, consent, content review, delivery receipt, privacy ve reversal/remediation |
+| Order/operations | Authorization, idempotency, inventory/fulfillment reconciliation, exception ve audit trail |
+| Finance/cash flow | Source ledger, period/currency/accounting basis, reconciliation, uncertainty ve approval separation |
+| Enterprise agentic control | Tenant/RBAC, policy, segregation of duties, SLO, audit, retention ve reversible recovery |
+
+Gelecek outcome generic `GATE_FAILURE` değil; hangi gate profile/criterion/authority'nin hangi
+kanıtla doğrulandığını, refute edildiğini veya `HOLD` kaldığını açıklayan typed settlement olmalıdır.
+Unknown veya desteklenmeyen capability code gate'e zorlanmaz; dürüst typed `HOLD` verir. Exact
+yeniden tasarım ürünün mevcut closure hedefleri tamamlandıktan sonra, mevcut `EVALUATION-001`,
+`GOAL-ACCEPTANCE-001`, `KERNEL-SETTLEMENT-001` ve `SPRINT-HONESTY-001` outcome'ları altında
+disposition edilir; bu karar yeni root veya B16 scope'u doğurmaz.
 
 ## 4. Hız, bitiş tahmini ve iki haftalık kapasite
 
@@ -126,6 +164,31 @@ Agent/worker execution saati ile Alperen'in owner/decision saati aynı kapasite 
 - committed outcome sınırı dondurulmuş;
 - günlük verified closure kapasitesi P80 ihtiyacını karşılıyor;
 - born finding'ler otomatik olarak aynı iki haftalık scope'a girmiyor.
+
+### 4.4 Owner availability ve gece otonomi kontratı (13–26 Ağustos 2026)
+
+Bu takvim Alperen'in projede yalnız karar vereceği anlamına gelmez; 10 iş günlük aktif execution
+penceresidir. Agent/worker'lar admitted scope içinde üretim, doğrulama ve closure işlerini gün boyunca
+yürütür. Owner availability yalnız admission, yön, approval, review ve settlement kararlarının servis
+kapasitesidir; agent execution saatleriyle aynı havuzda sayılmaz.
+
+| Zaman/sıklık | Owner servis kontratı |
+|---|---|
+| 08:00–00:00, Europe/Istanbul (`UTC+3`) | Telegram bildirimi sonrası normal beklenti 30 dakika; planlama/garanti SLA'sı 45 dakika |
+| Karar batching | Dört saatte bir karar batch'i; konservatif planlama üst sınırı günde dört × 45 dakikalık owner penceresi |
+| Hafta içi | Toplantı/acil durum istisnası dışında 45 dakikalık SLA |
+| Hafta sonu | Müsaitlik değişken; erişilebilir olduğunda aynı 45 dakikalık SLA. 10 iş günü baseline kapasitesine zorunlu execution günü olarak eklenmez |
+| 00:00–08:00, Europe/Istanbul (`UTC+3`) | Uyku/quiet hours; owner yanıtı beklenmez, önceden admitted otonom çalışma zorunludur |
+
+Operasyon semantiği:
+
+- 45 dakika bir **response SLA**'sıdır; timeout sonunda sessiz veya otomatik onay üretmez.
+- Owner kararı bekleyen work item typed `owner_pending`/`HOLD` olur; bağımsız DAG lane'leri ve başka admitted package işleri ilerlemeye devam eder.
+- Gece kuyruğu 00:00'dan önce dependency, filesWrite, budget, proof ve rollback sınırlarıyla hazırlanır; owner gate'i gerektirmeyen işler 00:00–08:00 arasında çalışır.
+- Gece otonomisi yetki genişletmez: destructive işlem, external iletişim/yayın, credential/auth mutation, yeni scope admission veya karar gerektiren irreversible side effect fresh owner authority olmadan yapılmaz.
+- Telegram teslimi başarısızsa karar verilmiş sayılmaz; notification delivery typed olarak kaydedilir ve karar bir sonraki owner penceresine taşınır.
+- Bir karar bağımlılığının tüm filoyu boşta bırakmaması için scheduler, aynı closure outcome içindeki bağımsız lane'leri ve sonraki admitted, collision-free işleri hazır tutar.
+- Toplantı/acil durum sapmaları actual owner-latency metriğine yazılır; plan bu istisnaları sahte SLA ihlali veya otomatik scope gerekçesi yapmaz.
 
 ## 5. UI/UX backend ile paralel, fakat bağımsız olmayacak
 
@@ -256,18 +319,26 @@ UI veya Closure OS planı aşağıdaki sınırları bypass edemez:
 
 B16'nın görevi Closure OS bootstrap'tır: classification projection, admission/tiering convention ve script-derived health ölçümü. B16, riskli planner-engine rewrite veya bağımsız büyük UI feature package ile şişirilmez. UI tarafı contract/component harness olarak staged ilerleyebilir; production promotion dependency-bound package'larda yapılır.
 
-## 10. Sprint 524 sonrası önerilen karar ve uygulama sırası
+## 10. Karara bağlanan uygulama sırası (mantık-karar turu, 2026-08-12)
 
-1. Sprint 524 settlement truth'unu ve landing durumunu doğrula.
-2. Bu working brief'e Alperen'in kalan maddelerini ekle.
-3. Codex ve Fable ile bulgu/çelişki kontrolü yap; görüşleri authority değil review evidence olarak kaydet.
-4. MASTER satırlarını Level × Lane için machine-suggested side projection'a çıkar.
-5. Owner disposition/admission turunda outcome sınırı ve T-tier önerisini karara bağla.
-6. B16 Closure OS Bootstrap package'ını exact scope, dependencies, filesWrite ve receipts ile admit et.
-7. Yedi günlük gerçek Closure Health verisi topla; mature burn, born rate, WIP age ve third-pass oranını ölç.
-8. İki haftalık P50/P80 ETA ve owner/worker kapasite ihtiyacını yeniden hesapla.
-9. Sonraki capability package'larına Desktop + Terminal surface obligation'ı ekle.
-10. Ayrı owner-approved release-governance package'ında `0.100.0` ve changelog cutover'ını uygula.
+Sol çapraz-analizi + owner onayıyla bağlanan sıra (önceki taslak sıranın yerine geçer):
+
+1. Sprint 524 terminal receipt'inin disk-truth doğrulaması ve kabulü.
+2. Zorunlu host-run canlı xverify smoke — geçemiyorsa dürüst typed `unavailable/HOLD` kaydı (kalan katman: codex reachability evidence-source).
+3. Source/dist identity uzlaştırması — mevcut `BINARY_IDENTITY_WARN` + provider-observation HOLD'ları owner-koordinasyonlu build/reconnect akışıyla kapatılır.
+4. Read-only Level × Lane side projection üretimi + owner disposition turu; aynı pencerede açık satırların dürüst P0/P1/P2 re-triage önerileri üretilir.
+5. B16 Closure OS Bootstrap admission (exact scope, dependencies, filesWrite, receipts).
+6. Repo temizliği ve migration — YENİ satır açılmaz; mevcut ledger satırları (`REPO-MIGRATION`, `REPO-CLEANUP-APPLY`, `DOCS-ARCHIVE`, `STATE-PRUNE`) G3/G5 gate'leriyle yürütülür; yeni repo geçişi son adımdır.
+7. Yedi günlük gerçek Closure Health verisi sonrası P50/P80 ETA yayını; owner-onaylı müsaitlik takvimiyle kapasite hesabı.
+8. Ayrı release-governance package'ında iki-adımlı `0.100.0` (tag'sız rebaseline commit → RELEASE-001 gate'leri kapanınca gerçek release).
+
+İlk üç adımın owner-adjudicated durumu:
+
+| Adım | Durum | Kanıt/yorum |
+|---:|---|---|
+| 1 | `COMPLETE` | 13/13 terminal receipt + tarball digest doğrulandı; legacy code-only `GATE_FAILURE` owner kararıyla ürün settlement hükmü değildir |
+| 2 | `TYPED_HOLD_ACCEPTED` | Opus→Sol tier tabanı geçti; composition `xverify_candidate_evidence_unavailable` ile dürüst durdu; Fable→Sol tier düzeltmesi owner-approved implementation bekliyor |
+| 3 | `PARTIAL` | Source/dist identity uzlaştı ve binary warning kayboldu; unresolved provider-observation kayıtları ayrı authority reconciliation olarak açık |
 
 ## 11. Karar kaydı
 
@@ -277,7 +348,7 @@ B16'nın görevi Closure OS bootstrap'tır: classification projection, admission
 | Payda `Committed Outcomes` olacak | Kabul edildi | Owner yönü; exact schema B16'da |
 | Finding otomatik release backlog olmaz | Kabul edildi | Owner admission gerekir |
 | Level × Lane önce side projection | Kabul edildi | Fable düzeltmesiyle uzlaşıldı |
-| Priority için `T00–T99` namespace | Öneri | Owner final mapping bekliyor |
+| Priority için `T00–T99` namespace | REDDEDİLDİ (2026-08-12) | Çift numaralandırma gereksiz; P0/P1/P2 canonical kalır + dürüst re-triage (aşağıda) |
 | Planner/settlement motoru B16'ya alınmayacak | Kabul edilen bootstrap sınırı | Gerçek kanıt sonrası yeniden değerlendirilecek |
 | UI/UX backend ile aynı outcome altında paralel yürür | Kabul edildi | Contract-first join barrier |
 | Desktop ve Terminal aynı runtime'ın client'larıdır | Canonical product direction | North Star/Reconciliation |
@@ -285,6 +356,20 @@ B16'nın görevi Closure OS bootstrap'tır: classification projection, admission
 | External product dogfood | Yön hedefi; mevcut scope değil | NATIVE-DEV sonrası canary |
 | `1.0.0-beta` iptal, başlangıç `0.100.0` | Kabul edildi | Alperen, 2026-08-12 |
 | Her version bump canonical changelog ile izlenir | Kabul edildi | Release package'ında uygulanacak |
+| **Mantık-karar turu (2026-08-12; sol çapraz-analizi + owner onayı):** | | |
+| Priority ekseni: P0/P1/P2 canonical kalır; dürüst re-triage yapılır | Kabul edildi | "Her şey P0 olamaz" — açık satırlarda şeffaf yeniden dağıtım; terminal satır priority'sine dokunulmaz; öneri üretimi §10 adım-4 disposition turunda |
+| Born satırları YERİNDE kalır; ayrım generated `Born View` projection'da | Kabul edildi | Fiziksel taşıma = shadow-ledger/deletion (validator); terfi = imzalı disposition geçişi veya linked outcome, satır taşıma değil |
+| Sınıflandırma authority: sidecar karar-defteri | Kabul edildi | Projection non-authoritative; owner disposition/terfi kararları append-only versioned sidecar'a (receipt'li) yazılır; projection her üretimde defteri uygular; exact şema B16-öncesi projection işinde |
+| B16-öncesi sıra: sol sırası (§10) | Kabul edildi | Receipt → canlı xverify smoke/HOLD → identity uzlaşı → projection+disposition → B16 → mevcut ledger satırlarıyla temizlik/migration |
+| İlk post-B16 outcome: Run Observation, `RUN-INSPECTOR-001` üzerinden | Kabul edildi | Yeni satır açılmaz; ilk paket = inspector read-model genişletme + Desktop `sprint-live-service` emekliliği (status split-brain kapanışı); Desktop+Terminal read-only surface obligation |
+| Kapasite: 10 iş günü + owner-onaylı müsaitlik takvimi | Kabul edildi | ≤2h/gün varsayımı atıldı; owner takvim beyan eder, plan ona kurulur; P50/P80 ancak 7 günlük gerçek kuyruk/servis verisiyle |
+| `0.100.0` iki adım: tag'sız rebaseline + gate'li release | Kabul edildi | Adım-1 yalnız version+changelog commit'i (yeni repoda, TAG YOK); adım-2 RELEASE-001 gate'leri kapanınca ayrı release package |
+| Publish authority: owner-manual CANONICAL | Kabul edildi | `release.yml`'den npm-publish adımı kaldırılacak (workflow yalnız build+validate+release-notes); npm publish daima Alperen elle — çifte-authority çatışması kapandı |
+| `gpt-5.6-sol` model tier'ı `premium_plus` olacak | Kabul edildi | Owner, 2026-08-12; global model registry amendment olarak uygulanacak, hardcoded xverify bypass yapılmayacak |
+| Sprint 524 generic `GATE_FAILURE` ürün settlement hükmü değildir | Kabul edildi | Owner adjudication: code-centric legacy signal; 524 receipt `COMPLETE` kabul edildi |
+| Gate authority Deckent'in çok-domain ürün kapsamına göre baştan tasarlanacak | Kabul edildi, ileriki closure | Code-only gate değil; task-kind/capability evidence adapterları + universal governance kernel; önce mevcut ürün closure hedefleri |
+| Sidecar karar-defteri revizyon 2 kontratı | Kabul edildi | Owner, 2026-08-12; `docs/governance/closure-dispositions.jsonl`, typed event/authority proof/external anchor/append-only gate (§12.1) |
+| 13–26 Ağustos owner karar-servis kontratı | Kabul edildi | 08:00–00:00 UTC+3, Telegram sonrası 45 dk garanti SLA, dört saatlik batch cadence; 00:00–08:00 otonom execution zorunlu (§4.4) |
 
 ## 12. Açık maddeler
 
@@ -302,13 +387,26 @@ B16 ilişkisi:
 Owner kararı:
 ```
 
-Henüz açık olan ana kararlar:
+Mantık-karar turu (2026-08-12) önceki beş açık maddenin TAMAMINI karara bağladı (bkz. §11).
+Kalan açık maddeler:
 
-- B16 öncesindeki owner-critical maddelerin exact listesi ve sırası.
-- İlk post-B16 closure outcome'u ve ona bağlanacak UI surface obligation.
-- `T00–T99` exact tier anlamları ve migration yöntemi.
-- İki haftalık hedefin 10 iş günü mü, 14 takvim günü mü olduğu; owner availability sınırı.
-- `0.100.0` cutover'ının geçmiş tag/release truth ile exact migration ve yayın tarihi.
+- `release.yml` npm-publish adımının kaldırılması — RELEASE-001 kapsamında; 0.100.0 adım-1'inden önce yapılmalı.
+- Codex reachability evidence-source (xverify son katmanı) — §10 adım-2'nin canlı smoke'unu mümkün kılar; yoksa typed HOLD. **2026-08-12 canlı smoke kaydı:** `xv-1786534081751` — Opus→Sol tier-taban geçti, kompozisyon dürüst typed HOLD: `xverify_candidate_evidence_unavailable`. `xv-1786534007938` Fable→Sol tier çelişkisini kanıtladı; owner `gpt-5.6-sol → premium_plus` registry amendment'ını onayladı. Source değişikliği ve yeni smoke henüz uygulanmadı.
+
+### 12.1 Sidecar karar-defteri kontratı — revizyon 2 (owner-approved, 2026-08-12)
+
+Kabul edilen "sidecar karar-defteri" kararının exact kontratı — §10 adım-4 projection işi bu
+kontratı eksiksiz uygular; daha zayıf bir şema canonical sayılamaz:
+
+- **Konum:** `docs/governance/closure-dispositions.jsonl` — repo-tracked, append-only; geçmiş event satırı silinmez veya değiştirilmez. Düzeltme yeni `supersede/revoke` event'iyle yapılır.
+- **Authority ayrımı:** MASTER work identity/state ledger'ının authority'sidir. Sidecar Level×Lane, born disposition, admission ve priority-decision authority'sidir. Generated Active/Born/Closure Health view'ları non-authoritative projection'dır.
+- **Typed event şeması (v1):** `{schemaVersion, seq, eventId, recordedAt, rowRef, decision, authorityProof, evidenceRefs, supersedesSeq?, previousEventDigest, eventDigest}`. `rowRef`, `workId + rowDefinitionDigest + masterSourceDigest` taşır. `decision`, kind'a göre typed union'dır; belirsiz genel `from/to` çifti değildir.
+- **Decision kind'ları:** `level-lane-disposition`, `priority-retriage`, `born-promotion`, `admission`, `supersede`, `revoke`. Level, Lane, priority ve admission-state enum'ları tek schema registry'den gelir.
+- **Owner authority proof:** salt `actor` string'i yeterli değildir. Her event authenticated owner decision receipt/signature referansı taşır; reviewed batch commit-bound settlement receipt ile kapanır. İmza/receipt authority unavailable ise event canonical promotion yapamaz ve typed `HOLD` kalır.
+- **Hash zinciri:** canonical JSON encoding version ve digest algorithm şemada sabittir. Her event önceki digest'i bağlar; her reviewed batch'in head digest'i repo dışı/externally anchored evidence snapshot veya mevcut Git trust authority'ye receipt ile bağlanır. Salt dosya-içi `prevDigest`, bütün dosyanın yeniden yazılmasına karşı yeterli sayılmaz.
+- **Projection semantiği:** producer eventleri `seq` sırasında uygular. Bilinmeyen row, definition/source digest drift'i, sequence gap, kırık chain, authority-proof eksikliği veya çakışan active decision ilgili satırı typed `HOLD` yapar; sessiz atlama/fallback yoktur.
+- **Priority uygulaması:** yalnız açık satırlar owner-reviewed batch ile MASTER Priority kolonuna taşınır; terminal satırlara dokunulmaz. Commit ve settlement receipt uygulanan exact `seq` aralığını ve head digest'i taşır.
+- **Makine-gate:** `scripts/lint-closure-dispositions.mjs`; schema/enum, canonical digest, chain, row/source identity, authority proof, active-decision conflict ve merge-base'e göre byte-prefix append-only diff'i doğrular. Bypass/unknown environment açık typed HOLD verir.
 
 ## 13. İncelenen canonical girdiler
 
