@@ -253,13 +253,22 @@ export function registerSkill(program: Command): void {
         // snapshot — same read model as MCP and the S8 determinism gate. The
         // legacy raw scan (loadAllSkills) stays only for non-catalog commands.
         const snapshot = snapshotSkillCatalog(root);
-        let skills = snapshot.entries.map((entry) => ({
-          ...normalizeSkillForRender(entry.definition as unknown as SkillDefinition),
+        let skills = snapshot.entries.map((entry) => {
+          const rendered = normalizeSkillForRender(entry.definition as unknown as SkillDefinition);
+          // The catalog normalizer stamps `triggers: []` on a manifest that
+          // declared none, which starved the v2 activation-derived triggers the
+          // raw-scan path used to render (born-558 pin) — an EMPTY list still
+          // derives; an authored list still wins.
+          if (rendered.triggers.length === 0) {
+            rendered.triggers = deriveTriggersFromActivation((entry.definition as SkillDefinition).activation);
+          }
+          return {
+          ...rendered,
           layer: entry.layer,
           disposition: entry.disposition,
           masked: entry.masked,
           profileState: (entry.definition as { routing?: { profileState?: string } }).routing?.profileState ?? null,
-        }));
+        };});
 
         if (opts.category) {
           skills = skills.filter((s) => s.category === opts.category);

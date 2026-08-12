@@ -52,11 +52,16 @@ describe('seedDocsConfig', () => {
       'utf-8',
     );
 
-    // Seed should not overwrite
+    // 83a1eebd2 (workspace-artifact authority): seed MERGES the
+    // workspace-managed entries into an existing config — custom entries are
+    // preserved, never clobbered, and the managed set is guaranteed present.
     seedDocsConfig(TEST_ROOT);
     const config = loadDocsConfig(TEST_ROOT);
-    expect(config!.docs).toHaveLength(1);
-    expect(config!.docs[0]!.id).toBe('custom');
+    const custom = config!.docs.find((d) => d.id === 'custom');
+    expect(custom).toBeDefined();
+    expect(custom!.autoSections).toEqual(['My Section']);
+    expect(config!.docs.length).toBeGreaterThan(1);
+    expect(config!.docs.some((d) => d.id === 'identity-md')).toBe(true);
   });
 
   it('is idempotent — calling twice produces same result', () => {

@@ -30,6 +30,10 @@ describe('docs.json.template', () => {
     const identityDoc = tpl.docs.find(d => d.id === 'identity-md');
     expect(identityDoc).toBeDefined();
     expect(identityDoc!.path).toBe('.deckent/workspace/IDENTITY.md');
-    expect(identityDoc!.autoSections).toContain('Project Status');
+    // 83a1eebd2 (workspace-artifact authority): Project Status moved from
+    // autoSections to protectedSections — identity is versioned-artifact
+    // owned now, the managed-docs pipeline may no longer auto-rewrite it.
+    expect(identityDoc!.autoSections).toEqual([]);
+    expect(identityDoc!.protectedSections).toContain('Project Status');
   });
 });
