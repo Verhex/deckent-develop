@@ -49,13 +49,12 @@ const PROVIDERS = {
     endpointRefHash: 'b'.repeat(64), runtimeFingerprint: 'c'.repeat(64),
   },
   codex: {
-    // MASTER-PLAN 670 (owner-approved 2026-07-26): codex/premium designates
-    // gpt-5.6-sol. Reachability + limit evidence is keyed by EXACT model, so the
+    // Codex/premium designates gpt-5.5. Reachability + limit evidence is keyed by EXACT model, so the
     // fixture must carry evidence for the designated one — with evidence only for
     // the previous generation the runtime honestly holds (`authority_unavailable`)
     // instead of dispatching an unevidenced model. Same is true on a real host:
     // the flip requires fresh per-model evidence, it does not inherit it.
-    model: 'gpt-5.6-sol', accountRefHash: 'd'.repeat(64),
+    model: 'gpt-5.5', accountRefHash: 'd'.repeat(64),
     endpointRefHash: 'e'.repeat(64), runtimeFingerprint: 'f'.repeat(64),
   },
 } as const;
@@ -295,7 +294,7 @@ describe('HostRoleInvocationAdmissionRuntime', () => {
       state: 'ready',
       candidate: {
         provider: 'codex',
-        model: 'gpt-5.6-sol',
+        model: 'gpt-5.5',
         auth: { mode: 'api', accountRefHash: PROVIDERS.codex.accountRefHash },
         backend: {
           transport: 'http',
@@ -410,9 +409,9 @@ describe('HostRoleInvocationAdmissionRuntime', () => {
     const { truthStore, limitStore, runtime } = await setup({ claude: 0 });
     const result = runtime.admit(request(truthStore, 'worker'));
     expect(result).toMatchObject({
-      decision: 'allow', reservation: { provider: 'codex', model: 'gpt-5.6-sol' },
+      decision: 'allow', reservation: { provider: 'codex', model: 'gpt-5.5' },
       resolution: {
-        role: 'worker', selected: { provider: 'codex', model: 'gpt-5.6-sol' },
+        role: 'worker', selected: { provider: 'codex', model: 'gpt-5.5' },
         fallbackChain: [{ fromProvider: 'claude', toProvider: 'codex' }],
       },
     });
@@ -547,12 +546,12 @@ describe('HostRoleInvocationAdmissionRuntime', () => {
         ...input.candidates,
         // MUST be a registered codex model that is NOT the one codex/premium
         // designates — the mismatch is the whole subject of this assertion. If a
-        // future designation ever names gpt-5.5, this literal has to move again,
+        // future designation ever names gpt-5.6-sol, this literal has to move again,
         // and the `expect` below is what will say so.
-        codex: { ...input.candidates.codex!, model: 'gpt-5.5' },
+        codex: { ...input.candidates.codex!, model: 'gpt-5.6-sol' },
       },
     });
-    expect(modelRegistry.getByProviderAndTier('codex', 'premium')?.id).not.toBe('gpt-5.5');
+    expect(modelRegistry.getByProviderAndTier('codex', 'premium')?.id).not.toBe('gpt-5.6-sol');
     expect(fallbackMismatched).toMatchObject({
       decision: 'hold', reasonCode: 'authority_identity_mismatch',
       resolution: { selected: null, resolved: { provider: null } },

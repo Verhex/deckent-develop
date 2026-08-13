@@ -114,7 +114,7 @@ describe('resolveTaskModel — codex provider', () => {
       'Architect migration refactor', 'Cross-cutting refactor', scope, config, patterns,
       undefined, undefined, 'codex',
     );
-    expect(result).toBe('gpt-5.6-sol');
+    expect(result).toBe('gpt-5.5');
   });
 
 });
@@ -167,7 +167,7 @@ describe('resolveTaskModel — forceModel + provider', () => {
       'Forced task', 'Forced model', scope, config, patterns,
       'claude-opus-4-8', undefined, 'codex',
     );
-    expect(result).toBe('gpt-5.6-sol');
+    expect(result).toBe('gpt-5.5');
   });
 
   it('forceModel=sonnet on gemini returns sonnet (adapter provider — forceModel is authoritative)', () => {
@@ -260,6 +260,6 @@ describe('resolveTaskModel — layer interactions with provider', () => {
       undefined, ['claude-opus-4-8'], 'codex',
     );
     // skill upgrades to opus, no caps apply, codex mapping -> gpt-5
-    expect(result).toBe('gpt-5.6-sol');
+    expect(result).toBe('gpt-5.5');
   });
 });

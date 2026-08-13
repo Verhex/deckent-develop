@@ -458,7 +458,7 @@ describe('buildPlannerSpawnArgs', () => {
 
   it('maps the task default into the configured worker provider namespace', () => {
     const policy = createPlannerTaskModelPolicy('claude-opus-4-8', 'codex');
-    expect(policy.defaultModel).toBe('gpt-5.6-sol');
+    expect(policy.defaultModel).toBe('gpt-5.5');
     expect(policy.allowedModels.length).toBeGreaterThan(0);
     expect(policy.allowedModels.every((model) => modelRegistry.get(model)?.provider === 'codex')).toBe(true);
   });

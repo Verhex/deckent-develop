@@ -11,6 +11,11 @@ import type {
   ApprovalDecisionAuthorization,
   ApprovalRequest,
 } from './approval-contract.js';
+import type { ProviderEvidenceProbeSubject } from './provider-evidence-probe-contract.js';
+
+/** Closed operation-subject vocabulary carried through the existing approval protocol. */
+export type ApprovalOperationSubject = ProviderEvidenceProbeSubject;
+export const PROVIDER_EVIDENCE_PROBE_APPROVAL_SUBJECT_KIND = 'provider-evidence-probe' as const;
 
 const SHA256_HEX = /^[a-f0-9]{64}$/u;
 
@@ -291,8 +296,7 @@ export class ApprovalDecisionIngress {
     const request = this.options.broker.getRequest(command.requestId);
     if (!request) return { kind: 'rejected', reason: 'unknown-request' };
 
-    const now = this.now();
-    if (now.getTime() >= Date.parse(request.expiresAt)) {
+    if (this.now().getTime() >= Date.parse(request.expiresAt)) {
       return { kind: 'expired', requestId: request.id, expiresAt: request.expiresAt };
     }
     const requestDigest = approvalRequestDigest(request);
@@ -306,6 +310,14 @@ export class ApprovalDecisionIngress {
       });
     } catch {
       return { kind: 'rejected', reason: 'unavailable' };
+    }
+    // Re-snapshot AFTER the (possibly interactive, seconds-long) live re-auth:
+    // an authenticatedAt minted while the operator was typing must not read as
+    // "in the future" against a pre-prompt clock, and a request that expired
+    // DURING the prompt must still fail closed as expired, never mint.
+    const now = this.now();
+    if (now.getTime() >= Date.parse(request.expiresAt)) {
+      return { kind: 'expired', requestId: request.id, expiresAt: request.expiresAt };
     }
     if (!live
       || live.actorId !== request.userId

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { canonicalJson } from '../core/audit-writer.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
+import { debugLog } from '../core/utils.js';
 import {
   assertCrossVerifyEnforcedAttemptContract,
   sameCrossVerifyExecutionContract,
@@ -10,6 +11,7 @@ import {
 import {
   type HostRoleInvocationAdmissionRequest,
   type HostRoleInvocationAdmissionResult,
+  type HostRoleInvocationNonReservableSubscription,
   HostRoleInvocationAdmissionRuntime,
 } from '../core/host-role-invocation-admission-runtime.js';
 import {
@@ -44,8 +46,7 @@ type SettlementEvent = ProviderLimitReservationEvent & { readonly type: 'consume
 type TransportEvent = Extract<InvocationEvent, { type: 'transport_settled' }>;
 type ConsumerEvent = Extract<InvocationEvent, { type: 'consumer_settled' }>;
 
-export interface CrossVerifyInvocationExecutionGrant extends ProviderLimitExecutionGrant {
-  readonly reservation: Readonly<ProviderLimitReservation>;
+interface CrossVerifyExecutionGrantCommon {
   readonly tenantId: string;
   readonly projectId: string;
   readonly runId: string;
@@ -56,6 +57,9 @@ export interface CrossVerifyInvocationExecutionGrant extends ProviderLimitExecut
   readonly provider: string;
   readonly model: string;
   readonly receiptRef: InvocationReceiptRef;
+  /** The canonical invocation-receipt ref string (`invocation-receipt:…`) —
+   *  identical on both arms; the non-reservable termination binding reads it. */
+  readonly invocationReceiptRef: string;
   readonly backend: ProviderLimitReservation['backend'] & {
     readonly executionProfileRef: string;
   };
@@ -64,7 +68,32 @@ export interface CrossVerifyInvocationExecutionGrant extends ProviderLimitExecut
     readonly accountRefHash: string | null;
   };
   readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContract>;
+  /** Dispatch evidence ref: the reservation-ledger `dispatched` event (reserved)
+   *  or the invocation-ledger `dispatch_started` event (non-reservable). */
+  readonly dispatchEventRef: string;
+  readonly dispatchEventHash: string;
 }
+
+/** Reserved arm — carries the numeric reservation; byte-identical to the prior grant. */
+export interface CrossVerifyReservedExecutionGrant
+extends CrossVerifyExecutionGrantCommon, ProviderLimitExecutionGrant {
+  readonly admissionMode: 'reserved';
+  readonly reservation: Readonly<ProviderLimitReservation>;
+}
+
+/**
+ * Non-reservable subscription arm — NO numeric reservation and NO reservation
+ * identity is fabricated. There is no `reservationId`; the dispatch is keyed by
+ * the invocation-ledger event and the grant's own identity fields.
+ */
+export interface CrossVerifyNonReservableExecutionGrant extends CrossVerifyExecutionGrantCommon {
+  readonly admissionMode: 'non_reservable_subscription';
+  readonly reservation: null;
+}
+
+export type CrossVerifyInvocationExecutionGrant =
+  | CrossVerifyReservedExecutionGrant
+  | CrossVerifyNonReservableExecutionGrant;
 
 export interface CrossVerifyActualCallEvidence {
   readonly provider: string;
@@ -111,6 +140,33 @@ export type CrossVerifyProviderUsageProjection =
       readonly authorityEvidenceRef: string;
     };
 
+export type CrossVerifyNonReservableUsageProjection =
+  | {
+      readonly state: 'settled';
+      /**
+       * Real, transport-reported usage counters (e.g. total tokens). No usd on a
+       * subscription; no estimate- or reservation-derived amount. No provider
+       * limit reservation event is produced (there is no reservation to settle).
+       */
+      readonly usage: {
+        readonly totalTokens: number;
+        readonly inputTokens: number | null;
+        readonly outputTokens: number | null;
+      };
+      readonly usageEvidenceRef: string;
+      readonly authorityEvidenceRef: string;
+    }
+  | {
+      readonly state: 'hold';
+      readonly reasonCode:
+        | 'usage_unavailable'
+        | 'usage_lineage_partial'
+        | 'actual_call_mismatch'
+        | 'termination_unverified'
+        | 'authority_failure';
+      readonly authorityEvidenceRef: string;
+    };
+
 export type CrossVerifyProviderUsagePreflight =
   | {
       readonly state: 'ready';
@@ -139,6 +195,17 @@ export interface CrossVerifyProviderUsageAuthority {
     readonly reservation: ProviderLimitReservation;
     readonly terminal: Readonly<CrossVerifyTerminalEvidenceBundle>;
   }): CrossVerifyProviderUsageProjection;
+  /**
+   * B2 — non-reservable subscription usage. Records ONLY what the canonical
+   * transport actually reported (the terminal usage receipt); never derives an
+   * amount from an estimate or reservation, and never fabricates a usd figure
+   * for a subscription. Absent/malformed transport usage is a typed
+   * `usage_unavailable` HOLD, not a silent zero.
+   */
+  projectNonReservable(input: {
+    readonly grant: Readonly<CrossVerifyInvocationExecutionGrant>;
+    readonly terminal: Readonly<CrossVerifyTerminalEvidenceBundle>;
+  }): CrossVerifyNonReservableUsageProjection;
 }
 
 export interface CrossVerifyInvocationCoordinatorAuthorities {
@@ -153,6 +220,14 @@ export interface CrossVerifyInvocationCoordinatorInput {
   readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContract>;
   readonly executionRequest: Readonly<CrossVerifyStrictExecutionRequest>;
   readonly buildDispatchEvent: (admission: ProviderLimitAdmissionAllowed) => DispatchEvent;
+  /**
+   * Pre-built non-reservable subscription admission (advisory `percent`-only
+   * windows under the owner flag). When present, the coordinator takes the
+   * non-reservable branch: it does NOT call the reservation-producing admission
+   * runtime, and no reservation-ledger event is ever emitted. Absent → the
+   * byte-identical reserved path via `admissionRuntime.admit`.
+   */
+  readonly nonReservableAdmission?: HostRoleInvocationNonReservableSubscription;
   /** Re-read the host claim immediately before each irreversible boundary. */
   readonly isClaimActive: () => boolean;
 }
@@ -193,7 +268,7 @@ export type CrossVerifyHostObservation =
 export interface CrossVerifyHostObservationAuthority {
   observe(input: {
     readonly grant: Readonly<CrossVerifyInvocationExecutionGrant>;
-    readonly reservation: ProviderLimitReservation;
+    readonly reservation: ProviderLimitReservation | null;
     readonly dispatch: Readonly<CrossVerifyStrictDispatchHandle>;
   }): Promise<CrossVerifyHostObservation>;
 }
@@ -204,9 +279,17 @@ export type CrossVerifyInvocationCoordinatorResult =
       readonly output: string;
       readonly execution: CrossVerifyExecutionEvidence;
       readonly invocationReceiptRef: InvocationReceiptRef;
-      readonly providerLimitReservationId: string;
+      /** Null on a non-reservable subscription dispatch (no numeric reservation). */
+      readonly providerLimitReservationId: string | null;
       readonly providerLimitDispatchEvidenceRef: string;
-      readonly providerLimitSettlementEvidenceRef: string;
+      /** Null on a non-reservable subscription dispatch (no reservation-ledger settlement). */
+      readonly providerLimitSettlementEvidenceRef: string | null;
+      /**
+       * Real transport-reported usage evidence for a non-reservable dispatch
+       * (B2). Null on the reserved path, where usage settles through the
+       * reservation-ledger `consumed` event instead.
+       */
+      readonly providerReportedUsageEvidenceRef: string | null;
       readonly executionContractEvidenceRef: string;
       readonly outputArtifactRef: string;
       readonly hostObservationEvidenceRef: string;
@@ -490,42 +573,64 @@ function buildReceipt(
   projection: ReadyProjection,
   admission: HostRoleInvocationAdmissionResult,
 ): InvocationReceipt {
-  if (admission.decision !== 'allow') {
+  if (admission.decision === 'hold') {
     throw createExecutionAuthorityError('Executable xverify receipt requires an allowed admission');
   }
   const projected = projection.invocationReceipt.receipt;
-  const reservation = admission.reservation;
   const candidate = projection.verifierCandidates[0];
-  if (reservation.provider !== candidate.provider
-    || reservation.model !== candidate.model
-    || reservation.authMode !== candidate.auth.mode
-    || reservation.accountRefHash !== candidate.auth.accountRefHash
-    || !sameBackend(reservation.backend, candidate.backend)
-    || reservation.reachabilityEvidenceRef !== candidate.reachability.evidenceRef
-    || admission.resolution.selected?.provider !== candidate.provider
-    || admission.resolution.selected.model !== candidate.model) {
-    throw createExecutionAuthorityError(
-      'Admitted xverify route differs from the exact verifier projection',
-    );
+  let called: { readonly provider: string; readonly model: string };
+  let backend: InvocationReceipt['backend'];
+  let auth: InvocationReceipt['auth'];
+  if (admission.decision === 'allow') {
+    const reservation = admission.reservation;
+    if (reservation.provider !== candidate.provider
+      || reservation.model !== candidate.model
+      || reservation.authMode !== candidate.auth.mode
+      || reservation.accountRefHash !== candidate.auth.accountRefHash
+      || !sameBackend(reservation.backend, candidate.backend)
+      || reservation.reachabilityEvidenceRef !== candidate.reachability.evidenceRef
+      || admission.resolution.selected?.provider !== candidate.provider
+      || admission.resolution.selected.model !== candidate.model) {
+      throw createExecutionAuthorityError(
+        'Admitted xverify route differs from the exact verifier projection',
+      );
+    }
+    called = { provider: reservation.provider, model: reservation.model };
+    backend = {
+      transport: reservation.backend.transport,
+      executionBackend: reservation.backend.executionBackend,
+    };
+    auth = { mode: reservation.authMode, accountRefHash: reservation.accountRefHash };
+  } else {
+    // non_reservable_subscription — the identity source is the exact verifier
+    // candidate (there is no numeric reservation). The same route-drift guard
+    // against the projection still holds; reachability must be proven.
+    if (candidate.reachability.evidenceRef === null
+      || admission.resolution.selected?.provider !== candidate.provider
+      || admission.resolution.selected.model !== candidate.model) {
+      throw createExecutionAuthorityError(
+        'Admitted xverify route differs from the exact verifier projection',
+      );
+    }
+    called = { provider: candidate.provider, model: candidate.model };
+    backend = {
+      transport: candidate.backend.transport,
+      executionBackend: candidate.backend.executionBackend,
+    };
+    auth = { mode: candidate.auth.mode, accountRefHash: candidate.auth.accountRefHash };
   }
   const receipt: InvocationReceipt = {
     ...projected,
     configured: admission.resolution.configured,
     resolved: admission.resolution.resolved,
     called: {
-      provider: reservation.provider,
-      model: reservation.model,
+      provider: called.provider,
+      model: called.model,
       source: 'wire',
       reasonCode: 'none',
     },
-    backend: {
-      transport: reservation.backend.transport,
-      executionBackend: reservation.backend.executionBackend,
-    },
-    auth: {
-      mode: reservation.authMode,
-      accountRefHash: reservation.accountRefHash,
-    },
+    backend,
+    auth,
     fallbackChain: admission.resolution.fallbackChain,
     reachability: admission.resolution.reachability,
     limits: admission.resolution.limits,
@@ -640,6 +745,27 @@ function assertUsageSettlement(
 }
 
 /**
+ * Seam-A — the non-reservable analog of `assertUsageSettlement`. There is no
+ * `consumed` reservation event on this arm; the proof that the provider call
+ * truly happened is the terminal's own actual-call + succeeded-transport
+ * evidence. Re-assert the acceptance binding so an accepted verdict can NEVER
+ * settle without a proven provider call, giving the same integrity guarantee the
+ * reserved arm gets from its consumed event. The reserved `assertUsageSettlement`
+ * is untouched.
+ */
+function assertNonReservableUsageSettlement(
+  terminal: CrossVerifyTerminalEvidenceBundle,
+): void {
+  if (terminal.consumerEvent.payload.outcome === 'accepted'
+    && (terminal.actualCall === null
+      || terminal.transportEvent.payload.outcome !== 'succeeded')) {
+    throw createExecutionAuthorityError(
+      'Accepted non-reservable xverify verdict requires a proven provider call',
+    );
+  }
+}
+
+/**
  * Host-owned auditor invocation saga.
  *
  * Receipt and provider-limit stores are separate durability domains. Every
@@ -690,52 +816,71 @@ export class CrossVerifyInvocationCoordinator {
         return hold('XVERIFY_INVOCATION_CLAIM_INACTIVE', projection.binding.attemptId);
       }
 
-      const admissionRequest = bindAdmission(input);
-      const admission = this.authorities.admissionRuntime.admit(admissionRequest);
+      const admission: HostRoleInvocationAdmissionResult = input.nonReservableAdmission
+        ? input.nonReservableAdmission
+        : this.authorities.admissionRuntime.admit(bindAdmission(input));
       if (admission.decision === 'hold') {
         return hold(
           `XVERIFY_INVOCATION_HOLD:${admission.reasonCode}`,
           admission.authorityEvidenceRef,
         );
       }
+      // The reserved arm carries a numeric reservation; the non-reservable
+      // subscription arm carries none. `reserved` narrows the union so every
+      // reservation-ledger sub-step below is compiler-scoped to the allow arm —
+      // the non-reservable arm can never reach claimDispatch/settleDispatch.
+      const reserved = admission.decision === 'allow' ? admission : null;
+      const candidate = projection.verifierCandidates[0];
       const receipt = buildReceipt(projection, admission);
-      const usagePreflight = this.authorities.usageAuthority.preflight({
-        reservation: admission.reservation,
-        executionProfileRef: projection.verifierCandidates[0].backend.executionProfileRef,
-      });
-      assertOpaqueEvidenceRef(
-        'xverify usage preflight authority',
-        usagePreflight.authorityEvidenceRef,
-        true,
-      );
-      if (usagePreflight.state === 'hold') {
-        return hold(
-          `XVERIFY_INVOCATION_USAGE_HOLD:${usagePreflight.reasonCode}`,
+      if (reserved) {
+        const usagePreflight = this.authorities.usageAuthority.preflight({
+          reservation: reserved.reservation,
+          executionProfileRef: candidate.backend.executionProfileRef,
+        });
+        assertOpaqueEvidenceRef(
+          'xverify usage preflight authority',
           usagePreflight.authorityEvidenceRef,
+          true,
         );
+        if (usagePreflight.state === 'hold') {
+          return hold(
+            `XVERIFY_INVOCATION_USAGE_HOLD:${usagePreflight.reasonCode}`,
+            usagePreflight.authorityEvidenceRef,
+          );
+        }
       }
       ref = ledger.declare(receipt).ref;
       if (!input.isClaimActive()) {
         return hold('XVERIFY_INVOCATION_CLAIM_EXPIRED_BEFORE_DISPATCH', projection.binding.attemptId, ref);
       }
 
-      const dispatchEvent = input.buildDispatchEvent(admission);
-      if (dispatchEvent.type !== 'dispatched'
-        || dispatchEvent.fenceTokenHash !== projection.binding.fenceTokenHash) {
-        throw createExecutionAuthorityError(
-          'Xverify dispatch event is outside the exact claim fence',
-        );
+      // Reserved: open a numeric reservation-ledger `dispatched` event and take
+      // its execution grant. Non-reservable: no reservation ledger exists — the
+      // invocation-ledger dispatch_started event (appended below) is the sole
+      // dispatch evidence, and NO reservation identity is fabricated.
+      let reservedDispatchGrant: ProviderLimitExecutionGrant | null = null;
+      if (reserved) {
+        const dispatchEvent = input.buildDispatchEvent(reserved);
+        if (dispatchEvent.type !== 'dispatched'
+          || dispatchEvent.fenceTokenHash !== projection.binding.fenceTokenHash) {
+          throw createExecutionAuthorityError(
+            'Xverify dispatch event is outside the exact claim fence',
+          );
+        }
+        const dispatch = this.authorities.admissionRuntime.claimDispatch(reserved, dispatchEvent);
+        if (!dispatch.claimed) {
+          return reconciliationRequired(
+            'XVERIFY_INVOCATION_DISPATCH_ALREADY_CLAIMED',
+            dispatch.existingDispatchEvidenceRef,
+            ref,
+            dispatch.existingDispatchEvidenceRef,
+          );
+        }
+        dispatchEvidenceRef = dispatch.executionGrant.dispatchEventRef;
+        reservedDispatchGrant = dispatch.executionGrant;
+      } else {
+        dispatchEvidenceRef = `invocation-receipt-event:${eventId(receipt.invocationId, 'dispatch-started')}`;
       }
-      const dispatch = this.authorities.admissionRuntime.claimDispatch(admission, dispatchEvent);
-      if (!dispatch.claimed) {
-        return reconciliationRequired(
-          'XVERIFY_INVOCATION_DISPATCH_ALREADY_CLAIMED',
-          dispatch.existingDispatchEvidenceRef,
-          ref,
-          dispatch.existingDispatchEvidenceRef,
-        );
-      }
-      dispatchEvidenceRef = dispatch.executionGrant.dispatchEventRef;
       ledger.append(scope, receipt.invocationId, {
         eventId: eventId(receipt.invocationId, 'dispatch-started'),
         type: 'dispatch_started',
@@ -750,12 +895,11 @@ export class CrossVerifyInvocationCoordinator {
         );
       }
 
-      const candidate = projection.verifierCandidates[0];
-      const grant = deepFreeze<CrossVerifyInvocationExecutionGrant>({
-        ...dispatch.executionGrant,
-        reservation: JSON.parse(
-          JSON.stringify(admission.reservation),
-        ) as ProviderLimitReservation,
+      // Identity for the grant/launcher is the numeric reservation (reserved) or
+      // the exact verifier candidate (non-reservable) — same provider/model/
+      // backend/auth on both arms, already validated against the projection in
+      // buildReceipt. The reserved arm is byte-identical to its prior form.
+      const grantCommon = {
         tenantId: receipt.tenantId,
         projectId: receipt.projectId,
         runId: receipt.runId,
@@ -763,27 +907,49 @@ export class CrossVerifyInvocationCoordinator {
         callId: receipt.callId,
         attemptId: projection.binding.attemptId,
         fenceTokenHash: projection.binding.fenceTokenHash,
-        provider: admission.reservation.provider,
-        model: admission.reservation.model,
+        provider: reserved ? reserved.reservation.provider : candidate.provider,
+        model: reserved ? reserved.reservation.model : candidate.model,
         receiptRef: { ...ref },
-        backend: deepFreeze({
-          ...admission.reservation.backend,
-          executionProfileRef: candidate.backend.executionProfileRef,
-        }),
-        auth: deepFreeze({
-          mode: admission.reservation.authMode,
-          accountRefHash: admission.reservation.accountRefHash,
-        }),
+        invocationReceiptRef: projection.identity.receiptRef,
+        backend: reserved
+          ? { ...reserved.reservation.backend, executionProfileRef: candidate.backend.executionProfileRef }
+          : {
+              transport: candidate.backend.transport,
+              executionBackend: candidate.backend.executionBackend,
+              endpointRefHash: candidate.backend.endpointRefHash,
+              executionProfileRef: candidate.backend.executionProfileRef,
+            },
+        auth: {
+          mode: reserved ? reserved.reservation.authMode : candidate.auth.mode,
+          accountRefHash: reserved ? reserved.reservation.accountRefHash : candidate.auth.accountRefHash,
+        },
         executionContract: JSON.parse(
           JSON.stringify(input.executionContract),
         ) as CrossVerifyEnforcedAttemptContract,
-      });
+      };
+      const grant: CrossVerifyInvocationExecutionGrant = reserved && reservedDispatchGrant
+        ? deepFreeze({
+            admissionMode: 'reserved',
+            reservationId: reservedDispatchGrant.reservationId,
+            dispatchEventRef: reservedDispatchGrant.dispatchEventRef,
+            dispatchEventHash: reservedDispatchGrant.dispatchEventHash,
+            reservation: JSON.parse(JSON.stringify(reserved.reservation)) as ProviderLimitReservation,
+            ...grantCommon,
+          })
+        : deepFreeze({
+            admissionMode: 'non_reservable_subscription',
+            reservation: null,
+            dispatchEventRef: dispatchEvidenceRef,
+            dispatchEventHash: digest(dispatchEvidenceRef),
+            ...grantCommon,
+          });
       if (!sameCrossVerifyExecutionContract(grant.executionContract, input.executionContract)) {
         throw createExecutionAuthorityError(
           'Frozen xverify grant differs from the admitted execution contract',
         );
       }
-      if (canonicalJson(grant.reservation) !== canonicalJson(admission.reservation)) {
+      if (grant.admissionMode === 'reserved'
+        && canonicalJson(grant.reservation) !== canonicalJson(reserved!.reservation)) {
         throw createExecutionAuthorityError(
           'Frozen xverify grant differs from the admitted provider reservation',
         );
@@ -799,7 +965,7 @@ export class CrossVerifyInvocationCoordinator {
       });
       const observation = await this.authorities.observationAuthority.observe({
         grant,
-        reservation: admission.reservation,
+        reservation: grant.reservation,
         dispatch: dispatchHandle,
       });
       assertOpaqueEvidenceRef(
@@ -817,30 +983,55 @@ export class CrossVerifyInvocationCoordinator {
       }
       const terminal = observation.terminal;
       assertTerminal(terminal, grant);
-      const usage = this.authorities.usageAuthority.project({
-        grant,
-        reservation: admission.reservation,
-        terminal,
-      });
-      if (usage.state === 'hold') {
+      // Usage settlement. Reserved: project the numeric `consumed` reservation
+      // event and settle it on the reservation ledger. Non-reservable (B2):
+      // record ONLY the transport-reported usage (a typed usage_unavailable HOLD
+      // when absent) and settle through the invocation ledger — no reservation
+      // event is ever produced.
+      let providerReportedUsageEvidenceRef: string | null = null;
+      if (reserved) {
+        const usage = this.authorities.usageAuthority.project({
+          grant,
+          reservation: reserved.reservation,
+          terminal,
+        });
+        if (usage.state === 'hold') {
+          assertOpaqueEvidenceRef(
+            'xverify usage authority hold',
+            usage.authorityEvidenceRef,
+            true,
+          );
+          return reconciliationRequired(
+            `XVERIFY_INVOCATION_USAGE_HOLD:${usage.reasonCode}`,
+            usage.authorityEvidenceRef,
+            ref,
+            dispatchEvidenceRef,
+          );
+        }
+        assertUsageSettlement(usage, terminal, reserved.reservation);
+        const settlement = this.authorities.admissionRuntime.settleDispatch(
+          reserved,
+          usage.event,
+        );
+        settlementEvidenceRef = `provider-limit-reservation-event:${settlement.eventId}`;
+      } else {
+        const usage = this.authorities.usageAuthority.projectNonReservable({ grant, terminal });
         assertOpaqueEvidenceRef(
-          'xverify usage authority hold',
+          'xverify non-reservable usage authority',
           usage.authorityEvidenceRef,
           true,
         );
-        return reconciliationRequired(
-          `XVERIFY_INVOCATION_USAGE_HOLD:${usage.reasonCode}`,
-          usage.authorityEvidenceRef,
-          ref,
-          dispatchEvidenceRef,
-        );
+        if (usage.state === 'hold') {
+          return reconciliationRequired(
+            `XVERIFY_INVOCATION_USAGE_HOLD:${usage.reasonCode}`,
+            usage.authorityEvidenceRef,
+            ref,
+            dispatchEvidenceRef,
+          );
+        }
+        assertNonReservableUsageSettlement(terminal);
+        providerReportedUsageEvidenceRef = usage.usageEvidenceRef;
       }
-      assertUsageSettlement(usage, terminal, admission.reservation);
-      const settlement = this.authorities.admissionRuntime.settleDispatch(
-        admission,
-        usage.event,
-      );
-      settlementEvidenceRef = `provider-limit-reservation-event:${settlement.eventId}`;
       ledger.append(scope, receipt.invocationId, terminal.transportEvent);
       ledger.append(scope, receipt.invocationId, terminal.consumerEvent);
       return {
@@ -848,17 +1039,23 @@ export class CrossVerifyInvocationCoordinator {
         output: terminal.output,
         execution: terminal.execution,
         invocationReceiptRef: ref,
-        providerLimitReservationId: admission.reservation.reservationId,
+        providerLimitReservationId: reserved ? reserved.reservation.reservationId : null,
         providerLimitDispatchEvidenceRef: dispatchEvidenceRef,
-        providerLimitSettlementEvidenceRef: settlementEvidenceRef,
+        providerLimitSettlementEvidenceRef: settlementEvidenceRef ?? null,
+        providerReportedUsageEvidenceRef,
         executionContractEvidenceRef: grant.executionContract.evidenceRef,
         outputArtifactRef: dispatchHandle.outputArtifactRef,
         hostObservationEvidenceRef: observation.authorityEvidenceRef,
         terminalSettlementRef: dispatchHandle.settlementRef,
-        calledProvider: admission.reservation.provider,
-        calledModel: admission.reservation.model,
+        calledProvider: grant.provider,
+        calledModel: grant.model,
       };
     } catch (error) {
+      // A bare reconciliation code hides why the post-dispatch attempt could not
+      // settle. Record it ONLY via the bounded/sanitized debug sink (message-only,
+      // 200-char cap, stderr just under DECKENT_DEBUG, skipped in tests) — never a
+      // raw stack to the user surface. The typed result below stays authoritative.
+      debugLog('cross-verify-coordinator:execute-failed', error);
       if (dispatchEvidenceRef) {
         return reconciliationRequired(
           'XVERIFY_INVOCATION_RECONCILIATION_REQUIRED',

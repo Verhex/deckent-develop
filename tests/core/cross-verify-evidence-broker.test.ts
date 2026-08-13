@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   constants as fsConstants,
   existsSync,
@@ -39,9 +39,15 @@ import {
 } from '../../src/core/cross-verify-evidence-broker.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlement,
   createTaskResultSettlementRefForAttempt,
+  readTaskResultSettlementClosure,
   taskResultSettlementActiveClaimDigest,
+  writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
+  writeTaskResultSettlementDispatchAtomic,
+  writeTaskResultSettlementPreparedAtomic,
   type TaskResultSettlementRefV1,
 } from '../../src/core/task-result-settlement.js';
 
@@ -228,6 +234,16 @@ describe.skipIf(!pinnedRuntimeAvailable)(
       expect(Buffer.from(blob.receipt.contentBase64, 'base64'))
         .toEqual(Buffer.from([0, 1, 2, 255]));
 
+      // Host-decoded plain snapshot: raw bytes (binary-safe — never base64), keyed
+      // by bare contentSha256, so the sandboxed verifier reads it with a bare `cat`
+      // and no interpreter. The filename asserts the digest the verifier can re-check.
+      const decodedBinary = readFileSync(
+        join(crossVerifyEvidenceBrokerDirectory(ref), 'decoded', binary.contentSha256),
+      );
+      expect(decodedBinary).toEqual(Buffer.from([0, 1, 2, 255]));
+      expect(createHash('sha256').update(decodedBinary).digest('hex'))
+        .toBe(binary.contentSha256);
+
       writeFileSync(join(projectRoot, 'src', 'z.ts'), 'drift after capture\n');
       expect(captureCrossVerifyEvidenceSnapshotAtomic({
         projectRoot,
@@ -235,6 +251,30 @@ describe.skipIf(!pinnedRuntimeAvailable)(
         claim,
       })).toEqual(evidence);
       expect(readCrossVerifyEvidenceReceipt(projectRoot, ref)).toEqual(evidence);
+    });
+
+    it('fails closed when a reused host-decoded artifact is tampered', () => {
+      const { projectRoot, ref, fenceTokenHash } = fixture();
+      mkdirSync(join(projectRoot, 'src'));
+      writeFileSync(join(projectRoot, 'src', 'file.ts'), 'evidence\n');
+      const claim = claimCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot, settlementRef: ref, fenceTokenHash, relativePaths: ['src/file.ts'],
+      });
+      const evidence = captureCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot, settlementRef: ref, claim,
+      });
+      // Tamper the published decoded artifact in place, keeping its content-
+      // addressed name — the replay/re-capture CAS re-read must reject the
+      // mismatch and never mount a corrupt snapshot to the verifier.
+      const contentSha = evidence.manifest.entries[0]!.contentSha256;
+      writeFileSync(
+        join(crossVerifyEvidenceBrokerDirectory(ref), 'decoded', contentSha),
+        'TAMPERED-DECODED-CONTENT',
+      );
+      expectBrokerCode(
+        () => captureCrossVerifyEvidenceSnapshotAtomic({ projectRoot, settlementRef: ref, claim }),
+        'UNSAFE_FILESYSTEM_ENTRY',
+      );
     });
 
     it('enforces first-writer claim and manifest authority', () => {
@@ -349,6 +389,17 @@ describe.skipIf(!pinnedRuntimeAvailable)(
         settlementRef: ref,
         claim,
       });
+      // The host verdict receipt may only publish after a terminally closed
+      // settlement (see writeCrossVerifyVerdictReceiptAtomic), so close it first.
+      writeTaskResultSettlementPreparedAtomic(ref, 'claude-fable-5');
+      writeTaskResultSettlementDispatchAtomic(ref, 'e'.repeat(64), '2026-07-28T00:00:02.000Z');
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref, exitCode: 0, settledAt: '2026-07-28T00:00:03.000Z',
+        result: { taskId: ref.taskId, selfAssessment: 'DONE' },
+      }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'stopped-removed', locksReleased: true,
+      });
       const input = {
         projectRoot,
         settlementRef: ref,
@@ -389,6 +440,96 @@ describe.skipIf(!pinnedRuntimeAvailable)(
         ...input,
         adjudicationReceiptSha256: 'c'.repeat(64),
       }), 'IMMUTABLE_CONFLICT');
+    });
+
+    it('publishes the host verdict receipt after the settlement is terminally closed', () => {
+      const { projectRoot, ref, fenceTokenHash } = fixture();
+      mkdirSync(join(projectRoot, 'src'));
+      writeFileSync(join(projectRoot, 'src', 'file.ts'), 'evidence\n');
+      const claim = claimCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot,
+        settlementRef: ref,
+        fenceTokenHash,
+        relativePaths: ['src/file.ts'],
+      });
+      const evidence = captureCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot,
+        settlementRef: ref,
+        claim,
+      });
+      // Settle + terminally close the attempt — retiring the ACTIVE settlement
+      // claim, exactly as the coordinator does before the runner persists the
+      // final host verdict receipt.
+      writeTaskResultSettlementPreparedAtomic(ref, 'claude-fable-5');
+      writeTaskResultSettlementDispatchAtomic(ref, 'e'.repeat(64), '2026-07-28T00:00:02.000Z');
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref, exitCode: 0, settledAt: '2026-07-28T00:00:03.000Z',
+        result: { taskId: ref.taskId, selfAssessment: 'DONE' },
+      }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'stopped-removed', locksReleased: true,
+      });
+      expect(readTaskResultSettlementClosure(ref)).not.toBeNull();
+
+      // The verdict receipt still publishes: BOTH the pre- and post-publication
+      // fence checks bind to the durable (now-closed) claim, not the retired
+      // active claim. (This is the exact §12.2 verdict-receipt path.)
+      const verdict = writeCrossVerifyVerdictReceiptAtomic({
+        projectRoot,
+        settlementRef: ref,
+        claimSha256: claim.claimSha256,
+        evidenceManifestSha256: evidence.manifestSha256,
+        effectiveVerdict: 'CONFIRMED',
+        disposition: 'allow',
+        adjudicationReceiptSha256: 'a'.repeat(64),
+        outputSha256: 'b'.repeat(64),
+        outputByteLength: 64,
+      });
+      expect(verdict.receipt).toMatchObject({
+        state: 'host-adjudicated',
+        effectiveVerdict: 'CONFIRMED',
+        disposition: 'allow',
+      });
+      expect(readCrossVerifyVerdictReceipt(projectRoot, ref)).toEqual(verdict);
+    });
+
+    it('fails closed on an open settlement and accepts idempotent replay once closed', () => {
+      const { projectRoot, ref, fenceTokenHash } = fixture();
+      mkdirSync(join(projectRoot, 'src'));
+      writeFileSync(join(projectRoot, 'src', 'file.ts'), 'evidence\n');
+      const claim = claimCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot, settlementRef: ref, fenceTokenHash, relativePaths: ['src/file.ts'],
+      });
+      const evidence = captureCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot, settlementRef: ref, claim,
+      });
+      const input = {
+        projectRoot, settlementRef: ref,
+        claimSha256: claim.claimSha256,
+        evidenceManifestSha256: evidence.manifestSha256,
+        effectiveVerdict: 'CONFIRMED' as const,
+        disposition: 'allow' as const,
+        adjudicationReceiptSha256: 'a'.repeat(64),
+        outputSha256: 'b'.repeat(64),
+        outputByteLength: 64,
+      };
+      // Open settlement (claimed but not closed) → fail closed, nothing published.
+      expectBrokerCode(() => writeCrossVerifyVerdictReceiptAtomic(input), 'AUTHORITY_MISMATCH');
+      expect(existsSync(crossVerifyVerdictReceiptPath(ref))).toBe(false);
+
+      // Terminally close it → the receipt publishes and idempotently replays.
+      writeTaskResultSettlementPreparedAtomic(ref, 'claude-fable-5');
+      writeTaskResultSettlementDispatchAtomic(ref, 'e'.repeat(64), '2026-07-28T00:00:02.000Z');
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref, exitCode: 0, settledAt: '2026-07-28T00:00:03.000Z',
+        result: { taskId: ref.taskId, selfAssessment: 'DONE' },
+      }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'stopped-removed', locksReleased: true,
+      });
+      const verdict = writeCrossVerifyVerdictReceiptAtomic(input);
+      expect(writeCrossVerifyVerdictReceiptAtomic(input)).toEqual(verdict);
+      expect(readCrossVerifyVerdictReceipt(projectRoot, ref)).toEqual(verdict);
     });
 
     it('detects receipt tampering and refuses receipt-path symlink replacement', () => {

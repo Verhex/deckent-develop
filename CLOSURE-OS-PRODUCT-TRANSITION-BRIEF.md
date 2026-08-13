@@ -508,6 +508,26 @@ DIRECTIVES'e yazılır. T1 worker scoped suite'inden sonra host model/routing/pr
 regression gate'i çalıştırır. T5'e kadar build/provider call yoktur; aktif sprint varken build her
 durumda yasaktır. T5 `HOLD` olursa outer package `COMPLETE` olamaz.
 
+#### Kapanış Makbuzu (T5 terminal proof — 2026-08-13)
+
+`[PLAN-V3:FABLE-SOL-XVERIFY]` T5 zinciri gerçek bir host-terminal-proof koşusuyla kapandı:
+
+- **Genuine verdict:** host disposition **CONFIRMED / ALLOW** (typed HOLD değil).
+- **Verifier:** `codex / gpt-5.6-sol`, author `claude / claude-fable-5` — farklı provider
+  (XVERIFY-PROVIDER-SEPARATION gerçek cross-provider dispatch olarak kanıtlandı).
+- **Assurance:** `typed-host-adjudicated`.
+- **Usage (provider-reported, uydurma yok):** input 38311, output 460, cache-read 22016, **total 60787**.
+- **Verdict receipt:** `cross-verify-verdict:sha256:3543790980fdb345e65d065b011c877ecf728d53d4acab2d6bc7ef6d3426cf20`.
+- **Settlement kanıtı:** global settlement reader'ları `settled.json` + `closure.json` +
+  `provider-terminal-usage.json` + `provider-actual-call.json` + verdict receipt'i valid okudu.
+- **Owner-bounded budget:** non-reservable subscription adjudication artık owner-authored
+  `execution_budget.purposes.xverify-adjudication` profilinden gelir (maxTokens 100000,
+  maxWallClockSeconds 300, maxVerificationsPerSprint 1); tavan aşımı verdict başarılı olsa bile
+  typed overrun HOLD üretir; reserved/metered API yolu byte-identical korunur.
+
+Bu makbuz kanıttır; yeniden canlı smoke yalnız tüm hermetik kontroller bittikten sonra, gerçekten
+gerekirse bir kez koşulur.
+
 ### 12.3 Ajanlar arası devir ve plan-turu verimlilik kontratı
 
 Owner talimatı (2026-08-12): Alperen, Codex ve Fable arasında prompt kopyalayan insan message bus

@@ -98,9 +98,8 @@ describe('resolveProviderWithFallback', () => {
     );
 
     // opus (premium on claude) -> the DESIGNATED codex premium model.
-    // MASTER-PLAN 670 (owner-approved 2026-07-26): the tier names its current
-    // generation instead of returning whichever GA model registered first.
-    expect(result.model).toBe('gpt-5.6-sol');
+    // The premium tier has an explicit preferred Codex model.
+    expect(result.model).toBe('gpt-5.5');
   });
 
   it('remaps standard-tier model correctly on fallback', async () => {

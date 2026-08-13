@@ -32,6 +32,7 @@ import {
   CrossVerifyDockerHostObservationAuthority,
   CrossVerifyDockerProviderUsageAuthority,
   CrossVerifyDockerTerminationAuthority,
+  frameTerminalAdjudicationProtocol,
 } from '../../src/orchestra/cross-verify-docker-runtime-authority.js';
 import { persistDockerTerminalProviderBillingReceipt } from '../../src/orchestra/spawn-backend-docker.js';
 import type { CrossVerifyInvocationExecutionGrant } from '../../src/orchestra/cross-verify-invocation-coordinator.js';
@@ -165,6 +166,7 @@ function grant(
     settlementAttemptRef: ref,
   });
   return {
+    admissionMode: 'reserved',
     reservationId: admitted.reservationId,
     dispatchEventRef: 'provider-limit-dispatch:strict-xverify-0001',
     dispatchEventHash: '7'.repeat(64),
@@ -178,6 +180,7 @@ function grant(
     fenceTokenHash: admitted.fenceTokenHash,
     provider: admitted.provider,
     model: admitted.model,
+    invocationReceiptRef: admitted.receiptRef,
     receiptRef: {
       schemaVersion: 1,
       tenantId: admitted.tenantId,
@@ -292,6 +295,8 @@ function closeExactAttempt(
       taskId: ref.taskId,
       selfAssessment: 'DONE',
       notes: 'Host-observed terminal xverify protocol completed.\n'
+        + 'XVERIFY_RESPONSE_JSON: {"schemaVersion":2,"protocol":"xverify-adjudication-v2",'
+        + '"assertionResults":[{"assertionId":"A1","status":"supported"}]}\n'
         + 'VERDICT: CONFIRMED exact runtime authority is consistent',
       hostTerminalProjection: {
         version: 1,
@@ -351,7 +356,10 @@ describe('CrossVerify Docker runtime authority', () => {
     expect(observed).toMatchObject({
       state: 'settled',
       terminal: {
-        output: expect.stringContaining('VERDICT: CONFIRMED'),
+        // v2-aware extraction: the terminal output carries BOTH the machine-
+        // readable response line and the VERDICT line, so the host's v2 parser
+        // receives an object (a lone VERDICT line parses to null → false UNCLEAR).
+        output: expect.stringContaining('XVERIFY_RESPONSE_JSON:'),
         actualCall: {
           provider: 'claude',
           model: 'claude-fable-5',
@@ -542,7 +550,7 @@ describe('CrossVerify Docker runtime authority', () => {
       evidenceRefs: [`docker-runtime-release:sha256:${'5'.repeat(64)}`],
       retiredAt: T3,
     });
-    writeTaskResultSettlementLandedRetirementAtomic(ref, T3);
+    writeTaskResultSettlementLandedRetirementAtomic(ref);
 
     const first = await new CrossVerifyDockerHostObservationAuthority(firstLedger, {
       now: () => new Date(T4),
@@ -600,5 +608,38 @@ describe('CrossVerify Docker runtime authority', () => {
       reasonCode: 'window_mapper_unavailable',
     });
     store.close();
+  });
+});
+
+describe('frameTerminalAdjudicationProtocol · fail-closed framing', () => {
+  const R = 'XVERIFY_RESPONSE_JSON: {"schemaVersion":2}';
+  const V = 'VERDICT: CONFIRMED integrity holds';
+  const PREFIX = 'Host-observed terminal xverify protocol completed.';
+
+  it('frames a valid v2 two-line response (response then verdict)', () => {
+    expect(frameTerminalAdjudicationProtocol(`${PREFIX}\n${R}\n${V}`)).toBe(`${R}\n${V}`);
+  });
+
+  it('falls back to the lone verdict line for a valid v1 single-line protocol', () => {
+    expect(frameTerminalAdjudicationProtocol(`${PREFIX}\n${V}`)).toBe(V);
+  });
+
+  it('returns the verdict line (v1 shape) when the v2 JSON response is missing', () => {
+    // The downstream v2 parser then derives UNCLEAR from the lone verdict line.
+    expect(frameTerminalAdjudicationProtocol(V)).toBe(V);
+  });
+
+  it('fails closed on a duplicated JSON response marker', () => {
+    expect(frameTerminalAdjudicationProtocol(`${PREFIX}\n${R}\n${R}\n${V}`)).toBeNull();
+  });
+
+  it('fails closed on a duplicated terminal verdict (v1 and v2 shapes)', () => {
+    expect(frameTerminalAdjudicationProtocol(`${PREFIX}\n${V}\nVERDICT: REFUTED other`)).toBeNull();
+    expect(frameTerminalAdjudicationProtocol(`${PREFIX}\n${R}\n${V}\nVERDICT: REFUTED other`)).toBeNull();
+  });
+
+  it('fails closed on a missing verdict and on a response after its verdict', () => {
+    expect(frameTerminalAdjudicationProtocol(`${PREFIX}\n${R}`)).toBeNull();
+    expect(frameTerminalAdjudicationProtocol(`${PREFIX}\n${V}\n${R}`)).toBeNull();
   });
 });

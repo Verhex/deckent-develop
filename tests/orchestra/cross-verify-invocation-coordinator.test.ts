@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { HostRoleInvocationAdmissionRuntime } from '../../src/core/host-role-invocation-admission-runtime.js';
+import {
+  HostRoleInvocationAdmissionRuntime,
+  type HostRoleInvocationNonReservableSubscription,
+} from '../../src/core/host-role-invocation-admission-runtime.js';
 import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
 import { canonicalJson } from '../../src/core/audit-writer.js';
 import {
@@ -27,7 +30,10 @@ import {
   ProviderTruthStore,
   type ExactReachabilityQuery,
 } from '../../src/core/provider-truth-store.js';
-import type { RoleInvocationSelected } from '../../src/core/role-invocation-resolver.js';
+import {
+  defaultRoleInvocationPolicy,
+  type RoleInvocationSelected,
+} from '../../src/core/role-invocation-resolver.js';
 import {
   projectCrossVerifyInvocation,
   deriveCrossVerifyReservationIdentity,
@@ -202,8 +208,14 @@ function limitObservation(projectId: string, remaining = 100): ProviderLimitObse
   };
 }
 
+// The reserved-path tests never dispatch the non-reservable arm; this stub proves
+// that by throwing if the coordinator ever routes a reserved fixture through it.
+const unusedProjectNonReservable: CrossVerifyProviderUsageAuthority['projectNonReservable'] =
+  () => { throw new Error('projectNonReservable must not run on a reserved fixture'); };
+
 function consumedUsageAuthority(): CrossVerifyProviderUsageAuthority {
   return {
+    projectNonReservable: unusedProjectNonReservable,
     preflight: () => ({
       state: 'ready',
       authorityEvidenceRef: 'provider-usage-preflight:xverify-coordinator-0001',
@@ -583,7 +595,7 @@ describe('CrossVerifyInvocationCoordinator', () => {
     const reservation = h.limitStore.getReservation({
       ...limitScope(),
       projectId: h.receiptStore.projectId,
-    }, result.providerLimitReservationId);
+    }, result.providerLimitReservationId!);
     expect(reservation).toMatchObject({
       state: 'consumed',
       events: [
@@ -593,9 +605,79 @@ describe('CrossVerifyInvocationCoordinator', () => {
     });
   });
 
+  it('dispatches and settles the non-reservable subscription arm from transport usage, forging no reservation', async () => {
+    const h = await harness();
+    const candidate = h.input.projection.verifierCandidates[0];
+    const nonReservableAdmission: HostRoleInvocationNonReservableSubscription = {
+      decision: 'non_reservable_subscription',
+      reservation: null,
+      attempts: [],
+      authorityEvidenceRef: 'xverify-non-reservable-admission:coordinator-0001',
+      basis: {
+        advisoryLimitEvidenceRefs: candidate.limits.evidenceRefs,
+        ownerBoundRef: 'config:cross_verify.allow_non_reservable_subscription_adjudication',
+        requiredWindows: [{ windowId: 'codex.primary', unit: 'percent', model: null }],
+      },
+      resolution: {
+        role: 'auditor',
+        purpose: 'audit-evaluation',
+        policy: defaultRoleInvocationPolicy('auditor'),
+        selected: { provider: 'codex', model: MODEL, source: 'config', sequence: 1 },
+        attempts: [],
+        rejected: [],
+        decisionReasonCode: 'none',
+        configured: { provider: 'codex', model: MODEL, source: 'config', reasonCode: 'none' },
+        resolved: { provider: 'codex', model: MODEL, source: 'wire', reasonCode: 'none' },
+        fallbackChain: [],
+        reachability: { state: candidate.reachability.state, evidenceRef: candidate.reachability.evidenceRef },
+        limits: { state: candidate.limits.state, evidenceRefs: candidate.limits.evidenceRefs },
+      },
+    };
+    const projectNonReservable = vi.fn(() => ({
+      state: 'settled' as const,
+      usage: { totalTokens: 15, inputTokens: 10, outputTokens: 5 },
+      usageEvidenceRef: 'provider-usage:non-reservable-0001',
+      authorityEvidenceRef: 'xverify-non-reservable-usage:coordinator-0001',
+    }));
+    const usageAuthority: CrossVerifyProviderUsageAuthority = {
+      preflight: () => { throw new Error('reserved preflight must not run on the non-reservable arm'); },
+      project: () => { throw new Error('reserved project must not run on the non-reservable arm'); },
+      projectNonReservable,
+    };
+    const executor = vi.fn(async (grant: CrossVerifyInvocationExecutionGrant) => dispatchHandle(grant));
+    const coordinator = new CrossVerifyInvocationCoordinator({
+      admissionRuntime: h.runtime,
+      usageAuthority,
+      observationAuthority: settledObservationAuthority(),
+    });
+    const result = await coordinator.execute({ ...h.input, nonReservableAdmission }, executor);
+    expect(result.state).toBe('settled');
+    if (result.state !== 'settled') return;
+    expect(result).toMatchObject({
+      calledProvider: 'codex',
+      calledModel: MODEL,
+      providerLimitReservationId: null,
+      providerLimitSettlementEvidenceRef: null,
+      providerReportedUsageEvidenceRef: 'provider-usage:non-reservable-0001',
+    });
+    expect(projectNonReservable).toHaveBeenCalledTimes(1);
+    const grant = executor.mock.calls[0]![0];
+    expect(grant.admissionMode).toBe('non_reservable_subscription');
+    expect(grant.reservation).toBeNull();
+    // The invocation-ledger settlement is byte-identical to the reserved arm; only
+    // the numeric reservation ledger is skipped.
+    const receipt = h.receiptStore.get(result.invocationReceiptRef, result.invocationReceiptRef.invocationId);
+    expect(receipt?.events.map(event => event.type)).toEqual([
+      'dispatch_started',
+      'transport_settled',
+      'consumer_settled',
+    ]);
+  });
+
   it('parks route drift after dispatch and never accepts or settles the verdict', async () => {
     const h = await harness();
     const usage = {
+      projectNonReservable: unusedProjectNonReservable,
       preflight: consumedUsageAuthority().preflight,
       project: vi.fn(consumedUsageAuthority().project),
     };
@@ -696,6 +778,7 @@ describe('CrossVerifyInvocationCoordinator', () => {
   it('keeps the claimed reservation open when host observation cannot prove the call', async () => {
     const h = await harness();
     const usage = {
+      projectNonReservable: unusedProjectNonReservable,
       preflight: consumedUsageAuthority().preflight,
       project: vi.fn(consumedUsageAuthority().project),
     };
@@ -724,6 +807,7 @@ describe('CrossVerifyInvocationCoordinator', () => {
     const coordinator = new CrossVerifyInvocationCoordinator({
       admissionRuntime: h.runtime,
       usageAuthority: {
+        projectNonReservable: unusedProjectNonReservable,
         preflight: () => ({
           state: 'ready',
           authorityEvidenceRef: 'provider-usage-preflight:xverify-coordinator-0001',
@@ -761,6 +845,7 @@ describe('CrossVerifyInvocationCoordinator', () => {
     const coordinator = new CrossVerifyInvocationCoordinator({
       admissionRuntime: h.runtime,
       usageAuthority: {
+        projectNonReservable: unusedProjectNonReservable,
         preflight: () => ({
           state: 'hold',
           reasonCode: 'window_mapper_unavailable',
@@ -827,6 +912,7 @@ describe('CrossVerifyInvocationCoordinator', () => {
     const coordinator = new CrossVerifyInvocationCoordinator({
       admissionRuntime: h.runtime,
       usageAuthority: {
+        projectNonReservable: unusedProjectNonReservable,
         preflight: consumedUsageAuthority().preflight,
         project: ({ grant }) => ({
           state: 'settled',
@@ -875,7 +961,7 @@ describe('CrossVerifyInvocationCoordinator', () => {
     const reservation = h.limitStore.getReservation({
       ...limitScope(),
       projectId: h.receiptStore.projectId,
-    }, result.providerLimitReservationId);
+    }, result.providerLimitReservationId!);
     expect(reservation).toMatchObject({
       state: 'released',
       events: [

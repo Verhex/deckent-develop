@@ -17,6 +17,7 @@ import type {
   StoredProviderLimitReservationEvent,
 } from './provider-limit-store.js';
 import {
+  evaluateProviderLimitWindows,
   toLimitEvidence,
   type ProviderLimitReservationEvent,
   type ProviderLimitReservationRequest,
@@ -75,9 +76,48 @@ export interface HostRoleInvocationHeld {
   readonly authorityEvidenceRef: string;
 }
 
+/**
+ * The advisory-floor basis under which a subscription provider whose only limit
+ * windows are advisory `percent`-unit (never numerically reservable) is admitted
+ * WITHOUT forging a numeric reservation. Carries the evidence the admission was
+ * built on — never a reserved/consumed amount (there is none).
+ */
+export interface HostRoleInvocationNonReservableBasis {
+  /** Advisory percent-window limit evidence whose floor-check gated admission. */
+  readonly advisoryLimitEvidenceRefs: readonly string[];
+  /** Owner config authority (flag) that permitted this non-reservable admission. */
+  readonly ownerBoundRef: string;
+  /** The advisory percent windows that could not be numerically reserved. */
+  readonly requiredWindows: readonly {
+    readonly windowId: string;
+    readonly unit: 'percent';
+    readonly model: string | null;
+  }[];
+}
+
+/**
+ * Third admission arm — produced ONLY by the xverify verifier-adjudication
+ * ingress when the owner flag + subscription auth + advisory `percent`-only
+ * windows + advisory-floor allow all hold together. `reservation: null` is
+ * load-bearing: the reservation-ledger APIs (`claimDispatch`/`settleDispatch`)
+ * are typed on the narrow `ProviderLimitAdmissionAllowed` arm, so this arm can
+ * NEVER reach them — the compiler, not convention, guarantees no numeric
+ * reservation is ever forged or settled. The general heavy-task reservation path
+ * (`ProviderLimitAdmissionAllowed`) is untouched and never yields this arm.
+ */
+export interface HostRoleInvocationNonReservableSubscription {
+  readonly decision: 'non_reservable_subscription';
+  readonly reservation: null;
+  readonly resolution: RoleInvocationResolution;
+  readonly attempts: readonly ProviderLimitAdmissionAttempt[];
+  readonly authorityEvidenceRef: string;
+  readonly basis: HostRoleInvocationNonReservableBasis;
+}
+
 export type HostRoleInvocationAdmissionResult =
   | ProviderLimitAdmissionAllowed
-  | HostRoleInvocationHeld;
+  | HostRoleInvocationHeld
+  | HostRoleInvocationNonReservableSubscription;
 
 export type HostRoleVerifierCandidateProjection =
   | {
@@ -258,11 +298,26 @@ export class HostRoleInvocationAdmissionRuntime {
 
       const reachabilityEvidence = toReachabilityEvidence(reachability, at);
       const limitEvidence = toLimitEvidence(limit, at);
+      // §12.2 Öneri-A extends to candidate eligibility: a subscription-CLI
+      // provider (codex/claude) only ever has an ADVISORY usage read — the
+      // durable snapshot integrity invariant forbids it from being `known` —
+      // so an authoritative-limit requirement would make such a provider
+      // permanently ineligible as a verifier/role candidate. A bounded,
+      // liveProven-reachable candidate is admitted when its advisory usage is
+      // under the policy block ratio (evaluated here from the same durable
+      // windows), still failing closed at the block ratio. Non-advisory
+      // sources keep the strict `known ∧ !limited` gate unchanged.
+      const advisoryUnderBlock = limitEvidence.state !== 'known'
+        && limit.source.authority === 'advisory'
+        && evaluateProviderLimitWindows(
+          limit.windows, limit.requiredWindowIds, limit.policy,
+        ).decision === 'allow';
+      const limitAdmissible = (limitEvidence.state === 'known' && !limitEvidence.limited)
+        || advisoryUnderBlock;
       if (reachabilityEvidence.state !== 'known'
         || !reachabilityEvidence.reachable
         || reachabilityEvidence.evidenceRef === null
-        || limitEvidence.state !== 'known'
-        || limitEvidence.limited
+        || !limitAdmissible
         || limitEvidence.evidenceRefs.length === 0) {
         return {
           state: 'hold',

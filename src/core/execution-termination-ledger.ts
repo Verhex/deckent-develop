@@ -30,6 +30,20 @@ import {
 } from './task-result-settlement.js';
 
 export const EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION = 1 as const;
+/**
+ * Non-reservable subscription bindings carry payload schema version 2. Reserved
+ * bindings keep version 1 so their canonical serialization + digests stay
+ * byte-identical to every binding written before this arm existed — existing
+ * rows are NEVER re-serialized. The two are a discriminated union on
+ * `admissionMode`; the version is a projection of the arm, not a global bump.
+ */
+export const EXECUTION_TERMINATION_LEDGER_NON_RESERVABLE_SCHEMA_VERSION = 2 as const;
+/**
+ * DB `user_version`. Bumped to 2 for the admission_mode column + nullable
+ * reservation_id + partial-unique index migration. Distinct from the per-binding
+ * payload schema version above.
+ */
+const EXECUTION_TERMINATION_LEDGER_DB_VERSION = 2 as const;
 const ROW_INTEGRITY_VERSION = 1;
 const AUTHORITY_SENTINEL = 'deckent-execution-termination-ledger:v1';
 const HASH_PATTERN = /^[a-f0-9]{64}$/u;
@@ -60,8 +74,36 @@ export interface ExecutionTerminationBindingInput {
   readonly createdAt: string;
 }
 
-export interface ExecutionTerminationBinding {
-  readonly schemaVersion: typeof EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION;
+/**
+ * Non-reservable subscription binding input — carries the exact identity fields
+ * directly (from the execution grant), and NO reservation. There is no
+ * `reservationEvidenceRef` and no fabricated reservation identity.
+ */
+export interface NonReservableExecutionTerminationBindingInput {
+  readonly admissionMode: 'non_reservable_subscription';
+  readonly bindingId: string;
+  readonly identity: {
+    readonly tenantId: string;
+    readonly projectId: string;
+    readonly runId: string;
+    readonly taskId: string;
+    readonly callId: string;
+    readonly attemptId: string;
+    readonly invocationReceiptRef: string;
+    readonly fenceTokenHash: string;
+    readonly provider: string;
+    readonly model: string;
+    readonly accountRefHash: string | null;
+    readonly quotaScopeRefHash: string;
+    readonly authMode: ProviderLimitReservation['authMode'];
+    readonly transport: ProviderLimitReservation['backend']['transport'];
+    readonly endpointRefHash: string | null;
+  };
+  readonly runtime: ExecutionTerminationRuntimeIdentity;
+  readonly createdAt: string;
+}
+
+interface ExecutionTerminationBindingCommon {
   readonly bindingId: string;
   readonly tenantId: string;
   readonly projectId: string;
@@ -70,9 +112,6 @@ export interface ExecutionTerminationBinding {
   readonly callId: string;
   readonly attemptId: string;
   readonly invocationReceiptRef: string;
-  readonly providerLimitReservationId: string;
-  readonly providerLimitReservationRef: string;
-  readonly providerLimitReservationDigest: string;
   readonly fenceTokenHash: string;
   readonly provider: string;
   readonly model: string;
@@ -87,6 +126,29 @@ export interface ExecutionTerminationBinding {
   readonly createdAt: string;
   readonly authorityRevision: number;
 }
+
+/**
+ * Reserved arm — structurally identical to the original binding, so its canonical
+ * serialization + digests stay byte-identical. Discriminated by `admissionMode`,
+ * which is projected OUT of the v1 payload at serialization time.
+ */
+export interface ReservedExecutionTerminationBinding extends ExecutionTerminationBindingCommon {
+  readonly schemaVersion: typeof EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION;
+  readonly admissionMode: 'reserved';
+  readonly providerLimitReservationId: string;
+  readonly providerLimitReservationRef: string;
+  readonly providerLimitReservationDigest: string;
+}
+
+/** Non-reservable arm — NO reservation identity fields exist; payload version 2. */
+export interface NonReservableExecutionTerminationBinding extends ExecutionTerminationBindingCommon {
+  readonly schemaVersion: typeof EXECUTION_TERMINATION_LEDGER_NON_RESERVABLE_SCHEMA_VERSION;
+  readonly admissionMode: 'non_reservable_subscription';
+}
+
+export type ExecutionTerminationBinding =
+  | ReservedExecutionTerminationBinding
+  | NonReservableExecutionTerminationBinding;
 
 export interface ExecutionTerminationTerminal {
   readonly schemaVersion: typeof EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION;
@@ -141,7 +203,8 @@ interface BindingRow {
   readonly binding_id: string;
   readonly tenant_id: string;
   readonly project_id: string;
-  readonly reservation_id: string;
+  readonly admission_mode: string;
+  readonly reservation_id: string | null;
   readonly run_id: string;
   readonly call_id: string;
   readonly attempt_id: string;
@@ -239,8 +302,19 @@ function timestamp(name: string, value: string): number {
   return parsed;
 }
 
+/**
+ * The canonical persisted payload — the in-memory-only `admissionMode`
+ * discriminant is stripped so the serialization matches `payload_json` exactly
+ * and reserved bindings keep byte-identical digests (and thus evidence refs) to
+ * every binding written before this arm existed.
+ */
+function canonicalBindingPayload(binding: ExecutionTerminationBinding): Record<string, unknown> {
+  const { admissionMode: _admissionMode, ...payload } = binding;
+  return payload;
+}
+
 function bindingDigest(binding: ExecutionTerminationBinding): string {
-  return sha256(canonicalJson(binding));
+  return sha256(canonicalJson(canonicalBindingPayload(binding)));
 }
 
 function bindingEvidenceRef(binding: ExecutionTerminationBinding): string {
@@ -283,7 +357,10 @@ function dockerTerminalEvidenceRef(
 }
 
 function assertBindingShape(binding: ExecutionTerminationBinding): void {
-  if (binding.schemaVersion !== EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION) {
+  const expectedVersion = binding.admissionMode === 'reserved'
+    ? EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION
+    : EXECUTION_TERMINATION_LEDGER_NON_RESERVABLE_SCHEMA_VERSION;
+  if (binding.schemaVersion !== expectedVersion) {
     throw new ExecutionTerminationLedgerError('INTEGRITY_FAILURE', 'Unsupported termination binding version');
   }
   assertIdentity('bindingId', binding.bindingId);
@@ -294,19 +371,23 @@ function assertBindingShape(binding: ExecutionTerminationBinding): void {
     ['taskId', binding.taskId],
     ['callId', binding.callId],
     ['attemptId', binding.attemptId],
-    ['providerLimitReservationId', binding.providerLimitReservationId],
   ] as const) assertExternalIdentity(name, value);
   for (const [name, value] of [
     ['invocationReceiptRef', binding.invocationReceiptRef],
-    ['providerLimitReservationRef', binding.providerLimitReservationRef],
     ['runtimeEvidenceRef', binding.runtimeEvidenceRef],
   ] as const) assertOpaqueRef(name, value);
   for (const [name, value] of [
-    ['providerLimitReservationDigest', binding.providerLimitReservationDigest],
     ['fenceTokenHash', binding.fenceTokenHash],
     ['quotaScopeRefHash', binding.quotaScopeRefHash],
     ['runtimeEvidenceDigest', binding.runtimeEvidenceDigest],
   ] as const) assertHash(name, value);
+  // Reserved bindings carry the numeric reservation identity (byte-identical
+  // checks to before this arm existed). Non-reservable bindings carry none.
+  if (binding.admissionMode === 'reserved') {
+    assertExternalIdentity('providerLimitReservationId', binding.providerLimitReservationId);
+    assertOpaqueRef('providerLimitReservationRef', binding.providerLimitReservationRef);
+    assertHash('providerLimitReservationDigest', binding.providerLimitReservationDigest);
+  }
   if (binding.accountRefHash !== null) assertHash('accountRefHash', binding.accountRefHash);
   if (binding.endpointRefHash !== null) assertHash('endpointRefHash', binding.endpointRefHash);
   if (!binding.provider.trim() || !binding.model.trim() || binding.authorityRevision < 1) {
@@ -335,6 +416,9 @@ function sameReservation(
   binding: ExecutionTerminationBinding,
   reservation: ProviderLimitReservation,
 ): boolean {
+  // A non-reservable subscription binding carries no reservation identity and can
+  // never match a numeric reservation.
+  if (binding.admissionMode !== 'reserved') return false;
   return binding.tenantId === reservation.tenantId
     && binding.projectId === reservation.projectId
     && binding.runId === reservation.runId
@@ -431,6 +515,55 @@ export function createDockerExecutionTerminationBindingInput(input: {
   };
 }
 
+/**
+ * Non-reservable subscription Docker binding input — the identity comes straight
+ * from the execution grant (there is no reservation), and the same prepared-
+ * metadata + model checks apply as the reserved path. No reservation identity or
+ * `reservationEvidenceRef` is fabricated.
+ */
+export function createNonReservableDockerExecutionTerminationBindingInput(input: {
+  readonly bindingId: string;
+  readonly identity: NonReservableExecutionTerminationBindingInput['identity'];
+  readonly model: string;
+  readonly settlementRef: TaskResultSettlementRefV1;
+  readonly createdAt: string;
+}): NonReservableExecutionTerminationBindingInput {
+  const { identity, settlementRef } = input;
+  if (identity.taskId === '' || identity.transport !== 'cli'
+    || settlementRef.backend !== 'docker'
+    || settlementRef.taskId !== identity.taskId
+    || settlementRef.attemptId !== identity.attemptId) {
+    throw new ExecutionTerminationLedgerError(
+      'EVIDENCE_MISMATCH',
+      'Docker non-reservable termination binding does not match its execution grant',
+    );
+  }
+  const prepared = readTaskResultSettlementPrepared(settlementRef);
+  if (!prepared || readTaskResultSettlementDispatch(settlementRef)) {
+    throw new ExecutionTerminationLedgerError(
+      'EVIDENCE_UNAVAILABLE',
+      'Docker termination binding requires prepared metadata before durable dispatch',
+    );
+  }
+  if (prepared.model !== input.model || identity.model !== input.model) {
+    throw new ExecutionTerminationLedgerError(
+      'EVIDENCE_MISMATCH',
+      'Docker prepared model does not match the non-reservable execution grant model',
+    );
+  }
+  return {
+    admissionMode: 'non_reservable_subscription',
+    bindingId: input.bindingId,
+    identity,
+    runtime: {
+      executionBackend: 'docker',
+      evidenceRef: dockerPreparedEvidenceRef(settlementRef),
+      evidenceDigest: sha256(canonicalJson(prepared)),
+    },
+    createdAt: input.createdAt,
+  };
+}
+
 export class ExecutionTerminationLedger {
   private readonly db: Database.Database;
   private readonly now: () => Date;
@@ -458,7 +591,7 @@ export class ExecutionTerminationLedger {
     this.db.pragma('synchronous = FULL');
     try {
       const version = this.db.pragma('user_version', { simple: true }) as number;
-      if (version > EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION) {
+      if (version > EXECUTION_TERMINATION_LEDGER_DB_VERSION) {
         throw new ExecutionTerminationLedgerError(
           'INTEGRITY_FAILURE',
           'Execution termination schema is newer than this runtime',
@@ -468,15 +601,21 @@ export class ExecutionTerminationLedger {
         SELECT 1 AS present FROM sqlite_master
         WHERE type = 'table' AND name LIKE 'execution_termination_%' LIMIT 1
       `).get() as { present: number } | undefined;
-      if (existing && version !== EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION) {
+      if (!existing) {
+        this.initSchema();
+        this.db.pragma(`user_version = ${EXECUTION_TERMINATION_LEDGER_DB_VERSION}`);
+      } else if (version === 1) {
+        // Atomic v1 → v2 migration: admission_mode discriminant column + nullable
+        // reservation_id + CHECK constraint + partial-unique index. Legacy rows
+        // become `reserved`; their payload_json/payload_hash/MAC/receipts are
+        // copied verbatim and NEVER re-signed.
+        this.migrateBindingsV1ToV2();
+        this.db.pragma(`user_version = ${EXECUTION_TERMINATION_LEDGER_DB_VERSION}`);
+      } else if (version !== EXECUTION_TERMINATION_LEDGER_DB_VERSION) {
         throw new ExecutionTerminationLedgerError(
           'INTEGRITY_FAILURE',
           'Execution termination schema requires an explicit migration',
         );
-      }
-      if (!existing) {
-        this.initSchema();
-        this.db.pragma(`user_version = ${EXECUTION_TERMINATION_LEDGER_SCHEMA_VERSION}`);
       }
       this.assertSchema();
       this.assertAuthority();
@@ -543,8 +682,15 @@ export class ExecutionTerminationLedger {
         runtimeEvidenceDigest: input.runtime.evidenceDigest,
         createdAt: input.createdAt,
         authorityRevision,
-      } satisfies ExecutionTerminationBinding));
-      const binding = signed.value;
+      } satisfies Omit<ReservedExecutionTerminationBinding, 'admissionMode'>));
+      // `admissionMode` is an in-memory discriminant only — it is NEVER part of
+      // the canonical payload, so the reserved payload + digest + MAC stay
+      // byte-identical to every binding written before this arm existed. The
+      // persisted arm discriminant is the `admission_mode` column + schemaVersion.
+      const binding: ReservedExecutionTerminationBinding = {
+        ...signed.value,
+        admissionMode: 'reserved',
+      };
       assertBindingShape(binding);
       const existingById = this.selectBinding(binding.bindingId);
       if (existingById) {
@@ -577,15 +723,120 @@ export class ExecutionTerminationLedger {
       }
       this.db.prepare(`
         INSERT INTO execution_termination_bindings (
-          binding_id, tenant_id, project_id, reservation_id, run_id, call_id,
+          binding_id, tenant_id, project_id, admission_mode, reservation_id, run_id, call_id,
           attempt_id, task_id, receipt_ref, execution_backend, created_at,
           payload_json, payload_hash, integrity_key_id, integrity_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         binding.bindingId,
         binding.tenantId,
         binding.projectId,
+        binding.admissionMode,
         binding.providerLimitReservationId,
+        binding.runId,
+        binding.callId,
+        binding.attemptId,
+        binding.taskId,
+        binding.invocationReceiptRef,
+        binding.executionBackend,
+        binding.createdAt,
+        signed.payloadJson,
+        signed.mac.mac,
+        signed.mac.keyId,
+        ROW_INTEGRITY_VERSION,
+      );
+      return {
+        value: binding,
+        evidenceRef: bindingEvidenceRef(binding),
+        authorityRef: authorityEvidenceRef(signed.mac.keyId, binding.authorityRevision),
+        created: true,
+      };
+    });
+    return transaction.immediate();
+  }
+
+  putNonReservableBinding(
+    input: NonReservableExecutionTerminationBindingInput,
+  ): ExecutionTerminationWrite<ExecutionTerminationBinding> {
+    assertIdentity('bindingId', input.bindingId);
+    if (!['host-subprocess', 'docker', 'tmux', 'api', 'in-process'].includes(input.runtime.executionBackend)) {
+      throw new ExecutionTerminationLedgerError(
+        'EVIDENCE_MISMATCH',
+        'Execution runtime backend is not supported for a non-reservable binding',
+      );
+    }
+    assertOpaqueRef('runtime evidenceRef', input.runtime.evidenceRef);
+    assertHash('runtime evidenceDigest', input.runtime.evidenceDigest);
+    const createdAt = timestamp('binding createdAt', input.createdAt);
+    if (createdAt > this.now().getTime()) {
+      throw new ExecutionTerminationLedgerError(
+        'EVIDENCE_TOO_LATE',
+        'Execution termination binding cannot be created in the future',
+      );
+    }
+
+    const transaction = this.db.transaction(() => {
+      this.syncAuthorityForWrite();
+      const signed = this.buildSignedRecord('binding', authorityRevision => ({
+        schemaVersion: EXECUTION_TERMINATION_LEDGER_NON_RESERVABLE_SCHEMA_VERSION,
+        bindingId: input.bindingId,
+        tenantId: input.identity.tenantId,
+        projectId: input.identity.projectId,
+        runId: input.identity.runId,
+        taskId: input.identity.taskId,
+        callId: input.identity.callId,
+        attemptId: input.identity.attemptId,
+        invocationReceiptRef: input.identity.invocationReceiptRef,
+        fenceTokenHash: input.identity.fenceTokenHash,
+        provider: input.identity.provider,
+        model: input.identity.model,
+        accountRefHash: input.identity.accountRefHash,
+        quotaScopeRefHash: input.identity.quotaScopeRefHash,
+        authMode: input.identity.authMode,
+        transport: input.identity.transport,
+        executionBackend: input.runtime.executionBackend,
+        endpointRefHash: input.identity.endpointRefHash,
+        runtimeEvidenceRef: input.runtime.evidenceRef,
+        runtimeEvidenceDigest: input.runtime.evidenceDigest,
+        createdAt: input.createdAt,
+        authorityRevision,
+      } satisfies Omit<NonReservableExecutionTerminationBinding, 'admissionMode'>));
+      const binding: NonReservableExecutionTerminationBinding = {
+        ...signed.value,
+        admissionMode: 'non_reservable_subscription',
+      };
+      assertBindingShape(binding);
+      const existingById = this.selectBinding(binding.bindingId);
+      if (existingById) {
+        const existing = this.verifyBindingRow(existingById);
+        if (existingById.payload_json !== signed.payloadJson) {
+          throw new ExecutionTerminationLedgerError(
+            'IDEMPOTENCY_CONFLICT',
+            'Execution termination binding idempotency conflict',
+          );
+        }
+        return {
+          value: existing,
+          evidenceRef: bindingEvidenceRef(existing),
+          authorityRef: authorityEvidenceRef(
+            existingById.integrity_key_id,
+            existing.authorityRevision,
+          ),
+          created: false,
+        };
+      }
+      this.db.prepare(`
+        INSERT INTO execution_termination_bindings (
+          binding_id, tenant_id, project_id, admission_mode, reservation_id, run_id, call_id,
+          attempt_id, task_id, receipt_ref, execution_backend, created_at,
+          payload_json, payload_hash, integrity_key_id, integrity_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        binding.bindingId,
+        binding.tenantId,
+        binding.projectId,
+        binding.admissionMode,
+        null,
         binding.runId,
         binding.callId,
         binding.attemptId,
@@ -780,6 +1031,99 @@ export class ExecutionTerminationLedger {
     this.db.close();
   }
 
+  /**
+   * Atomic v1 → v2 binding-table rebuild. SQLite cannot relax `reservation_id`
+   * from NOT NULL UNIQUE to nullable + partial index in place, so the table is
+   * rebuilt inside one transaction: legacy rows are copied verbatim (payload,
+   * hash, MAC and receipt refs untouched) with `admission_mode = 'reserved'`, and
+   * the logical/reservation indexes + immutability/authority triggers are
+   * recreated. Foreign-key enforcement is disabled only for the structural
+   * drop/rename and re-verified before it is restored; any failure rolls the
+   * whole migration back.
+   */
+  private migrateBindingsV1ToV2(): void {
+    const rebuild = this.db.transaction(() => {
+      this.db.exec(`
+        CREATE TABLE execution_termination_bindings_v2 (
+          inserted_seq INTEGER PRIMARY KEY AUTOINCREMENT,
+          binding_id TEXT NOT NULL UNIQUE,
+          tenant_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          admission_mode TEXT NOT NULL DEFAULT 'reserved',
+          reservation_id TEXT,
+          run_id TEXT NOT NULL,
+          call_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL,
+          task_id TEXT NOT NULL,
+          receipt_ref TEXT NOT NULL,
+          execution_backend TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          payload_hash TEXT NOT NULL,
+          integrity_key_id TEXT NOT NULL,
+          integrity_version INTEGER NOT NULL,
+          CHECK (
+            (admission_mode = 'reserved' AND reservation_id IS NOT NULL)
+            OR (admission_mode = 'non_reservable_subscription' AND reservation_id IS NULL)
+          )
+        );
+
+        INSERT INTO execution_termination_bindings_v2 (
+          inserted_seq, binding_id, tenant_id, project_id, admission_mode, reservation_id,
+          run_id, call_id, attempt_id, task_id, receipt_ref, execution_backend,
+          created_at, payload_json, payload_hash, integrity_key_id, integrity_version
+        )
+        SELECT
+          inserted_seq, binding_id, tenant_id, project_id, 'reserved', reservation_id,
+          run_id, call_id, attempt_id, task_id, receipt_ref, execution_backend,
+          created_at, payload_json, payload_hash, integrity_key_id, integrity_version
+        FROM execution_termination_bindings;
+
+        DROP TABLE execution_termination_bindings;
+        ALTER TABLE execution_termination_bindings_v2 RENAME TO execution_termination_bindings;
+
+        CREATE UNIQUE INDEX execution_termination_logical_binding
+          ON execution_termination_bindings (
+            tenant_id, project_id, run_id, call_id, attempt_id
+          );
+        CREATE UNIQUE INDEX execution_termination_reservation_unique
+          ON execution_termination_bindings (reservation_id)
+          WHERE reservation_id IS NOT NULL;
+
+        CREATE TRIGGER execution_termination_bindings_no_update
+          BEFORE UPDATE ON execution_termination_bindings BEGIN
+            SELECT RAISE(ABORT, 'execution termination bindings are immutable');
+          END;
+        CREATE TRIGGER execution_termination_bindings_no_delete
+          BEFORE DELETE ON execution_termination_bindings BEGIN
+            SELECT RAISE(ABORT, 'execution termination bindings are immutable');
+          END;
+        CREATE TRIGGER execution_termination_bindings_active_key_insert
+          BEFORE INSERT ON execution_termination_bindings
+          WHEN NEW.integrity_version != 1 OR NEW.integrity_key_id != (
+            SELECT active_key_id FROM execution_termination_authority WHERE singleton_id = 1
+          ) BEGIN
+            SELECT RAISE(ABORT, 'execution termination active authority mismatch');
+          END;
+      `);
+      const violations = this.db.pragma('foreign_key_check') as unknown[];
+      if (violations.length > 0) {
+        throw new ExecutionTerminationLedgerError(
+          'INTEGRITY_FAILURE',
+          'Execution termination migration violated foreign-key integrity',
+        );
+      }
+    });
+    // SQLite forbids toggling foreign_keys inside a transaction, so the guard is
+    // set around the atomic rebuild and always restored.
+    this.db.pragma('foreign_keys = OFF');
+    try {
+      rebuild.immediate();
+    } finally {
+      this.db.pragma('foreign_keys = ON');
+    }
+  }
+
   private initSchema(): void {
     const sentinel = this.signValue('authority', AUTHORITY_SENTINEL);
     this.db.exec(`
@@ -796,7 +1140,8 @@ export class ExecutionTerminationLedger {
         binding_id TEXT NOT NULL UNIQUE,
         tenant_id TEXT NOT NULL,
         project_id TEXT NOT NULL,
-        reservation_id TEXT NOT NULL UNIQUE,
+        admission_mode TEXT NOT NULL DEFAULT 'reserved',
+        reservation_id TEXT,
         run_id TEXT NOT NULL,
         call_id TEXT NOT NULL,
         attempt_id TEXT NOT NULL,
@@ -807,7 +1152,11 @@ export class ExecutionTerminationLedger {
         payload_json TEXT NOT NULL,
         payload_hash TEXT NOT NULL,
         integrity_key_id TEXT NOT NULL,
-        integrity_version INTEGER NOT NULL
+        integrity_version INTEGER NOT NULL,
+        CHECK (
+          (admission_mode = 'reserved' AND reservation_id IS NOT NULL)
+          OR (admission_mode = 'non_reservable_subscription' AND reservation_id IS NULL)
+        )
       );
 
       CREATE TABLE execution_termination_terminals (
@@ -829,6 +1178,10 @@ export class ExecutionTerminationLedger {
         ON execution_termination_bindings (
           tenant_id, project_id, run_id, call_id, attempt_id
         );
+
+      CREATE UNIQUE INDEX execution_termination_reservation_unique
+        ON execution_termination_bindings (reservation_id)
+        WHERE reservation_id IS NOT NULL;
 
       CREATE TRIGGER execution_termination_bindings_no_update
         BEFORE UPDATE ON execution_termination_bindings BEGIN
@@ -874,7 +1227,7 @@ export class ExecutionTerminationLedger {
         'singleton_id', 'integrity_check', 'active_key_id', 'integrity_version', 'authority_revision',
       ],
       execution_termination_bindings: [
-        'binding_id', 'tenant_id', 'project_id', 'reservation_id', 'run_id',
+        'binding_id', 'tenant_id', 'project_id', 'admission_mode', 'reservation_id', 'run_id',
         'call_id', 'attempt_id', 'task_id', 'receipt_ref', 'execution_backend',
         'created_at', 'payload_json', 'payload_hash', 'integrity_key_id', 'integrity_version',
       ],
@@ -1030,12 +1383,26 @@ export class ExecutionTerminationLedger {
         'Execution termination binding integrity mismatch',
       );
     }
-    const binding = JSON.parse(row.payload_json) as ExecutionTerminationBinding;
+    // `admissionMode` is reconstructed from the persisted column (never from the
+    // payload, which omits it so reserved digests stay byte-identical).
+    // assertBindingShape then proves the payload schemaVersion agrees with the
+    // reconstructed arm, so a tampered admission_mode column cannot smuggle a
+    // reservation-shaped payload into the non-reservable arm or vice versa.
+    const admissionMode = row.admission_mode === 'non_reservable_subscription'
+      ? 'non_reservable_subscription' as const
+      : 'reserved' as const;
+    const binding = {
+      ...(JSON.parse(row.payload_json) as Record<string, unknown>),
+      admissionMode,
+    } as ExecutionTerminationBinding;
     assertBindingShape(binding);
+    const reservationEnvelopeMatches = binding.admissionMode === 'reserved'
+      ? binding.providerLimitReservationId === row.reservation_id
+      : row.reservation_id === null;
     if (binding.bindingId !== row.binding_id
       || binding.tenantId !== row.tenant_id
       || binding.projectId !== row.project_id
-      || binding.providerLimitReservationId !== row.reservation_id
+      || !reservationEnvelopeMatches
       || binding.runId !== row.run_id
       || binding.callId !== row.call_id
       || binding.attemptId !== row.attempt_id

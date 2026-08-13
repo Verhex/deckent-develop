@@ -355,12 +355,48 @@ export function parseCrossVerifyEvidenceManifestV2(
   return deepFreeze(manifest);
 }
 
+/**
+ * Parse-boundary alias for the citation digest ONLY: the evidence manifest names
+ * the digest `contentSha256`, so a verifier naturally copies that key into a
+ * citation. Rewrite it to the canonical `evidenceSha256` before strict validation
+ * so the canonical field is the only one the schema (and thus the receipt/output)
+ * ever carries. If a citation supplies BOTH keys they MUST match; a conflicting
+ * pair is left untouched so `.strict()` fails closed. Any non-citation shape is
+ * returned verbatim for the schema to reject.
+ */
+function normalizeCitationDigestAlias(value: unknown): unknown {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+  const root = value as Record<string, unknown>;
+  const results = root['assertionResults'];
+  if (!Array.isArray(results)) return value;
+  return {
+    ...root,
+    assertionResults: results.map((result) => {
+      if (result === null || typeof result !== 'object' || Array.isArray(result)) return result;
+      const citations = (result as Record<string, unknown>)['citations'];
+      if (!Array.isArray(citations)) return result;
+      return {
+        ...(result as Record<string, unknown>),
+        citations: citations.map((citation) => {
+          if (citation === null || typeof citation !== 'object' || Array.isArray(citation)) return citation;
+          const record = citation as Record<string, unknown>;
+          if (!('contentSha256' in record)) return citation;
+          const { contentSha256, ...rest } = record;
+          const canonical = rest['evidenceSha256'];
+          if (canonical !== undefined && canonical !== contentSha256) return citation;
+          return { ...rest, evidenceSha256: canonical ?? contentSha256 };
+        }),
+      };
+    }),
+  };
+}
+
 export function parseCrossVerifyAdjudicationResponseV2(
   value: unknown,
 ): Readonly<CrossVerifyAdjudicationResponseV2> {
   const response = parseStrict(
     crossVerifyAdjudicationResponseV2Schema,
-    value,
+    normalizeCitationDigestAlias(value),
     'xverify v2 adjudication response',
   );
   assertResponseSemantics(response);

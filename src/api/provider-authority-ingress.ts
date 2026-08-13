@@ -25,6 +25,11 @@ export interface ApiBrainProviderAuthorityHoldBody {
 export type ApiBrainProviderAuthorityDecision =
   | { readonly decision: 'not-configured' }
   | {
+      /** Composition healthy — not an execution permit (see core ingress). */
+      readonly decision: 'ready';
+      readonly authorityEvidenceRefs: readonly string[];
+    }
+  | {
       readonly decision: 'hold';
       readonly statusCode: 503;
       readonly body: ApiBrainProviderAuthorityHoldBody;

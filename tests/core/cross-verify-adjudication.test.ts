@@ -427,3 +427,49 @@ describe('CrossVerifyAdjudicationV2 host derivation', () => {
     expect(Object.isFrozen(manifestInput)).toBe(false);
   });
 });
+
+describe('CrossVerifyAdjudicationV2 citation digest alias', () => {
+  const contract = createCrossVerifyAdjudicationContractV2(claim(), manifest());
+  const canonicalCitation = {
+    evidenceId: 'E1',
+    locator: 'src/input.ts#L10-L20',
+    evidenceSha256: D1,
+  };
+  // The evidence manifest names the digest `contentSha256`; a verifier that copies
+  // that key into its citation must still be accepted, normalized to canonical.
+  const withCitation = (citation: Record<string, unknown>): unknown => {
+    const response = clone(supportedResponse(contract)) as unknown as {
+      assertionResults: { citations: Record<string, unknown>[] }[];
+    };
+    response.assertionResults[0]!.citations[0] = citation;
+    return response;
+  };
+  const firstCitation = (parsed: ReturnType<typeof parseCrossVerifyAdjudicationResponseV2>) =>
+    parsed.assertionResults[0]!.citations[0]!;
+
+  it('accepts the canonical evidenceSha256 unchanged', () => {
+    const parsed = parseCrossVerifyAdjudicationResponseV2(withCitation({ ...canonicalCitation }));
+    expect(firstCitation(parsed)).toEqual(canonicalCitation);
+  });
+
+  it('accepts contentSha256 as a parse-boundary alias, normalizing to evidenceSha256', () => {
+    const parsed = parseCrossVerifyAdjudicationResponseV2(withCitation({
+      evidenceId: 'E1', locator: 'src/input.ts#L10-L20', contentSha256: D1,
+    }));
+    expect(firstCitation(parsed)).toEqual(canonicalCitation);
+    expect('contentSha256' in firstCitation(parsed)).toBe(false);
+  });
+
+  it('accepts both keys when their digests are identical, emitting only the canonical field', () => {
+    const parsed = parseCrossVerifyAdjudicationResponseV2(withCitation({
+      evidenceId: 'E1', locator: 'src/input.ts#L10-L20', evidenceSha256: D1, contentSha256: D1,
+    }));
+    expect(firstCitation(parsed)).toEqual(canonicalCitation);
+  });
+
+  it('fails closed when evidenceSha256 and contentSha256 disagree', () => {
+    expect(() => parseCrossVerifyAdjudicationResponseV2(withCitation({
+      evidenceId: 'E1', locator: 'src/input.ts#L10-L20', evidenceSha256: D1, contentSha256: D2,
+    }))).toThrow(/contentSha256|unrecognized/iu);
+  });
+});

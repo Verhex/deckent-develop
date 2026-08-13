@@ -13,10 +13,13 @@
 // source is `pricing-data-baseline.json` (project cost-config overrides it).
 // Callers pass `CostConfig.estimator` through; there is no literal fallback.
 
+import { DeckentError } from './errors.js';
 import type { ExecutionBudget } from './work-model.js';
 import type { Task } from './task-types.js';
 import type { TaskCostInput } from './cost-calculator.js';
 import type { EstimatorDefaults } from './cost-config-loader.js';
+import type { ReachabilityProbeBudget } from './provider-evidence-probe-contract.js';
+import type { ReachabilityProbePurposeProfile } from './execution-budget-policy.js';
 
 /** Build the estimator input for one task from config-resolved defaults —
  *  the CLI cost tables and the planner's budget stamping share this, so the
@@ -104,4 +107,43 @@ export function deriveRequestedExecutionBudget(input: DeriveExecutionBudgetInput
   }
 
   return budget;
+}
+
+/**
+ * Project the canonical budget through the owner-authored reachability purpose
+ * profile. The profile supplies every required probe ceiling; a canonical
+ * ceiling may only narrow it. Billing determines whether the owner USD ceiling
+ * is carried at all.
+ */
+export function deriveReachabilityProbeBudget(input: {
+  readonly executionBudget: Readonly<ExecutionBudget>;
+  readonly billingMode: ReachabilityProbeBudget['billingMode'];
+  readonly purposeProfile: Readonly<ReachabilityProbePurposeProfile>;
+}): ReachabilityProbeBudget {
+  const narrow = (authority: number, requested: number | undefined): number =>
+    requested === undefined ? authority : Math.min(authority, requested);
+  const base = {
+    maxInputTokens: narrow(input.purposeProfile.maxInputTokens, input.executionBudget.maxInputTokens),
+    maxOutputTokens: narrow(input.purposeProfile.maxOutputTokens, input.executionBudget.maxOutputTokens),
+    maxTokens: narrow(input.purposeProfile.maxTokens, input.executionBudget.maxTokens),
+    timeoutMs: input.purposeProfile.timeoutMs,
+  };
+  if (base.maxTokens < base.maxInputTokens + base.maxOutputTokens) {
+    throw new DeckentError(
+      'DECKENT_E081',
+      'reachability probe purpose profile is incompatible with the canonical execution budget',
+    );
+  }
+  if (input.billingMode !== 'metered-api') return { billingMode: input.billingMode, ...base };
+  if (input.purposeProfile.maxUsd === undefined) {
+    throw new DeckentError(
+      'DECKENT_E082',
+      'metered-api reachability probe requires an owner-authored USD ceiling',
+    );
+  }
+  return {
+    billingMode: 'metered-api',
+    ...base,
+    maxUsd: narrow(input.purposeProfile.maxUsd, input.executionBudget.maxUsd),
+  };
 }

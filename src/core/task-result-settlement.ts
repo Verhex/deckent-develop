@@ -147,6 +147,45 @@ export interface TaskProviderActualCallReceiptV1 extends TaskResultSettlementRef
   sourceEventSha256: string;
 }
 
+/**
+ * Second, discriminated actual-call proof arm for a SUBSCRIPTION provider that
+ * never emits a per-call usd billing envelope. The proof of "the provider call
+ * happened" is derived ONLY from the provider's genuinely-reported token usage
+ * (never an estimate, owner budget, or synthetic value), bound to the exact
+ * execution-contract identity AND the terminal transport settlement. The
+ * `metered_billing` arm (V1) is untouched and stays byte-identical.
+ */
+export interface TaskProviderActualCallReceiptV2 extends TaskResultSettlementRefV1 {
+  lifecycleVersion: typeof TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION;
+  state: 'provider-actual-call';
+  proofKind: 'subscription_transport_usage';
+  observedAt: string;
+  provider: string;
+  model: string;
+  authMode: CrossVerifyEnforcedAttemptContract['authMode'];
+  accountRefHash: string | null;
+  transport: CrossVerifyEnforcedAttemptContract['transport'];
+  executionBackend: CrossVerifyEnforcedAttemptContract['executionBackend'];
+  endpointRefHash: string | null;
+  executionProfileRef: string;
+  executionContractEvidenceRef: string;
+  /** The provider-reported terminal-usage evidence this proof is derived from. */
+  providerTerminalUsageEvidenceRef: string;
+  /** Provider-reported token counters — must be positive; never synthetic. */
+  usage: {
+    readonly inputTokens: number;
+    readonly outputTokens: number;
+    readonly totalTokens: number;
+  };
+  /** Binds the proof to THIS attempt's terminal transport settlement (anti-replay). */
+  terminalTransportSettlementDigest: string;
+  sourceEventSha256: string;
+}
+
+export type TaskProviderActualCallReceipt =
+  | TaskProviderActualCallReceiptV1
+  | TaskProviderActualCallReceiptV2;
+
 export interface TaskProviderTerminalUsageSourceV1 {
   version: 2;
   projectId: string;
@@ -774,13 +813,22 @@ function hasFiniteUsageCounters(value: unknown): value is LiveUsageCounters {
       && (counters[key] as number) >= 0);
 }
 
-export function parseTaskProviderActualCallReceipt(
-  value: unknown,
-): TaskProviderActualCallReceiptV1 | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  if (
-    !hasValidRefShape(record)
+function asRecordOrNull(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function isPositiveSafeInt(value: unknown): boolean {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+function isNonNegativeSafeInt(value: unknown): boolean {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function actualCallCommonShapeInvalid(record: Record<string, unknown>): boolean {
+  return !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
     || record.state !== 'provider-actual-call'
     || typeof record.observedAt !== 'string'
@@ -798,10 +846,31 @@ export function parseTaskProviderActualCallReceipt(
         || !/^[a-f0-9]{64}$/u.test(record.endpointRefHash)))
     || typeof record.executionProfileRef !== 'string'
     || typeof record.executionContractEvidenceRef !== 'string'
-    || typeof record.providerBillingEvidenceRef !== 'string'
     || typeof record.sourceEventSha256 !== 'string'
-    || !/^[a-f0-9]{64}$/u.test(record.sourceEventSha256)
-  ) return null;
+    || !/^[a-f0-9]{64}$/u.test(record.sourceEventSha256);
+}
+
+export function parseTaskProviderActualCallReceipt(
+  value: unknown,
+): TaskProviderActualCallReceipt | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (actualCallCommonShapeInvalid(record)) return null;
+  if (record.proofKind === 'subscription_transport_usage') {
+    const usage = asRecordOrNull(record.usage);
+    if (
+      typeof record.providerTerminalUsageEvidenceRef !== 'string'
+      || typeof record.terminalTransportSettlementDigest !== 'string'
+      || !/^[a-f0-9]{64}$/u.test(record.terminalTransportSettlementDigest)
+      || !usage
+      || !isPositiveSafeInt(usage.totalTokens)
+      || !isNonNegativeSafeInt(usage.inputTokens)
+      || !isNonNegativeSafeInt(usage.outputTokens)
+      || 'providerBillingEvidenceRef' in record
+    ) return null;
+    return record as unknown as TaskProviderActualCallReceiptV2;
+  }
+  if (typeof record.providerBillingEvidenceRef !== 'string' || 'proofKind' in record) return null;
   return record as unknown as TaskProviderActualCallReceiptV1;
 }
 
@@ -1379,6 +1448,25 @@ export function taskResultSettlementActiveClaimDigest(
 }
 
 /**
+ * The settlement's DURABLE claim fence — the active claim while the attempt is
+ * live, and the immutable closed/LANDED tail afterwards. The claim record itself
+ * is never rewritten on closure (closure is a sibling file), so its fence digest
+ * `sha256(JSON.stringify(claim))` is identical before and after closure. The host
+ * verdict receipt is the FINAL artifact, persisted after the coordinator closes
+ * the settlement, so it must bind to this durable claim identity rather than an
+ * active claim that closure has already retired. Returns null (fail-closed) when
+ * no claim matches the exact ref.
+ */
+export function taskResultSettlementDurableClaimFence(
+  ref: TaskResultSettlementRefV1,
+): { readonly fenceTokenHash: string; readonly claimedAt: string } | null {
+  const chain = resolveTaskResultSettlementClaimChain(ref);
+  const claim = chain.active ?? chain.latest;
+  if (!claim || !sameRef(claim, ref)) return null;
+  return { fenceTokenHash: sha256(JSON.stringify(claim)), claimedAt: claim.claimedAt };
+}
+
+/**
  * Resolve the exact host-owned lifecycle authority for one canonical project/task.
  * Active execution wins; after closure the immutable tail remains discoverable so
  * restart-time consumers do not need an in-memory settlementRef or raw `.result`.
@@ -1676,21 +1764,118 @@ export function writeTaskProviderActualCallReceiptAtomic(
   );
   chmodSync(path, 0o600);
   const persisted = readTaskProviderActualCallReceipt(ref);
-  if (!persisted || JSON.stringify(persisted) !== JSON.stringify(receipt)) {
+  if (!persisted || 'proofKind' in persisted
+    || JSON.stringify(persisted) !== JSON.stringify(receipt)) {
     throw createDockerLifecycleError('Docker provider actual-call receipt could not be verified');
   }
   return persisted;
 }
 
+/**
+ * Subscription-arm actual-call proof: the provider call is proven ONLY from the
+ * provider's genuinely-reported terminal token usage (`sourceUsageSha256` +
+ * positive counters), bound to the exact execution-contract identity and THIS
+ * attempt's terminal transport settlement. No usd, no estimate, no synthetic
+ * value. Absent/zero usage or a missing terminal settlement throws (→ the caller
+ * surfaces `actual_call_unproven`).
+ */
+export function writeTaskProviderActualCallReceiptFromTransportUsageAtomic(
+  ref: TaskResultSettlementRefV1,
+): TaskProviderActualCallReceiptV2 {
+  const attempt = parseTaskResultSettlementAttempt(
+    readJson(taskResultSettlementAttemptPath(ref)),
+  );
+  if (!attempt || !sameRef(attempt, ref)) {
+    throw createDockerLifecycleError(
+      'Docker provider actual-call has no matching durable attempt',
+    );
+  }
+  const contract = readTaskResultSettlementExecutionContract(ref);
+  const terminalUsage = readTaskProviderTerminalUsageReceipt(ref);
+  const settlementDigest = terminalTransportSettlementDigest(ref);
+  if (!contract || !terminalUsage || settlementDigest === null
+    || contract.authMode !== 'subscription'
+    // Post-hoc budget containment: a final-only provider's ceilings settle after
+    // the call. An exceeded or unmeasurable terminal usage is NOT a successful
+    // call — the proof is refused (→ actual_call_unproven / budget-violation HOLD),
+    // never fabricated into success.
+    || terminalUsage.decisionState === 'exceeded'
+    || terminalUsage.decisionState === 'unmeasurable'
+    || !(terminalUsage.counters.totalTokens > 0)) {
+    throw createDockerLifecycleError(
+      'Docker non-reservable actual-call requires an exact subscription contract, positive within-budget provider-reported terminal usage, and a terminal transport settlement',
+    );
+  }
+  const receipt: TaskProviderActualCallReceiptV2 = {
+    ...ref,
+    lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
+    state: 'provider-actual-call',
+    proofKind: 'subscription_transport_usage',
+    observedAt: terminalUsage.observedAt,
+    provider: contract.provider,
+    model: contract.model,
+    authMode: contract.authMode,
+    accountRefHash: contract.accountRefHash,
+    transport: contract.transport,
+    executionBackend: contract.executionBackend,
+    endpointRefHash: contract.endpointRefHash,
+    executionProfileRef: contract.executionProfileRef,
+    executionContractEvidenceRef: contract.evidenceRef,
+    providerTerminalUsageEvidenceRef: taskProviderTerminalUsageEvidenceRef(terminalUsage),
+    usage: {
+      inputTokens: terminalUsage.counters.inputTokens,
+      outputTokens: terminalUsage.counters.outputTokens,
+      totalTokens: terminalUsage.counters.totalTokens,
+    },
+    terminalTransportSettlementDigest: settlementDigest,
+    sourceEventSha256: terminalUsage.sourceUsageSha256,
+  };
+  if (!parseTaskProviderActualCallReceipt(receipt)) {
+    throw createDockerLifecycleError('Invalid Docker provider actual-call receipt');
+  }
+  const path = taskProviderActualCallReceiptPath(ref);
+  publishJsonFirstWriter(
+    path,
+    receipt,
+    existing => JSON.stringify(parseTaskProviderActualCallReceipt(existing))
+      === JSON.stringify(receipt),
+  );
+  chmodSync(path, 0o600);
+  const persisted = readTaskProviderActualCallReceipt(ref);
+  if (!persisted || !('proofKind' in persisted)
+    || JSON.stringify(persisted) !== JSON.stringify(receipt)) {
+    throw createDockerLifecycleError('Docker provider actual-call receipt could not be verified');
+  }
+  return persisted;
+}
+
+/**
+ * Bind an actual-call proof to THIS attempt's terminal transport settlement:
+ * the durable dispatch record (the container that carried the provider call) plus
+ * the settlement's exit outcome. A proof lifted from another attempt cannot forge
+ * this digest, so replay/stale evidence is rejected on read.
+ */
+function terminalTransportSettlementDigest(ref: TaskResultSettlementRefV1): string | null {
+  const dispatch = readTaskResultSettlementDispatch(ref);
+  const settlement = readTaskResultSettlement(ref);
+  if (!dispatch || !settlement) return null;
+  // Both the writer and every reader digest the SAME durable dispatch + settlement
+  // objects, so a plain stable stringify is deterministic here.
+  return sha256(JSON.stringify({
+    dispatch,
+    exitCode: settlement.exitCode,
+    settledAt: settlement.settledAt,
+  }));
+}
+
 export function readTaskProviderActualCallReceipt(
   ref: TaskResultSettlementRefV1,
-): TaskProviderActualCallReceiptV1 | null {
+): TaskProviderActualCallReceipt | null {
   const path = taskProviderActualCallReceiptPath(ref);
   const receipt = parseTaskProviderActualCallReceipt(readJson(path));
   if (!receipt || !sameRef(receipt, ref) || !hasPrivateFileMode(path)) return null;
   const contract = readTaskResultSettlementExecutionContract(ref);
-  const billing = readTaskProviderTerminalBillingReceipt(ref);
-  if (!contract || !billing
+  if (!contract
     || receipt.provider !== contract.provider
     || receipt.model !== contract.model
     || receipt.authMode !== contract.authMode
@@ -1699,7 +1884,22 @@ export function readTaskProviderActualCallReceipt(
     || receipt.executionBackend !== contract.executionBackend
     || receipt.endpointRefHash !== contract.endpointRefHash
     || receipt.executionProfileRef !== contract.executionProfileRef
-    || receipt.executionContractEvidenceRef !== contract.evidenceRef
+    || receipt.executionContractEvidenceRef !== contract.evidenceRef) return null;
+  if ('proofKind' in receipt) {
+    const terminalUsage = readTaskProviderTerminalUsageReceipt(ref);
+    const settlementDigest = terminalTransportSettlementDigest(ref);
+    if (!terminalUsage
+      || settlementDigest === null
+      || receipt.terminalTransportSettlementDigest !== settlementDigest
+      || receipt.providerTerminalUsageEvidenceRef !== taskProviderTerminalUsageEvidenceRef(terminalUsage)
+      || receipt.usage.totalTokens <= 0
+      || receipt.usage.totalTokens !== terminalUsage.counters.totalTokens
+      || receipt.usage.inputTokens !== terminalUsage.counters.inputTokens
+      || receipt.usage.outputTokens !== terminalUsage.counters.outputTokens) return null;
+    return receipt;
+  }
+  const billing = readTaskProviderTerminalBillingReceipt(ref);
+  if (!billing
     || receipt.providerBillingEvidenceRef !== taskProviderTerminalBillingEvidenceRef(billing)
     || receipt.sourceEventSha256 !== billing.sourceEventSha256
     || !exactModelUsageIsPositive(billing.billing, contract.model)) return null;
@@ -1707,7 +1907,7 @@ export function readTaskProviderActualCallReceipt(
 }
 
 export function taskProviderActualCallEvidenceRef(
-  receipt: TaskProviderActualCallReceiptV1,
+  receipt: TaskProviderActualCallReceipt,
 ): string {
   if (!parseTaskProviderActualCallReceipt(receipt)) {
     throw createDockerLifecycleError('Invalid Docker provider actual-call evidence');

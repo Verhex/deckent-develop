@@ -5,6 +5,7 @@ import {
   deriveExecutionLandingTurnAllocation,
   executionBudgetPolicyDigest,
   resolveExecutionBudgetPolicy,
+  resolveXverifyAdjudicationPurposeProfile,
 } from '../../src/core/execution-budget-policy.js';
 import type { ExecutionBudgetPolicyConfig } from '../../src/core/config-types.js';
 
@@ -296,5 +297,50 @@ describe('execution budget policy', () => {
     const held: ExecutionBudgetPolicyConfig = { ...authorized, final_only_usage: { action: 'hold' } };
     const heldAuditor = resolveExecutionBudgetPolicy({ policy: held, role: 'auditor', taskKind: 'audit' });
     expect(heldAuditor.state === 'allow' && heldAuditor.finalOnlyUsage).toBeUndefined();
+  });
+});
+
+describe('resolveXverifyAdjudicationPurposeProfile', () => {
+  const withProfile = (profile: unknown): ExecutionBudgetPolicyConfig =>
+    ({ ...policy(), purposes: { 'xverify-adjudication': profile } } as ExecutionBudgetPolicyConfig);
+
+  it('holds with a typed reason when no policy is provided', () => {
+    expect(resolveXverifyAdjudicationPurposeProfile({})).toMatchObject({
+      state: 'unavailable',
+      reasonCode: 'xverify-adjudication-profile-missing',
+      profileRef: 'execution_budget.purposes.xverify-adjudication',
+    });
+  });
+
+  it('holds when the profile is absent from the purposes block', () => {
+    expect(resolveXverifyAdjudicationPurposeProfile({ policy: policy() })).toMatchObject({
+      state: 'unavailable',
+      reasonCode: 'xverify-adjudication-profile-missing',
+    });
+  });
+
+  it('rejects a missing or non-positive total-token ceiling at config validation', () => {
+    expect(() => assertExecutionBudgetPolicyConfig(withProfile({
+      maxWallClockSeconds: 300, maxVerificationsPerSprint: 1,
+    }))).toThrow(ExecutionBudgetPolicyError);
+    expect(() => assertExecutionBudgetPolicyConfig(withProfile({
+      maxTokens: 0, maxWallClockSeconds: 300, maxVerificationsPerSprint: 1,
+    }))).toThrow(/maxTokens must be a positive safe integer/u);
+    expect(() => assertExecutionBudgetPolicyConfig(withProfile({
+      maxTokens: 100_000, maxWallClockSeconds: 300, maxVerificationsPerSprint: 1, extra: 1,
+    }))).toThrow(/unknown field/iu);
+  });
+
+  it('resolves the owner-authored ceilings when the profile is valid', () => {
+    const decision = resolveXverifyAdjudicationPurposeProfile({
+      policy: withProfile({ maxTokens: 100_000, maxWallClockSeconds: 300, maxVerificationsPerSprint: 1 }),
+    });
+    expect(decision.state).toBe('available');
+    if (decision.state !== 'available') throw new Error(decision.reasonCode);
+    expect(decision.profile).toEqual({
+      maxTokens: 100_000, maxWallClockSeconds: 300, maxVerificationsPerSprint: 1,
+    });
+    expect(decision.profileRef).toBe('execution_budget.purposes.xverify-adjudication');
+    expect(Object.isFrozen(decision.profile)).toBe(true);
   });
 });

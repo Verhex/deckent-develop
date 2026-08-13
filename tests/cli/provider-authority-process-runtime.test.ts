@@ -87,6 +87,51 @@ describe('withCliProviderAuthority', () => {
 });
 
 describe('preflightCliBrainProviderAuthority', () => {
+  const READY_CONFIG = {
+    mode: 'balanced',
+    modes: {
+      balanced: {
+        brain_model: 'claude-fable-5',
+        default_model: 'claude-fable-5',
+      },
+    },
+    providers: { brain: 'claude' },
+  } as never;
+
+  it.each(['cli-run:100', 'cli-start:100', 'cli-do:100', 'cli-xverify:100'])(
+    'passes a healthy composition as ready for %s — never the empty-candidate hold',
+    (executionId) => {
+      const admit = vi.fn();
+      const authority = {
+        state: 'ready',
+        tenantId: 'local',
+        projectId: 'project-cli-0001',
+        authorityEvidenceRef: `provider-authority:${'e'.repeat(64)}`,
+        service: { roleAdmissionRuntime: { admit } },
+        close: vi.fn(),
+      } as never;
+
+      const decision = preflightCliBrainProviderAuthority(
+        authority,
+        READY_CONFIG,
+        '/project',
+        executionId,
+      );
+
+      // Front door = composition health only. The candidate-bound admission
+      // belongs to the later stage where the exact candidate/backend resolves.
+      expect(admit).not.toHaveBeenCalled();
+      expect(decision).toMatchObject({
+        decision: 'ready',
+        authorityEvidenceRefs: [
+          `provider-authority:${'e'.repeat(64)}`,
+          expect.stringMatching(/^provider-execution-ingress:[a-f0-9]{64}$/u),
+        ],
+      });
+      expect(JSON.stringify(decision)).not.toContain('candidate_authority_unavailable');
+    },
+  );
+
   it('binds canonical Brain identity and returns the shared authority HOLD', () => {
     const authority = {
       state: 'hold',

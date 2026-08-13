@@ -131,7 +131,7 @@ function canonicalProjectRoot(projectRoot: string): string {
   try { return realpathSync.native(projectRoot); } catch { return resolve(projectRoot); }
 }
 
-function budgetFingerprint(budget: ExecutionBudget): string {
+export function budgetFingerprint(budget: ExecutionBudget): string {
   return sha256(JSON.stringify(Object.fromEntries(
     BUDGET_FIELDS.filter(field => budget[field] !== undefined).map(field => [field, budget[field]]),
   )));

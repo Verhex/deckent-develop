@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 
 import {
   createDockerExecutionTerminationBindingInput,
+  createNonReservableDockerExecutionTerminationBindingInput,
   ExecutionTerminationLedger,
 } from '../core/execution-termination-ledger.js';
 import { providerLimitReservationEvidenceRef } from '../core/provider-limit-admission.js';
+import { deriveProviderQuotaScopeRefHash } from '../core/provider-limit-truth.js';
 import type {
   ProviderLimitReservation,
   ProviderLimitReservationEvent,
@@ -21,9 +23,11 @@ import {
   taskProviderTerminalBillingEvidenceRef,
   taskProviderTerminalUsageEvidenceRef,
   writeTaskProviderActualCallReceiptAtomic,
+  writeTaskProviderActualCallReceiptFromTransportUsageAtomic,
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
 import { canonicalJson } from '../core/audit-writer.js';
+import { CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX } from '../core/cross-verify-prompt.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
 import type { SpawnBackendOptions } from './spawn-backend.js';
 import {
@@ -36,6 +40,7 @@ import type {
   CrossVerifyInvocationExecutionGrant,
   CrossVerifyProviderUsageAuthority,
   CrossVerifyProviderUsagePreflight,
+  CrossVerifyNonReservableUsageProjection,
   CrossVerifyProviderUsageProjection,
   CrossVerifyStrictExecutionRequest,
   CrossVerifyStrictLauncher,
@@ -78,6 +83,9 @@ function sameReservation(
 function reservationMatchesGrant(
   grant: Readonly<CrossVerifyInvocationExecutionGrant>,
 ): boolean {
+  // A non-reservable subscription grant carries no numeric reservation to
+  // cross-check; its identity lives directly on the grant.
+  if (grant.admissionMode !== 'reserved') return true;
   const reservation = grant.reservation;
   return reservation.reservationId === grant.reservationId
     && reservation.tenantId === grant.tenantId
@@ -96,18 +104,29 @@ function reservationMatchesGrant(
     && reservation.backend.endpointRefHash === grant.backend.endpointRefHash;
 }
 
+/**
+ * The `admissionMode` discriminant is stripped from the reserved identity so its
+ * binding/terminal ids stay byte-identical to before this arm existed. The
+ * non-reservable arm keeps the discriminant (and carries NO reservationId), so
+ * the two id spaces never collide and no reservation identity is fabricated.
+ */
+function terminationIdentity(
+  grant: Readonly<CrossVerifyInvocationExecutionGrant>,
+): Record<string, unknown> {
+  const { admissionMode, ...rest } = grant;
+  return admissionMode === 'reserved' ? rest : { ...rest, admissionMode };
+}
+
 export function crossVerifyTerminationBindingId(
-  grant: Pick<CrossVerifyInvocationExecutionGrant,
-    'tenantId' | 'projectId' | 'runId' | 'taskId' | 'callId' | 'attemptId' | 'reservationId'>,
+  grant: Readonly<CrossVerifyInvocationExecutionGrant>,
 ): string {
-  return `xv-bind-${sha256(canonicalJson(grant)).slice(0, 48)}`;
+  return `xv-bind-${sha256(canonicalJson(terminationIdentity(grant))).slice(0, 48)}`;
 }
 
 function crossVerifyTerminationTerminalId(
-  grant: Pick<CrossVerifyInvocationExecutionGrant,
-    'tenantId' | 'projectId' | 'runId' | 'taskId' | 'callId' | 'attemptId' | 'reservationId'>,
+  grant: Readonly<CrossVerifyInvocationExecutionGrant>,
 ): string {
-  return `xv-term-${sha256(canonicalJson(grant)).slice(0, 48)}`;
+  return `xv-term-${sha256(canonicalJson(terminationIdentity(grant))).slice(0, 48)}`;
 }
 
 export class CrossVerifyDockerTerminationAuthority
@@ -130,15 +149,50 @@ implements DockerExactCrossVerifyTerminationAuthority {
         'Cross-verify termination authority differs from the exact execution grant',
       );
     }
-    const bindingId = crossVerifyTerminationBindingId(this.grant);
-    const write = this.ledger.putBinding(createDockerExecutionTerminationBindingInput({
-      bindingId,
-      reservation: this.grant.reservation,
-      reservationEvidenceRef:
-        providerLimitReservationEvidenceRef(this.grant.reservation.reservationId),
-      settlementRef: input.settlementRef,
-      createdAt: this.now().toISOString(),
-    }));
+    const grant = this.grant;
+    const bindingId = crossVerifyTerminationBindingId(grant);
+    const write = grant.admissionMode === 'reserved'
+      ? this.ledger.putBinding(createDockerExecutionTerminationBindingInput({
+          bindingId,
+          reservation: grant.reservation,
+          reservationEvidenceRef:
+            providerLimitReservationEvidenceRef(grant.reservation.reservationId),
+          settlementRef: input.settlementRef,
+          createdAt: this.now().toISOString(),
+        }))
+      : this.ledger.putNonReservableBinding(createNonReservableDockerExecutionTerminationBindingInput({
+          bindingId,
+          identity: {
+            tenantId: grant.tenantId,
+            projectId: grant.projectId,
+            runId: grant.runId,
+            taskId: grant.taskId,
+            callId: grant.callId,
+            attemptId: grant.attemptId,
+            invocationReceiptRef: grant.invocationReceiptRef,
+            fenceTokenHash: grant.fenceTokenHash,
+            provider: grant.provider,
+            model: grant.model,
+            accountRefHash: grant.auth.accountRefHash,
+            quotaScopeRefHash: deriveProviderQuotaScopeRefHash({
+              tenantId: grant.tenantId,
+              provider: grant.provider,
+              accountRefHash: grant.auth.accountRefHash,
+              authMode: grant.auth.mode,
+              backend: {
+                transport: grant.backend.transport,
+                executionBackend: grant.backend.executionBackend,
+                endpointRefHash: grant.backend.endpointRefHash,
+              },
+            }),
+            authMode: grant.auth.mode,
+            transport: grant.backend.transport,
+            endpointRefHash: grant.backend.endpointRefHash,
+          },
+          model: grant.model,
+          settlementRef: input.settlementRef,
+          createdAt: this.now().toISOString(),
+        }));
     return Object.freeze({
       bindingId,
       evidenceRef: write.evidenceRef,
@@ -194,6 +248,40 @@ function hold(
   };
 }
 
+const TERMINAL_VERDICT_LINE = /^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/iu;
+
+/**
+ * Frame the host-observed terminal adjudication protocol from settlement notes,
+ * fail-closed on ambiguity. Exactly ONE terminal `VERDICT:` line is mandatory;
+ * at most ONE machine-readable `XVERIFY_RESPONSE_JSON:` line is allowed. Any
+ * missing or duplicated marker of either kind returns null so the host derives
+ * UNCLEAR rather than silently trusting the first/last of an ambiguous set.
+ *
+ *  - one response + one verdict (response first) → the v2 two-line protocol, so
+ *    parseCrossVerifyAdjudicationOutputV2 receives its object.
+ *  - zero response + one verdict → the single-line v1 protocol fallback.
+ *  - duplicated response, duplicated verdict, missing verdict, or a response
+ *    after its verdict → null (fail-closed).
+ */
+export function frameTerminalAdjudicationProtocol(notes: string): string | null {
+  const lines = notes.trim().split(/\r?\n/u)
+    .map((line: string) => line.trim())
+    .filter((line: string) => line.length > 0);
+  const verdictLines = lines.filter((line: string) => TERMINAL_VERDICT_LINE.test(line));
+  if (verdictLines.length !== 1) return null;
+  const verdictLine = verdictLines[0]!;
+  const responseLines = lines.filter(
+    (line: string) => line.startsWith(CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX),
+  );
+  if (responseLines.length > 1) return null;
+  if (responseLines.length === 1) {
+    const responseLine = responseLines[0]!;
+    if (lines.indexOf(responseLine) >= lines.indexOf(verdictLine)) return null;
+    return `${responseLine}\n${verdictLine}`;
+  }
+  return verdictLine;
+}
+
 function terminalProtocolFromSettlement(
   settlement: NonNullable<ReturnType<typeof readTaskResultSettlement>>,
 ): string | null {
@@ -205,13 +293,7 @@ function terminalProtocolFromSettlement(
     || host['observedBy'] !== 'host') return null;
   const notes = settlement.result['notes'];
   if (typeof notes !== 'string') return null;
-  const lines = notes.trim().split(/\r?\n/u).map((line: string) => line.trim());
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    if (/^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/iu.test(lines[index]!)) {
-      return lines[index]!;
-    }
-  }
-  return null;
+  return frameTerminalAdjudicationProtocol(notes);
 }
 
 function transportDurationMs(
@@ -241,14 +323,17 @@ implements CrossVerifyHostObservationAuthority {
 
   async observe(input: {
     readonly grant: Readonly<CrossVerifyInvocationExecutionGrant>;
-    readonly reservation: ProviderLimitReservation;
+    readonly reservation: ProviderLimitReservation | null;
     readonly dispatch: {
       readonly settlementRef: Readonly<TaskResultSettlementRefV1>;
       readonly outputArtifactRef: string;
     };
   }): Promise<CrossVerifyHostObservation> {
     const { grant, reservation, dispatch } = input;
-    if (!sameReservation(grant.reservation, reservation)
+    const reservationConsistent = grant.admissionMode === 'reserved'
+      ? reservation !== null && sameReservation(grant.reservation, reservation)
+      : reservation === null;
+    if (!reservationConsistent
       || !reservationMatchesGrant(grant)
       || !sameRef(dispatch.settlementRef, grant.executionContract.settlementAttemptRef)) {
       return hold('authority_failure', 'grant-reservation-dispatch-mismatch');
@@ -311,10 +396,18 @@ implements CrossVerifyHostObservationAuthority {
           authorityEvidenceRef: evidenceRef('xverify-docker-observation', rejected),
         };
       }
+      // Metered arm proves the call from the usd billing envelope; the
+      // non-reservable subscription arm never has usd and proves it from the
+      // provider-reported terminal usage instead (discriminated, versioned).
+      const nonReservable = grant.admissionMode === 'non_reservable_subscription';
       let actualCall = readTaskProviderActualCallReceipt(dispatch.settlementRef);
-      if (!actualCall && readTaskProviderTerminalBillingReceipt(dispatch.settlementRef)) {
+      if (!actualCall) {
         try {
-          actualCall = writeTaskProviderActualCallReceiptAtomic(dispatch.settlementRef);
+          actualCall = nonReservable
+            ? writeTaskProviderActualCallReceiptFromTransportUsageAtomic(dispatch.settlementRef)
+            : (readTaskProviderTerminalBillingReceipt(dispatch.settlementRef)
+                ? writeTaskProviderActualCallReceiptAtomic(dispatch.settlementRef)
+                : null);
         } catch {
           actualCall = null;
         }
@@ -322,7 +415,9 @@ implements CrossVerifyHostObservationAuthority {
       if (!actualCall) return hold('actual_call_unproven', dispatch.settlementRef);
       const terminalUsage = readTaskProviderTerminalUsageReceipt(dispatch.settlementRef);
       const billing = readTaskProviderTerminalBillingReceipt(dispatch.settlementRef);
-      if (!terminalUsage || !billing) {
+      // Terminal usage is always required; the usd billing envelope is required
+      // ONLY on the metered arm.
+      if (!terminalUsage || (!nonReservable && !billing)) {
         return hold('provider_envelope_incomplete', dispatch.settlementRef);
       }
       const output = terminalProtocolFromSettlement(settlement);
@@ -358,10 +453,12 @@ implements CrossVerifyHostObservationAuthority {
             terminal.evidenceRef,
           ],
         },
-        usageEvidenceRefs: [
-          taskProviderTerminalUsageEvidenceRef(terminalUsage),
-          taskProviderTerminalBillingEvidenceRef(billing),
-        ],
+        usageEvidenceRefs: billing
+          ? [
+              taskProviderTerminalUsageEvidenceRef(terminalUsage),
+              taskProviderTerminalBillingEvidenceRef(billing),
+            ]
+          : [taskProviderTerminalUsageEvidenceRef(terminalUsage)],
         transportEvent: {
           eventId: `xv-transport-${sha256(grant.receiptRef.invocationId).slice(0, 40)}`,
           type: 'transport_settled',
@@ -495,7 +592,7 @@ implements CrossVerifyProviderUsageAuthority {
     readonly terminal: Readonly<CrossVerifyTerminalEvidenceBundle>;
   }): CrossVerifyProviderUsageProjection {
     const { grant, reservation, terminal } = input;
-    if (!sameReservation(grant.reservation, reservation)) {
+    if (grant.reservation === null || !sameReservation(grant.reservation, reservation)) {
       return this.usageHold('window_scope_mismatch', 'reservation-drift');
     }
     const bindingId = crossVerifyTerminationBindingId(grant);
@@ -581,6 +678,82 @@ implements CrossVerifyProviderUsageAuthority {
       state: 'settled',
       event,
       authorityEvidenceRef: event.evidenceRef,
+    };
+  }
+
+  /**
+   * B2 — non-reservable subscription usage. There is no reservation to settle, so
+   * this produces NO reservation-ledger event; it records ONLY the real usage the
+   * canonical transport reported (the terminal usage receipt). No usd is
+   * fabricated for a subscription, and no amount is derived from an estimate.
+   * Missing or malformed transport usage is a typed `usage_unavailable` HOLD.
+   */
+  projectNonReservable(input: {
+    readonly grant: Readonly<CrossVerifyInvocationExecutionGrant>;
+    readonly terminal: Readonly<CrossVerifyTerminalEvidenceBundle>;
+  }): CrossVerifyNonReservableUsageProjection {
+    const { grant, terminal } = input;
+    if (grant.admissionMode !== 'non_reservable_subscription') {
+      return this.nonReservableUsageHold('authority_failure', 'reserved-grant-on-non-reservable-usage');
+    }
+    const bindingId = crossVerifyTerminationBindingId(grant);
+    const binding = this.terminationLedger.getBinding(bindingId);
+    if (!binding || binding.admissionMode !== 'non_reservable_subscription') {
+      return this.nonReservableUsageHold('termination_unverified', bindingId);
+    }
+    const ref = grant.executionContract.settlementAttemptRef;
+    const actualCall = readTaskProviderActualCallReceipt(ref);
+    const terminalEvidence = terminal.lineage.settlementEvidenceRefs
+      .find(refValue => refValue.startsWith('execution-termination:'));
+    const termination = terminalEvidence
+      ? this.terminationLedger.getTerminalByEvidenceRef(terminalEvidence)
+      : null;
+    if (!termination
+      || termination.value.bindingId !== bindingId
+      || termination.value.capacityDisposition !== 'consumed') {
+      return this.nonReservableUsageHold('termination_unverified', terminalEvidence ?? bindingId);
+    }
+    if (terminal.lineage.coverage !== 'complete'
+      || terminal.lineage.attemptIds.length !== 1
+      || terminal.lineage.attemptIds[0] !== grant.attemptId) {
+      return this.nonReservableUsageHold('usage_lineage_partial', terminal.lineage);
+    }
+    if (terminal.actualCall === null
+      || !actualCall
+      || terminal.actualCall.evidenceRef !== taskProviderActualCallEvidenceRef(actualCall)
+      || actualCall.provider !== grant.provider
+      || actualCall.model !== grant.model) {
+      return this.nonReservableUsageHold('actual_call_mismatch', ref);
+    }
+    const terminalUsage = readTaskProviderTerminalUsageReceipt(ref);
+    if (!terminalUsage) {
+      return this.nonReservableUsageHold('usage_unavailable', ref);
+    }
+    const usageEvidenceRef = taskProviderTerminalUsageEvidenceRef(terminalUsage);
+    return {
+      state: 'settled',
+      usage: {
+        totalTokens: terminalUsage.counters.totalTokens,
+        inputTokens: terminalUsage.counters.inputTokens,
+        outputTokens: terminalUsage.counters.outputTokens,
+      },
+      usageEvidenceRef,
+      authorityEvidenceRef: evidenceRef('xverify-non-reservable-usage', {
+        bindingId,
+        usageEvidenceRef,
+        actualCall: taskProviderActualCallEvidenceRef(actualCall),
+      }),
+    };
+  }
+
+  private nonReservableUsageHold(
+    reasonCode: Extract<CrossVerifyNonReservableUsageProjection, { state: 'hold' }>['reasonCode'],
+    detail: unknown,
+  ): Extract<CrossVerifyNonReservableUsageProjection, { state: 'hold' }> {
+    return {
+      state: 'hold',
+      reasonCode,
+      authorityEvidenceRef: evidenceRef('xverify-non-reservable-usage-hold', { reasonCode, detail }),
     };
   }
 

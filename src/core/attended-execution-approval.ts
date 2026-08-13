@@ -17,11 +17,45 @@ import {
   attendedExecutionProposalSha256,
   type AttendedExecutionProposalDigests,
 } from './attended-execution-proposal.js';
+import {
+  isProviderEvidenceProbeSubject,
+  type ProviderEvidenceProbeSubject,
+} from './provider-evidence-probe-contract.js';
 
 export const ATTENDED_EXECUTION_APPROVAL_SCHEMA_VERSION = 2 as const;
 export const ATTENDED_EXECUTION_APPROVAL_KIND = 'attended-execution-hard-stop' as const;
 export const ATTENDED_EXECUTION_DISPATCH_CLAIM_SCHEMA_VERSION = 1 as const;
 export const ATTENDED_EXECUTION_DISPATCH_CLAIM_KIND = 'attended-execution-dispatch-claim' as const;
+export const PROVIDER_EVIDENCE_PROBE_APPROVAL_KIND = 'provider-evidence-probe' as const;
+export const OPERATION_SUBJECT_CLAIM_SCHEMA_VERSION = 1 as const;
+
+export interface ProviderEvidenceProbeApprovalRequestDetailsV1 {
+  readonly schemaVersion: 1;
+  readonly kind: typeof PROVIDER_EVIDENCE_PROBE_APPROVAL_KIND;
+  readonly subject: ProviderEvidenceProbeSubject;
+  readonly subjectDigest: string;
+}
+
+export interface SubmitProviderEvidenceProbeApprovalInput {
+  readonly requester: { readonly role: RequesterRole; readonly instanceId: string };
+  readonly userId: string;
+  readonly summary: string;
+  readonly subject: ProviderEvidenceProbeSubject;
+  readonly createdAt?: string;
+}
+
+export interface ProviderEvidenceProbeApprovalClaimV1 {
+  readonly schemaVersion: typeof OPERATION_SUBJECT_CLAIM_SCHEMA_VERSION;
+  readonly kind: 'provider-evidence-probe-claim';
+  readonly claimId: string;
+  readonly requestId: string;
+  readonly subjectDigest: string;
+  readonly subject: ProviderEvidenceProbeSubject;
+  readonly evidenceRef: string;
+  readonly grantedAt: string;
+  readonly expiresAt: string;
+  readonly claimedAt: string;
+}
 
 export interface AttendedExecutionApprovalPolicyBindingV1 {
   readonly profileRef: string;
@@ -96,6 +130,7 @@ export interface AttendedExecutionApprovalAuthorityOptions {
   readonly receiptStoreDir?: string;
   readonly proposalStoreDir?: string;
   readonly dispatchClaimStoreDir?: string;
+  readonly operationClaimStoreDir?: string;
   readonly now?: () => Date;
 }
 
@@ -174,6 +209,19 @@ function canonicalJson(value: unknown): string {
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+/**
+ * Deterministic request id for a provider-evidence-probe subject — the same
+ * digest {@link AttendedExecutionApprovalAuthority.submitProviderEvidenceProbe}
+ * derives, exported so a concurrent contender hitting the broker's
+ * first-writer-wins duplicate refusal can adopt the existing request instead
+ * of failing its preparation chain.
+ */
+export function providerEvidenceProbeApprovalRequestId(
+  subject: ProviderEvidenceProbeSubject,
+): string {
+  return `aprp-${sha256(canonicalJson(subject))}`;
 }
 
 function canonicalProjectRoot(projectRoot: string): string {
@@ -500,6 +548,7 @@ export class AttendedExecutionApprovalAuthority {
   readonly receiptStoreDir: string;
   readonly proposalStoreDir: string;
   readonly dispatchClaimStoreDir: string;
+  readonly operationClaimStoreDir: string;
   private readonly proposalStore: AttendedExecutionProposalStore;
   private readonly now: () => Date;
 
@@ -518,13 +567,113 @@ export class AttendedExecutionApprovalAuthority {
       ?? join(stateDir, 'runtime', 'attended-execution-approvals', projectId, 'proposals');
     this.dispatchClaimStoreDir = options.dispatchClaimStoreDir
       ?? join(stateDir, 'runtime', 'attended-execution-approvals', projectId, 'dispatch-claims');
+    this.operationClaimStoreDir = options.operationClaimStoreDir
+      ?? join(stateDir, 'runtime', 'attended-execution-approvals', projectId, 'operation-claims');
     this.now = options.now ?? (() => new Date());
     assertHostAuthorityOutsideProject(projectRoot, this.receiptStoreDir);
     assertHostAuthorityOutsideProject(projectRoot, this.proposalStoreDir);
     assertHostAuthorityOutsideProject(projectRoot, this.dispatchClaimStoreDir);
+    assertHostAuthorityOutsideProject(projectRoot, this.operationClaimStoreDir);
     mkdirSync(this.receiptStoreDir, { recursive: true, mode: 0o700 });
     mkdirSync(this.dispatchClaimStoreDir, { recursive: true, mode: 0o700 });
+    mkdirSync(this.operationClaimStoreDir, { recursive: true, mode: 0o700 });
     this.proposalStore = new AttendedExecutionProposalStore(projectRoot, this.proposalStoreDir);
+  }
+
+  submitProviderEvidenceProbe(input: SubmitProviderEvidenceProbeApprovalInput): ApprovalRequest {
+    if (!isProviderEvidenceProbeSubject(input.subject)) {
+      throw new AttendedExecutionApprovalError('INVALID_BINDING', 'Invalid provider-evidence-probe subject');
+    }
+    if (input.subject.projectId !== attendedExecutionProjectId(this.projectRoot)) {
+      throw new AttendedExecutionApprovalError('INVALID_BINDING', 'Probe subject projectId does not match authority project');
+    }
+    const createdAt = input.createdAt ?? this.now().toISOString();
+    if (Date.parse(input.subject.ttl.startsAt) > Date.parse(createdAt)
+      || Date.parse(input.subject.ttl.expiresAt) <= Date.parse(createdAt)) {
+      throw new AttendedExecutionApprovalError('INVALID_BINDING', 'Probe subject TTL does not contain request creation');
+    }
+    const subject = Object.freeze(structuredClone(input.subject));
+    const subjectDigest = sha256(canonicalJson(subject));
+    return this.broker.submit({
+      id: `aprp-${subjectDigest}`,
+      requester: input.requester,
+      summary: input.summary,
+      details: { schemaVersion: 1, kind: PROVIDER_EVIDENCE_PROBE_APPROVAL_KIND, subject, subjectDigest },
+      scopeId: subject.projectId,
+      scope: 'network',
+      risk: 'high',
+      policy: 'require-approval',
+      defaultAction: 'deny',
+      tenantId: subject.tenantId,
+      userId: input.userId,
+      createdAt,
+      expiresAt: subject.ttl.expiresAt,
+      maskedArgs: {
+        provider: subject.provider,
+        model: subject.model,
+        backendScope: subject.backendScope,
+        executionProfileRef: subject.executionProfileRef,
+      },
+      rawArgsRef: null,
+    });
+  }
+
+  verifyAndClaimProviderEvidenceProbe(
+    requestId: string,
+    expected: ProviderEvidenceProbeSubject,
+  ): ProviderEvidenceProbeApprovalClaimV1 {
+    const request = this.broker.getRequest(requestId);
+    if (!request) throw new AttendedExecutionApprovalError('REQUEST_NOT_FOUND', `Approval request ${requestId} was not found`);
+    const details = request.details;
+    if (!isRecord(details) || details.schemaVersion !== 1
+      || details.kind !== PROVIDER_EVIDENCE_PROBE_APPROVAL_KIND
+      || !isProviderEvidenceProbeSubject(details.subject)
+      || typeof details.subjectDigest !== 'string'
+      || !SHA256_RE.test(details.subjectDigest)
+      || !isProviderEvidenceProbeSubject(expected)) {
+      throw new AttendedExecutionApprovalError('REQUEST_MISMATCH', 'Approval request does not carry a valid provider-evidence-probe subject');
+    }
+    const subjectDigest = sha256(canonicalJson(details.subject));
+    if (subjectDigest !== details.subjectDigest
+      || canonicalJson(details.subject) !== canonicalJson(expected)
+      || request.scope !== 'network'
+      || request.policy !== 'require-approval'
+      || request.defaultAction !== 'deny'
+      || request.scopeId !== expected.projectId
+      || request.tenantId !== expected.tenantId
+      || request.expiresAt !== expected.ttl.expiresAt
+      || expected.projectId !== attendedExecutionProjectId(this.projectRoot)) {
+      throw new AttendedExecutionApprovalError('REQUEST_MISMATCH', 'Probe approval does not exactly match the expected operation subject');
+    }
+    const decision = this.broker.getDecision(requestId);
+    if (!decision) throw new AttendedExecutionApprovalError('DECISION_NOT_FOUND', `Approval request ${requestId} has no decision`);
+    if (decision.decision !== 'allow' || decision.closureReason !== undefined) {
+      throw new AttendedExecutionApprovalError('DECISION_NOT_ALLOWED', `Approval request ${requestId} was not allowed`);
+    }
+    const validation = this.decisions.validate(request, decision, this.now());
+    if (!validation.ok) {
+      throw new AttendedExecutionApprovalError('DECISION_UNTRUSTED', `Provider evidence probe decision is not trusted: ${validation.reason}`);
+    }
+    const claim: ProviderEvidenceProbeApprovalClaimV1 = Object.freeze({
+      schemaVersion: OPERATION_SUBJECT_CLAIM_SCHEMA_VERSION,
+      kind: 'provider-evidence-probe-claim',
+      claimId: `aprpc-${subjectDigest}`,
+      requestId,
+      subjectDigest,
+      subject: details.subject,
+      evidenceRef: `approval:${requestId}`,
+      grantedAt: decision.decidedAt,
+      expiresAt: new Date(Math.min(
+        Date.parse(request.expiresAt),
+        Date.parse(validation.authorization.authExpiresAt),
+      )).toISOString(),
+      claimedAt: this.now().toISOString(),
+    });
+    const path = join(this.operationClaimStoreDir, `${claim.claimId}.json`);
+    if (!createJsonFileFirstWriterWins(path, claim)) {
+      throw new AttendedExecutionApprovalError('APPROVAL_ALREADY_CONSUMED', `Provider evidence probe approval ${requestId} was already consumed`);
+    }
+    return claim;
   }
 
   submit(input: SubmitAttendedExecutionApprovalInput): ApprovalRequest {

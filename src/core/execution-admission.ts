@@ -8,6 +8,7 @@ import {
   hasLiveUsageCeiling,
 } from './live-execution-budget.js';
 import type { ExecutionBudget, TaskKind } from './work-model.js';
+import { isReachabilityProbeBudget, type ReachabilityProbeBudget } from './provider-evidence-probe-contract.js';
 
 export const EXECUTION_ADMISSION_SCHEMA_VERSION = 1 as const;
 
@@ -59,6 +60,8 @@ export interface ExecutionAdmissionInput {
   readonly budgetProfileRef: string | null;
   readonly budgetPolicyDigest: string | null;
   readonly budget: ExecutionBudget | null;
+  /** Derived projection, not a second authority; preserves the persisted ExecutionBudget contract. */
+  readonly reachabilityProbeBudget?: ReachabilityProbeBudget;
   readonly decision: ExecutionAdmissionDecision;
   readonly reasonCode: string;
   readonly createdAt?: string;
@@ -241,6 +244,9 @@ function normalizeInput(input: ExecutionAdmissionInput): Omit<ExecutionAdmission
     throw new ExecutionAdmissionError('INVALID_INPUT', 'fallbackChain may contain at most one accepted attempt');
   }
   const budget = input.budget === null ? null : cloneBudget(input.budget);
+  if (input.reachabilityProbeBudget !== undefined && !isReachabilityProbeBudget(input.reachabilityProbeBudget)) {
+    throw new ExecutionAdmissionError('INVALID_INPUT', 'reachabilityProbeBudget must be a valid billing-aware projection');
+  }
   for (const [field, value] of [
     ['receiptRef', input.receiptRef],
     ['approvalEvidenceRef', input.approvalEvidenceRef],

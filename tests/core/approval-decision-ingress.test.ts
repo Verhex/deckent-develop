@@ -107,6 +107,48 @@ afterEach(() => {
 });
 
 describe('ApprovalDecisionIngress', () => {
+  it('accepts an interactive re-auth minted seconds after decide() entry, and still fails closed on mid-prompt request expiry', async () => {
+    // Bulgu #8 regression: a human typing at a TTY takes seconds; the ingress
+    // must judge authenticatedAt against a POST-prompt clock, not the entry
+    // snapshot — otherwise every genuinely interactive decision reads as
+    // "authenticated in the future" and dies unauthorized.
+    let current = NOW;
+    const fx = fixture(() => current);
+    const promptLatencyMs = 8_000;
+    fx.authenticator.reauthenticate = async () => {
+      current = new Date(current.getTime() + promptLatencyMs);
+      return {
+        ...fx.authenticator.identity,
+        authenticatedAt: current.toISOString(),
+        expiresAt: new Date(current.getTime() + 60_000).toISOString(),
+      };
+    };
+    const outcome = await fx.ingress.decide({
+      requestId: fx.request.id,
+      action: 'allow',
+      idempotencyKey: 'interactive-latency-1',
+    });
+    expect(outcome.kind).toBe('decided');
+
+    // A request that expires DURING the prompt must not mint: expired, not decided.
+    const late = fixture(() => current);
+    current = new Date(Date.parse(late.request.expiresAt) - 1_000);
+    late.authenticator.reauthenticate = async () => {
+      current = new Date(current.getTime() + promptLatencyMs);
+      return {
+        ...late.authenticator.identity,
+        authenticatedAt: current.toISOString(),
+        expiresAt: new Date(current.getTime() + 60_000).toISOString(),
+      };
+    };
+    const lateOutcome = await late.ingress.decide({
+      requestId: late.request.id,
+      action: 'allow',
+      idempotencyKey: 'interactive-latency-2',
+    });
+    expect(lateOutcome.kind).toBe('expired');
+  });
+
   it('derives identity from live auth, binds the exact request, and persists no raw session secret', async () => {
     const f = fixture();
     const outcome = await f.ingress.decide({

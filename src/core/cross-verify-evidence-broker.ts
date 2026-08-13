@@ -20,13 +20,15 @@ import {
   win32,
 } from 'node:path';
 
-import { createJsonFileFirstWriterWins } from './approval-file-cas.js';
+import { createJsonFileFirstWriterWins, createRawFileFirstWriterWins } from './approval-file-cas.js';
 import { canonicalJson } from './audit-writer.js';
 import {
   assertTaskResultSettlementRef,
   readTaskResultSettlementActiveClaim,
+  readTaskResultSettlementClosure,
   taskResultSettlementActiveClaimDigest,
   taskResultSettlementAttemptPath,
+  taskResultSettlementDurableClaimFence,
   type TaskResultSettlementRefV1,
 } from './task-result-settlement.js';
 
@@ -40,6 +42,39 @@ export const CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES = 12_000;
 
 const BROKER_DIRECTORY = 'cross-verify-evidence';
 const BLOBS_DIRECTORY = 'blobs';
+// Host-decoded plain-text snapshots, one file per evidence entry, keyed by the
+// entry's bare `contentSha256`. The sandboxed verifier reads these with a bare
+// `cat` — no base64, no interpreter — so adjudication never depends on which
+// interpreters (python3/node/jq) happen to exist in a provider's container image.
+// The `blobs/` envelopes + `manifest.json` remain the content-addressed integrity
+// record; a decoded file's name asserts the sha256 the verifier can re-check.
+const DECODED_DIRECTORY = 'decoded';
+
+/**
+ * Content-address (CAS) re-verification of a host-decoded evidence artifact: read
+ * it back symlink-safe (O_NOFOLLOW on every path segment, via
+ * {@link readPinnedBoundedFile}) and size-bounded, then require its actual bytes
+ * to hash to the manifest `contentSha256` and match the recorded byte length. A
+ * tamper, a truncation, a symlink swap, or a first-writer conflict all fail
+ * closed with a typed error, so a corrupt decoded snapshot is never mounted to
+ * the verifier. Both the winner and the existing-file/replay paths call this.
+ */
+function verifyDecodedEvidenceArtifact(
+  decodedDirectory: string,
+  contentSha256: string,
+  byteLength: number,
+  maxBytes: number,
+): void {
+  const readBack = readPinnedBoundedFile(decodedDirectory, contentSha256, maxBytes, false);
+  if (!readBack
+    || readBack.byteLength !== byteLength
+    || sha256(readBack) !== contentSha256) {
+    throw new CrossVerifyEvidenceBrokerError(
+      'UNSAFE_FILESYSTEM_ENTRY',
+      `Host-decoded evidence artifact failed content-address verification: ${contentSha256}`,
+    );
+  }
+}
 const CLAIM_RECEIPT_FILE = 'claim.json';
 const EVIDENCE_RECEIPT_FILE = 'manifest.json';
 const VERDICT_RECEIPT_FILE = 'verdict.json';
@@ -464,6 +499,41 @@ function assertCurrentFence(
       { cause: error },
     );
   }
+}
+
+// The host verdict receipt is the FINAL cross-verify artifact — the coordinator
+// has already closed the settlement (retiring the active claim) by the time the
+// runner persists it. It therefore binds to the DURABLE claim fence (active while
+// live, immutable closed tail afterwards) rather than requiring an active claim
+// that closure has legitimately retired. The claim record is never rewritten on
+// closure, so its fence digest is unchanged; a wrong fence still fails closed.
+// The host verdict receipt is the FINAL cross-verify artifact and may publish
+// ONLY after the settlement is terminally closed. A merely-active/durable claim
+// fence is not sufficient: an open (still-executing) settlement must fail closed
+// so a verdict can never be minted mid-flight. The canonical closure reader is
+// the single source of truth; a durable idempotent replay still sees it closed.
+function assertClosedSettlement(ref: TaskResultSettlementRefV1): void {
+  if (!readTaskResultSettlementClosure(ref)) {
+    throw new CrossVerifyEvidenceBrokerError(
+      'AUTHORITY_MISMATCH',
+      'Cross-verify verdict receipt requires a terminally closed settlement',
+    );
+  }
+}
+
+function assertDurableFence(
+  ref: TaskResultSettlementRefV1,
+  expectedFenceTokenHash: string,
+): string {
+  assertDigest(expectedFenceTokenHash, 'fenceTokenHash');
+  const durable = taskResultSettlementDurableClaimFence(ref);
+  if (!durable || durable.fenceTokenHash !== expectedFenceTokenHash) {
+    throw new CrossVerifyEvidenceBrokerError(
+      'AUTHORITY_MISMATCH',
+      'Cross-verify verdict receipt has no matching durable settlement fence',
+    );
+  }
+  return durable.claimedAt;
 }
 
 function assertPrivateDirectory(path: string, expectedParent: string): string {
@@ -1398,6 +1468,10 @@ export function captureCrossVerifyEvidenceSnapshotAtomic(
     true,
     value => parseManifestEnvelope(value, input.settlementRef, durableClaim),
   );
+  const decodedDirectory = createPrivateDirectory(
+    join(authority.brokerDirectory, DECODED_DIRECTORY),
+    authority.brokerDirectory,
+  );
   if (existing !== null) {
     for (const entry of existing.manifest.entries) {
       readBlobForEntry(
@@ -1405,6 +1479,14 @@ export function captureCrossVerifyEvidenceSnapshotAtomic(
         input.settlementRef,
         durableClaim.claimSha256,
         entry,
+      );
+      // Replay path: re-verify the reused host-decoded artifact against the
+      // manifest content-address before it can be mounted to the verifier.
+      verifyDecodedEvidenceArtifact(
+        decodedDirectory,
+        entry.contentSha256,
+        entry.byteLength,
+        durableClaim.claim.limits.maxFileBytes,
       );
     }
     return existing;
@@ -1470,6 +1552,19 @@ export function captureCrossVerifyEvidenceSnapshotAtomic(
         ...entry,
         claimSha256: durableClaim.claimSha256,
       }),
+    );
+    // Host-decoded plain snapshot, keyed by bare contentSha256 (flat, so no
+    // nested-directory publication and no path-injection surface). First-writer-
+    // wins: a pre-existing name is the same content-addressed bytes, so a false
+    // return is a benign idempotent re-capture, never a conflict.
+    createRawFileFirstWriterWins(join(decodedDirectory, receipt.contentSha256), content);
+    // Winner AND existing-file both traverse here: re-verify the decoded artifact
+    // against its content-address before it can be mounted to the verifier.
+    verifyDecodedEvidenceArtifact(
+      decodedDirectory,
+      receipt.contentSha256,
+      receipt.byteLength,
+      durableClaim.claim.limits.maxFileBytes,
     );
     entries.push(Object.freeze(entry));
   }
@@ -1579,7 +1674,8 @@ export function writeCrossVerifyVerdictReceiptAtomic(
       'Cross-verify verdict input does not match the durable evidence chain',
     );
   }
-  assertCurrentFence(
+  assertClosedSettlement(input.settlementRef);
+  assertDurableFence(
     input.settlementRef,
     claim.claim.fenceTokenHash,
   );
@@ -1619,7 +1715,10 @@ export function writeCrossVerifyVerdictReceiptAtomic(
       evidence,
     ),
   );
-  assertCurrentFence(
+  // Post-publication re-check: the fence must still resolve to the same durable
+  // claim identity after the write (anti-race). Durable, not active — the verdict
+  // receipt is written after settlement closure retires the active claim.
+  assertDurableFence(
     input.settlementRef,
     claim.claim.fenceTokenHash,
   );

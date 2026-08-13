@@ -66,7 +66,7 @@ const PROFILE_REF = 'execution_profile.codex.subscription-cli';
 const TENANT = 'local';
 
 const PREMIUM_AUTHOR = 'claude-opus-5';
-const PREMIUM_VERIFIER = 'gpt-5.6-sol';
+const PREMIUM_PLUS_VERIFIER = 'gpt-5.6-sol';
 const ECONOMY_VERIFIER = 'gpt-5.6-luna';
 
 const dirs: string[] = [];
@@ -263,9 +263,9 @@ describe('the live unlock — authored policy replaces the authority-unavailable
     if (providerAuthority) closers.push(() => providerAuthority.close());
     expect(providerAuthority?.state).toBe('ready');
 
-    // The Task 4 floor agrees: an equal-tier verifier is never refused.
-    expect(resolveVerifierTierFloorRefusal(PREMIUM_AUTHOR, PREMIUM_VERIFIER)).toBeNull();
-    expect(modelRegistry.getTier(PREMIUM_AUTHOR)).toBe(modelRegistry.getTier(PREMIUM_VERIFIER));
+    // The floor admits a verifier above the author tier.
+    expect(resolveVerifierTierFloorRefusal(PREMIUM_AUTHOR, PREMIUM_PLUS_VERIFIER)).toBeNull();
+    expect(modelRegistry.compareTiers(modelRegistry.getTier(PREMIUM_PLUS_VERIFIER), modelRegistry.getTier(PREMIUM_AUTHOR))).toBeGreaterThan(0);
 
     const effectiveConfig: ResolvedConfig = {
       ...config,
@@ -273,7 +273,7 @@ describe('the live unlock — authored policy replaces the authority-unavailable
         enabled: true,
         high_stakes_only: false,
         verifier_priority: ['codex', 'claude'],
-        verifier_model: { codex: PREMIUM_VERIFIER },
+        verifier_model: { codex: PREMIUM_PLUS_VERIFIER },
         enforce_refuted: false,
       },
     };
@@ -302,7 +302,7 @@ describe('the live unlock — authored policy replaces the authority-unavailable
     // Verifier scope + tier-equivalent model selection both resolved correctly
     // before that later hold — the configured model won the selection.
     expect(res.verifier).toBe('codex');
-    expect(res.verifierModel).toBe(PREMIUM_VERIFIER);
+    expect(res.verifierModel).toBe(PREMIUM_PLUS_VERIFIER);
   });
 
   it('still holds typed when no policy has been authored — selector and full composition agree', async () => {
@@ -331,7 +331,7 @@ describe('the live unlock — authored policy replaces the authority-unavailable
         enabled: true,
         high_stakes_only: false,
         verifier_priority: ['codex', 'claude'],
-        verifier_model: { codex: PREMIUM_VERIFIER },
+        verifier_model: { codex: PREMIUM_PLUS_VERIFIER },
         enforce_refuted: false,
       },
     };

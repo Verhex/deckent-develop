@@ -149,6 +149,20 @@ export interface CrossVerifyConfig {
    * substitution.
    */
   verifier_model?: Record<string, string>;
+  /**
+   * Owner-bounded allowance for the xverify verifier-adjudication dispatch to
+   * proceed against a SUBSCRIPTION provider whose only limit windows are advisory
+   * `percent`-unit — never numerically reservable. Default-off → byte-identical
+   * (composition holds at `xverify_limit_unit_unreservable`). When true, the
+   * verifier-adjudication path (ONLY) may admit via a typed
+   * `non_reservable_subscription` outcome: no numeric reservation is forged, the
+   * advisory floor policy still gates admission, and usage is captured solely
+   * from what the canonical transport reports (a typed `usage_unavailable` HOLD
+   * when absent — never a fabricated figure, never a usd on a subscription). The
+   * metered/API reservation path and general heavy-task reservation rules are
+   * unaffected. Reaching a gate is an honest, logged HOLD — never a silent stop.
+   */
+  allow_non_reservable_subscription_adjudication?: boolean;
 }
 
 // ─── Worker Comms Config ─────────────────────────────────────────────
@@ -237,7 +251,10 @@ export interface ApprovalConfig {
   authority?: {
     enabled: boolean;
     tenant_id: string;
-    oidc: {
+    /** OIDC channel policy — required for the HTTP decision ingress; a
+     *  terminal-only composition may omit it (the OIDC bootstrap then holds
+     *  honestly while `decideTerminal` stays available). */
+    oidc?: {
       authority_ref: string;
       tenant_claim: string;
       role_claim?: string;
@@ -246,6 +263,15 @@ export interface ApprovalConfig {
       required_acr?: string[];
       required_amr?: string[];
     };
+    /** Local-terminal live re-auth channel policy (K6). Bounds the interactive
+     *  re-authentication assertion window used by `decideTerminal`. */
+    terminal?: {
+      max_auth_age_seconds: number;
+    };
+    /** How long a probe-approval request stays decidable while a preparation
+     *  waits (seconds). Defaults to the preparation's bounded 120s window —
+     *  raise it when decisions arrive via a human round-trip. */
+    decision_window_seconds?: number;
   };
   /** Activate the brain-side question→approval bridge (question-approval-bridge.ts
    *  via ipc-registry's CKPT-QUESTION-BRIDGE-WIRE seam): a CLI worker's `.question`

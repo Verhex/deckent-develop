@@ -697,6 +697,28 @@ registry.set('DECKENT_E080', {
   ],
 });
 
+registry.set('DECKENT_E081', {
+  message: 'reachability probe purpose profile is incompatible with the canonical execution budget',
+  suggestion: 'Raise execution_budget.purposes.reachability-probe.maxTokens to at least maxInputTokens + maxOutputTokens',
+  whatHappened: 'The owner-authored reachability-probe profile derived a total-token ceiling below the sum of its input and output ceilings.',
+  why: 'A probe whose maxTokens cannot cover input plus output would fail closed mid-flight; the derivation refuses it up front instead.',
+  howToFix: [
+    'Open the owner config and inspect execution_budget.purposes.reachability-probe',
+    'Set maxTokens >= maxInputTokens + maxOutputTokens',
+  ],
+});
+
+registry.set('DECKENT_E082', {
+  message: 'metered-api reachability probe requires an owner-authored USD ceiling',
+  suggestion: 'Add execution_budget.purposes.reachability-probe.maxUsd for metered-api billing',
+  whatHappened: 'A metered-api reachability probe was derived without an owner-authored maxUsd ceiling.',
+  why: 'Metered-API spend cannot be admitted without an explicit owner-authored USD ceiling; the derivation fails closed.',
+  howToFix: [
+    'Open the owner config and inspect execution_budget.purposes.reachability-probe',
+    'Add a positive maxUsd ceiling for metered-api billing',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {

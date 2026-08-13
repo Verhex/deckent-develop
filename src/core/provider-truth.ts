@@ -9,6 +9,7 @@ import type {
 } from './invocation-receipt.js';
 import { getLegacyModelMigration } from './model-registry.js';
 import type { ReachabilityEvidence } from './role-invocation-resolver.js';
+import { isReachabilityProbeBudget, type ReachabilityProbeBudget } from './provider-evidence-probe-contract.js';
 
 export const PROVIDER_TRUTH_SCHEMA_VERSION = 1 as const;
 
@@ -205,10 +206,12 @@ export interface ReachabilityAdmissionDecision extends InvocationScope {
   };
   readonly budget: {
     readonly evidenceRef: string | null;
-    readonly maxInputTokens: number;
-    readonly maxOutputTokens: number;
-    readonly maxTotalTokens: number;
-    readonly maxUsd: number;
+    readonly maxInputTokens?: number;
+    readonly maxOutputTokens?: number;
+    readonly maxTotalTokens?: number;
+    readonly maxUsd?: number;
+    /** Task 1 projection; legacy flat fields remain readable until Task 6 owns production wiring. */
+    readonly projection?: ReachabilityProbeBudget;
   };
 }
 
@@ -253,12 +256,25 @@ export function assertOpaqueSha256(name: string, value: string | null, required:
   if (!/^[a-f0-9]{64}$/u.test(value)) throw new Error(`${name} must be a SHA-256 digest`);
 }
 
+// A durable evidence reference is opaque in one of exactly two shapes: the
+// generic single-segment form `prefix:token`, or the canonical content-addressed
+// digest form `prefix:sha256:<64-lowercase-hex>` that the task-result-settlement
+// receipt helpers emit (e.g. `provider-terminal-usage:sha256:…`). The content-
+// addressed second segment is admitted ONLY as literal `sha256:` + 64 hex — never
+// a general `algo:` relaxation — so a wrong algorithm, a short/long digest, an
+// extra colon, a slash, or a URL still fails closed.
+const OPAQUE_EVIDENCE_REF_SINGLE = /^[a-z][a-z0-9-]*:[A-Za-z0-9._-]{8,160}$/u;
+const OPAQUE_EVIDENCE_REF_CONTENT_ADDRESSED = /^[a-z][a-z0-9-]*:sha256:[a-f0-9]{64}$/u;
+
 export function assertOpaqueEvidenceRef(name: string, value: string | null, required: boolean): void {
   if (value === null) {
     if (required) throw new Error(`${name} is required`);
     return;
   }
-  if (value.length > 192 || value.includes('://') || !/^[a-z][a-z0-9-]*:[A-Za-z0-9._-]{8,160}$/u.test(value)) {
+  if (value.length > 192
+    || value.includes('://')
+    || !(OPAQUE_EVIDENCE_REF_SINGLE.test(value)
+      || OPAQUE_EVIDENCE_REF_CONTENT_ADDRESSED.test(value))) {
     throw new Error(`${name} must be an opaque durable reference`);
   }
 }
@@ -276,9 +292,10 @@ function sameBackend(left: ReachabilityBackendScope, right: ReachabilityBackendS
 }
 
 function hasPositiveBudget(budget: ReachabilityAdmissionDecision['budget']): boolean {
+  if (budget.projection !== undefined) return isReachabilityProbeBudget(budget.projection);
   const values = [budget.maxInputTokens, budget.maxOutputTokens, budget.maxTotalTokens, budget.maxUsd];
-  return values.every(value => Number.isFinite(value) && value > 0)
-    && budget.maxInputTokens + budget.maxOutputTokens <= budget.maxTotalTokens;
+  return values.every(value => typeof value === 'number' && Number.isFinite(value) && value > 0)
+    && budget.maxInputTokens! + budget.maxOutputTokens! <= budget.maxTotalTokens!;
 }
 
 function admissionMatchesRequest(request: ReachabilityProbeRequest): boolean {

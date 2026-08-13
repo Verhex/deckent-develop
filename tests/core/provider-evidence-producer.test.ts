@@ -87,10 +87,13 @@ function request(overrides: Partial<ProviderEvidenceRefreshRequest> = {}): Provi
     },
     budget: {
       evidenceRef: 'budget:provider-probe-0001',
-      maxInputTokens: 64,
-      maxOutputTokens: 16,
-      maxTotalTokens: 80,
-      maxUsd: 0.01,
+      projection: {
+        billingMode: 'subscription',
+        maxInputTokens: 64,
+        maxOutputTokens: 16,
+        maxTokens: 80,
+        timeoutMs: 30_000,
+      },
     },
     ...overrides,
   };
@@ -490,23 +493,55 @@ describe('ProviderEvidenceProducer', () => {
     expect(result).toMatchObject({ limit: { accountRefHash: null } });
   });
 
-  it('persists a limit HOLD and a not-run reachability result without declaring a receipt', async () => {
+  it('admits the bounded probe on an advisory limit under the block ratio, keeping the durable snapshot advisory (§12.2 Öneri-A)', async () => {
+    // Default window = 20% consumed, block ratio 0.95 → under block. An advisory
+    // usage read (codex/claude CLI) no longer blocks the bounded reachability
+    // probe: the probe runs and promotes to liveProven, while the DURABLE limit
+    // snapshot stays advisory `unknown/hold` so heavy-task admission is unaffected.
+    const exactProbe = vi.fn(async input => ({
+      outcome: 'succeeded' as const,
+      calledProvider: input.provider,
+      calledModel: input.model,
+      providerRequestRefHash: 'b'.repeat(64),
+      latencyMs: 2,
+    }));
+    const fx = fixture({
+      limit: { ...sources().limit, authority: 'advisory' },
+      reachability: { ...sources().reachability, probe: exactProbe },
+    });
+    const result = await fx.producer.refresh(request());
+    expect(exactProbe).toHaveBeenCalledOnce();
+    expect(result.state).toBe('ready');
+    // The durable snapshot is still the advisory truth, not an authoritative allow.
+    expect(result.limit).toMatchObject({ state: 'unknown', decision: 'hold' });
+    if (result.state === 'ready') {
+      expect(result.reachability).toMatchObject({ liveProven: true, reachable: true });
+    }
+  });
+
+  it('holds a blocked advisory limit WITHOUT running the probe (fails closed at the block ratio)', async () => {
     const exactProbe = vi.fn();
     const fx = fixture({
       limit: {
         ...sources().limit,
         authority: 'advisory',
+        observe: async () => ({
+          state: 'known' as const,
+          requiredWindowIds: ['session'],
+          windows: [limitWindow(96)], // 96% consumed ≥ 0.95 block ratio
+          source: {
+            operatorApprovalRef: null,
+            evidenceRef: 'provider-limit:source-blocked',
+            fetchedAt: T0.toISOString(),
+            expiresAt: T1,
+            incorporatedReservationEventRefs: [],
+          },
+        }),
       },
       reachability: { ...sources().reachability, probe: exactProbe },
     });
     const result = await fx.producer.refresh(request());
-    expect(result).toMatchObject({
-      state: 'hold',
-      reasonCode: 'limit_hold',
-      limit: { state: 'unknown', decision: 'hold' },
-      reachability: { liveProven: false, reasonCode: 'limit_hold' },
-      receiptRef: null,
-    });
+    expect(result).toMatchObject({ state: 'hold', reasonCode: 'limit_hold' });
     expect(exactProbe).not.toHaveBeenCalled();
   });
 
@@ -598,9 +633,11 @@ describe('ProviderEvidenceProducer', () => {
     const firstResult = await first;
 
     expect(firstResult.state).toBe('ready');
+    // §12.2 clause 3 supersede (sprint-527): a same-epoch follower is a typed
+    // bounded singleflight deferral, never an operator-facing replay error.
     expect(secondResult).toMatchObject({
       state: 'hold',
-      reasonCode: 'probe_replay_blocked',
+      reasonCode: 'probe_singleflight_deferred',
       receiptRef: null,
     });
     expect(exactProbe).toHaveBeenCalledTimes(1);
@@ -649,5 +686,34 @@ describe('ProviderEvidenceProducer', () => {
     });
     expect(readFileSync(join(fx.projectRoot, '.deckent', 'runtime', 'invocations.db')).toString('utf8'))
       .not.toContain('disk details must not persist');
+  });
+
+  it('holds a refresh whose budget projection violates the billing-mode contract, before any probe', async () => {
+    const exactProbe = vi.fn();
+    const fx = fixture({
+      reachability: { ...sources().reachability, probe: exactProbe },
+    });
+
+    // metered-api without an owner-authored usd ceiling is exactly the arm the
+    // discriminated projection forbids — a flat/fabricated budget must never
+    // reach the provider.
+    const result = await fx.producer.refresh(request({
+      budget: {
+        evidenceRef: 'budget:provider-probe-0001',
+        projection: {
+          billingMode: 'metered-api',
+          maxInputTokens: 64,
+          maxOutputTokens: 16,
+          maxTokens: 80,
+          timeoutMs: 30_000,
+        } as never,
+      },
+    }));
+
+    expect(result).toMatchObject({
+      state: 'hold',
+      reasonCode: 'authority_failure',
+    });
+    expect(exactProbe).not.toHaveBeenCalled();
   });
 });

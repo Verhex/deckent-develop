@@ -24,6 +24,7 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type {
@@ -51,6 +52,14 @@ import type {
   MandatoryCrossVerifyInvocationFactory,
 } from '../../orchestra/cross-verify-runner.js';
 import { DockerSpawnBackend } from '../../orchestra/spawn-backend-docker.js';
+import {
+  prepareCrossVerifyCandidateEvidence,
+  type CrossVerifyEvidencePreparationResult,
+} from '../../orchestra/cross-verify-evidence-preparation.js';
+import {
+  openApprovalAuthorityRuntime,
+  type ApprovalAuthorityRuntimeService,
+} from '../../core/approval-authority-runtime.js';
 
 // ─── Options ────────────────────────────────────────────────────────────
 
@@ -109,6 +118,13 @@ export interface XverifyDeps {
   providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
   /** Hermetic seam; production composes an exact Docker-backed v2 authority. */
   mandatoryInvocationFactory?: MandatoryCrossVerifyInvocationFactory;
+  /** Hermetic seam for the pre-compose candidate evidence preparation (T2b). */
+  prepareCandidateEvidenceFn?: typeof prepareCrossVerifyCandidateEvidence;
+  /** Hermetic seam; production opens the project approval authority runtime. */
+  openApprovalRuntimeFn?: (
+    root: string,
+    config: ResolvedConfig,
+  ) => ApprovalAuthorityRuntimeService | undefined;
 }
 
 // ─── Diff capture (default impl) ────────────────────────────────────────
@@ -560,6 +576,63 @@ export async function runXverifyForResult(
       executionProfiles,
     });
 
+  // ── Pre-compose candidate evidence preparation (§12.2 T2b) ──
+  // Runs BEFORE the composition so the candidate gate reads real reachability/
+  // limit rows instead of holding forever on candidate_evidence_unavailable.
+  // Every missing authority is a typed resumable HOLD printed here; the run
+  // still proceeds into the composition, whose own gate ladder stays the
+  // single settlement authority (no fabricated evidence, no fallback).
+  if (deps.providerAuthority?.state === 'ready' && authMode !== 'hybrid') {
+    const prepare = deps.prepareCandidateEvidenceFn ?? prepareCrossVerifyCandidateEvidence;
+    const openApproval = deps.openApprovalRuntimeFn ?? ((r: string, c: ResolvedConfig) => {
+      const authorityConfig = c.approval?.authority;
+      if (authorityConfig?.enabled !== true) return undefined;
+      const opened = openApprovalAuthorityRuntime({
+        projectRoot: r,
+        tenantId: authorityConfig.tenant_id,
+      });
+      return opened.state === 'ready' ? opened.service : undefined;
+    });
+    const candidateProvider = verifierPriority.find(candidate => candidate !== author);
+    const candidateModel = candidateProvider
+      ? effectiveConfig.cross_verify?.verifier_model?.[candidateProvider]
+      : undefined;
+    if (candidateProvider && candidateModel) {
+      const approvalRuntime = openApproval(root, config);
+      const lang = getLanguage(config.language);
+      const preparation: CrossVerifyEvidencePreparationResult = await prepare({
+        projectRoot: root,
+        config,
+        providerAuthority: deps.providerAuthority,
+        ...(approvalRuntime ? { approvalRuntime } : {}),
+        candidate: { provider: candidateProvider, model: candidateModel },
+        dockerBackend,
+        requester: { role: 'brain', instanceId: `cli-xverify:${process.pid}` },
+        userId: userInfo().username,
+        approvalSummary: getMessage('xverify.prepare.approval_summary', lang, {
+          provider: candidateProvider,
+          model: candidateModel,
+        }),
+        runId: `xverify:${id}`,
+        ...(config.approval?.authority?.decision_window_seconds
+          ? { decisionWindowMs: config.approval.authority.decision_window_seconds * 1000 }
+          : {}),
+        ...(deps.nowFn ? { now: deps.nowFn } : {}),
+      });
+      if (preparation.state === 'hold') {
+        print(getMessage('xverify.prepare.hold', lang, {
+          reason: preparation.reasonCode,
+          detail: preparation.detailCode,
+          evidence: preparation.evidenceRefs.join(',') || '-',
+        }));
+        print(getMessage(`xverify.remedy.${preparation.reasonCode}`, lang, {
+          requestId: preparation.approvalRequestId ?? '-',
+          producerReason: preparation.producerReasonCode ?? '-',
+        }));
+      }
+    }
+  }
+
   // Registry/catalog presence is not live reachability. The interactive surface
   // may carry only an explicit, attended owner selection into the runner. Without
   // `--verifier`, the runner fails closed until the production authority
@@ -616,7 +689,13 @@ export async function runXverifyForResult(
   // own input carried zero evidence or the runner independently flagged it missing.
   const remedy = (!hasEvidence || outcome.skippedReason === 'verifier-eligibility-evidence-missing')
     ? getMessage('xverify.remedy.no_evidence', lang)
-    : null;
+    : outcome.skippedReason?.includes('limit_unit_unreservable')
+      ? getMessage('xverify.remedy.limit_unit_unreservable', lang)
+      : outcome.skippedReason?.includes('adjudication_budget_unavailable')
+        ? getMessage('xverify.remedy.adjudication_budget_unavailable', lang)
+        : outcome.skippedReason?.includes('usage_unavailable')
+          ? getMessage('xverify.remedy.usage_unavailable', lang)
+          : null;
   // A tier-floor refusal is a host decision, not a verifier rationale — but it
   // is the ONLY thing the operator needs to read, so it takes the rationale slot
   // whenever no verifier verdict exists to occupy it.

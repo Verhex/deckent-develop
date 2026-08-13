@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  assertOpaqueEvidenceRef,
   createCapabilityCatalog,
   materializeReachability,
   probeExactModelReachability,
@@ -310,5 +311,43 @@ describe('provider truth contract', () => {
       auth: { mode: 'api', accountRefHash: HASH_A },
       backend: expect.objectContaining({ transport: 'http', executionBackend: 'docker' }),
     }));
+  });
+});
+
+describe('assertOpaqueEvidenceRef', () => {
+  const accepts = (value: string) =>
+    expect(() => assertOpaqueEvidenceRef('ref', value, true)).not.toThrow();
+  const rejects = (value: string) =>
+    expect(() => assertOpaqueEvidenceRef('ref', value, true))
+      .toThrow(/opaque durable reference/u);
+
+  it('accepts the generic single-segment opaque form', () => {
+    accepts(`task-result-settlement:${'a'.repeat(64)}`);
+    accepts('execution-budget:0123456789abcdef');
+    accepts('provider-limit-reservation-event:abcdefgh');
+  });
+
+  it('accepts the canonical content-addressed sha256 digest form', () => {
+    // The exact task-result-settlement receipt refs that reach assertTerminal.
+    accepts(`provider-terminal-usage:sha256:${'a'.repeat(64)}`);
+    accepts(`provider-actual-call:sha256:${'f'.repeat(64)}`);
+    accepts(`termination-terminal:sha256:${'0'.repeat(64)}`);
+  });
+
+  it('rejects a wrong algorithm, malformed digest, extra colon, slash, or URL', () => {
+    rejects(`provider-terminal-usage:md5:${'a'.repeat(64)}`);          // wrong algorithm
+    rejects(`provider-terminal-usage:sha256:${'a'.repeat(63)}`);       // short digest
+    rejects(`provider-terminal-usage:sha256:${'a'.repeat(65)}`);       // long digest
+    rejects(`provider-terminal-usage:sha256:${'A'.repeat(64)}`);       // not lowercase hex
+    rejects(`provider-terminal-usage:sha256:${'g'.repeat(64)}`);       // non-hex digest
+    rejects(`provider-terminal-usage:sha256:${'a'.repeat(64)}:x`);     // extra colon
+    rejects(`provider:sha256:${'a'.repeat(64)}/x`);                    // slash
+    rejects('https://evil.example/x');                                 // URL
+    rejects(`provider-terminal-usage:sha256:${'a'.repeat(64)}`.padEnd(200, 'a')); // over 192
+  });
+
+  it('honors the required/null contract unchanged', () => {
+    expect(() => assertOpaqueEvidenceRef('ref', null, true)).toThrow(/required/u);
+    expect(() => assertOpaqueEvidenceRef('ref', null, false)).not.toThrow();
   });
 });
