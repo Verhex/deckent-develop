@@ -36,7 +36,7 @@ describe('canonical provider API model identity', () => {
     });
     expect(resolveConfigMigrationModelTier('o3')).toBe('standard');
     expect(resolveConfigMigrationModelTier('o4-mini')).toBe('economy');
-    expect(resolveConfigMigrationModelTier('gpt-5.6-sol')).toBe('premium');
+    expect(resolveConfigMigrationModelTier('gpt-5.6-sol')).toBe('premium_plus');
     expect(resolveConfigMigrationModelTier('fable')).toBe('premium_plus');
     expect(() => resolveConfigMigrationModelTier('unknown-model')).toThrowError(
       expect.objectContaining({ code: 'E_UNKNOWN_MODEL' }),

@@ -4,6 +4,7 @@ import {
   type ProviderAuthorityRuntimeServiceOpenResult,
 } from '../core/provider-authority-composition.js';
 import type { GlobalScopeEnv } from '../core/global-scope-resolver.js';
+import type { BoundedReachabilityProbeTransport } from '../core/provider-evidence-probe-contract.js';
 import type { ProviderEvidenceSourceResolver } from '../core/provider-evidence-producer.js';
 import {
   ProviderEvidenceSourceRegistry,
@@ -16,6 +17,14 @@ export interface LocalProviderAuthorityRuntimeBootstrapOptions {
   readonly env?: GlobalScopeEnv;
   readonly nodePlatform?: string;
   readonly now?: () => Date;
+  /**
+   * Lazy resolver for the canonical Docker bounded-probe transport consumed by
+   * the codex docker reachability slot (§12.2 clause 4). Supplied by the CLI
+   * composition root; registration stays lazy/provider-free — the resolver
+   * runs only when a probe is actually dispatched.
+   */
+  readonly codexDockerReachabilityTransport?:
+    () => BoundedReachabilityProbeTransport | null;
 }
 
 export function hasAuthoredProviderLimitAuthority(
@@ -44,8 +53,16 @@ export function createLocalProviderEvidenceSourceRegistrations(
   return Object.freeze([
     ...createClaudeHostSubscriptionEvidenceSourceRegistrations({ projectRoot, env, platform }),
     // Codex sources read only the CLI's durable on-disk state — no project tree,
-    // so they take no projectRoot.
-    ...createCodexHostSubscriptionEvidenceSourceRegistrations({ env, platform }),
+    // so they take no projectRoot. The docker reachability slot additionally
+    // receives the canonical bounded-probe transport when the composition root
+    // supplies one; absent that, it stays the honest typed-unsupported source.
+    ...createCodexHostSubscriptionEvidenceSourceRegistrations({
+      env,
+      platform,
+      ...(options.codexDockerReachabilityTransport
+        ? { dockerReachabilityTransport: options.codexDockerReachabilityTransport }
+        : {}),
+    }),
   ]);
 }
 

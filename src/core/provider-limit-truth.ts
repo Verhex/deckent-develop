@@ -425,6 +425,27 @@ function isComplete(window: ProviderLimitWindow): boolean {
     && window.limit !== null && window.limit > 0;
 }
 
+/**
+ * Evaluate the real usage windows against a policy's warn/block ratios.
+ *
+ * `createProviderLimitResult` only runs this for an `authoritative` source, so
+ * a durable limit snapshot from an advisory source stays `unknown/hold`. The
+ * bounded reachability-probe path (ProviderEvidenceProducer) reuses this to
+ * decide whether to admit a single owner-budgeted probe on advisory usage
+ * data — it still fails closed at `blockAtRatio`, so a genuinely exhausted
+ * quota blocks the probe; it just does not demand a reservation-capable
+ * authoritative source that subscription CLIs do not expose. This never
+ * mutates the stored snapshot, so heavy-task admission still sees the advisory
+ * truth.
+ */
+export function evaluateProviderLimitWindows(
+  windows: readonly ProviderLimitWindow[],
+  requiredWindowIds: readonly string[],
+  policy: ProviderLimitPolicy,
+): Pick<ProviderLimitResult, 'state' | 'decision' | 'pressure' | 'reasonCode'> {
+  return evaluateKnownWindows(windows, requiredWindowIds, policy);
+}
+
 function evaluateKnownWindows(
   windows: readonly ProviderLimitWindow[],
   requiredWindowIds: readonly string[],

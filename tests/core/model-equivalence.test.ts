@@ -76,8 +76,12 @@ describe('model-equivalence', () => {
   // generation to the designated one — the assertions below are the point of
   // the change, not collateral of it.
   describe('getEquivalentModel — Claude to Codex', () => {
-    it('opus → gpt-5.6-sol for codex (premium tier)', () => {
-      expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.6-sol');
+    it('opus → gpt-5.5 for codex (premium tier)', () => {
+      expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
+    });
+
+    it('fable → gpt-5.6-sol for codex (premium_plus tier)', () => {
+      expect(getEquivalentModel('claude-fable-5', 'codex')).toBe('gpt-5.6-sol');
     });
 
     it('sonnet → gpt-5.6-terra for codex (standard tier)', () => {
@@ -164,8 +168,8 @@ describe('model-equivalence', () => {
   describe('getEquivalentModel — Gemini to Codex', () => {
     // Same designation, third source provider: MASTER-PLAN 670 is a property of
     // the codex tiers, so gemini→codex moves in lockstep with claude→codex.
-    it('gemini-2.5-pro → gpt-5.6-sol for codex (premium)', () => {
-      expect(getEquivalentModel('gemini-2.5-pro', 'codex')).toBe('gpt-5.6-sol');
+    it('gemini-2.5-pro → gpt-5.5 for codex (premium)', () => {
+      expect(getEquivalentModel('gemini-2.5-pro', 'codex')).toBe('gpt-5.5');
     });
 
     it('gemini-2.5-flash → gpt-5.6-terra for codex (standard)', () => {
@@ -305,7 +309,7 @@ describe('model-equivalence', () => {
   describe('getModelsInTier', () => {
     it('premium tier exposes every registered canonical API id', () => {
       expect(getModelsInTier('premium')).toEqual([
-        'claude-opus-4-8', 'claude-opus-5', 'gpt-5.5', 'gemini-2.5-pro', 'gpt-5.6-sol',
+        'claude-opus-4-8', 'claude-opus-5', 'gpt-5.5', 'gemini-2.5-pro',
       ]);
     });
 

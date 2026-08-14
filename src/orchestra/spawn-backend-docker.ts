@@ -25,6 +25,10 @@ import {
 } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand, type ProviderCommandSpec } from '../core/provider-command-spec.js';
+import type {
+  BoundedReachabilityProbeRequest,
+  ProviderNativeProbeObservation,
+} from '../core/provider-evidence-probe-contract.js';
 import { createClaudeAdapter } from '../providers/claude.js';
 import { createCodexAdapter } from '../providers/codex.js';
 import { createGeminiAdapter } from '../providers/gemini.js';
@@ -3928,6 +3932,14 @@ export type DockerCrossVerifyRuntimeCommandRunner = (
   args: readonly string[],
 ) => Promise<DockerCrossVerifyRuntimeCommandResult>;
 
+/** Internal execution seam; the public probe surface never exposes Docker arguments. */
+export type DockerReachabilityProbeCommandRunner = (input: Readonly<{
+  readonly args: readonly string[];
+  readonly stdin: Uint8Array;
+  readonly timeoutMs: number;
+  readonly outputCeiling: number;
+}>) => Promise<Readonly<DockerCrossVerifyRuntimeCommandResult>>;
+
 export interface DockerSpawnBackendConstructionOptions {
   readonly image?: string;
   readonly timeoutSeconds?: number;
@@ -3939,6 +3951,11 @@ export interface DockerSpawnBackendConstructionOptions {
   readonly homeTmpfsSize?: string;
   readonly verifyProviderCliInImage?: boolean;
   readonly crossVerifyRuntimeCommandRunner?: DockerCrossVerifyRuntimeCommandRunner;
+  readonly reachabilityProbeCommandRunner?: DockerReachabilityProbeCommandRunner;
+  /** Injectable host adapter selector for hermetic platform-matrix tests. */
+  readonly platform?: NodeJS.Platform;
+  /** Test-only HOME projection; production defaults to the host HOME. */
+  readonly homeDir?: string;
 }
 
 /** Result of a streamed docker-logs capture. */
@@ -4078,6 +4095,67 @@ function runBoundedCrossVerifyRuntimeCommand(
       });
     }, CROSS_VERIFY_RUNTIME_COMMAND_TIMEOUT_MS);
     timer.unref();
+  });
+}
+
+function runBoundedReachabilityProbeCommand(input: Readonly<{
+  readonly args: readonly string[];
+  readonly stdin: Uint8Array;
+  readonly timeoutMs: number;
+  readonly outputCeiling: number;
+}>): Promise<DockerCrossVerifyRuntimeCommandResult> {
+  return new Promise(resolveCommand => {
+    let settled = false;
+    let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let child: ReturnType<typeof nodeSpawn>;
+    const finish = (result: DockerCrossVerifyRuntimeCommandResult): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolveCommand(Object.freeze(result));
+    };
+    const append = (current: Buffer<ArrayBufferLike>, chunk: string | Buffer): {
+      value: Buffer<ArrayBufferLike>;
+      exceeded: boolean;
+    } => {
+      const incoming = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const remaining = input.outputCeiling - current.length;
+      if (remaining <= 0) return { value: current, exceeded: incoming.length > 0 };
+      return {
+        value: Buffer.concat([current, incoming.subarray(0, remaining)]),
+        exceeded: incoming.length > remaining,
+      };
+    };
+    try {
+      child = nodeSpawn('docker', [...input.args], { shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    } catch (error) {
+      finish({ status: null, stdout: '', stderr: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    const exceed = (): void => {
+      try { child.kill('SIGKILL'); } catch { /* process may already have exited */ }
+      finish({ status: null, stdout: stdout.toString('utf8'), stderr: 'probe output ceiling exceeded' });
+    };
+    child.stdout?.on('data', chunk => {
+      const next = append(stdout, chunk as string | Buffer);
+      stdout = next.value;
+      if (next.exceeded) exceed();
+    });
+    child.stderr?.on('data', chunk => {
+      const next = append(stderr, chunk as string | Buffer);
+      stderr = next.value;
+      if (next.exceeded) exceed();
+    });
+    child.once('error', error => finish({ status: null, stdout: stdout.toString('utf8'), stderr: error.message }));
+    child.once('close', status => finish({ status, stdout: stdout.toString('utf8'), stderr: stderr.toString('utf8') }));
+    child.stdin?.end(Buffer.from(input.stdin));
+    timer = setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch { /* process may already have exited */ }
+      finish({ status: null, stdout: stdout.toString('utf8'), stderr: 'probe timeout' });
+    }, input.timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
   });
 }
 
@@ -4224,6 +4302,9 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly homeTmpfsSize: string;
   private readonly verifyProviderCliInImage: boolean;
   private readonly crossVerifyRuntimeCommandRunner: DockerCrossVerifyRuntimeCommandRunner;
+  private readonly reachabilityProbeCommandRunner: DockerReachabilityProbeCommandRunner;
+  private readonly platform: NodeJS.Platform;
+  private readonly homeDir: string;
   private readonly containers = new Map<string, {
     containerId: string;
     containerName: string;
@@ -4286,6 +4367,10 @@ export class DockerSpawnBackend implements SpawnBackend {
     this.verifyProviderCliInImage = opts?.verifyProviderCliInImage ?? false;
     this.crossVerifyRuntimeCommandRunner =
       opts?.crossVerifyRuntimeCommandRunner ?? runBoundedCrossVerifyRuntimeCommand;
+    this.reachabilityProbeCommandRunner =
+      opts?.reachabilityProbeCommandRunner ?? runBoundedReachabilityProbeCommand;
+    this.platform = opts?.platform ?? process.platform;
+    this.homeDir = opts?.homeDir ?? homedir();
   }
 
   /**
@@ -4399,6 +4484,90 @@ export class DockerSpawnBackend implements SpawnBackend {
       toolProfileDigest,
       authorityEvidenceRef: `docker-xverify-runtime:${runtimeFingerprint}`,
     });
+  }
+
+  /**
+   * Execute one provider-neutral, bounded probe through the Docker backend.
+   * Docker details remain internal: callers supply only the frozen contract's
+   * scalar request and receive only its sanitized observation union.
+   */
+  async invokeBoundedReachabilityProbe(
+    request: Readonly<BoundedReachabilityProbeRequest>,
+  ): Promise<Readonly<ProviderNativeProbeObservation>> {
+    const startedAt = Date.now();
+    const elapsed = (): number => Math.max(0, Date.now() - startedAt);
+    const transportError = (errorCode: string, retryable: boolean): Readonly<ProviderNativeProbeObservation> =>
+      Object.freeze({ outcome: 'transport-error', errorCode, retryable, elapsedMs: elapsed() });
+    const provider = request.provider as ProviderName;
+    const spec = getProviderCommandSpec(provider);
+    if (!spec || this.platform !== 'darwin' && this.platform !== 'linux' && this.platform !== 'win32') {
+      return transportError('backend_unsupported', false);
+    }
+    const runtime = await this.inspectExactCrossVerifyRuntime(provider, request.model);
+    if (runtime.state !== 'ready' || runtime.executionProfileRef !== request.executionProfileRef) {
+      return transportError('backend_unsupported', false);
+    }
+    const home = this.homeDir;
+    const authBroker = prepareProviderAuthBroker(
+      this.projectDir,
+      home,
+      spec.binary,
+      spec.oauthHomeDir ?? undefined,
+    );
+    const auth = buildProviderAuthIsolation(
+      home,
+      spec.binary,
+      spec.oauthHomeDir ?? undefined,
+      false,
+      existsSync,
+      authBroker,
+    );
+    if (auth.missingRequiredFiles.length > 0) {
+      return transportError('credential_unavailable', false);
+    }
+    const containerHome = '/tmp/deckent-home';
+    const command = buildProviderCommand(spec, modelRegistry.get(request.model)?.apiId ?? request.model, '/dev/stdin', {
+      isolatedContext: true,
+      autoApprove: false,
+    });
+    // `-i` attaches the container's stdin so the bounded prompt bytes actually
+    // reach the provider CLI (codex reads its prompt from stdin). Without it the
+    // CLI exits "No prompt provided via stdin" and the probe misreads a dead
+    // container for an unreachable backend. No network flag is set here:
+    // provider dispatch owns its effective network policy.
+    const args = [
+      'run', '--rm', '-i',
+      '--tmpfs', `${containerHome}:size=${this.homeTmpfsSize}`,
+      '-e', `HOME=${containerHome}`,
+      ...auth.mountArgs,
+      runtime.imageId,
+      'sh', '-c',
+      `${auth.bootstrapLines.join('\n')}\nexec ${command}`,
+    ];
+    let result: Readonly<DockerCrossVerifyRuntimeCommandResult>;
+    try {
+      result = await this.reachabilityProbeCommandRunner({
+        args,
+        stdin: request.promptBytes,
+        timeoutMs: request.timeoutMs,
+        outputCeiling: request.maxOutputTokens,
+      });
+    } catch {
+      return transportError('backend_unreachable', true);
+    }
+    if (result.status === null && result.stderr === 'probe timeout') {
+      return Object.freeze({ outcome: 'timed-out', elapsedMs: elapsed() });
+    }
+    const preflight = classifyDockerPreflight({ status: result.status, stderr: result.stderr });
+    if (preflight?.code === DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE
+      || preflight?.code === DOCKER_ERROR_CODES.DAEMON_PERMISSION
+      || preflight?.code === DOCKER_ERROR_CODES.DOCKER_ABSENT) {
+      return transportError('backend_unreachable', true);
+    }
+    if (result.status === 0) {
+      return Object.freeze({ outcome: 'completed', providerRequestRef: null, outputBytes: Buffer.byteLength(result.stdout), latencyMs: elapsed() });
+    }
+    return Object.freeze({ outcome: 'rejected', providerCode: null, retryable: false, latencyMs: elapsed() });
   }
 
   /**

@@ -37,6 +37,10 @@ import {
   type ApprovalOidcPolicy,
 } from './approval-oidc-authenticator.js';
 import {
+  LocalTerminalLiveApprovalAuthenticator,
+  type LocalTerminalReauthenticationProvider,
+} from './approval-terminal-authenticator.js';
+import {
   normalizeGlobalScopePlatform,
   resolveGlobalScopePaths,
   type GlobalScopeEnv,
@@ -84,6 +88,11 @@ export interface CreateApprovalOidcIngressInput {
   readonly token: string;
   readonly policy: ApprovalOidcPolicy;
   readonly verifier: ApprovalOidcAssertionVerifier;
+  readonly channel: string;
+}
+
+export interface CreateApprovalTerminalIngressInput {
+  readonly provider: LocalTerminalReauthenticationProvider;
   readonly channel: string;
 }
 
@@ -193,6 +202,30 @@ export class ApprovalAuthorityRuntimeService {
       return { kind: 'rejected', reason: request ? 'unauthorized' : 'unknown-request' };
     }
     return this.createOidcIngress(input).decide(command);
+  }
+
+  async decideTerminal(
+    input: CreateApprovalTerminalIngressInput,
+    command: ApprovalDecisionCommand,
+  ): Promise<ApprovalDecisionIngressOutcome> {
+    if (this.closed) throw createExecutionAuthorityError('APPROVAL_AUTHORITY_RUNTIME_CLOSED');
+    assertIdentity(input.channel, 'channel');
+    const request = this.broker.getRequest(command.requestId);
+    if (!request || request.tenantId !== this.tenantId) {
+      return { kind: 'rejected', reason: request ? 'unauthorized' : 'unknown-request' };
+    }
+    const authenticator = new LocalTerminalLiveApprovalAuthenticator({
+      provider: input.provider,
+      sessions: this.sessions,
+      now: this.now,
+    });
+    return new ApprovalDecisionIngress({
+      broker: this.broker,
+      authenticator,
+      integrity: this.custody,
+      channel: input.channel,
+      now: this.now,
+    }).decide(command);
   }
 
   prepareAttendedExecutionApproval(

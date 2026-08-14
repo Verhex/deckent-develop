@@ -10,14 +10,20 @@ import {
 } from '../core/cross-verify-evidence-broker.js';
 import type { CrossVerifyOperationClass } from '../core/cross-verify-prompt.js';
 import { createCrossVerifyEnforcedAttemptContractV2 } from '../core/cross-verify-execution-contract.js';
-import { resolveExecutionBudgetPolicy } from '../core/execution-budget-policy.js';
+import {
+  resolveExecutionBudgetPolicy,
+  resolveXverifyAdjudicationPurposeProfile,
+} from '../core/execution-budget-policy.js';
 import type { ExecutionTerminationLedger } from '../core/execution-termination-ledger.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
+import { debugLog } from '../core/utils.js';
 import { readExecutionLandingContext } from '../core/execution-landing-context.js';
 import type {
   HostRoleInvocationCandidateAuthority,
+  HostRoleInvocationNonReservableSubscription,
 } from '../core/host-role-invocation-admission-runtime.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { defaultRoleInvocationPolicy } from '../core/role-invocation-resolver.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 import {
   projectExactProviderLimitAuthoritySelector,
@@ -60,6 +66,7 @@ import type {
 import { prepareDockerExecutionLanding } from './execution-landing-coordinator.js';
 import type { DockerSpawnBackend } from './spawn-backend-docker.js';
 import { bootstrapCrossVerifyRuntimeV2 } from './cross-verify-runtime-bootstrap.js';
+import { budgetFingerprint as computeBudgetFingerprint } from './runtime-budget-monitor.js';
 
 const TASKS_DIR = '.tasks';
 const MODEL_EFFORT = 'low';
@@ -396,6 +403,23 @@ export function createDockerCrossVerifyExecutionProfileAuthority(input: {
             executionAdmissionMode: grant.executionContract.attendanceMode,
             executionLandingContext: landing,
             modelEffort: grant.executionContract.modelEffort,
+            // Owner-authorized final-only containment, scoped to the
+            // non-reservable subscription adjudication ONLY (an admission-mode
+            // gate, NOT a provider-name bypass). A subscription verifier CLI
+            // reports usage only at the end, so no live token cap can be
+            // enforced: the owner-authored execution-budget wall clock is the sole
+            // in-flight containment (the process is killed at expiry) and the
+            // token ceilings settle post-hoc against the real transport usage.
+            // The metered / incremental-usage (reserved) arm is untouched.
+            ...(grant.admissionMode === 'non_reservable_subscription'
+              ? {
+                  finalOnlyUsageContainment: {
+                    maxWallClockSeconds: Math.floor(grant.executionContract.timeoutMs / 1_000),
+                    profileRef: grant.executionContract.budgetProfileRef,
+                    policyDigest: grant.executionContract.budgetPolicyDigest,
+                  },
+                }
+              : {}),
           };
         },
       });
@@ -707,10 +731,104 @@ implements MandatoryCrossVerifyInvocationFactory {
         budgetDecision.profileRef,
       );
     }
+    // The owner-authored budget policy yields a config-path profileRef
+    // (`execution_budget.roles.<role>`), but the xverify execution contract binds
+    // an OPAQUE durable reference. Derive the canonical opaque budget profile ref
+    // from the owner-authored policy DIGEST — never relaxed, never a config path.
+    // Used consistently by the verifier task's budget policy and the contract so
+    // the coordinator's exact cross-check holds.
+    const budgetProfileRef = `execution-budget:${budgetDecision.policyDigest}`;
     const estimates = estimatesFor(candidate.requiredWindows, model, budgetDecision.budget);
-    if (!estimates) {
+    // Non-reservable subscription arm (owner-bounded): when the required windows
+    // are advisory `percent`-unit (never numerically reservable) on a SUBSCRIPTION
+    // provider, the owner flag is set, the advisory floor still admits, and the
+    // budget already resolved above, admit via the typed non-reservable outcome
+    // instead of holding. NO reservation is forged. Any missing condition keeps
+    // the byte-identical `xverify_limit_unit_unreservable` HOLD.
+    const verifierCandidate = candidate.candidate;
+    const nonReservableBaseEligible = estimates === null
+      && input.config.cross_verify?.allow_non_reservable_subscription_adjudication === true
+      && profile.authMode === 'subscription'
+      && candidate.requiredWindows.length > 0
+      && candidate.requiredWindows.every(window => window.unit === 'percent')
+      && verifierCandidate.limits.limited === false
+      && verifierCandidate.reachability.reachable === true
+      && verifierCandidate.reachability.evidenceRef !== null;
+    // A non-reservable subscription adjudication may dispatch ONLY under the
+    // owner-authored xverify-adjudication purpose profile (positive maxTokens +
+    // wall clock, config not code). Its absence — when the arm would otherwise be
+    // eligible — is a typed HOLD, never a dispatch without a total-token ceiling.
+    const adjudicationProfile = resolveXverifyAdjudicationPurposeProfile({
+      policy: input.config.execution_budget,
+    });
+    if (!estimates && nonReservableBaseEligible && adjudicationProfile.state !== 'available') {
+      return selectedHold('xverify_adjudication_budget_unavailable', {
+        reasonCode: adjudicationProfile.reasonCode,
+        profileRef: adjudicationProfile.profileRef,
+      });
+    }
+    const nonReservableEligible = nonReservableBaseEligible
+      && adjudicationProfile.state === 'available';
+    if (!estimates && !nonReservableEligible) {
       return selectedHold('xverify_limit_unit_unreservable', candidate.requiredWindows);
     }
+    const nonReservableAdmission: HostRoleInvocationNonReservableSubscription | undefined = estimates
+      ? undefined
+      : {
+          decision: 'non_reservable_subscription',
+          reservation: null,
+          attempts: [],
+          authorityEvidenceRef: evidenceRef('non-reservable-admission', {
+            provider,
+            model,
+            selector: selected.authorityEvidenceRef,
+            candidate: candidate.authorityEvidenceRef,
+            ownerBound: 'cross_verify.allow_non_reservable_subscription_adjudication',
+          }),
+          basis: {
+            advisoryLimitEvidenceRefs: verifierCandidate.limits.evidenceRefs,
+            ownerBoundRef: 'config:cross_verify.allow_non_reservable_subscription_adjudication',
+            requiredWindows: candidate.requiredWindows.map(window => ({
+              windowId: window.windowId,
+              unit: 'percent' as const,
+              model: window.model,
+            })),
+          },
+          resolution: {
+            role: 'auditor',
+            purpose: 'audit-evaluation',
+            policy: defaultRoleInvocationPolicy('auditor'),
+            selected: { provider, model, source: 'config', sequence: 1 },
+            attempts: [],
+            rejected: [],
+            decisionReasonCode: 'none',
+            configured: { provider, model, source: 'config', reasonCode: 'none' },
+            resolved: { provider, model, source: 'wire', reasonCode: 'none' },
+            fallbackChain: [],
+            reachability: {
+              state: verifierCandidate.reachability.state,
+              evidenceRef: verifierCandidate.reachability.evidenceRef,
+            },
+            limits: {
+              state: verifierCandidate.limits.state,
+              evidenceRefs: verifierCandidate.limits.evidenceRefs,
+            },
+          },
+        } satisfies HostRoleInvocationNonReservableSubscription;
+
+    // Arm-aware owner-authored ceilings. The non-reservable subscription
+    // adjudication carries the owner's maxTokens into the execution-contract
+    // budget (so the runtime monitor enforces the total-token cap post-hoc from
+    // the provider-reported terminal usage) and its wall clock through timeoutMs
+    // (the optionsFor final-only containment kills the process at expiry). The
+    // reserved / metered arm keeps budgetDecision.budget and input.timeoutMs
+    // byte-identical.
+    const adjudicationBudget = nonReservableAdmission && adjudicationProfile.state === 'available'
+      ? { ...budgetDecision.budget, maxTokens: adjudicationProfile.profile.maxTokens }
+      : budgetDecision.budget;
+    const adjudicationTimeoutMs = nonReservableAdmission && adjudicationProfile.state === 'available'
+      ? adjudicationProfile.profile.maxWallClockSeconds * 1_000
+      : input.timeoutMs;
 
     const runId = input.task.sprintId ?? `xverify-${sha256(input.task.id).slice(0, 16)}`;
     const verifierTaskId = `${input.task.id}-xverify`;
@@ -731,7 +849,7 @@ implements MandatoryCrossVerifyInvocationFactory {
       selectorDigest: selected.selectorDigest,
       executionProfileRef: profile.executionProfileRef,
       runtimeFingerprint: profile.runtimeFingerprint,
-      budget: budgetDecision.budget,
+      budget: adjudicationBudget,
       policyDigest: budgetDecision.policyDigest,
       criteria: input.task.goNogo.items ?? null,
       evidencePaths,
@@ -776,6 +894,7 @@ implements MandatoryCrossVerifyInvocationFactory {
         attemptId,
         fenceTokenHash,
         createdAt: claim.claimedAt,
+        allowAdvisorySubscriptionLimits: nonReservableEligible,
       });
       if (projected.state === 'hold') {
         return selectedHold(
@@ -797,7 +916,12 @@ implements MandatoryCrossVerifyInvocationFactory {
         reason: 'cross-verify adversarial verification',
         scope: {
           directories: [],
-          filesRead: [],
+          // The Docker execution landing requires a bounded scope with at least
+          // one path. The verifier is inspection-only, so its scope is exactly the
+          // claim's evidence files (read-only). Scoped to the non-reservable arm to
+          // keep the reserved path byte-identical; the reserved-metered path hits
+          // the same empty-scope landing gate and is tracked as a separate finding.
+          filesRead: nonReservableEligible ? evidencePaths : [],
           filesWrite: [],
         },
         dependencies: [],
@@ -812,7 +936,7 @@ implements MandatoryCrossVerifyInvocationFactory {
           taskKind: 'audit',
           resolvedProvider: provider,
           executionCostClass: 'remote',
-          profileRef: budgetDecision.profileRef,
+          profileRef: budgetProfileRef,
           policyDigest: budgetDecision.policyDigest,
           admissionMode: 'unattended',
           landingPolicy: { ...budgetDecision.landingPolicy },
@@ -851,9 +975,17 @@ implements MandatoryCrossVerifyInvocationFactory {
         basePromptSha256: sha256(basePrompt),
         dispatchedPromptSha256: sha256(prepared.prompt),
         taskSnapshotSha256: sha256(canonicalJson(executionRequest.taskSnapshot)),
-        budget: budgetDecision.budget,
-        budgetFingerprint: sha256(canonicalJson(budgetDecision.budget)),
-        budgetProfileRef: budgetDecision.profileRef,
+        budget: adjudicationBudget,
+        // Budget identity MUST use the runtime-budget-monitor's canonical
+        // `budgetFingerprint()` (BUDGET_FIELDS order) — the same function that
+        // stamps the live usage/stop/guard evidence (runtime-budget-monitor.ts).
+        // The old `sha256(canonicalJson(budget))` produced an alphabetical-key
+        // hash that never equalled the monitor's, so the terminal-usage receipt
+        // writer's `source.budgetFingerprint === contract.budgetFingerprint`
+        // check aborted every docker adjudication settlement before persist/close
+        // (surfaced first by the xverify non_reservable arm, the first to settle).
+        budgetFingerprint: computeBudgetFingerprint(adjudicationBudget),
+        budgetProfileRef,
         budgetPolicyDigest: budgetDecision.policyDigest,
         landingPolicy: budgetDecision.landingPolicy,
         attendanceMode: 'unattended',
@@ -865,14 +997,14 @@ implements MandatoryCrossVerifyInvocationFactory {
         executionBackend: profile.executionBackend,
         endpointRefHash: profile.endpointRefHash,
         executionProfileRef: profile.executionProfileRef,
-        providerLimitEstimates: estimates,
-        timeoutMs: input.timeoutMs,
+        providerLimitEstimates: estimates ?? [],
+        timeoutMs: adjudicationTimeoutMs,
         modelEffort: provider === 'claude' ? MODEL_EFFORT : 'default',
         toolProfileDigest: profile.toolProfileDigest,
         isolatedContext: true,
         settlementAttemptRef: settlementRef,
         adjudication: bootstrap.executionBinding,
-      });
+      }, { allowEmptyProviderLimitEstimates: nonReservableEligible });
       const reservationIdentity = deriveCrossVerifyReservationIdentity(
         projected.identity,
         provider,
@@ -908,7 +1040,10 @@ implements MandatoryCrossVerifyInvocationFactory {
           fenceTokenHash,
           receiptRef: projected.identity.receiptRef,
           reachabilityEvidenceRef: projected.verifierCandidates[0].reachability.evidenceRef!,
-          estimates,
+          // Dead for the non-reservable arm (the coordinator uses
+          // nonReservableAdmission and never calls buildReservation); reserved
+          // always has non-null estimates so `?? []` is a no-op there.
+          estimates: estimates ?? [],
           estimateEvidenceRefs: [
             selected.authorityEvidenceRef,
             executionContract.evidenceRef,
@@ -949,6 +1084,7 @@ implements MandatoryCrossVerifyInvocationFactory {
           input: {
             projection: projected,
             admission,
+            ...(nonReservableAdmission ? { nonReservableAdmission } : {}),
             executionContract,
             executionRequest,
             buildDispatchEvent: allowed => ({
@@ -991,6 +1127,11 @@ implements MandatoryCrossVerifyInvocationFactory {
         },
       };
     } catch (error) {
+      // A bare hashed hold ref hides why composition failed. Record it ONLY via
+      // the bounded/sanitized debug sink (message-only, 200-char cap, stderr just
+      // under DECKENT_DEBUG, skipped in tests) — never a raw stack to the user
+      // surface. The typed hold below stays the authoritative, opaque signal.
+      debugLog('cross-verify-ingress:composition-failed', error);
       return selectedHold(
         'xverify_attempt_composition_failed',
         error instanceof Error ? error.message : String(error),

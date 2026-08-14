@@ -6,12 +6,14 @@
 > Komut adları ve bayraklar tanımlayıcıdır; çevrilmez.
 
 <!-- AUTOGEN:START id="cli-tr" -->
-> 165 commands. Generated from `src/cli/commands/*.ts`.
+> 168 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
 | `deckent accept <id>` | Accept a pending nervous system suggestion |
 | `deckent accept-panic <task-id>` | Approve a PanicGuard-blocked worker kill (writes IPC marker) |
+| `deckent activate <model>` | Allow a detected model to enter the routing pool |
+| `deckent activation` | Show recorded model activation decisions (unrecorded = active) |
 | `deckent add` | Add a new entry to the autonomous backlog |
 | `deckent add <cron> <action>` | Add a new scheduled flow (cron: 5-field expression, e.g. "* * * * * |
 | `deckent add <name> <cmdOrUrl> [args...]` | Add an MCP server (stdio or http) — writes to .mcp.json by scope |
@@ -45,6 +47,7 @@
 | `deckent create-list <title>` | Create a Type-1 list mission from N work-items |
 | `deckent cu-status` | Show computer-use (TOOL-CU) status: flag state + per-capability availability |
 | `deckent dashboard` | Show terminal dashboard with auto-refresh (see also: deckent status --watch) |
+| `deckent deactivate <model>` | Remove a model from the routing pool (detection still sees it) |
 | `deckent delete <name>` | Delete an agent from the pool |
 | `deckent delete <name>` | Delete a skill |
 | `deckent disable <name>` | Disable an agent |
@@ -141,7 +144,7 @@
 | `deckent roles` | List all roles and their effective permissions |
 | `deckent run` | Run managed doc updates without a sprint |
 | `deckent run` | Run the flow-runtime tick once (--once) or start the daemon |
-| `deckent runs` | List run-flows (the multi-flow inbox) — plus per-run decide: --approve/--reject/--start |
+| `deckent runs` | List run-flows (the multi-flow inbox) — plus per-run decide: --approve/--reject/--retire/--start |
 | `deckent scan` | Hash + timestamp + rank all docs; write front-matter; sync memory.db |
 | `deckent search <query>` | Search skills in the marketplace registry |
 | `deckent serve` | Start HTTP API server with SSE support |

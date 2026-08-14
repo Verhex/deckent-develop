@@ -281,7 +281,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE
 
 ## MCP Tool Reference — MCP Arac Referansi
 
-> **Tam araç listesi (49 araç) koddan otomatik türetilir — bkz. `docs/generated/tr/reference/mcp-tools.md`** (`npm run docs:ref`).
+> **Tam araç listesi (50 araç) koddan otomatik türetilir — bkz. `docs/generated/tr/reference/mcp-tools.md`** (`npm run docs:ref`).
 > Eskiden burada duran el-yazımı tablo **drift etmişti** (33 vs 35 vs 46); canonical generated referans tek-kaynaktır.
 > Araç adları yukarıdaki `## MCP Integration` bölümünde listelenir; somut parametre örnekleri aşağıdadır.
 
@@ -314,6 +314,25 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE
 { target: "all", root: "/path/to/project" }
 { target: "worker", workerId: "w-001-003", root: "/path/to/project" }
 ```
+
+### approvals ve xverify kullanıcı akışı
+
+**approvals — runtime onay isteklerinin yönetimi:**
+- `deckent approvals list` → bekleyen (pending) onay isteklerini listeler (read-only).
+- `deckent approvals decide <requestId> --allow|--deny [--reason <text>]` → kararı verir; bu mutation
+  YALNIZ CLI'da, interactive live-auth arkasında yapılır.
+- MCP `deckent_approvals` yalnız **read-only pending inbox**'tur (canonical `ApprovalBroker` →
+  `list('pending')`); MCP üzerinden allow/deny/decide/self-approval YOKTUR.
+
+**xverify — cross-provider host-adjudicated doğrulama:**
+- `deckent xverify …` bir iddiayı ÜRETEN provider'dan FARKLI bir provider ile bağımsız doğrular
+  (XVERIFY-PROVIDER-SEPARATION; same-provider self-verify yasaktır).
+- Host, CONFIRMED/REFUTED/UNCLEAR → ALLOW/NO-GO/HOLD disposition'ını türetir; assurance
+  `typed-host-adjudicated`.
+- Kapanış (closure) YALNIZ şu zincirle olur: verdict + gerçek provider call + provider-reported usage +
+  terminally-closed settlement + durable verdict receipt (`cross-verify-verdict:sha256:…`).
+  `HOLD`/`UNCLEAR` kapanış DEĞİLDİR. Kanıtlanan Fable→Sol koşusu (CONFIRMED/ALLOW, total 60787 token) ve
+  owner-bounded subscription budget için bkz. `CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md` §12.2.
 
 ---
 

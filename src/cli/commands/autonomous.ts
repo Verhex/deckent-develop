@@ -1243,7 +1243,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
               // unattended; provider fallback config cannot relax attendance.
               unattended: true,
             });
-            if (decision.decision === 'not-configured') {
+            if (decision.decision !== 'hold') {
               return { decision: 'allow' as const };
             }
             return {

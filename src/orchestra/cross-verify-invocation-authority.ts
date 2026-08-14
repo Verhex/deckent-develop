@@ -31,6 +31,12 @@ export interface CrossVerifyInvocationProjectionInput {
   /** Host-only claim fence digest. The raw fence token is never projected. */
   readonly fenceTokenHash: string;
   readonly createdAt: string;
+  /**
+   * Owner-flagged non-reservable subscription admission — accept an advisory
+   * `percent`-window verifier as canonical (its limit state is never `known`).
+   * Default-off keeps every other projection byte-identical.
+   */
+  readonly allowAdvisorySubscriptionLimits?: boolean;
 }
 
 export interface CrossVerifyInvocationIdentity {
@@ -127,7 +133,10 @@ function canonicalTimestamp(value: string): boolean {
   return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
 }
 
-function candidateIsCanonical(candidate: VerifierEligibilityCandidate): boolean {
+function candidateIsCanonical(
+  candidate: VerifierEligibilityCandidate,
+  allowAdvisorySubscriptionLimits = false,
+): boolean {
   const definition = modelRegistry.get(candidate.model);
   if (!definition
     || definition.id !== definition.apiId
@@ -135,7 +144,11 @@ function candidateIsCanonical(candidate: VerifierEligibilityCandidate): boolean 
     || candidate.reachability.state !== 'known'
     || candidate.reachability.reachable !== true
     || candidate.reachability.evidenceRef === null
-    || candidate.limits.state !== 'known'
+    // The non-reservable subscription arm (owner-flagged) admits an advisory
+    // `percent`-window verifier whose limit state is never `known`; the floor
+    // signal (`!limited`) + evidence presence still gate it. Every other path
+    // keeps the byte-identical `known` requirement.
+    || (!allowAdvisorySubscriptionLimits && candidate.limits.state !== 'known')
     || candidate.limits.limited
     || candidate.limits.evidenceRefs.length === 0
     || candidate.backend.executionBackend === 'unknown'
@@ -201,7 +214,7 @@ export function projectCrossVerifyInvocation(
   }
 
   const { candidate } = input.projection;
-  if (!candidateIsCanonical(candidate)) {
+  if (!candidateIsCanonical(candidate, input.allowAdvisorySubscriptionLimits)) {
     return {
       state: 'hold',
       reasonCode: 'candidate_identity_invalid',

@@ -29,6 +29,10 @@ import {
   type ReachabilityProbeObservation,
   type ReachabilityProbeRequest,
 } from '../core/provider-truth.js';
+import {
+  isExecutionProfileRef,
+  type BoundedReachabilityProbeTransport,
+} from '../core/provider-evidence-probe-contract.js';
 
 // ─── Codex durable on-disk state contract ────────────────────────────────────
 //
@@ -72,6 +76,14 @@ export interface CodexHostSubscriptionEvidenceRegistryOptions {
   readonly platform?: NodeJS.Platform;
   readonly env?: NodeJS.ProcessEnv;
   readonly now?: () => Date;
+  /**
+   * Lazy resolver for the canonical Docker-backed bounded probe transport
+   * (§12.2 clause 4). Registration stays provider-free: the resolver is only
+   * invoked when a probe actually runs, and a composition root that cannot
+   * supply a canonical transport simply omits it — the docker slot then keeps
+   * the honest typed-unsupported source instead of a raw fallback.
+   */
+  readonly dockerReachabilityTransport?: () => BoundedReachabilityProbeTransport | null;
 }
 
 function digest(...parts: readonly string[]): string {
@@ -607,17 +619,24 @@ export class CodexUsageStateLimitEvidenceSource implements ProviderLimitEvidence
     }
 
     const windows: ProviderLimitWindow[] = [];
+    const requiredWindowIds: string[] = [];
     if (state.primary !== null) {
       windows.push(percentWindow(PRIMARY_WINDOW_ID, 'session', state.primary));
+      requiredWindowIds.push(PRIMARY_WINDOW_ID);
     }
     if (state.secondary !== null) {
       windows.push(percentWindow(SECONDARY_WINDOW_ID, 'week-all', state.secondary));
+      requiredWindowIds.push(SECONDARY_WINDOW_ID);
     }
     return {
       state: 'known',
-      // Both display windows stay required: a snapshot missing one is incomplete
-      // evidence upstream, not a silently narrowed limit picture.
-      requiredWindowIds: [PRIMARY_WINDOW_ID, SECONDARY_WINDOW_ID],
+      // Required = the windows the VALID snapshot actually declares. The codex
+      // CLI truthfully reports `secondary: null` on plans without a secondary
+      // window (measured live 2026-08-12, pro plan) — an absent-by-design
+      // window is provider shape, not incomplete evidence, and must not hold
+      // every probe forever. Corrupt/unreadable state still fails closed above
+      // as typed `unavailable`; this list can never widen past what was read.
+      requiredWindowIds,
       windows,
       source: {
         ...window,
@@ -664,6 +683,122 @@ implements ProviderReachabilityEvidenceSource {
   });
 }
 
+/**
+ * Live codex reachability over the canonical Docker bounded-probe transport
+ * (§12.2 clause 4).
+ *
+ * Exact scope: subscription · cli · docker with a resolvable execution profile
+ * ref. Anything else — and any probe arriving without a resolvable canonical
+ * transport or a billing-mode budget projection — is a typed non-live outcome,
+ * never a fabricated verdict. The source emits provider-native observations
+ * only; `reachable`/`liveProven` promotion stays in canonical core
+ * (provider-truth), which also enforces called-identity match.
+ */
+const DOCKER_PROBE_PROMPT = 'Reply with exactly DECKENT_REACHABILITY_OK. Do not use tools.';
+
+export class CodexDockerReachabilityEvidenceSource
+implements ProviderReachabilityEvidenceSource {
+  readonly authorityRef = reachabilityRef('authority', 'codex-docker-bounded-probe-v1');
+
+  constructor(
+    private readonly resolveTransport: () => BoundedReachabilityProbeTransport | null,
+  ) {}
+
+  readonly probe = async (
+    request: Readonly<ReachabilityProbeRequest>,
+  ): Promise<ReachabilityProbeObservation> => {
+    const scopeRefs = [reachabilityRef(
+      'scope',
+      request.provider,
+      request.model,
+      request.auth.mode,
+      request.backend.transport,
+      request.backend.executionBackend,
+      request.backend.executionProfileRef,
+    )];
+    const notLive = (
+      outcome: 'unsupported' | 'not-run',
+      detail: string,
+    ): ReachabilityProbeObservation => ({
+      outcome,
+      calledProvider: null,
+      calledModel: null,
+      providerRequestRefHash: null,
+      latencyMs: null,
+      evidenceRefs: [...scopeRefs, reachabilityRef('hold', detail)],
+    });
+
+    if (request.provider !== 'codex'
+      || request.auth.mode !== 'subscription'
+      || request.backend.transport !== 'cli'
+      || request.backend.executionBackend !== 'docker'
+      || !isExecutionProfileRef(request.backend.executionProfileRef)) {
+      return notLive('unsupported', 'scope-mismatch');
+    }
+    const projection = request.admission.budget.projection;
+    if (!projection) return notLive('not-run', 'budget-projection-unavailable');
+    const transport = this.resolveTransport();
+    if (!transport) return notLive('unsupported', 'no-canonical-docker-transport');
+
+    const native = await transport.invoke({
+      provider: request.provider,
+      model: request.model,
+      executionProfileRef: request.backend.executionProfileRef,
+      promptBytes: new TextEncoder().encode(DOCKER_PROBE_PROMPT),
+      timeoutMs: projection.timeoutMs,
+      maxOutputTokens: projection.maxOutputTokens,
+    });
+
+    switch (native.outcome) {
+      case 'completed':
+        // Called identity is structurally pinned: the canonical builder derives
+        // argv from the provider command spec + registry apiId for exactly this
+        // request, so echoing the requested identity is backed by the executed
+        // command, not by parsing provider output.
+        return {
+          outcome: 'succeeded',
+          calledProvider: request.provider,
+          calledModel: request.model,
+          providerRequestRefHash: native.providerRequestRef
+            ? digest('provider-request-ref', native.providerRequestRef)
+            : null,
+          latencyMs: native.latencyMs,
+          evidenceRefs: scopeRefs,
+        };
+      case 'timed-out':
+        return {
+          outcome: 'timeout',
+          calledProvider: null,
+          calledModel: null,
+          providerRequestRefHash: null,
+          latencyMs: native.elapsedMs,
+          evidenceRefs: scopeRefs,
+        };
+      case 'rejected':
+        return {
+          outcome: 'invalid-response',
+          calledProvider: null,
+          calledModel: null,
+          providerRequestRefHash: null,
+          latencyMs: native.latencyMs,
+          evidenceRefs: [...scopeRefs, reachabilityRef('rejected', native.providerCode ?? 'unclassified')],
+        };
+      case 'transport-error':
+        return {
+          outcome: native.errorCode === 'backend_unreachable' ? 'backend-unreachable'
+            : native.errorCode === 'backend_unsupported' ? 'unsupported'
+              : native.errorCode === 'credential_unavailable' ? 'auth-rejected'
+                : 'transport-error',
+          calledProvider: null,
+          calledModel: null,
+          providerRequestRefHash: null,
+          latencyMs: native.elapsedMs,
+          evidenceRefs: [...scopeRefs, reachabilityRef('transport-error', native.errorCode)],
+        };
+    }
+  };
+}
+
 // ─── Registrations ───────────────────────────────────────────────────────────
 
 /**
@@ -676,35 +811,47 @@ export function createCodexHostSubscriptionEvidenceSourceRegistrations(
 ): readonly ProviderEvidenceSourceRegistration[] {
   const accountAuthority = new CodexAccountIdentityAuthority(options);
   const limitSource = new CodexUsageStateLimitEvidenceSource(options);
-  const reachabilitySource = new CodexReachabilityUnavailableEvidenceSource();
+  const hostReachabilitySource = new CodexReachabilityUnavailableEvidenceSource();
+  // The docker slot gains a LIVE source only when the composition root supplies
+  // the canonical Docker bounded-probe transport (§12.2 clause 4); otherwise it
+  // keeps the honest typed-unsupported source. The host-subprocess slot always
+  // stays the honest stub — no live codex transport exists on that scope.
+  const dockerReachabilitySource = options.dockerReachabilityTransport
+    ? new CodexDockerReachabilityEvidenceSource(options.dockerReachabilityTransport)
+    : hostReachabilitySource;
   // The xverify verifier runs the codex CLI inside the DOCKER backend while the
   // authoring flow's default probe is host-subprocess — the SAME durable
   // auth/usage state backs both, so both scopes register over the same lazy
   // producers (measured live 2026-08-12: docker-scope authoring held with
   // source-unavailable until this second registration existed).
   const backends = ['host-subprocess', 'docker'] as const;
-  return Object.freeze(backends.map((executionBackend) => ({
-    provider: 'codex' as const,
-    authMode: 'subscription' as const,
-    transport: 'cli' as const,
-    executionBackend,
-    sources: {
-      account: {
-        authorityRef: accountAuthority.authorityRef,
-        resolve: (input: ProviderAccountIdentityRequest) => accountAuthority.resolve(input),
+  return Object.freeze(backends.map((executionBackend) => {
+    const reachabilitySource = executionBackend === 'docker'
+      ? dockerReachabilitySource
+      : hostReachabilitySource;
+    return {
+      provider: 'codex' as const,
+      authMode: 'subscription' as const,
+      transport: 'cli' as const,
+      executionBackend,
+      sources: {
+        account: {
+          authorityRef: accountAuthority.authorityRef,
+          resolve: (input: ProviderAccountIdentityRequest) => accountAuthority.resolve(input),
+        },
+        limit: {
+          authorityRef: limitSource.authorityRef,
+          kind: limitSource.kind,
+          authority: limitSource.authority,
+          observe: (input: LimitSourceInput) => limitSource.observe(input),
+        },
+        reachability: {
+          authorityRef: reachabilitySource.authorityRef,
+          probe: (input: ReachabilityProbeRequest) => reachabilitySource.probe(input),
+        },
       },
-      limit: {
-        authorityRef: limitSource.authorityRef,
-        kind: limitSource.kind,
-        authority: limitSource.authority,
-        observe: (input: LimitSourceInput) => limitSource.observe(input),
-      },
-      reachability: {
-        authorityRef: reachabilitySource.authorityRef,
-        probe: (input: ReachabilityProbeRequest) => reachabilitySource.probe(input),
-      },
-    },
-  } satisfies ProviderEvidenceSourceRegistration)));
+    } satisfies ProviderEvidenceSourceRegistration;
+  }));
 }
 
 /**

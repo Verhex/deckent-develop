@@ -36,12 +36,14 @@ function flushPublishedDirectory(filePath: string): void {
  * exists. Any other filesystem capability/error is surfaced fail-loud; approval
  * authority must never degrade to replace-on-write semantics.
  */
-export function createJsonFileFirstWriterWins(filePath: string, data: unknown): boolean {
+function publishFileFirstWriterWins(filePath: string, content: string | Buffer): boolean {
   const tmpPath = `${filePath}.${randomUUID()}.tmp`;
   try {
     const tmpFd = openSync(tmpPath, 'wx', 0o600);
     try {
-      writeFileSync(tmpFd, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+      // A string writes as utf-8 (Node's default); a Buffer writes verbatim —
+      // this is the sole difference between the JSON and raw publication paths.
+      writeFileSync(tmpFd, content);
       fsyncSync(tmpFd);
     } finally {
       closeSync(tmpFd);
@@ -72,4 +74,19 @@ export function createJsonFileFirstWriterWins(filePath: string, data: unknown): 
       // maintenance. The final path is never removed or replaced here.
     }
   }
+}
+
+export function createJsonFileFirstWriterWins(filePath: string, data: unknown): boolean {
+  return publishFileFirstWriterWins(filePath, JSON.stringify(data, null, 2) + '\n');
+}
+
+/**
+ * Publish raw bytes at `filePath` with the identical first-writer-wins,
+ * fsync-durable, non-replacing semantics as {@link createJsonFileFirstWriterWins}.
+ * Used for host-decoded evidence snapshots that the sandboxed verifier reads with
+ * a bare `cat` — no interpreter, no base64 — so adjudication never depends on
+ * which interpreters happen to exist in a provider's container image.
+ */
+export function createRawFileFirstWriterWins(filePath: string, content: Buffer): boolean {
+  return publishFileFirstWriterWins(filePath, content);
 }

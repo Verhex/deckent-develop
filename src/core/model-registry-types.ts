@@ -59,7 +59,8 @@ export interface ModelDefinition {
    * more than one GA model, so registration order was silently deciding real
    * dispatch identity; each now names its current generation explicitly:
    * `claude/premium → claude-opus-5`, `codex/standard → gpt-5.6-terra`,
-   * `codex/premium → gpt-5.6-sol`, `codex/economy → gpt-5.6-luna`. Sets with a
+   * `codex/premium → gpt-5.5`, `codex/premium_plus → gpt-5.6-sol`,
+   * `codex/economy → gpt-5.6-luna`. Sets with a
    * single GA model carry no flag — there is nothing for order to decide.
    *
    * The flag designates GENERATION, not entitlement. Whether an account may

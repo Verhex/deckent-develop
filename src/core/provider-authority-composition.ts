@@ -505,6 +505,12 @@ export class ProviderAuthorityRuntimeService {
     return this.composition.evidenceProducer;
   }
 
+  /** Read-only truth access for pre-compose freshness checks (§12.2 T2b). */
+  get truthStore(): ProviderTruthStore {
+    this.assertOpen();
+    return this.composition.truthStore;
+  }
+
   get roleAdmissionRuntime(): HostRoleInvocationAdmissionRuntime {
     this.assertOpen();
     return this.composition.runtime;

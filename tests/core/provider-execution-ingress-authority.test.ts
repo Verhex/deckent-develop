@@ -68,15 +68,8 @@ describe('preflightProviderExecutionIngress', () => {
     });
   });
 
-  it('consumes the shared role-admission runtime and holds the missing exact candidate', () => {
-    const admit = vi.fn(() => ({
-      decision: 'hold',
-      reservation: null,
-      reasonCode: 'authority_unavailable',
-      resolution: {},
-      attempts: [],
-      authorityEvidenceRef: `host-role-admission:${'b'.repeat(64)}`,
-    }));
+  it('passes a healthy composition as ready WITHOUT running the role admission', () => {
+    const admit = vi.fn();
     const authority = {
       state: 'ready',
       tenantId: 'local',
@@ -86,45 +79,24 @@ describe('preflightProviderExecutionIngress', () => {
       close: vi.fn(),
     } as never;
 
-    const result = preflightProviderExecutionIngress(authority, REQUEST);
+    const first = preflightProviderExecutionIngress(authority, REQUEST);
+    const second = preflightProviderExecutionIngress(authority, REQUEST);
 
-    expect(admit).toHaveBeenCalledOnce();
-    expect(admit.mock.calls[0]?.[0]).toMatchObject({
-      invocation: {
-        role: 'worker',
-        purpose: 'worker-execution',
-        primaryProvider: 'claude',
-        model: 'claude-sonnet-5',
-        fallbackProviders: ['codex'],
-        policy: {
-          role: 'worker',
-          unattended: true,
-          acceptableReachability: ['known'],
-          acceptableLimits: ['known'],
-        },
-      },
-      candidates: {},
-    });
-    expect(result).toMatchObject({
-      decision: 'hold',
-      reasonCode: 'candidate_authority_unavailable',
+    // The front door checks composition health only: the real, candidate-bound
+    // admission runs at the stage where the exact candidate/backend resolves.
+    expect(admit).not.toHaveBeenCalled();
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({
+      decision: 'ready',
       authorityEvidenceRefs: [
-        authority.authorityEvidenceRef,
-        `host-role-admission:${'b'.repeat(64)}`,
+        `provider-authority:${'a'.repeat(64)}`,
         expect.stringMatching(/^provider-execution-ingress:[a-f0-9]{64}$/u),
       ],
     });
   });
 
-  it('threads an exact Brain role/purpose through the same admission runtime', () => {
-    const admit = vi.fn(() => ({
-      decision: 'hold',
-      reservation: null,
-      reasonCode: 'authority_unavailable',
-      resolution: {},
-      attempts: [],
-      authorityEvidenceRef: `host-role-admission:${'c'.repeat(64)}`,
-    }));
+  it('grants no role an execution permit — Brain preflight is composition health only', () => {
+    const admit = vi.fn();
     const authority = {
       state: 'ready',
       tenantId: 'local',
@@ -141,27 +113,16 @@ describe('preflightProviderExecutionIngress', () => {
       configuredBackend: 'unresolved-before-provider-bootstrap',
     });
 
-    expect(admit).toHaveBeenCalledWith(expect.objectContaining({
-      invocation: expect.objectContaining({
-        role: 'brain',
-        purpose: 'sprint-planning',
-        primaryProvider: 'claude',
-        model: 'claude-sonnet-5',
-        policy: expect.objectContaining({
-          role: 'brain',
-          unattended: true,
-        }),
-      }),
-      candidates: {},
-    }));
+    expect(admit).not.toHaveBeenCalled();
     expect(result).toMatchObject({
-      decision: 'hold',
-      reasonCode: 'candidate_authority_unavailable',
+      decision: 'ready',
       authorityEvidenceRefs: [
-        authority.authorityEvidenceRef,
-        `host-role-admission:${'c'.repeat(64)}`,
+        `provider-authority:${'a'.repeat(64)}`,
         expect.stringMatching(/^provider-execution-ingress:[a-f0-9]{64}$/u),
       ],
     });
+    // The pre-fix behaviour (empty-candidate admission → permanent
+    // candidate_authority_unavailable) must never come back.
+    expect(JSON.stringify(result)).not.toContain('candidate_authority_unavailable');
   });
 });

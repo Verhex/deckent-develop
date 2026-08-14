@@ -512,6 +512,10 @@ const MESSAGES: MessageMap = {
     en: 'Inspect and explicitly reconcile execution authority bindings',
     tr: 'Execution authority bağlarını incele ve açıkça uzlaştır',
   },
+  'cmdCatalog.approvals.summary': {
+    en: 'Review pending runtime approval requests and decide execution admission (allow/deny)',
+    tr: 'Bekleyen runtime onay isteklerini gözden geçir ve execution admission kararını ver (izin/ret)',
+  },
   // ─── execution-authority mount adoption ─────────────────────────────────
   'execution_authority.cmd_desc': {
     en: 'Inspect and reconcile project execution authority bindings',
@@ -767,6 +771,133 @@ const MESSAGES: MessageMap = {
   'xverify.cmd_desc': {
     en: 'Cross-verify a claim on a DIFFERENT provider; the host derives ALLOW/NO-GO/HOLD from typed evidence',
     tr: 'Bir iddiayı FARKLI sağlayıcıda çapraz doğrula; ALLOW/NO-GO/HOLD kararını typed kanıttan host üretir',
+  },
+  // ─── approvals — runtime-wide approval inbox + local-terminal decision ──
+  'approvals.cmd_desc': {
+    en: 'Runtime-wide approval inbox — list pending requests and decide them over the live-authenticated local-terminal channel',
+    tr: 'Runtime-genelinde onay kutusu — bekleyen istekleri listele ve canlı-doğrulamalı local-terminal kanalından karara bağla',
+  },
+  'approvals.list_desc': {
+    en: 'List pending approval requests',
+    tr: 'Bekleyen onay isteklerini listele',
+  },
+  'approvals.decide_desc': {
+    en: 'Decide one pending approval request; requires an interactive TTY re-authentication',
+    tr: 'Bekleyen bir onay isteğini karara bağla; interaktif TTY yeniden-doğrulaması gerektirir',
+  },
+  'approvals.opt_allow': {
+    en: 'Approve the request',
+    tr: 'İsteği onayla',
+  },
+  'approvals.opt_deny': {
+    en: 'Deny the request',
+    tr: 'İsteği reddet',
+  },
+  'approvals.opt_reason': {
+    en: 'Optional decision reason recorded with the outcome',
+    tr: 'Sonuçla birlikte kaydedilecek isteğe bağlı karar gerekçesi',
+  },
+  'approvals.decide_requires_action': {
+    en: 'Exactly one of --allow or --deny is required',
+    tr: '--allow veya --deny seçeneklerinden tam olarak biri gereklidir',
+  },
+  'approvals.authority_disabled': {
+    en: 'The approval authority is not enabled — author approval.authority.enabled=true (with tenant_id) in the owner config',
+    tr: 'Approval authority etkin değil — owner config\'inde approval.authority.enabled=true (tenant_id ile) yazılmalı',
+  },
+  'approvals.terminal_window_missing': {
+    en: 'The local-terminal re-auth window is not authored — set approval.authority.terminal.max_auth_age_seconds in the owner config',
+    tr: 'Local-terminal yeniden-doğrulama penceresi yazılmamış — owner config\'inde approval.authority.terminal.max_auth_age_seconds ayarlanmalı',
+  },
+  'approvals.runtime_hold': {
+    en: 'Approval authority runtime HOLD — reason: {reason}, detail: {detail}',
+    tr: 'Approval authority runtime HOLD — neden: {reason}, detay: {detail}',
+  },
+  'approvals.none_pending': {
+    en: 'No pending approval requests',
+    tr: 'Bekleyen onay isteği yok',
+  },
+  'approvals.pending_line': {
+    en: '⏳ {id} — {summary} (valid until {expiresAt})',
+    tr: '⏳ {id} — {summary} (son geçerlilik: {expiresAt})',
+  },
+  'approvals.decide_context': {
+    en: 'You are deciding: {summary}\n  Target: {provider}/{model} · {backendScope}\n  Ceiling: at most {maxTokens} tokens · at most {timeoutSec}s of run time\n  What it grants: ONE single limited reachability check of exactly this target — nothing else\n  Valid until: {expiresAt}',
+    tr: 'Onayladığın şey: {summary}\n  Hedef: {provider}/{model} · {backendScope}\n  Üst sınır: en çok {maxTokens} jeton · en çok {timeoutSec} saniye çalışma süresi\n  Verdiği yetki: yalnızca bu hedef için TEK bir sınırlı erişim denemesi — başka hiçbir şey değil\n  Son geçerlilik: {expiresAt}',
+  },
+  'approvals.decided_effect': {
+    en: 'What happens now: the waiting job takes this one-time approval, runs the single limited check, and records whether this target is reachable.',
+    tr: 'Şimdi ne olacak: bekleyen iş bu tek kullanımlık onayı alır, tek seferlik sınırlı denemeyi yapar ve bu hedefin erişilebilir olup olmadığını kaydeder.',
+  },
+  'approvals.confirm_prompt': {
+    en: 'Confirm your identity to {action} this request: type "yes" to approve as the operator at this terminal: ',
+    tr: 'İşlemi {action} için kimliğini doğrula: bu terminaldeki yetkili olarak onaylıyorsan "yes" yaz: ',
+  },
+  'approvals.action_allow': { en: 'approve', tr: 'onayla' },
+  'approvals.action_deny': { en: 'deny', tr: 'reddet' },
+  'approvals.decided': {
+    en: '✓ Request {id} decided: {action} (identity-verified, this terminal)',
+    tr: '✓ İstek {id} karara bağlandı: {action} (kimlik doğrulandı, bu terminal)',
+  },
+  'approvals.decision_refused': {
+    en: 'The decision was not recorded for {id} — result: {kind}, reason: {reason}',
+    tr: '{id} için karar kaydedilmedi — sonuç: {kind}, neden: {reason}',
+  },
+  'xverify.prepare.approval_summary': {
+    en: 'Authorize a bounded reachability probe for verifier {provider}/{model} (docker, owner-budgeted)',
+    tr: '{provider}/{model} hakemi için sınırlı reachability probe yetkilendir (docker, owner bütçeli)',
+  },
+  'xverify.prepare.hold': {
+    en: 'Candidate evidence preparation HOLD — reason: {reason}, detail: {detail}, evidence: {evidence}. The run continues; the composition will report the same typed hold.',
+    tr: 'Aday kanıt hazırlığı HOLD — neden: {reason}, detay: {detail}, kanıt: {evidence}. Koşu devam ediyor; kompozisyon aynı typed hold\'u raporlayacak.',
+  },
+  'xverify.remedy.limit_unit_unreservable': {
+    en: 'The verifier is a subscription provider whose only limit windows are advisory percent-remaining — never numerically reservable, so the adjudication call cannot open a reservation. Either provision a metered/API path for the verifier (usd/token windows), or set cross_verify.allow_non_reservable_subscription_adjudication: true in the owner config to admit it via the typed non-reservable outcome.',
+    tr: 'Hakem, tek limit penceresi advisory yüzde-kalan olan bir abonelik sağlayıcısı — sayısal olarak rezerve edilemez, bu yüzden adjudication çağrısı rezervasyon açamaz. Ya hakem için metered/API yolu sağlayın (usd/token pencereleri), ya da owner config\'inde cross_verify.allow_non_reservable_subscription_adjudication: true yaparak typed non-reservable sonucuyla kabul edin.',
+  },
+  'xverify.remedy.usage_unavailable': {
+    en: 'The Fable-to-Sol call dispatched, but the canonical transport reported no usable usage, so no numbers were fabricated and the package stays OPEN. Confirm the verifier CLI emits its token counters (provider version/flags), then rerun xverify.',
+    tr: 'Fable-Sol çağrısı yapıldı, ancak canonical transport kullanılabilir usage raporlamadı; hiçbir sayı uydurulmadı ve paket OPEN kalıyor. Hakem CLI\'ının token sayaçlarını yaydığını doğrulayın (sağlayıcı sürümü/bayrakları), sonra xverify\'ı yeniden çalıştırın.',
+  },
+  'xverify.remedy.adjudication_budget_unavailable': {
+    en: 'The non-reservable subscription adjudication requires an owner-authored execution_budget.purposes.xverify-adjudication profile with a positive maxTokens ceiling and wall clock; it is missing or its total-token ceiling is not positive, so the arm holds rather than dispatch without a ceiling. Add the profile (maxTokens, maxWallClockSeconds, maxVerificationsPerSprint) to the owner config, then rerun xverify.',
+    tr: 'Non-reservable abonelik adjudication\'ı, pozitif maxTokens tavanı ve wall-clock içeren owner-authored bir execution_budget.purposes.xverify-adjudication profili ister; profil eksik ya da total-token tavanı pozitif değil, bu yüzden kol tavansız dispatch etmek yerine HOLD veriyor. Owner config\'ine profili (maxTokens, maxWallClockSeconds, maxVerificationsPerSprint) ekleyip xverify\'ı yeniden çalıştırın.',
+  },
+  'xverify.remedy.provider_authority_unavailable': {
+    en: 'Missing authority: the provider-limit authority runtime. Author the provider_limits envelope (owner config) so the runtime opens, then retry.',
+    tr: 'Eksik authority: provider-limit authority runtime\'ı. Owner config\'inde provider_limits envelope\'unu yazın ki runtime açılsın, sonra yeniden deneyin.',
+  },
+  'xverify.remedy.backend_identity_unavailable': {
+    en: 'Missing authority: the digest-pinned Docker runtime identity. Ensure the docker daemon runs and the pinned verifier image (with the provider CLI) is present, then retry.',
+    tr: 'Eksik authority: digest-pinli Docker runtime kimliği. Docker daemon\'ın çalıştığından ve pinli verifier imajının (provider CLI ile) mevcut olduğundan emin olun, sonra yeniden deneyin.',
+  },
+  'xverify.remedy.budget_profile_unavailable': {
+    en: 'Missing authority: the owner-authored probe budget. Author execution_budget.purposes.reachability-probe (token ceilings + timeout; usd only for metered API) in the owner config.',
+    tr: 'Eksik authority: owner-authored probe bütçesi. Owner config\'inde execution_budget.purposes.reachability-probe yazın (token tavanları + timeout; usd yalnız metered API için).',
+  },
+  'xverify.remedy.approval_authority_unavailable': {
+    en: 'Missing authority: the approval authority runtime. Enable approval.authority (enabled + tenant_id, plus terminal.max_auth_age_seconds for local-terminal decisions) in the owner config.',
+    tr: 'Eksik authority: approval authority runtime\'ı. Owner config\'inde approval.authority\'yi etkinleştirin (enabled + tenant_id, local-terminal kararları için terminal.max_auth_age_seconds ile).',
+  },
+  'xverify.remedy.approval_undecided': {
+    en: 'Missing authority: a live-authenticated probe decision. Decide request {requestId} via `deckent approvals decide {requestId} --allow` at an interactive terminal, then rerun xverify.',
+    tr: 'Eksik authority: canlı-doğrulamalı probe kararı. İnteraktif terminalde `deckent approvals decide {requestId} --allow` ile {requestId} isteğini karara bağlayın, sonra xverify\'ı yeniden çalıştırın.',
+  },
+  'xverify.remedy.approval_rejected': {
+    en: 'The probe approval {requestId} was denied by the operator. No probe will run for this scope until a new request is approved.',
+    tr: 'Probe onayı {requestId} operatör tarafından reddedildi. Yeni bir istek onaylanana kadar bu scope için probe çalışmayacak.',
+  },
+  'xverify.remedy.approval_untrusted': {
+    en: 'The decision for {requestId} carried no live re-authentication and was refused fail-closed. Decide it over a live-authenticated channel (interactive `deckent approvals decide` or the OIDC API).',
+    tr: '{requestId} kararı canlı yeniden-doğrulama taşımadığı için fail-closed reddedildi. Kararı canlı-doğrulamalı kanaldan verin (interaktif `deckent approvals decide` veya OIDC API).',
+  },
+  'xverify.remedy.approval_consumed': {
+    en: 'The probe approval {requestId} was already consumed by a prior attempt (single-use). Approve a fresh request to authorize another probe.',
+    tr: 'Probe onayı {requestId} önceki bir deneme tarafından tüketildi (tek-kullanımlık). Yeni bir probe yetkilendirmek için taze bir isteği onaylayın.',
+  },
+  'xverify.remedy.evidence_refresh_hold': {
+    en: 'The canonical evidence producer held: {producerReason}. Cooldown/singleflight holds clear by themselves after their window; other reasons name the exact failing source.',
+    tr: 'Canonical evidence producer hold verdi: {producerReason}. Cooldown/singleflight hold\'ları pencereleri dolunca kendiliğinden açılır; diğer nedenler hatalı kaynağı adıyla belirtir.',
   },
   'xverify.opt_author': {
     en: 'Provider that authored the claimed work ({providers}) — the verifier must differ. Required.',

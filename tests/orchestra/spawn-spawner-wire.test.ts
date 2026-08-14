@@ -211,25 +211,19 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     );
   });
 
-  it('does not retry a provider-authority HOLD and never reaches prompt/task assignment/backend', async () => {
+  it('does not retry a provider-authority composition HOLD and never reaches prompt/task assignment/backend', async () => {
     const task = createTask('168-PROVIDER-AUTH-HOLD', []);
     persistTasks([task]);
     const sprint = makeSprint('sprint-168-provider-authority', [task]);
     const backend = makeMockBackend();
-    const admit = vi.fn(() => ({
-      decision: 'hold',
-      reservation: null,
-      reasonCode: 'authority_unavailable',
-      resolution: {},
-      attempts: [],
-      authorityEvidenceRef: `host-role-admission:${'b'.repeat(64)}`,
-    }));
+    // Front-door contract: only a broken authority COMPOSITION (keyring,
+    // custody, policy layer) holds the spawn; a healthy composition passes
+    // and the candidate-bound admission runs at the exact-candidate stage.
     const authority = {
-      state: 'ready',
-      tenantId: 'local',
-      projectId: 'project-provider-authority',
+      state: 'hold',
+      reasonCode: 'authority_unavailable',
       authorityEvidenceRef: `provider-authority:${'a'.repeat(64)}`,
-      service: { roleAdmissionRuntime: { admit } },
+      retryable: false,
       close: vi.fn(),
     } as never;
 
@@ -243,7 +237,7 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
 
     expect(caught).toBeInstanceOf(ProviderExecutionIngressHoldError);
     expect(caught).toMatchObject({
-      reasonCode: 'candidate_authority_unavailable',
+      reasonCode: 'authority_unavailable',
       durableEvidenceWritten: true,
       request: {
         role: 'worker',
@@ -255,7 +249,6 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
         unattended: true,
       },
     });
-    expect(admit).toHaveBeenCalledOnce();
     expect(backend.calls).toHaveLength(0);
     expect(task.status).toBe(TaskStatus.PENDING);
     expect(readEvents(testRoot, sprint.id).filter(

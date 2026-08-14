@@ -158,7 +158,7 @@ describe('approval authority config validation', () => {
       },
     };
     expect(() => validateConfig(config)).toThrow(
-      'approval.authority requires enabled api_oidc with an explicit audience',
+      'approval.authority.oidc requires enabled api_oidc with an explicit audience',
     );
   });
 });

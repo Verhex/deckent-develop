@@ -132,13 +132,13 @@ Non-skip `if (process.platform ...)` branches inside test bodies — the test st
 | `tests/core/deck-file-secret-lifecycle.test.ts` | 66 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/deck-file-secret-lifecycle.test.ts` | 76 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/pid-liveness.test.ts` | 44 | `windows-native` | asserts differently ON windows-native |
-| `tests/core/task-result-settlement.test.ts` | 259 | `windows-native` | asserts differently OFF windows-native |
-| `tests/core/task-result-settlement.test.ts` | 284 | `windows-native` | asserts differently OFF windows-native |
-| `tests/core/task-result-settlement.test.ts` | 307 | `windows-native` | asserts differently OFF windows-native |
-| `tests/core/task-result-settlement.test.ts` | 329 | `windows-native` | asserts differently OFF windows-native |
-| `tests/core/task-result-settlement.test.ts` | 339 | `windows-native` | asserts differently OFF windows-native |
-| `tests/core/task-result-settlement.test.ts` | 364 | `windows-native` | asserts differently OFF windows-native |
-| `tests/core/task-result-settlement.test.ts` | 449 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/task-result-settlement.test.ts` | 264 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/task-result-settlement.test.ts` | 289 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/task-result-settlement.test.ts` | 312 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/task-result-settlement.test.ts` | 334 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/task-result-settlement.test.ts` | 344 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/task-result-settlement.test.ts` | 369 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/task-result-settlement.test.ts` | 454 | `windows-native` | asserts differently OFF windows-native |
 | `tests/e2e/docker-backend.test.ts` | 529 | `windows-native` | asserts differently ON windows-native |
 | `tests/helpers/platform.test.ts` | 25 | `macos` | asserts differently ON macos |
 | `tests/native/exec-authority-native.test.ts` | 135 | `macos` | asserts differently ON macos |
@@ -174,7 +174,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 | `tests/config/nervous-faz1-smoke.test.ts` | 42 | it | `!nervousEnabled` |
 | `tests/core/builtins/catalog-sync-parity.test.ts` | 93 | it | `!inPool` |
 | `tests/core/builtins/catalog-sync-parity.test.ts` | 122 | it | `!inPool` |
-| `tests/core/cross-verify-evidence-broker.test.ts` | 180 | describe | `!pinnedRuntimeAvailable` |
+| `tests/core/cross-verify-evidence-broker.test.ts` | 186 | describe | `!pinnedRuntimeAvailable` |
 | `tests/core/nervous-enabled-integration.test.ts` | 38 | it | `!hasProjectConfig \|\| !projectNervousEnabled` |
 | `tests/dashboard/dashboard-build-smoke.test.ts` | 59 | it | `!BUILD_OUTPUT_PRESENT` |
 | `tests/dashboard/dashboard-build-smoke.test.ts` | 66 | it | `!BUILD_OUTPUT_PRESENT` |
@@ -229,7 +229,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2554 of 2611 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2564 of 2621 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work

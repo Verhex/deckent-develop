@@ -80,6 +80,7 @@ const TOOL_CATALOG_SOURCE: readonly McpToolCatalogSource[] = [
   { name: 'deckent_autonomous_approve', description: 'Approve an approval-required autonomous backlog entry', sideEffect: 'mutating' },
   { name: 'deckent_autonomous_reject', description: 'Reject an approval-required autonomous backlog entry', sideEffect: 'mutating' },
   { name: 'deckent_execution_authority', description: 'Inspect or reconcile namespace-local execution-authority mount metadata', sideEffect: 'mutating', idempotent: true },
+  { name: 'deckent_approvals', description: 'List pending runtime approval requests (read-only) over the canonical ApprovalBroker; deciding stays CLI-only behind interactive live-auth', sideEffect: 'read-only' },
 ];
 
 export const TOOL_CATALOG: McpToolCatalogEntry[] = TOOL_CATALOG_SOURCE.map((entry) => {

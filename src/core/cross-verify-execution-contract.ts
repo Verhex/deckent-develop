@@ -249,7 +249,10 @@ function assertSettlementRef(
   assertOpaqueSha256('xverify settlement projectRootSha256', ref.projectRootSha256, true);
 }
 
-function assertInput(input: CrossVerifyEnforcedAttemptContractInputV1): void {
+function assertInput(
+  input: CrossVerifyEnforcedAttemptContractInputV1,
+  allowEmptyProviderLimitEstimates = false,
+): void {
   for (const field of Object.keys(input) as Array<keyof CrossVerifyEnforcedAttemptContractInputV1>) {
     if (!INPUT_FIELDS.has(field)) {
       throw createExecutionAdmissionError(
@@ -307,7 +310,10 @@ function assertInput(input: CrossVerifyEnforcedAttemptContractInputV1): void {
   }
   assertBudget(input.budget);
   assertExecutionLandingPolicyConfig(input.landingPolicy, 'xverify execution contract landing');
-  if (input.providerLimitEstimates.length === 0) {
+  // The non-reservable subscription arm carries no numeric reservation, so it has
+  // no provider-limit estimates. Every other path keeps the byte-identical
+  // non-empty requirement.
+  if (!allowEmptyProviderLimitEstimates && input.providerLimitEstimates.length === 0) {
     throw createExecutionAdmissionError(
       'xverify execution contract requires provider-limit estimates',
     );
@@ -477,7 +483,10 @@ export function assertCrossVerifyEnforcedAttemptContract(
     );
   }
   const input = contractInput(contract);
-  assertInput(input);
+  // On re-validation the create-path was the authoritative gate; a persisted
+  // contract with empty estimates is a legitimate non-reservable dispatch, while
+  // a reserved contract (non-empty) still gets the byte-identical strict check.
+  assertInput(input, input.providerLimitEstimates.length === 0);
   const payload = contractPayload(input);
   assertOpaqueSha256('xverify contractSha256', contract.contractSha256, true);
   assertOpaqueEvidenceRef('xverify execution contract evidenceRef', contract.evidenceRef, true);
@@ -490,10 +499,11 @@ export function assertCrossVerifyEnforcedAttemptContract(
 
 export function createCrossVerifyEnforcedAttemptContractV2(
   input: CrossVerifyEnforcedAttemptContractInputV2,
+  options: { readonly allowEmptyProviderLimitEstimates?: boolean } = {},
 ): Readonly<CrossVerifyEnforcedAttemptContractV2> {
   const copied = clone(input);
   const { adjudication, ...base } = copied;
-  assertInput(base);
+  assertInput(base, options.allowEmptyProviderLimitEstimates);
   assertAdjudicationBinding(adjudication);
   const payload = contractV2Payload({ ...base, adjudication });
   const contractSha256 = sha256(canonicalJson(payload));
@@ -519,7 +529,9 @@ export function assertCrossVerifyEnforcedAttemptContractV2(
     adjudication,
     ...base
   } = contract;
-  assertInput(base);
+  // Empty estimates re-validate as a legitimate non-reservable contract; reserved
+  // (non-empty) keeps the byte-identical strict check.
+  assertInput(base, base.providerLimitEstimates.length === 0);
   assertAdjudicationBinding(adjudication);
   const expected = sha256(canonicalJson(contractV2Payload({ ...base, adjudication })));
   assertOpaqueSha256('xverify v2 contractSha256', contract.contractSha256, true);

@@ -91,6 +91,12 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
   config + registry + capability evidence'dan çözülür; instruction metni model kataloğu
   değildir. Fresh ikinci-provider authority yoksa sonuç typed `unavailable/HOLD` olur,
   self-verify veya sessiz fallback olmaz.
+- **XVERIFY-CLOSURE + APPROVAL-SURFACE.** XVerify kapanışı YALNIZ şu zincirle olur: verdict + gerçek
+  provider call + provider-reported usage + terminally-closed settlement + durable receipt
+  (`cross-verify-verdict:sha256:…`); `HOLD`/`UNCLEAR` kapanış DEĞİLDİR. Onay yüzeyi: karar YALNIZ
+  `deckent approvals decide` CLI'da, interactive live-auth arkasında verilir; MCP `deckent_approvals`
+  read-only pending inbox'tur — MCP üzerinden allow/deny/decide/self-approval yoktur. (Kanıt:
+  `CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md` §12.2.)
 - **XVERIFY-CLARIFICATION OPTION.** Codex/Brain, kök-neden veya tasarım kararı ciddi biçimde
   belirsiz kaldığında `deckent xverify` ile cross-provider ikinci görüş isteyebilir. Tercih
   edilen verifier Fable 5'tir; exact provider/model effective config + registry +
@@ -167,7 +173,7 @@ enjekte edilmez; worker persona authority'si `.deckent/agents/<id>/PROMPT.md` zi
 
 <contracts>
 ## Contracts
-> Ajan-arası kontratlar (HTTP API, task/result/lock formatları): **docs/reference/api-surface.md** — auto-load dışı; yalnız API/contract işinde oku.
+> Ajan-arası kontratlar (HTTP API, task/result/lock formatları): **docs/en/reference/api-surface.md** (TR karşılığı: **docs/tr/reference/api-surface.md**) — auto-load dışı; yalnız API/contract işinde oku.
 </contracts>
 
 <identity>

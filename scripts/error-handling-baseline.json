@@ -277,11 +277,6 @@
       "count": 1
     },
     {
-      "file": "src/core/provider-evidence-producer.ts",
-      "fingerprint": "9e59d782f67320e6c6ddb68b2f3346e804147c49f49b8decad73ab986bb44f79",
-      "count": 1
-    },
-    {
       "file": "src/core/provider-execution-profile.ts",
       "fingerprint": "1d2c6676f91c85fe420c46d3415b5ecb5be04e07dd1a10d589b68d8a76fef3b0",
       "count": 1

@@ -20,7 +20,7 @@ import {
 const PREMIUM_MODEL = 'claude-opus-4-8';
 const STANDARD_MODEL = 'claude-sonnet-5';
 const ECONOMY_MODEL = 'claude-haiku-4-5-20251001';
-const CROSS_PROVIDER_PREMIUM_MODEL = 'gpt-5.6-sol';
+const CROSS_PROVIDER_PREMIUM_MODEL = 'gpt-5.5';
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {

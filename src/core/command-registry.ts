@@ -132,6 +132,10 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('openrouter-probe', 'Core', 'Oku', 'core', ['cli']), // 366-003 canlı-probe (key'siz dürüst-unavailable)
   entry('provider-authority', 'Enterprise', 'Değiştir', 'providers', ['cli']),
   entry('execution-authority', 'Enterprise', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_execution_authority']), // mount-adopt: yerel execution-lock authority mutasyonu
+  // approvals: CLI `list` + `decide --allow/--deny` mutates approval-admission state ('Değiştir');
+  // the folded MCP tool `deckent_approvals` is a READ-ONLY pending inbox only — deciding stays
+  // CLI-only behind interactive live-auth (no allow/deny/decide/self-approval over MCP).
+  entry('approvals', 'Enterprise', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_approvals']),
 
   entry('xverify', 'Core', 'Oku', 'orchestra', ['cli', 'mcp'], ['deckent_xverify']), // XVERIFY-TOOL host-adjudicated cross-provider hakem
   entry('kpi', 'Core', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_kpi']),

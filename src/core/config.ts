@@ -1137,6 +1137,10 @@ export function validateConfig(config: DeckentConfig): string[] {
     if (cv.enforce_refuted !== undefined && typeof cv.enforce_refuted !== 'boolean') {
       errors.push('cross_verify.enforce_refuted must be a boolean');
     }
+    if (cv.allow_non_reservable_subscription_adjudication !== undefined
+      && typeof cv.allow_non_reservable_subscription_adjudication !== 'boolean') {
+      errors.push('cross_verify.allow_non_reservable_subscription_adjudication must be a boolean');
+    }
     if (cv.max_verifications_per_sprint !== undefined
       && (typeof cv.max_verifications_per_sprint !== 'number'
         || !Number.isInteger(cv.max_verifications_per_sprint)
@@ -1379,12 +1383,31 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
     if (approvalAuthority.enabled === true) {
       const oidc = approvalAuthority.oidc;
+      const terminal = approvalAuthority.terminal;
       if (typeof approvalAuthority.tenant_id !== 'string' || approvalAuthority.tenant_id.trim().length === 0) {
         errors.push('approval.authority.tenant_id must be a non-empty string when enabled');
       }
-      if (!oidc || typeof oidc !== 'object') {
-        errors.push('approval.authority.oidc is required when enabled');
-      } else {
+      // At least one live re-authentication channel must be authored: the OIDC
+      // policy (HTTP decision ingress) or the local-terminal window (K6). A
+      // channel-less enabled authority could never mint a trusted decision.
+      if (!oidc && !terminal) {
+        errors.push('approval.authority requires an oidc or terminal channel block when enabled');
+      }
+      if (terminal !== undefined
+        && (typeof terminal.max_auth_age_seconds !== 'number'
+          || !Number.isFinite(terminal.max_auth_age_seconds)
+          || terminal.max_auth_age_seconds <= 0)) {
+        errors.push('approval.authority.terminal.max_auth_age_seconds must be a positive finite number');
+      }
+      if (approvalAuthority.decision_window_seconds !== undefined
+        && (typeof approvalAuthority.decision_window_seconds !== 'number'
+          || !Number.isFinite(approvalAuthority.decision_window_seconds)
+          || approvalAuthority.decision_window_seconds <= 0)) {
+        errors.push('approval.authority.decision_window_seconds must be a positive finite number');
+      }
+      if (oidc !== undefined && (!oidc || typeof oidc !== 'object')) {
+        errors.push('approval.authority.oidc must be an object when configured');
+      } else if (oidc) {
         for (const [field, value] of [
           ['authority_ref', oidc.authority_ref],
           ['tenant_claim', oidc.tenant_claim],
@@ -1413,10 +1436,13 @@ export function validateConfig(config: DeckentConfig): string[] {
           }
         }
       }
-      if (config.api_oidc?.enabled !== true
-        || typeof config.api_oidc.audience !== 'string'
-        || config.api_oidc.audience.trim().length === 0) {
-        errors.push('approval.authority requires enabled api_oidc with an explicit audience');
+      // The OIDC channel needs the API's signature material; the terminal
+      // channel authenticates interactively and has no api_oidc dependency.
+      if (oidc !== undefined
+        && (config.api_oidc?.enabled !== true
+          || typeof config.api_oidc.audience !== 'string'
+          || config.api_oidc.audience.trim().length === 0)) {
+        errors.push('approval.authority.oidc requires enabled api_oidc with an explicit audience');
       }
     }
   }
@@ -1538,15 +1564,19 @@ export function resolveApprovalConfig(
       ? {
           authority: {
             ...config.approval.authority,
-            oidc: {
-              ...config.approval.authority.oidc,
-              ...(config.approval.authority.oidc.required_acr
-                ? { required_acr: [...config.approval.authority.oidc.required_acr] }
-                : {}),
-              ...(config.approval.authority.oidc.required_amr
-                ? { required_amr: [...config.approval.authority.oidc.required_amr] }
-                : {}),
-            },
+            ...(config.approval.authority.oidc
+              ? {
+                  oidc: {
+                    ...config.approval.authority.oidc,
+                    ...(config.approval.authority.oidc.required_acr
+                      ? { required_acr: [...config.approval.authority.oidc.required_acr] }
+                      : {}),
+                    ...(config.approval.authority.oidc.required_amr
+                      ? { required_amr: [...config.approval.authority.oidc.required_amr] }
+                      : {}),
+                  },
+                }
+              : {}),
           },
         }
       : {}),

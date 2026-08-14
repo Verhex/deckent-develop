@@ -644,6 +644,19 @@ export class MissionWorkerInvocationCoordinator implements MissionWorkerInvocati
         );
       }
 
+      if (admission.decision === 'non_reservable_subscription') {
+        // The non-reservable subscription arm is produced ONLY by the xverify
+        // verifier-adjudication ingress; the mission-worker admission runtime
+        // never yields it. Rather than dispatch this xverify-only arm, park a
+        // typed HOLD that preserves the admission's authority evidence — the
+        // mission worker must never dispatch it, and never fails on a raw throw.
+        return parked(
+          'MISSION_WORKER_INVOCATION_HOLD:non_reservable_subscription_unsupported',
+          admission.authorityEvidenceRef,
+          receiptRef,
+        );
+      }
+
       if (!input.isClaimActive()) throw new Error('Mission dispatch claim expired before provider grant');
       const dispatchEvent = prepared.buildDispatchEvent(admission);
       if (dispatchEvent.type !== 'dispatched'

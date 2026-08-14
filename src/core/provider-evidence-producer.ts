@@ -14,6 +14,7 @@ import type { ProviderLimitSnapshotQuery, ProviderLimitStore } from './provider-
 import {
   createProviderLimitResult,
   deriveProviderQuotaScopeRefHash,
+  evaluateProviderLimitWindows,
   type ProviderLimitObservation,
   type ProviderLimitPolicy,
   type ProviderLimitResult,
@@ -33,6 +34,14 @@ import {
   type ReachabilityProbeTransport,
   type ReachabilityResult,
 } from './provider-truth.js';
+import type {
+  ProbeFreshnessEpoch,
+  ProbeInvocationIdentity,
+  ProbeScopeDigest,
+  ReachabilityProbeBudget,
+} from './provider-evidence-probe-contract.js';
+import { isReachabilityProbeBudget } from './provider-evidence-probe-contract.js';
+import type { ExactReachabilityQuery } from './provider-truth-store.js';
 
 export type ProviderAccountIdentityKind =
   | 'provider-account'
@@ -169,10 +178,14 @@ export interface ProviderEvidenceRefreshRequest {
   };
   readonly budget: {
     readonly evidenceRef: string;
-    readonly maxInputTokens: number;
-    readonly maxOutputTokens: number;
-    readonly maxTotalTokens: number;
-    readonly maxUsd: number;
+    /**
+     * Billing-mode discriminated probe ceiling (§12.2 clause 2). The
+     * subscription/free/local arm carries token+timeout ceilings and has no
+     * usd field; only the metered-api arm requires an owner-authored usd
+     * ceiling. A flat unconditional maxUsd here would force fabricating USD
+     * authority for subscription work.
+     */
+    readonly projection: ReachabilityProbeBudget;
   };
 }
 
@@ -184,6 +197,8 @@ export type ProviderEvidenceHoldReason =
   | 'limit_source_invalid'
   | 'limit_hold'
   | 'probe_replay_blocked'
+  | 'probe_cooldown'
+  | 'probe_singleflight_deferred'
   | 'probe_unreachable'
   | 'authority_failure';
 
@@ -194,6 +209,8 @@ export interface ProviderEvidenceRefreshHeld {
   readonly limit: ProviderLimitResult | null;
   readonly reachability: ReachabilityResult | null;
   readonly receiptRef: InvocationReceiptRef | null;
+  /** Immutable evidence that explains a cooldown or bounded singleflight deferral. */
+  readonly deferralEvidenceRef: string | null;
 }
 
 export interface ProviderEvidenceRefreshReady {
@@ -211,6 +228,7 @@ export type ProviderEvidenceRefreshResult =
 const DEFAULT_LIMIT_MAX_TTL_MS = 60_000;
 const DEFAULT_REACHABILITY_TTL_MS = 60_000;
 const DEFAULT_ACCOUNT_IDENTITY_MAX_TTL_MS = 60_000;
+const SINGLEFLIGHT_RETRY_DELAYS_MS = [2, 4, 8] as const;
 const ACCOUNT_IDENTITY_KINDS = new Set<ProviderAccountIdentityKind>([
   'provider-account',
   'organization',
@@ -264,6 +282,7 @@ function hold(
   limit: ProviderLimitResult | null = null,
   reachability: ReachabilityResult | null = null,
   receiptRef: InvocationReceiptRef | null = null,
+  deferralEvidenceRef: string | null = null,
 ): ProviderEvidenceRefreshHeld {
   return {
     state: 'hold',
@@ -272,7 +291,12 @@ function hold(
     limit,
     reachability,
     receiptRef,
+    deferralEvidenceRef,
   };
+}
+
+function pause(milliseconds: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
 function sourceFailureObservation(
@@ -293,7 +317,10 @@ function sourceFailureObservation(
     endpointRefHash: request.backend.endpointRefHash,
   };
   return {
-    idempotencyKey: `${request.idempotencyKey}:limit`,
+    // Content-versioned by the read instant so a fixed caller idempotencyKey
+    // (e.g. the pre-compose seam's stable xverify-prep key) does not collide
+    // with an earlier snapshot that carried different windows/timestamps.
+    idempotencyKey: `${request.idempotencyKey}:limit:${input.now.toISOString()}`,
     tenantId: input.tenantId,
     projectId: input.projectId,
     provider: request.provider,
@@ -498,6 +525,9 @@ export class ProviderEvidenceProducer {
     assertCanonicalModelApiId(request.model);
     assertOpaqueEvidenceRef('approval evidence', request.approval.evidenceRef, true);
     assertOpaqueEvidenceRef('budget evidence', request.budget.evidenceRef, true);
+    if (!isReachabilityProbeBudget(request.budget.projection)) {
+      return hold('authority_failure', 'budget-projection-invalid');
+    }
     if (request.executionProfile.provider !== request.provider
       || request.executionProfile.profileRef !== request.backend.executionProfileRef) {
       return hold('authority_failure', 'execution-profile-mismatch');
@@ -598,7 +628,7 @@ export class ProviderEvidenceProducer {
         expiresAt: maxLimitExpiry,
         detail: errorCode(error),
       }), policy, {
-        idFactory: () => `limit-${digest(this.options.tenantId, this.options.projectId, request.idempotencyKey).slice(0, 32)}`,
+        idFactory: () => `limit-${digest(this.options.tenantId, this.options.projectId, request.idempotencyKey, startedAt.toISOString()).slice(0, 32)}`,
       });
       this.options.limitStore.putSnapshot(unavailable);
       return hold('limit_source_failure', errorCode(error), unavailable);
@@ -615,7 +645,12 @@ export class ProviderEvidenceProducer {
       return hold('limit_source_invalid', sources.limit.authorityRef);
     }
     const limit = createProviderLimitResult({
-      idempotencyKey: `${request.idempotencyKey}:limit`,
+      // Content-versioned by the observation's read instant so a fixed caller
+      // idempotencyKey never conflicts with an earlier, differently-timestamped
+      // snapshot (the reachability keys are already epoch-versioned; the limit
+      // snapshot needs the same treatment or a stable xverify-prep key throws
+      // IDEMPOTENCY_CONFLICT on every re-run).
+      idempotencyKey: `${request.idempotencyKey}:limit:${observed.source.fetchedAt}`,
       ...limitScope,
       quotaScopeRefHash,
       state: observed.state,
@@ -628,70 +663,143 @@ export class ProviderEvidenceProducer {
       },
       evidenceRefs: observed.evidenceRefs,
     }, policy, {
-      idFactory: () => `limit-${digest(this.options.tenantId, this.options.projectId, request.idempotencyKey).slice(0, 32)}`,
+      idFactory: () => `limit-${digest(this.options.tenantId, this.options.projectId, request.idempotencyKey, observed.source.fetchedAt).slice(0, 32)}`,
     });
     const limitWrite = this.options.limitStore.putSnapshot(limit);
-    const reachabilityId = `reach-${digest(
-      this.options.tenantId,
-      this.options.projectId,
-      request.idempotencyKey,
-    ).slice(0, 32)}`;
-    const priorReachability = this.options.truthStore.getReachability(
-      { tenantId: this.options.tenantId, projectId: this.options.projectId },
-      reachabilityId,
-      startedAt,
-    );
-    if (priorReachability) {
-      const priorReceipt = this.receiptRef(request);
-      const priorReceiptView = this.options.receiptLedger.get(priorReceipt, priorReceipt.invocationId);
-      const receiptProvesAcceptedCall = priorReceiptView?.transportOutcome === 'succeeded'
-        && priorReceiptView.consumerOutcome === 'accepted';
-      return priorReachability.liveProven
-        && limit.state === 'known'
-        && limit.decision === 'allow'
-        && receiptProvesAcceptedCall
-        ? {
+
+    // Probe-scoped limit admission (§12.2 Öneri-A). The durable snapshot above
+    // stays exactly as the source proved it — an advisory codex/claude usage
+    // read is `unknown/hold` in the truth store, so heavy-task admission still
+    // sees the advisory truth. But a bounded, owner-budgeted reachability probe
+    // does not need a reservation-capable authoritative source: it only needs
+    // the real usage to be under the block ratio. So for the probe's OWN
+    // admission we evaluate the advisory windows here. It still fails closed at
+    // `blockAtRatio`, so an exhausted quota blocks the probe; it just no longer
+    // demands an authority subscription CLIs cannot expose. This value never
+    // enters the durable snapshot or any other admission surface.
+    const probeLimitAdmission = limit.state === 'known'
+      ? { state: limit.state, decision: limit.decision }
+      : observed.state === 'known'
+        ? (() => {
+            const evaluated = evaluateProviderLimitWindows(
+              limit.windows, limit.requiredWindowIds, policy,
+            );
+            return { state: evaluated.state, decision: evaluated.decision };
+          })()
+        : { state: limit.state, decision: limit.decision };
+
+    const exactReachabilityScope: ExactReachabilityQuery = {
+      tenantId: this.options.tenantId,
+      projectId: this.options.projectId,
+      provider: request.provider,
+      model: request.model,
+      authMode: request.authMode,
+      accountRefHash,
+      transport: request.backend.transport,
+      executionBackend: request.backend.executionBackend,
+      endpointRefHash: request.backend.endpointRefHash,
+      runtimeFingerprint: request.backend.runtimeFingerprint,
+      executionProfileRef: request.backend.executionProfileRef,
+      capability: 'inference',
+    };
+    // This is deliberately re-read before every probe attempt. The latest exact
+    // scope is independent of a caller's idempotency key.
+    let priorReachability = this.options.truthStore.getLatestReachability(exactReachabilityScope, startedAt);
+    if (priorReachability && priorReachability.state !== 'stale') {
+      const priorReceipt = this.receiptRefFromReachability(priorReachability);
+      // Reuse gates on the SAME probe-scoped admission as a fresh probe
+      // (§12.2 Öneri-A): an advisory usage read under the block ratio admits
+      // reuse of a fresh liveProven row. The row's authenticity is guaranteed
+      // by the truth store's integrity verification on read — re-fetching the
+      // receipt to "re-prove" the accepted call was belt-and-suspenders that
+      // dead-ended at authority_failure whenever the receipt had rotated out
+      // from under a still-fresh row (exactly what stalled the Fable→Sol
+      // smoke). The receipt is supplementary audit, not the reachability truth.
+      if (priorReachability.liveProven
+        && probeLimitAdmission.state === 'known' && probeLimitAdmission.decision === 'allow'
+        && priorReceipt) {
+        return {
           state: 'ready',
           authorityEvidenceRef: this.authorityRef,
           limit,
           reachability: priorReachability,
           receiptRef: priorReceipt,
-        }
-        : hold(
-          receiptProvesAcceptedCall || !priorReachability.liveProven
-            ? 'probe_unreachable'
-            : 'probe_replay_blocked',
+        };
+      }
+      if (!priorReachability.liveProven) {
+        return hold(
+          'probe_cooldown',
           priorReachability.reasonCode,
           limit,
           priorReachability,
-          priorReceiptView ? priorReceipt : null,
+          priorReceipt,
+          `provider-reachability:${priorReachability.reachabilityId}`,
         );
+      }
+      // liveProven but the probe-scoped admission now blocks (quota over the
+      // block ratio): an honest limit_hold, never authority_failure.
+      return hold('limit_hold', priorReachability.reasonCode, limit, priorReachability, priorReceipt);
     }
 
-    const invocationId = this.invocationId(request);
+    const identity = this.probeInvocationIdentity(exactReachabilityScope, priorReachability);
+    const invocationId = this.invocationId(identity);
+    const reachabilityId = `reach-${digest(identity.scopeDigest, identity.freshnessEpoch).slice(0, 32)}`;
     const scope = { tenantId: this.options.tenantId, projectId: this.options.projectId };
-    if (this.options.receiptLedger.get(scope, invocationId)) {
-      return hold('probe_replay_blocked', invocationId, limit);
+
+    const receipt = this.buildReceipt(request, limit, limitWrite.evidenceRef, invocationId, identity);
+    let receiptRef: InvocationReceiptRef | null = null;
+    // Singleflight is keyed on the PROBE admission decision: an advisory limit
+    // that admits the bounded probe still needs the first-writer-wins receipt
+    // declaration so concurrent contenders do not each fire a real probe.
+    let ownsProbe = probeLimitAdmission.decision !== 'allow';
+    if (!ownsProbe) {
+      try {
+        const declared = this.options.receiptLedger.declare(receipt);
+        receiptRef = declared.ref;
+        ownsProbe = declared.created;
+      } catch (error) {
+        if (errorCode(error) !== 'IDEMPOTENCY_CONFLICT') throw error;
+      }
     }
 
-    let receiptRef: InvocationReceiptRef | null = null;
+    if (!ownsProbe) {
+      for (const delayMs of SINGLEFLIGHT_RETRY_DELAYS_MS) {
+        await pause(delayMs);
+        priorReachability = this.options.truthStore.getLatestReachability(exactReachabilityScope, this.now());
+        if (!priorReachability || priorReachability.state === 'stale') continue;
+        const winnerReceipt = this.receiptRefFromReachability(priorReachability);
+        const winnerReceiptView = winnerReceipt
+          ? this.options.receiptLedger.get(winnerReceipt, winnerReceipt.invocationId)
+          : null;
+        if (priorReachability.liveProven
+          && winnerReceiptView?.transportOutcome === 'succeeded'
+          && winnerReceiptView.consumerOutcome === 'accepted'
+          && winnerReceipt) {
+          return {
+            state: 'ready', authorityEvidenceRef: this.authorityRef, limit,
+            reachability: priorReachability, receiptRef: winnerReceipt,
+          };
+        }
+        return hold(
+          'probe_cooldown', priorReachability.reasonCode, limit, priorReachability, winnerReceipt,
+          `provider-reachability:${priorReachability.reachabilityId}`,
+        );
+      }
+      return hold(
+        'probe_singleflight_deferred', identity.freshnessEpoch, limit, null, null,
+        `provider-singleflight:${identity.scopeDigest}:${identity.freshnessEpoch}`,
+      );
+    }
+
     let dispatchStartedAt: Date | null = null;
     let transportObservation: ReachabilityProbeObservation | null = null;
-    let raced = false;
     const wrappedProbe: ReachabilityProbeTransport = async (probeRequest) => {
-      const receipt = this.buildReceipt(request, limit, limitWrite.evidenceRef, invocationId);
-      const declared = this.options.receiptLedger.declare(receipt);
-      receiptRef = declared.ref;
-      if (!declared.created) {
-        raced = true;
-        throw new Error('provider reachability probe declaration raced');
-      }
       dispatchStartedAt = this.now();
       this.options.receiptLedger.append(scope, invocationId, {
         eventId: `${invocationId}:dispatch`,
         type: 'dispatch_started',
         occurredAt: dispatchStartedAt.toISOString(),
-        payload: { attempt: 1 },
+        payload: { attempt: this.probeAttempt(identity) },
       });
       try {
         transportObservation = await sources.reachability.probe(probeRequest);
@@ -732,7 +840,7 @@ export class ProviderEvidenceProducer {
     let reachability: ReachabilityResult | null = null;
     try {
       reachability = await probeExactModelReachability({
-        idempotencyKey: `${request.idempotencyKey}:reachability`,
+        idempotencyKey: `reachability:${identity.scopeDigest}:${identity.freshnessEpoch}`,
         tenantId: this.options.tenantId,
         projectId: this.options.projectId,
         provider: request.provider,
@@ -757,8 +865,11 @@ export class ProviderEvidenceProducer {
           approvalGrantedAt: request.approval.grantedAt,
           approvalExpiresAt: request.approval.expiresAt,
           limits: {
-            state: limit.state,
-            decision: limit.decision,
+            // Probe-scoped admission (§12.2 Öneri-A): an advisory usage read
+            // under the block ratio admits the bounded probe. The durable
+            // snapshot the evidenceRefs point at is unchanged (still advisory).
+            state: probeLimitAdmission.state,
+            decision: probeLimitAdmission.decision,
             evidenceRefs: [limitWrite.evidenceRef, ...limit.evidenceRefs],
             fetchedAt: limit.source.fetchedAt,
             expiresAt: limit.source.expiresAt,
@@ -772,6 +883,7 @@ export class ProviderEvidenceProducer {
           sources.account.authorityRef,
           sources.limit.authorityRef,
           sources.reachability.authorityRef,
+          `invocation-receipt:${invocationId}`,
         ],
         ttlMs: this.reachabilityTtlMs,
       }, {
@@ -780,10 +892,9 @@ export class ProviderEvidenceProducer {
         idFactory: () => reachabilityId,
       });
 
-      if (raced) return hold('probe_replay_blocked', invocationId, limit);
       this.options.truthStore.putReachability(reachability);
     } catch (error) {
-      if (receiptRef && !raced) {
+      if (receiptRef) {
         this.options.receiptLedger.append(scope, invocationId, {
           eventId: `${invocationId}:consumer`,
           type: 'consumer_settled',
@@ -823,20 +934,50 @@ export class ProviderEvidenceProducer {
     };
   }
 
-  private invocationId(request: ProviderEvidenceRefreshRequest): string {
-    return `inv-probe-${digest(
-      this.options.tenantId,
-      this.options.projectId,
-      request.idempotencyKey,
-    ).slice(0, 32)}`;
+  private probeInvocationIdentity(
+    scope: ExactReachabilityQuery,
+    priorReachability: ReachabilityResult | null,
+  ): ProbeInvocationIdentity {
+    const scopeDigest = digest(
+      scope.tenantId,
+      scope.projectId,
+      scope.provider,
+      scope.model,
+      scope.authMode,
+      scope.accountRefHash ?? 'none',
+      scope.transport,
+      scope.executionBackend,
+      scope.endpointRefHash ?? 'none',
+      scope.runtimeFingerprint ?? 'none',
+      scope.executionProfileRef,
+      scope.capability,
+    ) as ProbeScopeDigest;
+    const freshnessEpoch = digest(
+      'provider-reachability-freshness-epoch',
+      scopeDigest,
+      priorReachability?.probe.expiresAt ?? 'absent',
+    ) as ProbeFreshnessEpoch;
+    return { scopeDigest, freshnessEpoch };
   }
 
-  private receiptRef(request: ProviderEvidenceRefreshRequest): InvocationReceiptRef {
+  private invocationId(identity: ProbeInvocationIdentity): string {
+    return `inv-probe-${digest(identity.scopeDigest, identity.freshnessEpoch).slice(0, 32)}`;
+  }
+
+  private probeAttempt(identity: ProbeInvocationIdentity): number {
+    return (Number.parseInt(identity.freshnessEpoch.slice(0, 12), 16) % Number.MAX_SAFE_INTEGER) + 1;
+  }
+
+  private receiptRefFromReachability(result: ReachabilityResult): InvocationReceiptRef | null {
+    const receiptEvidence = result.evidenceRefs.find(ref => ref.startsWith('invocation-receipt:'));
+    if (!receiptEvidence) return null;
+    const invocationId = receiptEvidence.slice('invocation-receipt:'.length);
+    if (!invocationId) return null;
     return {
       schemaVersion: INVOCATION_RECEIPT_SCHEMA_VERSION,
       tenantId: this.options.tenantId,
       projectId: this.options.projectId,
-      invocationId: this.invocationId(request),
+      invocationId,
     };
   }
 
@@ -845,6 +986,7 @@ export class ProviderEvidenceProducer {
     limit: ProviderLimitResult,
     limitEvidenceRef: string,
     invocationId: string,
+    identity: ProbeInvocationIdentity,
   ): InvocationReceipt {
     const selection = {
       provider: request.provider,
@@ -855,12 +997,12 @@ export class ProviderEvidenceProducer {
     return {
       schemaVersion: INVOCATION_RECEIPT_SCHEMA_VERSION,
       invocationId,
-      idempotencyKey: `${request.idempotencyKey}:probe-receipt`,
+      idempotencyKey: `probe-receipt:${identity.scopeDigest}:${identity.freshnessEpoch}`,
       tenantId: this.options.tenantId,
       projectId: this.options.projectId,
-      runId: request.runId,
-      taskId: request.taskId,
-      callId: request.callId,
+      runId: `probe:${identity.scopeDigest}`,
+      taskId: null,
+      callId: `probe:${identity.freshnessEpoch}`,
       role: 'brain',
       purpose: 'reachability-probe',
       configured: { ...selection, source: 'config' },

@@ -146,13 +146,56 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-11 (B10+B11 hasadı): +339 — born-intake, binary-staging, adr-sync,
   // npm-pack, capability-resolution ve config-truth suite'lerinin tmpdir yazım
   // siteleri. Temiz HEAD worktree (0f951956d).
-  count: 12774,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate pins in provider-command-spec.test + the TASK_ASSIGN wiring pin in
   // spawn-spawner-wire.test (both already-tracked); same 12499 count, digest only.
   // 2026-08-09 (DRIFT-VISIBILITY): exact-plan drift diagnosis + spawn-hint pins
   // in exact-plan-spawn-authority.test (already tracked); same 12499, digest only.
-  digest: 'dcceb4d62570bf84b603e3294f7af75b99f614c1ae309cd2c0f3d48925f187d9',
+  // 2026-08-12 (FRONT-DOOR-COMPOSITION-HEALTH): the empty-candidate CLI/worker
+  // preflight became composition-health-only; ready-path pins replaced the
+  // permanent candidate_authority_unavailable pins in the ingress-authority,
+  // process-runtime and spawn-spawner-wire suites (all already tracked); same
+  // 12774 count, digest only.
+  // 2026-08-12 (T2B-PRODUCTION-WIRING): +35 — the sprint-528 hand-closure wave:
+  // cross-verify-evidence-preparation + cross-verify-progression suites (tmpdir
+  // stores), the codex docker reachability source pins, the producer budget
+  // projection pins, and the §12.2-clause-3 follower supersede. Prior:
+  // FRONT-DOOR-COMPOSITION-HEALTH (12774).
+  // 2026-08-12 (INTERACTIVE-REAUTH-CLOCK): +7 — the ingress interactive-latency
+  // regression pin (bulgu #8: post-prompt clock for authenticatedAt, expired-
+  // during-prompt fail-closed). Prior: T2B-PRODUCTION-WIRING (12809).
+  // 2026-08-12 (PROVIDER-WINDOW-SHAPE): +6 — bulgu #9 pin (codex secondary:null
+  // is provider shape, required windows follow the valid snapshot) + the
+  // decision-card i18n surfaces. Prior: INTERACTIVE-REAUTH-CLOCK (12816).
+  // 2026-08-12 (PROBE-STDIN-I): same 12822 count, digest only — the docker
+  // probe `-i` stdin pin (bulgu #10). Prior: PROVIDER-WINDOW-SHAPE (12822).
+  // 2026-08-13 (ADVISORY-PROBE-ADMISSION, Öneri-A): same 12822 count, digest
+  // only — the producer probe-scoped advisory-limit admission split test.
+  // 2026-08-13 (FABLE-SOL-CLOSURE-HARDENING): +25 — the §12.2 closure-hardening
+  // wave's new tmpdir-based hermetic sites: the owner-bounded adjudication budget
+  // overrun/settle pins (task-result-settlement), the terminally-closed verdict
+  // receipt + open-reject + host-decoded CAS tamper pins (cross-verify-evidence-
+  // broker), and the durable-fence-across-closure pin. All tmpdir-based (fixture()
+  // helpers), never real .tasks/.deckent writes. Prior: PROBE-STDIN-I (12822).
+  // 2026-08-13 (CLOSURE-HARDENING-MIGRATE): +2 — the error-migration turn: the
+  // DECKENT_E081/E082 reachability-budget catalog entries + the mission-worker
+  // parked-HOLD migration re-classified two source sites; digest-and-count only.
+  // Prior: FABLE-SOL-CLOSURE-HARDENING (12847).
+  // 2026-08-14 (MCP-INSTRUCTIONS-DRIFT-CLOSE): same 12849 count, digest only —
+  // the DECKENT_MCP_INSTRUCTIONS `## Tools (49→50)` header + the deckent_approvals
+  // list line (Gate G's registered tool was missing from the server instructions
+  // string, failing the CI Type Check job's lint-mcp-instructions step). Adding
+  // the one template-literal line in src/mcp/server.ts shifted the line numbers of
+  // that file's already-tracked unresolved entries; no unresolved symbol added or
+  // removed. Prior: CLOSURE-HARDENING-MIGRATE (12849).
+  // 2026-08-14 (APPROVAL-PARITY-FIXTURE-CLOSE): same 12849 count, digest only —
+  // the first-run test-contract closure (command-registry.ts approvals row,
+  // messages.ts summary key, index.test.ts 49→50 pins, scheduler-spawn-executor
+  // fixture rewire to the candidate-bound hold seam) shifted the line numbers of
+  // those already-tracked files' unresolved entries; no unresolved symbol added or
+  // removed. Prior: MCP-INSTRUCTIONS-DRIFT-CLOSE (12849).
+  count: 12849,
+  digest: '99cc9c1d1b882c6f499646a63d37cfcc008bf8658eef02cb433a24388b0bb19e',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -185,7 +228,6 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // envantere girdi. Temiz HEAD worktree (a8c6c0d8d).
   // 2026-08-11 (B10+B11): +4 — census/registry/lint modülleri yeni suite'lerin
   // test-support bağımlılığı olarak envantere girdi. Temiz worktree (0f951956d).
-  count: 1227,
   // 2026-08-08 (TOOL-AUTHORITY filesystem-write-guard): resolveWriteScopeShellEscape
   // predicate in provider-command-spec + writeScopeShellEscape wiring in sprint-spawner
   // (both already-inventoried); same 1203 count, content digest only.
@@ -204,7 +246,50 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-11 (sprint-510 harvest): edits to already-inventoried modules only
   // (parser, verify, controller, finalizer, plugin, catalog) — same 1207 count,
   // content digest only. Measured on a clean HEAD worktree (27d9bdec4).
-  digest: '1a8d44b97f95b446cdc105b4682c45e7c8765287ebd0e487888ebccd1aca7597',
+  // 2026-08-12 (FRONT-DOOR-COMPOSITION-HEALTH): edits to already-inventoried
+  // modules only (provider-execution-ingress-authority ready arm, CLI/API
+  // front-door docs+type, autonomous ready mapping) — same 1227 count, content
+  // digest only.
+  // 2026-08-12 (T2B-PRODUCTION-WIRING): +4 REAL production modules — the
+  // cross-verify evidence preparation orchestrator, the `deckent approvals`
+  // local-terminal decision surface, the codex docker reachability source
+  // additions and the probe-contract/producer budget alignment. Prior:
+  // FRONT-DOOR-COMPOSITION-HEALTH (1227).
+  // 2026-08-12 (INTERACTIVE-REAUTH-CLOCK): approval-decision-ingress post-prompt
+  // clock fix (already-inventoried); same 1231 count, content digest only.
+  // 2026-08-12 (PROVIDER-WINDOW-SHAPE): codex required-window shape fix +
+  // decision-card render + decision-window config (already-inventoried); same
+  // 1231 count, content digest only.
+  // 2026-08-12 (PROBE-STDIN-I + i18n polish): docker probe `-i` flag, codex
+  // window shape, decision-card render + human date (already-inventoried);
+  // same 1231 count, content digest only.
+  // 2026-08-13 (ADVISORY-PROBE-ADMISSION, Öneri-A): producer probe-scoped
+  // advisory-limit admission + evaluateProviderLimitWindows export
+  // (already-inventoried); same 1231 count, content digest only.
+  // 2026-08-13 (ADVISORY-CANDIDATE-ELIGIBILITY): candidate eligibility admits an
+  // advisory-under-block subscription-CLI verifier + limit key content-versioning
+  // + reuse receipt relaxation (already-inventoried); same 1231 count, digest only.
+  // 2026-08-13 (FABLE-SOL-CLOSURE-HARDENING): +1 REAL production module —
+  // src/mcp/tools/approvals.ts (read-only MCP approval-inbox surface over the
+  // canonical ApprovalBroker, closing the CLI↔MCP parity gap; no decide/allow/
+  // deny). Prior: ADVISORY-CANDIDATE-ELIGIBILITY (1231).
+  // 2026-08-13 (CLOSURE-HARDENING-MIGRATE): same 1232 count, digest only — the
+  // DECKENT_E081/E082 catalog entries (errors.ts), the two reachability-budget
+  // raw-throw migrations (execution-budget-derivation.ts) and the mission-worker
+  // parked-HOLD migration. Prior: FABLE-SOL-CLOSURE-HARDENING (1232).
+  // 2026-08-14 (MCP-INSTRUCTIONS-DRIFT-CLOSE): same 1232 count, digest only — the
+  // DECKENT_MCP_INSTRUCTIONS `## Tools (49→50)` header + deckent_approvals list
+  // line in src/mcp/server.ts (an inventoried production module); adding the one
+  // template-literal line shifted the module's line-numbered inventory
+  // fingerprint. No production module added or removed. Prior:
+  // CLOSURE-HARDENING-MIGRATE (1232).
+  // 2026-08-14 (APPROVAL-PARITY-FIXTURE-CLOSE): same 1232 count, digest only — the
+  // approvals COMMAND_REGISTRY row (command-registry.ts) and its en+tr summary key
+  // (messages.ts), both inventoried production modules, shifted their line-numbered
+  // inventory fingerprints. No production module added or removed. Prior:
+  // MCP-INSTRUCTIONS-DRIFT-CLOSE (1232).
+  count: 1232,
+  digest: '85555106d3d312b604c93f27c5f52bf77cf92032835361fb39f394c058462354',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

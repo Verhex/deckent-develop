@@ -289,9 +289,20 @@ describe('cross-verify-prompt · typed adjudication v2', () => {
     expect(built.prompt).toContain(contract.claimDigest);
     expect(built.prompt).toContain(contract.evidenceManifestDigest);
     expect(built.prompt).toContain('"id":"A1"');
-    expect(built.prompt).toContain('/deckent/xverify-evidence/manifest.json');
+    // Interpreter-free evidence read: literal decoded cat paths + a single bare
+    // `cat`, no manifest parse / base64 / python3 (the smoke9 python3-not-found wall).
+    expect(built.prompt).toContain('/deckent/xverify-evidence/decoded/');
+    expect(built.prompt).toContain('cat /deckent/xverify-evidence/decoded/');
+    expect(built.prompt).toContain('no interpreter (python3/node/jq) is required');
     expect(built.prompt).toContain('at most ONE read-only evidence tool call');
     expect(built.prompt).toContain('no top-level verdict field');
+    // Representation consistency: the decoded filename strips the `sha256:` prefix
+    // so the prompt path exactly equals the broker's on-disk bare-hex filename.
+    const firstEntry = contract.evidenceManifest.entries[0];
+    expect(built.prompt).toContain(
+      `/deckent/xverify-evidence/decoded/${firstEntry.contentSha256.replace(/^sha256:/u, '')}`,
+    );
+    expect(built.prompt).not.toContain('decoded/sha256:');
     expect(built.prompt).not.toContain('Continue normal work');
     expect(built.prompt).not.toContain('Budget Landing Checkpoint');
   });

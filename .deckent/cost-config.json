@@ -204,7 +204,7 @@
           "supports_prompt_caching": true,
           "supports_reasoning": true,
           "supports_vision": true,
-          "deckent_tier": "standard",
+          "deckent_tier": "economy",
           "deckent_aliases": [
             "gpt-5-mini",
             "gpt5-mini"
@@ -260,7 +260,7 @@
           "supports_reasoning": true,
           "supports_vision": true,
           "supports_tool_choice": true,
-          "deckent_tier": "premium",
+          "deckent_tier": "premium_plus",
           "deckent_aliases": [
             "gpt-5.6-sol",
             "gpt56-sol",

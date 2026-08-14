@@ -8,6 +8,33 @@ import type {
 import { TASK_KINDS, type ExecutionBudget, type TaskKind } from './work-model.js';
 import type { ProviderCommandSpec } from './provider-command-spec.js';
 
+export interface ReachabilityProbePurposeProfile {
+  readonly maxInputTokens: number;
+  readonly maxOutputTokens: number;
+  readonly maxTokens: number;
+  readonly timeoutMs: number;
+  readonly maxUsd?: number;
+}
+
+/**
+ * Owner-authored ceilings for a single non-reservable xverify adjudication (a
+ * subscription verifier with no numeric reservation). Every field is a hard,
+ * positive owner bound — never a code literal — carried into the execution
+ * contract and enforced post-hoc from the provider-reported terminal usage.
+ */
+export interface XverifyAdjudicationPurposeProfile {
+  readonly maxTokens: number;
+  readonly maxWallClockSeconds: number;
+  readonly maxVerificationsPerSprint: number;
+}
+
+type ExecutionBudgetPolicyWithPurposeProfiles = ExecutionBudgetPolicyConfig & {
+  readonly purposes?: {
+    readonly 'reachability-probe'?: ReachabilityProbePurposeProfile;
+    readonly 'xverify-adjudication'?: XverifyAdjudicationPurposeProfile;
+  };
+};
+
 /**
  * Provider-declared usage-reporting granularity (`ProviderCommandSpec.liveUsage`),
  * re-exported here so budget-policy resolution can become provider-aware without
@@ -35,6 +62,24 @@ export type ExecutionBudgetPolicyHoldReason =
   | 'landing-policy-missing'
   | 'landing-turn-reserve-insufficient'
   | 'final-only-usage-authorization-missing';
+
+export type ReachabilityProbePurposeProfileUnavailableReason =
+  | 'reachability-probe-profile-missing'
+  | 'metered-api-usd-ceiling-missing';
+
+export type ReachabilityProbePurposeProfileDecision =
+  | {
+    readonly state: 'available';
+    readonly profile: Readonly<ReachabilityProbePurposeProfile>;
+    readonly profileRef: 'execution_budget.purposes.reachability-probe';
+    readonly policyDigest: string;
+  }
+  | {
+    readonly state: 'unavailable';
+    readonly reasonCode: ReachabilityProbePurposeProfileUnavailableReason;
+    readonly profileRef: 'execution_budget.purposes.reachability-probe';
+    readonly policyDigest?: string;
+  };
 
 /**
  * Owner authorization to run a final-only-usage provider under host wall-clock
@@ -215,6 +260,38 @@ function assertBudget(value: unknown, path: string): asserts value is ExecutionB
   }
 }
 
+function assertXverifyAdjudicationPurposeProfile(
+  value: unknown,
+): asserts value is XverifyAdjudicationPurposeProfile {
+  const path = 'execution_budget.purposes.xverify-adjudication';
+  if (!isPlainObject(value)) throw new ExecutionBudgetPolicyError(`${path} must be an object`);
+  assertKnownKeys(value, ['maxTokens', 'maxWallClockSeconds', 'maxVerificationsPerSprint'], path);
+  for (const field of ['maxTokens', 'maxWallClockSeconds', 'maxVerificationsPerSprint'] as const) {
+    if (!Number.isSafeInteger(value[field]) || (value[field] as number) <= 0) {
+      throw new ExecutionBudgetPolicyError(`${path}.${field} must be a positive safe integer`);
+    }
+  }
+}
+
+function assertReachabilityProbePurposeProfile(
+  value: unknown,
+): asserts value is ReachabilityProbePurposeProfile {
+  const path = 'execution_budget.purposes.reachability-probe';
+  if (!isPlainObject(value)) throw new ExecutionBudgetPolicyError(`${path} must be an object`);
+  assertKnownKeys(value, ['maxInputTokens', 'maxOutputTokens', 'maxTokens', 'timeoutMs', 'maxUsd'], path);
+  for (const field of ['maxInputTokens', 'maxOutputTokens', 'maxTokens', 'timeoutMs'] as const) {
+    if (!Number.isSafeInteger(value[field]) || (value[field] as number) <= 0) {
+      throw new ExecutionBudgetPolicyError(`${path}.${field} must be a positive safe integer`);
+    }
+  }
+  if ((value.maxTokens as number) < (value.maxInputTokens as number) + (value.maxOutputTokens as number)) {
+    throw new ExecutionBudgetPolicyError(`${path}.maxTokens must cover input plus output ceilings`);
+  }
+  if (value.maxUsd !== undefined && (typeof value.maxUsd !== 'number' || !Number.isFinite(value.maxUsd) || value.maxUsd <= 0)) {
+    throw new ExecutionBudgetPolicyError(`${path}.maxUsd must be a positive finite number when provided`);
+  }
+}
+
 /** Runtime validation for JSON-authored policy. Unknown keys always fail loudly. */
 export function assertExecutionBudgetPolicyConfig(
   value: unknown,
@@ -224,7 +301,7 @@ export function assertExecutionBudgetPolicyConfig(
   }
   assertKnownKeys(
     value,
-    ['roles', 'landing', 'unmetered_backend', 'final_only_usage'],
+    ['roles', 'landing', 'unmetered_backend', 'final_only_usage', 'purposes'],
     'execution_budget',
   );
   if (!isPlainObject(value.roles)) {
@@ -267,6 +344,23 @@ export function assertExecutionBudgetPolicyConfig(
 
   if (value.final_only_usage !== undefined) {
     assertFinalOnlyUsagePolicyConfig(value.final_only_usage);
+  }
+
+  if (value.purposes !== undefined) {
+    if (!isPlainObject(value.purposes)) {
+      throw new ExecutionBudgetPolicyError('execution_budget.purposes must be an object');
+    }
+    assertKnownKeys(
+      value.purposes,
+      ['reachability-probe', 'xverify-adjudication'],
+      'execution_budget.purposes',
+    );
+    if (value.purposes['reachability-probe'] !== undefined) {
+      assertReachabilityProbePurposeProfile(value.purposes['reachability-probe']);
+    }
+    if (value.purposes['xverify-adjudication'] !== undefined) {
+      assertXverifyAdjudicationPurposeProfile(value.purposes['xverify-adjudication']);
+    }
   }
 
   const unmetered = value.unmetered_backend;
@@ -316,6 +410,69 @@ function canonicalJson(value: unknown): string {
 export function executionBudgetPolicyDigest(policy: ExecutionBudgetPolicyConfig): string {
   assertExecutionBudgetPolicyConfig(policy);
   return createHash('sha256').update(canonicalJson(policy)).digest('hex');
+}
+
+/** Resolve the owner-authored probe purpose profile; absence is a typed HOLD. */
+export function resolveReachabilityProbePurposeProfile(input: {
+  readonly policy?: ExecutionBudgetPolicyConfig;
+  readonly billingMode: 'subscription' | 'free' | 'local' | 'metered-api';
+}): ReachabilityProbePurposeProfileDecision {
+  const profileRef = 'execution_budget.purposes.reachability-probe' as const;
+  if (!input.policy) return { state: 'unavailable', reasonCode: 'reachability-probe-profile-missing', profileRef };
+  assertExecutionBudgetPolicyConfig(input.policy);
+  const policyDigest = executionBudgetPolicyDigest(input.policy);
+  const profile = (input.policy as ExecutionBudgetPolicyWithPurposeProfiles).purposes?.['reachability-probe'];
+  if (!profile) {
+    return { state: 'unavailable', reasonCode: 'reachability-probe-profile-missing', profileRef, policyDigest };
+  }
+  if (input.billingMode === 'metered-api' && profile.maxUsd === undefined) {
+    return { state: 'unavailable', reasonCode: 'metered-api-usd-ceiling-missing', profileRef, policyDigest };
+  }
+  return { state: 'available', profile: Object.freeze({ ...profile }), profileRef, policyDigest };
+}
+
+export type XverifyAdjudicationPurposeProfileUnavailableReason =
+  | 'xverify-adjudication-profile-missing'
+  | 'xverify-adjudication-token-ceiling-missing';
+
+export type XverifyAdjudicationPurposeProfileDecision =
+  | {
+      readonly state: 'available';
+      readonly profile: Readonly<XverifyAdjudicationPurposeProfile>;
+      readonly profileRef: 'execution_budget.purposes.xverify-adjudication';
+      readonly policyDigest: string;
+    }
+  | {
+      readonly state: 'unavailable';
+      readonly reasonCode: XverifyAdjudicationPurposeProfileUnavailableReason;
+      readonly profileRef: 'execution_budget.purposes.xverify-adjudication';
+      readonly policyDigest?: string;
+    };
+
+/**
+ * Resolve the owner-authored xverify-adjudication purpose profile. Absence, or a
+ * non-positive total-token ceiling, is a typed HOLD: the non-reservable
+ * subscription adjudication arm must never dispatch without an owner-authored
+ * maxTokens ceiling.
+ */
+export function resolveXverifyAdjudicationPurposeProfile(input: {
+  readonly policy?: ExecutionBudgetPolicyConfig;
+}): XverifyAdjudicationPurposeProfileDecision {
+  const profileRef = 'execution_budget.purposes.xverify-adjudication' as const;
+  if (!input.policy) {
+    return { state: 'unavailable', reasonCode: 'xverify-adjudication-profile-missing', profileRef };
+  }
+  assertExecutionBudgetPolicyConfig(input.policy);
+  const policyDigest = executionBudgetPolicyDigest(input.policy);
+  const profile = (input.policy as ExecutionBudgetPolicyWithPurposeProfiles)
+    .purposes?.['xverify-adjudication'];
+  if (!profile) {
+    return { state: 'unavailable', reasonCode: 'xverify-adjudication-profile-missing', profileRef, policyDigest };
+  }
+  if (!(Number.isSafeInteger(profile.maxTokens) && profile.maxTokens > 0)) {
+    return { state: 'unavailable', reasonCode: 'xverify-adjudication-token-ceiling-missing', profileRef, policyDigest };
+  }
+  return { state: 'available', profile: Object.freeze({ ...profile }), profileRef, policyDigest };
 }
 
 function cloneBudget(value: ExecutionBudget): ExecutionBudget {

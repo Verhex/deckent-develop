@@ -53,10 +53,17 @@ Tam envanter: 2026-07-28 analiz oturumu. Kilit sonuçlar:
 | `deckent_watch` / notify | **🔴 MEVCUT BUG (spec'ten bağımsız):** `logging` capability beyan edilmediği için SDK 1.27.1'de `sendLoggingMessage` sessiz no-op → watch + MCP notify adapter muhtemelen prod'da ölü. Testler mock'lu, yakalayamıyor | 🔴 |
 | `deckent_watch` mimarisi | Yeni spec'te iki koldan geçersiz: Logging deprecate + istek-bağlamsız `notifications/message` yasak. Hedef: resource-subscription (`subscriptions/listen`) veya cursor-poll | 🔴 |
 | `deckent_nervous_subscribe` | Gerçek push aboneliği yok (Set'e ekleyip okumuyor, `nervous.ts:65,399-425`) — kırılma yok, semantik borç | 🟡 |
+| `deckent_approvals` | **READ-ONLY pending approval inbox** (`src/mcp/tools/approvals.ts`): canonical `ApprovalBroker` üzerinden `list('pending')` döner. MCP üzerinden allow/deny/decide/self-approval YOKTUR; karar yalnız `deckent approvals decide` CLI yüzeyinde, interactive live-auth arkasında verilir. Read-only inbox kaydedildi; MCP decision-authority live-auth olmadan AÇILAMAZ | 🟢 |
 
 **Stratejik sonuç:** "MCP connects capabilities, Deckent owns execution" pozisyonu doğrulandı.
 Protokolün session + SSE-resumability'yi atması, retry/checkpoint/evidence sorumluluğunu açıkça
 Deckent gibi control plane'lere itiyor — değer önerimizi güçlendiriyor.
+
+> **MCPV2 disposition (2026-08-13):** Bu belgedeki §3 iş paketleri (P0 watch/notify onarımı,
+> P1 dual-era, P2 yeni primitive, P3 sınır kararları) hâlâ AÇIKTIR ve DONE gösterilmez. Yalnız
+> read-only `deckent_approvals` inbox'u eklendi; MCP tarafında karar/mutation yetkisi açılmadı
+> (live-auth sınırı korunur). MCPV2 sonraki MASTER revizyonunda **critical disposition** olarak
+> görünür kalır.
 
 ## 3. İş paketleri
 

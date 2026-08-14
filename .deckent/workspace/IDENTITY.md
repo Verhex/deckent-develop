@@ -18,13 +18,13 @@ Direction (2026-06-29 pivot): Tool-driven, progressive-disclosure, full-control 
 Moat: Deterministik eval-backed orchestration · governance-by-construction · outcome→evidence→routing→promotion→training-trace kapalı öğrenme döngüsü
 SSOT: `docs/MASTER-PLAN.md` · core-memory: `.deckent/docs/core-memory/MEMORY.md` · yön gerekçesi: `.analysis/hermes-vs-deckent-direction-decisions.md`
 <!-- AUTOGEN:START id="identity-tests" -->
-Tests: 35,161 descriptors (parsed from tests/**/*.test.ts(x))
+Tests: 35,249 descriptors (parsed from tests/**/*.test.ts(x))
 Dashboard Tests: 96 descriptors (parsed from src/dashboard/src/**/*.test.tsx)
 Coverage: N/A
 <!-- AUTOGEN:END id="identity-tests" -->
 <!-- AUTOGEN:START id="identity-summary" -->
-CLI Commands: 75+
-MCP: 49 tools, 8 resources
+CLI Commands: 76+
+MCP: 50 tools, 8 resources
 Agents: 21 built-in
 Skills: 31 built-in
 <!-- AUTOGEN:END id="identity-summary" -->
@@ -35,9 +35,9 @@ Core Capabilities: Deterministik lifecycle orchestration; durable execution/reco
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| MCP Tools | 49 |
+| MCP Tools | 50 |
 | MCP Resources | 8 |
-| CLI Commands | 75+ |
+| CLI Commands | 76+ |
 | Dashboard Pages | 20 |
 | Agents | 21 built-in |
 | Skills | 31 built-in |

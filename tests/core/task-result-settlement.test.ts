@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   chmodSync,
   mkdtempSync,
@@ -40,9 +40,11 @@ import {
   readTaskResultSettlementPrepared,
   readTaskResultSettlementPrompt,
   readTaskResultSettlement,
+  taskResultSettlementActiveClaimDigest,
   taskResultSettlementAttemptPath,
   taskResultSettlementClaimPath,
   taskResultSettlementClosurePath,
+  taskResultSettlementDurableClaimFence,
   taskResultSettlementExecutionBudgetAuthorityPath,
   taskResultSettlementExecutionContractPath,
   taskResultSettlementPreparedPath,
@@ -58,6 +60,7 @@ import {
   taskProviderTerminalUsageEvidenceRef,
   taskProviderTerminalUsageReceiptPath,
   writeTaskProviderActualCallReceiptAtomic,
+  writeTaskProviderActualCallReceiptFromTransportUsageAtomic,
   writeTaskProviderTerminalBillingReceiptAtomic,
   writeTaskProviderTerminalUsageReceiptAtomic,
   writeTaskResultSettlementAtomic,
@@ -80,6 +83,8 @@ import {
   writeExecutionLandingCheckpointAtomic,
   type CreateExecutionLandingCheckpointInput,
 } from '../../src/core/execution-landing-checkpoint.js';
+import { budgetFingerprint } from '../../src/orchestra/runtime-budget-monitor.js';
+import { canonicalJson } from '../../src/core/audit-writer.js';
 
 const roots: string[] = [];
 const originalDeckentHome = process.env.DECKENT_HOME;
@@ -453,6 +458,206 @@ describe('host-authoritative Docker TaskResult settlement', () => {
 
     writeFileSync(taskProviderActualCallReceiptPath(ref), '{}', 'utf-8');
     expect(readTaskProviderActualCallReceipt(ref)).toBeNull();
+  });
+
+  it('derives a subscription actual-call proof from provider-reported usage, forging no usd', () => {
+    const { root } = fixture();
+    const ref = createTaskResultSettlementRef(root, 'task-subscription-call');
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    const contract = createCrossVerifyEnforcedAttemptContract(xverifyContractInput(ref));
+    writeTaskResultSettlementExecutionContractAtomic(ref, contract);
+    // Provider-reported terminal usage — NO billing envelope is ever written.
+    writeTaskProviderTerminalUsageReceiptAtomic(ref, {
+      version: 2,
+      projectId: ref.projectRootSha256,
+      taskId: ref.taskId,
+      attemptId: ref.attemptId,
+      budgetFingerprint: contract.budgetFingerprint,
+      backend: 'docker',
+      terminal: true,
+      decision: {
+        state: 'within-budget',
+        counters: {
+          turns: 1, inputTokens: 12, outputTokens: 8, cacheReadTokens: 0,
+          cacheCreationTokens: 0, totalTokens: 20, maxContextTokens: 20,
+        },
+      },
+      updatedAt: '2026-07-25T02:00:01.000Z',
+    });
+    writeTaskResultSettlementPreparedAtomic(ref, contract.model);
+    writeTaskResultSettlementDispatchAtomic(ref, 'e'.repeat(64), '2026-07-25T02:00:02.000Z');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref, exitCode: 0, settledAt: '2026-07-25T02:00:03.000Z',
+      result: { taskId: ref.taskId, selfAssessment: 'DONE' },
+    }));
+
+    const proof = writeTaskProviderActualCallReceiptFromTransportUsageAtomic(ref);
+    expect(proof.proofKind).toBe('subscription_transport_usage');
+    expect(proof.usage).toEqual({ inputTokens: 12, outputTokens: 8, totalTokens: 20 });
+    expect('providerBillingEvidenceRef' in proof).toBe(false);
+    expect(proof.terminalTransportSettlementDigest).toMatch(/^[a-f0-9]{64}$/u);
+    // Idempotent + reads back through the discriminated reader.
+    expect(writeTaskProviderActualCallReceiptFromTransportUsageAtomic(ref)).toEqual(proof);
+    expect(readTaskProviderActualCallReceipt(ref)).toEqual(proof);
+    expect(taskProviderActualCallEvidenceRef(proof))
+      .toMatch(/^provider-actual-call:sha256:[a-f0-9]{64}$/u);
+
+    // Integrity: a tampered usage count no longer matches the provider-reported
+    // terminal usage → the reader rejects it.
+    writeFileSync(
+      taskProviderActualCallReceiptPath(ref),
+      JSON.stringify({ ...proof, usage: { ...proof.usage, totalTokens: 999 } }),
+      'utf-8',
+    );
+    chmodSync(taskProviderActualCallReceiptPath(ref), 0o600);
+    expect(readTaskProviderActualCallReceipt(ref)).toBeNull();
+  });
+
+  it('refuses a subscription actual-call proof when provider usage is absent', () => {
+    const { root } = fixture();
+    const ref = createTaskResultSettlementRef(root, 'task-subscription-no-usage');
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    const contract = createCrossVerifyEnforcedAttemptContract(xverifyContractInput(ref));
+    writeTaskResultSettlementExecutionContractAtomic(ref, contract);
+    writeTaskResultSettlementPreparedAtomic(ref, contract.model);
+    writeTaskResultSettlementDispatchAtomic(ref, 'e'.repeat(64), '2026-07-25T02:00:02.000Z');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref, exitCode: 0, settledAt: '2026-07-25T02:00:03.000Z',
+      result: { taskId: ref.taskId, selfAssessment: 'DONE' },
+    }));
+    // No terminal-usage receipt written → the proof cannot be produced.
+    expect(() => writeTaskProviderActualCallReceiptFromTransportUsageAtomic(ref))
+      .toThrow();
+    expect(readTaskProviderActualCallReceipt(ref)).toBeNull();
+  });
+
+  it('holds the subscription actual-call proof when terminal usage exceeds the owner ceiling', () => {
+    const { root } = fixture();
+    const ref = createTaskResultSettlementRef(root, 'task-subscription-overrun');
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    const contract = createCrossVerifyEnforcedAttemptContract(xverifyContractInput(ref));
+    writeTaskResultSettlementExecutionContractAtomic(ref, contract);
+    // The runtime monitor stamped an `exceeded` decision because provider-reported
+    // totalTokens ran past the owner-authored maxTokens ceiling in the contract.
+    writeTaskProviderTerminalUsageReceiptAtomic(ref, {
+      version: 2,
+      projectId: ref.projectRootSha256,
+      taskId: ref.taskId,
+      attemptId: ref.attemptId,
+      budgetFingerprint: contract.budgetFingerprint,
+      backend: 'docker',
+      terminal: true,
+      decision: {
+        state: 'exceeded',
+        counters: {
+          turns: 1, inputTokens: 200_000, outputTokens: 5_000, cacheReadTokens: 0,
+          cacheCreationTokens: 0, totalTokens: 205_000, maxContextTokens: 0,
+        },
+      },
+      updatedAt: '2026-07-25T02:00:01.000Z',
+    });
+    writeTaskResultSettlementPreparedAtomic(ref, contract.model);
+    writeTaskResultSettlementDispatchAtomic(ref, 'e'.repeat(64), '2026-07-25T02:00:02.000Z');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref, exitCode: 0, settledAt: '2026-07-25T02:00:03.000Z',
+      result: { taskId: ref.taskId, selfAssessment: 'DONE' },
+    }));
+    // Overrun fails the actual-call proof closed even though the container exited
+    // 0 — a successful verdict never promotes an over-ceiling settlement.
+    expect(() => writeTaskProviderActualCallReceiptFromTransportUsageAtomic(ref)).toThrow();
+    expect(readTaskProviderActualCallReceipt(ref)).toBeNull();
+  });
+
+  it('settles docker terminal usage only when the contract carries the runtime-canonical budgetFingerprint (Gate B)', () => {
+    const { root } = fixture();
+    // The runtime-budget-monitor stamps the live usage receipt with this canonical
+    // fingerprint (BUDGET_FIELDS order). The old ingress computed the contract
+    // fingerprint via sha256(canonicalJson(budget)) — an alphabetical-key hash that
+    // never equalled the monitor's, so writeTaskProviderTerminalUsageReceiptAtomic's
+    // exact-equality check aborted every docker adjudication settlement before
+    // persist/close (surfaced first by the xverify non_reservable arm, the first to
+    // reach settlement). The ingress now uses budgetFingerprint() — this locks it.
+    const budget = { maxTurns: 16, maxCacheReadTokens: 1_000_000 };
+    const runtimeFingerprint = budgetFingerprint(budget);
+    const legacyFingerprint = createHash('sha256').update(canonicalJson(budget)).digest('hex');
+    expect(runtimeFingerprint).not.toBe(legacyFingerprint);
+
+    const runtimeUsage = (ref: ReturnType<typeof createTaskResultSettlementRef>) => ({
+      version: 2 as const,
+      projectId: ref.projectRootSha256,
+      taskId: ref.taskId,
+      attemptId: ref.attemptId,
+      budgetFingerprint: runtimeFingerprint,
+      backend: 'docker',
+      terminal: true as const,
+      decision: {
+        state: 'within-budget' as const,
+        counters: {
+          turns: 1, inputTokens: 12, outputTokens: 8, cacheReadTokens: 0,
+          cacheCreationTokens: 0, totalTokens: 20, maxContextTokens: 20,
+        },
+      },
+      updatedAt: '2026-07-25T02:00:01.000Z',
+    });
+
+    // A contract carrying the LEGACY canonicalJson fingerprint cannot settle the
+    // runtime-stamped usage — the exact abort observed in the smoke.
+    const badRef = createTaskResultSettlementRef(root, 'task-gateb-legacy');
+    writeTaskResultSettlementAttemptAtomic(badRef);
+    claimTaskResultSettlementAttemptAtomic(badRef);
+    writeTaskResultSettlementExecutionContractAtomic(badRef, createCrossVerifyEnforcedAttemptContract({
+      ...xverifyContractInput(badRef), budget, budgetFingerprint: legacyFingerprint,
+    }));
+    expect(() => writeTaskProviderTerminalUsageReceiptAtomic(badRef, runtimeUsage(badRef)))
+      .toThrow(/differs from the exact execution contract/u);
+
+    // The FIXED ingress stamps budgetFingerprint(budget) — the same canonical hash →
+    // settlement proceeds.
+    const okRef = createTaskResultSettlementRef(root, 'task-gateb-runtime');
+    writeTaskResultSettlementAttemptAtomic(okRef);
+    claimTaskResultSettlementAttemptAtomic(okRef);
+    writeTaskResultSettlementExecutionContractAtomic(okRef, createCrossVerifyEnforcedAttemptContract({
+      ...xverifyContractInput(okRef), budget, budgetFingerprint: runtimeFingerprint,
+    }));
+    const usage = writeTaskProviderTerminalUsageReceiptAtomic(okRef, runtimeUsage(okRef));
+    expect(readTaskProviderTerminalUsageReceipt(okRef)).toEqual(usage);
+    expect(usage.budgetFingerprint).toBe(runtimeFingerprint);
+  });
+
+  it('resolves the durable claim fence unchanged across settlement closure (verdict-receipt path)', () => {
+    const { root } = fixture();
+    const ref = createTaskResultSettlementRef(root, 'task-durable-fence');
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    // While the claim is active, the durable fence equals the active-claim digest.
+    const activeFence = taskResultSettlementActiveClaimDigest(ref);
+    expect(taskResultSettlementDurableClaimFence(ref))
+      .toMatchObject({ fenceTokenHash: activeFence });
+
+    // Settle + terminally close the attempt — this retires the ACTIVE claim.
+    writeTaskResultSettlementPreparedAtomic(ref, 'claude-fable-5');
+    writeTaskResultSettlementDispatchAtomic(ref, 'e'.repeat(64), '2026-07-25T02:00:02.000Z');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref, exitCode: 0, settledAt: '2026-07-25T02:00:03.000Z',
+      result: { taskId: ref.taskId, selfAssessment: 'DONE' },
+    }));
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'stopped-removed', locksReleased: true,
+    });
+    expect(readTaskResultSettlementClosure(ref)).not.toBeNull();
+
+    // The active-claim digest now fails closed (retired) — but the DURABLE fence
+    // that the host verdict receipt binds to is unchanged: the claim record is
+    // never rewritten on closure. A wrong fence still fails closed.
+    expect(() => taskResultSettlementActiveClaimDigest(ref)).toThrow();
+    expect(taskResultSettlementDurableClaimFence(ref))
+      .toEqual({ fenceTokenHash: activeFence, claimedAt: expect.any(String) });
+    expect(taskResultSettlementDurableClaimFence(
+      createTaskResultSettlementRef(root, 'task-durable-fence-other'),
+    )).toBeNull();
   });
 
   it('refuses actual-call evidence when the exact contract model is absent from the envelope', () => {

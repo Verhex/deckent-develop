@@ -248,6 +248,7 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     apiId: 'gpt-5.5',
     provider: 'codex',
     tier: 'premium',
+    preferredForTier: true,
     contextWindow: 1_050_000,
     costPerMillion: { input: 5, output: 30 },
     pricingEvidenceRef: 'https://platform.openai.com/docs/pricing',
@@ -359,7 +360,7 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
     id: 'gpt-5.6-sol',
     apiId: 'gpt-5.6-sol',
     provider: 'codex',
-    tier: 'premium',
+    tier: 'premium_plus',
     // MASTER-PLAN 670 (owner-approved 2026-07-26). Entitlement live-proven on the
     // active ChatGPT account: run xv-1785008399857 reached `turn.completed` with
     // real consumption, unlike `gpt-4.1` which the same account refuses with 400.

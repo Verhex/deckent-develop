@@ -40,7 +40,7 @@ export function bootstrapApprovalAuthority(
   const authority = config.approval?.authority;
   if (authority?.enabled !== true) return { state: 'disabled' };
   const oidc = config.api_oidc;
-  if (oidc?.enabled !== true || !oidc.audience) {
+  if (oidc?.enabled !== true || !oidc.audience || !authority.oidc) {
     return {
       state: 'hold',
       reasonCode: 'approval_authority_composition_failed',

@@ -150,7 +150,7 @@ describe('cross_verify.verifier_model — owner-configured verifier identity', (
     // The whole reason the config key exists: `claude-sonnet-5` is standard, so
     // tier equivalence can only ever return a standard-tier codex model.
     expect(modelRegistry.getOrThrow('claude-sonnet-5').tier).toBe('standard');
-    expect(modelRegistry.getOrThrow('gpt-5.6-sol').tier).toBe('premium');
+    expect(modelRegistry.getOrThrow('gpt-5.6-sol').tier).toBe('premium_plus');
     expect(modelRegistry.getEquivalent('claude-sonnet-5', 'codex')).not.toBe('gpt-5.6-sol');
 
     await runCrossVerify(

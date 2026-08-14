@@ -615,16 +615,16 @@ describe('waitForResults — queue-completion trigger (processQueue) delegates t
         },
       }),
     );
-    const admit = vi.fn(() => ({
-      decision: 'hold',
-      reservation: null,
-      reasonCode: 'authority_unavailable',
-      resolution: {},
-      attempts: [],
-      authorityEvidenceRef: `host-role-admission:${'b'.repeat(64)}`,
-    }));
+    // The provider-authority front door is composition-health-only now: it never
+    // runs role admission itself. A HOLD is injected by an UNHEALTHY authority
+    // composition (state: 'hold'); the candidate-bound admission seam
+    // (scheduler-effects → preflightProviderExecutionIngress) propagates it as a
+    // typed ProviderExecutionIngressHoldError. The retired roleAdmissionRuntime
+    // .admit path must NOT be consulted at this seam.
+    const admit = vi.fn();
     const authority = {
-      state: 'ready',
+      state: 'hold',
+      reasonCode: 'authority_unavailable',
       tenantId: 'local',
       projectId: 'project-sched3',
       authorityEvidenceRef: `provider-authority:${'a'.repeat(64)}`,
@@ -640,17 +640,28 @@ describe('waitForResults — queue-completion trigger (processQueue) delegates t
       activeModeConfig: { max_workers: 1 },
     } as unknown as ResolvedConfig;
 
-    await expect(waitForResults(
-      root,
-      sprint,
-      300,
-      [queued],
-      { spawnBackend: backend, providerAuthority: authority },
-      undefined,
-      config,
-    )).rejects.toBeInstanceOf(ProviderExecutionIngressHoldError);
+    let caught: unknown;
+    try {
+      await waitForResults(
+        root,
+        sprint,
+        300,
+        [queued],
+        { spawnBackend: backend, providerAuthority: authority },
+        undefined,
+        config,
+      );
+    } catch (e) {
+      caught = e;
+    }
 
-    expect(admit).toHaveBeenCalledOnce();
+    // HOLD propagates as the typed error, carrying the composition reasonCode faithfully.
+    expect(caught).toBeInstanceOf(ProviderExecutionIngressHoldError);
+    expect((caught as ProviderExecutionIngressHoldError).reasonCode).toBe('authority_unavailable');
+    // The retired front-door role-admission path is not consulted at this seam.
+    expect(admit).not.toHaveBeenCalled();
+    // Fail-closed safety preserved: a HOLD never becomes a spawn/dispatch, and the
+    // queued task is not fail-open retried.
     expect(backend.calls).toHaveLength(0);
     expect(buildWorkerPrompt).not.toHaveBeenCalled();
     expect(queued.status).toBe(TaskStatus.PENDING);

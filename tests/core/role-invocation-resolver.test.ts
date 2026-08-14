@@ -101,12 +101,9 @@ describe('resolveRoleInvocation — fallback transitions', () => {
 
     expect(res.selected!.provider).toBe('codex');
     expect(res.selected!.source).toBe('fallback');
-    // Exact model equivalence: opus (premium) → the DESIGNATED codex premium
-    // model. MASTER-PLAN 670 (owner-approved 2026-07-26) moved this from
-    // `gpt-5.5` — whichever GA premium model registered first — to the tier's
-    // named current generation. Fallback dispatches a billed model, so this
-    // assertion is the audit of which one.
-    expect(res.selected!.model).toBe('gpt-5.6-sol');
+    // Exact model equivalence: opus (premium) → the designated Codex premium
+    // model. Fallback dispatches a billed model, so this assertion audits it.
+    expect(res.selected!.model).toBe('gpt-5.5');
     expect(res.resolved.source).toBe('fallback');
     expect(res.resolved.reasonCode).toBe('provider_resolution_fallback');
 
@@ -411,7 +408,7 @@ describe('resolveRoleInvocation — receipt-ready provenance shape', () => {
     });
     // resolved reflects the selected fallback
     expect(res.resolved.provider).toBe('codex');
-    expect(res.resolved.model).toBe('gpt-5.6-sol');
+    expect(res.resolved.model).toBe('gpt-5.5');
     // top-level reachability/limits describe the terminal (selected) candidate
     expect(res.reachability.state).toBe('known');
     expect(res.reachability.evidenceRef).toBe('cx:reach');

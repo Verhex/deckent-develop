@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { createExecutionAdmissionError } from './errors.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from './provider-authority-composition.js';
-import { defaultRoleInvocationPolicy } from './role-invocation-resolver.js';
 import type { InvocationPurpose, InvocationRole } from './invocation-receipt.js';
 
 export interface ProviderExecutionIngressRequest {
@@ -28,6 +26,18 @@ export type ProviderExecutionIngressDecision =
        * execution defaults.
        */
       readonly decision: 'not-configured';
+    }
+  | {
+      /**
+       * The authority composition itself is healthy (custody opened, keyring
+       * usable, policy layer readable). This is NOT an execution permit: the
+       * real provider admission — candidate evidence, route lock, reservation
+       * binding — happens at the stage where the exact candidate/backend is
+       * resolved (worker spawn, mission dispatch, cross-verify composition).
+       * The front door only refuses when the composition itself is broken.
+       */
+      readonly decision: 'ready';
+      readonly authorityEvidenceRefs: readonly string[];
     }
   | {
       readonly decision: 'hold';
@@ -89,11 +99,13 @@ function ingressEvidenceRef(
 /**
  * Common pre-mutation provider-authority boundary for one-shot worker surfaces.
  *
- * A configured authority is always consumed through the shared role admission
- * runtime. The current production composition deliberately has no
- * caller-authored exact candidate/query adapter for these surfaces, so an empty
- * candidate map produces the honest HOLD. Adding an ALLOW path belongs to the
- * separately reviewed candidate + route-lock + reservation binding.
+ * The front door checks authority COMPOSITION health only (custody, keyring,
+ * policy layer). It never runs the role admission itself: the real provider
+ * admission consumes exact candidate evidence at the stage where the concrete
+ * candidate/backend is resolved, and an empty-candidate admission here could
+ * only ever HOLD (the pre-fix behaviour that locked every configured host out
+ * of run/start/do/xverify). Fail-closed is preserved: a broken composition is
+ * still a typed HOLD, and `ready` grants no execution permit.
  */
 export function preflightProviderExecutionIngress(
   authority: ProviderAuthorityRuntimeServiceOpenResult | undefined,
@@ -108,8 +120,9 @@ export function preflightProviderExecutionIngress(
 
 /**
  * Role-aware front-door variant used by Brain/Worker/Auditor process roots.
- * It shares the exact same no-candidate HOLD semantics as the Worker wrapper;
- * callers cannot gain an ALLOW path by choosing a role.
+ * It shares the exact same composition-health semantics as the Worker wrapper;
+ * no role gains an execution permit here — `ready` only states the authority
+ * composition can serve the later, candidate-bound admission stages.
  */
 export function preflightProviderRoleExecutionIngress(
   authority: ProviderAuthorityRuntimeServiceOpenResult | undefined,
@@ -129,40 +142,10 @@ export function preflightProviderRoleExecutionIngress(
     };
   }
 
-  const result = authority.service.roleAdmissionRuntime.admit({
-    invocation: {
-      role: request.role,
-      purpose: request.purpose,
-      primaryProvider: request.provider,
-      model: request.model,
-      fallbackProviders: request.fallbackProviders,
-      policy: defaultRoleInvocationPolicy(request.role, request.unattended),
-    },
-    candidates: {},
-    buildReservation: () => {
-      throw createExecutionAdmissionError(
-        'UNREACHABLE_ONE_SHOT_RESERVATION_WITHOUT_EXACT_CANDIDATE',
-      );
-    },
-  });
-
-  if (result.decision !== 'hold') {
-    return {
-      decision: 'hold',
-      reasonCode: 'dispatch_binding_unavailable',
-      authorityEvidenceRefs: Object.freeze([
-        authority.authorityEvidenceRef,
-        ingressRef,
-      ]),
-    };
-  }
-
   return {
-    decision: 'hold',
-    reasonCode: 'candidate_authority_unavailable',
+    decision: 'ready',
     authorityEvidenceRefs: Object.freeze([
       authority.authorityEvidenceRef,
-      result.authorityEvidenceRef,
       ingressRef,
     ]),
   };

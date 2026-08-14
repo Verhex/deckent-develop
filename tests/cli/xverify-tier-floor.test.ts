@@ -56,7 +56,7 @@ vi.mock('../../src/orchestra/sprint-phases.js', () => ({
 // fail loudly instead of silently testing a stale ladder.
 const PREMIUM_AUTHOR = 'claude-opus-5';
 const STANDARD_AUTHOR = 'claude-sonnet-5';
-const PREMIUM_VERIFIER = 'gpt-5.6-sol';
+const PREMIUM_PLUS_VERIFIER = 'gpt-5.6-sol';
 const STANDARD_VERIFIER = 'gpt-5.6-terra';
 const ECONOMY_VERIFIER = 'gpt-5.6-luna';
 
@@ -145,7 +145,7 @@ describe('tier facts come from the model registry, not from this codebase', () =
   it('reads the fixture ladder straight out of the registry', () => {
     expect(modelRegistry.getTier(PREMIUM_AUTHOR)).toBe('premium');
     expect(modelRegistry.getTier(STANDARD_AUTHOR)).toBe('standard');
-    expect(modelRegistry.getTier(PREMIUM_VERIFIER)).toBe('premium');
+    expect(modelRegistry.getTier(PREMIUM_PLUS_VERIFIER)).toBe('premium_plus');
     expect(modelRegistry.getTier(STANDARD_VERIFIER)).toBe('standard');
     expect(modelRegistry.getTier(ECONOMY_VERIFIER)).toBe('economy');
     // Ordering authority is the registry's comparator, not a local constant.
@@ -155,12 +155,12 @@ describe('tier facts come from the model registry, not from this codebase', () =
   it('refuses below-tier, admits equal and above-tier, in the pure seam', () => {
     expect(resolveVerifierTierFloorRefusal(PREMIUM_AUTHOR, ECONOMY_VERIFIER))
       .toContain(VERIFIER_TIER_BELOW_AUTHOR);
-    expect(resolveVerifierTierFloorRefusal(PREMIUM_AUTHOR, PREMIUM_VERIFIER)).toBeNull();
-    expect(resolveVerifierTierFloorRefusal(STANDARD_AUTHOR, PREMIUM_VERIFIER)).toBeNull();
+    expect(resolveVerifierTierFloorRefusal(PREMIUM_AUTHOR, PREMIUM_PLUS_VERIFIER)).toBeNull();
+    expect(resolveVerifierTierFloorRefusal(STANDARD_AUTHOR, PREMIUM_PLUS_VERIFIER)).toBeNull();
   });
 
   it('fails closed — an identity absent from the registry proves no floor', () => {
-    const refusal = resolveVerifierTierFloorRefusal('ghost-model-9', PREMIUM_VERIFIER);
+    const refusal = resolveVerifierTierFloorRefusal('ghost-model-9', PREMIUM_PLUS_VERIFIER);
     expect(refusal).toContain(VERIFIER_TIER_FLOOR_UNRESOLVABLE);
     expect(refusal).toContain('ghost-model-9');
   });
@@ -194,11 +194,11 @@ describe('cross-verify-runner — verifier capability-tier floor', () => {
       makeResult(),
       TaskEvaluation.DONE,
       makeRunnerConfig({ enabled: true }),
-      { availableProviders: ['claude', 'codex'], verifierModel: PREMIUM_VERIFIER },
+      { availableProviders: ['claude', 'codex'], verifierModel: PREMIUM_PLUS_VERIFIER },
     );
 
     expect(res.outcome).toBe('confirmed');
-    expect(dispatchedModel()).toBe(PREMIUM_VERIFIER);
+    expect(dispatchedModel()).toBe(PREMIUM_PLUS_VERIFIER);
   });
 
   it('admits an above-tier verifier — the floor is a floor, not an equality', async () => {
@@ -208,11 +208,11 @@ describe('cross-verify-runner — verifier capability-tier floor', () => {
       makeResult(),
       TaskEvaluation.DONE,
       makeRunnerConfig({ enabled: true }),
-      { availableProviders: ['claude', 'codex'], verifierModel: PREMIUM_VERIFIER },
+      { availableProviders: ['claude', 'codex'], verifierModel: PREMIUM_PLUS_VERIFIER },
     );
 
     expect(res.outcome).toBe('confirmed');
-    expect(dispatchedModel()).toBe(PREMIUM_VERIFIER);
+    expect(dispatchedModel()).toBe(PREMIUM_PLUS_VERIFIER);
   });
 
   it('refuses a below-tier identity that came from config, not from a flag', async () => {
@@ -274,7 +274,7 @@ describe('cross-verify-runner — verifier capability-tier floor', () => {
       makeRunnerConfig({ enabled: true }),
       {
         availableProviders: ['claude', 'codex'],
-        verifierModel: PREMIUM_VERIFIER,
+        verifierModel: PREMIUM_PLUS_VERIFIER,
         authorModel: 'ghost-model-9',
       },
     );
@@ -372,7 +372,7 @@ describe('xverify CLI — --author-model', () => {
     const runner = makeStubRunner();
     await expect(runXverifyForResult(
       'The resolver enforces the floor.',
-      { author: 'claude', authorModel: PREMIUM_VERIFIER, files: 'src/core/auth.ts' },
+      { author: 'claude', authorModel: PREMIUM_PLUS_VERIFIER, files: 'src/core/auth.ts' },
       cliDeps(runner),
     )).rejects.toThrow(/gpt-5\.6-sol/u);
     expect(runner.fn).not.toHaveBeenCalled();

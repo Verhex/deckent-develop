@@ -63,13 +63,13 @@ describe('model-registry: canonical gpt-5.5', () => {
     const registry = new ModelRegistry();
     registerCodexParityModels(registry);
     expect(registry.get('gpt-5')).toBeUndefined();
-    expect(registry.getByProviderAndTier('codex', 'premium')!.id).toBe('gpt-5.6-sol');
+    expect(registry.getByProviderAndTier('codex', 'premium')!.id).toBe('gpt-5.5');
   });
 });
 
 describe('model-registry: gpt-5.6 family (Alperen 2026-07-11, feed-verified)', () => {
   const FAMILY = [
-    { id: 'gpt-5.6-sol', tier: 'premium', cost: { input: 5, output: 30 } },
+    { id: 'gpt-5.6-sol', tier: 'premium_plus', cost: { input: 5, output: 30 } },
     { id: 'gpt-5.6-terra', tier: 'standard', cost: { input: 2.5, output: 15 } },
     { id: 'gpt-5.6-luna', tier: 'economy', cost: { input: 1, output: 6 } },
   ] as const;
@@ -128,8 +128,8 @@ describe('pricing-data-baseline.json: providers.openai.models gpt-5.6 family', (
   it('ships official Standard-pricing entries with per-model aliases', () => {
     const config = loadCostConfig(tmpDir, { forceReload: true });
     const cases: Array<[string, number, number, string, string[]]> = [
-      ['gpt-5.6', 0.000005, 0.00003, 'premium', ['gpt-5.6', 'gpt56']],
-      ['gpt-5.6-sol', 0.000005, 0.00003, 'premium', ['gpt-5.6-sol', 'gpt56-sol', 'sol']],
+      ['gpt-5.6', 0.000005, 0.00003, 'premium_plus', ['gpt-5.6', 'gpt56']],
+      ['gpt-5.6-sol', 0.000005, 0.00003, 'premium_plus', ['gpt-5.6-sol', 'gpt56-sol', 'sol']],
       ['gpt-5.6-terra', 0.0000025, 0.000015, 'standard', ['gpt-5.6-terra', 'gpt56-terra', 'terra']],
       ['gpt-5.6-luna', 0.000001, 0.000006, 'economy', ['gpt-5.6-luna', 'gpt56-luna', 'luna']],
     ];

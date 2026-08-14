@@ -41,6 +41,7 @@ import { registerAutonomousSurfaceTools } from './autonomous-surface.js';
 import { registerNervousEditTools } from './nervous-edit.js';
 import { registerAutonomousApprovalTools } from './autonomous-approval.js';
 import { registerExecutionAuthorityTool } from './execution-authority.js';
+import { registerApprovalsTool } from './approvals.js';
 
 export { TOOL_CATALOG, MCP_TOOL_COUNT } from './tool-catalog.js';
 export type {
@@ -113,6 +114,7 @@ export const TOOL_REGISTRARS: readonly McpToolRegistrar[] = [
   { module: 'nervous-edit.ts', register: (s) => registerNervousEditTools(s) },
   { module: 'autonomous-approval.ts', register: (s) => registerAutonomousApprovalTools(s) },
   { module: 'execution-authority.ts', register: (s) => registerExecutionAuthorityTool(s) },
+  { module: 'approvals.ts', register: (s) => registerApprovalsTool(s) },
 ];
 
 /**

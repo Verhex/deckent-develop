@@ -322,7 +322,7 @@ describe('Provider Fallback Chain Smoke Tests', () => {
     expect(result.provider).toBe('codex');
     expect(result.wasOriginal).toBe(false);
     // Claude premium → canonical Codex premium equivalent.
-    expect(result.model).toBe('gpt-5.6-sol');
+    expect(result.model).toBe('gpt-5.5');
   });
 
   it('applies model equivalence during fallback: sonnet → gpt-4.1', async () => {
@@ -412,7 +412,7 @@ describe('Model Equivalence Smoke Tests', () => {
   });
 
   it('getEquivalentModel maps across providers correctly', () => {
-    expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.6-sol');
+    expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
     expect(getEquivalentModel('claude-opus-4-8', 'gemini')).toBe('gemini-2.5-pro');
     expect(getEquivalentModel('claude-sonnet-5', 'codex')).toBe('gpt-5.6-terra');
     expect(getEquivalentModel('claude-sonnet-5', 'gemini')).toBe('gemini-2.5-flash');

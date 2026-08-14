@@ -572,7 +572,7 @@ describe('CodexAdapter', () => {
 
   describe('CODEX_TIER_MODELS', () => {
     it('should map premium to gpt-5.5', () => {
-      expect(CODEX_TIER_MODELS.premium).toBe('gpt-5.6-sol');
+      expect(CODEX_TIER_MODELS.premium).toBe('gpt-5.5');
     });
 
     it('should map standard to gpt-4.1', () => {
@@ -588,7 +588,7 @@ describe('CodexAdapter', () => {
 
   describe('getModelForTier()', () => {
     it('should return correct model for each tier', () => {
-      expect(adapter.getModelForTier('premium')).toBe('gpt-5.6-sol');
+      expect(adapter.getModelForTier('premium')).toBe('gpt-5.5');
       expect(adapter.getModelForTier('standard')).toBe('gpt-5.6-terra');
       expect(adapter.getModelForTier('economy')).toBe('gpt-5.6-luna');
     });

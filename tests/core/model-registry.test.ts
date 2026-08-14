@@ -279,8 +279,12 @@ describe('ModelRegistry', () => {
   // ── getEquivalent ──
 
   describe('getEquivalent()', () => {
-    it('maps opus → gpt-5.6-sol (claude premium → codex premium)', () => {
-      expect(registry.getEquivalent('claude-opus-4-8', 'codex')).toBe('gpt-5.6-sol');
+    it('maps opus → gpt-5.5 (claude premium → codex premium)', () => {
+      expect(registry.getEquivalent('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
+    });
+
+    it('maps fable → gpt-5.6-sol (claude premium_plus → codex premium_plus)', () => {
+      expect(registry.getEquivalent('claude-fable-5', 'codex')).toBe('gpt-5.6-sol');
     });
 
     it('maps opus → gemini-2.5-pro (claude premium → gemini premium)', () => {

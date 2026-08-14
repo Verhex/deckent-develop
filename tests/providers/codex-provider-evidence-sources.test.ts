@@ -12,11 +12,16 @@ import { ProviderEvidenceSourceRegistry } from '../../src/core/provider-evidence
 import type { ReachabilityProbeRequest } from '../../src/core/provider-truth.js';
 import {
   CodexAccountIdentityAuthority,
+  CodexDockerReachabilityEvidenceSource,
   CodexReachabilityUnavailableEvidenceSource,
   CodexUsageStateLimitEvidenceSource,
   createCodexHostSubscriptionEvidenceSourceRegistrations,
   createCodexHostSubscriptionEvidenceSourceRegistry,
 } from '../../src/providers/codex-provider-evidence-sources.js';
+import type {
+  BoundedReachabilityProbeRequest,
+  ProviderNativeProbeObservation,
+} from '../../src/core/provider-evidence-probe-contract.js';
 import { createLocalProviderEvidenceSourceRegistrations } from '../../src/providers/provider-authority-runtime-bootstrap.js';
 
 const NOW = new Date('2026-08-12T09:00:00.000Z');
@@ -412,7 +417,10 @@ describe('CodexUsageStateLimitEvidenceSource', () => {
     }).observe(limitInput());
 
     expect(observation.state).toBe('known');
-    expect(observation.requiredWindowIds).toEqual(['codex.primary', 'codex.secondary']);
+    // Measured live 2026-08-12 (pro plan): the codex CLI truthfully reports
+    // `secondary: null` — provider shape, not incomplete evidence. Requiring a
+    // window the provider does not declare held every probe forever (bulgu #9).
+    expect(observation.requiredWindowIds).toEqual(['codex.primary']);
     expect(observation.windows.map(window => window.windowId)).toEqual(['codex.primary']);
   });
 
@@ -489,6 +497,141 @@ describe('CodexReachabilityUnavailableEvidenceSource', () => {
       latencyMs: null,
       evidenceRefs: [expect.stringMatching(/^codex-reachability-scope:[a-f0-9]{64}$/u)],
     });
+  });
+});
+
+describe('CodexDockerReachabilityEvidenceSource', () => {
+  function dockerProbeRequest(
+    overrides: Record<string, unknown> = {},
+  ): Readonly<ReachabilityProbeRequest> {
+    const base = probeRequest() as unknown as Record<string, unknown>;
+    return {
+      ...base,
+      backend: {
+        ...(base.backend as Record<string, unknown>),
+        executionBackend: 'docker',
+      },
+      admission: {
+        budget: {
+          evidenceRef: `execution-budget:${'b'.repeat(64)}`,
+          projection: {
+            billingMode: 'subscription',
+            maxInputTokens: 32_768,
+            maxOutputTokens: 512,
+            maxTokens: 33_280,
+            timeoutMs: 60_000,
+          },
+        },
+      },
+      ...overrides,
+    } as unknown as Readonly<ReachabilityProbeRequest>;
+  }
+
+  function transportOf(
+    observation: ProviderNativeProbeObservation,
+    calls: BoundedReachabilityProbeRequest[] = [],
+  ) {
+    return () => ({
+      invoke: async (request: Readonly<BoundedReachabilityProbeRequest>) => {
+        calls.push(request as BoundedReachabilityProbeRequest);
+        return observation;
+      },
+    });
+  }
+
+  it('maps a completed canonical probe to succeeded with the structurally pinned identity', async () => {
+    const calls: BoundedReachabilityProbeRequest[] = [];
+    const source = new CodexDockerReachabilityEvidenceSource(transportOf({
+      outcome: 'completed',
+      providerRequestRef: null,
+      outputBytes: 24,
+      latencyMs: 1234,
+    }, calls));
+
+    const observation = await source.probe(dockerProbeRequest());
+
+    expect(observation).toMatchObject({
+      outcome: 'succeeded',
+      calledProvider: 'codex',
+      calledModel: MODEL,
+      providerRequestRefHash: null,
+      latencyMs: 1234,
+    });
+    // The bounded request carries ONLY owner-budgeted ceilings — no literals.
+    expect(calls[0]).toMatchObject({
+      provider: 'codex',
+      model: MODEL,
+      timeoutMs: 60_000,
+      maxOutputTokens: 512,
+    });
+    expect(calls[0]?.promptBytes.byteLength).toBeGreaterThan(0);
+  });
+
+  it('stays typed-unsupported outside the exact docker/cli/subscription scope', async () => {
+    const source = new CodexDockerReachabilityEvidenceSource(transportOf({
+      outcome: 'completed', providerRequestRef: null, outputBytes: 1, latencyMs: 1,
+    }));
+    const observation = await source.probe(probeRequest());
+    expect(observation.outcome).toBe('unsupported');
+    expect(observation.calledProvider).toBeNull();
+  });
+
+  it('returns typed not-run when the billing-mode budget projection is absent', async () => {
+    const source = new CodexDockerReachabilityEvidenceSource(transportOf({
+      outcome: 'completed', providerRequestRef: null, outputBytes: 1, latencyMs: 1,
+    }));
+    const observation = await source.probe(dockerProbeRequest({
+      admission: { budget: { evidenceRef: `execution-budget:${'b'.repeat(64)}` } },
+    }));
+    expect(observation.outcome).toBe('not-run');
+  });
+
+  it('returns typed unsupported when no canonical docker transport is bound', async () => {
+    const source = new CodexDockerReachabilityEvidenceSource(() => null);
+    const observation = await source.probe(dockerProbeRequest());
+    expect(observation.outcome).toBe('unsupported');
+  });
+
+  it.each([
+    ['backend_unreachable', 'backend-unreachable'],
+    ['backend_unsupported', 'unsupported'],
+    ['credential_unavailable', 'auth-rejected'],
+    ['some_other_code', 'transport-error'],
+  ] as const)('maps transport-error %s to %s', async (errorCode, expected) => {
+    const source = new CodexDockerReachabilityEvidenceSource(transportOf({
+      outcome: 'transport-error', errorCode, retryable: false, elapsedMs: 9,
+    }));
+    const observation = await source.probe(dockerProbeRequest());
+    expect(observation.outcome).toBe(expected);
+    expect(observation.calledProvider).toBeNull();
+  });
+
+  it('maps a timed-out probe to timeout and a rejection to invalid-response', async () => {
+    const timedOut = new CodexDockerReachabilityEvidenceSource(transportOf({
+      outcome: 'timed-out', elapsedMs: 60_001,
+    }));
+    expect((await timedOut.probe(dockerProbeRequest())).outcome).toBe('timeout');
+    const rejected = new CodexDockerReachabilityEvidenceSource(transportOf({
+      outcome: 'rejected', providerCode: null, retryable: false, latencyMs: 5,
+    }));
+    expect((await rejected.probe(dockerProbeRequest())).outcome).toBe('invalid-response');
+  });
+
+  it('registration binds the live source to the docker slot ONLY, host stays the honest stub', async () => {
+    const registrations = createCodexHostSubscriptionEvidenceSourceRegistrations({
+      platform: 'linux',
+      env: {},
+      dockerReachabilityTransport: transportOf({
+        outcome: 'completed', providerRequestRef: null, outputBytes: 1, latencyMs: 7,
+      }),
+    });
+    const docker = registrations.find(r => r.executionBackend === 'docker');
+    const host = registrations.find(r => r.executionBackend === 'host-subprocess');
+    expect(docker && host).toBeTruthy();
+    const dockerObservation = await docker!.sources.reachability.probe(dockerProbeRequest());
+    expect(dockerObservation.outcome).toBe('succeeded');
+    const hostObservation = await host!.sources.reachability.probe(probeRequest());
+    expect(hostObservation.outcome).toBe('unsupported');
   });
 });
 

@@ -93,6 +93,12 @@ The header comment in `src/api/run-flow-routes.ts` still says there are four rou
 
 `POST /api/rpc` carries a versioned request/response envelope. The catalog contains `session.list`, `session.resume`, `run.status`, `run.start-detached`, `approval.list`, and `approval.decide`; `limits.get` is also present in the server handler map. Current write wiring supports `run.start-detached` and `approval.decide`, while `session.resume` remains explicitly unsupported. [Evidence: `src/core/term-rpc.ts:143-183`; `src/api/rpc-write-handlers.ts:120-199`; `src/api/server.ts:621-742,1385-1395`]
 
+### Cross-verify receipt and approval-decision boundary
+
+- Cross-verify (`deckent xverify`) is host-adjudicated across two DIFFERENT providers (author ≠ verifier; same-provider self-verify is forbidden). A claim reaches closure only through the full chain: genuine terminal verdict + actual provider call + provider-reported usage + terminally-closed settlement + a durable verdict receipt (`cross-verify-verdict:sha256:…`). `HOLD`/`UNCLEAR` is not closure. [Evidence: `CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md` §12.2]
+- Approval decisions are a mutation. The MCP `deckent_approvals` tool is a READ-ONLY pending inbox (`ApprovalBroker.list('pending')`) — it exposes no allow/deny/decide/self-approval. A decision is taken only on the `deckent approvals decide` CLI surface behind interactive live-auth, or through the flag/policy-gated HTTP `POST /api/approvals/:id/decision` / `approval.decide` RPC. [Evidence: `src/mcp/tools/approvals.ts`; `src/cli/commands/approvals.ts`]
+- Local-terminal auth is independent: `/api/terminal/token` is loopback-only and requires a valid API bearer; the WebSocket terminal transport is not authorized by the generic API-auth bypass. [Evidence: `src/api/server.ts:2567-2708`]
+
 ## Dogfood / repository reality
 
 - ✅ Central bearer, rate, CORS, and control-mutation gates precede route dispatch. [Evidence: `src/api/server.ts:745-856`]
