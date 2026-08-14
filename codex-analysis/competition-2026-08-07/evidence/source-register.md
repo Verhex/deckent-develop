@@ -16,7 +16,7 @@ Bu kayıt, rekabet raporlarının kanıt zinciridir. Dış ürünler için önce
 | [`src/core/approval-broker.ts`](../../../src/core/approval-broker.ts) ve [`src/core/approval-decision-ingress.ts`](../../../src/core/approval-decision-ingress.ts) | Durable approval state, first-writer-wins, signed/actor-bound decision ingress | Source evidence; runtime-wide cutover açık |
 | [`src/core/routing/route-task-v3.ts`](../../../src/core/routing/route-task-v3.ts) ve [`src/core/routing/journal.ts`](../../../src/core/routing/journal.ts) | Production Routing V3, verification, deterministic replay/journal | Shipped source evidence |
 | [`src/agent/trace-recorder.ts`](../../../src/agent/trace-recorder.ts) | Worker claim, Brain verdict ve retry/FIX trace shape | Source foundation; end-to-end training trace açık |
-| [31 Temmuz 2026 competitor audit](../../../.analysis/deckent-competitors-2026-07-31/artifact.json) | Orca/Ruflo/Cline/OpenClaw/Paperclip için önceki source-level audit ve superseded verdict zinciri | Prior internal analysis; current external docs ile yeniden sınandı |
+| 31 Temmuz 2026 competitor audit | Orca/Ruflo/Cline/OpenClaw/Paperclip için önceki source-level audit ve superseded verdict zinciri | Prior internal analysis; current external docs ile yeniden sınandı |
 
 ## Naive
 

@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "1f6e7dacd5d6c32b53d48e6625b2f9ee5a20f84de6d898f7986f621361aeee0a"
+    "value": "a9db8977826a20f28d40b80ab912bf0fb3cf3500da9a643c5a5d4ce9e7db2692"
   },
   "summary": {
     "total": 491,
@@ -4855,9 +4855,9 @@
       "program": "RELEASE",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-08-03",
+      "updated": "2026-08-14",
       "definitionDigest": "923158605bf56dc17a638dddc797d35d67827ba44c4b542cc8ba6c446add02dd",
-      "progressDigest": "294f187a7309adff866b8aedfe147074cfbabdc46575c402643b0ce2c4db3ad9",
+      "progressDigest": "c6c502ffa31adce9b551565f0e6a5a40fb47e10fd856566b6be946d4e7181385",
       "terminalClosureDigest": null
     },
     {
@@ -23244,8 +23244,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "72h declared-platform soak, zero release blocker, signed artifacts, owner publish approval",
-      "evidence": "Legacy 535; 2026-08-03 P0→P1 indirimi 2026-08-03 xverify turunda GERİ ALINDI (Alperen onayı, xverify C-ekseni): \"dependent yok → critical path değil\" çıkarımım terminal düğümde yönü ters okuyordu — unified release gate SONUÇ düğümüdür, arkasında node olmaması critical-path dışılık değil tam tersine uç nokta olduğunun kanıtıdır. P0 geri geldi",
-      "updated": "2026-08-03"
+      "evidence": "Legacy 535; 2026-08-03 P0→P1 indirimi 2026-08-03 xverify turunda GERİ ALINDI (Alperen onayı, xverify C-ekseni): \"dependent yok → critical path değil\" çıkarımım terminal düğümde yönü ters okuyordu — unified release gate SONUÇ düğümüdür, arkasında node olmaması critical-path dışılık değil tam tersine uç nokta olduğunun kanıtıdır. P0 geri geldi. 2026-08-14 rebaseline dimension (status UNCHANGED — soak/GA/owner-publish conditions intact): the product was re-baselined at 0.100.0 (tagless — no git tag, GitHub Release or npm publish), the wrong 1.0.0-beta.1 narrative cancelled, the 277-entry sprint-dump changelog archived (docs/archive/docs-pre-reset-2026-08-14/) and the per-sprint automation stopped from minting product-version headers, and the release workflow's automatic npm publish + Create-GitHub-Release steps removed (canonical publish is owner-manual; validate:publish gains a changelog_section gate). This closes only the version/changelog/publish-boundary truth dimension, not the RELEASE-001 soak/GA gate",
+      "updated": "2026-08-14"
     },
     {
       "order": 8070,
@@ -25453,6 +25453,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ecbcbe35fb442043a4d45979b29c651e758fa78ede88cea0bb7a3d9c9febb6d5"
+    "value": "347ae9b8d6de5a1e39bc1e3e402880d47321e1c1bd24b6459df4de664dd4ae1a"
   }
 }

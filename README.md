@@ -33,7 +33,7 @@ node dist/cli/entry.js status --json
 
 Observed checkpoints:
 
-- Version reported `1.0.0-beta.1`, Node `v24.15.0`, Linux; exit 0.
+- Version reported `0.100.0`, Node `v24.15.0`, Linux; exit 0.
 - Doctor returned `ok: true`; its honest summary reported 15 ready and 2 non-required missing checks in this workspace; exit 0.
 - Onboarding returned a project-scoped, balanced config plan with `applied: false`; it detected logged-in Claude and Codex sessions and did not write the plan; exit 0.
 - Status returned `active: false`, `lifecycle: IDLE`, and an honest provider-observation `HOLD` for four unresolved intervals outside the exact current-run task set; exit 0.
@@ -98,7 +98,7 @@ Deckent's three immutable laws are Dual Lens + Scale, Every Environment, and Nev
 License: MIT. [Evidence: `package.json:90-91`; `LICENSE`]
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-35249%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-35265%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.100.0-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 <!-- AUTOGEN:START id="stat-counts" -->

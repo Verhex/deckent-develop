@@ -4,15 +4,6 @@ import { TaskEvaluation } from '../../core/types.js';
 import type { TaskResult } from '../../core/types.js';
 import type { DocUpdater, DocUpdateContext, DocUpdateResult } from './types.js';
 
-function readPackageVersion(projectRoot: string): string {
-  try {
-    const pkg = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf-8'));
-    return (pkg as { version?: string }).version ?? '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-}
-
 export interface CategoryHints {
   added: string[];
   changed: string[];
@@ -72,7 +63,6 @@ export const changelogUpdater: DocUpdater = {
     const { projectRoot, sprintResult, results } = ctx;
     const { sprint, evaluations, metrics } = sprintResult;
     const date = new Date().toISOString().slice(0, 10);
-    const version = readPackageVersion(projectRoot);
     const sprintNum = sprint.number;
 
     const changelogPath = join(projectRoot, 'docs', 'CHANGELOG.md');
@@ -81,7 +71,11 @@ export const changelogUpdater: DocUpdater = {
     const fileExisted = existsSync(changelogPath);
     const existing = fileExisted ? readFileSync(changelogPath, 'utf-8') : headerText;
 
-    const versionTag = `${version}-sprint${String(sprintNum).padStart(2, '0')}`;
+    // Engineering-ledger row, NOT a product release. The header carries only the
+    // sprint number — never a product-version-shaped tag. Since the 0.100.0
+    // rebaseline, product release notes live in the root CHANGELOG.md; sprint
+    // settlement must not mint product-version headers into this ledger.
+    const versionTag = `sprint${String(sprintNum).padStart(2, '0')}`;
     const versionHeader = `## [${versionTag}]`;
 
     // Idempotency: skip if an entry for this sprint version already exists.

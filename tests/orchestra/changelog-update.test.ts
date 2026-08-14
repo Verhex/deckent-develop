@@ -158,7 +158,7 @@ describe('changelogUpdater — sprint-finalizer wire', () => {
     expect(result.reason).toBe('created');
     expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
     const written = String(mockedWriteFileSync.mock.calls[0][1]);
-    expect(written).toContain('## [1.0.0-beta.1-sprint189]');
+    expect(written).toContain('## [sprint189]');
     expect(written).toContain('### Added');
     expect(written).toContain('CHANGELOG sprint-reporter auto-update wire');
     expect(written).toContain('_Tasks: 1 total, 1 done');
@@ -198,7 +198,7 @@ describe('changelogUpdater — sprint-finalizer wire', () => {
 
   it('skips duplicate entries when the sprint version header already exists', () => {
     const existing =
-      '# Changelog\n\nDesc\n\n## [1.0.0-beta.1-sprint189] - 2026-05-22\n\n### Added\n\n- prior entry\n';
+      '# Changelog\n\nDesc\n\n## [sprint189] - 2026-05-22\n\n### Added\n\n- prior entry\n';
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockImplementation((p: any) => {
       if (String(p).endsWith('package.json'))

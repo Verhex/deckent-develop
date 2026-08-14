@@ -2,7 +2,7 @@
 
 ## Product-user perspective
 
-Deckent is currently packaged as `1.0.0-beta.1`. The npm package exposes two binaries, `deckent` and `deckent-mcp`, plus the package root and `deckent/sdk` import paths. The declared runtime floor is Node.js 24. [Evidence: `package.json:2-20,115-123`]
+Deckent is currently packaged as `0.100.0`. The npm package exposes two binaries, `deckent` and `deckent-mcp`, plus the package root and `deckent/sdk` import paths. The declared runtime floor is Node.js 24. [Evidence: `package.json:2-20,115-123`]
 
 ### Install and build surfaces
 

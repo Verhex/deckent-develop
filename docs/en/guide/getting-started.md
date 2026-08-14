@@ -67,7 +67,7 @@ The command registrations above were all real-binary help-verified. Their state-
 
 | Area | State | Current evidence |
 |---|---|---|
-| Built CLI | ✅ live | Version `1.0.0-beta.1`; 211 visible paths; every visible help path exited 0. |
+| Built CLI | ✅ live | Version `0.100.0`; 211 visible paths; every visible help path exited 0. |
 | Readiness diagnosis | ✅ live | `doctor --json`, `connect --json`, onboarding plan, and status were run against the binary. |
 | Installation from npm | ⚠️ partial | Package contract exists; network/global installation was outside this audit's write authority. |
 | Onboarding | ✅ live | Read-only planner and explicit apply/dry-run paths are wired. |

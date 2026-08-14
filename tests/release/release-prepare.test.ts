@@ -8,7 +8,7 @@
  * metadata survives; (3) that the script never tags/pushes/publishes; (4) the retired
  * scripts/bump-version.sh stub; (5) the two-file changelog-canonicity role-banners + the MRR text
  * fix in the REAL root CHANGELOG.md; (6) a regression pin that validateChangelogSectionFormat
- * accepts the real root CHANGELOG.md's current [1.0.0-beta.1] section — the exact-anchor contract
+ * accepts the real root CHANGELOG.md's current [0.100.0] section — the exact-anchor contract
  * .github/workflows/release.yml's extractor (and any future parser) relies on.
  *
  * Async spawn only (no spawnSync — would freeze the vitest worker's heartbeat RPC), all mutable
@@ -232,14 +232,14 @@ describe('validateChangelogSectionFormat', () => {
   });
 
   it('does not prefix-match a longer sprint-suffixed heading (the exact bug REL-03 fixed)', () => {
-    const content = '# Changelog\n\n## [1.0.0-beta.1-sprint413] — 2026-07-11\n\n### Added\n\n- x\n';
-    const result = validateChangelogSectionFormat(content, '1.0.0-beta.1');
+    const content = '# Changelog\n\n## [0.100.0-sprint413] — 2026-07-11\n\n### Added\n\n- x\n';
+    const result = validateChangelogSectionFormat(content, '0.100.0');
     expect(result.ok).toBe(false);
   });
 
-  it('regression pin: the REAL root CHANGELOG.md current section satisfies the contract', () => {
+  it('regression pin: the REAL root CHANGELOG.md current [0.100.0] section satisfies the contract', () => {
     const content = readFileSync(ROOT_CHANGELOG_PATH, 'utf-8');
-    const result = validateChangelogSectionFormat(content, '1.0.0-beta.1');
+    const result = validateChangelogSectionFormat(content, '0.100.0');
     expect(result.ok).toBe(true);
   });
 });
@@ -367,11 +367,14 @@ describe('release-prepare.mjs CLI — real-binary round-trip on a tmpdir copy-fi
     expect(source).not.toMatch(/execSync|spawnSync|spawn\(|child_process/);
   });
 
-  it('next-steps guidance names git tag / push / npm publish as the human/workflow\'s job, not something it does itself', async () => {
+  it('next-steps guidance is owner-manual publish (no tag-triggered publish, no --provenance)', async () => {
     const dir = makeTmpFixtureDir();
     const { stdout } = await runNodeScriptAsync(['--version', '9.9.9-guidance.1', '--root', dir]);
-    expect(stdout).toMatch(/does NOT create git tags, push, or run npm publish/);
-    expect(stdout).toContain('git tag v9.9.9-guidance.1');
+    expect(stdout).toMatch(/does NOT create git tags, push, or publish/);
+    expect(stdout).toContain('npm publish --access public --ignore-scripts');
+    // The publish COMMAND carries no --provenance (the guidance may still say "no --provenance").
+    expect(stdout).not.toMatch(/npm publish[^\n]*--provenance/);
+    expect(stdout).not.toMatch(/pushing the tag triggers[^\n]*publish/i);
   });
 });
 

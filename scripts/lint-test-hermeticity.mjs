@@ -194,8 +194,19 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // fixture rewire to the candidate-bound hold seam) shifted the line numbers of
   // those already-tracked files' unresolved entries; no unresolved symbol added or
   // removed. Prior: MCP-INSTRUCTIONS-DRIFT-CLOSE (12849).
+  // 2026-08-14 (VERSION-0.100.0-REBASELINE): same 12849 count, digest only — the
+  // version/changelog rebaseline edited already-tracked test files (index.test,
+  // changelog-update, release.test workflow) and doc-updaters/changelog.ts, and
+  // added the fully-resolved tests/release/version-rebaseline.test.ts (all imports
+  // resolve → no new unresolved symbol); the line-number shifts move existing
+  // entries only. Prior: APPROVAL-PARITY-FIXTURE-CLOSE (12849).
+  // 2026-08-14 (REBASELINE-NOGO-FIXES): same 12849 count, digest only — the Codex
+  // NO-GO fixes: the upgrade.ts product-successor policy (fully-resolved new exports),
+  // the validate-publish.mjs duplicate-heading gate, release.yml/release-prepare.mjs
+  // owner-manual edits, and the expanded version-rebaseline/release tests. All imports
+  // resolve; line shifts only. Prior: VERSION-0.100.0-REBASELINE (12849).
   count: 12849,
-  digest: '99cc9c1d1b882c6f499646a63d37cfcc008bf8658eef02cb433a24388b0bb19e',
+  digest: 'fd418931f645a7e527b1dc0e8d7b7e603ed6d84d06d37b10f628daefb3508d9f',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -288,8 +299,18 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (messages.ts), both inventoried production modules, shifted their line-numbered
   // inventory fingerprints. No production module added or removed. Prior:
   // MCP-INSTRUCTIONS-DRIFT-CLOSE (1232).
+  // 2026-08-14 (VERSION-0.100.0-REBASELINE): same 1232 count, digest only — the
+  // sprint-finalizer changelog automation (src/orchestra/doc-updaters/changelog.ts,
+  // an inventoried production module) dropped readPackageVersion and stopped deriving
+  // a product-version-shaped sprint header, shifting its line-numbered inventory
+  // fingerprint. No production module added or removed. Prior:
+  // APPROVAL-PARITY-FIXTURE-CLOSE (1232).
+  // 2026-08-14 (REBASELINE-NOGO-FIXES): same 1232 count, digest only — the Codex NO-GO
+  // fix added the retired-lineage product-successor policy to src/cli/commands/upgrade.ts
+  // (an inventoried production module), shifting its line-numbered inventory fingerprint.
+  // No production module added or removed. Prior: VERSION-0.100.0-REBASELINE (1232).
   count: 1232,
-  digest: '85555106d3d312b604c93f27c5f52bf77cf92032835361fb39f394c058462354',
+  digest: '22bcd4d330305006a9f7baa4627d934eb80227f7a49fac39851188a93fee0390',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

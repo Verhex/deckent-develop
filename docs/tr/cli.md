@@ -8,7 +8,7 @@ Built Commander tree 75 registered top-level command içerir: 74'ü visible, `ga
 
 `node dist/cli/entry.js --help` ile 211 visible path'in her birindeki `--help` gerçek binary üzerinde çalıştırıldı: 212 invocation, 212 exit-code-zero sonuç. Help verification; registration, parsing, usage, options ve help rendering'i kanıtlar, her state-changing action'ı kanıtlamaz. Bu yeniden-yazımın `docs/` dışında yazma izni olmadığı için run/sprint/autonomous, config mutation, cleanup, kill, provisioning ve diğer mutating action'lar çalıştırılmadı. [Kanıt: recursive binary-help audit çıktısı, 2026-08-01; user boundary]
 
-İncelenen binary Deckent `1.0.0-beta.1` ve Node `v24.15.0` bildirir. [Kanıt: `node dist/cli/entry.js --version-json`, 2026-08-01]
+İncelenen binary Deckent `0.100.0` ve Node `v24.15.0` bildirir. [Kanıt: `node dist/cli/entry.js --version-json`, 2026-08-14]
 
 ### Invocation
 

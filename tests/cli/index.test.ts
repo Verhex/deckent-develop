@@ -154,7 +154,7 @@ describe('CLI index — buildProgram()', () => {
   });
 
   it('version matches DECKENT_VERSION constant', () => {
-    expect(DECKENT_VERSION).toBe('1.0.0-beta.1');
+    expect(DECKENT_VERSION).toBe('0.100.0');
   });
 
   it('buildProgram does not call parseAsync', () => {

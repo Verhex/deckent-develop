@@ -22,10 +22,12 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toContain("- 'v*'")
     })
 
-    it('should define permissions for contents and id-token', () => {
+    it('should request least-privilege permissions — no publish/OIDC/write (0.100.0 rebaseline)', () => {
       expect(workflowContent).toContain("permissions:")
-      expect(workflowContent).toContain("contents: write")
-      expect(workflowContent).toContain("id-token: write")
+      // No automatic publish and no GitHub Release → no contents:write, no id-token OIDC.
+      expect(workflowContent).toContain("contents: read")
+      expect(workflowContent).not.toContain("contents: write")
+      expect(workflowContent).not.toContain("id-token: write")
     })
 
     it('should define actions:read permission (REL-02 — gh run list needs it)', () => {
@@ -53,8 +55,9 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toContain("- name: Type check (lint)")
       expect(workflowContent).toContain("- name: Release smoke test-gate")
       expect(workflowContent).toContain("- name: Build")
-      expect(workflowContent).toContain("- name: Create GitHub Release")
-      expect(workflowContent).toContain("- name: Publish to npm")
+      // 0.100.0 rebaseline: publishing is owner-manual — NO automatic publish / GitHub Release step.
+      expect(workflowContent).not.toContain("- name: Publish to npm")
+      expect(workflowContent).not.toContain("- name: Create GitHub Release")
     })
   })
 
@@ -169,15 +172,15 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   })
 
   describe('Dependency Audit Step (SEC-05, 419-003)', () => {
-    it('should exist, after CI attestation + install, before publish', () => {
+    it('should exist, after CI attestation + install, before build', () => {
       const verifyCiIdx = workflowContent.indexOf('- name: Verify CI attestation for this commit')
       const installIdx = workflowContent.indexOf('- name: Install dependencies')
       const auditIdx = workflowContent.indexOf('- name: Dependency audit (fail-closed, signed-exception allowlist; SEC-05)')
-      const publishIdx = workflowContent.indexOf('- name: Publish to npm')
+      const buildIdx = workflowContent.indexOf('- name: Build')
       expect(auditIdx).toBeGreaterThan(-1)
       expect(verifyCiIdx).toBeLessThan(auditIdx)
       expect(installIdx).toBeLessThan(auditIdx)
-      expect(auditIdx).toBeLessThan(publishIdx)
+      expect(auditIdx).toBeLessThan(buildIdx)
     })
 
     it('should invoke the fail-closed gate script (not a bare `npm audit`)', () => {
@@ -188,13 +191,13 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).not.toContain('continue-on-error')
     })
 
-    it('must not touch the SHA-pinned action / OIDC permission structure elsewhere in the file', () => {
-      // Regression guard: this step is a bare `run:` (no `uses:`), so it introduces no new
-      // action pin; the pre-existing pinned actions and the id-token/actions permissions
-      // block must be exactly as many as before this task.
+    it('keeps the SHA-pin set minimal and drops the OIDC write permission (least privilege)', () => {
+      // This workflow is bare `run:` + a few pinned actions; after the 0.100.0 rebaseline it
+      // publishes nothing, so the id-token OIDC write permission is dropped and only the three
+      // read/attest actions remain pinned.
       const shaPinnedActionCount = (workflowContent.match(/uses: [a-zA-Z0-9/_.-]+@[0-9a-f]{40}/g) || []).length
-      expect(shaPinnedActionCount).toBe(4) // checkout, setup-node, action-gh-release, upload-artifact
-      expect(workflowContent).toContain('id-token: write')
+      expect(shaPinnedActionCount).toBe(3) // checkout, setup-node, upload-artifact (action-gh-release removed with the auto-release step)
+      expect(workflowContent).not.toContain('id-token: write') // least privilege — no OIDC publish
     })
   })
 
@@ -262,54 +265,26 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
     })
   })
 
-  describe('Create GitHub Release Step', () => {
-    it('should use softprops/action-gh-release pinned to an immutable commit SHA (SEC-06)', () => {
-      expect(workflowContent).toMatch(/uses: softprops\/action-gh-release@[0-9a-f]{40} # v2\.\d+\.\d+/)
+  describe('No automatic publish or GitHub Release (0.100.0 rebaseline — owner-manual)', () => {
+    it('does NOT run an automatic npm publish', () => {
+      expect(workflowContent).not.toMatch(/run:\s*npm publish/)
+      expect(workflowContent).not.toContain('- name: Publish to npm')
     })
 
-    it('should use ref_name as release name', () => {
-      expect(workflowContent).toContain("name: ${{ github.ref_name }}")
+    it('does NOT create a GitHub Release', () => {
+      expect(workflowContent).not.toContain('- name: Create GitHub Release')
+      expect(workflowContent).not.toMatch(/uses: softprops\/action-gh-release/)
+      expect(workflowContent).not.toContain('generate_release_notes: true')
     })
 
-    it('should use changelog output as body', () => {
-      expect(workflowContent).toContain("body_path: ${{ steps.changelog.outputs.notes_file }}")
+    it('documents that publishing is owner-manual', () => {
+      expect(workflowContent).toMatch(/OWNER-MANUAL/i)
+      expect(workflowContent).toMatch(/no automatic package publish/i)
     })
 
-    it('should upload dist artifacts', () => {
-      expect(workflowContent).toMatch(/Create GitHub Release[\s\S]*?files:[\s\S]*?dist/)
-    })
-
-    it('should enable auto-generated release notes', () => {
-      expect(workflowContent).toContain("generate_release_notes: true")
-    })
-  })
-
-  describe('Publish to npm Step', () => {
-    it('should exist', () => {
-      expect(workflowContent).toContain("- name: Publish to npm")
-    })
-
-    it('should run npm publish with provenance', () => {
-      expect(workflowContent).toMatch(/Publish to npm[\s\S]*?npm publish[\s\S]*?--provenance/)
-    })
-
-    it('should set --access public', () => {
-      expect(workflowContent).toMatch(/npm publish[\s\S]*?--access public/)
-    })
-
-    it('should carry zero npm-auth-secret references — SEC-06: trusted-publishing/OIDC only', () => {
+    it('carries zero npm-auth-secret references', () => {
       expect(workflowContent).not.toContain('NPM_TOKEN')
-      expect(workflowContent).not.toMatch(/Publish to npm[\s\S]*?NODE_AUTH_TOKEN/)
-    })
-
-    it('should honestly document the npmjs.com trusted-publisher registry-side requirement', () => {
-      expect(workflowContent).toMatch(/trusted publisher[\s\S]{0,400}Publish to npm/i)
-      expect(workflowContent).toContain('npmjs.com')
-    })
-
-    it('should document the failure mode when the registry-side trusted-publisher is not configured', () => {
-      expect(workflowContent).toContain('ENEEDAUTH')
-      expect(workflowContent).toMatch(/Unable to authenticate/)
+      expect(workflowContent).not.toContain('NODE_AUTH_TOKEN')
     })
   })
 
@@ -332,13 +307,13 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   })
 
   describe('Complete Flow Validation', () => {
-    it('should have at least 13 distinct steps (RC4A adds 2 verify steps)', () => {
+    it('should have at least 11 distinct steps (auto-publish + auto-release steps removed in the 0.100.0 rebaseline)', () => {
       const steps = workflowContent.match(/- name: /g)
       expect(steps).not.toBeNull()
-      expect(steps!.length).toBeGreaterThanOrEqual(13)
+      expect(steps!.length).toBeGreaterThanOrEqual(11)
     })
 
-    it('should execute steps in logical order: checkout → setup → verify-integrity → verify-ci → install → lint → build → test-gate → changelog → publish → release', () => {
+    it('should execute steps in logical order: checkout → setup → verify-integrity → verify-ci → install → lint → build → test-gate → changelog (publish/release are owner-manual, not steps)', () => {
       const checkoutIdx = workflowContent.indexOf('- name: Checkout')
       const setupIdx = workflowContent.indexOf('- name: Setup Node.js')
       const verifyIntegrityIdx = workflowContent.indexOf('- name: Verify release integrity')
@@ -349,8 +324,6 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       const testIdx = workflowContent.indexOf('- name: Release smoke test-gate')
       const buildIdx = workflowContent.indexOf('- name: Build')
       const changelogIdx = workflowContent.indexOf('- name: Extract changelog for this version')
-      const releaseIdx = workflowContent.indexOf('- name: Create GitHub Release')
-      const publishIdx = workflowContent.indexOf('- name: Publish to npm')
 
       // born-608 (407-001) yeni-sıra: build, test-gate'ten ÖNCE — validate:publish
       // derlenmiş dist ister; smoke-gate build-sonrası koşar; npm publish,
@@ -368,13 +341,11 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(lintIdx).toBeLessThan(buildIdx)
       expect(buildIdx).toBeLessThan(testIdx)
       expect(testIdx).toBeLessThan(changelogIdx)
-      expect(changelogIdx).toBeLessThan(publishIdx)
-      expect(publishIdx).toBeLessThan(releaseIdx)
     })
 
-    it('should have permissions properly set for provenance', () => {
-      expect(workflowContent).toContain("id-token: write")
-      expect(workflowContent).toMatch(/Publish to npm[\s\S]*?npm publish[\s\S]*?--provenance/)
+    it('should NOT request id-token/contents:write — least privilege, no OIDC publish (0.100.0 rebaseline)', () => {
+      expect(workflowContent).not.toContain("id-token: write")
+      expect(workflowContent).not.toContain("contents: write")
     })
   })
 })

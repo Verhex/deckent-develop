@@ -141,7 +141,7 @@ Create `skills/<your-skill>/manifest.json`:
     "fileRead": [],
     "fileWrite": []
   },
-  "deckentVersionMin": "1.0.0-beta.1",
+  "deckentVersionMin": "0.100.0",
   "license": "MIT"
 }
 ```

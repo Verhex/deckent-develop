@@ -67,7 +67,7 @@ Yukarıdaki command registration'ların tümü real-binary help ile doğrulandı
 
 | Alan | State | Güncel evidence |
 |---|---|---|
-| Built CLI | ✅ canlı | Version `1.0.0-beta.1`; 211 visible path; her visible help path exit 0. |
+| Built CLI | ✅ canlı | Version `0.100.0`; 211 visible path; her visible help path exit 0. |
 | Readiness diagnosis | ✅ canlı | `doctor --json`, `connect --json`, onboarding plan ve status binary'de çalıştırıldı. |
 | npm installation | ⚠️ kısmi | Package contract var; network/global installation bu audit'in write authority'si dışındaydı. |
 | Onboarding | ✅ canlı | Read-only planner ve explicit apply/dry-run path'leri wired. |

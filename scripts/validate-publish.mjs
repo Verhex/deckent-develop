@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * validate-publish.mjs — npm publish v1.0.0-beta.1 readiness gates
+ * validate-publish.mjs — npm publish v0.100.0 readiness gates
  *
  * Sprint 180 W5-1 — Crisis Stabilization §6.
  *
@@ -73,7 +73,13 @@ export const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
 // headroom while remaining well under npm's own 50 MB warning threshold.
 // The dashboard bundle is a functional product feature (served by `deckent serve`)
 // and cannot be excluded without breaking the UI.
-const MAX_PACK_BYTES = 5 * 1024 * 1024; // 5 MB (see Sprint 271 calibration above)
+// 2026-08-14 re-calibration (0.100.0 rebaseline): threshold raised 5 MB → 6 MB. The
+// compiled dist/ grew with the accumulated production code (measured packed size 5.11 MB
+// / 5,360,281 bytes at 0.100.0 — all legitimate dist/{core,orchestra,cli} .js + .d.ts,
+// no docs/ or archive in the tarball; `files` is dist/bin/assets/README/LICENSE only).
+// 6 MB gives ~17% headroom while staying far below npm's 50 MB warning — same calibration
+// pattern as the earlier 2→3→5 MB bumps, not a way to hide a real bloat regression.
+const MAX_PACK_BYTES = 6 * 1024 * 1024; // 6 MB (see 0.100.0 rebaseline calibration above)
 
 // Sprint 413 (413-002, PUB-02): the absolute file-count pin (920±800, upper bound
 // 1720) is retired — it WARNed on the honest, all-legitimate 1853-file compiled
@@ -303,7 +309,7 @@ export function checkPackSizeAndCount(packOutput) {
       gate: 'pack_size_and_count',
       ok: false,
       severity: 'error',
-      message: `Package size ${packageSize} exceeds 5 MB limit (${packageSizeBytes} > ${MAX_PACK_BYTES} bytes)`,
+      message: `Package size ${packageSize} exceeds ${MAX_PACK_BYTES / 1024 / 1024} MB limit (${packageSizeBytes} > ${MAX_PACK_BYTES} bytes)`,
       topOffenders,
     };
   }
@@ -664,6 +670,83 @@ export function checkCriticalFilesInTarball(packOutput, pkg) {
 const CATEGORY_COUNT_GROWTH_TOLERANCE = 0.10; // a category may grow up to +10% in file count
 const CATEGORY_TOTAL_BYTES_GROWTH_LIMIT = 5 * 1024 * 1024; // total packed bytes may grow up to 5 MB vs baseline
 
+// ─── REL-CHANGELOG: the shipping version has a canonical release-notes section ──
+//
+// The 0.100.0 rebaseline makes this a HARD publish-readiness gate: a version bump
+// without a matching, non-empty `## [X.Y.Z]` section in the ROOT CHANGELOG.md — the
+// single source `.github/workflows/release.yml`'s changelog extractor reads — must
+// fail readiness. No silent publish of a version that has no release notes. The
+// exact-anchor match mirrors that extractor: the version token must end at `]`, so
+// `## [0.100.0]` never matches a `## [0.100.0-sprint84]` heading.
+//
+// Standalone (not in the 8-entry GATES array — that count is test-pinned): wired into
+// the CLI print/exit path (extraChecks), same precedent as checkCriticalFilesInTarball.
+/**
+ * @param {string} root project root
+ * @returns {{ gate: string, ok: boolean, severity: 'error', message: string }}
+ */
+export function checkChangelogSectionForVersion(root) {
+  const gate = 'changelog_section';
+  let version;
+  try {
+    version = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8')).version;
+  } catch (err) {
+    return { gate, ok: false, severity: 'error', message: `cannot read package.json version: ${err.message}` };
+  }
+  if (typeof version !== 'string' || version.length === 0) {
+    return { gate, ok: false, severity: 'error', message: 'package.json has no version string' };
+  }
+  let changelog;
+  try {
+    changelog = readFileSync(resolve(root, 'CHANGELOG.md'), 'utf-8');
+  } catch (err) {
+    return { gate, ok: false, severity: 'error', message: `cannot read root CHANGELOG.md: ${err.message}` };
+  }
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Exact-anchor, SINGULAR: heading is `## [VERSION]`, VERSION ends at ] (mirrors the
+  // release.yml changelog extractor, which fails on zero OR duplicate headings). A
+  // global match + count===1 is the contract — the first-match `.exec` alone would let
+  // a duplicate `## [VERSION]` heading through and splice ambiguous release notes.
+  const anchor = new RegExp(`^##\\s+\\[${escaped}\\](?:\\s|$)`, 'gm');
+  const matches = [...changelog.matchAll(anchor)];
+  if (matches.length === 0) {
+    return {
+      gate,
+      ok: false,
+      severity: 'error',
+      message: `no canonical release-notes section '## [${version}]' in root CHANGELOG.md — a version bump requires a matching, non-empty changelog entry before publish (run scripts/release-prepare.mjs --version ${version}, then fill in the section).`,
+    };
+  }
+  if (matches.length > 1) {
+    return {
+      gate,
+      ok: false,
+      severity: 'error',
+      message: `${matches.length} duplicate '## [${version}]' headings in root CHANGELOG.md — a version must have exactly one release-notes section (the release.yml extractor rejects duplicates too).`,
+    };
+  }
+  const match = matches[0];
+  // Non-empty: at least one non-blank line AFTER the heading line, before the next
+  // `## ` heading or EOF (skip past the heading line's own `— DATE` remainder).
+  const lineEnd = changelog.indexOf('\n', match.index);
+  const after = lineEnd === -1 ? '' : changelog.slice(lineEnd + 1);
+  const body = after.split(/\n## /)[0] ?? '';
+  if (body.trim().length === 0) {
+    return {
+      gate,
+      ok: false,
+      severity: 'error',
+      message: `release-notes section '## [${version}]' in root CHANGELOG.md is empty — fill in the release notes before publish.`,
+    };
+  }
+  return {
+    gate,
+    ok: true,
+    severity: 'error',
+    message: `canonical release-notes section '## [${version}]' present in root CHANGELOG.md`,
+  };
+}
+
 /**
  * Classify a packed file path into an extension bucket. `.d.ts` is checked before
  * `.js`/generic so declaration files don't fall into the `.js`-adjacent bucket.
@@ -1003,7 +1086,7 @@ if (entryArg !== '' && fileURLToPath(import.meta.url) === resolve(entryArg)) {
   console.log(`  [${driftTag}] ${driftCheck.gate}: ${driftCheck.message}`);
 
   const criticalFiles = checkCriticalFilesInTarball(result.packOutput, result.pkg);
-  const extraChecks = [criticalFiles, result.categoryBaselineCheck];
+  const extraChecks = [criticalFiles, result.categoryBaselineCheck, checkChangelogSectionForVersion(projectRoot)];
   for (const check of extraChecks) {
     if (!check.ok) {
       console.log(`  [\x1b[31mFAIL\x1b[0m] ${check.gate}: ${check.message}`);
