@@ -200,8 +200,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // added the fully-resolved tests/release/version-rebaseline.test.ts (all imports
   // resolve → no new unresolved symbol); the line-number shifts move existing
   // entries only. Prior: APPROVAL-PARITY-FIXTURE-CLOSE (12849).
+  // 2026-08-14 (REBASELINE-NOGO-FIXES): same 12849 count, digest only — the Codex
+  // NO-GO fixes: the upgrade.ts product-successor policy (fully-resolved new exports),
+  // the validate-publish.mjs duplicate-heading gate, release.yml/release-prepare.mjs
+  // owner-manual edits, and the expanded version-rebaseline/release tests. All imports
+  // resolve; line shifts only. Prior: VERSION-0.100.0-REBASELINE (12849).
   count: 12849,
-  digest: '3e51d915833b707f0e0093fd8661b265f849cef08d801c77fd47f0e267725431',
+  digest: '155a355793937d9e3c411ff04823b3a0fd9a5a5fa2c25db55b1b3b5424e1921c',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -300,8 +305,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // a product-version-shaped sprint header, shifting its line-numbered inventory
   // fingerprint. No production module added or removed. Prior:
   // APPROVAL-PARITY-FIXTURE-CLOSE (1232).
+  // 2026-08-14 (REBASELINE-NOGO-FIXES): same 1232 count, digest only — the Codex NO-GO
+  // fix added the retired-lineage product-successor policy to src/cli/commands/upgrade.ts
+  // (an inventoried production module), shifting its line-numbered inventory fingerprint.
+  // No production module added or removed. Prior: VERSION-0.100.0-REBASELINE (1232).
   count: 1232,
-  digest: '91f79f513438b4e814c75415abbdc4282fe716cbd8e357611cfc8f9214cdb175',
+  digest: '79d808e149ff42d3c68d9353b1972e7b69d46820ee9eec68e530d55447bd2b7c',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

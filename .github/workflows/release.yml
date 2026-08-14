@@ -52,8 +52,10 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
-  id-token: write
+  # Least privilege (0.100.0 rebaseline): this workflow no longer publishes or creates a
+  # GitHub Release, so no repo-write grant and no OIDC provenance token are needed. It
+  # only builds, validates and attests — read-only.
+  contents: read
   # actions: read — required by the "Verify CI attestation" step's `gh run list` call
   # (REL-02 + REL-02B). Default GITHUB_TOKEN scopes collapse to `none` for any permission
   # not explicitly listed once this block exists, so this must be named, not inherited.
@@ -237,27 +239,19 @@ jobs:
           node /tmp/extract-changelog.mjs "$VERSION"
           echo "notes_file=/tmp/release-notes.txt" >> "$GITHUB_OUTPUT"
 
-      # SEC-06 (RC4A): the long-lived npm auth secret this step used to read is gone.
-      # Publishing now relies entirely on npm trusted publishing (OIDC): the `id-token:
-      # write` permission above lets npm's CLI (Node 24.x bundles npm >=11.5.1, the
-      # trusted-publishing floor) exchange a short-lived GitHub Actions OIDC token for
-      # registry credentials at publish time — no secret stored in this repo at all.
-      # REQUIRED ONE-TIME MANUAL STEP (not automatable from this workflow): Alperen must
-      # register this GitHub repo + this workflow file as a trusted publisher for the
-      # `deckent` package on https://www.npmjs.com/package/deckent/access (Settings →
-      # Trusted Publisher). Until that registry-side setting exists, this step fails
-      # loudly with `npm error code ENEEDAUTH` / "Unable to authenticate" — it does NOT
-      # silently skip or no-op.
-      # --ignore-scripts: suppress prepublishOnly (see header note 1) so the build:all
       # ── PUBLISH IS OWNER-MANUAL (0.100.0 rebaseline, 2026-08-14) ──────────────
-      # This workflow deliberately performs NO automatic package publish and creates NO
-      # GitHub Release. It only builds, validates (validate:publish — verify-only),
-      # attests CI, and validates the CHANGELOG section, then stops. Canonical
-      # publishing is a MANUAL owner action, run by the owner from a validated tree:
+      # This workflow performs NO automatic package publish and creates NO GitHub Release.
+      # It only builds, validates (validate:publish — verify-only), attests CI, and
+      # validates the CHANGELOG section, then stops. There is no npm-auth secret and no
+      # npm trusted-publishing/OIDC step here — that is why no OIDC provenance token is
+      # requested (see the permissions block above). Canonical publishing is a MANUAL
+      # owner action, run by the owner from a validated tree:
       #     npm run build:all && npm run validate:publish
-      #     npm publish --provenance --access public --ignore-scripts
-      # Do NOT re-add an automatic publish or GitHub-Release step here under any name
-      # (owner decision: tagless, no auto-publish, no GitHub Release).
+      #     npm publish --access public --ignore-scripts
+      # (No `--provenance`: it requires a supported CI/trusted-publishing environment and
+      # is not used for a local owner-manual publish; enabling it later is a separate
+      # protected-CI decision.) Do NOT re-add an automatic publish or GitHub-Release step
+      # here under any name (owner decision: tagless, no auto-publish, no GitHub Release).
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

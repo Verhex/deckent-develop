@@ -17,7 +17,7 @@ Thank you for contributing to the Deckent Skill Registry! This guide explains th
 
 ## Prerequisites
 
-- Deckent v1.0.0-beta.1 or later. Until the first npm release ships, install from
+- Deckent v0.100.0 or later. Until the first npm release ships, install from
   source: clone `VerhexIO/deckent`, `npm ci && npm run build`, then `npm link`
   (post-release: `npm install -g deckent`)
 - A GitHub account

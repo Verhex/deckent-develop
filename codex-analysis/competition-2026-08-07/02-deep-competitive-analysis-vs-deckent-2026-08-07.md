@@ -113,7 +113,7 @@ Deckent Naive'ın cards/KYC/LLC feature set'ini kopyalamamalıdır. Bu, regulate
 
 #### Deckent'in avantaj adayı
 
-31 Temmuz source audit'inde Ruflo post-task success signal'ının caller'dan geldiği ve absent flag durumunda backward-compatible optimistic success'e düştüğü doğrulandı; adaptive scheduler signal'ı iyi tüketse de label artifact/test/eval'dan bağımsızdı ([prior audit](../../.analysis/deckent-competitors-2026-07-31/artifact.json), [hook source](https://github.com/ruvnet/ruflo/blob/main/v3/%40claude-flow/cli/src/commands/hooks.ts)). Deckent result evaluator ise disk/evidence/production-wiring gates taşır. Bu fark, **learning algorithm değil truth provenance** farkıdır.
+31 Temmuz source audit'inde Ruflo post-task success signal'ının caller'dan geldiği ve absent flag durumunda backward-compatible optimistic success'e düştüğü doğrulandı; adaptive scheduler signal'ı iyi tüketse de label artifact/test/eval'dan bağımsızdı (prior audit, [hook source](https://github.com/ruvnet/ruflo/blob/main/v3/%40claude-flow/cli/src/commands/hooks.ts)). Deckent result evaluator ise disk/evidence/production-wiring gates taşır. Bu fark, **learning algorithm değil truth provenance** farkıdır.
 
 #### Risk
 

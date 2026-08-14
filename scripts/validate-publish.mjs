@@ -697,10 +697,13 @@ export function checkChangelogSectionForVersion(root) {
     return { gate, ok: false, severity: 'error', message: `cannot read root CHANGELOG.md: ${err.message}` };
   }
   const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Exact-anchor: heading is `## [VERSION]`, VERSION ends at ] (mirrors the release.yml extractor).
-  const anchor = new RegExp(`^##\\s+\\[${escaped}\\](?:\\s|$)`, 'm');
-  const match = anchor.exec(changelog);
-  if (!match) {
+  // Exact-anchor, SINGULAR: heading is `## [VERSION]`, VERSION ends at ] (mirrors the
+  // release.yml changelog extractor, which fails on zero OR duplicate headings). A
+  // global match + count===1 is the contract — the first-match `.exec` alone would let
+  // a duplicate `## [VERSION]` heading through and splice ambiguous release notes.
+  const anchor = new RegExp(`^##\\s+\\[${escaped}\\](?:\\s|$)`, 'gm');
+  const matches = [...changelog.matchAll(anchor)];
+  if (matches.length === 0) {
     return {
       gate,
       ok: false,
@@ -708,6 +711,15 @@ export function checkChangelogSectionForVersion(root) {
       message: `no canonical release-notes section '## [${version}]' in root CHANGELOG.md — a version bump requires a matching, non-empty changelog entry before publish (run scripts/release-prepare.mjs --version ${version}, then fill in the section).`,
     };
   }
+  if (matches.length > 1) {
+    return {
+      gate,
+      ok: false,
+      severity: 'error',
+      message: `${matches.length} duplicate '## [${version}]' headings in root CHANGELOG.md — a version must have exactly one release-notes section (the release.yml extractor rejects duplicates too).`,
+    };
+  }
+  const match = matches[0];
   // Non-empty: at least one non-blank line AFTER the heading line, before the next
   // `## ` heading or EOF (skip past the heading line's own `— DATE` remainder).
   const lineEnd = changelog.indexOf('\n', match.index);

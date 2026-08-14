@@ -9,7 +9,7 @@
 > Added/Changed/Fixed, appended by the sprint-finalizer), see
 > [docs/CHANGELOG.md](docs/CHANGELOG.md) — a machine-written ledger with sprint-numbered headers
 > (`## [sprintNN]`, never product-version tags since the 0.100.0 rebaseline), not release notes.
-> Pre-0.100.0 sprint history is archived under [docs/archive/](docs/archive/).
+> Pre-0.100.0 sprint history is archived at [docs/archive/docs-pre-reset-2026-08-14/CHANGELOG.md](docs/archive/docs-pre-reset-2026-08-14/CHANGELOG.md).
 
 ## [Unreleased]
 

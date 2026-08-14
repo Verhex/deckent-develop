@@ -22,10 +22,12 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toContain("- 'v*'")
     })
 
-    it('should define permissions for contents and id-token', () => {
+    it('should request least-privilege permissions — no publish/OIDC/write (0.100.0 rebaseline)', () => {
       expect(workflowContent).toContain("permissions:")
-      expect(workflowContent).toContain("contents: write")
-      expect(workflowContent).toContain("id-token: write")
+      // No automatic publish and no GitHub Release → no contents:write, no id-token OIDC.
+      expect(workflowContent).toContain("contents: read")
+      expect(workflowContent).not.toContain("contents: write")
+      expect(workflowContent).not.toContain("id-token: write")
     })
 
     it('should define actions:read permission (REL-02 — gh run list needs it)', () => {
@@ -189,13 +191,13 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).not.toContain('continue-on-error')
     })
 
-    it('must not touch the SHA-pinned action / OIDC permission structure elsewhere in the file', () => {
-      // Regression guard: this step is a bare `run:` (no `uses:`), so it introduces no new
-      // action pin; the pre-existing pinned actions and the id-token/actions permissions
-      // block must be exactly as many as before this task.
+    it('keeps the SHA-pin set minimal and drops the OIDC write permission (least privilege)', () => {
+      // This workflow is bare `run:` + a few pinned actions; after the 0.100.0 rebaseline it
+      // publishes nothing, so the id-token OIDC write permission is dropped and only the three
+      // read/attest actions remain pinned.
       const shaPinnedActionCount = (workflowContent.match(/uses: [a-zA-Z0-9/_.-]+@[0-9a-f]{40}/g) || []).length
       expect(shaPinnedActionCount).toBe(3) // checkout, setup-node, upload-artifact (action-gh-release removed with the auto-release step)
-      expect(workflowContent).toContain('id-token: write')
+      expect(workflowContent).not.toContain('id-token: write') // least privilege — no OIDC publish
     })
   })
 
@@ -341,8 +343,9 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(testIdx).toBeLessThan(changelogIdx)
     })
 
-    it('should retain id-token: write permission (used for CI attestation and provenance-ready manual publish)', () => {
-      expect(workflowContent).toContain("id-token: write")
+    it('should NOT request id-token/contents:write — least privilege, no OIDC publish (0.100.0 rebaseline)', () => {
+      expect(workflowContent).not.toContain("id-token: write")
+      expect(workflowContent).not.toContain("contents: write")
     })
   })
 })

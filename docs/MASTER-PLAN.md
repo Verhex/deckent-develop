@@ -473,7 +473,7 @@ invariants yeniden doğrulanır.
 | Kaynak | Rol | Current disposition | Supersession veya sınır |
 |---|---|---|---|
 | `docs/HANDOVER-CODEX.md` | Session-local untracked handover ve live evidence | `historical-source-ingested` | Codex Brain ve Claude Worker rol kararı 2026-07-26 Brain ve Worker Codex kararıyla superseded; source owner session tarafından ayrıca track edilmedikçe fresh clone authority değildir |
-| [`.analysis/deckent-code-truth-audit-2026-07-26.md`](../.analysis/deckent-code-truth-audit-2026-07-26.md) | Current code-truth audit | `active-evidence` | Program P00–P10 gap setini besler; tracker değildir |
+| `.analysis/deckent-code-truth-audit-2026-07-26.md` (gitignored evidence, not a tracked link) | Current code-truth audit | `active-evidence` | Program P00–P10 gap setini besler; tracker değildir |
 | [`PROVIDER-AUTHORITY-EXECUTION-PLAN.md`](../PROVIDER-AUTHORITY-EXECUTION-PLAN.md) | PAEP architecture ve execution specification | `canonical-spec` | P02 ledger'ı burada; specification status authority değildir |
 | `docs/alperen-analysis/*` | Karar ve analiz geçmişi | `mixed-source; file manifest §4.1` | Delivered, approved-unexecuted, revalidate ve superseded ayrımı P00'da yönetilir |
 | `.deckent/docs/core-memory/*.md` | Kalıcı user law ve feedback mirror'ı | `memory-authority-input; file manifest §4.2` | Work tracker değildir; provider-neutral authority P00-MEMORY altında kurulacak |

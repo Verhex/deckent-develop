@@ -61,6 +61,39 @@ export function compareVersions(current: string, latest: string): number {
   return a.pre < b.pre ? -1 : 1;
 }
 
+// ─── Retired-lineage product-successor policy (0.100.0 rebaseline) ──────────
+//
+// SemVer sorts `1.0.0-beta.1` ABOVE `0.100.0` (1.0.0 > 0.x), so the GENERIC
+// `compareVersions` would tell a beta.1 user they are "already up to date" against
+// the 0.100.0 rebaseline and never upgrade them. The rebaseline explicitly cancels
+// the `1.0.0-beta.1` version string; the retired beta.1 lineage's canonical
+// successor is the `0.x` line (0.100.0 onward). This policy — NOT a change to the
+// generic SemVer comparator — declares that succession so `deckent upgrade` works.
+// It applies ONLY to the exact retired string; it never reorders two live
+// `0.x`/`1.x` releases, so a real downgrade (0.101.0 → 0.100.0) is still rejected.
+
+/** The exact pre-rebaseline version string whose lineage was retired. */
+export const RETIRED_BETA_LINEAGE = '1.0.0-beta.1';
+
+/** The 0.x canonical line begins at the 0.100.0 rebaseline. */
+export const REBASELINE_FLOOR = '0.100.0';
+
+/** True iff `version` is the retired `1.0.0-beta.1` lineage. */
+export function isRetiredBetaLineage(version: string): boolean {
+  return version.replace(/^v/, '') === RETIRED_BETA_LINEAGE;
+}
+
+/**
+ * True iff `latest` is the canonical product successor of the retired `current`:
+ * the retired 1.0.0-beta.1 lineage → any 0.x canonical release at/after 0.100.0.
+ * Used to override SemVer's `1.0.0-beta.1 > 0.100.0` ordering for upgrade only.
+ */
+export function isProductSuccessor(current: string, latest: string): boolean {
+  if (!isRetiredBetaLineage(current)) return false;
+  const b = parseSemver(latest);
+  return b.major === 0 && b.pre === '' && compareVersions(latest, REBASELINE_FLOOR) >= 0;
+}
+
 // ─── Install Strategy Detection ─────────────────────────────────────
 
 /**
@@ -298,7 +331,10 @@ export function executeUpgrade(opts: { check?: boolean; changelog?: boolean; can
   print(`Latest version:  ${latest}`);
 
   const cmp = compareVersions(current, latest);
-  if (cmp >= 0) {
+  // Retired 1.0.0-beta.1 → 0.x rebaseline is a product successor even though SemVer
+  // sorts beta.1 above 0.x; without this a beta.1 user is never upgraded to 0.100.0+.
+  const successor = isProductSuccessor(current, latest);
+  if (cmp >= 0 && !successor) {
     print('Already up to date.');
     return;
   }

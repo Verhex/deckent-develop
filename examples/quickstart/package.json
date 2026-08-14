@@ -13,7 +13,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "deckent": "^0.100.0"
+    "deckent": "file:../.."
   },
   "engines": {
     "node": ">=24.0.0"

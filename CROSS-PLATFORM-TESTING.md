@@ -51,7 +51,7 @@ koşup dolduracağı bir rapor şablonu (§5).
    ```powershell
    npm install -g deckent
    # veya beta/yerel paket:
-   npm install -g .\deckent-1.0.0-beta.1.tgz
+   npm install -g .\deckent-0.100.0.tgz
    ```
    - Doğrulama: `deckent --version`
    - **⚠️ unverified gotcha:** `better-sqlite3` ve `@lydell/node-pty` native (derlenmiş)
@@ -75,7 +75,7 @@ koşup dolduracağı bir rapor şablonu (§5).
    ```bash
    npm install -g deckent
    # veya beta/yerel paket:
-   npm install -g ./deckent-1.0.0-beta.1.tgz
+   npm install -g ./deckent-0.100.0.tgz
    ```
    - Doğrulama: `deckent --version`
    - **⚠️ unverified gotcha:** aynı native-eklenti riski Windows ile aynı — Apple Silicon

@@ -7,14 +7,14 @@
  * exactly — package.json, package-lock.json (both its top-level `.version` AND
  * `.packages[""].version`), and CHANGELOG.md (a new, exact-anchor-compatible `## [VERSION] — DATE`
  * section skeleton) — and nothing else. It replaces scripts/bump-version.sh, which only ever
- * touched package.json, silently dropped prerelease/build metadata, created its own git tag, and
- * suggested a manual `npm publish` — all of which conflicted with the sole-publish-authority model
- * born-608 (a pushed `v*` tag → release.yml is the only path that may ever run a real
- * `npm publish`; see that workflow's file header).
+ * touched package.json, silently dropped prerelease/build metadata, and created its own git tag.
  *
- * This script NEVER tags, NEVER pushes, and NEVER publishes — those remain workflow-authority. It
- * only prepares the working tree; a human (or a follow-up automation) still commits, fills in the
- * CHANGELOG skeleton with real notes, tags, and pushes.
+ * Publishing is OWNER-MANUAL (0.100.0 rebaseline, 2026-08-14): release.yml no longer runs any
+ * automatic `npm publish` or GitHub Release — it only builds, validates and attests. This script
+ * NEVER tags, NEVER pushes, and NEVER publishes; it only prepares the working tree. A human
+ * commits, fills in the CHANGELOG skeleton with real notes, and — from a validated tree — runs the
+ * owner-manual publish (`npm run build:all && npm run validate:publish && npm publish --access
+ * public --ignore-scripts`; no `--provenance`, which needs a supported CI/trusted-publishing env).
  *
  * Atomicity model: every mutation is computed and *validated* in memory first (JSON parse/
  * stringify round-trip, version-triple-equality, and the exact-anchor CHANGELOG section-format
@@ -288,14 +288,16 @@ if (entryArg.endsWith('release-prepare.mjs')) {
   console.log(`✅ release-prepare complete — ${result.version}`);
   for (const f of result.changed) console.log(`   updated: ${f}`);
   console.log(
-    '\nThis script does NOT create git tags, push, or run npm publish — those remain workflow-authority.',
+    '\nThis script does NOT create git tags, push, or publish — publishing is owner-manual (0.100.0 rebaseline).',
   );
   console.log('Next steps:');
   console.log(`  1. Fill in the CHANGELOG.md [${result.version}] section with real release notes.`);
   console.log(
     `  2. git add package.json package-lock.json CHANGELOG.md && git commit -m "chore(release): prepare v${result.version}"`,
   );
-  console.log(`  3. git tag v${result.version} && git push origin v${result.version}`);
-  console.log('     (pushing the tag triggers .github/workflows/release.yml, the sole publish authority)');
+  console.log('  3. Owner-manual publish from a validated tree (no automatic publish, no --provenance):');
+  console.log('       npm run build:all && npm run validate:publish');
+  console.log('       npm publish --access public --ignore-scripts');
+  console.log('     The release.yml workflow only builds/validates/attests — it never publishes.');
   process.exit(0);
 }
