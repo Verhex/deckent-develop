@@ -5,14 +5,72 @@
 > by `scripts/release-prepare.mjs` and filled in before tagging). `.github/workflows/release.yml`'s
 > changelog extractor reads sections from *this* file only, matched by an exact-anchored heading
 > (singular, non-empty — see `docs/release/release-checklist.md` step 6). For the
-> **automatically-generated, verbose per-sprint log** (every sprint's task-level
+> **automatically-generated, verbose per-sprint engineering ledger** (every sprint's task-level
 > Added/Changed/Fixed, appended by the sprint-finalizer), see
-> [docs/archive/docs-pre-reset-2026-08-03/CHANGELOG.md](docs/archive/docs-pre-reset-2026-08-03/CHANGELOG.md) — that file is a machine-written archive, not release
-> notes.
+> [docs/CHANGELOG.md](docs/CHANGELOG.md) — a machine-written ledger with sprint-numbered headers
+> (`## [sprintNN]`, never product-version tags since the 0.100.0 rebaseline), not release notes.
+> Pre-0.100.0 sprint history is archived under [docs/archive/](docs/archive/).
 
-## [1.0.0-beta.1] — 2026-04-22 (current)
+## [Unreleased]
 
-v1.0.0-beta.1 is the current release. All sprint work since Beta GA (Sprint 150) is part of the ongoing beta.1 cycle. Major capabilities added since the initial launch:
+_No unreleased changes yet._
+
+## [0.100.0] — 2026-08-14
+
+**Version rebaseline (tagless, no-publish).** The prior `1.0.0-beta.1` string overstated maturity;
+Deckent is re-baselined at `0.100.0` as an honest pre-1.0 line. No capability regressed — this is a
+narrative correction, not a release regression. Per-version product release history starts here;
+the earlier machine-written per-sprint engineering log is archived (see the header link) and never
+pollutes these notes.
+
+### Added
+
+- **Provider-separated cross-verification** (`deckent xverify`): a host-adjudicated verdict from a
+  provider DIFFERENT from the author (same-provider self-verify is forbidden). Closure requires the
+  full evidence chain — genuine terminal verdict + actual provider call + provider-reported usage +
+  terminally-closed settlement + a durable verdict receipt (`cross-verify-verdict:sha256:…`);
+  `HOLD`/`UNCLEAR` is never closure.
+- **Approval authority surfaces**: `deckent approvals list` / `deckent approvals decide --allow|--deny`
+  (CLI, behind interactive live-auth) and a read-only MCP `deckent_approvals` pending inbox
+  (list-only; no allow/deny/decide/self-approval over MCP).
+
+### Changed
+
+- **Single version authority**: the product version is sourced only from `package.json`; the CLI
+  `--version`, splash and build identity all derive from it at runtime/build (no parallel constant).
+  `scripts/release-prepare.mjs` remains the sole version-triple tool and never tags, pushes or
+  publishes.
+- **Changelog discipline**: product release notes live in this file only. Sprint settlement no longer
+  mints product-version-shaped changelog headers; the per-sprint engineering ledger is kept as an
+  archived surface. A future version bump without a matching `## [X.Y.Z]` section here fails publish
+  validation.
+
+### Fixed
+
+- Rebaseline carries the accumulated fixes of the beta.1 cycle; per-sprint detail is preserved in
+  the archived engineering ledger referenced in the header.
+
+### Security
+
+- `npm publish` is **owner-manual only**. The release workflow builds, validates and attests, but
+  performs no automatic publish; no `git tag` or GitHub Release is created by this rebaseline.
+
+### Known limitations
+
+- Terminal is the primary control surface; the dashboard is monitoring-only and the desktop app is
+  chat+console. MCPV2 (stateless-era MCP migration) remains **open/critical**, not DONE.
+- This rebaseline is **tagless**: it publishes nothing and cuts no tag/release; canonical publish
+  stays owner-manual.
+
+---
+
+## [1.0.0-beta.1] — 2026-04-22 (historical — superseded by the 0.100.0 rebaseline)
+
+> **Historical record — not the current version.** `1.0.0-beta.1` was retired by the `0.100.0`
+> rebaseline (2026-08-14) as an over-stated version string. This section is retained verbatim as a
+> record of the capabilities added during the beta.1 cycle; it no longer describes the current release.
+
+The capabilities added during the beta.1 cycle (Sprint 150 onward):
 
 ### Major Capabilities Added Since Beta GA (Sprints 151–285+)
 

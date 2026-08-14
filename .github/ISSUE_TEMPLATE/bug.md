@@ -42,7 +42,7 @@ If possible, include the smallest `DIRECTIVES.md` or command that reproduces the
 
 - OS: [e.g., macOS 14, Ubuntu 24.04, WSL2]
 - Node.js version: [e.g., 20.12.0] — run `node --version`
-- deckent version: [e.g., 1.0.0-beta.1] — run `deckent --version`
+- deckent version: [e.g., 0.100.0] — run `deckent --version`
 - Claude Code version (if applicable): [e.g., 1.0.0]
 - Provider: [claude / codex / gemini / ollama]
 - Backend: [tmux / subprocess / docker]

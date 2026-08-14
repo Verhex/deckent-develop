@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * validate-publish.mjs — npm publish v1.0.0-beta.1 readiness gates
+ * validate-publish.mjs — npm publish v0.100.0 readiness gates
  *
  * Sprint 180 W5-1 — Crisis Stabilization §6.
  *
@@ -664,6 +664,71 @@ export function checkCriticalFilesInTarball(packOutput, pkg) {
 const CATEGORY_COUNT_GROWTH_TOLERANCE = 0.10; // a category may grow up to +10% in file count
 const CATEGORY_TOTAL_BYTES_GROWTH_LIMIT = 5 * 1024 * 1024; // total packed bytes may grow up to 5 MB vs baseline
 
+// ─── REL-CHANGELOG: the shipping version has a canonical release-notes section ──
+//
+// The 0.100.0 rebaseline makes this a HARD publish-readiness gate: a version bump
+// without a matching, non-empty `## [X.Y.Z]` section in the ROOT CHANGELOG.md — the
+// single source `.github/workflows/release.yml`'s changelog extractor reads — must
+// fail readiness. No silent publish of a version that has no release notes. The
+// exact-anchor match mirrors that extractor: the version token must end at `]`, so
+// `## [0.100.0]` never matches a `## [0.100.0-sprint84]` heading.
+//
+// Standalone (not in the 8-entry GATES array — that count is test-pinned): wired into
+// the CLI print/exit path (extraChecks), same precedent as checkCriticalFilesInTarball.
+/**
+ * @param {string} root project root
+ * @returns {{ gate: string, ok: boolean, severity: 'error', message: string }}
+ */
+export function checkChangelogSectionForVersion(root) {
+  const gate = 'changelog_section';
+  let version;
+  try {
+    version = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8')).version;
+  } catch (err) {
+    return { gate, ok: false, severity: 'error', message: `cannot read package.json version: ${err.message}` };
+  }
+  if (typeof version !== 'string' || version.length === 0) {
+    return { gate, ok: false, severity: 'error', message: 'package.json has no version string' };
+  }
+  let changelog;
+  try {
+    changelog = readFileSync(resolve(root, 'CHANGELOG.md'), 'utf-8');
+  } catch (err) {
+    return { gate, ok: false, severity: 'error', message: `cannot read root CHANGELOG.md: ${err.message}` };
+  }
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Exact-anchor: heading is `## [VERSION]`, VERSION ends at ] (mirrors the release.yml extractor).
+  const anchor = new RegExp(`^##\\s+\\[${escaped}\\](?:\\s|$)`, 'm');
+  const match = anchor.exec(changelog);
+  if (!match) {
+    return {
+      gate,
+      ok: false,
+      severity: 'error',
+      message: `no canonical release-notes section '## [${version}]' in root CHANGELOG.md — a version bump requires a matching, non-empty changelog entry before publish (run scripts/release-prepare.mjs --version ${version}, then fill in the section).`,
+    };
+  }
+  // Non-empty: at least one non-blank line AFTER the heading line, before the next
+  // `## ` heading or EOF (skip past the heading line's own `— DATE` remainder).
+  const lineEnd = changelog.indexOf('\n', match.index);
+  const after = lineEnd === -1 ? '' : changelog.slice(lineEnd + 1);
+  const body = after.split(/\n## /)[0] ?? '';
+  if (body.trim().length === 0) {
+    return {
+      gate,
+      ok: false,
+      severity: 'error',
+      message: `release-notes section '## [${version}]' in root CHANGELOG.md is empty — fill in the release notes before publish.`,
+    };
+  }
+  return {
+    gate,
+    ok: true,
+    severity: 'error',
+    message: `canonical release-notes section '## [${version}]' present in root CHANGELOG.md`,
+  };
+}
+
 /**
  * Classify a packed file path into an extension bucket. `.d.ts` is checked before
  * `.js`/generic so declaration files don't fall into the `.js`-adjacent bucket.
@@ -1003,7 +1068,7 @@ if (entryArg !== '' && fileURLToPath(import.meta.url) === resolve(entryArg)) {
   console.log(`  [${driftTag}] ${driftCheck.gate}: ${driftCheck.message}`);
 
   const criticalFiles = checkCriticalFilesInTarball(result.packOutput, result.pkg);
-  const extraChecks = [criticalFiles, result.categoryBaselineCheck];
+  const extraChecks = [criticalFiles, result.categoryBaselineCheck, checkChangelogSectionForVersion(projectRoot)];
   for (const check of extraChecks) {
     if (!check.ok) {
       console.log(`  [\x1b[31mFAIL\x1b[0m] ${check.gate}: ${check.message}`);

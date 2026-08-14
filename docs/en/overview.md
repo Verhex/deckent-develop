@@ -36,7 +36,7 @@ Provider and model selection is resolved from effective configuration, the runti
 
 The repository declares TypeScript ESM, Node.js 24 or newer, `tsc`, and Vitest. [Evidence: `.deckent/workspace/IDENTITY.md:11-15`; `package.json` fields `type`, `engines`, and scripts]
 
-After the owner ran `npm run build:all`, `node dist/cli/entry.js --version-json` returned version `1.0.0-beta.1`, Node `v24.15.0`, and Linux. This proves the inspected binary identity; it does not claim support for only that host. [Evidence: command output, 2026-08-01]
+After the owner ran `npm run build:all`, `node dist/cli/entry.js --version-json` returned version `0.100.0`, Node `v24.15.0`, and Linux. This proves the inspected binary identity; it does not claim support for only that host. [Evidence: command output, 2026-08-14 (0.100.0 rebaseline re-observation)]
 
 The declared platform matrix is macOS, Linux, Windows native, and WSL2. [Evidence: `.deckent/workspace/IDENTITY.md:15`]
 
@@ -45,7 +45,7 @@ The declared platform matrix is macOS, Linux, Windows native, and WSL2. [Evidenc
 | Area | State | Current evidence |
 |---|---|---|
 | Identity and Trinity | ✅ live | Repository identity names the provider-neutral Agent OS, Trinity, surfaces, platform matrix, and authority chain. [Evidence: `.deckent/workspace/IDENTITY.md:2-18`] |
-| Built CLI identity | ✅ live | Real `--version-json` returned `1.0.0-beta.1`, Node `v24.15.0`, Linux after the owner build. |
+| Built CLI identity | ✅ live | Real `--version-json` returned `0.100.0`, Node `v24.15.0`, Linux after the owner build. |
 | Unified Goal→Operation implementation | ⚠️ partial | Durable contracts exist, but normalized work-model consumer adoption and canonical Operation remain OQ-05/OQ-06. |
 | Primary Terminal/Desktop direction | ⚠️ partial | The native chat/REPL, web-terminal API, and desktop source surfaces exist; this audit did not run their interactive/platform matrix. [Evidence: `src/cli/commands/chat.ts`; `src/api/terminal/session-manager.ts`; `src/desktop/`] |
 | Publish-grade autonomous execution | ⚠️ HOLD | Accepted audit reports 0/31 intervention-free end-to-end success pending stabilization/certification. [Evidence: `PAZARTESI.md:36-60`] |

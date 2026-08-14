@@ -2,7 +2,7 @@
 
 ## Product-user perspektifi
 
-Deckent şu anda `1.0.0-beta.1` olarak package edilir. npm package iki binary (`deckent`, `deckent-mcp`) ile package root ve `deckent/sdk` import path'lerini expose eder. Declared runtime floor Node.js 24'tür. [Kanıt: `package.json:2-20,115-123`]
+Deckent şu anda `0.100.0` olarak package edilir. npm package iki binary (`deckent`, `deckent-mcp`) ile package root ve `deckent/sdk` import path'lerini expose eder. Declared runtime floor Node.js 24'tür. [Kanıt: `package.json:2-20,115-123`]
 
 ### Install ve build surface'leri
 

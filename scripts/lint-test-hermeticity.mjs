@@ -194,8 +194,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // fixture rewire to the candidate-bound hold seam) shifted the line numbers of
   // those already-tracked files' unresolved entries; no unresolved symbol added or
   // removed. Prior: MCP-INSTRUCTIONS-DRIFT-CLOSE (12849).
+  // 2026-08-14 (VERSION-0.100.0-REBASELINE): same 12849 count, digest only — the
+  // version/changelog rebaseline edited already-tracked test files (index.test,
+  // changelog-update, release.test workflow) and doc-updaters/changelog.ts, and
+  // added the fully-resolved tests/release/version-rebaseline.test.ts (all imports
+  // resolve → no new unresolved symbol); the line-number shifts move existing
+  // entries only. Prior: APPROVAL-PARITY-FIXTURE-CLOSE (12849).
   count: 12849,
-  digest: '99cc9c1d1b882c6f499646a63d37cfcc008bf8658eef02cb433a24388b0bb19e',
+  digest: '3e51d915833b707f0e0093fd8661b265f849cef08d801c77fd47f0e267725431',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -288,8 +294,14 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (messages.ts), both inventoried production modules, shifted their line-numbered
   // inventory fingerprints. No production module added or removed. Prior:
   // MCP-INSTRUCTIONS-DRIFT-CLOSE (1232).
+  // 2026-08-14 (VERSION-0.100.0-REBASELINE): same 1232 count, digest only — the
+  // sprint-finalizer changelog automation (src/orchestra/doc-updaters/changelog.ts,
+  // an inventoried production module) dropped readPackageVersion and stopped deriving
+  // a product-version-shaped sprint header, shifting its line-numbered inventory
+  // fingerprint. No production module added or removed. Prior:
+  // APPROVAL-PARITY-FIXTURE-CLOSE (1232).
   count: 1232,
-  digest: '85555106d3d312b604c93f27c5f52bf77cf92032835361fb39f394c058462354',
+  digest: '91f79f513438b4e814c75415abbdc4282fe716cbd8e357611cfc8f9214cdb175',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

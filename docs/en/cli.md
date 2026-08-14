@@ -8,7 +8,7 @@ The built Commander tree contains 75 registered top-level commands: 74 are visib
 
 `node dist/cli/entry.js --help` and `--help` for every one of the 211 visible paths were executed against the real binary: 212 invocations, 212 exit-code-zero results. Help verification proves registration, parsing, usage, options, and help rendering; it does not prove every state-changing action. This rewrite was prohibited from writing outside `docs/`, so run/sprint/autonomous, config mutation, cleanup, kill, provisioning, and other mutating actions were not executed. [Evidence: recursive binary-help audit output, 2026-08-01; user boundary]
 
-The inspected binary reports Deckent `1.0.0-beta.1` on Node `v24.15.0`. [Evidence: `node dist/cli/entry.js --version-json`, 2026-08-01]
+The inspected binary reports Deckent `0.100.0` on Node `v24.15.0`. [Evidence: `node dist/cli/entry.js --version-json`, 2026-08-14]
 
 ### Invocation
 

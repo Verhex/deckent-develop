@@ -36,7 +36,7 @@ Provider ve model seçimi effective configuration, runtime model registry ve liv
 
 Repository; TypeScript ESM, Node.js 24 veya üstü, `tsc` ve Vitest bildirir. [Kanıt: `.deckent/workspace/IDENTITY.md:11-15`; `package.json` içindeki `type`, `engines` ve scripts]
 
-Owner `npm run build:all` çalıştırdıktan sonra `node dist/cli/entry.js --version-json`; `1.0.0-beta.1`, Node `v24.15.0` ve Linux döndürdü. Bu sonuç incelenen binary identity'yi kanıtlar; ürünün yalnız bu host'u desteklediği anlamına gelmez. [Kanıt: command output, 2026-08-01]
+Owner `npm run build:all` çalıştırdıktan sonra `node dist/cli/entry.js --version-json`; `0.100.0`, Node `v24.15.0` ve Linux döndürdü. Bu sonuç incelenen binary identity'yi kanıtlar; ürünün yalnız bu host'u desteklediği anlamına gelmez. [Kanıt: command output, 2026-08-14 (0.100.0 rebaseline re-observation)]
 
 Bildirilen platform matrix; macOS, Linux, Windows native ve WSL2'dir. [Kanıt: `.deckent/workspace/IDENTITY.md:15`]
 
@@ -45,7 +45,7 @@ Bildirilen platform matrix; macOS, Linux, Windows native ve WSL2'dir. [Kanıt: `
 | Alan | Durum | Current evidence |
 |---|---|---|
 | Identity ve Trinity | ✅ canlı | Repository identity provider-neutral Agent OS, Trinity, surface, platform matrix ve authority chain'i tanımlar. [Kanıt: `.deckent/workspace/IDENTITY.md:2-18`] |
-| Built CLI identity | ✅ canlı | Owner build sonrasında gerçek `--version-json`; `1.0.0-beta.1`, Node `v24.15.0`, Linux döndürdü. |
+| Built CLI identity | ✅ canlı | Owner build sonrasında gerçek `--version-json`; `0.100.0`, Node `v24.15.0`, Linux döndürdü. |
 | Unified Goal→Operation implementation | ⚠️ kısmi | Durable contract'lar vardır fakat normalized work-model consumer adoption ve canonical Operation OQ-05/OQ-06'dır. |
 | Primary Terminal/Desktop yönü | ⚠️ kısmi | Native chat/REPL, web-terminal API ve desktop source surface'leri vardır; bu audit interactive/platform matrix'i çalıştırmadı. [Kanıt: `src/cli/commands/chat.ts`; `src/api/terminal/session-manager.ts`; `src/desktop/`] |
 | Publish-grade autonomous execution | ⚠️ HOLD | Kabul edilen audit, stabilization/certification bekleyen 0/31 intervention-free end-to-end success raporlar. [Kanıt: `PAZARTESI.md:36-60`] |
