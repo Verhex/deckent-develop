@@ -48,7 +48,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Run Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE (cleanup is a separate command, not a phase)
 
-## Tools (49)
+## Tools (50)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write run goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -98,6 +98,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE
 - deckent_autonomous_reject: Reject an approval-required autonomous backlog entry
 - deckent_execution_authority: Inspect or reconcile namespace-local execution-authority mount metadata
 - deckent_kpi: Show the KPI scorecard for a run — returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics
+- deckent_approvals: List pending runtime approval requests (read-only) over the canonical ApprovalBroker; deciding stays CLI-only behind interactive live-auth
 
 ## Resources (8)
 - deckent://dashboard — Live run dashboard (agents, phases, alerts)

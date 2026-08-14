@@ -181,8 +181,15 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // DECKENT_E081/E082 reachability-budget catalog entries + the mission-worker
   // parked-HOLD migration re-classified two source sites; digest-and-count only.
   // Prior: FABLE-SOL-CLOSURE-HARDENING (12847).
+  // 2026-08-14 (MCP-INSTRUCTIONS-DRIFT-CLOSE): same 12849 count, digest only —
+  // the DECKENT_MCP_INSTRUCTIONS `## Tools (49→50)` header + the deckent_approvals
+  // list line (Gate G's registered tool was missing from the server instructions
+  // string, failing the CI Type Check job's lint-mcp-instructions step). Adding
+  // the one template-literal line in src/mcp/server.ts shifted the line numbers of
+  // that file's already-tracked unresolved entries; no unresolved symbol added or
+  // removed. Prior: CLOSURE-HARDENING-MIGRATE (12849).
   count: 12849,
-  digest: 'f187a24275795d2088953b8cca2eaf7974798f615ec9953e2932f2056d2329fa',
+  digest: 'a245a06873f42c0904f1ce7f74278dba74253dc1157597694863223574c8b066',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -264,8 +271,14 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // DECKENT_E081/E082 catalog entries (errors.ts), the two reachability-budget
   // raw-throw migrations (execution-budget-derivation.ts) and the mission-worker
   // parked-HOLD migration. Prior: FABLE-SOL-CLOSURE-HARDENING (1232).
+  // 2026-08-14 (MCP-INSTRUCTIONS-DRIFT-CLOSE): same 1232 count, digest only — the
+  // DECKENT_MCP_INSTRUCTIONS `## Tools (49→50)` header + deckent_approvals list
+  // line in src/mcp/server.ts (an inventoried production module); adding the one
+  // template-literal line shifted the module's line-numbered inventory
+  // fingerprint. No production module added or removed. Prior:
+  // CLOSURE-HARDENING-MIGRATE (1232).
   count: 1232,
-  digest: 'ce5b95a33f9daaf67ee35eda394e7839761c7860960215421bcc00654a8bb9bb',
+  digest: 'b7fe1479a1db053eba9320289790269dd30f9c57a63ac4cc9be6762698b9e917',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
