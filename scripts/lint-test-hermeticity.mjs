@@ -206,7 +206,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // owner-manual edits, and the expanded version-rebaseline/release tests. All imports
   // resolve; line shifts only. Prior: VERSION-0.100.0-REBASELINE (12849).
   count: 12849,
-  digest: '155a355793937d9e3c411ff04823b3a0fd9a5a5fa2c25db55b1b3b5424e1921c',
+  digest: 'fd418931f645a7e527b1dc0e8d7b7e603ed6d84d06d37b10f628daefb3508d9f',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -310,7 +310,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (an inventoried production module), shifting its line-numbered inventory fingerprint.
   // No production module added or removed. Prior: VERSION-0.100.0-REBASELINE (1232).
   count: 1232,
-  digest: '79d808e149ff42d3c68d9353b1972e7b69d46820ee9eec68e530d55447bd2b7c',
+  digest: '22bcd4d330305006a9f7baa4627d934eb80227f7a49fac39851188a93fee0390',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
