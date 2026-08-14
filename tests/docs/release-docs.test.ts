@@ -29,15 +29,23 @@ describe('release integrity chain — doc honesty (RC4A)', () => {
     expect(publishContent).not.toContain('NPM_TOKEN');
   });
 
-  it('honestly documents the npmjs.com trusted-publisher registry-side setup requirement', () => {
-    expect(releaseContent).toContain('npmjs.com');
-    expect(releaseContent).toMatch(/Trusted Publisher/);
-    expect(releaseContent).toMatch(/Alperen must/);
+  it('documents that publishing is owner-manual — no automatic publish or GitHub Release (0.100.0 rebaseline)', () => {
+    expect(releaseContent).toMatch(/OWNER-MANUAL/i);
+    expect(releaseContent).toMatch(/no automatic package publish/i);
+    expect(releaseContent).not.toContain('- name: Publish to npm');
+    expect(releaseContent).not.toContain('- name: Create GitHub Release');
+    expect(releaseContent).not.toMatch(/run:\s*npm publish/);
+    expect(releaseContent).not.toMatch(/uses: softprops\/action-gh-release/);
   });
 
-  it('documents the exact failure mode when the trusted-publisher setting is missing (not silent)', () => {
-    expect(releaseContent).toContain('ENEEDAUTH');
-    expect(releaseContent).toMatch(/Unable to authenticate/);
+  it('requests least-privilege permissions and gives a no-provenance owner-manual command', () => {
+    expect(releaseContent).toContain('contents: read');
+    expect(releaseContent).not.toContain('contents: write');
+    expect(releaseContent).not.toContain('id-token: write');
+    // The owner-manual publish command is documented, and it carries no --provenance
+    // (unsupported for a local publish; a separate future protected-CI decision).
+    expect(releaseContent).toContain('npm publish --access public --ignore-scripts');
+    expect(releaseContent).not.toMatch(/npm publish[^\n]*--provenance/);
   });
 
   it('every `uses:` action reference in both workflows is pinned to an immutable commit SHA', () => {
@@ -82,15 +90,18 @@ describe('release integrity chain — doc honesty (RC4A)', () => {
     expect(releaseContent).not.toContain('NOTES="Release ${GITHUB_REF_NAME}"');
   });
 
-  it('release.yml requires both a version-integrity gate and a CI-attestation gate before publish', () => {
+  it('runs the version-integrity + CI-attestation validation gates before the final artifact upload', () => {
     expect(releaseContent).toContain('- name: Verify release integrity');
     expect(releaseContent).toContain('- name: Verify CI attestation for this commit');
     const verifyIntegrityIdx = releaseContent.indexOf('- name: Verify release integrity');
     const verifyCiIdx = releaseContent.indexOf('- name: Verify CI attestation for this commit');
-    const publishIdx = releaseContent.indexOf('- name: Publish to npm');
+    // Validation/attestation-only workflow now: the last step is the dist artifact upload,
+    // not an automatic publish. The gates must precede it.
+    const uploadIdx = releaseContent.indexOf('- name: Upload dist artifacts');
     expect(verifyIntegrityIdx).toBeGreaterThan(-1);
-    expect(verifyIntegrityIdx).toBeLessThan(publishIdx);
-    expect(verifyCiIdx).toBeLessThan(publishIdx);
+    expect(uploadIdx).toBeGreaterThan(-1);
+    expect(verifyIntegrityIdx).toBeLessThan(uploadIdx);
+    expect(verifyCiIdx).toBeLessThan(uploadIdx);
   });
 
   it('the CI-attestation gate covers BOTH required workflows (CI + Cross-Platform E2E), not CI alone (415-002 RC5B)', () => {
