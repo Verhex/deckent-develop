@@ -84,20 +84,24 @@ describe('changelogUpdater — Keep a Changelog format', () => {
     expect(written).toContain('keepachangelog.com');
   });
 
-  it('reads version from package.json', () => {
+  it('writes a sprint-only header, NOT a product-version header (0.100.0 rebaseline)', () => {
     changelogUpdater.run(makeCtx());
     const written = String(mockedWriteFileSync.mock.calls[0][1]);
-    expect(written).toContain('[0.2.0-sprint05]');
+    // Since the rebaseline, this engineering ledger no longer mints product-version
+    // tags — the header is the sprint number only, never `${version}-sprintNN`.
+    expect(written).toContain('[sprint05]');
+    expect(written).not.toContain('0.2.0-sprint05');
   });
 
-  it('falls back to 0.0.0 when no package.json', () => {
+  it('writes the same sprint-only header even when there is no package.json', () => {
     mockedReadFileSync.mockImplementation(() => {
       throw new Error('ENOENT');
     });
     mockedExistsSync.mockReturnValue(false);
     changelogUpdater.run(makeCtx());
     const written = String(mockedWriteFileSync.mock.calls[0][1]);
-    expect(written).toContain('[0.0.0-sprint05]');
+    expect(written).toContain('[sprint05]');
+    expect(written).not.toMatch(/\[\d+\.\d+\.\d+-sprint05\]/);
   });
 
   it('DONE tasks go into Added section', () => {
