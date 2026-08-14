@@ -512,6 +512,10 @@ const MESSAGES: MessageMap = {
     en: 'Inspect and explicitly reconcile execution authority bindings',
     tr: 'Execution authority bağlarını incele ve açıkça uzlaştır',
   },
+  'cmdCatalog.approvals.summary': {
+    en: 'Review pending runtime approval requests and decide execution admission (allow/deny)',
+    tr: 'Bekleyen runtime onay isteklerini gözden geçir ve execution admission kararını ver (izin/ret)',
+  },
   // ─── execution-authority mount adoption ─────────────────────────────────
   'execution_authority.cmd_desc': {
     en: 'Inspect and reconcile project execution authority bindings',

@@ -109,11 +109,15 @@ describe('MCP tool catalog SSOT (index.ts)', () => {
       expect(extraInCatalog).toEqual([]);
     });
 
-    it('MCP_TOOL_COUNT, TOOL_CATALOG.length and registered count are all equal (49)', () => {
+    it('MCP_TOOL_COUNT, TOOL_CATALOG.length and registered count are all equal (50)', () => {
       const { names } = captureRegistrations();
-      expect(TOOL_CATALOG.length).toBe(49);
+      expect(TOOL_CATALOG.length).toBe(50);
       expect(MCP_TOOL_COUNT).toBe(TOOL_CATALOG.length);
       expect(names.length).toBe(MCP_TOOL_COUNT);
+    });
+
+    it('the deckent_approvals tool identity appears exactly once in the catalog', () => {
+      expect(TOOL_CATALOG.filter((t) => t.name === 'deckent_approvals')).toHaveLength(1);
     });
 
     it('catalog has no duplicate tool names', () => {
@@ -157,8 +161,8 @@ describe('MCP tool catalog SSOT (index.ts)', () => {
       for (const name of PREVIOUSLY_MISSING) {
         expect(names.has(name), `deckent_help missing ${name}`).toBe(true);
       }
-      // Old drift was 23; the single source now guarantees 49.
-      expect(names.size).toBe(49);
+      // Old drift was 23; the single source now guarantees 50.
+      expect(names.size).toBe(50);
     });
   });
 
