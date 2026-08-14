@@ -93,6 +93,12 @@ curl -N "http://127.0.0.1:3100/api/events?token=$DECKENT_API_TOKEN"
 
 `POST /api/rpc` versioned request/response envelope taşır. Catalog `session.list`, `session.resume`, `run.status`, `run.start-detached`, `approval.list` ve `approval.decide` içerir; server handler map'te ayrıca `limits.get` vardır. Güncel write wiring `run.start-detached` ve `approval.decide` destekler; `session.resume` explicitly unsupported kalır. [Kanıt: `src/core/term-rpc.ts:143-183`; `src/api/rpc-write-handlers.ts:120-199`; `src/api/server.ts:621-742,1385-1395`]
 
+### Cross-verify receipt ve onay-kararı sınırı
+
+- Cross-verify (`deckent xverify`) iki FARKLI provider arasında host-adjudicated'dır (author ≠ verifier; same-provider self-verify yasaktır). Bir iddia kapanışa YALNIZ tam zincirle ulaşır: gerçek terminal verdict + gerçek provider call + provider-reported usage + terminally-closed settlement + durable verdict receipt (`cross-verify-verdict:sha256:…`). `HOLD`/`UNCLEAR` kapanış değildir. [Kanıt: `CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md` §12.2]
+- Onay kararı bir mutation'dır. MCP `deckent_approvals` aracı READ-ONLY pending inbox'tur (`ApprovalBroker.list('pending')`) — allow/deny/decide/self-approval sunmaz. Karar YALNIZ `deckent approvals decide` CLI yüzeyinde interactive live-auth arkasında ya da flag/policy-gated HTTP `POST /api/approvals/:id/decision` / `approval.decide` RPC ile verilir. [Kanıt: `src/mcp/tools/approvals.ts`; `src/cli/commands/approvals.ts`]
+- Local-terminal auth bağımsızdır: `/api/terminal/token` loopback-only'dir ve geçerli API bearer gerektirir; WebSocket terminal transport genel API-auth bypass'ıyla yetkilendirilmez. [Kanıt: `src/api/server.ts:2567-2708`]
+
 ## Dogfood / repository gerçeği
 
 - ✅ Central bearer, rate, CORS ve control-mutation gate'leri route dispatch'ten önce çalışır. [Kanıt: `src/api/server.ts:745-856`]

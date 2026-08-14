@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9553e561e016dd826248714df1144a8d7ff8f0664c5674a98f2cdd0f7e6612fe"
+    "value": "1f6e7dacd5d6c32b53d48e6625b2f9ee5a20f84de6d898f7986f621361aeee0a"
   },
   "summary": {
     "total": 491,
@@ -2633,9 +2633,9 @@
       "program": "EVAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-31",
+      "updated": "2026-08-13",
       "definitionDigest": "b09bf6b47048f77a0b33823b943a7cf1570f163ead6ab1d62d2fba4ba1bcb9c8",
-      "progressDigest": "bc5ecebbe3d3ff2e6f60e195ddc280f67b2c35a01f3fc6e6ba11c80c0a39dac5",
+      "progressDigest": "2e1829350099cb9a95300fdade8d6710a5370b2dc8c228b2d9622945cb14d62e",
       "terminalClosureDigest": null
     },
     {
@@ -15989,8 +15989,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Every material claim field reaches the different-provider verifier intact or by content-addressed reference; host truncation yields typed HOLD/UNAVAILABLE and cannot be counted as successful verification or ignored by Brain promotion; verifier usage and billing evidence remain separately attributable",
-      "evidence": "Sprint-483 different-provider XVerify returned UNCLEAR after host truncation but Brain still accepted the producer and no further material check ran. Recovery routes production ingress through the exact typed V2 composition in advisory and enforced modes, separates payload transport from enforcement policy, carries structured criteria plus immutable evidence references, and records advisory CONFIRMED/REFUTED/UNCLEAR/UNAVAILABLE without fabricating a blocking result. Enforced UNCLEAR/unavailable remains HOLD; legacy string launch is isolated to compatibility callers without a production factory. Cross-verify suites pass 118/118 plus config/CLI regressions. Item remains OPEN for fresh different-provider live replay, multi-check admission policy, native and scale evidence",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-483 different-provider XVerify returned UNCLEAR after host truncation but Brain still accepted the producer and no further material check ran. Recovery routes production ingress through the exact typed V2 composition in advisory and enforced modes, separates payload transport from enforcement policy, carries structured criteria plus immutable evidence references, and records advisory CONFIRMED/REFUTED/UNCLEAR/UNAVAILABLE without fabricating a blocking result. Enforced UNCLEAR/unavailable remains HOLD; legacy string launch is isolated to compatibility callers without a production factory. Cross-verify suites pass 118/118 plus config/CLI regressions. The fresh different-provider live-replay proof dimension closed 2026-08-13 (§12.2 of CLOSURE-OS-PRODUCT-TRANSITION-BRIEF): a real Fable→Sol dispatch (author claude/claude-fable-5, verifier codex/gpt-5.6-sol) reached host verdict CONFIRMED/ALLOW with provider-reported usage 60787 and durable receipt cross-verify-verdict:sha256:3543790980fdb345e65d065b011c877ecf728d53d4acab2d6bc7ef6d3426cf20. Item stays OPEN (status unchanged, parent acceptance pending) for multi-check admission policy, native and scale evidence",
+      "updated": "2026-08-13"
     },
     {
       "order": 3194,
@@ -25453,6 +25453,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "de49a6acc109c570a024af33c471bb10d3b19e739c69d5ba71cd703333325e7f"
+    "value": "ecbcbe35fb442043a4d45979b29c651e758fa78ede88cea0bb7a3d9c9febb6d5"
   }
 }

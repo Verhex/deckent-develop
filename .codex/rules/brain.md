@@ -52,4 +52,23 @@ Accepted: **ADR-D-001**, **ADR-D-002**, **ADR-D-004**, **ADR-D-005**, **ADR-D-00
 
 <!-- CUSTOM-START -->
 
+## Verification & Settlement Evidence (Fable→Sol xverify closure, 2026-08-13)
+
+- A synthetic worker/agent verdict is never proof on its own. A claim is
+  CONFIRMED only when the disk receipt chain verifies: a genuine terminal
+  verdict + the actual provider call + provider-reported usage + a
+  terminally-closed settlement + a durable verdict receipt
+  (`cross-verify-verdict:sha256:…`). See §12.2 of
+  `CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md` for the canonical closure receipt.
+- Cross-verification is fail-closed and cross-provider: the verifier provider
+  MUST differ from the author (XVERIFY-PROVIDER-SEPARATION); same-provider
+  self-verify is forbidden. A `HOLD`/`UNCLEAR` outcome is NOT closure — never
+  settle a run as COMPLETE on a HOLD.
+- Do not cyclically re-attempt the same typed HOLD hoping for a different
+  result; a HOLD is resolved by supplying the missing authority/evidence, not
+  by retrying the identical admission.
+- A newly surfaced finding does not auto-produce a committed root: surface it
+  with exact file:line + reasonCode + disk evidence and let the owner decide
+  scope; never silently expand.
+
 <!-- CUSTOM-END -->

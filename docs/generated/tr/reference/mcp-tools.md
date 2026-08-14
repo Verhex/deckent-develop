@@ -7,13 +7,14 @@ Deckent, orchestration yüzeyini MCP-uyumlu IDE'lere (Claude Code, Cursor vb.) a
 > Tablo içeriği koddan gelen tanımlayıcılardır (tool adları, parametreler); çevrilmez.
 
 <!-- AUTOGEN:START id="mcp-tools-tr" -->
-> 49 tools registered. Generated from `src/mcp/tools/*.ts`.
+> 50 tools registered. Generated from `src/mcp/tools/*.ts`.
 
 | Tool | Title | Description |
 |------|-------|-------------|
-| `deckent_agent_list` | Agent List | List all registered agents in the Deckent project — both built-in and dynamically generated temp agents. |
+| `deckent_agent_list` | Agent List | List every agent the Deckent agent-catalog resolver resolves for this project — |
 | `deckent_agent_manage` | Agent Manage | Manage the agent pool: add a custom agent, remove one, or promote a temp agent |
 | `deckent_analyze_project` | Analyze Project | Analyze the current project to detect: language (TypeScript/JavaScript/Python/Go/Rust/etc.), framework (React/Express/FastAPI/etc.), test framework (vitest/jest/pytest/etc.), build tool (tsc/webpack/vite/etc.), CI system (GitHub Actions/GitLab CI/etc.), project size (small/medium/large based on file count), and methodology recommendation. Returns config suggestions (e.g. recommended plan mode, worker count). Useful before init to pick the right configuration, or to verify stack detection. Does not modify any files. |
+| `deckent_approvals` | Approval Inbox (read-only) | List pending runtime approval requests over the canonical ApprovalBroker read |
 | `deckent_audit` | Sprint Audit | Sprint audit multitool, mirrors the |
 | `deckent_autonomous` | Autonomous Engine | Control the deckent autonomous execution engine: query status, start/stop |
 | `deckent_autonomous_approve` | Autonomous Approve | Approve a pending autonomous-engine trigger — a backlog entry parked by the |
