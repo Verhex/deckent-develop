@@ -188,8 +188,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // the one template-literal line in src/mcp/server.ts shifted the line numbers of
   // that file's already-tracked unresolved entries; no unresolved symbol added or
   // removed. Prior: CLOSURE-HARDENING-MIGRATE (12849).
+  // 2026-08-14 (APPROVAL-PARITY-FIXTURE-CLOSE): same 12849 count, digest only —
+  // the first-run test-contract closure (command-registry.ts approvals row,
+  // messages.ts summary key, index.test.ts 49→50 pins, scheduler-spawn-executor
+  // fixture rewire to the candidate-bound hold seam) shifted the line numbers of
+  // those already-tracked files' unresolved entries; no unresolved symbol added or
+  // removed. Prior: MCP-INSTRUCTIONS-DRIFT-CLOSE (12849).
   count: 12849,
-  digest: 'a245a06873f42c0904f1ce7f74278dba74253dc1157597694863223574c8b066',
+  digest: '99cc9c1d1b882c6f499646a63d37cfcc008bf8658eef02cb433a24388b0bb19e',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -277,8 +283,13 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // template-literal line shifted the module's line-numbered inventory
   // fingerprint. No production module added or removed. Prior:
   // CLOSURE-HARDENING-MIGRATE (1232).
+  // 2026-08-14 (APPROVAL-PARITY-FIXTURE-CLOSE): same 1232 count, digest only — the
+  // approvals COMMAND_REGISTRY row (command-registry.ts) and its en+tr summary key
+  // (messages.ts), both inventoried production modules, shifted their line-numbered
+  // inventory fingerprints. No production module added or removed. Prior:
+  // MCP-INSTRUCTIONS-DRIFT-CLOSE (1232).
   count: 1232,
-  digest: 'b7fe1479a1db053eba9320289790269dd30f9c57a63ac4cc9be6762698b9e917',
+  digest: '85555106d3d312b604c93f27c5f52bf77cf92032835361fb39f394c058462354',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
