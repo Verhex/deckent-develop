@@ -54,6 +54,10 @@
     },
     "$ratifiedDoc": "These three structural defaults are ratified as-is (owner Phase-3 + Codex). The earlier EXC-outcome-no-descendants / EXC-package-single-child / EXC-leaf-high-fanin exception codes are RETIRED — they are no longer exceptions. An owner-override still always wins over a structural default."
   },
+  "rowRef": {
+    "requiredFields": ["workId", "rowDefinitionDigest", "masterSourceDigest", "batchManifestDigest"],
+    "$doc": "Machine-readable SSOT for the FOUR-part rowRef identity that binds a ledger event to a MASTER row AND its immutable batch (§12.1 rev-2 + phase-4.1 batch-snapshot binding). ALL four fields are required and non-empty; any missing → ROWREF_INCOMPLETE, any field outside this set → UNKNOWN_FIELD. The gate resolves its required/allowed rowRef fields from THIS array; the TS RowRef interface mirrors it via ROWREF_FIELDS (as-const); a TS↔schema exact-equality drift-guard plus a gate↔schema self-check keep all three aligned (enum parity alone is insufficient). Semantics: workId → MASTER identityRegistry membership; rowDefinitionDigest → per-row definition-drift vs current MASTER; masterSourceDigest → validated against the event's OWN batch snapshot (not the current global); batchManifestDigest → binds the event to its immutable batch bundle."
+  },
   "ownerOverrides": {
     "$doc": "Owner-declared per-row classification (Codex final disposition 2026-08-14). Highest Level/Lane authority after brief/MASTER semantics; every entry is HIGH confidence and overrides every heuristic.",
     "level": {

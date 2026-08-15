@@ -234,7 +234,10 @@ const CORRECTION_KINDS = new Set(['supersede', 'revoke']);
 // only discovery / future-deferred admissions are promotable (§ Codex: NOT duplicate-superseded-disposed)
 const PROMOTABLE_ADMISSIONS = new Set(['discovery', 'future-deferred']);
 const ALLOWED_TOP = new Set(['schemaVersion', 'seq', 'eventId', 'recordedAt', 'rowRef', 'decision', 'authorityProof', 'evidenceRefs', 'supersedesSeq', 'previousEventDigest', 'eventDigest']);
-const ALLOWED_ROWREF = new Set(['workId', 'rowDefinitionDigest', 'masterSourceDigest', 'batchManifestDigest']);
+// rowRef required/allowed fields resolved from the schema SSOT (schema.rowRef.requiredFields)
+// — NOT a hardcoded literal — so gate ↔ schema ↔ TS ROWREF_FIELDS stay exactly aligned.
+const ROWREF_REQUIRED = SCHEMA.rowRef.requiredFields;
+const ALLOWED_ROWREF = new Set(ROWREF_REQUIRED);
 const DECISION_FIELDS = {
   'level-lane-disposition': ['kind', 'level', 'lane', 'ruleId', 'confidence'],
   'priority-retriage': ['kind', 'fromPriority', 'toPriority'],
@@ -271,7 +274,7 @@ function validateShape(e, i) {
   if (typeof e.recordedAt === 'string' && !ISO_UTC.test(e.recordedAt)) p.push(err('RECORDEDAT_FORMAT', `event ${i}: recordedAt is not strict ISO UTC (…Z)`, seq));
   // rowRef 4-part (workId + rowDefinitionDigest + masterSourceDigest + batchManifestDigest) + no unknown fields
   const rr = e.rowRef || {};
-  for (const f of ['workId', 'rowDefinitionDigest', 'masterSourceDigest', 'batchManifestDigest']) if (typeof rr[f] !== 'string' || !rr[f]) p.push(err('ROWREF_INCOMPLETE', `event ${i}: rowRef.${f} missing (all 4 required)`, seq));
+  for (const f of ROWREF_REQUIRED) if (typeof rr[f] !== 'string' || !rr[f]) p.push(err('ROWREF_INCOMPLETE', `event ${i}: rowRef.${f} missing (all ${ROWREF_REQUIRED.length} required)`, seq));
   for (const k of Object.keys(rr)) if (!ALLOWED_ROWREF.has(k)) p.push(err('UNKNOWN_FIELD', `event ${i}: unknown rowRef field '${k}'`, seq));
   // authority proof
   if (typeof e.authorityProof?.ownerReceipt !== 'string' || !e.authorityProof.ownerReceipt) p.push(hold('AUTHORITY_UNRESOLVED', `event ${i}: authorityProof.ownerReceipt missing → HOLD (no fabricated receipt)`, seq));
@@ -648,6 +651,8 @@ export function runSelfCheck() {
   ok(has(gate(uf).errors, 'UNKNOWN_FIELD'), 'gate: unknown top-level field rejected');
   ok(has(gate(build([{ rowRef: rr('ROW-A'), decision: ll('task', 'runtime', { extra: 1 }) }])).errors, 'UNKNOWN_FIELD'), 'gate: unknown decision field rejected');
   ok(has(gate(build([{ rowRef: rr('ROW-A', { bogusRef: 1 }), decision: ll('task', 'runtime') }])).errors, 'UNKNOWN_FIELD'), 'gate: unknown rowRef field rejected');
+  // rowRef is FOUR-part (Codex closure-fixup): a MISSING batchManifestDigest → ROWREF_INCOMPLETE
+  ok(has(gate(build([{ rowRef: { workId: 'ROW-A', rowDefinitionDigest: 'def-ROW-A', masterSourceDigest: SRC }, decision: ll('task', 'runtime') }])).errors, 'ROWREF_INCOMPLETE'), 'gate: rowRef missing batchManifestDigest (3-part) → ROWREF_INCOMPLETE');
 
   // correction hardening (req 3)
   ok(has(validateCorrections(build([{ rowRef: rr('ROW-A'), decision: ll('task', 'runtime') }, { rowRef: rr('ROW-A'), decision: { kind: 'revoke', targetSeq: 99, reason: 'x' } }])), 'CORRECTION_TARGET_MISSING'), 'gate: correction target-missing (future seq) rejected');
@@ -872,6 +877,10 @@ export function runSelfCheck() {
 
   // schema SSOT internal consistency (TS union in closure-ledger-types.ts mirrors these)
   ok(SCHEMA.levels.values.length > 0 && SCHEMA.lanes.values.length > 0, 'schema: enums non-empty');
+  // gate ↔ schema SSOT: the gate's ALLOWED_ROWREF/ROWREF_REQUIRED IS schema.rowRef.requiredFields
+  // (resolved, not hardcoded). The TS↔schema half is the exact-equality drift-guard in tests/governance.
+  ok(JSON.stringify([...ALLOWED_ROWREF]) === JSON.stringify(SCHEMA.rowRef.requiredFields), 'schema: gate ALLOWED_ROWREF == schema.rowRef.requiredFields (4-part SSOT)');
+  ok(ROWREF_REQUIRED.length === 4 && ROWREF_REQUIRED.includes('batchManifestDigest'), 'schema: rowRef is the FOUR-part contract (incl. batchManifestDigest)');
   ok(SCHEMA.decisionKinds.values.every((k) => SCHEMA.decisionClasses.map[k]), 'schema: every kind has a decisionClass');
   const admissionVals = new Set(SCHEMA.admissionDispositions.values);
   ok(SCHEMA.decisionClasses.map.admission === 'admission' && SCHEMA.decisionClasses.map['born-promotion'] === 'promotion', 'schema: admission/promotion separate classes');

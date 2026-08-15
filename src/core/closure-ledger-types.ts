@@ -6,10 +6,11 @@
 // is scripts/closure-ledger/canonical.mjs + scripts/lint-closure-dispositions.mjs
 // (one validator, never re-implemented here).
 //
-// The literal enums below mirror src/core/closure-classification-schema.json (the
-// SSOT). tests/governance/schema-sync.test.ts asserts they equal the schema
-// arrays, so they cannot silently drift. Decision payloads are a discriminated
-// union PER KIND (§12.1 requires typed-per-kind, never a generic from/to pair).
+// The literal enums + ROWREF_FIELDS below mirror src/core/closure-classification-schema.json
+// (the SSOT). The TS↔schema exact-equality drift-guard in
+// tests/governance/closure-ledger.test.ts asserts they equal the schema arrays
+// (incl. rowRef.requiredFields), so they cannot silently drift. Decision payloads are a
+// discriminated union PER KIND (§12.1 requires typed-per-kind, never a generic from/to pair).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const LEVELS = ['outcome', 'package', 'task', 'check-proof', 'finding'] as const;
@@ -33,6 +34,10 @@ export const DECISION_KINDS = [
   'revoke',
 ] as const;
 export const CONFIDENCE = ['high', 'medium', 'low'] as const;
+// FOUR-part rowRef identity — mirrors schema.rowRef.requiredFields (SSOT). The
+// TS↔schema exact-equality drift-guard pins this against the schema, and the gate
+// resolves ALLOWED_ROWREF from the same SSOT, so all three stay aligned.
+export const ROWREF_FIELDS = ['workId', 'rowDefinitionDigest', 'masterSourceDigest', 'batchManifestDigest'] as const;
 
 export type Level = (typeof LEVELS)[number];
 export type Lane = (typeof LANES)[number] | typeof HOLD_LANE;
@@ -41,13 +46,18 @@ export type AdmissionDisposition = (typeof ADMISSION_DISPOSITIONS)[number];
 export type DecisionKind = (typeof DECISION_KINDS)[number];
 export type Confidence = (typeof CONFIDENCE)[number];
 
-/** rowRef binds an event to a MASTER row identity by THREE parts (§12.1): the
- *  stable work id, the row's definition digest (from identityRegistry), and the
- *  MASTER source digest. All three are required — 2/3 is not the contract. */
+/** rowRef binds an event to a MASTER row identity AND its immutable batch by FOUR
+ *  parts (§12.1 rev-2 + phase-4.1 batch-snapshot binding): the stable work id, the
+ *  row's definition digest (from identityRegistry), the MASTER source digest, and
+ *  the batch manifest digest. All FOUR are required and non-empty — this exactly
+ *  mirrors schema.rowRef.requiredFields / ROWREF_FIELDS, and the runtime gate
+ *  enforces the same (ROWREF_INCOMPLETE on a missing field, UNKNOWN_FIELD on an
+ *  extra one). Keep this interface, ROWREF_FIELDS, and the schema in lockstep. */
 export interface RowRef {
   workId: string;
   rowDefinitionDigest: string;
   masterSourceDigest: string;
+  batchManifestDigest: string;
 }
 
 /** Owner authority proof — an actor string is insufficient (§12.1). Each event

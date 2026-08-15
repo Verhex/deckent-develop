@@ -147,6 +147,13 @@ describe('TS ↔ schema drift-guard (EXACT equality, no import)', () => {
     expect(arr('ADMISSION_DISPOSITIONS')).toEqual(schema.admissionDispositions.values);
     expect(arr('DECISION_KINDS')).toEqual(schema.decisionKinds.values);
   });
+  it('ROWREF_FIELDS is the FOUR-part rowRef SSOT and exactly equals schema.rowRef.requiredFields', () => {
+    // enum parity alone is insufficient (Codex closure-fixup): pin the rowRef shape TS ↔ schema.
+    // The gate ↔ schema half is asserted in the gate --self-check (ALLOWED_ROWREF == this array).
+    expect(arr('ROWREF_FIELDS')).toEqual(schema.rowRef.requiredFields);
+    expect(arr('ROWREF_FIELDS')).toContain('batchManifestDigest');
+    expect(arr('ROWREF_FIELDS')).toHaveLength(4);
+  });
   it('HOLD_LANE equals schema.lanes.holdState', () => {
     const m = typesSrc.match(/export const HOLD_LANE = '([^']+)' as const/);
     expect(m?.[1]).toBe(schema.lanes.holdState);

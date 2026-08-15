@@ -122,17 +122,16 @@ rowRef = { workId, rowDefinitionDigest, masterSourceDigest, batchManifestDigest 
 - `masterSourceDigest` — **kendi batch snapshot'ına** karşı doğrulanır (current global'e değil; aksi `BATCH_SNAPSHOT_MISMATCH`).
 - `batchManifestDigest` — event'i immutable batch'ine bağlar; çözülemezse `BATCH_UNRESOLVED` HOLD.
 
-> ⚠️ **Bilinen TS↔gate drift'i (Phase-5'ten önce kapatılmalı).** Runtime authority
-> gate'tir ve **4-part** enforce eder. Ancak `src/core/closure-ledger-types.ts`
-> içindeki `RowRef` interface'i hâlâ yalnız **3** alan (`workId`,
-> `rowDefinitionDigest`, `masterSourceDigest`) tanımlar ve docstring'i "THREE
-> parts … 2/3 is not the contract" der — `batchManifestDigest` tipe hiç eklenmemiştir
-> (`grep -rn batchManifestDigest src/` yalnız schema JSON'daki path string'ini bulur).
-> Phase-4.1'de 4. parça gate'e eklenmiş, TS interface güncellenmemiştir; Phase-4.1
-> TS↔schema drift-guard'ı **enum as-const array'lerini** karşılaştırdığı için interface
-> shape'ini yakalayamaz. Phase-5 writer (bu tipin tüketicisi) yazılmadan bu drift
-> kapatılmalıdır. Bu doküman gate'i enforced contract olarak kabul eder; TS'in
-> güncellenmemiş olduğunu açıkça beyan eder.
+> **Tek SSOT ile hizalı kontrat.** rowRef'in dört alanı tek makine-okunur SSOT'tan
+> gelir: `schema.rowRef.requiredFields`. Gate `ALLOWED_ROWREF`/`ROWREF_REQUIRED`'i bu
+> diziden **çözer** (hardcode literal değil); TS `RowRef` interface'i + `ROWREF_FIELDS`
+> (`src/core/closure-ledger-types.ts`, as-const) bunu birebir yansıtır. Üçü şu ikili ile
+> kilitlenir: (a) `tests/governance/closure-ledger.test.ts` içindeki **TS↔schema
+> exact-equality** drift-guard'ı (`ROWREF_FIELDS === schema.rowRef.requiredFields`,
+> `batchManifestDigest` dahil, uzunluk 4) ve (b) gate `--self-check`'teki
+> `ALLOWED_ROWREF == schema.rowRef.requiredFields` assertion'ı + `batchManifestDigest`
+> eksik (`ROWREF_INCOMPLETE`) / fazla (`UNKNOWN_FIELD`) negatif hermetik testleri. Enum
+> parity tek başına yetersizdir — interface shape'i de bu drift-guard'la pinlenir.
 
 ### 3.3 Batch (unsigned decision manifest)
 
