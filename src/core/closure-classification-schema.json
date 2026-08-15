@@ -1,0 +1,211 @@
+{
+  "$registry": "closure-classification",
+  "$doc": "SSOT enum registry for the Closure OS Level x Lane classification + append-only sidecar decision-ledger (CLOSURE-OS-PRODUCT-TRANSITION-BRIEF §3, §12.1 rev-2). Language-neutral data file so BOTH the pre-build gate (scripts/*.mjs, no dist dependency) and product code (src/**/*.ts) consume ONE source. Enum VALUES live here; the discriminated-union event TYPES + canonical encoder + digest live in the phase-4 TS module that reads these constants. Never hardcode any of these values elsewhere (ADR-G-036 zero-hardcode).",
+  "schemaVersion": 1,
+  "canonicalEncoding": {
+    "version": 1,
+    "algorithm": "json-canonical-sorted-keys-utf8",
+    "digestAlgorithm": "sha256",
+    "digestEncoding": "hex",
+    "coveredFields": "EVERY event field EXCEPT eventDigest itself (which is the output). seq AND previousEventDigest ARE covered — this binds sequence position and chain linkage into the digest, so reordering or re-linking breaks it. eventDigest = sha256(canonical(event minus eventDigest)).",
+    "undefinedHandling": "OBJECT keys: an absent key and value===undefined are EQUIVALENT — both omitted (never serialized); an absent optional field digests identically to one set to undefined. ARRAY elements: an undefined element is REJECTED (a canonicalization error), never silently dropped — array positions are significant.",
+    "arrayOrder": "SIGNIFICANT — arrays are never sorted; element order is preserved as authored (e.g. evidenceRefs). Reordering an array changes the digest. An undefined array element is a hard error.",
+    "keyOrder": "object keys recursively sorted by JS default string comparison (UTF-16 code-unit order) AFTER NFC normalization, stable across Node runtimes.",
+    "stringNormalization": "Unicode NFC applied to every string value AND every object key before UTF-8 encoding, so canonically-equivalent Unicode sequences digest identically. Two DISTINCT keys that NFC-normalize to the SAME string are a collision and REJECTED (ambiguous canonical key), never silently merged.",
+    "numbers": "integers only (seq); serialized as base-10 JSON integers with no exponent/fraction. A non-integer number in a covered field is a canonicalization error (fail, never coerce).",
+    "whitespace": "none (no insignificant whitespace between tokens).",
+    "$doc": "The phase-4 canonical encoder (scripts/closure-ledger/canonical.mjs) MUST read these constants, not hardcode them. previousEventDigest + eventDigest form the hash chain; each reviewed batch head digest is anchored to an external/Git trust authority via receipt (file-internal prevDigest alone is insufficient). This spec is frozen at version 1 before the first real event; changing it requires a version bump and a migration, never an in-place edit."
+  },
+  "levels": {
+    "values": ["outcome", "package", "task", "check-proof", "finding"],
+    "scopeEffect": {
+      "outcome": "+1",
+      "package": "under-outcome",
+      "task": "no-growth",
+      "check-proof": "no-growth",
+      "finding": "no-auto-backlog"
+    },
+    "$source": "§3.1 — Level = plan-içi muhasebe seviyesi (accounting level within the plan)."
+  },
+  "lanes": {
+    "values": ["contract", "runtime", "desktop", "terminal", "proof"],
+    "holdState": "hold-unassigned",
+    "startGate": {
+      "contract": "first-and-single-author",
+      "runtime": "contract-freeze",
+      "desktop": "contract-freeze",
+      "terminal": "contract-freeze",
+      "proof": "lane-join"
+    },
+    "$source": "§11 Lane table — Lane = işin türü (work type). UI task'leri ayrı root outcome üretmez.",
+    "$holdDoc": "A row whose lane cannot be resolved to exactly one canonical lane is assigned 'hold-unassigned' — the typed-HOLD lane state (§12.1: unresolved/conflicting classification → typed HOLD, never a blank/silent pass). It is NOT a work-lane and never appears as a start-gated Lane; projections render it as HOLD and the phase-4 gate treats it as unresolved. Owner disposition resolves it to one of the canonical values. Kept out of 'values' so a canonical-lane check stays exact."
+  },
+  "levelPrecedence": {
+    "order": ["owner-override", "declared-program", "structural-topology", "typed-hold"],
+    "$doc": "Codex final disposition (2026-08-14): owner-declared semantics OUTRANK topology, which outranks text/ID heuristics. ID-regex is NO LONGER a classification authority — at most a candidate/exception signal. Resolution: owner-override manifest → declared program (ASSURANCE⇒check-proof) → structural topology (ratified defaults) → typed HOLD."
+  },
+  "invariants": {
+    "checkProofImpliesProofLane": true,
+    "$checkProofDoc": "level=check-proof ⇒ lane=proof. If any generator output has a check-proof row in another lane, the gate FAILS (report↔disk parity + this invariant are phase-4 tests).",
+    "structuralDefaultsRatified": {
+      "top-bucket-child": "outcome — no descendant/fan-out condition",
+      "row-with-children": "package — a single child does not break package-hood",
+      "leaf": "task — high fan-in does not promote a leaf to package"
+    },
+    "$ratifiedDoc": "These three structural defaults are ratified as-is (owner Phase-3 + Codex). The earlier EXC-outcome-no-descendants / EXC-package-single-child / EXC-leaf-high-fanin exception codes are RETIRED — they are no longer exceptions. An owner-override still always wins over a structural default."
+  },
+  "ownerOverrides": {
+    "$doc": "Owner-declared per-row classification (Codex final disposition 2026-08-14). Highest Level/Lane authority after brief/MASTER semantics; every entry is HIGH confidence and overrides every heuristic.",
+    "level": {
+      "RUN-INSPECTOR-001": "outcome",
+      "LEDGER-ISOLATED-COMMIT-PROOF-001": "check-proof",
+      "RECOVERY-LIVE-CONTINUATION-PROOF-001": "check-proof",
+      "APPROVAL-READ-CROSSPLATFORM-PROOF-001": "check-proof",
+      "PROVIDER-HOLD-LIVE-PROOF-001": "check-proof",
+      "PLATFORM-PROOF-001": "check-proof",
+      "FLAGSHIP-PROOF-001": "check-proof",
+      "TEST-675": "outcome",
+      "TEST-676": "outcome",
+      "TEST-HERMETIC-001": "outcome",
+      "TEST-CONTAINMENT-001": "outcome",
+      "TEST-SPAWN-001": "outcome",
+      "TEST-ORPHAN-001": "outcome",
+      "XVERIFY-TRUTH-001": "outcome",
+      "XVERIFY-WIRE-001": "task",
+      "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001": "task",
+      "RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001": "task",
+      "RECEIPT-001": "task"
+    },
+    "lane": {
+      "SURFACES-001": "contract",
+      "RUN-INSPECTOR-001": "contract",
+      "SURFACE-ADAPTER-001": "runtime",
+      "DESIGN-SYSTEM-001": "contract",
+      "DESIGN-PRECISION-INSTRUMENT-001": "contract",
+      "COMPETITIVE-INTEL-001": "proof",
+      "LAUNCH-COMMS-001": "hold-unassigned"
+    },
+    "$laneNote": "LAUNCH-COMMS-001 stays hold-unassigned by owner decision — communication/go-to-market execution is not honestly representable in the current lane taxonomy; kept typed-HOLD (no new root) as a B16 design input. RUN-INSPECTOR-001 = Level outcome (brief §11 'first post-B16 outcome') + Lane contract.",
+    "priorityPreserved": ["TEST-CONTAINMENT-001", "XVERIFY-TRUTH-001"],
+    "$priorityPreservedNote": "Codex final disposition (2026-08-14): these two P0 rows are preserved at P0 by owner decision, not by explicit closure evidence. Priority changes this phase = 0; F-P0-INFLATION stays an acknowledged/open measurement finding. Reported separately as the 'semantic-owner-preserved' priority category (never folded into 'closure-proven')."
+  },
+  "approvalIntegration": {
+    "$doc": "Codex phase-4.1 req-1: a closure-disposition-batch is authorized through the EXISTING ApprovalBroker / ApprovalDecisionIngress protocol (no second authority). The WRITE-TIME path — a closure-disposition-batch operation subject + claim type + submit/verifyAndClaim method pair on AttendedExecutionApprovalAuthority + a consumer, mirroring the provider-evidence-probe claim path — is PHASE-5 TS machinery: SPECIFIED and FROZEN here, NOT implemented (owner forbids phase-5 + append; shipping uncalled TS would be an unwired module). This block freezes the subject SHAPE + the git-trust batch-receipt the buildless gate resolves and verifies.",
+    "subjectKind": "closure-disposition-batch",
+    "subjectBoundFields": {
+      "tenantId": "string — tenant identity",
+      "projectId": "string — project identity",
+      "masterSnapshotDigest": "sha256 — the sourceDigest.value recorded INSIDE the immutable per-batch master-snapshot.json (the exact docs/generated/master-plan-active.json bytes archived at batch time). Recomputed from the bundle, NEVER from current MASTER.",
+      "registryIntegrityDigest": "sha256 — the registryIntegrity.value recorded INSIDE that same immutable master-snapshot.json. Recomputed from the bundle, NEVER from current MASTER.",
+      "proposalDigest": "sha256 — of the immutable per-batch proposal.md (the exact owner-proposal doc bytes archived at batch time). Recomputed from the bundle, NEVER from the current proposal doc.",
+      "unsignedManifestDigest": "sha256 (closure canonical v1) — of the ordered unsigned decision manifest",
+      "eventCount": "integer — number of events in the batch",
+      "seqIntervalStart": "integer — first seq in the batch",
+      "seqIntervalEnd": "integer — last seq in the batch"
+    },
+    "digestOwnership": "unsignedManifestDigest + proposalDigest are computed by scripts/closure-ledger/canonical.mjs (closure canonical v1). The approval SUBJECT digest (bound into the ApprovalRequest by the phase-5 TS writer) is computed via attendedExecutionProposalSha256 (the approval-path canonical). Two digests, two owners — neither side recomputes the other's, so there is no cross-canonical drift.",
+    "noCircularDigest": "The approval request binds the unsignedManifestDigest of the UNSIGNED manifest FIRST. Only AFTER the authenticated decision + single-use claim is the claim ref (evidenceRef `approval:${requestId}`) written into each event's authorityProof and the chain finalized. The manifest digest never includes any receipt/claim material.",
+    "batchReceipt": {
+      "$doc": "The git-committed, repo-verifiable durable proof the buildless gate resolves. Written by the phase-5 writer ONLY after a valid authenticated claim. Its authenticity is proven by an ASYMMETRIC attestation (below), NOT by a self-authored string — a plain 'authenticationEvidence' string is rejected fail-closed (Codex phase-4.2 req-1).",
+      "path": "docs/governance/closure-dispositions.receipts/<requestId>.json (basename MUST equal requestId)",
+      "requiredFields": ["schemaVersion", "requestId", "claimRef", "decision", "subject", "authenticatedAt", "decidedAt", "authExpiresAt", "attestation"],
+      "allowedFields": ["schemaVersion", "requestId", "claimRef", "decision", "closureReason", "subject", "authenticatedAt", "decidedAt", "authExpiresAt", "attestation"],
+      "rejectedFields": ["authenticationEvidence", "grantedAt"],
+      "decisionMustBe": "allow (a deny or a TTL system-closure — closureReason set — is rejected)"
+    },
+    "attestation": {
+      "$doc": "Repo-verifiable, OFFLINE-checkable proof (Codex phase-4.2 req-1). The buildless gate verifies an ed25519 signature over the closure-canonical binding using a COMMITTED PUBLIC trust anchor — no private/HMAC secret ever enters the repo. A self-authored string is never proof. The signature is produced at DECISION time by the phase-5 write path (owner private key); the private key never enters the repo, and nothing in this branch produces a real signature.",
+      "algorithm": "ed25519",
+      "signatureEncoding": "base64",
+      "shape": "{ keyId: string, signature: base64 }",
+      "trustAnchorPath": "docs/governance/closure-trust-anchors.json — { schemaVersion:1, anchors:[{ keyId, publicKeyPem, tenantId, projectId }], rotations?:[{ newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId, signature }] }. The trusted key SET is resolved from the REVIEWED PARENT (trustAnchorRootOfTrust below), NEVER the current working tree. Absent/unresolvable or no matching keyId → typed HOLD reporting the exact missing anchor.",
+      "signedBinding": "closure canonical v1 of { requestId, claimRef, decision, tenantId, projectId, masterSnapshotDigest, registryIntegrityDigest, proposalDigest, unsignedManifestDigest, eventCount, seqIntervalStart, seqIntervalEnd, authenticatedAt, decidedAt, authExpiresAt }",
+      "independentVerification": "the gate does NOT trust the reconstructed binding on sig-verify alone (a forger who controls the receipt controls the binding). It INDEPENDENTLY re-derives or cross-checks EVERY signed field: recompute unsignedManifestDigest/eventCount/seqInterval from the events; masterSnapshotDigest + registryIntegrityDigest + proposalDigest from the IMMUTABLE per-batch snapshot bundle's archived bytes (batchSnapshotBundle below), NEVER from current MASTER/proposal — a progress-only MASTER/proposal change must not invalidate a historical batch; tenantId/projectId from the reviewed-parent TRUST-ANCHOR entry (not the receipt); requestId from the receipt FILENAME; claimRef from each event's ownerReceipt; decision === allow. Current MASTER is used ONLY for the effective-latest rowDefinitionDigest drift (a per-row HOLD), never for authority. NO `== null` short-circuit — a missing bundle/anchor is a typed HOLD, never a silent skip.",
+      "windowRule": "authenticatedAt ≤ decidedAt ≤ authExpiresAt, all strict ISO-UTC (…Z). Validity is fixed at DECISION time; the gate's current clock is IRRELEVANT — a historical durable decision does NOT expire because the lint runs later."
+    },
+    "trustAnchorRootOfTrust": {
+      "$doc": "Codex phase-4.3 req-1: the SET of trusted signing keys is the set committed at the REVIEWED PARENT (merge-base HEAD origin/main), mirroring lint-master-plan TRUST-ANCHOR-001 — a key added in the same PR CANNOT vouch for itself. resolveTrustAnchors() reads the anchors file at the parent blob (`git show <merge-base>:…`) with the ok/absent/error trichotomy (OQ-XVE-05: a provable-exists-but-unreadable blob is 'error', NEVER 'absent').",
+      "reviewedParentAnchor": "merge-base HEAD origin/main (same reviewed baseline resolveBaseline uses for append-only).",
+      "workingTreeRule": "a working-tree anchor absent at the parent is trusted ONLY via a rotation receipt ed25519-signed by a reviewed-parent key; introducing or replacing a key without one → error TRUST_ANCHOR_UNAUTHORIZED_ROTATION. Reviewed-parent keys are always trusted; a working-tree removal cannot silently drop a reviewed key.",
+      "rotationBinding": "closure canonical v1 of { newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId }, ed25519-signed by the reviewed-parent key named in signedByKeyId.",
+      "genesis": "no anchors file at the reviewed parent → the first key cannot self-bootstrap in-repo → typed HOLD TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED. A real genesis anchor needs an external owner fingerprint / signed Git authority — a REPORTED phase-5 provisioning procedure, never generated or committed in this line of work.",
+      "degradation": "UNLIKE TRUST-ANCHOR-001 there is NO WARN fallback and NO fallback to HEAD or the working-tree file: authority verification IS the deliverable, so no-git / no-history / shallow / unfetchable-origin-main all → TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED HOLD (§12.2: a HOLD is not closure, so this costs nothing and is the honest outcome).",
+      "strictShape": "schemaVersion===1, allowed/required fields only, duplicate keyId, invalid PEM, unknown field → fail-closed (a malformed anchor file never yields a usable key)."
+    },
+    "batchSnapshotBundle": {
+      "$doc": "Codex phase-4.3 req-2: each batch is bound to an IMMUTABLE content-addressed snapshot of the MASTER + proposal state AT batch time, so historical validation never depends on the CURRENT (evolving) MASTER/proposal. The receipt signs the digests; the gate recomputes them from the archived bytes.",
+      "path": "docs/governance/closure-batches/<batchManifestDigest>/ — the directory name IS the batch's manifest digest.",
+      "files": { "master-snapshot.json": "the exact docs/generated/master-plan-active.json bytes at batch time (its sourceDigest.value → masterSnapshotDigest; its registryIntegrity.value → registryIntegrityDigest).", "proposal.md": "the exact owner-proposal doc bytes at batch time (sha256 → proposalDigest)." },
+      "deleteOnConsumeRule": "delete-on-consume of the LIVE proposal doc is standing project behavior, so the writer MUST archive the exact proposal bytes into this bundle and verify the digest BEFORE any delete-on-consume. A bundle whose proposal bytes are absent is the expected steady state of a MISSING archival step → distinct typed HOLD BATCH_SNAPSHOT_PROPOSAL_ABSENT (vs BATCH_SNAPSHOT_MISSING for a wholly-absent bundle, BATCH_SNAPSHOT_MASTER_ABSENT for a missing/malformed master snapshot).",
+      "phase5Only": "the WRITER that produces real bundles + receipts + the ed25519 signature (owner private key) is phase-5; this line of work builds only the buildless gate-side VERIFIER + hermetic fixtures."
+    },
+    "gateVerification": {
+      "$doc": "The buildless lint:gates gate verifies the offline attestation + independent binding. Exactly three outcomes per batch:",
+      "verified-binding": "a committed batchReceipt is present; decision=allow with no closureReason; the ed25519 attestation verifies against a REVIEWED-PARENT trust anchor; every signed field is independently re-derived/cross-checked against the immutable bundle/anchor and matches; authenticatedAt ≤ decidedAt ≤ authExpiresAt; the claim ref is single-use.",
+      "typed-HOLD": "codes AUTHORITY_UNVERIFIABLE (no committed receipt / no reviewed-parent trust anchor / no anchor matching the attestation keyId), TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED (no reviewed-parent anchors file or an unresolvable git baseline — no WARN, no working-tree fallback), and BATCH_SNAPSHOT_MISSING / BATCH_SNAPSHOT_MASTER_ABSENT / BATCH_SNAPSHOT_PROPOSAL_ABSENT (the immutable per-batch snapshot bundle or its archived bytes are unavailable). The gate reports the exact missing anchor/bundle and NEVER fabricates a verified-binding.",
+      "error": "a committed receipt is present but the signature is invalid, decision≠allow, an independently-checked field mismatches the archived bundle/anchor (AUTHORITY_SNAPSHOT_MISMATCH / AUTHORITY_REGISTRY_MISMATCH / AUTHORITY_PROPOSAL_MISMATCH / AUTHORITY_TENANT_MISMATCH / AUTHORITY_PROJECT_MISMATCH / …), the decision is outside its window, the claim/manifest is replayed/duplicated/filename-mismatched, or a working-tree trust anchor is introduced/replaced without a parent-signed rotation (TRUST_ANCHOR_UNAUTHORIZED_ROTATION)."
+    }
+  },
+  "surfaceObligations": {
+    "values": ["n/a", "read-only", "control", "full-workflow"],
+    "$source": "§11 — kullanıcıya dönük committed outcome'un surface obligation alanı; UI-lane rows dispose one of these explicitly."
+  },
+  "priorities": {
+    "values": ["P0", "P1", "P2"],
+    "$source": "§3.4(3) — canonical P0/P1/P2 korunur; ayrı priority namespace (T00–T99) REDDEDİLDİ. Yalnız OPEN rows owner-reviewed disposition turunda re-triage görür; terminal rows değişmez."
+  },
+  "admissionDispositions": {
+    "values": [
+      "child-proof-under-committed-outcome",
+      "separate-committed-outcome",
+      "discovery",
+      "future-deferred",
+      "duplicate-superseded-disposed",
+      "hold"
+    ],
+    "requiresParentOutcome": ["child-proof-under-committed-outcome"],
+    "committedMarker": "already-committed",
+    "$committedMarkerDoc": "The admissionDispositions above apply ONLY to the FINDINGS path (a new/born observation the owner admits). An EXISTING active MASTER row is already committed — its admission was decided when it was created — so the scan labels it 'already-committed' rather than re-deriving a §3.2 disposition. This preserves the row's real Level semantics (task/package/check-proof) instead of blanket-labelling every child 'child-proof'. 'already-committed' is NOT a §3.2 disposition and never appears in a findings admission event.",
+    "$source": "§3.2 Admission kuralı — her bulgu kaydedilir; yalnız owner admission ile bu disposition'lardan BİRİNİ alır. Born finding'in kayda girmesi ile release scope'a girmesi aynı işlem değildir."
+  },
+  "b16SchedulingClasses": {
+    "values": ["blocker", "child", "post-b16"],
+    "analysisOnly": true,
+    "$source": "scope-7 — B16 admission analiz ekseni (blocker/child/post-B16). Bu bir LEDGER decision kind DEĞİLDİR; yalnız read-only admission-output projeksiyonunda kullanılır."
+  },
+  "decisionKinds": {
+    "values": [
+      "level-lane-disposition",
+      "priority-retriage",
+      "admission",
+      "born-promotion",
+      "supersede",
+      "revoke"
+    ],
+    "$source": "§12.1 rev-2 — decision = typed union PER KIND (generic from/to DEĞİL). Payload shapes live in the phase-4 TS module. Order: admission precedes born-promotion (lifecycle order)."
+  },
+  "decisionClasses": {
+    "map": {
+      "level-lane-disposition": "classification",
+      "priority-retriage": "priority",
+      "admission": "admission",
+      "born-promotion": "promotion",
+      "supersede": "correction",
+      "revoke": "correction"
+    },
+    "activeExclusivity": "At most ONE active (non-superseded, non-revoked) decision per (rowRef.workId, decisionClass). 'admission' and 'born-promotion' are in SEPARATE classes ('admission' and 'promotion') and are NOT mutually exclusive — they are SEQUENTIAL lifecycle steps (see 'lifecycle'). The 'correction' class targets a prior seq, not a row-state, so it is exempt from per-row exclusivity. A conflicting active decision WITHIN one class is a typed HOLD for that row (never a silent skip).",
+    "lifecycle": {
+      "$doc": "admission and born-promotion are ordered, not competing (owner Phase-3 disposition, 2026-08-14: the earlier 'same mutually-exclusive disposition class' model was REJECTED). A row is first admitted (§3.2 disposition); a born/discovery-admitted row may LATER be promoted to a committed outcome. The gate enforces ORDERING, never mutual exclusion.",
+      "states": ["unadmitted", "admitted-committed", "admitted-parked", "admitted-hold", "admitted-disposed", "promoted-committed-outcome"],
+      "transitions": [
+        { "from": "unadmitted", "event": "admission", "when": "disposition ∈ {child-proof-under-committed-outcome, separate-committed-outcome}", "to": "admitted-committed" },
+        { "from": "unadmitted", "event": "admission", "when": "disposition ∈ {discovery, future-deferred}", "to": "admitted-parked" },
+        { "from": "unadmitted", "event": "admission", "when": "disposition = duplicate-superseded-disposed", "to": "admitted-disposed" },
+        { "from": "unadmitted", "event": "admission", "when": "disposition = hold", "to": "admitted-hold" },
+        { "from": "admitted-parked", "event": "born-promotion", "when": "prior admission disposition ∈ {discovery, future-deferred}", "to": "promoted-committed-outcome" }
+      ],
+      "invariant": "A born-promotion event for a workId is valid ONLY when a prior non-revoked admission event exists for that workId whose disposition is a PROMOTABLE state — exactly {discovery, future-deferred} (→ lifecycle state 'admitted-parked'). A 'duplicate-superseded-disposed' admission is terminal ('admitted-disposed') and can NEVER be promoted; 'admitted-committed' and 'admitted-hold' are likewise non-promotable. born-promotion supersedes nothing; it is a forward transition. Phase-4 proves this with a state-transition test BEFORE any ledger write; if the invariant cannot be shown, the ledger stays unwritten (typed HOLD)."
+    },
+    "$source": "§12.1 rev-2 projection semantics + owner Phase-3 disposition (2026-08-14): admission/promotion are sequential lifecycle classes, not one mutually-exclusive class. This map makes intra-class conflict machine-decidable and inter-class ordering explicit."
+  }
+}

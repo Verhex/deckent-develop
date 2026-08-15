@@ -82,6 +82,14 @@ Deckent'in Goal → Mission → Flow → Run authority zinciri çeşitli adapter
 yürütülebilir. Aşağıdaki sprint akışı, DIRECTIVES-backed CLI/MCP adapterının compatibility
 workflow'udur; ürünün bütünü veya tek execution authority'si değildir:
 
+> **Closure OS governance yüzeyi (Phase-4 foundation):** MASTER'dan ayrı, append-only hash-chained
+> **sidecar decision-ledger** (Level×Lane sınıflandırma + admission + priority-karar authority'si);
+> reviewed-parent trust-anchor, immutable historical snapshot bundle ve transactional four-view
+> projection ile. Buildless gate `npm run lint:gates` içinde (`scripts/lint-closure-dispositions.mjs`);
+> projector `scripts/closure-ledger/project.mjs`. Bu **yalnız mekanizmadır** — Phase-5 writer / genesis
+> key / gerçek receipt+event **henüz kurulmadı**, canlı ledger mutation yoktur. Tam referans:
+> [`docs/governance/closure-os-sidecar-ledger.md`](docs/governance/closure-os-sidecar-ledger.md).
+
 1. **`deckent_init`** — Projeyi başlat. `.deckent/`, `.brain/`, `.tasks/` dizinlerini ve seçili host adapterının provider-neutral kural/reference projection'larını oluşturur. Desteklenen her environment/project scope'unda bir kez çalıştırılır.
 
 2. **`deckent_set_directives`** — Sprint hedeflerini yaz. DIRECTIVES.md dosyasini gunceller. Asagidaki DIRECTIVES Format Rehberini kullanarak task'lari tanimla.
