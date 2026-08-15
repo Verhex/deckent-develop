@@ -595,7 +595,7 @@ referans: [`docs/governance/closure-os-sidecar-ledger.md`](docs/governance/closu
   `approval-identity.mjs`, `src/core/approval-contract.ts::approvalIdSchema`'ya bir parity testiyle
   pinlenmiş **mirror**'dır (ikinci serbest authority değil).
 
-Kanıt: gate self-check **124/124**, projector **22/22**, governance **9/9** (normal + PATH-stripped),
+Kanıt: gate self-check **127/127**, projector **22/22**, governance **9/9** (normal + PATH-stripped),
 approval-parity **3/3**, `lint:gates`+`tsc` yeşil. Mekanizma yalnız self-check/fixture + boş-ledger
 yeşil gate ile kanıtlıdır — **gerçek veri akmadı**.
 

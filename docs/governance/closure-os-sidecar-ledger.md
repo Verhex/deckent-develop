@@ -124,14 +124,16 @@ rowRef = { workId, rowDefinitionDigest, masterSourceDigest, batchManifestDigest 
 
 > **Tek SSOT ile hizalı kontrat.** rowRef'in dört alanı tek makine-okunur SSOT'tan
 > gelir: `schema.rowRef.requiredFields`. Gate `ALLOWED_ROWREF`/`ROWREF_REQUIRED`'i bu
-> diziden **çözer** (hardcode literal değil); TS `RowRef` interface'i + `ROWREF_FIELDS`
-> (`src/core/closure-ledger-types.ts`, as-const) bunu birebir yansıtır. Üçü şu ikili ile
-> kilitlenir: (a) `tests/governance/closure-ledger.test.ts` içindeki **TS↔schema
-> exact-equality** drift-guard'ı (`ROWREF_FIELDS === schema.rowRef.requiredFields`,
-> `batchManifestDigest` dahil, uzunluk 4) ve (b) gate `--self-check`'teki
-> `ALLOWED_ROWREF == schema.rowRef.requiredFields` assertion'ı + `batchManifestDigest`
-> eksik (`ROWREF_INCOMPLETE`) / fazla (`UNKNOWN_FIELD`) negatif hermetik testleri. Enum
-> parity tek başına yetersizdir — interface shape'i de bu drift-guard'la pinlenir.
+> diziden **çözer** (hardcode literal değil). TS tarafında `RowRef`, `ROWREF_FIELDS`'tan
+> bir **mapped type** ile **türetilir** (`{ [K in (typeof ROWREF_FIELDS)[number]]: string }`,
+> `src/core/closure-ledger-types.ts`); dolayısıyla RowRef shape'i bu diziden **asla
+> sapamaz**. Üçü şu ikili ile kilitlenir: (a) `tests/governance/closure-ledger.test.ts`
+> içindeki **TS↔schema exact-equality** drift-guard'ı (`ROWREF_FIELDS ===
+> schema.rowRef.requiredFields`, `batchManifestDigest` dahil, uzunluk 4) — RowRef
+> türetildiği için bu, tüm TS RowRef shape'ini transitif olarak schema'ya pinler; ve
+> (b) gate `--self-check`'teki `ALLOWED_ROWREF == schema.rowRef.requiredFields`
+> assertion'ı + `batchManifestDigest` eksik (`ROWREF_INCOMPLETE`) / fazla
+> (`UNKNOWN_FIELD`) negatif hermetik testleri. Enum parity tek başına yetersizdir.
 
 ### 3.3 Batch (unsigned decision manifest)
 
@@ -451,7 +453,7 @@ binding'i kontrol ettiğinden bu bağımsız kontroller gereklidir.
 node scripts/lint-closure-dispositions.mjs [--self-check | <ledger-path>]
 #   argümansız: default docs/governance/closure-dispositions.jsonl'i doğrular.
 #   Ledger boş/absent → "[closure-gate] ledger empty/absent — nothing to validate (OK)" (exit 0).
-#   --self-check: 124/124 in-process assertion (canonical edge-case + authority + root-of-trust + fixtures).
+#   --self-check: 127/127 in-process assertion (canonical edge-case + authority + root-of-trust + rowRef SSOT + fixtures).
 
 # Projection producer — yalnız gate-PASSING defterden dört view
 node scripts/closure-ledger/project.mjs [--self-check | --dry-run | --check | --write]
@@ -516,7 +518,7 @@ tanımlanmamıştır.
 | Immutable snapshot binding + integrity recompute (`loadBatchSnapshots`, `master-plan-integrity.mjs`) | Gerçek **receipt** dosyaları (`closure-dispositions.receipts/<id>.json`) |
 | Transactional projections (`project.mjs`, bundle + pointer swap) | Gerçek **ledger event'leri** (`closure-dispositions.jsonl` — bugün mevcut değil) |
 | Identity pin (`approval-identity.mjs` mirror + parity test) | MASTER **state/priority mutation** (OPEN satırlara priority uygulama; **0 değişiklik**) |
-| Tüm self-check/testler: gate **124/124**, projector **22/22**, governance **9/9** (normal + PATH-stripped), approval-parity **3/3** (12/12 combined); tsc 0; `lint:gates` exit 0 | Gerçek batch snapshot bundle'ları (`closure-batches/`) ve projection bundle'ları (`closure-projections/`) |
+| Tüm self-check/testler: gate **127/127**, projector **22/22**, governance **9/9** (normal + PATH-stripped), approval-parity **3/3** (12/12 combined); tsc 0; `lint:gates` exit 0 | Gerçek batch snapshot bundle'ları (`closure-batches/`) ve projection bundle'ları (`closure-projections/`) |
 
 **Disk-gerçeği (doğrulandı).** `docs/governance/` yalnız `closure-classification-owner-proposal.md`
 içerir. **Yok:** `closure-dispositions.jsonl`, `closure-dispositions.receipts/`,

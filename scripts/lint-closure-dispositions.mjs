@@ -4,7 +4,7 @@
 // Machine gate for the Closure OS append-only sidecar decision-ledger
 // (docs/governance/closure-dispositions.jsonl, §12.1 rev-2). The SOLE validator.
 //
-// Checks: schema/enum · canonical digest chain · rowRef 3-part identity ·
+// Checks: schema/enum · canonical digest chain · rowRef 4-part identity ·
 // intra-class active-exclusivity · admission→promotion lifecycle ordering ·
 // check-proof⇒proof invariant · authority-proof presence · append-only byte
 // prefix vs merge-base. Any unresolved condition (unknown row, digest drift, seq

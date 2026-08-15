@@ -148,8 +148,10 @@ describe('TS ↔ schema drift-guard (EXACT equality, no import)', () => {
     expect(arr('DECISION_KINDS')).toEqual(schema.decisionKinds.values);
   });
   it('ROWREF_FIELDS is the FOUR-part rowRef SSOT and exactly equals schema.rowRef.requiredFields', () => {
-    // enum parity alone is insufficient (Codex closure-fixup): pin the rowRef shape TS ↔ schema.
-    // The gate ↔ schema half is asserted in the gate --self-check (ALLOWED_ROWREF == this array).
+    // RowRef is a mapped type DERIVED from ROWREF_FIELDS (`{ [K in (typeof ROWREF_FIELDS)[number]]: string }`),
+    // so it can never drift from this array; pinning ROWREF_FIELDS === schema here therefore
+    // transitively pins the whole TS RowRef SHAPE to the schema SSOT (enum parity alone is
+    // insufficient). The gate ↔ schema half is asserted in the gate --self-check (ALLOWED_ROWREF == this array).
     expect(arr('ROWREF_FIELDS')).toEqual(schema.rowRef.requiredFields);
     expect(arr('ROWREF_FIELDS')).toContain('batchManifestDigest');
     expect(arr('ROWREF_FIELDS')).toHaveLength(4);

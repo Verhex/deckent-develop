@@ -46,19 +46,18 @@ export type AdmissionDisposition = (typeof ADMISSION_DISPOSITIONS)[number];
 export type DecisionKind = (typeof DECISION_KINDS)[number];
 export type Confidence = (typeof CONFIDENCE)[number];
 
-/** rowRef binds an event to a MASTER row identity AND its immutable batch by FOUR
- *  parts (§12.1 rev-2 + phase-4.1 batch-snapshot binding): the stable work id, the
- *  row's definition digest (from identityRegistry), the MASTER source digest, and
- *  the batch manifest digest. All FOUR are required and non-empty — this exactly
- *  mirrors schema.rowRef.requiredFields / ROWREF_FIELDS, and the runtime gate
- *  enforces the same (ROWREF_INCOMPLETE on a missing field, UNKNOWN_FIELD on an
- *  extra one). Keep this interface, ROWREF_FIELDS, and the schema in lockstep. */
-export interface RowRef {
-  workId: string;
-  rowDefinitionDigest: string;
-  masterSourceDigest: string;
-  batchManifestDigest: string;
-}
+/** rowRef binds an event to a MASTER row identity AND its immutable batch by the
+ *  FOUR fields listed in ROWREF_FIELDS (§12.1 rev-2 + phase-4.1 batch-snapshot
+ *  binding): stable work id, the row's definition digest (from identityRegistry),
+ *  the MASTER source digest, and the batch manifest digest — all required, non-empty.
+ *  The type is DERIVED from ROWREF_FIELDS via a mapped type, so it can NEVER drift
+ *  from that array; ROWREF_FIELDS is in turn pinned to schema.rowRef.requiredFields
+ *  by the TS↔schema drift-guard, and the runtime gate resolves ALLOWED_ROWREF from
+ *  the same schema SSOT (ROWREF_INCOMPLETE on a missing field, UNKNOWN_FIELD on an
+ *  extra one). One source (the schema), three surfaces (schema · ROWREF_FIELDS/type · gate). */
+export type RowRef = {
+  [K in (typeof ROWREF_FIELDS)[number]]: string;
+};
 
 /** Owner authority proof — an actor string is insufficient (§12.1). Each event
  *  carries an authenticated owner decision-receipt reference; authority that

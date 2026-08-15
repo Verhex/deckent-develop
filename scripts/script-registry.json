@@ -534,7 +534,7 @@
       "owner": "closure-os-governance",
       "npmScript": "part of lint:gates",
       "input": "docs/governance/closure-dispositions.jsonl (append-only ledger) + closure-trust-anchors.json + closure-batches/ + closure-dispositions.receipts/ (currently absent)",
-      "output": "typed HOLD/error validation or OK; --self-check runs 124 in-process assertions",
+      "output": "typed HOLD/error validation or OK; --self-check runs 127 in-process assertions",
       "expiry": "none — permanent lint:gates member",
       "notes": "SOLE validator for the Closure OS append-only decision-ledger: canonical digest chain, reviewed-parent trust-anchor, immutable batch-snapshot integrity, ed25519 attestation verification, append-only prefix. Empty ledger → nothing-to-validate OK (Phase-4 foundation; writer is Phase-5)."
     },
