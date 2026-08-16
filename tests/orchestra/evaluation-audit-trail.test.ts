@@ -193,7 +193,7 @@ describe('evaluation-audit-trail', () => {
   });
 
   // ─── Scenario 5: multi-attempt overwrite semantics ────────────────────
-  it('writes distinct files per attempt and overwrites at the same attempt slot', () => {
+  it('writes distinct files per attempt; same-decision rewrite is idempotent, different-decision is conflict-fail-closed', () => {
     const baseInput: EvaluationAuditInput = {
       ruleSet: 'CODE',
       schemaValidation: VALID_SCHEMA,
@@ -230,18 +230,30 @@ describe('evaluation-audit-trail', () => {
     expect(attempt1.decision).toBe('NO_GO');
     expect(attempt2.decision).toBe('DONE');
 
-    // Rewrite attempt 1 — must overwrite, not append
+    // RECEIPT-BEFORE-DONE conflict-fail-closed (2026-08-16): re-writing the same
+    // attempt with the SAME decision is idempotent (crash/replay safe)…
     writeEvaluationAudit(root, 'sprint-157', 'task-3', 1, {
-      ...baseInput,
-      totalScore: 55,
-      decision: 'GO_WITH_TECH_DEBT',
-      decisionRationale: 'manual reconcile after auditor re-scan',
+      ...baseInput, totalScore: 51, decisionRationale: 'idempotent replay',
     });
-    const rewritten = JSON.parse(readFileSync(path1, 'utf-8'));
-    expect(rewritten.attemptNum).toBe(1);
-    expect(rewritten.totalScore).toBe(55);
-    expect(rewritten.decision).toBe('GO_WITH_TECH_DEBT');
-    expect(rewritten.decisionRationale).toBe('manual reconcile after auditor re-scan');
+    const idem = JSON.parse(readFileSync(path1, 'utf-8'));
+    expect(idem.attemptNum).toBe(1);
+    expect(idem.decision).toBe('NO_GO'); // decision unchanged
+    // …but re-writing the same attempt with a DIFFERENT decision is a forensic
+    // CONFLICT and is refused — a dependent must never be admitted on a silently
+    // rewritten receipt.
+    expect(() => writeEvaluationAudit(root, 'sprint-157', 'task-3', 1, {
+      ...baseInput, totalScore: 55, decision: 'GO_WITH_TECH_DEBT',
+    })).toThrow(/EVALUATION_AUDIT_CONFLICT/);
+    // The prior receipt is intact (NO_GO), never clobbered by the rejected write.
+    expect(JSON.parse(readFileSync(path1, 'utf-8')).decision).toBe('NO_GO');
+
+    // An existing malformed receipt is also immutable evidence: recovery must
+    // disposition it explicitly rather than silently replacing forensic bytes.
+    writeFileSync(path2, '{not-json\n', 'utf-8');
+    expect(() => writeEvaluationAudit(root, 'sprint-157', 'task-3', 2, {
+      ...baseInput, decision: 'DONE',
+    })).toThrow(/EVALUATION_AUDIT_CONFLICT/);
+    expect(readFileSync(path2, 'utf-8')).toBe('{not-json\n');
 
     // File contents must be valid JSON only (single record, no NDJSON append)
     const raw = readFileSync(path1, 'utf-8');

@@ -8,15 +8,18 @@
 // actually leaves the executable registry (not just the discovery list).
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 
 import {
   ModelActivationStore,
   ModelActivationStoreError,
   activationKey,
   readInactiveModels,
+  resolveActiveModelPolicy,
+  emptyModelActivationPolicy,
 } from '../../src/core/model-activation-store.js';
 import { detectAndRegisterModels } from '../../src/core/model-auto-detect.js';
 import { ModelRegistry } from '../../src/core/model-registry.js';
@@ -152,6 +155,156 @@ describe('readInactiveModels — the registration path lookup', () => {
     expect(inactive.has(activationKey('claude', 'claude-opus-4-8'))).toBe(true);
     expect(inactive.has(activationKey('codex', 'gpt-5.6-terra'))).toBe(false);
     expect(inactive.size).toBe(2);
+  });
+});
+
+// ═══ Provider policy mode (OWNER-MODEL-POLICY-001, schema v2) ════════════════
+describe('ModelActivationStore — provider policy mode', () => {
+  it('defaults to implicit-active for any unrecorded provider', () => {
+    const store = open();
+    try {
+      expect(store.getProviderPolicy('codex')).toBe('implicit-active');
+      expect(store.listProviderPolicies()).toEqual([]);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('records explicit-active and reports it (durable, per-provider)', () => {
+    const store = open();
+    try {
+      store.setProviderPolicy('codex', 'explicit-active');
+      expect(store.getProviderPolicy('codex')).toBe('explicit-active');
+      expect(store.getProviderPolicy('claude')).toBe('implicit-active');
+      expect(store.listProviderPolicies()).toEqual([{
+        provider: 'codex',
+        mode: 'explicit-active',
+        updatedAt: '2026-08-09T00:00:00.000Z',
+        actor: 'owner',
+      }]);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('rejects an unknown mode instead of writing a junk policy', () => {
+    const store = open();
+    try {
+      // @ts-expect-error — invalid mode is a compile + runtime error
+      expect(() => store.setProviderPolicy('codex', 'sometimes')).toThrowError(ModelActivationStoreError);
+      expect(store.listProviderPolicies()).toEqual([]);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('isExecutable under implicit-active == isActive (unrecorded stays eligible)', () => {
+    const store = open();
+    try {
+      store.setActivation('codex', 'gpt-5-mini', false);
+      expect(store.isExecutable('codex', 'gpt-5-mini')).toBe(false); // deactivated
+      expect(store.isExecutable('codex', 'gpt-5.6-terra')).toBe(true); // unrecorded → eligible
+    } finally {
+      store.close();
+    }
+  });
+
+  it('isExecutable under explicit-active admits ONLY active=true records', () => {
+    const store = open();
+    try {
+      store.setProviderPolicy('codex', 'explicit-active');
+      store.setActivation('codex', 'gpt-5.6-terra', true);
+      expect(store.isExecutable('codex', 'gpt-5.6-terra')).toBe(true); // owner-active
+      expect(store.isExecutable('codex', 'gpt-5.5')).toBe(false); // unrecorded → INERT
+      store.setActivation('codex', 'gpt-5.5', false);
+      expect(store.isExecutable('codex', 'gpt-5.5')).toBe(false); // recorded-inactive → INERT
+    } finally {
+      store.close();
+    }
+  });
+});
+
+// ═══ Forward migration v1 → v2 (existing stores keep their rows) ═════════════
+describe('schema migration — a v1 store gains provider_policy without data loss', () => {
+  it('opens a v1 store, preserves model_activation rows, and enables policy writes', () => {
+    const mig = mkdtempSync(join(tmpdir(), 'model-activation-v1-'));
+    try {
+      // Forge a v1 store: model_activation only, user_version = 1, one decision.
+      const dbPath = join(mig, '.deckent', 'models.db');
+      mkdirSync(join(mig, '.deckent'), { recursive: true });
+      const raw = new Database(dbPath);
+      raw.exec(`CREATE TABLE model_activation (
+        provider TEXT NOT NULL, model_id TEXT NOT NULL, active INTEGER NOT NULL,
+        updated_at TEXT NOT NULL, actor TEXT NOT NULL, PRIMARY KEY (provider, model_id));`);
+      raw.prepare(`INSERT INTO model_activation VALUES (?,?,?,?,?)`)
+        .run('codex', 'gpt-4.1', 0, '2026-01-01T00:00:00.000Z', 'owner');
+      raw.pragma('user_version = 1');
+      raw.close();
+
+      // Open through the v2 store → migrates in place, no throw, row preserved.
+      const store = new ModelActivationStore(mig, { now: () => '2026-08-16T00:00:00.000Z' });
+      try {
+        expect(store.isActive('codex', 'gpt-4.1')).toBe(false); // v1 row survived
+        expect(store.getProviderPolicy('codex')).toBe('implicit-active'); // new surface works
+        store.setProviderPolicy('codex', 'explicit-active'); // new table now writable
+        expect(store.getProviderPolicy('codex')).toBe('explicit-active');
+      } finally {
+        store.close();
+      }
+    } finally {
+      rmSync(mig, { recursive: true, force: true });
+    }
+  });
+});
+
+// ═══ resolveActiveModelPolicy — the injected snapshot ════════════════════════
+describe('resolveActiveModelPolicy — immutable in-memory snapshot', () => {
+  it('is the all-executable fail-safe when no store exists', () => {
+    const missing = mkdtempSync(join(tmpdir(), 'model-activation-none2-'));
+    try {
+      const policy = resolveActiveModelPolicy(missing);
+      expect(policy.isExecutable('codex', 'anything')).toBe(true);
+      expect(policy.explicitProviders.size).toBe(0);
+      expect(policy.snapshotDigest).toBe(emptyModelActivationPolicy().snapshotDigest);
+    } finally {
+      rmSync(missing, { recursive: true, force: true });
+    }
+  });
+
+  it('reflects explicit-active semantics + a sorted active-set', () => {
+    const store = open();
+    try {
+      store.setProviderPolicy('codex', 'explicit-active');
+      store.setActivation('codex', 'gpt-5.6-terra', true);
+      store.setActivation('codex', 'gpt-5.6-luna', true);
+    } finally {
+      store.close();
+    }
+    const policy = resolveActiveModelPolicy(root);
+    expect(policy.providerMode('codex')).toBe('explicit-active');
+    expect(policy.providerMode('claude')).toBe('implicit-active');
+    expect(policy.isExecutable('codex', 'gpt-5.6-terra')).toBe(true);
+    expect(policy.isExecutable('codex', 'gpt-5.5')).toBe(false); // unrecorded under explicit-active
+    expect(policy.isExecutable('claude', 'anything')).toBe(true); // implicit provider
+    expect(policy.activeModels).toEqual([
+      { provider: 'codex', modelId: 'gpt-5.6-luna' },
+      { provider: 'codex', modelId: 'gpt-5.6-terra' },
+    ]);
+  });
+
+  it('the snapshot digest is stable across identical stores and shifts on any change', () => {
+    const seed = (s: ModelActivationStore): void => {
+      s.setProviderPolicy('codex', 'explicit-active');
+      s.setActivation('codex', 'gpt-5.6-terra', true);
+    };
+    const a = open(); try { seed(a); } finally { a.close(); }
+    const digest1 = resolveActiveModelPolicy(root).snapshotDigest;
+    const digest2 = resolveActiveModelPolicy(root).snapshotDigest;
+    expect(digest2).toBe(digest1); // identical store → identical digest
+
+    const b = open();
+    try { b.setActivation('codex', 'gpt-5.6-sol', true); } finally { b.close(); }
+    expect(resolveActiveModelPolicy(root).snapshotDigest).not.toBe(digest1); // decision changed
   });
 });
 

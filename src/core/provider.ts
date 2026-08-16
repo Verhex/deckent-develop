@@ -7,7 +7,13 @@ import { getEquivalentModel } from './model-equivalence.js';
 import { Connector } from './session-interface.js';
 import { loadDeckSecrets } from './deck-file.js';
 import { detectAndRegisterModels, type DetectResult, type DetectAndRegisterOptions } from './model-auto-detect.js';
-import { modelRegistry as globalModelRegistry, type ModelRegistry } from './model-registry.js';
+import {
+  ensureLocalLlmModelRegistered,
+  modelRegistry as globalModelRegistry,
+  type LocalLlmModelFacts,
+  type ModelRegistry,
+} from './model-registry.js';
+import { resolveActiveModelPolicy, emptyModelActivationPolicy } from './model-activation-store.js';
 import type { TokenUsage } from './token-usage.js';
 import { DeckBroker } from './deck-broker.js';
 import type { ExecutionBudget } from './work-model.js';
@@ -397,6 +403,21 @@ export class ProviderUnavailableError extends ProviderError {
       : `Provider "${providerName}" is unavailable`;
     super(msg, providerName);
     this.name = 'ProviderUnavailableError';
+  }
+}
+
+export class LocalProviderHoldError extends ProviderUnavailableError {
+  readonly code = 'E_LOCAL_PROVIDER_HOLD';
+  readonly disposition = 'HOLD' as const;
+
+  constructor(
+    providerName: string,
+    public readonly reasonCode: 'endpoint-unhealthy' | 'cloud-remap-forbidden',
+  ) {
+    super(providerName, reasonCode === 'endpoint-unhealthy'
+      ? 'local endpoint is stale or unhealthy; cloud fallback is forbidden'
+      : 'local provider identity cannot be remapped to a cloud provider');
+    this.name = 'LocalProviderHoldError';
   }
 }
 
@@ -901,10 +922,11 @@ export async function resolveProviderWithFallback(
   config: { fallback_provider?: ProviderName },
   registry: ProviderRegistry,
 ): Promise<FallbackResult> {
+  let primaryAdapter: ProviderAdapter | undefined;
   // Step 1: Try the requested provider
   if (registry.hasProvider(requestedProvider)) {
-    const adapter = registry.getProvider(requestedProvider);
-    const available = await adapter.isAvailable();
+    primaryAdapter = registry.getProvider(requestedProvider);
+    const available = await primaryAdapter.isAvailable();
     if (available) {
       return {
         provider: requestedProvider,
@@ -913,6 +935,11 @@ export async function resolveProviderWithFallback(
         wasOriginal: true,
       };
     }
+  }
+
+  if (String(requestedProvider) === 'local-llm'
+      || primaryAdapter?.executionCostClass === 'local') {
+    throw new LocalProviderHoldError(String(requestedProvider), 'endpoint-unhealthy');
   }
 
   // Step 2: Check for fallback
@@ -1282,6 +1309,10 @@ export interface OpenAICompatCandidate {
   name: string;
   /** Env var holding the API key — registration is gated on its presence. */
   apiKeyEnv: string;
+  /** Authentication semantics forwarded from a config-driven definition. */
+  authMode?: ProviderDefinition['authMode'];
+  /** Execution cost classification forwarded from a config-driven definition. */
+  executionCostClass?: ProviderDefinition['executionCostClass'];
   /** Built-in preset (set for the byte-for-byte built-in providers). */
   preset?: BuiltinOpenAICompatPreset;
   /** Explicit base URL (set for config-driven providers). */
@@ -1300,6 +1331,18 @@ const BUILTIN_OPENAI_COMPAT_CANDIDATES: readonly OpenAICompatCandidate[] = [
   { name: 'qwen',     apiKeyEnv: 'DASHSCOPE_API_KEY', preset: 'qwen'     },
   { name: 'zhipu',    apiKeyEnv: 'ZHIPU_API_KEY',     preset: 'glm'      },
 ];
+
+const LOCAL_LLM_MODEL_FACTS = Object.freeze({
+  tier: 'standard',
+  contextWindow: 262_144,
+  capabilities: Object.freeze({
+    streaming: true,
+    toolUse: true,
+    vision: false,
+    codeExecution: false,
+    reasoning: true,
+  }),
+} satisfies LocalLlmModelFacts);
 
 /**
  * Resolve the full set of openai-compatible provider candidates — the built-in
@@ -1325,8 +1368,16 @@ export function resolveOpenAICompatCandidates(
       const apiKeyEnv = typeof def?.apiKeyEnv === 'string' ? def.apiKeyEnv.trim() : '';
       const baseURL = typeof def?.baseUrl === 'string' ? def.baseUrl.trim() : '';
       const models = Array.isArray(def?.models) ? def.models : [];
-      if (!name || !apiKeyEnv || !baseURL || models.length === 0) continue;
-      const candidate: OpenAICompatCandidate = { name, apiKeyEnv, baseURL, models };
+      const keylessLocal = def.authMode === 'none' || def.authMode === 'local';
+      if (!name || (!apiKeyEnv && !keylessLocal) || !baseURL || models.length === 0) continue;
+      const candidate: OpenAICompatCandidate = {
+        name,
+        apiKeyEnv,
+        baseURL,
+        models,
+        authMode: def.authMode,
+        executionCostClass: def.executionCostClass,
+      };
       const idx = merged.findIndex(c => c.name === name);
       if (idx >= 0) merged[idx] = candidate; // config precedence over built-in
       else merged.push(candidate);
@@ -1375,6 +1426,14 @@ export interface BootstrapResult {
    * plus the subprocess consumption side are the two halves this task closes.
    */
   deckBroker?: DeckBroker | null;
+  /**
+   * OWNER-MODEL-POLICY-001: the `snapshotDigest` of the owner activation policy
+   * injected into the registry during this bootstrap (sha256 of the whole
+   * active-set + provider-mode decision set). Bound to plan + dispatch evidence
+   * so a run can prove exactly which active-set governed model selection. The
+   * fail-safe empty-policy digest when no store/decisions exist.
+   */
+  modelActivationDigest?: string;
 }
 
 /**
@@ -1545,12 +1604,14 @@ export async function bootstrapProviders(
   // `worker_provider=<name>` resolves and fails honestly at send-time rather
   // than silently falling back — hence config candidates skip silently here.
   const openaiCompatCandidates = resolveOpenAICompatCandidates(config.providers?.registry);
-  const anyOpenAICompatKey = openaiCompatCandidates.some(c => Boolean(process.env[c.apiKeyEnv]));
-  if (anyOpenAICompatKey) {
+  const anyOpenAICompatCandidate = openaiCompatCandidates.some(c =>
+    c.authMode === 'none' || c.authMode === 'local' || Boolean(process.env[c.apiKeyEnv]));
+  if (anyOpenAICompatCandidate) {
     const { OPENAI_COMPAT_PRESETS, OpenAICompatibleAdapter } = await import('../providers/openai-compatible.js');
     for (const candidate of openaiCompatCandidates) {
       const apiKey = process.env[candidate.apiKeyEnv];
-      if (!apiKey) {
+      const keylessLocal = candidate.authMode === 'none' || candidate.authMode === 'local';
+      if (!apiKey && !keylessLocal) {
         // Built-in presets keep today's friendly skip reason; config-declared
         // providers are registered (unconditionally) by the config block below.
         if (candidate.preset) {
@@ -1569,9 +1630,26 @@ export async function bootstrapProviders(
               name: candidate.name,
               baseURL: candidate.baseURL!,
               apiKeyEnv: candidate.apiKeyEnv,
+              authMode: candidate.authMode,
+              executionCostClass: candidate.executionCostClass,
               models: candidate.models!,
               credentialEnvKeys,
             });
+        if (candidate.executionCostClass === 'local') {
+          const checkedAtMs = Date.now();
+          const [healthy, modelIds] = await Promise.all([
+            adapter.probeHealth(),
+            adapter.fetchIdentity(),
+          ]);
+          for (const modelId of candidate.models ?? []) {
+            ensureLocalLlmModelRegistered(
+              modelId,
+              LOCAL_LLM_MODEL_FACTS,
+              { modelIds, healthy, checkedAtMs },
+              _hooks?.mr ?? globalModelRegistry,
+            );
+          }
+        }
         registry.registerProvider(adapter);
         registered.push(candidate.name as unknown as ProviderName);
       } catch {
@@ -1660,8 +1738,9 @@ export async function bootstrapProviders(
       try {
         let adapter: ProviderAdapter | null = null;
         if (kind === 'openai-compatible') {
-          if (!def.baseUrl || !def.apiKeyEnv || !Array.isArray(def.models) || def.models.length === 0) {
-            skipped.push({ name: name as ProviderName, reason: `openai-compatible provider "${name}" needs baseUrl, apiKeyEnv and a non-empty models list` });
+          const keylessLocal = def.authMode === 'none' || def.authMode === 'local';
+          if (!def.baseUrl || (!def.apiKeyEnv && !keylessLocal) || !Array.isArray(def.models) || def.models.length === 0) {
+            skipped.push({ name: name as ProviderName, reason: `openai-compatible provider "${name}" needs baseUrl, authentication configuration and a non-empty models list` });
             continue;
           }
           const { OpenAICompatibleAdapter } = await import('../providers/openai-compatible.js');
@@ -1669,6 +1748,8 @@ export async function bootstrapProviders(
             name,
             baseURL: def.baseUrl,
             apiKeyEnv: def.apiKeyEnv,
+            authMode: def.authMode,
+            executionCostClass: def.executionCostClass,
             models: def.models,
             credentialEnvKeys,
           });
@@ -1754,15 +1835,43 @@ export async function bootstrapProviders(
     // Health check failure should not block bootstrap
   }
 
+  const mr = _hooks?.mr ?? globalModelRegistry;
+
+  // ─── Owner model-activation policy (OWNER-MODEL-POLICY-001) ────────────────
+  // Resolve the owner's active-set snapshot from `.deckent/models.db` and inject
+  // it into the registry SYNCHRONOUSLY — a cheap local SQLite read, no probe
+  // latency. This MUST happen before any caller builds planner-policy vocabulary
+  // or resolves a dispatch model, so "activation filtering tamamlanmadan planner
+  // policy üretilemesin" holds without blanket-awaiting the async CLI probe
+  // below. The read-filter it installs also neutralises the parametric
+  // re-registration resurrection path — an inactive model stays resolvable for
+  // identity/receipts but never re-enters the selectable pool. Fail-safe: no
+  // store / no policy rows → every provider implicit-active → byte-identical.
+  const modelActivationPolicy = root
+    ? resolveActiveModelPolicy(root)
+    : emptyModelActivationPolicy();
+  mr.setActivationPolicy(modelActivationPolicy);
+
   // ─── Model Auto-Detect (F1-AD) — fire-and-forget, best-effort ─────────────
   // Probe available provider CLIs and register any discovered model-ids in
   // the global ModelRegistry (parametric — no code change needed for new models).
   // Does NOT block bootstrap: the promise is returned for callers that need it.
-  const mr = _hooks?.mr ?? globalModelRegistry;
+  // `projectRoot` is now threaded through so the detection path applies the same
+  // owner deactivations at registration time (previously dormant — no root was
+  // passed, so readInactiveModels never fired).
   const modelAutoDetectPromise = detectAndRegisterModels(
     mr,
-    { timeoutMs: 5_000, ...(_hooks?.detectOpts ?? {}) },
+    { timeoutMs: 5_000, projectRoot: root, ...(_hooks?.detectOpts ?? {}) },
   ).catch(() => [] as DetectResult[]);
 
-  return { connector, registered, skipped, defaultProvider, providerEnvOverrides, modelAutoDetectPromise, deckBroker };
+  return {
+    connector,
+    registered,
+    skipped,
+    defaultProvider,
+    providerEnvOverrides,
+    modelAutoDetectPromise,
+    deckBroker,
+    modelActivationDigest: modelActivationPolicy.snapshotDigest,
+  };
 }

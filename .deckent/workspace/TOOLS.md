@@ -11,7 +11,7 @@ Coverage: npx vitest run --coverage
 Dashboard: deckent web
 
 ## MCP Tools
-<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="7040f3ee4c57fdb1ecced07dd9e7c411d7dd05aaea63868b5576eeea842d819a" -->
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="8d560ed2daa7d1f7f8e6132815e10c0c4b8acdd0e9c629fa2723f0916fc87a38" -->
 Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla tool olarak yorumlanmaz.
 
 | MCP Adı | Etki | Onay | Idempotent |
@@ -65,18 +65,20 @@ Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla too
 | `deckent_autonomous_approve` | değiştirici | runtime policy gereği zorunlu | hayır |
 | `deckent_autonomous_reject` | değiştirici | runtime policy gereği zorunlu | hayır |
 | `deckent_execution_authority` | değiştirici | runtime policy gereği zorunlu | evet |
+| `deckent_approvals` | salt-okunur | effect class gereği zorunlu değil | evet |
 
-Toplam: 49
+Toplam: 50
 <!-- DECKENT:CONTRACT:END id="tools" -->
 
 ## CLI Commands
-<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="ae1ca9ed5ad7e12d1abe86e93643f459b661da046beb62e58a90546f949ae0c2" -->
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="bb631d96fbb556fdea0bbec8800e3fc2a9c9ab8714870f9ebc3b22fac85a6910" -->
 Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper module dosya adları dışlanır.
 
 | Komut | Kategori | Risk | Yüzeyler |
 |---|---|---|---|
 | `deckent agent` | Core | Değiştir | cli, mcp, repl |
 | `deckent analyze` | Core | Oku | cli, mcp, repl |
+| `deckent approvals` | Enterprise | Değiştir | cli, mcp |
 | `deckent archive-debt` | Core | Oku | cli |
 | `deckent attach` | Run | Çalıştır | cli |
 | `deckent audit` | Core | Çalıştır | cli, mcp, repl |
@@ -151,5 +153,5 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent web` | Run | Çalıştır | cli |
 | `deckent xverify` | Core | Oku | cli, mcp |
 
-Toplam: 75
+Toplam: 76
 <!-- DECKENT:CONTRACT:END id="tools" -->

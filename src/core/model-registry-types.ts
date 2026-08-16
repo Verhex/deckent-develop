@@ -9,9 +9,9 @@
  *  ids can be registered at all — `ModelDefinition.provider` is typed to this
  *  union, so without it no OpenRouter model could enter the registry and
  *  `isModelAvailable(*, 'openrouter')` was structurally always false. */
-export type RegistryProviderName = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter';
+export type RegistryProviderName = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter' | 'local-llm';
 
-/** Backward-compatible name retained for consumers; no longer a wider type. */
+/** Config-extensible registry ownership, including keyless local runtimes. */
 export type RegistryProviderNameExt = RegistryProviderName;
 
 export type ModelTier = 'economy' | 'standard' | 'premium' | 'premium_plus';
@@ -86,7 +86,7 @@ export interface ModelDefinition {
  */
 export interface ParametricResolveOptions {
   /** Explicit provider ownership when the API ID is not unambiguously namespaced. */
-  provider?: RegistryProviderName;
+  provider?: RegistryProviderNameExt;
   /** Force the tier instead of inferring it from the id. */
   tier?: ModelTier;
   /** @deprecated Canonical identity requires this to equal `id`. */
@@ -94,7 +94,8 @@ export interface ParametricResolveOptions {
   /** Context window in tokens (default 200_000). */
   contextWindow?: number;
   /** Cost per million tokens. Every dynamic cloud entry requires this together
-   *  with `pricingEvidenceRef`; only local Ollama tags may use the zero default. */
+   *  with `pricingEvidenceRef`; only explicitly owned local identities may use
+   *  the zero default. */
   costPerMillion?: ModelCost;
   /** Opaque pricing source reference required for every dynamic cloud entry. */
   pricingEvidenceRef?: string;

@@ -3,11 +3,11 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "7a0659489efc93b4dfa416e90b3029c10383bddca1cbfcd6000c50e4d816fe57"
+    "value": "6da553c80264edf9b7eb014a56b9fb023e0c2c475cf5dd9500bbf782aa8f06ae"
   },
   "summary": {
-    "total": 491,
-    "active": 429,
+    "total": 492,
+    "active": 430,
     "terminal": 62,
     "receipts": 184,
     "byState": {
@@ -15,14 +15,14 @@
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 23,
+      "VERIFY": 24,
       "DONE": 62,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 320,
-      "P1": 134,
+      "P1": 135,
       "P2": 37
     },
     "byProgram": {
@@ -49,7 +49,7 @@
       "PAEP": 35,
       "PRODUCT": 18,
       "PROMPT": 5,
-      "PROVIDER": 5,
+      "PROVIDER": 6,
       "RELEASE": 4,
       "REPO": 1,
       "RESILIENCE": 1,
@@ -4682,6 +4682,17 @@
       "updated": "2026-08-09",
       "definitionDigest": "c71612dea49f09b12bc2f171efafb362999df95ec8af8d9be07b7185e7dfe7c0",
       "progressDigest": "d267c01d80072610256b0be908fa998e701078ad00462dde75e8be90e5d7e531",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7076,
+      "id": "OWNER-MODEL-POLICY-001",
+      "program": "PROVIDER",
+      "priority": "P1",
+      "state": "VERIFY",
+      "updated": "2026-08-16",
+      "definitionDigest": "c34ad5c7a6ac8ba7871c6433e845e4ed431055c2ea73678172dcb7716c3a4a6b",
+      "progressDigest": "7bb0d14f015c4f3d210b53c320d936d650eab158a275cd8541bb5a9019ee3669",
       "terminalClosureDigest": null
     },
     {
@@ -21837,6 +21848,7 @@
         "TOOL-COMPUTER-001",
         "PROVIDER-EXTENSION-001",
         "MODEL-ACTIVATION-001",
+        "OWNER-MODEL-POLICY-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -21876,6 +21888,7 @@
         "TOOL-COMPUTER-001",
         "PROVIDER-EXTENSION-001",
         "MODEL-ACTIVATION-001",
+        "OWNER-MODEL-POLICY-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -22554,7 +22567,8 @@
       "priority": "P1",
       "dependsOn": [],
       "dependents": [
-        "DECKENT-CORE-MODEL-LIFECYCLE-001"
+        "DECKENT-CORE-MODEL-LIFECYCLE-001",
+        "OWNER-MODEL-POLICY-001"
       ],
       "children": [],
       "gates": [
@@ -22580,6 +22594,41 @@
       "acceptance": "Owner can activate or deactivate any detected model per provider from a first-class surface without editing files; only active models reach the routing pool; an absent record preserves current behaviour; brain-only models never enter the worker pool",
       "evidence": "Açılış 2026-08-09: Alperen Q&A kararı (çift-mercek — ürün kullanıcısı model/provider yönetimini kolayca yapabilmeli, dogfood aynı store'u kullanır; store yeri owner seçimi `.deckent/models.db` proje-kapsamlı). Kod-truth: `model-auto-detect.ts` provider artı authMode başına gerçekten sunulan modelleri tespit edip registry'ye kaydeder ve cache'ler, fakat AKTİFLİK kavramı yoktur — tespit edilen her model havuza girer. Ölçüm 2026-08-09: codex oturumunda `o3` `gpt-5.5` `gpt-4.1` `o4-mini` `gpt-5-mini` `gpt-4.1-mini` eski nesilleri `gpt-5.6` ailesiyle yan yana duruyor ve AI-planner ilk dogfood koşusunda economy görevine `gpt-5-mini` atadı. İlişkili iki kusur da ölçüldü ve ayrı residual'dır: `min_tier` config alanı `model-selector.ts` içinde HİÇ okunmuyor (yalnız `haiku_allowed` türetiliyor, oysa şema tersini vaat ediyor) ve tier tabanı planner'ın atamasına uygulanmıyor; `currentGeneration` bayrağı doğru nesilleri işaret etse de planner onu bypass ediyor ; `receipt=GR-2026-08-09-MODEL-ACTIVATION-01`; `receipt=GR-2026-08-09-MODEL-ACTIVATION-SUPP-01`; SETTLEMENT 2026-08-09: aktiflik katmani tespit-havuzunun ustune kuruldu — ModelActivationStore (.deckent/models.db, owner secimi) provider arti model basina owner karari tutar, kaydi olmayan model AKTIF kalir yani kurulum hicbir projede sessiz daralma yapmaz. Enforcement tek kayit otoritesinde: deaktif model executable registry'den UNREGISTER edilir, yalnizca kesif listesini filtrelemek yetmezdi cunku cloud modeller bundled katalogdan zaten kayitliydi ve planner yine secebilirdi. Kullanici yuzeyi deckent models activate/deactivate/activation — dosya duzenlemeden yonetim (KANUN 1 cift-mercek, ayni store dogfood'u da yonetir). Brain modeli ayri kalir worker havuzuna girmez. Gercek-binary kosumu ile owner listesi uygulandi: codex o3 gpt-5.5 gpt-4.1 o4-mini gpt-5-mini gpt-4.1-mini ve claude opus-4-8 kapatildi, aktif havuz gpt-5.6 ailesi arti claude opus-5 sonnet-5 haiku-4-5 olarak kaldi. `proof=model-activation-12-pins-plus-42-green-plus-real-binary-7-decisions`; 4 pin arti 1 mekanik supp. ACIK typed-residual: planner atamasinin aktif kumeye karsi dogrulanmasi, min_tier alaninin model-selector'da olu olmasi, ve cross-platform arti olcek kanitlari ayri dilimlerdir",
       "updated": "2026-08-09"
+    },
+    {
+      "order": 7076,
+      "id": "OWNER-MODEL-POLICY-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "PROVIDER",
+      "outcome": "Provider-scoped explicit-active model policy over the auto-detected activation pool",
+      "priority": "P1",
+      "dependsOn": [
+        "MODEL-ACTIVATION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "?",
+        "X": "0",
+        "S": "0"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "MODEL-ACTIVATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Under explicit-active a newly detected or catalog model never auto-enters the selectable pool; the single authority is ModelActivationStore with no parallel config allowlist; default_model is a preferred pick and NOT a hard ceiling — the hard execution limit is the owner active-set; an inactive model raises a typed MODEL_INACTIVE HOLD at forceModel Layer 0 and at pre-dispatch admission before any Task JSON write or spawn, never a silent substitution; the snapshot digest binds to plan and dispatch evidence",
+      "evidence": "`historical-authority=current-disk-owner-model-policy-001;historical-gates=G1;proof=owner-model-policy-001-hermetic-32-regression-248-canary-5of5`; no new write authority. FAZ-0 manual bootstrap seam diskte kanıtlı: ModelActivationStore schema v1→v2 (MODEL_ACTIVATION_STORE_SCHEMA_VERSION=2) provider başına ProviderPolicyMode taşır — implicit-active (default, byte-compatible) karşısında explicit-active (yalnız owner active=true kaydı çalıştırılabilir, yeni tespit/katalog modeli havuza asla kendiliğinden giremez). Tek authority ModelActivationStore, paralel config allowlist yok (KANUN 10). Enforcement: bootstrapProviders snapshot'ı senkron çözüp planner-policy'den ÖNCE mr.setActivationPolicy ile enjekte eder (provider.ts:1778-1781) ve snapshotDigest'i BootstrapResult.modelActivationDigest'e bağlar; ModelRegistry read-filter inaktif modeli pool accessor'larından gizler ama identity/accounting accessor'ları get/getOrThrow/has TOTAL kalır (tombstone — parametrik re-register diriltemez, model-registry.ts:606); forceModel Layer 0 (model-selector.ts:250) ve pre-dispatch admission (task-mode-runner.ts:218) inaktif modelde typed MODEL_INACTIVE HOLD verir, spawn'dan önce, sessiz ikame değil. Owner explicit-active set: claude {claude-fable-5, claude-opus-5, claude-sonnet-5, claude-haiku-4-5-20251001}, codex {gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna}, local-llm {Qwen3.8-27B}; gpt-5.5 INACTIVE. Kanıt: 32 hermetic test bu tur bağımsız yeşil koşuldu (21+11, model-activation-store + model-activation-policy-enforcement), 248 regression yeşil, tsc temiz, gerçek build; gpt-5.5 negatif binary canary 5/5 (havuz gpt-5.5'i dışlar, tier→premium gpt-5.6-sol verir, forceModel gpt-5.5 spawn'dan önce MODEL_INACTIVE); active-set snapshot digest sha256:759fb7e7a3f45bf8…. H bu tur diskte koşuldu (=1); L canary bu satırda bağımsız üretilmedi (relayed, ?). ACIK typed-residual: canlı models.dev kataloğu gpt-5.6-terra/sol'u premium projekte ediyor, owner-reviewed BUILTIN merdiven ise terra=standard, sol=premium_plus, luna=economy — hermetic tier testi owner-reviewed merdivene assert eder; projection uzlaştırması ayrı follow-up ve activation sözleşmesini etkilemez. FAZ-1 local-llm üretim wiring'i artık KURULU ve gerçek Qwen ile kanıtlıdır: keyless local auth + local cost class + registry identity/fresh health + Terminal native transport + http-agentic-worker + `local-llm start/status/stop`; Sprint-533 2/2 COMPLETE receipt digest `103e8f64d9d989f8fd32a8d5777c67c2710e0640b2b810f2386409abc8f4e237`; worker receipt `worker-execution:e50422ac35180a57be52ad08b7b19bcceb98ca5c360be901bfa3e8243a5c139d`; GPU placement CUDA0/RTX 5090 üzerinde fail-loud config authority ile Terminal yaklaşık 44 s ve worker transport 7064 ms; scoped suite 29/29 ve build yeşil. Daemon owner isteğiyle kapalıdır; wiring kalıcıdır. Satır `VERIFY` kalır: tier-projection residual'ı açık ve bu annotation Closure OS authenticated disposition yerine geçmez. Extended spec docs/governance/owner-model-policy.md",
+      "updated": "2026-08-16"
     },
     {
       "order": 7080,
@@ -25453,6 +25502,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "18465ce3dbe9948ba1a178d6de4010e9373d191b121e13609d7fb8123cf5f10d"
+    "value": "6e5b15db5440cb12a5a4842176226f92ea5868331f41f1755b0dd6cef12483a7"
   }
 }

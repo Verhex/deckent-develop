@@ -79,6 +79,17 @@ const PROVIDER_CAPABILITIES: Record<ProviderName, ProviderCapability> = {
     maxContextTokens: 128_000,
     costPerMillionTokens: { input: 0, output: 0 },
   },
+  // Config-resolved local OpenAI-compatible runtime. The endpoint/model
+  // identity is live-probed before registration; these conservative
+  // provider-level capabilities mirror the owner-reviewed model facts.
+  'local-llm': {
+    streaming: true,
+    toolUse: true,
+    vision: false,
+    codeExecution: false,
+    maxContextTokens: 262_144,
+    costPerMillionTokens: { input: 0, output: 0 },
+  },
 };
 
 // ─── Valid provider names (for runtime validation) ──────────────────────────

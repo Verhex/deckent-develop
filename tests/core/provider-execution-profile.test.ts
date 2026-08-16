@@ -4,6 +4,7 @@ import { resolveProviderExecutionCostClass } from '../../src/core/provider-execu
 describe('provider execution-cost authority', () => {
   it('resolves built-in local and unknown remote providers from one catalog', () => {
     expect(resolveProviderExecutionCostClass('ollama')).toBe('local');
+    expect(resolveProviderExecutionCostClass('local-llm')).toBe('local');
     expect(resolveProviderExecutionCostClass('future-cloud')).toBe('remote');
   });
 

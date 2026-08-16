@@ -4,10 +4,12 @@
 
 import { DeckentError } from './errors.js';
 import { OLLAMA_BUILTIN_MODELS } from './ollama-models.js';
+import type { ModelActivationPolicy } from './model-activation-store.js';
 import type {
   RegistryProviderName,
   RegistryProviderNameExt,
   ModelTier,
+  ModelCapabilities,
   ModelDefinition,
   ParametricResolveOptions,
 } from './model-registry-types.js';
@@ -509,7 +511,7 @@ export function buildParametricModel(
       `Model API ID ${id} belongs to ${inferredProvider}, not ${opts.provider}`,
     );
   }
-  if (provider !== 'ollama') {
+  if (provider !== 'ollama' && provider !== 'local-llm') {
     const suppliedCost = opts.costPerMillion;
     const validSuppliedCost = suppliedCost !== undefined
       && Number.isFinite(suppliedCost.input)
@@ -534,7 +536,7 @@ export function buildParametricModel(
   const def: ModelDefinition = {
     id,
     apiId: id,
-    provider,
+    provider: provider as RegistryProviderName,
     tier: opts.tier ?? inferTierFromId(id),
     contextWindow: opts.contextWindow ?? 200_000,
     costPerMillion: opts.costPerMillion ?? { input: 0, output: 0 },
@@ -553,7 +555,11 @@ export function buildParametricModel(
     // OpenRouter id is only ever reachable when the operator named it explicitly AND
     // the gateway serves it verbatim (id === apiId), so 'ga' is the honest default.
     // An explicit `opts.status` still wins.
-    status: opts.status ?? (provider === 'ollama' || provider === 'openrouter' ? 'ga' : 'preview'),
+    status: opts.status ?? (
+      provider === 'ollama' || provider === 'local-llm' || provider === 'openrouter'
+        ? 'ga'
+        : 'preview'
+    ),
   };
   if (opts.maxOutputTokens !== undefined) {
     def.maxOutputTokens = opts.maxOutputTokens;
@@ -569,12 +575,41 @@ export function buildParametricModel(
 export class ModelRegistry {
   private models = new Map<string, ModelDefinition>();
 
+  /**
+   * OWNER-MODEL-POLICY-001: the resolved owner activation snapshot, injected once
+   * at provider bootstrap ({@link setActivationPolicy}). When set, every *pool*
+   * accessor (getByProvider(AndTier)/getAllModels/getAllModelIds/getEquivalent…)
+   * hides models the owner has not made executable, so planning, tier resolution
+   * and dispatch see only the allowed set. Identity/accounting accessors
+   * (get/getOrThrow/has/resolve/getTier/estimateCost/resolveApiId) stay TOTAL —
+   * a tombstoned model still resolves for receipts and cannot be resurrected into
+   * the pool by a parametric re-`register`. Unset (tests, pre-bootstrap) → no
+   * filtering, byte-identical to the pre-policy registry.
+   */
+  private activationPolicy?: ModelActivationPolicy;
+
   constructor(builtins: readonly ModelDefinition[] = CANONICAL_MODELS) {
     assertSoleTierPreferencePerSet(builtins);
     for (const model of builtins) {
       assertCanonicalModelDefinition(model);
       this.models.set(model.id, model);
     }
+  }
+
+  /** Inject the owner activation snapshot (bootstrap). `undefined` clears it. */
+  setActivationPolicy(policy: ModelActivationPolicy | undefined): void {
+    this.activationPolicy = policy;
+  }
+
+  /** The active policy snapshot governing pool visibility, if any. */
+  getActivationPolicy(): ModelActivationPolicy | undefined {
+    return this.activationPolicy;
+  }
+
+  /** True when the model is executable under the owner policy (or no policy set). */
+  private isPoolExecutable(model: ModelDefinition): boolean {
+    return this.activationPolicy === undefined
+      || this.activationPolicy.isExecutable(model.provider, model.id);
   }
 
   get(id: string): ModelDefinition | undefined {
@@ -614,16 +649,16 @@ export class ModelRegistry {
   }
 
   getByProvider(provider: RegistryProviderName): ModelDefinition[] {
-    return [...this.models.values()].filter(m => m.provider === provider);
+    return [...this.models.values()].filter(m => m.provider === provider && this.isPoolExecutable(m));
   }
 
   getByTier(tier: ModelTier): ModelDefinition[] {
-    return [...this.models.values()].filter(m => m.tier === tier);
+    return [...this.models.values()].filter(m => m.tier === tier && this.isPoolExecutable(m));
   }
 
   getByProviderAndTier(provider: RegistryProviderNameExt, tier: ModelTier): ModelDefinition | undefined {
     const candidates = [...this.models.values()].filter(
-      m => m.provider === provider && m.tier === tier && m.status === 'ga',
+      m => m.provider === provider && m.tier === tier && m.status === 'ga' && this.isPoolExecutable(m),
     );
     // MASTER-PLAN 669: an explicit designation outranks registration order.
     // Order-as-identity is how a cross-verify dispatch silently landed on
@@ -637,6 +672,12 @@ export class ModelRegistry {
     // Same provider — return same model
     if (source.provider === targetProvider) {
       return source.id;
+    }
+    if (String(source.provider) === 'local-llm') {
+      throw new DeckentError(
+        'E_LOCAL_PROVIDER_FALLBACK_HOLD',
+        `Local model ${modelId} cannot be remapped to provider ${targetProvider}`,
+      );
     }
     const equivalent = this.getByProviderAndTier(targetProvider, source.tier);
     if (equivalent) {
@@ -740,17 +781,17 @@ export class ModelRegistry {
   }
 
   getAllModelIds(): string[] {
-    return [...this.models.keys()];
+    return [...this.models.values()].filter(m => this.isPoolExecutable(m)).map(m => m.id);
   }
 
   getAllModels(): ModelDefinition[] {
-    return [...this.models.values()];
+    return [...this.models.values()].filter(m => this.isPoolExecutable(m));
   }
 
   getAllProviders(): RegistryProviderName[] {
     const providers = new Set<RegistryProviderName>();
     for (const m of this.models.values()) {
-      providers.add(m.provider);
+      if (this.isPoolExecutable(m)) providers.add(m.provider);
     }
     return [...providers];
   }
@@ -828,6 +869,75 @@ export function ensureOllamaModelRegistered(
     capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
     status: 'ga',
   });
+}
+
+// ─── Fresh local OpenAI-compatible identity registration ──────────────────
+
+export const LOCAL_LLM_HEALTH_FRESHNESS_MS = 30_000;
+
+export interface LocalLlmEndpointEvidence {
+  /** Exact model ids returned by the endpoint's live `/models` response. */
+  modelIds: readonly string[];
+  /** Result of the endpoint's live `/health` probe. */
+  healthy: boolean;
+  /** Local observation time, expressed as `Date.now()` milliseconds. */
+  checkedAtMs: number;
+}
+
+export interface LocalLlmModelFacts {
+  tier: ModelTier;
+  contextWindow: number;
+  capabilities: ModelCapabilities;
+}
+
+/**
+ * Register an explicitly owned local OpenAI-compatible identity only from a
+ * fresh, healthy endpoint observation. Endpoint identity proves reachability;
+ * tier, context, and capabilities remain explicit owner-reviewed facts.
+ */
+export function ensureLocalLlmModelRegistered(
+  modelId: string,
+  facts: LocalLlmModelFacts,
+  evidence: LocalLlmEndpointEvidence,
+  registry: ModelRegistry = modelRegistry,
+  nowMs: number = Date.now(),
+): void {
+  const evidenceAgeMs = nowMs - evidence.checkedAtMs;
+  if (!evidence.healthy
+      || !Number.isFinite(evidence.checkedAtMs)
+      || evidenceAgeMs < 0
+      || evidenceAgeMs > LOCAL_LLM_HEALTH_FRESHNESS_MS
+      || !evidence.modelIds.includes(modelId)) {
+    throw new DeckentError(
+      'E_LOCAL_PROVIDER_HEALTH_HOLD',
+      `Local model ${modelId} requires a fresh, healthy endpoint identity`,
+    );
+  }
+  if (!Number.isInteger(facts.contextWindow) || facts.contextWindow <= 0) {
+    throw new DeckentError(
+      'E_MODEL_CONTEXT_INVALID',
+      `Local model ${modelId} requires an owner-reviewed positive context window`,
+    );
+  }
+  const existing = registry.get(modelId);
+  if (existing) {
+    if (String(existing.provider) !== 'local-llm') {
+      throw new DeckentError(
+        'E_MODEL_PROVIDER_MISMATCH',
+        `Model API ID ${modelId} is already owned by ${existing.provider}`,
+      );
+    }
+    return;
+  }
+  registry.register(buildParametricModel(modelId, {
+    provider: 'local-llm',
+    tier: facts.tier,
+    contextWindow: facts.contextWindow,
+    capabilities: { ...facts.capabilities, toolUse: true },
+    costPerMillion: { input: 0, output: 0 },
+    status: 'ga',
+    register: false,
+  }));
 }
 
 /** Per-model facts a caller can supply when registering an OpenRouter id.

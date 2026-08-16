@@ -24,6 +24,8 @@ const AUTH_ENV_VARS: Record<ProviderName, string | null> = {
   // (providers/openrouter.ts secret-resolution contract). A non-null entry here
   // would make health checks probe an env var that is intentionally never set.
   openrouter: null,
+  // Keyless loopback OpenAI-compatible runtime; reachability is the authority.
+  'local-llm': null,
 };
 
 /** Health check result for a single provider */

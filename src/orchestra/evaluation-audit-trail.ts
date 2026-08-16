@@ -10,10 +10,13 @@
 // sprint-phases) is intentionally out of scope for Task 1 — it lives in
 // Sprint 157 T-004.
 
-import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { EVALUATIONS_DIR } from '../core/constants.js';
+import { ErrorRegistry } from '../core/errors.js';
 
 /**
  * Rule-set identifier mirroring rubric-registry TaskType but in the
@@ -186,17 +189,85 @@ export function writeEvaluationAudit(
   const filePath = evaluationAuditPath(projectRoot, sprintId, taskId, attemptNum);
   mkdirSync(dirname(filePath), { recursive: true });
 
-  // Atomic write: tmp → rename (same pattern as sprint-checkpoint.ts::writeCheckpoint).
-  // A crash mid-write never leaves a half-serialized audit record for a post-mortem
-  // reader to trip over — readers only ever see the prior file or the fully new one.
+  // RECEIPT-BEFORE-DONE (2026-08-16): conflict-fail-closed. A receipt for a fixed
+  // (sprintId, taskId, attemptNum) is immutable once its decision is recorded.
+  // Re-writing the SAME decision is idempotent (crash/replay safe); a DIFFERENT
+  // decision for the same attempt is a forensic conflict and is REFUSED — a
+  // dependent must never be admitted on a receipt that was silently rewritten.
+  if (existsSync(filePath)) {
+    try {
+      const prior = JSON.parse(readFileSync(filePath, 'utf-8')) as { decision?: unknown };
+      if (prior.decision !== undefined && prior.decision !== record.decision) {
+        throw ErrorRegistry.createError('DECKENT_E094', {
+          message: `EVALUATION_AUDIT_CONFLICT: ${sprintId}/${taskId}/attempt-${attemptNum} already recorded `
+            + `decision=${String(prior.decision)}; refusing to overwrite with ${record.decision}`,
+        });
+      }
+    } catch (priorErr) {
+      if (priorErr instanceof Error && priorErr.message.startsWith('EVALUATION_AUDIT_CONFLICT')) throw priorErr;
+      throw ErrorRegistry.createError('DECKENT_E094', {
+        message: `EVALUATION_AUDIT_CONFLICT: ${sprintId}/${taskId}/attempt-${attemptNum} `
+          + `has unreadable existing receipt; refusing to overwrite immutable evidence`,
+      });
+    }
+  }
+
+  // Atomic + DURABLE write: tmp → fsync(tmp) → rename → fsync(dir). The receipt is
+  // flushed to stable storage BEFORE its dependent task's status can flip to DONE,
+  // so a crash after the receipt / before the status leaves the receipt recoverable
+  // and the RECEIPT-BEFORE-DONE invariant intact. Readers only ever see the prior
+  // file or the fully-new one.
   const tmpPath = `${filePath}.tmp`;
   writeFileSync(tmpPath, JSON.stringify(record, null, 2) + '\n', 'utf-8');
+  fsyncFilePath(tmpPath);
   try {
     renameSync(tmpPath, filePath);
   } catch (renameErr) {
     try { if (existsSync(tmpPath)) unlinkSync(tmpPath); } catch { /* ignore */ }
     throw renameErr;
   }
+  fsyncDirectoryPath(dirname(filePath));
 
   return record;
+}
+
+/** A receipt is not publishable unless its file bytes reach the filesystem. */
+function fsyncFilePath(p: string): void {
+  const fd = openSync(p, 'r');
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Directory fsync is unavailable on some supported filesystems; the file fsync above remains mandatory. */
+function fsyncDirectoryPath(p: string): void {
+  let fd: number | undefined;
+  try {
+    fd = openSync(p, 'r');
+    fsyncSync(fd);
+  } catch {
+    /* Platform adapter limitation: atomic rename still prevents partial JSON visibility. */
+  } finally {
+    if (fd !== undefined) try { closeSync(fd); } catch { /* already closed */ }
+  }
+}
+
+/**
+ * RECEIPT-BEFORE-DONE (2026-08-16): true iff the durable settlement receipt for
+ * `(sprintId, taskId)` at ANY attempt is already persisted and readable. The
+ * canonical DONE transition and the disk-aware dispatch chokepoint consult this
+ * so a dependent is never admitted on a status whose receipt has not yet landed.
+ */
+export function hasSettlementReceipt(projectRoot: string, sprintId: string, taskId: string): boolean {
+  if (!sprintId) return false;
+  const dir = join(projectRoot, EVALUATIONS_DIR, sprintId);
+  if (!existsSync(dir)) return false;
+  const prefix = `${taskId}-attempt-`;
+  try {
+    return readdirSync(dir).some((n) => n.startsWith(prefix) && n.endsWith('.json'));
+  } catch {
+    return false;
+  }
 }

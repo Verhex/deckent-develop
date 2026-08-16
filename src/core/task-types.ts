@@ -61,7 +61,7 @@ export type ModelType = string & {};
  * `ProviderNameExt` (core/types.ts) and `RegistryProviderName`
  * (core/model-registry-types.ts) — they are hand-mirrored.
  */
-export type ProviderName = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter';
+export type ProviderName = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter' | 'local-llm';
 
 /**
  * Mapping from each provider to its supported model list.
@@ -96,6 +96,10 @@ export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = Ob
     },
     openrouter: {
       get: () => modelRegistry.getByProvider('openrouter').map(m => m.id) as readonly ModelType[],
+      enumerable: true,
+    },
+    'local-llm': {
+      get: () => modelRegistry.getByProvider('local-llm').map(m => m.id) as readonly ModelType[],
       enumerable: true,
     },
   },

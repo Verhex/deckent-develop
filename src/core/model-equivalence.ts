@@ -88,6 +88,22 @@ export function isModelAvailable(
 }
 
 /**
+ * OWNER-MODEL-POLICY-001: is this model EXECUTABLE (not merely registered) under
+ * the owner's activation policy for the given provider? Returns true when no
+ * policy snapshot is injected (tests / implicit-active default) and when the
+ * provider is implicit-active with no deactivation. Selection (forceModel) and
+ * pre-dispatch admission consult THIS to refuse an inactive model with a typed
+ * `MODEL_INACTIVE` HOLD instead of silently substituting an equivalent one.
+ */
+export function isModelExecutable(
+  model: MultiProviderModelType,
+  provider: ProviderName,
+): boolean {
+  const policy = modelRegistry.getActivationPolicy();
+  return policy === undefined || policy.isExecutable(provider, model);
+}
+
+/**
  * Returns the provider that owns a given model.
  */
 export function getModelProvider(model: MultiProviderModelType): ProviderName {

@@ -78,6 +78,7 @@ import { registerApprovalsCommand } from './commands/approvals.js';
 import { registerProviderAuthorityCommand } from './commands/provider-authority.js';
 import { registerExecutionAuthorityCommand } from './commands/execution-authority.js';
 import { registerCuStatus } from './commands/cu-status.js';
+import { registerLocalLlm } from './commands/local-llm.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
@@ -222,6 +223,7 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerProviderAuthorityCommand(program);
   registerExecutionAuthorityCommand(program);
   registerCuStatus(program);
+  registerLocalLlm(program);
   registerHelp(program);
 
   return program;

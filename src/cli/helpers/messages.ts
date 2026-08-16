@@ -23,6 +23,34 @@ const MESSAGES: MessageMap = {
     tr: '`deckent plan` ile run planlayın',
     en: 'Run `deckent plan` to plan a run',
   },
+
+  // OWNER-MODEL-POLICY-001 — user-facing clarification (FAZ-0 item 5): the
+  // `default_model` config value is a PREFERRED/default pick, never a hard
+  // ceiling. The hard execution limit is the owner active-set.
+  'model_policy.default_not_ceiling': {
+    tr: '`default_model` TERCİH edilen/varsayılan seçimdir, kesin tavan DEĞİLDİR. '
+      + 'Kesin çalıştırma sınırı owner active-set’idir (`deckent models active-set`). '
+      + 'explicit-active bir sağlayıcıda yalnız owner’ın aktive ettiği modeller çalışır.',
+    en: '`default_model` is a PREFERRED/default pick, NOT a hard ceiling. '
+      + 'The hard execution limit is the owner active-set (`deckent models active-set`). '
+      + 'Under an explicit-active provider only owner-activated models run.',
+  },
+  'model_policy.inactive_hold': {
+    tr: 'Model {model} ({provider}) owner model policy (explicit-active) altında INACTIVE — '
+      + 'planlama, routing, forceModel veya dispatch yapamaz. '
+      + '`deckent models activate {model} --provider {provider}` ile aktive edin '
+      + 'ya da aktif bir model seçin.',
+    en: 'Model {model} ({provider}) is INACTIVE under the owner model policy (explicit-active) — '
+      + 'it cannot plan, route, forceModel or dispatch. '
+      + 'Activate it with `deckent models activate {model} --provider {provider}` '
+      + 'or choose an active model.',
+  },
+  'model_policy.explicit_active_set': {
+    tr: 'Sağlayıcı {provider} explicit-active: yalnız owner’ın aktive ettiği modeller '
+      + 'çalıştırılabilir; yeni tespit edilen veya katalog modeli havuza kendiliğinden giremez.',
+    en: 'Provider {provider} is explicit-active: only owner-activated models are executable; '
+      + 'a newly detected or catalog model never auto-enters the pool.',
+  },
   // Generic messages
   'status.tasks_running': {
     tr: '{taskCount} görev çalışıyor',
@@ -2632,10 +2660,21 @@ const MESSAGES: MessageMap = {
     en: 'switch failed — ollama needs a host: set {detail} in .deckent/config.json',
     tr: 'geçiş başarısız — ollama için host gerekli: .deckent/config.json içinde {detail} tanımlayın',
   },
-  'native.switch.unsupported-native-provider': {
-    en: 'switch failed — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm',
-    tr: 'geçiş başarısız — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm',
+  'native.switch.missing-local-llm-endpoint': {
+    en: 'switch failed — local-llm needs an endpoint: set {detail} in .deckent/config.json',
+    tr: 'geçiş başarısız — local-llm için endpoint gerekli: .deckent/config.json içinde {detail} tanımlayın',
   },
+  'native.switch.unsupported-native-provider': {
+    en: 'switch failed — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm, local-llm',
+    tr: 'geçiş başarısız — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm, local-llm',
+  },
+  'native.provider_status': {
+    en: 'Provider: {provider} · Model: {model} · Endpoint: {health}',
+    tr: 'Sağlayıcı: {provider} · Model: {model} · Endpoint: {health}',
+  },
+  'native.endpoint_health.healthy': { en: 'healthy', tr: 'sağlıklı' },
+  'native.endpoint_health.unhealthy': { en: 'unhealthy', tr: 'sağlıksız' },
+  'native.endpoint_health.unknown': { en: 'unknown', tr: 'bilinmiyor' },
   'native.switch.legacy-model-alias': {
     en: 'switch failed — "{detail}" is a legacy alias; use an exact provider API model ID such as claude-sonnet-5 or gpt-5.6-sol',
     tr: 'geçiş başarısız — "{detail}" eski bir takma addır; claude-sonnet-5 veya gpt-5.6-sol gibi tam sağlayıcı API model kimliği kullanın',

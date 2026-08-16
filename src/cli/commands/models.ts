@@ -10,8 +10,14 @@ import {
 } from '../../core/model-catalog.js';
 import type { ModelDefinition } from '../../core/model-registry.js';
 import { print, printError, color } from '../helpers/output.js';
-import { ModelActivationStore } from '../../core/model-activation-store.js';
+import {
+  ModelActivationStore,
+  resolveActiveModelPolicy,
+  PROVIDER_POLICY_MODES,
+  type ProviderPolicyMode,
+} from '../../core/model-activation-store.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Tier Display ──────────────────────────────────────────────────────────
 
@@ -198,6 +204,81 @@ export function registerModels(program: Command): void {
             ? color('\x1b[32m', 'active  ')
             : color('\x1b[31m', 'inactive');
           print(`  ${mark}  ${r.provider}/${r.modelId}  ${color('\x1b[2m', `(${r.actor}, ${r.updatedAt})`)}`);
+        }
+        print('');
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  // ── deckent models policy [<provider> <mode>] ────────────────────────────
+  // OWNER-MODEL-POLICY-001: switch a provider between implicit-active (default —
+  // a detected model is eligible unless deactivated) and explicit-active (ONLY
+  // the owner's active records are executable; a newly detected/catalog model
+  // can never auto-enter). `default_model` is a preferred pick, not a ceiling —
+  // the hard limit is this active-set.
+  models
+    .command('policy [provider] [mode]')
+    .description('Show or set a provider activation policy (implicit-active | explicit-active)')
+    .action((provider: string | undefined, mode: string | undefined) => {
+      try {
+        const lang = getLanguage();
+        if (!provider) {
+          const policies = withStore((store) => store.listProviderPolicies());
+          print(`\n  ${color('\x1b[1m', 'Provider Activation Policy')}`);
+          print(`  ${color('\x1b[2m', getMessage('model_policy.default_not_ceiling', lang))}\n`);
+          if (policies.length === 0) {
+            print('  No policy recorded — every provider is implicit-active (default).\n');
+            return;
+          }
+          for (const p of policies) {
+            const badge = p.mode === 'explicit-active'
+              ? color('\x1b[35m', 'explicit-active')
+              : color('\x1b[32m', 'implicit-active');
+            print(`  ${badge}  ${p.provider}  ${color('\x1b[2m', `(${p.actor}, ${p.updatedAt})`)}`);
+          }
+          print('');
+          return;
+        }
+        if (!mode || !PROVIDER_POLICY_MODES.includes(mode as ProviderPolicyMode)) {
+          printError(new Error(`mode must be one of: ${PROVIDER_POLICY_MODES.join(', ')}`));
+          process.exitCode = 1;
+          return;
+        }
+        withStore((store) => store.setProviderPolicy(provider, mode as ProviderPolicyMode));
+        print(`  ${color('\x1b[32m', '✓')} ${provider} → ${mode}`);
+        if (mode === 'explicit-active') {
+          print(`  ${color('\x1b[2m', getMessage('model_policy.explicit_active_set', lang, { provider }))}`);
+        }
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  // ── deckent models active-set ─────────────────────────────────────────────
+  // The resolved executable pool + snapshot digest bound to plan/dispatch
+  // evidence (OWNER-MODEL-POLICY-001) — the ground truth a run selects from.
+  models
+    .command('active-set')
+    .description('Show the resolved owner active execution set + snapshot digest')
+    .action(() => {
+      try {
+        const lang = getLanguage();
+        const policy = resolveActiveModelPolicy(resolveProjectRoot());
+        print(`\n  ${color('\x1b[1m', 'Active Execution Set')}  `
+          + `${color('\x1b[2m', `sha256:${policy.snapshotDigest.slice(0, 16)}…`)}`);
+        print(`  ${color('\x1b[2m', getMessage('model_policy.default_not_ceiling', lang))}\n`);
+        const explicit = [...policy.explicitProviders].sort();
+        if (explicit.length === 0 && policy.activeModels.length === 0) {
+          print('  No explicit-active policy — every provider implicit-active '
+            + '(all detected models eligible).\n');
+          return;
+        }
+        print(`  explicit-active providers: ${explicit.length ? explicit.join(', ') : '(none)'}\n`);
+        for (const m of policy.activeModels) {
+          print(`  ${color('\x1b[32m', 'active')}  ${m.provider}/${m.modelId}`);
         }
         print('');
       } catch (err) {

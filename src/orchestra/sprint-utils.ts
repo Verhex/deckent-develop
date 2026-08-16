@@ -152,14 +152,16 @@ export function isTmuxProvider(providerName: ProviderName): boolean {
  * model ids through the static availability/equivalence lookup (which throws
  * `E_UNKNOWN_MODEL`, since those ids are catalog-driven, not statically listed).
  *
- * @returns true for `'ollama'`, `'codex'`, `'gemini'`, `'openrouter'`; false for `'claude'`
+ * @returns true for `'ollama'`, `'codex'`, `'gemini'`, `'openrouter'`,
+ * `'local-llm'`; false for `'claude'`
  * @internal
  */
 export function isAdapterProvider(providerName: ProviderName): boolean {
   return providerName === 'ollama'
     || providerName === 'codex'
     || providerName === 'gemini'
-    || providerName === 'openrouter';
+    || providerName === 'openrouter'
+    || providerName === 'local-llm';
 }
 
 

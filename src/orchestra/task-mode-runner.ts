@@ -26,6 +26,8 @@ import { resolveDefaultModel } from '../core/config.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
 import { orderedRoleProviders } from '../core/provider.js';
 import { buildExecutionRequest, resolveExecutionModelIdentity, resolveToTask } from './execution-request-builder.js';
+import { isModelExecutable } from '../core/model-equivalence.js';
+import { DeckentError } from '../core/errors.js';
 import { createRunTaskId } from '../cli/commands/run.js';
 import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
 import { buildWorkerPrompt } from './task-builder.js';
@@ -212,6 +214,20 @@ export async function runTaskMode(
   const requestedModel = ctx.model ?? resolveDefaultModel(config);
   const identity = resolveExecutionModelIdentity(requestedModel, ctx.provider);
   const model = identity.model;
+
+  // OWNER-MODEL-POLICY-001: refuse an INACTIVE model at the pre-dispatch admission
+  // boundary — before any Task JSON write, prompt, routing or provider/backend
+  // spawn. Catches both a resolved default and an explicit ctx.model (the
+  // resume / replay / autonomous / run / do paths) that names a model the owner
+  // has not activated under an explicit-active provider. Typed HOLD; nothing
+  // starts. Inert when no owner policy is injected (implicit-active default).
+  if (!isModelExecutable(model, identity.provider)) {
+    throw new DeckentError(
+      'MODEL_INACTIVE',
+      `Model '${model}' is not active for provider '${identity.provider}' under the owner `
+      + 'model policy (explicit-active); activate it or select an active model before dispatch',
+    );
+  }
 
   // Build task — WM-1: unify on the canonical ExecutionRequest contract (sets
   // task.type, resolves provider via config, tags origin='autonomous').
