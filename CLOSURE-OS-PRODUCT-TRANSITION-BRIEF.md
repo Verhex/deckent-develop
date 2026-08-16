@@ -363,8 +363,8 @@ Sol çapraz-analizi + owner onayıyla bağlanan sıra (önceki taslak sıranın 
 | Adım | Durum | Kanıt/yorum |
 |---:|---|---|
 | 1 | `COMPLETE` | 13/13 terminal receipt + tarball digest doğrulandı; legacy code-only `GATE_FAILURE` owner kararıyla ürün settlement hükmü değildir |
-| 2 | `TYPED_HOLD_ACCEPTED` | Opus→Sol tier tabanı geçti; composition `xverify_candidate_evidence_unavailable` ile dürüst durdu; Fable→Sol tier düzeltmesi owner-approved implementation bekliyor |
-| 3 | `PARTIAL` | Source/dist identity uzlaştı ve binary warning kayboldu; unresolved provider-observation kayıtları ayrı authority reconciliation olarak açık |
+| 2 | `COMPLETE` (2026-08-14 uzlaştırma) | Fable→Sol tier düzeltmesi (`gpt-5.6-sol → premium_plus`) uygulandı ve gerçek cross-provider dispatch CONFIRMED/ALLOW verdi: author `claude/claude-fable-5` → verifier `codex/gpt-5.6-sol`, `typed-host-adjudicated`, usage 60787, receipt `cross-verify-verdict:sha256:3543790980fdb345e65d065b011c877ecf728d53d4acab2d6bc7ef6d3426cf20` (PR #123 §12.2, 2026-08-13). Önceki `TYPED_HOLD_ACCEPTED` artık geçerli değil |
+| 3 | `PARTIAL (bound)` | Source/dist identity uzlaştı ve binary warning kayboldu; unresolved provider-observation residual **yeni root açmadan** mevcut MASTER satırı `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` (OPEN; P12: live DB `user_version=1`, v1→v2 migration owner-controlled adoption proof bekliyor) altında forensic-open kalır |
 
 ## 11. Karar kaydı
 
@@ -415,10 +415,11 @@ Owner kararı:
 ```
 
 Mantık-karar turu (2026-08-12) önceki beş açık maddenin TAMAMINI karara bağladı (bkz. §11).
-Kalan açık maddeler:
+Kalan açık maddeler (2026-08-14 uzlaştırması — [CLOSURE-CLASSIFICATION-FOUNDATION], §10 adım-4):
 
-- `release.yml` npm-publish adımının kaldırılması — RELEASE-001 kapsamında; 0.100.0 adım-1'inden önce yapılmalı.
-- Codex reachability evidence-source (xverify son katmanı) — §10 adım-2'nin canlı smoke'unu mümkün kılar; yoksa typed HOLD. **2026-08-12 canlı smoke kaydı:** `xv-1786534081751` — Opus→Sol tier-taban geçti, kompozisyon dürüst typed HOLD: `xverify_candidate_evidence_unavailable`. `xv-1786534007938` Fable→Sol tier çelişkisini kanıtladı; owner `gpt-5.6-sol → premium_plus` registry amendment'ını onayladı. Source değişikliği ve yeni smoke henüz uygulanmadı.
+- ✅ **KAPANDI (PR #124, merge `7232615322`, 2026-08-14):** `release.yml`'in otomatik `npm-publish` adımı + `Create GitHub Release` adımı kaldırıldı; workflow yalnız build/validate/attestation. Least-privilege (`contents: read`, `id-token` yok); publish owner-manual (`npm publish --access public --ignore-scripts`, `--provenance` yok — local publish'te desteklenmez). Çifte-authority çatışması kapandı. `0.100.0` **tag'sız** rebaseline (git tag / GitHub Release / npm publish YOK) main'e indi.
+- ✅ **KAPANDI — §10 adım-2 COMPLETE (PR #123 §12.2, 2026-08-13):** Codex reachability evidence-source + Fable→Sol canlı xverify uygulandı. Gerçek cross-provider dispatch (author `claude/claude-fable-5` → verifier `codex/gpt-5.6-sol`) host verdict **CONFIRMED / ALLOW**, assurance `typed-host-adjudicated`, provider-reported usage **60787** token, durable receipt `cross-verify-verdict:sha256:3543790980fdb345e65d065b011c877ecf728d53d4acab2d6bc7ef6d3426cf20`; `gpt-5.6-sol → premium_plus` registry amendment uygulandı; owner-bounded subscription adjudication (maxTokens 100000, maxWallClockSeconds 300, maxVerificationsPerSprint 1). "Source değişikliği ve yeni smoke henüz uygulanmadı" ifadesi artık geçersizdir.
+- 🔗 **§10 adım-3 residual bağlandı (yeni root YOK):** source/dist identity + historical provider-observation HOLD'ları mevcut MASTER satırı **`RECOVERY-BORN-490-PROVIDER-OBSERVATION-001`** (OPEN, P12: live DB `user_version=1`, v1→v2 migration owner-controlled adoption proof bekliyor) altında forensic-open kalır. Yeni satır/root açılmaz; kapanış o satırın owner-koordinasyonlu build/reconnect adoption proof'una bağlıdır.
 
 ### 12.1 Sidecar karar-defteri kontratı — revizyon 2 (owner-approved, 2026-08-12)
 
@@ -556,3 +557,66 @@ değildir. Bundan sonraki analiz/verifier devri şu kuralla yürür:
 - Commit `d453607136d35e9b7ffae8638f8ef073a8dd7c5a`
 
 UI/UX referans araması generic dark/neon/glass “AI interface” yönünü önerdiği için negative control olarak kullanılmıştır; canonical `Precision Instrument` yönü korunur. Aramadan yalnız error recovery, asynchronous feedback, keyboard/focus, ARIA ve reduced-motion kalite girdileri alınmıştır.
+
+## 14. Closure OS Phase-4 Foundation — COMPLETE (2026-08-15)
+
+§12.1 sidecar karar-defteri kontratı (rev-2) için **Phase-4 foundation** mekanik ve kanıt olarak
+**COMPLETE**'tir. Bu bir **mekanizma + governance foundation** kapanışıdır; **ürün wiring değildir** ve
+**canlı bir ledger mutation'ı yoktur** (ledger boş; gate `nothing to validate (OK)` döner). Tam teknik
+referans: [`docs/governance/closure-os-sidecar-ledger.md`](docs/governance/closure-os-sidecar-ledger.md).
+
+### 14.1 Authority ayrımı (değişmedi, artık kodla zorlanıyor)
+
+- **MASTER** = iş kimliği/state authority'si (`docs/MASTER-PLAN.md` + generated projections).
+- **Sidecar ledger** = Level×Lane sınıflandırma + admission + priority-karar authority'si
+  (`docs/governance/closure-dispositions.jsonl`, append-only). MASTER'ı MUTATE ETMEZ.
+- **Projections** = yalnız-okuma türev (Active/Born/Closure-Health/Level×Lane); **hiçbir zaman**
+  truth kaynağı değildir.
+- Elle MASTER/ledger sınıflandırması veya sahte receipt **yasaktır**; mutation yalnız authenticated
+  batch authority + append-only gate + projection settlement üzerinden yapılır.
+
+### 14.2 Teslim edilen mekanizma (buildless, dist-bağımsız)
+
+- **Append-only hash-chained decision-ledger gate** (`scripts/lint-closure-dispositions.mjs`,
+  `lint:gates`'e bağlı; tek validator) + **Closure canonical v1** encoder/digest (`canonical.mjs`).
+- **Reviewed-parent root-of-trust**: güvenilen key seti **merge-base `origin/main`**'den çözülür;
+  aynı PR'da eklenen key kendini yetkilendiremez; rotation ancak parent-key'in ed25519-imzaladığı
+  rotation receipt'iyle; genesis/çözülemez git → typed HOLD `TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED`
+  (in-repo self-sign YOK, WARN fallback YOK).
+- **Immutable per-batch historical snapshot bundle**: her batch, batch-anındaki MASTER+proposal
+  byte'larını arşivler; imzalı digest'ler **arşivlenen byte'lardan** yeniden hesaplanır (current
+  MASTER'dan değil) — canonical-payload integrity (`master-plan-integrity.mjs`), tamper →
+  `AUTHORITY_SNAPSHOT_INTEGRITY_MISMATCH`.
+- **ed25519 offline attestation VERIFIER** (committed public trust-anchor'a karşı doğrular; **signer
+  değil**) + bağımsız field cross-check + saat-bağımsız `authenticatedAt ≤ decidedAt ≤ authExpiresAt`.
+- **Transactional four-view projection bundle** (`project.mjs`): immutable versioned bundle + tek
+  atomik `current.json` pointer swap; dört view digest'i manifest'ten doğrulanır.
+- **ApprovalBroker identity pin**: `requestId` canonical + `claimRef === approval:${requestId}`;
+  `approval-identity.mjs`, `src/core/approval-contract.ts::approvalIdSchema`'ya bir parity testiyle
+  pinlenmiş **mirror**'dır (ikinci serbest authority değil).
+
+Kanıt: gate self-check **127/127**, projector **22/22**, governance **9/9** (normal + PATH-stripped),
+approval-parity **3/3**, `lint:gates`+`tsc` yeşil. Mekanizma yalnız self-check/fixture + boş-ledger
+yeşil gate ile kanıtlıdır — **gerçek veri akmadı**.
+
+### 14.3 Phase-5 (HENÜZ KURULMADI — dürüst kayıt)
+
+Aşağıdakiler **kod olarak yoktur**; bu foundation onları YALNIZCA **doğrular/bekler**:
+
+- genesis public trust-anchor provisioning (owner fingerprint / signed Git authority);
+- ed25519 **SIGNER** + owner private-key custody (repo'da hiçbir private key yok);
+- gerçek **ApprovalBroker writer** (subject/claim submit yolu);
+- gerçek **receipt / ledger event**;
+- **MASTER state/priority mutation**;
+- herhangi bir **provider çağrısı**.
+
+### 14.4 HOLD ≠ closure ve exact sonraki sıra
+
+Bir typed **HOLD asla başarı/kapanış değildir** (§12.2 ile aynı ilke). Zorunlu sıra:
+
+1. Bu **foundation PR**'ı manifest-kontrollü merge.
+2. **Ayrı genesis trust-anchor PR**'ı — public-key fingerprint'ini owner doğrular; ayrı olması şart
+   (reviewed-parent kuralı: key kendi eklendiği PR'da kendini yetkilendiremez).
+3. **Phase-5 writer** (ApprovalBroker subject/claim + immutable batch bundle + signer/key custody).
+4. **Exact dry-run batch digest** → owner'a **tek authenticated approval** → **ledger append** →
+   **atomic projections**.

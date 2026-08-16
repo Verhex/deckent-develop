@@ -119,6 +119,7 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
   projection'dan okunur, metinde hardcode edilmez) + pinned `MEMORY.md`. Eski plan:
   `docs/archive/MASTER-PLAN-archived-2026-07-26.md`.
 - **🧭 Aktif Yön (2026-06-29 pivot — Hermes-vs-Deckent analiz turu):** terminal = ana yönetim+kullanım yüzeyi (tool-driven, derin, **full-control + yormayan**; iş CLI değil terminalden, CLI/MCP opsiyonel) · dashboard = yalnız izleme. **P0:** training-trace WIRE · runtime-wide ApprovalBroker (çok-ortam canlı onay) · Hermes-rol-model tool + progressive disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık. **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction. Detay: `.analysis/hermes-vs-deckent-direction-decisions.md` + memory `project_hermes_deckent_direction_2026_06`.
+- **CLOSURE-OS-LEDGER-AUTHORITY.** Closure disposition / sidecar-ledger mutation yalnız authenticated batch authority + append-only gate (`scripts/lint-closure-dispositions.mjs`) + projection settlement üzerinden yapılır; elle MASTER/ledger sınıflandırması veya sahte receipt YASAK. Phase-4 foundation COMPLETE (yalnız mekanizma; Phase-5 writer / genesis key / gerçek receipt+event KURULMADI). Ayrıntı: `docs/governance/closure-os-sidecar-ledger.md`.
 </operating_rules>
 
 <rules>

@@ -205,8 +205,25 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // the validate-publish.mjs duplicate-heading gate, release.yml/release-prepare.mjs
   // owner-manual edits, and the expanded version-rebaseline/release tests. All imports
   // resolve; line shifts only. Prior: VERSION-0.100.0-REBASELINE (12849).
-  count: 12849,
-  digest: 'fd418931f645a7e527b1dc0e8d7b7e603ed6d84d06d37b10f628daefb3508d9f',
+  // 2026-08-15 (CLOSURE-CLASSIFICATION-PHASE-4.3): +1 — the governance test's
+  // MANDATED tmpdir cleanup (Codex phase-4.3 req-3 "add tmpdir cleanup"): an
+  // afterAll() that recursive-rmSync's the suite's mkdtemp fixtures. That recursive
+  // removal of a dynamic tmpdir path is the ONE new unresolved fs-mutation effect —
+  // proven provenance: deleting the afterAll block restores 12849 exactly, and the
+  // process.execPath spawn change contributes nothing (original structure +
+  // process.execPath = 12849). All the test's imports still resolve; no production
+  // module added (production-inventory stays 1232). Prior: REBASELINE-NOGO-FIXES (12849).
+  // 2026-08-15 (CLOSURE-CLASSIFICATION-PHASE-4.4): +1 (12850→12851) — Codex phase-4.4
+  // req-1 rewrote the governance test's subprocess capture from execFile PIPES to an
+  // async spawn whose child stdout/stderr are redirected to OS fds on tmpdir files
+  // (immune to the hermetic runtime guard's empty-pipe capture); that spawn+fd-redirect
+  // callsite is the ONE new unresolved command effect (proven: reverting only the
+  // spawn structure restores 12850). The digest also folds the phase-4.4 req-2/req-3
+  // line shifts in lint-master-plan.mjs (canonical extraction to master-plan-integrity.mjs)
+  // and the gate — all imports resolve, no other unresolved symbol added.
+  // Prior: CLOSURE-CLASSIFICATION-PHASE-4.3 (12850).
+  count: 12851,
+  digest: '3bce3f8623738c7d8565f8654a7ba55e0e6314f627fc13af1cdde878149429c5',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -309,8 +326,35 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // fix added the retired-lineage product-successor policy to src/cli/commands/upgrade.ts
   // (an inventoried production module), shifting its line-numbered inventory fingerprint.
   // No production module added or removed. Prior: VERSION-0.100.0-REBASELINE (1232).
-  count: 1232,
-  digest: '22bcd4d330305006a9f7baa4627d934eb80227f7a49fac39851188a93fee0390',
+  // 2026-08-14 (CLOSURE-CLASSIFICATION-FOUNDATION): same 1232 count, digest only — the
+  // package.json `lint:gates` chain gained `node scripts/lint-closure-dispositions.mjs`
+  // (the Closure OS sidecar-ledger gate; Codex final-disposition req #5). package.json is
+  // an inventoried production manifest, so the one-token chain addition shifted its
+  // fingerprint. No production module added or removed. Provenance: reverting ONLY the
+  // lint:gates addition restored digest 22bcd4d3… exactly, proving nothing else in this
+  // worktree touches the fingerprint. Prior: REBASELINE-NOGO-FIXES (1232).
+  // 2026-08-15 (CLOSURE-CLASSIFICATION-PHASE-4.4): +1 (1232→1233) — Codex phase-4.4 req-2
+  // extracted the master-plan integrity canonical (registryIntegrity = sha256(canonical-json-utf8))
+  // into ONE shared authority, scripts/master-plan-integrity.mjs, so the Closure OS gate
+  // reuses MASTER's byte-semantic algorithm verbatim instead of reimplementing it. That new
+  // module is reachable from the test graph (tests/scripts/lint-master-plan.test.ts →
+  // lint-master-plan.mjs → master-plan-integrity.mjs), so it joins the production inventory.
+  // lint-master-plan --check still passes (registryIntegrity recomputed byte-identical), so
+  // the extraction changed no MASTER output. Prior: CLOSURE-CLASSIFICATION-FOUNDATION (1232).
+  // 2026-08-15 (CLOSURE-CLASSIFICATION-PHASE-4.4a): +1 (1233→1234) — Codex phase-4.4a pinned
+  // the gate's ApprovalBroker identity (requestId canonical + claimRef === approval:<id>) to
+  // the SOLE authority src/core/approval-contract.ts::approvalIdSchema via a buildless MIRROR,
+  // scripts/approval-identity.mjs, cross-checked by tests/governance/approval-identity-parity.test.ts.
+  // That parity test IMPORTS the mirror, so the new pure module joins the production inventory.
+  // No second identifier authority (the test proves mirror ≡ approvalIdSchema over the corpus);
+  // UNRESOLVED_BASELINE unchanged (the mirror is pure, no command effects). Prior: PHASE-4.4 (1233).
+  // 2026-08-15 (CLOSURE-CLASSIFICATION-PHASE-4.4a-commit): same 1234 count, digest only — the
+  // foundation-commit corrected approval-identity.mjs's header comment (a trailing hyphen/underscore
+  // IS accepted by the regex; only a trailing dot/space is not), which shifts that inventoried
+  // module's content digest. Comment-only; no behavior change (gate 124/124 + parity 3/3 unchanged).
+  // Prior: CLOSURE-CLASSIFICATION-PHASE-4.4a (1234).
+  count: 1234,
+  digest: '204a5f044c956d44228cee4711ebdb691875518cbe5c76f714407ca3c40cf610',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -108,6 +108,7 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
   routing yapılmaz. Model atamasını host istemcisi değil Brain/routing yapar.
 - **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek tablo, Durum+Tarih sütunlu). Eski plan: `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
 - **🧭 Aktif Yön:** terminal = ana yüzey (full-control + yormayan) · dashboard = yalnız izleme · Desktop = chat+console (SURF-treni). Güncel çerçeve: MASTER-PLAN mercek-bloğu (karar-turu-4). **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction.
+- **CLOSURE-OS-LEDGER-AUTHORITY.** Closure disposition / sidecar-ledger mutation yalnız authenticated batch authority + append-only gate (`scripts/lint-closure-dispositions.mjs`) + projection settlement üzerinden yapılır; elle MASTER/ledger sınıflandırması veya sahte receipt YASAK. Phase-4 foundation COMPLETE (yalnız mekanizma; Phase-5 writer / genesis key / gerçek receipt+event KURULMADI). Ayrıntı: `docs/governance/closure-os-sidecar-ledger.md`.
 </operating_rules>
 
 <rules>

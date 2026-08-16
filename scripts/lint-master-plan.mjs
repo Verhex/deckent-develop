@@ -42,6 +42,9 @@ import {
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+// The master-plan integrity canonical (registryIntegrity = sha256(canonical-json-utf8))
+// now lives in ONE shared authority so the Closure OS gate reuses it verbatim.
+import { sha256CanonicalJson, registryIntegrityDigest } from './master-plan-integrity.mjs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -3219,26 +3222,6 @@ export function validateMasterPlan(source, options = {}) {
   };
 }
 
-/** @param {unknown} value */
-function canonicalJsonValue(value) {
-  if (Array.isArray(value)) return value.map(canonicalJsonValue);
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-        .map(([key, child]) => [key, canonicalJsonValue(child)]),
-    );
-  }
-  return value;
-}
-
-/** @param {unknown} value */
-function sha256CanonicalJson(value) {
-  return createHash('sha256')
-    .update(JSON.stringify(canonicalJsonValue(value)), 'utf8')
-    .digest('hex');
-}
-
 /** @param {WorkItem | Record<string, unknown>} item */
 function workDefinitionDigest(item) {
   return sha256CanonicalJson({
@@ -3273,11 +3256,6 @@ function workProgressDigest(item, blocker) {
   });
 }
 
-/** @param {Record<string, unknown>} model */
-function registryIntegrityDigest(model) {
-  const { registryIntegrity: _ignored, ...payload } = model;
-  return sha256CanonicalJson(payload);
-}
 
 /**
  * @param {ReturnType<typeof validateMasterPlan>} validation

@@ -69,6 +69,16 @@
       "notes": "Sprint 224 T-224-027 run-proven smoke harness."
     },
     {
+      "file": "scripts/approval-identity.mjs",
+      "class": "gate",
+      "owner": "closure-os-governance",
+      "npmScript": null,
+      "input": "an approval id string (in-memory)",
+      "output": "isCanonicalApprovalId(id) boolean + claimRefFor(id) string",
+      "expiry": "none — pure library",
+      "notes": "Buildless mirror of the canonical ApprovalBroker identity (src/core/approval-contract.ts approvalIdSchema), consumed by lint-closure-dispositions.mjs (the Closure OS gate) and pinned to that SOLE authority by tests/governance/approval-identity-parity.test.ts. Not a standalone CLI."
+    },
+    {
       "file": "scripts/audit-install-ingress.mjs",
       "class": "recurring-proof",
       "owner": "install-ingress-census",
@@ -369,6 +379,16 @@
       "notes": "Fixes the old rm -rf dist footgun that silently broke `deckent serve` after a TS-only build."
     },
     {
+      "file": "scripts/closure-classification-scan.mjs",
+      "class": "recurring-proof",
+      "owner": "closure-os-governance",
+      "npmScript": null,
+      "input": "docs/generated/master-plan-active.json + src/core/closure-classification-schema.json",
+      "output": "docs/governance/closure-classification-owner-proposal.md (--write) or a drift check (--check)",
+      "expiry": "none",
+      "notes": "Deterministic Level×Lane classification scanner and owner-proposal generator; report↔disk parity asserted in tests/governance/closure-ledger.test.ts."
+    },
+    {
       "file": "scripts/copy-assets.mjs",
       "class": "gate",
       "owner": "asset-copy",
@@ -507,6 +527,16 @@
       "output": "exit 1 on NEW gap vs scripts/cli-mcp-parity-baseline.json",
       "expiry": "none — permanent lint:gates member",
       "notes": "--update-baseline regenerates the known-intentional-gap baseline."
+    },
+    {
+      "file": "scripts/lint-closure-dispositions.mjs",
+      "class": "gate",
+      "owner": "closure-os-governance",
+      "npmScript": "part of lint:gates",
+      "input": "docs/governance/closure-dispositions.jsonl (append-only ledger) + closure-trust-anchors.json + closure-batches/ + closure-dispositions.receipts/ (currently absent)",
+      "output": "typed HOLD/error validation or OK; --self-check runs 127 in-process assertions",
+      "expiry": "none — permanent lint:gates member",
+      "notes": "SOLE validator for the Closure OS append-only decision-ledger: canonical digest chain, reviewed-parent trust-anchor, immutable batch-snapshot integrity, ed25519 attestation verification, append-only prefix. Empty ledger → nothing-to-validate OK (Phase-4 foundation; writer is Phase-5)."
     },
     {
       "file": "scripts/lint-config-truth.mjs",
@@ -667,6 +697,16 @@
       "output": "exit 1 policy violations / 2 scan error, source-derived hermeticity registry",
       "expiry": "none — permanent lint:gates member",
       "notes": "Largest gate script in the tree (253KB); source-derived registry + fail-loud policy."
+    },
+    {
+      "file": "scripts/master-plan-integrity.mjs",
+      "class": "gate",
+      "owner": "master-plan-governance",
+      "npmScript": null,
+      "input": "a master-plan model object (in-memory)",
+      "output": "registryIntegrity = sha256(canonical-json-utf8) digest",
+      "expiry": "none — pure library",
+      "notes": "The SINGLE byte-semantic authority for master-plan-active.json registryIntegrity, reused verbatim by lint-master-plan.mjs (--check gate) and lint-closure-dispositions.mjs (archived-snapshot integrity). No standalone CLI; a regression fails both gates."
     },
     {
       "file": "scripts/measure-prompt-cost.mjs",
