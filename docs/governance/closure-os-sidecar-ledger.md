@@ -261,8 +261,14 @@ Trust-anchor'ların **kaynağı** kritik güvenlik sınırıdır. `resolveTrustA
   (error). Reviewed-parent anahtarları (aynı PEM) her zaman güvenilir kalır.
 - **Genesis.** Reviewed parent'ta anchors dosyası **yoksa**, ilk anahtar in-repo
   self-bootstrap yapamaz → `TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED` (**HOLD**). Gerçek bir
-  genesis anchor'ı, harici owner fingerprint / signed Git authority gerektirir —
-  **REPORTED Phase-5 provisioning procedure**'dür; bu hatta üretilmez/commit edilmez.
+  genesis anchor'ı, harici owner fingerprint / signed Git authority gerektirir — bu
+  **REPORTED provisioning procedure** artık `scripts/closure-ledger/genesis-anchor.mjs`
+  + [`closure-genesis-provisioning.md`](./closure-genesis-provisioning.md) olarak **ayrı
+  genesis PR**'ında sevk edildi. Araç repo'ya **private key YAZMAZ** (in-repo path'i
+  reddeder), yalnız public anchor + fingerprint (`sha256`(SPKI DER)) commit edilir;
+  authority hâlâ owner'ın fingerprint'i doğrulayıp merge etmesinden (reviewed-parent)
+  gelir — foundation hattında anchor üretilmez/commit edilmez, gerçek anchor owner
+  ceremony'siyle provision edilir. ed25519 **SIGNER**/writer hâlâ Phase-5'tir.
 - **NO WARN fallback.** TRUST-ANCHOR-001'den ayrışır: no-git / no-history / shallow
   clone / unfetchable-origin-main / okunamayan-parent-blob (OQ-XVE-05: provably-exists
   ama unreadable = `error`, asla `absent`) hepsi → `TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED`
@@ -512,7 +518,7 @@ tanımlanmamıştır.
 
 | DELIVERED (Phase-4, buildless — sevk edildi) | NOT-YET-WIRED (Phase-5 — YAZILMADI) |
 |---|---|
-| Gate/validator `scripts/lint-closure-dispositions.mjs` (SOLE validator) | Genesis **public** trust-anchor provisioning (harici owner fingerprint / signed Git authority) — REPORTED procedure |
+| Gate/validator `scripts/lint-closure-dispositions.mjs` (SOLE validator) | Genesis provisioning **TOOL + procedure sevk edildi** (`scripts/closure-ledger/genesis-anchor.mjs`, `closure-genesis-provisioning.md`, ayrı genesis PR — SOLE validator'ı reuse eder, private key üretmez/commit etmez); **kalan:** owner'ın ceremony'yi koşup public anchor+fingerprint'i commit+verify+merge etmesi |
 | Canonical encoder + digest `scripts/closure-ledger/canonical.mjs` (v1 freeze) | ed25519 **SIGNER** + owner **private key custody** (karar anında imza üreten; hiçbir şey bu dalda gerçek imza üretmez) |
 | Reviewed-parent trust-anchor **VERIFIER** (`resolveTrustAnchors`, rotation-verify) | Gerçek **ApprovalBroker writer** (subject/claim submit + `verifyAndClaim` method pair; provider-evidence-probe claim path mirror'ı) — SPECIFIED + FROZEN, built değil |
 | Immutable snapshot binding + integrity recompute (`loadBatchSnapshots`, `master-plan-integrity.mjs`) | Gerçek **receipt** dosyaları (`closure-dispositions.receipts/<id>.json`) |

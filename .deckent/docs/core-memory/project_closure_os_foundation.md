@@ -18,13 +18,25 @@ projections yalnız-okuma türevdir ve truth kaynağı değildir.
 - Mutation yalnız **authenticated batch authority + append-only gate + projection settlement** ile;
   elle MASTER/ledger sınıflandırması veya **sahte receipt YASAK**.
 
+## Genesis provisioning TOOL sevk edildi (2026-08-16 — ayrı genesis PR)
+`scripts/closure-ledger/genesis-anchor.mjs` + [`docs/governance/closure-genesis-provisioning.md`](../../../docs/governance/closure-genesis-provisioning.md):
+buildless ceremony/verify aracı, **SOLE validator** `parseTrustAnchorsDoc`'u reuse eder (ikinci şema
+authority'si icat etmez). Fingerprint = `sha256`(**SPKI DER**), deterministik/recomputable. Araç repo'ya
+**private key YAZMAZ** (in-repo path reddi), yalnız public anchor + fingerprint manifest emit eder. **Bu
+PR'da gerçek anchor commit YOK** — anchor'ı owner ceremony (kendi makinesinde keygen, private key custody,
+fingerprint doğrula) provision eder; authority yalnız owner-verified **reviewed-parent merge**'den gelir.
+Negatif forgery seti (BAD_PEM/UNKNOWN_FIELD/SCHEMA/DUPLICATE_KEYID/MALFORMED/self-vouch rotation/in-repo
+key reddi) tool `--self-check` + `tests/governance/closure-genesis-anchor.test.ts`'te. tenantId/projectId'in
+**canonical producer'ı YOK** → owner ceremony input'u; Phase-5 writer'ın approval subject'i birebir eşleşmeli.
+
 ## Phase-5 (KURULMADI — kod olarak yok)
-genesis public trust-anchor provisioning (owner fingerprint) · ed25519 **SIGNER** + private-key custody ·
-gerçek **ApprovalBroker writer** · gerçek **receipt/ledger-event** · **MASTER state/priority mutation** ·
-provider çağrısı.
+ed25519 **SIGNER** + owner private-key custody · gerçek **ApprovalBroker writer** · gerçek
+**receipt/ledger-event** · **MASTER state/priority mutation** · provider çağrısı · **owner ceremony ile
+gerçek genesis anchor commit** (tool hazır; anchor henüz yok).
 
 ## Sıra
-foundation PR merge → **ayrı** genesis trust-anchor PR (owner fingerprint doğrular) → Phase-5 writer →
+foundation PR merge → **ayrı genesis trust-anchor PR** (tool açıldı; owner ceremony koşup public
+anchor+fingerprint commit + fingerprint doğrula + merge eder) → Phase-5 writer →
 exact dry-run digest → **tek authenticated owner approval** → ledger append + atomic projections.
 
 Extended spec: [`docs/governance/closure-os-sidecar-ledger.md`](../../../docs/governance/closure-os-sidecar-ledger.md) ·

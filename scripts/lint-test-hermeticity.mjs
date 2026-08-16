@@ -233,8 +233,19 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // Measured from the complete FAZ-0/FAZ-1 closure tree; no live `.tasks`, `.brain`
   // or owner runtime path is admitted.
   // Prior: CLOSURE-CLASSIFICATION-PHASE-4.4 (12851).
-  count: 12863,
-  digest: 'a5f3f9678574650a883e5485d2be8cd067bf88dcd960eb331578e217a8b68738',
+  // 2026-08-16 (CLOSURE-OS-GENESIS-ANCHOR): +2 (12863→12865) — the new
+  // tests/governance/closure-genesis-anchor.test.ts spawns the genesis
+  // provisioning tool (scripts/closure-ledger/genesis-anchor.mjs) via the same
+  // real-fd async-spawn harness the ledger governance test uses. The TWO new
+  // unresolved effects are (1) its suite mkdtemp + afterAll recursive-rmSync
+  // tmpdir cleanup and (2) the spawn+fd-redirect callsite — the identical pair
+  // charged for the phase-4.3/4.4 governance test. No production module added
+  // (the tool is a scripts/closure-ledger/ subdir script, exempt from the
+  // top-level script-registry and outside the production inventory); all imports
+  // resolve. Count verified IDENTICAL on the built tree AND with `dist/` moved
+  // away (build-free), per the header procedure. Prior: OWNER-MODEL-POLICY-LOCAL-LLM (12863).
+  count: 12865,
+  digest: '78d452151a58c320de1f61aa1a41a00d42d93f1edecf6e57d225d570bda58edb',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
