@@ -35,7 +35,8 @@ vi.mock('node:fs', () => ({
   },
 }));
 
-vi.mock('node:crypto', () => ({
+vi.mock('node:crypto', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:crypto')>()),
   randomBytes: vi.fn(() => ({ toString: () => 'cafebabe' })),
 }));
 

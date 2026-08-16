@@ -445,22 +445,15 @@ export function resolveMode(mode: string): string {
 const VALID_MODES: readonly PlanMode[] = ['performance', 'balanced', 'economic', 'api'] as const;
 const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 
-/** All valid provider names — original Anthropic/OpenAI/Google trio (subscription/API). */
+/** All valid provider names, derived from the canonical provider/model map. */
 export const VALID_PROVIDERS: readonly ProviderName[] = Object.keys(PROVIDER_MODEL_MAP) as ProviderName[];
 
 /**
- * VALID_PROVIDERS_ALL — extended set including local providers (Ollama).
+ * VALID_PROVIDERS_ALL — compatibility projection of the canonical provider set.
  *
- * Sprint 190 W-F F-11: Ollama is added as a local LLM provider. Type widening
- * for `ProviderName` lives in task-types.ts (out of scope for task 190-009);
- * runtime validation accepts 'ollama' through this constant so users can run
- * `deckent config set worker_provider ollama` without a validation error.
- *
- * Used by validateConfig() below — the existing VALID_PROVIDERS list is kept
- * untouched for any caller that consumes it as a typed `ProviderName[]`.
- *
- * OPENROUTER-PROVIDER (row 477): `'openrouter'` joins for the same reason. This
- * constant also gates DIRECTIVES parsing — `task-builder.ts:1138-1148` checks
+ * Used by validateConfig() below; all local and remote providers now enter via
+ * PROVIDER_MODEL_MAP, so the string projection cannot drift from ProviderName.
+ * This constant also gates DIRECTIVES parsing — `task-builder.ts:1138-1148` checks
  * membership and SILENTLY drops an unknown `- Provider:` value, after which a
  * provider-less `resolveCanonicalModelIdentity` throws
  * `E_MODEL_PROVIDER_UNVERIFIED`. So a missing entry here does not merely fail

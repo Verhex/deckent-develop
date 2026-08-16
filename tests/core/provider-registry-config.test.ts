@@ -169,14 +169,14 @@ describe('bootstrapProviders — config-driven provider registry (F1-012)', () =
     expect(result.skipped.some(s => /missing type\/adapter/i.test(s.reason))).toBe(true);
   });
 
-  it('skips an openai-compatible entry missing baseUrl/apiKeyEnv/models', async () => {
+  it('skips an openai-compatible entry missing baseUrl even with API-key auth configured', async () => {
     const cfg = makeConfig([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { name: 'bad-oai', type: 'openai-compatible', apiKeyEnv: 'X_KEY', models: ['m'] } as any,
     ]);
     const result = await bootstrapProviders(cfg, ROOT, registry);
     expect(registry.hasProvider('bad-oai')).toBe(false);
-    expect(result.skipped.some(s => /needs baseUrl, apiKeyEnv and a non-empty models/i.test(s.reason))).toBe(true);
+    expect(result.skipped.some(s => /needs baseUrl, authentication configuration and a non-empty models/i.test(s.reason))).toBe(true);
   });
 
   it('skips an entry with an unknown adapter type without throwing', async () => {

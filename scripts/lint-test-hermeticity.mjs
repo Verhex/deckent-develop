@@ -233,8 +233,15 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // Measured from the complete FAZ-0/FAZ-1 closure tree; no live `.tasks`, `.brain`
   // or owner runtime path is admitted.
   // Prior: CLOSURE-CLASSIFICATION-PHASE-4.4 (12851).
+  // 2026-08-17 (LOCAL-LLM-CI-CLOSURE): same 12863 count, digest only. The post-#126
+  // CI-contract hotfix edited five test files (config, provider-bootstrap-register,
+  // provider-registry-config, eaa-atomic, tmux-prompt-filename) to realign assertions
+  // with the landed local-llm contracts — line shifts inside already-tracked, fully
+  // resolved test files, no new unresolved effect site (count unchanged). Value taken
+  // from CI's build-free run and verified IDENTICAL locally with dist present (the scan
+  // is dist-blind). Prior: OWNER-MODEL-POLICY-LOCAL-LLM (12863).
   count: 12863,
-  digest: 'a5f3f9678574650a883e5485d2be8cd067bf88dcd960eb331578e217a8b68738',
+  digest: '68bb9809701f79688d78814988ac8617c82b5207a8b15d8b301d6c00240a8580',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -371,8 +378,16 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // edits, mandatory receipt-file fsync/fail-closed malformed-receipt handling,
   // and the DECKENT_E092/E093/E094 typed error metadata in already-inventoried
   // modules. Prior: PHASE-4.4a-commit (1234).
+  // 2026-08-17 (LOCAL-LLM-CI-CLOSURE): same 1235 count, digest only. The post-#126
+  // CI-contract hotfix edited four already-inventoried production modules
+  // (src/cli/commands/local-llm.ts group description; src/cli/helpers/messages.ts
+  // en/tr descriptions; src/core/command-registry.ts local-llm registration;
+  // src/core/config.ts VALID_PROVIDERS/provider-map parity + stale-bootstrap message)
+  // to realign with the landed local-llm contracts — no new production module (count
+  // unchanged), only content digests shift. Value verified IDENTICAL with dist present
+  // and build-free (dist-blind). Prior: OWNER-MODEL-POLICY-LOCAL-LLM (1235).
   count: 1235,
-  digest: '09915636c33a4e9baf1a1bf33a229429ed47b486f027e0ca3332e79b7232cd06',
+  digest: '309c1f2a6b527b6b0f3fac4d3713fc8aff641660de005393276c04cb79cc52a0',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
