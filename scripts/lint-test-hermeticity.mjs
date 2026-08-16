@@ -233,15 +233,38 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // Measured from the complete FAZ-0/FAZ-1 closure tree; no live `.tasks`, `.brain`
   // or owner runtime path is admitted.
   // Prior: CLOSURE-CLASSIFICATION-PHASE-4.4 (12851).
-  // 2026-08-17 (LOCAL-LLM-CI-CLOSURE): same 12863 count, digest only. The post-#126
-  // CI-contract hotfix edited five test files (config, provider-bootstrap-register,
-  // provider-registry-config, eaa-atomic, tmux-prompt-filename) to realign assertions
-  // with the landed local-llm contracts — line shifts inside already-tracked, fully
-  // resolved test files, no new unresolved effect site (count unchanged). Value taken
-  // from CI's build-free run and verified IDENTICAL locally with dist present (the scan
-  // is dist-blind). Prior: OWNER-MODEL-POLICY-LOCAL-LLM (12863).
-  count: 12863,
-  digest: '68bb9809701f79688d78814988ac8617c82b5207a8b15d8b301d6c00240a8580',
+  // 2026-08-16 (CLOSURE-OS-GENESIS-ANCHOR): +2 (12863→12865) — the new
+  // tests/governance/closure-genesis-anchor.test.ts spawns the genesis
+  // provisioning tool (scripts/closure-ledger/genesis-anchor.mjs) via the same
+  // real-fd async-spawn harness the ledger governance test uses. The TWO new
+  // unresolved effects are (1) its suite mkdtemp + afterAll recursive-rmSync
+  // tmpdir cleanup and (2) the spawn+fd-redirect callsite — the identical pair
+  // charged for the phase-4.3/4.4 governance test. No production module added
+  // (the tool is a scripts/closure-ledger/ subdir script, exempt from the
+  // top-level script-registry and outside the production inventory); all imports
+  // resolve. Count verified IDENTICAL on the built tree AND with `dist/` moved
+  // away (build-free), per the header procedure. Prior: OWNER-MODEL-POLICY-LOCAL-LLM (12863).
+  // 2026-08-16 (CLOSURE-OS-GENESIS-ANCHOR-SECURITY-REAUDIT): same 12865 count,
+  // digest only. The Codex re-audit fix expanded the genesis test with the
+  // fail-closed filesystem corpus (existing private/anchors/fingerprint sentinel
+  // refusal, POSIX 0600, symlink/repo-local rejection, --adopt-public-key with
+  // zero private artifact, non-ed25519 / malformed reject) — all through the SAME
+  // single spawn+fd-redirect callsite and the SAME suite tmpdir lifecycle, so the
+  // unresolved-effect COUNT is unchanged; the digest folds the added test line
+  // positions. The tool rewrite (O_EXCL/preflight/adopt) is a spawned
+  // scripts/closure-ledger/ script, not in the test graph. Verified IDENTICAL
+  // built AND build-free. Prior: CLOSURE-OS-GENESIS-ANCHOR (12865).
+  // 2026-08-17 (LOCAL-LLM-CI-CLOSURE): post-#126 CI-contract hotfix realigned five
+  // test files (config, provider-bootstrap-register, provider-registry-config,
+  // eaa-atomic, tmux-prompt-filename) — count-neutral, digest-only on main (12863).
+  // Prior: OWNER-MODEL-POLICY-LOCAL-LLM (12863).
+  // 2026-08-17 (MERGE genesis←main 0dbefb32c): union of the genesis test file
+  // (+2 → 12865) and the local-llm hotfix's count-neutral test edits. Count stays
+  // 12865; the digest folds BOTH change sets and is recomputed on the merged tree,
+  // verified build-free. Prior: CLOSURE-OS-GENESIS-ANCHOR-SECURITY-REAUDIT (12865)
+  // + LOCAL-LLM-CI-CLOSURE (12863).
+  count: 12865,
+  digest: '932a83e12e4dcbea655e29fb78c279d6847cd5a895f79ab61c945b2656eae9e3',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({

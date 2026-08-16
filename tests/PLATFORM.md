@@ -51,6 +51,8 @@ _None at this time._
 | File | Line | Block | Test/Suite name |
 |------|------|------|------|
 | `tests/cli/worktree-binary-authority-live.test.ts` | 130 | it | enforces the same HOLD through an npm-link-shaped executable symlink |
+| `tests/governance/closure-genesis-anchor.test.ts` | 109 | it | --generate: private key mode is exactly 0600 (POSIX) |
+| `tests/governance/closure-genesis-anchor.test.ts` | 149 | it | GUARD: a symlink at --private-out is refused (O_EXCL) and its target is untouched |
 | `tests/hermeticity/global-setup.test.ts` | 74 | it | rejects a symlink anywhere in the dist snapshot |
 | `tests/hermeticity/runtime-write-guard.test.ts` | 303 | it | derives module authority from the physical file behind a symlink |
 | `tests/mcp/server-entrypoint.test.ts` | 35 | it | accepts a POSIX executable symlink that resolves to the module |
@@ -229,7 +231,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2567 of 2624 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2573 of 2631 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work

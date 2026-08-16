@@ -193,8 +193,8 @@ sabittir; gate'in saati alakasızdır (clock-independent).
 ```
 
 - top-level allowed: `schemaVersion, anchors, rotations` (aksi `TRUST_ANCHOR_UNKNOWN_FIELD`); `schemaVersion` ≠ 1 → `TRUST_ANCHOR_SCHEMA`.
-- anchor allowed: `keyId, publicKeyPem, tenantId, projectId` — dördü de non-empty (aksi `TRUST_ANCHOR_MALFORMED`); `publicKeyPem` geçerli public key olmalı (`TRUST_ANCHOR_BAD_PEM`); tekrar `keyId` → `TRUST_ANCHOR_DUPLICATE_KEYID`.
-- rotation allowed: `newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId, signature`. **rotation binding** = closure-canonical-v1 of `{ newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId }`, bir reviewed-parent anahtarıyla ed25519-imzalı (aksi `TRUST_ANCHOR_UNAUTHORIZED_ROTATION`).
+- anchor allowed: `keyId, publicKeyPem, tenantId, projectId` — dördü de non-empty (aksi `TRUST_ANCHOR_MALFORMED`); tekrar `keyId` → `TRUST_ANCHOR_DUPLICATE_KEYID`. **`publicKeyPem` invariant (Codex round-2):** tam olarak **bir SPKI `PUBLIC KEY`** bloğu (`createPublicKey` başarı yetmez — Node private PEM'den public türetir); **PRIVATE KEY envelope YASAK** → `TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN`; `asymmetricKeyType==='ed25519'` şart → değilse (P-256/RSA) `TRUST_ANCHOR_BAD_KEY_TYPE`; geçersiz/çoklu-blok → `TRUST_ANCHOR_BAD_PEM`.
+- rotation allowed: `newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId, signature`. **rotation binding** = closure-canonical-v1 of `{ newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId }`, bir reviewed-parent anahtarıyla ed25519-imzalı (aksi `TRUST_ANCHOR_UNAUTHORIZED_ROTATION`). `newPublicKeyPem` de yukarıdaki **aynı ed25519 SPKI public-key invariant**'ına tabidir — geçerli parent-imzası bile non-ed25519/private key'i trusted-set'e sokamaz (key-type önce, imza sonra).
 
 Bu dosya repoda yalnız **public** anahtar taşır; private key hiçbir zaman commit
 edilmez (Phase-5, owner key custody).
@@ -261,8 +261,21 @@ Trust-anchor'ların **kaynağı** kritik güvenlik sınırıdır. `resolveTrustA
   (error). Reviewed-parent anahtarları (aynı PEM) her zaman güvenilir kalır.
 - **Genesis.** Reviewed parent'ta anchors dosyası **yoksa**, ilk anahtar in-repo
   self-bootstrap yapamaz → `TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED` (**HOLD**). Gerçek bir
-  genesis anchor'ı, harici owner fingerprint / signed Git authority gerektirir —
-  **REPORTED Phase-5 provisioning procedure**'dür; bu hatta üretilmez/commit edilmez.
+  genesis anchor'ı, harici owner fingerprint / signed Git authority gerektirir — bu
+  **REPORTED provisioning procedure** artık `scripts/closure-ledger/genesis-anchor.mjs`
+  + [`closure-genesis-provisioning.md`](./closure-genesis-provisioning.md) olarak **ayrı
+  genesis PR**'ında sevk edildi. İki mod: **`--adopt-public-key` (CANONICAL)** —
+  hardware/KMS/keychain'de tutulan key'in yalnız public'ini alır, private'e hiç
+  dokunmaz; **`--generate`** — software-key bootstrap (plaintext PKCS8, repo-DIŞI,
+  POSIX 0600 enforce+verify; Windows'ta typed HOLD). Fail-closed: tüm hedefler
+  (private/anchors/fingerprint) önce absent preflight edilir, private key **O_EXCL**
+  ile yazılır (mevcut dosyayı/symlink'i overwrite/follow etmez), partial failure yalnız
+  bu koşumun dosyalarını rollback eder; private key hiçbir stream'e basılmaz. Araç
+  repo'ya **private key YAZMAZ** (in-repo/symlink-into-repo path'i reddeder), yalnız
+  public anchor + fingerprint (`sha256`(SPKI DER)) commit edilir; authority hâlâ
+  owner'ın fingerprint'i doğrulayıp merge etmesinden (reviewed-parent) gelir — foundation
+  hattında anchor üretilmez/commit edilmez, gerçek anchor owner ceremony'siyle provision
+  edilir. ed25519 **SIGNER**/writer hâlâ Phase-5'tir.
 - **NO WARN fallback.** TRUST-ANCHOR-001'den ayrışır: no-git / no-history / shallow
   clone / unfetchable-origin-main / okunamayan-parent-blob (OQ-XVE-05: provably-exists
   ama unreadable = `error`, asla `absent`) hepsi → `TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED`
@@ -512,7 +525,7 @@ tanımlanmamıştır.
 
 | DELIVERED (Phase-4, buildless — sevk edildi) | NOT-YET-WIRED (Phase-5 — YAZILMADI) |
 |---|---|
-| Gate/validator `scripts/lint-closure-dispositions.mjs` (SOLE validator) | Genesis **public** trust-anchor provisioning (harici owner fingerprint / signed Git authority) — REPORTED procedure |
+| Gate/validator `scripts/lint-closure-dispositions.mjs` (SOLE validator) | Genesis provisioning **TOOL + procedure sevk edildi** (`scripts/closure-ledger/genesis-anchor.mjs`, `closure-genesis-provisioning.md`, ayrı genesis PR — SOLE validator'ı reuse eder, private key üretmez/commit etmez); **kalan:** owner'ın ceremony'yi koşup public anchor+fingerprint'i commit+verify+merge etmesi |
 | Canonical encoder + digest `scripts/closure-ledger/canonical.mjs` (v1 freeze) | ed25519 **SIGNER** + owner **private key custody** (karar anında imza üreten; hiçbir şey bu dalda gerçek imza üretmez) |
 | Reviewed-parent trust-anchor **VERIFIER** (`resolveTrustAnchors`, rotation-verify) | Gerçek **ApprovalBroker writer** (subject/claim submit + `verifyAndClaim` method pair; provider-evidence-probe claim path mirror'ı) — SPECIFIED + FROZEN, built değil |
 | Immutable snapshot binding + integrity recompute (`loadBatchSnapshots`, `master-plan-integrity.mjs`) | Gerçek **receipt** dosyaları (`closure-dispositions.receipts/<id>.json`) |

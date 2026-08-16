@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "keyAlgorithm": "ed25519",
+  "fingerprintAlgorithm": "sha256-spki-der",
+  "genesis": true,
+  "predecessor": null,
+  "rotationBoundary": {
+    "depth": 1,
+    "requiresParentSignedRotation": true,
+    "note": "A working-tree key not committed at the reviewed parent is trusted ONLY via a rotation receipt ed25519-signed by a reviewed-parent key (TRUST_ANCHOR_UNAUTHORIZED_ROTATION otherwise); a rotation-added key cannot authorize another rotation in the same change (depth-1). Genesis carries no rotations and no predecessor."
+  },
+  "anchors": [
+    {
+      "keyId": "closure-owner-genesis-v1",
+      "tenantId": "main",
+      "projectId": "deckent",
+      "fingerprint": "sha256:fca3fe07dc726c0dde3fa7203a934ed442066afe576e81002ddf626b8a498b32"
+    }
+  ],
+  "generatedBy": "scripts/closure-ledger/genesis-anchor.mjs"
+}
