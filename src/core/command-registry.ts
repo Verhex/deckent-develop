@@ -126,6 +126,7 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('truth', 'Core', 'Oku', 'core', ['cli', 'mcp'], ['deckent_truth']),
   entry('audit-verify', 'Core', 'Oku', 'orchestra', ['cli']),
   entry('models', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_models'], true),
+  entry('local-llm', 'Core', 'Çalıştır', 'providers', ['cli']),
   entry('resources', 'Core', 'Oku', 'monitor', ['cli', 'repl']),
   entry('usage', 'Core', 'Oku', 'api', ['cli', 'mcp', 'repl'], ['deckent_usage']),
   entry('limits', 'Core', 'Oku', 'core', ['cli']),          // 361-002 subscription limit-probe

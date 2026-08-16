@@ -107,13 +107,16 @@ describe('bootstrapProviders — OpenAI-compat register (215-005)', () => {
     expect(registry.hasProvider('zhipu')).toBe(true);
   });
 
-  it('exposes a usable adapter via registry.getProvider after registration', async () => {
+  it('exposes a registered adapter while preserving live endpoint availability truth', async () => {
     process.env['DEEPSEEK_API_KEY'] = 'sk-test-deepseek';
     await bootstrapProviders(makeConfig(), '/tmp/test-215-005', registry);
     const adapter = registry.getProvider('deepseek');
     expect(adapter.name).toBe('deepseek');
     expect(Array.isArray(adapter.supportedModels)).toBe(true);
     expect(adapter.supportedModels.length).toBeGreaterThan(0);
-    await expect(adapter.isAvailable()).resolves.toBe(true);
+    // Registration proves the adapter is wired; availability remains a live
+    // health+identity probe. The hermetic fetch fixture returns HTTP 500, so a
+    // false result is the only honest outcome here.
+    await expect(adapter.isAvailable()).resolves.toBe(false);
   });
 });

@@ -75,25 +75,27 @@ describe('writeEvaluationAudit — atomic write', () => {
     expect(files.some((f) => f.endsWith('.tmp'))).toBe(false);
   });
 
-  it('never produces a torn file: a simulated rename failure leaves the prior record untouched and cleans up the tmp file', () => {
+  it('refuses a conflicting rewrite before rename and leaves the prior record untouched', () => {
     // Seed an existing "old" record at this exact path.
     writeEvaluationAudit(root, 'sprint-351', 'task-2', 1, buildInput({ decision: 'NO_GO', totalScore: 10 }));
     const filePath = evaluationAuditPath(root, 'sprint-351', 'task-2', 1);
     const before = readFileSync(filePath, 'utf-8');
+    mockedRenameSync.mockClear();
 
-    // Simulate the write being interrupted exactly at the rename boundary —
-    // the tmp file was fully written but the swap onto the final path never
-    // completed (crash/kill between the two syscalls).
+    // A durable evaluation identity is append-once. A differing retry must be
+    // rejected before the atomic rename boundary instead of overwriting the
+    // already-settled record.
     mockedRenameSync.mockImplementationOnce(() => {
       throw new Error('simulated rename failure');
     });
 
     expect(() =>
       writeEvaluationAudit(root, 'sprint-351', 'task-2', 1, buildInput({ decision: 'DONE', totalScore: 99 })),
-    ).toThrow('simulated rename failure');
+    ).toThrow('EVALUATION_AUDIT_CONFLICT');
 
-    // The final file must be exactly what it was before — never half-written,
-    // never the (failed) new content.
+    expect(mockedRenameSync).not.toHaveBeenCalled();
+
+    // The final file remains exactly what it was before.
     const after = readFileSync(filePath, 'utf-8');
     expect(after).toBe(before);
     expect(JSON.parse(after).decision).toBe('NO_GO');
