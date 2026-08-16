@@ -719,6 +719,42 @@ registry.set('DECKENT_E082', {
   ],
 });
 
+registry.set('DECKENT_E092', {
+  message: 'local model runtime configuration is invalid',
+  suggestion: 'Correct local_llm and local_llm.acceleration in the resolved project config before starting the daemon',
+  whatHappened: 'Deckent rejected a local model launch configuration before creating a process.',
+  why: 'A missing, malformed, remotely exposed, or internally conflicting local runtime setting could start the wrong artifact or silently change hardware placement.',
+  howToFix: [
+    'Inspect the field named in the error message under local_llm in .deckent/config.json',
+    'Use a loopback host and provide every required field for the selected acceleration backend',
+    'Run the local-llm status command after correcting the owner-authored config',
+  ],
+});
+
+registry.set('DECKENT_E093', {
+  message: 'local model runtime process identity is unavailable',
+  suggestion: 'Inspect the local-llm PID authority and restart the daemon through the canonical lifecycle command',
+  whatHappened: 'Deckent could not establish a valid process identity for the local model daemon.',
+  why: 'Start, status, and stop must act on one positive, durable PID; guessing could signal an unrelated host process.',
+  howToFix: [
+    'Inspect .deckent/runtime/local-llm.pid without editing it manually',
+    'Confirm no stale local model daemon remains',
+    'Start the daemon again through deckent local-llm start',
+  ],
+});
+
+registry.set('DECKENT_E094', {
+  message: 'evaluation audit receipt conflicts with an existing decision',
+  suggestion: 'Reconcile the existing immutable evaluation receipt before retrying the same task attempt',
+  whatHappened: 'Deckent refused to replace a durable evaluation decision for an already-recorded attempt.',
+  why: 'Changing a decision in place could admit dependents on rewritten evidence and break receipt-before-DONE ordering.',
+  howToFix: [
+    'Inspect the sprint, task, attempt, and prior decision named in the error',
+    'Do not overwrite the existing evaluation receipt manually',
+    'Use the canonical recovery or a new attempt after dispositioning the conflict',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {

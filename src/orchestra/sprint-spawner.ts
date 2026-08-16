@@ -151,6 +151,7 @@ import { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 
 // ─── Task Builder ─────────────────────────────────────────────────
 import { buildWorkerPrompt } from './task-builder.js';
+import { hasSettlementReceipt } from './evaluation-audit-trail.js';
 
 // ─── Planner dependency normalization (323-031 wire) ──────────────
 import { normalizePlannerDependencies } from './planner.js';
@@ -908,6 +909,51 @@ export async function spawnWorkers(
     if (blockedTaskIds.has(task.id)) {
       debugLog('spawnWorkers:skipBlocked', `Task ${task.id} blocked by scope collision`);
       continue;
+    }
+
+    // ─── RECEIPT-BEFORE-DONE defense-in-depth (2026-08-16) ───────────────────
+    // The pure scheduler admits a dependent on a dependency's DONE *status*. At
+    // this disk-aware dispatch chokepoint we ALSO require every DONE dependency's
+    // durable settlement receipt to be visible on disk before spawning. Without
+    // it the worker prompt's dependency gate would render `Pending`, and the
+    // worker would emit a zero-diff dependency-blocked NO_GO → REPEATED_ZERO_DIFF
+    // → replan → pause. Deferring (leave the task PENDING, emit a typed
+    // DEPENDENCY_RECEIPT_PENDING) lets the next tick spawn it once the canonical
+    // reconciliation producer has landed the receipt — no DONE→pending regression,
+    // no replan. Pure scheduler contract (scheduler-state / selectEligibleForSpawn
+    // / respawnEligibleTasks) is untouched and disk-I/O-free.
+    if (
+      config?.dependency_pipeline_enabled === true
+      && task.dependencies
+      && task.dependencies.length > 0
+    ) {
+      const receiptsPending: string[] = [];
+      for (const dep of task.dependencies) {
+        // The dependency is satisfied either by `dep` itself (DONE) or by a DONE
+        // fix-task pointing at it (one-level fix aggregation, matching the scheduler).
+        const satisfier = sprint.tasks.find(
+          (t) => (t.id === dep || t.fixForTaskId === dep) && t.status === TaskStatus.DONE,
+        );
+        if (satisfier && !hasSettlementReceipt(projectRoot, sprint.id, satisfier.id)) {
+          receiptsPending.push(dep);
+        }
+      }
+      if (receiptsPending.length > 0) {
+        try {
+          writeEvent(
+            projectRoot, sprint.id, 'brain', 'worker',
+            'BRAIN→WORKER:DEPENDENCY_RECEIPT_PENDING',
+            {
+              taskId: task.id,
+              dependencyReceiptsPending: receiptsPending,
+              reason: 'DEPENDENCY_RECEIPT_PENDING: durable settlement receipt not yet visible',
+            },
+          );
+        } catch (e) {
+          debugLog('spawnWorkers:dependencyReceiptPending', e);
+        }
+        continue; // defer — next tick spawns once the receipt lands
+      }
     }
 
     // Sprint 202 Task 202-004 — pace spawns by token_throttle_ms (skip first).

@@ -21,6 +21,8 @@ import { CodexAdapter } from '../../providers/codex.js';
 import { GeminiAdapter } from '../../providers/gemini.js';
 import { OllamaAdapter } from '../../providers/ollama.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { loadConfig } from '../../core/config.js';
+import { loadDeckSecrets } from '../../core/deck-file.js';
 import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import type { ChatTurn } from '../../core/memory-types.js';
@@ -29,6 +31,12 @@ import { getMessage, getLanguage } from '../helpers/messages.js';
 import { ensureMcpAttached, type McpHost } from '../helpers/mcp-attach.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
+import { createNativeEngine } from '../repl/native-agent-bridge.js';
+import { buildNativeToolRegistry } from '../repl/native-tool-registry.js';
+import {
+  resolveNativeProvider,
+  type NativeTransportConfig,
+} from '../repl/native-transport.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -68,6 +76,66 @@ const NO_PROVIDER_MESSAGE =
 
 /** Priority order — first ready provider wins during auto-detect. */
 const PROVIDER_PRIORITY: readonly ChatTool[] = ['claude', 'codex', 'gemini'];
+
+/**
+ * Run the command-mode native surface through the same provider/tool-use
+ * engine as the Ink terminal whenever effective config pins a native provider.
+ * `false` means no configured native authority exists, so the caller may use
+ * the legacy subscription-chat path. A configured-but-invalid provider fails
+ * closed here and never silently falls back to another transport.
+ */
+async function runConfiguredNativeChat(
+  projectRoot: string,
+  lang: string,
+  input: AsyncIterable<string>,
+): Promise<boolean> {
+  const cfg = await loadConfig(projectRoot).catch(() => null);
+  const nativeProvider = (cfg as { native_provider?: unknown } | null)?.native_provider;
+  if (typeof nativeProvider !== 'string' || nativeProvider.trim().length === 0) return false;
+
+  const nativeCfg: NativeTransportConfig = {
+    openai_base_url: (cfg as { openai_base_url?: string }).openai_base_url,
+    ollama_host: (cfg as { ollama_host?: string }).ollama_host,
+    native_provider: nativeProvider,
+    native_model: (cfg as { native_model?: string }).native_model,
+    native_context_tokens: (cfg as { native_context_tokens?: number }).native_context_tokens,
+    providers: (cfg as { providers?: NativeTransportConfig['providers'] }).providers,
+    local_llm: (cfg as { local_llm?: NativeTransportConfig['local_llm'] }).local_llm,
+  };
+  const resolved = resolveNativeProvider(process.env, nativeCfg, loadDeckSecrets(projectRoot));
+  if ('error' in resolved) {
+    printError(new Error(resolved.error));
+    process.exitCode = 1;
+    return true;
+  }
+
+  const engine = createNativeEngine({
+    adapter: resolved.adapter,
+    registry: buildNativeToolRegistry({ cwd: () => projectRoot }),
+    cwd: projectRoot,
+    model: resolved.model,
+    getContextBudgetTokens: () => nativeCfg.native_context_tokens,
+    lang: lang === 'tr' ? 'tr' : 'en',
+    // Command mode has no interactive approval card. Silent/read-only tools
+    // still run; anything requiring approval is denied fail-closed.
+    confirm: async () => 'n',
+    toolSink: () => {},
+    t: (key) => getMessage(key, lang),
+  });
+
+  for await (const message of input) {
+    let emitted = false;
+    await engine(message, {
+      output: (chunk) => {
+        emitted = true;
+        process.stdout.write(chunk);
+      },
+      onTurnEnd: () => {},
+    });
+    if (emitted) process.stdout.write('\n');
+  }
+  return true;
+}
 
 // ─── Naïve Mode (Sprint 190 T-190-007) ──────────────────────────────
 //
@@ -451,6 +519,27 @@ export function registerChat(program: Command): void {
       if (isNativeMode) {
         const isOnce = opts.once === true || opts.message !== undefined;
 
+        async function* nativeInput(): AsyncGenerator<string> {
+          if (opts.message !== undefined) {
+            yield opts.message;
+            return;
+          }
+          const rl = createInterface({ input: process.stdin });
+          try {
+            for await (const line of rl) {
+              yield line;
+              if (isOnce) return;
+            }
+          } finally {
+            rl.close();
+          }
+        }
+
+        // A config-pinned native provider is authoritative for `--native`.
+        // This is the same real engine/registry used by the Ink terminal; the
+        // older subscription-chat adapter remains only as the no-pin fallback.
+        if (!isLocalMode && await runConfiguredNativeChat(projectRoot, lang, nativeInput())) return;
+
         let nativeProvider: ChatProviderAdapter;
         if (isLocalMode) {
           // Honest-fail when no local runtime is reachable — NEVER silently
@@ -489,22 +578,10 @@ export function registerChat(program: Command): void {
         const dispatcher = createCliToolDispatcher();
 
         if (isOnce) {
-          async function* singleTurnInput(): AsyncGenerator<string> {
-            if (opts.message !== undefined) {
-              yield opts.message;
-              return;
-            }
-            const rl = createInterface({ input: process.stdin });
-            for await (const line of rl) {
-              rl.close();
-              yield line;
-              return;
-            }
-          }
           await runChatNativeLoop({
             provider: nativeProvider,
             dispatcher,
-            input: singleTurnInput(),
+            input: nativeInput(),
             output: print,
             maxTurns: 1,
             gracefulErrors: true,

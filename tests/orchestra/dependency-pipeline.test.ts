@@ -246,7 +246,7 @@ vi.mock('../../src/orchestra/sprint-phases.js', () => ({
 
 // ─── Imports (after mocks) ───────────────────────────────────────────
 
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { spawnWorker } from '../../src/orchestra/tmux.js';
 
 import {
@@ -437,11 +437,37 @@ Task without dependencies.
       const t2 = makeTask({ id: '134-002', dependencies: [], status: TaskStatus.DONE });
       const sprint = makeSprint({ tasks: [t1, t2] });
       const config = makeConfig({ dependency_pipeline_enabled: true });
+      // RECEIPT-BEFORE-DONE (2026-08-16): in production a DONE dependency always has
+      // a durable settlement receipt on disk; simulate it so the disk-aware dispatch
+      // gate admits the dependent (the gate defers only when a DONE dep's receipt is
+      // NOT yet visible — see the DEPENDENCY_RECEIPT_PENDING guard test below).
+      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('evaluations'));
+      vi.mocked(readdirSync).mockImplementation(
+        (p) => (String(p).includes('evaluations') ? ['134-002-attempt-1.json'] : []) as unknown as ReturnType<typeof readdirSync>,
+      );
 
       await spawnWorkers('/tmp/test', sprint, config);
 
-      // t1's dep (t2) is DONE → t1 should be spawned
+      // t1's dep (t2) is DONE and its receipt is visible → t1 should be spawned
       expect(t1.status).toBe(TaskStatus.EXECUTING);
+    });
+
+    it('defers a dependent when a DONE dependency has NO settlement receipt yet (DEPENDENCY_RECEIPT_PENDING)', async () => {
+      const t1 = makeTask({ id: '134-101', dependencies: ['134-102'], status: TaskStatus.PENDING });
+      const t2 = makeTask({ id: '134-102', dependencies: [], status: TaskStatus.DONE });
+      const sprint = makeSprint({ tasks: [t1, t2] });
+      const config = makeConfig({ dependency_pipeline_enabled: true });
+      // Evaluation infra exists (some receipts landed) but THIS dep's receipt is
+      // not yet visible → the gate must defer t1, never spawn it on a `Pending`.
+      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('evaluations'));
+      vi.mocked(readdirSync).mockImplementation(
+        () => ([]) as unknown as ReturnType<typeof readdirSync>, // no receipt for 134-102
+      );
+
+      await spawnWorkers('/tmp/test', sprint, config);
+
+      // receipt-write pending → dependency spawn = 0 (t1 stays PENDING, deferred)
+      expect(t1.status).toBe(TaskStatus.PENDING);
     });
   });
 

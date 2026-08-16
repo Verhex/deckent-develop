@@ -642,6 +642,37 @@ export interface BotAgentConfig {
  */
 export type ProviderAdapterKind = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openai-compatible';
 
+export type LocalLlmAccelerationBackend = 'auto' | 'cpu' | 'cuda' | 'vulkan' | 'metal';
+export type LocalLlmGpuLayers = 'auto' | 'all' | number;
+export type LocalLlmFlashAttention = 'auto' | 'on' | 'off';
+
+/** Config-resolved hardware placement for a directly managed llama.cpp server. */
+export interface LocalLlmAccelerationConfig {
+  backend: LocalLlmAccelerationBackend;
+  /** Dynamic ggml backend shared library; required for explicit CUDA/Vulkan loading. */
+  backendLibrary?: string;
+  /** Ordered runtime library directories prepended to the platform loader path. */
+  runtimeLibraryDirectories?: string[];
+  /** llama.cpp device identifier returned by `--list-devices` (for example CUDA0). */
+  device?: string;
+  /** Maximum model layers placed on the selected device. Zero is valid only for CPU placement. */
+  gpuLayers?: LocalLlmGpuLayers;
+  flashAttention?: LocalLlmFlashAttention;
+}
+
+/** Owner-authored launch authority for a directly managed OpenAI-compatible local model server. */
+export interface LocalLlmLaunchConfig {
+  serverBinary: string;
+  modelArtifact: string;
+  endpoint: string;
+  host: string;
+  port: number;
+  contextSize: number;
+  modelAlias: string;
+  /** Omitted preserves portable llama.cpp auto-discovery and the pre-acceleration argv. */
+  acceleration?: LocalLlmAccelerationConfig;
+}
+
 /**
  * Role-aware provider fallback policy (454-007) — the config surface for the
  * shared role-aware resolution contract (`core/role-invocation-resolver.ts`).
@@ -800,6 +831,10 @@ export interface ProviderDefinition {
   baseUrl?: string;
   /** Env var holding the API key (type='openai-compatible'). */
   apiKeyEnv?: string;
+  /** Authentication mode; local/none providers require no credential. */
+  authMode?: 'api_key' | 'none' | 'local';
+  /** Provider execution cost classification for admission and budgeting. */
+  executionCostClass?: 'remote' | 'local';
   /** Model ids this provider serves (type='openai-compatible'). */
   models?: string[];
 }
@@ -975,6 +1010,8 @@ export interface DeckentConfig {
      *  unchanged (backward-safe default). */
     registry?: ProviderDefinition[];
   };
+  /** Direct llama.cpp lifecycle configuration used by `deckent local-llm`. */
+  local_llm?: LocalLlmLaunchConfig;
   /** Host-side `DeckBroker` credential minting (DECKBROKER-WIRE, 354-006).
    *  @see DeckBrokerConfig */
   deck_broker?: DeckBrokerConfig;
@@ -1801,6 +1838,8 @@ export interface ResolvedConfig {
    *  flattened into brain_provider/worker_provider/fallback_provider above; this
    *  carries `registry` (config-driven provider definitions) to bootstrap. */
   providers?: DeckentConfig['providers'];
+  /** Resolved direct llama.cpp lifecycle configuration; never synthesized at runtime. */
+  local_llm?: DeckentConfig['local_llm'];
   /** Host-side `DeckBroker` credential minting (passed through from DeckentConfig, 354-006). */
   deck_broker?: DeckentConfig['deck_broker'];
   /** OpenRouter provider registration (passed through from DeckentConfig, row 477). */

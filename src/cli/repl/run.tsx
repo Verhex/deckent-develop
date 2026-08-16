@@ -909,6 +909,8 @@ export async function runInkRepl(
       native_provider: (cfg as { native_provider?: string }).native_provider,
       native_model: (cfg as { native_model?: string }).native_model,
       native_context_tokens: (cfg as { native_context_tokens?: number }).native_context_tokens,
+      providers: (cfg as { providers?: NativeTransportConfig['providers'] }).providers,
+      local_llm: (cfg as { local_llm?: NativeTransportConfig['local_llm'] }).local_llm,
     };
     // .deck secrets (ADR-G-005) — credential source for API-backed transports;
     // documented precedence: .deck over env.

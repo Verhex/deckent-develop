@@ -2,7 +2,7 @@
 // Extracted from brain.ts — score-based and layered model selection
 import type { TaskScope, ModelType, ResolvedConfig, PatternEntry, ProviderName } from '../core/types.js';
 import { getModelTier } from '../core/types.js';
-import { getEquivalentModel, isModelAvailable, getModelForProviderTier } from '../core/model-equivalence.js';
+import { getEquivalentModel, isModelAvailable, isModelExecutable, getModelForProviderTier } from '../core/model-equivalence.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { enforceModelTierGuard } from '../core/model-tier-guard.js';
 import { DeckentError } from '../core/errors.js';
@@ -246,6 +246,17 @@ export function resolveTaskModel(
     // Validate forceModel against target provider; if mismatch, map to equivalent
     if (!isModelAvailable(forceModel, targetProvider)) {
       return getEquivalentModel(forceModel, targetProvider);
+    }
+    // OWNER-MODEL-POLICY-001: an explicit forceModel that belongs to the target
+    // provider but is NOT active under the owner policy is a typed HOLD — never a
+    // silent substitution. This fires before any routing/persist/dispatch, so the
+    // provider/backend never starts on an inactive model.
+    if (!isModelExecutable(forceModel, targetProvider)) {
+      throw new DeckentError(
+        'MODEL_INACTIVE',
+        `forceModel '${forceModel}' is not an active model for provider '${targetProvider}' `
+        + 'under the owner model policy (explicit-active); activate it or choose an active model',
+      );
     }
     return forceModel;
   }

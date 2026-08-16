@@ -16,6 +16,10 @@ describe('Sprint 248 provider-parity contract', () => {
       expect(isAdapterProvider('gemini')).toBe(true);
     });
 
+    it('returns true for local-llm', () => {
+      expect(isAdapterProvider('local-llm')).toBe(true);
+    });
+
     it('returns false for claude', () => {
       expect(isAdapterProvider('claude')).toBe(false);
     });

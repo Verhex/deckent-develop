@@ -520,6 +520,13 @@ export interface RunHttpWorkerEntryDeps {
    * a runtime dynamic import — no static providers/ cycle).
    */
   send?: HttpAgenticSend;
+  /** Hermetic seam for asserting the config-resolved host endpoint contract. */
+  sendFactory?: (connection: {
+    model: string;
+    baseURL: string;
+    apiKeyEnv?: string;
+    provider: string;
+  }) => Promise<HttpAgenticSend>;
 }
 
 export interface RunHttpWorkerEntryReturn {
@@ -640,7 +647,7 @@ async function buildResultFromLoop(
 async function buildRealSend(
   model: string,
   baseURL: string,
-  apiKeyEnv: string,
+  apiKeyEnv: string | undefined,
   provider: string,
 ): Promise<HttpAgenticSend> {
   const { OpenAICompatibleAdapter } = await import('../providers/openai-compatible.js');
@@ -665,6 +672,7 @@ async function buildRealSend(
     name: provider,
     baseURL,
     apiKeyEnv,
+    ...(apiKeyEnv ? {} : { authMode: 'none' as const }),
     models: [model],
     ...(extraBody ? { extraBody } : {}),
   });
@@ -684,7 +692,7 @@ async function buildRealSend(
 
 /**
  * Drive a single task end-to-end. Invocation:
- *   `node dist/agents/http-agentic-worker.js <taskId> <model> <baseURL> <apiKeyEnv> [provider]`
+ *   `node dist/agents/http-agentic-worker.js <taskId> <model> <baseURL> [apiKeyEnv] [provider]`
  * Returns `{ exitCode, resultPath, result }` so tests assert without `process.exit`.
  */
 export async function runHttpWorkerEntry(
@@ -697,11 +705,11 @@ export async function runHttpWorkerEntry(
   const taskId = argv[0];
   const model = argv[1];
   const baseURL = argv[2];
-  const apiKeyEnv = argv[3];
+  const apiKeyEnv = argv[3] || undefined;
   const provider = argv[4] && argv[4].length > 0 ? argv[4] : DEFAULT_HTTP_PROVIDER;
 
-  if (!taskId || !model || !baseURL || !apiKeyEnv) {
-    const reason = `http-agentic-worker-entry: missing argv (got [${argv.join(', ')}]; expected <taskId> <model> <baseURL> <apiKeyEnv> [provider])`;
+  if (!taskId || !model || !baseURL) {
+    const reason = `http-agentic-worker-entry: missing argv (got [${argv.join(', ')}]; expected <taskId> <model> <baseURL> [apiKeyEnv] [provider])`;
     const fallbackId = taskId && taskId.length > 0 ? taskId : 'unknown';
     const r = buildNoGoResult(fallbackId, reason, provider, model ?? 'unknown');
     const p = writeResultFile(fallbackId, projectDir, r);
@@ -724,7 +732,14 @@ export async function runHttpWorkerEntry(
 
   let send: HttpAgenticSend;
   try {
-    send = deps.send ?? (await buildRealSend(model, baseURL, apiKeyEnv, provider));
+    send =
+      deps.send ??
+      (await (deps.sendFactory ?? (connection => buildRealSend(
+        connection.model,
+        connection.baseURL,
+        connection.apiKeyEnv,
+        connection.provider,
+      )))({ model, baseURL, apiKeyEnv, provider }));
   } catch (err) {
     const reason = `http-agentic-worker-entry: failed to build provider send: ${err instanceof Error ? err.message : String(err)}`;
     const r = buildNoGoResult(taskId, reason, provider, model);

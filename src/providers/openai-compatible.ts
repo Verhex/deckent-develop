@@ -108,8 +108,12 @@ export interface OpenAICompatibleConfig {
   name: string;
   /** Base URL without `/chat/completions` (e.g. https://api.deepseek.com/v1). */
   baseURL: string;
-  /** Environment variable that holds the apiKey. */
-  apiKeyEnv: string;
+  /** Environment variable that holds the apiKey. Required unless authMode is local/none. */
+  apiKeyEnv?: string;
+  /** Authentication contract. `none` and `local` never read or transmit a credential. */
+  authMode?: 'api_key' | 'none' | 'local';
+  /** Execution cost classification consumed by budget/admission policy. */
+  executionCostClass?: 'remote' | 'local';
   /** Supported model ids — used to validate `send()` calls. */
   models: readonly string[];
   /** Every provider credential key that must be removed before re-injecting only `apiKeyEnv`. */
@@ -157,6 +161,8 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
   readonly name: string;
   readonly baseURL: string;
   readonly apiKeyEnv: string;
+  readonly authMode: 'api_key' | 'none' | 'local';
+  readonly executionCostClass: 'remote' | 'local';
   readonly supportedModels: readonly ModelType[];
 
   private readonly fetchImpl: typeof fetch;
@@ -172,7 +178,10 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
   constructor(config: OpenAICompatibleConfig) {
     this.name = config.name;
     this.baseURL = config.baseURL.replace(/\/+$/, '');
-    this.apiKeyEnv = config.apiKeyEnv;
+    this.authMode = config.authMode ?? 'api_key';
+    this.apiKeyEnv = config.apiKeyEnv ?? '';
+    this.executionCostClass = config.executionCostClass
+      ?? (this.authMode === 'api_key' ? 'remote' : 'local');
     // Models are stringly-typed in the registry until ModelType is widened.
     this.supportedModels = config.models as unknown as readonly ModelType[];
     this.fetchImpl = config.fetchImpl ?? ((...args) => fetch(...args));
@@ -185,7 +194,7 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     this.credentialEnvKeys = Object.freeze([
       ...new Set([
         ...(config.credentialEnvKeys ?? resolveCrossProviderCredentialKeys()),
-        this.apiKeyEnv,
+        ...(this.apiKeyEnv ? [this.apiKeyEnv] : []),
       ]),
     ]);
   }
@@ -201,8 +210,8 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     model: string,
     opts?: ChatCompletionOptions,
   ): Promise<ChatCompletionResult> {
-    const apiKey = process.env[this.apiKeyEnv];
-    if (!apiKey) {
+    const apiKey = this.apiKeyEnv ? process.env[this.apiKeyEnv] : undefined;
+    if (this.authMode === 'api_key' && !apiKey) {
       throw new ProviderError(
         `${this.apiKeyEnv} is not set — cannot call ${this.name}`,
         this.name,
@@ -232,12 +241,12 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     // to today's behavior when `tools` is unset.
     if (opts?.tools !== undefined && opts.tools.length > 0) body['tools'] = opts.tools;
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.authMode === 'api_key') headers['Authorization'] = `Bearer ${apiKey}`;
+
     const res = await this.fetchImpl(`${this.baseURL}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
@@ -290,30 +299,75 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
 
   // ─── isAvailable() ─────────────────────────────────────────────────
 
-  /**
-   * True when the configured apiKey env var is set. No network probe —
-   * 3rd-party HTTP endpoints should not be ping'd on cold-path startup.
-   */
+  /** Fetch the live model identity advertised by the OpenAI-compatible endpoint. */
+  async fetchIdentity(): Promise<string[]> {
+    const response = await this.fetchImpl(`${this.baseURL}/models`, {
+      method: 'GET',
+      headers: this.authorizationHeaders(),
+    });
+    if (!response.ok) {
+      throw new ProviderError(`${this.name} /models returned ${response.status}`, this.name);
+    }
+    const payload = (await response.json()) as { data?: Array<{ id?: unknown }> };
+    if (!Array.isArray(payload?.data)) return [];
+    return payload.data
+      .map(model => model?.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+  }
+
+  /** Probe the endpoint's explicit health route. */
+  async probeHealth(): Promise<boolean> {
+    try {
+      const response = await this.fetchImpl(`${this.baseURL}/health`, {
+        method: 'GET',
+        headers: this.authorizationHeaders(),
+      });
+      if (!response.ok) return false;
+      const payload = (await response.json()) as { status?: unknown; healthy?: unknown };
+      return payload.healthy !== false && payload.status !== 'error' && payload.status !== 'unhealthy';
+    } catch {
+      return false;
+    }
+  }
+
   async isAvailable(): Promise<boolean> {
-    return Boolean(process.env[this.apiKeyEnv]);
+    if (this.authMode === 'api_key' && !process.env[this.apiKeyEnv]) return false;
+    try {
+      const [healthy] = await Promise.all([this.probeHealth(), this.fetchIdentity()]);
+      return healthy;
+    } catch {
+      return false;
+    }
   }
 
   // ─── diagnoseAvailability() ────────────────────────────────────────
 
   async diagnoseAvailability(): Promise<ProviderAvailabilityDetail> {
-    const hasKey = Boolean(process.env[this.apiKeyEnv]);
+    const requiresKey = this.authMode === 'api_key';
+    const hasKey = !requiresKey || Boolean(process.env[this.apiKeyEnv]);
+    let healthy = false;
+    let identity: string[] = [];
+    if (hasKey) {
+      [healthy, identity] = await Promise.all([
+        this.probeHealth(),
+        this.fetchIdentity().catch(() => []),
+      ]);
+    }
+    const available = hasKey && healthy;
     return {
       name: this.name,
       binaryFound: true, // HTTP — no binary
       binaryPath: undefined,
-      versionStatus: hasKey ? 'unknown' : 'missing',
-      authMethod: 'api_key',
+      versionStatus: available ? 'ok' : hasKey ? 'unknown' : 'missing',
+      authMethod: requiresKey ? 'api_key' : 'none',
       authStatus: hasKey ? 'ok' : 'missing',
-      available: hasKey,
+      available,
       partial: false,
-      models: [...this.supportedModels] as ModelType[],
-      reason: hasKey
-        ? `${this.name} HTTP adapter ready (apiKey present in ${this.apiKeyEnv})`
+      models: (identity.length > 0 ? identity : [...this.supportedModels]) as ModelType[],
+      reason: available
+        ? `${this.name} HTTP endpoint is healthy`
+        : hasKey
+          ? `${this.name} HTTP endpoint is unavailable`
         : `${this.apiKeyEnv} not set — ${this.name} unavailable`,
       hints: hasKey ? [] : [`Set ${this.apiKeyEnv}=<your-api-key>`],
     };
@@ -503,6 +557,12 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
 
   private isSupportedModel(model: string): boolean {
     return (this.supportedModels as readonly string[]).includes(model);
+  }
+
+  private authorizationHeaders(): Record<string, string> {
+    if (this.authMode !== 'api_key') return {};
+    const apiKey = process.env[this.apiKeyEnv];
+    return apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 }
 

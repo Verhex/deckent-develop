@@ -1656,7 +1656,19 @@ export function createDefaultConfig(): DeckentConfig {
     mode: DEFAULT_MODE,
     modes: structuredClone(DEFAULT_MODES),
     // Provider (Sprint 150 Decision 4 — grouped `providers` is canonical; flat keys deprecated)
-    providers: { brain: 'claude', worker: 'claude' },
+    providers: {
+      brain: 'claude',
+      worker: 'claude',
+      registry: [{
+        name: 'local-llm',
+        type: 'openai-compatible',
+        baseUrl: 'http://127.0.0.1:8080/v1',
+        apiKeyEnv: '',
+        authMode: 'none',
+        executionCostClass: 'local',
+        models: ['Qwen3.8-27B'],
+      }],
+    },
     provider_overrides: undefined,
     cost_optimization: false,
     // claude_backend removed (Sprint 150 Decision 3 — use spawn_backend instead)
@@ -2089,6 +2101,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // bootstrapProviders can register config-declared providers. Routing fields
     // are already flattened above; this preserves `registry` for the registry loop.
     providers: config.providers,
+    // FAZ-1 local-llm lifecycle command — preserve the owner-authored launch
+    // authority through the resolved config boundary instead of stripping it.
+    local_llm: config.local_llm,
     // Sprint 220 Task 220-001 — optional native REPL provider override.
     chat_provider: (config as DeckentConfigWithChatProvider).chat_provider,
     // Native transport + BOT-1 bot-agent — pass through so loadConfig does not

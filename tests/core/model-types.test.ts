@@ -46,9 +46,9 @@ describe('PROVIDER_MODEL_MAP', () => {
     expect(PROVIDER_MODEL_MAP.gemini).toEqual(['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
   });
 
-  it('has every canonical provider including OpenRouter', () => {
-    expect(Object.keys(PROVIDER_MODEL_MAP)).toHaveLength(5);
-    expect(Object.keys(PROVIDER_MODEL_MAP).sort()).toEqual(['claude', 'codex', 'gemini', 'ollama', 'openrouter']);
+  it('has every canonical provider including OpenRouter and local-llm', () => {
+    expect(Object.keys(PROVIDER_MODEL_MAP)).toHaveLength(6);
+    expect(Object.keys(PROVIDER_MODEL_MAP).sort()).toEqual(['claude', 'codex', 'gemini', 'local-llm', 'ollama', 'openrouter']);
   });
 });
 

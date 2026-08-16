@@ -222,8 +222,19 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // line shifts in lint-master-plan.mjs (canonical extraction to master-plan-integrity.mjs)
   // and the gate — all imports resolve, no other unresolved symbol added.
   // Prior: CLOSURE-CLASSIFICATION-PHASE-4.3 (12850).
-  count: 12851,
-  digest: '3bce3f8623738c7d8565f8654a7ba55e0e6314f627fc13af1cdde878149429c5',
+  // 2026-08-16 (OWNER-MODEL-POLICY-LOCAL-LLM): +12 — the new hermetic local-llm
+  // command/transport/worker suites exercise real tmpdir lifecycle, process probing,
+  // file-backed daemon state and child-process boundaries instead of fixture-local
+  // reimplementations. Three additional registry-resolved typed error edges replace
+  // raw throws at local config/PID and immutable evaluation-receipt boundaries; the
+  // model-activation and settlement suites also moved existing effect sites as the
+  // production wiring closed. The final effect is a tmpdir-only malformed-receipt
+  // write proving immutable audit bytes fail closed instead of being overwritten.
+  // Measured from the complete FAZ-0/FAZ-1 closure tree; no live `.tasks`, `.brain`
+  // or owner runtime path is admitted.
+  // Prior: CLOSURE-CLASSIFICATION-PHASE-4.4 (12851).
+  count: 12863,
+  digest: 'a5f3f9678574650a883e5485d2be8cd067bf88dcd960eb331578e217a8b68738',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -353,8 +364,15 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // IS accepted by the regex; only a trailing dot/space is not), which shifts that inventoried
   // module's content digest. Comment-only; no behavior change (gate 124/124 + parity 3/3 unchanged).
   // Prior: CLOSURE-CLASSIFICATION-PHASE-4.4a (1234).
-  count: 1234,
-  digest: '204a5f044c956d44228cee4711ebdb691875518cbe5c76f714407ca3c40cf610',
+  // 2026-08-16 (OWNER-MODEL-POLICY-LOCAL-LLM): +1 REAL production module —
+  // src/cli/commands/local-llm.ts provides the config-resolved start/status/stop
+  // lifecycle for a keyless local provider, including explicit fail-loud hardware
+  // placement. The digest also records the connected provider/registry/Terminal/worker
+  // edits, mandatory receipt-file fsync/fail-closed malformed-receipt handling,
+  // and the DECKENT_E092/E093/E094 typed error metadata in already-inventoried
+  // modules. Prior: PHASE-4.4a-commit (1234).
+  count: 1235,
+  digest: '09915636c33a4e9baf1a1bf33a229429ed47b486f027e0ca3332e79b7232cd06',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

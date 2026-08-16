@@ -8,6 +8,7 @@ export type ProviderExecutionCostClass = 'remote' | 'local';
  */
 const BUILTIN_EXECUTION_COST_CLASS: Readonly<Record<string, ProviderExecutionCostClass>> = Object.freeze({
   ollama: 'local',
+  'local-llm': 'local',
 });
 
 /**

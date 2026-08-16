@@ -21,7 +21,14 @@ import {
   OLLAMA_BUILTIN_MODELS,
 } from '../../core/model-registry.js';
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
+import { getMessage } from '../helpers/messages.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
+
+export interface NativeEndpointHealth {
+  endpoint: string;
+  healthy: boolean;
+  detail?: string;
+}
 
 export interface ResolvedProvider {
   adapter: ProviderAdapter;
@@ -30,6 +37,7 @@ export interface ResolvedProvider {
    *  | 'qwen' | 'glm' | 'mock') — what the status bar shows and what a runtime
    *  /provider switch round-trips through. */
   providerName: string;
+  endpointHealth?: () => Promise<NativeEndpointHealth>;
 }
 export interface ProviderError {
   error: string;
@@ -65,6 +73,13 @@ export type NativeTransportConfig = TransportConfig & {
   native_model?: string;
   /** Prompt-side context budget override (estimated tokens). */
   native_context_tokens?: number;
+  /** Canonical grouped provider registry plus legacy keyed definitions. */
+  providers?: {
+    registry?: Array<{ name: string; baseUrl?: string; endpoint?: string }>;
+    [provider: string]: unknown;
+  };
+  /** Resolved direct llama.cpp lifecycle authority shared with the CLI command. */
+  local_llm?: { endpoint?: string };
 };
 
 /** What a /model — /provider switch (or the settings pin) asks for. */
@@ -79,11 +94,47 @@ export interface NativeResolveContext {
   config: NativeTransportConfig;
   /** .deck secrets (ADR-G-005) — its documented contract is precedence OVER env. */
   secrets?: Record<string, string>;
+  fetchFn?: typeof globalThis.fetch;
 }
 
 /** Providers whose native tool_use transport exists. codex/gemini are
  *  subscription-CLI providers (orchestrator-side) — honestly unsupported here. */
-export const NATIVE_PROVIDER_NAMES = ['claude', 'openai', 'ollama', 'deepseek', 'qwen', 'glm'] as const;
+export const NATIVE_PROVIDER_NAMES = ['claude', 'openai', 'ollama', 'deepseek', 'qwen', 'glm', 'local-llm'] as const;
+
+export async function probeNativeEndpointHealth(
+  endpoint: string,
+  fetchFn: typeof globalThis.fetch = globalThis.fetch,
+): Promise<NativeEndpointHealth> {
+  const healthUrl = new URL('/health', endpoint).toString();
+  try {
+    const response = await fetchFn(healthUrl);
+    return {
+      endpoint,
+      healthy: response.ok,
+      ...(!response.ok ? { detail: `HTTP ${response.status}` } : {}),
+    };
+  } catch (error) {
+    return {
+      endpoint,
+      healthy: false,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function formatNativeProviderStatus(
+  resolved: ResolvedProvider,
+  lang: string,
+): Promise<string> {
+  const health = await resolved.endpointHealth?.();
+  return getMessage('native.provider_status', lang, {
+    provider: resolved.providerName,
+    model: resolved.model,
+    health: health
+      ? getMessage(health.healthy ? 'native.endpoint_health.healthy' : 'native.endpoint_health.unhealthy', lang)
+      : getMessage('native.endpoint_health.unknown', lang),
+  });
+}
 
 /** Confidently infer the native provider a bare `/model <id>` implies, or null.
  *  Only canonical, unambiguous shapes count — `claude-*` → claude,
@@ -205,6 +256,30 @@ export function resolveNativeSelection(
       adapter: createOpenAIAdapter(opts),
       model: requestedModel ?? configModel ?? DEFAULT_MODEL['openai-compatible'],
       providerName: 'openai',
+    };
+  }
+
+  if (provider === 'local-llm') {
+    const legacyDefinition = config.providers?.['local-llm'] as { baseUrl?: string; endpoint?: string } | undefined;
+    const registryDefinition = config.providers?.registry?.find((entry) => entry.name === 'local-llm');
+    const endpoint = config.local_llm?.endpoint
+      ?? registryDefinition?.baseUrl
+      ?? registryDefinition?.endpoint
+      ?? legacyDefinition?.baseUrl
+      ?? legacyDefinition?.endpoint;
+    if (!endpoint) {
+      return {
+        error: 'local-llm native transport needs a configured endpoint',
+        errorCode: 'missing-local-llm-endpoint',
+        detail: 'local_llm.endpoint / providers.registry[name=local-llm].baseUrl',
+        provider: 'local-llm',
+      };
+    }
+    return {
+      adapter: createOpenAIAdapter({ baseUrl: endpoint, name: 'local-llm' }),
+      model: requestedModel ?? config.native_model ?? 'Qwen3.8-27B',
+      providerName: 'local-llm',
+      endpointHealth: () => probeNativeEndpointHealth(endpoint, ctx.fetchFn),
     };
   }
 
