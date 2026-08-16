@@ -254,8 +254,17 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // positions. The tool rewrite (O_EXCL/preflight/adopt) is a spawned
   // scripts/closure-ledger/ script, not in the test graph. Verified IDENTICAL
   // built AND build-free. Prior: CLOSURE-OS-GENESIS-ANCHOR (12865).
+  // 2026-08-17 (LOCAL-LLM-CI-CLOSURE): post-#126 CI-contract hotfix realigned five
+  // test files (config, provider-bootstrap-register, provider-registry-config,
+  // eaa-atomic, tmux-prompt-filename) — count-neutral, digest-only on main (12863).
+  // Prior: OWNER-MODEL-POLICY-LOCAL-LLM (12863).
+  // 2026-08-17 (MERGE genesis←main 0dbefb32c): union of the genesis test file
+  // (+2 → 12865) and the local-llm hotfix's count-neutral test edits. Count stays
+  // 12865; the digest folds BOTH change sets and is recomputed on the merged tree,
+  // verified build-free. Prior: CLOSURE-OS-GENESIS-ANCHOR-SECURITY-REAUDIT (12865)
+  // + LOCAL-LLM-CI-CLOSURE (12863).
   count: 12865,
-  digest: '57ec4849b1489cf046b2d6959f8fa104fbcf5b03c8ce5d331adb365681dee91f',
+  digest: '932a83e12e4dcbea655e29fb78c279d6847cd5a895f79ab61c945b2656eae9e3',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -392,8 +401,16 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // edits, mandatory receipt-file fsync/fail-closed malformed-receipt handling,
   // and the DECKENT_E092/E093/E094 typed error metadata in already-inventoried
   // modules. Prior: PHASE-4.4a-commit (1234).
+  // 2026-08-17 (LOCAL-LLM-CI-CLOSURE): same 1235 count, digest only. The post-#126
+  // CI-contract hotfix edited four already-inventoried production modules
+  // (src/cli/commands/local-llm.ts group description; src/cli/helpers/messages.ts
+  // en/tr descriptions; src/core/command-registry.ts local-llm registration;
+  // src/core/config.ts VALID_PROVIDERS/provider-map parity + stale-bootstrap message)
+  // to realign with the landed local-llm contracts — no new production module (count
+  // unchanged), only content digests shift. Value verified IDENTICAL with dist present
+  // and build-free (dist-blind). Prior: OWNER-MODEL-POLICY-LOCAL-LLM (1235).
   count: 1235,
-  digest: '09915636c33a4e9baf1a1bf33a229429ed47b486f027e0ca3332e79b7232cd06',
+  digest: '309c1f2a6b527b6b0f3fac4d3713fc8aff641660de005393276c04cb79cc52a0',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

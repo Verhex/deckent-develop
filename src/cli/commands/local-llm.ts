@@ -11,6 +11,7 @@ import type {
   LocalLlmLaunchConfig,
 } from '../../core/config-types.js';
 import { ErrorRegistry } from '../../core/errors.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print } from '../helpers/output.js';
 
@@ -311,14 +312,22 @@ export async function stopLocalLlm(deps: LocalLlmCommandDeps = {}): Promise<numb
 }
 
 export function registerLocalLlm(program: Command): void {
-  const command = program.command(PROVIDER_NAME);
-  command.command('start').action(async () => {
-    await startLocalLlm();
-  });
-  command.command('status').action(async () => {
-    print(JSON.stringify(await getLocalLlmStatus()));
-  });
-  command.command('stop').action(async () => {
-    await stopLocalLlm();
-  });
+  const lang = getLanguage(undefined);
+  const command = program.command(PROVIDER_NAME)
+    .description(getMessage('local_llm.cmd_desc', lang));
+  command.command('start')
+    .description(getMessage('local_llm.start_desc', lang))
+    .action(async () => {
+      await startLocalLlm();
+    });
+  command.command('status')
+    .description(getMessage('local_llm.status_desc', lang))
+    .action(async () => {
+      print(JSON.stringify(await getLocalLlmStatus()));
+    });
+  command.command('stop')
+    .description(getMessage('local_llm.stop_desc', lang))
+    .action(async () => {
+      await stopLocalLlm();
+    });
 }

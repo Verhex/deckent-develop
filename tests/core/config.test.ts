@@ -16,6 +16,7 @@ import {
 } from '../../src/core/config.js';
 import type { SystemProfile, PlanMode } from '../../src/core/types.js';
 import type { ProviderLimitsConfig } from '../../src/core/config-types.js';
+import { PROVIDER_MODEL_MAP } from '../../src/core/task-types.js';
 import { DEFAULT_MODE } from '../../src/core/constants.js';
 import { ProviderConfigAliasConflictError } from '../../src/core/provider-config-canonicalizer.js';
 
@@ -714,7 +715,8 @@ describe('VALID_PROVIDERS', () => {
     expect(VALID_PROVIDERS).toContain('gemini');
     expect(VALID_PROVIDERS).toContain('ollama');
     expect(VALID_PROVIDERS).toContain('openrouter');
-    expect(VALID_PROVIDERS).toHaveLength(5);
+    expect(VALID_PROVIDERS).toContain('local-llm');
+    expect(new Set(VALID_PROVIDERS)).toEqual(new Set(Object.keys(PROVIDER_MODEL_MAP)));
   });
 });
 

@@ -544,6 +544,26 @@ const MESSAGES: MessageMap = {
     en: 'Review pending runtime approval requests and decide execution admission (allow/deny)',
     tr: 'Bekleyen runtime onay isteklerini gözden geçir ve execution admission kararını ver (izin/ret)',
   },
+  'cmdCatalog.local-llm.summary': {
+    en: 'Manage the project-scoped local LLM runtime',
+    tr: 'Proje kapsamlı local LLM runtime\'ını yönet',
+  },
+  'local_llm.cmd_desc': {
+    en: 'Manage the project-scoped local LLM runtime',
+    tr: 'Proje kapsamlı local LLM runtime\'ını yönet',
+  },
+  'local_llm.start_desc': {
+    en: 'Start the configured local LLM server',
+    tr: 'Yapılandırılmış local LLM sunucusunu başlat',
+  },
+  'local_llm.status_desc': {
+    en: 'Inspect local LLM health and advertised models',
+    tr: 'Local LLM sağlığını ve sunduğu modelleri incele',
+  },
+  'local_llm.stop_desc': {
+    en: 'Stop the project-scoped local LLM server',
+    tr: 'Proje kapsamlı local LLM sunucusunu durdur',
+  },
   // ─── execution-authority mount adoption ─────────────────────────────────
   'execution_authority.cmd_desc': {
     en: 'Inspect and reconcile project execution authority bindings',
