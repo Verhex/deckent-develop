@@ -193,8 +193,8 @@ sabittir; gate'in saati alakasızdır (clock-independent).
 ```
 
 - top-level allowed: `schemaVersion, anchors, rotations` (aksi `TRUST_ANCHOR_UNKNOWN_FIELD`); `schemaVersion` ≠ 1 → `TRUST_ANCHOR_SCHEMA`.
-- anchor allowed: `keyId, publicKeyPem, tenantId, projectId` — dördü de non-empty (aksi `TRUST_ANCHOR_MALFORMED`); `publicKeyPem` geçerli public key olmalı (`TRUST_ANCHOR_BAD_PEM`); tekrar `keyId` → `TRUST_ANCHOR_DUPLICATE_KEYID`.
-- rotation allowed: `newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId, signature`. **rotation binding** = closure-canonical-v1 of `{ newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId }`, bir reviewed-parent anahtarıyla ed25519-imzalı (aksi `TRUST_ANCHOR_UNAUTHORIZED_ROTATION`).
+- anchor allowed: `keyId, publicKeyPem, tenantId, projectId` — dördü de non-empty (aksi `TRUST_ANCHOR_MALFORMED`); tekrar `keyId` → `TRUST_ANCHOR_DUPLICATE_KEYID`. **`publicKeyPem` invariant (Codex round-2):** tam olarak **bir SPKI `PUBLIC KEY`** bloğu (`createPublicKey` başarı yetmez — Node private PEM'den public türetir); **PRIVATE KEY envelope YASAK** → `TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN`; `asymmetricKeyType==='ed25519'` şart → değilse (P-256/RSA) `TRUST_ANCHOR_BAD_KEY_TYPE`; geçersiz/çoklu-blok → `TRUST_ANCHOR_BAD_PEM`.
+- rotation allowed: `newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId, signature`. **rotation binding** = closure-canonical-v1 of `{ newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId }`, bir reviewed-parent anahtarıyla ed25519-imzalı (aksi `TRUST_ANCHOR_UNAUTHORIZED_ROTATION`). `newPublicKeyPem` de yukarıdaki **aynı ed25519 SPKI public-key invariant**'ına tabidir — geçerli parent-imzası bile non-ed25519/private key'i trusted-set'e sokamaz (key-type önce, imza sonra).
 
 Bu dosya repoda yalnız **public** anahtar taşır; private key hiçbir zaman commit
 edilmez (Phase-5, owner key custody).

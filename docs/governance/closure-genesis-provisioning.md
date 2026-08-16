@@ -25,6 +25,11 @@ The `--generate` mode is an honest software-key bootstrap. It does **not** provi
 custody and never claims "cross-platform secure private-key storage". For a real root of trust, generate the
 key inside your HSM/KMS/keychain and use `--adopt-public-key`.
 
+`--adopt-public-key` **never sees private material** — and that is *enforced*, not merely asserted: because
+Node's `createPublicKey()` will accept a private-key PEM and silently derive the public key, the tool rejects
+any input containing a `PRIVATE KEY` envelope (PKCS8 / EC / RSA / encrypted) **before** `createPublicKey` is
+ever called (`GENESIS_PRIVATE_KEY_INPUT_FORBIDDEN`), and requires exactly one SPKI `PUBLIC KEY` block.
+
 The **fingerprint** both modes emit is:
 ```
 sha256:<lowercase-hex of sha256( SPKI DER bytes of the ed25519 public key )>
@@ -118,8 +123,11 @@ Exercised in `genesis-anchor.mjs --self-check` and `tests/governance/closure-gen
 | Forgery / hazard | Typed rejection |
 |---|---|
 | Tampered / non-PEM public key | `TRUST_ANCHOR_BAD_PEM` |
+| **Private-key PEM given to `--adopt-public-key`** (PKCS8/EC/RSA/encrypted) | **`GENESIS_PRIVATE_KEY_INPUT_FORBIDDEN`** (rejected at the envelope, before `createPublicKey`) |
 | Non-ed25519 public key (adopt) | `GENESIS_PUBLIC_KEY_NOT_ED25519` |
-| Malformed public key (adopt) | `GENESIS_PUBLIC_KEY_INVALID` |
+| Malformed / multiple-block public key (adopt) | `GENESIS_PUBLIC_KEY_INVALID` |
+| **Committed anchor / rotation carrying a PRIVATE KEY PEM** (SOLE validator) | **`TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN`** |
+| **Committed anchor / rotation that isn't ed25519** (P-256/RSA, SOLE validator) | **`TRUST_ANCHOR_BAD_KEY_TYPE`** |
 | Unknown top-level / anchor field | `TRUST_ANCHOR_UNKNOWN_FIELD` |
 | `schemaVersion` ≠ 1 | `TRUST_ANCHOR_SCHEMA` |
 | Duplicate `keyId` | `TRUST_ANCHOR_DUPLICATE_KEYID` |

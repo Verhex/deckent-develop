@@ -75,6 +75,24 @@ const TA_ALLOWED_TOP = new Set(['schemaVersion', 'anchors', 'rotations']);
 const TA_ANCHOR_ALLOWED = new Set(['keyId', 'publicKeyPem', 'tenantId', 'projectId']);
 const TA_ROTATION_ALLOWED = new Set(['newKeyId', 'newPublicKeyPem', 'tenantId', 'projectId', 'signedByKeyId', 'signature']);
 
+const PEM_BEGIN_RE = /-----BEGIN ([A-Za-z0-9 ]+?)-----/g;
+/** Ed25519 SPKI PUBLIC KEY invariant for trust-anchor / rotation key material (Codex
+ *  round-2 req-A/B). Returns null if valid, else a TRUST_ANCHOR_* reason code. Private
+ *  envelopes are rejected BEFORE createPublicKey: Node's createPublicKey ACCEPTS a
+ *  private-key PEM and silently derives the public key, so a private PEM (or a P-256/RSA
+ *  key) must never slip into the trusted set through the shape parse. Enforced identically
+ *  for anchor.publicKeyPem and rotation.newPublicKeyPem — one implementation, no mirror. */
+function ed25519PublicPemProblem(pem) {
+  if (typeof pem !== 'string' || pem.trim() === '') return 'TRUST_ANCHOR_BAD_PEM';
+  const labels = [...pem.matchAll(PEM_BEGIN_RE)].map((m) => m[1].trim());
+  if (labels.some((l) => /PRIVATE KEY$/.test(l))) return 'TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN';
+  if (labels.length !== 1 || labels[0] !== 'PUBLIC KEY') return 'TRUST_ANCHOR_BAD_PEM'; // exactly one SPKI PUBLIC KEY block; no extraneous/multiple blocks
+  let key;
+  try { key = createPublicKey(pem); } catch { return 'TRUST_ANCHOR_BAD_PEM'; }
+  if (key.asymmetricKeyType !== 'ed25519') return 'TRUST_ANCHOR_BAD_KEY_TYPE';
+  return null;
+}
+
 /** Strict-shape parse of a trust-anchors doc → { anchors: Map<keyId,{publicKeyPem,
  *  tenantId, projectId}>, rotations: [...], problems }. Any deviation (bad JSON,
  *  wrong schemaVersion, unknown field, duplicate keyId, missing required, invalid
@@ -96,7 +114,10 @@ export function parseTrustAnchorsDoc(text, label) {
     if (typeof a.tenantId !== 'string' || !a.tenantId) { problems.push(err('TRUST_ANCHOR_MALFORMED', `${label}: anchor '${a.keyId}' missing non-empty tenantId`)); continue; }
     if (typeof a.projectId !== 'string' || !a.projectId) { problems.push(err('TRUST_ANCHOR_MALFORMED', `${label}: anchor '${a.keyId}' missing non-empty projectId`)); continue; }
     if (anchors.has(a.keyId)) { problems.push(err('TRUST_ANCHOR_DUPLICATE_KEYID', `${label}: duplicate keyId '${a.keyId}'`)); continue; }
-    try { createPublicKey(a.publicKeyPem); } catch { problems.push(err('TRUST_ANCHOR_BAD_PEM', `${label}: anchor '${a.keyId}' publicKeyPem is not a valid public key`)); continue; }
+    const pemProblem = ed25519PublicPemProblem(a.publicKeyPem);
+    if (pemProblem === 'TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN') { problems.push(err(pemProblem, `${label}: anchor '${a.keyId}' publicKeyPem contains a PRIVATE KEY envelope — only an SPKI PUBLIC KEY is allowed`)); continue; }
+    if (pemProblem === 'TRUST_ANCHOR_BAD_KEY_TYPE') { problems.push(err(pemProblem, `${label}: anchor '${a.keyId}' publicKeyPem is not an ed25519 key`)); continue; }
+    if (pemProblem) { problems.push(err(pemProblem, `${label}: anchor '${a.keyId}' publicKeyPem is not a single valid SPKI PUBLIC KEY`)); continue; }
     anchors.set(a.keyId, { publicKeyPem: a.publicKeyPem, tenantId: a.tenantId, projectId: a.projectId });
   }
   if (j.rotations !== undefined) {
@@ -157,6 +178,12 @@ export function resolveTrustAnchors({ gitRunner, workingTreeText }) {
     if (!shapeOk) { problems.push(err('TRUST_ANCHOR_UNAUTHORIZED_ROTATION', 'rotation entry malformed (needs non-empty newKeyId, newPublicKeyPem, tenantId, projectId, signedByKeyId, signature)')); continue; }
     const signer = parent.anchors.get(rot.signedByKeyId); // MUST be a reviewed-parent key (no self-authorization)
     if (!signer) { problems.push(err('TRUST_ANCHOR_UNAUTHORIZED_ROTATION', `rotation of '${rot.newKeyId}' is signed by '${rot.signedByKeyId}', not a reviewed-parent trusted key → FAIL`)); continue; }
+    // round-2 req-B: the incoming rotation key must itself satisfy the ed25519 SPKI
+    // PUBLIC-KEY invariant — a P-256/RSA/private newPublicKeyPem is rejected on key type
+    // BEFORE the signature is even checked (a valid parent signature cannot launder a
+    // non-ed25519 or private key into the trusted set).
+    const rotPemProblem = ed25519PublicPemProblem(rot.newPublicKeyPem);
+    if (rotPemProblem) { problems.push(err(rotPemProblem, `rotation of '${rot.newKeyId}' newPublicKeyPem fails the ed25519 SPKI public-key invariant (${rotPemProblem})`)); continue; }
     const binding = { newKeyId: rot.newKeyId, newPublicKeyPem: rot.newPublicKeyPem, tenantId: rot.tenantId, projectId: rot.projectId, signedByKeyId: rot.signedByKeyId };
     let sigOk = false;
     try { createPublicKey(rot.newPublicKeyPem); sigOk = cryptoVerify(null, Buffer.from(canonicalize(binding), 'utf8'), createPublicKey(signer.publicKeyPem), Buffer.from(String(rot.signature), 'base64')); } catch { sigOk = false; }
@@ -831,6 +858,17 @@ export function runSelfCheck() {
     ok(parseTrustAnchorsDoc(JSON.stringify({ schemaVersion: 1, anchors: [{ keyId: 'k', publicKeyPem: 'not-a-pem', tenantId, projectId }] }), 'x').problems.some((x) => x.code === 'TRUST_ANCHOR_BAD_PEM'), 'root-of-trust: invalid PEM rejected');
     ok(parseTrustAnchorsDoc(JSON.stringify({ schemaVersion: 1, anchors: [], bogus: 1 }), 'x').problems.some((x) => x.code === 'TRUST_ANCHOR_UNKNOWN_FIELD'), 'root-of-trust: unknown top-level field rejected');
     ok(parseTrustAnchorsDoc(JSON.stringify({ schemaVersion: 2, anchors: [] }), 'x').problems.some((x) => x.code === 'TRUST_ANCHOR_SCHEMA'), 'root-of-trust: wrong schemaVersion rejected');
+    // (round-2 req-B) ed25519 key-type + private-envelope invariant on anchors AND rotations.
+    const privPkcs8Pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+    const p256PubPem = generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ type: 'spki', format: 'pem' });
+    const rsaPubPem = generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey.export({ type: 'spki', format: 'pem' });
+    ok(parseTrustAnchorsDoc(JSON.stringify({ schemaVersion: 1, anchors: [{ keyId: 'k', publicKeyPem: privPkcs8Pem, tenantId, projectId }] }), 'x').problems.some((x) => x.code === 'TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN'), 'root-of-trust: ed25519 PRIVATE-key anchor → TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN (createPublicKey bypass closed)');
+    ok(parseTrustAnchorsDoc(JSON.stringify({ schemaVersion: 1, anchors: [{ keyId: 'k', publicKeyPem: p256PubPem, tenantId, projectId }] }), 'x').problems.some((x) => x.code === 'TRUST_ANCHOR_BAD_KEY_TYPE'), 'root-of-trust: P-256 anchor → TRUST_ANCHOR_BAD_KEY_TYPE');
+    ok(parseTrustAnchorsDoc(JSON.stringify({ schemaVersion: 1, anchors: [{ keyId: 'k', publicKeyPem: rsaPubPem, tenantId, projectId }] }), 'x').problems.some((x) => x.code === 'TRUST_ANCHOR_BAD_KEY_TYPE'), 'root-of-trust: RSA anchor → TRUST_ANCHOR_BAD_KEY_TYPE');
+    const p256RotBinding = { newKeyId: 'anchor-ec', newPublicKeyPem: p256PubPem, tenantId, projectId, signedByKeyId: keyId };
+    const p256RotSig = edSign(null, Buffer.from(canonicalize(p256RotBinding), 'utf8'), privateKey).toString('base64');
+    const p256RotWt = JSON.stringify({ schemaVersion: 1, anchors: [{ keyId, publicKeyPem, tenantId, projectId }], rotations: [{ ...p256RotBinding, signature: p256RotSig }] });
+    ok(rtProblem({ parentDoc }, p256RotWt, 'TRUST_ANCHOR_BAD_KEY_TYPE'), 'root-of-trust: a parent-signed P-256 rotation newPublicKeyPem → TRUST_ANCHOR_BAD_KEY_TYPE (signature cannot launder a non-ed25519 key)');
 
     // ── req-3 STRICT NESTED SHAPE (receipt / subject / attestation / anchor / rotation) ──
     const av = (rc, over) => validateAuthority(A.events, M(rc), over ?? anchors, snaps());

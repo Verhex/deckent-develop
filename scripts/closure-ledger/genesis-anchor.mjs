@@ -65,6 +65,7 @@ export const REASON = Object.freeze({
   FINGERPRINT_OUT_EXISTS: 'GENESIS_FINGERPRINT_OUT_EXISTS',
   PRIVATE_MODE_UNVERIFIED: 'GENESIS_PRIVATE_MODE_UNVERIFIED',
   WINDOWS_KEY_CUSTODY_UNVERIFIABLE: 'GENESIS_WINDOWS_KEY_CUSTODY_UNVERIFIABLE',
+  PRIVATE_KEY_INPUT_FORBIDDEN: 'GENESIS_PRIVATE_KEY_INPUT_FORBIDDEN',
   PUBLIC_KEY_INVALID: 'GENESIS_PUBLIC_KEY_INVALID',
   PUBLIC_KEY_NOT_ED25519: 'GENESIS_PUBLIC_KEY_NOT_ED25519',
   ROTATIONS_NOT_ALLOWED: 'GENESIS_ROTATIONS_NOT_ALLOWED',
@@ -141,8 +142,19 @@ function assertConformant(anchorsDoc) {
   if (check.problems.length > 0) fail(REASON.NON_CONFORMANT, `generated anchor non-conformant: ${check.problems.map((p) => p.code).join(',')}`);
 }
 
-// ── Ed25519 public-key gate for adoption (SOLE-validator PEM parse + ed25519 type) ─
+// ── Ed25519 PUBLIC-key gate for adoption ──────────────────────────────────────────
+// createPublicKey() ACCEPTS a private-key PEM and silently derives the public key, so
+// the "adopt never sees private material" contract must be enforced at the ENVELOPE
+// level BEFORE createPublicKey: any PRIVATE KEY envelope (PKCS8 / ENCRYPTED / EC / RSA /
+// OPENSSH) is a typed reject, and the input must be exactly one SPKI PUBLIC KEY block.
 export function assertEd25519SpkiPem(pem) {
+  const labels = [...String(pem).matchAll(/-----BEGIN ([A-Za-z0-9 ]+?)-----/g)].map((m) => m[1].trim());
+  if (labels.some((l) => /PRIVATE KEY$/.test(l))) {
+    fail(REASON.PRIVATE_KEY_INPUT_FORBIDDEN, 'input contains a PRIVATE KEY envelope — --adopt-public-key accepts ONLY an SPKI PUBLIC KEY; keep the private key in your HSM/KMS/keychain');
+  }
+  if (labels.length !== 1 || labels[0] !== 'PUBLIC KEY') {
+    fail(REASON.PUBLIC_KEY_INVALID, 'input must be exactly one SPKI PUBLIC KEY PEM block (no extraneous or multiple PEM blocks)');
+  }
   let key;
   try { key = createPublicKey(pem); }
   catch { return fail(REASON.PUBLIC_KEY_INVALID, 'not a valid public key (expected an SPKI PEM public key)'); }
@@ -346,6 +358,12 @@ export function runSelfCheck() {
   const ecPub = generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ type: 'spki', format: 'pem' });
   ok(reasonOf(() => adoptPublicKey({ keyId: 'k', tenantId: 't', projectId: 'p', publicKeyPem: ecPub })) === REASON.PUBLIC_KEY_NOT_ED25519, 'non-ed25519 adopt → GENESIS_PUBLIC_KEY_NOT_ED25519');
   ok(reasonOf(() => adoptPublicKey({ keyId: 'k', tenantId: 't', projectId: 'p', publicKeyPem: 'not a pem' })) === REASON.PUBLIC_KEY_INVALID, 'malformed adopt → GENESIS_PUBLIC_KEY_INVALID');
+
+  // 8. adopt REJECTS a private-key PEM envelope BEFORE createPublicKey can derive its public half
+  const edPrivPem = kp.privateKey.export({ type: 'pkcs8', format: 'pem' });
+  ok(reasonOf(() => adoptPublicKey({ keyId: 'k', tenantId: 't', projectId: 'p', publicKeyPem: edPrivPem })) === REASON.PRIVATE_KEY_INPUT_FORBIDDEN, 'adopt must reject an ed25519 PRIVATE PKCS8 PEM with GENESIS_PRIVATE_KEY_INPUT_FORBIDDEN (no private ingestion)');
+  // and a valid SPKI public key still passes (the guard is not over-broad)
+  ok(assertEd25519SpkiPem(publicKeyPem).includes('BEGIN PUBLIC KEY'), 'a canonical ed25519 SPKI PUBLIC KEY still passes assertEd25519SpkiPem');
 
   return passed;
 }

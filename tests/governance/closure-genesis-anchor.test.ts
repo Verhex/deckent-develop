@@ -71,6 +71,13 @@ function ecPublicPem(path: string): string {
   writeFileSync(path, pem, 'utf8');
   return pem;
 }
+function anchorFile(name: string, publicKeyPem: string): string {
+  const p = join(IO_DIR, name);
+  writeFileSync(p, JSON.stringify({ schemaVersion: 1, anchors: [{ keyId: 'k', publicKeyPem, tenantId: 'main', projectId: 'deckent' }] }, null, 2), 'utf8');
+  return p;
+}
+const ed25519PrivatePkcs8 = (): string => generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+const rsaPublic = (): string => generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey.export({ type: 'spki', format: 'pem' }) as string;
 
 describe('closure genesis trust-anchor provisioning tool', () => {
   it('--self-check: the adversarial conformance/forgery suite passes', async () => {
@@ -188,6 +195,47 @@ describe('closure genesis trust-anchor provisioning tool', () => {
     const r = await runNode(['--adopt-public-key', pub, '--key-id', 'k', '--tenant-id', 't', '--project-id', 'p']);
     expect(r.code).toBe(1);
     expect(r.stderr).toMatch(/reasonCode=GENESIS_PUBLIC_KEY_INVALID/);
+  });
+
+  it('BLOCKER A: --adopt-public-key rejects an ed25519 PRIVATE PKCS8 PEM (no ingestion, no output)', async () => {
+    const priv = join(IO_DIR, 'ed-private-input.pem');
+    writeFileSync(priv, ed25519PrivatePkcs8(), 'utf8');
+    const anchors = join(IO_DIR, 'privadopt-anchors.json');
+    const manifest = join(IO_DIR, 'privadopt-manifest.json');
+    const r = await runNode(['--adopt-public-key', priv, '--key-id', 'closure-owner-genesis-v1', '--tenant-id', 'main', '--project-id', 'deckent', '--anchors-out', anchors, '--fingerprint-out', manifest]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/reasonCode=GENESIS_PRIVATE_KEY_INPUT_FORBIDDEN/);
+    expect(existsSync(anchors)).toBe(false);
+    expect(existsSync(manifest)).toBe(false);
+  });
+
+  it('BLOCKER B: --verify an ed25519 PRIVATE-PEM anchor → TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN, no manifest', async () => {
+    const r = await runNode(['--verify', anchorFile('v-priv.json', ed25519PrivatePkcs8())]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN/);
+    expect(r.stdout).not.toMatch(/fingerprint/);
+  });
+
+  it('BLOCKER B: --verify a P-256 anchor → TRUST_ANCHOR_BAD_KEY_TYPE, no manifest', async () => {
+    const pub = join(IO_DIR, 'v-p256.pem');
+    const r = await runNode(['--verify', anchorFile('v-p256.json', ecPublicPem(pub))]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/TRUST_ANCHOR_BAD_KEY_TYPE/);
+    expect(r.stdout).not.toMatch(/fingerprint/);
+  });
+
+  it('BLOCKER B: --verify an RSA anchor → TRUST_ANCHOR_BAD_KEY_TYPE, no manifest', async () => {
+    const r = await runNode(['--verify', anchorFile('v-rsa.json', rsaPublic())]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/TRUST_ANCHOR_BAD_KEY_TYPE/);
+    expect(r.stdout).not.toMatch(/fingerprint/);
+  });
+
+  it('--verify: a canonical ed25519 SPKI PUBLIC anchor passes and emits a fingerprint', async () => {
+    const pub = join(IO_DIR, 'v-ok.pem');
+    const r = await runNode(['--verify', anchorFile('v-ok.json', ed25519PublicPem(pub))]);
+    expect(r.code).toBe(0);
+    expect(JSON.parse(r.stdout).anchors[0].fingerprint).toMatch(/^sha256:[0-9a-f]{64}$/);
   });
 
   it('--verify: strict-validates a generated anchor and recomputes the identical fingerprint', async () => {

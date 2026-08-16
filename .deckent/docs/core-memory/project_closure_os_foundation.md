@@ -33,6 +33,14 @@ anchor commit YOK** — anchor'ı owner ceremony provision eder; authority yaln�
 `--self-check` (21/21) + `tests/governance/closure-genesis-anchor.test.ts` (13/13)'te. Canonical owner
 identity: keyId=`closure-owner-genesis-v1`, tenantId=`main`, projectId=`deckent`. tenantId/projectId'in
 **canonical producer'ı YOK** → owner ceremony input'u; Phase-5 writer'ın approval subject'i birebir eşleşmeli.
+**Round-2 security re-audit (2026-08-16):** (A) `createPublicKey` private PEM'den public türetiyor → adopt artık
+PRIVATE KEY envelope'ını createPublicKey'den ÖNCE reddeder (`GENESIS_PRIVATE_KEY_INPUT_FORBIDDEN`) — "no private
+material" envelope-guard ile KANITLI. (B) **SOLE validator** (`parseTrustAnchorsDoc` + `resolveTrustAnchors`,
+`lint-closure-dispositions.mjs`) artık anchor.publicKeyPem VE rotation.newPublicKeyPem için tek `ed25519PublicPemProblem`
+helper'ıyla: tam bir SPKI PUBLIC KEY bloğu + private-envelope YASAK (`TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN`) + ed25519
+type (`TRUST_ANCHOR_BAD_KEY_TYPE`) zorunlu — P-256/RSA/private anchor artık trusted-set'e giremez; parent-imzası bile
+non-ed25519 rotation'ı launder edemez (key-type önce). Gate self-check 131/131, genesis tool self-check 23/23,
+genesis vitest 18/18. İkinci validator icat edilmedi (helper gate içinde reuse).
 
 ## Phase-5 (KURULMADI — kod olarak yok)
 ed25519 **SIGNER** + owner private-key custody · gerçek **ApprovalBroker writer** · gerçek
