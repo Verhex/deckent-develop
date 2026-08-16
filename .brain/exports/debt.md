@@ -9,6 +9,20 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-532-002 | Tech debt from 532-002: Implemented explicit local-llm registry ownership and ze | normal | sprint-532 | resolved |
+| debt-532-004 | Tech debt from 532-004: Verification passed: npx tsc --noEmit exited 0; exact ta | normal | sprint-532 | resolved |
+| debt-530-001 | Tech debt from 530-001: npx tsc --noEmit passed. Exact targeted command passed:  | normal | sprint-530 | resolved |
+| debt-528-005 | Tech debt from 528-005: Verified npx tsc --noEmit passes. Verified exact targete | normal | sprint-528 | resolved |
+| debt-527-002 | Tech debt from 527-002: Targeted invariant test passed with 3 tests. TypeScript  | normal | sprint-527 | resolved |
+| debt-524-008 | Tech debt from 524-008: Root cause: assertTaskProjectionParity's stray-file scan | normal | sprint-524 | resolved |
+| debt-523-011 | Tech debt from 523-011: FIX-admission truth pin landed as a new hermetic regress | normal | sprint-523 | resolved |
+| debt-522-012 | Tech debt from 522-012: DONE on both declared verify commands (npx tsc --noEmit  | normal | sprint-522 | resolved |
+| debt-522-009 | Tech debt from 522-009: S4 (row 7011) — both read surfaces now consume the resol | normal | sprint-522 | resolved |
+| debt-521-007 | Tech debt from 521-007: Implemented a test-local recursive src census that pins  | normal | sprint-521 | resolved |
+| debt-521-008 | Tech debt from 521-008: Extended the existing scope-satisfiability gate (no new  | normal | sprint-521 | resolved |
+| debt-521-004 | Tech debt from 521-004: Skill catalog S1 — one effective read model behind the e | normal | sprint-521 | resolved |
+| debt-521-005 | Tech debt from 521-005: Skill catalog S2 — V3 profile state carried as data (des | normal | sprint-521 | resolved |
+| debt-519-004 | Tech debt from 519-004: ROOT CAUSE (row 3275, sprint-487) — where a plan could e | normal | sprint-519 | resolved |
 | debt-517-004 | Tech debt from 517-004: Created and verified the exact-path owner-decision propo | normal | sprint-517 | resolved |
 | debt-517-002 | Tech debt from 517-002: CANONICAL SEMANTICS CHOSEN: the docker ALLOWLIST-SSOT ru | normal | sprint-517 | resolved |
 | debt-517-001 | Tech debt from 517-001: ROOT CAUSE / CALLER INVENTORY (row 60) — the destructive | normal | sprint-517 | resolved |

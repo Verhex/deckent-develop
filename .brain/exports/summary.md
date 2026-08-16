@@ -55,6 +55,16 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-533 Learnings** (sprint-533): ## Sprint sprint-533 Learnings
+
+## Gains
+- 533-001 — close the local-llm agentic worker and settlement lineage — Veri...
+- **Sprint sprint-525 Learnings** (sprint-525): ## Sprint sprint-525 Learnings
+- Fix: Probe contract freeze — typed provider-evidence-probe contracts: NO_GO — Refusi...
+- **Sprint sprint-524 Learnings** (sprint-524): ## Sprint sprint-524 Learnings
+- KN3 projection-parity guard — landing-proposal artifacts are not task ids: GO_WITH_T...
+- **Sprint sprint-521 Learnings** (sprint-521): ## Sprint sprint-521 Learnings
+- Skill catalog S1 — one effective read model behind the existing API (row 7012): GO_W...
 - **Sprint sprint-518 Learnings** (sprint-518): ## Sprint sprint-518 Learnings
 
 ## Gains
@@ -71,28 +81,14 @@
 
 ## Gains
 - 508-001 — One runtime floor: doctor derives from package engines (row 450)...
-- **Sprint sprint-506 Learnings** (sprint-506): ## Sprint sprint-506 Learnings
-- Sweep task artifacts by task identity, not by filename prefix: GO_WITH_TECH_DEBT — T...
-- **Sprint sprint-505 Learnings** (sprint-505): ## Sprint sprint-505 Learnings
-
-## Gains
-- 505-001 — Let an approved-but-unstarted flow be retired from the inbox — V...
-- **Sprint sprint-504 Learnings** (sprint-504): ## Sprint sprint-504 Learnings
-
-## Gains
-- 504-001 — Render a liveness-proven ACTIVE run instead of holding it — Base...
-- **Sprint sprint-501 Learnings** (sprint-501): ## Sprint sprint-501 Learnings
-
-## Gains
-- 501-001 — Address any run-flow directly and page the inbox — Implemented c...
 
 ## Active Technical Debt
 _No active technical debt._
 
 ## Active Patterns
-- Violation pattern: stale_heartbeat (×46 sprints)
+- Violation pattern: stale_heartbeat (×47 sprints)
 - Violation pattern: file_outside_scope (×21 sprints)
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1837 | Generated: 2026-08-11_
+_Total entries: 1870 | Generated: 2026-08-16_
