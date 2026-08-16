@@ -264,11 +264,18 @@ Trust-anchor'ların **kaynağı** kritik güvenlik sınırıdır. `resolveTrustA
   genesis anchor'ı, harici owner fingerprint / signed Git authority gerektirir — bu
   **REPORTED provisioning procedure** artık `scripts/closure-ledger/genesis-anchor.mjs`
   + [`closure-genesis-provisioning.md`](./closure-genesis-provisioning.md) olarak **ayrı
-  genesis PR**'ında sevk edildi. Araç repo'ya **private key YAZMAZ** (in-repo path'i
-  reddeder), yalnız public anchor + fingerprint (`sha256`(SPKI DER)) commit edilir;
-  authority hâlâ owner'ın fingerprint'i doğrulayıp merge etmesinden (reviewed-parent)
-  gelir — foundation hattında anchor üretilmez/commit edilmez, gerçek anchor owner
-  ceremony'siyle provision edilir. ed25519 **SIGNER**/writer hâlâ Phase-5'tir.
+  genesis PR**'ında sevk edildi. İki mod: **`--adopt-public-key` (CANONICAL)** —
+  hardware/KMS/keychain'de tutulan key'in yalnız public'ini alır, private'e hiç
+  dokunmaz; **`--generate`** — software-key bootstrap (plaintext PKCS8, repo-DIŞI,
+  POSIX 0600 enforce+verify; Windows'ta typed HOLD). Fail-closed: tüm hedefler
+  (private/anchors/fingerprint) önce absent preflight edilir, private key **O_EXCL**
+  ile yazılır (mevcut dosyayı/symlink'i overwrite/follow etmez), partial failure yalnız
+  bu koşumun dosyalarını rollback eder; private key hiçbir stream'e basılmaz. Araç
+  repo'ya **private key YAZMAZ** (in-repo/symlink-into-repo path'i reddeder), yalnız
+  public anchor + fingerprint (`sha256`(SPKI DER)) commit edilir; authority hâlâ
+  owner'ın fingerprint'i doğrulayıp merge etmesinden (reviewed-parent) gelir — foundation
+  hattında anchor üretilmez/commit edilmez, gerçek anchor owner ceremony'siyle provision
+  edilir. ed25519 **SIGNER**/writer hâlâ Phase-5'tir.
 - **NO WARN fallback.** TRUST-ANCHOR-001'den ayrışır: no-git / no-history / shallow
   clone / unfetchable-origin-main / okunamayan-parent-blob (OQ-XVE-05: provably-exists
   ama unreadable = `error`, asla `absent`) hepsi → `TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED`

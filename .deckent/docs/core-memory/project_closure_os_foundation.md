@@ -21,12 +21,17 @@ projections yalnız-okuma türevdir ve truth kaynağı değildir.
 ## Genesis provisioning TOOL sevk edildi (2026-08-16 — ayrı genesis PR)
 `scripts/closure-ledger/genesis-anchor.mjs` + [`docs/governance/closure-genesis-provisioning.md`](../../../docs/governance/closure-genesis-provisioning.md):
 buildless ceremony/verify aracı, **SOLE validator** `parseTrustAnchorsDoc`'u reuse eder (ikinci şema
-authority'si icat etmez). Fingerprint = `sha256`(**SPKI DER**), deterministik/recomputable. Araç repo'ya
-**private key YAZMAZ** (in-repo path reddi), yalnız public anchor + fingerprint manifest emit eder. **Bu
-PR'da gerçek anchor commit YOK** — anchor'ı owner ceremony (kendi makinesinde keygen, private key custody,
-fingerprint doğrula) provision eder; authority yalnız owner-verified **reviewed-parent merge**'den gelir.
-Negatif forgery seti (BAD_PEM/UNKNOWN_FIELD/SCHEMA/DUPLICATE_KEYID/MALFORMED/self-vouch rotation/in-repo
-key reddi) tool `--self-check` + `tests/governance/closure-genesis-anchor.test.ts`'te. tenantId/projectId'in
+authority'si icat etmez). Fingerprint = `sha256`(**SPKI DER**), deterministik/recomputable. **İki mod
+(Codex security re-audit sonrası):** `--adopt-public-key` (CANONICAL — hardware/KMS/keychain public key'i
+alır, private'e dokunmaz) ve `--generate` (software-key bootstrap; plaintext PKCS8 repo-DIŞI, POSIX 0600
+enforce+verify; **Windows'ta typed HOLD**). **Fail-closed:** private/anchors/fingerprint hedefleri önce
+absent preflight; private key **O_EXCL** (overwrite/symlink-follow yok) + mode-verify; partial failure yalnız
+bu-koşum-dosyaları rollback; private key hiçbir stream'de. Araç repo'ya **private key YAZMAZ**
+(in-repo/symlink-into-repo reddi), yalnız public anchor + fingerprint manifest emit eder. **Bu PR'da gerçek
+anchor commit YOK** — anchor'ı owner ceremony provision eder; authority yalnız owner-verified
+**reviewed-parent merge**'den gelir. Stable reasonCode'lar (`GENESIS_*`) + negatif forgery seti tool
+`--self-check` (21/21) + `tests/governance/closure-genesis-anchor.test.ts` (13/13)'te. Canonical owner
+identity: keyId=`closure-owner-genesis-v1`, tenantId=`main`, projectId=`deckent`. tenantId/projectId'in
 **canonical producer'ı YOK** → owner ceremony input'u; Phase-5 writer'ın approval subject'i birebir eşleşmeli.
 
 ## Phase-5 (KURULMADI — kod olarak yok)

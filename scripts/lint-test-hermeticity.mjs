@@ -244,8 +244,18 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // top-level script-registry and outside the production inventory); all imports
   // resolve. Count verified IDENTICAL on the built tree AND with `dist/` moved
   // away (build-free), per the header procedure. Prior: OWNER-MODEL-POLICY-LOCAL-LLM (12863).
+  // 2026-08-16 (CLOSURE-OS-GENESIS-ANCHOR-SECURITY-REAUDIT): same 12865 count,
+  // digest only. The Codex re-audit fix expanded the genesis test with the
+  // fail-closed filesystem corpus (existing private/anchors/fingerprint sentinel
+  // refusal, POSIX 0600, symlink/repo-local rejection, --adopt-public-key with
+  // zero private artifact, non-ed25519 / malformed reject) — all through the SAME
+  // single spawn+fd-redirect callsite and the SAME suite tmpdir lifecycle, so the
+  // unresolved-effect COUNT is unchanged; the digest folds the added test line
+  // positions. The tool rewrite (O_EXCL/preflight/adopt) is a spawned
+  // scripts/closure-ledger/ script, not in the test graph. Verified IDENTICAL
+  // built AND build-free. Prior: CLOSURE-OS-GENESIS-ANCHOR (12865).
   count: 12865,
-  digest: '78d452151a58c320de1f61aa1a41a00d42d93f1edecf6e57d225d570bda58edb',
+  digest: '57ec4849b1489cf046b2d6959f8fa104fbcf5b03c8ce5d331adb365681dee91f',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
