@@ -228,59 +228,89 @@ describe('post-FIX circuit breaker', () => {
     ]);
   });
 
-  it('scales the count threshold for a three-task run', () => {
-    const tasks = [
-      task('small-1', TaskStatus.NO_GO),
-      task('small-2', TaskStatus.NO_GO),
-      task('small-3', TaskStatus.DONE),
-    ];
-    const evaluations = new Map([
-      ['small-1', TaskEvaluation.NO_GO],
-      ['small-2', TaskEvaluation.NO_GO],
-      ['small-3', TaskEvaluation.DONE],
-    ]);
+  it.each([
+    { totalTasks: 1, unresolvedTasks: 1 },
+    { totalTasks: 2, unresolvedTasks: 1 },
+  ])('does not pause $unresolvedTasks/$totalTasks before the count threshold', ({
+    totalTasks,
+    unresolvedTasks,
+  }) => {
+    const tasks = Array.from({ length: totalTasks }, (_, index) =>
+      task(`small-${index + 1}`, index < unresolvedTasks ? TaskStatus.NO_GO : TaskStatus.DONE),
+    );
+    const evaluations = new Map(tasks.map((item, index) => [
+      item.id,
+      index < unresolvedTasks ? TaskEvaluation.NO_GO : TaskEvaluation.DONE,
+    ]));
 
     expect(evaluateFixCircuitBreaker(tasks, evaluations, policy)).toMatchObject({
-      shouldPause: true,
-      totalTasks: 3,
-      unresolvedTasks: 2,
-      effectiveCountThreshold: 2,
+      shouldPause: false,
+      totalTasks,
+      unresolvedTasks,
+      effectiveCountThreshold: 5,
     });
   });
 
-  it('does not pause a three-task run for one unresolved root below the ratio gate', () => {
-    const tasks = [
-      task('small-1', TaskStatus.NO_GO),
-      task('small-2', TaskStatus.DONE),
-      task('small-3', TaskStatus.DONE),
-    ];
-    const evaluations = new Map([
-      ['small-1', TaskEvaluation.NO_GO],
-      ['small-2', TaskEvaluation.DONE],
-      ['small-3', TaskEvaluation.DONE],
-    ]);
+  it.each([
+    { totalTasks: 8, shouldPause: true, unresolvedRatioPercent: 62.5 },
+    { totalTasks: 20, shouldPause: false, unresolvedRatioPercent: 25 },
+  ])('evaluates five unresolved roots against the independent ratio gate for $totalTasks tasks', ({
+    totalTasks,
+    shouldPause,
+    unresolvedRatioPercent,
+  }) => {
+    const tasks = Array.from({ length: totalTasks }, (_, index) =>
+      task(`ratio-${index + 1}`, index < 5 ? TaskStatus.NO_GO : TaskStatus.DONE),
+    );
+    const evaluations = new Map(tasks.map((item, index) => [
+      item.id,
+      index < 5 ? TaskEvaluation.NO_GO : TaskEvaluation.DONE,
+    ]));
 
-    expect(evaluateFixCircuitBreaker(tasks, evaluations, policy).shouldPause).toBe(false);
+    expect(evaluateFixCircuitBreaker(tasks, evaluations, policy)).toMatchObject({
+      shouldPause,
+      unresolvedTasks: 5,
+      unresolvedRatioPercent,
+      effectiveCountThreshold: 5,
+    });
   });
 
   it('pauses below the ratio gate when an exhausted lineage still blocks unfinished dependants', () => {
     const tasks = [
       task('blocked-root', TaskStatus.NO_GO),
-      task('independent', TaskStatus.DONE),
+      task('second-unresolved', TaskStatus.NO_GO),
       task('dependent', TaskStatus.PENDING, { dependencies: ['blocked-root'] }),
+      task('independent', TaskStatus.DONE),
     ];
     const evaluations = new Map([
       ['blocked-root', TaskEvaluation.NO_GO],
-      ['independent', TaskEvaluation.DONE],
+      ['second-unresolved', TaskEvaluation.NO_GO],
       ['dependent', TaskEvaluation.NOT_DISPATCHED],
+      ['independent', TaskEvaluation.DONE],
     ]);
 
     expect(evaluateFixCircuitBreaker(tasks, evaluations, policy)).toMatchObject({
       shouldPause: true,
-      unresolvedTasks: 1,
+      totalTasks: 4,
+      unresolvedTasks: 2,
       blockedDependentTaskIds: ['dependent'],
       forcedByBlockedDependents: true,
     });
+  });
+
+  it('never pauses through the configured thresholds when the policy is disabled', () => {
+    const tasks = Array.from({ length: 8 }, (_, index) =>
+      task(`disabled-${index + 1}`, index < 5 ? TaskStatus.NO_GO : TaskStatus.DONE),
+    );
+    const evaluations = new Map(tasks.map((item, index) => [
+      item.id,
+      index < 5 ? TaskEvaluation.NO_GO : TaskEvaluation.DONE,
+    ]));
+
+    expect(evaluateFixCircuitBreaker(tasks, evaluations, {
+      ...policy,
+      enabled: false,
+    }).shouldPause).toBe(false);
   });
 
   it('does not pause a large run merely because five roots failed when the ratio is low', () => {

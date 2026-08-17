@@ -148,6 +148,23 @@ import { BrainError } from './sprint-lifecycle.js';
 import { notify } from '../core/notify.js';
 import { emitProgress } from '../core/event-stream.js';
 
+/**
+ * Preserve the exact write authorities authored by the structured DIRECTIVES
+ * parser at the planner boundary. Declared files are source authority: unlike
+ * inferred/read-context paths, they must never depend on git tracking or current
+ * disk existence. The stable first-seen order also makes repeated declarations
+ * deterministic without widening the scope beyond parser-authored entries.
+ */
+function mergeDeclaredFilesIntoScope(
+  scope: TaskScope,
+  declaredFiles: readonly string[],
+): TaskScope {
+  return {
+    ...scope,
+    filesWrite: [...new Set([...scope.filesWrite, ...declaredFiles])],
+  };
+}
+
 // ═══ Exported Functions ════════════════════════════════════════════
 
 /**
@@ -624,7 +641,15 @@ export async function planSprint(
     // ANY `routing.*` flag, including effort_tiering. See sprint notes.
     const effortTieringEnabled = config.routing?.effort_tiering ?? false;
 
-    for (const src of directiveSources) {
+    for (let sourceIndex = 0; sourceIndex < directiveSources.length; sourceIndex++) {
+      const src = directiveSources[sourceIndex]!;
+      // The structured parser is the authority for explicit `Files:` entries.
+      // Snapshot/merge them here, before routing and persistence, so later
+      // existence/tracked-file classifiers can classify but never delete an
+      // operator-declared create target. Fallback line-split tasks have no
+      // structured declaration snapshot and therefore gain no authority.
+      const declaredFiles = structuredTasks[sourceIndex]?.scope.filesWrite ?? [];
+      const sourceScope = mergeDeclaredFilesIntoScope(src.scope, declaredFiles);
       if (src.forceModel) {
         resolveCanonicalModelIdentity(src.forceModel, {
           ...(src.provider ? { provider: src.provider } : {}),
@@ -656,19 +681,19 @@ export async function planSprint(
         resolvedModel = src.forceModel;
       } else {
         resolvedModel = recommendation.modelConstraint ??
-          resolveTaskModel(src.title, src.description, src.scope, config, parsedPatterns, undefined, undefined, src.provider);
+          resolveTaskModel(src.title, src.description, sourceScope, config, parsedPatterns, undefined, undefined, src.provider);
       }
       // born-636-K2: task-tipi→effort tiering, flag-gated (effortTieringEnabled,
       // hoisted above the loop). `detectedTaskType` is computed once here and
       // reused below for `goNogo.kind` (previously a second, redundant call to
       // the same pure scope-only function — dedupe, zero behavior change).
-      const detectedTaskType = detectTaskType({ scope: src.scope } as Task);
+      const detectedTaskType = detectTaskType({ scope: sourceScope } as Task);
       const tieredEffort: TaskEffort = detectedTaskType === 'audit'
         ? 'high'
         : effortForWorkType(
             produceContentStructural(
-              { title: src.title, description: src.description, scope: src.scope } as Task,
-              producePositional({ title: src.title, description: src.description, scope: src.scope } as Task, { domains: BUILTIN_DOMAINS }),
+              { title: src.title, description: src.description, scope: sourceScope } as Task,
+              producePositional({ title: src.title, description: src.description, scope: sourceScope } as Task, { domains: BUILTIN_DOMAINS }),
             ).workType,
           );
       // `- Effort:` directive ALWAYS wins (404-003 hint-chain, unchanged `??`);
@@ -683,7 +708,7 @@ export async function planSprint(
         reason: src.forceModel
           ? `Directive (model: ${resolvedModel} -- user override)`
           : `Directive (model: ${resolvedModel} -- resolved from scope/complexity/plan)`,
-        scope: src.scope,
+        scope: sourceScope,
         provider: src.provider,
         dependencies: src.dependencies ?? [],
         goNogo: extractGoNogoCriteria(src.description, src.testTarget, {

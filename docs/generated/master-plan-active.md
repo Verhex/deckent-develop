@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):82ca5edb8c68aa2ba8c1a9c4776e6b09be27c7836f46b88d198404caa8716c3d`
+**Source digest:** `sha256(normalized-lf-utf8):73aa97a157b933061e9d48fda31afee0ae034b216dcc78c9f13cd086e7ac20c0`
 
-**Rows:** 496 total · 432 active · 64 terminal
+**Rows:** 497 total · 433 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 339 |
+| OPEN | 340 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -389,6 +389,7 @@
 | 7075 | `MODEL-ACTIVATION-001` | VERIFY | P1 | PROVIDER | — | — | Owner-managed model activation over the auto-detected pool |
 | 7076 | `OWNER-MODEL-POLICY-001` | VERIFY | P1 | PROVIDER | `MODEL-ACTIVATION-001` | — | Provider-scoped explicit-active model policy over the auto-detected activation pool |
 | 7077 | `LOCAL-LLM-MODEL-IDENTITY-001` | OPEN | P0 | PROVIDER | `OWNER-MODEL-POLICY-001` | — | Native terminal ↔ local-llm model identity — exact, discoverable, validated ve lifecycle-tutarlı |
+| 7078 | `NATIVE-AGENT-HORIZON-001` | OPEN | P0 | TERMINAL | `LOCAL-LLM-MODEL-IDENTITY-001` | — | Native terminal agent loop'una enterprise-grade long-horizon kapasite — config-resolved budget, scratch checkpoint/context-epoch continuation, permission-mode closure |
 | 7080 | `IDE-ADAPTER-001` | OPEN | P2 | SURFACE | `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | VS Code, JetBrains and future IDE adapters as non-canonical clients |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |

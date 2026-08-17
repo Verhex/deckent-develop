@@ -539,8 +539,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer/skill-pool/generator/planner/collector/template/cli/mcp hashes moved.
   // 2026-08-17 (LOCAL-LLM-MODEL-IDENTITY-001): same 1246 count, digest only —
   // openai adapter / native-transport / messages production hashes moved.
+  // 2026-08-17 (PLANNER-TRUTH correction, sprint-546): same 1246 count, digest
+  // only — task-lineage (scale-honest breaker), sprint-utils/criteria-deriver
+  // (authored criteria), sprint-planner (declared-files scope) hashes moved.
   count: 1246,
-  digest: 'e1699ca4fd35c7316feb2b91e13253464546303f022da5c7f2852adac9d6751e',
+  digest: '786ba8f8963907e2e0c294934e05ba17363fe7ad42a2f532c2dd0ac13d636cf5',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

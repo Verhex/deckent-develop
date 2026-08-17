@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-546 Learnings
+- Sprint sprint-546 Learnings: ## Sprint sprint-546 Learnings
+
+## Gains
+- 546-001 — scale-honest post-FIX circuit breaker — npx tsc --noEmit passed.\nnpx vitest run tests/core/task-lineage.test.ts passed.\nIndependent cou...
+- 546-002 — authored GO/NO-GO criteria reach the task verbatim — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0; npx vitest run tests/core/criteria-deri...
+- 546-003 — declared Files enter filesWrite even when not yet on disk (depends on nothing) — Budget Landing Checkpoint Protocol early-stop: the first atomic lifecycle shell call failed with ...
+
 ## Sprint sprint-544 Learnings
 - Sprint sprint-544 Learnings: ## Sprint sprint-544 Learnings
 - core — bounded log-tail lineage: GO_WITH_TECH_DEBT — Implemented additive bounded logTail lineage with default 40-line selection, opts override capped at 200, fatal UTF-8 de

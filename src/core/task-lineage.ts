@@ -368,9 +368,9 @@ export function selectPendingFixTasks(
 /**
  * Decide whether exhausted logical task lineages warrant a PAUSED settlement.
  *
- * Both the absolute and proportional gates must be satisfied. The absolute
- * gate scales down for small runs: with a 50% ratio policy, a three-task run
- * needs two unresolved roots rather than an impossible hardcoded five.
+ * Both the absolute and proportional gates must be satisfied independently.
+ * Small runs therefore cannot trip the breaker before an unresolved cascade
+ * reaches the configured absolute threshold.
  */
 export function evaluateFixCircuitBreaker(
   rootTasks: readonly Task[],
@@ -391,11 +391,7 @@ export function evaluateFixCircuitBreaker(
   const unresolvedTasks = unresolvedTaskIds.length;
   const unresolvedRatioPercent =
     totalTasks > 0 ? (unresolvedTasks / totalTasks) * 100 : 0;
-  const ratioCount = totalTasks > 0
-    ? Math.max(1, Math.ceil(totalTasks * (policy.min_unresolved_ratio_percent / 100)))
-    : 0;
-  const effectiveCountThreshold =
-    totalTasks > 0 ? Math.min(policy.max_unresolved_tasks, ratioCount) : 0;
+  const effectiveCountThreshold = policy.max_unresolved_tasks;
   const unresolvedSet = new Set(unresolvedTaskIds);
   const rootsById = new Map(logicalRoots.map(task => [task.id, task]));
   const dependsOnUnresolvedLineage = (task: Task): boolean => {

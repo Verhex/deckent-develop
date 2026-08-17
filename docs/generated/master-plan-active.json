@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "82ca5edb8c68aa2ba8c1a9c4776e6b09be27c7836f46b88d198404caa8716c3d"
+    "value": "73aa97a157b933061e9d48fda31afee0ae034b216dcc78c9f13cd086e7ac20c0"
   },
   "summary": {
-    "total": 496,
-    "active": 432,
+    "total": 497,
+    "active": 433,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 339,
+      "OPEN": 340,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 324,
+      "P0": 325,
       "P1": 135,
       "P2": 37
     },
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 8,
       "SURFACE": 1,
-      "TERMINAL": 13,
+      "TERMINAL": 14,
       "TOOL": 1,
       "TRUTH": 93,
       "XPLAT": 3
@@ -4704,6 +4704,17 @@
       "updated": "2026-08-17",
       "definitionDigest": "331c28d6af15bcf1313f09064f05ac95ce57a8faa5c9330194b286f89d3a5647",
       "progressDigest": "6d583984761439db9f870674be6276698d691b7c4592e961322138163eccb40b",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7078,
+      "id": "NATIVE-AGENT-HORIZON-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-17",
+      "definitionDigest": "9cdcc5427669732ef1027ab51f1e1b6c8c64c0d0dbad46389fa46f2164dc3c75",
+      "progressDigest": "96222d47a3b56be4a709e69a3a46bbba8b484f1d0f5331efec55a2b77834873c",
       "terminalClosureDigest": null
     },
     {
@@ -21914,6 +21925,7 @@
         "MODEL-ACTIVATION-001",
         "OWNER-MODEL-POLICY-001",
         "LOCAL-LLM-MODEL-IDENTITY-001",
+        "NATIVE-AGENT-HORIZON-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -21956,6 +21968,7 @@
         "MODEL-ACTIVATION-001",
         "OWNER-MODEL-POLICY-001",
         "LOCAL-LLM-MODEL-IDENTITY-001",
+        "NATIVE-AGENT-HORIZON-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -22709,7 +22722,9 @@
       "dependsOn": [
         "OWNER-MODEL-POLICY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "NATIVE-AGENT-HORIZON-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -22732,6 +22747,42 @@
       "evidenceReceipts": [],
       "acceptance": "Native terminal, external local-llm router ve `deckent local-llm` lifecycle yolları model identity'yi exact + discoverable + validated taşır; unknown-model upstream 400 body'sinin güvenli/actionable ayrıntısı en+tr i18n ile kullanıcıya gösterilir (opak `[openai-compatible http 400]` yasak); cold-start/readiness sessiz fallback'siz dürüst ele alınır; router model-ID keşfi (GET /v1/models) config'teki id'yi doğrular, mismatch typed öneriyle raporlanır; hermetic regression testleri (exact router IDs, unknown-model 400 detayı, readiness, lifecycle identity consistency) + gerçek native-terminal/live-endpoint proof",
       "evidence": "ACİL ADMISSION (Alperen, 2026-08-17 — araya alındı). Canlı kanıt: config native_provider=local-llm native_model=Qwen3.8-27B endpoint=127.0.0.1:8080/v1; router yalnız Qwen3.8-27B-Q4_K_M ve Qwen3.8-27B-CRACK-Q6_K_L yayımlıyor; Qwen3.8-27B → HTTP 400 model-not-found, Q4_K_M → 200; cold-start ilk turn 'fetch failed'; terminal upstream body'yi gizliyor. Tek-makine config yaması ile geçiştirilmez — kalıcı ürün çözümü; mevcut provider-adapter/model-registry/i18n pattern'leriyle. LANDED (Brain el-kodu + owner onayı 2026-08-17): kök neden çift — native-transport'ta hardcoded `Qwen3.8-27B` fallback literal'i (KANUN 10) + openai adapter'ının upstream error body'sini yutması. Çözüm: `discoverNativeEndpointModels` + `validateNativeModelIdentity` (router GET /models = kimlik authority'si; typed valid/unknown-model+published/unreachable verdicts), `ResolvedProvider.modelIdentity` seam'i, oturum-başı status'ta i18n mismatch uyarısı; typed `OpenAICompatHttpError` (status+code+bounded upstream mesajı) + dürüst connect-failed sarmalaması; hardcode fallback SİLİNDİ → typed `missing-native-model`. Kanıt: 43/43 hermetic battery, tsc 0, i18n lint 0, CANLI router e2e (discovery gerçek ID'ler; yanlış id typed 400 'model not found' detayıyla; Q4_K_M ile gerçek inference 'OK'; TR status mismatch uyarısı yayımlanan listeyle). Kalan dürüst sınırlar: cold-start ilk turn (dürüst mesajlı, auto-retry ayrı karar), /model switch proaktif validation'ı, CRACK-Q6 router-side load hatası (deckent dışı)",
+      "updated": "2026-08-17"
+    },
+    {
+      "order": 7078,
+      "id": "NATIVE-AGENT-HORIZON-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "Native terminal agent loop'una enterprise-grade long-horizon kapasite — config-resolved budget, scratch checkpoint/context-epoch continuation, permission-mode closure",
+      "priority": "P0",
+      "dependsOn": [
+        "LOCAL-LLM-MODEL-IDENTITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "LOCAL-LLM-MODEL-IDENTITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Canonical native-agent execution budget mevcut execution_budget mimarisinin typed terminal profile'ı olarak çözülür (maxModelRounds/maxToolCalls/maxWallTimeMs/maxCumulativeTokens/maxNoProgressRounds/checkpointEvery*/outputReserve/safety-reserve; provider-adına hardcode YOK) ve config→resolver→terminal ingress→createNativeEngine→AgentSession→runAgentTurn zinciri canlı çalışır; first-class provider-neutral scratch checkpoint (session-scoped mkdtemp, cross-platform 0700/0600 adapter policy, atomic temp+rename, checksum, containment, bounded crash-recovery) → context-epoch compaction/continuation orphan tool-pairing üretmeden; usage/cost/wall/audit sayaçları ASLA resetlenmez (yalnız model working-context epoch'u yenilenir); local-llm effective context = model metadata × server config × host admission kesişimi, native_context_tokens türetilir, restart-required diagnostics dürüst; permission modes (suggest first-use session-grant, auto-edit, full-auto) direct/nested/MCP paritesiyle tek rule-store tüketir — critical floor (rm -rf, kill/cleanup, force-push, deny-rules, tenant/secret guard) full-auto'da bile ASLA bypass edilmez, her auto-decision audit event'lidir; no-progress/semantic-repeat convergence guard'ı checkpoint+synthesis+bounded-termination üçlemesiyle; tüm reason'lar typed + en/tr i18n; 60+ distinct tool-call'lu fixture final answer'a ulaşır, runaway fixture typed hard-cap'te durur; 17-sınıf hermetic battery + gerçek binary/PTY proof",
+      "evidence": "ACİL ADMISSION (Alperen kararı 2026-08-17 — öncelikli iş ataması; sıra değişmedi, çalışma disiplini/handoff aynı; bitiminde Alperen'e deneme raporu). Kesin RCA (Codex, trace `.deckent/traces/chat-2026-08-17T20-18-15-173Z-e33p9i.jsonl`): DEFAULT_MAX_ITERATIONS=25 (src/agent/guards/recursion.ts) — Qwen 25 round'da 50 FARKLI tool call'la (47 bash + 2 grep + 1 read; byte-identical retry YOK) geniş analizi bitiremeden sabit guard'a çarptı ('recursion limit exceeded', 424s, 17067 tok); maxIterations seam'i LoopDeps→NativeEngineDeps'te VAR ama production ingress run.tsx geçmiyor; execution_budget.roles.worker.maxTurns=100 native loop'a bağlı değil. İkinci bulgu: 99.507 karakterlik user prompt transcriptte AYNI hash'le iki kez (~25k token israfı) — user-resend mi queue/replay mı üretim wiring'inden ayrıştırılacak, deckent-kaynaklıysa exactly-once turn append + trace'e turnId/origin/replayReason. Yalnız 25→100 değişikliği KABUL EDİLMEZ",
       "updated": "2026-08-17"
     },
     {
@@ -25640,6 +25691,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "db296c46abb4be3da0e4568d4978e1877475991dac9fd73f57bbb2e9a70b5138"
+    "value": "06559a3502d3af9e383119662ecd2dee1fa2db46087f731c8966499353c94d2d"
   }
 }

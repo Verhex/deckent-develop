@@ -14,6 +14,20 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint546] - 2026-08-17
+
+### Added
+
+- authored GO/NO-GO criteria reach the task verbatim
+- declared Files enter filesWrite even when not yet on disk (depends on nothing)
+
+### Fixed
+
+- scale-honest post-FIX circuit breaker
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint544] - 2026-08-17
 
 ### Added

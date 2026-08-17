@@ -520,6 +520,77 @@ const PROOF_LABEL_PREFIX_RE =
 const NOGO_LABEL_PREFIX_RE =
   /^\s*[-*]?\s*\*{0,2}\s*(?:no[-_\s]?go(?:[-_\s]?criteria)?)\*{0,2}:\*{0,2}\s*/i;
 
+const AUTHORED_CRITERION_MAX_CHARS = 2_000;
+const AUTHORED_GO_PREFIX_RE =
+  /^\s*[-*]?\s*\*{0,2}\s*GO\s*:\*{0,2}\s*/i;
+const AUTHORED_NOGO_PREFIX_RE =
+  /^\s*[-*]?\s*\*{0,2}\s*NO[-_\s]?GO(?:\s+(?:otherwise|if))?\s*:?\*{0,2}\s*/i;
+const AUTHORED_TECH_DEBT_PREFIX_RE =
+  /^\s*[-*]?\s*\*{0,2}\s*(?:TECH[-_\s]?DEBT|techDebtAcceptable)\s*:\*{0,2}\s*/i;
+
+type AuthoredCriterionField = 'go' | 'no-go' | 'tech-debt';
+
+interface AuthoredCriteria {
+  go?: string;
+  noGo?: string;
+  techDebt?: string;
+}
+
+function stripMarkdownEmphasis(value: string): string {
+  return value
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1');
+}
+
+function authoredFieldStart(line: string): { field: AuthoredCriterionField; content: string } | undefined {
+  for (const [field, pattern] of [
+    ['go', AUTHORED_GO_PREFIX_RE],
+    ['no-go', AUTHORED_NOGO_PREFIX_RE],
+    ['tech-debt', AUTHORED_TECH_DEBT_PREFIX_RE],
+  ] as const) {
+    if (pattern.test(line)) {
+      return { field, content: line.replace(pattern, '') };
+    }
+  }
+  return undefined;
+}
+
+function extractAuthoredCriteria(description: string): AuthoredCriteria {
+  const captured = new Map<AuthoredCriterionField, string[]>();
+  let activeField: AuthoredCriterionField | undefined;
+
+  for (const line of description.split('\n')) {
+    const start = authoredFieldStart(line);
+    if (start) {
+      activeField = start.field;
+      if (!captured.has(activeField)) captured.set(activeField, [start.content]);
+      continue;
+    }
+    if (!activeField || line.trim() === '') {
+      activeField = undefined;
+      continue;
+    }
+    captured.get(activeField)?.push(line);
+  }
+
+  const read = (field: AuthoredCriterionField): string | undefined => {
+    const lines = captured.get(field);
+    if (!lines) return undefined;
+    const value = stripMarkdownEmphasis(lines.join('\n').trim());
+    return value ? value.slice(0, AUTHORED_CRITERION_MAX_CHARS) : undefined;
+  };
+
+  return { go: read('go'), noGo: read('no-go'), techDebt: read('tech-debt') };
+}
+
+function appendBoundedCriterion(authored: string, derived: string): string {
+  const separator = '\n';
+  const authoredLimit = Math.max(0, AUTHORED_CRITERION_MAX_CHARS - separator.length - derived.length);
+  return `${authored.slice(0, authoredLimit)}${separator}${derived}`.slice(0, AUTHORED_CRITERION_MAX_CHARS);
+}
+
 /**
  * Strip the proof-label prefix from a directive line (WP-13). When no label
  * prefix is present (e.g. an inline `- \`grep …\`` command line caught by the
@@ -582,6 +653,7 @@ export function extractGoNogoCriteria(
   const lines = description.split('\n');
   const proofLines: string[] = [];
   const noGoLines: string[] = [];
+  const authored = extractAuthoredCriteria(description);
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -637,6 +709,16 @@ export function extractGoNogoCriteria(
   // ── WM-7 path: kind × stack aware base ──────────────────────────────────
   if (opts?.kind) {
     const base = deriveBaseCriteria(opts.kind, opts.stack ?? 'generic', opts.commands);
+    if (authored.go) {
+      const authoredGo = appendBoundedCriterion(authored.go, base.goCriteria);
+      const authoredNoGo = authored.noGo ?? base.noGoCriteria;
+      const display = {
+        goCriteria: authoredGo,
+        noGoCriteria: authoredNoGo,
+        techDebtAcceptable: authored.techDebt ?? base.techDebtAcceptable,
+      };
+      return attachStructuredCriteria(display, display, specificItems);
+    }
     if (hasSpecific) {
       // Compose the task-specific GO proof lines + NO-GO prohibitions on top of
       // the kind-aware base. For doc/audit/data the base already says "no
@@ -646,17 +728,30 @@ export function extractGoNogoCriteria(
         {
           goCriteria: proofLines.length > 0 ? `${base.goCriteria}; ${specificCriteria}` : base.goCriteria,
           noGoCriteria: specificNoGo ? `${base.noGoCriteria}; ${specificNoGo}` : base.noGoCriteria,
-          techDebtAcceptable: base.techDebtAcceptable,
+          techDebtAcceptable: authored.techDebt ?? base.techDebtAcceptable,
         },
         base,
         specificItems,
       );
     }
-    return attachStructuredCriteria(base, base, []);
+    const display = authored.techDebt
+      ? { ...base, techDebtAcceptable: authored.techDebt }
+      : base;
+    return attachStructuredCriteria(display, base, []);
   }
 
   // ── Legacy path (no kind context): preserved verbatim ───────────────────
   const baseCriteria = testTarget ? `${testTarget}; Tests pass` : 'Tests pass; tsc clean';
+
+  if (authored.go) {
+    const authoredGo = appendBoundedCriterion(authored.go, baseCriteria);
+    const display = {
+      goCriteria: authoredGo,
+      noGoCriteria: authored.noGo ?? 'Build fails or verification commands fail',
+      techDebtAcceptable: authored.techDebt ?? 'Minor issues if all verification commands pass',
+    };
+    return attachStructuredCriteria(display, display, specificItems);
+  }
 
   if (hasSpecific) {
     const base = {
@@ -667,6 +762,7 @@ export function extractGoNogoCriteria(
     return attachStructuredCriteria(
       {
         ...base,
+        techDebtAcceptable: authored.techDebt ?? base.techDebtAcceptable,
         goCriteria: proofLines.length > 0 ? `${base.goCriteria}; ${specificCriteria}` : base.goCriteria,
         noGoCriteria: specificNoGo
           ? `${base.noGoCriteria}; ${specificNoGo}`
@@ -680,7 +776,7 @@ export function extractGoNogoCriteria(
   const base = {
     goCriteria: baseCriteria,
     noGoCriteria: 'Build fails or tests fail',
-    techDebtAcceptable: 'Minor style issues if tests pass',
+    techDebtAcceptable: authored.techDebt ?? 'Minor style issues if tests pass',
   };
   return attachStructuredCriteria(base, base, []);
 }

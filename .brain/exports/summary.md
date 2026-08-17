@@ -55,6 +55,10 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-546 Learnings** (sprint-546): ## Sprint sprint-546 Learnings
+
+## Gains
+- 546-001 — scale-honest post-FIX circuit breaker — npx tsc --noEmit passed....
 - **Sprint sprint-544 Learnings** (sprint-544): ## Sprint sprint-544 Learnings
 - core — bounded log-tail lineage: GO_WITH_TECH_DEBT — Implemented additive bounded lo...
 - **Sprint sprint-542 Learnings** (sprint-542): ## Sprint sprint-542 Learnings
@@ -75,7 +79,6 @@
 - Canary no-op doc touch: GO_WITH_TECH_DEBT — Exact-byte disk readback passed via cmp;...
 - **Sprint sprint-536 Learnings** (sprint-536): ## Sprint sprint-536 Learnings
 - **Sprint sprint-535 Learnings** (sprint-535): ## Sprint sprint-535 Learnings
-- **Sprint sprint-534 Learnings** (sprint-534): ## Sprint sprint-534 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
@@ -86,4 +89,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1916 | Generated: 2026-08-17_
+_Total entries: 1951 | Generated: 2026-08-17_

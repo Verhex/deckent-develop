@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-545-002 | Tech debt from 545-002: LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 | normal | sprint-545 | resolved |
+| debt-545-004 | Tech debt from 545-004: LOCAL_VERIFIED: tsc exit 0; targeted tests exit 0; i18n  | normal | sprint-545 | resolved |
 | debt-544-002 | Tech debt from 544-002: LOCAL_VERIFIED: npx tsc --noEmit passed; npx vitest run  | normal | sprint-544 | resolved |
 | debt-544-001 | Tech debt from 544-001: Implemented additive bounded logTail lineage with defaul | normal | sprint-544 | resolved |
 | debt-544-005 | Tech debt from 544-005: Updated both reference trees with semantic and heading p | normal | sprint-544 | resolved |
