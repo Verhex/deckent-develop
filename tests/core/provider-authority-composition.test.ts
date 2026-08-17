@@ -110,12 +110,12 @@ afterEach(() => {
 });
 
 describe('composeProviderAuthority', () => {
-  it('defaults only solo tenancy to local and composes one host authority', () => {
+  it('defaults only solo tenancy to main and composes one host authority', () => {
     const options = base();
     const composed = composeProviderAuthority(options);
     expect(composed).toMatchObject({
       state: 'ready',
-      tenantId: 'local',
+      tenantId: 'main',
       projectId: 'project-canonical-0001',
     });
     if (composed.state !== 'ready') throw new Error('expected ready composition');

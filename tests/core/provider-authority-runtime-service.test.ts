@@ -70,7 +70,7 @@ function policyConfig(
     authorityRef: 'provider-limit-authority:runtime-test',
     policies: [{
       selector: {
-        tenantId: 'local',
+        tenantId: 'main',
         provider: 'provider-alpha',
         accountRefHash: ACCOUNT_HASH,
         quotaScopeRefHash: QUOTA_HASH,
@@ -161,7 +161,7 @@ describe('ProviderAuthorityRuntimeService', () => {
     const service = openReady(input);
 
     expect(service).toMatchObject({
-      tenantId: 'local',
+      tenantId: 'main',
       projectId: 'project-runtime-canonical-0001',
       authorityEvidenceRef: expect.stringMatching(/^provider-authority:[a-f0-9]{64}$/u),
       policyAuthorityRef: expect.stringMatching(

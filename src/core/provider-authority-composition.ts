@@ -321,8 +321,11 @@ function openReadyComposition(input: {
 export function composeProviderAuthority(
   options: ProviderAuthorityCompositionOptions,
 ): ProviderAuthorityComposition {
+  // Solo default tenant is 'main' (owner directive, 2026-08-17): approval requests
+  // minted here must be decidable under the owner's approval.authority.tenant_id.
+  // The 'local' fallback made probe approvals structurally unauthorized.
   const tenantId = options.mode === 'solo'
-    ? (requiredRef(options.tenantId) ?? 'local')
+    ? (requiredRef(options.tenantId) ?? 'main')
     : requiredRef(options.tenantId);
   if (!tenantId) return hold('tenant_authority_unavailable', options.mode, false);
   if (!options.policyResolver) return hold('policy_authority_unavailable', tenantId, false);
@@ -384,7 +387,7 @@ export class ProviderAuthorityRuntimeService {
     options: ProviderAuthorityRuntimeServiceOptions,
   ): ProviderAuthorityRuntimeServiceOpenResult {
     const tenantId = options.mode === 'solo'
-      ? (requiredRef(options.tenantId) ?? 'local')
+      ? (requiredRef(options.tenantId) ?? 'main')
       : requiredRef(options.tenantId);
     if (!tenantId) return hold('tenant_authority_unavailable', options.mode, false);
 

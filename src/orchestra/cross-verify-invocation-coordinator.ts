@@ -465,54 +465,77 @@ function assertProjection(input: CrossVerifyInvocationCoordinatorInput): void {
     && !Array.isArray(requestBudgetPolicy)
     ? requestBudgetPolicy as Record<string, unknown>
     : null;
-  if (projection.verifierCandidates.length !== 1
-    || receipt.role !== 'auditor'
-    || receipt.purpose !== 'audit-evaluation'
-    || receipt.projectId !== projection.invocationReceipt.ledger.projectId
-    || receipt.taskId === null
-    || receipt.invocationId !== projection.identity.invocationId
-    || receipt.idempotencyKey !== projection.identity.idempotencyKey
-    || receipt.callId !== projection.identity.callId
-    || admission.invocation.role !== 'auditor'
-    || admission.invocation.purpose !== 'audit-evaluation'
-    || String(admission.invocation.primaryProvider) !== candidate.provider
-    || admission.invocation.model !== candidate.model
-    || admission.invocation.fallbackProviders.length !== 0
-    || Object.keys(admission.candidates).length !== 1
-    || admission.candidates[candidate.provider]?.model !== candidate.model
-    || contract.tenantId !== receipt.tenantId
-    || contract.projectId !== receipt.projectId
-    || contract.runId !== receipt.runId
-    || contract.taskId !== receipt.taskId.replace(/-xverify$/u, '')
-    || contract.verifierTaskId !== receipt.taskId
-    || contract.callId !== receipt.callId
-    || contract.attemptId !== projection.binding.attemptId
-    || contract.fenceTokenHash !== projection.binding.fenceTokenHash
-    || contract.provider !== candidate.provider
-    || contract.model !== candidate.model
-    || contract.authMode !== candidate.auth.mode
-    || contract.accountRefHash !== candidate.auth.accountRefHash
-    || contract.transport !== candidate.backend.transport
-    || contract.executionBackend !== candidate.backend.executionBackend
-    || contract.endpointRefHash !== candidate.backend.endpointRefHash
-    || contract.executionProfileRef !== candidate.backend.executionProfileRef
-    || digest(request.basePrompt) !== contract.basePromptSha256
-    || digest(request.dispatchedPrompt) !== contract.dispatchedPromptSha256
-    || digest(canonicalJson(request.taskSnapshot)) !== contract.taskSnapshotSha256
-    || requestTaskId !== contract.verifierTaskId
-    || requestModel !== contract.model
-    || canonicalJson(requestBudget) !== canonicalJson(contract.budget)
-    || requestPolicy?.['profileRef'] !== contract.budgetProfileRef
-    || requestPolicy?.['policyDigest'] !== contract.budgetPolicyDigest
-    || requestPolicy?.['admissionMode'] !== contract.attendanceMode
-    || canonicalJson(requestPolicy?.['landingPolicy'])
-      !== canonicalJson(contract.landingPolicy)
-    || !sameCandidateAuthority(
+  // Named predicate table instead of one opaque || chain: the thrown error names
+  // WHICH identity facets diverged (field names only — never values), because a
+  // bare "do not share one exact identity" is undiagnosable in the field. A
+  // predicate that itself throws (e.g. a null it may only dereference after an
+  // earlier check) counts as a mismatch — strictly fail-closed, never fail-open.
+  const identityChecks: ReadonlyArray<readonly [string, () => boolean]> = [
+    ['projection.verifierCandidates', () => projection.verifierCandidates.length !== 1],
+    ['receipt.role', () => receipt.role !== 'auditor'],
+    ['receipt.purpose', () => receipt.purpose !== 'audit-evaluation'],
+    ['receipt.projectId', () => receipt.projectId !== projection.invocationReceipt.ledger.projectId],
+    ['receipt.taskId', () => receipt.taskId === null],
+    ['receipt.invocationId', () => receipt.invocationId !== projection.identity.invocationId],
+    ['receipt.idempotencyKey', () => receipt.idempotencyKey !== projection.identity.idempotencyKey],
+    ['receipt.callId', () => receipt.callId !== projection.identity.callId],
+    ['admission.role', () => admission.invocation.role !== 'auditor'],
+    ['admission.purpose', () => admission.invocation.purpose !== 'audit-evaluation'],
+    ['admission.primaryProvider', () => String(admission.invocation.primaryProvider) !== candidate.provider],
+    ['admission.model', () => admission.invocation.model !== candidate.model],
+    ['admission.fallbackProviders', () => admission.invocation.fallbackProviders.length !== 0],
+    ['admission.candidates', () => Object.keys(admission.candidates).length !== 1],
+    ['admission.candidateModel', () => admission.candidates[candidate.provider]?.model !== candidate.model],
+    ['contract.tenantId', () => contract.tenantId !== receipt.tenantId],
+    ['contract.projectId', () => contract.projectId !== receipt.projectId],
+    ['contract.runId', () => contract.runId !== receipt.runId],
+    ['contract.taskId', () => contract.taskId !== receipt.taskId!.replace(/-xverify$/u, '')],
+    ['contract.verifierTaskId', () => contract.verifierTaskId !== receipt.taskId],
+    ['contract.callId', () => contract.callId !== receipt.callId],
+    ['contract.attemptId', () => contract.attemptId !== projection.binding.attemptId],
+    ['contract.fenceTokenHash', () => contract.fenceTokenHash !== projection.binding.fenceTokenHash],
+    ['contract.provider', () => contract.provider !== candidate.provider],
+    ['contract.model', () => contract.model !== candidate.model],
+    ['contract.authMode', () => contract.authMode !== candidate.auth.mode],
+    ['contract.accountRefHash', () => contract.accountRefHash !== candidate.auth.accountRefHash],
+    ['contract.transport', () => contract.transport !== candidate.backend.transport],
+    ['contract.executionBackend', () => contract.executionBackend !== candidate.backend.executionBackend],
+    ['contract.endpointRefHash', () => contract.endpointRefHash !== candidate.backend.endpointRefHash],
+    ['contract.executionProfileRef', () => contract.executionProfileRef !== candidate.backend.executionProfileRef],
+    ['contract.basePromptSha256', () => digest(request.basePrompt) !== contract.basePromptSha256],
+    ['contract.dispatchedPromptSha256', () => digest(request.dispatchedPrompt) !== contract.dispatchedPromptSha256],
+    ['contract.taskSnapshotSha256', () => digest(canonicalJson(request.taskSnapshot)) !== contract.taskSnapshotSha256],
+    ['request.taskId', () => requestTaskId !== contract.verifierTaskId],
+    ['request.model', () => requestModel !== contract.model],
+    ['request.budget', () => canonicalJson(requestBudget) !== canonicalJson(contract.budget)],
+    ['request.budgetProfileRef', () => requestPolicy?.['profileRef'] !== contract.budgetProfileRef],
+    ['request.budgetPolicyDigest', () => requestPolicy?.['policyDigest'] !== contract.budgetPolicyDigest],
+    ['request.attendanceMode', () => requestPolicy?.['admissionMode'] !== contract.attendanceMode],
+    ['request.landingPolicy', () => canonicalJson(requestPolicy?.['landingPolicy'])
+      !== canonicalJson(contract.landingPolicy)],
+    ['candidateAuthority', () => !sameCandidateAuthority(
       projection.candidateAuthority,
       admission.candidates[candidate.provider],
-    )) {
+    )],
+  ];
+  const mismatched: string[] = [];
+  for (const [name, check] of identityChecks) {
+    try {
+      if (check()) mismatched.push(name);
+    } catch {
+      mismatched.push(`${name}(unevaluable)`);
+    }
+  }
+  if (mismatched.length > 0) {
+    if (mismatched.includes('request.budget')) {
+      // Budget ceilings are non-secret host numbers; surfacing both canonical
+      // encodings under DECKENT_DEBUG is what makes this divergence fixable.
+      debugLog('cross-verify-coordinator:budget-divergence', new Error(
+        `request=${canonicalJson(requestBudget)} contract=${canonicalJson(contract.budget)}`,
+      ));
+    }
     throw createExecutionAuthorityError(
-      'Xverify projection and admission authority do not share one exact identity',
+      `Xverify projection and admission authority do not share one exact identity (mismatch: ${mismatched.join(', ')})`,
     );
   }
   assertCanonicalProviderId(candidate.provider);

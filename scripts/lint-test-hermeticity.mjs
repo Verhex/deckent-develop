@@ -305,8 +305,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // phase5-writer.mjs claim identity fixed to userInfo().username (approval
   // authority compares live actorId to request.userId; the 'owner' literal
   // failed real decide). No graph membership change.
+  // 2026-08-17 (xverify live-channel repair): same 14331 count, digest only —
+  // solo tenant mint 'local'→'main' (runtime bootstrap + composition default),
+  // xverify claim envelope carries the author model, coordinator identity gate
+  // names mismatched facets, ingress task snapshot binds the same arm-aware
+  // adjudication budget as its contract. No graph membership change.
   count: 14331,
-  digest: '160741815533f80b014812236c89b4d673cb55f10380468bfd0a7f7198463c13',
+  digest: '45ce10f3016df4ae4dea03911548d497763934b6c7802ff1bcc992022539d666',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -491,8 +496,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (PHASE5 live-batch closure): same 1243 count, digest only —
   // phase5-writer.mjs content hash moved with the userInfo().username claim
   // identity fix; inventory membership unchanged.
+  // 2026-08-17 (xverify live-channel repair): same 1243 count, digest only —
+  // the five production-module content hashes moved with the tenant-mint,
+  // author-model, identity-gate and adjudication-budget fixes; membership unchanged.
   count: 1243,
-  digest: '3f55f811ceaf11cd3d1bbb3327b945215c222798dbe4f656ea49e3541b4090cf',
+  digest: '1206638b060a6e85855d26ff7a001fcdce8e11ba4f2ce4306dc81d95ffff9d3b',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

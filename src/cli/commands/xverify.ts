@@ -468,7 +468,10 @@ export async function runXverifyForResult(
     // apply its explicit host-truncation contract.
     title: `Session claim ${id}`,
     description: claim,
-    model: resolvedDefaultModel,
+    // The envelope carries the AUTHOR's model (registry-validated above) so the
+    // provider/model pair stays coherent and the runner's `task.model` author
+    // fallback reads the truth — the session default is NOT the author's model.
+    model: authorModel,
     // Carrying the AUTHOR here is what enforces verifier≠author:
     // selectVerifierProvider never picks the task's own provider.
     provider: author,

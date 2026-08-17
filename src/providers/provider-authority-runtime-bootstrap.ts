@@ -107,7 +107,10 @@ export function openLocalProviderAuthorityRuntime(
     : null;
   return ProviderAuthorityRuntimeService.open({
     mode: 'solo',
-    tenantId: 'local',
+    // Owner directive (2026-08-17): solo CLI runtime mints tenant 'main' so the
+    // approval requests it produces are decidable under approval.authority.tenant_id.
+    // The 'local' literal made every probe approval structurally unauthorized.
+    tenantId: 'main',
     projectRoot,
     env: options.env,
     nodePlatform: options.nodePlatform,

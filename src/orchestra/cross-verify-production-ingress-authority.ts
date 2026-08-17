@@ -929,7 +929,11 @@ implements MandatoryCrossVerifyInvocationFactory {
         type: 'audit',
         backend: 'docker',
         authMode: profile.authMode === 'api' ? 'api' : 'subscription',
-        budget: { ...budgetDecision.budget },
+        // The task snapshot MUST carry the same arm-aware budget the execution
+        // contract binds below (adjudicationBudget adds the owner's maxTokens on
+        // the non-reservable subscription arm; reserved arm is byte-identical) —
+        // the coordinator's exact identity cross-check compares the two.
+        budget: { ...adjudicationBudget },
         budgetPolicy: {
           state: 'allow',
           role: 'auditor',

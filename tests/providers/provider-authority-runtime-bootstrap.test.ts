@@ -25,7 +25,7 @@ function parentPolicy(): ProviderLimitsConfig {
     authorityRef: 'provider-limit-authority:global-bootstrap-0001',
     policies: [{
       selector: {
-        tenantId: 'local',
+        tenantId: 'main',
         provider: 'claude',
         accountRefHash: 'a'.repeat(64),
         quotaScopeRefHash: 'b'.repeat(64),
