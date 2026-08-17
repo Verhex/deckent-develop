@@ -65,8 +65,18 @@ MODE: implement
   missing/mismatch/GWT/tamper ⇒ NO_GO; exact/policy-free/FIX-exact ⇒ korunur).
 - FIX/retry attempt'leri identical digest taşır; tamper fail-closed
 - LOCAL_VERIFIED battery yeşil; direct-main push
-- `CANARY_READY` ancak bu correction + gerçek canary hazırlığı sonrası; Alperen'in açık ON kararı
-  olmadan DOGFOOD_MODE değişmez
+- **CANARY PASS (owner kararı, 2026-08-17 — sprint-537):** Alperen'in açık ON kararıyla
+  `DOGFOOD_MODE=ON` (gate kanıtı: twin parity + control digest `edf73a2851…f75c85f`);
+  A′/ADR-D-007 bounded recovery ile zero-task terminal-publication fail-closed kapatıldı
+  (`d47e69c08`). Canlı zincir disk-kanıtlı: task-537-001 `runPolicy.policyDigest` = owner-pin
+  `54754a6bc806ef89ef7fd0e3f07411b8f4bfec5c2bb5d36b8abfb4bdeca3a989` → docker'daki gerçek
+  gpt-5.6-sol worker'ı `.result.runPolicyEvidence`'ta AYNI digest'i echo'ladı → finalizer
+  convergence GWT claim'ini yalnız exact evidence ile geçirdi → terminal receipt COMPLETE
+  (logicalTaskCount=1, holds=[], cleanupEligibility CANDIDATE) → `CANARY-NOTE.md` tek gerekli
+  satırla oluştu; advisory compile-observation jsonl satırı mevcut. Verdict GO_WITH_TECH_DEBT
+  policy-DIŞI rubrik sınıfından (doc-task coverage). Owner PASS ile `DOGFOOD_HEALTH=DEGRADED`
+  ilanı kalktı. MASTER 7140 state flip'i ve capsule silinmesi Phase-5 writer kurulana dek
+  YAPILMAZ (owner talimatı) — bu blok o kapanışın evidence kaydıdır.
 
 ## Stop conditions
 - Owner gate: CANARY_READY sonrası ON kararı yalnız Alperen'den

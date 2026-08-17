@@ -1,27 +1,20 @@
-# DIRECTIVES — RUN-POLICY canary (tek no-op task)
+# DIRECTIVES — no active run (idle truth-state)
 
-## Goal
+**Güncelleme:** 2026-08-17 (sprint-537 canary PASS sonrası truth-sync; owner kararı). Şu anda
+aktif Deckent run/sprint YOKTUR ve bu dosya hiçbir execution authority taşımaz. Retained
+DIRECTIVES içeriği ASLA aktif-iş kanıtı değildir (operating policy §2; brain kuralı: "do not
+infer a live run from a retained document").
 
-Prove the task-carried run-policy chain end-to-end with ONE no-op task:
-plan-time stamp → persisted task JSON digest → worker digest echo →
-evaluator/finalizer parity → terminal settlement.
+- Son kapanan wave: **sprint-537 — RUN-POLICY canary, owner-PASS** (terminal receipt COMPLETE,
+  policy digest `54754a6b…` uçtan uca kanıtlı; kayıt: `docs/SPRINT-LOG.md`, arşiv:
+  `.deckent/archive/sprints/sprint-537-tasks/`). Önceki wave: Sprint-533 local-llm GPU
+  closure — COMPLETE.
+- Aktif mode authority: `AGENTS.md`/`CLAUDE.md` başındaki machine-readable
+  `DECKENT-DEV-CONTROL` bloğu (capsule/DIRECTIVES mode authority DEĞİLDİR). Aktif outcome
+  kaydı: `docs/execution/active/` altındaki Outcome Capsule'lar.
+- Repo-development çalışma kontratı: `docs/governance/deckent-dev-operating-policy.md`
+  (host'lara OPERATING-POLICY bloğu olarak projekte edilir; parity
+  `scripts/lint-operating-policy.mjs` ile lint:gates içinde machine-enforced'tur).
 
-## Execution Contract
-
-- No build and no repository-wide/full-suite test run during this sprint.
-- Effective concurrency is one; no parallel writer.
-- The only writable PROJECT-CONTENT path is docs/execution/canary/CANARY-NOTE.md;
-  any other project-content write is a boundary violation. Protocol-owned
-  .tasks artifacts (your .plan, .result, .hb heartbeat) are required protocol
-  writes and are NOT project content.
-- Echo the policy digest in your .result as runPolicyEvidence exactly as the
-  prompt's Result contract instructs.
-
-## Task 1: Canary no-op doc touch
-- Files: docs/execution/canary/CANARY-NOTE.md
-- Scope: docs/execution/canary/
-
-### Description
-Create docs/execution/canary/CANARY-NOTE.md with the single line
-"run-policy canary executed" and nothing else. Do not modify any other
-project-content file.
+`DOGFOOD_MODE=ON` bir run başlatıldığında bu dosya o run'ın exact execution projection'ı
+olarak yeniden üretilir; o ana kadar boş/idle kalır.
