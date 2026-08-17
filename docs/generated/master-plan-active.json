@@ -3,25 +3,25 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6da553c80264edf9b7eb014a56b9fb023e0c2c475cf5dd9500bbf782aa8f06ae"
+    "value": "07b935a2776dc1ae36cffc011bbf4cba342cf27e50a272a6c53603beaf0084da"
   },
   "summary": {
-    "total": 492,
-    "active": 430,
+    "total": 495,
+    "active": 433,
     "terminal": 62,
     "receipts": 184,
     "byState": {
-      "OPEN": 338,
+      "OPEN": 340,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 24,
+      "VERIFY": 25,
       "DONE": 62,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 320,
+      "P0": 323,
       "P1": 135,
       "P2": 37
     },
@@ -48,10 +48,10 @@
       "OPS": 6,
       "PAEP": 35,
       "PRODUCT": 18,
-      "PROMPT": 5,
+      "PROMPT": 6,
       "PROVIDER": 6,
       "RELEASE": 4,
-      "REPO": 1,
+      "REPO": 3,
       "RESILIENCE": 1,
       "ROUTING": 8,
       "SCALE": 1,
@@ -4773,6 +4773,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 7140,
+      "id": "RUN-POLICY-DELIVERY-001",
+      "program": "PROMPT",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-16",
+      "definitionDigest": "db257570be7d97728b470b283e0b57eeed3b09e3680f8ba7122539a72c7fbad7",
+      "progressDigest": "522952d294966f5233c1b0cde332a73984cc95ae66943386e56b711a4c2f7802",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 8000,
       "id": "EVERY-ENV-001",
       "program": "XPLAT",
@@ -5001,6 +5012,28 @@
       "updated": "2026-08-08",
       "definitionDigest": "1e188212532953030474164132aa2121d9645219fa62bc0749908fb008e70022",
       "progressDigest": "2fe6bedbd42505482f54ede2d93dac7e2210865c05f6374c37febdba71f93bfd",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8100,
+      "id": "CI-POSTMERGE-127-TRUTH-001",
+      "program": "REPO",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-08-16",
+      "definitionDigest": "fb4025e4ef013dacf37dee85fc1aa75f8ca2949e5d59578e854b3c1b7b75d6b1",
+      "progressDigest": "68a4c885d647108c430689869159600150d1275f521e566850c207bdcd5ec95c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8101,
+      "id": "DEV-OPERATING-CONTRACT-001",
+      "program": "REPO",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-16",
+      "definitionDigest": "f895757df4df32b399634485023cad58df9c773854f7c0459db88ee3bb51bc69",
+      "progressDigest": "5b2716164315a9416bf4835ebfdf3edcac8cc22bb5f60b110e818cbe15f3e152",
       "terminalClosureDigest": null
     },
     {
@@ -21854,7 +21887,8 @@
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
-        "AGENT-RUNTIME-ADAPTER-001"
+        "AGENT-RUNTIME-ADAPTER-001",
+        "RUN-POLICY-DELIVERY-001"
       ],
       "gates": [
         "G2",
@@ -21894,7 +21928,8 @@
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
-        "AGENT-RUNTIME-ADAPTER-001"
+        "AGENT-RUNTIME-ADAPTER-001",
+        "RUN-POLICY-DELIVERY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Provenance, install, permissions, sandbox, update, revoke and quarantine are one trust plane",
@@ -22879,6 +22914,42 @@
       "updated": "2026-08-04"
     },
     {
+      "order": 7140,
+      "id": "RUN-POLICY-DELIVERY-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "PROMPT",
+      "outcome": "Provider-neutral run-policy delivery — task-carried runPolicyAuthority with settlement digest parity (Paket B)",
+      "priority": "P0",
+      "dependsOn": [
+        "DEV-OPERATING-CONTRACT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "-",
+        "X": "-",
+        "S": "-"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "DEV-OPERATING-CONTRACT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "486-017 producer'ı (buildRunPolicyAuthorityBlock, prompt-god-template.ts — bugün \"empty until the caller wires\" durumunda) production consumer'ını 487-026 task-carried pattern'iyle kazanır (ctx-injection ASLA: \"can never be gated off by caller wiring drift\"): plan-time resolver → task.runPolicy digest → her provider için (Codex/Fable/Qwen) byte-identical compiled prompt → .result gözlenen policy digest'i taşır → settlement aynı digest'i doğrular; hermetic provider-parity testi identical digest'leri kanıtlar; CI green-class adlandırması + canonical verify manifest merge-queue authority açığını kapatır (2026-08-04/535 owner kararıyla çelişmeden amendment olarak); DONE ek şartı: tek no-op dogfood canary terminal settlement (DOGFOOD ON-dönüş koşulu)",
+      "evidence": "Owner approval c (Alperen 2026-08-17): ürün kodu olarak yazılır, repo-local script değil — deckent-dev ilk tenant'tır; DUAL LENS gereği aynı mekanizma son kullanıcının org-policy-her-provider'a-aynı-bitlerle-gider enterprise ihtiyacıdır. Kanıt zinciri işaretleri: prompt-god-template.ts:1706 (unwired yorum), task-builder.ts exactExecutionAuthority kontrast-pattern'i, execution-authority.jsonl audit izi",
+      "updated": "2026-08-16"
+    },
+    {
       "order": 8000,
       "id": "EVERY-ENV-001",
       "parent": "P08",
@@ -22904,7 +22975,9 @@
         "DOCS-TRUTH-PASS-001",
         "LAUNCH-COMMS-001",
         "DOCS-VISION-001",
-        "DOCS-VISION-002"
+        "DOCS-VISION-002",
+        "CI-POSTMERGE-127-TRUTH-001",
+        "DEV-OPERATING-CONTRACT-001"
       ],
       "gates": [
         "G2",
@@ -22935,7 +23008,9 @@
         "NPM-CHANNEL-001",
         "DOCS-TRUTH-PASS-001",
         "LAUNCH-COMMS-001",
-        "DOCS-VISION-002"
+        "DOCS-VISION-002",
+        "CI-POSTMERGE-127-TRUTH-001",
+        "DEV-OPERATING-CONTRACT-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Supported/degraded/unsupported matrix for every declared component and surface",
@@ -23704,6 +23779,70 @@
       "acceptance": "Aylık scorecard + Naive/Ruflo/Orca/Cline/GitHub/Codex/Paperclip adlandırılmış-olay tetikleyicileriyle yeniden-analiz kaydı; her tur codex-analysis benzeri artefakt üretir",
       "evidence": "2026-08-08: ilk örnek codex-analysis/competition-2026-08-07; süreç satırı olarak açıldı",
       "updated": "2026-08-08"
+    },
+    {
+      "order": 8100,
+      "id": "CI-POSTMERGE-127-TRUTH-001",
+      "parent": "EVERY-ENV-001",
+      "program": "REPO",
+      "outcome": "Post-#127 main truth closure — hermetic docker-probe pin + ingress baseline realign",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "-",
+        "X": "-",
+        "S": "-"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Main-push Shards Green red is closed by a bounded incident package with zero feature scope; the flake class is pinned via the designed test seam and the report-only ingress baseline realigned through its own --write flow; satır DONE'a yalnız MAIN_POSTMERGE_GREEN kanıtıyla geçer, required-green ile asla",
+      "evidence": "`historical-authority=pr-129-postmerge-truth-closure-merge-7f8fa399b;historical-gates=G1;proof=hostile-and-normal-probe-pin-25of25-plus-docs-scripts-1748of1748-plus-lint-gates-green`; PR #129 merged (fix/postmerge-main-truth-closure, f40c08733 → merge 7f8fa399b). Root cause: provider-flow \"(modernized)\" auto-mode testleri spawn-backend-docker.js'i mock'lar fakat KN2 capability probe'u (2026-08-08 dogfood kararı) resolveBackend('auto')'yu mock'un kapsamadığı gerçek process-memoize'lu docker-info probe'una bağlar — 2s probe penceresini kaçıran runner 'subprocess' çözer; tmux-deprecation.test.ts aynı unpinned sınıftaydı. Deterministic repro: PATH-shimmed failing docker binary aynı CI assertion'larını lokalde birebir üretti; fix mevcut _resetDockerProbeForTests seam'iyle pinler (pattern tests/core/spawn-backend.test.ts:257). Baseline: operation-ingress 691→693 (2 fs-write sitesi, genesis-anchor.mjs) resmi --write akışıyla. UNRELATED finding kaydı: Cross-Platform E2E main'de #125'ten beri kırmızı (Packed Install win/mac + E2E macos/tmux) — bu paketin kapsamı dışında, owner admission bekler",
+      "updated": "2026-08-16"
+    },
+    {
+      "order": 8101,
+      "id": "DEV-OPERATING-CONTRACT-001",
+      "parent": "EVERY-ENV-001",
+      "program": "REPO",
+      "outcome": "Owner-approved dev operating contract — canonical policy, host projection parity gate, capsule lifecycle, law 3/4/6 amendments",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "RUN-POLICY-DELIVERY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "-",
+        "X": "-",
+        "S": "-"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "docs/governance/deckent-dev-operating-policy.md tek canonical'dır (DOGFOOD_MODE authority + DEGRADED/ADR-D-007 lane, bir-outcome-bir-chat-bir-worktree-bir-PR, üç-sınıf finding disposition, audit sınırı, dört-sınıf CI yeşil taksonomisi, versioned handoff receipt, kanun 3/4/6 amendment metinleri); AGENTS.md ve CLAUDE.md OPERATING-POLICY bloğu byte-identical'dır ve scripts/lint-operating-policy.mjs lint:gates içinde sha256 digest raporuyla enforce eder; docs/execution/active capsule hygiene (şema alanları, filename=OUTCOME_ID, owner-admission=MASTER satırı şartı, delete-on-consume) machine-checked'tir; core-memory kanun 3/4/6 dosyaları amendment'lı, DIRECTIVES idle truth-sync'li",
+      "evidence": "Owner approvals a-d (Alperen 2026-08-17; DOGFOOD_MODE=OFF; execution izole worktree agent/dev-operating-contract branch'inde, PR review/merge akışı bu satırın ledger admission yoludur — state OPEN ledger-yetki durumudur, hazırlık kanıtı bu hücrededir). Gate + 11 hermetic test (tests/scripts/lint-operating-policy.test.ts) yeşil; hermeticity baseline realign +94 unresolved (script+test çifti) ve +1 production inventory (script, suite'i üzerinden test-support production dependency; package.json digest bileşeni) ampirik atıfla belgelendi; records residue disposition commit 8c887987d (sprint-525 seam + sprint-532 review/disposition + sprint-533 SPRINT-LOG/CHANGELOG/DIRECTIVES + exports/manifests; canlı runtime DB'ler bilinçli hariç). Capsule: docs/execution/active/DEV-OPERATING-CONTRACT-001.md; DONE = PR merge + capsule silinmesi",
+      "updated": "2026-08-16"
     },
     {
       "order": 9000,
@@ -25502,6 +25641,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6e5b15db5440cb12a5a4842176226f92ea5868331f41f1755b0dd6cef12483a7"
+    "value": "4f9116e85528b87421f535d55a4bae5fec03c7ddc612faf2b8d6da02218b6a5d"
   }
 }

@@ -263,8 +263,15 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 12865; the digest folds BOTH change sets and is recomputed on the merged tree,
   // verified build-free. Prior: CLOSURE-OS-GENESIS-ANCHOR-SECURITY-REAUDIT (12865)
   // + LOCAL-LLM-CI-CLOSURE (12863).
-  count: 12865,
-  digest: '932a83e12e4dcbea655e29fb78c279d6847cd5a895f79ab61c945b2656eae9e3',
+  // 2026-08-17 (DEV-OPERATING-CONTRACT-001): +94 — the operating-policy gate
+  // pair enters the graph for the first time: scripts/lint-operating-policy.mjs
+  // (fs read/write/readdir effect sites behind its --check/--write CLI) and the
+  // tmpdir-hermetic suite tests/scripts/lint-operating-policy.test.ts. Delta
+  // attributed empirically: with ONLY these two files moved out, the scan
+  // reproduces the prior 12865:932a83e1… exactly (build-free, dist absent).
+  // Prior: MERGE genesis←main (12865).
+  count: 12959,
+  digest: '2de6a4ba39e9f29ce62a396ce0786ff9d295be3a0294cfa6530ef14c6cf92f57',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -409,8 +416,16 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // to realign with the landed local-llm contracts — no new production module (count
   // unchanged), only content digests shift. Value verified IDENTICAL with dist present
   // and build-free (dist-blind). Prior: OWNER-MODEL-POLICY-LOCAL-LLM (1235).
-  count: 1235,
-  digest: '309c1f2a6b527b6b0f3fac4d3713fc8aff641660de005393276c04cb79cc52a0',
+  // 2026-08-17 (DEV-OPERATING-CONTRACT-001): +1 — scripts/lint-operating-policy.mjs
+  // enters the inventory as a test-support production dependency via its new
+  // tmpdir-hermetic suite (build-dashboard.mjs precedent), and the
+  // already-inventoried package.json gains the lint:operating-policy(:write)
+  // entries + the lint:gates append (digest component). Attributed empirically:
+  // with the script/test pair moved out AND package.json reverted the scan
+  // reproduces 1235:309c1f2a… exactly (build-free).
+  // Prior: LOCAL-LLM-CI-CLOSURE (1235).
+  count: 1236,
+  digest: 'a8e22f948e288a8f278879a61d521f115f377a25aff2e2ac29271842cdc058d1',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
