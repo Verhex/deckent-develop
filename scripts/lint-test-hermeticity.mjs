@@ -276,8 +276,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // (tmpdir fixture writes). Attributed empirically: with ONLY these two files at
   // their prior HEAD the scan reproduces 12959:2de6a4ba… exactly (build-free).
   // Prior: DEV-OPERATING-CONTRACT-001 (12959).
-  count: 13015,
-  digest: '965b9750a8184a609e0f44b47b591edc3dd0a62a06dda30adc4163e57b71b4bc',
+  // 2026-08-17 (RUN-POLICY-DELIVERY-001): +4 — the Paket B suites enter the
+  // graph (run-policy-delivery tmpdir fixture read/write sites + the core
+  // authority/settlement suite). Structurally attributed: the only
+  // graph-relevant edits in this slice are the two new suites and the
+  // production modules they import (which land in the production inventory,
+  // not here). Prior: DEV-CONTROL amendment (13015).
+  count: 13019,
+  digest: '1d9e110b68909c6dbb57ff53753fb49c3c5522ed7ea3cbc6032dab0155e5a615',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -433,8 +439,14 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (DEV-CONTROL amendment): same 1236 count, digest only —
   // already-inventoried lint-operating-policy.mjs gains the DECKENT-DEV-CONTROL
   // parser/validator content. Prior: DEV-OPERATING-CONTRACT-001 (1236).
-  count: 1236,
-  digest: '8636232423d9797d91190a26aa2318b54a40c640a90fc4b875d606af432eb249',
+  // 2026-08-17 (RUN-POLICY-DELIVERY-001): +1 — src/orchestra/run-policy-resolver.ts
+  // enters the inventory as the plan-time run-policy producer consumed by the new
+  // Paket B suites; already-inventoried task-types/settlement/schema/planner/
+  // debt-manager/prompt-god-template/task-builder/result-evaluator content
+  // digests shift with the task-carried delivery chain (digest component).
+  // Prior: DEV-CONTROL amendment (1236).
+  count: 1237,
+  digest: '912e1ada23eaa012e679890f3aa95dc5cecbc9ffe33dc895be0740074b91df24',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

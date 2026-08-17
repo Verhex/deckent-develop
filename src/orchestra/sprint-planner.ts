@@ -51,6 +51,7 @@ import { preflightCriticalDebt } from './debt-preflight.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import { readFileSafe, extractGoNogoCriteria } from './sprint-utils.js';
+import { resolveRunPolicyFromDirectives } from './run-policy-resolver.js';
 import { resolveCanonicalModelIdentity } from '../core/model-registry.js';
 
 // ─── Core — provider abstraction ──────────────────────────────────
@@ -1070,6 +1071,19 @@ export async function planSprint(
   }
 
   const plannerProof = buildPlannerProof(usedMode);
+
+  // ── RUN-POLICY-DELIVERY-001: task-carried run policy ──────────────────
+  // Resolve the run's binding execution policy ONCE at plan time and stamp the
+  // identical digest-bound snapshot on EVERY task in this sprint — ai,
+  // structured, fallback and injected-debt paths alike converge here, so no
+  // creation path can drift out of the policy (487-026 task-carried pattern).
+  // FIX attempts inherit the parent task's snapshot (debt-manager) instead of
+  // re-resolving, so a mid-run DIRECTIVES edit can never silently supersede
+  // the policy a run was admitted under.
+  const runPolicy = resolveRunPolicyFromDirectives(context.directives);
+  if (runPolicy) {
+    for (const stampTarget of tasks) stampTarget.runPolicy = runPolicy;
+  }
 
   return {
     id: sprintId,

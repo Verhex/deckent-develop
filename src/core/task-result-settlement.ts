@@ -39,8 +39,11 @@ import type { ProviderBillingEvidence } from './provider-billing-evidence.js';
 import { deckentPath } from './state-paths.js';
 import {
   createProductionWiringPlanEvidence,
+  createRunPolicyPlanAuthority,
   type ProductionWiringPlanEvidence,
   type ProductionWiringResultEvidence,
+  type RunPolicyPlanAuthority,
+  type RunPolicyResultEvidence,
 } from './task-types.js';
 import type { ExecutionBudget } from './work-model.js';
 
@@ -352,6 +355,56 @@ export function settleProductionWiringResultEvidence(input: {
     contractDigest: expectedPlan.contractDigest,
     evidenceRefs: [...hostConsumerExecution.evidenceRefs],
   };
+}
+
+/** Typed outcome of expected-vs-observed run-policy digest settlement. */
+export type RunPolicyResultSettlementDecision =
+  | { readonly state: 'POLICY_PARITY'; readonly policyDigest: string }
+  | {
+      readonly state: 'HOLD';
+      readonly reason:
+        | 'invalid-plan-authority'
+        | 'missing-worker-policy-evidence'
+        | 'invalid-worker-policy-evidence'
+        | 'policy-digest-mismatch';
+    };
+
+/**
+ * Settle a worker's run-policy digest echo against the exact task-carried plan
+ * authority (RUN-POLICY-DELIVERY-001). The plan digest is recomputed from the
+ * carried constraint bytes — a tampered snapshot can never settle — and a
+ * missing or different observed digest is a typed HOLD, never a silent pass.
+ */
+export function settleRunPolicyResultEvidence(input: {
+  readonly plan: RunPolicyPlanAuthority;
+  readonly workerEvidence?: RunPolicyResultEvidence;
+}): RunPolicyResultSettlementDecision {
+  let expected: RunPolicyPlanAuthority;
+  try {
+    expected = createRunPolicyPlanAuthority({
+      constraints: input.plan.constraints,
+      ...(input.plan.sourceRef !== undefined ? { sourceRef: input.plan.sourceRef } : {}),
+    });
+  } catch {
+    return { state: 'HOLD', reason: 'invalid-plan-authority' };
+  }
+  if (input.plan.version !== expected.version || input.plan.policyDigest !== expected.policyDigest) {
+    return { state: 'HOLD', reason: 'invalid-plan-authority' };
+  }
+  const workerEvidence = input.workerEvidence;
+  if (!workerEvidence) return { state: 'HOLD', reason: 'missing-worker-policy-evidence' };
+  if (
+    workerEvidence.version !== expected.version
+    || workerEvidence.observedBy !== 'worker'
+    || typeof workerEvidence.observedPolicyDigest !== 'string'
+    || !/^[a-f0-9]{64}$/.test(workerEvidence.observedPolicyDigest)
+  ) {
+    return { state: 'HOLD', reason: 'invalid-worker-policy-evidence' };
+  }
+  if (workerEvidence.observedPolicyDigest !== expected.policyDigest) {
+    return { state: 'HOLD', reason: 'policy-digest-mismatch' };
+  }
+  return { state: 'POLICY_PARITY', policyDigest: expected.policyDigest };
 }
 
 const DOCKER_CONTAINER_PREFIX = 'deckent-w-';

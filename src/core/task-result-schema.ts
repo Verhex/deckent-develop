@@ -90,6 +90,13 @@ export const productionWiringResultEvidenceSchema = z.object({
   evidence: nonCompleteWiringEvidenceSchema,
 });
 
+/** Run-policy digest echo — a worker can only OBSERVE the policy, never settle it. */
+export const runPolicyResultEvidenceSchema = z.object({
+  version: z.literal(1),
+  observedPolicyDigest: sha256DigestSchema,
+  observedBy: z.literal('worker'),
+});
+
 /** Downstream orchestrator evidence; additive and absent before cross-verification. */
 export const crossVerifyEvidenceSchema = z.union([
   z.object({
@@ -312,6 +319,7 @@ export const taskResultSchema = z.object({
   honestGate: honestGateSchema.default({ flagged: false, violation: null }),
   crossVerify: crossVerifyEvidenceSchema.optional(),
   productionWiringEvidence: productionWiringResultEvidenceSchema.optional(),
+  runPolicyEvidence: runPolicyResultEvidenceSchema.optional(),
 
   // comms (optional)
   handoffNotes: z.string().nullable().default(null),

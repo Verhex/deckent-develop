@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "41e3a59a997746b082c4a4c6065b36b939c93db61c68e10ece72c16c3189943e"
+    "value": "71006a35d3d43c52ea026942f69f82934542f58ecee959979347ee56ee26bd3d"
   },
   "summary": {
     "total": 495,
@@ -4778,9 +4778,9 @@
       "program": "PROMPT",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-16",
+      "updated": "2026-08-17",
       "definitionDigest": "db257570be7d97728b470b283e0b57eeed3b09e3680f8ba7122539a72c7fbad7",
-      "progressDigest": "522952d294966f5233c1b0cde332a73984cc95ae66943386e56b711a4c2f7802",
+      "progressDigest": "c7f4cd441be7670f68666c466d2f9eb4699fcfc8e21ff61d723c863fca1bbdab",
       "terminalClosureDigest": null
     },
     {
@@ -22946,8 +22946,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "486-017 producer'ı (buildRunPolicyAuthorityBlock, prompt-god-template.ts — bugün \"empty until the caller wires\" durumunda) production consumer'ını 487-026 task-carried pattern'iyle kazanır (ctx-injection ASLA: \"can never be gated off by caller wiring drift\"): plan-time resolver → task.runPolicy digest → her provider için (Codex/Fable/Qwen) byte-identical compiled prompt → .result gözlenen policy digest'i taşır → settlement aynı digest'i doğrular; hermetic provider-parity testi identical digest'leri kanıtlar; CI green-class adlandırması + canonical verify manifest merge-queue authority açığını kapatır (2026-08-04/535 owner kararıyla çelişmeden amendment olarak); DONE ek şartı: tek no-op dogfood canary terminal settlement (DOGFOOD ON-dönüş koşulu)",
-      "evidence": "Owner approval c (Alperen 2026-08-17): ürün kodu olarak yazılır, repo-local script değil — deckent-dev ilk tenant'tır; DUAL LENS gereği aynı mekanizma son kullanıcının org-policy-her-provider'a-aynı-bitlerle-gider enterprise ihtiyacıdır. Kanıt zinciri işaretleri: prompt-god-template.ts:1706 (unwired yorum), task-builder.ts exactExecutionAuthority kontrast-pattern'i, execution-authority.jsonl audit izi",
-      "updated": "2026-08-16"
+      "evidence": "PHASE-2 implementation LANDED bu satırın production zinciriyle: resolver (run-policy-resolver.ts, DIRECTIVES \"## Execution Contract\") → planSprint tek choke-point stamp (ai+structured+fallback+injected-debt yolları) → task.runPolicy carriage + debt-manager FIX inheritance ×2 → prompt-god-template task-carried render (ctx-injection KALDIRILDI) + worker digest-echo result kontratı → runPolicyEvidence şeması → settleRunPolicyResultEvidence (recompute, typed HOLD) → gateRunPolicyParityVerdict evaluateWithRubric İÇİNDE (her ingress, FIX dahil) → execution-authority.jsonl kind=run-policy-authority durable audit. Kanıt: 20/20 hermetic matrix (create/bounds/settlement/tamper + resolver + provider-parity Codex/Fable/Qwen byte-identical + FIX-identical + audit + evaluator gate), tsc 0 hata. Owner approval c (Alperen 2026-08-17): ürün kodu olarak yazılır, repo-local script değil — deckent-dev ilk tenant'tır; DUAL LENS gereği aynı mekanizma son kullanıcının org-policy-her-provider'a-aynı-bitlerle-gider enterprise ihtiyacıdır. Kanıt zinciri işaretleri: prompt-god-template.ts:1706 (unwired yorum), task-builder.ts exactExecutionAuthority kontrast-pattern'i, execution-authority.jsonl audit izi",
+      "updated": "2026-08-17"
     },
     {
       "order": 8000,
@@ -25641,6 +25641,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9fbcf4fb1e39f894d2569ef173a0cbfb7e33ac65b5797728b62d026b41f83768"
+    "value": "f9a36815bccafb26da38bb2bc4e27cdc9d3e8917e215908b6503cb23b03fd381"
   }
 }

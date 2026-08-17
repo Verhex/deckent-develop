@@ -9,7 +9,7 @@ Sıra (dependency-ordered; owner onayı Alperen 2026-08-17):
    PR #129 MERGED (7f8fa399b); DONE = MAIN_POSTMERGE_GREEN kanıtı.
 2. **DEV-OPERATING-CONTRACT-001** (8101) — Paket A MERGED (PR #130 → a9018571d) + 2026-08-17 direct-main amendment; satır VERIFY.
    Capsule: `DEV-OPERATING-CONTRACT-001.md` (bu dizin). DOGFOOD_MODE=OFF.
-3. **RUN-POLICY-DELIVERY-001** (7140) — Paket B: task-carried runPolicyAuthority delivery
+3. **RUN-POLICY-DELIVERY-001** (7140) — Paket B implementation LANDED (capsule bu dizinde); CANARY_READY owner gate bekleniyor
    (ürün kodu; 487-026 pattern) + provider digest-parity hermetic proof + CI green-class
    authority kapanışı + no-op dogfood canary (ON-dönüş koşulu). Capsule başlangıcında yazılır.
 4. **Phase-5 writer** (Closure OS — mevcut MASTER closure satırları üzerinden; DOGFOOD mode

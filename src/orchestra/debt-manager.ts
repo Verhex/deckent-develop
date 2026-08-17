@@ -776,6 +776,9 @@ export function handleEvaluation(
     sprintId: task.sprintId,
     isPriorityFix: true,
     fixForTaskId: task.id,
+    // RUN-POLICY-DELIVERY-001: a FIX attempt inherits the parent's exact
+    // digest-bound run policy — never re-resolved, never silently dropped.
+    ...(task.runPolicy !== undefined ? { runPolicy: task.runPolicy } : {}),
     assignedAgent: fixAgent,
     forceAgent: fixAgent,
     assignedSkills: rotatedSkills,
@@ -901,6 +904,9 @@ export function handleCrossDependencies(
           sprintId: depTask.sprintId,
           isPriorityFix: true,
           fixForTaskId: depId,
+          // RUN-POLICY-DELIVERY-001: cross-dependency FIX inherits the parent's
+          // exact digest-bound run policy (same rule as the primary fix site).
+          ...(depTask.runPolicy !== undefined ? { runPolicy: depTask.runPolicy } : {}),
           assignedAgent: rotationStrategy.rotatedAgent,
           forceAgent: rotationStrategy.rotatedAgent,
           assignedSkills: rotatedSkills,

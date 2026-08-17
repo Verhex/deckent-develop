@@ -2402,6 +2402,31 @@ export function buildWorkerPrompt(
     }
   }
 
+  // RUN-POLICY-DELIVERY-001: durable audit evidence that this compile carried
+  // the task's digest-bound run policy — same append-only jsonl the exact-plan
+  // authority uses (no parallel audit store), `kind`-tagged for disambiguation.
+  if (task.runPolicy) {
+    try {
+      const auditDir = join(projectRoot, '.deckent', 'runtime', 'prompt-authority');
+      mkdirSync(auditDir, { recursive: true });
+      appendFileSync(
+        join(auditDir, 'execution-authority.jsonl'),
+        `${JSON.stringify({
+          schemaVersion: 1,
+          kind: 'run-policy-authority',
+          taskId: task.id,
+          policyDigest: task.runPolicy.policyDigest,
+          constraintCount: task.runPolicy.constraints.length,
+          ...(task.runPolicy.sourceRef !== undefined ? { sourceRef: task.runPolicy.sourceRef } : {}),
+          recordedAt: new Date().toISOString(),
+        })}\n`,
+        'utf-8',
+      );
+    } catch (e) {
+      debugLog('buildWorkerPrompt:runPolicyAuthorityAudit', e);
+    }
+  }
+
   const promptDependencyIds = resolvePromptDependencyIds(projectRoot, task);
   const dependencyResults = promptDependencyIds.length > 0
     ? collectDependencyResultEntries(projectRoot, task.sprintId)

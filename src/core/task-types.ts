@@ -398,6 +398,93 @@ export function createProductionWiringPlanEvidence(
   };
 }
 
+// ─── Run-policy authority (486-017 producer → RUN-POLICY-DELIVERY-001 consumer) ──
+
+export const RUN_POLICY_AUTHORITY_VERSION = 1 as const;
+
+/** Bounds: an authority is a digest-addressed constraint set, never a document dump. */
+export const RUN_POLICY_MAX_AUTHORITY_CONSTRAINTS = 64;
+export const RUN_POLICY_MAX_AUTHORITY_CONSTRAINT_CHARS = 500;
+
+/**
+ * Task-carried, plan-time-resolved run execution policy (487-026 pattern:
+ * carried ON the task so the compiled block "can never be gated off by caller
+ * wiring drift"; the same snapshot renders for the original attempt and every
+ * FIX/retry attempt). Source-neutral: a DIRECTIVES-backed sprint resolves its
+ * `## Execution Contract`, but any run ingress may supply an authority.
+ * `policyDigest` is authored ONLY by {@link createRunPolicyPlanAuthority};
+ * plan admission recomputes and rejects a mismatch fail-closed.
+ */
+export interface RunPolicyPlanAuthority {
+  readonly version: typeof RUN_POLICY_AUTHORITY_VERSION;
+  readonly policyDigest: string;
+  /** Short, human-readable constraint summaries — never raw source bytes. */
+  readonly constraints: readonly string[];
+  /** Human-readable pointer to the digest's source — never the source content. */
+  readonly sourceRef?: string;
+}
+
+/**
+ * Worker-observed run-policy evidence: a digest echo ONLY. It is structurally
+ * incapable of claiming compliance — settlement compares expected == observed
+ * and a missing or different digest is a typed parity HOLD, never a silent pass.
+ */
+export interface RunPolicyResultEvidence {
+  readonly version: typeof RUN_POLICY_AUTHORITY_VERSION;
+  readonly observedPolicyDigest: string;
+  readonly observedBy: 'worker';
+}
+
+/** Thrown when an authored constraint set violates the bounded-authority contract. */
+export class RunPolicyAuthorityBoundsError extends TypeError {
+  constructor(reason: string) {
+    super(`Run-policy authority out of bounds: ${reason}`);
+    this.name = 'RunPolicyAuthorityBoundsError';
+  }
+}
+
+/**
+ * Build the only supported run-policy authority shape; callers never author the
+ * digest. Fail-closed: an empty or blank constraint set can never produce an
+ * authority (the no-silent-empty rule), and bounds violations throw.
+ */
+export function createRunPolicyPlanAuthority(input: {
+  readonly constraints: readonly string[];
+  readonly sourceRef?: string;
+}): RunPolicyPlanAuthority {
+  const constraints = input.constraints.map(c => c.trim());
+  if (constraints.length === 0) {
+    throw new RunPolicyAuthorityBoundsError('constraint set is empty');
+  }
+  if (constraints.length > RUN_POLICY_MAX_AUTHORITY_CONSTRAINTS) {
+    throw new RunPolicyAuthorityBoundsError(
+      `${constraints.length} constraints exceed the ${RUN_POLICY_MAX_AUTHORITY_CONSTRAINTS} cap`,
+    );
+  }
+  for (const constraint of constraints) {
+    if (constraint.length === 0) throw new RunPolicyAuthorityBoundsError('blank constraint');
+    if (constraint.length > RUN_POLICY_MAX_AUTHORITY_CONSTRAINT_CHARS) {
+      throw new RunPolicyAuthorityBoundsError(
+        `constraint exceeds ${RUN_POLICY_MAX_AUTHORITY_CONSTRAINT_CHARS} chars`,
+      );
+    }
+  }
+  const sourceRef = input.sourceRef?.trim();
+  if (sourceRef !== undefined && sourceRef.length === 0) {
+    throw new RunPolicyAuthorityBoundsError('sourceRef present but blank');
+  }
+  const canonicalPayload = sourceRef === undefined
+    ? { constraints }
+    : { constraints, sourceRef };
+  const policyDigest = createHash('sha256').update(canonicalJson(canonicalPayload)).digest('hex');
+  return {
+    version: RUN_POLICY_AUTHORITY_VERSION,
+    policyDigest,
+    constraints,
+    ...(sourceRef !== undefined ? { sourceRef } : {}),
+  };
+}
+
 export const POST_SETTLEMENT_PLAN_PROJECTION_VERSION = 1 as const;
 export const POST_SETTLEMENT_PLAN_PROJECTION_KIND = 'post-settlement-plan-projection' as const;
 
@@ -629,6 +716,14 @@ export interface Task {
   budgetPolicy?: TaskExecutionBudgetPolicySnapshot;
   /** Digest-bound production-wiring authority supplied by the planner/host. */
   productionWiring?: ProductionWiringPlanEvidence;
+  /**
+   * Task-carried run execution policy (RUN-POLICY-DELIVERY-001). Resolved once
+   * at plan time for the whole run and stamped on every task, so the compiled
+   * prompt reads it from the task itself — never from caller context — and FIX
+   * attempts inherit the identical digest. Absent only when the run declares no
+   * policy source; an existing-but-empty source fails plan-time, never here.
+   */
+  runPolicy?: RunPolicyPlanAuthority;
   /**
    * Digest-bound post-settlement promotion-proof declaration (488-014),
    * parsed from a `- PromotionProof:` directive line. Represented separately
@@ -958,6 +1053,8 @@ export interface TaskResult {
   crossVerify?: CrossVerifyEvidence;
   /** Non-authoritative worker observations bound to the task's plan contract. */
   productionWiringEvidence?: ProductionWiringResultEvidence;
+  /** Worker's digest echo of the task-carried run policy; parity-verified at settlement. */
+  runPolicyEvidence?: RunPolicyResultEvidence;
 }
 
 // ─── TaskPlan ────────────────────────────────────────────────────────

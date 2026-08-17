@@ -7,7 +7,7 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import type { ProductionWiringPlanEvidence, Task, TaskScope } from '../core/task-types.js';
+import type { ProductionWiringPlanEvidence, RunPolicyPlanAuthority, Task, TaskScope } from '../core/task-types.js';
 import {
   PRODUCTION_WIRING_EVIDENCE_VERSION,
   createProductionWiringPlanEvidence,
@@ -239,18 +239,6 @@ export interface SprintContext {
   trackedFiles?: string[];
   /** Digest-bound execution directive for an approved exact RunFlow. */
   exactExecutionAuthority?: WorkerExactExecutionAuthority;
-  /**
-   * Digest-addressed evidence of this RUN's binding execution constraints
-   * (486-017 — e.g. a DIRECTIVES-backed sprint's `## Execution Contract`).
-   *
-   * Unlike {@link exactExecutionAuthority} (a per-flow/per-task exact-plan
-   * binding), this is the SAME value for every task compiled from this run —
-   * caller-resolved and injected exactly like {@link toolAllowlist} /
-   * {@link verifyCommands}, so this compiler stays pure and never reads
-   * DIRECTIVES.md or any repository file itself. `undefined` (until the caller
-   * wire lands) → no block, byte-identical to the pre-486-017 prompt.
-   */
-  runPolicyAuthority?: RunPolicyAuthority;
 }
 
 export interface WorkerExactExecutionAuthority {
@@ -268,37 +256,17 @@ export interface WorkerExactExecutionAuthority {
   readonly observedDirectivesSha256?: string;
 }
 
-/** Schema version for {@link RunPolicyAuthority} — bump on any shape change. */
-export const RUN_POLICY_AUTHORITY_SCHEMA_VERSION = 1 as const;
-
 /**
- * Digest-addressed evidence of a run's binding execution constraints (486-017 —
- * "Run-wide prompt policy propagation").
- *
- * For a DIRECTIVES-backed sprint this is the sprint's `## Execution Contract`
- * (no build/full-suite, FIX-lineage rules, scope authority, concurrency ceiling,
- * …), but the shape is source-neutral: any run may supply it. The caller (out of
- * this file's write scope) computes `policyDigest` — a content hash of the
- * canonical constraint set — and a BOUNDED list of short constraint summaries.
- * The digest is the addressing mechanism: a worker or auditor can verify these
- * summaries against the run's recorded policy by digest without this prompt ever
- * reproducing the source document's raw bytes (486-017 NO-GO: "Copying arbitrary
- * DIRECTIVES bytes... unbounded prompt dump").
- *
- * Shared across EVERY task compiled from this run — the same value renders for
- * an original task and every one of its FIX attempts, because both flow through
- * the single {@link buildTaskPromptSegmented} entry point (task-builder.ts has
- * no separate FIX-prompt path), so a FIX prompt can never silently drop or
- * override this policy (486-017 NO-GO: "auto-FIX policy override").
+ * Run-policy authority now lives ON the task (`task.runPolicy`,
+ * {@link RunPolicyPlanAuthority} — RUN-POLICY-DELIVERY-001 closing the 486-017
+ * producer). Task-carried like `task.productionWiring` (487-026), so the block
+ * renders identically on every ingress that compiles this task — the original
+ * attempt and every FIX/retry attempt — and can never be gated off by caller
+ * wiring drift. The digest is the addressing mechanism: constraints are bounded
+ * summaries, never raw source bytes (486-017 NO-GO: unbounded prompt dump).
+ * Kept as an exported alias for the historical 486-017 name.
  */
-export interface RunPolicyAuthority {
-  readonly schemaVersion: typeof RUN_POLICY_AUTHORITY_SCHEMA_VERSION;
-  readonly policyDigest: string;
-  /** Short, human-readable constraint summaries — never the raw source text. */
-  readonly constraints: readonly string[];
-  /** Human-readable pointer to the digest's source (e.g. a file/section name) — never the source content itself. */
-  readonly sourceRef?: string;
-}
+export type RunPolicyAuthority = RunPolicyPlanAuthority;
 
 /**
  * A single inter-worker shared-context entry (Sprint 278 COMM-1 / 278-003).
@@ -574,7 +542,12 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   // workers never know these fields exist (Tasks 1-5 path stays empty).
   const commsInstructionBlock = buildWorkerCommsInstructionBlock(ctx.workerCommsEnabled);
   const executionAuthorityBlock = buildExactExecutionAuthorityBlock(ctx.exactExecutionAuthority);
-  const runPolicyBlock = buildRunPolicyAuthorityBlock(ctx.runPolicyAuthority);
+  // ── 5e. Run Execution Policy (RUN-POLICY-DELIVERY-001) ──────────────
+  // Consumer of the 486-017 producer. Rendered from `task.runPolicy` (never
+  // from ctx — 487-026 pattern) so the SAME digest-bound block is compiled on
+  // every ingress, initial attempt and every FIX attempt alike, and can never
+  // be gated off by caller wiring drift.
+  const runPolicyBlock = buildRunPolicyAuthorityBlock(task.runPolicy);
   // ── 5f. Production Wiring Authority (487-026) ───────────────────────
   // Consumer of the 487-025 plan-time authority carried on the task itself. It is
   // rendered from `task.productionWiring` (never from ctx) so the SAME block is
@@ -1561,7 +1534,8 @@ export function buildRunPolicyAuthorityBlock(authority?: RunPolicyAuthority): st
 Policy digest: sha256:${authority.policyDigest}${sourceLine}
 This run's binding execution constraints — they apply to THIS task and to every original and FIX attempt in this run:
 ${list}${omittedNote}
-Generated goCriteria and Definition-of-Done checklist items may ADD proof obligations for this task, but they never authorize a build, a repository-wide/full-suite test run, or any other action forbidden above, and they can never override or contradict a constraint listed here. Where a generated criterion conflicts with this policy, this policy governs — report the conflict in your result notes rather than silently resolving it either way.`;
+Generated goCriteria and Definition-of-Done checklist items may ADD proof obligations for this task, but they never authorize a build, a repository-wide/full-suite test run, or any other action forbidden above, and they can never override or contradict a constraint listed here. Where a generated criterion conflicts with this policy, this policy governs — report the conflict in your result notes rather than silently resolving it either way.
+Result contract (mandatory): echo this exact policy digest in your .result JSON as \`"runPolicyEvidence": { "version": 1, "observedPolicyDigest": "${authority.policyDigest}", "observedBy": "worker" }\` — settlement verifies expected == observed, and a missing or different digest is a typed parity HOLD.`;
 }
 
 // ─── Production Wiring Authority Block (487-026) ────────────────────────

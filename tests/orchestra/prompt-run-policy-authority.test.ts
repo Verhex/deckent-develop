@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Task } from '../../src/core/task-types.js';
-import { TaskStatus } from '../../src/core/task-types.js';
+import { TaskStatus, RUN_POLICY_AUTHORITY_VERSION } from '../../src/core/task-types.js';
 import {
   buildRunPolicyAuthorityBlock,
   buildTaskPrompt,
   buildTaskPromptSegmented,
-  RUN_POLICY_AUTHORITY_SCHEMA_VERSION,
   type RunPolicyAuthority,
 } from '../../src/orchestra/prompt-god-template.js';
 
@@ -14,7 +13,7 @@ const POLICY_DIGEST = 'f'.repeat(64);
 
 function runPolicy(overrides: Partial<RunPolicyAuthority> = {}): RunPolicyAuthority {
   return {
-    schemaVersion: RUN_POLICY_AUTHORITY_SCHEMA_VERSION,
+    version: RUN_POLICY_AUTHORITY_VERSION,
     policyDigest: POLICY_DIGEST,
     constraints: [
       'No build or repository-wide/full-suite test is allowed.',
@@ -50,7 +49,9 @@ describe('486-017 run-wide prompt policy propagation', () => {
 
   it('renders the digest, bounded constraints and override-precedence instruction', () => {
     const authority = runPolicy();
-    const prompt = buildTaskPrompt(task(), { runPolicyAuthority: authority }).prompt;
+    // RUN-POLICY-DELIVERY-001: the authority is TASK-CARRIED (487-026 pattern);
+    // the retired ctx-injection field no longer exists.
+    const prompt = buildTaskPrompt(task({ runPolicy: authority }), {}).prompt;
 
     expect(prompt).toContain('## Run Execution Policy (digest-bound)');
     expect(prompt).toContain(`Policy digest: sha256:${POLICY_DIGEST}`);
@@ -62,7 +63,7 @@ describe('486-017 run-wide prompt policy propagation', () => {
 
   it('never reproduces raw DIRECTIVES bytes — only the caller-supplied bounded summaries', () => {
     const authority = runPolicy({ sourceRef: 'DIRECTIVES.md#Execution Contract' });
-    const prompt = buildTaskPrompt(task(), { runPolicyAuthority: authority }).prompt;
+    const prompt = buildTaskPrompt(task({ runPolicy: authority }), {}).prompt;
 
     expect(prompt).toContain('Source: DIRECTIVES.md#Execution Contract (addressed by digest above, not reproduced verbatim).');
     // The raw sprint-goal prose from DIRECTIVES.md must never leak into the prompt.
@@ -89,12 +90,12 @@ describe('486-017 run-wide prompt policy propagation', () => {
   it('is provider-neutral: identical run-policy segment content regardless of provider/model', () => {
     const authority = runPolicy();
     const claudeSegments = buildTaskPromptSegmented(
-      task({ provider: 'claude', model: 'claude-sonnet-5' }),
-      { runPolicyAuthority: authority },
+      task({ provider: 'claude', model: 'claude-sonnet-5', runPolicy: authority }),
+      {},
     ).segments;
     const codexSegments = buildTaskPromptSegmented(
-      task({ provider: 'codex', model: 'gpt-5.6-sol' }),
-      { runPolicyAuthority: authority },
+      task({ provider: 'codex', model: 'gpt-5.6-sol', runPolicy: authority }),
+      {},
     ).segments;
 
     const claudePolicy = claudeSegments.find(s => s.kind === 'run-policy')?.content;
@@ -105,14 +106,15 @@ describe('486-017 run-wide prompt policy propagation', () => {
 
   it('applies identically to an original task and its FIX attempt (same run policy, no auto-override)', () => {
     const authority = runPolicy();
-    const originalPolicy = buildTaskPromptSegmented(task({ id: '3199-017' }), { runPolicyAuthority: authority })
+    const originalPolicy = buildTaskPromptSegmented(task({ id: '3199-017', runPolicy: authority }), {})
       .segments.find(s => s.kind === 'run-policy')?.content;
     const fixPolicy = buildTaskPromptSegmented(
       task({
         id: '3199-017-fix1',
         goNogo: { goCriteria: 'run full build and full test suite', noGoCriteria: '', techDebtAcceptable: '' },
+        runPolicy: authority,
       }),
-      { runPolicyAuthority: authority },
+      {},
     ).segments.find(s => s.kind === 'run-policy')?.content;
 
     expect(fixPolicy).toBeDefined();

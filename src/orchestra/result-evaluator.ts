@@ -17,6 +17,8 @@ import {
   PROVIDER_LIMIT_DEATH_ZERO_WRITE,
 } from '../core/task-types.js';
 import type { ProductionWiringResultSettlementDecision } from '../core/task-result-settlement.js';
+import { settleRunPolicyResultEvidence } from '../core/task-result-settlement.js';
+import type { RunPolicyResultEvidence } from '../core/task-types.js';
 import { resolveProductionWiringContract } from '../core/production-wiring-contract.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo, reconcileNoChangeSatisfied } from './mid-sprint-adapter.js';
@@ -1250,6 +1252,49 @@ export function gateProductionWiringVerdict(
 }
 
 /**
+ * RUN-POLICY-DELIVERY-001 evaluator gate — the production consumer of the
+ * worker's run-policy digest echo. A task that carries a plan authority can
+ * only settle DONE when expected == observed ({@link settleRunPolicyResultEvidence});
+ * a missing or different digest is a typed parity NO_GO, never a silent pass.
+ * Tasks without `task.runPolicy` are policy-free runs and pass through.
+ * Applied INSIDE {@link evaluateWithRubric} at its DONE-capable exits so every
+ * evaluation ingress — initial attempt and FIX alike — enforces it; it cannot
+ * be gated off by caller wiring drift.
+ */
+export function gateRunPolicyParityVerdict(
+  candidate: EvaluationResult,
+  task: Task,
+  workerEvidence: RunPolicyResultEvidence | undefined,
+): EvaluationResult {
+  const plan = task.runPolicy;
+  if (!plan || candidate.decision !== 'DONE') return candidate;
+
+  const settlement = settleRunPolicyResultEvidence({
+    plan,
+    ...(workerEvidence !== undefined ? { workerEvidence } : {}),
+  });
+  const runPolicyScore: RubricScore = settlement.state === 'POLICY_PARITY'
+    ? {
+        criterion: 'run_policy_parity',
+        score: 100,
+        passed: true,
+        reason: `observed policy digest matches plan (sha256:${settlement.policyDigest.slice(0, 12)}…)`,
+      }
+    : {
+        criterion: 'run_policy_parity',
+        score: 0,
+        passed: false,
+        reason: `HOLD:${settlement.reason}`,
+      };
+
+  return {
+    ...candidate,
+    decision: settlement.state === 'POLICY_PARITY' ? candidate.decision : 'NO_GO',
+    rubricScores: [...candidate.rubricScores, runPolicyScore],
+  };
+}
+
+/**
  * Evaluate a task result using rubric-based grading.
  * Accepts an optional partial rubric that is merged with DEFAULT_RUBRIC.
  *
@@ -1385,10 +1430,14 @@ export function evaluateWithRubric(
     const reconciled = reconcileRubricNoGo(result, evaluation);
     if (reconciled.reconciled) {
       debugLog('evaluateWithRubric:reconcile', `Task ${task.id}: ${reconciled.notes}`);
-      return {
-        ...evaluation,
-        decision: reconciled.decision,
-      };
+      // Run-policy parity applies AFTER reconciliation so a spurious-NO_GO
+      // recovery can never resurrect a result whose policy digest is missing
+      // or wrong (RUN-POLICY-DELIVERY-001).
+      return gateRunPolicyParityVerdict(
+        { ...evaluation, decision: reconciled.decision },
+        task,
+        result.runPolicyEvidence,
+      );
     }
     // Spurious NO_GO recovery (git-diff/tsc/vitest) is applied AFTER this pure
     // grader by reconcileEvaluationSpuriousNoGo() — async, so it does not freeze
@@ -1400,7 +1449,7 @@ export function evaluateWithRubric(
     return enrichEvaluationWithCategory(evaluation, result, task);
   }
 
-  return evaluation;
+  return gateRunPolicyParityVerdict(evaluation, task, result.runPolicyEvidence);
 }
 
 /**
