@@ -277,6 +277,53 @@ describe('SkillPoolManager', () => {
     });
   });
 
+  // ─── saveGeneratedSkill ────────────────────────────────────────────────────
+
+  describe('saveGeneratedSkill', () => {
+    it('preserves a demoted manifest without re-enabling it', () => {
+      const skill = makeSkill({ id: 'demoted', name: 'Demoted', enabled: true });
+      const demotedAt = '2026-08-17T12:00:00.000Z';
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+        ...skill,
+        enabled: false,
+        _demotedAt: demotedAt,
+      }));
+
+      manager.saveGeneratedSkill(skill, '# Demoted\n');
+
+      const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string);
+      expect(written.enabled).toBe(false);
+      expect(written._demotedAt).toBe(demotedAt);
+    });
+
+    it('keeps fresh generated manifests enabled', () => {
+      const skill = makeSkill({ id: 'fresh', name: 'Fresh', enabled: true });
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+      manager.saveGeneratedSkill(skill, '# Fresh\n');
+
+      const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string);
+      expect(written.enabled).toBe(true);
+    });
+
+    it('preserves unknown fields from an existing manifest', () => {
+      const skill = makeSkill({ id: 'extended', name: 'Extended', enabled: true });
+      const extension = { owner: 'catalog-governance', revision: 7 };
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+        ...skill,
+        extension,
+      }));
+
+      manager.saveGeneratedSkill(skill, '# Extended\n');
+
+      const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string);
+      expect(written.extension).toEqual(extension);
+    });
+  });
+
   // ─── removeSkill ────────────────────────────────────────────────────────────
 
   describe('removeSkill', () => {

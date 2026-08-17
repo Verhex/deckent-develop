@@ -13105,3 +13105,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 544-005: documentation — follow + tail + stream adoption (depends on Tasks 1,2,3) (DONE)
 
 ---
+## Sprint 545 — sprint-545
+
+**Status:** ABORTED
+**Date:** 2026-08-17
+**Duration:** 689s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 689140ms |
+
+### Tasks
+
+- 545-001: finalizer — single canonical outcome→sidecar write, honest recency (DONE)
+- 545-002: skill-pool — PLAN must not overwrite demotion/disposition (DONE)
+- 545-003-fix: Fix: project-conventions → deterministic context segment (depends on Task 2) (PAUSED)
+- 545-003: project-conventions → deterministic context segment (depends on Task 2) (NO_GO)
+- 545-004: one canonical stats read-model for every surface (DONE)
+
+---

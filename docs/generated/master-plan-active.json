@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f5ce8a24537349da3ecb144aed5fd5b4efa5fd60ad4961eb88942e917284e96d"
+    "value": "8a11b86b049da269726bb19b56b772501fa752d7f99824d6e4ed5abe6143b1de"
   },
   "summary": {
     "total": 496,
@@ -4549,7 +4549,7 @@
       "state": "OPEN",
       "updated": "2026-08-17",
       "definitionDigest": "636d42948a631a5ed537486b6d3e1744c39c13dc8c7d58fb1b725069902ea95e",
-      "progressDigest": "68c28c058656aab66fc3258e37f80321d63e6a3185d5af8994cd98b53dba4876",
+      "progressDigest": "3f31849908b18f31b751af54129d2f474efea74c850ed1be2c67a409d5712b96",
       "terminalClosureDigest": null
     },
     {
@@ -22180,7 +22180,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Tek versioned shared schema ve canonical projection service yalnız verified accepted outcome eventlerini stable project, tenant, run, task, attempt, generation, agent, skill, source ve outcome watermark ile işler; uses, success, coverage ve last-used aynı cohort ve ölçüm semantiğini taşır, `lastUsed` yalnız accepted gerçek kullanımda ilerler ve sentetik ölçüm provenance olmadan yazılmaz; bütün generation atomik, CAS/fencing/lock ile concurrent-safe, corruption-quarantine ve immutable eventlerden deterministic rebuild edilebilir olur; unknown/tombstoned entity typed disposition alır; manifest dual-truth kontrollü migration ve cutover receipt'iyle kapanır; CLI, MCP, API, Terminal, dashboard, routing, training ve docs aynı bounded tenant-scoped read modelini tüketir; retention, legal hold, privacy/least-privilege, Linux/macOS/Windows-native/WSL ve million-entity/concurrent-finalizer proof'u pass olur; legacy byte'lar lossless migration+disposition receipt'inden önce rewrite/delete edilmez",
-      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: schemaVersion/generation/source/project/tenant/run/outcome watermark taşımayan shared `catalog-stats.json` 20 agent+28 skill satırı içeriyor; bütün sidecar satırları raw manifestten farklı ve iki skill satırında schema drift var. Agent ve skill modülleri aynı dosyayı duplicate shallow reader ve lock/CAS'siz whole-file read-modify-write ile yönetiyor; atomic rename torn-write'ı azaltıyor fakat multi-process lost-update'ı önlemiyor. Finalizer legacy V2 learnings'i projection kaynağı yapıyor, tarihsel bütün entityleri current sprintte kullanılmış gibi damgalıyor ve 48 entity için dosyayı 48 kez baştan yazıyor. Malformed state sessiz boş ledgera düşüyor; retention/rotation/legal-hold veya generation-level recovery yok. Dosya live pool/API girdisi olduğu için migration receipt'i olmadan silinmez. ACİL ADMISSION (Alperen + Codex analizi, 2026-08-17 — correction package araya alındı): dört yeni delta ile kapsam netleşti: (1) V3 task'lar legacy OutcomeTracker'dan dışlanıyor (sprint-finalizer.ts:3246) — skill başarısı V3'te hiç yazılmıyor; (2) finalizer geçmiş TÜM entity'lere lastUsedInSprint=current damgalıyor (:3351) — yalancı recency; (3) generated `project-conventions` skill'i demote edilse bile her PLAN materialization'ı (skill-pool.ts:1271) enabled:true ile diriltiyor — öğrenme döngüsü kendi kararını bypass ediyor; çözüm: routable/learnable skill'likten çıkarıp deterministic project-context prompt segmentine taşımak; (4) CLI info yüzeyleri sidecar yerine manifest okuyor (skill.ts:665) ve oran Math.round(0.84)=1% gösteriyor (agent.ts:338). Bounded correction package: gerçek inject edilen agent+skill kimlikleri canonical terminal outcome'dan TEK KEZ sidecar'a; lastUsed yalnız kullanılan entity'ye; demotion/disposition PLAN'la ezilmez; list+info+MCP+API tek canonical read-model; yüzde dönüşümü düzelir; V3+FIX+filtered-skill+real-binary CLI kanıtı",
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: schemaVersion/generation/source/project/tenant/run/outcome watermark taşımayan shared `catalog-stats.json` 20 agent+28 skill satırı içeriyor; bütün sidecar satırları raw manifestten farklı ve iki skill satırında schema drift var. Agent ve skill modülleri aynı dosyayı duplicate shallow reader ve lock/CAS'siz whole-file read-modify-write ile yönetiyor; atomic rename torn-write'ı azaltıyor fakat multi-process lost-update'ı önlemiyor. Finalizer legacy V2 learnings'i projection kaynağı yapıyor, tarihsel bütün entityleri current sprintte kullanılmış gibi damgalıyor ve 48 entity için dosyayı 48 kez baştan yazıyor. Malformed state sessiz boş ledgera düşüyor; retention/rotation/legal-hold veya generation-level recovery yok. Dosya live pool/API girdisi olduğu için migration receipt'i olmadan silinmez. ACİL ADMISSION (Alperen + Codex analizi, 2026-08-17 — correction package araya alındı): dört yeni delta ile kapsam netleşti: (1) V3 task'lar legacy OutcomeTracker'dan dışlanıyor (sprint-finalizer.ts:3246) — skill başarısı V3'te hiç yazılmıyor; (2) finalizer geçmiş TÜM entity'lere lastUsedInSprint=current damgalıyor (:3351) — yalancı recency; (3) generated `project-conventions` skill'i demote edilse bile her PLAN materialization'ı (skill-pool.ts:1271) enabled:true ile diriltiyor — öğrenme döngüsü kendi kararını bypass ediyor; çözüm: routable/learnable skill'likten çıkarıp deterministic project-context prompt segmentine taşımak; (4) CLI info yüzeyleri sidecar yerine manifest okuyor (skill.ts:665) ve oran Math.round(0.84)=1% gösteriyor (agent.ts:338). Bounded correction package: gerçek inject edilen agent+skill kimlikleri canonical terminal outcome'dan TEK KEZ sidecar'a; lastUsed yalnız kullanılan entity'ye; demotion/disposition PLAN'la ezilmez; list+info+MCP+API tek canonical read-model; yüzde dönüşümü düzelir; V3+FIX+filtered-skill+real-binary CLI kanıtı. CORRECTION LANDED (sprint-545, 3/4 dogfood-DONE + Brain el-tamamlaması 2026-08-17): finalizer tek-atomik outcome→sidecar yazımı (V3+FIX dahil, lastUsed yalnız kullanılan entity, unknown-field lossless); skill-pool materialization disposition-preserving (demote PLAN'la dirilmez); `project-conventions` skill'likten ÇIKTI → deterministic `=== Project Context ===` prompt segmenti (planner insertion kaldırıldı, collector fallback emekli, runtime dizini arşivde); canonical `catalog-stats-read-model` tüm yüzeylerde (CLI skill/agent info+list, MCP list'ler) — Math.round yüzde bug'ı öldü. Kanıt: 124/124 + 32/32 battery, tsc 0, gates exit 0, gerçek-binary `agent list` %79/81/86/87 sidecar-truth",
       "updated": "2026-08-17"
     },
     {
@@ -25640,6 +25640,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "492827f59d4ca3711760701195d68807c942c92dddb961277903f4a74aec7647"
+    "value": "015aa07eb1381bd74345700eecd2ed67a687ca2e72648d351e6ce4861f933975"
   }
 }

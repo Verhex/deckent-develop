@@ -77,6 +77,12 @@ export interface SprintContext {
   agentId?: string;
   /** Skill prompts to inject */
   skillPrompts?: Array<{ name: string; content: string }>;
+  /**
+   * Deterministic project-context segment (auto-generated conventions content).
+   * Always-on data injected for every worker — NOT a skill: it never enters
+   * routing or stats (CATALOG-STATS-AUTHORITY-001 correction, 2026-08-17).
+   */
+  projectContext?: string;
   /** All accepted ADR entries from memory store */
   allAdrs?: MemoryEntryV2[];
   /** Worker effort level */
@@ -501,6 +507,9 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   const dedupedSkillPrompts = dedupeAgentNamedSkills(ctx.skillPrompts, agentId);
   const skillBlock = buildSkillBlock(dedupedSkillPrompts, skillNames);
 
+  // ── 2b. Project Context Block (deterministic, always-on data — not a skill) ─
+  const projectContextBlock = buildProjectContextBlock(ctx.projectContext);
+
   // ── 3. ADR Block (topN=3, relevance-scored) ─────────────────────────
   // Sprint 182 PQ-5 (F7): threshold-based filtering. ADRs below
   // `ctx.adrMinRelevance` (default DEFAULT_ADR_MIN_RELEVANCE) are dropped, and
@@ -563,6 +572,7 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   const defaultOrder = renderSegments({
     agentBlock,
     skillBlock,
+    projectContextBlock,
     adrBlock,
     scopeBlock,
     depsBlock,
@@ -711,6 +721,17 @@ export function buildSkillBlock(
   // Only emit if we have at least one skill
   if (parts.length <= 1) return '';
   return parts.join('\n') + '\n';
+}
+
+/**
+ * Deterministic project-context section (CATALOG-STATS-AUTHORITY-001
+ * correction, 2026-08-17). The auto-generated conventions content is prompt
+ * DATA injected for every worker — it is not a skill, so it never routes,
+ * never earns stats, and can never be demoted/resurrected by the learning loop.
+ */
+export function buildProjectContextBlock(projectContext: string | undefined): string {
+  if (!projectContext || projectContext.trim() === '') return '';
+  return `=== Project Context ===\n${projectContext.trim()}\n`;
 }
 
 // ─── ADR Block Builder ─────────────────────────────────────────────────
@@ -1666,6 +1687,8 @@ ${PRODUCTION_WIRING_REPORTING_CONTRACT}`;
 interface RenderInput {
   agentBlock: string;
   skillBlock: string;
+  /** Deterministic project-context data block — rendered right after skills. */
+  projectContextBlock: string;
   adrBlock: string;
   scopeBlock: string;
   depsBlock: string;
@@ -2016,7 +2039,7 @@ export function resolveTargetedTestPaths(
 }
 
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
+  const { agentBlock, skillBlock, projectContextBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -2044,6 +2067,7 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   // locked by tests/orchestra/prompt-determinism.test.ts block-order test.)
   // Skills / persona / operative ADRs are the T1 (tenant-project) tier.
   if (skillBlock) push('T1', 'skills', skillBlock);
+  if (projectContextBlock) push('T1', 'project-context', projectContextBlock);
   if (agentBlock) push('T1', 'persona', agentBlock);
   if (adrBlock) push('T1', 'adr', adrBlock);
   // Run-wide policy (486-017): same digest-bound content for every task in this

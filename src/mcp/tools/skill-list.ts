@@ -1,5 +1,7 @@
 import { snapshotSkillCatalog } from '../../core/skill-pool.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
+import type { CatalogEntityStats } from '../../core/catalog-stats-read-model.js';
 
 interface SkillManifest {
   id?: string;
@@ -17,11 +19,13 @@ interface SkillEntry {
   name: string;
   category: string;
   triggers: string[];
+  stats: CatalogEntityStats | null;
 }
 
 // S5 (sprint-523 task 7): the raw directory scan is deleted — this surface
 // consumes the canonical catalog snapshot, identical to CLI and the S8 gate.
 function readSkills(root: string): SkillEntry[] {
+  const catalogStats = readCatalogStats(root);
   return snapshotSkillCatalog(root).entries.map((entry) => {
     const manifest = entry.definition as SkillManifest & {
       routing?: { profileState?: string };
@@ -35,6 +39,7 @@ function readSkills(root: string): SkillEntry[] {
       disposition: entry.disposition,
       masked: entry.masked,
       profileState: manifest.routing?.profileState ?? null,
+      stats: catalogStats.skills[entry.id] ?? null,
     };
   });
 }

@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { buildAgentCatalogEntries } from '../../core/agent-catalog-projection.js';
+import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
 
 // ─── Agent catalog read model (row 7011, slice S4) ──────────────────────────
 //
@@ -45,8 +46,22 @@ export function registerAgentListTool(server: McpServer): void {
     },
     async () => {
       try {
-        const entries = buildAgentCatalogEntries(process.cwd());
-        const agents = entries.map(({ displayType: _displayType, ...entry }) => entry);
+        const root = process.cwd();
+        const catalogStats = readCatalogStats(root);
+        const entries = buildAgentCatalogEntries(root);
+        const agents = entries.map(({ displayType: _displayType, ...entry }) => {
+          const legacyRatio = entry.uses === 0
+            ? null
+            : Math.max(0, Math.min(1, entry.successRate > 1 ? entry.successRate / 100 : entry.successRate));
+          const stats = catalogStats.agents[entry.id] ?? {
+            uses: entry.uses,
+            successes: legacyRatio === null ? 0 : Math.round(legacyRatio * entry.uses),
+            successRatio: legacyRatio,
+            successPercent: legacyRatio === null ? null : Math.round(legacyRatio * 100),
+            lastUsedInSprint: null,
+          };
+          return { ...entry, ...stats, successRate: stats.successRatio };
+        });
 
         const response = {
           agents,

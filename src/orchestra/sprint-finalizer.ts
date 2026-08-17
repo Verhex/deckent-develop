@@ -32,6 +32,149 @@ import { resolveHostPreDispatchSettlement } from '../core/pre-dispatch-settlemen
 
 import type { TaskDNA } from '../core/routing-types.js';
 
+type CatalogStatsEntry = Record<string, unknown> & {
+  totalUses?: number;
+  successCount?: number;
+  successRate?: number;
+  avgCoverage?: number;
+  lastUsedInSprint?: string;
+};
+
+interface CatalogStatsSidecar extends Record<string, unknown> {
+  agents?: Record<string, CatalogStatsEntry>;
+  skills?: Record<string, CatalogStatsEntry>;
+}
+
+export interface CatalogStatsTerminalOutcome {
+  readonly taskId: string;
+  readonly agentId: string | null;
+  readonly skillIds: readonly string[];
+  readonly evaluation: TaskEvaluation.DONE | TaskEvaluation.GO_WITH_TECH_DEBT | TaskEvaluation.NO_GO;
+  readonly coverage?: number;
+}
+
+export function collectCatalogStatsTerminalOutcomes(
+  tasks: readonly Task[],
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  results: ReadonlyMap<string, TaskResult>,
+): CatalogStatsTerminalOutcome[] {
+  const outcomes: CatalogStatsTerminalOutcome[] = [];
+  for (const task of tasks) {
+    const evaluation = evaluations.get(task.id);
+    const result = results.get(task.id);
+    if (
+      result === undefined
+      || result.cascadeSkipped === true
+      || (
+        evaluation !== TaskEvaluation.DONE
+        && evaluation !== TaskEvaluation.GO_WITH_TECH_DEBT
+        && evaluation !== TaskEvaluation.NO_GO
+      )
+    ) continue;
+    outcomes.push({
+      taskId: task.id,
+      agentId: result.agentId ?? task.assignedAgent ?? null,
+      skillIds: result.skillIds ?? task.assignedSkills ?? [],
+      evaluation,
+      ...(typeof result.coverage === 'number' ? { coverage: result.coverage } : {}),
+    });
+  }
+  return outcomes;
+}
+
+export interface CatalogStatsFileSystem {
+  readonly exists: (path: string) => boolean;
+  readonly read: (path: string) => string;
+  readonly mkdir: (path: string) => void;
+  readonly write: (path: string, content: string) => void;
+  readonly rename: (source: string, destination: string) => void;
+}
+
+const catalogStatsFileSystem: CatalogStatsFileSystem = {
+  exists: path => existsSync(path),
+  read: path => readFileSync(path, 'utf-8'),
+  mkdir: path => mkdirSync(path, { recursive: true }),
+  write: (path, content) => writeFileSync(path, content, 'utf-8'),
+  rename: (source, destination) => renameSync(source, destination),
+};
+
+function mergeCatalogStatsEntry(
+  current: CatalogStatsEntry | undefined,
+  outcomes: readonly CatalogStatsTerminalOutcome[],
+  sprintId: string,
+): CatalogStatsEntry {
+  const prior = current ?? {};
+  const previousUses = typeof prior.totalUses === 'number' ? prior.totalUses : 0;
+  const previousSuccesses = typeof prior.successCount === 'number'
+    ? prior.successCount
+    : Math.round((typeof prior.successRate === 'number' ? prior.successRate : 0) * previousUses);
+  const addedSuccesses = outcomes.filter(outcome => outcome.evaluation !== TaskEvaluation.NO_GO).length;
+  const totalUses = previousUses + outcomes.length;
+  const successCount = previousSuccesses + addedSuccesses;
+  const measuredCoverage = outcomes
+    .map(outcome => outcome.coverage)
+    .filter((coverage): coverage is number => typeof coverage === 'number');
+  const avgCoverage = measuredCoverage.length === 0
+    ? prior.avgCoverage
+    : previousUses > 0
+      ? (((typeof prior.avgCoverage === 'number' ? prior.avgCoverage : 0) * previousUses)
+        + measuredCoverage.reduce((sum, coverage) => sum + coverage, 0))
+        / (previousUses + measuredCoverage.length)
+      : measuredCoverage.reduce((sum, coverage) => sum + coverage, 0) / measuredCoverage.length;
+
+  return {
+    ...prior,
+    totalUses,
+    successCount,
+    successRate: totalUses > 0 ? successCount / totalUses : 0,
+    ...(avgCoverage === undefined ? {} : { avgCoverage }),
+    lastUsedInSprint: sprintId,
+  };
+}
+
+/** Publish this run's terminal catalog outcomes with one read and one atomic replacement. */
+export function writeCatalogStatsTerminalOutcomes(
+  projectRoot: string,
+  sprintId: string,
+  outcomes: readonly CatalogStatsTerminalOutcome[],
+  fileSystem: CatalogStatsFileSystem = catalogStatsFileSystem,
+): void {
+  const agentOutcomes = new Map<string, CatalogStatsTerminalOutcome[]>();
+  const skillOutcomes = new Map<string, CatalogStatsTerminalOutcome[]>();
+  for (const outcome of outcomes) {
+    if (outcome.agentId && outcome.agentId !== 'generic') {
+      const entries = agentOutcomes.get(outcome.agentId) ?? [];
+      entries.push(outcome);
+      agentOutcomes.set(outcome.agentId, entries);
+    }
+    for (const skillId of new Set(outcome.skillIds)) {
+      const entries = skillOutcomes.get(skillId) ?? [];
+      entries.push(outcome);
+      skillOutcomes.set(skillId, entries);
+    }
+  }
+  if (agentOutcomes.size === 0 && skillOutcomes.size === 0) return;
+
+  const statsDir = join(projectRoot, '.deckent', 'stats');
+  const statsPath = join(statsDir, 'catalog-stats.json');
+  const current = fileSystem.exists(statsPath)
+    ? JSON.parse(fileSystem.read(statsPath)) as CatalogStatsSidecar
+    : {};
+  const agents = { ...(current.agents ?? {}) };
+  const skills = { ...(current.skills ?? {}) };
+  for (const [agentId, entityOutcomes] of agentOutcomes) {
+    agents[agentId] = mergeCatalogStatsEntry(agents[agentId], entityOutcomes, sprintId);
+  }
+  for (const [skillId, entityOutcomes] of skillOutcomes) {
+    skills[skillId] = mergeCatalogStatsEntry(skills[skillId], entityOutcomes, sprintId);
+  }
+
+  fileSystem.mkdir(statsDir);
+  const tempPath = `${statsPath}.${process.pid}.${randomUUID()}.tmp`;
+  fileSystem.write(tempPath, `${JSON.stringify({ ...current, agents, skills }, null, 2)}\n`);
+  fileSystem.rename(tempPath, statsPath);
+}
+
 import {
   BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE, RECENT_WORKS_DIR, TASKS_DIR,
   SPRINT_ACTIVE_FILE, SPRINT_PAUSE_STATE_FILE,
@@ -171,9 +314,7 @@ import { rotateMetricsFile } from '../core/observability-rotation.js';
 import type { ObservabilityRotationConfig } from '../core/observability-rotation.js';
 
 // ─── Agent/Skill Pool ─────────────────────────────────────────────
-import { AgentPoolManager } from '../core/agent-pool.js';
 import { PromptVersionManager } from '../agents/prompt-version.js';
-import { SkillPoolManager } from '../core/skill-pool.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
 import { runHooks } from '../core/plugin-hooks.js';
@@ -3213,19 +3354,14 @@ export async function finalizeSprint(
       debugLog('finalizeSprint:routing-outcomes',
         `Stats already recorded for ${sprint.id} — skipping re-record (idempotent re-finalize)`);
     } else {
-      for (const task of sprint.tasks) {
-        const evaluation = evaluations.get(task.id);
-        if (!evaluation) continue;
+      const catalogOutcomes = collectCatalogStatsTerminalOutcomes(attemptTasks, evaluations, resultsMap);
+      const catalogOutcomesByTask = new Map(catalogOutcomes.map(outcome => [outcome.taskId, outcome]));
+      for (const task of attemptTasks) {
+        const terminalOutcome = catalogOutcomesByTask.get(task.id);
+        if (!terminalOutcome) continue;
+        const evaluation = terminalOutcome.evaluation;
         const taskResult = resultsMap.get(task.id);
-        const learningEligible =
-          taskResult !== undefined
-          && taskResult.cascadeSkipped !== true
-          && (
-            evaluation === TaskEvaluation.DONE
-            || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT
-            || evaluation === TaskEvaluation.NO_GO
-          );
-        if (!learningEligible) continue;
+        if (!taskResult) continue;
         // F5: record use against the agent's current prompt version (V2 path).
         if (task.assignedAgent) {
           promptVersionMgr.recordCurrentVersionUse(task.assignedAgent, evaluation);
@@ -3240,22 +3376,17 @@ export async function finalizeSprint(
           } catch (e) { debugLog('finalizeSprint:assessQuality', e); }
         }
 
-        // V2's DNA outcome ledger is legacy-only. Feeding V3 tasks into both
-        // ledgers double-credited agents/skills and polluted a learner the live
-        // router no longer consumes.
-        if (task.routingMeta?.routingVersion !== 'v3') {
-          tracker.recordOutcome({
-            taskId: task.id,
-            sprintId: sprint.id,
-            taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
-            agentId: task.assignedAgent ?? null,
-            skillIds: task.assignedSkills ?? [],
-            evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-            coverage: taskResult?.coverage ?? 0,
-            qualityScore,
-            routingVersion: 'v2',
-          });
-        }
+        tracker.recordOutcome({
+          taskId: task.id,
+          sprintId: sprint.id,
+          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
+          agentId: terminalOutcome.agentId,
+          skillIds: [...terminalOutcome.skillIds],
+          evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+          coverage: taskResult.coverage ?? 0,
+          qualityScore,
+          routingVersion: 'v2',
+        });
 
         // ROUTING-V3 learning cells (Slice-2): tasks routed by V3 also feed
         // the workType×domain×agent cell ledger — PER-TASK DNA by contract
@@ -3283,6 +3414,7 @@ export async function finalizeSprint(
           }
         }
       }
+      writeCatalogStatsTerminalOutcomes(projectRoot, sprint.id, catalogOutcomes);
       debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
     }
 
@@ -3298,95 +3430,6 @@ export async function finalizeSprint(
         evolver.saveRules(evolution.newRules);
       }
     } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
-
-    // 8d2. Sync V2 learnings → stats sidecar (.deckent/stats/catalog-stats.json), so
-    // Dashboard/CLI see real stats without mutating the git-tracked agent.json /
-    // manifest.json on every sprint (born-605 STATS-SIDECAR — the manifest write
-    // here used to cause per-sprint repo-diff noise + a hermeticity/C5 violation).
-    // AgentPoolManager.getAgent()/SkillPoolManager.getSkill() already overlay the
-    // sidecar onto the loaded `stats` (unified read), so `stats` below starts from
-    // whichever store currently holds the freshest value — including a first-ever
-    // sidecar write, which therefore carries the manifest's prior history forward
-    // instead of resetting it.
-    try {
-      const poolManager = new AgentPoolManager(projectRoot);
-      const skillPoolManager = new SkillPoolManager(projectRoot);
-      const learnings = tracker.getLearnings();
-
-      for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
-        // Compute average coverage from task results for this agent — only results
-        // that carry a REAL coverage measurement participate. A missing/undefined
-        // `coverage` is a MEASUREMENT GAP, not a 0%, and must not dilute the average
-        // (born-591 P0 phantom-zero-dilution fix) — neither in the numerator nor in
-        // the sample count used to weight it.
-        const agentTasks = sprint.tasks.filter(t => t.assignedAgent === agentId);
-        const coveredResults = agentTasks
-          .map(t => resultsMap.get(t.id))
-          .filter((r): r is TaskResult => r != null && typeof r.coverage === 'number');
-        let avgCov = 0;
-        if (coveredResults.length > 0) {
-          const totalCov = coveredResults.reduce((sum, r) => sum + r.coverage, 0);
-          avgCov = totalCov / coveredResults.length;
-        }
-
-        // Build cumulative stats from learnings performance data
-        const agent = poolManager.getAgent(agentId);
-        if (agent) {
-          const stats = agent.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' };
-          // Prior cumulative uses — captured BEFORE totalUses is overwritten below,
-          // so it reflects the agent's real use count as of the last sprint (no
-          // subtraction/algebra needed; born-591 P0 dilution fix).
-          const prevTotal = stats.totalUses;
-          stats.totalUses = perf.totalTasks;
-          stats.successRate = perf.successRate;
-          // Blend historical avg coverage with current-sprint coverage — weighted
-          // ONLY by coverage-bearing results and normalized by (prior uses + new
-          // coverage samples), NOT stats.totalUses (which would still count this
-          // sprint's non-covered tasks and re-dilute the average).
-          if (coveredResults.length > 0) {
-            stats.avgCoverage = prevTotal > 0
-              ? ((stats.avgCoverage * prevTotal) + (avgCov * coveredResults.length)) / (prevTotal + coveredResults.length)
-              : avgCov;
-          }
-          stats.lastUsedInSprint = sprint.id;
-          poolManager.saveAgentStats(agentId, stats);
-        }
-      }
-
-      for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
-        // Same dilution-fix as the agent block above (born-591 P0 item b) — the
-        // skill side previously never computed/wrote avgCoverage at all (always 0).
-        const skillTasks = sprint.tasks.filter(t => t.assignedSkills?.includes(skillId));
-        const coveredResults = skillTasks
-          .map(t => resultsMap.get(t.id))
-          .filter((r): r is TaskResult => r != null && typeof r.coverage === 'number');
-        let avgCov = 0;
-        if (coveredResults.length > 0) {
-          const totalCov = coveredResults.reduce((sum, r) => sum + r.coverage, 0);
-          avgCov = totalCov / coveredResults.length;
-        }
-
-        const skill = skillPoolManager.getSkill(skillId);
-        if (skill) {
-          const stats = skill.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '', successCount: 0 };
-          // Prior cumulative uses — captured BEFORE totalUses is overwritten below
-          // (same reasoning as the agent block above).
-          const prevTotal = stats.totalUses;
-          stats.totalUses = perf.totalTasks;
-          stats.successRate = perf.successRate;
-          stats.successCount = perf.successCount;
-          if (coveredResults.length > 0) {
-            stats.avgCoverage = prevTotal > 0
-              ? ((stats.avgCoverage * prevTotal) + (avgCov * coveredResults.length)) / (prevTotal + coveredResults.length)
-              : avgCov;
-          }
-          stats.lastUsedInSprint = sprint.id;
-          skillPoolManager.saveSkillStats(skillId, stats);
-        }
-      }
-
-      debugLog('finalizeSprint:syncStatsToManifests', `Synced ${Object.keys(learnings.agentPerformance).length} agents, ${Object.keys(learnings.skillPerformance).length} skills to stats sidecar (.deckent/stats/catalog-stats.json)`);
-    } catch (e) { debugLog('finalizeSprint:syncStatsToManifests', e); }
 
     // 8e. Evaluate promotions/demotions
     try {

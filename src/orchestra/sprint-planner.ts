@@ -751,15 +751,11 @@ export async function planSprint(
     // S3: the V2 learning-bonus block (the tasks[0]-DNA K4 bug) is retired —
     // V3's learning-cells feed the numerical axis per-task inside the adapter.
 
-    // Generate project conventions temp skill
-    try {
-      const { generateProjectConventionsSkill } = await import('./temp-skill-generator.js');
-      if (projectStackV2) {
-        const conventionsSkill = generateProjectConventionsSkill(projectStackV2);
-        skillsV2.set(conventionsSkill.id, conventionsSkill);
-        debugLog('planSprint:temp-skill', `Generated project-conventions skill for ${projectStackV2.language}`);
-      }
-    } catch (e) { debugLog('planSprint:generateProjectConventionsSkill', e); }
+    // project-conventions is NO LONGER a routable/learnable skill: its content
+    // ships as the deterministic project-context prompt segment injected for
+    // every worker at compile time (task-builder → prompt-god-template).
+    // Inserting it here made the learning loop grade an always-matching
+    // pseudo-skill (CATALOG-STATS-AUTHORITY-001 correction, 2026-08-17).
 
     // Generate and persist project-specific temp agents (V2 only)
     try {

@@ -12,6 +12,7 @@ import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { modelRegistry, resolveCanonicalModelIdentity } from '../../core/model-registry.js';
 import { createAgentDefinition } from '../../core/agent-types.js';
 import { buildAgentCatalogEntries } from '../../core/agent-catalog-projection.js';
+import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -315,7 +316,20 @@ export function registerAgent(program: Command): void {
     .action(async (opts: { json?: boolean }) => {
       try {
         const root = resolveProjectRoot();
-        const agents = buildAgentCatalogEntries(root);
+        const catalogStats = readCatalogStats(root);
+        const agents = buildAgentCatalogEntries(root).map((agent) => {
+          const legacyRatio = agent.uses === 0
+            ? null
+            : Math.max(0, Math.min(1, agent.successRate > 1 ? agent.successRate / 100 : agent.successRate));
+          const stats = catalogStats.agents[agent.id] ?? {
+            uses: agent.uses,
+            successes: legacyRatio === null ? 0 : Math.round(legacyRatio * agent.uses),
+            successRatio: legacyRatio,
+            successPercent: legacyRatio === null ? null : Math.round(legacyRatio * 100),
+            lastUsedInSprint: null,
+          };
+          return { ...agent, ...stats, successRate: stats.successRatio };
+        });
 
         if (agents.length === 0) {
           print('No agents found. Create one with: deckent agent create <name>');
@@ -335,7 +349,7 @@ export function registerAgent(program: Command): void {
           a.displayType ?? 'custom',
           a.enabled ? 'enabled' : 'disabled',
           String(a.uses),
-          `${Math.round(a.successRate)}%`,
+          a.successPercent === null ? 'never' : `${a.successPercent}%`,
           a.model ?? '-',
         ]);
         print(formatTable(headers, rows));
@@ -696,14 +710,15 @@ export function registerAgent(program: Command): void {
         const root = resolveProjectRoot();
         const agentDir = join(getAgentsDir(root), name);
         const agent = loadAgentConfig(agentDir);
+        const stats = readCatalogStats(root).agents[name];
 
         print(`Agent: ${agent.name}`);
         print(`  Type: ${agent.type}`);
         print(`  Model: ${agent.model}`);
         print(`  Enabled: ${agent.enabled}`);
         print(`  Description: ${agent.description}`);
-        print(`  Uses: ${getAgentUses(agent)}`);
-        print(`  Success Rate: ${getAgentSuccessRate(agent)}%`);
+        print(`  Uses: ${stats?.uses ?? 0}`);
+        print(`  Success Rate: ${stats?.successPercent === null || stats === undefined ? 'never' : `${stats.successPercent}%`}`);
         print(`  Created: ${agent.createdAt}`);
         print(`  Updated: ${agent.updatedAt}`);
 

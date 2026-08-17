@@ -75,6 +75,8 @@ export function logInjectionAudit(
 }
 import { readBaseline } from './baseline-tracker.js';
 import { buildTaskPrompt } from './prompt-god-template.js';
+import { generateProjectContextSegment } from './temp-skill-generator.js';
+import { detectProjectStack } from '../core/stack-detector.js';
 import type {
   DependencyResultEntry,
   SprintContext,
@@ -2448,10 +2450,20 @@ export function buildWorkerPrompt(
     ])].sort();
   }
 
+  // Deterministic project-context segment (not a skill — CATALOG-STATS-AUTHORITY-001
+  // correction, 2026-08-17): always-on conventions data for every worker prompt.
+  let projectContext: string | undefined;
+  try {
+    projectContext = generateProjectContextSegment(detectProjectStack(projectRoot));
+  } catch (e) {
+    debugLog('buildWorkerPrompt:projectContextSegment', e);
+  }
+
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
     skillPrompts: effectiveSkillPrompts,
+    ...(projectContext !== undefined ? { projectContext } : {}),
     allAdrs,
     effort,
     dependencies: [...promptDependencyIds],

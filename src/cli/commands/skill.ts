@@ -11,6 +11,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { snapshotSkillCatalog } from '../../core/skill-pool.js';
 import { registerSkillMarketplace } from './skill-marketplace.js';
 import { ErrorRegistry } from '../../core/errors.js';
+import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
 import { analyzeNewSkill, persistSkillActivation } from '../../orchestra/ecosystem-intelligence.js';
 // Note: `skill publish` is registered by registerSkillMarketplace() below —
 // the unified pipeline (sandbox + Ed25519 sign + registry upload) lives there.
@@ -253,6 +254,7 @@ export function registerSkill(program: Command): void {
         // snapshot — same read model as MCP and the S8 determinism gate. The
         // legacy raw scan (loadAllSkills) stays only for non-catalog commands.
         const snapshot = snapshotSkillCatalog(root);
+        const catalogStats = readCatalogStats(root);
         let skills = snapshot.entries.map((entry) => {
           const rendered = normalizeSkillForRender(entry.definition as unknown as SkillDefinition);
           // The catalog normalizer stamps `triggers: []` on a manifest that
@@ -268,6 +270,7 @@ export function registerSkill(program: Command): void {
           disposition: entry.disposition,
           masked: entry.masked,
           profileState: (entry.definition as { routing?: { profileState?: string } }).routing?.profileState ?? null,
+          stats: catalogStats.skills[entry.id] ?? null,
         };});
 
         if (opts.category) {
@@ -673,13 +676,13 @@ export function registerSkill(program: Command): void {
           print(`  Triggers: ${manifest.triggers.join(', ')}`);
         }
 
-        if (opts.stats && manifest.stats) {
+        if (opts.stats) {
+          const stats = readCatalogStats(root).skills[manifest.id];
           print('');
           print('  Usage Statistics:');
-          print(`    Total uses:      ${manifest.stats.totalUses}`);
-          print(`    Success rate:    ${Math.round(manifest.stats.successRate * 100)}%`);
-          print(`    Avg coverage:    ${manifest.stats.avgCoverage}%`);
-          print(`    Last sprint:     ${manifest.stats.lastUsedInSprint || 'never'}`);
+          print(`    Total uses:      ${stats?.uses ?? 0}`);
+          print(`    Success rate:    ${stats?.successPercent === null || stats === undefined ? 'never' : `${stats.successPercent}%`}`);
+          print(`    Last sprint:     ${stats?.lastUsedInSprint ?? 'never'}`);
         }
 
         const meta = loadSourceMeta(skillDir);

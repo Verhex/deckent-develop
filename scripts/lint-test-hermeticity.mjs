@@ -324,8 +324,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-17 (RUN-INSPECTOR-001 package 4, sprint-544): +3 — the follow-mode
   // and log-tail slices grew the cli/api/core suites' import closures (new graph
   // members via the observer-injection test seams); no test files were removed.
-  count: 14337,
-  digest: 'b44b66ac8a33256b0feacf621f6bf96d2a7492ebc73c1d05a9fdeb7eeadae33c',
+  // 2026-08-17 (CATALOG-STATS-AUTHORITY-001 correction, sprint-545 + Brain
+  // completion): +4 — the three filled stub suites/module (catalog-stats
+  // outcome-truth, catalog-stats read-model + its test) and their import
+  // closures enter the graph; finalizer/skill-pool/generator/template/collector
+  // changed content only.
+  count: 14341,
+  digest: 'a8181541efbd581e634ce832d21370c559b525fb2f1984844c24c3de85a413b2',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -525,8 +530,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (RUN-INSPECTOR-001 package 4): same 1245 count, digest only —
   // core read-model, server, inspect CLI, messages, desktop shell content hashes
   // moved with the log-tail/follow/stream-adoption slices; membership unchanged.
-  count: 1245,
-  digest: '5dc527b77d8586a8e7fd9aff05a392b0be44a18e44410ca6bbdfcdc5c77e9d26',
+  // 2026-08-17 (CATALOG-STATS-AUTHORITY-001 correction): +1 — the canonical
+  // src/core/catalog-stats-read-model.ts production module enters the inventory;
+  // finalizer/skill-pool/generator/planner/collector/template/cli/mcp hashes moved.
+  count: 1246,
+  digest: '19bffed8365eebf5d7727401bc6caf02f2bf38bf0b94eb3fbc171c8dfaa6d7c5',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

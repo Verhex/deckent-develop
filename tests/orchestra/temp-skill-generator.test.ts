@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  generateProjectContextSegment,
   generateProjectConventionsSkill,
   generateDataDrivenSkills,
   getGeneratedContent,
@@ -285,5 +286,22 @@ describe('temp-skill-generator', () => {
         expect(agent.id).toMatch(/^temp-/);
       }
     });
+  });
+});
+
+describe('generateProjectContextSegment (deterministic project-context data)', () => {
+  it('returns the conventions content as plain prompt data, not a skill', () => {
+    const segment = generateProjectContextSegment({
+      language: 'TypeScript',
+      framework: 'none',
+      buildTool: 'tsc',
+      testFramework: 'vitest',
+      dependencies: ['zod'],
+    });
+    expect(segment).toContain('# Project Conventions (Auto-Generated)');
+    expect(segment).toContain('- Language: TypeScript');
+    expect(segment).toContain('## Testing');
+    // Data, not a SkillDefinition — no id/activation surface.
+    expect(typeof segment).toBe('string');
   });
 });

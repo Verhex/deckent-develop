@@ -105,10 +105,7 @@ export function getSharedMemory(projectRoot: string, ttlMs?: number): SharedMemo
 // ─── DNA skill filtering (born-593 DNA-FILTER-STAT-CREDIT) ───────
 import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
 import type { TaskDNA } from '../core/routing-types.js';
-import { detectProjectStack } from '../core/stack-detector.js';
 import {
-  generateProjectConventionsSkill,
-  getGeneratedContent,
 } from './temp-skill-generator.js';
 
 // ─── Agent prompt single-source resolution (ADR-048, Sprint 182 F4) ──
@@ -1081,17 +1078,12 @@ export async function resolveSkillPrompts(
     }
     const skillId = resolution.skillId;
     if (skillId === 'project-conventions') {
-      try {
-        const generated = generateProjectConventionsSkill(detectProjectStack(projectRoot));
-        const content = getGeneratedContent(generated);
-        if (content) {
-          results.push({ name: skillId, content });
-          metric('skill.prompt_generated', 1, { skillId, taskId: task.id });
-          continue;
-        }
-      } catch (generationError) {
-        debugLog('resolveSkillPrompts:generateProjectConventions', generationError);
-      }
+      // Retired as a skill (2026-08-17): the content is now the deterministic
+      // project-context prompt segment. A legacy task that still references the
+      // id gets a tolerant skip — no regeneration, no skill.prompt_generated
+      // metric, no phantom stats credit.
+      debugLog('resolveSkillPrompts:projectConventionsRetired', skillId);
+      continue;
     }
     // A skill assigned to the task whose body could not be resolved is NOT
     // injected into the worker prompt — yet downstream outcome tracking still

@@ -607,3 +607,20 @@ describe('buildBehaviorPrecedenceNote (G2b)', () => {
     expect(buildBehaviorPrecedenceNote(withAgentIntent('refactorer', 'documentation'))).toBe('');
   });
 });
+
+describe('project-context block (CATALOG-STATS-AUTHORITY-001 correction)', () => {
+  it('renders the deterministic segment for every worker when ctx carries it', () => {
+    const task = makeTask();
+    const { prompt } = buildTaskPrompt(task, makeCtx({
+      projectContext: '# Project Conventions (Auto-Generated)\n- Language: TypeScript',
+    }));
+    expect(prompt).toContain('=== Project Context ===');
+    expect(prompt).toContain('- Language: TypeScript');
+  });
+
+  it('omits the section entirely when the segment is absent', () => {
+    const task = makeTask();
+    const { prompt } = buildTaskPrompt(task, makeCtx({}));
+    expect(prompt).not.toContain('=== Project Context ===');
+  });
+});

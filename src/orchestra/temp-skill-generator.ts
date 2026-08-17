@@ -64,12 +64,14 @@ export interface ProjectAnalysisInput {
 // ─── Project Conventions Skill ──────────────────────────────────────────────
 
 /**
- * Generate a "project-conventions" temp skill from project analysis.
- * This is the highest-value temp skill — zero risk, always relevant.
+ * Deterministic PROJECT-CONTEXT prompt segment (CATALOG-STATS-AUTHORITY-001
+ * correction, 2026-08-17): the same auto-generated conventions content, but as
+ * plain prompt data — it never enters the skill pool, routing, or stats, so it
+ * can no longer poison the learning loop with an always-matching pseudo-skill.
  */
-export function generateProjectConventionsSkill(
+export function generateProjectContextSegment(
   analysis: ProjectAnalysisInput,
-): SkillDefinition {
+): string {
   const sections: string[] = [];
 
   sections.push('# Project Conventions (Auto-Generated)');
@@ -137,7 +139,21 @@ export function generateProjectConventionsSkill(
   }
   sections.push('');
 
-  const content = sections.join('\n');
+  return sections.join('\n');
+}
+
+/**
+ * Generate a "project-conventions" temp skill from project analysis.
+ *
+ * PRODUCTION-RETIRED (2026-08-17): planning no longer inserts this into the
+ * skill pool — the content ships as the deterministic project-context prompt
+ * segment above. The factory remains for compiled-contract compatibility and
+ * legacy fixtures only.
+ */
+export function generateProjectConventionsSkill(
+  analysis: ProjectAnalysisInput,
+): SkillDefinition {
+  const content = generateProjectContextSegment(analysis);
 
   // Build activation config — always active for this project's language
   const activation: ActivationConfig = {

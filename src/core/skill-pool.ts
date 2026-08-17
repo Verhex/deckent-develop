@@ -1270,13 +1270,26 @@ export class SkillPoolManager {
    */
   saveGeneratedSkill(skill: SkillDefinition, content: string): void {
     const skillDir = path.join(this.projectRoot, SKILLS_DIR, skill.id);
+    const manifestPath = path.join(skillDir, MANIFEST_FILENAME);
     const { _generatedContent: _ignored, ...manifest } = skill as SkillDefinition & {
       _generatedContent?: string;
     };
+    const existingManifest = readJsonSafe<Record<string, unknown>>(manifestPath) ?? {};
+    const hasDispositionMarker = Object.keys(existingManifest).some((key) =>
+      key === 'disposition'
+      || /^_(?:demoted|disabled|retired|quarantined|disposed)/i.test(key),
+    );
+    const persistedManifest: Record<string, unknown> = {
+      ...existingManifest,
+      ...manifest,
+    };
+    if (existingManifest.enabled === false || hasDispositionMarker) {
+      persistedManifest.enabled = false;
+    }
     fs.mkdirSync(skillDir, { recursive: true });
     fs.writeFileSync(
-      path.join(skillDir, MANIFEST_FILENAME),
-      JSON.stringify(manifest, null, 2) + '\n',
+      manifestPath,
+      JSON.stringify(persistedManifest, null, 2) + '\n',
       'utf8',
     );
     fs.writeFileSync(path.join(skillDir, SKILL_MD_FILENAME), content, 'utf8');
