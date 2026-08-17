@@ -7,18 +7,28 @@ BASE_SHA: abf3892d1 (post PHASE-1 governance commit)
 BRANCH: main (WORKSPACE_MODE=MAIN — doğrudan root checkout)
 MODE: implement
 
-## Allowed mutations
+## Allowed mutations (gerçek kapsam — ana paket + correction + correction-2 ile LANDED)
 - `src/core/task-types.ts` (RunPolicyPlanAuthority + create + result evidence)
 - `src/core/task-result-schema.ts` (runPolicyEvidence şeması)
 - `src/core/task-result-settlement.ts` (settleRunPolicyResultEvidence)
 - `src/orchestra/run-policy-resolver.ts` (yeni plan-time producer)
-- `src/orchestra/sprint-planner.ts` (tek choke-point stamp)
+- `src/orchestra/sprint-planner.ts` (choke-point stamp — correction-2 ile İLK task-JSON
+  persistence'ının ÖNCESİNE taşındı)
 - `src/orchestra/debt-manager.ts` (FIX inheritance ×2)
 - `src/orchestra/prompt-god-template.ts` (task-carried consumer; ctx-injection kaldırıldı)
-- `src/orchestra/task-builder.ts` (execution-authority.jsonl audit satırı)
-- `src/orchestra/result-evaluator.ts` (gateRunPolicyParityVerdict, evaluateWithRubric içinde)
-- `tests/core/run-policy-authority.test.ts` + `tests/orchestra/run-policy-delivery.test.ts`
-- Regen/baseline: PLATFORM.md, hermeticity baselines, README stats, MASTER 7140 evidence + projections
+- `src/orchestra/task-builder.ts` (fail-soft compile-observation jsonl satırı + dürüst adlandırma)
+- `src/orchestra/result-evaluator.ts` (üç terminal producer'da içselleştirilmiş parity gate:
+  grader wrapper + reconcile wrapper + reconstruction kuyruğu; idempotent)
+- `src/orchestra/sprint-finalizer.ts` (correction-2: `enforceRunPolicyParityOnTerminalInputs`
+  terminal-convergence veto'su — standard/test-mode/CLI-finalize/checkpoint-recovery tek giriş)
+- `src/orchestra/sprint-phases.ts` + `src/orchestra/autonomous/backlog-eval.ts` (dış wrap'lerin
+  geri alınması + boundary işaret yorumları)
+- Testler: `tests/core/run-policy-authority.test.ts` · `tests/orchestra/run-policy-delivery.test.ts`
+  · `tests/orchestra/run-policy-plan-persistence.test.ts` (yeni, gerçek planSprint+fs adapter)
+  · `tests/orchestra/prompt-run-policy-authority.test.ts` (486-017 suite'inin task-carried migrasyonu)
+- Regen/baseline: PLATFORM.md, hermeticity baselines (atıflı realign'lar), README stats,
+  MASTER 7140 evidence + projections, bu capsule
+- **Bu noktadan sonra runtime source FROZEN (owner talimatı) — yalnız canary/docs**
 
 ## Explicit exclusions (owner brief)
 - CI taxonomy / merge-group / Shards workflow tamiri — owner kararıyla bu phase'den ÇIKARILDI
@@ -26,12 +36,15 @@ MODE: implement
 - Literal DOGFOOD_MODE'un customer product feature yapılması
 - Runtime DB/evidence cleanup; private PEM
 
-## Verification manifest
-- `npx vitest run tests/core/run-policy-authority.test.ts tests/orchestra/run-policy-delivery.test.ts` → 20/20
-- `tests/core/ + tests/orchestra/` regression ailesi → yeşil
+## Verification manifest (correction-2 sonrası gerçek komutlar)
+- `VITEST_MAX_FORKS=2 npx vitest run tests/core/run-policy-authority.test.ts tests/orchestra/run-policy-delivery.test.ts tests/orchestra/run-policy-plan-persistence.test.ts tests/orchestra/prompt-run-policy-authority.test.ts --pool=forks` → **44/44**
+- `VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/ --pool=forks` → 686/686 dosya, 9169 test, exit 0
 - `npx tsc --noEmit` → 0 hata
-- `npm run lint:gates` → yeşil (hermeticity realign dahil)
-- Build + gerçek-binary kanıtı (canlı execution yokluğu doğrulanarak)
+- `npm run lint:gates` → 16/16 (hermeticity atıflı realign dahil)
+- Sprint yokken `npm run build` → yeşil; source↔dist davranışsal kimlik: compiled dist üzerinde
+  `DIST-IDENTITY missing=NO_GO exact=DONE policyFree=DONE`
+- Fresh host-adapter reconnect: stale MCP server'lar kapatıldı, taze server yeni dist'ten
+  `deckent_doctor` cevapladı
 
 ## DONE
 - Production chain gerçek: resolver → task persistence → compiler (task'tan) → provider-neutral
