@@ -12663,3 +12663,249 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 524-013: Runs-inbox hygiene — typed supersession through the flow authority (DONE)
 
 ---
+## Sprint 525 — sprint-525
+
+**Status:** ABORTED
+**Date:** 2026-08-12
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 525-001-fix: Fix: Probe contract freeze — typed provider-evidence-probe contracts (NO_GO)
+- 525-002-fix: Fix: Tier flip — sol premium_plus + explicit preferreds + pricing + invariant (NO_GO)
+- 525-003: Machine-generated impacted manifest + tier expectation updates (PAUSED)
+- 525-004: Approval operation-subject + local-terminal live-auth adapter (PAUSED)
+- 525-005: ReachabilityProbeBudget projection + execution_budget purpose profile (PAUSED)
+- 525-006: Producer freshness epoch + durable singleflight + typed cooldown (PAUSED)
+- 525-007: Canonical DockerSpawnBackend bounded probe adapter (PAUSED)
+- 525-008: Pre-compose evidence preparation + codex docker source + registry wiring (PAUSED)
+- 525-009: Composition progression matrix + replay/expiry/concurrency + en/tr remedies (PAUSED)
+
+---
+## Sprint 527 — sprint-527
+
+**Status:** ABORTED
+**Date:** 2026-08-12
+**Duration:** 5018s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 5018389ms |
+
+### Tasks
+
+- 527-001: Probe contract freeze — typed provider-evidence-probe contracts (DONE)
+- 527-002: Tier flip — sol premium_plus + explicit preferreds + pricing + invariant (DONE)
+- 527-003: Machine-generated impacted manifest + tier expectation updates (DONE)
+- 527-004-fix: Fix: Approval operation-subject + local-terminal live-auth adapter (DONE)
+- 527-004: Approval operation-subject + local-terminal live-auth adapter (DONE)
+- 527-005: ReachabilityProbeBudget projection + execution_budget purpose profile (DONE)
+- 527-006-fix-fix: Fix: Fix: Producer freshness epoch + durable singleflight + typed cooldown (PAUSED)
+- 527-006-fix: Fix: Producer freshness epoch + durable singleflight + typed cooldown (NO_GO)
+- 527-006: Producer freshness epoch + durable singleflight + typed cooldown (NO_GO)
+- 527-007: Canonical DockerSpawnBackend bounded probe adapter (PENDING)
+- 527-008: Pre-compose evidence preparation + codex docker source + registry wiring (PENDING)
+- 527-009: Composition progression matrix + replay/expiry/concurrency + en/tr remedies (PENDING)
+
+---
+## Sprint 528 — sprint-528
+
+**Status:** ABORTED
+**Date:** 2026-08-12
+**Duration:** 3955s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 7 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 3954660ms |
+
+### Tasks
+
+- 528-001: Probe contract freeze — typed provider-evidence-probe contracts (DONE)
+- 528-002: Tier flip — sol premium_plus + explicit preferreds + pricing + invariant (DONE)
+- 528-003-fix: Fix: Machine-generated impacted manifest + tier expectation updates (DONE)
+- 528-003: Machine-generated impacted manifest + tier expectation updates (DONE)
+- 528-004: Approval operation-subject + local-terminal live-auth adapter (DONE)
+- 528-005: ReachabilityProbeBudget projection + execution_budget purpose profile (DONE)
+- 528-006: Producer freshness epoch + durable singleflight + typed cooldown (DONE)
+- 528-007: Canonical DockerSpawnBackend bounded probe adapter (DONE)
+- 528-008-fix: Fix: Pre-compose evidence preparation + codex docker source + registry wiring (PAUSED)
+- 528-008: Pre-compose evidence preparation + codex docker source + registry wiring (NO_GO)
+- 528-009: Composition progression matrix + replay/expiry/concurrency + en/tr remedies (PAUSED)
+
+---
+## Sprint 529 — sprint-529
+
+**Status:** ABORTED
+**Date:** 2026-08-16
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 529-001: Dynamic provider ve model authority (PENDING)
+- 529-002: Bootstrap, keyless HTTP adapter, Brain planner ve worker route (PENDING)
+- 529-003: Architecture analysis ve runbook (PENDING)
+
+---
+## Sprint 530 — sprint-530
+
+**Status:** ABORTED
+**Date:** 2026-08-16
+**Duration:** 7501s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 1 |
+| Tech Debt | 1 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 7501305ms |
+
+### Tasks
+
+- 530-001: local no-auth OpenAI-compatible provider contract and config (GO_WITH_TECH_DEBT)
+- 530-002-fix: Fix: Qwen registry identity, health and no-cloud-fallback HOLD (PAUSED)
+- 530-002: Qwen registry identity, health and no-cloud-fallback HOLD (NO_GO)
+- 530-003: local-llm agentic worker and settlement (PAUSED)
+- 530-004: Deckent Terminal native tool-use local-llm selection (PAUSED)
+- 530-005-fix: Fix: deckent local-llm start command (PAUSED)
+- 530-005: deckent local-llm start command (NO_GO)
+
+---
+## Sprint 531 — sprint-531
+
+**Status:** ABORTED
+**Date:** 2026-08-16
+**Duration:** 382s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 382334ms |
+
+### Tasks
+
+- 531-001-fix: Fix: local no-auth OpenAI-compatible provider contract and config (PAUSED)
+- 531-001: local no-auth OpenAI-compatible provider contract and config (NO_GO)
+- 531-002: Qwen registry identity, health and no-cloud-fallback HOLD (NO_GO)
+- 531-003: local-llm agentic worker and settlement (NO_GO)
+- 531-004: Deckent Terminal native tool-use local-llm selection (NO_GO)
+- 531-005: deckent local-llm start command (NO_GO)
+
+---
+## Sprint 532 — sprint-532
+
+**Status:** ABORTED
+**Date:** 2026-08-16
+**Duration:** 6915s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 6915171ms |
+
+### Tasks
+
+- 532-001: local no-auth OpenAI-compatible provider contract and config (DONE)
+- 532-002: Qwen registry identity, health and no-cloud-fallback HOLD (DONE)
+- 532-003: local-llm agentic worker and settlement (NO_GO)
+- 532-004: Deckent Terminal native tool-use local-llm selection (GO_WITH_TECH_DEBT)
+- 532-005-fix: Fix: deckent local-llm start command (PENDING)
+- 532-005: deckent local-llm start command (NO_GO)
+
+---
+## Sprint 533 — sprint-533
+
+**Status:** COMPLETE
+**Date:** 2026-08-16
+**Duration:** 311s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 310724ms |
+
+### Tasks
+
+- 533-001: close the local-llm agentic worker and settlement lineage (DONE)
+- 533-002: close the deckent local-llm lifecycle command lineage (DONE)
+
+---
+## Sprint 534 — sprint-534
+
+**Status:** ABORTED
+**Date:** 2026-08-16
+**Duration:** 59s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 59073ms |
+
+### Tasks
+
+- 534-001: wire config-resolved local-llm hardware acceleration (PENDING)
+
+---

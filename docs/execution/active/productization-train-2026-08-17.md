@@ -1,0 +1,21 @@
+# Active Productization Train — 2026-08-17
+
+> MASTER'ın geçici çalışma ağacıdır; YENİ work identity içermez (operating policy §4).
+> Node tüketildikçe silinir; kalıcı kayıt MASTER + Git history'dir.
+
+Sıra (dependency-ordered; owner onayı Alperen 2026-08-17):
+
+1. **CI-POSTMERGE-127-TRUTH-001** (8100) — post-#127 main truth closure incident paketi.
+   PR #129 MERGED (7f8fa399b); DONE = MAIN_POSTMERGE_GREEN kanıtı.
+2. **DEV-OPERATING-CONTRACT-001** (8101) — Paket A: operating contract + host parity gate.
+   Capsule: `DEV-OPERATING-CONTRACT-001.md` (bu dizin). DOGFOOD_MODE=OFF.
+3. **RUN-POLICY-DELIVERY-001** (7140) — Paket B: task-carried runPolicyAuthority delivery
+   (ürün kodu; 487-026 pattern) + provider digest-parity hermetic proof + CI green-class
+   authority kapanışı + no-op dogfood canary (ON-dönüş koşulu). Capsule başlangıcında yazılır.
+4. **Phase-5 writer** (Closure OS — mevcut MASTER closure satırları üzerinden; DOGFOOD mode
+   kararı Alperen'in) → authenticated ledger batch.
+5. **RUN-INSPECTOR-001** (6071) — ilk gerçek ürün outcome'u: canonical inspector read-model +
+   Terminal + Desktop, aynı runtime authority (transition brief §390 kabulü).
+
+Çıkış koşulu: her node'un MASTER satırı terminal state'e ulaşınca node buradan silinir;
+tren boşalınca dosya silinir ve sıradaki tren MASTER'dan yeniden seçilir.

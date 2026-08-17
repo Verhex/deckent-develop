@@ -14,3 +14,12 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint533] - 2026-08-16
+
+### Added
+
+- close the local-llm agentic worker and settlement lineage
+- close the deckent local-llm lifecycle command lineage
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_

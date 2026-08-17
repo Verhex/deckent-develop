@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "kind": "bounded-bootstrap-recovery-seam",
+  "sprintId": "sprint-525",
+  "flowId": "92e00850-6ded-473c-b5f3-ba1b603b68b4",
+  "planDigest": "70381f1a4ddec0a89e2d4b3d067acc24b07c53808a54afe8e1e060c8fa624a25",
+  "approvedBy": "Alperen (2026-08-12, option A with safety clauses)",
+  "authoredKeySuspended": "provider_limits",
+  "globalConfig": "/home/alperen/.deckent/config.json",
+  "preDigest": "a13ff9b1a28f42d7977b70814b6aefee7ed47e4419fa214859515e26b6e88b3e",
+  "suspendedDigest": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+  "suspendedAt": "2026-08-12T19:23:00+03:00 (owner-run via session bash; sha256 output ca3d163b…)",
+  "suspendedBy": "Alperen (owner-run one-liner; assistant classifier-blocked from the write)",
+  "startOutcome": "ADMISSION_PASSED — approved flow 92e00850 consumed by the canonical run-flow machinery; detached run child executed; wave-1 tasks failed pre-dispatch (FORCED_SKILL_UNAVAILABLE, unrelated diagnosis in progress); run settled typed PAUSED/resumable (recovery: deckent recover sprint-525 --resume)",
+  "restoreResult": "restored-verified",
+  "restoredDigest": "a13ff9b1a28f42d7977b70814b6aefee7ed47e4419fa214859515e26b6e88b3e",
+  "restoredAt": "2026-08-12T19:30:33+03:00",
+  "restoredBy": "assistant (cp from verified backup)",
+  "backupPath": "/home/alperen/.deckent/recovery-snapshots/config.json.seam-sprint525.bak",
+  "untouched": ["keyring", "truth stores", "worker/runtime byproducts", "project config", "other configs"],
+  "note": "One-shot seam to admit the sprint that repairs the no-candidate front door (finding stays under PROVIDER-INGRESS-001). Not a standing gate bypass. To be folded into Sprint-525 settlement notes."
+}

@@ -649,6 +649,16 @@
       "notes": "ADR-D-002 (C4/C5) + ADR-G-002; ratchet + hot-path hard-block."
     },
     {
+      "file": "scripts/lint-operating-policy.mjs",
+      "class": "gate",
+      "owner": "dev-operating-contract-governance",
+      "npmScript": "lint:operating-policy (in lint:gates), lint:operating-policy:write",
+      "input": "docs/governance/deckent-dev-operating-policy.md HOST-BLOCK + AGENTS.md/CLAUDE.md OPERATING-POLICY blocks + docs/execution/active/ capsules + docs/MASTER-PLAN.md rows",
+      "output": "exit 1 on host-block drift or capsule-hygiene violation (--check); host blocks rewritten from canonical (--write); canonical policy sha256 digest on every run",
+      "expiry": "none — permanent lint:gates member (DEV-OPERATING-CONTRACT-001)",
+      "notes": "Provider-neutral projection gate: AGENTS.md and CLAUDE.md must carry the byte-identical execution-mode contract; capsules must map to owner-admitted, non-terminal MASTER rows (delete-on-consume). Pure functions reused by tests/scripts/lint-operating-policy.test.ts."
+    },
+    {
       "file": "scripts/lint-operation-catalog.mjs",
       "class": "gate",
       "owner": "operation-catalog-governance",

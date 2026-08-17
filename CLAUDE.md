@@ -111,6 +111,36 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
 - **CLOSURE-OS-LEDGER-AUTHORITY.** Closure disposition / sidecar-ledger mutation yalnız authenticated batch authority + append-only gate (`scripts/lint-closure-dispositions.mjs`) + projection settlement üzerinden yapılır; elle MASTER/ledger sınıflandırması veya sahte receipt YASAK. Phase-4 foundation COMPLETE (yalnız mekanizma; Phase-5 writer / genesis key / gerçek receipt+event KURULMADI). Ayrıntı: `docs/governance/closure-os-sidecar-ledger.md`.
 </operating_rules>
 
+<execution_mode>
+<!-- OPERATING-POLICY:START source=docs/governance/deckent-dev-operating-policy.md -->
+## Deckent-dev Execution Mode (operating policy projection)
+
+Canonical source: `docs/governance/deckent-dev-operating-policy.md` — read it before any
+run-touching work. Dogfood mode is a repository-development policy, not a Deckent user feature.
+
+- Never infer DOGFOOD_MODE from repository identity, retained DIRECTIVES, old sprint state,
+  config flags, or prior chat context. Authority: Alperen's live instruction, else the active
+  Outcome Capsule (`docs/execution/active/`), else UNSET → recommend with evidence, do not
+  start execution. Only Alperen changes the mode.
+- DOGFOOD_MODE=ON: implement through Deckent Goal/Mission/Flow/Run/Do; direct edits only via
+  the typed ADR-D-007 recovery seam; a degraded engine never silently flips the mode OFF
+  (declare DOGFOOD_HEALTH=DEGRADED, run one bounded recovery package, return to dogfood).
+- DOGFOOD_MODE=OFF: never create or mutate Deckent sprint/task/settlement state; work directly
+  in an isolated git worktree; every quality, i18n, wiring-closure, hermetic-test and
+  real-binary-proof rule still applies; close with commit/PR/CI evidence.
+- One outcome = one chat = one worktree = one PR. Other outcomes are reported as findings,
+  never implemented in-session. Findings classify as BLOCKS_CURRENT_DONE (fix in-package),
+  RELATED_BUT_NONBLOCKING (report only) or UNRELATED (one-line finding; never auto-enters
+  MASTER — owner admission required).
+- One implementation pass + one independent verification pass per outcome; a further audit
+  needs NEW disk/CI evidence. After GO, the next step is landing, not another design round.
+- CI results MUST be reported by named class — SCOPED_GREEN, PR_CLOSURE_GREEN,
+  MERGE_GROUP_GREEN, MAIN_POSTMERGE_GREEN; "required green" is never "repo green".
+- Handoff between agents happens via the versioned handoff receipt (schema in the canonical
+  policy), never by relaying transcripts; the owner is not a message bus.
+<!-- OPERATING-POLICY:END -->
+</execution_mode>
+
 <rules>
 ## Rules
 > `DIRECTIVES.md` — aktif run sırasında owner/system talimatlarından sonra bağlayıcı execution contractıdır. Auto-load dışı (32KB, F1-TOK) — run'a dokunan işte OKU.

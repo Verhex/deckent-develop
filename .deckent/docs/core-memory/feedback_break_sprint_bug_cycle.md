@@ -9,6 +9,8 @@ metadata:
 
 **Kural:** Sprint planlanırken **sadece bug fix odaklı sprint yasak**. Her sprint en az 1 ileri-yönlü vizyon task'ı (W-E evrimsel, W-K dead-code wire, W-H docs growth) içermeli. Bug fix → fix the fix → fix the fix of the fix döngüsü = stagnation.
 
+**Amendment (Alperen 2026-08-17 — operating policy §9):** Yasak olan **tekrarlayan reaktif fix-DÖNGÜSÜDÜR**, tekil bounded closure paketi değil. Incident, release-closure, CI-repair, recovery ve settlement paketleri YALNIZ kendi closure kapsamını taşır — bunlara zorla feature EKLENMEZ. Forward/vizyon işi ayrı committed outcome olarak yürür. Canonical: `docs/governance/deckent-dev-operating-policy.md` §9.
+
 **Why:** Crisis Stabilization Initiative (Sprint 177-183) 7 sprint sadece bug fix'e harcandı — momentum kaybedildi, Trinity 3-face gelişimi durdu. Çıkış stratejisi: Sprint 184+ yeni feature task'ları zorunlu, bug fix paralel.
 
 **How to apply:**

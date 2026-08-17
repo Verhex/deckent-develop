@@ -1,5 +1,45 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-533 Learnings
+- Sprint sprint-533 Learnings: ## Sprint sprint-533 Learnings
+
+## Gains
+- 533-001 — close the local-llm agentic worker and settlement lineage — Verified preserved local-llm lineage: empty apiKeyEnv becomes undefined, the dynamic OpenAI-compa...
+- 533-002 — close the deckent local-llm lifecycle command lineage — Verified npx tsc --noEmit passed.
+
+## Sprint sprint-525 Learnings
+- Sprint sprint-525 Learnings: ## Sprint sprint-525 Learnings
+- Fix: Probe contract freeze — typed provider-evidence-probe contracts: NO_GO — Refusing to spawn without every explicitly forced skill active. forceSkills declared [typescript-expert] but SKILL.md co
+- Fix: Tier flip — sol premium_plus + explicit preferreds + pricing + invariant: NO_GO — Refusing to spawn without every explicitly forced skill active. forceSkills declared [typescript-expert] but SKILL.md co
+
+## Sprint sprint-524 Learnings
+- Sprint sprint-524 Learnings: ## Sprint sprint-524 Learnings
+- KN3 projection-parity guard — landing-proposal artifacts are not task ids: GO_WITH_TECH_DEBT — Root cause: assertTaskProjectionParity's stray-file scan filters on f.startsWith('task-') && f.endsWith('.json'), which
+
+## Gains
+- 524-001 — Codex evidence-source registrations + bootstrap consumption — What landed (3/3 goCriteria ticked with evidence):
+- 524-002 — Authoring flow sourceResolver — the bootstrap exposes, the CLI consumes — What landed (3/3 goCriteria ticked with evidence):
+- 524-003 — The live unlock proof — authored policy, first healthy xverify — Wrote tests/cli/xverify-authority-unlock.test.ts (only file in scope.filesWrite), a hermetic test...
+- 524-004 — XVerify tier floor — an authoritative author-model input, enforced in the resolver — Tier floor implemented in the resolver, with the author model as an authoritative CLI input.
+- 524-005 — Born 3323 — producer fencing compares the pre-enrichment core — ROOT CAUSE (read-verified).
+- 524-006 — Born 3324 — provider-limit death is its own typed class, lineage-visible — Born 3324 — PROVIDER_LIMIT_DEATH_ZERO_WRITE now travels all four layers, and the two neighbouring...
+- 524-007 — The 523-001-fix unmeasurable-diff RCA — evidence over theory — RCA COMPLETE — the mechanism is measured, not theorised, and reproduced in a hermetic fixture.
+- 524-009 — Fix-budget contract pin — admitted rounds are the documented truth — Pinned the ACTUAL fix-budget contract in one new hermetic test file.
+- …and 4 more delivered
+
+## Sprint sprint-521 Learnings
+- Sprint sprint-521 Learnings: ## Sprint sprint-521 Learnings
+- Skill catalog S1 — one effective read model behind the existing API (row 7012): GO_WITH_TECH_DEBT — Skill catalog S1 — one effective read model behind the existing skill-pool API (design follow-up-works/skill-catalog-aut
+- Skill catalog S2 — V3 profile state carried as data (row 7012): GO_WITH_TECH_DEBT — Skill catalog S2 — V3 profile state carried as data (design follow-up-works/skill-catalog-authority-design-2026-08-11.md
+- Agent catalog S0 — the discovery census gate (row 7011): GO_WITH_TECH_DEBT — Implemented a test-local recursive src census that pins all detected AGENTS_DIR definitions and raw agent-layer director
+- The plan gate learns read-satisfiability (born from two honest refusals): GO_WITH_TECH_DEBT — Extended the existing scope-satisfiability gate (no new gate mechanism) with a read-side sibling of rule 1b: Satisfiabil
+
+## Gains
+- 521-001 — Fail-closed tenant authority for autonomous approval ingress (row 4021, rerun) — Root-cause inventory: autonomous approval request/pending/accept/reject in approval-adapter.ts pr...
+- 521-002 — Agent catalog S1 — schema and state model, types only (row 7011) — S1 landed exactly as the design specifies: the versioned manifest schema + the validity/provenanc...
+- 521-003 — Agent catalog S2 — the resolver behind the existing API (row 7011) — Implemented S2 exactly as scoped: the D1 owner-approved precedence (L1 project-override > L2 lear...
+- 521-006 — Crash artifacts gain retention and a bounded reader (row 121 second slice) — Added age+count+size crash-artifact retention (CrashRetentionConfig: maxAgeDays/maxCount/maxSizeM...
+
 ## Sprint sprint-518 Learnings
 - Sprint sprint-518 Learnings: ## Sprint sprint-518 Learnings
 
