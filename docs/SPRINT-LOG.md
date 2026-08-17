@@ -13183,3 +13183,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 547-004: terminal ingress wiring + i18n surface (depends on Tasks 1,2) (INTERRUPTED)
 
 ---
+## Sprint 548 — sprint-548
+
+**Status:** ABORTED
+**Date:** 2026-08-17
+**Duration:** 668s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 668076ms |
+
+### Tasks
+
+- 548-001: parser-based shell risk classification wired into the loop (DONE)
+- 548-002: typed grant scopes + auto-decision audit events (DONE)
+- 548-003: direct/nested/MCP permission parity (depends on Tasks 1,2) (DONE)
+- 548-004-fix-fix: Fix: Fix: local-llm effective context + reserve accounting + restart diagnostics (PAUSED)
+- 548-004-fix: Fix: local-llm effective context + reserve accounting + restart diagnostics (NO_GO)
+- 548-004: local-llm effective context + reserve accounting + restart diagnostics (NO_GO)
+
+---

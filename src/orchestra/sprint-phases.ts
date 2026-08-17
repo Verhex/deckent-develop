@@ -109,10 +109,6 @@ import {
 import { AgentPoolManager } from '../core/agent-pool.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
 import { detectProjectStack } from '../core/stack-detector.js';
-import {
-  generateProjectConventionsSkill,
-  getGeneratedContent,
-} from './temp-skill-generator.js';
 
 // ─── Rich Output ─────────────────────────────────────────────────
 import { showSplashIfEnabled } from '../cli/helpers/splash.js';
@@ -1115,16 +1111,13 @@ export interface SpawnPhaseResult {
  * the exact PLAN rendering at the phase boundary so the lineage reuses one
  * immutable-on-disk body instead of regenerating it during each repair round.
  */
-export function persistPlanGeneratedProjectConventionsSkill(projectRoot: string): boolean {
-  const projectStack = detectProjectStack(projectRoot);
-  if (!projectStack) return false;
-
-  const generatedSkill = generateProjectConventionsSkill(projectStack);
-  const content = getGeneratedContent(generatedSkill);
-  if (!content) return false;
-
-  new SkillPoolManager(projectRoot).saveGeneratedSkill(generatedSkill, content);
-  return true;
+export function persistPlanGeneratedProjectConventionsSkill(_projectRoot: string): boolean {
+  // RETIRED (CATALOG-STATS-AUTHORITY-001, 2026-08-18): project-conventions is
+  // no longer a skill — its content ships as the deterministic project-context
+  // prompt segment (task-builder → prompt-god-template), so persisting a skill
+  // body here only resurrected the ghost after every SPAWN. The export remains
+  // for compiled-contract compatibility and always reports the honest no-op.
+  return false;
 }
 
 

@@ -2751,6 +2751,22 @@ const MESSAGES: MessageMap = {
   'native.endpoint_health.healthy': { en: 'healthy', tr: 'sağlıklı' },
   'native.endpoint_health.unhealthy': { en: 'unhealthy', tr: 'sağlıksız' },
   'native.endpoint_health.unknown': { en: 'unknown', tr: 'bilinmiyor' },
+  'native.context.effective': {
+    en: 'Context: configured {configured} · effective {effective} · native budget derived from {budgetSource}',
+    tr: 'Bağlam: yapılandırılan {configured} · etkin {effective} · native bütçe kaynağı: {budgetSource}',
+  },
+  'native.context.restart_required': {
+    en: 'Context: configured {configured} · effective {effective} · restart required · native budget derived from {budgetSource}',
+    tr: 'Bağlam: yapılandırılan {configured} · etkin {effective} · yeniden başlatma gerekli · native bütçe kaynağı: {budgetSource}',
+  },
+  'native.context.unavailable': {
+    en: 'Context: configured {configured} · effective unavailable (live server metadata unavailable)',
+    tr: 'Bağlam: yapılandırılan {configured} · etkin değer kullanılamıyor (canlı sunucu metadata erişilemiyor)',
+  },
+  'native.context.budget_source.effective': {
+    en: 'effective server context',
+    tr: 'etkin sunucu bağlamı',
+  },
   'native.switch.legacy-model-alias': {
     en: 'switch failed — "{detail}" is a legacy alias; use an exact provider API model ID such as claude-sonnet-5 or gpt-5.6-sol',
     tr: 'geçiş başarısız — "{detail}" eski bir takma addır; claude-sonnet-5 veya gpt-5.6-sol gibi tam sağlayıcı API model kimliği kullanın',

@@ -13,6 +13,22 @@ export interface PermissionRule {
   pattern: string;
 }
 
+/**
+ * A remembered approval for a confirm-tier call covers the whole tool. The
+ * permission engine's always-floor remains authoritative over this pattern,
+ * so an always-tier call can never be auto-approved by the resulting rule.
+ */
+export function grantPatternFor(
+  tool: string,
+  resource: string,
+  lifetime: 'session' | 'always',
+): string {
+  void tool;
+  void resource;
+  void lifetime;
+  return '**';
+}
+
 /** Compile a glob to a RegExp: `**`→`.*`, `*`→`[^/]*`, rest escaped. */
 function globToRegExp(pattern: string): RegExp {
   let out = '';

@@ -3,9 +3,11 @@
 // Wraps the REPL's existing tool dispatchers (chat-tool-exec: read/write/edit/
 // bash; chat-tool-bridge: deckent_* CLI) as native ToolDefinitions for the
 // AgentSession. The dispatchers run with NO internal confirm — the AgentSession
-// permission engine + guards are the SINGLE gate (no double-prompt). Legacy tier
+// permission engine + guards are the SINGLE gate (no double-prompt), including
+// direct, nested deckent_call_tool, CLI-bridge, and MCP-backed dispatch. Legacy tier
 // names ('read'|'confirm'|'always') map to the engine's ('silent'|'confirm'|
-// 'always'); read→silent. (MCP tool source is a deferred follow-up.)
+// 'always'); read→silent. MCP bridge confirms are deliberately pre-approved
+// below only after AgentSession has made the live permission decision.
 
 import { z, type ZodTypeAny } from 'zod';
 import { ToolRegistry } from '../../agent/tools/registry.js';
@@ -636,7 +638,11 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
     },
   });
 
-  // MCP tools (external) — always 'confirm' (never silent); single gate via no-op confirm.
+  // MCP tools (external) — always 'confirm' (never silent). The bridge's legacy
+  // confirm callback is a no-op approval because every handler invocation is
+  // reached only after AgentSession's live mode + live rule-store decision.
+  // Nested deckent_call_tool reaches the same decision through the parity exec
+  // resolver before invoking this handler, so the bridge must never ask again.
   if (opts.mcpBridge) {
     const alwaysApprove = async (): Promise<boolean> => true;
     const bridge = opts.mcpBridge;

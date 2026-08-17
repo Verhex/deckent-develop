@@ -337,8 +337,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // completion): +5 — loop-budget, scratch-checkpoint and native-agent-budget-
   // wiring suites plus the scratch-checkpoint production module and their
   // import closures enter the graph.
-  count: 14346,
-  digest: 'f9835ca2ed7ecd77f8688679d1585c7c2d9f09f4b4dcbcc651b0e49962470bb6',
+  // 2026-08-18 (HORIZON package 2, sprint-548 + Brain completion): +4 —
+  // shell-risk module+suite, permission-grants and permission-parity suites
+  // enter the graph; loop/permission/events/context-budget/transport/local-llm
+  // changed content.
+  count: 14350,
+  digest: 'd2b1caf39dde80afa7cee5bc07ba5a17b24c87c3370227f698e837601205ec74',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -549,8 +553,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-18 (NATIVE-AGENT-HORIZON-001 package 1): +1 — the scratch-checkpoint
   // production module enters the inventory; loop/session/transcript/events/
   // recursion/config/bridge/run.tsx/messages hashes moved.
-  count: 1247,
-  digest: 'fb15366381d0e3f80e76cbd2e51f0ffc5274122085a73eb6ed2445166c5f5785',
+  // 2026-08-18 (HORIZON package 2): +1 — src/agent/guards/shell-risk.ts enters
+  // the inventory; loop/permission/events/context-budget/transport hashes moved.
+  count: 1248,
+  digest: '05ed599bba6e1aa47354f7a7eefc7e9da804f5e4e622611abc3cdbf906e2f112',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

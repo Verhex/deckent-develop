@@ -14,6 +14,7 @@ import { ErrorRegistry } from '../../core/errors.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print } from '../helpers/output.js';
+import { deriveEffectiveContext, type EffectiveContextResult } from '../../agent/context-budget.js';
 
 const PROVIDER_NAME = 'local-llm';
 const PID_FILE = join('.deckent', 'runtime', 'local-llm.pid');
@@ -33,6 +34,8 @@ export interface LocalLlmStatus {
   healthy: boolean;
   models: Array<{ id: string; ownedBy?: string }>;
   error?: string;
+  configuredContextSize: number;
+  effectiveContext: EffectiveContextResult | null;
 }
 
 type SpawnFn = typeof spawn;
@@ -278,24 +281,43 @@ export async function getLocalLlmStatus(deps: LocalLlmCommandDeps = {}): Promise
   const base = config.endpoint.replace(/\/$/, '');
   const healthUrl = new URL('/health', config.endpoint).toString();
   try {
-    const [healthResponse, modelsResponse] = await Promise.all([
+    const [healthResponse, modelsResponse, propsResponse] = await Promise.all([
       fetchFn(healthUrl),
       fetchFn(`${base}/models`),
+      fetchFn(`${base}/props`),
     ]);
     const body = modelsResponse.ok
-      ? await modelsResponse.json() as { data?: Array<{ id?: unknown; owned_by?: unknown }> }
+      ? await modelsResponse.json() as { data?: Array<{ id?: unknown; owned_by?: unknown; context_length?: unknown }> }
       : {};
     const models = Array.isArray(body.data)
       ? body.data.flatMap((model) => typeof model.id === 'string'
         ? [{ id: model.id, ...(typeof model.owned_by === 'string' ? { ownedBy: model.owned_by } : {}) }]
         : [])
       : [];
-    return { endpoint: config.endpoint, healthy: healthResponse.ok && modelsResponse.ok, models };
+    const props = propsResponse.ok
+      ? await propsResponse.json() as { default_generation_settings?: { n_ctx?: unknown }; n_ctx?: unknown }
+      : {};
+    const serverReported = props.default_generation_settings?.n_ctx ?? props.n_ctx;
+    const advertised = body.data?.find((model) => model.id === config.modelAlias)?.context_length;
+    const serverReportedContext = typeof serverReported === 'number' ? serverReported : null;
+    const modelAdvertisedContext = typeof advertised === 'number' ? advertised : null;
+    const healthy = healthResponse.ok && modelsResponse.ok;
+    return {
+      endpoint: config.endpoint,
+      healthy,
+      models,
+      configuredContextSize: config.contextSize,
+      effectiveContext: healthy
+        ? deriveEffectiveContext({ configuredContextSize: config.contextSize, serverReportedContext, modelAdvertisedContext })
+        : null,
+    };
   } catch (error) {
     return {
       endpoint: config.endpoint,
       healthy: false,
       models: [],
+      configuredContextSize: config.contextSize,
+      effectiveContext: null,
       error: error instanceof Error ? error.message : String(error),
     };
   }

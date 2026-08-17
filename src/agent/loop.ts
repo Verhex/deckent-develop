@@ -11,7 +11,7 @@ import { composeSystemPrompt } from './identity.js';
 import { decide, resolveTier } from './permission.js';
 import type { PermissionPolicy } from './permission-policy.js';
 import type { GrantLifetime, RuleStore } from './permission-store.js';
-import type { ApprovalMode } from './permission-types.js';
+import { grantPatternFor, type ApprovalMode } from './permission-types.js';
 import { ToolRegistry } from './tools/registry.js';
 import type { ToolResult } from './tools/types.js';
 import { Transcript } from './transcript.js';
@@ -25,7 +25,9 @@ import {
 import type { ResolvedNativeAgentBudget } from '../core/execution-budget-policy.js';
 import { checkSelfModifying } from './guards/self-modifying.js';
 import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
-import { fitMessagesToBudget } from './context-budget.js';
+import { classifyShellCommand } from './guards/shell-risk.js';
+import { fitMessagesToBudget, derivePromptBudget } from './context-budget.js';
+import { matchRule } from './permission-types.js';
 
 export type PermissionResponse = { decision: 'once' | 'session' | 'always' | 'deny' };
 
@@ -130,7 +132,26 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // BEFORE the backend hits its window — a server-side truncation returns an
     // empty turn with HTTP 200 and looks like a dead REPL.
     let messages = transcript.toProviderMessages();
-    const budget = deps.getContextBudgetTokens?.();
+    const rawBudget = deps.getContextBudgetTokens?.();
+    // 548-004 production wiring: the visible reserve arithmetic — system prompt,
+    // serialized tool schemas and the configured output/safety reserves all come
+    // OUT of the context before transcript fitting, so the backend can never be
+    // handed a prompt that leaves no room for its own answer.
+    const budget = rawBudget !== undefined && rawBudget > 0
+      ? Math.max(
+          derivePromptBudget({
+            contextTokens: rawBudget,
+            systemPrompt: system,
+            toolSchemas: deps.registry.toNativeSchemas(),
+            outputReserveTokens: deps.nativeBudget?.outputReserveTokens ?? 0,
+            contextSafetyReserveTokens: deps.nativeBudget?.contextSafetyReserveTokens ?? 0,
+          }).promptBudgetTokens,
+          // Floor: overheads (system prompt + tool schemas) may exceed a small
+          // configured budget entirely — fitting must still keep a minimal
+          // window rather than silently disabling compaction.
+          Math.ceil(rawBudget * 0.25),
+        )
+      : rawBudget;
     if (budget !== undefined && budget > 0) {
       const fit = fitMessagesToBudget(messages, budget);
       if (fit.droppedCount > 0) {
@@ -157,7 +178,17 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         else if (ev.type === 'tool-call') { calls.push(ev); yield { type: 'tool-proposed', id: ev.id, tool: ev.name, args: ev.args }; }
         else if (ev.type === 'usage') {
           yield { type: 'usage', inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
-          if (budgetState) budgetState.cumulativeTokens += ev.inputTokens + ev.outputTokens;
+          if (budgetState) {
+            // Fresh-token accounting: each round's reported input re-counts the
+            // WHOLE resent context, so summing raw input grows quadratically and
+            // a normal 118k-context analysis exhausted a 2M cap in ~17 rounds
+            // (live incident 2026-08-18). Count output plus only the POSITIVE
+            // input growth — the honest new-work approximation. The audit/usage
+            // events above stay raw and untouched.
+            const freshInput = Math.max(0, ev.inputTokens - budgetState.lastInputTokens);
+            budgetState.lastInputTokens = ev.inputTokens;
+            budgetState.cumulativeTokens += freshInput + ev.outputTokens;
+          }
           if (deps.costGuard) {
             accrue(deps.costGuard, { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens });
             const c = costExceeded(deps.costGuard);
@@ -245,9 +276,35 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       const resource = primaryResource(call.args);
       const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
       let tier = resolveTier(def, deps.policy);
+      const isShellTool = call.name === 'bash' || call.name.endsWith('_bash');
+      const rawShellCommand = call.args['command'] ?? call.args['cmd'] ?? resource;
+      const shellCommand = typeof rawShellCommand === 'string' ? rawShellCommand : '';
+      const shellRisk = isShellTool ? classifyShellCommand(shellCommand) : undefined;
+      if (shellRisk?.risk === 'destructive') tier = 'always';
+      else if (shellRisk?.risk === 'safe-read') tier = 'silent';
       if (elevated) tier = 'always';
 
       const decision = decide(call.name, resource, tier, { rules: deps.ruleStore.activeRules(), denies: deps.ruleStore.activeDenies(), policy: deps.policy, mode: deps.getMode() });
+      // Every NON-ask outcome is an auditable auto-decision (548-T2 contract):
+      // mode, tool, resource class, matched rule, tier, decision and floor
+      // status — the trace-side record of what ran without a human prompt.
+      if (decision !== 'ask') {
+        const matched = decision === 'deny'
+          ? deps.ruleStore.activeDenies().find((d) => matchRule(d, call.name, resource))
+          : deps.ruleStore.activeRules().find((r) => matchRule(r, call.name, resource));
+        yield {
+          type: 'permission-auto-decision',
+          tool: call.name,
+          resource,
+          resourceClass: isShellTool ? (shellRisk?.risk ?? 'modify') : 'non-shell',
+          decision: decision === 'deny' ? 'deny' : 'allow',
+          matchedRule: matched ? `${matched.tool}(${matched.pattern})` : null,
+          mode: deps.getMode(),
+          tier,
+          grantLifetime: 'none',
+          floor: tier === 'always',
+        };
+      }
       if (decision === 'deny') {
         const output = '[denied by policy]';
         yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output };
@@ -267,7 +324,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         // A self-modifying-elevated call never persists a grant — each deckent-source
         // write must be re-confirmed, or a single "always" would silently auto-approve
         // later source writes by this tool and defeat the guard (review follow-up #2).
-        if (resp.decision !== 'once' && !elevated) deps.ruleStore.grant({ tool: call.name, pattern: resource || '**' }, resp.decision as GrantLifetime);
+        if (resp.decision !== 'once' && !elevated) {
+          const lifetime = resp.decision as Exclude<GrantLifetime, 'once'>;
+          deps.ruleStore.grant({ tool: call.name, pattern: grantPatternFor(call.name, resource, lifetime) }, lifetime);
+        }
       }
 
       yield { type: 'tool-executing', id: call.id, tool: call.name };

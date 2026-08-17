@@ -3,10 +3,23 @@
 // consumes them. Transport-neutral: in-proc AsyncIterable, SSE/WS, or NDJSON.
 
 import type { ToolPermissionTier } from './tools/types.js';
+import type { ApprovalMode } from './permission-types.js';
 
 export interface TextDeltaEvent { type: 'text-delta'; text: string; }
 export interface ToolProposedEvent { type: 'tool-proposed'; id: string; tool: string; args: Record<string, unknown>; }
 export interface PermissionRequestEvent { type: 'permission-request'; id: string; tool: string; resource: string; tier: ToolPermissionTier; }
+export interface PermissionAutoDecisionEvent {
+  type: 'permission-auto-decision';
+  tool: string;
+  resource: string;
+  resourceClass: 'safe-read' | 'modify' | 'destructive' | 'non-shell';
+  decision: 'allow' | 'deny';
+  matchedRule: string | null;
+  mode: ApprovalMode;
+  tier: ToolPermissionTier;
+  grantLifetime: 'none' | 'session' | 'always';
+  floor: boolean;
+}
 export interface ToolExecutingEvent { type: 'tool-executing'; id: string; tool: string; }
 export interface ToolResultEvent { type: 'tool-result'; id: string; tool: string; ok: boolean; output: string; }
 export interface TurnEndEvent { type: 'turn-end'; }
@@ -24,7 +37,7 @@ export interface NoticeEvent { type: 'notice'; code: string; message: string; }
  *  how to fulfil and render it. */
 export interface BudgetCheckpointRequestEvent {
   type: 'budget-checkpoint-request';
-  reason: 'cadence-rounds' | 'cadence-toolcalls' | 'no-progress';
+  reason: 'cadence-rounds' | 'cadence-toolcalls' | 'no-progress' | 'token-pressure';
   rounds: number;
   toolCalls: number;
 }
@@ -33,6 +46,7 @@ export type AgentEvent =
   | TextDeltaEvent
   | ToolProposedEvent
   | PermissionRequestEvent
+  | PermissionAutoDecisionEvent
   | ToolExecutingEvent
   | ToolResultEvent
   | TurnEndEvent

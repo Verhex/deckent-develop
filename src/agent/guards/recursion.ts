@@ -22,6 +22,8 @@ export interface NativeBudgetState {
   rounds: number;
   toolCalls: number;
   cumulativeTokens: number;
+  /** Last round's provider-reported input size — fresh-token delta base. */
+  lastInputTokens: number;
   noProgressRounds: number;
   startedAtMs: number;
   /** name+canonicalized-args digests seen this session (semantic-repeat detection). */
@@ -31,6 +33,8 @@ export interface NativeBudgetState {
   lastCheckpointToolCalls: number;
   /** a no-progress checkpoint was already requested; next no-progress round terminates. */
   noProgressCheckpointRequested: boolean;
+  /** the 80%-of-token-cap checkpoint was already requested once. */
+  tokenPressureCheckpointRequested: boolean;
 }
 
 export function createNativeBudgetState(nowMs: number = Date.now()): NativeBudgetState {
@@ -38,18 +42,20 @@ export function createNativeBudgetState(nowMs: number = Date.now()): NativeBudge
     rounds: 0,
     toolCalls: 0,
     cumulativeTokens: 0,
+    lastInputTokens: 0,
     noProgressRounds: 0,
     startedAtMs: nowMs,
     seenCallDigests: new Set(),
     lastCheckpointRound: 0,
     lastCheckpointToolCalls: 0,
     noProgressCheckpointRequested: false,
+    tokenPressureCheckpointRequested: false,
   };
 }
 
 export type NativeBudgetVerdict =
   | { verdict: 'ok' }
-  | { verdict: 'checkpoint'; reason: 'cadence-rounds' | 'cadence-toolcalls' | 'no-progress' }
+  | { verdict: 'checkpoint'; reason: 'cadence-rounds' | 'cadence-toolcalls' | 'no-progress' | 'token-pressure' }
   | { verdict: 'terminate'; code:
       | 'native-budget.rounds-exhausted'
       | 'native-budget.toolcalls-exhausted'
@@ -75,6 +81,14 @@ export function evaluateNativeBudget(
   }
   if (state.cumulativeTokens > budget.maxCumulativeTokens) {
     return { verdict: 'terminate', code: 'native-budget.tokens-exhausted' };
+  }
+  if (!state.tokenPressureCheckpointRequested
+    && state.cumulativeTokens >= budget.maxCumulativeTokens * 0.8) {
+    // 80% pressure: one checkpoint request so the epoch compaction shrinks the
+    // resent context long before the hard stop — the session lands its answer
+    // instead of dying mid-analysis (live incident 2026-08-18).
+    state.tokenPressureCheckpointRequested = true;
+    return { verdict: 'checkpoint', reason: 'token-pressure' };
   }
   if (state.noProgressRounds >= budget.maxNoProgressRounds) {
     if (!state.noProgressCheckpointRequested) {

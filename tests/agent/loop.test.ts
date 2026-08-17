@@ -67,7 +67,8 @@ describe('runAgentTurn', () => {
     ]);
     const t = new Transcript();
     const evs = await drain(runAgentTurn(baseDeps({ adapter }), t, 'go'));
-    expect(evs.map((e) => e.type)).toEqual(['text-delta', 'tool-proposed', 'tool-executing', 'tool-result', 'text-delta', 'turn-end']);
+    // 548-T2: every promptless run now carries its auditable auto-decision event.
+    expect(evs.map((e) => e.type)).toEqual(['text-delta', 'tool-proposed', 'permission-auto-decision', 'tool-executing', 'tool-result', 'text-delta', 'turn-end']);
     expect(evs).toContainEqual({ type: 'tool-result', id: 'c1', tool: 'echo', ok: true, output: 'echoed:X' });
     // round-trip: the 2nd request carries the assistant toolCalls + the tool result.
     const second = requests[1]!;

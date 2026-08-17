@@ -103,3 +103,21 @@ describe('evaluateNativeBudget (T2)', () => {
     expect(recursionExceeded(26)).toBe(true);
   });
 });
+
+describe('token accounting honesty (live incident 2026-08-18)', () => {
+  it('token-pressure at 80% requests ONE checkpoint before the hard stop', () => {
+    const s = createNativeBudgetState(0);
+    s.rounds = 3;
+    s.cumulativeTokens = Math.ceil(B.maxCumulativeTokens * 0.8);
+    expect(evaluateNativeBudget(s, B, 1)).toEqual({ verdict: 'checkpoint', reason: 'token-pressure' });
+    expect(evaluateNativeBudget(s, B, 1)).toEqual({ verdict: 'ok' });
+    s.cumulativeTokens = B.maxCumulativeTokens + 1;
+    expect(evaluateNativeBudget(s, B, 1)).toEqual({ verdict: 'terminate', code: 'native-budget.tokens-exhausted' });
+  });
+
+  it('fresh-token base field starts at zero (delta accounting seam)', () => {
+    const s = createNativeBudgetState(0);
+    expect(s.lastInputTokens).toBe(0);
+    expect(s.tokenPressureCheckpointRequested).toBe(false);
+  });
+});

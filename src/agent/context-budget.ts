@@ -26,6 +26,80 @@ export function estimateMessageTokens(m: ProviderMessage): number {
   return Math.ceil(chars / 4) + 4;
 }
 
+export type EffectiveContextProvenance =
+  | { source: 'configured'; tokens: number; counted: true }
+  | { source: 'server-reported'; tokens: number | null; counted: boolean }
+  | { source: 'model-advertised'; tokens: number | null; counted: boolean };
+
+export interface EffectiveContextResult {
+  effectiveContextSize: number;
+  provenance: EffectiveContextProvenance[];
+}
+
+function positiveIntegerOrNull(value: number | null): number | null {
+  return value !== null && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+/** Derive the usable context ceiling exclusively from known, positive signals. */
+export function deriveEffectiveContext(input: {
+  configuredContextSize: number;
+  serverReportedContext: number | null;
+  modelAdvertisedContext: number | null;
+}): EffectiveContextResult {
+  const configured = positiveIntegerOrNull(input.configuredContextSize);
+  if (configured === null) throw new RangeError('configuredContextSize must be a positive integer');
+  const server = positiveIntegerOrNull(input.serverReportedContext);
+  const advertised = positiveIntegerOrNull(input.modelAdvertisedContext);
+  const known = [configured, ...(server === null ? [] : [server]), ...(advertised === null ? [] : [advertised])];
+  return {
+    effectiveContextSize: Math.min(...known),
+    provenance: [
+      { source: 'configured', tokens: configured, counted: true },
+      { source: 'server-reported', tokens: server, counted: server !== null },
+      { source: 'model-advertised', tokens: advertised, counted: advertised !== null },
+    ],
+  };
+}
+
+export interface PromptBudgetBreakdown {
+  contextTokens: number;
+  systemPromptTokens: number;
+  toolSchemaTokens: number;
+  outputReserveTokens: number;
+  contextSafetyReserveTokens: number;
+  promptBudgetTokens: number;
+}
+
+/** Visible prompt-budget arithmetic used before transcript fitting. */
+export function derivePromptBudget(input: {
+  contextTokens: number;
+  systemPrompt: string;
+  toolSchemas: readonly unknown[];
+  outputReserveTokens: number;
+  contextSafetyReserveTokens: number;
+}): PromptBudgetBreakdown {
+  const nonNegative = (value: number, field: string): number => {
+    if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${field} must be a non-negative integer`);
+    return value;
+  };
+  const contextTokens = nonNegative(input.contextTokens, 'contextTokens');
+  const systemPromptTokens = estimateTokens(input.systemPrompt);
+  const toolSchemaTokens = estimateTokens(JSON.stringify(input.toolSchemas));
+  const outputReserveTokens = nonNegative(input.outputReserveTokens, 'outputReserveTokens');
+  const contextSafetyReserveTokens = nonNegative(input.contextSafetyReserveTokens, 'contextSafetyReserveTokens');
+  return {
+    contextTokens,
+    systemPromptTokens,
+    toolSchemaTokens,
+    outputReserveTokens,
+    contextSafetyReserveTokens,
+    promptBudgetTokens: Math.max(
+      0,
+      contextTokens - systemPromptTokens - toolSchemaTokens - outputReserveTokens - contextSafetyReserveTokens,
+    ),
+  };
+}
+
 export interface FitResult {
   /** The kept window (most-recent messages, pairing-safe). */
   messages: ProviderMessage[];

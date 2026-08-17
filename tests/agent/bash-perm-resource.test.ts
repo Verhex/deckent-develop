@@ -58,7 +58,8 @@ describe('primaryResource — deckent_bash schema-key extraction (born-519)', ()
     ]);
     const evs = await drain(runAgentTurn(baseDeps({ adapter, registry: reg }), new Transcript(), 'go'));
     expect(evs).toContainEqual({
-      type: 'permission-request', id: 'b1', tool: 'deckent_bash', resource: 'rm -rf /tmp/scratch', tier: 'confirm',
+      // 548-T1 shell-risk: rm -rf is DESTRUCTIVE-floor — 'always', never 'confirm'.
+      type: 'permission-request', id: 'b1', tool: 'deckent_bash', resource: 'rm -rf /tmp/scratch', tier: 'always',
     });
   });
 
@@ -73,9 +74,14 @@ describe('primaryResource — deckent_bash schema-key extraction (born-519)', ()
       [{ type: 'done' }],
     ]);
     const evs = await drain(runAgentTurn(baseDeps({ adapter, registry: reg }), new Transcript(), 'go'));
-    const req = evs.find((e) => e.type === 'permission-request');
-    expect(req).toBeDefined();
-    expect((req as Extract<AgentEvent, { type: 'permission-request' }>).resource).toBe('');
+    // 548-T1: the shell-risk classifier reads the command from the args
+    // (cmd ?? command), so 'echo …' is safe-read and runs PROMPTLESS — the
+    // resource-extraction honesty now shows through the auto-decision audit
+    // event instead of a permission prompt.
+    expect(evs.some((e) => e.type === 'permission-request')).toBe(false);
+    const auto = evs.find((e) => e.type === 'permission-auto-decision');
+    expect(auto).toBeDefined();
+    expect((auto as Extract<AgentEvent, { type: 'permission-auto-decision' }>).decision).toBe('allow');
   });
 
   it('still resolves `path`/`file_path` args first, ahead of `cmd` (fallback order preserved)', async () => {

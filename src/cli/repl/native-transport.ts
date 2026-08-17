@@ -23,6 +23,7 @@ import {
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
 import { getMessage } from '../helpers/messages.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
+import { deriveEffectiveContext, type EffectiveContextResult } from '../../agent/context-budget.js';
 
 export interface NativeEndpointHealth {
   endpoint: string;
@@ -42,6 +43,8 @@ export interface ResolvedProvider {
    *  publish /models — local-llm today). Absent for hosted providers whose
    *  registry is the identity authority. */
   modelIdentity?: () => Promise<NativeModelIdentityVerdict>;
+  contextStatus?: () => Promise<EffectiveContextResult | null>;
+  configuredContextSize?: number;
 }
 export interface ProviderError {
   error: string;
@@ -83,7 +86,7 @@ export type NativeTransportConfig = TransportConfig & {
     [provider: string]: unknown;
   };
   /** Resolved direct llama.cpp lifecycle authority shared with the CLI command. */
-  local_llm?: { endpoint?: string };
+  local_llm?: { endpoint?: string; contextSize?: number };
 };
 
 /** What a /model — /provider switch (or the settings pin) asks for. */
@@ -181,20 +184,61 @@ export async function formatNativeProviderStatus(
   });
   // Model-identity verdict (LOCAL-LLM-MODEL-IDENTITY-001): surfaced at session
   // start so a config/router mismatch is visible BEFORE the first failing turn.
+  const lines = [statusLine];
   const identity = await resolved.modelIdentity?.();
   if (identity && identity.state === 'unknown-model') {
-    return `${statusLine}\n${getMessage('native.model_identity.unknown', lang, {
+    lines.push(getMessage('native.model_identity.unknown', lang, {
       model: identity.model,
       published: identity.published.length > 0 ? identity.published.join(', ') : '—',
-    })}`;
+    }));
   }
   if (identity && identity.state === 'unreachable') {
-    return `${statusLine}\n${getMessage('native.model_identity.unreachable', lang, {
+    lines.push(getMessage('native.model_identity.unreachable', lang, {
       model: identity.model,
       detail: identity.detail,
-    })}`;
+    }));
   }
-  return statusLine;
+  if (resolved.providerName !== 'local-llm' || resolved.configuredContextSize === undefined) return lines.join('\n');
+  if (!health?.healthy) {
+    lines.push(getMessage('native.context.unavailable', lang, {
+      configured: String(resolved.configuredContextSize),
+    }));
+    return lines.join('\n');
+  }
+  const context = await resolved.contextStatus?.();
+  if (context === null || context === undefined) {
+    lines.push(getMessage('native.context.unavailable', lang, {
+      configured: String(resolved.configuredContextSize),
+    }));
+    return lines.join('\n');
+  }
+  const mismatch = context.effectiveContextSize !== resolved.configuredContextSize;
+  lines.push(getMessage(mismatch ? 'native.context.restart_required' : 'native.context.effective', lang, {
+    configured: String(resolved.configuredContextSize),
+    effective: String(context.effectiveContextSize),
+    budgetSource: getMessage('native.context.budget_source.effective', lang),
+  }));
+  return lines.join('\n');
+}
+
+async function probeNativeContext(
+  endpoint: string,
+  configuredContextSize: number,
+  fetchFn: typeof globalThis.fetch,
+): Promise<EffectiveContextResult | null> {
+  try {
+    const response = await fetchFn(new URL('props', endpoint.endsWith('/') ? endpoint : `${endpoint}/`).toString());
+    if (!response.ok) return null;
+    const body = await response.json() as { default_generation_settings?: { n_ctx?: unknown }; n_ctx?: unknown };
+    const reported = body.default_generation_settings?.n_ctx ?? body.n_ctx;
+    return deriveEffectiveContext({
+      configuredContextSize,
+      serverReportedContext: typeof reported === 'number' ? reported : null,
+      modelAdvertisedContext: null,
+    });
+  } catch {
+    return null;
+  }
 }
 
 /** Confidently infer the native provider a bare `/model <id>` implies, or null.
@@ -355,6 +399,16 @@ export function resolveNativeSelection(
       providerName: 'local-llm',
       endpointHealth: () => probeNativeEndpointHealth(endpoint, ctx.fetchFn),
       modelIdentity: () => validateNativeModelIdentity(selectedModel, endpoint, ctx.fetchFn ?? globalThis.fetch),
+      ...(typeof config.local_llm?.contextSize === 'number'
+        ? {
+            configuredContextSize: config.local_llm.contextSize,
+            contextStatus: () => probeNativeContext(
+              endpoint,
+              config.local_llm!.contextSize!,
+              ctx.fetchFn ?? globalThis.fetch,
+            ),
+          }
+        : {}),
     };
   }
 
@@ -415,9 +469,14 @@ export function resolveNativeSelection(
 export function resolveContextBudgetTokens(
   providerName: string,
   config: { native_context_tokens?: unknown },
+  effectiveContextTokens?: number | null,
 ): number {
   const c = config.native_context_tokens;
   if (typeof c === 'number' && Number.isFinite(c) && c > 0) return Math.floor(c);
+  if (providerName === 'local-llm' && typeof effectiveContextTokens === 'number'
+    && Number.isSafeInteger(effectiveContextTokens) && effectiveContextTokens > 0) {
+    return effectiveContextTokens;
+  }
   if (providerName === 'ollama') return 24_000;
   if (providerName === 'claude') return 160_000;
   return 100_000;
