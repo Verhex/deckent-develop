@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):3e830f0f7248a33a3d513c48170df56e027c123d6b04f670dba8b77c35fce888`
+**Source digest:** `sha256(normalized-lf-utf8):f5ce8a24537349da3ecb144aed5fd5b4efa5fd60ad4961eb88942e917284e96d`
 
-**Rows:** 495 total · 431 active · 64 terminal
+**Rows:** 496 total · 432 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 338 |
+| OPEN | 339 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -388,6 +388,7 @@
 | 7070 | `PROVIDER-EXTENSION-001` | OPEN | P1 | PROVIDER | `P02-637`, `P02-646`, `P02-647` | — | OpenRouter and future provider extensions through PAEP |
 | 7075 | `MODEL-ACTIVATION-001` | VERIFY | P1 | PROVIDER | — | — | Owner-managed model activation over the auto-detected pool |
 | 7076 | `OWNER-MODEL-POLICY-001` | VERIFY | P1 | PROVIDER | `MODEL-ACTIVATION-001` | — | Provider-scoped explicit-active model policy over the auto-detected activation pool |
+| 7077 | `LOCAL-LLM-MODEL-IDENTITY-001` | OPEN | P0 | PROVIDER | `OWNER-MODEL-POLICY-001` | — | Native terminal ↔ local-llm model identity — exact, discoverable, validated ve lifecycle-tutarlı |
 | 7080 | `IDE-ADAPTER-001` | OPEN | P2 | SURFACE | `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | VS Code, JetBrains and future IDE adapters as non-canonical clients |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |

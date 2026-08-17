@@ -64,6 +64,7 @@ export default function WorkerView(): React.JSX.Element {
 
   const [detail, setDetail] = useState<SprintTaskDetailPayload | null>(null);
   const [lifecycle, setLifecycle] = useState<string | null>(null);
+  const [liveHb, setLiveHb] = useState<SprintTaskDetailPayload['hb']>(null);
   const [boot, setBoot] = useState<'loading' | 'missing' | 'error' | 'ready'>('loading');
   const [lines, setLines] = useState<string[]>([]);
   const [logMissing, setLogMissing] = useState(false);
@@ -82,16 +83,20 @@ export default function WorkerView(): React.JSX.Element {
     return () => { cancelled = true; };
   }, [api, taskId]);
 
-  // Lifecycle is projected only from the canonical authority block. A missing
-  // live snapshot stays honestly absent; hb/task status is never a substitute.
+  // Lifecycle and heartbeat come from one canonical snapshot subscription.
+  // Neither task status nor client logic substitutes for lifecycle authority.
   useEffect(() => {
     if (!api) return;
-    let cancelled = false;
-    api.getSprintLive()
-      .then((payload) => { if (!cancelled) setLifecycle(payload.lifecycle.lifecycle); })
-      .catch(() => { if (!cancelled) setLifecycle(null); });
-    return () => { cancelled = true; };
-  }, [api]);
+    setLiveHb(null);
+    return api.subscribeSprintLive(
+      (snapshot) => {
+        setLifecycle(snapshot.lifecycle.lifecycle);
+        const worker = snapshot.workers.find((candidate) => candidate.taskId === taskId);
+        if (worker !== undefined) setLiveHb(worker.hb ?? null);
+      },
+      () => setLifecycle(null),
+    );
+  }, [api, taskId]);
 
   // Canlı-akış: named-SSE (log_line/log_unavailable), satır-cap'li birikim.
   useEffect(() => {
@@ -128,6 +133,7 @@ export default function WorkerView(): React.JSX.Element {
     ? (scope['filesWrite'] as unknown[]).filter((v): v is string => typeof v === 'string')
     : [];
   const result = detail?.result ?? null;
+  const hb = liveHb ?? detail?.hb ?? null;
 
   return (
     <div className="worker">
@@ -141,10 +147,10 @@ export default function WorkerView(): React.JSX.Element {
             {t(MSG.lifecycle)}: {lifecycle}
           </span>
         )}
-        {detail?.hb && (
+        {hb && (
           <span className="worker__hb">
-            {detail.hb.status} · {t(MSG.hbAge, { n: String(Math.round(detail.hb.ageMs / 1000)) })}
-            {detail.hb.currentAction !== undefined ? ` · ${detail.hb.currentAction}` : ''}
+            {hb.status} · {t(MSG.hbAge, { n: String(Math.round(hb.ageMs / 1000)) })}
+            {hb.currentAction !== undefined ? ` · ${hb.currentAction}` : ''}
           </span>
         )}
       </p>

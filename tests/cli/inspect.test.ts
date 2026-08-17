@@ -48,7 +48,10 @@ describe('deckent inspect', () => {
         taskId: '542-003', status: 'EXECUTING', agent: 'terminal-ux-engineer', model: 'model-a',
         heartbeat: { currentAction: 'testing' }, plan: { truncated: false },
         result: { selfAssessment: 'DONE' },
-        lineage: { logPath: null, logTailAvailable: false, resultEvidence: null },
+        lineage: {
+          logPath: 'task.log', logTailAvailable: true, resultEvidence: null,
+          logTail: { lines: ['first', 'last'], truncated: true },
+        },
       }),
     });
     expect(code).toBe(0);
@@ -56,7 +59,8 @@ describe('deckent inspect', () => {
     expect(lines[0]).toContain('Heartbeat: testing');
     expect(lines[0]).toContain('Plan truncated: false');
     expect(lines[0]).toContain('Self-assessment: DONE');
-    expect(lines[0]).toContain('Lineage: {"logPath":null');
+    expect(lines[0]).toContain('Lineage: {"logPath":"task.log"');
+    expect(lines[0]).toContain('Log tail (2 lines, truncated: true):\nfirst\nlast');
   });
 
   it('returns typed exit 1 for an unknown task', async () => {
@@ -73,7 +77,10 @@ describe('deckent inspect', () => {
 
   it('preserves listing and detail machine shapes with --json', async () => {
     const listing = { schemaVersion: 1, generatedAt: 'now', revision: 'r1', runs: [] };
-    const detail = { schemaVersion: 1, taskId: '542-003', lineage: { logPath: 'task.log' } };
+    const detail = {
+      schemaVersion: 1, taskId: '542-003',
+      lineage: { logPath: 'task.log', logTail: { lines: ['verbatim'], truncated: false } },
+    };
     const output: string[] = [];
     await runInspectCommand(undefined, { json: true }, {
       projectRoot: fixtureRoot, output: (value) => output.push(value), listRuns: () => listing,
@@ -85,12 +92,72 @@ describe('deckent inspect', () => {
     expect(JSON.parse(output[1] ?? '')).toEqual(detail);
   });
 
-  it('registers a help-visible inspect command and JSON option', () => {
+  it('follows snapshot revisions and disposes the observer on close', async () => {
+    const output: string[] = [];
+    const listeners = new Map<string, () => void>();
+    let emit: ((snapshot: unknown) => void) | undefined;
+    let closeCount = 0;
+    const running = runInspectCommand(undefined, { follow: true }, {
+      projectRoot: fixtureRoot,
+      language: 'en',
+      output: (value) => output.push(value),
+      listRuns: () => ({ runs: [{ runId: 'run-1', lifecycle: 'EXECUTE' }] }),
+      observeSnapshot: (_root, onSnapshot) => {
+        emit = onSnapshot;
+        return { close: () => { closeCount += 1; } };
+      },
+      followSignals: {
+        on: (event, listener) => { listeners.set(event, listener); },
+        off: (event) => { listeners.delete(event); },
+      },
+    });
+    await Promise.resolve();
+    emit?.({ lifecycle: 'EXECUTE', phase: 'RUNNING', workers: [{ taskId: '1' }], revision: 7 });
+    expect(output[0]).toContain('Run ID\tState');
+    expect(output[1]).toBe('\r\u001b[2KLifecycle: EXECUTE · phase: RUNNING · workers: 1 · revision: 7');
+    listeners.get('close')?.();
+    expect(await running).toBe(0);
+    expect(closeCount).toBe(1);
+    expect(listeners.size).toBe(0);
+  });
+
+  it('follows one task status and heartbeat on each revision', async () => {
+    const output: string[] = [];
+    const listeners = new Map<string, () => void>();
+    let emit: ((snapshot: unknown) => void) | undefined;
+    const running = runInspectCommand('544-003', { follow: true }, {
+      projectRoot: fixtureRoot,
+      language: 'en',
+      output: (value) => output.push(value),
+      readTaskDetail: () => ({ taskId: '544-003', status: 'EXECUTING', lineage: {} }),
+      observeSnapshot: (_root, onSnapshot) => {
+        emit = onSnapshot;
+        return { close() {} };
+      },
+      followSignals: {
+        on: (event, listener) => { listeners.set(event, listener); },
+        off: (event) => { listeners.delete(event); },
+      },
+    });
+    await Promise.resolve();
+    emit?.({
+      revision: 8,
+      tasks: [{ taskId: '544-003', status: 'EXECUTING', heartbeat: { currentAction: 'testing' } }],
+    });
+    expect(output[1]).toBe(
+      '\r\u001b[2KTask 544-003 · status: EXECUTING · heartbeat: testing · revision: 8',
+    );
+    listeners.get('SIGINT')?.();
+    expect(await running).toBe(0);
+  });
+
+  it('registers a help-visible inspect command with JSON and follow options', () => {
     const program = new Command().name('deckent');
     registerInspect(program, { projectRoot: fixtureRoot, language: 'tr' });
     const command = program.commands.find((candidate) => candidate.name() === 'inspect');
     expect(command).toBeDefined();
     expect(command?.description()).toContain('Canonical');
     expect(command?.options.map((option) => option.long)).toContain('--json');
+    expect(command?.options.map((option) => option.long)).toContain('--follow');
   });
 });

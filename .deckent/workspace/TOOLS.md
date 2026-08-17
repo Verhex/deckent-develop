@@ -11,7 +11,7 @@ Coverage: npx vitest run --coverage
 Dashboard: deckent web
 
 ## MCP Tools
-<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="8d560ed2daa7d1f7f8e6132815e10c0c4b8acdd0e9c629fa2723f0916fc87a38" -->
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="a2b7041affc08bfc3479820e5e55b6dcb4347c1d2359f3a3c9ecc9d39e76abb1" -->
 Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla tool olarak yorumlanmaz.
 
 | MCP Adı | Etki | Onay | Idempotent |
@@ -21,6 +21,7 @@ Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla too
 | `deckent_plan` | değiştirici | runtime policy gereği zorunlu | hayır |
 | `deckent_start` | değiştirici | runtime policy gereği zorunlu | hayır |
 | `deckent_status` | salt-okunur | effect class gereği zorunlu değil | evet |
+| `deckent_inspect` | salt-okunur | effect class gereği zorunlu değil | evet |
 | `deckent_doctor` | salt-okunur | effect class gereği zorunlu değil | evet |
 | `deckent_retro` | salt-okunur | effect class gereği zorunlu değil | evet |
 | `deckent_history` | salt-okunur | effect class gereği zorunlu değil | evet |
@@ -67,7 +68,7 @@ Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla too
 | `deckent_execution_authority` | değiştirici | runtime policy gereği zorunlu | evet |
 | `deckent_approvals` | salt-okunur | effect class gereği zorunlu değil | evet |
 
-Toplam: 50
+Toplam: 51
 <!-- DECKENT:CONTRACT:END id="tools" -->
 
 ## CLI Commands

@@ -321,8 +321,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-17 (RUN-INSPECTOR-001 package 3, sprint-543 + Brain completion):
   // +1 — src/mcp/tools/inspect.ts + tests/mcp/inspect.test.ts enter the graph
   // (observer/SSE/Desktop slices changed existing-file content only).
-  count: 14334,
-  digest: 'e3530acf1951e29c6e9a4b110e4f58aa93e2ba6068f232a720374c40f0138674',
+  // 2026-08-17 (RUN-INSPECTOR-001 package 4, sprint-544): +3 — the follow-mode
+  // and log-tail slices grew the cli/api/core suites' import closures (new graph
+  // members via the observer-injection test seams); no test files were removed.
+  count: 14337,
+  digest: 'b44b66ac8a33256b0feacf621f6bf96d2a7492ebc73c1d05a9fdeb7eeadae33c',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -519,8 +522,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (RUN-INSPECTOR-001 package 3): +1 — src/mcp/tools/inspect.ts
   // (deckent_inspect MCP twin) enters the inventory; server/Shell/RunsView/
   // api-client/read-model content hashes moved.
+  // 2026-08-17 (RUN-INSPECTOR-001 package 4): same 1245 count, digest only —
+  // core read-model, server, inspect CLI, messages, desktop shell content hashes
+  // moved with the log-tail/follow/stream-adoption slices; membership unchanged.
   count: 1245,
-  digest: '3aca6da79a822f49bd5e9066f8a4914d4f679033f5d246017e31cc2fe9086dde',
+  digest: '5dc527b77d8586a8e7fd9aff05a392b0be44a18e44410ca6bbdfcdc5c77e9d26',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

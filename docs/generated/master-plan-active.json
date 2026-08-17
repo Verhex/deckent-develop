@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3e830f0f7248a33a3d513c48170df56e027c123d6b04f670dba8b77c35fce888"
+    "value": "f5ce8a24537349da3ecb144aed5fd5b4efa5fd60ad4961eb88942e917284e96d"
   },
   "summary": {
-    "total": 495,
-    "active": 431,
+    "total": 496,
+    "active": 432,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 338,
+      "OPEN": 339,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 323,
+      "P0": 324,
       "P1": 135,
       "P2": 37
     },
@@ -49,7 +49,7 @@
       "PAEP": 35,
       "PRODUCT": 18,
       "PROMPT": 6,
-      "PROVIDER": 6,
+      "PROVIDER": 7,
       "RELEASE": 4,
       "REPO": 3,
       "RESILIENCE": 1,
@@ -4547,9 +4547,9 @@
       "program": "ECOSYSTEM",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-17",
       "definitionDigest": "636d42948a631a5ed537486b6d3e1744c39c13dc8c7d58fb1b725069902ea95e",
-      "progressDigest": "f252b18a82244a681ee65c4e801c995bd81d2097657da2dcfbc6884202207f13",
+      "progressDigest": "68c28c058656aab66fc3258e37f80321d63e6a3185d5af8994cd98b53dba4876",
       "terminalClosureDigest": null
     },
     {
@@ -4693,6 +4693,17 @@
       "updated": "2026-08-16",
       "definitionDigest": "c34ad5c7a6ac8ba7871c6433e845e4ed431055c2ea73678172dcb7716c3a4a6b",
       "progressDigest": "7bb0d14f015c4f3d210b53c320d936d650eab158a275cd8541bb5a9019ee3669",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7077,
+      "id": "LOCAL-LLM-MODEL-IDENTITY-001",
+      "program": "PROVIDER",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-17",
+      "definitionDigest": "331c28d6af15bcf1313f09064f05ac95ce57a8faa5c9330194b286f89d3a5647",
+      "progressDigest": "5aa8925dd8cb7cb9087517b6fa93b623584d76432dcaa917b6d46da8d73ba427",
       "terminalClosureDigest": null
     },
     {
@@ -21902,6 +21913,7 @@
         "PROVIDER-EXTENSION-001",
         "MODEL-ACTIVATION-001",
         "OWNER-MODEL-POLICY-001",
+        "LOCAL-LLM-MODEL-IDENTITY-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -21943,6 +21955,7 @@
         "PROVIDER-EXTENSION-001",
         "MODEL-ACTIVATION-001",
         "OWNER-MODEL-POLICY-001",
+        "LOCAL-LLM-MODEL-IDENTITY-001",
         "IDE-ADAPTER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -22167,8 +22180,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Tek versioned shared schema ve canonical projection service yalnız verified accepted outcome eventlerini stable project, tenant, run, task, attempt, generation, agent, skill, source ve outcome watermark ile işler; uses, success, coverage ve last-used aynı cohort ve ölçüm semantiğini taşır, `lastUsed` yalnız accepted gerçek kullanımda ilerler ve sentetik ölçüm provenance olmadan yazılmaz; bütün generation atomik, CAS/fencing/lock ile concurrent-safe, corruption-quarantine ve immutable eventlerden deterministic rebuild edilebilir olur; unknown/tombstoned entity typed disposition alır; manifest dual-truth kontrollü migration ve cutover receipt'iyle kapanır; CLI, MCP, API, Terminal, dashboard, routing, training ve docs aynı bounded tenant-scoped read modelini tüketir; retention, legal hold, privacy/least-privilege, Linux/macOS/Windows-native/WSL ve million-entity/concurrent-finalizer proof'u pass olur; legacy byte'lar lossless migration+disposition receipt'inden önce rewrite/delete edilmez",
-      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: schemaVersion/generation/source/project/tenant/run/outcome watermark taşımayan shared `catalog-stats.json` 20 agent+28 skill satırı içeriyor; bütün sidecar satırları raw manifestten farklı ve iki skill satırında schema drift var. Agent ve skill modülleri aynı dosyayı duplicate shallow reader ve lock/CAS'siz whole-file read-modify-write ile yönetiyor; atomic rename torn-write'ı azaltıyor fakat multi-process lost-update'ı önlemiyor. Finalizer legacy V2 learnings'i projection kaynağı yapıyor, tarihsel bütün entityleri current sprintte kullanılmış gibi damgalıyor ve 48 entity için dosyayı 48 kez baştan yazıyor. Malformed state sessiz boş ledgera düşüyor; retention/rotation/legal-hold veya generation-level recovery yok. Dosya live pool/API girdisi olduğu için migration receipt'i olmadan silinmez",
-      "updated": "2026-08-11"
+      "evidence": "2026-08-11 disk/code RCA ve Alperen onayı: schemaVersion/generation/source/project/tenant/run/outcome watermark taşımayan shared `catalog-stats.json` 20 agent+28 skill satırı içeriyor; bütün sidecar satırları raw manifestten farklı ve iki skill satırında schema drift var. Agent ve skill modülleri aynı dosyayı duplicate shallow reader ve lock/CAS'siz whole-file read-modify-write ile yönetiyor; atomic rename torn-write'ı azaltıyor fakat multi-process lost-update'ı önlemiyor. Finalizer legacy V2 learnings'i projection kaynağı yapıyor, tarihsel bütün entityleri current sprintte kullanılmış gibi damgalıyor ve 48 entity için dosyayı 48 kez baştan yazıyor. Malformed state sessiz boş ledgera düşüyor; retention/rotation/legal-hold veya generation-level recovery yok. Dosya live pool/API girdisi olduğu için migration receipt'i olmadan silinmez. ACİL ADMISSION (Alperen + Codex analizi, 2026-08-17 — correction package araya alındı): dört yeni delta ile kapsam netleşti: (1) V3 task'lar legacy OutcomeTracker'dan dışlanıyor (sprint-finalizer.ts:3246) — skill başarısı V3'te hiç yazılmıyor; (2) finalizer geçmiş TÜM entity'lere lastUsedInSprint=current damgalıyor (:3351) — yalancı recency; (3) generated `project-conventions` skill'i demote edilse bile her PLAN materialization'ı (skill-pool.ts:1271) enabled:true ile diriltiyor — öğrenme döngüsü kendi kararını bypass ediyor; çözüm: routable/learnable skill'likten çıkarıp deterministic project-context prompt segmentine taşımak; (4) CLI info yüzeyleri sidecar yerine manifest okuyor (skill.ts:665) ve oran Math.round(0.84)=1% gösteriyor (agent.ts:338). Bounded correction package: gerçek inject edilen agent+skill kimlikleri canonical terminal outcome'dan TEK KEZ sidecar'a; lastUsed yalnız kullanılan entity'ye; demotion/disposition PLAN'la ezilmez; list+info+MCP+API tek canonical read-model; yüzde dönüşümü düzelir; V3+FIX+filtered-skill+real-binary CLI kanıtı",
+      "updated": "2026-08-17"
     },
     {
       "order": 7020,
@@ -22659,7 +22672,9 @@
       "dependsOn": [
         "MODEL-ACTIVATION-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "LOCAL-LLM-MODEL-IDENTITY-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -22683,6 +22698,41 @@
       "acceptance": "Under explicit-active a newly detected or catalog model never auto-enters the selectable pool; the single authority is ModelActivationStore with no parallel config allowlist; default_model is a preferred pick and NOT a hard ceiling — the hard execution limit is the owner active-set; an inactive model raises a typed MODEL_INACTIVE HOLD at forceModel Layer 0 and at pre-dispatch admission before any Task JSON write or spawn, never a silent substitution; the snapshot digest binds to plan and dispatch evidence",
       "evidence": "`historical-authority=current-disk-owner-model-policy-001;historical-gates=G1;proof=owner-model-policy-001-hermetic-32-regression-248-canary-5of5`; no new write authority. FAZ-0 manual bootstrap seam diskte kanıtlı: ModelActivationStore schema v1→v2 (MODEL_ACTIVATION_STORE_SCHEMA_VERSION=2) provider başına ProviderPolicyMode taşır — implicit-active (default, byte-compatible) karşısında explicit-active (yalnız owner active=true kaydı çalıştırılabilir, yeni tespit/katalog modeli havuza asla kendiliğinden giremez). Tek authority ModelActivationStore, paralel config allowlist yok (KANUN 10). Enforcement: bootstrapProviders snapshot'ı senkron çözüp planner-policy'den ÖNCE mr.setActivationPolicy ile enjekte eder (provider.ts:1778-1781) ve snapshotDigest'i BootstrapResult.modelActivationDigest'e bağlar; ModelRegistry read-filter inaktif modeli pool accessor'larından gizler ama identity/accounting accessor'ları get/getOrThrow/has TOTAL kalır (tombstone — parametrik re-register diriltemez, model-registry.ts:606); forceModel Layer 0 (model-selector.ts:250) ve pre-dispatch admission (task-mode-runner.ts:218) inaktif modelde typed MODEL_INACTIVE HOLD verir, spawn'dan önce, sessiz ikame değil. Owner explicit-active set: claude {claude-fable-5, claude-opus-5, claude-sonnet-5, claude-haiku-4-5-20251001}, codex {gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna}, local-llm {Qwen3.8-27B}; gpt-5.5 INACTIVE. Kanıt: 32 hermetic test bu tur bağımsız yeşil koşuldu (21+11, model-activation-store + model-activation-policy-enforcement), 248 regression yeşil, tsc temiz, gerçek build; gpt-5.5 negatif binary canary 5/5 (havuz gpt-5.5'i dışlar, tier→premium gpt-5.6-sol verir, forceModel gpt-5.5 spawn'dan önce MODEL_INACTIVE); active-set snapshot digest sha256:759fb7e7a3f45bf8…. H bu tur diskte koşuldu (=1); L canary bu satırda bağımsız üretilmedi (relayed, ?). ACIK typed-residual: canlı models.dev kataloğu gpt-5.6-terra/sol'u premium projekte ediyor, owner-reviewed BUILTIN merdiven ise terra=standard, sol=premium_plus, luna=economy — hermetic tier testi owner-reviewed merdivene assert eder; projection uzlaştırması ayrı follow-up ve activation sözleşmesini etkilemez. FAZ-1 local-llm üretim wiring'i artık KURULU ve gerçek Qwen ile kanıtlıdır: keyless local auth + local cost class + registry identity/fresh health + Terminal native transport + http-agentic-worker + `local-llm start/status/stop`; Sprint-533 2/2 COMPLETE receipt digest `103e8f64d9d989f8fd32a8d5777c67c2710e0640b2b810f2386409abc8f4e237`; worker receipt `worker-execution:e50422ac35180a57be52ad08b7b19bcceb98ca5c360be901bfa3e8243a5c139d`; GPU placement CUDA0/RTX 5090 üzerinde fail-loud config authority ile Terminal yaklaşık 44 s ve worker transport 7064 ms; scoped suite 29/29 ve build yeşil. Daemon owner isteğiyle kapalıdır; wiring kalıcıdır. Satır `VERIFY` kalır: tier-projection residual'ı açık ve bu annotation Closure OS authenticated disposition yerine geçmez. Extended spec docs/governance/owner-model-policy.md",
       "updated": "2026-08-16"
+    },
+    {
+      "order": 7077,
+      "id": "LOCAL-LLM-MODEL-IDENTITY-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "PROVIDER",
+      "outcome": "Native terminal ↔ local-llm model identity — exact, discoverable, validated ve lifecycle-tutarlı",
+      "priority": "P0",
+      "dependsOn": [
+        "OWNER-MODEL-POLICY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OWNER-MODEL-POLICY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Native terminal, external local-llm router ve `deckent local-llm` lifecycle yolları model identity'yi exact + discoverable + validated taşır; unknown-model upstream 400 body'sinin güvenli/actionable ayrıntısı en+tr i18n ile kullanıcıya gösterilir (opak `[openai-compatible http 400]` yasak); cold-start/readiness sessiz fallback'siz dürüst ele alınır; router model-ID keşfi (GET /v1/models) config'teki id'yi doğrular, mismatch typed öneriyle raporlanır; hermetic regression testleri (exact router IDs, unknown-model 400 detayı, readiness, lifecycle identity consistency) + gerçek native-terminal/live-endpoint proof",
+      "evidence": "ACİL ADMISSION (Alperen, 2026-08-17 — araya alındı). Canlı kanıt: config native_provider=local-llm native_model=Qwen3.8-27B endpoint=127.0.0.1:8080/v1; router yalnız Qwen3.8-27B-Q4_K_M ve Qwen3.8-27B-CRACK-Q6_K_L yayımlıyor; Qwen3.8-27B → HTTP 400 model-not-found, Q4_K_M → 200; cold-start ilk turn 'fetch failed'; terminal upstream body'yi gizliyor. Tek-makine config yaması ile geçiştirilmez — kalıcı ürün çözümü; mevcut provider-adapter/model-registry/i18n pattern'leriyle",
+      "updated": "2026-08-17"
     },
     {
       "order": 7080,
@@ -25590,6 +25640,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "33531eb3a00ccfc8b578e61b7d42d2c32496b067742247473a895572ef966e59"
+    "value": "492827f59d4ca3711760701195d68807c942c92dddb961277903f4a74aec7647"
   }
 }

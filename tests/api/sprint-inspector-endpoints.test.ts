@@ -237,6 +237,7 @@ describe('GET /api/sprint/* canonical inspector routes', () => {
       plan: { text: string; truncated: boolean };
       lineage: {
         logPath: string | null;
+        logTail: { lines: string[]; truncated: boolean } | null;
         logTailAvailable: boolean;
         resultEvidence: {
           selfAssessment: string | null;
@@ -253,6 +254,7 @@ describe('GET /api/sprint/* canonical inspector routes', () => {
     expect(detail.plan.text).toBe('x'.repeat(SPRINT_DETAIL_TEXT_CAP));
     expect(detail.lineage).toEqual({
       logPath: join('.tasks', 'task-541-002.log'),
+      logTail: { lines: ['bounded worker log'], truncated: false },
       logTailAvailable: true,
       resultEvidence: {
         selfAssessment: 'DONE',
@@ -264,6 +266,45 @@ describe('GET /api/sprint/* canonical inspector routes', () => {
     const invalidResponse = await get(`/api/sprint/task/${encodeURIComponent('../escape')}`);
     expect(invalidResponse.status).toBe(403);
   });
+
+  it('passes a bounded tailLines override through to the task log tail', async () => {
+    seedTask('541-002');
+    writeFileSync(join(root, '.tasks', 'task-541-002.log'), 'first\nsecond\nthird\nfourth\n');
+    await boot();
+
+    const response = await get('/api/sprint/task/541-002?tailLines=2');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(expect.objectContaining({
+      taskId: '541-002',
+      lineage: expect.objectContaining({
+        logTail: { lines: ['third', 'fourth'], truncated: true },
+      }),
+    }));
+  });
+
+  it.each(['0', '201', '-1', '1.5', 'abc', ''])(
+    'rejects invalid tailLines=%s with a typed 400',
+    async (tailLines) => {
+      seedTask('541-002');
+      await boot();
+
+      const response = await get(`/api/sprint/task/541-002?tailLines=${tailLines}`);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tailLines must be an integer between 1 and 200',
+          details: [{
+            field: 'tailLines',
+            message: 'Must be an integer between 1 and 200',
+            value: tailLines,
+          }],
+        },
+      });
+    },
+  );
 
   it('returns an honest 404 for an unknown valid task id', async () => {
     await boot();

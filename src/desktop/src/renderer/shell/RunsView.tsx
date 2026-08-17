@@ -3,6 +3,7 @@ import {
   createApiClient,
   type DaemonApiClient,
   type InspectorRunPayload,
+  type SprintLiveSnapshotPayload,
 } from './api-client.js';
 import { translateShellMessage } from './i18n.js';
 import { useShellStore } from './session-store.js';
@@ -17,6 +18,8 @@ export const MSG = {
   loading: 'desktop.shell.runs.loading',
   empty: 'desktop.shell.runs.empty',
   error: 'desktop.shell.runs.error',
+  authority: 'desktop.shell.runs.authority',
+  streamDegraded: 'desktop.shell.runs.stream_degraded',
   notSettled: 'desktop.shell.runs.not_settled',
 } as const;
 
@@ -35,6 +38,8 @@ export default function RunsView(): React.JSX.Element {
   );
   const [runs, setRuns] = useState<InspectorRunPayload[]>([]);
   const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [liveSnapshot, setLiveSnapshot] = useState<SprintLiveSnapshotPayload | null>(null);
+  const [streamDegraded, setStreamDegraded] = useState(false);
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!api) return;
@@ -65,18 +70,42 @@ export default function RunsView(): React.JSX.Element {
     return () => { active = false; };
   }, [api]);
 
+  useEffect(() => {
+    if (!api) return;
+    setStreamDegraded(false);
+    return api.subscribeSprintLive(
+      (snapshot) => {
+        setLiveSnapshot(snapshot);
+        setStreamDegraded(false);
+      },
+      () => setStreamDegraded(true),
+    );
+  }, [api]);
+
+  const displayedRuns = useMemo(() => runs.map((run) => (
+    liveSnapshot?.sprintId === run.runId
+      ? { ...run, state: liveSnapshot.lifecycle.lifecycle }
+      : run
+  )), [liveSnapshot, runs]);
+
   return (
     <section className="console" aria-labelledby="runs-title">
       <p id="runs-title" className="view-eyebrow">{t(MSG.title)}</p>
       <button type="button" className="btn" disabled={!api || loadState === 'loading'} onClick={() => void refresh()}>
         {t(MSG.refresh)}
       </button>
+      {liveSnapshot !== null ? (
+        <span className="state-pill">
+          {t(MSG.authority)}: {liveSnapshot.lifecycle.lifecycle}
+        </span>
+      ) : null}
+      {streamDegraded ? <p className="shell-notice">{t(MSG.streamDegraded)}</p> : null}
       {loadState === 'loading' ? <p className="shell-muted">{t(MSG.loading)}</p> : null}
       {loadState === 'error' ? <p className="shell-notice">{t(MSG.error)}</p> : null}
-      {loadState === 'ready' && runs.length === 0 ? <p className="shell-muted">{t(MSG.empty)}</p> : null}
-      {loadState === 'ready' && runs.length > 0 ? (
+      {loadState === 'ready' && displayedRuns.length === 0 ? <p className="shell-muted">{t(MSG.empty)}</p> : null}
+      {loadState === 'ready' && displayedRuns.length > 0 ? (
         <ul className="flow-list">
-          {runs.map((run) => (
+          {displayedRuns.map((run) => (
             <li key={run.runId} className="flow-row">
               <span>
                 <span className="shell-muted">{t(MSG.runId)}</span>{' '}

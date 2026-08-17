@@ -24,6 +24,8 @@ import {
 
 export const SPRINT_DETAIL_TEXT_CAP = 64_000;
 export const SPRINT_TASK_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+export const RUN_INSPECTOR_LOG_TAIL_DEFAULT_LINES = 40;
+export const RUN_INSPECTOR_LOG_TAIL_MAX_LINES = 200;
 
 export interface RunInspectorHeartbeat {
   readonly status: string | null;
@@ -78,6 +80,10 @@ export interface RunInspectorTaskDetail {
 export interface RunInspectorTaskLineage {
   readonly logPath: string | null;
   readonly logTailAvailable: boolean;
+  readonly logTail: {
+    readonly lines: readonly string[];
+    readonly truncated: boolean;
+  } | null;
   readonly resultEvidence: {
     readonly selfAssessment: string | null;
     readonly filesChanged: readonly string[];
@@ -119,6 +125,10 @@ export interface RunInspectorRunList {
 
 interface SnapshotOptions {
   readonly nowMs?: number;
+}
+
+export interface RunInspectorTaskDetailOptions {
+  readonly tailLines?: number;
 }
 
 export const RUN_INSPECTOR_OBSERVER_MIN_INTERVAL_MS = 250;
@@ -515,9 +525,58 @@ function cappedPlan(path: string): RunInspectorTaskPlan | null {
   return { text: truncated ? value.slice(0, SPRINT_DETAIL_TEXT_CAP) : value, truncated };
 }
 
+function normalizedTailLines(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return RUN_INSPECTOR_LOG_TAIL_DEFAULT_LINES;
+  return Math.min(RUN_INSPECTOR_LOG_TAIL_MAX_LINES, Math.max(1, Math.trunc(value)));
+}
+
+function utf8Suffix(value: string, byteCap: number): string {
+  const bytes = Buffer.from(value, 'utf8');
+  if (bytes.length <= byteCap) return value;
+  let start = bytes.length - byteCap;
+  while (start < bytes.length && (bytes[start]! & 0xc0) === 0x80) start += 1;
+  return bytes.subarray(start).toString('utf8');
+}
+
+function readLogTail(
+  path: string,
+  requestedLines: number | undefined,
+): RunInspectorTaskLineage['logTail'] {
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(path);
+  } catch {
+    return null;
+  }
+
+  let value: string;
+  try {
+    value = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+
+  const lines = value.split('\n');
+  if (value.endsWith('\n')) lines.pop();
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index]!.endsWith('\r')) lines[index] = lines[index]!.slice(0, -1);
+  }
+
+  const lineLimit = normalizedTailLines(requestedLines);
+  let truncated = lines.length > lineLimit;
+  let selected = lines.slice(-lineLimit);
+  const joined = selected.join('\n');
+  if (Buffer.byteLength(joined, 'utf8') > SPRINT_DETAIL_TEXT_CAP) {
+    truncated = true;
+    selected = utf8Suffix(joined, SPRINT_DETAIL_TEXT_CAP).split('\n');
+  }
+  return { lines: selected, truncated };
+}
+
 export function readRunInspectorTaskDetail(
   projectRoot: string,
   taskId: string,
+  options: RunInspectorTaskDetailOptions = {},
 ): RunInspectorTaskDetail | null {
   if (!SPRINT_TASK_ID_RE.test(taskId)) return null;
   const base = join(projectRoot, TASKS_DIR, `task-${taskId}`);
@@ -536,6 +595,7 @@ export function readRunInspectorTaskDetail(
     lineage: {
       logPath,
       logTailAvailable: logPath !== null,
+      logTail: logPath === null ? null : readLogTail(join(projectRoot, logPath), options.tailLines),
       resultEvidence: result === null ? null : {
         selfAssessment: text(result.selfAssessment),
         filesChanged: stringArray(result.filesChanged),

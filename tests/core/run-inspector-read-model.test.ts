@@ -134,11 +134,11 @@ describe('run inspector read model', () => {
     expect(detail?.lineage).toEqual({
       logPath: join('.tasks', 'task-541-001.log'),
       logTailAvailable: true,
+      logTail: { lines: ['private log content'], truncated: false },
       resultEvidence: {
         selfAssessment: 'DONE', filesChanged: ['src/core/x.ts'], notesPresent: true,
       },
     });
-    expect(JSON.stringify(detail)).not.toContain('private log content');
     expect(readRunInspectorTaskDetail(projectRoot, '../escape')).toBeNull();
     expect(readRunInspectorTaskDetail(projectRoot, 'missing')).toBeNull();
   });
@@ -195,7 +195,65 @@ describe('run inspector read model', () => {
     const projectRoot = root();
     write(projectRoot, '.tasks/task-542-001.json', { id: '542-001', description: 'Task' });
     expect(readRunInspectorTaskDetail(projectRoot, '542-001')?.lineage).toEqual({
-      logPath: null, logTailAvailable: false, resultEvidence: null,
+      logPath: null, logTailAvailable: false, logTail: null, resultEvidence: null,
+    });
+  });
+
+  it('returns the last default or overridden number of log lines', () => {
+    const projectRoot = root();
+    write(projectRoot, '.tasks/task-544-001.json', { id: '544-001', description: 'Task' });
+    write(projectRoot, '.tasks/task-544-001.log', Array.from(
+      { length: 45 },
+      (_, index) => `line-${index + 1}`,
+    ).join('\n'));
+
+    expect(readRunInspectorTaskDetail(projectRoot, '544-001')?.lineage.logTail).toEqual({
+      lines: Array.from({ length: 40 }, (_, index) => `line-${index + 6}`),
+      truncated: true,
+    });
+    expect(readRunInspectorTaskDetail(projectRoot, '544-001', { tailLines: 3 })
+      ?.lineage.logTail).toEqual({
+      lines: ['line-43', 'line-44', 'line-45'],
+      truncated: true,
+    });
+  });
+
+  it('hard-caps the requested line count and joined tail bytes without an ellipsis', () => {
+    const projectRoot = root();
+    write(projectRoot, '.tasks/task-544-002.json', { id: '544-002', description: 'Task' });
+    write(projectRoot, '.tasks/task-544-002.log', [
+      ...Array.from({ length: 201 }, (_, index) => `discard-${index}`),
+      'x'.repeat(SPRINT_DETAIL_TEXT_CAP + 1),
+    ].join('\n'));
+
+    const tail = readRunInspectorTaskDetail(projectRoot, '544-002', { tailLines: 500 })
+      ?.lineage.logTail;
+    expect(tail?.truncated).toBe(true);
+    expect(tail?.lines).toHaveLength(1);
+    expect(Buffer.byteLength(tail?.lines.join('\n') ?? '', 'utf8')).toBe(SPRINT_DETAIL_TEXT_CAP);
+    expect(tail?.lines[0]).toBe('x'.repeat(SPRINT_DETAIL_TEXT_CAP));
+    expect(tail?.lines.join('\n')).not.toContain('…');
+  });
+
+  it('keeps a torn final log line as-is', () => {
+    const projectRoot = root();
+    write(projectRoot, '.tasks/task-544-003.json', { id: '544-003', description: 'Task' });
+    write(projectRoot, '.tasks/task-544-003.log', 'complete\r\ntorn');
+
+    expect(readRunInspectorTaskDetail(projectRoot, '544-003')?.lineage.logTail).toEqual({
+      lines: ['complete', 'torn'], truncated: false,
+    });
+  });
+
+  it('degrades invalid UTF-8 log content to null while retaining availability truth', () => {
+    const projectRoot = root();
+    write(projectRoot, '.tasks/task-544-004.json', { id: '544-004', description: 'Task' });
+    const logPath = write(projectRoot, '.tasks/task-544-004.log', 'valid');
+    writeFileSync(logPath, Buffer.from([0xc3, 0x28]));
+
+    expect(readRunInspectorTaskDetail(projectRoot, '544-004')?.lineage).toMatchObject({
+      logTailAvailable: true,
+      logTail: null,
     });
   });
 

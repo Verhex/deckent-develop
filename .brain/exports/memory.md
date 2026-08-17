@@ -1,5 +1,41 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-544 Learnings
+- Sprint sprint-544 Learnings: ## Sprint sprint-544 Learnings
+- core — bounded log-tail lineage: GO_WITH_TECH_DEBT — Implemented additive bounded logTail lineage with default 40-line selection, opts override capped at 200, fatal UTF-8 de
+- API — task detail serves the log tail (depends on Task 1): GO_WITH_TECH_DEBT — LOCAL_VERIFIED: npx tsc --noEmit passed; npx vitest run tests/api/server.test.ts tests/api/sprint-inspector-endpoints.te
+- Desktop — stream adoption on Runs/console (depends on Task 2): GO_WITH_TECH_DEBT — LOCAL_VERIFIED: npx tsc --noEmit passed; npx tsc --noEmit -p src/desktop passed; npm run lint:i18n passed.\nTargeted tes
+- documentation — follow + tail + stream adoption (depends on Tasks 1,2,3): GO_WITH_TECH_DEBT — Updated both reference trees with semantic and heading parity for bounded logTail lineage, default/override/hard/text ca
+
+## Gains
+- 544-003 — Terminal — `deckent inspect --follow` (depends on Task 1) — LOCAL_VERIFIED SCOPED_GREEN: npx tsc --noEmit passed; targeted Vitest passed 2 files / 117 tests.
+
+## Sprint sprint-542 Learnings
+- Sprint sprint-542 Learnings: ## Sprint sprint-542 Learnings
+- API face — inspector runs endpoints (depends on Task 1): NO_GO — Added GET /api/inspector/runs backed by the canonical read model and extended task detail regression coverage for additi
+- Desktop face — canonical lifecycle adoption (depends on Task 2): NO_GO — BLOCKS_CURRENT_DONE: dependency task 542-002 did not reach a terminal settlement; its .result remained absent and heartb
+- Fix: Desktop face — canonical lifecycle adoption (depends on Task 2): NO_GO — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit passed (exit 0); node scripts/lint-i18n-hardcode.mjs passed (exit 0). No
+
+## Gains
+- 542-001 — read-model expansion — logical run listing + run lineage detail — Implemented schemaVersion-1 authority-first run listing with tolerant .brain settlement records a...
+- 542-003 — Terminal face — `deckent inspect` (depends on Task 1) — LOCAL_VERIFIED: npx tsc --noEmit passed; exact targeted Vitest set passed 3 files / 129 tests; no...
+- 542-005 — bilingual reference documentation (depends on Task 1) — Verified both target files exist and are non-empty; read both back from disk; confirmed identical...
+- 542-002-fix — Fix: API face — inspector runs endpoints (depends on Task 1) — Recovered and verified the scoped changes left by the prior failed-attribution attempt.
+
+## Sprint sprint-541 Learnings
+- Sprint sprint-541 Learnings: ## Sprint sprint-541 Learnings
+- /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1): NO_GO — LOCAL_VERIFIED/SCOPED_GREEN: npx tsc --noEmit exit 0.\nLOCAL_VERIFIED/SCOPED_GREEN: VITEST_MAX_FORKS=2 canonical targete
+- Fix: Fix: Fix: /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1): NO_GO — Budget Landing Checkpoint Protocol failure: the first lifecycle Bash action failed during shell parsing (unexpected EOF
+- Fix: Fix: /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1): NO_GO — Bug: GET /api/sprint/task/:id returns canonical plan text whose total length exceeds SPRINT_DETAIL_TEXT_CAP when truncat
+- Fix: /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1): NO_GO — Bug: the endpoint regression test and Desktop payload type expected a wrapper object although the canonical Task-1 read-
+
+## Gains
+- 541-001 — canonical inspector read-model v1 (core module + hermetic suite) — npx tsc --noEmit: exit 0.
+
+## Sprint sprint-540 Learnings
+- Sprint sprint-540 Learnings: ## Sprint sprint-540 Learnings
+- live-ledger truth-sync — projections regen + test expectations + proposal regen: NO_GO — LOCAL_VERIFIED / SCOPED_GREEN. `npx tsc --noEmit` exited 0. `VITEST_MAX_FORKS=2 npx vitest run tests/governance/closure-
+
 ## Sprint sprint-539 Learnings
 - Sprint sprint-539 Learnings: ## Sprint sprint-539 Learnings
 

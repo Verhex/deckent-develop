@@ -9,6 +9,11 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-544-002 | Tech debt from 544-002: LOCAL_VERIFIED: npx tsc --noEmit passed; npx vitest run  | normal | sprint-544 | resolved |
+| debt-544-001 | Tech debt from 544-001: Implemented additive bounded logTail lineage with defaul | normal | sprint-544 | resolved |
+| debt-544-005 | Tech debt from 544-005: Updated both reference trees with semantic and heading p | normal | sprint-544 | resolved |
+| debt-544-004 | Tech debt from 544-004: LOCAL_VERIFIED: npx tsc --noEmit passed; npx tsc --noEmi | normal | sprint-544 | resolved |
+| rollback-sprint-540 | Sprint sprint-540 rollback SUCCESS | normal | sprint-540 | resolved |
 | debt-537-001 | Tech debt from 537-001: Exact-byte disk readback passed via cmp; target contains | normal | sprint-537 | resolved |
 | debt-532-002 | Tech debt from 532-002: Implemented explicit local-llm registry ownership and ze | normal | sprint-532 | resolved |
 | debt-532-004 | Tech debt from 532-004: Verification passed: npx tsc --noEmit exited 0; exact ta | normal | sprint-532 | resolved |

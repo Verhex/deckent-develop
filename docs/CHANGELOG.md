@@ -14,6 +14,22 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint544] - 2026-08-17
+
+### Added
+
+- Terminal — `deckent inspect --follow` (depends on Task 1)
+
+### Changed
+
+- core — bounded log-tail lineage (completed with tech debt)
+- API — task detail serves the log tail (depends on Task 1) (completed with tech debt)
+- Desktop — stream adoption on Runs/console (depends on Task 2) (completed with tech debt)
+- documentation — follow + tail + stream adoption (depends on Tasks 1,2,3) (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 4 tech debt, 0 no-go_
+
 ## [sprint542] - 2026-08-17
 
 ### Added

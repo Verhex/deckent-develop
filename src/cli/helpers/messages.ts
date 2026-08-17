@@ -72,6 +72,10 @@ const MESSAGES: MessageMap = {
     en: 'Output machine-readable JSON',
     tr: 'Makine tarafından okunabilir JSON çıktısı üret',
   },
+  'inspect.option.follow': {
+    en: 'Follow live inspector revisions',
+    tr: 'Canlı inspector revizyonlarını takip et',
+  },
   'inspect.column.run_id': { en: 'Run ID', tr: 'Run ID' },
   'inspect.column.state': { en: 'State', tr: 'Durum' },
   'inspect.column.source': { en: 'Source', tr: 'Kaynak' },
@@ -84,6 +88,22 @@ const MESSAGES: MessageMap = {
   'inspect.field.plan_truncated': { en: 'Plan truncated', tr: 'Plan kısaltıldı' },
   'inspect.field.self_assessment': { en: 'Self-assessment', tr: 'Öz değerlendirme' },
   'inspect.field.lineage': { en: 'Lineage', tr: 'Lineage' },
+  'inspect.log_tail.header': {
+    en: 'Log tail ({count} lines, truncated: {truncated}):',
+    tr: 'Log sonu ({count} satır, kısaltıldı: {truncated}):',
+  },
+  'inspect.follow.run_status': {
+    en: 'Lifecycle: {lifecycle} · phase: {phase} · workers: {workers} · revision: {revision}',
+    tr: 'Lifecycle: {lifecycle} · faz: {phase} · worker: {workers} · revizyon: {revision}',
+  },
+  'inspect.follow.task_status': {
+    en: 'Task {taskId} · status: {status} · heartbeat: {heartbeat} · revision: {revision}',
+    tr: 'Görev {taskId} · durum: {status} · heartbeat: {heartbeat} · revizyon: {revision}',
+  },
+  'inspect.error.follow_json': {
+    en: 'INSPECT_FOLLOW_JSON_UNSUPPORTED: --follow cannot be combined with --json',
+    tr: 'INSPECT_FOLLOW_JSON_UNSUPPORTED: --follow ile --json birlikte kullanılamaz',
+  },
   'inspect.error.unknown_task': {
     en: 'INSPECT_TASK_NOT_FOUND: Unknown task ID: {taskId}',
     tr: 'INSPECT_TASK_NOT_FOUND: Bilinmeyen görev ID: {taskId}',

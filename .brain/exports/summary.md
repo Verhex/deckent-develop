@@ -55,6 +55,14 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-544 Learnings** (sprint-544): ## Sprint sprint-544 Learnings
+- core — bounded log-tail lineage: GO_WITH_TECH_DEBT — Implemented additive bounded lo...
+- **Sprint sprint-542 Learnings** (sprint-542): ## Sprint sprint-542 Learnings
+- API face — inspector runs endpoints (depends on Task 1): NO_GO — Added GET /api/insp...
+- **Sprint sprint-541 Learnings** (sprint-541): ## Sprint sprint-541 Learnings
+- /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1): NO_GO — ...
+- **Sprint sprint-540 Learnings** (sprint-540): ## Sprint sprint-540 Learnings
+- live-ledger truth-sync — projections regen + test expectations + proposal regen: NO_...
 - **Sprint sprint-539 Learnings** (sprint-539): ## Sprint sprint-539 Learnings
 
 ## Gains
@@ -68,16 +76,6 @@
 - **Sprint sprint-536 Learnings** (sprint-536): ## Sprint sprint-536 Learnings
 - **Sprint sprint-535 Learnings** (sprint-535): ## Sprint sprint-535 Learnings
 - **Sprint sprint-534 Learnings** (sprint-534): ## Sprint sprint-534 Learnings
-- **Sprint sprint-533 Learnings** (sprint-533): ## Sprint sprint-533 Learnings
-
-## Gains
-- 533-001 — close the local-llm agentic worker and settlement lineage — Veri...
-- **Sprint sprint-525 Learnings** (sprint-525): ## Sprint sprint-525 Learnings
-- Fix: Probe contract freeze — typed provider-evidence-probe contracts: NO_GO — Refusi...
-- **Sprint sprint-524 Learnings** (sprint-524): ## Sprint sprint-524 Learnings
-- KN3 projection-parity guard — landing-proposal artifacts are not task ids: GO_WITH_T...
-- **Sprint sprint-521 Learnings** (sprint-521): ## Sprint sprint-521 Learnings
-- Skill catalog S1 — one effective read model behind the existing API (row 7012): GO_W...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -88,4 +86,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1889 | Generated: 2026-08-17_
+_Total entries: 1916 | Generated: 2026-08-17_

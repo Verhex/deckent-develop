@@ -13079,3 +13079,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 543-005: documentation — stream + MCP faces (depends on Tasks 1,2,3) (DONE)
 
 ---
+## Sprint 544 — sprint-544
+
+**Status:** COMPLETE
+**Date:** 2026-08-17
+**Duration:** 335s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 334706ms |
+
+### Tasks
+
+- 544-001: core — bounded log-tail lineage (DONE)
+- 544-002: API — task detail serves the log tail (depends on Task 1) (DONE)
+- 544-003: Terminal — `deckent inspect --follow` (depends on Task 1) (DONE)
+- 544-004: Desktop — stream adoption on Runs/console (depends on Task 2) (DONE)
+- 544-005: documentation — follow + tail + stream adoption (depends on Tasks 1,2,3) (DONE)
+
+---

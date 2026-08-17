@@ -11,6 +11,8 @@ export const SHELL_MESSAGES = {
     'desktop.shell.runs.loading': 'Loading runs…',
     'desktop.shell.runs.empty': 'No runs are available.',
     'desktop.shell.runs.error': 'Runs could not be loaded.',
+    'desktop.shell.runs.authority': 'Live authority',
+    'desktop.shell.runs.stream_degraded': 'Live updates are unavailable. Use Refresh for the latest known state.',
     'desktop.shell.runs.not_settled': 'Not settled',
   },
   tr: {
@@ -24,6 +26,8 @@ export const SHELL_MESSAGES = {
     'desktop.shell.runs.loading': 'Koşular yükleniyor…',
     'desktop.shell.runs.empty': 'Kullanılabilir koşu yok.',
     'desktop.shell.runs.error': 'Koşular yüklenemedi.',
+    'desktop.shell.runs.authority': 'Canlı otorite',
+    'desktop.shell.runs.stream_degraded': 'Canlı güncellemeler kullanılamıyor. Bilinen son durum için Yenile’yi kullanın.',
     'desktop.shell.runs.not_settled': 'Henüz sonuçlanmadı',
   },
 } as const;

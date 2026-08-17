@@ -190,6 +190,14 @@ export function buildWorkerLogUrl(session: DaemonSession, taskId: string): strin
   return url.toString();
 }
 
+/** RUN-INSPECTOR-001 — canonical sprint-live SSE URL. EventSource cannot
+ * attach the bearer header, so use the server's allowlisted query token. */
+export function buildSprintLiveStreamUrl(session: DaemonSession): string {
+  const url = new URL('/api/sprint/live/stream', session.url);
+  if (session.apiToken) url.searchParams.set('token', session.apiToken);
+  return url.toString();
+}
+
 export interface WorkerLogHandlers {
   onLine(line: string): void;
   /** The task has no .log yet — an honest state, not an error. */
@@ -303,6 +311,12 @@ export interface DaemonApiClient {
   decideApproval(id: string, decision: 'allow' | 'deny', reason?: string): Promise<Record<string, unknown>>;
   // ── Sprint-live contract (588/F1 «Köprü» — /api/sprint/*) ──
   getSprintLive(): Promise<SprintLiveSnapshotPayload>;
+  /** Subscribe to canonical sprint snapshots. Returns an unsubscribe closer. */
+  subscribeSprintLive(
+    onSnapshot: (snapshot: SprintLiveSnapshotPayload) => void,
+    onError: () => void,
+    opts?: { EventSourceImpl?: typeof EventSource },
+  ): () => void;
   getSprintTask(taskId: string): Promise<SprintTaskDetailPayload>;
   inspectorRuns(): Promise<InspectorRunsPayload>;
   /** Worker canlı-log SSE (named events log_line/log_unavailable). Returns close(). */
@@ -442,6 +456,35 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
 
     // ── Sprint-live contract (588/F1 «Köprü») ──
     getSprintLive: () => request<SprintLiveSnapshotPayload>('GET', '/api/sprint/live'),
+    subscribeSprintLive: (onSnapshot, onError, opts = {}) => {
+      const Impl = opts.EventSourceImpl ?? EventSource;
+      const source = new Impl(buildSprintLiveStreamUrl(session));
+      let closed = false;
+      const close = (): void => {
+        if (!closed) {
+          closed = true;
+          source.close();
+        }
+      };
+      const handleSnapshot = (raw: MessageEvent): void => {
+        if (closed) return;
+        try {
+          onSnapshot(JSON.parse(String(raw.data)) as SprintLiveSnapshotPayload);
+        } catch {
+          // A torn frame is skipped; the next canonical snapshot can recover.
+        }
+      };
+      // Accept both the stream's named snapshot event and the standard
+      // unnamed SSE form without creating another transport subscription.
+      source.addEventListener('snapshot', handleSnapshot);
+      source.onmessage = handleSnapshot;
+      source.onerror = () => {
+        if (closed) return;
+        close();
+        onError();
+      };
+      return close;
+    },
     getSprintTask: (taskId) =>
       request<SprintTaskDetailPayload>('GET', `/api/sprint/task/${encodeURIComponent(taskId)}`),
     inspectorRuns: () => request<InspectorRunsPayload>('GET', '/api/inspector/runs'),

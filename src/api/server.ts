@@ -228,6 +228,9 @@ const SECURITY_HEADERS: Record<string, string> = {
 
 // ─── Zod Schemas for POST validation ────────────────────────────
 const StartSchema = z.object({ autoApprove: z.boolean().optional() });
+const SprintTaskDetailQuerySchema = z.object({
+  tailLines: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(200)).optional(),
+});
 const PlanSchema = z.object({
   directive: z.string().optional(),
   mode: z.enum(['ai', 'structured', 'auto']).optional(),
@@ -1323,10 +1326,29 @@ async function handleRequest(
       return;
     }
     if (method === 'GET' && url.startsWith('/api/sprint/task/')) {
-      const rawId = url.slice('/api/sprint/task/'.length);
+      const taskUrl = new URL(url, 'http://localhost');
+      const rawId = taskUrl.pathname.slice('/api/sprint/task/'.length);
       let taskId: string;
       try { taskId = decodeURIComponent(rawId); } catch { taskId = rawId; }
-      const detail = readRunInspectorTaskDetail(projectRoot, taskId);
+      const parsedQuery = SprintTaskDetailQuerySchema.safeParse(
+        Object.fromEntries(taskUrl.searchParams.entries()),
+      );
+      if (!parsedQuery.success) {
+        const rawTailLines = taskUrl.searchParams.get('tailLines');
+        sendJson(res, {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'tailLines must be an integer between 1 and 200',
+            details: [{
+              field: 'tailLines',
+              message: 'Must be an integer between 1 and 200',
+              value: rawTailLines,
+            }],
+          },
+        }, 400);
+        return;
+      }
+      const detail = readRunInspectorTaskDetail(projectRoot, taskId, parsedQuery.data);
       if (detail === null) {
         sendError(res, SPRINT_TASK_ID_RE.test(taskId) ? 404 : 403, 'task not found');
         return;

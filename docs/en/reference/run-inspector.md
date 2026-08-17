@@ -48,7 +48,7 @@ The schema-version 1 snapshot is the canonical live-run projection served by `/a
 
 ## Task detail shape
 
-`readRunInspectorTaskDetail` returns one task drill-down. Package 1 supplies the existing task fields, including status, assigned agent/model, heartbeat summary, lock state, bounded plan view and its truncation flag, and result summary. Task 1 of this package adds `lineage` without removing or changing those keys.
+`readRunInspectorTaskDetail` returns one task drill-down. Package 1 supplies the existing task fields, including status, assigned agent/model, heartbeat summary, lock state, bounded plan view and its truncation flag, and result summary. The additive `lineage` block does not remove or change those keys.
 
 ### Detail fields
 
@@ -66,12 +66,15 @@ The schema-version 1 snapshot is the canonical live-run projection served by `/a
 
 | Field | Type | Meaning |
 |---|---|---|
-| `logPath` | string or `null` | Path to the task's own log artifact, or `null` when unavailable. The detail response does not include log content. |
-| `logTailAvailable` | boolean | Whether the task-local log tail can be obtained through the existing log face. It does not mean log content is embedded here. |
+| `logPath` | string or `null` | Path to the task's own log artifact, or `null` when unavailable. |
+| `logTailAvailable` | boolean | Whether a task-local log artifact is available. It remains the availability truth even when content cannot be decoded. |
+| `logTail` | `{ lines: readonly string[], truncated: boolean }` or `null` | Last lines of the task-local log, or `null` when the log is absent or cannot be decoded as text. A torn final line is retained as-is. |
 | `resultEvidence` | object or `null` | Evidence derived only from the task's own result artifact; `null` when no usable result exists. |
 | `resultEvidence.selfAssessment` | string or `null` | Recorded self-assessment, or `null` when the result omits it. |
 | `resultEvidence.filesChanged` | string array | Recorded changed-file paths. Absence is represented honestly as an empty array. |
 | `resultEvidence.notesPresent` | boolean | Whether the result contains notes; note content is not duplicated into the lineage block. |
+
+The log tail defaults to the last 40 lines. Callers can request a different positive count, up to the hard limit of 200 lines. The joined tail content is also bounded by `SPRINT_DETAIL_TEXT_CAP`; `truncated` is `true` when earlier lines were omitted or the text cap shortened the returned set. Truncation is reported only by the typed flag, never by an in-band ellipsis.
 
 ## HTTP API
 
@@ -80,10 +83,12 @@ These are monitoring reads and use the same authentication class as `/api/sprint
 | Method and path | Response |
 |---|---|
 | `GET /api/sprint/live` | Canonical schema-version 1 inspector snapshot. |
-| `GET /api/sprint/task/:id` | Task detail with the additive `lineage` block. Existing package-1 keys remain present. |
+| `GET /api/sprint/task/:id` | Task detail with the additive `lineage` block, including its bounded `logTail`. Existing package-1 keys remain present. |
 | `GET /api/inspector/runs` | Run-list envelope containing the current authority entry and any discoverable archive entries. |
 
 The API face depends on the core read-model package. Route registration alone does not create a second lifecycle authority.
+
+`GET /api/sprint/task/:id?tailLines=<1..200>` selects the maximum number of returned tail lines. Omitting it uses 40. Zero, values above 200, negative values, non-integers, and non-numeric values return a typed HTTP `400` response rather than silently changing the request.
 
 ## SSE live snapshot stream
 
@@ -107,6 +112,8 @@ Task 3 ships the read-only Terminal face:
 ```bash
 deckent inspect
 deckent inspect <taskId>
+deckent inspect --follow
+deckent inspect <taskId> --follow
 deckent inspect --json
 deckent inspect <taskId> --json
 ```
@@ -114,11 +121,19 @@ deckent inspect <taskId> --json
 | Invocation | Behavior |
 |---|---|
 | `deckent inspect` | Lists runs with run ID, state, source, and settlement time. |
-| `deckent inspect <taskId>` | Shows task status, agent, model, heartbeat summary, plan truncation state, result self-assessment, and lineage. |
+| `deckent inspect <taskId>` | Shows task status, agent, model, heartbeat summary, plan truncation state, result self-assessment, lineage, and the bounded log-tail section when available. |
+| `deckent inspect --follow` | Prints the run-list header once, then updates one status line from the core snapshot observer with lifecycle, phase, worker count, and revision. It does not implement a separate polling loop. |
+| `deckent inspect <taskId> --follow` | Re-renders the selected task's status and heartbeat line when the snapshot revision advances. |
 | `--json` | Emits the core read-model shape for machine consumers instead of the localized table/detail presentation. |
 | Unknown task ID | Prints a typed, localized message without a stack trace and exits with code `1`. |
 
-Human-readable labels use the English/Turkish message catalogs. The command consumes the core module directly; it does not infer state from formatted API or Terminal output.
+Human-readable labels use the English/Turkish message catalogs. The command consumes the core module directly; it does not infer state from formatted API or Terminal output. Closing follow mode or interrupting it with `SIGINT` disposes its snapshot observer and timer before exit. JSON task detail includes `logTail` verbatim from the core projection.
+
+## Desktop live stream adoption
+
+The Desktop Runs view subscribes to `/api/sprint/live/stream`. Stream snapshots update the authority chip and current-run row; archived rows continue to come from the run-list fetch. The Worker view uses its mounted view's stream subscription to update the selected task's heartbeat when that task is present in a snapshot. Each mounted view owns at most one subscription and closes it on unmount.
+
+Stream failure is explicit: the Runs view shows a localized degradation notice and keeps the manual refresh affordance available. It does not silently present stale data as live. Desktop consumes the authoritative snapshot fields and does not derive lifecycle state in the renderer.
 
 ## MCP tool
 
@@ -136,17 +151,17 @@ The successful MCP JSON shapes are the same shapes emitted by `deckent inspect -
 
 | Face | Package status |
 |---|---|
-| Core read model | Packages 1–3: snapshot, disposable snapshot observer, task detail, run list, and lineage. |
-| HTTP API | Run list, additive task lineage, and `/api/sprint/live/stream` latest-snapshot SSE. |
-| Terminal | `deckent inspect` list/detail and JSON modes. |
+| Core read model | Snapshot, disposable snapshot observer, task detail, run list, lineage, and bounded log-tail content. |
+| HTTP API | Run list, additive task lineage with `tailLines`, and `/api/sprint/live/stream` latest-snapshot SSE. |
+| Terminal | `deckent inspect` list/detail, follow, and JSON modes. |
 | MCP | `deckent_inspect` list/detail with Terminal JSON-shape parity. |
-| Desktop | Runs-list face is package-dependent and separate from the stream and MCP contracts documented here. |
+| Desktop | Runs and Worker views adopt the live snapshot stream with explicit manual-refresh degradation and unmount disposal. |
 
 ## Explicit non-goals and open 6071 dimensions
 
-Package 3 ships the first revision-cursor stream slice, including reconnect-without-duplicate semantics, latest-wins coalescing, keepalive, and disposal. It does not close the full `RUN-INSPECTOR-001` outcome. The following 6071 dimensions remain open:
+Package 4 adds bounded log-tail lineage, API tail selection, Terminal follow mode, and Desktop stream adoption to the previously shipped revision-cursor stream. It does not close the full `RUN-INSPECTOR-001` outcome. The following 6071 dimensions remain open:
 
 - No million-event virtualization proof or implementation yet.
 - No complete cross-surface execution timeline covering attempt, agent, worker, tool, MCP, context, prompt/skill, token/cost/latency, checkpoint, approval, policy, verifier, result, and evidence lineage yet.
 
-Existing log streaming remains a separate face. The task-detail lineage block deliberately exposes availability and provenance, not log content.
+Existing full log streaming remains a separate face; the task-detail lineage carries only the bounded tail described above.
