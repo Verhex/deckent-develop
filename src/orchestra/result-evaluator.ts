@@ -1268,6 +1268,12 @@ export function gateRunPolicyParityVerdict(
 ): EvaluationResult {
   const plan = task.runPolicy;
   if (!plan || candidate.decision !== 'DONE') return candidate;
+  // Idempotent across chained terminal producers: a DONE that already carries a
+  // PASSED parity score was verified against the same immutable task snapshot —
+  // re-appending would only duplicate the audit row.
+  if (candidate.rubricScores.some(s => s.criterion === 'run_policy_parity' && s.passed)) {
+    return candidate;
+  }
 
   const settlement = settleRunPolicyResultEvidence({
     plan,
@@ -1303,7 +1309,7 @@ export function gateRunPolicyParityVerdict(
  * - totalScore >= passingScore * 0.7 → GO_WITH_TECH_DEBT
  * - totalScore < passingScore * 0.7 → NO_GO
  */
-export function evaluateWithRubric(
+function evaluateWithRubricCore(
   result: TaskResult,
   task: Task,
   rubric?: Partial<EvaluationRubric>,
@@ -1430,14 +1436,10 @@ export function evaluateWithRubric(
     const reconciled = reconcileRubricNoGo(result, evaluation);
     if (reconciled.reconciled) {
       debugLog('evaluateWithRubric:reconcile', `Task ${task.id}: ${reconciled.notes}`);
-      // Run-policy parity applies AFTER reconciliation so a spurious-NO_GO
-      // recovery can never resurrect a result whose policy digest is missing
-      // or wrong (RUN-POLICY-DELIVERY-001).
-      return gateRunPolicyParityVerdict(
-        { ...evaluation, decision: reconciled.decision },
-        task,
-        result.runPolicyEvidence,
-      );
+      return {
+        ...evaluation,
+        decision: reconciled.decision,
+      };
     }
     // Spurious NO_GO recovery (git-diff/tsc/vitest) is applied AFTER this pure
     // grader by reconcileEvaluationSpuriousNoGo() — async, so it does not freeze
@@ -1449,7 +1451,35 @@ export function evaluateWithRubric(
     return enrichEvaluationWithCategory(evaluation, result, task);
   }
 
-  return gateRunPolicyParityVerdict(evaluation, task, result.runPolicyEvidence);
+  return evaluation;
+}
+
+/**
+ * Canonical rubric evaluation entrypoint — the ONLY exported sync grader.
+ *
+ * RUN-POLICY-DELIVERY-001 correction (owner analiz turu, 2026-08-17): the
+ * run-policy parity gate is applied HERE, at the single terminal boundary of
+ * the sync grader, so EVERY internal return — the D-1 verification fast-path,
+ * the D-2 schema rejection, the reconcile override and the plain rubric exit —
+ * flows through it. No internal branch can hand out a DONE that skipped the
+ * policy digest check. The other two terminal EvaluationResult producers live
+ * in THIS module and gate their own exits the same way:
+ * {@link reconcileEvaluationSpuriousNoGo} (async recovery flip) and
+ * {@link reconstructFromDurableEvidence} (rubric-fault reconstruction) — so a
+ * downstream caller (sprint-phases, backlog-eval) can never strip the gate,
+ * and partial test mocks of downstream modules cannot bypass it.
+ */
+export function evaluateWithRubric(
+  result: TaskResult,
+  task: Task,
+  rubric?: Partial<EvaluationRubric>,
+  _projectRoot?: string,
+): EvaluationResult {
+  return gateRunPolicyParityVerdict(
+    evaluateWithRubricCore(result, task, rubric, _projectRoot),
+    task,
+    result.runPolicyEvidence,
+  );
 }
 
 /**
@@ -1489,6 +1519,24 @@ export function evaluateAcceptanceBoundSemanticVerdict(
  * Otherwise the input evaluation is returned unchanged.
  */
 export async function reconcileEvaluationSpuriousNoGo(
+  evaluation: EvaluationResult,
+  result: TaskResult,
+  task: Task,
+  projectRoot?: string,
+): Promise<EvaluationResult> {
+  // RUN-POLICY-DELIVERY-001 correction: the recovery may flip NO_GO→DONE after
+  // the sync grader's gated exit — the flip re-passes the same parity gate at
+  // THIS module's boundary (idempotent), so recovery can never resurrect a
+  // result whose policy digest is missing or wrong. Kept inside
+  // result-evaluator so partial test mocks of downstream modules cannot strip it.
+  return gateRunPolicyParityVerdict(
+    await reconcileEvaluationSpuriousNoGoCore(evaluation, result, task, projectRoot),
+    task,
+    result.runPolicyEvidence,
+  );
+}
+
+async function reconcileEvaluationSpuriousNoGoCore(
   evaluation: EvaluationResult,
   result: TaskResult,
   task: Task,
@@ -1738,7 +1786,12 @@ export function reconstructFromDurableEvidence(
     retryCount: 0,
   };
 
-  return decision === 'NO_GO' ? enrichEvaluationWithCategory(evaluation, result, task) : evaluation;
+  // RUN-POLICY-DELIVERY-001 correction: a rubric-fault reconstruction is a
+  // terminal EvaluationResult producer — its DONE passes the same parity gate,
+  // so an evaluation fault can never become a policy bypass.
+  return decision === 'NO_GO'
+    ? enrichEvaluationWithCategory(evaluation, result, task)
+    : gateRunPolicyParityVerdict(evaluation, task, result.runPolicyEvidence);
 }
 
 // ─── TECH_DEBT Downgrade Layer (Honest Assessment Calibration v2) ────

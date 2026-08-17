@@ -86,6 +86,8 @@ export async function evaluateBacklogResult(
   config?: ResolvedConfig,
 ): Promise<BacklogEvaluation> {
   const task = buildTaskForEval(entry, result, config);
+  // RUN-POLICY-DELIVERY-001: both producers below are parity-gated at the
+  // result-evaluator terminal boundary (grader exit + reconcile exit).
   const evaluation = await reconcileEvaluationSpuriousNoGo(
     evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
   return mapEvaluation(result, evaluation);

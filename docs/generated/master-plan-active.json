@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "71006a35d3d43c52ea026942f69f82934542f58ecee959979347ee56ee26bd3d"
+    "value": "229c882a2c6aed34f9ab73907f6bbbd4a6e765f550be281e2dd84219f027fa1d"
   },
   "summary": {
     "total": 495,
@@ -4780,7 +4780,7 @@
       "state": "OPEN",
       "updated": "2026-08-17",
       "definitionDigest": "db257570be7d97728b470b283e0b57eeed3b09e3680f8ba7122539a72c7fbad7",
-      "progressDigest": "c7f4cd441be7670f68666c466d2f9eb4699fcfc8e21ff61d723c863fca1bbdab",
+      "progressDigest": "001330197a2332db59266ab22433a5619a4b576ed699b39f2bcbfa05ebb3fe47",
       "terminalClosureDigest": null
     },
     {
@@ -22946,7 +22946,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "486-017 producer'ı (buildRunPolicyAuthorityBlock, prompt-god-template.ts — bugün \"empty until the caller wires\" durumunda) production consumer'ını 487-026 task-carried pattern'iyle kazanır (ctx-injection ASLA: \"can never be gated off by caller wiring drift\"): plan-time resolver → task.runPolicy digest → her provider için (Codex/Fable/Qwen) byte-identical compiled prompt → .result gözlenen policy digest'i taşır → settlement aynı digest'i doğrular; hermetic provider-parity testi identical digest'leri kanıtlar; CI green-class adlandırması + canonical verify manifest merge-queue authority açığını kapatır (2026-08-04/535 owner kararıyla çelişmeden amendment olarak); DONE ek şartı: tek no-op dogfood canary terminal settlement (DOGFOOD ON-dönüş koşulu)",
-      "evidence": "PHASE-2 implementation LANDED bu satırın production zinciriyle: resolver (run-policy-resolver.ts, DIRECTIVES \"## Execution Contract\") → planSprint tek choke-point stamp (ai+structured+fallback+injected-debt yolları) → task.runPolicy carriage + debt-manager FIX inheritance ×2 → prompt-god-template task-carried render (ctx-injection KALDIRILDI) + worker digest-echo result kontratı → runPolicyEvidence şeması → settleRunPolicyResultEvidence (recompute, typed HOLD) → gateRunPolicyParityVerdict evaluateWithRubric İÇİNDE (her ingress, FIX dahil) → execution-authority.jsonl kind=run-policy-authority durable audit. Kanıt: 20/20 hermetic matrix (create/bounds/settlement/tamper + resolver + provider-parity Codex/Fable/Qwen byte-identical + FIX-identical + audit + evaluator gate), tsc 0 hata. Owner approval c (Alperen 2026-08-17): ürün kodu olarak yazılır, repo-local script değil — deckent-dev ilk tenant'tır; DUAL LENS gereği aynı mekanizma son kullanıcının org-policy-her-provider'a-aynı-bitlerle-gider enterprise ihtiyacıdır. Kanıt zinciri işaretleri: prompt-god-template.ts:1706 (unwired yorum), task-builder.ts exactExecutionAuthority kontrast-pattern'i, execution-authority.jsonl audit izi",
+      "evidence": "PHASE-2 implementation LANDED bu satırın production zinciriyle: resolver (run-policy-resolver.ts, DIRECTIVES \"## Execution Contract\") → planSprint tek choke-point stamp (ai+structured+fallback+injected-debt yolları) → task.runPolicy carriage + debt-manager FIX inheritance ×2 → prompt-god-template task-carried render (ctx-injection KALDIRILDI) + worker digest-echo result kontratı → runPolicyEvidence şeması → settleRunPolicyResultEvidence (recompute, typed HOLD) → gateRunPolicyParityVerdict evaluateWithRubric İÇİNDE (her ingress, FIX dahil) → execution-authority.jsonl kind=run-policy-authority BEST-EFFORT compile observation (fail-soft yüzey; authoritative compile-evidence authority = 9024 PROMPT-COMPILE-EVIDENCE-AUTHORITY-001; enforcement = settlement parity zinciri). CORRECTION (owner analiz turu, 2026-08-17): parity gate tek canonical terminal boundary'ye taşındı — evaluateWithRubric exported wrapper (D-1 verification fast-path + D-2 schema dahil her iç dönüş) + async terminal producer'lar (safeRubricReconcile reconciled/reconstruction + backlog-eval reconciled) aynı gate'i uygular; verification fast-path ve rubric-fault reconstruction bypass'ları kapandı, production-entrypoint testleriyle kanıtlı. Kanıt: 20/20 hermetic matrix (create/bounds/settlement/tamper + resolver + provider-parity Codex/Fable/Qwen byte-identical + FIX-identical + audit + evaluator gate), tsc 0 hata. Owner approval c (Alperen 2026-08-17): ürün kodu olarak yazılır, repo-local script değil — deckent-dev ilk tenant'tır; DUAL LENS gereği aynı mekanizma son kullanıcının org-policy-her-provider'a-aynı-bitlerle-gider enterprise ihtiyacıdır. Kanıt zinciri işaretleri: prompt-god-template.ts:1706 (unwired yorum), task-builder.ts exactExecutionAuthority kontrast-pattern'i, execution-authority.jsonl audit izi",
       "updated": "2026-08-17"
     },
     {
@@ -25641,6 +25641,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f9a36815bccafb26da38bb2bc4e27cdc9d3e8917e215908b6503cb23b03fd381"
+    "value": "d7de82efaa7281248bc5c561ffc1eab8af76d0136141f9b52bc16916fabda02e"
   }
 }

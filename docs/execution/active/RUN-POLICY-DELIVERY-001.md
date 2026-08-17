@@ -35,11 +35,19 @@ MODE: implement
 
 ## DONE
 - Production chain gerçek: resolver → task persistence → compiler (task'tan) → provider-neutral
-  byte-parity → worker digest echo kontratı → evaluator/settlement parity (typed HOLD) → durable audit
+  byte-parity → worker digest echo kontratı → evaluator/settlement parity (typed HOLD) →
+  best-effort compile observation jsonl (fail-soft; authoritative compile-evidence authority =
+  MASTER 9024, enforcement = settlement parity zinciri)
+- **Correction (owner analiz turu, 2026-08-17):** parity gate TEK canonical terminal boundary'de —
+  `evaluateWithRubric` exported wrapper (D-1 verification fast-path + D-2 schema + tüm iç dönüşler
+  dahil) + async terminal producer'lar (`safeRubricReconcile` reconciled/reconstruction dönüşleri,
+  `backlog-eval` reconciled dönüşü) aynı gate'i yeniden uygular. Production-entrypoint testleri:
+  verification fast-path missing/mismatch/exact + rubric-fault reconstruction missing/exact +
+  normal/FIX korunumu.
 - FIX/retry attempt'leri identical digest taşır; tamper fail-closed
 - LOCAL_VERIFIED battery yeşil; direct-main push
-- `CANARY_READY` raporu verildi ve Alperen'in ON kararı BEKLENIYOR (bu satır DONE'un parçası değil;
-  canary terminal settlement'ı ON kararı sonrası ayrı kanıttır)
+- `CANARY_READY` ancak bu correction + gerçek canary hazırlığı sonrası; Alperen'in açık ON kararı
+  olmadan DOGFOOD_MODE değişmez
 
 ## Stop conditions
 - Owner gate: CANARY_READY sonrası ON kararı yalnız Alperen'den

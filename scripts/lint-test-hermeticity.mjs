@@ -282,8 +282,17 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // graph-relevant edits in this slice are the two new suites and the
   // production modules they import (which land in the production inventory,
   // not here). Prior: DEV-CONTROL amendment (13015).
+  // 2026-08-17 (RUN-POLICY correction turu): same 13019 count, digest only —
+  // the owner-analysis correction edits already-tracked files (canonical
+  // terminal-boundary gate in result-evaluator/sprint-phases/backlog-eval and
+  // the production-entrypoint cases added to the existing Paket B suite).
+  // Prior: RUN-POLICY-DELIVERY-001 (13019).
+  // 2026-08-17 (RUN-POLICY correction, boundary internalization): same 13019
+  // count, digest only — the gate moved INSIDE result-evaluator's three
+  // terminal producers (grader wrapper + reconcile wrapper + reconstruction
+  // tail); sprint-phases/backlog-eval external wraps reverted.
   count: 13019,
-  digest: '1d9e110b68909c6dbb57ff53753fb49c3c5522ed7ea3cbc6032dab0155e5a615',
+  digest: 'c3eaac1cb44e8fa1f80187de7d3b9e2e0359e4d3da1c1fe540e82489c8fb2e23',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -445,8 +454,15 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // debt-manager/prompt-god-template/task-builder/result-evaluator content
   // digests shift with the task-carried delivery chain (digest component).
   // Prior: DEV-CONTROL amendment (1236).
+  // 2026-08-17 (RUN-POLICY correction turu): same 1237 count, digest only —
+  // already-inventoried result-evaluator/sprint-phases/backlog-eval/task-builder
+  // content shifts with the canonical terminal-boundary gate + honest
+  // observation naming. Prior: RUN-POLICY-DELIVERY-001 (1237).
+  // 2026-08-17 (boundary internalization): same 1237 count, digest only — the
+  // gate now lives inside result-evaluator's terminal producers; downstream
+  // sprint-phases/backlog-eval external wraps reverted.
   count: 1237,
-  digest: '912e1ada23eaa012e679890f3aa95dc5cecbc9ffe33dc895be0740074b91df24',
+  digest: 'cc215f52eecb717026379cf441a62888825ae2b0f013bb0f4e99a18e56dcbe87',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

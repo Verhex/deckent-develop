@@ -332,6 +332,8 @@ export async function safeRubricReconcile(
     ) {
       return scored;
     }
+    // RUN-POLICY-DELIVERY-001: `reconciled` is parity-gated INSIDE
+    // reconcileEvaluationSpuriousNoGo (result-evaluator terminal boundary).
     return reconciled;
   } catch (rubricErr) {
     const msg = rubricErr instanceof Error ? rubricErr.message : String(rubricErr);
@@ -360,6 +362,8 @@ export async function safeRubricReconcile(
       `evidence (worker claim=${String(result.selfAssessment)}, testsPassed=${String(result.testsPassed)}) ` +
       `→ ${reconstruction.decision}`;
     result.notes = result.notes ? `${result.notes}\n${faultNote}` : faultNote;
+    // RUN-POLICY-DELIVERY-001: `reconstruction` is parity-gated INSIDE
+    // reconstructFromDurableEvidence (result-evaluator terminal boundary).
     return reconstruction;
   }
 }

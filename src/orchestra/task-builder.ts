@@ -2402,9 +2402,14 @@ export function buildWorkerPrompt(
     }
   }
 
-  // RUN-POLICY-DELIVERY-001: durable audit evidence that this compile carried
-  // the task's digest-bound run policy — same append-only jsonl the exact-plan
-  // authority uses (no parallel audit store), `kind`-tagged for disambiguation.
+  // RUN-POLICY-DELIVERY-001: BEST-EFFORT compile OBSERVATION that this compile
+  // carried the task's digest-bound run policy — same fail-soft append-only
+  // jsonl the exact-plan authority uses (no parallel audit store),
+  // `kind`-tagged for disambiguation. This surface is deliberately fail-soft
+  // (append errors only debug-log) and is NOT authoritative execution truth;
+  // the authoritative prompt-compile evidence authority is MASTER 9024
+  // (PROMPT-COMPILE-EVIDENCE-AUTHORITY-001). Enforcement lives in the
+  // settlement parity chain, not here.
   if (task.runPolicy) {
     try {
       const auditDir = join(projectRoot, '.deckent', 'runtime', 'prompt-authority');
