@@ -1,5 +1,11 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-538 Learnings
+- Sprint sprint-538 Learnings: ## Sprint sprint-538 Learnings
+
+## Gains
+- 538-001 — Phase-5 dry-run bundle builder + hermetic proof — npx tsc --noEmit: PASS (exit 0).
+
 ## Sprint sprint-537 Learnings
 - Sprint sprint-537 Learnings: ## Sprint sprint-537 Learnings
 - Canary no-op doc touch: GO_WITH_TECH_DEBT — Exact-byte disk readback passed via cmp; target contains one required line with a trailing newline. Tier-0 documentation

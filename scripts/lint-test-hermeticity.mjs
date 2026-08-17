@@ -291,8 +291,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // count, digest only — the gate moved INSIDE result-evaluator's three
   // terminal producers (grader wrapper + reconcile wrapper + reconstruction
   // tail); sprint-phases/backlog-eval external wraps reverted.
-  count: 13019,
-  digest: 'c3eaac1cb44e8fa1f80187de7d3b9e2e0359e4d3da1c1fe540e82489c8fb2e23',
+  // 2026-08-17 (PHASE5-S1, sprint-538 dogfood): +13 — the dry-run bundle
+  // builder (scripts/closure-ledger/phase5-dry-run.mjs staging fs sites) and
+  // its tmpdir-hermetic governance suite enter the graph. First fully-DONE
+  // dogfood-authored code slice under the task-carried run policy.
+  count: 13032,
+  digest: 'e54f4077e0ba833bedee86f8298bb8dbab23d6bc3fe7f101af42630adb4e17c7',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -468,8 +472,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // digest only — sprint-finalizer gains the pre-write COMPLETE-receipt HOLDs
   // (TERMINAL_PUBLICATION_ZERO_TASK_HOLD / _EVIDENCE_HOLD /
   // _NOT_CLEANUP_CANDIDATE_*).
-  count: 1237,
-  digest: 'cc67b5869f9a906262d50048b28b3aef018d512569e0b552c6e9660cdbb87db0',
+  // 2026-08-17 (PHASE5-S1, sprint-538 dogfood): +2 — phase5-dry-run.mjs and
+  // (via its suite imports) an adjacent closure-ledger module enter the
+  // inventory as test-support production dependencies.
+  count: 1239,
+  digest: '1618b8b07456cfc6cc4a2af3608170deab49905a4df12eb120215342fe6580d9',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

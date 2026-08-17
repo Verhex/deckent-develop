@@ -14,6 +14,15 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint538] - 2026-08-17
+
+### Added
+
+- Phase-5 dry-run bundle builder + hermetic proof
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [sprint537] - 2026-08-17
 
 
