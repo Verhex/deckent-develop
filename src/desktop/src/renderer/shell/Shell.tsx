@@ -131,6 +131,7 @@ function ShellLayout(): React.JSX.Element {
         <span className="shell-nav__group">{t(MSG.navGroupVoyage)}</span>
         <NavLink to="/console">{t(MSG.navConsole)}</NavLink>
         <NavLink to="/history">{t(MSG.navHistory)}</NavLink>
+        <NavLink to="/runs">{t('desktop.shell.runs.title')}</NavLink>
         <NavLink to="/approval">{t(MSG.navApproval)}</NavLink>
         <span className="shell-nav__group">{t(MSG.navGroupWork)}</span>
         <NavLink to="/chat">{t(MSG.navChat)}</NavLink>
@@ -862,6 +863,19 @@ function WorkerRoute(): React.JSX.Element {
   );
 }
 
+// ─── Runs listing (RUN-INSPECTOR-001 package 3) — lazy route ─────────────────
+
+const RunsView = lazy(() => import('./RunsView.js'));
+
+function RunsRoute(): React.JSX.Element {
+  const t = useT();
+  return (
+    <Suspense fallback={<p className="shell-muted">{t(MSG.loading)}</p>}>
+      <RunsView />
+    </Suspense>
+  );
+}
+
 // ─── «Changes» (588/F0) — lazy route (same react-aria isolation rule) ────────
 
 const Changes = lazy(() => import('./Changes.js'));
@@ -895,6 +909,7 @@ export function Shell({ queryClient }: { queryClient: QueryClient }): React.JSX.
             { path: 'terminal', element: <EngineRoomRoute /> },
             { path: 'changes', element: <ChangesRoute /> },
             { path: 'workers/:taskId', element: <WorkerRoute /> },
+            { path: 'runs', element: <RunsRoute /> },
           ],
         },
       ]),

@@ -166,6 +166,20 @@ export interface SprintTaskDetailPayload {
   };
 }
 
+/** RUN-INSPECTOR-001 — authority-backed run-list projection. The renderer
+ * displays these server fields verbatim and never derives lifecycle truth. */
+export interface InspectorRunPayload {
+  runId: string;
+  state: string;
+  source: string;
+  settledAt: string | null;
+}
+
+export interface InspectorRunsPayload {
+  schemaVersion: 1;
+  runs: InspectorRunPayload[];
+}
+
 /** F1 — the worker live-log SSE URL (`/api/workers/` prefix is on the
  *  query-token allowlist; `render=human` = the readable `[type] summary`
  *  projection). Exported pure — unit-pinned. */
@@ -290,6 +304,7 @@ export interface DaemonApiClient {
   // ── Sprint-live contract (588/F1 «Köprü» — /api/sprint/*) ──
   getSprintLive(): Promise<SprintLiveSnapshotPayload>;
   getSprintTask(taskId: string): Promise<SprintTaskDetailPayload>;
+  inspectorRuns(): Promise<InspectorRunsPayload>;
   /** Worker canlı-log SSE (named events log_line/log_unavailable). Returns close(). */
   openWorkerLog(taskId: string, handlers: WorkerLogHandlers, opts?: { EventSourceImpl?: typeof EventSource }): () => void;
   // ── Git contract (A1 «Changes» — /api/git/*, N4-servisin HTTP-yüzü) ──
@@ -429,6 +444,7 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
     getSprintLive: () => request<SprintLiveSnapshotPayload>('GET', '/api/sprint/live'),
     getSprintTask: (taskId) =>
       request<SprintTaskDetailPayload>('GET', `/api/sprint/task/${encodeURIComponent(taskId)}`),
+    inspectorRuns: () => request<InspectorRunsPayload>('GET', '/api/inspector/runs'),
     openWorkerLog: (taskId, handlers, opts = {}) => {
       const Impl = opts.EventSourceImpl ?? EventSource;
       const source = new Impl(buildWorkerLogUrl(session, taskId));

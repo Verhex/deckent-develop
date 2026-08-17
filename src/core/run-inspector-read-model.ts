@@ -121,6 +121,26 @@ interface SnapshotOptions {
   readonly nowMs?: number;
 }
 
+export const RUN_INSPECTOR_OBSERVER_MIN_INTERVAL_MS = 250;
+export const RUN_INSPECTOR_OBSERVER_FAILURE_THRESHOLD = 3;
+
+export interface RunInspectorObserverError {
+  readonly code: 'PERSISTENT_READ_FAILURE';
+  readonly consecutiveFailures: number;
+  readonly cause: unknown;
+}
+
+export interface RunInspectorSnapshotObserverOptions {
+  readonly intervalMs?: number;
+  readonly sinceRevision?: number;
+  readonly onSnapshot: (snapshot: RunInspectorSnapshot) => void;
+  readonly onError?: (error: RunInspectorObserverError) => void;
+}
+
+export interface RunInspectorSnapshotObserver {
+  close(): void;
+}
+
 interface ReadTracker {
   maxMtimeMs: number;
 }
@@ -398,6 +418,66 @@ export function buildRunInspectorSnapshot(
     phase: lifecycle.phase,
     workers,
     locks,
+  };
+}
+
+export function observeRunInspectorSnapshot(
+  projectRoot: string,
+  options: RunInspectorSnapshotObserverOptions,
+): RunInspectorSnapshotObserver {
+  const requestedInterval = options.intervalMs ?? RUN_INSPECTOR_OBSERVER_MIN_INTERVAL_MS;
+  const intervalMs = Math.max(
+    RUN_INSPECTOR_OBSERVER_MIN_INTERVAL_MS,
+    Number.isFinite(requestedInterval) ? requestedInterval : RUN_INSPECTOR_OBSERVER_MIN_INTERVAL_MS,
+  );
+  let lastDeliveredRevision = options.sinceRevision;
+  let consecutiveFailures = 0;
+  let failureReported = false;
+  let closed = false;
+
+  const poll = (): void => {
+    if (closed) return;
+    try {
+      const snapshot = buildRunInspectorSnapshot(projectRoot);
+      consecutiveFailures = 0;
+      failureReported = false;
+      if (lastDeliveredRevision === undefined || snapshot.revision > lastDeliveredRevision) {
+        lastDeliveredRevision = snapshot.revision;
+        try {
+          options.onSnapshot(snapshot);
+        } catch {
+          // A consumer failure must not escape the timer or replay an already delivered revision.
+        }
+      }
+    } catch (cause) {
+      consecutiveFailures += 1;
+      if (
+        consecutiveFailures >= RUN_INSPECTOR_OBSERVER_FAILURE_THRESHOLD
+        && !failureReported
+      ) {
+        failureReported = true;
+        try {
+          options.onError?.({
+            code: 'PERSISTENT_READ_FAILURE',
+            consecutiveFailures,
+            cause,
+          });
+        } catch {
+          // Error reporting is observational and must not break polling.
+        }
+      }
+    }
+  };
+
+  poll();
+  const timer = setInterval(poll, intervalMs);
+  timer.unref?.();
+  return {
+    close(): void {
+      if (closed) return;
+      closed = true;
+      clearInterval(timer);
+    },
   };
 }
 

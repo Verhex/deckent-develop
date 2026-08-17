@@ -1,12 +1,14 @@
 import { mkdtempSync, mkdirSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildRunInspectorSnapshot,
   listRunInspectorRuns,
+  observeRunInspectorSnapshot,
   readRunInspectorTaskDetail,
+  RUN_INSPECTOR_OBSERVER_FAILURE_THRESHOLD,
   SPRINT_DETAIL_TEXT_CAP,
 } from '../../src/core/run-inspector-read-model.js';
 
@@ -26,6 +28,7 @@ function write(projectRoot: string, relative: string, value: unknown): string {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   for (const value of roots.splice(0)) rmSync(value, { recursive: true, force: true });
 });
 
@@ -206,6 +209,96 @@ describe('run inspector read model', () => {
     const second = listRunInspectorRuns(projectRoot, { nowMs: 1_800_000_000_000 });
     expect(second.revision).toBeGreaterThan(first.revision);
     expect(second.runs).toHaveLength(2);
+  });
+
+  it('delivers the current snapshot immediately when no revision cursor is supplied', () => {
+    vi.useFakeTimers();
+    const projectRoot = root();
+    const onSnapshot = vi.fn();
+
+    const observer = observeRunInspectorSnapshot(projectRoot, { onSnapshot });
+
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    expect(onSnapshot.mock.calls[0]?.[0]).toMatchObject({ schemaVersion: 1, revision: 0 });
+    vi.advanceTimersByTime(250);
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    observer.close();
+  });
+
+  it('primes a reconnect cursor without delivering a duplicate snapshot', () => {
+    vi.useFakeTimers();
+    const projectRoot = root();
+    const revision = buildRunInspectorSnapshot(projectRoot).revision;
+    const onSnapshot = vi.fn();
+    const observer = observeRunInspectorSnapshot(projectRoot, {
+      sinceRevision: revision,
+      onSnapshot,
+    });
+
+    expect(onSnapshot).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(250);
+    expect(onSnapshot).not.toHaveBeenCalled();
+    observer.close();
+  });
+
+  it('coalesces rapid source changes and delivers only the latest revision on the next tick', () => {
+    vi.useFakeTimers();
+    const projectRoot = root();
+    const onSnapshot = vi.fn();
+    const observer = observeRunInspectorSnapshot(projectRoot, { intervalMs: 1, onSnapshot });
+    const taskPath = write(projectRoot, '.tasks/task-543-001.json', {
+      id: '543-001', description: 'First', status: 'PENDING', scope: { filesWrite: [] },
+    });
+    utimesSync(taskPath, new Date(1_700_000_001_000), new Date(1_700_000_001_000));
+    writeFileSync(taskPath, JSON.stringify({
+      id: '543-001', description: 'Latest', status: 'PENDING', scope: { filesWrite: [] },
+    }));
+    utimesSync(taskPath, new Date(1_700_000_002_000), new Date(1_700_000_002_000));
+
+    vi.advanceTimersByTime(249);
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    expect(onSnapshot).toHaveBeenCalledTimes(2);
+    expect(onSnapshot.mock.calls[1]?.[0].workers[0]?.title).toBe('Latest');
+    observer.close();
+  });
+
+  it('closes idempotently and stops future polling', () => {
+    vi.useFakeTimers();
+    const projectRoot = root();
+    const onSnapshot = vi.fn();
+    const observer = observeRunInspectorSnapshot(projectRoot, { onSnapshot });
+
+    observer.close();
+    observer.close();
+    write(projectRoot, '.tasks/task-543-001.json', { id: '543-001', description: 'Later' });
+    vi.advanceTimersByTime(1_000);
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('contains callback errors and reports a persistent read failure once', () => {
+    vi.useFakeTimers();
+    const callbackError = new Error('consumer failed');
+    const onSnapshot = vi.fn(() => { throw callbackError; });
+    const healthy = observeRunInspectorSnapshot(root(), { onSnapshot });
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    expect(() => vi.advanceTimersByTime(250)).not.toThrow();
+    healthy.close();
+
+    const onError = vi.fn(() => { throw new Error('reporter failed'); });
+    const broken = observeRunInspectorSnapshot(null as unknown as string, {
+      onSnapshot: vi.fn(),
+      onError,
+    });
+    expect(() => vi.advanceTimersByTime(
+      250 * (RUN_INSPECTOR_OBSERVER_FAILURE_THRESHOLD + 2),
+    )).not.toThrow();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]?.[0]).toMatchObject({
+      code: 'PERSISTENT_READ_FAILURE',
+      consecutiveFailures: RUN_INSPECTOR_OBSERVER_FAILURE_THRESHOLD,
+    });
+    broken.close();
   });
 });
 

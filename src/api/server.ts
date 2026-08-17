@@ -44,6 +44,7 @@ import {
 import {
   buildRunInspectorSnapshot,
   listRunInspectorRuns,
+  observeRunInspectorSnapshot,
   readRunInspectorTaskDetail,
   SPRINT_TASK_ID_RE,
 } from '../core/run-inspector-read-model.js';
@@ -116,6 +117,7 @@ const MIME_TYPES: Record<string, string> = {
 const DEFAULT_PORT = 3100;
 const LOCALHOST_ONLY = '127.0.0.1';
 const MAX_BODY_SIZE = 1024 * 1024; // 1MB
+const SPRINT_LIVE_STREAM_PING_MS = 30_000;
 
 // APPROVAL-EXPIRY-DRIVER-WIRE (404-004): sweep cadence when neither an
 // explicit `opts.approvalExpirySweepMs` nor `approval.expiry_sweep_ms` in
@@ -1247,6 +1249,68 @@ async function handleRequest(
     // ─── /api/sprint/* — canonical inspector reads ────────────────────────
     // Monitoring reads — never gated (SURF-7 rule). Lifecycle is resolved
     // exclusively by the core read-model's run-status authority.
+    if (method === 'GET' && (url === '/api/sprint/live/stream' || url.startsWith('/api/sprint/live/stream?'))) {
+      const params = new URL(url, 'http://localhost').searchParams;
+      const rawSinceRevision = params.get('sinceRevision');
+      if (rawSinceRevision !== null && !/^\d+$/.test(rawSinceRevision)) {
+        sendJson(res, {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'sinceRevision must be a non-negative integer',
+            details: [{ field: 'sinceRevision', message: 'Must be a non-negative integer', value: rawSinceRevision }],
+          },
+        }, 400);
+        return;
+      }
+
+      const sinceRevision = rawSinceRevision === null ? undefined : Number(rawSinceRevision);
+      if (sinceRevision !== undefined && !Number.isSafeInteger(sinceRevision)) {
+        sendJson(res, {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'sinceRevision must be a non-negative safe integer',
+            details: [{ field: 'sinceRevision', message: 'Must be a non-negative safe integer', value: rawSinceRevision }],
+          },
+        }, 400);
+        return;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'Access-Control-Allow-Origin': allowedOrigin,
+      });
+      res.write('retry: 3000\n\n');
+
+      let closed = false;
+      let observer: ReturnType<typeof observeRunInspectorSnapshot> | undefined;
+      const pingTimer = setInterval(() => {
+        if (closed || res.destroyed || res.writableEnded) return;
+        res.write('event: ping\ndata: {}\n\n');
+      }, SPRINT_LIVE_STREAM_PING_MS);
+      pingTimer.unref?.();
+
+      const closeStream = (): void => {
+        if (closed) return;
+        closed = true;
+        clearInterval(pingTimer);
+        observer?.close();
+      };
+      req.on('close', closeStream);
+      req.on('error', closeStream);
+      res.on('error', closeStream);
+
+      observer = observeRunInspectorSnapshot(projectRoot, {
+        ...(sinceRevision !== undefined ? { sinceRevision } : {}),
+        onSnapshot: (snapshot) => {
+          if (closed || res.destroyed || res.writableEnded) return;
+          res.write(`event: snapshot\ndata: ${JSON.stringify({ ...snapshot, active: snapshot.lifecycle.active })}\n\n`);
+        },
+      });
+      if (closed) observer.close();
+      return;
+    }
     if (method === 'GET' && url === '/api/sprint/live') {
       const snapshot = buildRunInspectorSnapshot(projectRoot);
       // Legacy `active` key preserved for payload compat, but its value comes

@@ -318,8 +318,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-17 (RUN-INSPECTOR-001 package 2, sprint-542 + Brain completion):
   // +1 — src/cli/commands/inspect.ts + tests/cli/inspect.test.ts enter the
   // graph; read-model/api/desktop suites changed content only.
-  count: 14333,
-  digest: '711af4650950368a7ac33f745b3d584f9829d92841e021125a07bb8e07b58e04',
+  // 2026-08-17 (RUN-INSPECTOR-001 package 3, sprint-543 + Brain completion):
+  // +1 — src/mcp/tools/inspect.ts + tests/mcp/inspect.test.ts enter the graph
+  // (observer/SSE/Desktop slices changed existing-file content only).
+  count: 14334,
+  digest: 'e3530acf1951e29c6e9a4b110e4f58aa93e2ba6068f232a720374c40f0138674',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -513,8 +516,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (RUN-INSPECTOR-001 package 2): +1 — src/cli/commands/inspect.ts
   // enters the production inventory (new CLI face over the core read-model);
   // read-model/server/api-client/messages content hashes moved.
-  count: 1244,
-  digest: '330e3bb916f2788f2a2c79f9fc1a6698fb54076211ee25fea5ede0826fec87a8',
+  // 2026-08-17 (RUN-INSPECTOR-001 package 3): +1 — src/mcp/tools/inspect.ts
+  // (deckent_inspect MCP twin) enters the inventory; server/Shell/RunsView/
+  // api-client/read-model content hashes moved.
+  count: 1245,
+  digest: '3aca6da79a822f49bd5e9066f8a4914d4f679033f5d246017e31cc2fe9086dde',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

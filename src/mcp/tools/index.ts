@@ -18,6 +18,7 @@ import { registerKillTool } from './kill.js';
 import { registerCleanupTool } from './cleanup.js';
 import { registerHelpTool } from './help.js'; // deckent_help
 import { registerAgentListTool } from './agent-list.js';
+import { registerInspectTool } from './inspect.js';
 import { registerSkillListTool } from './skill-list.js';
 import { registerCheckpointTool } from './checkpoint.js';
 import { registerDocsTool } from './docs.js';
@@ -76,6 +77,7 @@ export const TOOL_REGISTRARS: readonly McpToolRegistrar[] = [
   { module: 'plan.ts', register: (s) => registerPlanTool(s) },
   { module: 'start.ts', register: (s, runtime) => registerStartTool(s, runtime) },
   { module: 'status.ts', register: (s) => registerStatusTool(s) },
+  { module: 'inspect.ts', register: (s) => registerInspectTool(s) },
   { module: 'doctor.ts', register: (s) => registerDoctorTool(s) },
   { module: 'retro.ts', register: (s) => registerRetroTool(s) },
   { module: 'history.ts', register: (s) => registerHistoryTool(s) },

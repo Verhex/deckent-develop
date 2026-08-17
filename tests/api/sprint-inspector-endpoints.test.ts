@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,6 +34,40 @@ function seedTask(taskId: string): void {
     model: 'test-model',
     scope: { filesWrite: ['src/api/server.ts'] },
   }));
+}
+
+async function openLiveStream(path = '/api/sprint/live/stream'): Promise<{
+  response: Response;
+  reader: ReadableStreamDefaultReader<Uint8Array>;
+  readUntil: (predicate: (text: string) => boolean) => Promise<string>;
+  close: () => Promise<void>;
+}> {
+  const controller = new AbortController();
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: { Authorization: `Bearer ${API_TOKEN}`, Accept: 'text/event-stream' },
+    signal: controller.signal,
+  });
+  if (!response.body) throw new Error('SSE response has no body');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const readUntil = async (predicate: (text: string) => boolean): Promise<string> => {
+    let text = '';
+    while (!predicate(text)) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    return text;
+  };
+  return {
+    response,
+    reader,
+    readUntil,
+    close: async () => {
+      controller.abort();
+      try { await reader.cancel(); } catch { /* already aborted */ }
+    },
+  };
 }
 
 beforeEach(() => {
@@ -117,6 +151,73 @@ describe('GET /api/sprint/* canonical inspector routes', () => {
     expect(body).toHaveProperty('phase');
     expect((body.lifecycle as { lifecycle: string }).lifecycle).not.toBe('PAUSED');
   });
+
+  it('streams an initial full live snapshot with the legacy active key', async () => {
+    seedTask('541-002');
+    await boot();
+
+    const stream = await openLiveStream();
+    const body = await stream.readUntil((text) => text.includes('event: snapshot'));
+    await stream.close();
+
+    expect(stream.response.status).toBe(200);
+    expect(stream.response.headers.get('content-type')).toBe('text/event-stream');
+    expect(body).toContain('retry: 3000');
+    const dataLine = body.split('\n').find((line) => line.startsWith('data: {'));
+    const payload = JSON.parse(dataLine!.slice('data: '.length)) as Record<string, unknown>;
+    expect(payload).toEqual(expect.objectContaining({
+      schemaVersion: 1,
+      revision: expect.any(Number),
+      lifecycle: expect.objectContaining({ active: expect.any(Boolean) }),
+      workers: expect.any(Array),
+      locks: expect.any(Array),
+      active: expect.any(Boolean),
+    }));
+    expect(payload.active).toBe((payload.lifecycle as { active: boolean }).active);
+  });
+
+  it('uses sinceRevision as the observer cursor and skips the duplicate snapshot', async () => {
+    await boot();
+    const liveResponse = await get('/api/sprint/live');
+    const live = await liveResponse.json() as { revision: number };
+
+    const stream = await openLiveStream(`/api/sprint/live/stream?sinceRevision=${live.revision}`);
+    const { value } = await stream.reader.read();
+    await stream.close();
+
+    expect(new TextDecoder().decode(value)).toContain('retry: 3000');
+    expect(new TextDecoder().decode(value)).not.toContain('event: snapshot');
+  });
+
+  it('disposes the observer and ping interval when the client closes', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    await boot();
+    const timersBeforeConnect = vi.getTimerCount();
+
+    const stream = await openLiveStream();
+    await stream.readUntil((text) => text.includes('event: snapshot'));
+    expect(vi.getTimerCount()).toBeGreaterThan(timersBeforeConnect);
+    await stream.close();
+    for (let attempt = 0; attempt < 20 && vi.getTimerCount() !== timersBeforeConnect; attempt += 1) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    expect(vi.getTimerCount()).toBe(timersBeforeConnect);
+    vi.useRealTimers();
+  });
+
+  it.each(['-1', '1.5', 'abc', '9007199254740992'])(
+    'rejects invalid sinceRevision=%s with a typed 400 and no stream',
+    async (sinceRevision) => {
+      await boot();
+      const response = await get(`/api/sprint/live/stream?sinceRevision=${sinceRevision}`);
+
+      expect(response.status).toBe(400);
+      expect(response.headers.get('content-type')).toContain('application/json');
+      expect(await response.json()).toEqual({
+        error: expect.objectContaining({ code: 'VALIDATION_ERROR' }),
+      });
+    },
+  );
 
   it('caps task plan text and rejects an invalid task id without reading outside the fixture', async () => {
     seedTask('541-002');

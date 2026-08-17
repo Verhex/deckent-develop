@@ -16,7 +16,7 @@ Schema-version 1 snapshot, `/api/sprint/live` tarafından servis edilen canonica
 |---|---|---|
 | `schemaVersion` | `1` | Inspector response contract'ının version'ı. Additive field'lar version 1'i değiştirmez; semantic değişiklik version değişikliği gerektirir. |
 | `generatedAt` | ISO-8601 string | Projection'ın üretildiği zaman. Lifecycle timestamp'i değildir. |
-| `revision` | number | Read model'in maximum-source-mtime kuralıyla türetilen monotonic freshness değeri. Projection'ın okuduğu her source'u kapsar. Event offset veya pagination cursor olarak kullanılmaz. |
+| `revision` | number | Read model'in maximum-source-mtime kuralıyla türetilen monotonic freshness değeri. Projection'ın okuduğu her source'u kapsar. Live stream bunu freshness cursor olarak kullanabilir; event offset, pagination cursor veya backfill position değildir. |
 | `lifecycle` | canonical lifecycle value | Run-status authority'den kopyalanan lifecycle. Artifact varlığı bu değerin yerini alamaz. |
 | `active` | boolean | Aynı lifecycle authority'den türetilen backward-compatible active-state projection'ı. |
 | `tasks` | task summary array | Current run için tolerant biçimde parse edilen task view'ları. Eksik optional artifact'ler missing veya nullable kalır. |
@@ -85,6 +85,21 @@ Bunlar monitoring read'leridir ve `/api/sprint/live` ile aynı authentication cl
 
 API face core read-model paketine bağlıdır. Route registration ikinci bir lifecycle authority oluşturmaz.
 
+## SSE live snapshot stream
+
+`GET /api/sprint/live/stream`, schema-version 1 snapshot'ın monitoring-authenticated live face'idir. `/api/sprint/live` ile aynı authentication class'ını kullanır ve client bağlantıyı kesene kadar Server-Sent Event gönderir.
+
+| Contract | Davranış |
+|---|---|
+| Snapshot frame | Authority-bound backward-compatible `active` field'ı dahil tam `/api/sprint/live` payload'ını taşıyan `event: snapshot`. Frame'ler event delta değil, complete latest-state projection'larıdır. |
+| Initial connection | `sinceRevision` verilmezse current snapshot hemen bir kez teslim edilir. |
+| `?sinceRevision=<int>` | Connection cursor'ını prime eder. Stream yalnız snapshot `revision`'ı verilen non-negative integer'dan büyük olduğunda snapshot gönderir; böylece last-seen revision ile reconnect aynı frame'i duplicate etmez. Non-integer veya negative değer stream açmak yerine typed HTTP `400` response döndürür. |
+| Coalescing | Delivery revision-gated ve latest-wins'tir. Source revision'ları polling veya delivery'den hızlı ilerlerse intermediate revision'lar atlanabilir; consumer her snapshot'ı complete current state olarak ele almalıdır. |
+| Keepalive | `event: ping` frame'leri idle SSE connection'ı açık tutar. Revision cursor'ını ilerletmez veya snapshot taşımaz. |
+| Disposal | Client connection kapandığında snapshot observer ve timer'ları dispose edilir. Aynı snapshot'ı replay etmeden devam etmek için son görülen `revision` ile reconnect edilir. |
+
+Bu ilk cursor-stream slice'ı resumable latest-snapshot delivery sağlar. Atlanan intermediate revision'lar için event ledger veya cursor backfill sağlamaz.
+
 ## Terminal command
 
 Task 3 read-only Terminal face'ini ship eder:
@@ -105,23 +120,33 @@ deckent inspect <taskId> --json
 
 Human-readable label'lar İngilizce/Türkçe message catalog'larını kullanır. Command core modülü doğrudan tüketir; formatted API veya Terminal output'tan state infer etmez.
 
+## MCP tool
+
+`deckent_inspect`, Terminal command'ın read-only MCP twin'idir. Aynı core projection'ları okur ve tek optional argument kabul eder:
+
+| Argument'lar | Sonuç |
+|---|---|
+| Argument yok | [Run list shape](#run-list-shape) altında belgelenen `listRunInspectorRuns` list envelope'unu döndürür. |
+| `{ "taskId": "<taskId>" }` | `lineage` dahil [Task detail shape](#task-detail-shape) altında belgelenen `readRunInspectorTaskDetail` object'ini döndürür. |
+| Unknown veya invalid `taskId` | Typed MCP error result döndürür; tool uncaught exception fırlatmaz veya task uydurmaz. |
+
+Başarılı MCP JSON shape'ları sırasıyla `deckent inspect --json` ve `deckent inspect <taskId> --json` çıktılarıyla aynıdır. Bu, ayrı formatlanmış bir approximation değil projection parity'dir: MCP ve Terminal aynı core read model'i tüketir.
+
 ## Face availability
 
 | Face | Package status |
 |---|---|
-| Core read model | Package 1 + Task 1: snapshot, task detail, run list ve lineage. |
-| HTTP API | Task 2: run list endpoint ve additive task lineage. |
-| Terminal | Task 3: `deckent inspect` list/detail ve JSON mode'ları. |
-| Desktop | HTTP paketinden sonraki Task'a bağlıdır; burada belgelenen package 1–2 kapsamına dahil değildir. |
+| Core read model | Package 1–3: snapshot, disposable snapshot observer, task detail, run list ve lineage. |
+| HTTP API | Run list, additive task lineage ve `/api/sprint/live/stream` latest-snapshot SSE. |
+| Terminal | `deckent inspect` list/detail ve JSON mode'ları. |
+| MCP | Terminal JSON-shape parity ile `deckent_inspect` list/detail. |
+| Desktop | Runs-list face'i package-dependent'tır ve burada belgelenen stream ve MCP contract'larından ayrıdır. |
 
 ## Explicit non-goal'lar ve açık 6071 dimensions
 
-Package 1–2 bounded bir read-model ve face expansion'dır; tüm `RUN-INSPECTOR-001` outcome'unun kapanışı değildir. Aşağıdakiler açık 6071 dimension'ları olarak kalır:
+Package 3; reconnect-without-duplicate semantics, latest-wins coalescing, keepalive ve disposal dahil ilk revision-cursor stream slice'ını ship eder. Tüm `RUN-INSPECTOR-001` outcome'unu kapatmaz. Aşağıdaki 6071 dimension'ları açık kalır:
 
 - Henüz million-event virtualization implementation veya proof'u yoktur.
-- Henüz revision-plus-cursor event stream, cursor backfill veya resume stream yoktur. `revision` cursor değildir.
-- Attempt, agent, worker, tool, MCP, context, prompt/skill, token/cost/latency, checkpoint, approval, policy, verifier, result ve evidence lineage'ın tamamını kapsayan execution graph/timeline henüz yoktur.
-- Reconnect, ordering, deduplication veya backpressure closure henüz yoktur.
-- Bu paketlerde Desktop parity, tenant-isolation proof, accessibility proof veya Linux/macOS/Windows-native/WSL scale proof claim edilmez.
+- Attempt, agent, worker, tool, MCP, context, prompt/skill, token/cost/latency, checkpoint, approval, policy, verifier, result ve evidence lineage'ın tamamını kapsayan complete cross-surface execution timeline henüz yoktur.
 
 Mevcut log streaming ayrı bir face olarak kalır. Task-detail lineage block bilinçli olarak availability ve provenance gösterir; log content göstermez.

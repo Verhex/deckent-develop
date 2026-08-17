@@ -36,6 +36,7 @@ const TOOL_CATALOG_SOURCE: readonly McpToolCatalogSource[] = [
   { name: 'deckent_plan', description: 'Plan the next run — creates task JSON files in .tasks/', sideEffect: 'mutating' },
   { name: 'deckent_start', description: 'Start the run — spawns workers and begins execution', sideEffect: 'mutating' },
   { name: 'deckent_status', description: 'Get the current run dashboard: agents, progress, usage, alerts', sideEffect: 'read-only' },
+  { name: 'deckent_inspect', description: 'Inspect logical runs via the canonical inspector read-model — run listing or task drill-down (CLI `deckent inspect` parity)', sideEffect: 'read-only' },
   { name: 'deckent_doctor', description: 'Run system health checks — config, memory, locks, providers', sideEffect: 'read-only' },
   { name: 'deckent_retro', description: 'Read the latest run retrospective (RETRO.md)', sideEffect: 'read-only' },
   { name: 'deckent_history', description: 'Browse run history and outcomes across all past runs', sideEffect: 'read-only' },

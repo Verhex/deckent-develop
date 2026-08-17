@@ -48,12 +48,13 @@ init → set_directives → plan → start → status → review → retro → c
 ## Run Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE (cleanup is a separate command, not a phase)
 
-## Tools (50)
+## Tools (51)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write run goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
 - deckent_start: Spawn workers and begin run execution (pre-spawn cost gate active — over-budget runs return COST_GATE_EXCEEDED unless acknowledgeCost=true)
 - deckent_status: Show live run progress, agent activity, and alerts
+- deckent_inspect: Inspect logical runs — run listing or task drill-down from the canonical inspector read-model
 - deckent_review: Evaluate run results — returns GO/NO_GO/GO_WITH_TECH_DEBT
 - deckent_retro: Read the retrospective and learnings from the last run
 - deckent_history: Show run history with agent/skill performance stats

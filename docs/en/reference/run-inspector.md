@@ -16,7 +16,7 @@ The schema-version 1 snapshot is the canonical live-run projection served by `/a
 |---|---|---|
 | `schemaVersion` | `1` | Version of the inspector response contract. Additive fields do not change version 1; a semantic change requires a version change. |
 | `generatedAt` | ISO-8601 string | Time at which this projection was generated. It is not a lifecycle timestamp. |
-| `revision` | number | Monotonic freshness value derived with the read model's maximum-source-mtime rule. It covers every source read by the projection. Treat it as a change detector, not an event offset or pagination cursor. |
+| `revision` | number | Monotonic freshness value derived with the read model's maximum-source-mtime rule. It covers every source read by the projection. The live stream can use it as a freshness cursor; it is not an event offset, pagination cursor, or backfill position. |
 | `lifecycle` | canonical lifecycle value | Lifecycle copied from the run-status authority. Artifact presence cannot replace this value. |
 | `active` | boolean | Backward-compatible active-state projection derived from the same lifecycle authority. |
 | `tasks` | task summary array | Tolerantly parsed task views for the current run. Missing optional artifacts remain missing or nullable. |
@@ -85,6 +85,21 @@ These are monitoring reads and use the same authentication class as `/api/sprint
 
 The API face depends on the core read-model package. Route registration alone does not create a second lifecycle authority.
 
+## SSE live snapshot stream
+
+`GET /api/sprint/live/stream` is the monitoring-authenticated live face of the schema-version 1 snapshot. It uses the same authentication class as `/api/sprint/live` and sends Server-Sent Events until the client disconnects.
+
+| Contract | Behavior |
+|---|---|
+| Snapshot frame | `event: snapshot` with the full `/api/sprint/live` payload, including the authority-bound backward-compatible `active` field. Frames are complete latest-state projections, not event deltas. |
+| Initial connection | With no `sinceRevision`, the current snapshot is delivered once immediately. |
+| `?sinceRevision=<int>` | Primes the connection cursor. The stream emits a snapshot only when its `revision` is greater than the supplied non-negative integer, so reconnecting at the last seen revision does not duplicate that frame. A non-integer or negative value returns a typed HTTP `400` response instead of opening a stream. |
+| Coalescing | Delivery is revision-gated and latest-wins. If source revisions advance faster than polling or delivery, intermediate revisions can be skipped; consumers must treat every snapshot as the complete current state. |
+| Keepalive | `event: ping` frames keep an otherwise idle SSE connection alive. They do not advance the revision cursor or carry a snapshot. |
+| Disposal | Closing the client connection disposes the snapshot observer and its timers. Reconnect with the last observed `revision` to continue without replaying that snapshot. |
+
+This first cursor-stream slice provides resumable latest-snapshot delivery. It does not provide an event ledger or cursor backfill for skipped intermediate revisions.
+
 ## Terminal command
 
 Task 3 ships the read-only Terminal face:
@@ -105,23 +120,33 @@ deckent inspect <taskId> --json
 
 Human-readable labels use the English/Turkish message catalogs. The command consumes the core module directly; it does not infer state from formatted API or Terminal output.
 
+## MCP tool
+
+`deckent_inspect` is the read-only MCP twin of the Terminal command. It reads the same core projections and accepts one optional argument:
+
+| Arguments | Result |
+|---|---|
+| No arguments | Returns the `listRunInspectorRuns` list envelope documented under [Run list shape](#run-list-shape). |
+| `{ "taskId": "<taskId>" }` | Returns the `readRunInspectorTaskDetail` object documented under [Task detail shape](#task-detail-shape), including `lineage`. |
+| Unknown or invalid `taskId` | Returns a typed MCP error result; the tool does not throw an uncaught exception or fabricate a task. |
+
+The successful MCP JSON shapes are the same shapes emitted by `deckent inspect --json` and `deckent inspect <taskId> --json`, respectively. This is projection parity, not a separately formatted approximation: MCP and Terminal consume the same core read model.
+
 ## Face availability
 
 | Face | Package status |
 |---|---|
-| Core read model | Package 1 plus Task 1: snapshot, task detail, run list, and lineage. |
-| HTTP API | Task 2: run list endpoint and additive task lineage. |
-| Terminal | Task 3: `deckent inspect` list/detail and JSON modes. |
-| Desktop | Task-dependent after the HTTP package; not part of packages 1–2 documented here. |
+| Core read model | Packages 1–3: snapshot, disposable snapshot observer, task detail, run list, and lineage. |
+| HTTP API | Run list, additive task lineage, and `/api/sprint/live/stream` latest-snapshot SSE. |
+| Terminal | `deckent inspect` list/detail and JSON modes. |
+| MCP | `deckent_inspect` list/detail with Terminal JSON-shape parity. |
+| Desktop | Runs-list face is package-dependent and separate from the stream and MCP contracts documented here. |
 
 ## Explicit non-goals and open 6071 dimensions
 
-Packages 1–2 are a bounded read-model and face expansion, not closure of the full `RUN-INSPECTOR-001` outcome. The following remain open 6071 dimensions:
+Package 3 ships the first revision-cursor stream slice, including reconnect-without-duplicate semantics, latest-wins coalescing, keepalive, and disposal. It does not close the full `RUN-INSPECTOR-001` outcome. The following 6071 dimensions remain open:
 
 - No million-event virtualization proof or implementation yet.
-- No revision-plus-cursor event stream, cursor backfill, or resume stream yet. `revision` is not a cursor.
-- No complete execution graph/timeline covering attempt, agent, worker, tool, MCP, context, prompt/skill, token/cost/latency, checkpoint, approval, policy, verifier, result, and evidence lineage yet.
-- No reconnect, ordering, deduplication, or backpressure closure yet.
-- No claim of Desktop parity, tenant-isolation proof, accessibility proof, or Linux/macOS/Windows-native/WSL scale proof in these packages.
+- No complete cross-surface execution timeline covering attempt, agent, worker, tool, MCP, context, prompt/skill, token/cost/latency, checkpoint, approval, policy, verifier, result, and evidence lineage yet.
 
 Existing log streaming remains a separate face. The task-detail lineage block deliberately exposes availability and provenance, not log content.

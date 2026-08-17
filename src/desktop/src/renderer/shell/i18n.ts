@@ -2,9 +2,29 @@
 export const SHELL_MESSAGES = {
   en: {
     'desktop.shell.worker.lifecycle': 'Lifecycle',
+    'desktop.shell.runs.title': 'Runs',
+    'desktop.shell.runs.run_id': 'Run ID',
+    'desktop.shell.runs.state': 'State',
+    'desktop.shell.runs.source': 'Source',
+    'desktop.shell.runs.settled_at': 'Settled at',
+    'desktop.shell.runs.refresh': 'Refresh',
+    'desktop.shell.runs.loading': 'Loading runs…',
+    'desktop.shell.runs.empty': 'No runs are available.',
+    'desktop.shell.runs.error': 'Runs could not be loaded.',
+    'desktop.shell.runs.not_settled': 'Not settled',
   },
   tr: {
     'desktop.shell.worker.lifecycle': 'Yaşam döngüsü',
+    'desktop.shell.runs.title': 'Koşular',
+    'desktop.shell.runs.run_id': 'Koşu kimliği',
+    'desktop.shell.runs.state': 'Durum',
+    'desktop.shell.runs.source': 'Kaynak',
+    'desktop.shell.runs.settled_at': 'Sonuçlanma zamanı',
+    'desktop.shell.runs.refresh': 'Yenile',
+    'desktop.shell.runs.loading': 'Koşular yükleniyor…',
+    'desktop.shell.runs.empty': 'Kullanılabilir koşu yok.',
+    'desktop.shell.runs.error': 'Koşular yüklenemedi.',
+    'desktop.shell.runs.not_settled': 'Henüz sonuçlanmadı',
   },
 } as const;
 

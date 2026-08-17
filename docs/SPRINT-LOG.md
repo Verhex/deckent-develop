@@ -13052,3 +13052,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 542-005: bilingual reference documentation (depends on Task 1) (DONE)
 
 ---
+## Sprint 543 — sprint-543
+
+**Status:** ABORTED
+**Date:** 2026-08-17
+**Duration:** 403s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 402725ms |
+
+### Tasks
+
+- 543-001: core — observable snapshot helper (revision-cursor seed) (DONE)
+- 543-002: API — /api/sprint/live/stream SSE (depends on Task 1) (DONE)
+- 543-003-fix: Fix: MCP twin — deckent_inspect (depends on Task 1) (PAUSED)
+- 543-003: MCP twin — deckent_inspect (depends on Task 1) (NO_GO)
+- 543-004: Desktop — Köprü runs panel (depends on Task 2) (NO_GO)
+- 543-005: documentation — stream + MCP faces (depends on Tasks 1,2,3) (DONE)
+
+---
