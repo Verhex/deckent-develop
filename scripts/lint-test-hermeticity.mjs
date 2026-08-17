@@ -295,8 +295,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // builder (scripts/closure-ledger/phase5-dry-run.mjs staging fs sites) and
   // its tmpdir-hermetic governance suite enter the graph. First fully-DONE
   // dogfood-authored code slice under the task-carried run policy.
-  count: 13032,
-  digest: 'e54f4077e0ba833bedee86f8298bb8dbab23d6bc3fe7f101af42630adb4e17c7',
+  // 2026-08-17 (PHASE5-S3, sprint-539 dogfood): +1299 — the signed-writer pair
+  // (phase5-writer.mjs claim/append fs+broker sites, phase5-sign.mjs ceremony
+  // sites) and their tmpdir suites enter the graph; the writer suite's
+  // ApprovalBroker import closure pulls the src/core broker subtree into the
+  // test graph for the first time. Only these four new files changed the graph
+  // in this slice (sprint records are md/json outside the scan).
+  count: 14331,
+  digest: '208be610856c5ce263bbeb3d57aaa608f181b695cd2bef99ec3bd26e36c44b66',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -475,8 +481,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (PHASE5-S1, sprint-538 dogfood): +2 — phase5-dry-run.mjs and
   // (via its suite imports) an adjacent closure-ledger module enter the
   // inventory as test-support production dependencies.
-  count: 1239,
-  digest: '1618b8b07456cfc6cc4a2af3608170deab49905a4df12eb120215342fe6580d9',
+  // 2026-08-17 (PHASE5-S3, sprint-539 dogfood): +4 — phase5-writer.mjs,
+  // phase5-sign.mjs and the broker-subtree modules their suites import enter
+  // the inventory as test-support production dependencies.
+  count: 1243,
+  digest: '39332dff6bb3f9b89c8b1fe42f835b538f2514b5b6f05308aee428d9cddce9c5',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

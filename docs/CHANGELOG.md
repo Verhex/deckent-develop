@@ -14,6 +14,16 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint539] - 2026-08-17
+
+### Added
+
+- phase5-writer.mjs — claim filing + verified append + projections
+- phase5-sign.mjs — owner sign ceremony (depends on Task 1)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [sprint538] - 2026-08-17
 
 ### Added

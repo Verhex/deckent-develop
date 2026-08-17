@@ -55,6 +55,10 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-539 Learnings** (sprint-539): ## Sprint sprint-539 Learnings
+
+## Gains
+- 539-001 — phase5-writer.mjs — claim filing + verified append + projections...
 - **Sprint sprint-538 Learnings** (sprint-538): ## Sprint sprint-538 Learnings
 
 ## Gains
@@ -74,10 +78,6 @@
 - KN3 projection-parity guard — landing-proposal artifacts are not task ids: GO_WITH_T...
 - **Sprint sprint-521 Learnings** (sprint-521): ## Sprint sprint-521 Learnings
 - Skill catalog S1 — one effective read model behind the existing API (row 7012): GO_W...
-- **Sprint sprint-518 Learnings** (sprint-518): ## Sprint sprint-518 Learnings
-
-## Gains
-- 518-001 — Agent catalog authority — design and owner decision points (row ...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -88,4 +88,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1886 | Generated: 2026-08-17_
+_Total entries: 1889 | Generated: 2026-08-17_

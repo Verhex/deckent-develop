@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-539 Learnings
+- Sprint sprint-539 Learnings: ## Sprint sprint-539 Learnings
+
+## Gains
+- 539-001 — phase5-writer.mjs — claim filing + verified append + projections — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit passed; exact targeted Vitest command passed 3 fi...
+- 539-002 — phase5-sign.mjs — owner sign ceremony (depends on Task 1) — npx tsc --noEmit: PASS.
+
 ## Sprint sprint-538 Learnings
 - Sprint sprint-538 Learnings: ## Sprint sprint-538 Learnings
 
