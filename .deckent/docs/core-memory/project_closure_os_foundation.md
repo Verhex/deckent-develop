@@ -47,9 +47,10 @@ ed25519 **SIGNER** + owner private-key custody · gerçek **ApprovalBroker write
 **receipt/ledger-event** · **MASTER state/priority mutation** · provider çağrısı · **owner ceremony ile
 gerçek genesis anchor commit** (tool hazır; anchor henüz yok).
 
-## Sıra
-foundation PR merge → **ayrı genesis trust-anchor PR** (tool açıldı; owner ceremony koşup public
-anchor+fingerprint commit + fingerprint doğrula + merge eder) → Phase-5 writer →
+## Sıra (güncelleme 2026-08-17)
+foundation PR ✅ → genesis trust-anchor PR #127 ✅ **MERGED** (owner ceremony koşuldu;
+owner-verified public anchor + fingerprint main'de — commit `88637d5d6`) → **Paket B
+(`RUN-POLICY-DELIVERY-001`, aktif sıradaki product closure)** → Phase-5 writer →
 exact dry-run digest → **tek authenticated owner approval** → ledger append + atomic projections.
 
 Extended spec: [`docs/governance/closure-os-sidecar-ledger.md`](../../../docs/governance/closure-os-sidecar-ledger.md) ·

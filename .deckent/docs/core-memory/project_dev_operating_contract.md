@@ -26,13 +26,14 @@ Paket B (worker-prompt delivery) ile mekanikleşir. Detay işler Sonnet/Opus sub
 delege edilebilir; kritik analiz/eleştiride deckent xverify ile gpt-5.6-sol ikinci görüşü
 (Kanun 14 sınırlarında — karar/authority devri değildir).
 
-**AKIŞ DEĞİŞİKLİĞİ (Alperen, 2026-08-17 — ürün tamamlanana kadar geçerli):** PR / merge-queue /
-CI-bekleme ceremony'si ASKIDA. GitHub `main-protection` ruleset'i (id 20321963)
-`enforcement=disabled` yapıldı (SİLİNMEDİ — ürün olgunlaşınca tek API çağrısıyla geri açılır);
-`rules/branches/main` effective listesi `[]` (enforce edilen sıfır kural). Çalışma: **doğrudan
-main'de, eski usül commit+push**; branch/worktree YALNIZ gerçek paralel çalışma gerektiğinde.
-CI main-push'ta bilgilendirme olarak koşar, hiçbir şeyi bloklamaz, beklenmez. "Bir outcome =
-bir PR" kuralı bu owner kararıyla askıdadır; az push, çok iş.
+**AKIŞ DEĞİŞİKLİĞİ (`DECISION_REF=owner-live-2026-08-17-direct-main` — ürün tamamlanana kadar):**
+Aktif mode değerleri YALNIZ `AGENTS.md`/`CLAUDE.md` başındaki machine-readable
+`DECKENT-DEV-CONTROL` bloğundadır (gate: `lint-operating-policy.mjs`): DOGFOOD_MODE=OFF,
+WORKSPACE_MODE=MAIN, DELIVERY_MODE=DIRECT_MAIN, PR/merge-queue optional, REMOTE_CI=ADVISORY,
+LOCAL_VERIFICATION=REQUIRED, EXECUTION_AUTHORITY=FABLE, ANALYSIS_AUTHORITY=CODEX. Çalışma
+doğrudan root `main`'de; worktree YALNIZ gerçek paralellik gerektiğinde. **GitHub branch
+protection/ruleset/security ayarlarını Alperen yönetir; agent değiştirmez** (mevcut durum:
+`main-protection` ruleset id 20321963 owner kararıyla `disabled`, effective rules `[]`).
 
 **Sıra:** Paket A (`DEV-OPERATING-CONTRACT-001`) → Paket B (`RUN-POLICY-DELIVERY-001`) →
 Phase-5 writer (mode kararı Alperen'in) → RUN-INSPECTOR-001 → Terminal/Desktop treni.

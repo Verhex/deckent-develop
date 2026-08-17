@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "07b935a2776dc1ae36cffc011bbf4cba342cf27e50a272a6c53603beaf0084da"
+    "value": "41e3a59a997746b082c4a4c6065b36b939c93db61c68e10ece72c16c3189943e"
   },
   "summary": {
     "total": 495,
@@ -11,11 +11,11 @@
     "terminal": 62,
     "receipts": 184,
     "byState": {
-      "OPEN": 340,
+      "OPEN": 339,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 25,
+      "VERIFY": 26,
       "DONE": 62,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -5020,9 +5020,9 @@
       "program": "REPO",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-16",
+      "updated": "2026-08-17",
       "definitionDigest": "fb4025e4ef013dacf37dee85fc1aa75f8ca2949e5d59578e854b3c1b7b75d6b1",
-      "progressDigest": "68a4c885d647108c430689869159600150d1275f521e566850c207bdcd5ec95c",
+      "progressDigest": "f88d578584300a3a088679311bdd8379168ec0dc4862408284584b3613a1472e",
       "terminalClosureDigest": null
     },
     {
@@ -5030,10 +5030,10 @@
       "id": "DEV-OPERATING-CONTRACT-001",
       "program": "REPO",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-16",
+      "state": "VERIFY",
+      "updated": "2026-08-17",
       "definitionDigest": "f895757df4df32b399634485023cad58df9c773854f7c0459db88ee3bb51bc69",
-      "progressDigest": "5b2716164315a9416bf4835ebfdf3edcac8cc22bb5f60b110e818cbe15f3e152",
+      "progressDigest": "04ecf1e1a9a4fc25d88c7a100f0978c6db78c64b43751a3193d129443980eb3b",
       "terminalClosureDigest": null
     },
     {
@@ -23808,8 +23808,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Main-push Shards Green red is closed by a bounded incident package with zero feature scope; the flake class is pinned via the designed test seam and the report-only ingress baseline realigned through its own --write flow; satır DONE'a yalnız MAIN_POSTMERGE_GREEN kanıtıyla geçer, required-green ile asla",
-      "evidence": "`historical-authority=pr-129-postmerge-truth-closure-merge-7f8fa399b;historical-gates=G1;proof=hostile-and-normal-probe-pin-25of25-plus-docs-scripts-1748of1748-plus-lint-gates-green`; PR #129 merged (fix/postmerge-main-truth-closure, f40c08733 → merge 7f8fa399b). Root cause: provider-flow \"(modernized)\" auto-mode testleri spawn-backend-docker.js'i mock'lar fakat KN2 capability probe'u (2026-08-08 dogfood kararı) resolveBackend('auto')'yu mock'un kapsamadığı gerçek process-memoize'lu docker-info probe'una bağlar — 2s probe penceresini kaçıran runner 'subprocess' çözer; tmux-deprecation.test.ts aynı unpinned sınıftaydı. Deterministic repro: PATH-shimmed failing docker binary aynı CI assertion'larını lokalde birebir üretti; fix mevcut _resetDockerProbeForTests seam'iyle pinler (pattern tests/core/spawn-backend.test.ts:257). Baseline: operation-ingress 691→693 (2 fs-write sitesi, genesis-anchor.mjs) resmi --write akışıyla. UNRELATED finding kaydı: Cross-Platform E2E main'de #125'ten beri kırmızı (Packed Install win/mac + E2E macos/tmux) — bu paketin kapsamı dışında, owner admission bekler",
-      "updated": "2026-08-16"
+      "evidence": "`historical-authority=pr-129-postmerge-truth-closure-merge-7f8fa399b;historical-gates=G1;proof=hostile-and-normal-probe-pin-25of25-plus-docs-scripts-1748of1748-plus-lint-gates-green`; PR #129 merged (fix/postmerge-main-truth-closure, f40c08733 → merge 7f8fa399b). Root cause: provider-flow \"(modernized)\" auto-mode testleri spawn-backend-docker.js'i mock'lar fakat KN2 capability probe'u (2026-08-08 dogfood kararı) resolveBackend('auto')'yu mock'un kapsamadığı gerçek process-memoize'lu docker-info probe'una bağlar — 2s probe penceresini kaçıran runner 'subprocess' çözer; tmux-deprecation.test.ts aynı unpinned sınıftaydı. Deterministic repro: PATH-shimmed failing docker binary aynı CI assertion'larını lokalde birebir üretti; fix mevcut _resetDockerProbeForTests seam'iyle pinler (pattern tests/core/spawn-backend.test.ts:257). Baseline: operation-ingress 691→693 (2 fs-write sitesi, genesis-anchor.mjs) resmi --write akışıyla. UNRELATED finding kaydı: Cross-Platform E2E main'de #125'ten beri kırmızı (Packed Install win/mac + E2E macos/tmux) — bu paketin kapsamı dışında, owner admission bekler. MAIN_POSTMERGE_GREEN kanıtı geldi: #129 main-push CI workflow SUCCESS (run 31979500135, 11m16s, 2026-08-16T23:34Z); DONE flip authorized receipt yoluna bırakıldı",
+      "updated": "2026-08-17"
     },
     {
       "order": 8101,
@@ -23826,7 +23826,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -23841,8 +23841,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "docs/governance/deckent-dev-operating-policy.md tek canonical'dır (DOGFOOD_MODE authority + DEGRADED/ADR-D-007 lane, bir-outcome-bir-chat-bir-worktree-bir-PR, üç-sınıf finding disposition, audit sınırı, dört-sınıf CI yeşil taksonomisi, versioned handoff receipt, kanun 3/4/6 amendment metinleri); AGENTS.md ve CLAUDE.md OPERATING-POLICY bloğu byte-identical'dır ve scripts/lint-operating-policy.mjs lint:gates içinde sha256 digest raporuyla enforce eder; docs/execution/active capsule hygiene (şema alanları, filename=OUTCOME_ID, owner-admission=MASTER satırı şartı, delete-on-consume) machine-checked'tir; core-memory kanun 3/4/6 dosyaları amendment'lı, DIRECTIVES idle truth-sync'li",
-      "evidence": "Owner approvals a-d (Alperen 2026-08-17; DOGFOOD_MODE=OFF; execution izole worktree agent/dev-operating-contract branch'inde, PR review/merge akışı bu satırın ledger admission yoludur — state OPEN ledger-yetki durumudur, hazırlık kanıtı bu hücrededir). Gate + 11 hermetic test (tests/scripts/lint-operating-policy.test.ts) yeşil; hermeticity baseline realign +94 unresolved (script+test çifti) ve +1 production inventory (script, suite'i üzerinden test-support production dependency; package.json digest bileşeni) ampirik atıfla belgelendi; records residue disposition commit 8c887987d (sprint-525 seam + sprint-532 review/disposition + sprint-533 SPRINT-LOG/CHANGELOG/DIRECTIVES + exports/manifests; canlı runtime DB'ler bilinçli hariç). Capsule: docs/execution/active/DEV-OPERATING-CONTRACT-001.md; DONE = PR merge + capsule silinmesi",
-      "updated": "2026-08-16"
+      "evidence": "`historical-authority=pr-130-dev-operating-contract-merge-a9018571d;historical-gates=G1;proof=lint-gates-16of16-plus-policy-gate-tests-plus-docs-308of308`; Owner approvals a-d (Alperen 2026-08-17; DOGFOOD_MODE=OFF; execution izole worktree agent/dev-operating-contract branch'inde, PR review/merge akışı bu satırın ledger admission yoludur — state OPEN ledger-yetki durumudur, hazırlık kanıtı bu hücrededir). Gate + 11 hermetic test (tests/scripts/lint-operating-policy.test.ts) yeşil; hermeticity baseline realign +94 unresolved (script+test çifti) ve +1 production inventory (script, suite'i üzerinden test-support production dependency; package.json digest bileşeni) ampirik atıfla belgelendi; records residue disposition commit 8c887987d (sprint-525 seam + sprint-532 review/disposition + sprint-533 SPRINT-LOG/CHANGELOG/DIRECTIVES + exports/manifests; canlı runtime DB'ler bilinçli hariç). Capsule: docs/execution/active/DEV-OPERATING-CONTRACT-001.md; DONE = PR merge + capsule silinmesi",
+      "updated": "2026-08-17"
     },
     {
       "order": 9000,
@@ -25641,6 +25641,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "4f9116e85528b87421f535d55a4bae5fec03c7ddc612faf2b8d6da02218b6a5d"
+    "value": "9fbcf4fb1e39f894d2569ef173a0cbfb7e33ac65b5797728b62d026b41f83768"
   }
 }

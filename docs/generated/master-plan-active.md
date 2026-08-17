@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):07b935a2776dc1ae36cffc011bbf4cba342cf27e50a272a6c53603beaf0084da`
+**Source digest:** `sha256(normalized-lf-utf8):41e3a59a997746b082c4a4c6065b36b939c93db61c68e10ece72c16c3189943e`
 
 **Rows:** 495 total · 433 active · 62 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 340 |
+| OPEN | 339 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
-| VERIFY | 25 |
+| VERIFY | 26 |
 | DONE | 62 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -417,7 +417,7 @@
 | 8098 | `FLAGSHIP-PROOF-001` | OPEN | P1 | PRODUCT | `METRICS-NORTHSTAR-001`, `XVERIFY-WIRE-001` | — | Eight-scenario flagship competitive acceptance suite on the production binary |
 | 8099 | `COMPETITIVE-INTEL-001` | OPEN | P2 | PRODUCT | — | — | Recurring competitive telemetry scorecard and trigger-based re-analysis |
 | 8100 | `CI-POSTMERGE-127-TRUTH-001` | VERIFY | P0 | REPO | — | — | Post-#127 main truth closure — hermetic docker-probe pin + ingress baseline realign |
-| 8101 | `DEV-OPERATING-CONTRACT-001` | OPEN | P0 | REPO | — | — | Owner-approved dev operating contract — canonical policy, host projection parity gate, capsule lifecycle, law 3/4/6 amendments |
+| 8101 | `DEV-OPERATING-CONTRACT-001` | VERIFY | P0 | REPO | — | — | Owner-approved dev operating contract — canonical policy, host projection parity gate, capsule lifecycle, law 3/4/6 amendments |
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9011 | `PROMPT-INJECTION-TRACE-001` | OPEN | P0 | LEARNING | `PROMPT-001`, `AUDIT-001`, `STATE-RETENTION-001` | — | Prompt/ADR injection kararları için project-root-bound, versioned, privacy-safe ve outcome-linked causal trace authority |

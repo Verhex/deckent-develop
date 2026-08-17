@@ -5,9 +5,9 @@
 
 Sıra (dependency-ordered; owner onayı Alperen 2026-08-17):
 
-1. **CI-POSTMERGE-127-TRUTH-001** (8100) — post-#127 main truth closure incident paketi.
+1. **CI-POSTMERGE-127-TRUTH-001** (8100) — post-#127 main truth closure incident paketi — MAIN_POSTMERGE_GREEN kanıtı GELDİ (run 31979500135).
    PR #129 MERGED (7f8fa399b); DONE = MAIN_POSTMERGE_GREEN kanıtı.
-2. **DEV-OPERATING-CONTRACT-001** (8101) — Paket A: operating contract + host parity gate.
+2. **DEV-OPERATING-CONTRACT-001** (8101) — Paket A MERGED (PR #130 → a9018571d) + 2026-08-17 direct-main amendment; satır VERIFY.
    Capsule: `DEV-OPERATING-CONTRACT-001.md` (bu dizin). DOGFOOD_MODE=OFF.
 3. **RUN-POLICY-DELIVERY-001** (7140) — Paket B: task-carried runPolicyAuthority delivery
    (ürün kodu; 487-026 pattern) + provider digest-parity hermetic proof + CI green-class

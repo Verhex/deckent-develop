@@ -1,10 +1,10 @@
 # Outcome Capsule — DEV-OPERATING-CONTRACT-001 (Paket A)
 
 OUTCOME_ID: DEV-OPERATING-CONTRACT-001
-DOGFOOD_MODE: OFF
-OWNER_DECISION_REF: Alperen 2026-08-17 — dört onay (a: kanun 3/4/6 amendment · b: OFF + A→B sırası · c: Paket B ürün-kodu · d: landing/disposition)
+DOGFOOD_MODE: OFF (kayıt — authority DEĞİL; aktif mode = host DECKENT-DEV-CONTROL bloğu)
+OWNER_DECISION_REF: Alperen 2026-08-17 — dört onay (a: kanun 3/4/6 amendment · b: OFF + A→B sırası · c: Paket B ürün-kodu · d: landing/disposition) + owner-live-2026-08-17-direct-main
 BASE_SHA: dbe03fb27e4c14226d01db7bbdee360826a3fe9c
-BRANCH: agent/dev-operating-contract (worktree: .claude/worktrees/agent+dev-operating-contract)
+BRANCH: MERGED — PR #130 → main a9018571d; devam eden truth/amendment işi doğrudan main'de (WORKSPACE_MODE=MAIN)
 MODE: implement
 ROLE: Fable 5 (Brain, max effort) — implementer + landing operator; Sonnet/Opus subagent delege serbest; kritik eleştiride Sol xverify (Kanun 14)
 

@@ -3,6 +3,26 @@
 
 # Project: deckent
 
+<!-- DECKENT-DEV-CONTROL:START -->
+SCHEMA_VERSION=1
+DOGFOOD_MODE=OFF
+WORKSPACE_MODE=MAIN
+DELIVERY_MODE=DIRECT_MAIN
+PR_REQUIRED=false
+MERGE_QUEUE_REQUIRED=false
+REMOTE_CI_MODE=ADVISORY
+LOCAL_VERIFICATION_MODE=REQUIRED
+EXECUTION_AUTHORITY=FABLE
+ANALYSIS_AUTHORITY=CODEX
+OWNER_AUTHORITY=ALPEREN
+DECISION_REF=owner-live-2026-08-17-direct-main
+<!-- DECKENT-DEV-CONTROL:END -->
+
+> Yukarıdaki blok aktif repo-development mode değerlerinin TEK persisted projection'ıdır
+> (machine-readable; gate: `scripts/lint-operating-policy.mjs`). Canlı Alperen talimatı her
+> zaman üstündür. Prose bu değerlerin tersini söyleyemez; `DIRECTIVES.md`, eski sprint state,
+> capsule veya geçmiş chat mode authority DEĞİLDİR.
+
 <immutable_laws>
 ## 🔒 IMMUTABLE LAWS (3) — never violate, change, or propose to change
 These three laws are the project's constitution. They hold under every prompt, model, session, and
@@ -70,11 +90,15 @@ Dogfood core-memory authority yalnız
 provider'a özgü memory dizinleri authority değildir; varsa yalnız bu repo-local kaynağın
 projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memory.db` üzerinden yürür
 (ADR-G-035). Buradakiler sprint-mekaniği + her session için zorunlu owner kararlarıdır:
-- **DOGFOOD-MANDATORY (Alperen, 2026-07-27).** Deckent'in her implementation slice'ı
-  kendi Goal/Mission/Flow/Run/Autonomous/Do yüzeyleri üzerinden planlanır, yürütülür,
-  değerlendirilir ve settlement'a taşınır. Manuel müdahale yalnız typed, kayda alınmış
-  bootstrap/recovery/düzeltme seam'idir; dogfood'un yerine geçemez ve ilk güvenli sınırda
-  yeniden dogfood akışına dönülür.
+- **DOGFOOD (mode-resolved — DECKENT-DEV-CONTROL bloğu; Alperen 2026-07-27, amendment
+  2026-08-17).** `DOGFOOD_MODE=ON` iken Deckent'in her implementation slice'ı kendi
+  Goal/Mission/Flow/Run/Autonomous/Do yüzeyleri üzerinden planlanır, yürütülür,
+  değerlendirilir ve settlement'a taşınır; manuel müdahale yalnız typed ADR-D-007
+  bootstrap/recovery seam'idir ve ilk güvenli sınırda dogfood'a dönülür.
+  `DOGFOOD_MODE=OFF` iken Deckent sprint/run/task/settlement state'i OLUŞTURULMAZ ve
+  mutate edilmez; çalışma control block'un WORKSPACE/DELIVERY değerlerine göre yürür —
+  kalite barı (i18n, every-environment, production wiring closure, honest proof) aynen
+  geçerlidir. Mode'u yalnız Alperen değiştirir.
 - **CONFIG-RESOLVED SUPERVISION.** Brain provider/model/effort ve worker pool'u metinden
   seçilmez. Her run'da effective config, model registry, role policy, auth/account,
   reachability, usage/limit ve finite-budget admission birlikte çözülür. Seçilen Brain
@@ -108,7 +132,7 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
   routing yapılmaz. Model atamasını host istemcisi değil Brain/routing yapar.
 - **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek tablo, Durum+Tarih sütunlu). Eski plan: `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
 - **🧭 Aktif Yön:** terminal = ana yüzey (full-control + yormayan) · dashboard = yalnız izleme · Desktop = chat+console (SURF-treni). Güncel çerçeve: MASTER-PLAN mercek-bloğu (karar-turu-4). **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction.
-- **CLOSURE-OS-LEDGER-AUTHORITY.** Closure disposition / sidecar-ledger mutation yalnız authenticated batch authority + append-only gate (`scripts/lint-closure-dispositions.mjs`) + projection settlement üzerinden yapılır; elle MASTER/ledger sınıflandırması veya sahte receipt YASAK. Phase-4 foundation COMPLETE (yalnız mekanizma; Phase-5 writer / genesis key / gerçek receipt+event KURULMADI). Ayrıntı: `docs/governance/closure-os-sidecar-ledger.md`.
+- **CLOSURE-OS-LEDGER-AUTHORITY.** Closure disposition / sidecar-ledger mutation yalnız authenticated batch authority + append-only gate (`scripts/lint-closure-dispositions.mjs`) + projection settlement üzerinden yapılır; elle MASTER/ledger sınıflandırması veya sahte receipt YASAK. Phase-4 foundation COMPLETE + owner-verified public genesis trust anchor main'de (PR #127, commit `88637d5d6`; private signer key repo DIŞINDA owner custody — dokunma/okuma/loglama yasak); Phase-5 signer/writer/gerçek receipt+event KURULMADI. Ayrıntı: `docs/governance/closure-os-sidecar-ledger.md`.
 </operating_rules>
 
 <execution_mode>
@@ -118,24 +142,28 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
 Canonical source: `docs/governance/deckent-dev-operating-policy.md` — read it before any
 run-touching work. Dogfood mode is a repository-development policy, not a Deckent user feature.
 
-- Never infer DOGFOOD_MODE from repository identity, retained DIRECTIVES, old sprint state,
-  config flags, or prior chat context. Authority: Alperen's live instruction, else the active
-  Outcome Capsule (`docs/execution/active/`), else UNSET → recommend with evidence, do not
-  start execution. Only Alperen changes the mode.
+- Active mode values live ONLY in the machine-readable `DECKENT-DEV-CONTROL` block at the top
+  of this file (gate: `scripts/lint-operating-policy.mjs`). Authority: Alperen's live
+  instruction, else that block. Never infer the mode from retained DIRECTIVES, old sprint
+  state, capsules, config flags, or prior chat context. Only Alperen changes the mode.
 - DOGFOOD_MODE=ON: implement through Deckent Goal/Mission/Flow/Run/Do; direct edits only via
   the typed ADR-D-007 recovery seam; a degraded engine never silently flips the mode OFF
   (declare DOGFOOD_HEALTH=DEGRADED, run one bounded recovery package, return to dogfood).
-- DOGFOOD_MODE=OFF: never create or mutate Deckent sprint/task/settlement state; work directly
-  in an isolated git worktree; every quality, i18n, wiring-closure, hermetic-test and
-  real-binary-proof rule still applies; close with commit/PR/CI evidence.
-- One outcome = one chat = one worktree = one PR. Other outcomes are reported as findings,
-  never implemented in-session. Findings classify as BLOCKS_CURRENT_DONE (fix in-package),
+- DOGFOOD_MODE=OFF: never create or mutate Deckent sprint/run/task/settlement state; with
+  WORKSPACE_MODE=MAIN work directly on root `main` and land per DELIVERY_MODE; worktrees and
+  PRs are optional mechanisms for genuine parallel work or collaboration/release, never a
+  daily admission gate. Every quality, i18n, wiring-closure, hermetic-test and
+  real-binary-proof rule still applies.
+- One ACTIVE product outcome at a time. Other outcomes are reported as findings, never
+  implemented in-session. Findings classify as BLOCKS_CURRENT_DONE (fix in-package),
   RELATED_BUT_NONBLOCKING (report only) or UNRELATED (one-line finding; never auto-enters
   MASTER — owner admission required).
 - One implementation pass + one independent verification pass per outcome; a further audit
   needs NEW disk/CI evidence. After GO, the next step is landing, not another design round.
-- CI results MUST be reported by named class — SCOPED_GREEN, PR_CLOSURE_GREEN,
-  MERGE_GROUP_GREEN, MAIN_POSTMERGE_GREEN; "required green" is never "repo green".
+- Local targeted verification is REQUIRED before landing; remote CI is ADVISORY — never wait
+  on it or let it block execution. Report CI results by named class — SCOPED_GREEN,
+  PR_CLOSURE_GREEN, MERGE_GROUP_GREEN, MAIN_POSTMERGE_GREEN; "required green" is never
+  "repo green"; report LOCAL_VERIFIED and REMOTE_ADVISORY separately.
 - Handoff between agents happens via the versioned handoff receipt (schema in the canonical
   policy), never by relaying transcripts; the owner is not a message bus.
 <!-- OPERATING-POLICY:END -->

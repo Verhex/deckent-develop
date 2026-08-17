@@ -270,8 +270,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attributed empirically: with ONLY these two files moved out, the scan
   // reproduces the prior 12865:932a83e1… exactly (build-free, dist absent).
   // Prior: MERGE genesis←main (12865).
-  count: 12959,
-  digest: '2de6a4ba39e9f29ce62a396ce0786ff9d295be3a0294cfa6530ef14c6cf92f57',
+  // 2026-08-17 (DEV-CONTROL amendment): +56 — lint-operating-policy.mjs gains the
+  // DECKENT-DEV-CONTROL parser/validator (one added host readFileSync site + new
+  // exported pure functions) and its suite gains 9 control-block negative cases
+  // (tmpdir fixture writes). Attributed empirically: with ONLY these two files at
+  // their prior HEAD the scan reproduces 12959:2de6a4ba… exactly (build-free).
+  // Prior: DEV-OPERATING-CONTRACT-001 (12959).
+  count: 13015,
+  digest: '965b9750a8184a609e0f44b47b591edc3dd0a62a06dda30adc4163e57b71b4bc',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -424,8 +430,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // with the script/test pair moved out AND package.json reverted the scan
   // reproduces 1235:309c1f2a… exactly (build-free).
   // Prior: LOCAL-LLM-CI-CLOSURE (1235).
+  // 2026-08-17 (DEV-CONTROL amendment): same 1236 count, digest only —
+  // already-inventoried lint-operating-policy.mjs gains the DECKENT-DEV-CONTROL
+  // parser/validator content. Prior: DEV-OPERATING-CONTRACT-001 (1236).
   count: 1236,
-  digest: 'a8e22f948e288a8f278879a61d521f115f377a25aff2e2ac29271842cdc058d1',
+  digest: '8636232423d9797d91190a26aa2318b54a40c640a90fc4b875d606af432eb249',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

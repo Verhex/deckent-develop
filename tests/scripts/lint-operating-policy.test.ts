@@ -8,6 +8,9 @@ import {
   normalizeBlock,
   sha256Hex,
   findMasterRowState,
+  parseControlBlock,
+  controlValuesDigest,
+  CONTROL_KEYS,
   CANONICAL_RELATIVE_PATH,
   HOST_RELATIVE_PATHS,
   ACTIVE_DIR_RELATIVE_PATH,
@@ -18,15 +21,40 @@ const BLOCK = [
   '## Deckent-dev Execution Mode (operating policy projection)',
   '',
   '- Only Alperen changes the mode.',
-  '- One outcome = one chat = one worktree = one PR.',
+  '- One ACTIVE product outcome at a time.',
 ].join('\n');
 
-function canonicalDoc(inner: string): string {
-  return `# Policy\n\ngiris\n\n<!-- HOST-BLOCK:START -->\n${inner}\n<!-- HOST-BLOCK:END -->\n\nson\n`;
+const DECISION_REF = 'owner-live-2026-08-17-direct-main';
+
+const CONTROL_VALUES: Record<string, string> = {
+  SCHEMA_VERSION: '1',
+  DOGFOOD_MODE: 'OFF',
+  WORKSPACE_MODE: 'MAIN',
+  DELIVERY_MODE: 'DIRECT_MAIN',
+  PR_REQUIRED: 'false',
+  MERGE_QUEUE_REQUIRED: 'false',
+  REMOTE_CI_MODE: 'ADVISORY',
+  LOCAL_VERIFICATION_MODE: 'REQUIRED',
+  EXECUTION_AUTHORITY: 'FABLE',
+  ANALYSIS_AUTHORITY: 'CODEX',
+  OWNER_AUTHORITY: 'ALPEREN',
+  DECISION_REF,
+};
+
+function controlBlock(overrides: Record<string, string | null> = {}, extraLine?: string): string {
+  const lines = (CONTROL_KEYS as readonly string[])
+    .map((k) => (overrides[k] === null ? null : `${k}=${overrides[k] ?? CONTROL_VALUES[k]}`))
+    .filter((l): l is string => l !== null);
+  if (extraLine) lines.push(extraLine);
+  return `<!-- DECKENT-DEV-CONTROL:START -->\n${lines.join('\n')}\n<!-- DECKENT-DEV-CONTROL:END -->`;
 }
 
-function hostDoc(inner: string): string {
-  return `# Host\n\n<!-- OPERATING-POLICY:START source=${CANONICAL_RELATIVE_PATH} -->\n${inner}\n<!-- OPERATING-POLICY:END -->\n`;
+function canonicalDoc(inner: string): string {
+  return `# Policy\n\ngiris (DECISION_REF=${DECISION_REF})\n\n<!-- HOST-BLOCK:START -->\n${inner}\n<!-- HOST-BLOCK:END -->\n\nson\n`;
+}
+
+function hostDoc(inner: string, control: string = controlBlock()): string {
+  return `# Host\n\n${control}\n\n<!-- OPERATING-POLICY:START source=${CANONICAL_RELATIVE_PATH} -->\n${inner}\n<!-- OPERATING-POLICY:END -->\n`;
 }
 
 function masterWithRow(id: string, state: string): string {
@@ -149,5 +177,68 @@ describe('lint-operating-policy — host projection parity + capsule hygiene', (
   it('findMasterRowState parses the 13-column ledger row state', () => {
     expect(findMasterRowState(masterWithRow('X-001', 'VERIFY'), 'X-001')).toEqual({ state: 'VERIFY' });
     expect(findMasterRowState(masterWithRow('X-001', 'VERIFY'), 'Y-001')).toBeNull();
+  });
+
+  describe('DECKENT-DEV-CONTROL machine-readable mode block', () => {
+    it('passes with byte-identical twin blocks and reports the control digest', () => {
+      const result = checkOperatingPolicy(root);
+      expect(result.problems).toEqual([]);
+      expect(result.controlDigest).toBe(controlValuesDigest(CONTROL_VALUES));
+    });
+
+    it('flags DEV_CONTROL_BLOCK_MISSING when one host lacks the block', () => {
+      writeFileSync(join(root, 'AGENTS.md'), hostDoc(BLOCK, '').replace(/\n\n\n/, '\n\n'), 'utf-8');
+      const codes = checkOperatingPolicy(root).problems.map((p) => p.code);
+      expect(codes).toContain('DEV_CONTROL_BLOCK_MISSING');
+    });
+
+    it('flags unknown, duplicate and missing fields with typed codes', () => {
+      writeFileSync(
+        join(root, 'AGENTS.md'),
+        hostDoc(BLOCK, controlBlock({ OWNER_AUTHORITY: null }, 'ROGUE_KEY=x\nDOGFOOD_MODE=OFF')),
+        'utf-8',
+      );
+      const codes = checkOperatingPolicy(root).problems.map((p) => p.code);
+      expect(codes).toContain('DEV_CONTROL_UNKNOWN_FIELD');
+      expect(codes).toContain('DEV_CONTROL_DUPLICATE_FIELD');
+      expect(codes).toContain('DEV_CONTROL_MISSING_FIELD');
+    });
+
+    it('flags a strict enum violation as DEV_CONTROL_INVALID_VALUE', () => {
+      writeFileSync(join(root, 'AGENTS.md'), hostDoc(BLOCK, controlBlock({ DOGFOOD_MODE: 'MAYBE' })), 'utf-8');
+      const problems = checkOperatingPolicy(root).problems;
+      expect(problems.map((p) => p.code)).toContain('DEV_CONTROL_INVALID_VALUE');
+      expect(problems.find((p) => p.code === 'DEV_CONTROL_INVALID_VALUE')?.detail).toContain('DOGFOOD_MODE');
+    });
+
+    it('flags canonical key-order violation as DEV_CONTROL_KEY_ORDER', () => {
+      const swapped = controlBlock()
+        .replace('SCHEMA_VERSION=1\nDOGFOOD_MODE=OFF', 'DOGFOOD_MODE=OFF\nSCHEMA_VERSION=1');
+      writeFileSync(join(root, 'AGENTS.md'), hostDoc(BLOCK, swapped), 'utf-8');
+      const codes = checkOperatingPolicy(root).problems.map((p) => p.code);
+      expect(codes).toContain('DEV_CONTROL_KEY_ORDER');
+    });
+
+    it('flags twin drift when AGENTS and CLAUDE blocks are not byte-identical', () => {
+      writeFileSync(join(root, 'CLAUDE.md'), hostDoc(BLOCK, controlBlock({ EXECUTION_AUTHORITY: 'CODEX' })), 'utf-8');
+      const codes = checkOperatingPolicy(root).problems.map((p) => p.code);
+      expect(codes).toContain('DEV_CONTROL_BLOCK_DRIFT');
+    });
+
+    it('flags a surviving unconditional legacy DOGFOOD-MANDATORY token', () => {
+      writeFileSync(join(root, 'AGENTS.md'), `${hostDoc(BLOCK)}\n- **DOGFOOD-MANDATORY.** eski kosulsuz kural\n`, 'utf-8');
+      const codes = checkOperatingPolicy(root).problems.map((p) => p.code);
+      expect(codes).toContain('DEV_CONTROL_LEGACY_DOGFOOD_CONFLICT');
+    });
+
+    it('flags DECISION_REF not anchored in the canonical policy', () => {
+      writeFileSync(join(root, CANONICAL_RELATIVE_PATH), canonicalDoc(BLOCK).replace(DECISION_REF, 'baska-bir-ref'), 'utf-8');
+      const codes = checkOperatingPolicy(root).problems.map((p) => p.code);
+      expect(codes).toContain('DEV_CONTROL_DECISION_REF_UNANCHORED');
+    });
+
+    it('parseControlBlock returns found:false without markers', () => {
+      expect(parseControlBlock('# no block here\n')).toEqual({ found: false });
+    });
   });
 });

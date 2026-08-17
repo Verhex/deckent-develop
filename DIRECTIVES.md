@@ -7,8 +7,9 @@ from a retained document").
 
 - Son kapanan wave: Sprint-533 local-llm GPU acceleration closure — COMPLETE
   (kayıt: `docs/SPRINT-LOG.md`; işletim kanıtı MASTER `OWNER-MODEL-POLICY-001` satırında).
-- Aktif işin authority'si: `docs/execution/active/` altındaki Outcome Capsule'lar.
-  Şu an: `DEV-OPERATING-CONTRACT-001` (DOGFOOD_MODE=OFF — owner kararı Alperen 2026-08-17).
+- Aktif mode authority: `AGENTS.md`/`CLAUDE.md` başındaki machine-readable
+  `DECKENT-DEV-CONTROL` bloğu (capsule/DIRECTIVES mode authority DEĞİLDİR). Aktif outcome
+  kaydı: `docs/execution/active/` altındaki Outcome Capsule'lar.
 - Repo-development çalışma kontratı: `docs/governance/deckent-dev-operating-policy.md`
   (host'lara OPERATING-POLICY bloğu olarak projekte edilir; parity
   `scripts/lint-operating-policy.mjs` ile lint:gates içinde machine-enforced'tur).

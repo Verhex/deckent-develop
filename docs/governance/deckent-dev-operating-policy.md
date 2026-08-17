@@ -1,7 +1,12 @@
 # Deckent-Dev Operating Policy — repo-development çalışma kontratı
 
 **Statü:** CANONICAL (owner-approved, Alperen 2026-08-17 — dört onay: kanun 3/4/6 amendment ·
-DOGFOOD_MODE=OFF + Paket A→B sırası · Paket B ürün-kodu çerçevesi · landing/disposition).
+DOGFOOD_MODE=OFF + Paket A→B sırası · Paket B ürün-kodu çerçevesi · landing/disposition;
+amendment aynı gün: `DECISION_REF=owner-live-2026-08-17-direct-main` — direct-main çalışma,
+PR/merge-queue optional, remote CI advisory).
+**Aktif mode değerleri:** YALNIZ `AGENTS.md`/`CLAUDE.md` başındaki machine-readable
+`DECKENT-DEV-CONTROL` bloğundadır (tek persisted projection; gate doğrular). Bu doküman mode
+değerini PROSE olarak taşımaz; çelişki durumunda canlı Alperen kararı → control block kazanır.
 **Tip:** repo-development policy. Bu bir Deckent **ürün özelliği DEĞİLDİR**; deckent reposunun
 kendisini nasıl geliştirdiğimize dair owner-controlled çalışma sözleşmesidir. Ürün config/spec
 yüzeylerine (`.deckent/config.json`, product docs) taşınmaz.
@@ -22,7 +27,7 @@ deckent reposunda çalışan her agent aynı çalışma prensibi setini görür 
 
 | Katman | Mekanizma | Durum |
 |---|---|---|
-| İnteraktif host oturumları | Host dosyalarındaki `OPERATING-POLICY` bloğu (auto-load) + bu doküman | Paket A (bu paket) |
+| İnteraktif host oturumları | Host dosyalarındaki machine-readable `DECKENT-DEV-CONTROL` bloğu (aktif mode) + `OPERATING-POLICY` bloğu (auto-load) + bu doküman | Paket A + 2026-08-17 amendment |
 | Digest parity | `lint-operating-policy.mjs` — canonical ↔ host blokları byte-eşit, sha256 raporlu | Paket A (bu paket) |
 | Deckent worker'ları (compiled prompt) | `runPolicyAuthority`'nin task-carried delivery'si (487-026 `task.productionWiring` pattern'i) + settlement digest doğrulaması + provider-parity hermetic testi | **Paket B** (`RUN-POLICY-DELIVERY-001`) |
 
@@ -34,10 +39,11 @@ sessiz "kapalı sayma" yasaktır.
 Dogfood mode bir ürün config'i değil, aktif outcome başına owner-controlled repo-development
 kararıdır. **Yalnız Alperen değiştirir**; agent öneri sunabilir, mutation yapamaz.
 
-- **Authority sırası:** (1) Alperen'in canlı açık kararı → (2) aktif Outcome Capsule'daki
-  tüketilmemiş owner kararı → (3) yoksa `UNSET`: agent kanıtlı ON/OFF önerisi sunar, execution
-  başlatmaz. Repo adından, retained DIRECTIVES'ten, eski sprint state'inden veya geçmiş chat
-  context'inden mode TAHMİN ETMEK YASAK.
+- **Authority sırası (amendment 2026-08-17):** (1) Alperen'in canlı açık kararı → (2)
+  host dosyalarındaki `DECKENT-DEV-CONTROL` bloğu (tek persisted mode projection) → (3) yoksa
+  `UNSET`: agent kanıtlı ON/OFF önerisi sunar, execution başlatmaz. Capsule mode'u KAYDEDER ama
+  mode AUTHORITY'si değildir. Repo adından, retained DIRECTIVES'ten, eski sprint state'inden,
+  capsule'dan veya geçmiş chat context'inden mode TAHMİN ETMEK YASAK.
 - **ON:** implementation Deckent Goal/Mission/Flow/Run/Do yüzeylerinden geçer; DIRECTIVES.md
   seçili slice'ın exact execution projection'ıdır; doğrudan kod yazımı yalnız typed ADR-D-007
   recovery seam'iyle olur ve kayda bağlanır. Engine bozulursa mode sessizce OFF'a düşmez:
@@ -49,18 +55,20 @@ kararıdır. **Yalnız Alperen değiştirir**; agent öneri sunabilir, mutation 
   production-wiring closure, hermetic test ve real-binary proof kuralları AYNEN geçerlidir;
   kapanış Git commit/PR/CI kanıtıyla olur. OFF ≠ düşük kalite; yalnız execution controller
   Deckent değildir.
-- **Güncel karar (Alperen, 2026-08-17):** landing + Paket A + Paket B için `DOGFOOD_MODE=OFF`.
+- **Güncel karar:** control block'ta (`DECISION_REF=owner-live-2026-08-17-direct-main`).
   **ON-dönüş koşulu:** Paket B DONE — runPolicyAuthority task-carried wiring + Codex/Fable/Qwen
-  policy-digest parity hermetic testi + tek no-op dogfood canary'nin terminal settlement'ı.
-  Phase-5 writer için mode kararı Alperen'indir.
+  policy-digest parity hermetic testi + tek no-op dogfood canary'nin terminal settlement'ı;
+  canary öncesi `CANARY_READY` raporu verilir ve Alperen'in açık ON kararı beklenir (tek owner
+  gate). Phase-5 writer için mode kararı Alperen'indir.
 
-## 3. Bir outcome = bir chat = bir worktree = bir PR
+## 3. Bir anda TEK aktif product outcome (amendment 2026-08-17)
 
-Her coherent outcome kendi izole worktree'sinde, kendi branch'inde ve kendi PR'ında yürür;
-oturum/chat o outcome'a adanır. Aynı oturumda başka outcome yalnız **finding** olarak
-raporlanır, uygulanmaz. Outcome kapanınca capsule silinir ve sonraki outcome yeni
-chat/worktree'de başlar. Root/shared checkout'ta doğrudan implementation yürütmek yasaktır
-(bootstrap/recovery seam hariç, o da typed kayıtla).
+Bir anda tek aktif product outcome ilkesi KORUNUR: oturum tek outcome'a adanır; başka
+outcome yalnız **finding** olarak raporlanır, uygulanmaz. Outcome kapanınca capsule silinir.
+**Kaldırılan zorunluluklar (owner kararı, `DECISION_REF` üstte):** one-outcome/one-worktree/
+one-PR ZORUNLU DEĞİLDİR. `WORKSPACE_MODE=MAIN` iken günlük development doğrudan root `main`
+üzerinde yürür; worktree YALNIZ gerçek paralel çalışma gerektiğinde, PR/merge-queue YALNIZ
+optional release/collaboration mekanizması olarak kullanılır — günlük admission gate değildir.
 
 ## 4. Outcome Capsule ve Active Train
 
@@ -97,19 +105,23 @@ yalnız YENİ disk/CI evidence ile açılır; aynı kanıtla üçüncü analiz/p
 sonucu GO ise sıradaki adım landing'dir, yeni tasarım turu değil. (Transition brief §12.3'ün
 bağlayıcı uygulaması.)
 
-## 7. CI yeşil taksonomisi — "green" tek kelimeyle kullanılamaz
+## 7. Doğrulama rejimi ve CI yeşil taksonomisi (amendment 2026-08-17)
 
-Bir agent CI sonucu raporlarken sınıf adı vermek ZORUNDADIR:
+**Günlük admission = LOCAL doğrulamadır:** targeted test + type-check + gerçek-binary/product
+proof ZORUNLUDUR (`LOCAL_VERIFICATION_MODE=REQUIRED`). **Remote CI ADVISORY'dir**
+(`REMOTE_CI_MODE=ADVISORY`): beklenmez, hiçbir şeyi bloklamaz; sonucu görülürse kanıt olarak
+raporlanır. CI workflow/merge-group tamiri owner kararıyla aktif kapsam DIŞIDIR.
 
-- **SCOPED_GREEN** — değişen alanın scoped test/lint koşumu yeşil.
-- **PR_CLOSURE_GREEN** — PR'ın required check seti yeşil (bugün: lint + shards + typecheck…).
-- **MERGE_GROUP_GREEN** — merge queue'nun final-SHA'da koşturduğu set yeşil (bugün bilinçli
-  owner kararıyla yalnız Type Check — 2026-08-04/535; bu daraltma Paket B'de yeniden ele alınır).
-- **MAIN_POSTMERGE_GREEN** — main-push full matrix yeşil (bugün fiilen mevcut olan tam kanıt).
+CI sonucu raporlanırken sınıf adı vermek yine ZORUNLUDUR ("green" tek kelime olamaz):
 
-"Required green"i "repo green" olarak raporlamak ihlaldir; PR sonrası deterministic fail
-"latent/normal" diye normalleştirilemez — typed incident'tir (bkz. §5 sınıf 1). Gerçek runner
-flake'i `INFRA_FAILURE` olarak, test assertion kırmızısından ayrı raporlanır.
+- **SCOPED_GREEN** — değişen alanın scoped LOCAL test/lint koşumu yeşil.
+- **PR_CLOSURE_GREEN** / **MERGE_GROUP_GREEN** — yalnız optional PR/queue akışı kullanıldığında
+  anlamlıdır (PR required check seti / queue final-SHA seti).
+- **MAIN_POSTMERGE_GREEN** — main-push full matrix yeşil (advisory tam-kapsam sinyali).
+
+"Required/scoped green"i "repo green" olarak raporlamak ihlaldir. Gerçek runner flake'i
+`INFRA_FAILURE` olarak, test assertion kırmızısından ayrı raporlanır. LOCAL_VERIFIED durumu
+ile REMOTE_ADVISORY durumu raporlarda ayrı satırlarda verilir.
 
 ## 8. Handoff receipt kontratı
 
@@ -153,24 +165,28 @@ canonical metinler core-memory dosyalarındadır (`.deckent/docs/core-memory/`):
 Canonical source: `docs/governance/deckent-dev-operating-policy.md` — read it before any
 run-touching work. Dogfood mode is a repository-development policy, not a Deckent user feature.
 
-- Never infer DOGFOOD_MODE from repository identity, retained DIRECTIVES, old sprint state,
-  config flags, or prior chat context. Authority: Alperen's live instruction, else the active
-  Outcome Capsule (`docs/execution/active/`), else UNSET → recommend with evidence, do not
-  start execution. Only Alperen changes the mode.
+- Active mode values live ONLY in the machine-readable `DECKENT-DEV-CONTROL` block at the top
+  of this file (gate: `scripts/lint-operating-policy.mjs`). Authority: Alperen's live
+  instruction, else that block. Never infer the mode from retained DIRECTIVES, old sprint
+  state, capsules, config flags, or prior chat context. Only Alperen changes the mode.
 - DOGFOOD_MODE=ON: implement through Deckent Goal/Mission/Flow/Run/Do; direct edits only via
   the typed ADR-D-007 recovery seam; a degraded engine never silently flips the mode OFF
   (declare DOGFOOD_HEALTH=DEGRADED, run one bounded recovery package, return to dogfood).
-- DOGFOOD_MODE=OFF: never create or mutate Deckent sprint/task/settlement state; work directly
-  in an isolated git worktree; every quality, i18n, wiring-closure, hermetic-test and
-  real-binary-proof rule still applies; close with commit/PR/CI evidence.
-- One outcome = one chat = one worktree = one PR. Other outcomes are reported as findings,
-  never implemented in-session. Findings classify as BLOCKS_CURRENT_DONE (fix in-package),
+- DOGFOOD_MODE=OFF: never create or mutate Deckent sprint/run/task/settlement state; with
+  WORKSPACE_MODE=MAIN work directly on root `main` and land per DELIVERY_MODE; worktrees and
+  PRs are optional mechanisms for genuine parallel work or collaboration/release, never a
+  daily admission gate. Every quality, i18n, wiring-closure, hermetic-test and
+  real-binary-proof rule still applies.
+- One ACTIVE product outcome at a time. Other outcomes are reported as findings, never
+  implemented in-session. Findings classify as BLOCKS_CURRENT_DONE (fix in-package),
   RELATED_BUT_NONBLOCKING (report only) or UNRELATED (one-line finding; never auto-enters
   MASTER — owner admission required).
 - One implementation pass + one independent verification pass per outcome; a further audit
   needs NEW disk/CI evidence. After GO, the next step is landing, not another design round.
-- CI results MUST be reported by named class — SCOPED_GREEN, PR_CLOSURE_GREEN,
-  MERGE_GROUP_GREEN, MAIN_POSTMERGE_GREEN; "required green" is never "repo green".
+- Local targeted verification is REQUIRED before landing; remote CI is ADVISORY — never wait
+  on it or let it block execution. Report CI results by named class — SCOPED_GREEN,
+  PR_CLOSURE_GREEN, MERGE_GROUP_GREEN, MAIN_POSTMERGE_GREEN; "required green" is never
+  "repo green"; report LOCAL_VERIFIED and REMOTE_ADVISORY separately.
 - Handoff between agents happens via the versioned handoff receipt (schema in the canonical
   policy), never by relaying transcripts; the owner is not a message bus.
 <!-- HOST-BLOCK:END -->
