@@ -88,7 +88,9 @@ workflow'udur; ürünün bütünü veya tek execution authority'si değildir:
 > projection ile. Buildless gate `npm run lint:gates` içinde (`scripts/lint-closure-dispositions.mjs`);
 > projector `scripts/closure-ledger/project.mjs`. **Owner-verified public genesis trust anchor
 > main'dedir** (PR #127, commit `88637d5d6`; private signer key repo DIŞINDA owner custody).
-> Phase-5 writer / gerçek receipt+event **henüz kurulmadı**, canlı ledger mutation yoktur. Tam referans:
+> **Phase-5 CANLI (2026-08-17):** writer + owner sign ceremony sevk edildi; ilk authenticated
+> batch (`dba89c03…`, 2 event, owner-signed ed25519 receipt) append edildi, dört-view projection
+> üretildi ve 8101+7140 MASTER settlement'ı bu batch'e bağlı receipt'lerle kapandı. Tam referans:
 > [`docs/governance/closure-os-sidecar-ledger.md`](docs/governance/closure-os-sidecar-ledger.md).
 
 1. **`deckent_init`** — Projeyi başlat. `.deckent/`, `.brain/`, `.tasks/` dizinlerini ve seçili host adapterının provider-neutral kural/reference projection'larını oluşturur. Desteklenen her environment/project scope'unda bir kez çalıştırılır.

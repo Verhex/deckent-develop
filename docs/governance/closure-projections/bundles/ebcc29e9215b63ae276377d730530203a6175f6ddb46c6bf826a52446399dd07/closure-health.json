@@ -1,0 +1,16 @@
+{
+  "byPriority": {
+    "P0": 295,
+    "P1": 107,
+    "P2": 31
+  },
+  "byState": {
+    "BLOCKED": 68,
+    "OPEN": 339,
+    "VERIFY": 26
+  },
+  "classificationCoverage": 0,
+  "ledgerClassified": 2,
+  "ledgerEvents": 2,
+  "totalActive": 433
+}

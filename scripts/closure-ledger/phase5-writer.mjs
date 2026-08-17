@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { userInfo } from 'node:os';
 import {
   chmodSync,
   closeSync,
@@ -187,7 +188,10 @@ function approvalRequest(subject, requestId, now) {
     policy: 'require-approval',
     defaultAction: 'deny',
     tenantId: subject.tenantId,
-    userId: 'owner',
+    // The terminal decide ingress mints its live-session actorId from the OS
+    // username (approvals CLI → userInfo().username) and rejects on
+    // actorId !== request.userId — a fixed literal here can never be decided.
+    userId: userInfo().username,
     createdAt,
     expiresAt,
     maskedArgs: { unsignedManifestDigest: subject.unsignedManifestDigest, eventCount: subject.eventCount },

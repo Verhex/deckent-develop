@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d599b4f8b7a956b6a96aed0b7fdfa86f73307e8330147373dcd3a7529bb2c26d"
+    "value": "8b2ac3d1b92804bed5f381540c86087064f7b07c1551240d4b642c6753084948"
   },
   "summary": {
     "total": 495,
-    "active": 433,
-    "terminal": 62,
-    "receipts": 184,
+    "active": 431,
+    "terminal": 64,
+    "receipts": 186,
     "byState": {
-      "OPEN": 339,
+      "OPEN": 338,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 26,
-      "DONE": 62,
+      "VERIFY": 25,
+      "DONE": 64,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -4777,11 +4777,11 @@
       "id": "RUN-POLICY-DELIVERY-001",
       "program": "PROMPT",
       "priority": "P0",
-      "state": "OPEN",
+      "state": "DONE",
       "updated": "2026-08-17",
       "definitionDigest": "db257570be7d97728b470b283e0b57eeed3b09e3680f8ba7122539a72c7fbad7",
-      "progressDigest": "5f828cfc871361a2722d0c14a35572b6a281eb32d6ab31ec3ba02df029682ef4",
-      "terminalClosureDigest": null
+      "progressDigest": "0b3c696a280164102344a408bc45104acfc377d7146129c4a18c5a6e36d6db75",
+      "terminalClosureDigest": "fc2f610f6852f9691800abac947805b31d9fdb6685a5149363439e2caa337e35"
     },
     {
       "order": 8000,
@@ -5030,11 +5030,11 @@
       "id": "DEV-OPERATING-CONTRACT-001",
       "program": "REPO",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-17",
       "definitionDigest": "f895757df4df32b399634485023cad58df9c773854f7c0459db88ee3bb51bc69",
-      "progressDigest": "04ecf1e1a9a4fc25d88c7a100f0978c6db78c64b43751a3193d129443980eb3b",
-      "terminalClosureDigest": null
+      "progressDigest": "14ea3451cc0ddc87ac77d633c15de9726f841f647dcc59e43ac4de4bb5381009",
+      "terminalClosureDigest": "adef714e97e418905fb34c5d514b260de07ef6428d8e753d9bcec584c89833da"
     },
     {
       "order": 9000,
@@ -7348,6 +7348,26 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-11T10:23:05Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-17-CLOSURE-BATCH-01",
+      "authorityDigest": "55b547935df0c9ae3d40fa85390eee0b8030bb81cf26c52a48b8631d0dc31a63",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-17T16:26:09Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-17-CLOSURE-BATCH-02",
+      "authorityDigest": "587ffbe35c09abbec2315a58ac48d8ea71e89cec06d00c11fb06eef70c91535b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-17T16:26:09Z"
       },
       "g7AttemptIdentity": null
     }
@@ -21928,8 +21948,7 @@
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
-        "AGENT-RUNTIME-ADAPTER-001",
-        "RUN-POLICY-DELIVERY-001"
+        "AGENT-RUNTIME-ADAPTER-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Provenance, install, permissions, sandbox, update, revoke and quarantine are one trust plane",
@@ -22914,42 +22933,6 @@
       "updated": "2026-08-04"
     },
     {
-      "order": 7140,
-      "id": "RUN-POLICY-DELIVERY-001",
-      "parent": "ECOSYSTEM-001",
-      "program": "PROMPT",
-      "outcome": "Provider-neutral run-policy delivery — task-carried runPolicyAuthority with settlement digest parity (Paket B)",
-      "priority": "P0",
-      "dependsOn": [
-        "DEV-OPERATING-CONTRACT-001"
-      ],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1",
-        "G2"
-      ],
-      "state": "OPEN",
-      "truth": {
-        "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [
-        "DEV-OPERATING-CONTRACT-001"
-      ],
-      "evidenceReceipts": [],
-      "acceptance": "486-017 producer'ı (buildRunPolicyAuthorityBlock, prompt-god-template.ts — bugün \"empty until the caller wires\" durumunda) production consumer'ını 487-026 task-carried pattern'iyle kazanır (ctx-injection ASLA: \"can never be gated off by caller wiring drift\"): plan-time resolver → task.runPolicy digest → her provider için (Codex/Fable/Qwen) byte-identical compiled prompt → .result gözlenen policy digest'i taşır → settlement aynı digest'i doğrular; hermetic provider-parity testi identical digest'leri kanıtlar; CI green-class adlandırması + canonical verify manifest merge-queue authority açığını kapatır (2026-08-04/535 owner kararıyla çelişmeden amendment olarak); DONE ek şartı: tek no-op dogfood canary terminal settlement (DOGFOOD ON-dönüş koşulu)",
-      "evidence": "PHASE-2 implementation LANDED bu satırın production zinciriyle: resolver (run-policy-resolver.ts, DIRECTIVES \"## Execution Contract\") → planSprint tek choke-point stamp (ai+structured+fallback+injected-debt yolları) → task.runPolicy carriage + debt-manager FIX inheritance ×2 → prompt-god-template task-carried render (ctx-injection KALDIRILDI) + worker digest-echo result kontratı → runPolicyEvidence şeması → settleRunPolicyResultEvidence (recompute, typed HOLD) → gateRunPolicyParityVerdict evaluateWithRubric İÇİNDE (her ingress, FIX dahil) → execution-authority.jsonl kind=run-policy-authority BEST-EFFORT compile observation (fail-soft yüzey; authoritative compile-evidence authority = 9024 PROMPT-COMPILE-EVIDENCE-AUTHORITY-001; enforcement = settlement parity zinciri). CORRECTION (owner analiz turu, 2026-08-17): parity gate tek canonical terminal boundary'ye taşındı — evaluateWithRubric exported wrapper (D-1 verification fast-path + D-2 schema dahil her iç dönüş) + async terminal producer'lar (safeRubricReconcile reconciled/reconstruction + backlog-eval reconciled) aynı gate'i uygular; verification fast-path ve rubric-fault reconstruction bypass'ları kapandı, production-entrypoint testleriyle kanıtlı. CORRECTION-2 (owner talimatı, 2026-08-17): (a) snapshot stamp planSprint içinde İLK task-JSON persistence'ından ÖNCE (gerçek planSprint→tmpdir disk kanıtı: her persisted task digest'li snapshot taşır; contract'sız run'da alan yok); (b) buildFinalizerTerminalTruth girişinde enforceRunPolicyParityOnTerminalInputs — standard finalize / test-mode receipt / CLI finalize / completed-checkpoint recovery TEK convergence'tan geçer, evaluationDecision/selfAssessment-türevi DONE/GWT missing/mismatch/tampered evidence ile terminal olamaz (7-case attempt-authority matrisi). Kanıt: 44-case toplam hermetic matrix (create/bounds/settlement/tamper + resolver + provider-parity Codex/Fable/Qwen byte-identical + FIX-identical + audit + evaluator gate), tsc 0 hata. Owner approval c (Alperen 2026-08-17): ürün kodu olarak yazılır, repo-local script değil — deckent-dev ilk tenant'tır; DUAL LENS gereği aynı mekanizma son kullanıcının org-policy-her-provider'a-aynı-bitlerle-gider enterprise ihtiyacıdır. Kanıt zinciri işaretleri: prompt-god-template.ts:1706 (unwired yorum), task-builder.ts exactExecutionAuthority kontrast-pattern'i, execution-authority.jsonl audit izi",
-      "updated": "2026-08-17"
-    },
-    {
       "order": 8000,
       "id": "EVERY-ENV-001",
       "parent": "P08",
@@ -23009,8 +22992,7 @@
         "DOCS-TRUTH-PASS-001",
         "LAUNCH-COMMS-001",
         "DOCS-VISION-002",
-        "CI-POSTMERGE-127-TRUTH-001",
-        "DEV-OPERATING-CONTRACT-001"
+        "CI-POSTMERGE-127-TRUTH-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Supported/degraded/unsupported matrix for every declared component and surface",
@@ -23809,39 +23791,6 @@
       "evidenceReceipts": [],
       "acceptance": "Main-push Shards Green red is closed by a bounded incident package with zero feature scope; the flake class is pinned via the designed test seam and the report-only ingress baseline realigned through its own --write flow; satır DONE'a yalnız MAIN_POSTMERGE_GREEN kanıtıyla geçer, required-green ile asla",
       "evidence": "`historical-authority=pr-129-postmerge-truth-closure-merge-7f8fa399b;historical-gates=G1;proof=hostile-and-normal-probe-pin-25of25-plus-docs-scripts-1748of1748-plus-lint-gates-green`; PR #129 merged (fix/postmerge-main-truth-closure, f40c08733 → merge 7f8fa399b). Root cause: provider-flow \"(modernized)\" auto-mode testleri spawn-backend-docker.js'i mock'lar fakat KN2 capability probe'u (2026-08-08 dogfood kararı) resolveBackend('auto')'yu mock'un kapsamadığı gerçek process-memoize'lu docker-info probe'una bağlar — 2s probe penceresini kaçıran runner 'subprocess' çözer; tmux-deprecation.test.ts aynı unpinned sınıftaydı. Deterministic repro: PATH-shimmed failing docker binary aynı CI assertion'larını lokalde birebir üretti; fix mevcut _resetDockerProbeForTests seam'iyle pinler (pattern tests/core/spawn-backend.test.ts:257). Baseline: operation-ingress 691→693 (2 fs-write sitesi, genesis-anchor.mjs) resmi --write akışıyla. UNRELATED finding kaydı: Cross-Platform E2E main'de #125'ten beri kırmızı (Packed Install win/mac + E2E macos/tmux) — bu paketin kapsamı dışında, owner admission bekler. MAIN_POSTMERGE_GREEN kanıtı geldi: #129 main-push CI workflow SUCCESS (run 31979500135, 11m16s, 2026-08-16T23:34Z); DONE flip authorized receipt yoluna bırakıldı",
-      "updated": "2026-08-17"
-    },
-    {
-      "order": 8101,
-      "id": "DEV-OPERATING-CONTRACT-001",
-      "parent": "EVERY-ENV-001",
-      "program": "REPO",
-      "outcome": "Owner-approved dev operating contract — canonical policy, host projection parity gate, capsule lifecycle, law 3/4/6 amendments",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "RUN-POLICY-DELIVERY-001"
-      ],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [],
-      "acceptance": "docs/governance/deckent-dev-operating-policy.md tek canonical'dır (DOGFOOD_MODE authority + DEGRADED/ADR-D-007 lane, bir-outcome-bir-chat-bir-worktree-bir-PR, üç-sınıf finding disposition, audit sınırı, dört-sınıf CI yeşil taksonomisi, versioned handoff receipt, kanun 3/4/6 amendment metinleri); AGENTS.md ve CLAUDE.md OPERATING-POLICY bloğu byte-identical'dır ve scripts/lint-operating-policy.mjs lint:gates içinde sha256 digest raporuyla enforce eder; docs/execution/active capsule hygiene (şema alanları, filename=OUTCOME_ID, owner-admission=MASTER satırı şartı, delete-on-consume) machine-checked'tir; core-memory kanun 3/4/6 dosyaları amendment'lı, DIRECTIVES idle truth-sync'li",
-      "evidence": "`historical-authority=pr-130-dev-operating-contract-merge-a9018571d;historical-gates=G1;proof=lint-gates-16of16-plus-policy-gate-tests-plus-docs-308of308`; Owner approvals a-d (Alperen 2026-08-17; DOGFOOD_MODE=OFF; execution izole worktree agent/dev-operating-contract branch'inde, PR review/merge akışı bu satırın ledger admission yoludur — state OPEN ledger-yetki durumudur, hazırlık kanıtı bu hücrededir). Gate + 11 hermetic test (tests/scripts/lint-operating-policy.test.ts) yeşil; hermeticity baseline realign +94 unresolved (script+test çifti) ve +1 production inventory (script, suite'i üzerinden test-support production dependency; package.json digest bileşeni) ampirik atıfla belgelendi; records residue disposition commit 8c887987d (sprint-525 seam + sprint-532 review/disposition + sprint-533 SPRINT-LOG/CHANGELOG/DIRECTIVES + exports/manifests; canlı runtime DB'ler bilinçli hariç). Capsule: docs/execution/active/DEV-OPERATING-CONTRACT-001.md; DONE = PR merge + capsule silinmesi",
       "updated": "2026-08-17"
     },
     {
@@ -25641,6 +25590,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0b7f6d578b4bcd8f68de9f6637ea1e1c6a96c23ef36eba32422950847c33058a"
+    "value": "f0b807ca892fb38dba15ff55dfbcbccf70fc64a9d965bf282c393b5989d1f186"
   }
 }

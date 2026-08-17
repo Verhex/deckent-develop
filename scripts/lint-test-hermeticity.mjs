@@ -301,8 +301,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // ApprovalBroker import closure pulls the src/core broker subtree into the
   // test graph for the first time. Only these four new files changed the graph
   // in this slice (sprint records are md/json outside the scan).
+  // 2026-08-17 (PHASE5 live-batch closure): same 14331 count, digest only —
+  // phase5-writer.mjs claim identity fixed to userInfo().username (approval
+  // authority compares live actorId to request.userId; the 'owner' literal
+  // failed real decide). No graph membership change.
   count: 14331,
-  digest: '208be610856c5ce263bbeb3d57aaa608f181b695cd2bef99ec3bd26e36c44b66',
+  digest: '160741815533f80b014812236c89b4d673cb55f10380468bfd0a7f7198463c13',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -484,8 +488,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (PHASE5-S3, sprint-539 dogfood): +4 — phase5-writer.mjs,
   // phase5-sign.mjs and the broker-subtree modules their suites import enter
   // the inventory as test-support production dependencies.
+  // 2026-08-17 (PHASE5 live-batch closure): same 1243 count, digest only —
+  // phase5-writer.mjs content hash moved with the userInfo().username claim
+  // identity fix; inventory membership unchanged.
   count: 1243,
-  digest: '39332dff6bb3f9b89c8b1fe42f835b538f2514b5b6f05308aee428d9cddce9c5',
+  digest: '3f55f811ceaf11cd3d1bbb3327b945215c222798dbe4f656ea49e3541b4090cf',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):d599b4f8b7a956b6a96aed0b7fdfa86f73307e8330147373dcd3a7529bb2c26d`
+**Source digest:** `sha256(normalized-lf-utf8):8b2ac3d1b92804bed5f381540c86087064f7b07c1551240d4b642c6753084948`
 
-**Rows:** 495 total · 433 active · 62 terminal
+**Rows:** 495 total · 431 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 339 |
+| OPEN | 338 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
-| VERIFY | 26 |
-| DONE | 62 |
+| VERIFY | 25 |
+| DONE | 64 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -395,7 +395,6 @@
 | 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
 | 7121 | `SKILLMD-V3-RECONCILIATION-001` | OPEN | P0 | ECOSYSTEM | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | SKILLMD-INGEST-001'in immutable V2 activation kabulünü production V3 SkillProfile ve fail-closed package ingress contractıyla lossless uzlaştır |
 | 7130 | `AGENT-RUNTIME-ADAPTER-001` | OPEN | P2 | PROVIDER | `COMPOSITE-WORKER-001` | — | Harici agent-runtime adapter ailesi değerlendirmesi: generic ACP worker adapter + Hermes/OpenClaw/Codex-remote/ADK sınıfı runtime'ların governed composite worker olarak admission'ı |
-| 7140 | `RUN-POLICY-DELIVERY-001` | OPEN | P0 | PROMPT | `DEV-OPERATING-CONTRACT-001` | — | Provider-neutral run-policy delivery — task-carried runPolicyAuthority with settlement digest parity (Paket B) |
 | 8000 | `EVERY-ENV-001` | OPEN | P0 | XPLAT | `SSOT-003`, `TEST-PLATFORM-001` | — | Every-environment architecture and release parent |
 | 8010 | `ENV-ADAPTER-001` | OPEN | P0 | XPLAT | `KERNEL-001`, `AUTHORITY-001` | — | PlatformAdapter contracts for process, paths, locks, IPC, credentials, terminal and services |
 | 8020 | `INSTALL-SCOPE-001` | OPEN | P0 | ONBOARDING | `ENV-ADAPTER-001`, `MEMORY-AUTHORITY-001` | — | Global install plus project-scoped state and learning |
@@ -417,7 +416,6 @@
 | 8098 | `FLAGSHIP-PROOF-001` | OPEN | P1 | PRODUCT | `METRICS-NORTHSTAR-001`, `XVERIFY-WIRE-001` | — | Eight-scenario flagship competitive acceptance suite on the production binary |
 | 8099 | `COMPETITIVE-INTEL-001` | OPEN | P2 | PRODUCT | — | — | Recurring competitive telemetry scorecard and trigger-based re-analysis |
 | 8100 | `CI-POSTMERGE-127-TRUTH-001` | VERIFY | P0 | REPO | — | — | Post-#127 main truth closure — hermetic docker-probe pin + ingress baseline realign |
-| 8101 | `DEV-OPERATING-CONTRACT-001` | VERIFY | P0 | REPO | — | — | Owner-approved dev operating contract — canonical policy, host projection parity gate, capsule lifecycle, law 3/4/6 amendments |
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9011 | `PROMPT-INJECTION-TRACE-001` | OPEN | P0 | LEARNING | `PROMPT-001`, `AUDIT-001`, `STATE-RETENTION-001` | — | Prompt/ADR injection kararları için project-root-bound, versioned, privacy-safe ve outcome-linked causal trace authority |

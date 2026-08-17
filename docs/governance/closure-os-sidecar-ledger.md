@@ -7,12 +7,16 @@ buildless (dist bağımlılığı olmayan) bir doğrulama katmanıdır: Level×L
 sınıflandırması, admission ve priority-decision kararlarını hash-chained + owner
 authority-bound event'ler olarak biriktirmeyi, bu event'leri repo-verifiable bir
 gate ile katı biçimde doğrulamayı ve read-only projection'lar üretmeyi tarifler.
-**Kritik disk-gerçeği (bugün):** defter (`docs/governance/closure-dispositions.jsonl`)
-**BOŞ / mevcut değil**; gerçek anahtar, imzalayan (signer), ApprovalBroker
-writer'ı, gerçek receipt/event ve MASTER mutation'ı **Phase-5** işidir ve bu hatta
-**henüz kurulmamıştır**. Bu spec, Phase-4 foundation'ında **fiilen sevk edilmiş
-olan doğrulayıcı (verifier) tarafını** ile Phase-5'te yapılacak olanı adversarial
-cross-provider audit'e dayanacak netlikte ayırır. Bir typed `HOLD` asla bir
+**Kritik disk-gerçeği (2026-08-17 itibarıyla):** Phase-5 **CANLIDIR**. Defter
+(`docs/governance/closure-dispositions.jsonl`) ilk authenticated batch'i taşır
+(unsignedManifestDigest `dba89c0355ac…`, 2 event, zero-anchor hash-chain), owner-signed
+ed25519 receipt (`closure-dispositions.receipts/aprcdb-dba89c0355ac0654f52a24e68e669329.json`,
+keyId `closure-owner-genesis-v1`) commit'lidir ve gate `chain + identity + lifecycle +
+append-only verified` döner. Yazım araçları: `scripts/closure-ledger/phase5-dry-run.mjs`
+(staging bundle), `phase5-writer.mjs` (claim + fail-closed verified append + projections),
+`phase5-sign.mjs` (owner sign ceremony — private key daima repo DIŞI). Bu spec, Phase-4
+foundation verifier'ı ile Phase-5 writer hattını adversarial cross-provider audit'e
+dayanacak netlikte ayırır; §11.1 delivery kaydıdır. Bir typed `HOLD` asla bir
 kapanış (closure) değildir; §12.2 gereği "HOLD ≠ closure" bu dokümanın her
 bölümünde geçerlidir.
 
@@ -52,7 +56,7 @@ implementasyondan uygular.
 | Katman | Authority | Ne DEĞİLDİR |
 |---|---|---|
 | **MASTER** (`docs/generated/master-plan-active.json` + `docs/MASTER-PLAN.md`) | İş **kimliği ve durumu** (workId, program, state, mevcut priority, `identityRegistry`, `sourceDigest`, `registryIntegrity`). | Level×Lane / admission / priority-**karar** authority'si değildir. |
-| **Sidecar ledger** (`docs/governance/closure-dispositions.jsonl`) | **Level×Lane disposition + born-disposition/admission + priority-decision** authority'si. Kararları append-only, hash-chained, owner-authenticated event'ler olarak taşır. | İş kimliği/durumu üretmez. Priority **kararını** taşır ama MASTER satırına priority'yi **uygulamak** (mutation) Phase-5'tir ve gerçekleşmemiştir (0 priority değişikliği). |
+| **Sidecar ledger** (`docs/governance/closure-dispositions.jsonl`) | **Level×Lane disposition + born-disposition/admission + priority-decision** authority'si. Kararları append-only, hash-chained, owner-authenticated event'ler olarak taşır. | İş kimliği/durumu üretmez. Priority **kararını** taşır ama MASTER satırına priority'yi **uygulamak** ayrı bir owner-receipt yetkisidir ve bugüne dek uygulanmamıştır (0 priority değişikliği; state settlement'ları `receipt=GR-…` MASTER grammar'ıyla yürür). |
 | **Projections** (Active / Born / Closure-Health / Level×Lane) | **Hiçbiri** — read-only türetilmiş görünümlerdir. Her üretimde defteri `seq` sırasında yeniden uygular. | Asla bir source-of-truth değildir. Çakışma/drift/bilinmeyen satır → typed `HOLD` kolonu; sessiz skip/fallback yoktur. |
 
 Öncelik: MASTER, bir satırın **var** ve **hangi durumda** olduğunu söyler; sidecar,
@@ -275,7 +279,7 @@ Trust-anchor'ların **kaynağı** kritik güvenlik sınırıdır. `resolveTrustA
   public anchor + fingerprint (`sha256`(SPKI DER)) commit edilir; authority hâlâ
   owner'ın fingerprint'i doğrulayıp merge etmesinden (reviewed-parent) gelir — foundation
   hattında anchor üretilmez/commit edilmez, gerçek anchor owner ceremony'siyle provision
-  edilir. ed25519 **SIGNER**/writer hâlâ Phase-5'tir.
+  edilir. ed25519 **SIGNER**/writer Phase-5'te sevk edildi (`phase5-sign.mjs` + `phase5-writer.mjs`; ilk gerçek owner imzası 2026-08-17).
 - **NO WARN fallback.** TRUST-ANCHOR-001'den ayrışır: no-git / no-history / shallow
   clone / unfetchable-origin-main / okunamayan-parent-blob (OQ-XVE-05: provably-exists
   ama unreadable = `error`, asla `absent`) hepsi → `TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED`
@@ -284,8 +288,8 @@ Trust-anchor'ların **kaynağı** kritik güvenlik sınırıdır. `resolveTrustA
 
 **Scoped sınırlar (kasıtlı daraltmalar, disktruth'ta beyanlı):**
 - **Reviewed-key removal** parent anahtarlarını sonsuza dek güvenilir tutar (güvenli
-  yön: kaldırılmış bir anahtar imza atamaz). Gerçek **revocation** (anahtar iptali) =
-  **Phase-5**.
+  yön: kaldırılmış bir anahtar imza atamaz). Gerçek **revocation** (anahtar iptali)
+  Phase-5 writer kapsamına ALINMADI — açık sonraki-faz işi.
 - **Rotation depth-1:** yalnız reviewed-parent anahtarları bir rotation'ı imzalayabilir;
   bir rotation-ile-eklenen anahtar aynı değişiklikte başka bir rotation'ı yetkilendiremez.
 
@@ -516,12 +520,31 @@ Her git-bağımlı yol yalnız (a) injected-`gitRunner` fixture'ları ve (b) `TR
 
 ---
 
-## 11. Phase-4 DELIVERED vs Phase-5 NOT-YET-WIRED
+## 11. Phase-4 DELIVERED vs Phase-5 (tarihsel sınır kaydı)
 
-Bu en kritik bölümdür. Phase-4 foundation **yalnız buildless VERIFIER tarafını** sevk
-etti. Phase-5'in tümü (gerçek anahtar, signer, writer, gerçek receipt/event, MASTER
-mutation) **YAZILMAMIŞTIR** — aşağıda "shipped/working/available" olarak
-tanımlanmamıştır.
+Bu bölüm Phase-4 foundation sınırının TARİHSEL kaydıdır: Phase-4 **yalnız buildless
+VERIFIER tarafını** sevk etmişti; sağ kolon o günkü "yazılmadı" durumunu belgeler.
+Güncel delivery durumu §11.1'dedir.
+
+### 11.1 Phase-5 DELIVERY kaydı (2026-08-17)
+
+- **Genesis:** owner ceremony tamamlandı — public trust anchor main'de (PR #127,
+  commit `88637d5d6`; private key owner custody, repo dışı).
+- **Writer + signer:** `phase5-dry-run.mjs` (dogfood sprint-538) ve
+  `phase5-writer.mjs` + `phase5-sign.mjs` (dogfood sprint-539) sevk edildi;
+  hermetic suite'ler tmpdir-only, canlı `docs/governance/**` test-untouched.
+- **İlk authenticated batch:** requestId `aprcdb-dba89c0355ac0654f52a24e68e669329`;
+  claim canonical ApprovalBroker'a dosyalandı, karar `deckent approvals decide`
+  interactive live-auth ile OWNER tarafından verildi, ed25519 attestation
+  (`closure-owner-genesis-v1`) owner sign ceremony'sinde üretildi; append fail-closed
+  doğrulama zincirinden geçti. Ledger: seq1 (8101, package/contract, zero-anchor →
+  `355d347e…`) + seq2 (7140, package/runtime, → `44302b7f…`). Batch bundle
+  `closure-batches/dba89c03…/` arşivli; dört-view projection üretildi; gate:
+  `chain + identity + lifecycle + append-only verified`.
+- **MASTER settlement:** 8101 + 7140 satırları bu batch'e bağlı consumed
+  `GR-2026-08-17-CLOSURE-BATCH-01/-02` receipt'leriyle DONE'a taşındı.
+- **Yapılmayan (açık):** priority-mutation uygulaması (0 değişiklik), key revocation,
+  rotation depth>1.
 
 | DELIVERED (Phase-4, buildless — sevk edildi) | NOT-YET-WIRED (Phase-5 — YAZILMADI) |
 |---|---|
@@ -533,16 +556,14 @@ tanımlanmamıştır.
 | Identity pin (`approval-identity.mjs` mirror + parity test) | MASTER **state/priority mutation** (OPEN satırlara priority uygulama; **0 değişiklik**) |
 | Tüm self-check/testler: gate **127/127**, projector **22/22**, governance **9/9** (normal + PATH-stripped), approval-parity **3/3** (12/12 combined); tsc 0; `lint:gates` exit 0 | Gerçek batch snapshot bundle'ları (`closure-batches/`) ve projection bundle'ları (`closure-projections/`) |
 
-**Disk-gerçeği (doğrulandı).** `docs/governance/` yalnız `closure-classification-owner-proposal.md`
-içerir. **Yok:** `closure-dispositions.jsonl`, `closure-dispositions.receipts/`,
-`closure-trust-anchors.json` (hem working tree'de hem reviewed parent'ta yok — genesis
-tam da bu yüzden çözülemez), `closure-batches/`, `closure-projections/`. Genesis
-**çift-yönlü** unprovisioned'dır; hiçbir projection bundle yazılmamıştır.
+**Disk-gerçeği (2026-08-17 güncellemesi — tarihsel Phase-4 durumu üstteki paragraflardadır).**
+`docs/governance/` bugün canlı yüzeyleri taşır: `closure-trust-anchors.json` (genesis anchor),
+`closure-dispositions.jsonl` (2 event), `closure-dispositions.receipts/` (owner-signed receipt),
+`closure-batches/` (immutable bundle) ve `closure-projections/` (dört view).
 
-**Mekanizmanın kanıt durumu.** Defter **BOŞ**; mekanizma yalnız self-check'ler/fixture'lar
-+ boş-ledger green gate ile kanıtlanmıştır. **Sidecar için gerçek bir approval, receipt
-veya provider call GERÇEKLEŞMEMİŞTİR.** `validateAuthority`'nin verified-binding yolu
-yalnız hermetic ed25519 fixture'larla egzersiz edilmiştir.
+**Mekanizmanın kanıt durumu.** `validateAuthority`'nin verified-binding yolu artık GERÇEK
+owner approval + ed25519 receipt ile canlıda egzersiz edilmiştir (§11.1); hermetic
+fixture'lar bunun yanında regression teminatı olarak durur.
 
 ---
 
