@@ -20,6 +20,10 @@ describe('resolveBackend — tmux deprecation', () => {
     const mod = await import('../../src/orchestra/spawn-backend.js');
     resolveBackend = (mod as unknown as { resolveBackend: (b: string) => string }).resolveBackend;
     resetTmuxDeprecationWarning = (mod as unknown as { resetTmuxDeprecationWarning: () => void }).resetTmuxDeprecationWarning;
+    // KN2: the fresh module's 'auto' resolution runs a real memoized
+    // `docker info` probe; pin it so these contract tests stay hermetic on
+    // hosts/runners without a reachable docker daemon.
+    (mod as unknown as { _resetDockerProbeForTests: (v?: boolean | null) => void })._resetDockerProbeForTests(true);
 
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });

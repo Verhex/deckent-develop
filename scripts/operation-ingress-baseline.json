@@ -13,10 +13,10 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 691,
+  "total": 693,
   "mediated": 0,
-  "unmediated": 691,
-  "fileCount": 236,
+  "unmediated": 693,
+  "fileCount": 237,
   "byFile": {
     "src/agent/permission-store.ts": {
       "count": 1,
@@ -176,6 +176,10 @@
     },
     "src/cli/commands/kill.ts": {
       "count": 3,
+      "mediated": false
+    },
+    "src/cli/commands/local-llm.ts": {
+      "count": 2,
       "mediated": false
     },
     "src/cli/commands/mcp.ts": {
@@ -963,5 +967,5 @@
       "mediated": false
     }
   },
-  "digest": "a007c0006444991ed1a4002ebbc4a8d437067b63cb7f1d0a481bb5b91efa70a3"
+  "digest": "76931266eac57f9c71b9b68c3c4d99ca3a85e4b652dc73d449b4f06e5ebecc95"
 }

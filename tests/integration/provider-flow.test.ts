@@ -24,6 +24,7 @@ import {
   TmuxBackend,
   SubprocessBackend,
   SpawnBackendError,
+  _resetDockerProbeForTests,
 } from '../../src/orchestra/spawn-backend.js';
 import type { ModelType } from '../../src/core/types.js';
 
@@ -227,6 +228,11 @@ describe('Provider Flow Integration', () => {
 
   it('auto mode resolves to docker when tmux unavailable (modernized)', () => {
     vi.spyOn(SpawnBackendFactory, 'isTmuxAvailable').mockReturnValue(false);
+    // KN2: resolveBackend('auto') consults the process-memoized real
+    // `docker info` probe (isDockerDaemonReachable) — the file-level
+    // spawn-backend-docker.js mock does NOT cover it. Pin the probe so this
+    // resolution-contract assertion never depends on the host's live daemon.
+    _resetDockerProbeForTests(true);
 
     const backend = SpawnBackendFactory.create({
       backend: 'auto',
@@ -234,6 +240,7 @@ describe('Provider Flow Integration', () => {
     });
     expect(backend.name).toBe('docker');
 
+    _resetDockerProbeForTests();
     vi.restoreAllMocks();
   });
 
@@ -244,6 +251,7 @@ describe('Provider Flow Integration', () => {
     // covered by tests/core/spawn-backend.test.ts; here we only assert the
     // resolveBackend('auto') contract via SpawnBackendError surface.
     vi.spyOn(SpawnBackendFactory, 'isTmuxAvailable').mockReturnValue(true);
+    _resetDockerProbeForTests(true); // KN2 probe pin — see sibling test above.
 
     const backend = SpawnBackendFactory.create({
       backend: 'auto',
@@ -255,6 +263,7 @@ describe('Provider Flow Integration', () => {
     expect(backend).not.toBeInstanceOf(TmuxBackend);
     expect(backend).not.toBeInstanceOf(SubprocessBackend);
 
+    _resetDockerProbeForTests();
     vi.restoreAllMocks();
   });
 
