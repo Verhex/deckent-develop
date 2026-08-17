@@ -19,6 +19,15 @@ export interface ErrorEvent { type: 'error'; message: string; code?: string; }
  *  continues, but the view must tell the user something degraded — silence here
  *  is what turned a full context window into a "model stopped replying" mystery. */
 export interface NoticeEvent { type: 'notice'; code: string; message: string; }
+/** NATIVE-AGENT-HORIZON-001: the loop asks the session layer to take a scratch
+ *  checkpoint (cadence or no-progress). Data-only — the session/view decides
+ *  how to fulfil and render it. */
+export interface BudgetCheckpointRequestEvent {
+  type: 'budget-checkpoint-request';
+  reason: 'cadence-rounds' | 'cadence-toolcalls' | 'no-progress';
+  rounds: number;
+  toolCalls: number;
+}
 
 export type AgentEvent =
   | TextDeltaEvent
@@ -28,6 +37,7 @@ export type AgentEvent =
   | ToolResultEvent
   | TurnEndEvent
   | UsageEvent
+  | BudgetCheckpointRequestEvent
   | ErrorEvent
   | NoticeEvent;
 

@@ -13155,3 +13155,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 546-003: declared Files enter filesWrite even when not yet on disk (depends on nothing) (DONE)
 
 ---
+## Sprint 547 — sprint-547
+
+**Status:** ABORTED
+**Date:** 2026-08-17
+**Duration:** 1804s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1804369ms |
+
+### Tasks
+
+- 547-001-fix: Fix: canonical native-agent budget profile (config authority) (PENDING)
+- 547-001: canonical native-agent budget profile (config authority) (NO_GO)
+- 547-002-fix: Fix: multi-dimension loop budget + typed termination + no-progress convergence (depends on Task 1) (PENDING)
+- 547-002: multi-dimension loop budget + typed termination + no-progress convergence (depends on Task 1) (NO_GO)
+- 547-003-fix: Fix: first-class scratch checkpoint + context-epoch continuation (depends on Task 2) (PENDING)
+- 547-003: first-class scratch checkpoint + context-epoch continuation (depends on Task 2) (NO_GO)
+- 547-004: terminal ingress wiring + i18n surface (depends on Tasks 1,2) (INTERRUPTED)
+
+---

@@ -28,6 +28,68 @@ export interface XverifyAdjudicationPurposeProfile {
   readonly maxVerificationsPerSprint: number;
 }
 
+// ─── NATIVE-AGENT-HORIZON-001: terminal/native-agent session budget ─────────
+
+export interface ResolvedNativeAgentBudget {
+  readonly maxModelRounds: number;
+  readonly maxToolCalls: number;
+  readonly maxWallTimeMs: number;
+  readonly maxCumulativeTokens: number;
+  readonly maxNoProgressRounds: number;
+  readonly checkpointEveryRounds: number;
+  readonly checkpointEveryToolCalls: number;
+  readonly outputReserveTokens: number;
+  readonly contextSafetyReserveTokens: number;
+}
+
+/** Bounded deep/extended defaults. Rationale (owner RCA 2026-08-17): a healthy
+ *  50-distinct-call analysis died at the fixed 25-round wall, so rounds/calls
+ *  comfortably exceed that observed shape while every dimension stays a hard
+ *  session-wide cap; wall time bounds a runaway loop even when rounds are
+ *  cheap; noProgress ends semantic-repeat spirals long before the hard caps;
+ *  checkpoint cadence forces synthesis well inside the budget so long analyses
+ *  land instead of drowning. NO provider-name-keyed values — owner config is
+ *  the only override authority. */
+export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.freeze({
+  maxModelRounds: 120,
+  maxToolCalls: 400,
+  maxWallTimeMs: 45 * 60_000,
+  maxCumulativeTokens: 2_000_000,
+  maxNoProgressRounds: 8,
+  checkpointEveryRounds: 20,
+  checkpointEveryToolCalls: 60,
+  outputReserveTokens: 4_096,
+  contextSafetyReserveTokens: 2_048,
+});
+
+const NATIVE_AGENT_BUDGET_FIELDS = Object.keys(DEFAULT_NATIVE_AGENT_BUDGET) as
+  ReadonlyArray<keyof ResolvedNativeAgentBudget>;
+
+/** Merge owner-authored execution_budget.native_agent over the defaults with
+ *  loud validation — unknown keys and non-positive/non-integer values fail. */
+export function resolveNativeAgentBudget(input: {
+  policy?: ExecutionBudgetPolicyConfig | undefined;
+}): ResolvedNativeAgentBudget {
+  const authored = (input.policy as { native_agent?: Record<string, unknown> } | undefined)?.native_agent;
+  if (authored === undefined) return DEFAULT_NATIVE_AGENT_BUDGET;
+  if (!isPlainObject(authored)) {
+    throw new ExecutionBudgetPolicyError('execution_budget.native_agent must be an object');
+  }
+  assertKnownKeys(authored, NATIVE_AGENT_BUDGET_FIELDS as readonly string[], 'execution_budget.native_agent');
+  const merged: Record<string, number> = { ...DEFAULT_NATIVE_AGENT_BUDGET };
+  for (const field of NATIVE_AGENT_BUDGET_FIELDS) {
+    const value = authored[field];
+    if (value === undefined) continue;
+    if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+      throw new ExecutionBudgetPolicyError(
+        `execution_budget.native_agent.${field} must be a positive safe integer`,
+      );
+    }
+    merged[field] = value as number;
+  }
+  return Object.freeze(merged) as unknown as ResolvedNativeAgentBudget;
+}
+
 type ExecutionBudgetPolicyWithPurposeProfiles = ExecutionBudgetPolicyConfig & {
   readonly purposes?: {
     readonly 'reachability-probe'?: ReachabilityProbePurposeProfile;
@@ -301,7 +363,7 @@ export function assertExecutionBudgetPolicyConfig(
   }
   assertKnownKeys(
     value,
-    ['roles', 'landing', 'unmetered_backend', 'final_only_usage', 'purposes'],
+    ['roles', 'landing', 'unmetered_backend', 'final_only_usage', 'purposes', 'native_agent'],
     'execution_budget',
   );
   if (!isPlainObject(value.roles)) {

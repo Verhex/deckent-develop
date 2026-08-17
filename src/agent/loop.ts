@@ -16,7 +16,13 @@ import { ToolRegistry } from './tools/registry.js';
 import type { ToolResult } from './tools/types.js';
 import { Transcript } from './transcript.js';
 import type { ProviderAdapter, ProviderRequest, ProviderToolCall } from './provider-tooluse/types.js';
-import { recursionExceeded } from './guards/recursion.js';
+import {
+  recursionExceeded,
+  createNativeBudgetState,
+  evaluateNativeBudget,
+  type NativeBudgetState,
+} from './guards/recursion.js';
+import type { ResolvedNativeAgentBudget } from '../core/execution-budget-policy.js';
 import { checkSelfModifying } from './guards/self-modifying.js';
 import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
 import { fitMessagesToBudget } from './context-budget.js';
@@ -32,6 +38,13 @@ export interface LoopDeps {
   model: string;
   lang?: 'en' | 'tr';
   maxIterations?: number;
+  /** NATIVE-AGENT-HORIZON-001: config-resolved multi-dimension session budget.
+   *  Absent → the legacy single-round guard below stays byte-identical. */
+  nativeBudget?: ResolvedNativeAgentBudget;
+  /** SESSION-cumulative counters (created once per session by the caller) —
+   *  a context-epoch reset never resets them. Absent with nativeBudget set →
+   *  the loop creates turn-scoped state (still bounded, honestly weaker). */
+  nativeBudgetState?: NativeBudgetState;
   /** Live adapter override — read per provider call so a runtime /provider
    *  switch takes effect mid-session without rebuilding the loop/transcript.
    *  Absent → the fixed `adapter` above (back-compat). */
@@ -78,12 +91,33 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
   transcript.appendUser(userInput);
   const system = composeSystemPrompt({ cwd: deps.cwd, lang: deps.lang });
   let iterations = 0;
+  const budgetState = deps.nativeBudget
+    ? (deps.nativeBudgetState ?? createNativeBudgetState())
+    : undefined;
 
   while (true) {
     if (deps.isCancelled?.()) { yield { type: 'turn-end' }; return; }
     iterations++;
-    if (recursionExceeded(iterations, deps.maxIterations)) {
-      yield { type: 'error', message: 'recursion limit exceeded' };
+    if (deps.nativeBudget && budgetState) {
+      budgetState.rounds++;
+      const check = evaluateNativeBudget(budgetState, deps.nativeBudget);
+      if (check.verdict === 'terminate') {
+        // Typed session-budget termination: the CODE is the contract; the CLI
+        // surface localizes it (mechanism string stays terse English).
+        yield { type: 'error', code: check.code, message: check.code };
+        yield { type: 'turn-end' };
+        return;
+      }
+      if (check.verdict === 'checkpoint') {
+        yield {
+          type: 'budget-checkpoint-request',
+          reason: check.reason,
+          rounds: budgetState.rounds,
+          toolCalls: budgetState.toolCalls,
+        };
+      }
+    } else if (recursionExceeded(iterations, deps.maxIterations)) {
+      yield { type: 'error', code: 'native-budget.rounds-exhausted', message: 'recursion limit exceeded' };
       yield { type: 'turn-end' };
       return;
     }
@@ -123,6 +157,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         else if (ev.type === 'tool-call') { calls.push(ev); yield { type: 'tool-proposed', id: ev.id, tool: ev.name, args: ev.args }; }
         else if (ev.type === 'usage') {
           yield { type: 'usage', inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
+          if (budgetState) budgetState.cumulativeTokens += ev.inputTokens + ev.outputTokens;
           if (deps.costGuard) {
             accrue(deps.costGuard, { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens });
             const c = costExceeded(deps.costGuard);
@@ -156,6 +191,27 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // Skip a truly-empty assistant turn (no text, no tool calls) — appending
     // `{role:'assistant', content:''}` would replay to the provider next send
     // (OpenAI may 400 on empty content with no tool_calls). Review carry-over.
+    if (budgetState) {
+      // Progress = at least one semantically-new tool call (name + canonical
+      // args digest unseen this session) OR substantive assistant text. Distinct
+      // relevant work never trips the no-progress guard; repeat spirals do.
+      budgetState.toolCalls += calls.length;
+      let sawNewCall = false;
+      for (const call of calls) {
+        const digest = `${call.name}\u0000${JSON.stringify(call.args, Object.keys(call.args).sort())}`;
+        if (!budgetState.seenCallDigests.has(digest)) {
+          budgetState.seenCallDigests.add(digest);
+          sawNewCall = true;
+        }
+      }
+      const substantiveText = assistantText.trim().length > 80;
+      if (sawNewCall || substantiveText) {
+        budgetState.noProgressRounds = 0;
+        budgetState.noProgressCheckpointRequested = false;
+      } else {
+        budgetState.noProgressRounds++;
+      }
+    }
     if (assistantText !== '' || calls.length > 0) {
       transcript.appendAssistant(assistantText, calls.map((c) => ({ id: c.id, name: c.name, args: c.args })));
     }

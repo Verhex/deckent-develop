@@ -28,6 +28,7 @@ import type { ToolRiskLevel as CoreToolRiskLevel } from '../../core/tool-registr
 import type { ApprovalMode } from '../../agent/permission-types.js';
 import type { ToolInfo } from './app.js';
 import type { ChatTurnQueue, ChatTurnPayload } from './chat-turn-queue.js';
+import type { resolveNativeAgentBudget } from '../../core/execution-budget-policy.js';
 
 /** The view's engine contract (same shape the legacy runChatNativeLoop satisfies).
  *  `onTurnEnd` intentionally stays `{inputTokens, outputTokens}` — no `elapsedMs`, unlike
@@ -78,6 +79,8 @@ export interface NativeEngineDeps {
   /** The existing tool/change-block sink (run.tsx toolSink). */
   toolSink: (info: ToolInfo) => void;
   maxIterations?: number;
+  /** Config-resolved, multi-dimensional native-agent session budget. */
+  nativeBudget?: ReturnType<typeof resolveNativeAgentBudget>;
   /** Optional hard cost ceiling (USD) for the session; undefined → advisory only. */
   costCeilingUsd?: number;
   /** Blended price per 1M tokens (default 3). */
@@ -187,6 +190,29 @@ function localizeOrFallback(t: (key: string) => string, key: string, fallback: s
   return label === key ? fallback : label;
 }
 
+const NATIVE_AGENT_SIGNAL_KEYS = new Set([
+  'native-budget.rounds-exhausted',
+  'native-budget.toolcalls-exhausted',
+  'native-budget.walltime-exhausted',
+  'native-budget.tokens-exhausted',
+  'native-budget.noprogress-terminated',
+  'native.checkpoint.saved',
+  'native.checkpoint.epoch-advanced',
+  'native.checkpoint.degraded',
+]);
+
+/** Resolve stable native-agent codes at the CLI boundary. Unknown codes retain
+ * the mechanism-provided fallback instead of exposing an untranslated key. */
+export function localizeNativeAgentSignal(
+  t: (key: string) => string,
+  code: string | undefined,
+  fallback: string,
+): string {
+  if (!code) return fallback;
+  const key = NATIVE_AGENT_SIGNAL_KEYS.has(code) ? code : `native.${code}`;
+  return localizeOrFallback(t, key, fallback);
+}
+
 /**
  * born-607 — ENGINE-PARITY exec resolver for `deckent_call_tool`. A nested
  * dispatch (call_tool → target) is NOT a model-proposed tool_use, so the loop's
@@ -288,7 +314,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     model: deps.model,
     lang: deps.lang,
     costGuard: cost,
-    ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
+    ...(deps.nativeBudget ? { nativeBudget: deps.nativeBudget } : {}),
+    ...((deps.nativeBudget?.maxModelRounds ?? deps.maxIterations) !== undefined
+      ? { maxIterations: deps.nativeBudget?.maxModelRounds ?? deps.maxIterations }
+      : {}),
     ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
     ...(deps.getModel ? { getModel: deps.getModel } : {}),
     ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
@@ -319,7 +348,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // Localize a loop signal by its stable code ('native.<code>' message key);
   // an unmapped/unlocalized code falls back to the loop's English default.
   const localizeSignal = (code: string | undefined, fallback: string): string =>
-    code ? localizeOrFallback(t, `native.${code}`, fallback) : fallback;
+    localizeNativeAgentSignal(t, code, fallback);
 
   const runTurn: ReplEngine = async (input, cbs) => {
     let inputTokens = 0;

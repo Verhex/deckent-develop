@@ -333,8 +333,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // openai adapter (typed http/connect errors), native-transport (discovery +
   // identity validation, hardcoded fallback removed), messages and their two
   // suites changed content; no graph membership change.
-  count: 14341,
-  digest: '19f5dc6d1689cf38d9f49a44b23ecfbbe2588b946bd0ba5667f308f60f5fab38',
+  // 2026-08-18 (NATIVE-AGENT-HORIZON-001 package 1, sprint-547 + Brain
+  // completion): +5 — loop-budget, scratch-checkpoint and native-agent-budget-
+  // wiring suites plus the scratch-checkpoint production module and their
+  // import closures enter the graph.
+  count: 14346,
+  digest: 'f9835ca2ed7ecd77f8688679d1585c7c2d9f09f4b4dcbcc651b0e49962470bb6',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -542,8 +546,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (PLANNER-TRUTH correction, sprint-546): same 1246 count, digest
   // only — task-lineage (scale-honest breaker), sprint-utils/criteria-deriver
   // (authored criteria), sprint-planner (declared-files scope) hashes moved.
-  count: 1246,
-  digest: '786ba8f8963907e2e0c294934e05ba17363fe7ad42a2f532c2dd0ac13d636cf5',
+  // 2026-08-18 (NATIVE-AGENT-HORIZON-001 package 1): +1 — the scratch-checkpoint
+  // production module enters the inventory; loop/session/transcript/events/
+  // recursion/config/bridge/run.tsx/messages hashes moved.
+  count: 1247,
+  digest: 'fb15366381d0e3f80e76cbd2e51f0ffc5274122085a73eb6ed2445166c5f5785',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

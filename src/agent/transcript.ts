@@ -7,6 +7,12 @@
 
 import type { ProviderMessage, ToolCallRef } from './provider-tooluse/types.js';
 import { fitMessagesToBudget } from './context-budget.js';
+import { createHash } from 'node:crypto';
+
+export type TurnOrigin = 'user' | 'replay' | 'system';
+export interface TurnMetadata { turnId: string; origin: TurnOrigin }
+export type AppendUserResult = { status: 'appended' } | { status: 'duplicate'; reason: 'immediate-user-content-hash-match' };
+export interface TranscriptEntry { message: ProviderMessage; turnId: string; origin: TurnOrigin; contentHash: string }
 
 /**
  * Eviction policy for the Transcript's OWN backing store (born-546) — distinct
@@ -39,8 +45,10 @@ const DEFAULT_EVICTION_POLICY: Required<TranscriptEvictionPolicy> = {
 
 export class Transcript {
   private readonly messages: ProviderMessage[] = [];
+  private readonly entries: TranscriptEntry[] = [];
   private readonly policy: Required<TranscriptEvictionPolicy>;
   private droppedCount = 0;
+  private nextUserMetadata: TurnMetadata | undefined;
 
   constructor(policy: TranscriptEvictionPolicy = {}) {
     this.policy = {
@@ -49,26 +57,69 @@ export class Transcript {
     };
   }
 
-  appendUser(content: string): void {
-    this.messages.push({ role: 'user', content });
+  setNextUserMetadata(metadata: TurnMetadata): void { this.nextUserMetadata = metadata; }
+
+  appendUser(content: string, metadata?: TurnMetadata): AppendUserResult {
+    // Exactly-once applies ONLY to explicitly-identified production turns (the
+    // session stamps turnId/origin). Metadata-less library appends keep the
+    // legacy append-always behavior — a caller building a fixture transcript
+    // from identical strings is not a replay.
+    const explicit = metadata ?? this.nextUserMetadata;
+    const effectiveMetadata = explicit ?? { turnId: 'legacy', origin: 'user' as const };
+    this.nextUserMetadata = undefined;
+    const contentHash = createHash('sha256').update(content).digest('hex');
+    const previous = this.entries.at(-1);
+    if (explicit && previous?.message.role === 'user' && previous.turnId === effectiveMetadata.turnId && previous.contentHash === contentHash) {
+      return { status: 'duplicate', reason: 'immediate-user-content-hash-match' };
+    }
+    const message: ProviderMessage = { role: 'user', content };
+    this.messages.push(message);
+    this.entries.push({ message, ...effectiveMetadata, contentHash });
     this.evict();
+    return { status: 'appended' };
   }
 
   appendAssistant(content: string, toolCalls: ToolCallRef[] = []): void {
     const m: ProviderMessage = { role: 'assistant', content };
     if (toolCalls.length > 0) m.toolCalls = toolCalls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args }));
     this.messages.push(m);
+    this.entries.push({ message: m, turnId: this.currentTurnId(), origin: 'system', contentHash: createHash('sha256').update(content).digest('hex') });
     this.evict();
   }
 
   appendToolResult(toolCallId: string, output: string): void {
-    this.messages.push({ role: 'tool', content: output, toolCallId });
+    const message: ProviderMessage = { role: 'tool', content: output, toolCallId };
+    this.messages.push(message);
+    this.entries.push({ message, turnId: this.currentTurnId(), origin: 'system', contentHash: createHash('sha256').update(output).digest('hex') });
     this.evict();
   }
 
   /** A defensive copy — callers iterate, the loop owns the source of truth. */
   toProviderMessages(): ProviderMessage[] {
     return this.messages.map((m) => ({ ...m }));
+  }
+
+  toEntries(): TranscriptEntry[] {
+    return this.entries.map((entry) => ({ ...entry, message: { ...entry.message } }));
+  }
+
+  replaceForContextEpoch(messages: readonly ProviderMessage[], turnId: string): void {
+    this.messages.splice(0, this.messages.length, ...messages.map((message) => ({ ...message })));
+    this.entries.splice(0, this.entries.length, ...this.messages.map((message) => ({
+      message,
+      turnId,
+      origin: 'system' as const,
+      contentHash: createHash('sha256').update(message.content).digest('hex'),
+    })));
+  }
+
+  compactForContextEpoch(objective: string, checkpoint: string, turnId: string, lineageLimit = 8): void {
+    const lineage = pairingSafeLineage(this.messages, lineageLimit);
+    this.replaceForContextEpoch([
+      { role: 'user', content: objective },
+      { role: 'user', content: checkpoint },
+      ...lineage,
+    ], turnId);
   }
 
   /** Total messages evicted from this transcript so far (diagnostics). */
@@ -97,7 +148,29 @@ export class Transcript {
     if (dropped <= 0) return;
     this.droppedCount += dropped;
     this.messages.splice(0, dropped);
+    this.entries.splice(0, dropped);
   }
+
+  private currentTurnId(): string { return this.entries.at(-1)?.turnId ?? 'legacy'; }
+}
+
+function pairingSafeLineage(messages: readonly ProviderMessage[], limit: number): ProviderMessage[] {
+  if (limit <= 0) return [];
+  const selected: ProviderMessage[] = [];
+  const resultIds = new Set<string>();
+  for (let i = messages.length - 1; i >= 0 && selected.length < limit; i--) {
+    const message = messages[i]!;
+    if (message.role === 'tool' && message.toolCallId) {
+      resultIds.add(message.toolCallId);
+      selected.unshift({ ...message });
+      continue;
+    }
+    if (message.role === 'assistant' && message.toolCalls?.some((call) => resultIds.has(call.id))) {
+      selected.unshift({ ...message, toolCalls: message.toolCalls.filter((call) => resultIds.has(call.id)) });
+    }
+  }
+  const paired = new Set(selected.flatMap((message) => message.role === 'assistant' ? (message.toolCalls ?? []).map((call) => call.id) : []));
+  return selected.filter((message) => message.role !== 'tool' || (message.toolCallId !== undefined && paired.has(message.toolCallId)));
 }
 
 /** Drop the oldest messages down to `maxMessages`, pairing-safe: the window

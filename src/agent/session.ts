@@ -22,6 +22,8 @@ import type { CostGuardState } from './guards/cost.js';
 import { ToolRegistry } from './tools/registry.js';
 import { Transcript } from './transcript.js';
 import type { ProviderAdapter, ProviderMessage } from './provider-tooluse/types.js';
+import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore } from './scratch-checkpoint.js';
+import { createNativeBudgetState } from './guards/recursion.js';
 
 export interface AgentSessionDeps {
   adapter: ProviderAdapter;
@@ -41,6 +43,9 @@ export interface AgentSessionDeps {
   getAdapter?: () => ProviderAdapter;
   getModel?: () => string;
   getContextBudgetTokens?: () => number | undefined;
+  /** NATIVE-AGENT-HORIZON-001: resolved multi-dimension session budget. */
+  nativeBudget?: import('../core/execution-budget-policy.js').ResolvedNativeAgentBudget;
+  scratch?: { tenantId: string; projectId: string; sessionId: string; checkpointInstruction: string };
 }
 
 export interface AgentSession {
@@ -53,6 +58,8 @@ export interface AgentSession {
   getApprovalMode(): ApprovalMode;
   /** The cross-turn transcript (a copy) — for trace recording. */
   transcript(): ProviderMessage[];
+  latestCheckpoint(): CheckpointReadResult;
+  close(options?: { keepForRecoveryMs?: number }): void;
 }
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
@@ -63,9 +70,45 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   const preAnswers = new Map<string, PermissionResponse>();
   let mode: ApprovalMode = deps.policy.defaultMode;
   let cancelled = false;
+  let turnSequence = 0;
+  const scratch: ScratchStore | undefined = deps.scratch ? openScratchStore(deps.scratch) : undefined;
+  let checkpointDegradation: CheckpointReadResult | undefined;
 
+  async function* runWithCheckpoints(userInput: string, turnId: string): AsyncIterable<AgentEvent> {
+    const events = runAgentTurn(loopDeps, transcript, userInput);
+    for await (const event of events) {
+      yield event;
+      if ((event as { type: string }).type !== 'budget-checkpoint-request' || !scratch || !deps.scratch) continue;
+      try {
+        let text = '';
+        const adapter = deps.getAdapter?.() ?? deps.adapter;
+        const request = {
+          system: deps.scratch.checkpointInstruction,
+          messages: transcript.toProviderMessages(),
+          tools: [],
+          model: deps.getModel?.() ?? deps.model,
+        };
+        for await (const response of adapter.send(request)) if (response.type === 'text-delta') text += response.text;
+        const payload = JSON.parse(text) as ScratchCheckpointPayload;
+        scratch.writeCheckpoint(payload);
+        transcript.compactForContextEpoch(userInput, text, turnId);
+        checkpointDegradation = undefined;
+      } catch (error) {
+        checkpointDegradation = {
+          status: 'corrupt',
+          path: scratch.info.root,
+          reason: `checkpoint-degraded: ${error instanceof Error ? error.message : String(error)}`,
+        };
+        // The existing epoch is deliberately left untouched on refusal/corruption.
+      }
+    }
+  }
+
+  const nativeBudgetState = deps.nativeBudget ? createNativeBudgetState() : undefined;
   const loopDeps: LoopDeps = {
     adapter: deps.adapter,
+    ...(deps.nativeBudget ? { nativeBudget: deps.nativeBudget } : {}),
+    ...(nativeBudgetState ? { nativeBudgetState } : {}),
     registry: deps.registry,
     policy: deps.policy,
     ruleStore: deps.ruleStore,
@@ -94,7 +137,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       cancelled = false;
       pending.clear();
       preAnswers.clear();
-      return runAgentTurn(loopDeps, transcript, userInput);
+      const turnId = `turn-${++turnSequence}`;
+      transcript.setNextUserMetadata({ turnId, origin: 'user' });
+      return runWithCheckpoints(userInput, turnId);
     },
     respondPermission(id: string, response: PermissionResponse): void {
       const resolve = pending.get(id);
@@ -121,6 +166,12 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     },
     transcript(): ProviderMessage[] {
       return transcript.toProviderMessages();
+    },
+    latestCheckpoint(): CheckpointReadResult { return checkpointDegradation ?? scratch?.readLatestCheckpoint() ?? { status: 'empty' }; },
+    close(options = {}): void {
+      if (!scratch) return;
+      const keep = options.keepForRecoveryMs ?? 0;
+      scratch.close(keep > 0 ? { policy: 'keep-for-recovery', recoveryWindowMs: keep } : { policy: 'delete' });
     },
   };
 }

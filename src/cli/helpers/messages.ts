@@ -2769,6 +2769,44 @@ const MESSAGES: MessageMap = {
     en: 'switch failed — no native transport configured: set ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host',
     tr: 'geçiş başarısız — native transport tanımlı değil: ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host tanımlayın',
   },
+  // Native-agent budget/checkpoint codes are mechanism data; user-facing
+  // rendering belongs exclusively to this CLI i18n boundary.
+  'native-budget.rounds-exhausted': {
+    en: 'Model-round budget exhausted.',
+    tr: 'Model turu bütçesi tükendi.',
+  },
+  'native-budget.toolcalls-exhausted': {
+    en: 'Tool-call budget exhausted.',
+    tr: 'Araç çağrısı bütçesi tükendi.',
+  },
+  'native-budget.walltime-exhausted': {
+    en: 'Session time budget exhausted.',
+    tr: 'Oturum süre bütçesi tükendi.',
+  },
+  'native-budget.tokens-exhausted': {
+    en: 'Cumulative token budget exhausted.',
+    tr: 'Toplam token bütçesi tükendi.',
+  },
+  'native-budget.noprogress-terminated': {
+    en: 'Session stopped after repeated rounds without progress.',
+    tr: 'Oturum, ilerleme sağlamayan tekrarlı turlardan sonra durduruldu.',
+  },
+  'native.checkpoint.saved': {
+    en: 'Scratch checkpoint saved.',
+    tr: 'Scratch checkpoint kaydedildi.',
+  },
+  'native.checkpoint.epoch-advanced': {
+    en: 'Working-context epoch advanced to {n}.',
+    tr: 'Çalışma bağlamı dönemi {n} olarak ilerletildi.',
+  },
+  'native.checkpoint.degraded': {
+    en: 'Scratch checkpoint could not be saved; the session continues without checkpoint recovery.',
+    tr: 'Scratch checkpoint kaydedilemedi; oturum checkpoint kurtarması olmadan sürüyor.',
+  },
+  'native-budget.remaining': {
+    en: 'Remaining budget: {rounds} rounds · {toolCalls} tool calls.',
+    tr: 'Kalan bütçe: {rounds} tur · {toolCalls} araç çağrısı.',
+  },
   'tui.render_error': {
     en: 'REPL render error',
     tr: 'REPL render hatası',

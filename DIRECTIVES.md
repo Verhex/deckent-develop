@@ -1,16 +1,14 @@
 # DIRECTIVES — no active run (idle truth-state)
 
-**Güncelleme:** 2026-08-17 (sprint-546 PLANNER-TRUTH kapanışı sonrası truth-sync). Şu anda
-aktif Deckent run/sprint YOKTUR ve bu dosya hiçbir execution authority taşımaz.
+**Güncelleme:** 2026-08-18 (NATIVE-AGENT-HORIZON-001 package-1 kapanışı sonrası truth-sync).
+Şu anda aktif Deckent run/sprint YOKTUR ve bu dosya hiçbir execution authority taşımaz.
 
-- Son kapanan wave: **sprint-546 — PLANNER-TRUTH correction** (3/3 DONE, self-completed):
-  scale-honest post-FIX circuit breaker (iki eşik bağımsız minimum — 1/1 ve 1/2 artık
-  duraklatmaz) · authored GO/NO-GO kriterleri task'a verbatim taşınır (derived şablon
-  yalnız fallback + makine-komutu append) · declared Files henüz diskte olmasa da
-  filesWrite'a girer (üç sprint'lik CLAIM_OUTSIDE_WRITE_SCOPE sınıfı kapandı).
-- ACİL SIRADA: **7078 NATIVE-AGENT-HORIZON-001** (Alperen kararı — native terminal
-  long-horizon budget + scratch checkpoint + permission closure; bitiminde Alperen'e
-  deneme raporu).
+- Son kapanan wave: **sprint-547 — NATIVE-AGENT-HORIZON-001 package 1** (dürüst ABORTED;
+  FIX-dispatch stall + protokol Bash bug'ı iki yeni bulgu üretti; 003/004 işleri diskte,
+  T1/T2 Brain el-koduyla — Alperen 'finalize edip elle bitirelim' talimatı). Long-horizon
+  budget + scratch checkpoint + typed termination + i18n LANDED; kanıt MASTER 7078.
+- KALAN (7078 package 2): permission-mode closure + local-llm effective-context + canlı
+  50+ tool-call PTY proof.
 
 DOGFOOD_MODE=ON bir run başlatıldığında bu dosya o run'ın exact execution projection'ı
 olarak yeniden üretilir; o ana kadar boş/idle kalır.

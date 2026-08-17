@@ -750,6 +750,24 @@ export interface ExecutionBudgetPolicyConfig {
     action: 'hold' | 'reroute-or-hold';
     ordered_backends?: Array<'docker' | 'subprocess' | 'tmux'>;
   };
+  /** NATIVE-AGENT-HORIZON-001: multi-dimension terminal/native-agent session
+   *  budget. Every field optional — defaults are the bounded deep/extended
+   *  profile in execution-budget-policy.ts (never provider-name-keyed). */
+  native_agent?: NativeAgentBudgetConfig;
+}
+
+/** Owner-authored overrides for the native-agent session budget (all optional,
+ *  positive safe integers; unknown keys fail loudly at validation). */
+export interface NativeAgentBudgetConfig {
+  maxModelRounds?: number;
+  maxToolCalls?: number;
+  maxWallTimeMs?: number;
+  maxCumulativeTokens?: number;
+  maxNoProgressRounds?: number;
+  checkpointEveryRounds?: number;
+  checkpointEveryToolCalls?: number;
+  outputReserveTokens?: number;
+  contextSafetyReserveTokens?: number;
 }
 
 export interface ProviderLimitPolicySourceScopeConfig {

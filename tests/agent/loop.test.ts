@@ -97,7 +97,7 @@ describe('runAgentTurn', () => {
     const adapter: ProviderAdapter = { name: 'spin', async *send() { for (const e of loopForever) yield e; } };
     const evs = await drain(runAgentTurn(baseDeps({ adapter, maxIterations: 3 }), new Transcript(), 'go'));
     expect(evs.filter((e) => e.type === 'tool-result').length).toBe(3);
-    expect(evs[evs.length - 2]).toEqual({ type: 'error', message: 'recursion limit exceeded' });
+    expect(evs[evs.length - 2]).toEqual({ type: 'error', code: 'native-budget.rounds-exhausted', message: 'recursion limit exceeded' });
     expect(evs[evs.length - 1]).toEqual({ type: 'turn-end' });
   });
 

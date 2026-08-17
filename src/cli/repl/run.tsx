@@ -17,7 +17,7 @@ import {
 } from './native-transport.js';
 import { loadDeckSecrets } from '../../core/deck-file.js';
 import { buildNativeToolRegistry, resolveToolSurfaceOptions, resolveRunFlowEnabled } from './native-tool-registry.js';
-import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge.js';
+import { createNativeEngine, resolveCostCeilingUsd, type NativeEngineDeps, type ReplEngine } from './native-agent-bridge.js';
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
 import type { RunFlowMountLabels, DoSlashLabels } from './app.js';
@@ -58,8 +58,25 @@ import { join, resolve, relative, isAbsolute } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { createLocalRpcTransport, buildReplRpcHandlers, runRpcDebugCommand } from './rpc-client.js';
 import { probeSubscriptionLimits } from '../../core/limit-preflight.js';
+import { resolveNativeAgentBudget } from '../../core/execution-budget-policy.js';
 
 const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
+
+/** Production config-to-engine closure, exported as a pure dependency seam so
+ * wiring tests can inspect the exact engine arguments without mounting Ink. */
+export function createResolvedNativeEngine(
+  config: ResolvedConfig,
+  deps: NativeEngineDeps,
+  factory: (deps: NativeEngineDeps) => ReplEngine = createNativeEngine,
+): ReplEngine {
+  const nativeBudget = resolveNativeAgentBudget({ policy: config.execution_budget });
+  return factory({
+    ...deps,
+    nativeBudget,
+    // Back-compat for session implementations still reading the legacy seam.
+    maxIterations: nativeBudget.maxModelRounds,
+  });
+}
 
 /** Localize a native-transport resolution failure by its errorCode
  *  ('native.switch.<code>' message keys); unknown codes fall back to the
@@ -1014,7 +1031,7 @@ export async function runInkRepl(
           (event) => { runFlowResultSink?.(event); },
         );
       }
-      nativeEngine = createNativeEngine({
+      nativeEngine = createResolvedNativeEngine(cfg as ResolvedConfig, {
         adapter: resolved.adapter,
         registry: buildNativeToolRegistry({
           cwd: () => process.cwd(),
