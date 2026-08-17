@@ -5,6 +5,7 @@ import { registerInit } from './commands/init.js';
 import { registerStart } from './commands/start.js';
 import { registerPlan } from './commands/plan.js';
 import { registerStatus } from './commands/status.js';
+import { registerInspect } from './commands/inspect.js';
 import { readProviderConcurrencyRuntime } from '../core/provider-concurrency-runtime-reader.js';
 import { registerAttach } from './commands/attach.js';
 import { registerSpawn } from './commands/spawn.js';
@@ -129,6 +130,7 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
     openTaskSettlementProjection,
     providerConcurrencyRuntime: readProviderConcurrencyRuntime,
   });
+  registerInspect(program);
   registerAttach(program);
   registerSpawn(program);
   registerKill(program);

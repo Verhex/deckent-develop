@@ -64,6 +64,30 @@ const MESSAGES: MessageMap = {
     tr: 'Aktif run (sprint) yok',
     en: 'No active run (sprint)',
   },
+  'inspect.description': {
+    en: 'Inspect canonical runs or task detail',
+    tr: 'Canonical run veya görev ayrıntısını incele',
+  },
+  'inspect.option.json': {
+    en: 'Output machine-readable JSON',
+    tr: 'Makine tarafından okunabilir JSON çıktısı üret',
+  },
+  'inspect.column.run_id': { en: 'Run ID', tr: 'Run ID' },
+  'inspect.column.state': { en: 'State', tr: 'Durum' },
+  'inspect.column.source': { en: 'Source', tr: 'Kaynak' },
+  'inspect.column.settled_at': { en: 'Settled at', tr: 'Sonuçlanma zamanı' },
+  'inspect.field.task_id': { en: 'Task ID', tr: 'Görev ID' },
+  'inspect.field.status': { en: 'Status', tr: 'Durum' },
+  'inspect.field.agent': { en: 'Agent', tr: 'Agent' },
+  'inspect.field.model': { en: 'Model', tr: 'Model' },
+  'inspect.field.heartbeat': { en: 'Heartbeat', tr: 'Heartbeat' },
+  'inspect.field.plan_truncated': { en: 'Plan truncated', tr: 'Plan kısaltıldı' },
+  'inspect.field.self_assessment': { en: 'Self-assessment', tr: 'Öz değerlendirme' },
+  'inspect.field.lineage': { en: 'Lineage', tr: 'Lineage' },
+  'inspect.error.unknown_task': {
+    en: 'INSPECT_TASK_NOT_FOUND: Unknown task ID: {taskId}',
+    tr: 'INSPECT_TASK_NOT_FOUND: Bilinmeyen görev ID: {taskId}',
+  },
 
   // ─── catalog network policy (SEC-04, task 418-003) ────────────────────
   'catalog.network_fetch_notice': {

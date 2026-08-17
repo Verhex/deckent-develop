@@ -1,25 +1,5 @@
 {
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-guard.mjs\""
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__deckent__deckent_kill|mcp__deckent__deckent_cleanup",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-guard.mjs\""
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "matcher": "",

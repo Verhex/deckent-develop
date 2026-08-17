@@ -315,8 +315,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/api/sprint-inspector-endpoints.test.ts enter the graph while
   // src/orchestra/sprint-live-service.ts and its orchestra suite retire
   // (the API suite's server import closure was already in the graph).
-  count: 14332,
-  digest: 'b4f070eb5ca94c54b7264f6769ecf699a15aa8a8257aeb46642a1cf8ebd281ad',
+  // 2026-08-17 (RUN-INSPECTOR-001 package 2, sprint-542 + Brain completion):
+  // +1 — src/cli/commands/inspect.ts + tests/cli/inspect.test.ts enter the
+  // graph; read-model/api/desktop suites changed content only.
+  count: 14333,
+  digest: '711af4650950368a7ac33f745b3d584f9829d92841e021125a07bb8e07b58e04',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -507,8 +510,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (RUN-INSPECTOR-001 package 1): same 1243 count — the new
   // run-inspector-read-model production module replaces the retired
   // sprint-live-service one-for-one; server/api-client content hashes moved.
-  count: 1243,
-  digest: '204ddb7ab777a6c8d627f31cf606abad25c6c9d43ea2cb914f0d2d1bef3153e6',
+  // 2026-08-17 (RUN-INSPECTOR-001 package 2): +1 — src/cli/commands/inspect.ts
+  // enters the production inventory (new CLI face over the core read-model);
+  // read-model/server/api-client/messages content hashes moved.
+  count: 1244,
+  digest: '330e3bb916f2788f2a2c79f9fc1a6698fb54076211ee25fea5ede0826fec87a8',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

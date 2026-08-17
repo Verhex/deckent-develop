@@ -14,6 +14,39 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint542] - 2026-08-17
+
+### Added
+
+- read-model expansion — logical run listing + run lineage detail
+- Terminal face — `deckent inspect` (depends on Task 1)
+- bilingual reference documentation (depends on Task 1)
+
+### Fixed
+
+- Fix: API face — inspector runs endpoints (depends on Task 1)
+
+
+_Tasks: 5 total, 4 done, 0 tech debt, 1 no-go_
+
+## [sprint541] - 2026-08-17
+
+### Added
+
+- canonical inspector read-model v1 (core module + hermetic suite)
+
+
+_Tasks: 2 total, 1 done, 0 tech debt, 1 no-go_
+
+## [sprint540] - 2026-08-17
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 1 total, 0 done, 0 tech debt, 1 no-go_
+
 ## [sprint539] - 2026-08-17
 
 ### Added

@@ -12976,3 +12976,79 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 539-002: phase5-sign.mjs — owner sign ceremony (depends on Task 1) (DONE)
 
 ---
+## Sprint 540 — sprint-540
+
+**Status:** ABORTED
+**Date:** 2026-08-17
+**Duration:** 2748s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 2747749ms |
+
+### Tasks
+
+- 540-001: live-ledger truth-sync — projections regen + test expectations + proposal regen (NO_GO)
+
+---
+## Sprint 541 — sprint-541
+
+**Status:** ABORTED
+**Date:** 2026-08-17
+**Duration:** 1308s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1307537ms |
+
+### Tasks
+
+- 541-001: canonical inspector read-model v1 (core module + hermetic suite) (DONE)
+- 541-002-fix-fix-fix: Fix: Fix: Fix: /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1) (PAUSED)
+- 541-002-fix-fix: Fix: Fix: /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1) (NO_GO)
+- 541-002-fix: Fix: /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1) (NO_GO)
+- 541-002: /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1) (NO_GO)
+
+---
+## Sprint 542 — sprint-542
+
+**Status:** ABORTED
+**Date:** 2026-08-17
+**Duration:** 682s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 681534ms |
+
+### Tasks
+
+- 542-001: read-model expansion — logical run listing + run lineage detail (DONE)
+- 542-002-fix: Fix: API face — inspector runs endpoints (depends on Task 1) (DONE)
+- 542-002: API face — inspector runs endpoints (depends on Task 1) (DONE)
+- 542-003: Terminal face — `deckent inspect` (depends on Task 1) (DONE)
+- 542-004-fix: Fix: Desktop face — canonical lifecycle adoption (depends on Task 2) (PAUSED)
+- 542-004: Desktop face — canonical lifecycle adoption (depends on Task 2) (NO_GO)
+- 542-005: bilingual reference documentation (depends on Task 1) (DONE)
+
+---

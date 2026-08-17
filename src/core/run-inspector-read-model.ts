@@ -7,12 +7,14 @@ import {
 import { basename, join } from 'node:path';
 
 import {
+  BRAIN_DIR,
   DASHBOARD_FILE,
   DECKENT_DIR,
   LOCKS_DIR,
   SPRINT_ACTIVE_FILE,
   SPRINT_PAUSE_STATE_FILE,
   SPRINT_STATE_FILE,
+  SPRINTS_DIR,
   TASKS_DIR,
 } from './constants.js';
 import {
@@ -70,6 +72,49 @@ export interface RunInspectorTaskDetail {
   readonly plan: RunInspectorTaskPlan | null;
   readonly result: Record<string, unknown> | null;
   readonly hb: RunInspectorHeartbeat | null;
+  readonly lineage: RunInspectorTaskLineage;
+}
+
+export interface RunInspectorTaskLineage {
+  readonly logPath: string | null;
+  readonly logTailAvailable: boolean;
+  readonly resultEvidence: {
+    readonly selfAssessment: string | null;
+    readonly filesChanged: readonly string[];
+    readonly notesPresent: boolean;
+  } | null;
+}
+
+export interface RunInspectorTaskCounts {
+  readonly total: number | null;
+  readonly completed: number | null;
+  readonly noGo: number | null;
+  readonly techDebt: number | null;
+}
+
+export type RunInspectorRun = {
+  readonly runId: string | null;
+  readonly lifecycle: CanonicalRunStatus['lifecycle'];
+  readonly recordState?: never;
+  readonly source: 'authority';
+  readonly startedAt: string | null;
+  readonly settledAt: string | null;
+  readonly taskCounts: RunInspectorTaskCounts | null;
+} | {
+  readonly runId: string | null;
+  readonly lifecycle?: never;
+  readonly recordState: string | null;
+  readonly source: 'archive';
+  readonly startedAt: string | null;
+  readonly settledAt: string | null;
+  readonly taskCounts: RunInspectorTaskCounts | null;
+};
+
+export interface RunInspectorRunList {
+  readonly schemaVersion: 1;
+  readonly generatedAt: string;
+  readonly revision: number;
+  readonly runs: readonly RunInspectorRun[];
 }
 
 interface SnapshotOptions {
@@ -122,6 +167,118 @@ function number(value: unknown): number {
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value;
+  if (typeof value !== 'string' || !/^\d+$/u.test(value.trim())) return null;
+  return Number(value.trim());
+}
+
+function markdownField(value: string, names: readonly string[]): string | null {
+  const normalized = value.replaceAll('**', '');
+  for (const name of names) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    const match = normalized.match(new RegExp(
+      `^\\s*(?:[-*]\\s*)?${escaped}\\s*:\\s*(.+?)\\s*$`,
+      'imu',
+    ));
+    if (match?.[1]) return match[1].replace(/^`|`$/gu, '').trim() || null;
+  }
+  return null;
+}
+
+function runIdFromName(name: string): string | null {
+  return name.match(/(?:^|[^A-Za-z0-9])(sprint-[A-Za-z0-9._-]+)/u)?.[1] ?? null;
+}
+
+interface ArchivedRunCandidate {
+  run: Extract<RunInspectorRun, { source: 'archive' }>;
+  sortTime: number;
+}
+
+function archivedRunFromMarkdown(
+  path: string,
+  file: string,
+  tracker: ReadTracker,
+): ArchivedRunCandidate | null {
+  const value = readText(path, tracker);
+  if (value === null) return null;
+  const runId = markdownField(value, ['Sprint ID', 'Sprint', 'Run ID', 'Run'])
+    ?? runIdFromName(basename(file, '.md'));
+  const startedAt = markdownField(value, ['Started At', 'Started', 'Start Time']);
+  const settledAt = markdownField(value, ['Settled At', 'Completed At', 'Finished At', 'Ended At']);
+  const recordState = markdownField(value, ['Record State', 'Status', 'Outcome', 'Result']);
+  const count = (names: readonly string[]): number | null => nullableNumber(markdownField(value, names));
+  const taskCounts: RunInspectorTaskCounts = {
+    total: count(['Total Tasks', 'Tasks Total']),
+    completed: count(['Completed Tasks', 'Tasks Completed']),
+    noGo: count(['No-Go Tasks', 'NO_GO Tasks', 'No Go Tasks']),
+    techDebt: count(['Tech Debt Tasks', 'GO_WITH_TECH_DEBT Tasks']),
+  };
+  const hasTaskCounts = Object.values(taskCounts).some(item => item !== null);
+  let mtimeMs = 0;
+  try { mtimeMs = statSync(path).mtimeMs; } catch { /* Tolerate a disappearing record. */ }
+  const settledMs = settledAt === null ? Number.NaN : Date.parse(settledAt);
+  return {
+    run: {
+      runId,
+      recordState,
+      source: 'archive',
+      startedAt,
+      settledAt,
+      taskCounts: hasTaskCounts ? taskCounts : null,
+    },
+    sortTime: Number.isFinite(settledMs) ? settledMs : mtimeMs,
+  };
+}
+
+function readArchivedRuns(projectRoot: string, tracker: ReadTracker): ArchivedRunCandidate[] {
+  const recordsDir = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
+  const byRunId = new Map<string, ArchivedRunCandidate>();
+  try {
+    recordMtime(recordsDir, tracker);
+    for (const file of readdirSync(recordsDir).filter(name => name.endsWith('.md')).sort()) {
+      const candidate = archivedRunFromMarkdown(join(recordsDir, file), file, tracker);
+      if (!candidate) continue;
+      byRunId.set(candidate.run.runId ?? `record:${file}`, candidate);
+    }
+  } catch {
+    // Historical settlement records are optional in a new or migrated project.
+  }
+
+  const archiveDir = join(projectRoot, DECKENT_DIR, 'archive', 'sprints');
+  try {
+    recordMtime(archiveDir, tracker);
+    for (const entry of readdirSync(archiveDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!entry.isDirectory()) continue;
+      const runId = runIdFromName(entry.name) ?? entry.name;
+      const path = join(archiveDir, entry.name);
+      recordMtime(path, tracker);
+      if (byRunId.has(runId)) continue;
+      let mtimeMs = 0;
+      try { mtimeMs = statSync(path).mtimeMs; } catch { /* Tolerate concurrent retention. */ }
+      byRunId.set(runId, {
+        run: {
+          runId,
+          recordState: null,
+          source: 'archive',
+          startedAt: null,
+          settledAt: null,
+          taskCounts: null,
+        },
+        sortTime: mtimeMs,
+      });
+    }
+  } catch {
+    // The runtime archive is optional until retention has archived a run.
+  }
+  return [...byRunId.values()].sort((a, b) =>
+    b.sortTime - a.sortTime
+    // Numeric-aware tiebreak so equal record times (retention touches archives
+    // in batches) still list sprint-542 before sprint-532.
+    || (b.run.runId ?? '').localeCompare(a.run.runId ?? '', undefined, { numeric: true }),
+  );
 }
 
 function taskFiles(projectRoot: string): string[] {
@@ -244,6 +401,31 @@ export function buildRunInspectorSnapshot(
   };
 }
 
+export function listRunInspectorRuns(
+  projectRoot: string,
+  options: SnapshotOptions = {},
+): RunInspectorRunList {
+  const nowMs = options.nowMs ?? Date.now();
+  const tracker: ReadTracker = { maxMtimeMs: 0 };
+  const authority = readCanonicalRunStatus(projectRoot, { nowMs });
+  recordAuthoritySources(projectRoot, tracker);
+  const archives = readArchivedRuns(projectRoot, tracker)
+    .filter(candidate => candidate.run.runId !== authority.sprintId);
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date(nowMs).toISOString(),
+    revision: Math.max(0, Math.ceil(tracker.maxMtimeMs)),
+    runs: [{
+      runId: authority.sprintId,
+      lifecycle: authority.lifecycle,
+      source: 'authority',
+      startedAt: null,
+      settledAt: null,
+      taskCounts: null,
+    }, ...archives.map(candidate => candidate.run)],
+  };
+}
+
 function cappedPlan(path: string): RunInspectorTaskPlan | null {
   const value = readText(path);
   if (value === null) return null;
@@ -261,12 +443,24 @@ export function readRunInspectorTaskDetail(
   const base = join(projectRoot, TASKS_DIR, `task-${taskId}`);
   const task = readJson(`${base}.json`);
   if (!task) return null;
+  const result = readJson(`${base}.result`);
+  const logRelativePath = join(TASKS_DIR, `task-${taskId}.log`);
+  const logPath = existsSync(join(projectRoot, logRelativePath)) ? logRelativePath : null;
   const worker = buildRunInspectorSnapshot(projectRoot).workers
     .find(entry => entry.taskId === taskId);
   return {
     task,
     plan: cappedPlan(`${base}.plan`),
-    result: readJson(`${base}.result`),
+    result,
     hb: worker?.hb ?? null,
+    lineage: {
+      logPath,
+      logTailAvailable: logPath !== null,
+      resultEvidence: result === null ? null : {
+        selfAssessment: text(result.selfAssessment),
+        filesChanged: stringArray(result.filesChanged),
+        notesPresent: text(result.notes) !== null,
+      },
+    },
   };
 }

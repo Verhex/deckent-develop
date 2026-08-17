@@ -43,6 +43,7 @@ import {
 // RUN-INSPECTOR-001 — canonical, authority-backed sprint inspection read-model.
 import {
   buildRunInspectorSnapshot,
+  listRunInspectorRuns,
   readRunInspectorTaskDetail,
   SPRINT_TASK_ID_RE,
 } from '../core/run-inspector-read-model.js';
@@ -1251,6 +1252,10 @@ async function handleRequest(
       // Legacy `active` key preserved for payload compat, but its value comes
       // from the run-status AUTHORITY — never re-inferred from worker files.
       sendJson(res, { ...snapshot, active: snapshot.lifecycle.active });
+      return;
+    }
+    if (method === 'GET' && url === '/api/inspector/runs') {
+      sendJson(res, listRunInspectorRuns(projectRoot));
       return;
     }
     if (method === 'GET' && url.startsWith('/api/sprint/task/')) {

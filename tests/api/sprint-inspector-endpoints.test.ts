@@ -49,6 +49,47 @@ afterEach(async () => {
 });
 
 describe('GET /api/sprint/* canonical inspector routes', () => {
+  it('lists the current authority run and archived run projections', async () => {
+    mkdirSync(join(root, '.brain', 'sprints'), { recursive: true });
+    writeFileSync(join(root, '.brain', 'sprints', 'sprint-540.md'), [
+      '# Sprint 540',
+      'Sprint ID: sprint-540',
+      'Status: COMPLETE',
+      'Started At: 2026-08-15T10:00:00.000Z',
+      'Completed At: 2026-08-15T11:00:00.000Z',
+      'Total Tasks: 3',
+      'Completed Tasks: 2',
+      'No-Go Tasks: 1',
+      'Tech Debt Tasks: 0',
+    ].join('\n'));
+    await boot();
+
+    const response = await get('/api/inspector/runs');
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      schemaVersion: number;
+      generatedAt: string;
+      revision: number;
+      runs: Array<Record<string, unknown>>;
+    };
+
+    expect(body).toEqual(expect.objectContaining({
+      schemaVersion: 1,
+      generatedAt: expect.any(String),
+      revision: expect.any(Number),
+      runs: expect.any(Array),
+    }));
+    expect(body.runs[0]).toEqual(expect.objectContaining({ source: 'authority' }));
+    expect(body.runs).toContainEqual(expect.objectContaining({
+      runId: 'sprint-540',
+      recordState: 'COMPLETE',
+      source: 'archive',
+      startedAt: '2026-08-15T10:00:00.000Z',
+      settledAt: '2026-08-15T11:00:00.000Z',
+      taskCounts: { total: 3, completed: 2, noGo: 1, techDebt: 0 },
+    }));
+  });
+
   it('serves the legacy live keys plus canonical lifecycle authority', async () => {
     seedTask('541-002');
     mkdirSync(join(root, '.brain'), { recursive: true });
@@ -80,6 +121,12 @@ describe('GET /api/sprint/* canonical inspector routes', () => {
   it('caps task plan text and rejects an invalid task id without reading outside the fixture', async () => {
     seedTask('541-002');
     writeFileSync(join(root, '.tasks', 'task-541-002.plan'), 'x'.repeat(SPRINT_DETAIL_TEXT_CAP + 7));
+    writeFileSync(join(root, '.tasks', 'task-541-002.result'), JSON.stringify({
+      selfAssessment: 'DONE',
+      filesChanged: ['src/api/server.ts'],
+      notes: 'verified',
+    }));
+    writeFileSync(join(root, '.tasks', 'task-541-002.log'), 'bounded worker log');
     await boot();
 
     const detailResponse = await get('/api/sprint/task/541-002');
@@ -87,10 +134,31 @@ describe('GET /api/sprint/* canonical inspector routes', () => {
     const detail = await detailResponse.json() as {
       taskId: string;
       plan: { text: string; truncated: boolean };
+      lineage: {
+        logPath: string | null;
+        logTailAvailable: boolean;
+        resultEvidence: {
+          selfAssessment: string | null;
+          filesChanged: string[];
+          notesPresent: boolean;
+        } | null;
+      };
     };
+    expect(Object.keys(detail).sort()).toEqual([
+      'hb', 'lineage', 'plan', 'result', 'task', 'taskId',
+    ]);
     expect(detail.taskId).toBe('541-002');
     expect(detail.plan.truncated).toBe(true);
     expect(detail.plan.text).toBe('x'.repeat(SPRINT_DETAIL_TEXT_CAP));
+    expect(detail.lineage).toEqual({
+      logPath: join('.tasks', 'task-541-002.log'),
+      logTailAvailable: true,
+      resultEvidence: {
+        selfAssessment: 'DONE',
+        filesChanged: ['src/api/server.ts'],
+        notesPresent: true,
+      },
+    });
 
     const invalidResponse = await get(`/api/sprint/task/${encodeURIComponent('../escape')}`);
     expect(invalidResponse.status).toBe(403);

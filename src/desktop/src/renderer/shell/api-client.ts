@@ -155,6 +155,15 @@ export interface SprintTaskDetailPayload {
   plan: { text: string; truncated: boolean } | null;
   result: Record<string, unknown> | null;
   hb: SprintLiveWorkerPayload['hb'] | null;
+  lineage: {
+    logPath: string | null;
+    logTailAvailable: boolean;
+    resultEvidence: {
+      selfAssessment: string | null;
+      filesChanged: string[];
+      notesPresent: boolean;
+    } | null;
+  };
 }
 
 /** F1 — the worker live-log SSE URL (`/api/workers/` prefix is on the

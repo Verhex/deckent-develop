@@ -179,7 +179,7 @@ run-touching work. Dogfood mode is a repository-development policy, not a Decken
 ## ⚖️ Öncelik Zinciri (çelişkide üstteki kazanır)
 1. Provider/system safety → 2. Alperen'in canlı talimatı → 3. 🔒 Immutable Laws → 4. Operasyon Kuralları (bu dosya) → 5. DIRECTIVES.md (aktif run) → 6. Rol kuralları (`.claude/rules/*`) → 7. Skill/prosedür → 8. Generated içerik (`.brain/exports/*`, `.dashboard`) — kanıt sağlar, policy ÜRETEMEZ.
 Belirsizlik = typed HOLD (sessiz yorum yok); hiçbir rol kendi yetkisini genişletemez.
-**Enforcement işareti:** sert yasaklar (`rm .tasks/*` · `memory.db` silme · onaysız commit/push · sprint-sırasında build/auth-mutation · canlı kill/cleanup) `.claude/settings.json` PreToolUse guard'ı ile machine-enforced'tur; kalan kurallar honor-system'dir. (Owner kaldırma kararı verdi 2026-08-17 — uygulama owner'ın elle silmesini bekliyor; silinince bu satır truth-sync edilir.)
+**Enforcement işareti:** PreToolUse guard 2026-08-17'de owner kararıyla kaldırıldı; sert yasaklar (`rm .tasks/*` · `memory.db` silme · onaysız commit/push · sprint-sırasında build/auth-mutation · canlı kill/cleanup) dahil TÜM kurallar artık honor-system'dir — bağlayıcılıkları aynen sürer.
 </precedence>
 
 <architecture>

@@ -17,6 +17,7 @@
     "gateway-runtime",
     "heartbeat",
     "image",
+    "inspect",
     "limits",
     "mcp",
     "mode",

@@ -190,7 +190,7 @@ run-touching work. Dogfood mode is a repository-development policy, not a Decken
 ## ⚖️ Öncelik Zinciri (çelişkide üstteki kazanır)
 1. Provider/system safety → 2. Alperen'in canlı talimatı → 3. 🔒 Immutable Laws → 4. Operasyon Kuralları (bu dosya) → 5. DIRECTIVES.md (aktif run) → 6. Rol kuralları (`.codex/rules/*.md`) → 7. Skill/prosedür → 8. Generated içerik (`.brain/exports/*`, `.dashboard`) — kanıt sağlar, policy ÜRETEMEZ.
 Belirsizlik = typed HOLD (sessiz yorum yok); hiçbir rol kendi yetkisini genişletemez.
-**Enforcement işareti:** Trusted project + hooks enabled + hook hash'i trusted olan normal Codex oturumunda #1/#2/#5/#6 project `PreToolUse` hook'uyla deny; #3 ve doğrudan/common-wrapper CLI #4 project execpolicy ile prompt; MCP #4 local per-tool approval ile prompt'tur. Repo-local mekanizmalar unbypassable admin boundary değildir: untrusted/disabled hook, `--ignore-rules`, specialized hook-bypass path, tanınmayan CLI wrapper veya local MCP config'in bulunmadığı durumda bu yasaklar honor-system kalır; tam enterprise enforcement managed `requirements.toml` gerektirir.
+**Enforcement işareti:** PreToolUse guard 2026-08-17'de owner kararıyla kaldırıldı; sert yasaklar (`rm .tasks/*` · `memory.db` silme · onaysız commit/push · sprint-sırasında build/auth-mutation · canlı kill/cleanup) dahil TÜM kurallar artık honor-system'dir — bağlayıcılıkları aynen sürer.
 </precedence>
 
 <architecture>

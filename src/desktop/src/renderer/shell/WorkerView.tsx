@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { createApiClient, type DaemonApiClient, type SprintTaskDetailPayload } from './api-client.js';
+import { translateShellMessage } from './i18n.js';
 import { humanizeLogLine, humanizeResult } from './log-humanize.js';
 import { useShellStore } from './session-store.js';
 
@@ -39,6 +40,7 @@ export const MSG = {
   assessment: 'desktop.shell.worker.assessment',
   notFound: 'desktop.shell.worker.not_found',
   hbAge: 'desktop.shell.bridge.hb_age',
+  lifecycle: 'desktop.shell.worker.lifecycle',
   truncated: 'desktop.shell.diff.truncated',
   loading: 'desktop.connection.list_loading',
   loadError: 'desktop.shell.load_error',
@@ -46,11 +48,7 @@ export const MSG = {
 
 function useT(): (key: string, vars?: Record<string, string>) => string {
   const strings = useShellStore((s) => s.strings);
-  return (key, vars) => {
-    const template = strings[key] ?? key;
-    if (!vars) return template;
-    return template.replace(/\{(\w+)\}/g, (_m, name: string) => vars[name] ?? `{${name}}`);
-  };
+  return (key, vars) => translateShellMessage(strings, key, vars);
 }
 
 const LIVE_LINE_CAP = 600;
@@ -65,6 +63,7 @@ export default function WorkerView(): React.JSX.Element {
   const api = apiRef.current;
 
   const [detail, setDetail] = useState<SprintTaskDetailPayload | null>(null);
+  const [lifecycle, setLifecycle] = useState<string | null>(null);
   const [boot, setBoot] = useState<'loading' | 'missing' | 'error' | 'ready'>('loading');
   const [lines, setLines] = useState<string[]>([]);
   const [logMissing, setLogMissing] = useState(false);
@@ -82,6 +81,17 @@ export default function WorkerView(): React.JSX.Element {
       });
     return () => { cancelled = true; };
   }, [api, taskId]);
+
+  // Lifecycle is projected only from the canonical authority block. A missing
+  // live snapshot stays honestly absent; hb/task status is never a substitute.
+  useEffect(() => {
+    if (!api) return;
+    let cancelled = false;
+    api.getSprintLive()
+      .then((payload) => { if (!cancelled) setLifecycle(payload.lifecycle.lifecycle); })
+      .catch(() => { if (!cancelled) setLifecycle(null); });
+    return () => { cancelled = true; };
+  }, [api]);
 
   // Canlı-akış: named-SSE (log_line/log_unavailable), satır-cap'li birikim.
   useEffect(() => {
@@ -126,6 +136,11 @@ export default function WorkerView(): React.JSX.Element {
       </button>
       <p className="worker__head">
         <code>{taskId}</code>
+        {lifecycle !== null && (
+          <span className="state-pill">
+            {t(MSG.lifecycle)}: {lifecycle}
+          </span>
+        )}
         {detail?.hb && (
           <span className="worker__hb">
             {detail.hb.status} · {t(MSG.hbAge, { n: String(Math.round(detail.hb.ageMs / 1000)) })}
