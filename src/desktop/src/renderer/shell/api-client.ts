@@ -115,7 +115,7 @@ export function buildEventsUrl(session: DaemonSession, flowId: string, afterSequ
   return url.toString();
 }
 
-/** 588/F1 «Köprü» — /api/sprint/* payload shapes (sprint-live-service). */
+/** RUN-INSPECTOR-001 — authority-backed /api/sprint/* payload shapes. */
 export interface SprintLiveWorkerPayload {
   taskId: string;
   title: string;
@@ -133,6 +133,15 @@ export interface SprintLiveWorkerPayload {
   };
 }
 export interface SprintLiveSnapshotPayload {
+  schemaVersion: 1;
+  revision: number;
+  lifecycle: {
+    schemaVersion: 1;
+    lifecycle: string;
+    sprintId: string | null;
+    phase: string | null;
+    [key: string]: unknown;
+  };
   sprintId: string | null;
   phase: string | null;
   workers: SprintLiveWorkerPayload[];

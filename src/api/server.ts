@@ -40,8 +40,12 @@ import {
   buildCommitProposal,
   buildRunCommitProposal,
 } from '../orchestra/git-workflow-service.js';
-// 588/F1 «Köprü» — the live-sprint read-model (sprint-live-service, plan §3).
-import { readSprintLive, readSprintTaskDetail, SPRINT_TASK_ID_RE } from '../orchestra/sprint-live-service.js';
+// RUN-INSPECTOR-001 — canonical, authority-backed sprint inspection read-model.
+import {
+  buildRunInspectorSnapshot,
+  readRunInspectorTaskDetail,
+  SPRINT_TASK_ID_RE,
+} from '../core/run-inspector-read-model.js';
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
 import { buildAgentCatalogEntries } from '../core/agent-catalog-projection.js';
@@ -1239,22 +1243,26 @@ async function handleRequest(
       return;
     }
 
-    // ─── /api/sprint/* — 588/F1 «Köprü» canlı-okumaları (plan §2.1/§2.2) ───
-    // Monitoring reads — never gated (SURF-7 rule). One read-model, one face.
+    // ─── /api/sprint/* — canonical inspector reads ────────────────────────
+    // Monitoring reads — never gated (SURF-7 rule). Lifecycle is resolved
+    // exclusively by the core read-model's run-status authority.
     if (method === 'GET' && url === '/api/sprint/live') {
-      sendJson(res, readSprintLive(projectRoot));
+      const snapshot = buildRunInspectorSnapshot(projectRoot);
+      // Legacy `active` key preserved for payload compat, but its value comes
+      // from the run-status AUTHORITY — never re-inferred from worker files.
+      sendJson(res, { ...snapshot, active: snapshot.lifecycle.active });
       return;
     }
     if (method === 'GET' && url.startsWith('/api/sprint/task/')) {
       const rawId = url.slice('/api/sprint/task/'.length);
       let taskId: string;
       try { taskId = decodeURIComponent(rawId); } catch { taskId = rawId; }
-      const detail = readSprintTaskDetail(projectRoot, taskId);
+      const detail = readRunInspectorTaskDetail(projectRoot, taskId);
       if (detail === null) {
         sendError(res, SPRINT_TASK_ID_RE.test(taskId) ? 404 : 403, 'task not found');
         return;
       }
-      sendJson(res, detail);
+      sendJson(res, { taskId, ...detail });
       return;
     }
 

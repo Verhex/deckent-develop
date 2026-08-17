@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8b2ac3d1b92804bed5f381540c86087064f7b07c1551240d4b642c6753084948"
+    "value": "1951c1595d07333257471c6d5f22fce686fe866e3e9f6c85378d56cc2d0e3908"
   },
   "summary": {
     "total": 495,
@@ -4294,9 +4294,9 @@
       "program": "PRODUCT",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-12",
+      "updated": "2026-08-17",
       "definitionDigest": "4c5f2574c3a2e5493312ef819064e0e0f949b93dcfd420d51f3da8a0199ca432",
-      "progressDigest": "a1ab05dcc4517e3bc3f7a1a6c37005cec41b04dbf63489d7c7df7cd3ff40fa74",
+      "progressDigest": "eed52caa5a397535286815c6275354c88231026ae775c3631320c1a4d83ccf95",
       "terminalClosureDigest": null
     },
     {
@@ -21230,8 +21230,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Versioned inspector read model logical run/attempt/agent/worker/tool/MCP/context/prompt-skill/token/cost/latency/log/checkpoint/approval/policy/verifier/result/evidence lineageını tek revision+cursor contractında taşır; Desktop graph/timeline/panels ve Terminal run-tree/detail aynı IDs, denominators, reason codes ve redactionı gösterir; reconnect/backfill/order/dedupe/backpressure, million-event virtualization, tenant isolation, a11y ve Linux/macOS/Windows-native/WSL proof'u pass olur; hiçbir surface lifecycle veya cost/evidence stateini yeniden infer etmez",
-      "evidence": "2026-08-12 owner north-star §11/23/32/33/43 ve reconciliation §7/17; mevcut worker/log/read-model parçaları foundationdır, birleşik cross-surface inspector product outcome'u daha önce atomik sahipliğe sahip değildi",
-      "updated": "2026-08-12"
+      "evidence": "2026-08-12 owner north-star §11/23/32/33/43 ve reconciliation §7/17; mevcut worker/log/read-model parçaları foundationdır, birleşik cross-surface inspector product outcome'u daha önce atomik sahipliğe sahip değildi. PACKAGE-1 LANDED (owner admission Alperen 2026-08-17 'inspector read-model ilk onaylandı'): canonical `src/core/run-inspector-read-model.ts` (schemaVersion-1 snapshot; lifecycle YALNIZ run-status-authority'den, revision monotonic, tolerant-parse worker/hb/lock detayı, split-brain regression testli) → /api/sprint/live + /api/sprint/task/:id bu modülden servis; `src/orchestra/sprint-live-service.ts` EMEKLİ (0 referans) — status split-brain kapandı, legacy `active` alanı dahi authority'den. Payload eski anahtarların superset'i (Desktop WorkerView değişmeden render). Kanıt: 99/99 targeted battery + tsc 0 + lint:gates exit 0 + gerçek-binary smoke (serve:3311 → 200, lifecycle=IDLE, payload.active==authority.active). Dogfood kaydı dürüst: sprint-541 ABORTED (task-1 DONE; task-2 worker 98/99'a getirdi, FIX worker'ı protokol Bash quote-parse hatasıyla öldü, ratio-guard %50 eşiğinde run'ı kesti) — kalan cap/shape tamamlaması Brain el-koduyla (ADR-D-007 seam)",
+      "updated": "2026-08-17"
     },
     {
       "order": 6072,
@@ -25590,6 +25590,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f0b807ca892fb38dba15ff55dfbcbccf70fc64a9d965bf282c393b5989d1f186"
+    "value": "ed371e1aeea4c6fc4bc709293e237ba27fe6ae229092f42c0d84090e08833c4a"
   }
 }

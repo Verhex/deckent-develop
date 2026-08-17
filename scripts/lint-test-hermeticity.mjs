@@ -310,8 +310,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // xverify claim envelope carries the author model, coordinator identity gate
   // names mismatched facets, ingress task snapshot binds the same arm-aware
   // adjudication budget as its contract. No graph membership change.
-  count: 14331,
-  digest: '45ce10f3016df4ae4dea03911548d497763934b6c7802ff1bcc992022539d666',
+  // 2026-08-17 (RUN-INSPECTOR-001 package 1, sprint-541 + Brain completion):
+  // net +1 — src/core/run-inspector-read-model.ts + its core suite +
+  // tests/api/sprint-inspector-endpoints.test.ts enter the graph while
+  // src/orchestra/sprint-live-service.ts and its orchestra suite retire
+  // (the API suite's server import closure was already in the graph).
+  count: 14332,
+  digest: 'b4f070eb5ca94c54b7264f6769ecf699a15aa8a8257aeb46642a1cf8ebd281ad',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -499,8 +504,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (xverify live-channel repair): same 1243 count, digest only —
   // the five production-module content hashes moved with the tenant-mint,
   // author-model, identity-gate and adjudication-budget fixes; membership unchanged.
+  // 2026-08-17 (RUN-INSPECTOR-001 package 1): same 1243 count — the new
+  // run-inspector-read-model production module replaces the retired
+  // sprint-live-service one-for-one; server/api-client content hashes moved.
   count: 1243,
-  digest: '1206638b060a6e85855d26ff7a001fcdce8e11ba4f2ce4306dc81d95ffff9d3b',
+  digest: '204ddb7ab777a6c8d627f31cf606abad25c6c9d43ea2cb914f0d2d1bef3153e6',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
