@@ -2728,6 +2728,18 @@ const MESSAGES: MessageMap = {
     en: 'switch failed — local-llm needs an endpoint: set {detail} in .deckent/config.json',
     tr: 'geçiş başarısız — local-llm için endpoint gerekli: .deckent/config.json içinde {detail} tanımlayın',
   },
+  'native.switch.missing-native-model': {
+    en: 'switch failed — local-llm needs an exact model ID: set {detail} (deckent config set native_model <id>) to one of the endpoint\'s published /models IDs',
+    tr: 'geçiş başarısız — local-llm için tam model kimliği gerekli: {detail} değerini (deckent config set native_model <id>) endpoint\'in /models listesindeki kimliklerden biri yapın',
+  },
+  'native.model_identity.unknown': {
+    en: 'model identity mismatch — "{model}" is not published by this endpoint; published IDs: {published}. Fix native_model to an exact published ID.',
+    tr: 'model kimliği uyuşmuyor — "{model}" bu endpoint tarafından yayımlanmıyor; yayımlanan kimlikler: {published}. native_model değerini yayımlanan tam bir kimlikle düzeltin.',
+  },
+  'native.model_identity.unreachable': {
+    en: 'model identity for "{model}" could not be verified — endpoint /models unreachable ({detail}); the server may still be starting (cold start). The first turn may fail until it is ready — no silent fallback was applied.',
+    tr: '"{model}" model kimliği doğrulanamadı — endpoint /models erişilemez ({detail}); sunucu hâlâ başlıyor olabilir (cold start). Hazır olana dek ilk tur başarısız olabilir — sessiz fallback uygulanmadı.',
+  },
   'native.switch.unsupported-native-provider': {
     en: 'switch failed — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm, local-llm',
     tr: 'geçiş başarısız — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm, local-llm',

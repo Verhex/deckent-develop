@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8a11b86b049da269726bb19b56b772501fa752d7f99824d6e4ed5abe6143b1de"
+    "value": "82ca5edb8c68aa2ba8c1a9c4776e6b09be27c7836f46b88d198404caa8716c3d"
   },
   "summary": {
     "total": 496,
@@ -4703,7 +4703,7 @@
       "state": "OPEN",
       "updated": "2026-08-17",
       "definitionDigest": "331c28d6af15bcf1313f09064f05ac95ce57a8faa5c9330194b286f89d3a5647",
-      "progressDigest": "5aa8925dd8cb7cb9087517b6fa93b623584d76432dcaa917b6d46da8d73ba427",
+      "progressDigest": "6d583984761439db9f870674be6276698d691b7c4592e961322138163eccb40b",
       "terminalClosureDigest": null
     },
     {
@@ -22717,10 +22717,10 @@
       "state": "OPEN",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "0",
-        "L": "0",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
         "X": "?",
         "S": "?"
       },
@@ -22731,7 +22731,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Native terminal, external local-llm router ve `deckent local-llm` lifecycle yolları model identity'yi exact + discoverable + validated taşır; unknown-model upstream 400 body'sinin güvenli/actionable ayrıntısı en+tr i18n ile kullanıcıya gösterilir (opak `[openai-compatible http 400]` yasak); cold-start/readiness sessiz fallback'siz dürüst ele alınır; router model-ID keşfi (GET /v1/models) config'teki id'yi doğrular, mismatch typed öneriyle raporlanır; hermetic regression testleri (exact router IDs, unknown-model 400 detayı, readiness, lifecycle identity consistency) + gerçek native-terminal/live-endpoint proof",
-      "evidence": "ACİL ADMISSION (Alperen, 2026-08-17 — araya alındı). Canlı kanıt: config native_provider=local-llm native_model=Qwen3.8-27B endpoint=127.0.0.1:8080/v1; router yalnız Qwen3.8-27B-Q4_K_M ve Qwen3.8-27B-CRACK-Q6_K_L yayımlıyor; Qwen3.8-27B → HTTP 400 model-not-found, Q4_K_M → 200; cold-start ilk turn 'fetch failed'; terminal upstream body'yi gizliyor. Tek-makine config yaması ile geçiştirilmez — kalıcı ürün çözümü; mevcut provider-adapter/model-registry/i18n pattern'leriyle",
+      "evidence": "ACİL ADMISSION (Alperen, 2026-08-17 — araya alındı). Canlı kanıt: config native_provider=local-llm native_model=Qwen3.8-27B endpoint=127.0.0.1:8080/v1; router yalnız Qwen3.8-27B-Q4_K_M ve Qwen3.8-27B-CRACK-Q6_K_L yayımlıyor; Qwen3.8-27B → HTTP 400 model-not-found, Q4_K_M → 200; cold-start ilk turn 'fetch failed'; terminal upstream body'yi gizliyor. Tek-makine config yaması ile geçiştirilmez — kalıcı ürün çözümü; mevcut provider-adapter/model-registry/i18n pattern'leriyle. LANDED (Brain el-kodu + owner onayı 2026-08-17): kök neden çift — native-transport'ta hardcoded `Qwen3.8-27B` fallback literal'i (KANUN 10) + openai adapter'ının upstream error body'sini yutması. Çözüm: `discoverNativeEndpointModels` + `validateNativeModelIdentity` (router GET /models = kimlik authority'si; typed valid/unknown-model+published/unreachable verdicts), `ResolvedProvider.modelIdentity` seam'i, oturum-başı status'ta i18n mismatch uyarısı; typed `OpenAICompatHttpError` (status+code+bounded upstream mesajı) + dürüst connect-failed sarmalaması; hardcode fallback SİLİNDİ → typed `missing-native-model`. Kanıt: 43/43 hermetic battery, tsc 0, i18n lint 0, CANLI router e2e (discovery gerçek ID'ler; yanlış id typed 400 'model not found' detayıyla; Q4_K_M ile gerçek inference 'OK'; TR status mismatch uyarısı yayımlanan listeyle). Kalan dürüst sınırlar: cold-start ilk turn (dürüst mesajlı, auto-retry ayrı karar), /model switch proaktif validation'ı, CRACK-Q6 router-side load hatası (deckent dışı)",
       "updated": "2026-08-17"
     },
     {
@@ -25640,6 +25640,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "015aa07eb1381bd74345700eecd2ed67a687ca2e72648d351e6ce4861f933975"
+    "value": "db296c46abb4be3da0e4568d4978e1877475991dac9fd73f57bbb2e9a70b5138"
   }
 }

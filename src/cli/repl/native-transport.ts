@@ -38,6 +38,10 @@ export interface ResolvedProvider {
    *  /provider switch round-trips through. */
   providerName: string;
   endpointHealth?: () => Promise<NativeEndpointHealth>;
+  /** Exact model-identity validation against the live endpoint (endpoints that
+   *  publish /models — local-llm today). Absent for hosted providers whose
+   *  registry is the identity authority. */
+  modelIdentity?: () => Promise<NativeModelIdentityVerdict>;
 }
 export interface ProviderError {
   error: string;
@@ -122,18 +126,75 @@ export async function probeNativeEndpointHealth(
   }
 }
 
+/** Published model identity discovery (LOCAL-LLM-MODEL-IDENTITY-001): the
+ *  OpenAI-compatible router's GET /models is the ONLY authority on which model
+ *  IDs are servable. Tolerant and bounded — unreachable/malformed responses are
+ *  typed data, never a throw. */
+export async function discoverNativeEndpointModels(
+  endpoint: string,
+  fetchFn: typeof globalThis.fetch = globalThis.fetch,
+): Promise<{ ok: true; ids: string[] } | { ok: false; detail: string }> {
+  try {
+    const response = await fetchFn(new URL('models', endpoint.endsWith('/') ? endpoint : `${endpoint}/`).toString());
+    if (!response.ok) return { ok: false, detail: `HTTP ${response.status}` };
+    const body = await response.json() as { data?: Array<{ id?: unknown }> };
+    const ids = Array.isArray(body?.data)
+      ? body.data.map((entry) => entry?.id).filter((id): id is string => typeof id === 'string' && id.trim() !== '')
+      : [];
+    return { ok: true, ids };
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export type NativeModelIdentityVerdict =
+  | { state: 'valid'; model: string }
+  | { state: 'unknown-model'; model: string; published: string[] }
+  | { state: 'unreachable'; model: string; detail: string };
+
+/** Exact model-identity validation against the live endpoint's published IDs.
+ *  'unreachable' is the honest cold-start verdict — never a silent pass, never
+ *  a silent fallback to a different model. */
+export async function validateNativeModelIdentity(
+  model: string,
+  endpoint: string,
+  fetchFn: typeof globalThis.fetch = globalThis.fetch,
+): Promise<NativeModelIdentityVerdict> {
+  const discovery = await discoverNativeEndpointModels(endpoint, fetchFn);
+  if (!discovery.ok) return { state: 'unreachable', model, detail: discovery.detail };
+  return discovery.ids.includes(model)
+    ? { state: 'valid', model }
+    : { state: 'unknown-model', model, published: discovery.ids };
+}
+
 export async function formatNativeProviderStatus(
   resolved: ResolvedProvider,
   lang: string,
 ): Promise<string> {
   const health = await resolved.endpointHealth?.();
-  return getMessage('native.provider_status', lang, {
+  const statusLine = getMessage('native.provider_status', lang, {
     provider: resolved.providerName,
     model: resolved.model,
     health: health
       ? getMessage(health.healthy ? 'native.endpoint_health.healthy' : 'native.endpoint_health.unhealthy', lang)
       : getMessage('native.endpoint_health.unknown', lang),
   });
+  // Model-identity verdict (LOCAL-LLM-MODEL-IDENTITY-001): surfaced at session
+  // start so a config/router mismatch is visible BEFORE the first failing turn.
+  const identity = await resolved.modelIdentity?.();
+  if (identity && identity.state === 'unknown-model') {
+    return `${statusLine}\n${getMessage('native.model_identity.unknown', lang, {
+      model: identity.model,
+      published: identity.published.length > 0 ? identity.published.join(', ') : '—',
+    })}`;
+  }
+  if (identity && identity.state === 'unreachable') {
+    return `${statusLine}\n${getMessage('native.model_identity.unreachable', lang, {
+      model: identity.model,
+      detail: identity.detail,
+    })}`;
+  }
+  return statusLine;
 }
 
 /** Confidently infer the native provider a bare `/model <id>` implies, or null.
@@ -275,11 +336,25 @@ export function resolveNativeSelection(
         provider: 'local-llm',
       };
     }
+    // 0-hardcode (LOCAL-LLM-MODEL-IDENTITY-001): there is NO literal fallback
+    // model — the servable IDs are whatever the router publishes on /models.
+    // A missing selection is a typed error telling the user exactly which
+    // config key to set, never a silently-guessed identity.
+    const selectedModel = requestedModel ?? config.native_model ?? null;
+    if (!selectedModel) {
+      return {
+        error: 'local-llm native transport needs an exact model ID — set native_model (deckent config set native_model <id>) to one of the endpoint\'s published /models IDs',
+        errorCode: 'missing-native-model',
+        detail: 'native_model',
+        provider: 'local-llm',
+      };
+    }
     return {
       adapter: createOpenAIAdapter({ baseUrl: endpoint, name: 'local-llm' }),
-      model: requestedModel ?? config.native_model ?? 'Qwen3.8-27B',
+      model: selectedModel,
       providerName: 'local-llm',
       endpointHealth: () => probeNativeEndpointHealth(endpoint, ctx.fetchFn),
+      modelIdentity: () => validateNativeModelIdentity(selectedModel, endpoint, ctx.fetchFn ?? globalThis.fetch),
     };
   }
 

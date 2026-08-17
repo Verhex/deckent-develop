@@ -329,8 +329,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // outcome-truth, catalog-stats read-model + its test) and their import
   // closures enter the graph; finalizer/skill-pool/generator/template/collector
   // changed content only.
+  // 2026-08-17 (LOCAL-LLM-MODEL-IDENTITY-001): same 14341 count, digest only —
+  // openai adapter (typed http/connect errors), native-transport (discovery +
+  // identity validation, hardcoded fallback removed), messages and their two
+  // suites changed content; no graph membership change.
   count: 14341,
-  digest: 'a8181541efbd581e634ce832d21370c559b525fb2f1984844c24c3de85a413b2',
+  digest: '19f5dc6d1689cf38d9f49a44b23ecfbbe2588b946bd0ba5667f308f60f5fab38',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -533,8 +537,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (CATALOG-STATS-AUTHORITY-001 correction): +1 — the canonical
   // src/core/catalog-stats-read-model.ts production module enters the inventory;
   // finalizer/skill-pool/generator/planner/collector/template/cli/mcp hashes moved.
+  // 2026-08-17 (LOCAL-LLM-MODEL-IDENTITY-001): same 1246 count, digest only —
+  // openai adapter / native-transport / messages production hashes moved.
   count: 1246,
-  digest: '19bffed8365eebf5d7727401bc6caf02f2bf38bf0b94eb3fbc171c8dfaa6d7c5',
+  digest: 'e1699ca4fd35c7316feb2b91e13253464546303f022da5c7f2852adac9d6751e',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

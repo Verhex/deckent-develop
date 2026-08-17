@@ -63,6 +63,43 @@ function drainToolCalls(acc: Map<number, { id: string; name: string; args: strin
   return events;
 }
 
+/** Typed OpenAI-compatible HTTP failure (LOCAL-LLM-MODEL-IDENTITY-001):
+ *  carries the SAFE, bounded upstream error detail instead of swallowing the
+ *  response body behind an opaque status line. Mechanism module — the fields
+ *  are data; user-facing rendering happens at the CLI surface. */
+export class OpenAICompatHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly model: string,
+    readonly upstreamCode: string | null,
+    readonly upstreamMessage: string | null,
+  ) {
+    const detail = [upstreamCode, upstreamMessage].filter(Boolean).join(': ');
+    super(`openai-compatible http ${status}${detail ? ` — ${detail}` : ''}`);
+    this.name = 'OpenAICompatHttpError';
+  }
+}
+
+const UPSTREAM_DETAIL_CAP = 300;
+
+/** Bounded, tolerant parse of the OpenAI-compatible error body
+ *  ({error:{message,type,code}}); control characters stripped so a hostile or
+ *  binary body can never corrupt the terminal. */
+function parseUpstreamError(raw: string): { code: string | null; message: string | null } {
+  const clean = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim() !== ''
+      ? value.replace(/[\u0000-\u001f\u007f]+/gu, ' ').trim().slice(0, UPSTREAM_DETAIL_CAP)
+      : null;
+  try {
+    const parsed = JSON.parse(raw) as { error?: { message?: unknown; type?: unknown; code?: unknown } };
+    const err = parsed?.error;
+    if (err && typeof err === 'object') {
+      return { code: clean(err.code) ?? clean(err.type), message: clean(err.message) };
+    }
+  } catch { /* non-JSON body — fall through to the raw excerpt */ }
+  return { code: null, message: clean(raw) };
+}
+
 export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter {
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
   return {
@@ -81,12 +118,25 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
         body['tools'] = req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
       }
 
-      const resp = await fetchImpl(`${opts.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}) },
-        body: JSON.stringify(body),
-      });
-      if (!resp.ok || !resp.body) throw new Error(`openai-compatible http ${resp.status}`);
+      let resp: Response;
+      try {
+        resp = await fetchImpl(`${opts.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}) },
+          body: JSON.stringify(body),
+        });
+      } catch (cause) {
+        // Cold-start / connection-refused class: keep the honest low-level cause
+        // ('fetch failed', ECONNREFUSED, …) instead of an unhandled rejection.
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(`openai-compatible connect failed — ${detail}`);
+      }
+      if (!resp.ok || !resp.body) {
+        let raw = '';
+        try { raw = (await resp.text()).slice(0, 4096); } catch { /* body unreadable — status-only error below */ }
+        const upstream = parseUpstreamError(raw);
+        throw new OpenAICompatHttpError(resp.status, req.model, upstream.code, upstream.message);
+      }
 
       const toolAcc = new Map<number, { id: string; name: string; args: string }>();
       // Last finish_reason seen — 'length' means the backend cut generation at

@@ -4,6 +4,7 @@
 // the native engine, and the boot path shipped an ollama tag at the anthropic
 // transport. These tests pin the selection seam both paths now share.
 import { describe, it, expect } from 'vitest';
+import { discoverNativeEndpointModels, validateNativeModelIdentity } from '../../src/cli/repl/native-transport.js';
 import {
   resolveNativeSelection,
   resolveNativeProvider,
@@ -193,5 +194,52 @@ describe('inferNativeProviderForModel — bare /model provider inference', () =>
     expect(inferNativeProviderForModel('deepseek-chat')).toBeNull();
     expect(inferNativeProviderForModel('glm-4-plus')).toBeNull();
     expect(inferNativeProviderForModel('qwen-plus')).toBeNull();
+  });
+});
+
+describe('local-llm model identity (LOCAL-LLM-MODEL-IDENTITY-001)', () => {
+  const llmCfg = { local_llm: { endpoint: 'http://127.0.0.1:8080/v1' } };
+
+  it('refuses a missing model selection with a typed error — no hardcoded fallback identity', () => {
+    const r = resolveNativeSelection(
+      { provider: 'local-llm', model: null },
+      { env: {}, config: llmCfg },
+    );
+    expect('errorCode' in r && r.errorCode).toBe('missing-native-model');
+    expect('detail' in r && r.detail).toBe('native_model');
+  });
+
+  it('carries the exact selected model and a modelIdentity seam', () => {
+    const r = resolveNativeSelection(
+      { provider: 'local-llm', model: 'Qwen3.8-27B-Q4_K_M' },
+      { env: {}, config: llmCfg },
+    );
+    expect('model' in r && r.model).toBe('Qwen3.8-27B-Q4_K_M');
+    expect('modelIdentity' in r && typeof r.modelIdentity).toBe('function');
+  });
+
+  it('discovery parses exact published router IDs and tolerates failure as typed data', async () => {
+    const fetchOk = (async () => new Response(JSON.stringify({
+      data: [{ id: 'Qwen3.8-27B-Q4_K_M' }, { id: 'Qwen3.8-27B-CRACK-Q6_K_L' }],
+    }), { status: 200 })) as unknown as typeof fetch;
+    const ok = await discoverNativeEndpointModels('http://127.0.0.1:8080/v1', fetchOk);
+    expect(ok).toEqual({ ok: true, ids: ['Qwen3.8-27B-Q4_K_M', 'Qwen3.8-27B-CRACK-Q6_K_L'] });
+
+    const fetchDown = (async () => { throw new Error('fetch failed'); }) as unknown as typeof fetch;
+    const down = await discoverNativeEndpointModels('http://127.0.0.1:8080/v1', fetchDown);
+    expect(down).toEqual({ ok: false, detail: 'fetch failed' });
+  });
+
+  it('validation verdicts: valid / unknown-model with published IDs / unreachable cold-start', async () => {
+    const fetchOk = (async () => new Response(JSON.stringify({
+      data: [{ id: 'Qwen3.8-27B-Q4_K_M' }],
+    }), { status: 200 })) as unknown as typeof fetch;
+    expect(await validateNativeModelIdentity('Qwen3.8-27B-Q4_K_M', 'http://x/v1', fetchOk))
+      .toEqual({ state: 'valid', model: 'Qwen3.8-27B-Q4_K_M' });
+    expect(await validateNativeModelIdentity('Qwen3.8-27B', 'http://x/v1', fetchOk))
+      .toEqual({ state: 'unknown-model', model: 'Qwen3.8-27B', published: ['Qwen3.8-27B-Q4_K_M'] });
+    const fetchDown = (async () => { throw new Error('ECONNREFUSED'); }) as unknown as typeof fetch;
+    expect(await validateNativeModelIdentity('Qwen3.8-27B', 'http://x/v1', fetchDown))
+      .toEqual({ state: 'unreachable', model: 'Qwen3.8-27B', detail: 'ECONNREFUSED' });
   });
 });

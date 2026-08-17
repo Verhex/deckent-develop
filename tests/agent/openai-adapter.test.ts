@@ -99,3 +99,29 @@ describe('createOpenAIAdapter', () => {
     expect(ids).toEqual(['call-read_file-0', 'call-read_file-1']);
   });
 });
+
+describe('openai-compatible http error detail (LOCAL-LLM-MODEL-IDENTITY-001)', () => {
+  it('surfaces the SAFE upstream error body instead of an opaque status line', async () => {
+    const { createOpenAIAdapter, OpenAICompatHttpError } = await import('../../src/agent/provider-tooluse/openai.js');
+    const fetchImpl = (async () => new Response(JSON.stringify({
+      error: { message: 'model not found: Qwen3.8-27B', type: 'invalid_request_error', code: 'model_not_found' },
+    }), { status: 400 })) as unknown as typeof fetch;
+    const adapter = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl });
+    const events = adapter.send({ system: 's', messages: [{ role: 'user', content: 'hi' }], tools: [], model: 'Qwen3.8-27B' });
+    await expect((async () => { for await (const _ of events) { /* drain */ } })())
+      .rejects.toSatisfy((err: unknown) => err instanceof OpenAICompatHttpError
+        && err.status === 400
+        && err.upstreamCode === 'model_not_found'
+        && err.upstreamMessage === 'model not found: Qwen3.8-27B'
+        && err.message.includes('model not found: Qwen3.8-27B'));
+  });
+
+  it('wraps connection failures as an honest connect error (cold-start class)', async () => {
+    const { createOpenAIAdapter } = await import('../../src/agent/provider-tooluse/openai.js');
+    const fetchImpl = (async () => { throw new TypeError('fetch failed'); }) as unknown as typeof fetch;
+    const adapter = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl });
+    const events = adapter.send({ system: 's', messages: [{ role: 'user', content: 'hi' }], tools: [], model: 'm' });
+    await expect((async () => { for await (const _ of events) { /* drain */ } })())
+      .rejects.toThrow(/openai-compatible connect failed — fetch failed/);
+  });
+});
