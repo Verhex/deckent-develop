@@ -98,20 +98,26 @@ describe('closure-ledger projector CLI', () => {
     expect(a.stdout).toMatch(/unsignedManifestDigest/);
     expect(a.stdout).toBe(b.stdout); // deterministic
   });
-  it('--check on the (empty) ledger is OK and writes nothing', async () => {
+  it('--check on the live non-empty ledger is OK and writes nothing', async () => {
     const r = await runNode(PROJECT, ['--check']);
     expect(r.code).toBe(0);
     expect(r.stderr).toBe('');
-    expect(r.stdout).toMatch(/nothing to project|in sync/);
+    expect(r.stdout).toMatch(/--check OK/);
   });
 });
 
 describe('closure-ledger gate — CLI plumbing', () => {
   it('an empty/absent ledger validates OK (exit 0, no stderr)', async () => {
-    const r = await runNode(GATE, []);
-    expect(r.code).toBe(0);
-    expect(r.stderr).toBe('');
-    expect(r.stdout).toMatch(/nothing to validate/);
+    const emptyPath = join(IO_DIR, 'empty.jsonl');
+    const absentPath = join(IO_DIR, 'absent.jsonl');
+    writeFileSync(emptyPath, '');
+
+    for (const path of [emptyPath, absentPath]) {
+      const r = await runNode(GATE, [path]);
+      expect(r.code).toBe(0);
+      expect(r.stderr).toBe('');
+      expect(r.stdout).toMatch(/nothing to validate/);
+    }
   });
   it('a malformed ledger line is a typed HOLD (exit 1, LEDGER_PARSE) — fixture in tmpdir', async () => {
     const p = join(IO_DIR, 'malformed.jsonl');

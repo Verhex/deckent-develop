@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
   "bundleId": "5c79560760ab2065217901bdbc4aff382150b3d3755f15a04e764bb3b5593271",
+  "schemaVersion": 1,
   "views": {
     "level-lane.json": "5e0cc37d569bb4286cd8d7c114facdddd56ebb46dce0af90be46c8f810fdfc82",
     "active.json": "5c6be9e56213e4bf17b61b0d1817beaa22a2af1f9e742e130d845b7a71c8e6b1",
