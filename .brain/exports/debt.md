@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-537-001 | Tech debt from 537-001: Exact-byte disk readback passed via cmp; target contains | normal | sprint-537 | resolved |
 | debt-532-002 | Tech debt from 532-002: Implemented explicit local-llm registry ownership and ze | normal | sprint-532 | resolved |
 | debt-532-004 | Tech debt from 532-004: Verification passed: npx tsc --noEmit exited 0; exact ta | normal | sprint-532 | resolved |
 | debt-530-001 | Tech debt from 530-001: npx tsc --noEmit passed. Exact targeted command passed:  | normal | sprint-530 | resolved |

@@ -1800,6 +1800,29 @@ function publishFencedTerminalReceipt(
     attempts: input.truth.attempts,
     coordinatorEvidence: [receiptEvidence],
   });
+  // A′ / ADR-D-007 bounded recovery (owner onayı, 2026-08-17): a COMPLETE
+  // terminal receipt asserts settled WORK. The sprint-535/536 chronology showed
+  // an execute-handoff fault producing an EMPTY logical-task set — the vacuous
+  // settled check above passes on an empty set, an empty "complete" receipt was
+  // written, and only the post-publication archive guard failed (confusingly,
+  // with the receipt already on disk). Fail closed BEFORE any byte is written:
+  // zero logical tasks, unresolved evidence holds (missing/moved task
+  // evidence) or a non-candidate cleanup eligibility are typed HOLDs, never a
+  // receipt. The operator-approved ABORTED path is exempt — force-abort IS the
+  // fail-closed closure mechanism for exactly these broken runs.
+  if (terminalOutcome === 'COMPLETE') {
+    if (input.truth.terminalEvidence.logicalTasks.length === 0) {
+      throw new FinalizerTerminalEvidenceError('TERMINAL_PUBLICATION_ZERO_TASK_HOLD');
+    }
+    if (terminalEvidence.holds.length > 0) {
+      throw new FinalizerTerminalEvidenceError('TERMINAL_PUBLICATION_EVIDENCE_HOLD');
+    }
+    if (terminalEvidence.cleanupEligibility.candidate !== true) {
+      throw new FinalizerTerminalEvidenceError(
+        `TERMINAL_PUBLICATION_NOT_CLEANUP_CANDIDATE_${terminalEvidence.cleanupEligibility.state}`,
+      );
+    }
+  }
   const artifact: PersistedSprintTerminalReceipt = {
     version: 1,
     terminalOutcome,

@@ -464,8 +464,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (correction-2): same 1237 count, digest only — sprint-planner
   // gains the pre-persistence stamp, sprint-finalizer gains the terminal-input
   // parity veto (enforceRunPolicyParityOnTerminalInputs).
+  // 2026-08-17 (A′/ADR-D-007 zero-task publication guard): same 1237 count,
+  // digest only — sprint-finalizer gains the pre-write COMPLETE-receipt HOLDs
+  // (TERMINAL_PUBLICATION_ZERO_TASK_HOLD / _EVIDENCE_HOLD /
+  // _NOT_CLEANUP_CANDIDATE_*).
   count: 1237,
-  digest: '06164d5ad4cdca2d3de3d8babe01d7db55a827242f43f1965c1acfdaa2c521cc',
+  digest: 'cc67b5869f9a906262d50048b28b3aef018d512569e0b552c6e9660cdbb87db0',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

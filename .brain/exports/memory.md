@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-537 Learnings
+- Sprint sprint-537 Learnings: ## Sprint sprint-537 Learnings
+- Canary no-op doc touch: GO_WITH_TECH_DEBT — Exact-byte disk readback passed via cmp; target contains one required line with a trailing newline. Tier-0 documentation
+
+## Sprint sprint-536 Learnings
+- Sprint sprint-536 Learnings: ## Sprint sprint-536 Learnings
+
+## Sprint sprint-535 Learnings
+- Sprint sprint-535 Learnings: ## Sprint sprint-535 Learnings
+
+## Sprint sprint-534 Learnings
+- Sprint sprint-534 Learnings: ## Sprint sprint-534 Learnings
+
 ## Sprint sprint-533 Learnings
 - Sprint sprint-533 Learnings: ## Sprint sprint-533 Learnings
 

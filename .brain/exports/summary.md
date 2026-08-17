@@ -55,6 +55,11 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-537 Learnings** (sprint-537): ## Sprint sprint-537 Learnings
+- Canary no-op doc touch: GO_WITH_TECH_DEBT — Exact-byte disk readback passed via cmp;...
+- **Sprint sprint-536 Learnings** (sprint-536): ## Sprint sprint-536 Learnings
+- **Sprint sprint-535 Learnings** (sprint-535): ## Sprint sprint-535 Learnings
+- **Sprint sprint-534 Learnings** (sprint-534): ## Sprint sprint-534 Learnings
 - **Sprint sprint-533 Learnings** (sprint-533): ## Sprint sprint-533 Learnings
 
 ## Gains
@@ -71,16 +76,6 @@
 - 518-001 — Agent catalog authority — design and owner decision points (row ...
 - **Sprint sprint-517 Learnings** (sprint-517): ## Sprint sprint-517 Learnings
 - Find and close the fail-loud root cause of the dist-clean call in test runs (row 60)...
-- **Sprint sprint-515 Learnings** (sprint-515): ## Sprint sprint-515 Learnings
-- Supported trace migrate and corpus CLI wiring with i18n: NO_GO — Bounded-discovery b...
-- **Sprint sprint-511 Learnings** (sprint-511): ## Sprint sprint-511 Learnings
-- Move the 4 sync git calls off the worker-dispatch hot path (row 3315): GO_WITH_TECH_...
-- **Sprint sprint-510 Learnings** (sprint-510): ## Sprint sprint-510 Learnings
-- Worker verification cannot judge unrelated concurrent partial writes (row 3277): GO_...
-- **Sprint sprint-508 Learnings** (sprint-508): ## Sprint sprint-508 Learnings
-
-## Gains
-- 508-001 — One runtime floor: doctor derives from package engines (row 450)...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -91,4 +86,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1870 | Generated: 2026-08-16_
+_Total entries: 1883 | Generated: 2026-08-17_

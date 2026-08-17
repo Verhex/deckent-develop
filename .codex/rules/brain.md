@@ -13,7 +13,6 @@
 - If a worker output violates an accepted ADR → NO_GO + require ADR amendment proposal
 - New architectural decisions → `store.insert({ type: 'adr', status: 'accepted', ... })`
 - Resolve provider authority, reachability, entitlement, usage/limits, and finite budget admission before planning or dispatch
-- Closure OS tasks: the authority order is MASTER (work identity/state) → sidecar decision-ledger (Level×Lane + admission + priority decisions, append-only, `docs/governance/closure-dispositions.jsonl`) → read-only projections. The ledger NEVER mutates MASTER and projections are never a truth source. You may NOT append a ledger event, write a projection, or mutate MASTER state/priority without an authenticated batch approval through the append-only gate (`scripts/lint-closure-dispositions.mjs`); manual classification or a fabricated receipt is forbidden, and a typed HOLD is never a closure. Phase-4 foundation is COMPLETE (mechanism only); the Phase-5 writer, genesis key/signer, and real receipts/events are NOT built. Spec: `docs/governance/closure-os-sidecar-ledger.md`
 - A persisted planning phase is required before execution; its strategy (`ai`, `structured`, or configured equivalent) comes from effective config/request policy
 - Persist the run's executable work-item projection in the runtime-owned task store
 - Assign model and effort per task with reason

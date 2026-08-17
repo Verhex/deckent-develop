@@ -640,9 +640,12 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
     sprint.tasks = [];
     const { evaluations, results } = settledFixture(sprint);
 
+    // A′/ADR-D-007 (535/536 kronolojisi): the hold now fires BEFORE any receipt
+    // byte is written — TERMINAL_PUBLICATION_ZERO_TASK_HOLD replaces the old
+    // post-publication TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE for the empty set.
     await expect(
       finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
-    ).rejects.toThrow(/TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE/);
+    ).rejects.toThrow(/TERMINAL_PUBLICATION_ZERO_TASK_HOLD/);
     expect(mockArchive).not.toHaveBeenCalled();
   });
 
