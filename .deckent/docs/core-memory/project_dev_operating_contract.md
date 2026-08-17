@@ -26,6 +26,14 @@ Paket B (worker-prompt delivery) ile mekanikleşir. Detay işler Sonnet/Opus sub
 delege edilebilir; kritik analiz/eleştiride deckent xverify ile gpt-5.6-sol ikinci görüşü
 (Kanun 14 sınırlarında — karar/authority devri değildir).
 
+**AKIŞ DEĞİŞİKLİĞİ (Alperen, 2026-08-17 — ürün tamamlanana kadar geçerli):** PR / merge-queue /
+CI-bekleme ceremony'si ASKIDA. GitHub `main-protection` ruleset'i (id 20321963)
+`enforcement=disabled` yapıldı (SİLİNMEDİ — ürün olgunlaşınca tek API çağrısıyla geri açılır);
+`rules/branches/main` effective listesi `[]` (enforce edilen sıfır kural). Çalışma: **doğrudan
+main'de, eski usül commit+push**; branch/worktree YALNIZ gerçek paralel çalışma gerektiğinde.
+CI main-push'ta bilgilendirme olarak koşar, hiçbir şeyi bloklamaz, beklenmez. "Bir outcome =
+bir PR" kuralı bu owner kararıyla askıdadır; az push, çok iş.
+
 **Sıra:** Paket A (`DEV-OPERATING-CONTRACT-001`) → Paket B (`RUN-POLICY-DELIVERY-001`) →
 Phase-5 writer (mode kararı Alperen'in) → RUN-INSPECTOR-001 → Terminal/Desktop treni.
 İlgili: [[project_closure_os_foundation]], [[project_owner_model_policy]].
