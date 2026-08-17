@@ -86,8 +86,9 @@ workflow'udur; ürünün bütünü veya tek execution authority'si değildir:
 > **sidecar decision-ledger** (Level×Lane sınıflandırma + admission + priority-karar authority'si);
 > reviewed-parent trust-anchor, immutable historical snapshot bundle ve transactional four-view
 > projection ile. Buildless gate `npm run lint:gates` içinde (`scripts/lint-closure-dispositions.mjs`);
-> projector `scripts/closure-ledger/project.mjs`. Bu **yalnız mekanizmadır** — Phase-5 writer / genesis
-> key / gerçek receipt+event **henüz kurulmadı**, canlı ledger mutation yoktur. Tam referans:
+> projector `scripts/closure-ledger/project.mjs`. **Owner-verified public genesis trust anchor
+> main'dedir** (PR #127, commit `88637d5d6`; private signer key repo DIŞINDA owner custody).
+> Phase-5 writer / gerçek receipt+event **henüz kurulmadı**, canlı ledger mutation yoktur. Tam referans:
 > [`docs/governance/closure-os-sidecar-ledger.md`](docs/governance/closure-os-sidecar-ledger.md).
 
 1. **`deckent_init`** — Projeyi başlat. `.deckent/`, `.brain/`, `.tasks/` dizinlerini ve seçili host adapterının provider-neutral kural/reference projection'larını oluşturur. Desteklenen her environment/project scope'unda bir kez çalıştırılır.
