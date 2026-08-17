@@ -38,12 +38,18 @@ MODE: implement
   byte-parity → worker digest echo kontratı → evaluator/settlement parity (typed HOLD) →
   best-effort compile observation jsonl (fail-soft; authoritative compile-evidence authority =
   MASTER 9024, enforcement = settlement parity zinciri)
-- **Correction (owner analiz turu, 2026-08-17):** parity gate TEK canonical terminal boundary'de —
-  `evaluateWithRubric` exported wrapper (D-1 verification fast-path + D-2 schema + tüm iç dönüşler
-  dahil) + async terminal producer'lar (`safeRubricReconcile` reconciled/reconstruction dönüşleri,
-  `backlog-eval` reconciled dönüşü) aynı gate'i yeniden uygular. Production-entrypoint testleri:
-  verification fast-path missing/mismatch/exact + rubric-fault reconstruction missing/exact +
-  normal/FIX korunumu.
+- **Correction (owner analiz turu, 2026-08-17):** parity gate result-evaluator'ın ÜÇ terminal
+  producer'ının içinde — `evaluateWithRubric` exported wrapper (D-1 verification fast-path +
+  D-2 schema + tüm iç dönüşler), `reconcileEvaluationSpuriousNoGo` wrapper (recovery flip),
+  `reconstructFromDurableEvidence` kuyruğu (rubric-fault) — downstream caller/mock gate'i soyamaz.
+- **Correction-2 (owner talimatı, 2026-08-17):** (a) run-policy snapshot'ı planSprint içinde İLK
+  task-JSON persistence'ından ÖNCE stamp'lenir — disk'teki task worker'ın gördüğüdür; gerçek
+  planSprint→tmpdir persistence testiyle kanıtlı. (b) Finalize tarafı:
+  `buildFinalizerTerminalTruth` girişindeki `enforceRunPolicyParityOnTerminalInputs` veto'su —
+  standard finalize, test-mode receipt, CLI `deckent finalize` ve completed-checkpoint recovery
+  bu TEK convergence'tan geçer; evaluationDecision/selfAssessment-türevi DONE/GWT claim'leri
+  missing/mismatch/tampered evidence ile terminal olamaz (7-case attempt-authority matrisi:
+  missing/mismatch/GWT/tamper ⇒ NO_GO; exact/policy-free/FIX-exact ⇒ korunur).
 - FIX/retry attempt'leri identical digest taşır; tamper fail-closed
 - LOCAL_VERIFIED battery yeşil; direct-main push
 - `CANARY_READY` ancak bu correction + gerçek canary hazırlığı sonrası; Alperen'in açık ON kararı

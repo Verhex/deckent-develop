@@ -46,7 +46,7 @@ import { updateLastSprintId, debugLog, readJsonSafe } from '../core/utils.js';
 
 // ─── Provider execution observation retirement (row 3296) ─────────
 // orchestra → core import: ADR-D-004 C2 allowed direction.
-import { canonicalProjectRoot } from '../core/task-result-settlement.js';
+import { canonicalProjectRoot, settleRunPolicyResultEvidence } from '../core/task-result-settlement.js';
 import {
   ProviderExecutionObservationStore,
   type ProviderExecutionGenerationReconciliation,
@@ -1585,6 +1585,51 @@ function usageTotalsFromLineages(
   });
 }
 
+/**
+ * RUN-POLICY-DELIVERY-001 (correction-2): terminal-convergence parity veto.
+ *
+ * Every finalize ingress — standard finalize, test-mode receipt, CLI
+ * `deckent finalize`, completed-checkpoint recovery — converges on
+ * {@link buildFinalizerTerminalTruth}, and each builds its `evaluations` map
+ * from a different source (live Brain verdicts, archived results'
+ * `evaluationDecision`, checkpoint snapshots, worker `selfAssessment`
+ * projections). A task that CARRIES a run policy may therefore arrive here
+ * claiming DONE/GO_WITH_TECH_DEBT without ever passing the evaluator's parity
+ * gate. This input veto closes that class at the single convergence point:
+ * a completion claim with missing, mismatched or tampered policy evidence is
+ * downgraded to a typed NO_GO before any terminal truth is assembled. Tasks
+ * without a policy and claims with exact evidence pass through untouched, so
+ * policy-free and normal/FIX behavior is byte-preserved.
+ */
+function enforceRunPolicyParityOnTerminalInputs(
+  tasks: readonly Task[],
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  results: readonly TaskResult[],
+): ReadonlyMap<string, TaskEvaluation> {
+  let vetoed: Map<string, TaskEvaluation> | null = null;
+  const resultsById = new Map(results.map(result => [result.taskId, result]));
+  for (const task of tasks) {
+    if (!task.runPolicy) continue;
+    const evaluation = evaluations.get(task.id);
+    if (evaluation !== TaskEvaluation.DONE && evaluation !== TaskEvaluation.GO_WITH_TECH_DEBT) {
+      continue;
+    }
+    const workerEvidence = resultsById.get(task.id)?.runPolicyEvidence;
+    const settlement = settleRunPolicyResultEvidence({
+      plan: task.runPolicy,
+      ...(workerEvidence !== undefined ? { workerEvidence } : {}),
+    });
+    if (settlement.state !== 'POLICY_PARITY') {
+      (vetoed ??= new Map(evaluations)).set(task.id, TaskEvaluation.NO_GO);
+      debugLog(
+        'finalizer:run-policy-parity-veto',
+        `${task.id}: ${evaluation} → NO_GO (${settlement.reason})`,
+      );
+    }
+  }
+  return vetoed ?? evaluations;
+}
+
 export function buildFinalizerTerminalTruth(input: {
   readonly tasks: readonly Task[];
   readonly evaluations: ReadonlyMap<string, TaskEvaluation>;
@@ -1593,9 +1638,14 @@ export function buildFinalizerTerminalTruth(input: {
   readonly coordinatorEvidence?: readonly CoordinatorTerminalEvidence[];
   readonly notDispatchedSettlements?: ReadonlyMap<string, NotDispatchedSettlement>;
 }): FinalizerTerminalTruth {
-  const attempts = terminalAttemptEvidence(
+  const evaluations = enforceRunPolicyParityOnTerminalInputs(
     input.tasks,
     input.evaluations,
+    input.results,
+  );
+  const attempts = terminalAttemptEvidence(
+    input.tasks,
+    evaluations,
     input.results,
     input.notDispatchedSettlements ?? new Map(),
   );

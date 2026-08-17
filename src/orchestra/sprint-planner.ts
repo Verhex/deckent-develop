@@ -1048,6 +1048,20 @@ export async function planSprint(
   // auth/backend + reachability/limit evidence are bound at host dispatch.
   applyWorkerExecutionBudgetPolicy(tasks, config.execution_budget, config.worker_provider);
 
+  // ── RUN-POLICY-DELIVERY-001 (correction-2): task-carried run policy ────
+  // Resolve the run's binding execution policy ONCE at plan time and stamp the
+  // identical digest-bound snapshot on EVERY task BEFORE the first task-JSON
+  // persistence below — the on-disk task is what workers are spawned from, so
+  // a post-persistence stamp would deliver nothing at runtime. All creation
+  // paths (ai, structured, fallback, injected-debt) have converged by this
+  // point; FIX attempts inherit the parent snapshot (debt-manager) instead of
+  // re-resolving, so a mid-run DIRECTIVES edit can never silently supersede
+  // the policy a run was admitted under.
+  const runPolicy = resolveRunPolicyFromDirectives(context.directives);
+  if (runPolicy) {
+    for (const stampTarget of tasks) stampTarget.runPolicy = runPolicy;
+  }
+
   // Write task files (skip in dry-run mode)
   if (!options?.dryRun) {
     const tasksPath = join(projectRoot, TASKS_DIR);
@@ -1071,19 +1085,6 @@ export async function planSprint(
   }
 
   const plannerProof = buildPlannerProof(usedMode);
-
-  // ── RUN-POLICY-DELIVERY-001: task-carried run policy ──────────────────
-  // Resolve the run's binding execution policy ONCE at plan time and stamp the
-  // identical digest-bound snapshot on EVERY task in this sprint — ai,
-  // structured, fallback and injected-debt paths alike converge here, so no
-  // creation path can drift out of the policy (487-026 task-carried pattern).
-  // FIX attempts inherit the parent task's snapshot (debt-manager) instead of
-  // re-resolving, so a mid-run DIRECTIVES edit can never silently supersede
-  // the policy a run was admitted under.
-  const runPolicy = resolveRunPolicyFromDirectives(context.directives);
-  if (runPolicy) {
-    for (const stampTarget of tasks) stampTarget.runPolicy = runPolicy;
-  }
 
   return {
     id: sprintId,

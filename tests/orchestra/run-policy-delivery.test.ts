@@ -13,10 +13,12 @@ import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import { gateRunPolicyParityVerdict, evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
 import { safeRubricReconcile } from '../../src/orchestra/sprint-phases.js';
 import { evaluateBacklogResult } from '../../src/orchestra/autonomous/backlog-eval.js';
+import { buildFinalizerTerminalTruth } from '../../src/orchestra/sprint-finalizer.js';
 import {
   createRunPolicyPlanAuthority,
   type EvaluationResult,
   type Task,
+  type TaskEvaluation,
   type TaskResult,
 } from '../../src/core/types.js';
 import { DeckentError } from '../../src/core/errors.js';
@@ -283,6 +285,80 @@ describe('production entrypoints — no path can bypass the parity gate (correct
       expect(outcome.decision).toBeDefined();
       expect(outcome.schemaRejected).toBe(false);
     });
+  });
+});
+
+describe('correction-2 — finalizer terminal convergence veto (all finalize ingresses share this boundary)', () => {
+  const runPolicy = createRunPolicyPlanAuthority({ constraints: ['no build'], sourceRef: 'x' });
+
+  function terminalResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskResult {
+    return {
+      taskId,
+      selfAssessment: 'DONE',
+      filesChanged: ['src/x.ts'],
+      testsPassed: true,
+      coverage: 95,
+      evaluationDecision: 'DONE',
+      notes: 'done',
+      ...overrides,
+    } as TaskResult;
+  }
+
+  function attemptVerdict(task: Task, evaluation: TaskEvaluation, result: TaskResult): string | undefined {
+    const truth = buildFinalizerTerminalTruth({
+      tasks: [task],
+      evaluations: new Map([[task.id, evaluation]]),
+      results: [result],
+    });
+    const attempt = truth.attempts.find(a => a.identity.taskId === task.id);
+    return attempt?.authority.state === 'TERMINAL' ? attempt.authority.verdict : undefined;
+  }
+
+  it('DONE claim + missing evidence => vetoed to NO_GO at the convergence point', () => {
+    const task = makeTask({ id: '7140-fin', runPolicy });
+    expect(attemptVerdict(task, 'DONE' as TaskEvaluation, terminalResult(task.id))).toBe('NO_GO');
+  });
+
+  it('DONE claim + digest mismatch => vetoed to NO_GO', () => {
+    const task = makeTask({ id: '7140-fin', runPolicy });
+    expect(attemptVerdict(task, 'DONE' as TaskEvaluation, terminalResult(task.id, {
+      runPolicyEvidence: { version: 1, observedPolicyDigest: 'd'.repeat(64), observedBy: 'worker' },
+    }))).toBe('NO_GO');
+  });
+
+  it('GO_WITH_TECH_DEBT claim + missing evidence => vetoed (a policy violation cannot settle as debt)', () => {
+    const task = makeTask({ id: '7140-fin', runPolicy });
+    expect(attemptVerdict(task, 'GO_WITH_TECH_DEBT' as TaskEvaluation, terminalResult(task.id))).toBe('NO_GO');
+  });
+
+  it('DONE claim + exact evidence => DONE preserved', () => {
+    const task = makeTask({ id: '7140-fin', runPolicy });
+    expect(attemptVerdict(task, 'DONE' as TaskEvaluation, terminalResult(task.id, {
+      runPolicyEvidence: { version: 1, observedPolicyDigest: runPolicy.policyDigest, observedBy: 'worker' },
+    }))).toBe('DONE');
+  });
+
+  it('tampered plan snapshot => vetoed even with a matching echo', () => {
+    const tampered = { ...runPolicy, constraints: [...runPolicy.constraints, 'injected'] };
+    const task = makeTask({ id: '7140-fin', runPolicy: tampered });
+    expect(attemptVerdict(task, 'DONE' as TaskEvaluation, terminalResult(task.id, {
+      runPolicyEvidence: { version: 1, observedPolicyDigest: tampered.policyDigest, observedBy: 'worker' },
+    }))).toBe('NO_GO');
+  });
+
+  it('policy-free task => historical DONE byte-preserved', () => {
+    const task = makeTask({ id: '7140-free' });
+    expect(attemptVerdict(task, 'DONE' as TaskEvaluation, terminalResult(task.id))).toBe('DONE');
+  });
+
+  it('FIX attempt with inherited policy: exact evidence => DONE, missing => NO_GO', () => {
+    const original = makeTask({ id: '7140-org', runPolicy });
+    const fixExact = makeTask({ id: '7140-org-fix1', runPolicy, isPriorityFix: true, fixForTaskId: original.id });
+    const fixMissing = makeTask({ id: '7140-org-fix2', runPolicy, isPriorityFix: true, fixForTaskId: original.id });
+    expect(attemptVerdict(fixExact, 'DONE' as TaskEvaluation, terminalResult(fixExact.id, {
+      runPolicyEvidence: { version: 1, observedPolicyDigest: runPolicy.policyDigest, observedBy: 'worker' },
+    }))).toBe('DONE');
+    expect(attemptVerdict(fixMissing, 'DONE' as TaskEvaluation, terminalResult(fixMissing.id))).toBe('NO_GO');
   });
 });
 

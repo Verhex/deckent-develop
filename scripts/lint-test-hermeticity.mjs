@@ -461,8 +461,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-17 (boundary internalization): same 1237 count, digest only — the
   // gate now lives inside result-evaluator's terminal producers; downstream
   // sprint-phases/backlog-eval external wraps reverted.
+  // 2026-08-17 (correction-2): same 1237 count, digest only — sprint-planner
+  // gains the pre-persistence stamp, sprint-finalizer gains the terminal-input
+  // parity veto (enforceRunPolicyParityOnTerminalInputs).
   count: 1237,
-  digest: 'cc215f52eecb717026379cf441a62888825ae2b0f013bb0f4e99a18e56dcbe87',
+  digest: '06164d5ad4cdca2d3de3d8babe01d7db55a827242f43f1965c1acfdaa2c521cc',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
