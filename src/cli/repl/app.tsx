@@ -1078,6 +1078,35 @@ export interface ReplAppProps {
   atRefReader?: (rel: string) => string | null;
 }
 
+const AT_REF_OUTPUT_RESERVE_TOKENS = 32_000;
+const AT_REF_SAFETY_RESERVE_TOKENS = 16_000;
+const AT_REF_CHARS_PER_TOKEN_UPPER_BOUND = 3;
+const AT_REF_REMAINING_CONTEXT_SHARE = 0.5;
+
+/**
+ * Convert the live model's effective token window into a conservative @ref
+ * inline budget. The provider admission gate remains authoritative: an absent
+ * or throwing getter returns undefined, preserving the pre-budget inline path.
+ */
+export function deriveAtRefExpansionBudgetChars(
+  getContextBudgetTokens: (() => number | undefined) | undefined,
+  transcriptChars: number,
+): number | undefined {
+  if (!getContextBudgetTokens) return undefined;
+  try {
+    const contextTokens = getContextBudgetTokens();
+    if (contextTokens === undefined || !Number.isFinite(contextTokens) || contextTokens <= 0) return undefined;
+    const transcriptTokens = Math.ceil(Math.max(0, transcriptChars) / AT_REF_CHARS_PER_TOKEN_UPPER_BOUND);
+    const remainingTokens = Math.max(
+      0,
+      Math.floor(contextTokens) - AT_REF_OUTPUT_RESERVE_TOKENS - AT_REF_SAFETY_RESERVE_TOKENS - transcriptTokens,
+    );
+    return Math.floor(remainingTokens * AT_REF_CHARS_PER_TOKEN_UPPER_BOUND * AT_REF_REMAINING_CONTEXT_SHARE);
+  } catch {
+    return undefined;
+  }
+}
+
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
 
 interface TurnStats { elapsedMs: number; tokens?: number; }
@@ -1170,6 +1199,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [cwd, setCwd] = useState(props.cwd);
 
   const [turns, setTurns] = useState<Turn[]>([]);
+  const transcriptCharsRef = useRef(0);
   const [partial, setPartial] = useState(''); // in-progress (incomplete) reply line
   const [busy, setBusy] = useState(false);
   const [working, setWorking] = useState(false); // a turn is in progress (streaming)
@@ -1258,6 +1288,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const turn: Turn = { id: idRef.current++, role, text };
     setTurns((t) => [...t, turn]);
   };
+
+  useEffect(() => {
+    transcriptCharsRef.current = turns.reduce((total, turn) => total + turn.text.length, 0);
+  }, [turns]);
 
   // Push one completed reply segment (a line or a finished code/table block);
   // emit the '● deckent' head once per reply, before the first segment.
@@ -1404,7 +1438,16 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           // (e.g. a forwarded `/resume <id>` must reach the loop verbatim).
           // Both engines (nativeEngine + runChatNativeLoop) consume THIS
           // iterator, so one seam covers both.
-          yield atRefReader && !line.startsWith('/') ? expandAtRefs(line, atRefReader).prompt : line;
+          const contextBudgetGetter = (nativeEngine as ReplEngine & {
+            getContextBudgetTokens?: () => number | undefined;
+          } | undefined)?.getContextBudgetTokens;
+          const expansionBudgetChars = deriveAtRefExpansionBudgetChars(
+            contextBudgetGetter,
+            transcriptCharsRef.current + line.length,
+          );
+          yield atRefReader && !line.startsWith('/')
+            ? expandAtRefs(line, atRefReader, expansionBudgetChars === undefined ? {} : { expansionBudgetChars }).prompt
+            : line;
           finalizeReply(); // turn finished streaming → close it out
           // 358-006: turn-end steer drain (busy-controls markIdle) — the SAME
           // "never mid-turn" contract as the ChatTurnQueue drain below: notes

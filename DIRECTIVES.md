@@ -1,140 +1,109 @@
-# DIRECTIVES — SKILL-UNLOCK: builtin kataloğa canonical V3 profile + routing eligibility + force/exclude tutarlılığı + delivery-proof (9034+7121 çekirdeği)
+# DIRECTIVES — 7087 ATREF-TOOL-MEDIATED-READ: @ref bütçe-bilinçli descriptor modu + ranged deckent_read_file
 
 ## Goal
 
-MASTER 9034 (SKILL-ROUTING-ELIGIBILITY-001) + 7121 (SKILLMD-V3-RECONCILIATION-001)
-çekirdeği — owner öne-alması (Alperen 2026-08-18: "görevlere skill injection yok,
-kaybımız devam ediyor"). Kanıtlı durum: 30/30 builtin skill'de `profile: null`
-(manifest yalnız V2 activation taşır; V3 onu öldürdü), routing-plan-adapter.ts:91
-yalnız valid profile kabul eder → HER task `assignedSkills=[]` → 30 uzmanlık paketi
-hiçbir worker prompt'una ulaşmıyor. Enjeksiyon borusu CANLI (sprint-spawner.ts:1054
-resolveSkillPrompts + typed HOLD) — yalnız seçim tarafı boş besliyor.
-9034 code-truth'un ek canlı bug'ları: direct-V3 yolu forceSkills'i boş listeyle
-eziyor (sprint-spawner sonradan union ederken), V3 adapter enabled filtresi
-uygulamıyor, hermetik testler profile'ları test-local sabitte taklit ediyor.
-Owner karar tabanı (2026-08-11, follow-up-works/skill-catalog-authority-design +
-agent-catalog-authority-design): D1 generated < human-override · D2 terfi YALNIZ
-owner review-receipt (stats yalnız önerir) · D3 retired id tombstone + namespace ·
-D5 installed-but-unroutable görünür etiket · D9 flat-id + registry-mapping ·
-D10 kaçak resolver = lint FAILURE · 7121: canonical V3 profile source metadata /
-owner mapping'den versioned üretilir, üretilemeyen typed unroutable/HOLD; legacy V2
-activation yalnız migration girdisidir, tek başına routability kanıtı DEĞİLDİR.
+MASTER 7087 (owner onayı 2026-08-18). Canlı incident: 131K pencereli lokal Qwen'e
+3 doküman @ref'lendi → `INPUT_CONTEXT_OVERFLOW measured=149503 available=126976`
+(7086 admission'ı DOĞRU çalıştı; eksik olan davranış). Claude-Code paradigması:
+büyük dosya context'e GÖMÜLMEZ — model dosyayı read aracıyla KENDİ okur, parça
+parça. Mevcut mekanizma: src/cli/repl/at-ref.ts `expandAtRefs` (AT_REF_MAX_REFS=5,
+AT_REF_MAX_CHARS=32KB/dosya, full-inline) → app.tsx:1407 → bridge structured
+TurnInput (rawIntent/expandedPayload/references — 560-004 LANDED). Araç tarafı:
+native-tool-registry.ts `deckent_read_file` yalnız `{path}` — ranged okuma YOK.
+Hedef: küçük @ref inline kalır; ölçülen bütçeye sığmayan set otomatik
+tool-mediated moda düşer (descriptor + yönerge); read aracı satır-aralığı kazanır.
 
 ## Execution Contract
 
 - No build and no repository-wide/full-suite test run during this sprint.
-- ADR-G-036/KANUN-10: skill-id/model-adı literal'i kod yoluna gömülmez — profile
-  üretimi manifest source metadata'sından türetilir, elle yazılmış profil tablosu
-  koda konmaz (data dosyası + üretici mekanizma olur).
-- Mevcut S5 canonical projection (snapshotSkillCatalog) ve S3 entrypoint/containment
-  authority'si KULLANILIR — paralel katalog/resolver icat edilmez.
-- Legacy V2 `activation` bloğu routability authority'sine TERFİ ETTİRİLMEZ (7121
-  owner kararı) — yalnız V3 profile üretiminin migration GİRDİSİ olabilir.
+- 7086 zinciri BOZULMAZ: ölçüm/admission (measureProviderRequest, typed
+  INPUT_CONTEXT_OVERFLOW) authority olarak kalır — bu paket admission'ı
+  ZAYIFLATMAZ, tetiklenmesini önler. Kümülatif billing/usage sayaçlarına dokunma.
+- i18n-FIRST: user-facing metin getMessage en+tr; `[@ref]` protokol satırları
+  mekanizma-string'i olarak İngilizce typed kalır (at-ref.ts:12 mevcut sözleşme).
+- Descriptor modu KAYIPSIZ: hangi referansın inline, hangisinin descriptor'a
+  düştüğü typed olarak references lineage'ına yazılır (560-004 yapısı).
 - Parallel execution ADMITTED; single-writer chokepoints: ONLY Task 1 writes
-  src/core/skill-pool.ts + src/core/skill-types.ts + .deckent/skills/*/manifest.json;
-  ONLY Task 2 writes src/orchestra/routing-plan-adapter.ts; ONLY Task 3 writes
-  src/orchestra/sprint-spawner.ts + src/orchestra/task-builder.ts; scripts/ yazımı
-  YALNIZ Task 2 (lint) ve tests/ herkesin kendi dosyası.
-- i18n-FIRST: user-facing metin getMessage en+tr; typed rejection reason'ları
-  mekanizma kodu olarak kalır (İngilizce typed code), yüzey render'ı i18n.
+  src/cli/repl/at-ref.ts + src/cli/repl/app.tsx; ONLY Task 2 writes
+  src/cli/repl/native-tool-registry.ts; messages.ts yazımı YALNIZ Task 3.
 - Hermetic tmpdir tests; async spawn; no spawnSync; scoped verification only.
 - Echo the policy digest in your .result as runPolicyEvidence exactly as the
   prompt's Result contract instructs.
 
-## Task 1: Canonical V3 profile üretimi — 30 builtin skill routable olur
-- Files: src/core/skill-pool.ts, src/core/skill-types.ts, src/core/skill-profile-derivation.ts, .deckent/skills/, tests/core/skill-profile-derivation.test.ts
-- Scope: src/core/, .deckent/skills/, tests/core/
+## Task 1: Bütçe-bilinçli @ref kararı — inline vs descriptor modu
+- Files: src/cli/repl/at-ref.ts, src/cli/repl/app.tsx, tests/cli/at-ref-budget.test.ts
+- Scope: src/cli/repl/, tests/cli/
 - Provider: codex
 - Model: gpt-5.6-sol
 
 ### Description
-1. Yeni `src/core/skill-profile-derivation.ts`: manifest source metadata'sından
-   (category, triggers, stackDetection, composableWith, priority, description)
-   deterministik, VERSIONED canonical V3 SkillProfile üretir (mevcut
-   validateSkillProfile şemasına uygun). Üretim kuralları data-driven'dır (alan
-   eşlemeleri tek modülde, elle profil tablosu YOK); üretilemeyen skill typed
-   `unroutable/HOLD` diagnostiği taşır (sessiz atlama ölür — bugünkü adapter
-   davranışının tersi). Legacy `activation` yalnız migration girdisi olarak
-   okunabilir; profile'a yükseltilen her alan provenance notu taşır.
-2. SkillPoolManager yüklemede türetilmiş profile'ı effective record'a bağlar
-   (disk manifest'i değiştirmeden runtime-derivation MI, yoksa 30 manifest'e
-   profile alanının persist edilmesi Mİ — karar: PERSIST + derivation idempotent
-   `deckent sync` yolunda yeniden üretilebilir; manifest'ler .deckent/skills/
-   altında güncellenir, schemaVersion/lint-manifests uyumu korunur).
-3. `installed-but-unroutable` görünür durum (D5): profile üretilemeyen skill
-   effective record'da typed reason'la işaretlenir; CLI/MCP list yüzeyleri bu
-   durumu zaten canonical projection'dan okur — projection alanı eklenir.
-4. Test (hermetik): temsilci manifest fixture'larından deterministik profile
-   üretimi; üretilemeyen → typed HOLD; idempotent yeniden-üretim byte-eş;
-   GERÇEK repo taraması testte koşulmaz ama üretici script'in 30/30 gerçek
-   skill'de valid profile ürettiği tek assert'lik smoke (fs read-only).
+1. `expandAtRefs` bütçe-bilinçli olur: opsiyonel `expansionBudgetChars` parametresi
+   (caller'dan; yoksa mevcut davranış BYTE-IDENTICAL — geriye dönük güvenli).
+   Bütçe verildiğinde: referanslar sırayla inline edilir; TOPLAM expansion bütçeyi
+   aşacaksa kalan referanslar (ve gerekirse tümü) DESCRIPTOR moduna düşer —
+   inline içerik yerine `[@ref-descriptor] <path> — <bytes> bytes, <lines> lines,
+   sha256:<digest12> — read it in slices with deckent_read_file (offset/limit)`
+   protokol satırı. Sonuç yapısı hangi ref'in `inline` hangi ref'in `descriptor`
+   olduğunu typed taşır (mevcut AtRefExpansion şekli genişler; app.tsx tüketimi
+   uyumlanır).
+2. app.tsx:1407 çağrı yeri bütçeyi GERÇEK kaynaktan türetir: efektif context
+   penceresi (run.tsx'in getContextBudgetTokens zinciriyle aynı authority) −
+   çıktı/güvenlik rezervi − mevcut transcript tahmini → kalan alanın konservatif
+   payı (chars ≈ tokens×3 üst-sınır kuralı; iyimser katsayı YASAK). Authority
+   çözülemiyorsa (getter throw) mevcut inline davranış korunur — admission zaten
+   fail-closed (davranış gerilemez).
+3. Test (hermetik): küçük tek ref inline kalır (byte-parity); bütçeyi aşan set
+   descriptor'a düşer ve descriptor satırı path+bytes+digest taşır; karışık set
+   (ilk ref sığar, ikincisi düşer); bütçesiz çağrı mevcut snapshot'la byte-eş;
+   lineage typed alanları doğru.
 
-GO: tsc 0; scoped yeşil; 30/30 builtin valid V3 profile taşır (gerçek disk
-kanıtı .result'ta); üretilemeyen sınıf typed HOLD. NO_GO: elle profil tablosu
-veya legacy-activation'ın doğrudan routability'ye terfisi görülürse.
+GO: tsc 0; scoped yeşil; incident-şekilli karar (3×~50K ref + ~120K bütçe →
+descriptor) kanıtlı. NO_GO: bütçesiz yol byte-değişirse veya descriptor kayıpsız
+lineage taşımazsa.
 
-## Task 2: Routing eligibility + typed rejection + lint (depends on Task 1)
-- Files: src/orchestra/routing-plan-adapter.ts, scripts/lint-skill-routing-eligibility.mjs, tests/orchestra/skill-routing-eligibility.test.ts, tests/scripts/lint-skill-routing.test.ts
-- Scope: src/orchestra/, scripts/, tests/orchestra/, tests/scripts/
+## Task 2: deckent_read_file ranged-read — offset/limit satır-aralığı
+- Files: src/cli/repl/native-tool-registry.ts, tests/cli/native-read-ranged.test.ts
+- Scope: src/cli/repl/, tests/cli/
 - Provider: claude
 - Model: claude-opus-5
-- Dependencies: Task 1
 
 ### Description
-1. routing-plan-adapter.ts: sessiz atlama ölür — profile'sız/invalid/disabled/
-   retired/quarantined skill seçilmez AMA her red typed reason üretir
-   (`profile-missing`, `disabled`, `retired`, `quarantined`, `invalid-profile`);
-   enabled filtresi UYGULANIR (bugün yok — 9034 code-truth). Rejection'lar routing
-   decision journal'ına/plan meta'ya yazılır (mevcut journal pattern'i).
-2. Hermetik testlerdeki test-local profile reimplementation'ları GERÇEK
-   derivation authority'sine bağlanır (9034 kriteri: "test-local profile
-   reimplementation kalmaz") — kendi dosyalarında; başka test dosyası gerekirse
-   sayımla raporla.
-3. Yeni `scripts/lint-skill-routing-eligibility.mjs` (D10): resolver-bypass =
-   FAILURE — routing yüzeyinde skill seçimi yalnız adapter üzerinden; sentetik
-   ihlal fixture'ıyla FAIL + temiz fixture'la PASS testi; gerçek repo'da exit 0.
+1. `deckent_read_file` şeması genişler: `{path, offset?, limit?}` — offset =
+   1-tabanlı başlangıç satırı, limit = satır sayısı (default: baştan, mevcut
+   davranış). Dönüş, cat -n tarzı satır-numaralı içerik + `{totalLines, range}`
+   meta satırı (model kaç parça kaldığını bilsin). Mevcut path-containment/izin
+   katmanı AYNEN geçerli (read tier'ı değişmez).
+2. Büyük-dosya güvenliği: limit verilmemişse mevcut tek-parça davranış korunur
+   ama çıktı mevcut üst sınırı aşacaksa dürüst kesme işareti + totalLines meta
+   (sessiz kesme yok). Tool description'ı MCP/CLI kataloğu düzenine uygun
+   güncellenir (7085 tek-kaynak kuralı — description-catalog bağlaması varsa
+   oradan, yoksa mevcut yerinde metin + sayımlı not).
+3. Test (hermetik tmpdir): offset/limit dilimi doğru satırları döner; aralık-dışı
+   offset dürüst boş+meta; default yol regresyonsuz; 5,000 satırlık fixture 3
+   dilimde tam kapsanır (birleşim = bütün).
 
-GO: tsc 0; scoped yeşil; typed rejection'lar kanıtlı; lint gerçek repo'da 0.
-NO_GO: herhangi bir sessiz-atlama yolu kalırsa.
+GO: tsc 0; scoped yeşil; dilim-birleşim kanıtı. NO_GO: default davranış değişirse
+veya containment zayıflarsa.
 
-## Task 3: Force/exclude tutarlılığı + delivery-proof (depends on Task 1)
-- Files: src/orchestra/sprint-spawner.ts, src/orchestra/task-builder.ts, tests/orchestra/skill-force-delivery.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-- Provider: claude
-- Model: claude-opus-5
-- Dependencies: Task 1
-
-### Description
-1. FORCE-EZME BUG'ı ölür (9034 code-truth): direct-V3 yolunda forceSkills boş
-   routing sonucuyla EZİLMEZ — operatör force'u her yolda (sprint, FIX, single-task)
-   aynı sonucu verir; force edilen skill çözülemezse mevcut typed HOLD davranışı
-   korunur (GR-2026-08-08-DOGFOOD-RCPT2-01 dengesi: AUTO-assigned rotasyon
-   force'a TERFİ ETMEZ).
-2. DELIVERY-PROOF (9034 kriteri): skill içeriği resolveSkillPrompts'tan worker
-   prompt'una GERÇEKTEN girmeden stats credit yazılmaz — spawner, prompt'a giren
-   skill-id setini task meta'ya kaydeder; finalizer'ın sidecar yazımı (sprint-545
-   zinciri) bu kanıt setini tüketir (yalnız kanıt alanını üret; finalizer değişikliği
-   gerekiyorsa sayımla raporla, scope'a sızma).
-3. Test: force-preserve her üç yolda; boş-routing + force → force yaşar;
-   delivery-kanıt seti prompt'a giren gerçek id'lerle byte-eş.
-
-GO: tsc 0; scoped yeşil; üç yol tutarlılığı + delivery-kanıt seti kanıtlı.
-NO_GO: force'un ezildiği herhangi bir yol kalırsa.
-
-## Task 4: Uçtan-uca battery — assignedSkills dolu kanıtı (depends on Task 2, Task 3)
-- Files: tests/orchestra/skill-unlock-battery.test.ts
-- Scope: tests/orchestra/, tests/core/
+## Task 3: Typed UX + i18n + incident battery (depends on Task 1, Task 2)
+- Files: src/cli/repl/native-agent-bridge.ts, src/cli/helpers/messages.ts, tests/cli/atref-tool-mediated-battery.test.ts
+- Scope: src/cli/repl/, src/cli/helpers/, tests/cli/
 - Provider: claude
 - Model: claude-sonnet-5
-- Dependencies: Task 1, Task 2, Task 3
+- Dependencies: Task 1, Task 2
 
 ### Description
-Tek hermetik battery: (a) gerçek derivation → gerçek adapter → gerçek spawner
-zinciriyle (mock authority YOK) temsilci task'ların `assignedSkills`'inin DOLU
-çıktığı; (b) disabled/retired/profile'sız skill'in typed reason'la seçilmediği;
-(c) force/exclude'un üç yolda aynı sonucu verdiği; (d) delivery-kanıt setinin
-prompt'a giren id'lerle eşleştiği; (e) kapsam sayımı .result'a (N skill, M
-routable, K unroutable+nedenleri — sayı hardcode edilmez, taramadan türetilir).
+1. Bridge, Task 1 lineage'ından descriptor-moduna düşen referans olduğunda BİR
+   typed bilgilendirme satırı basar (en+tr, getMessage): "N referans ölçülen
+   bütçeye sığmadı; araçlı parçalı okumaya geçildi" — mevcut
+   REFERENCE_EXPANSION sınıf ailesinin devamı olarak (ret mesajı DEĞİL, bilgi).
+2. Battery (hermetik, gerçek modüller — fixture-local reimplementation YOK):
+   (a) incident şekli: 3 büyük ref + dar bütçe → prompt'ta inline gövde YOK,
+   3 descriptor VAR, ölçülen istek bütçe ALTINDA (measureProviderRequest'le
+   doğrula — admission tetiklenmez); (b) descriptor yönergesindeki read aracı
+   gerçekten ranged çağrılabilir (registry'den dispatch, dilim döner);
+   (c) küçük-ref yolu regresyonsuz inline; (d) en+tr bilgilendirme satırı.
+3. Kapsam sayımı .result'a (sessiz borç yok).
 
-GO: battery yeşil; tsc 0; sayım .result'ta. NO_GO: zincirin herhangi bir halkası
-fixture-local taklitse (UNWIRED).
+GO: battery yeşil; tsc 0; incident-şekli uçtan uca kanıtlı. NO_GO: herhangi bir
+halka mock'sa (UNWIRED) veya bilgilendirme ret gibi okunuyorsa.

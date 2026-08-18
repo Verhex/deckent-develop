@@ -232,6 +232,15 @@ passes — a HOLD is not closure; plan a calm retry.
   spawn after an interruption; the terminal-lockup RCA's 3-run xverify composition
   (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: re-run with the
   approval-liveness lesson applied).
+- **2026-08-18 — sprint-562 (@ref tool-mediated read) + owner rule**: an OWNER RULE
+  enters the playbook: NO hand-edits to source/test files while a sprint/task is
+  RUNNING — racing a worker pollutes attribution and produces dist-changed warnings;
+  hand-completion happens only (a) when a worker stopped on an honest NO_GO and the
+  blocker file is in NO live worker's scope (the bridge-expose case), or (b) after the
+  sprint is terminal. Today's two race-NO_GOs (worker read before the edit) prove the
+  rule. Second lesson: never force a live big-model proof — if a PTY repro times out,
+  the hermetic battery + on-disk trace evidence suffices and the fluent-turn check is
+  honestly deferred to the owner's session.
 - **2026-08-18 — sprint-561 (skill-unlock) + native-probe delivery**: the third
   live instance of Lesson 15 — with `.deckent/skills/` write authority dropped by
   the scope gate, the 001 fix chain could not win; the resolution was an

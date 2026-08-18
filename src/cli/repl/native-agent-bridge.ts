@@ -87,6 +87,13 @@ export interface ReplEngine {
    * `setApprovalMode`/`close` above.
    */
   renewBudgetEpoch?: () => { epoch: number };
+  /** 7087 (562-001 hand-completion) — the SAME context-budget authority the
+   *  loop's admission uses (run.tsx getContextBudgetTokens), exposed so the
+   *  @ref expansion in app.tsx can size its inline-vs-descriptor decision
+   *  from the real ceiling instead of a parallel estimate. Optional for the
+   *  same structural reasons as the members above; absent → the caller keeps
+   *  its legacy inline behavior (fail-safe, never fail-open). */
+  getContextBudgetTokens?: () => number | undefined;
 }
 
 export interface NativeEngineDeps {
@@ -180,30 +187,52 @@ const NATIVE_AGENT_AUDIT_PARTITION = 'repl';
 // intent, the expanded payload actually sent this turn, and the identity of each
 // reference (canonical path + digest + bounded excerpt).
 
-/** Block separator expandAtRefs writes between the user's text and the first ref. */
-const AT_REF_BLOCK_MARKER = '\n\n[@ref] ';
+/** Block separator expandAtRefs writes between the user's text and the first ref.
+ *  Broadened (562-003) to match EITHER an inline `[@ref] ` block OR a budget-fallback
+ *  `[@ref-descriptor] ` block — the literal used to be `'\n\n[@ref] '` (trailing space),
+ *  which never matched a prompt whose first/only block was a descriptor (the incident
+ *  shape: every ref over budget), silently losing the whole reference list. */
+const AT_REF_BLOCK_MARKER = '\n\n[@ref';
 /** `[@ref] <path>[ (truncated at N chars)]:` — a fenced expansion's header. */
 const AT_REF_FENCED_HEADER = /^\[@ref\] (.+?)(?: \(truncated at \d+ chars\))?:$/;
 /** `[@ref] <path> — unreadable (…)` — an honestly-noted failed reference. */
 const AT_REF_UNREADABLE_HEADER = /^\[@ref\] (.+?) — unreadable \(/;
+/** `[@ref-descriptor] <path> — <bytes> bytes, <lines> lines, sha256:<hex> — …` — a
+ *  single-line, budget-fallback reference (562-001's `expandAtRefs`, at-ref.ts). No
+ *  fenced body: the payload never left disk, so the lineage carries only its identity. */
+const AT_REF_DESCRIPTOR_HEADER = /^\[@ref-descriptor\] (.+?) — (\d+) bytes, \d+ lines, sha256:([0-9a-f]+) — /;
 const AT_REF_FENCE = /^`{3,}$/;
 
-/**
- * Recover `{rawIntent, expandedPayload, references}` from an already-expanded
- * prompt. No `[@ref]` block (the overwhelmingly common case) → intent and
- * payload are the same string and the reference list is empty, byte-identical to
- * the pre-560-004 behavior. Pure: no fs, no provider — hermetically testable.
- */
-export function parseAtRefLineage(prompt: string): StructuredTurnInput {
+/** `parseAtRefLineage` + the descriptor-fallback count in one pass, so `runTurn` can
+ *  render its typed info line without re-deriving the reference list. */
+interface AtRefLineageResult { lineage: StructuredTurnInput; descriptorCount: number }
+
+function deriveAtRefLineage(prompt: string): AtRefLineageResult {
   const markerIndex = prompt.indexOf(AT_REF_BLOCK_MARKER);
-  if (markerIndex < 0) return { rawIntent: prompt, expandedPayload: prompt, references: [] };
+  if (markerIndex < 0) {
+    return { lineage: { rawIntent: prompt, expandedPayload: prompt, references: [] }, descriptorCount: 0 };
+  }
   const lines = prompt.slice(markerIndex + 2).split('\n');
   const references: TurnReference[] = [];
+  let descriptorCount = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] as string;
     const unreadable = AT_REF_UNREADABLE_HEADER.exec(line);
     if (unreadable) {
       references.push({ path: unreadable[1] as string, digest: '', bytes: 0, excerpt: '', ok: false, truncated: false });
+      continue;
+    }
+    const descriptor = AT_REF_DESCRIPTOR_HEADER.exec(line);
+    if (descriptor) {
+      descriptorCount++;
+      references.push({
+        path: descriptor[1] as string,
+        digest: descriptor[3] as string,
+        bytes: Number(descriptor[2]),
+        excerpt: '',
+        ok: true,
+        truncated: false,
+      });
       continue;
     }
     const fenced = AT_REF_FENCED_HEADER.exec(line);
@@ -223,10 +252,22 @@ export function parseAtRefLineage(prompt: string): StructuredTurnInput {
     });
     i = end;
   }
-  // A `[@ref] ` marker that parsed into nothing is just user text — never let a
+  // A `[@ref` marker that parsed into nothing is just user text — never let a
   // failed parse silently split a real prompt in half.
-  if (references.length === 0) return { rawIntent: prompt, expandedPayload: prompt, references: [] };
-  return { rawIntent: prompt.slice(0, markerIndex), expandedPayload: prompt, references };
+  if (references.length === 0) {
+    return { lineage: { rawIntent: prompt, expandedPayload: prompt, references: [] }, descriptorCount: 0 };
+  }
+  return { lineage: { rawIntent: prompt.slice(0, markerIndex), expandedPayload: prompt, references }, descriptorCount };
+}
+
+/**
+ * Recover `{rawIntent, expandedPayload, references}` from an already-expanded
+ * prompt. No `[@ref]`/`[@ref-descriptor]` block (the overwhelmingly common case) →
+ * intent and payload are the same string and the reference list is empty, byte-identical
+ * to the pre-560-004 behavior. Pure: no fs, no provider — hermetically testable.
+ */
+export function parseAtRefLineage(prompt: string): StructuredTurnInput {
+  return deriveAtRefLineage(prompt).lineage;
 }
 
 /** Format one drained ChatTurnPayload (ChatTurnQueue.drainAsTurns()) as the
@@ -313,6 +354,9 @@ const CONTINUATION_EXHAUSTED_KEY = 'native-output.continuation-exhausted';
 const OUTPUT_CEILING_REACHED_KEY = 'native.output-ceiling-reached';
 const EMPTY_VISIBLE_WITH_REASONING_KEY = 'native.empty-visible-with-reasoning';
 const REFERENCE_EXPANSION_CHECKPOINT_KEY = 'native.reference-expansion-checkpoint';
+// 562-003 — the same REFERENCE_EXPANSION class family: a Task-1 (562-001) descriptor
+// fallback is INFORMATION about what happened this turn, never a rejection.
+const REFERENCE_DESCRIPTOR_FALLBACK_KEY = 'native.reference-descriptor-fallback';
 
 const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native-budget.rounds-exhausted',
@@ -583,7 +627,16 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     // 560-004: the three carriers are separated HERE, at the last seam before the
     // session — the live turn still rides the expanded payload, but a context
     // epoch now compacts onto the raw intent plus reference identity.
-    for await (const ev of session.send(parseAtRefLineage(input)) as AsyncIterable<AgentSessionEvent>) {
+    const { lineage, descriptorCount } = deriveAtRefLineage(input);
+    // 562-003 — ONE typed info line per turn when Task 1's budget-aware @ref
+    // expansion (at-ref.ts's expandAtRefs) fell back to a descriptor for at least
+    // one reference. Rendered BEFORE dispatch: this is a heads-up on what the
+    // model is about to do (read the rest itself via deckent_read_file), not a
+    // verdict on the turn — never gated behind success/failure of the send below.
+    if (descriptorCount > 0) {
+      cbs.output(`\n[${t(REFERENCE_DESCRIPTOR_FALLBACK_KEY).replace('{n}', String(descriptorCount))}]\n`);
+    }
+    for await (const ev of session.send(lineage) as AsyncIterable<AgentSessionEvent>) {
       switch (ev.type) {
         case 'text-delta':
           cbs.output(ev.text);
@@ -749,5 +802,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // NATIVE-BUDGET-RENEWAL (557-002) — see the ReplEngine.renewBudgetEpoch doc
   // comment above; only run.tsx's explicit `/renew` slash ever calls this.
   engine.renewBudgetEpoch = () => session.renewBudgetEpoch();
+  // 7087 — see the ReplEngine.getContextBudgetTokens doc comment above.
+  if (deps.getContextBudgetTokens) engine.getContextBudgetTokens = deps.getContextBudgetTokens;
   return engine;
 }

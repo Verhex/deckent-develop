@@ -13443,3 +13443,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 561-004: Uçtan-uca battery — assignedSkills dolu kanıtı (depends on Task 2, Task 3) (NO_GO)
 
 ---
+## Sprint 562 — sprint-562
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 1851s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1851160ms |
+
+### Tasks
+
+- 562-001-fix-fix: Fix: Fix: Bütçe-bilinçli @ref kararı — inline vs descriptor modu (DONE)
+- 562-001-fix: Fix: Bütçe-bilinçli @ref kararı — inline vs descriptor modu (NO_GO)
+- 562-001: Bütçe-bilinçli @ref kararı — inline vs descriptor modu (DONE)
+- 562-002-fix: Fix: deckent_read_file ranged-read — offset/limit satır-aralığı (DONE)
+- 562-002: deckent_read_file ranged-read — offset/limit satır-aralığı (GO_WITH_TECH_DEBT)
+- 562-003: Typed UX + i18n + incident battery (depends on Task 1, Task 2) (DONE)
+
+---

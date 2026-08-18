@@ -9,8 +9,10 @@
 // 'always'); read→silent. MCP bridge confirms are deliberately pre-approved
 // below only after AgentSession has made the live permission decision.
 
+import { createHash } from 'node:crypto';
 import { z, type ZodTypeAny } from 'zod';
 import { ToolRegistry } from '../../agent/tools/registry.js';
+import type { ContentWriter } from '../../agent/tool-result-broker.js';
 import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent/tools/types.js';
 import type { ToolExposure, ToolExposureKind } from '../../agent/tools/exposure.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
@@ -171,7 +173,20 @@ const EXEC_SIDE_EFFECTING: ReadonlySet<string> = new Set([
 
 /** A minimal JSON-schema for each tool's args (provider tool_use input_schema). */
 const SCHEMAS: Record<string, Record<string, unknown>> = {
-  deckent_read_file: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+  // 562-002 ranged read: `offset`/`limit` are OPTIONAL — omitting both keeps the
+  // pre-562 single-shot full read. Declared as `integer` (the JSON-schema type the
+  // catalog bridge maps to z.number()) with `minimum: 1` so a provider that
+  // validates the schema never sends the 0/negative values resolveReadFileRange
+  // would have to discard anyway.
+  deckent_read_file: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'Project-relative file path.' },
+      offset: { type: 'integer', minimum: 1, description: '1-based first line to return. Omit to start at line 1.' },
+      limit: { type: 'integer', minimum: 1, description: 'How many lines to return from offset. Omit to read to the end of the file.' },
+    },
+    required: ['path'],
+  },
   // 583/N2 — silent READ surface (list/grep/glob): pure-Node, capped, scope-guarded.
   deckent_list_dir: { type: 'object', properties: { path: { type: 'string' } } },
   deckent_grep: { type: 'object', properties: { pattern: { type: 'string' }, path: { type: 'string' } }, required: ['pattern'] },
@@ -188,7 +203,7 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
 };
 
 const DESCRIPTIONS: Record<string, string> = {
-  deckent_read_file: 'Read a file within the project (returns its content).',
+  deckent_read_file: 'Read a file within the project. With no offset/limit it returns the whole content, as before. Pass offset (1-based first line) and/or limit (line count) to get a line-numbered slice preceded by a "[deckent] read_file: totalLines=… range=… hasMore=… nextOffset=…" meta line, so a large file can be read in bounded pieces.',
   deckent_list_dir: 'List a directory within the project (dirs suffixed with /).',
   deckent_grep: 'Search project files with a JS regex; returns path:line:text hits (capped).',
   deckent_glob: 'Find project files matching a glob pattern (** / * / ?), capped.',
@@ -209,6 +224,150 @@ function toolResultFrom(output: string): ToolResult {
 
 function execToolTier(name: string): ToolPermissionTier {
   return EXEC_SIDE_EFFECTING.has(name) ? 'confirm' : 'silent';
+}
+
+// ─── 562-002 — deckent_read_file ranged read {path, offset?, limit?} ─────────
+// The exec dispatcher (chat-tool-exec.ts) already owns path containment and an
+// NT-01 server-side line slice, but its result is post-processed by
+// `brokerToolResult` (agent/tool-result-broker.ts): anything over the preview cap
+// reaches this file as a PREFIX plus a truncation tail. Slicing that string here
+// would slice a truncated preview, so a ranged read instead recovers the full
+// bytes through the broker's own `contentStore` seam (see readFullFileText) and
+// does the numbering + meta locally. No fs access, no second containment
+// implementation, and the read tier stays 'silent'.
+
+/** Resolved line window: 1-based `offset`, `limit === null` ⇒ read to EOF. */
+export interface ReadFileRange {
+  offset: number;
+  limit: number | null;
+}
+
+/**
+ * Parses deckent_read_file's optional `offset`/`limit`. Deliberately identical in
+ * contract to the dispatcher's own `resolveLineRange`: 1-based offset, limit ≥ 1,
+ * and a malformed/out-of-contract value is IGNORED rather than guessed at — with
+ * neither field usable the call degrades to the pre-562 full read (`null`) instead
+ * of a silently wrong slice.
+ */
+export function resolveReadFileRange(args: Record<string, unknown>): ReadFileRange | null {
+  const usable = (raw: unknown): number | null => {
+    if (raw === undefined || raw === null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : null;
+  };
+  const offset = usable(args['offset']);
+  const limit = usable(args['limit']);
+  if (offset === null && limit === null) return null;
+  return { offset: offset ?? 1, limit };
+}
+
+/**
+ * Splits file text into real lines. A trailing newline terminates the last line
+ * rather than starting an empty one, so `totalLines` matches what `cat -n` (and a
+ * human) counts; an empty file honestly has zero lines.
+ */
+export function splitFileLines(text: string): string[] {
+  if (text.length === 0) return [];
+  const lines = text.split('\n');
+  if (lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+
+/** cat -n gutter width — number right-aligned in 6 columns, then a TAB. */
+const READ_LINE_NUMBER_WIDTH = 6;
+
+/** Marker emitted by `renderToolResultEnvelope` (agent/tool-result-broker.ts) when
+ *  the rendered string is only a prefix of the real output. Matched here, never
+ *  produced: an oversized default read is already honest that it was cut, it just
+ *  never said how many lines the file actually has. */
+const BROKER_TRUNCATION_MARKER = '[deckent] tool-result truncated:';
+
+export interface RangedReadView {
+  output: string;
+  totalLines: number;
+  returned: number;
+  hasMore: boolean;
+}
+
+/**
+ * Pure renderer for a ranged read: a leading meta line (so the model knows how
+ * much of the file it is holding and where the next slice starts) followed by the
+ * cat -n numbered slice. An offset past EOF returns meta ONLY — an honest empty
+ * answer, never a silently clamped one.
+ */
+export function renderRangedRead(text: string, range: ReadFileRange): RangedReadView {
+  const lines = splitFileLines(text);
+  const totalLines = lines.length;
+  const start = Math.min(range.offset - 1, totalLines);
+  const end = range.limit === null ? totalLines : Math.min(start + range.limit, totalLines);
+  const slice = lines.slice(start, end);
+  const hasMore = end < totalLines;
+  const meta = slice.length === 0
+    ? `[deckent] read_file: totalLines=${totalLines} range=empty returned=0 hasMore=false requestedOffset=${range.offset}`
+    : `[deckent] read_file: totalLines=${totalLines} range=${start + 1}-${end} returned=${slice.length} hasMore=${hasMore}${hasMore ? ` nextOffset=${end + 1}` : ''}`;
+  const numbered = slice.map((line, i) => `${String(start + 1 + i).padStart(READ_LINE_NUMBER_WIDTH, ' ')}\t${line}`);
+  return { output: [meta, ...numbered].join('\n'), totalLines, returned: slice.length, hasMore };
+}
+
+/**
+ * Recovers the COMPLETE text of one file through the exec dispatcher.
+ *
+ * A dedicated per-call dispatcher is built with an in-memory `contentStore`: when
+ * the file exceeds the broker's preview cap the broker hands those full bytes to
+ * the store on its way to producing the (discarded) bounded preview, so the exact
+ * content is available here without a second containment implementation and
+ * without touching the shared dispatcher's real on-disk spill store. Per-call by
+ * construction — two concurrent read_file calls cannot capture each other's bytes.
+ * Under the cap nothing spills, and `renderToolResultEnvelope` guarantees the
+ * returned string is byte-identical to the raw content.
+ */
+async function readFullFileText(
+  cwd: NativeToolRegistryOptions['cwd'],
+  path: string,
+): Promise<{ ok: true; text: string } | { ok: false; output: string }> {
+  const spilled: Buffer[] = [];
+  const contentStore: ContentWriter = {
+    write(bytes) {
+      spilled.push(bytes);
+      return { path: '(in-memory ranged-read buffer)', sha256: createHash('sha256').update(bytes).digest('hex') };
+    },
+  };
+  const rendered = await createToolExecDispatcher({ cwd, contentStore }).dispatch('deckent_read_file', { path });
+  const captured = spilled[spilled.length - 1];
+  if (captured !== undefined) return { ok: true, text: captured.toString('utf8') };
+  if (!toolResultFrom(rendered).ok) return { ok: false, output: rendered };
+  return { ok: true, text: rendered };
+}
+
+/**
+ * `deckent_read_file`'s handler. Two paths, and only the second one is new:
+ *   • no usable offset/limit → the ORIGINAL shared dispatcher with the ORIGINAL
+ *     args, so an untruncated read stays byte-identical to pre-562. The single
+ *     addition is honesty on an already-truncated result: one extra full read
+ *     appends the real `totalLines` and points at the ranged form.
+ *   • offset and/or limit → exact slice + cat -n numbering + totalLines/range meta.
+ */
+async function dispatchReadFile(
+  cwd: NativeToolRegistryOptions['cwd'],
+  exec: McpToolDispatcher,
+  args: Record<string, unknown>,
+): Promise<ToolResult> {
+  const path = typeof args['path'] === 'string' ? args['path'] : String(args['path'] ?? '');
+  const range = resolveReadFileRange(args);
+  if (range === null) {
+    const rendered = await exec.dispatch('deckent_read_file', args);
+    const result = toolResultFrom(rendered);
+    if (!rendered.includes(BROKER_TRUNCATION_MARKER)) return result;
+    const full = await readFullFileText(cwd, path);
+    if (!full.ok) return result;
+    return {
+      ok: result.ok,
+      output: `${rendered}\n[deckent] read_file: totalLines=${splitFileLines(full.text).length}; the content above is a prefix, re-read with {offset, limit} for complete numbered slices.`,
+    };
+  }
+  const full = await readFullFileText(cwd, path);
+  if (!full.ok) return toolResultFrom(full.output);
+  return { ok: true, output: renderRangedRead(full.text, range).output };
 }
 
 /** An MCP server may report `description: ''` (empty string, not undefined) — `??`
@@ -629,7 +788,13 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
   // Exec tools — NO confirm injected (single gate = AgentSession permission engine).
   const exec = createToolExecDispatcher({ cwd: opts.cwd });
   for (const name of ['deckent_read_file', 'deckent_list_dir', 'deckent_grep', 'deckent_glob', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash', 'deckent_git_status', 'deckent_git_log', 'deckent_git_diff', 'deckent_git_add', 'deckent_git_commit'] as const) {
-    registry.register(defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec, 'core'));
+    const def = defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec, 'core');
+    // 562-002: read_file keeps its tier/exposure/definition and only swaps the
+    // handler in — the ranged form needs the broker's full bytes, which the plain
+    // dispatcher passthrough cannot expose (see dispatchReadFile).
+    registry.register(name === 'deckent_read_file'
+      ? { ...def, handler: (args) => dispatchReadFile(opts.cwd, exec, args) }
+      : def);
   }
 
   // CLI-bridge tools — the FULL dispatchable surface (born-596 TERM-TOOL-PARITY:

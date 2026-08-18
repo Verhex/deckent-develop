@@ -69,7 +69,7 @@ describe('expandAtRefs — prompt injection', () => {
 
   it('injects one fenced block per resolved ref, after the user text', () => {
     const r = expandAtRefs('explain @a.ts', readerFor({ 'a.ts': 'const x = 1;' }));
-    expect(r.refs).toEqual([{ path: 'a.ts', ok: true, truncated: false }]);
+    expect(r.refs).toMatchObject([{ path: 'a.ts', ok: true, truncated: false, mode: 'inline' }]);
     expect(r.prompt.startsWith('explain @a.ts\n\n')).toBe(true);
     expect(r.prompt).toContain('[@ref] a.ts:\n```\nconst x = 1;\n```');
   });
@@ -83,7 +83,7 @@ describe('expandAtRefs — prompt injection', () => {
   it('caps content at AT_REF_MAX_CHARS with an explicit truncation marker', () => {
     const big = 'x'.repeat(AT_REF_MAX_CHARS + 100);
     const r = expandAtRefs('read @big.txt', readerFor({ 'big.txt': big }));
-    expect(r.refs).toEqual([{ path: 'big.txt', ok: true, truncated: true }]);
+    expect(r.refs).toMatchObject([{ path: 'big.txt', ok: true, truncated: true, mode: 'inline' }]);
     expect(r.prompt).toContain(`(truncated at ${AT_REF_MAX_CHARS} chars)`);
     expect(r.prompt).not.toContain(big); // full body never leaks through
     expect(r.prompt).toContain('x'.repeat(AT_REF_MAX_CHARS));
@@ -103,9 +103,9 @@ describe('expandAtRefs — prompt injection', () => {
 
   it('notes an unreadable ref honestly instead of dropping it', () => {
     const r = expandAtRefs('see @gone.ts and @a.ts', readerFor({ 'a.ts': 'ok' }));
-    expect(r.refs).toEqual([
+    expect(r.refs).toMatchObject([
       { path: 'gone.ts', ok: false, truncated: false },
-      { path: 'a.ts', ok: true, truncated: false },
+      { path: 'a.ts', ok: true, truncated: false, mode: 'inline' },
     ]);
     expect(r.prompt).toContain('[@ref] gone.ts — unreadable');
     expect(r.prompt).toContain('[@ref] a.ts:');

@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):bbda90c62252313a3e88d1784e655a7b97f83d01075627a8e847613e08f36c03`
+**Source digest:** `sha256(normalized-lf-utf8):c9348ce71165eb2da4309140bb406b11be8ae76d1c4ebdef35b515f2a98cce83`
 
-**Rows:** 504 total · 440 active · 64 terminal
+**Rows:** 505 total · 441 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 347 |
+| OPEN | 348 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -398,6 +398,7 @@
 | 7084 | `CLOSURE-OS-TRANSITION-TRUTH-001` | OPEN | P1 | TRUTH | — | — | Closure OS transition-brief truth-sync — projection drift, doküman drift, approval-claim kapsamlama (Codex denetim paketi) |
 | 7085 | `CLI-SURFACE-TRUTH-001` | OPEN | P0 | TERMINAL | — | — | CLI+MCP yüzey doğruluğu — komut açıklamaları tr/en dil seçimine sadık, insan-vs-JSON çıktı ayrımı sözleşmeli (owner öne-alma) |
 | 7086 | `NATIVE-CONTEXT-LIFECYCLE-001` | OPEN | P0 | TERMINAL | — | — | Native chat/agent context yaşam-döngüsü: ölçülmüş admission + dinamik output tavanı + hidden-reasoning bounded continuation + delta-checkpoint context epoch + yapılandırılmış @ref soyağacı + /renew epoch semantiği |
+| 7087 | `ATREF-TOOL-MEDIATED-READ-001` | OPEN | P0 | TERMINAL | `NATIVE-CONTEXT-LIFECYCLE-001` | — | Native chat @ref'i Claude-Code paradigmasına geçer: ölçülen bütçeye sığmayan referanslar inline gömülmez — descriptor (path+boyut+digest) + araçlı parçalı okuma; deckent_read_file ranged-read kazanır |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |

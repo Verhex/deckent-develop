@@ -14,6 +14,20 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint562] - 2026-08-18
+
+### Added
+
+- Bütçe-bilinçli @ref kararı — inline vs descriptor modu
+- Typed UX + i18n + incident battery (depends on Task 1, Task 2)
+
+### Changed
+
+- deckent_read_file ranged-read — offset/limit satır-aralığı (completed with tech debt)
+
+
+_Tasks: 3 total, 2 done, 1 tech debt, 1 no-go_
+
 ## [sprint560] - 2026-08-18
 
 ### Added

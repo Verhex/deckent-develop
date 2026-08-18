@@ -16,7 +16,13 @@ describe('deckent_describe_tool — params (born-521)', () => {
     expect(r.ok).toBe(true);
     const desc = JSON.parse(r.output) as { params: Array<{ name: string; type: string; optional: boolean }> };
     expect(desc.params).not.toEqual([]);
-    expect(desc.params).toEqual([{ name: 'path', type: 'string', optional: false }]);
+    // 7087 (562-002): deckent_read_file gained ranged reads — offset/limit
+    // are optional numbers alongside the required path.
+    expect(desc.params.sort((a, b) => a.name.localeCompare(b.name))).toEqual([
+      { name: 'limit', type: 'number', optional: true },
+      { name: 'offset', type: 'number', optional: true },
+      { name: 'path', type: 'string', optional: false },
+    ]);
   });
 
   it('marks non-required fields optional and preserves declared field types', async () => {

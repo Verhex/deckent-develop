@@ -2858,6 +2858,14 @@ const MESSAGES: MessageMap = {
     en: 'Expanded reference material pushed this turn\'s context near its limit — saving a checkpoint before continuing.',
     tr: 'Genişletilmiş referans içeriği bu turun bağlamını sınırına yaklaştırdı — devam etmeden önce bir checkpoint kaydediliyor.',
   },
+  // 562-003 — REFERENCE_EXPANSION family: informational, never a rejection. Fires
+  // when at-ref.ts's expandAtRefs (562-001) could not fit one or more `@ref`
+  // references inline within the measured budget and fell back to a descriptor
+  // (path + size + digest) that the model reads itself via deckent_read_file.
+  'native.reference-descriptor-fallback': {
+    en: '{n} reference(s) exceeded the measured budget; switched to tool-mediated partial reads.',
+    tr: '{n} referans ölçülen bütçeye sığmadı; araçlı parçalı okumaya geçildi.',
+  },
   // NATIVE-BUDGET-RENEWAL (557-002) — the exhaustion offer + the `/renew` replies.
   // `{dimension}` is one of the `native-budget.*-exhausted` lines above; a renewal
   // restarts ONLY the working-budget epoch — billing/usage counters keep accruing,

@@ -222,6 +222,14 @@ değildir, sakin retry planla.
   sürdürülmesi; terminal-kilitlenme RCA'sının 3-koşu xverify kompozisyonu
   (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: onay-canlılık dersiyle
   yeniden koşuldu).
+- **2026-08-18 — sprint-562 (@ref tool-mediated read) + owner kuralı**: OWNER KURALI
+  playbook'a girdi: sprint/task ÇALIŞIRKEN kaynak/test dosyasına el-müdahalesi YOK —
+  worker'la yarış hem attribution kirletir hem dist-değişti uyarısı üretir; el-tamamlaması
+  yalnız (a) worker dürüst NO_GO ile durduysa ve blocker'ın dosyası hiçbir CANLI worker'ın
+  scope'unda değilse (bridge expose örneği) ya da (b) sprint terminal olduktan sonra yapılır.
+  Bugünkü iki yarış-NO_GO'su (worker editten önce okudu) bu kuralın kanıtı. İkinci ders:
+  büyük-model canlı kanıtı zorlanmaz — PTY reprosu timeout'ларsa hermetik battery +
+  disk-trace kanıtı yeter, akıcı-tur doğrulaması owner oturumuna bırakılır (dürüst kayıtla).
 - **2026-08-18 — sprint-561 (skill-unlock) + native-probe teslimi**: Ders 15'in
   üçüncü canlı örneği — `.deckent/skills/` persist yetkisi scope-gate'te düşünce
   001 fix zinciri kazanamazdı; çözüm worker'ın KENDİ authority'sini izole

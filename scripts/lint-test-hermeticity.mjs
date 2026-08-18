@@ -372,8 +372,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-18 (skill-unlock, sprint-561): +61 — new suites (profile
   // derivation, routing eligibility, force-delivery, unlock battery, D10
   // lint tests) + 25 task-builder mock realigns + probe/v1 fix pins.
+  // 2026-08-18 (7087 @ref tool-mediated read, sprint-562): same count,
+  // digest only — at-ref budget/descriptor suites, ranged-read suite,
+  // tool-mediated battery + realigned at-ref/describe-tool pins moved content.
   count: 14438,
-  digest: '905b22bc60c517a1b2c944d025d2278a82770eab2ea16f19763077565694bbe3',
+  digest: '57d80eee701441a63890a56ae523039b2c3368787233dc49753aba7680379b7d',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -611,8 +614,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-18 (skill-unlock, sprint-561): +2 — skill-profile-derivation.ts
   // (canonical V3 derivation authority) and the delivery-evidence surface in
   // task-builder enter the inventory; adapter/pool/spawner/probe hashes moved.
+  // 2026-08-18 (7087, sprint-562): same count, digest only — at-ref
+  // budget/descriptor mode, app.tsx budget wiring, bridge getContextBudgetTokens
+  // expose and ranged deckent_read_file moved production content.
   count: 1253,
-  digest: 'd5960b1a7371e2dea8580887285316590885035ab40ecdfa8f03b64638b90110',
+  digest: 'e1ca0ee13a1d30a7f37a3bc847dcdc0a7e4c3aed9f2ec84c99e4aee0ed8938a5',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

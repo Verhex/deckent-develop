@@ -15,6 +15,7 @@
 // localization surface. The only user-facing string this feature adds is the
 // @-menu hint, injected via labels (tui.atref_menu_hint, run.tsx).
 
+import { createHash } from 'node:crypto';
 import { relative, sep, isAbsolute } from 'node:path';
 
 /** Hard caps — explicit, never silent: extras beyond MAX_REFS and content
@@ -46,6 +47,22 @@ export interface AtRefExpansion {
   ok: boolean;
   /** true → content was cut at AT_REF_MAX_CHARS (marker noted in the prompt). */
   truncated: boolean;
+  /** How this reference was represented in the outbound prompt. */
+  mode: 'inline' | 'descriptor';
+  /** Full readable payload identity; empty/zero for unreadable references. */
+  digest: string;
+  bytes: number;
+  lines: number;
+}
+
+export interface AtRefExpansionOptions {
+  /** Maximum cumulative full-content chars admitted to inline mode. */
+  expansionBudgetChars?: number;
+}
+
+function lineCount(content: string): number {
+  if (content.length === 0) return 0;
+  return content.split('\n').length;
 }
 
 /** A fence strictly longer than any backtick run in `body` (min 3) — file
@@ -68,6 +85,7 @@ function pickFence(body: string): string {
 export function expandAtRefs(
   text: string,
   readFile: (rel: string) => string | null,
+  options: AtRefExpansionOptions = {},
 ): { prompt: string; refs: AtRefExpansion[] } {
   const tokens = extractAtRefs(text);
   if (tokens.length === 0) return { prompt: text, refs: [] };
@@ -75,16 +93,28 @@ export function expandAtRefs(
   const skipped = tokens.slice(AT_REF_MAX_REFS);
   const refs: AtRefExpansion[] = [];
   const blocks: string[] = [];
+  const budget = options.expansionBudgetChars;
+  let admittedChars = 0;
   for (const path of expanded) {
     const content = readFile(path);
     if (content === null) {
-      refs.push({ path, ok: false, truncated: false });
+      refs.push({ path, ok: false, truncated: false, mode: 'inline', digest: '', bytes: 0, lines: 0 });
       blocks.push(`[@ref] ${path} — unreadable (missing, binary, or outside the project)`);
       continue;
     }
+    const bytes = Buffer.byteLength(content, 'utf8');
+    const lines = lineCount(content);
+    const digest = createHash('sha256').update(content).digest('hex');
+    const fitsBudget = budget === undefined || admittedChars + content.length <= Math.max(0, budget);
+    if (!fitsBudget) {
+      refs.push({ path, ok: true, truncated: false, mode: 'descriptor', digest, bytes, lines });
+      blocks.push(`[@ref-descriptor] ${path} — ${bytes} bytes, ${lines} lines, sha256:${digest.slice(0, 12)} — read it in slices with deckent_read_file (offset/limit)`);
+      continue;
+    }
+    admittedChars += content.length;
     const truncated = content.length > AT_REF_MAX_CHARS;
     const body = truncated ? content.slice(0, AT_REF_MAX_CHARS) : content;
-    refs.push({ path, ok: true, truncated });
+    refs.push({ path, ok: true, truncated, mode: 'inline', digest, bytes, lines });
     const fence = pickFence(body);
     const header = `[@ref] ${path}${truncated ? ` (truncated at ${AT_REF_MAX_CHARS} chars)` : ''}:`;
     blocks.push(`${header}\n${fence}\n${body}\n${fence}`);
