@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):dbf40f1e04e3892bacedd212e3902157847909c8dfd3f37dfa847b65d5bc4976`
+**Source digest:** `sha256(normalized-lf-utf8):f7aad7f81789042d9712071bda16bb61fc66786d9cbd3261a1a3294e74fedc4a`
 
-**Rows:** 506 total · 442 active · 64 terminal
+**Rows:** 507 total · 443 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 349 |
+| OPEN | 350 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -400,6 +400,7 @@
 | 7086 | `NATIVE-CONTEXT-LIFECYCLE-001` | OPEN | P0 | TERMINAL | — | — | Native chat/agent context yaşam-döngüsü: ölçülmüş admission + dinamik output tavanı + hidden-reasoning bounded continuation + delta-checkpoint context epoch + yapılandırılmış @ref soyağacı + /renew epoch semantiği |
 | 7087 | `ATREF-TOOL-MEDIATED-READ-001` | OPEN | P0 | TERMINAL | `NATIVE-CONTEXT-LIFECYCLE-001` | — | Native chat @ref'i Claude-Code paradigmasına geçer: ölçülen bütçeye sığmayan referanslar inline gömülmez — descriptor (path+boyut+digest) + araçlı parçalı okuma; deckent_read_file ranged-read kazanır |
 | 7088 | `CLI-SURFACE-CONSOLIDATION-001` | OPEN | P0 | TERMINAL | `CLI-SURFACE-TRUTH-001` | — | CLI+MCP yüzeyi sadeleşir ve tutarlılaşır: bayat sayısal-ADR referansları user-facing metinlerden ölür (Faz-1) + kanıtlı-deprecated komut kaldırımı + gruplama/birleştirme disposition turu (Faz-2) |
+| 7089 | `NATIVE-SESSION-LEDGER-001` | OPEN | P0 | TERMINAL | `NATIVE-CONTEXT-LIFECYCLE-001` | — | Native terminal CC/Codex-paritesinde kalıcı session-ledger + uçucu yazboz (karatahta) kazanır: `~/.deckent/projects/<slug>/<session>.jsonl` per-turn mesaj+model+usage (append-only, /resume kaynağı) · `$TMPDIR/deckent/<slug>/<session>/scratchpad/` system-prompt'a enjekte uçucu çalışma alanı · full-fidelity session log training-trace'ten ayrılır · eski kayıtlar (.brain chat + .deckent/traces) dual-read, migrasyon YOK · /tmp deckent-* litter hijyeni aynı pakette |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |

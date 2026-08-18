@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "dbf40f1e04e3892bacedd212e3902157847909c8dfd3f37dfa847b65d5bc4976"
+    "value": "f7aad7f81789042d9712071bda16bb61fc66786d9cbd3261a1a3294e74fedc4a"
   },
   "summary": {
-    "total": 506,
-    "active": 442,
+    "total": 507,
+    "active": 443,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 349,
+      "OPEN": 350,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 331,
+      "P0": 332,
       "P1": 138,
       "P2": 37
     },
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 8,
       "SURFACE": 1,
-      "TERMINAL": 20,
+      "TERMINAL": 21,
       "TOOL": 1,
       "TRUTH": 95,
       "XPLAT": 3
@@ -4825,6 +4825,17 @@
       "updated": "2026-08-18",
       "definitionDigest": "97d885b067c8b8e3f78d8f74544c959a777c272da17850da1a7efcb8d5125ec7",
       "progressDigest": "d8dd28f99c31ac380858e64e726972f1230a17be5cab55eb8596dccdbb217ac4",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7089,
+      "id": "NATIVE-SESSION-LEDGER-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "7f28adbabbf3ee1ae2b852a5804e5d8e5ef4afdba2dbd6373e5cc7def1de9e45",
+      "progressDigest": "ecbd9510f0a3781b7c70494b2dc8ff4cbd40269e87723d6b865f2570b0f5f078",
       "terminalClosureDigest": null
     },
     {
@@ -22065,6 +22076,7 @@
         "CLOSURE-OS-TRANSITION-TRUTH-001",
         "CLI-SURFACE-TRUTH-001",
         "CLI-SURFACE-CONSOLIDATION-001",
+        "NATIVE-SESSION-LEDGER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -22114,6 +22126,7 @@
         "CLOSURE-OS-TRANSITION-TRUTH-001",
         "CLI-SURFACE-TRUTH-001",
         "CLI-SURFACE-CONSOLIDATION-001",
+        "NATIVE-SESSION-LEDGER-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -23142,7 +23155,8 @@
       "priority": "P0",
       "dependsOn": [],
       "dependents": [
-        "ATREF-TOOL-MEDIATED-READ-001"
+        "ATREF-TOOL-MEDIATED-READ-001",
+        "NATIVE-SESSION-LEDGER-001"
       ],
       "children": [],
       "gates": [
@@ -23237,6 +23251,42 @@
       "evidenceReceipts": [],
       "acceptance": "Faz-1: user-facing katalog metinlerinde ADR-0xx sınıfı referans KALMAZ (geçerli karşılığı yoksa referans silinir, işlev cümlesi kalır — uydurma eşleme yok) + ratchet lint; `web` (kendi metniyle deprecated, serve sarmalayıcısı) kayıttan kalkar — bilinmeyen-komut önerisi serve gösterir, MCP parity bozulmaz; battery: katalogda ADR-0xx=0 + web kayıtsız + help temiz. Faz-2 (ayrı owner-disposition turu): 78→~35-40 kök hedefiyle aday listesi (dashboard→status --watch, watch→status/inspect, audit-verify→audit, autonomous-mission→autonomous, usage+limits→cost, openrouter-probe→models, plan-nl→do, test→start --test, runs→run list, alias sadeleşmeleri) — komut başına wiring+MASTER kanıtı şartı",
       "evidence": "Owner admission+onay 2026-08-18 (analiz turu): canlı kanıt 78 top-level komut vs claude 14 / codex ~10; `process` desc \"ADR-022 CLI/MCP parity\" (yürürlükte yok — AI aracını olmayan referansa yönlendirir), nervous.recommendations \"(ADR-037)\", doctor --fix-image \"ADR-063\", agent --no-audit \"ADR-046\"; katalogda 9 ADR-0xx; `web` metni zaten \"deprecated — use deckent serve\". Kural: wired-olmayan/kapatılmamış hiçbir şey kaldırılmaz; her Faz-2 birleştirmesi ayrı owner disposition ister. FAZ-1 LANDED (sprint-563, 2026-08-18/19): (1) user-facing bayat-ADR temizliği — cli.process.desc 'ADR-022 parity' düştü (parity zaten makine-garantili), nervous.recommendations '(ADR-037)', doctor --fix-image 'ADR-063', agent --no-audit 'ADR-046' düz dile (563-001 DONE; uydurma eşleme yok); (2) `web` KALKTI — wiring-kanıtı: registerWeb tek tüketici index.ts, getMimeType yalnız test; katalog+registry+13 test güncel (563-002 GO-sınıfı; spec-düzeltmesi: Commander edit-distance 'web'→serve önerisi ÜRETMİYOR — ölçüldü, testler gerçeğe pinli); fix zinciri ölü-testin kendi dosyasında dar-scope'a takıldı → ders-15/a el-kapaması (web.test.ts silindi + index/cli-inventory pinleri, 337/337); (3) ratchet: lint-i18n-hardcode katalog-değeri ADR-\\d{2,3} FAIL + battery (563-003 DONE — tarayıcı yalnız en:/tr: değer literal'lerine çapalı, yorum false-positive'i yok). Gerçek-binary smoke: help'te web=0 + unknown-command + process ADR-0xx=0 + top-level 78→77 + ratchet exit 0. Run-defteri: ABORTED (002 fix-bütçesi komşu-pin duvarında — NO_GO taksonomisi A-sınıfı; pin-taraması pre-flight önlemi playbook'a girecek). Landed-verify (Sol, 2026-08-19 TSİ 01:07 / 2026-08-18 UTC) 2/2 CONFIRMED: A=ratchet — CATALOG_STALE_ADR_RE /ADR-\\d{2,3}\\b/g digit-zorunlu sınıf ayrımı + existsSync katalog-guard'ı (`cross-verify-verdict:sha256:0227ac58e0deb0ff41f4bec0888bbdfcacf8d825e6be12bad386c3fa8c857165`); B=web-removal — index.ts'te registerWeb=0/yalnız registerServe + command-registry'de web girişi=0, tam-dosya hedefli (`cross-verify-verdict:sha256:26f2933ba76d8cc03dacee182c1b8307c9d82cf36b2c70020f42bd0e27e3a651`). Dürüst kayıt: ilk kompozisyon typed HOLD (limit_hold→evidence_expired — kesinti sonrası codex rate-limit snapshot'ı bayattı); tek gerçek provider-call ile kanıt tazelendi, fallback/self-verify yok",
+      "updated": "2026-08-18"
+    },
+    {
+      "order": 7089,
+      "id": "NATIVE-SESSION-LEDGER-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "Native terminal CC/Codex-paritesinde kalıcı session-ledger + uçucu yazboz (karatahta) kazanır: `~/.deckent/projects/<slug>/<session>.jsonl` per-turn mesaj+model+usage (append-only, /resume kaynağı) · `$TMPDIR/deckent/<slug>/<session>/scratchpad/` system-prompt'a enjekte uçucu çalışma alanı · full-fidelity session log training-trace'ten ayrılır · eski kayıtlar (.brain chat + .deckent/traces) dual-read, migrasyon YOK · /tmp deckent-* litter hijyeni aynı pakette",
+      "priority": "P0",
+      "dependsOn": [
+        "NATIVE-CONTEXT-LIFECYCLE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "NATIVE-CONTEXT-LIFECYCLE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "(1) Ledger: her turn delta-mesajlar+model+provider-reported usage tek JSONL satırı (0600); reader re-hydrate + session listesi; canonical proje-slug tek helper (paralel türetim ölür). (2) Native `/resume` transcript'i GERÇEKTEN re-hydrate eder (bugün yalnız pointer değişiyor) — ledger birincil, legacy memory.db chat dual-read fallback. (3) Karatahta: scratch-checkpoint kökü `$TMPDIR/deckent/<slug>/<session>/scratchpad/` altına taşınır, composeSystemPrompt'a scratchDir enjekte, 10-dk keep-for-recovery KORUNUR ama gerçek reaper alır (bugün hiç silinmiyor); tool-content store teardown kazanır. (4) traces O(n²) tam-transcript kopyası ölür (~200MB kanıtlı). (5) `cleanup --tmp`: bilinen-önek + yaş-eşikli güvenli litter süpürme (i18n en+tr). Hermetik testler + battery; hiçbir path/pencere literal'i koda gömülmez (constants/config-resolved)",
+      "evidence": "Owner admission 2026-08-18 (onaylı mimari + 'onaylandı. başla.' sıra-2; CC/Codex nasıl yönetiyorsa aynısı, ekstra yük yok). Ölçüm kanıtları: CC 437MB projects + Codex 2.4GB sessions emsal; /tmp'de 1508 deckent-* (1489 test-artığı; 19 üretim sızıntısı = 12 scratch-checkpoint keep-for-recovery-no-reap + 7 tool-content teardown'sız); turn-başı token bugün diske YAZILMIYOR (bridge onTurnEnd↔recordTurn yan yana ama bağlantısız); native /resume re-hydrate etmiyor (yalnız activeSessionIdRef); traces tek dosya 3.5MB×O(n²), dizin ~200MB; üç uyumsuz proje-slug türetimi tespitli",
       "updated": "2026-08-18"
     },
     {
@@ -26107,6 +26157,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "05a2d622e6186ed2d63bdda4d9934f38253f973c35174217e5a94152f5b6a5a4"
+    "value": "0301764361e4f6a57c443185a92b098e3dabbb5c7729f887c3f54e987e97709c"
   }
 }
