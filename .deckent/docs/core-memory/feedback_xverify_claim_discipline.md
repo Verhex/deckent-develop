@@ -20,3 +20,14 @@ verify→land sırası. (b) Claim = ekli aralıkta GÖRÜNEN somut yapı/davran�
 her iddiaya onu gösteren `--target` eşlik eder. (c) Evrenseller (0-hardcode, tam i18n,
 tek-importer) makine-gate'lere (lint/grep/test) kanıtlatılır, xverify'a sorulmaz.
 (d) Salt-analiz claim'ine dosya listesi ekleme. Bkz [[feedback-xverify-clarification-option]].
+
+
+## Ek (2026-08-18 — evidence-read tavanı keşfi)
+
+Haftalık UNCLEAR sınıfının kökü kanıtlandı: hakemin TEK birleşik kanıt-okuması vardır
+ve büyük dosya setinde TRUNCATE olur ("the sole permitted combined evidence read was
+truncated"). Kural: **koşu başına küçük kanıt seti** — tek küçük dosya veya yalnız dar
+`--target` excerpt'leri; çok-dosyalı kompozit iddia verme, iddiayı koşulara böl.
+Kanıt: CONFIRMED receipt `…57448f5a` (tek-dosya koşusu) vs truncation-UNCLEAR
+`…48b9be1a`/`…e191d331` (8-dosya ve 3-dosya koşuları). Kalıcı çözüm (ranged/multi-read)
+7081-residual'dadır.
