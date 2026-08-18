@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "390add54e112fd369d9eb4aa93dc6aea74b767b59682bd868ceccc26fdf2ef43"
+    "value": "492ffd9a15e1cd521343d54761cfe37bd409b8cc1a2f7b01825064c7deb59d9e"
   },
   "summary": {
-    "total": 502,
-    "active": 438,
+    "total": 503,
+    "active": 439,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 345,
+      "OPEN": 346,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 327,
+      "P0": 328,
       "P1": 138,
       "P2": 37
     },
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 8,
       "SURFACE": 1,
-      "TERMINAL": 16,
+      "TERMINAL": 17,
       "TOOL": 1,
       "TRUTH": 95,
       "XPLAT": 3
@@ -4781,6 +4781,17 @@
       "updated": "2026-08-18",
       "definitionDigest": "a3d700becca28d0c1e7c9c41519dbf6a852dcea2f8ae943c9d3dc18f41ff850f",
       "progressDigest": "6e28059ad928d4c8e582c7698725a9473d2fba2997d5a45fb8c8a2529fc9fadf",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7085,
+      "id": "CLI-SURFACE-TRUTH-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "ab74f09d8694e3f40f781d46ca2e02f8c427331cfbfa8e4c3013307972f6ba7f",
+      "progressDigest": "dc71f702f76dd9974ef3c6a1eada118b1369998b30264ff193d054455d57060d",
       "terminalClosureDigest": null
     },
     {
@@ -22019,6 +22030,7 @@
         "NATIVE-CONTENT-WORKSPACE-001",
         "NATIVE-RUNFLOW-BOOTSTRAP-001",
         "CLOSURE-OS-TRANSITION-TRUTH-001",
+        "CLI-SURFACE-TRUTH-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -22066,6 +22078,7 @@
         "NATIVE-CONTENT-WORKSPACE-001",
         "NATIVE-RUNFLOW-BOOTSTRAP-001",
         "CLOSURE-OS-TRANSITION-TRUTH-001",
+        "CLI-SURFACE-TRUTH-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -23044,6 +23057,38 @@
       "evidenceReceipts": [],
       "acceptance": "Closure projection'ları (level-lane.json, active.json, closure-health.json, owner-proposal) güncel MASTER'a regen + drift gate yeşil; CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md §'Phase-5 kurulmadı' ve sidecar-spec'in 'projection yok / ledger boş' kalıntıları canlı duruma truth-sync edilir (MASTER 3296 evidence supersede işaretli); 'approval yalnız CLI' iddiası kapsamlanır: bugün effective config'te api_decide kapalı olduğundan fiilen CLI-only, code-wide invariant DEĞİL (flag-gated fresh-OIDC HTTP decision endpoint'i mevcut) — doküman ifadesi bu gerçeğe çekilir; hiçbir ledger/run state mutation yok, yalnız projection+doc",
       "evidence": "Codex denetim hükmü (2026-08-18): mekanizma zinciri COMPLETE (Phase-4→genesis→Phase-5 writer/signer, ilk batch canlı-gate OK, 8101+7140 DONE), brief roadmap'i OPEN — kalanlar: §10 adım-4 owner disposition + P0/P1/P2 re-triage TURU (classificationCoverage 0; OWNER KARARI gerekir, bu satır yalnız truth-sync yapar), §10 adım-3 residual (MASTER 1015/786 OPEN), STATE-PRUNE/DOCS-ARCHIVE/REPO-CLEANUP-APPLY blocked, RELEASE-001 blocked, 7-gün Closure Health + P50/P80 ETA yok; xverify yeni kapanışları 7081'e bağlı",
+      "updated": "2026-08-18"
+    },
+    {
+      "order": 7085,
+      "id": "CLI-SURFACE-TRUTH-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "CLI+MCP yüzey doğruluğu — komut açıklamaları tr/en dil seçimine sadık, insan-vs-JSON çıktı ayrımı sözleşmeli (owner öne-alma)",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Dil authority'si tek zincirden çözülür (config `language` → env → fallback) ve HER CLI komutu + MCP tool açıklaması/çıktısı seçili dile sadıktır — canlı bulgu sınıfı ölür: `DECKENT_LANG=en` altında Türkçe status, `xverify --help` İngilizce iken kardeş helplerin Türkçe olması; help/description kataloğu tek kaynaktan iki dilli üretilir (commander description'ları getMessage'a bağlanır, hardcode taranır + lint'e girer); insan-vs-makine çıktı sözleşmesi: `--json` bayraklı her komutta stdout YALNIZ parse-edilebilir tek JSON dokümanıdır (progress/uyarı stderr'e), insan modunda tablo/renk serbest — 556'nın xverify stderr-ayrımı pattern'i yüzey geneline; kapsam envanteri + hermetic battery + gerçek-binary iki dilde smoke; MCP tool description'ları aynı katalogdan (CLI-MCP parity lint mevcut genişler)",
+      "evidence": "Owner admission + ÖNE ALMA (Alperen 2026-08-18): 'clide bir hata varsa veya eksik sende deckenti yanlış kullanır veya anlarsın' — AI-operatör CLI'ı yanlış anlarsa deckent'i yanlış kullanır; sıra: 7082'den ÖNCE, 7083 landing'inin hemen ardından; mevcut ilişkili satırlar 500/505 (I18N-SURFACE, runtime catalog) bu satırın authority tabanıdır, çakışma değil — 7085 CLI/MCP yüzey sözleşmesini kapatır, 505 katalog altyapısını",
       "updated": "2026-08-18"
     },
     {
@@ -25914,6 +25959,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "59da68abfbdd60f087f7c41d9f2037fa1762c2bbfbc1a5f5986c77819bc79d0f"
+    "value": "63f26d8471dce038e10cf2aa4916724f3ba639a557957c9dfac1c6aa8cd28f3e"
   }
 }
