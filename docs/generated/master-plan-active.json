@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "4440b7a56504b454939054394d00c6d311c11443d5b68c6e6dda2c5ce1bc73df"
+    "value": "e3a67ffdac1a182edb4b1e5f80b0d0d20b8f736777a8addaa759abfdde55e9a0"
   },
   "summary": {
     "total": 504,
@@ -4802,7 +4802,7 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "c43ac9eb9a3e50e8cfb211b608cba70803c8729cd11372183fb8f89063f3743d",
-      "progressDigest": "c7335baaa0e8147ab8b3ad60292db81fa0e7c63f68e9acb25143cba9abfc6436",
+      "progressDigest": "4fa169e0fa1cc24efee046029fc56372a17676775e8d8c02d69609de16b6f097",
       "terminalClosureDigest": null
     },
     {
@@ -23134,7 +23134,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Uzun native chat/agent işi manuel `devam` olmadan, yanlış context uyarısı olmadan, sessiz durum kaybı olmadan akıcı; DÖRT failure sınıfı ayrışır ve typed kapanır: OUTPUT-CAP (outputReserve wire max_tokens olamaz; hidden reasoning typed metadata; bounded continuation + stitch; partial tool-call asla execute edilmez), GERÇEK INPUT OVERFLOW (provider-neutral wire ölçümü exact/üst-sınır etiketli + mahkûm istek gönderilmez; chars/4 authority değil), @REF ŞİŞMESİ (ham niyet / expanded payload / referans-descriptor+digest ayrı; checkpoint objective ham niyet+lineage), /RENEW (kümülatif billing/usage aynen + güvenli context-epoch tazelemesi); checkpoint isteği önceki özet + bounded delta (tam transcript değil) ve aynı admission zincirinden; 5 typed UX kodu en+tr + privacy-safe canonical audit; 11 incident-şekilli regresyon + fresh-build canlı local-Qwen + adapter paritesi + farklı-provider XVerify + terminal settlement",
-      "evidence": "Owner admission 2026-08-18: \"Codex analiz sonucu bunu da değerlendirerek sonraki sprinte dahil edelim\". Kanıt tabanı ÇİFT bağımsız RCA: Codex handoff receipt `.analysis/handoff-native-context-lifecycle-2026-08-18.json` (receiptDigest sha256:ab3a9a3a…, RCA scope digest sha256:8a8dea2c… bağımsız doğrulandı; kabul otoritesi `.analysis/native-context-lifecycle-rca-2026-08-18.md`) + Fable→Sol xverify 3/3 CONFIRMED (`0d4f3666…` probe config-şartlı + 100k hayalet tavan; `752b074e…` fitting hayalet tavana bağlı + tam-transcript checkpoint tıkanınca kendisi sığmaz; `897936bd…` renew transcript'e dokunmaz + max_tokens şartlı). Ölçülmüş incident'ler: 88,599 input / 131,072 n_ctx / 36k headroom VARKEN 4,096 output-cap'te boş-görünür length ×3; 222,682 vs 131,072 gerçek overflow (chars/4 126K demişti); 26 karakter ham → 99,353 karakter transcript. Planner not: Codex'in do denemesindeki Fable transport hatası bounded probe ile REPRODUCE EDİLEMEDİ (headless pong exit 0) — planner observability kaybı (typed hatanın no-usable-plan'a inmesi) bu satırın audit kapsamına dahil. Sıra: 7085 landing SONRASI ilk sprint (560); skill-unlock (9034+7121) onu izler",
+      "evidence": "Owner admission 2026-08-18: \"Codex analiz sonucu bunu da değerlendirerek sonraki sprinte dahil edelim\". Kanıt tabanı ÇİFT bağımsız RCA: Codex handoff receipt `.analysis/handoff-native-context-lifecycle-2026-08-18.json` (receiptDigest sha256:ab3a9a3a…, RCA scope digest sha256:8a8dea2c… bağımsız doğrulandı; kabul otoritesi `.analysis/native-context-lifecycle-rca-2026-08-18.md`) + Fable→Sol xverify 3/3 CONFIRMED (`0d4f3666…` probe config-şartlı + 100k hayalet tavan; `752b074e…` fitting hayalet tavana bağlı + tam-transcript checkpoint tıkanınca kendisi sığmaz; `897936bd…` renew transcript'e dokunmaz + max_tokens şartlı). Ölçülmüş incident'ler: 88,599 input / 131,072 n_ctx / 36k headroom VARKEN 4,096 output-cap'te boş-görünür length ×3; 222,682 vs 131,072 gerçek overflow (chars/4 126K demişti); 26 karakter ham → 99,353 karakter transcript. Planner not: Codex'in do denemesindeki Fable transport hatası bounded probe ile REPRODUCE EDİLEMEDİ (headless pong exit 0) — planner observability kaybı (typed hatanın no-usable-plan'a inmesi) bu satırın audit kapsamına dahil. LANDED (sprint-560, 2026-08-18): 6/6 görev + 1 dürüst fix döngüsü (003 üretici-yetki boşluğu → ADR-D-007 el-tamamlaması: types.ts metadata-only `reasoning-activity` + openai.ts `delta.reasoning_content` emisyonu → fix DONE). Teslim: (1) measureProviderRequest + withMeasuredAdmission — exact (/apply-template+/tokenize) ve conservative-upper-bound typed; 24k/100k/160k iyimser literaller SÖKÜLDÜ, çözümsüz tavan typed `INPUT_CONTEXT_AUTHORITY_UNAVAILABLE` (mahkûm istek asla gönderilmez, 222K/126K incident kanıtlı); (2) dinamik output tavanı + openai/anthropic normalized parite (anthropic 4096 hardcode öldü; Anthropic'te tavan-authority'siz istek typed 400); (3) hidden-reasoning typed metadata (CoT asla açılmaz) + bounded continuation/stitch/dedup + `generation-recovery` olayları (OUTPUT_LIMIT/EMPTY_VISIBLE_AFTER_REASONING/TRANSPORT_EMPTY) + length-kesikli tool-call asla execute edilmez + tükenince typed HOLD; (4) delta-tabanlı checkpoint epoch'ları (tam transcript taşınmaz, checkpoint aynı admission zincirinden) + @ref soyağacı ayrımı (rawIntent/expandedPayload/references) + /renew kümülatifi koruyup güvenli epoch tazeler; (5) 5 typed UX kodu en+tr + privacy-safe audit; (6) battery 11/11 gerçek üretim yollarıyla (32 test). CANLI QWEN KANITI (taze binary): büyük @MASTER-PLAN @ref turu + doğal 'devam' turu — 0 yanıt-kesildi/boş-yanıt/yanlış-uyarı. Landing-borcu: 6 dosyada bayat pin yeni sözleşmeye hizalandı (fallback→typed-refusal, truncated-notice→generation-recovery, string-send→TurnInput.rawIntent). Run-defteri: finalize retro-adımı TERMINAL_EVIDENCE_HOLD'la düştü, settlement terminal (bulgu listesinde)",
       "updated": "2026-08-18"
     },
     {
@@ -26005,6 +26005,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "3d96ab53a4c2a69e0551f4e4cee7519bb6b2f9840fa8933c8d17a579770c0aae"
+    "value": "35d5d8be0ac61eb9fa29f286aba75a2c2640b8c794d218b7cc05c240bb768c70"
   }
 }

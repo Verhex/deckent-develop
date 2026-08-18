@@ -6,7 +6,15 @@
 // lifecycle to the existing Sprint-285 confirm-queue (ConfirmTrigger) →
 // respondPermission. View-neutral mapping; the legacy path is untouched.
 
-import { createAgentSession, type AgentSessionEvent, type SessionBudgetExhaustedEvent } from '../../agent/session.js';
+import { createHash } from 'node:crypto';
+import {
+  createAgentSession,
+  REFERENCE_EXCERPT_CHARS,
+  type AgentSessionEvent,
+  type SessionBudgetExhaustedEvent,
+  type StructuredTurnInput,
+  type TurnReference,
+} from '../../agent/session.js';
 import { loadPolicy } from '../../agent/permission-policy.js';
 import { createRuleStore } from '../../agent/permission-store.js';
 import { createCostGuard } from '../../agent/guards/cost.js';
@@ -162,6 +170,65 @@ const CHECKPOINT_INSTRUCTION =
  *  mirrors process-runtime.ts's own 'process' partition for non-sprint-bound events. */
 const NATIVE_AGENT_AUDIT_PARTITION = 'repl';
 
+// ═══ @ref lineage recovery (560-004, RCA §5) ════════════════════════════════
+// app.tsx expands `@path` tokens into the OUTBOUND prompt at the submit boundary
+// (at-ref.ts's expandAtRefs) — by the time a line reaches this engine the 26-char
+// intent and a 99,327-char attachment are ONE string, and everything downstream
+// (context epochs, compaction objectives) inherited that conflation. The `[@ref]`
+// markers are a documented, English-canonical PROTOCOL (at-ref.ts's i18n note),
+// so they are parseable back into the three carriers the session wants: the raw
+// intent, the expanded payload actually sent this turn, and the identity of each
+// reference (canonical path + digest + bounded excerpt).
+
+/** Block separator expandAtRefs writes between the user's text and the first ref. */
+const AT_REF_BLOCK_MARKER = '\n\n[@ref] ';
+/** `[@ref] <path>[ (truncated at N chars)]:` — a fenced expansion's header. */
+const AT_REF_FENCED_HEADER = /^\[@ref\] (.+?)(?: \(truncated at \d+ chars\))?:$/;
+/** `[@ref] <path> — unreadable (…)` — an honestly-noted failed reference. */
+const AT_REF_UNREADABLE_HEADER = /^\[@ref\] (.+?) — unreadable \(/;
+const AT_REF_FENCE = /^`{3,}$/;
+
+/**
+ * Recover `{rawIntent, expandedPayload, references}` from an already-expanded
+ * prompt. No `[@ref]` block (the overwhelmingly common case) → intent and
+ * payload are the same string and the reference list is empty, byte-identical to
+ * the pre-560-004 behavior. Pure: no fs, no provider — hermetically testable.
+ */
+export function parseAtRefLineage(prompt: string): StructuredTurnInput {
+  const markerIndex = prompt.indexOf(AT_REF_BLOCK_MARKER);
+  if (markerIndex < 0) return { rawIntent: prompt, expandedPayload: prompt, references: [] };
+  const lines = prompt.slice(markerIndex + 2).split('\n');
+  const references: TurnReference[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] as string;
+    const unreadable = AT_REF_UNREADABLE_HEADER.exec(line);
+    if (unreadable) {
+      references.push({ path: unreadable[1] as string, digest: '', bytes: 0, excerpt: '', ok: false, truncated: false });
+      continue;
+    }
+    const fenced = AT_REF_FENCED_HEADER.exec(line);
+    if (!fenced) continue;
+    const fence = lines[i + 1];
+    if (fence === undefined || !AT_REF_FENCE.test(fence)) continue;
+    let end = i + 2;
+    while (end < lines.length && lines[end] !== fence) end++;
+    const body = lines.slice(i + 2, end).join('\n');
+    references.push({
+      path: fenced[1] as string,
+      digest: createHash('sha256').update(body).digest('hex'),
+      bytes: Buffer.byteLength(body, 'utf8'),
+      excerpt: body.slice(0, REFERENCE_EXCERPT_CHARS),
+      ok: true,
+      truncated: line.endsWith(' chars):'),
+    });
+    i = end;
+  }
+  // A `[@ref] ` marker that parsed into nothing is just user text — never let a
+  // failed parse silently split a real prompt in half.
+  if (references.length === 0) return { rawIntent: prompt, expandedPayload: prompt, references: [] };
+  return { rawIntent: prompt.slice(0, markerIndex), expandedPayload: prompt, references };
+}
+
 /** Format one drained ChatTurnPayload (ChatTurnQueue.drainAsTurns()) as the
  *  synthetic user-turn input fed back into the session — one coalesced bucket
  *  becomes one turn. Mirrors app.tsx's `bgPayloadsToTurnTexts` shape, but each
@@ -237,6 +304,16 @@ function localizeOrFallback(t: (key: string) => string, key: string, fallback: s
   return label === key ? fallback : label;
 }
 
+// 560-005 (RCA §7) — the two loop-level codes carrying their own typed context-
+// lifecycle class (see ContextLifecycleClass below). Named consts so
+// NATIVE_AGENT_SIGNAL_KEYS and CONTEXT_LIFECYCLE_MESSAGE_KEY can never diverge
+// on the same class's message key.
+const INPUT_CONTEXT_OVERFLOW_KEY = 'native-context.admission-denied';
+const CONTINUATION_EXHAUSTED_KEY = 'native-output.continuation-exhausted';
+const OUTPUT_CEILING_REACHED_KEY = 'native.output-ceiling-reached';
+const EMPTY_VISIBLE_WITH_REASONING_KEY = 'native.empty-visible-with-reasoning';
+const REFERENCE_EXPANSION_CHECKPOINT_KEY = 'native.reference-expansion-checkpoint';
+
 const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native-budget.rounds-exhausted',
   'native-budget.toolcalls-exhausted',
@@ -246,7 +323,58 @@ const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native.checkpoint.saved',
   'native.checkpoint.epoch-advanced',
   'native.checkpoint.degraded',
+  INPUT_CONTEXT_OVERFLOW_KEY,
+  CONTINUATION_EXHAUSTED_KEY,
 ]);
+
+/**
+ * 560-005 (RCA §7) — the five typed context-lifecycle UX states. Terminal
+ * OUTPUT exhaustion (OUTPUT_CEILING_REACHED / CONTINUATION_EXHAUSTED /
+ * EMPTY_VISIBLE_CONTENT_WITH_REASONING) must never read like a genuine
+ * INPUT_CONTEXT_OVERFLOW, and vice versa — today's "context window may be
+ * full" mislabel on a plain output-exhaustion event is the bug this type
+ * exists to prevent. REFERENCE_EXPANSION_REQUIRES_CHECKPOINT covers the
+ * distinct case where expanded @ref material forces a mid-turn checkpoint.
+ */
+export type ContextLifecycleClass =
+  | 'INPUT_CONTEXT_OVERFLOW'
+  | 'OUTPUT_CEILING_REACHED'
+  | 'CONTINUATION_EXHAUSTED'
+  | 'EMPTY_VISIBLE_CONTENT_WITH_REASONING'
+  | 'REFERENCE_EXPANSION_REQUIRES_CHECKPOINT';
+
+const CONTEXT_LIFECYCLE_MESSAGE_KEY: Record<ContextLifecycleClass, string> = {
+  INPUT_CONTEXT_OVERFLOW: INPUT_CONTEXT_OVERFLOW_KEY,
+  OUTPUT_CEILING_REACHED: OUTPUT_CEILING_REACHED_KEY,
+  CONTINUATION_EXHAUSTED: CONTINUATION_EXHAUSTED_KEY,
+  EMPTY_VISIBLE_CONTENT_WITH_REASONING: EMPTY_VISIBLE_WITH_REASONING_KEY,
+  REFERENCE_EXPANSION_REQUIRES_CHECKPOINT: REFERENCE_EXPANSION_CHECKPOINT_KEY,
+};
+
+/**
+ * Classify one AgentSessionEvent into a typed context-lifecycle UX class, or
+ * `undefined` when the event carries none of the five (e.g. a non-token-
+ * pressure checkpoint reason, or any other event type) — pure, so the
+ * 5-way separation is directly unit-testable without driving the real loop.
+ */
+export function classifyContextLifecycleEvent(ev: AgentSessionEvent): ContextLifecycleClass | undefined {
+  if (ev.type === 'error' && ev.code === INPUT_CONTEXT_OVERFLOW_KEY) return 'INPUT_CONTEXT_OVERFLOW';
+  if (ev.type === 'error' && ev.code === CONTINUATION_EXHAUSTED_KEY) return 'CONTINUATION_EXHAUSTED';
+  if (ev.type === 'generation-recovery' && ev.action === 'continue') {
+    return ev.classification === 'EMPTY_VISIBLE_AFTER_REASONING'
+      ? 'EMPTY_VISIBLE_CONTENT_WITH_REASONING'
+      : 'OUTPUT_CEILING_REACHED';
+  }
+  if (ev.type === 'budget-checkpoint-request' && ev.reason === 'token-pressure') {
+    return 'REFERENCE_EXPANSION_REQUIRES_CHECKPOINT';
+  }
+  return undefined;
+}
+
+/** Localize a typed context-lifecycle class via the injected localizer. */
+export function localizeContextLifecycleClass(t: (key: string) => string, cls: ContextLifecycleClass): string {
+  return t(CONTEXT_LIFECYCLE_MESSAGE_KEY[cls]);
+}
 
 /** Resolve stable native-agent codes at the CLI boundary. Unknown codes retain
  * the mechanism-provided fallback instead of exposing an untranslated key. */
@@ -452,7 +580,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   const runTurn: ReplEngine = async (input, cbs) => {
     let inputTokens = 0;
     let outputTokens = 0;
-    for await (const ev of session.send(input) as AsyncIterable<AgentSessionEvent>) {
+    // 560-004: the three carriers are separated HERE, at the last seam before the
+    // session — the live turn still rides the expanded payload, but a context
+    // epoch now compacts onto the raw intent plus reference identity.
+    for await (const ev of session.send(parseAtRefLineage(input)) as AsyncIterable<AgentSessionEvent>) {
       switch (ev.type) {
         case 'text-delta':
           cbs.output(ev.text);
@@ -497,9 +628,62 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           // accrual + ceiling check happen in the loop (via the threaded costGuard);
           // a crossed hard ceiling arrives here as an 'error' event, printed below.
           break;
-        case 'error':
+        case 'error': {
           cbs.output(`\n[${localizeSignal(ev.code, ev.message)}]`);
+          // 560-005 (RCA §7) — durable, privacy-safe record of a typed
+          // context-lifecycle terminal state (code + measured token counters
+          // only — never the prompt body or the streamed answer text).
+          const errorLifecycleClass = classifyContextLifecycleEvent(ev);
+          if (errorLifecycleClass) {
+            writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
+              tenantId: deps.scratch?.tenantId ?? 'local',
+              actor: 'native-agent',
+              action: `context-lifecycle.${errorLifecycleClass}`,
+              target: deps.scratch?.sessionId ?? 'session',
+              metadata: { code: ev.code, measuredInputTokens: inputTokens, measuredOutputTokens: outputTokens },
+            });
+          }
           break;
+        }
+        case 'generation-recovery':
+        case 'budget-checkpoint-request': {
+          // 560-005 (RCA §7) — classify + render the typed context-lifecycle
+          // states these two event types carry; `undefined` (e.g. a
+          // non-token-pressure checkpoint reason) stays silent, matching
+          // pre-task behavior for reasons outside this task's scope.
+          const lifecycleClass = classifyContextLifecycleEvent(ev);
+          if (lifecycleClass) cbs.output(`\n[${localizeContextLifecycleClass(t, lifecycleClass)}]\n`);
+          // Privacy-safe lifecycle audit for EVERY generation-recovery /
+          // checkpoint-request event, not just the ones with a rendered
+          // message — continuation index, stop-reason classification,
+          // hidden-reasoning-observed bool, recovery action, checkpoint
+          // reason/rounds/toolCalls, and measured token counters ONLY;
+          // never the prompt body, transcript delta, or streamed text.
+          writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
+            tenantId: deps.scratch?.tenantId ?? 'local',
+            actor: 'native-agent',
+            action: `context-lifecycle.${lifecycleClass ?? ev.type}`,
+            target: deps.scratch?.sessionId ?? 'session',
+            metadata: ev.type === 'generation-recovery'
+              ? {
+                  stopReason: ev.classification,
+                  continuationIndex: ev.continuationIndex,
+                  maxContinuations: ev.maxContinuations,
+                  hiddenReasoningObserved: ev.hiddenReasoningObserved,
+                  recoveryAction: ev.action,
+                  measuredInputTokens: inputTokens,
+                  measuredOutputTokens: outputTokens,
+                }
+              : {
+                  reason: ev.reason,
+                  rounds: ev.rounds,
+                  toolCalls: ev.toolCalls,
+                  measuredInputTokens: inputTokens,
+                  measuredOutputTokens: outputTokens,
+                },
+          });
+          break;
+        }
         case 'session-budget-exhausted': {
           // ONE offer per exhaustion (see createBudgetRenewalOffer) — the
           // session refuses every further provider turn until the user types
@@ -513,6 +697,19 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           // but non-fatal — silence here is what made a full context window
           // read as "the REPL died" (2026-07-07 incident).
           cbs.output(`\n[${localizeSignal(ev.code, ev.message)}]\n`);
+          // 560-004: a context epoch is a durable state transition, so it rides
+          // the SAME canonical hash-chained audit sink every other subsystem
+          // uses. Privacy-safe by construction: the stable CODE only — never the
+          // prompt body, the transcript delta or the checkpoint text.
+          if (ev.code.startsWith('native.checkpoint.')) {
+            writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
+              tenantId: deps.scratch?.tenantId ?? 'local',
+              actor: 'native-agent',
+              action: ev.code,
+              target: deps.scratch?.sessionId ?? 'session',
+              metadata: {},
+            });
+          }
           break;
         // 'tool-proposed' / 'tool-executing' are progress-only; 'turn-end' falls through.
       }

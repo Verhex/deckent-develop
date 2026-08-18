@@ -365,8 +365,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-18 (559 landing debt): same count, digest only — mock realigns
   // (getLanguage/resolveLanguage exports), census pin, retro-json stderr
   // realign, doctor/init MCP catalog pins moved graph content.
-  count: 14376,
-  digest: '39269c779257b47bb051809acd2f805835e2cd02470b69f3cad18af6bc7f78d6',
+  // 2026-08-18 (7086 NATIVE-CONTEXT-LIFECYCLE, sprint-560): +1 — new suites
+  // (request-measurement, output-ceiling-parity, reasoning-continuation,
+  // context-epoch-lineage, context-lifecycle-ux, context-lifecycle-battery)
+  // + realigned admission/signal/renewal/transport pins; agent core content moved.
+  count: 14377,
+  digest: '20a46a298907c09e8f3e19a6d0c19618b9343a8d7eed713d0c2b5ece1360e334',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -597,8 +601,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // command files + messages.ts + mcp tools production hashes moved.
   // 2026-08-18 (559 landing debt): same count, digest only — /renew registry
   // entry (command-registry.ts) moved production content.
+  // 2026-08-18 (7086, sprint-560): same count, digest only — measurement/
+  // admission (context-budget, native-transport), ceiling parity (openai/
+  // anthropic), continuation (loop/events/sse/types), epochs (session,
+  // bridge, run.tsx) and lifecycle i18n (messages) production hashes moved.
   count: 1251,
-  digest: 'fe94001c92cee1eb40fa692b67e678b42d5e85eda6d8a570788626d5e2165437',
+  digest: '1ced8a02ef530c250dc166b87725114d2f1bbca6ae8f60dee2007f003ff965cd',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

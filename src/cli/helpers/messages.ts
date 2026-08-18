@@ -2713,9 +2713,14 @@ const MESSAGES: MessageMap = {
     en: 'tool ran',
     tr: 'araç çalıştı',
   },
+  // 560-005 (RCA §7) — this line used to claim "its context window may be
+  // full", conflating a genuinely empty (output-side) turn with a real
+  // context-window overflow (that has its own typed class, see
+  // 'native-context.admission-denied' below). Fixed wording: no context-window
+  // claim, an honest output-generation label instead.
   'native.empty-response': {
-    en: 'model returned an empty response — its context window may be full; try again or switch model (/model)',
-    tr: 'model boş yanıt döndü — context penceresi dolmuş olabilir; tekrar deneyin veya model değiştirin (/model)',
+    en: 'The model returned no visible output this turn — an output-generation issue, not a full context window. Try again or switch model (/model).',
+    tr: 'Model bu turda görünür bir çıktı döndürmedi — bu bir çıktı-üretim sorunudur, bağlam penceresinin dolması değil. Tekrar deneyin veya model değiştirin (/model).',
   },
   'native.truncated': {
     en: 'response truncated — the model hit its output/context token limit',
@@ -2827,6 +2832,31 @@ const MESSAGES: MessageMap = {
   'native.checkpoint.degraded': {
     en: 'Scratch checkpoint could not be saved; the session continues without checkpoint recovery.',
     tr: 'Scratch checkpoint kaydedilemedi; oturum checkpoint kurtarması olmadan sürüyor.',
+  },
+  // ─── Context-lifecycle UX (560-005, RCA §7) ──────────────────────────────
+  // Five typed states, each with its own wording — a terminal OUTPUT exhaustion
+  // must never read like a context-window overflow, and vice versa. Only the
+  // INPUT_CONTEXT_OVERFLOW line below claims the context window is full; every
+  // output-side line explicitly says it is NOT that, by construction.
+  'native-context.admission-denied': {
+    en: 'The conversation\'s context window is full even after compacting older messages — this turn cannot be sent as-is. Start a fresh context epoch (/renew) or shorten the request.',
+    tr: 'Konuşmanın bağlam penceresi, eski mesajlar sıkıştırıldıktan sonra bile dolu — bu tur olduğu gibi gönderilemez. Yeni bir bağlam dönemi başlatın (/renew) veya isteği kısaltın.',
+  },
+  'native.output-ceiling-reached': {
+    en: 'The model hit its output token ceiling mid-answer — continuing generation automatically from where it stopped. This is an output limit, not a full context window.',
+    tr: 'Model, yanıt sırasında çıktı token tavanına ulaştı — kaldığı yerden üretim otomatik olarak sürdürülüyor. Bu bir çıktı sınırıdır, bağlam penceresinin dolması değil.',
+  },
+  'native-output.continuation-exhausted': {
+    en: 'Automatic continuation gave up after repeated attempts — the output ceiling kept cutting the answer short. This is an output-generation limit, not a full context window.',
+    tr: 'Otomatik devam denemesi art arda denendikten sonra vazgeçildi — çıktı tavanı yanıtı sürekli kesti. Bu bir çıktı-üretim sınırıdır, bağlam penceresinin dolması değil.',
+  },
+  'native.empty-visible-with-reasoning': {
+    en: 'The model spent its output budget on hidden reasoning without producing visible text yet — continuing automatically to recover a visible answer. This is an output issue, not a full context window.',
+    tr: 'Model çıktı bütçesini görünür metin üretmeden gizli akıl yürütmeye harcadı — görünür bir yanıt kurtarmak için otomatik olarak sürdürülüyor. Bu bir çıktı sorunudur, bağlam penceresinin dolması değil.',
+  },
+  'native.reference-expansion-checkpoint': {
+    en: 'Expanded reference material pushed this turn\'s context near its limit — saving a checkpoint before continuing.',
+    tr: 'Genişletilmiş referans içeriği bu turun bağlamını sınırına yaklaştırdı — devam etmeden önce bir checkpoint kaydediliyor.',
   },
   // NATIVE-BUDGET-RENEWAL (557-002) — the exhaustion offer + the `/renew` replies.
   // `{dimension}` is one of the `native-budget.*-exhausted` lines above; a renewal

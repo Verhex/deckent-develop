@@ -222,3 +222,11 @@ değildir, sakin retry planla.
   sürdürülmesi; terminal-kilitlenme RCA'sının 3-koşu xverify kompozisyonu
   (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: onay-canlılık dersiyle
   yeniden koşuldu).
+- **2026-08-18 — sprint-560 (7086 context-lifecycle)**: Ders 16'ya iki ek işledi:
+  commit-kimliği xverify iddiasına gömülmez (kanal evidence-digest'i zaten taşır)
+  ve chokepoint dosyaları görevlere tahsis ederken ÜRETİCİ-TÜKETİCİ zincirini düşün —
+  003'ün ihtiyacı tam da 1/2'ye tahsisli dosyalardaydı; çözüm terminal-yazarların
+  serbest kalmasıyla ADR-D-007 üretici el-tamamlaması + fix'in tüketici tarafı oldu.
+  Sözleşme değiştiren sprint'in landing-borcu (eski fallback/notice/string-send
+  pinleri) tek geçişte yeni typed sözleşmeye hizalandı; canlı Qwen kanıtı taze
+  binary + gerçek sunucuyla alındı.

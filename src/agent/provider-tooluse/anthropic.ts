@@ -6,13 +6,18 @@
 // fragments and are emitted (parsed) on content_block_stop. fetchImpl injectable.
 
 import { validateProviderRequest, type ProviderAdapter, type ProviderEvent, type ProviderMessage, type ProviderRequest } from './types.js';
+import { resolveWireOutputCeiling } from './openai.js';
 import { parseSSE } from './sse.js';
 
 export interface AnthropicAdapterOptions {
   apiKey: string;
   baseUrl?: string;        // default 'https://api.anthropic.com/v1'
   version?: string;        // anthropic-version header, default '2023-06-01'
-  maxTokens?: number;      // default 4096
+  /** Operator-pinned generation ceiling. NO default — see the ceiling note on
+   *  `send` below; absent means this adapter has no ceiling authority of its
+   *  own, NOT that a constant is substituted. Outranked by the per-request
+   *  `ProviderRequest.outputCeilingTokens`. */
+  maxTokens?: number;
   fetchImpl?: typeof fetch;
 }
 
@@ -86,10 +91,24 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
       const body: Record<string, unknown> = {
         model: req.model,
         stream: true,
-        max_tokens: opts.maxTokens ?? 4096,
         system: req.system,
         messages: toAnthropicMessages(req.messages),
       };
+      // RCA §2 — the wire ceiling is the caller's computed safe ceiling, resolved
+      // through the same ladder the OpenAI-compatible transport uses, so both
+      // transports wire the same value for the same request. The former
+      // `max_tokens: opts.maxTokens ?? 4096` capped every real request at the
+      // protected-minimum reserve (production builds this adapter without
+      // `maxTokens`), which is exactly the incident: a 93.5K-input turn that had
+      // room for tens of thousands of output tokens was cut at 4,096.
+      // Unresolved omits the field: this transport reports the missing ceiling
+      // authority through the provider's own typed rejection rather than
+      // silently truncating behind a constant.
+      const ceiling = resolveWireOutputCeiling({
+        requestCeilingTokens: req.outputCeilingTokens,
+        configuredCeilingTokens: opts.maxTokens,
+      });
+      if (ceiling.state === 'resolved') body['max_tokens'] = ceiling.tokens;
       if (req.tools.length > 0) {
         body['tools'] = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema }));
       }

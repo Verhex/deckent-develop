@@ -34,6 +34,17 @@ import {
 } from './context-budget.js';
 import { matchRule } from './permission-types.js';
 
+const MAX_OUTPUT_CONTINUATIONS = 2;
+const CONTINUATION_INSTRUCTION = 'Continue the same answer exactly where it stopped. Do not repeat prior visible text.';
+
+function removeRepeatedPrefix(previous: string, next: string): string {
+  const max = Math.min(previous.length, next.length);
+  for (let overlap = max; overlap > 0; overlap--) {
+    if (previous.endsWith(next.slice(0, overlap))) return next.slice(overlap);
+  }
+  return next;
+}
+
 export type PermissionResponse = { decision: 'once' | 'session' | 'always' | 'deny' };
 
 export interface LoopDeps {
@@ -252,16 +263,29 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       ...(outputCeilingTokens > 0 ? { outputCeilingTokens } : {}),
     };
     let assistantText = '';
-    let stopReason: string | undefined;
-    const calls: ProviderToolCall[] = [];
+    let calls: ProviderToolCall[] = [];
+    let continuationIndex = 0;
+    let continuationMessages = messages;
     try {
-      for await (const ev of adapter.send(req)) {
+      while (true) {
+        let segmentText = '';
+        const segmentCalls: ProviderToolCall[] = [];
+        let segmentStopReason: string | undefined;
+        let hiddenReasoningObserved = false;
+        const segmentRequest: ProviderRequest = { ...req, messages: continuationMessages };
+        for await (const ev of adapter.send(segmentRequest)) {
         // Mid-stream cancel(): stop consuming further provider events instead of
         // running the in-flight turn to completion (breaking a for-await triggers
         // the adapter's iterator.return(), giving it a chance to abort cleanly).
         if (deps.isCancelled?.()) break;
-        if (ev.type === 'text-delta') { assistantText += ev.text; yield { type: 'text-delta', text: ev.text }; }
-        else if (ev.type === 'tool-call') { calls.push(ev); yield { type: 'tool-proposed', id: ev.id, tool: ev.name, args: ev.args }; }
+        if (ev.type === 'text-delta') {
+          segmentText += ev.text;
+          // Preserve ordinary streaming order. Continuation segments alone are
+          // buffered until their overlap with already-visible text is known.
+          if (continuationIndex === 0) yield { type: 'text-delta', text: ev.text };
+        }
+        else if (ev.type === 'reasoning-activity') { hiddenReasoningObserved = true; }
+        else if (ev.type === 'tool-call') { segmentCalls.push(ev); }
         else if (ev.type === 'usage') {
           yield { type: 'usage', inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
           if (budgetState) {
@@ -285,7 +309,51 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
             }
           }
         }
-        else if (ev.type === 'done') { stopReason = ev.stopReason; }
+        else if (ev.type === 'done') { segmentStopReason = ev.stopReason; }
+        }
+
+        if (deps.isCancelled?.()) break;
+        const novelText = continuationIndex === 0
+          ? segmentText
+          : removeRepeatedPrefix(assistantText, segmentText);
+        assistantText += novelText;
+        if (continuationIndex > 0 && novelText !== '') {
+          yield { type: 'text-delta', text: novelText };
+        }
+
+        if (segmentStopReason !== 'length') {
+          calls = segmentCalls;
+          for (const call of calls) yield { type: 'tool-proposed', id: call.id, tool: call.name, args: call.args };
+          break;
+        }
+
+        // A length-cut segment is not an atomic tool-call boundary. Even if an
+        // adapter recovered JSON from accumulated fragments, none of its calls
+        // may be proposed, committed to the transcript, or executed.
+        const classification = segmentText === '' && hiddenReasoningObserved
+          ? 'EMPTY_VISIBLE_AFTER_REASONING'
+          : 'OUTPUT_LIMIT';
+        if (continuationIndex >= MAX_OUTPUT_CONTINUATIONS) {
+          yield {
+            type: 'generation-recovery', classification,
+            continuationIndex, maxContinuations: MAX_OUTPUT_CONTINUATIONS,
+            hiddenReasoningObserved, action: 'hold',
+          };
+          yield { type: 'error', code: 'native-output.continuation-exhausted', message: 'native-output.continuation-exhausted' };
+          yield { type: 'turn-end' };
+          return;
+        }
+        continuationIndex++;
+        yield {
+          type: 'generation-recovery', classification,
+          continuationIndex, maxContinuations: MAX_OUTPUT_CONTINUATIONS,
+          hiddenReasoningObserved, action: 'continue',
+        };
+        continuationMessages = [
+          ...messages,
+          ...(assistantText === '' ? [] : [{ role: 'assistant' as const, content: assistantText }]),
+          { role: 'user', content: CONTINUATION_INSTRUCTION },
+        ];
       }
     } catch (e) {
       yield { type: 'error', message: e instanceof Error ? e.message : String(e) };
@@ -297,13 +365,6 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // executed, so committing it (transcript.appendAssistant below) would leave
     // orphan tool_use ids with no matching tool_result — reject before that happens.
     if (deps.isCancelled?.()) { yield { type: 'turn-end' }; return; }
-
-    // Honest truncation signal: the backend cut generation at its token/context
-    // ceiling. The turn still carries whatever arrived, but the user must know
-    // the reply is incomplete rather than mistaking it for a finished answer.
-    if (stopReason === 'length') {
-      yield { type: 'notice', code: 'truncated', message: 'response truncated — the model hit its output/context token limit' };
-    }
 
     // Skip a truly-empty assistant turn (no text, no tool calls) — appending
     // `{role:'assistant', content:''}` would replay to the provider next send
@@ -337,6 +398,11 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       // it is the signature of a full context window (or a broken backend).
       // Fail honestly instead of closing the turn as if it succeeded.
       if (assistantText === '') {
+        yield {
+          type: 'generation-recovery', classification: 'TRANSPORT_EMPTY',
+          continuationIndex: 0, maxContinuations: MAX_OUTPUT_CONTINUATIONS,
+          hiddenReasoningObserved: false, action: 'hold',
+        };
         yield {
           type: 'error',
           code: 'empty-response',

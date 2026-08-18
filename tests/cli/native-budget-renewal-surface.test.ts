@@ -29,8 +29,12 @@ const fakeSession = vi.hoisted(() => ({
 
 vi.mock('../../src/agent/session.js', () => ({
   createAgentSession: () => ({
-    send(userInput: string) {
-      fakeSession.sends.push(userInput);
+    // 7086/560-004: the bridge now sends a structured TurnInput
+    // ({rawIntent, expandedPayload, references}) — capture the raw intent so
+    // the assertions stay input-shaped regardless of the envelope.
+    send(userInput: string | { rawIntent: string }) {
+      const raw = typeof userInput === 'string' ? userInput : userInput.rawIntent;
+      fakeSession.sends.push(raw);
       const code = fakeSession.exhaustedCode;
       const epoch = fakeSession.epoch;
       return (async function* fake() {
@@ -39,7 +43,7 @@ vi.mock('../../src/agent/session.js', () => ({
           yield { type: 'turn-end' };
           return;
         }
-        yield { type: 'text-delta', text: `ok:${userInput}` };
+        yield { type: 'text-delta', text: `ok:${raw}` };
         yield { type: 'turn-end' };
       })();
     },

@@ -48,7 +48,15 @@ describe('runAgentTurn — honest degradation signals', () => {
   it('surfaces an empty provider response as an empty-response error, not a silent turn', async () => {
     const { adapter } = scriptedAdapter([[{ type: 'done' }]]);
     const evs = await drain(runAgentTurn(baseDeps({ adapter }), new Transcript(), 'hi'));
+    // 7086/560-003: the empty turn is now ALSO classified as a typed
+    // generation-recovery fact (TRANSPORT_EMPTY, action hold) before the
+    // honest empty-response error.
     expect(evs).toEqual([
+      {
+        type: 'generation-recovery', classification: 'TRANSPORT_EMPTY',
+        continuationIndex: 0, maxContinuations: expect.any(Number),
+        hiddenReasoningObserved: false, action: 'hold',
+      },
       { type: 'error', code: 'empty-response', message: expect.stringContaining('empty response') },
       { type: 'turn-end' },
     ]);
@@ -60,10 +68,19 @@ describe('runAgentTurn — honest degradation signals', () => {
     expect(evs.some((e) => e.type === 'error')).toBe(false);
   });
 
-  it("emits a 'truncated' notice when the stream stops with stopReason 'length'", async () => {
-    const { adapter } = scriptedAdapter([[{ type: 'text-delta', text: 'partial…' }, { type: 'done', stopReason: 'length' }]]);
+  it("recovers a 'length' stop via bounded continuation (typed OUTPUT_LIMIT, no passive truncated notice)", async () => {
+    // 7086/560-003: a length stop no longer yields a passive 'truncated'
+    // notice — the loop continues the SAME logical turn with a bounded
+    // follow-up request and reports the fact as typed generation-recovery.
+    const { adapter } = scriptedAdapter([
+      [{ type: 'text-delta', text: 'partial…' }, { type: 'done', stopReason: 'length' }],
+      [{ type: 'text-delta', text: ' rest.' }, { type: 'done', stopReason: 'stop' }],
+    ]);
     const evs = await drain(runAgentTurn(baseDeps({ adapter }), new Transcript(), 'hi'));
-    expect(evs).toContainEqual({ type: 'notice', code: 'truncated', message: expect.stringContaining('truncated') });
+    expect(evs).toContainEqual(expect.objectContaining({
+      type: 'generation-recovery', classification: 'OUTPUT_LIMIT', action: 'continue', continuationIndex: 1,
+    }));
+    expect(evs.some((e) => (e as { code?: string }).code === 'truncated')).toBe(false);
     expect(evs[evs.length - 1]).toEqual({ type: 'turn-end' });
   });
 

@@ -13,7 +13,12 @@ import { detectTransport, type TransportConfig } from '../../agent/provider-dete
 import { createAnthropicAdapter } from '../../agent/provider-tooluse/anthropic.js';
 import { createOpenAIAdapter } from '../../agent/provider-tooluse/openai.js';
 import { createOllamaAdapter } from '../../agent/provider-tooluse/ollama.js';
-import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
+import type {
+  ProviderAdapter,
+  ProviderContextIdentity,
+  ProviderRequest,
+  ProviderRequestMeasurementCapability,
+} from '../../agent/provider-tooluse/types.js';
 import {
   getLegacyModelMigration,
   inferProviderFromId,
@@ -23,7 +28,12 @@ import {
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
 import { getMessage } from '../helpers/messages.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
-import { deriveEffectiveContext, type EffectiveContextResult } from '../../agent/context-budget.js';
+import {
+  decideProviderAdmission,
+  deriveEffectiveContext,
+  measureProviderRequest,
+  type EffectiveContextResult,
+} from '../../agent/context-budget.js';
 
 export interface NativeEndpointHealth {
   endpoint: string;
@@ -45,6 +55,123 @@ export interface ResolvedProvider {
   modelIdentity?: () => Promise<NativeModelIdentityVerdict>;
   contextStatus?: () => Promise<EffectiveContextResult | null>;
   configuredContextSize?: number;
+}
+
+export class InputContextOverflowError extends Error {
+  readonly code = 'INPUT_CONTEXT_OVERFLOW' as const;
+  constructor(readonly decision: Extract<ReturnType<typeof decideProviderAdmission>, { admitted: false }>) {
+    super(`INPUT_CONTEXT_OVERFLOW: measured=${decision.measurement.inputTokens} available=${decision.availableTokens}`);
+    this.name = 'InputContextOverflowError';
+  }
+}
+
+export class ContextAuthorityUnavailableError extends Error {
+  readonly code = 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE' as const;
+  constructor(provider: string, model: string) {
+    super(`INPUT_CONTEXT_AUTHORITY_UNAVAILABLE: provider=${provider} model=${model}`);
+    this.name = 'ContextAuthorityUnavailableError';
+  }
+}
+
+function registryContextTokens(model: string): number | null {
+  const definition = modelRegistry.get(model);
+  return definition && Number.isSafeInteger(definition.contextWindow) && definition.contextWindow > 0
+    ? definition.contextWindow
+    : null;
+}
+
+function requestMeasurementCapability(input: {
+  kind: 'llama.cpp' | 'anthropic';
+  endpoint: string;
+  fetchFn: typeof globalThis.fetch;
+  headers?: Record<string, string>;
+}): ProviderRequestMeasurementCapability {
+  return {
+    async measure(req, signal) {
+      if (input.kind === 'anthropic') {
+        const response = await input.fetchFn(new URL('messages/count_tokens', `${input.endpoint.replace(/\/$/, '')}/`).toString(), {
+          method: 'POST', signal, headers: { 'content-type': 'application/json', ...input.headers },
+          body: JSON.stringify({ model: req.model, system: req.system, messages: req.messages, tools: req.tools }),
+        });
+        if (!response.ok) return null;
+        const body = await response.json() as { input_tokens?: unknown };
+        return typeof body.input_tokens === 'number'
+          ? { inputTokens: body.input_tokens, provenance: 'anthropic-count-tokens' }
+          : null;
+      }
+      const templated = await input.fetchFn(new URL('apply-template', `${input.endpoint.replace(/\/$/, '')}/`).toString(), {
+        method: 'POST', signal, headers: { 'content-type': 'application/json', ...input.headers },
+        body: JSON.stringify({ model: req.model, system: req.system, messages: req.messages, tools: req.tools }),
+      });
+      if (!templated.ok) return null;
+      const templateBody = await templated.json() as { prompt?: unknown };
+      if (typeof templateBody.prompt !== 'string') return null;
+      const tokenized = await input.fetchFn(new URL('tokenize', `${input.endpoint.replace(/\/$/, '')}/`).toString(), {
+        method: 'POST', signal, headers: { 'content-type': 'application/json', ...input.headers },
+        body: JSON.stringify({ content: templateBody.prompt, add_special: true }),
+      });
+      if (!tokenized.ok) return null;
+      const tokenBody = await tokenized.json() as { tokens?: unknown[]; count?: unknown };
+      const count = typeof tokenBody.count === 'number'
+        ? tokenBody.count
+        : Array.isArray(tokenBody.tokens) ? tokenBody.tokens.length : null;
+      return count === null ? null : { inputTokens: count, provenance: 'llama.cpp-apply-template-tokenize' };
+    },
+  };
+}
+
+/** Wrap the real native adapter at its single dispatch seam. Measurement and
+ * admission finish before the underlying async iterator is even constructed. */
+export function withMeasuredAdmission(input: {
+  adapter: ProviderAdapter;
+  identity: ProviderContextIdentity | (() => Promise<ProviderContextIdentity>);
+  capability?: ProviderRequestMeasurementCapability;
+  outputReserveTokens?: number;
+  contextSafetyReserveTokens?: number;
+}): ProviderAdapter {
+  return {
+    name: input.adapter.name,
+    requestMeasurement: input.capability,
+    async *send(req: ProviderRequest) {
+      const identity = typeof input.identity === 'function' ? await input.identity() : input.identity;
+      const measurement = await measureProviderRequest({
+        request: req,
+        identity,
+        ...(input.capability ? { capability: input.capability } : {}),
+      });
+      const decision = decideProviderAdmission(
+        measurement,
+        input.outputReserveTokens ?? req.outputCeilingTokens ?? 0,
+        input.contextSafetyReserveTokens ?? 0,
+      );
+      if (!decision.admitted) throw new InputContextOverflowError(decision);
+      yield* input.adapter.send(req);
+    },
+  };
+}
+
+function registryIdentity(provider: string, model: string): ProviderContextIdentity {
+  const contextWindowTokens = registryContextTokens(model);
+  if (contextWindowTokens === null) throw new ContextAuthorityUnavailableError(provider, model);
+  return { provider, model, contextWindowTokens, contextProvenance: 'model-registry' };
+}
+
+function measuredResolved(input: {
+  adapter: ProviderAdapter;
+  providerName: string;
+  model: string;
+  capability?: ProviderRequestMeasurementCapability;
+  identity?: () => Promise<ProviderContextIdentity>;
+}): Pick<ResolvedProvider, 'adapter' | 'model' | 'providerName'> {
+  return {
+    adapter: withMeasuredAdmission({
+      adapter: input.adapter,
+      identity: input.identity ?? (() => Promise.resolve(registryIdentity(input.providerName, input.model))),
+      ...(input.capability ? { capability: input.capability } : {}),
+    }),
+    model: input.model,
+    providerName: input.providerName,
+  };
 }
 export interface ProviderError {
   error: string;
@@ -223,7 +350,8 @@ export async function formatNativeProviderStatus(
 
 async function probeNativeContext(
   endpoint: string,
-  configuredContextSize: number,
+  configuredContextSize: number | null,
+  modelAdvertisedContext: number | null,
   fetchFn: typeof globalThis.fetch,
 ): Promise<EffectiveContextResult | null> {
   try {
@@ -234,7 +362,7 @@ async function probeNativeContext(
     return deriveEffectiveContext({
       configuredContextSize,
       serverReportedContext: typeof reported === 'number' ? reported : null,
-      modelAdvertisedContext: null,
+      modelAdvertisedContext,
     });
   } catch {
     return null;
@@ -345,11 +473,16 @@ export function resolveNativeSelection(
         provider: 'claude',
       };
     }
-    return {
-      adapter: createAnthropicAdapter({ apiKey }),
+    const endpoint = 'https://api.anthropic.com/v1';
+    return measuredResolved({
+      adapter: createAnthropicAdapter({ apiKey, baseUrl: endpoint }),
       model: wire.apiId,
       providerName: 'claude',
-    };
+      capability: requestMeasurementCapability({
+        kind: 'anthropic', endpoint, fetchFn: ctx.fetchFn ?? globalThis.fetch,
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      }),
+    });
   }
 
   if (provider === 'openai') {
@@ -368,11 +501,14 @@ export function resolveNativeSelection(
     const configModel = config.native_model && inferProviderFromId(config.native_model) !== 'claude' ? config.native_model : null;
     const opts: Parameters<typeof createOpenAIAdapter>[0] = { baseUrl };
     if (apiKey) opts.apiKey = apiKey;
-    return {
-      adapter: createOpenAIAdapter(opts),
-      model: requestedModel ?? configModel ?? DEFAULT_MODEL['openai-compatible'],
-      providerName: 'openai',
-    };
+    const model = requestedModel ?? configModel ?? DEFAULT_MODEL['openai-compatible'];
+    return measuredResolved({
+      adapter: createOpenAIAdapter(opts), model, providerName: 'openai',
+      capability: requestMeasurementCapability({
+        kind: 'llama.cpp', endpoint: baseUrl, fetchFn: ctx.fetchFn ?? globalThis.fetch,
+        ...(apiKey ? { headers: { authorization: `Bearer ${apiKey}` } } : {}),
+      }),
+    });
   }
 
   if (provider === 'local-llm') {
@@ -411,10 +547,27 @@ export function resolveNativeSelection(
     // does not report leaves the configured value standing (honest config-only
     // fallback); a server that DOES report can only narrow it.
     const configuredContextTokens = resolveConfiguredContextTokens(config);
+    const advertisedContext = registryContextTokens(selectedModel);
+    const fetchFn = ctx.fetchFn ?? globalThis.fetch;
+    const identity = async (): Promise<ProviderContextIdentity> => {
+      const status = await probeNativeContext(endpoint, configuredContextTokens ?? null, advertisedContext, fetchFn);
+      if (!status) throw new ContextAuthorityUnavailableError('local-llm', selectedModel);
+      const server = status.provenance.find((entry) => entry.source === 'server-reported' && entry.counted);
+      const configured = status.provenance.find((entry) => entry.source === 'configured' && entry.counted);
+      return {
+        provider: 'local-llm', model: selectedModel,
+        contextWindowTokens: status.effectiveContextSize,
+        contextProvenance: server ? 'server-reported' : configured ? 'configured-narrowing' : 'model-registry',
+      };
+    };
     return {
-      adapter: createOpenAIAdapter({ baseUrl: endpoint, name: 'local-llm' }),
-      model: selectedModel,
-      providerName: 'local-llm',
+      ...measuredResolved({
+        adapter: createOpenAIAdapter({ baseUrl: endpoint, name: 'local-llm' }),
+        model: selectedModel,
+        providerName: 'local-llm',
+        capability: requestMeasurementCapability({ kind: 'llama.cpp', endpoint, fetchFn }),
+        identity,
+      }),
       endpointHealth: () => probeNativeEndpointHealth(endpoint, ctx.fetchFn),
       modelIdentity: () => validateNativeModelIdentity(selectedModel, endpoint, ctx.fetchFn ?? globalThis.fetch),
       ...(configuredContextTokens !== undefined
@@ -423,6 +576,7 @@ export function resolveNativeSelection(
             contextStatus: () => probeNativeContext(
               endpoint,
               configuredContextTokens,
+              advertisedContext,
               ctx.fetchFn ?? globalThis.fetch,
             ),
           }
@@ -448,11 +602,14 @@ export function resolveNativeSelection(
         provider,
       };
     }
-    return {
-      adapter: createOpenAIAdapter({ baseUrl: meta.baseURL, apiKey, name: meta.name }),
-      model: requestedModel ?? meta.models[0]!,
-      providerName: provider,
-    };
+    const model = requestedModel ?? meta.models[0]!;
+    return measuredResolved({
+      adapter: createOpenAIAdapter({ baseUrl: meta.baseURL, apiKey, name: meta.name }), model, providerName: provider,
+      capability: requestMeasurementCapability({
+        kind: 'llama.cpp', endpoint: meta.baseURL, fetchFn: ctx.fetchFn ?? globalThis.fetch,
+        headers: { authorization: `Bearer ${apiKey}` },
+      }),
+    });
   }
 
   if (provider === 'ollama') {
@@ -465,11 +622,13 @@ export function resolveNativeSelection(
       };
     }
     const configModel = config.native_model && inferProviderFromId(config.native_model) === 'ollama' ? config.native_model : null;
-    return {
-      adapter: createOllamaAdapter({ host: config.ollama_host }),
-      model: requestedModel ?? configModel ?? DEFAULT_MODEL.ollama,
-      providerName: 'ollama',
-    };
+    const model = requestedModel ?? configModel ?? DEFAULT_MODEL.ollama;
+    return measuredResolved({
+      adapter: createOllamaAdapter({ host: config.ollama_host }), model, providerName: 'ollama',
+      capability: requestMeasurementCapability({
+        kind: 'llama.cpp', endpoint: config.ollama_host, fetchFn: ctx.fetchFn ?? globalThis.fetch,
+      }),
+    });
   }
 
   return {
@@ -480,7 +639,7 @@ export function resolveNativeSelection(
   };
 }
 
-/** Prompt-side context budget (estimated tokens) for a provider selection.
+/** Prompt-side context budget for a provider selection.
  *  Authority order (owner directive 2026-08-18 — "use the model's full
  *  context; config only narrows"): the usable window is the minimum of the
  *  KNOWN ceilings — a boot-resolved effective context (server-reported,
@@ -489,9 +648,8 @@ export function resolveNativeSelection(
  *  it (NT-07: a widened window is exactly the doomed request the loop's
  *  admission gate then has to deny). Generation headroom is NOT subtracted
  *  here — derivePromptBudget's output/safety reserves own that arithmetic.
- *  The per-provider literals at the bottom are last-resort fallbacks for a
- *  model the registry cannot advertise: 24k for local Ollama slots (the
- *  2026-07-07 empty-turn incident), 160k for hosted claude, 100k otherwise. */
+ *  Unknown authority is rejected: a literal ceiling can be larger than the
+ *  real model window and therefore cannot authorize a dispatch. */
 export function resolveContextBudgetTokens(
   providerName: string,
   config: { native_context_tokens?: unknown },
@@ -507,9 +665,7 @@ export function resolveContextBudgetTokens(
   const ceiling = ceilings.length > 0 ? Math.min(...ceilings) : undefined;
   if (configured !== undefined) return ceiling !== undefined ? Math.min(configured, ceiling) : configured;
   if (ceiling !== undefined) return ceiling;
-  if (providerName === 'ollama') return 24_000;
-  if (providerName === 'claude') return 160_000;
-  return 100_000;
+  throw new ContextAuthorityUnavailableError(providerName, 'unresolved');
 }
 
 export function resolveNativeProvider(

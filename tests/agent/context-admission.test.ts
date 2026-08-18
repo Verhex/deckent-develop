@@ -287,10 +287,12 @@ describe('NT-07 boot-time effective context', () => {
     expect(resolveContextBudgetTokens('local-llm', { native_context_tokens: 60_000 }, 8_192)).toBe(8_192);
     expect(resolveContextBudgetTokens('local-llm', { native_context_tokens: 4_000 }, 8_192)).toBe(4_000);
     expect(resolveContextBudgetTokens('local-llm', {}, 8_192)).toBe(8_192);
-    // Providers with no discoverable server ceiling keep their existing results.
+    // Providers with no discoverable server ceiling keep an explicit config…
     expect(resolveContextBudgetTokens('claude', { native_context_tokens: 60_000 }, 8_192)).toBe(60_000);
-    expect(resolveContextBudgetTokens('ollama', {})).toBe(24_000);
-    expect(resolveContextBudgetTokens('claude', {})).toBe(160_000);
+    // …but with NO authority at all the resolver refuses (7086/560-001):
+    // optimistic literals (24k/100k/160k) are gone — unresolved is typed.
+    expect(() => resolveContextBudgetTokens('ollama', {})).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
+    expect(() => resolveContextBudgetTokens('claude', {})).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
   });
 
   it('uses the model-advertised FULL window; config only narrows (owner directive 2026-08-18)', () => {
@@ -302,7 +304,8 @@ describe('NT-07 boot-time effective context', () => {
     expect(resolveContextBudgetTokens('claude', { native_context_tokens: 2_000_000 }, null, 1_000_000)).toBe(1_000_000);
     // Server-reported and advertised ceilings compose as a minimum (local-llm).
     expect(resolveContextBudgetTokens('local-llm', {}, 131_072, 262_144)).toBe(131_072);
-    // A model the registry cannot advertise keeps the last-resort fallback.
-    expect(resolveContextBudgetTokens('claude', {}, null, null)).toBe(160_000);
+    // A model no authority can bound is a typed refusal, not a fallback
+    // (7086/560-001 — the last-resort literals are removed).
+    expect(() => resolveContextBudgetTokens('claude', {}, null, null)).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
   });
 });

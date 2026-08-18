@@ -232,3 +232,12 @@ passes — a HOLD is not closure; plan a calm retry.
   spawn after an interruption; the terminal-lockup RCA's 3-run xverify composition
   (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: re-run with the
   approval-liveness lesson applied).
+- **2026-08-18 — sprint-560 (7086 context-lifecycle)**: two additions folded into
+  Lesson 16: never embed a commit identity inside an xverify claim (the channel
+  already carries evidence digests), and when assigning chokepoint files to tasks
+  think through the PRODUCER-CONSUMER chain — task 3's need lived exactly in the
+  files assigned to tasks 1/2; the resolution was an ADR-D-007 producer
+  hand-completion (terminal writers had released their locks) plus the fix's
+  consumer side. A contract-changing sprint's landing debt (old fallback/notice/
+  string-send pins) was realigned to the new typed contracts in one pass; the live
+  Qwen proof ran on a fresh binary against the real server.

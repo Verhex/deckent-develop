@@ -38,6 +38,42 @@ export interface ProviderRequest {
   outputCeilingTokens?: number;
 }
 
+export interface ProviderContextIdentity {
+  provider: string;
+  model: string;
+  contextWindowTokens: number;
+  contextProvenance: 'server-reported' | 'model-registry' | 'configured-narrowing';
+}
+
+export type RequestMeasurementQuality = 'exact' | 'conservative-upper-bound';
+
+export interface RequestMeasurement {
+  inputTokens: number;
+  quality: RequestMeasurementQuality;
+  provenance: string;
+  requestDigest: string;
+  identity: ProviderContextIdentity;
+}
+
+/** Provider-specific token counting, when the transport can prove it. The
+ * normalized request is complete: system, messages, tools and model are all
+ * present before the capability is invoked. */
+export interface ProviderRequestMeasurementCapability {
+  measure(req: ProviderRequest, signal: AbortSignal): Promise<{
+    inputTokens: number;
+    provenance: string;
+  } | null>;
+}
+
+export type ProviderAdmissionDecision =
+  | { admitted: true; measurement: RequestMeasurement; availableTokens: number }
+  | {
+      admitted: false;
+      code: 'INPUT_CONTEXT_OVERFLOW';
+      measurement: RequestMeasurement;
+      availableTokens: number;
+    };
+
 export interface ProviderTextDelta { type: 'text-delta'; text: string; }
 export interface ProviderToolCall { type: 'tool-call'; id: string; name: string; args: Record<string, unknown>; }
 export interface ProviderUsage { type: 'usage'; inputTokens: number; outputTokens: number; }
@@ -48,11 +84,19 @@ export interface ProviderUsage { type: 'usage'; inputTokens: number; outputToken
  *  know the cause omit it; the loop then treats the stream as a plain stop. */
 export type ProviderStopReason = 'stop' | 'length' | 'tool_calls';
 export interface ProviderDone { type: 'done'; stopReason?: ProviderStopReason; }
-export type ProviderEvent = ProviderTextDelta | ProviderToolCall | ProviderUsage | ProviderDone;
+/** Hidden-reasoning activity observed on the stream (e.g. OpenAI-compatible
+ *  `delta.reasoning_content`). METADATA ONLY — the chain-of-thought text never
+ *  crosses this boundary (privacy contract, 7086/RCA §3): the event carries
+ *  the observed character count so the loop can classify a `length` stop with
+ *  empty visible content as EMPTY_VISIBLE_AFTER_REASONING and drive bounded
+ *  continuation, without ever being able to display the reasoning itself. */
+export interface ProviderReasoningActivity { type: 'reasoning-activity'; chars: number; }
+export type ProviderEvent = ProviderTextDelta | ProviderToolCall | ProviderUsage | ProviderDone | ProviderReasoningActivity;
 
 /** Every LLM backend (Anthropic/OpenAI-compat/Ollama) implements this. */
 export interface ProviderAdapter {
   readonly name: string;
+  readonly requestMeasurement?: ProviderRequestMeasurementCapability;
   send(req: ProviderRequest): AsyncIterable<ProviderEvent>;
 }
 

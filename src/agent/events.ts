@@ -24,6 +24,20 @@ export interface ToolExecutingEvent { type: 'tool-executing'; id: string; tool: 
 export interface ToolResultEvent { type: 'tool-result'; id: string; tool: string; ok: boolean; output: string; }
 export interface TurnEndEvent { type: 'turn-end'; }
 export interface UsageEvent { type: 'usage'; inputTokens: number; outputTokens: number; }
+export type GenerationRecoveryClassification =
+  | 'OUTPUT_LIMIT'
+  | 'EMPTY_VISIBLE_AFTER_REASONING'
+  | 'TRANSPORT_EMPTY';
+/** Privacy-safe generation recovery provenance. Hidden reasoning content is
+ * never carried; only the fact that activity was observed crosses the loop. */
+export interface GenerationRecoveryEvent {
+  type: 'generation-recovery';
+  classification: GenerationRecoveryClassification;
+  continuationIndex: number;
+  maxContinuations: number;
+  hiddenReasoningObserved: boolean;
+  action: 'continue' | 'hold';
+}
 /** `code` is a stable machine-readable id ('empty-response' | …) so views can
  *  localize known failure classes; `message` stays the English default for
  *  views without a localizer. */
@@ -51,6 +65,7 @@ export type AgentEvent =
   | ToolResultEvent
   | TurnEndEvent
   | UsageEvent
+  | GenerationRecoveryEvent
   | BudgetCheckpointRequestEvent
   | ErrorEvent
   | NoticeEvent;

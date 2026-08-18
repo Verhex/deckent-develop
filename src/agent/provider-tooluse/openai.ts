@@ -13,7 +13,55 @@ export interface OpenAIAdapterOptions {
   baseUrl: string;
   apiKey?: string;
   name?: string;
+  /** Operator-pinned generation ceiling for every request this adapter sends.
+   *  NO default — absent means "this adapter has no ceiling authority", not
+   *  "use a constant". Outranked by ProviderRequest.outputCeilingTokens. */
+  maxTokens?: number;
   fetchImpl?: typeof fetch;
+}
+
+/** Outcome of the normalized output-ceiling resolution (RCA §2). `unresolved`
+ *  is a first-class state: a transport that has no ceiling authority wires no
+ *  ceiling, it never falls back to a constant. */
+export type WireOutputCeiling =
+  | { state: 'resolved'; tokens: number; source: 'request' | 'configured' }
+  | { state: 'unresolved'; reason: 'no-ceiling-authority' | 'invalid-ceiling-authority' };
+
+/**
+ * ═══ Normalized output-ceiling contract — shared by ALL transports ══════════
+ * RCA §2: `outputReserveTokens` is the protected MINIMUM answer room, never the
+ * wire ceiling. The safe ceiling is a function of measured input, effective
+ * context, the safety reserve, the model-registry output limit, policy and the
+ * remaining session budget; it is computed by the caller that owns those
+ * authorities and reaches a transport as `ProviderRequest.outputCeilingTokens`.
+ *
+ * A transport's only job is to wire the ceiling it was given, or none at all:
+ *   1. `requestCeilingTokens`    — the per-request computed safe ceiling.
+ *   2. `configuredCeilingTokens` — the operator-pinned adapter option.
+ *   3. neither                   — unresolved; the transport omits the ceiling.
+ * An authority that is present but not a positive safe integer fails CLOSED
+ * (unresolved) instead of silently degrading to the next tier.
+ *
+ * Both the OpenAI-compatible and the Anthropic transport resolve through THIS
+ * function, so their ceiling behavior is identical by construction rather than
+ * by two copies that can drift apart.
+ */
+export function resolveWireOutputCeiling(input: {
+  requestCeilingTokens?: number;
+  configuredCeilingTokens?: number;
+}): WireOutputCeiling {
+  const authorities = [
+    { tokens: input.requestCeilingTokens, source: 'request' as const },
+    { tokens: input.configuredCeilingTokens, source: 'configured' as const },
+  ];
+  for (const authority of authorities) {
+    if (authority.tokens === undefined) continue;
+    if (!Number.isSafeInteger(authority.tokens) || authority.tokens <= 0) {
+      return { state: 'unresolved', reason: 'invalid-ceiling-authority' };
+    }
+    return { state: 'resolved', tokens: authority.tokens, source: authority.source };
+  }
+  return { state: 'unresolved', reason: 'no-ceiling-authority' };
 }
 
 function toOpenAIMessage(m: ProviderMessage): Record<string, unknown> {
@@ -114,9 +162,15 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
         stream_options: { include_usage: true },
         messages: [{ role: 'system', content: req.system }, ...req.messages.map(toOpenAIMessage)],
       };
-      // NT-08 — the loop's reserved generation room, made explicit on the wire.
-      // Omitted when unset so an existing caller's body stays byte-identical.
-      if (req.outputCeilingTokens !== undefined) body['max_tokens'] = req.outputCeilingTokens;
+      // NT-08 / RCA §2 — the computed safe ceiling, made explicit on the wire.
+      // Resolved through the shared ladder (request > configured > unresolved),
+      // so this transport and the Anthropic one wire the same value for the same
+      // request. Unresolved omits the field: no client-side constant, ever.
+      const ceiling = resolveWireOutputCeiling({
+        requestCeilingTokens: req.outputCeilingTokens,
+        configuredCeilingTokens: opts.maxTokens,
+      });
+      if (ceiling.state === 'resolved') body['max_tokens'] = ceiling.tokens;
       if (req.tools.length > 0) {
         body['tools'] = req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
       }
@@ -153,6 +207,10 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
         const choice = chunk.choices?.[0];
         const delta = choice?.delta;
         if (delta?.content) yield { type: 'text-delta', text: delta.content };
+        // Hidden reasoning (e.g. Qwen `reasoning_content`): surfaced as
+        // metadata-only activity — the text itself never leaves the adapter
+        // (privacy contract, 7086/RCA §3).
+        if (delta?.reasoning_content) yield { type: 'reasoning-activity', chars: delta.reasoning_content.length };
         if (Array.isArray(delta?.tool_calls)) {
           for (const tc of delta.tool_calls) {
             const idx = tc.index ?? 0;
@@ -181,6 +239,6 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
 }
 
 interface OpenAIChunk {
-  choices?: Array<{ delta?: { content?: string; tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }> }; finish_reason?: string }>;
+  choices?: Array<{ delta?: { content?: string; reasoning_content?: string; tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }> }; finish_reason?: string }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }

@@ -14,6 +14,23 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint560] - 2026-08-18
+
+### Added
+
+- Provider-neutral istek ölçümü + typed admission authority
+- Hidden-reasoning farkındalığı + bounded continuation + atomik tool güvenliği (depends on Task 2)
+- Context epoch'ları + yapılandırılmış @ref soyağacı + /renew semantiği (depends on Task 1)
+- Typed UX + i18n + canonical audit (depends on Task 3, Task 4)
+- Incident-şekilli hermetik battery — 11 regresyon kanıtı (depends on Task 5)
+
+### Changed
+
+- Dinamik output tavanı + adapter paritesi (depends on Task 1) (completed with tech debt)
+
+
+_Tasks: 6 total, 4 done, 1 tech debt, 2 no-go_
+
 ## [sprint559] - 2026-08-18
 
 ### Added

@@ -167,14 +167,16 @@ describe('resolveContextBudgetTokens', () => {
   it('uses the explicit config override when valid', () => {
     expect(resolveContextBudgetTokens('ollama', { native_context_tokens: 8000 })).toBe(8000);
   });
-  it('defaults per provider family (ollama small, claude large)', () => {
-    expect(resolveContextBudgetTokens('ollama', {})).toBe(24_000);
-    expect(resolveContextBudgetTokens('claude', {})).toBe(160_000);
-    expect(resolveContextBudgetTokens('openai', {})).toBe(100_000);
+  it('refuses every provider family with no authority (7086/560-001 — no per-family literals)', () => {
+    expect(() => resolveContextBudgetTokens('ollama', {})).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
+    expect(() => resolveContextBudgetTokens('claude', {})).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
+    expect(() => resolveContextBudgetTokens('openai', {})).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
   });
-  it('ignores invalid overrides', () => {
-    expect(resolveContextBudgetTokens('ollama', { native_context_tokens: -1 })).toBe(24_000);
-    expect(resolveContextBudgetTokens('ollama', { native_context_tokens: 'x' as unknown as number })).toBe(24_000);
+  it('an invalid override is not authority — typed refusal, never a literal fallback', () => {
+    expect(() => resolveContextBudgetTokens('ollama', { native_context_tokens: -1 })).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
+    expect(() => resolveContextBudgetTokens('ollama', { native_context_tokens: 'x' as unknown as number })).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
+    // A real advertised window restores normal resolution.
+    expect(resolveContextBudgetTokens('ollama', { native_context_tokens: -1 }, null, 32_768)).toBe(32_768);
   });
 });
 

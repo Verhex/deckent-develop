@@ -9,11 +9,116 @@
 // Pure + injectable: no I/O, no provider knowledge — estimation is chars/4
 // (the cross-tokenizer rule of thumb; deliberately conservative via ceil).
 
-import type { ProviderMessage } from './provider-tooluse/types.js';
+import { createHash } from 'node:crypto';
+import type {
+  ProviderAdmissionDecision,
+  ProviderContextIdentity,
+  ProviderMessage,
+  ProviderRequest,
+  ProviderRequestMeasurementCapability,
+  RequestMeasurement,
+} from './provider-tooluse/types.js';
+
+const DEFAULT_MEASUREMENT_TIMEOUT_MS = 2_000;
+const DEFAULT_MEASUREMENT_CACHE_SIZE = 256;
+const measurementCache = new Map<string, RequestMeasurement>();
 
 /** ~4 chars per token — the cross-model rule of thumb, rounded up. */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+export function digestProviderRequest(req: ProviderRequest): string {
+  return createHash('sha256').update(stableJson(req)).digest('hex');
+}
+
+/** A tokenizer-independent upper bound. Byte-token tokenizers cannot emit
+ * more content tokens than UTF-8 bytes; the additive envelope covers message,
+ * role and tool/chat-template framing without relying on chars/4. */
+export function conservativeRequestTokenUpperBound(req: ProviderRequest): number {
+  const wireBytes = Buffer.byteLength(stableJson(req), 'utf8');
+  const framingTokens = 64 + (req.messages.length * 16) + (req.tools.length * 32);
+  return wireBytes + framingTokens;
+}
+
+export async function measureProviderRequest(input: {
+  request: ProviderRequest;
+  identity: ProviderContextIdentity;
+  capability?: ProviderRequestMeasurementCapability;
+  timeoutMs?: number;
+  cacheSize?: number;
+}): Promise<RequestMeasurement> {
+  const requestDigest = digestProviderRequest(input.request);
+  const cacheKey = `${input.identity.provider}\0${input.identity.model}\0${input.identity.contextWindowTokens}\0${requestDigest}`;
+  const cached = measurementCache.get(cacheKey);
+  if (cached) return cached;
+
+  let result: RequestMeasurement | null = null;
+  if (input.capability) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? DEFAULT_MEASUREMENT_TIMEOUT_MS);
+    try {
+      const exact = await input.capability.measure(input.request, controller.signal);
+      if (exact && Number.isSafeInteger(exact.inputTokens) && exact.inputTokens >= 0) {
+        result = {
+          inputTokens: exact.inputTokens,
+          quality: 'exact',
+          provenance: exact.provenance,
+          requestDigest,
+          identity: input.identity,
+        };
+      }
+    } catch {
+      // A missing, timing-out or malformed exact counter degrades to the
+      // independently safe upper bound; it never becomes an exact estimate.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  result ??= {
+    inputTokens: conservativeRequestTokenUpperBound(input.request),
+    quality: 'conservative-upper-bound',
+    provenance: 'utf8-wire-bytes-plus-framing',
+    requestDigest,
+    identity: input.identity,
+  };
+
+  measurementCache.set(cacheKey, result);
+  const cacheSize = Math.max(1, input.cacheSize ?? DEFAULT_MEASUREMENT_CACHE_SIZE);
+  while (measurementCache.size > cacheSize) {
+    const oldest = measurementCache.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    measurementCache.delete(oldest);
+  }
+  return result;
+}
+
+export function decideProviderAdmission(
+  measurement: RequestMeasurement,
+  outputReserveTokens: number,
+  contextSafetyReserveTokens: number,
+): ProviderAdmissionDecision {
+  for (const [field, value] of Object.entries({ outputReserveTokens, contextSafetyReserveTokens })) {
+    if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${field} must be a non-negative integer`);
+  }
+  const availableTokens = Math.max(
+    0,
+    measurement.identity.contextWindowTokens - outputReserveTokens - contextSafetyReserveTokens,
+  );
+  return measurement.inputTokens <= availableTokens
+    ? { admitted: true, measurement, availableTokens }
+    : { admitted: false, code: 'INPUT_CONTEXT_OVERFLOW', measurement, availableTokens };
 }
 
 /** Estimate one message: content + serialized tool calls + a small per-message
@@ -27,7 +132,7 @@ export function estimateMessageTokens(m: ProviderMessage): number {
 }
 
 export type EffectiveContextProvenance =
-  | { source: 'configured'; tokens: number; counted: true }
+  | { source: 'configured'; tokens: number | null; counted: boolean }
   | { source: 'server-reported'; tokens: number | null; counted: boolean }
   | { source: 'model-advertised'; tokens: number | null; counted: boolean };
 
@@ -42,19 +147,19 @@ function positiveIntegerOrNull(value: number | null): number | null {
 
 /** Derive the usable context ceiling exclusively from known, positive signals. */
 export function deriveEffectiveContext(input: {
-  configuredContextSize: number;
+  configuredContextSize: number | null;
   serverReportedContext: number | null;
   modelAdvertisedContext: number | null;
 }): EffectiveContextResult {
   const configured = positiveIntegerOrNull(input.configuredContextSize);
-  if (configured === null) throw new RangeError('configuredContextSize must be a positive integer');
   const server = positiveIntegerOrNull(input.serverReportedContext);
   const advertised = positiveIntegerOrNull(input.modelAdvertisedContext);
-  const known = [configured, ...(server === null ? [] : [server]), ...(advertised === null ? [] : [advertised])];
+  const known = [configured, server, advertised].filter((value): value is number => value !== null);
+  if (known.length === 0) throw new RangeError('at least one context authority must be a positive integer');
   return {
     effectiveContextSize: Math.min(...known),
     provenance: [
-      { source: 'configured', tokens: configured, counted: true },
+      { source: 'configured', tokens: configured, counted: configured !== null },
       { source: 'server-reported', tokens: server, counted: server !== null },
       { source: 'model-advertised', tokens: advertised, counted: advertised !== null },
     ],
