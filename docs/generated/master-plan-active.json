@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d2d7977f52b3603316fd7cb3ce2c3418eb2ed448016c755c85e0e7faa24e188d"
+    "value": "31767573b9e56ecc3e176773b4003550ec149111d827b702ae3aaf7691e97c3e"
   },
   "summary": {
     "total": 500,
@@ -4747,7 +4747,7 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "d452038ef69eb4a3a053a22a7234c04534ec2211ca423aee3389e17a1b9e2bf8",
-      "progressDigest": "eb5afc59ea84425aa0c7aa05e299b2e52f30d09b2a7af14a2935bea478dbe608",
+      "progressDigest": "aede7754bb48cd3797526311a2d0623b99a2ebaf03037fef76de7426d9398a31",
       "terminalClosureDigest": null
     },
     {
@@ -22922,7 +22922,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "XVerify CLI approval-pending durumda typed `waiting-approval:<id>` sinyali basar ve `--timeout` approval-bekleme fazında da uygulanır (sessiz süresiz blok ölür); adjudication yanıtı şema-reject olduğunda ham provider çıktısı durable persist edilir (debug/audit kanıtı kaybolmaz); adjudication sonucu per-assertion breakdown (supported/contradicted/undecidable + missing-evidence map) persist + raporlanır; sprint finalize worker-not-found'u already-terminated sayar (var olmayan process 'sonlandırılamadı' HOLD'u ölür); xverify twin task'ları verdict settle olduğunda terminal receipt alır (clean-gate PENDING artığı bırakmaz); dördü de regression-testli + gerçek CLI kanıtı",
-      "evidence": "Owner admission: Alperen 2026-08-18 'bulgularında düzeltme izni verildi sonraki sprintte ele alınsın' — NT-06 sprint'inden SONRAKİ sprint; kaynak kanıt: 7078 satırındaki üç HOLD receipt + 2026-08-18 el-settlement",
+      "evidence": "Owner admission: Alperen 2026-08-18 'bulgularında düzeltme izni verildi sonraki sprintte ele alınsın' — NT-06 sprint'inden SONRAKİ sprint; kaynak kanıt: 7078 satırındaki üç HOLD receipt + 2026-08-18 el-settlement RCA GENİŞLEMESİ (2026-08-18, limit-artışı sonrası landed-verify denemeleri): (5. örnek) `xverify_v2_bootstrap_failed` — composition exception'ının `detail`'i yalnız digest'e gömülüyor, diske SIFIR ham kayıt (operatör kök nedeni göremez); (6. örnek) `approval_untrusted` — provider-evidence-probe requestId DETERMİNİSTİK + first-writer-wins adoption → yeni koşu önceki koşunun süresi-dolmuş request/decision kaydını adopte edip `request-expired/session-expired` validasyonunda fail-closed düşüyor (repro: aprp-da1e516f, tek-iddia probe koşusu); scope'a eklendi: bootstrap/composition hold'ları typed detail'i durable persist eder + probe approval'ları koşu-scoped taze subject/TTL taşır. Verifier budget artışı UYGULANDI (owner talimatı: xverify-adjudication 100k→2M token, 300→3600s, 1→8/sprint; auditor 16→64 turn, cacheRead 1M→10M) — kanal onarımı landed-verify'ın ön şartıdır",
       "updated": "2026-08-18"
     },
     {
@@ -25825,6 +25825,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "73fe7c57d9d501153c50da9fea16004dacbf37a3981b11301188c69d24c5e553"
+    "value": "c84f46280307712d2283134fba89235c35ae9f39dde28be15d62125bec7fe7c9"
   }
 }
