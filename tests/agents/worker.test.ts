@@ -372,6 +372,20 @@ describe('writeResult', () => {
     expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-001.hb'));
   });
 
+  it('keeps control characters JSON-safe at the atomic result boundary', () => {
+    const task = makeTask('001');
+    task.status = TaskStatus.EXECUTING;
+    mockedReadFileSync.mockReturnValue(JSON.stringify(task) as never);
+    mockedExistsSync.mockReturnValue(true);
+    writeResult('/project', {
+      taskId: '001', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0,
+      testsPassed: false, coverage: 0, selfAssessment: 'NO_GO', notes: 'before\u0000after',
+    });
+    const resultWrite = String(mockedWriteFileSync.mock.calls[0]![1]);
+    expect(resultWrite).toContain('before\\u0000after');
+    expect(JSON.parse(resultWrite).notes).toBe('before\u0000after');
+  });
+
   it('sets task status to DONE for selfAssessment DONE', () => {
     const task = makeTask('001');
     task.status = TaskStatus.TESTING;

@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8eac973bd9d18c1df8e11e2a6e55eaa96bc1edd6d2cef30a3109287281a2f578"
+    "value": "1fcbee20ab6e0e554250c40ecc4a5de737c81b7f2585552462fc258c6ead02bc"
   },
   "summary": {
-    "total": 497,
-    "active": 433,
+    "total": 498,
+    "active": 434,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 340,
+      "OPEN": 341,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 325,
+      "P0": 326,
       "P1": 135,
       "P2": 37
     },
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 109,
+      "KERNEL": 110,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -3538,6 +3538,17 @@
       "updated": "2026-08-10",
       "definitionDigest": "e4d1fafa3beb58b7ceb369c3bd9732e4e3d09897dd2eb22d9ed7467e0ce5030c",
       "progressDigest": "228fc9da1fccd859a9504b07ee3b03666095e74c63380b09377f0305233856e7",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3349,
+      "id": "ORCHESTRA-RELIABILITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "e04be6c0c6218271942cd17342317cef682c1d3e09bbf28946d0e499993f661a",
+      "progressDigest": "897300f033b34064e5bdb848c8107713abd356623e59c911ce3f79f5e671e5cd",
       "terminalClosureDigest": null
     },
     {
@@ -13613,7 +13624,8 @@
         "PLATFORM-EXEC-AUTH-W1-INTERFACE-001",
         "COMPOSITE-WORKER-001",
         "PLATFORM-EXEC-AUTH-W2-PROBE-001",
-        "PLATFORM-EXEC-AUTH-W3-DARWIN-001"
+        "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
+        "ORCHESTRA-RELIABILITY-001"
       ],
       "gates": [
         "G2",
@@ -13668,7 +13680,8 @@
         "PROD-SPAWNSYNC-ASYNC-001",
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "COMPOSITE-WORKER-001",
-        "PLATFORM-EXEC-AUTH-W3-DARWIN-001"
+        "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
+        "ORCHESTRA-RELIABILITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
@@ -18379,6 +18392,37 @@
       "acceptance": "Approval bekleyen work atomik `parked` state'e geçer ve bağımsız due work'ü bloke etmez; backlog, scheduled, reactive ve generator kaynakları starvation-free tenant-fair scheduling kullanır; audit yalnız state transition/heartbeat policy'sine göre dedupe edilir; due/admission/dependency queries keyset-paginated ve budget-bound olur; queue, per-tenant cap, retry/dead-letter, cancellation, crash replay ve noisy-neighbor davranışı solo→million-scale load/chaos kanıtlarıyla doğrulanır",
       "evidence": "2026-08-10 disk/code proof: `.deckent/recently-works/autonomous-events.jsonl` 19.3 MiB ve 56,920 valid event; 56,884 pending/awaiting-approval, tek `backlog-dash-ux-6-api` triggerı 56,881 tekrar; v1 `due[0]` + fixed source priority aynı kaydı her tick yeniden seçiyor. v2 per-tenant cap yolu bütün due FIFO'yu scansız sınır olmadan okuyor; legacy dependency/runtime reconciliation aktif seti toplu tarıyor",
       "updated": "2026-08-10"
+    },
+    {
+      "order": 3349,
+      "id": "ORCHESTRA-RELIABILITY-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "FIX-worker protokol quote bug'ı + result-JSON kontrol-karakteri toleransı + stale-spawnlock dispatch-watchdog",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Protokol landing-proposal Bash kompozisyonu quote-güvenli (üç sprint'i öldüren 'unexpected EOF' sınıfı reproducer'lı); worker result yazımı kontrol-karakteri sanitize + collector/evaluator tolerant/typed parse (bozuk result artık dispatch'i sessizce kilitleyemez); dispatch başına tek bounded stale-spawnlock sweep — release yalnız üç-kanıt (yaş>5dk + owner-pid ölü + result terminal) + typed audit event'le, canlı worker lock'ına asla dokunmaz",
+      "evidence": "ACİL ADMISSION (Alperen goal-onayı `deckent do` exact-plan dcedec38cd28…, 2026-08-18) + PACKAGE LANDED aynı gün: sprint-549 golden-flow (goal→exact plan→approve→run; 2/4 dogfood-DONE: 001 quote-fix 5/5 kriter, 002-fix sanitize+tolerant 283 test; 003 watchdog unit-kanıtlı ama dispatch sahası scope-dışıydı → production wiring sprint-spawner.ts spawnWorkers girişine Brain el-koduyla; 004 e2e-doc görevi dependency-blocked kaldı — üç fix'in kendi hermetik suite'leri regression'ı taşıdığından mock-ağırlıklı kopya yazılmadı, konsolidasyon kararı bu hücrede). Kanıt: 326/326 targeted battery (7 suite), tsc 0, build yeşil; Sol xverify 3 koşum dürüst UNCLEAR (receipt'ler `…4aa838b8`/`…01932d4b` — claim-yazım dersi: sıralama-iddiaları excerpt sınırına taşıyor; kapanış kanıtı makine-gate zinciri). Multi-provider dağıtım kanıtı: routing 003'ü gpt-5.6-sol'a (premium_plus concurrency gerekçeli), 004'ü economy gpt-5.6-luna'ya atadı; local-llm Qwen worker-role admission'ı ayrı config kararı bekliyor (owner)",
+      "updated": "2026-08-18"
     },
     {
       "order": 4000,
@@ -25691,6 +25735,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "2b7dd57b8a5716b41372c4f63b4a1e1be186952d04908f073f67b6f6b5a20bad"
+    "value": "f6d8d70276361e42410dc45403ed5fc673aa831f55aa2f45a848e394d7be5199"
   }
 }

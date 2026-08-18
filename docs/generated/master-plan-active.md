@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):8eac973bd9d18c1df8e11e2a6e55eaa96bc1edd6d2cef30a3109287281a2f578`
+**Source digest:** `sha256(normalized-lf-utf8):1fcbee20ab6e0e554250c40ecc4a5de737c81b7f2585552462fc258c6ead02bc`
 
-**Rows:** 497 total · 433 active · 64 terminal
+**Rows:** 498 total · 434 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 340 |
+| OPEN | 341 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -286,6 +286,7 @@
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
 | 3348 | `AUTONOMOUS-SCHEDULER-FAIRNESS-001` | OPEN | P0 | KERNEL | `AUTONOMOUS-CONTROL-PLANE-001`, `GOAL-DAG-001` | — | Tenant-fair autonomous scheduling, parked-approval progress ve bounded backpressure |
+| 3349 | `ORCHESTRA-RELIABILITY-001` | OPEN | P0 | KERNEL | — | — | FIX-worker protokol quote bug'ı + result-JSON kontrol-karakteri toleransı + stale-spawnlock dispatch-watchdog |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
 | 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |

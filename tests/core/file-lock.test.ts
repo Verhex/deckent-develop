@@ -2,7 +2,7 @@
 // Sprint 138 — Task 004: Core file lock system
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -13,6 +13,9 @@ import {
   releaseAllLocks,
   clearStaleLocks,
   clearOrphanLocks,
+  acquireSpawnLock,
+  inspectStaleSpawnLocks,
+  releaseInspectedSpawnLock,
   LockError,
 } from '../../src/core/file-lock.js';
 
@@ -232,5 +235,48 @@ describe('file-lock', () => {
     // Should not throw — corrupted file is skipped
     const released = clearOrphanLocks(testRoot, new Set());
     expect(released).toEqual([]);
+  });
+
+  it('inspects a bounded number of spawnlocks using filesystem mtime', () => {
+    acquireSpawnLock(testRoot, '001', 'src/a.ts');
+    acquireSpawnLock(testRoot, '002', 'src/b.ts');
+    const locksDir = join(testRoot, '.locks');
+    const old = new Date(Date.now() - 600_000);
+    for (const file of require('node:fs').readdirSync(locksDir) as string[]) {
+      utimesSync(join(locksDir, file), old, old);
+    }
+
+    const candidates = inspectStaleSpawnLocks(testRoot, {
+      maxAgeMs: 300_000,
+      maxFiles: 1,
+    });
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].lock.ownerPid).toBe(process.pid);
+    expect(candidates[0].ageMs).toBeGreaterThan(300_000);
+  });
+
+  it('releases only the unchanged spawnlock inspected earlier', () => {
+    acquireSpawnLock(testRoot, '001', 'src/stale.ts');
+    const locksDir = join(testRoot, '.locks');
+    const lockPath = join(locksDir, (require('node:fs').readdirSync(locksDir) as string[])[0]);
+    const old = new Date(Date.now() - 600_000);
+    utimesSync(lockPath, old, old);
+    const [candidate] = inspectStaleSpawnLocks(testRoot, { maxAgeMs: 300_000, maxFiles: 1 });
+
+    expect(releaseInspectedSpawnLock(candidate)).toBe(true);
+    expect(existsSync(lockPath)).toBe(false);
+
+    acquireSpawnLock(testRoot, '002', 'src/replaced.ts');
+    const replacementPath = join(locksDir, (require('node:fs').readdirSync(locksDir) as string[])[0]);
+    utimesSync(replacementPath, old, old);
+    const [replacementCandidate] = inspectStaleSpawnLocks(testRoot, { maxAgeMs: 300_000, maxFiles: 1 });
+    writeFileSync(replacementPath, JSON.stringify({
+      ...replacementCandidate.lock,
+      taskId: 'replacement-owner',
+    }));
+
+    expect(releaseInspectedSpawnLock(replacementCandidate)).toBe(false);
+    expect(existsSync(replacementPath)).toBe(true);
   });
 });

@@ -345,6 +345,24 @@ export function readExecutionLandingProposal(
   };
 }
 
+function quoteBashArgument(value: string): string {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function buildAtomicProposalWriteStep(
+  path: string,
+  proposal: ExecutionLandingProposalV1,
+): string {
+  const serialized = `${JSON.stringify(proposal, null, 2)}\n`;
+  return [
+    `proposal_path=${quoteBashArgument(path)}`,
+    `proposal_json=${quoteBashArgument(serialized)}`,
+    'proposal_tmp="${proposal_path}.tmp.$$"',
+    'printf \'%s\' "$proposal_json" > "$proposal_tmp"',
+    'mv -- "$proposal_tmp" "$proposal_path"',
+  ].join('\n');
+}
+
 export function buildExecutionLandingProposalPromptSegment(
   taskId: string,
   attemptId: string,
@@ -354,6 +372,19 @@ export function buildExecutionLandingProposalPromptSegment(
   if (!UUID.test(attemptId)) {
     throw createExecutionAuthorityError('Execution landing proposal prompt attemptId is invalid');
   }
+  const initialProposal: ExecutionLandingProposalV1 = {
+    version: EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION,
+    taskId,
+    attemptId,
+    sequence: 1,
+    summary: 'bounded current-state summary',
+    completedWork: ['verified completed step'],
+    remainingWork: ['specific remaining step'],
+    nextAction: 'single next action',
+    unresolvedRisks: ['specific unresolved risk'],
+    updatedAt: 'best-effort current ISO-8601 timestamp',
+  };
+  const atomicWriteStep = buildAtomicProposalWriteStep(path, initialProposal);
   const writeCadence = mode === 'finite-adjudication'
     ? [
         'This is a finite read-only adjudication. Do not spend a standalone tool call on this proposal.',
@@ -373,20 +404,13 @@ export function buildExecutionLandingProposalPromptSegment(
     'This execution has a host-enforced hard budget and a reserved landing window. The hard ceiling is unchanged.',
     `Maintain one bounded semantic proposal at \`${path}\` for task \`${taskId}\`, attempt \`${attemptId}\`.`,
     ...writeCadence,
+    'Use this quote-safe composition for the first write and every replacement: serialize the complete JSON first, quote each dynamic value as one Bash argument with the same single-quote escape, then atomically rename the temporary file.',
+    '```bash',
+    atomicWriteStep,
+    '```',
     'Use exactly this JSON shape and no extra fields:',
     '```json',
-    JSON.stringify({
-      version: EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION,
-      taskId,
-      attemptId,
-      sequence: 1,
-      summary: 'bounded current-state summary',
-      completedWork: ['verified completed step'],
-      remainingWork: ['specific remaining step'],
-      nextAction: 'single next action',
-      unresolvedRisks: ['specific unresolved risk'],
-      updatedAt: 'best-effort current ISO-8601 timestamp',
-    }, null, 2),
+    JSON.stringify(initialProposal, null, 2),
     '```',
     'Increment `sequence` on every replacement. Keep summary ≤4000 chars, each list ≤50 items, and each item/nextAction ≤1000 chars.',
     '`updatedAt` is diagnostic worker metadata only; exact attempt identity and host-observed file evidence are authoritative.',

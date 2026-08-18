@@ -23,6 +23,13 @@ import {
   suggestMaxWorkers,
   type HostMemoryDetection,
 } from '../core/host-detector.js';
+import {
+  inspectStaleSpawnLocks,
+  releaseInspectedSpawnLock,
+  type StaleSpawnLockCandidate,
+} from '../core/file-lock.js';
+import { writeAuditEvent, type AuditEvent } from '../core/audit-writer.js';
+import { readAuthoritativeTaskResult } from './task-result-authority.js';
 
 /**
  * Cached detection — `/proc/meminfo` does not change during a process
@@ -30,6 +37,131 @@ import {
  * {@link _resetSpawnCoordinatorCache} (underscored to signal "test seam").
  */
 let cachedDetection: HostMemoryDetection | null = null;
+
+export const STALE_SPAWNLOCK_MAX_AGE_MS = 5 * 60 * 1_000;
+export const STALE_SPAWNLOCK_MAX_FILES_PER_DISPATCH = 64;
+export const STALE_SPAWNLOCK_RELEASE_AUDIT_ACTION = 'spawnlock.stale_released' as const;
+
+export interface StaleSpawnLockEvidence {
+  ageExceeded: true;
+  ownerPidDead: true;
+  taskResultTerminal: true;
+}
+
+export interface StaleSpawnLockReleaseAuditMetadata extends Record<string, unknown> {
+  lockPath: string;
+  ownerPid: number;
+  taskId: string;
+  filePath: string;
+  ageMs: number;
+  maxAgeMs: number;
+  evidence: StaleSpawnLockEvidence;
+}
+
+export interface StaleSpawnLockWatchdogOptions {
+  sprintId?: string;
+  tenantId?: string;
+  maxFiles?: number;
+  nowMs?: number;
+}
+
+export interface StaleSpawnLockWatchdogReport {
+  inspected: number;
+  eligible: number;
+  released: number;
+}
+
+interface StaleSpawnLockWatchdogDeps {
+  isOwnerPidAlive(pid: number): boolean;
+  isTaskResultTerminal(projectRoot: string, taskId: string): boolean;
+  writeReleaseAudit(projectRoot: string, sprintId: string, event: AuditEvent): boolean;
+  inspect(
+    projectRoot: string,
+    options: { maxAgeMs: number; maxFiles: number; nowMs?: number },
+  ): StaleSpawnLockCandidate[];
+  release(candidate: StaleSpawnLockCandidate): boolean;
+}
+
+function isOwnerPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return true;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+function isTaskResultTerminal(projectRoot: string, taskId: string): boolean {
+  const authority = readAuthoritativeTaskResult<{ selfAssessment?: unknown }>(projectRoot, taskId);
+  if (authority.state === 'settled') return true;
+  if (authority.state !== 'legacy') return false;
+  const assessment = authority.result?.selfAssessment;
+  return assessment === 'DONE' || assessment === 'GO_WITH_TECH_DEBT' || assessment === 'NO_GO';
+}
+
+const defaultStaleSpawnLockWatchdogDeps: StaleSpawnLockWatchdogDeps = {
+  isOwnerPidAlive,
+  isTaskResultTerminal,
+  writeReleaseAudit: writeAuditEvent,
+  inspect: inspectStaleSpawnLocks,
+  release: releaseInspectedSpawnLock,
+};
+
+/**
+ * Run one bounded stale-spawnlock sweep immediately before a dispatch attempt.
+ * A lock is released only after age, dead-owner, and terminal-result evidence
+ * all hold and the typed audit event has been persisted successfully.
+ */
+export function sweepStaleSpawnLocksForDispatch(
+  projectRoot: string,
+  options: StaleSpawnLockWatchdogOptions = {},
+  deps: StaleSpawnLockWatchdogDeps = defaultStaleSpawnLockWatchdogDeps,
+): StaleSpawnLockWatchdogReport {
+  const requestedMax = options.maxFiles ?? STALE_SPAWNLOCK_MAX_FILES_PER_DISPATCH;
+  const maxFiles = Number.isFinite(requestedMax)
+    ? Math.max(0, Math.min(Math.floor(requestedMax), STALE_SPAWNLOCK_MAX_FILES_PER_DISPATCH))
+    : STALE_SPAWNLOCK_MAX_FILES_PER_DISPATCH;
+  const candidates = deps.inspect(projectRoot, {
+    maxAgeMs: STALE_SPAWNLOCK_MAX_AGE_MS,
+    maxFiles,
+    ...(options.nowMs !== undefined ? { nowMs: options.nowMs } : {}),
+  });
+  let eligible = 0;
+  let released = 0;
+
+  for (const candidate of candidates) {
+    if (deps.isOwnerPidAlive(candidate.lock.ownerPid)) continue;
+    if (!deps.isTaskResultTerminal(projectRoot, candidate.lock.taskId)) continue;
+    eligible++;
+
+    const evidence: StaleSpawnLockEvidence = {
+      ageExceeded: true,
+      ownerPidDead: true,
+      taskResultTerminal: true,
+    };
+    const metadata: StaleSpawnLockReleaseAuditMetadata = {
+      lockPath: candidate.lockPath,
+      ownerPid: candidate.lock.ownerPid,
+      taskId: candidate.lock.taskId,
+      filePath: candidate.lock.filePath,
+      ageMs: candidate.ageMs,
+      maxAgeMs: STALE_SPAWNLOCK_MAX_AGE_MS,
+      evidence,
+    };
+    const audited = deps.writeReleaseAudit(projectRoot, options.sprintId ?? 'dispatch', {
+      tenantId: options.tenantId ?? 'local',
+      actor: 'dispatch-watchdog',
+      action: STALE_SPAWNLOCK_RELEASE_AUDIT_ACTION,
+      target: candidate.lockPath,
+      metadata,
+    });
+    if (!audited) continue;
+    if (deps.release(candidate)) released++;
+  }
+
+  return { inspected: candidates.length, eligible, released };
+}
 
 /**
  * Returns the cached host memory reading, performing the detection lazily

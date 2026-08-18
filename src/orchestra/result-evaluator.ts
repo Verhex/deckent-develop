@@ -37,6 +37,58 @@ import {
   type DishonestEventSink,
 } from './honest-gate.js';
 
+export type TolerantResultJsonParse =
+  | { state: 'parsed'; result: TaskResult; sanitized: boolean }
+  | { state: 'parse-failure'; reason: string };
+
+/** Escapes literal C0 characters inside JSON strings without changing payload values. */
+export function sanitizeResultJsonControlCharacters(raw: string): string {
+  let inString = false;
+  let sanitized = '';
+  for (let index = 0; index < raw.length; index++) {
+    const char = raw[index]!;
+    if (char === '\\') {
+      sanitized += char;
+      if (index + 1 < raw.length) sanitized += raw[++index]!;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      sanitized += char;
+      continue;
+    }
+    const codePoint = char.charCodeAt(0);
+    sanitized += inString && codePoint <= 0x1f
+      ? `\\u${codePoint.toString(16).padStart(4, '0')}`
+      : char;
+  }
+  return sanitized;
+}
+
+export function parseTaskResultJsonTolerantly(raw: string): TolerantResultJsonParse {
+  try {
+    return { state: 'parsed', result: JSON.parse(raw) as TaskResult, sanitized: false };
+  } catch (initialError) {
+    const sanitized = sanitizeResultJsonControlCharacters(raw);
+    if (sanitized !== raw) {
+      try {
+        return { state: 'parsed', result: JSON.parse(sanitized) as TaskResult, sanitized: true };
+      } catch (retryError) {
+        return { state: 'parse-failure', reason: retryError instanceof Error ? retryError.message : String(retryError) };
+      }
+    }
+    return { state: 'parse-failure', reason: initialError instanceof Error ? initialError.message : String(initialError) };
+  }
+}
+
+export function createResultJsonParseFailure(taskId: string, reason: string): TaskResult {
+  return {
+    taskId, workerId: 'brain-result-parser', filesChanged: [], linesAdded: 0,
+    linesRemoved: 0, testsPassed: false, coverage: 0, selfAssessment: 'NO_GO',
+    notes: `RESULT_JSON_PARSE_FAILURE: ${reason}`,
+  };
+}
+
 // Re-export the dishonest-detector surface so downstream callers can
 // reach it through the single result-evaluator entry point (Sprint 194
 // Task 194-002 — W-INTEGRITY I-8).

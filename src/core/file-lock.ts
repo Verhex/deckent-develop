@@ -316,6 +316,23 @@ export interface SpawnLockInfo {
   filePath: string;
   taskId: string;
   acquiredAt: string;
+  /** Host PID that acquired the pre-spawn lock. Absent on legacy lock files. */
+  ownerPid?: number;
+}
+
+export interface StaleSpawnLockCandidate {
+  lockPath: string;
+  lock: SpawnLockInfo & { ownerPid: number };
+  mtimeMs: number;
+  ageMs: number;
+  inode: number;
+  size: number;
+}
+
+export interface InspectStaleSpawnLocksOptions {
+  maxAgeMs: number;
+  maxFiles: number;
+  nowMs?: number;
 }
 
 export class SpawnLockError extends Error {
@@ -373,6 +390,7 @@ export function acquireSpawnLock(
     filePath,
     taskId,
     acquiredAt: now(),
+    ownerPid: process.pid,
   };
   const data = JSON.stringify(info, null, 2);
 
@@ -650,6 +668,87 @@ export function releaseStaleSpawnLocksForTask(
     if (lock.taskId === taskId) {
       releaseSpawnLock(projectRoot, taskId, lock.filePath);
     }
+  }
+}
+
+/**
+ * Inspect at most `maxFiles` spawnlocks and return only evidence-complete age
+ * candidates. This helper never releases a lock: process and result authority
+ * belong to the orchestration layer. Files without a valid owner PID are
+ * intentionally ineligible so legacy/corrupt locks fail closed.
+ */
+export function inspectStaleSpawnLocks(
+  projectRoot: string,
+  options: InspectStaleSpawnLocksOptions,
+): StaleSpawnLockCandidate[] {
+  const locksDir = join(projectRoot, LOCKS_DIR);
+  if (!existsSync(locksDir)) return [];
+
+  const maxFiles = Math.max(0, Math.floor(options.maxFiles));
+  if (maxFiles === 0 || !Number.isFinite(options.maxAgeMs) || options.maxAgeMs < 0) return [];
+
+  let files: string[];
+  try {
+    files = readdirSync(locksDir)
+      .filter(file => file.endsWith('.spawnlock'))
+      .sort()
+      .slice(0, maxFiles);
+  } catch {
+    return [];
+  }
+
+  const nowMs = options.nowMs ?? Date.now();
+  const candidates: StaleSpawnLockCandidate[] = [];
+  for (const file of files) {
+    const lockPath = join(locksDir, file);
+    try {
+      const stats = lstatSync(lockPath);
+      const lock = JSON.parse(readFileSync(lockPath, 'utf-8')) as SpawnLockInfo;
+      if (!Number.isInteger(lock.ownerPid) || lock.ownerPid! <= 0) continue;
+      if (typeof lock.taskId !== 'string' || lock.taskId.length === 0) continue;
+      if (typeof lock.filePath !== 'string' || lock.filePath.length === 0) continue;
+      const ageMs = nowMs - stats.mtimeMs;
+      if (ageMs <= options.maxAgeMs) continue;
+      candidates.push({
+        lockPath,
+        lock: lock as SpawnLockInfo & { ownerPid: number },
+        mtimeMs: stats.mtimeMs,
+        ageMs,
+        inode: stats.ino,
+        size: stats.size,
+      });
+    } catch {
+      // Concurrent deletion, malformed content, and stat/read errors fail closed.
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Release an inspected candidate only if the same filesystem object and lock
+ * identity are still present. This narrows the inspection→release race and
+ * prevents a newly acquired replacement lock from being removed.
+ */
+export function releaseInspectedSpawnLock(candidate: StaleSpawnLockCandidate): boolean {
+  try {
+    const stats = lstatSync(candidate.lockPath);
+    if (
+      stats.ino !== candidate.inode
+      || stats.size !== candidate.size
+      || stats.mtimeMs !== candidate.mtimeMs
+    ) return false;
+
+    const current = JSON.parse(readFileSync(candidate.lockPath, 'utf-8')) as SpawnLockInfo;
+    if (
+      current.taskId !== candidate.lock.taskId
+      || current.filePath !== candidate.lock.filePath
+      || current.ownerPid !== candidate.lock.ownerPid
+    ) return false;
+
+    unlinkSync(candidate.lockPath);
+    return true;
+  } catch {
+    return false;
   }
 }
 

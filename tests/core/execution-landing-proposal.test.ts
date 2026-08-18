@@ -162,7 +162,10 @@ describe('execution landing proposal', () => {
     expect(segment).toContain('sequence 2 or higher');
     expect(segment).toContain('SAME assistant turn');
     expect(segment).toContain('stop early and report NO_GO');
-    expect(segment.length).toBeLessThan(2_500);
+    expect(segment).toContain('quote-safe composition');
+    expect(segment).toContain('proposal_tmp="${proposal_path}.tmp.$$"');
+    expect(segment).toContain('mv -- "$proposal_tmp" "$proposal_path"');
+    expect(segment.length).toBeLessThan(3_500);
   });
 
   it('combines finite adjudication checkpointing with the existing evidence tool call', () => {
@@ -175,7 +178,9 @@ describe('execution landing proposal', () => {
     expect(segment).toContain('SAME single Bash tool call');
     expect(segment).toContain('Do not update the proposal after the evidence pass');
     expect(segment).toContain('only permitted project-file mutation');
+    expect(segment).toContain('quote-safe composition');
+    expect(segment).toContain('mv -- "$proposal_tmp" "$proposal_path"');
     expect(segment).not.toContain('after your plan and after each coherent completed step');
-    expect(segment.length).toBeLessThan(3_000);
+    expect(segment.length).toBeLessThan(4_000);
   });
 });

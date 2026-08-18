@@ -44,6 +44,7 @@ import {
 import type { WorkerHeartbeatAuthorityIdentity } from '../core/worker-heartbeat-authority.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
+import { sanitizeResultJsonControlCharacters } from '../orchestra/result-evaluator.js';
 import { emitWorkerActivity } from './worker-activity.js';
 import { atomicWriteFileSync as _atomicWrite } from './worker-lifecycle.js';
 import { SharedMemory } from '../orchestra/shared-memory.js';
@@ -528,7 +529,7 @@ export function writeResult(projectRoot: string, result: TaskResult, sprintId?: 
   }
 
   const path = resultFilePath(projectRoot, result.taskId);
-  _atomicWrite(path, JSON.stringify(result, null, 2));
+  _atomicWrite(path, sanitizeResultJsonControlCharacters(JSON.stringify(result, null, 2)));
 
   const newStatus: TaskStatus =
     result.selfAssessment === 'NO_GO'

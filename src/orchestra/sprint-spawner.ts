@@ -40,6 +40,7 @@ import {
 } from '../core/attended-execution-approval.js';
 import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
 import { createHostPreDispatchNoGoResult } from '../core/pre-dispatch-settlement.js';
+import { sweepStaleSpawnLocksForDispatch } from './spawn-coordinator.js';
 import {
   assertAttendedExecutionProposalMaterial,
   createAttendedExecutionProposalMaterialFromTask,
@@ -632,6 +633,17 @@ export async function spawnWorkers(
   },
 ): Promise<Task[]> {
   const backend = spawnOpts?.spawnBackend;
+
+  // ORCHESTRA-RELIABILITY (549-003 production wiring, host-completed 2026-08-18):
+  // one bounded stale-spawnlock sweep per dispatch attempt — a dead worker's
+  // leftover locks froze the FIX wave for 25 minutes on sprint-547. Release is
+  // triple-evidence-gated (age + dead owner pid + terminal task result) and
+  // audit-evented inside the coordinator; a sweep failure never blocks dispatch.
+  try {
+    sweepStaleSpawnLocksForDispatch(projectRoot);
+  } catch (e) {
+    debugLog('spawnWorkers:staleSpawnLockSweep', e);
+  }
 
   let needsTmuxSession = false;
 

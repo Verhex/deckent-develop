@@ -341,8 +341,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // shell-risk module+suite, permission-grants and permission-parity suites
   // enter the graph; loop/permission/events/context-budget/transport/local-llm
   // changed content.
-  count: 14350,
-  digest: 'd2b1caf39dde80afa7cee5bc07ba5a17b24c87c3370227f698e837601205ec74',
+  // 2026-08-18 (ORCHESTRA-RELIABILITY-001, sprint-549 + Brain wiring): +8 —
+  // stale-spawnlock-watchdog and result-json-control-char-tolerance suites and
+  // their import closures (spawn-coordinator, sanitize seam) enter the graph;
+  // worker/collector/evaluator/file-lock/landing-proposal/spawner changed content.
+  count: 14358,
+  digest: 'a12fd22dea287f2f28cded995bc66d527dbbefcce0a4d597ed9f49b27ba0e59f',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -555,8 +559,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // recursion/config/bridge/run.tsx/messages hashes moved.
   // 2026-08-18 (HORIZON package 2): +1 — src/agent/guards/shell-risk.ts enters
   // the inventory; loop/permission/events/context-budget/transport hashes moved.
+  // 2026-08-18 (ORCHESTRA-RELIABILITY-001): same 1248 count, digest only —
+  // worker/collector/evaluator/file-lock/landing-proposal/spawn-coordinator/
+  // spawner production hashes moved; membership unchanged.
   count: 1248,
-  digest: '05ed599bba6e1aa47354f7a7eefc7e9da804f5e4e622611abc3cdbf906e2f112',
+  digest: '3fcd0dbe56321ea16ec4246f1b71c3fa58757eb75eaa8bc76228d78db9dbc993',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -13210,3 +13210,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 548-004: local-llm effective context + reserve accounting + restart diagnostics (NO_GO)
 
 ---
+## Sprint 549 — sprint-549
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 747s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 746590ms |
+
+### Tasks
+
+- 549-001: Quote-safe Budget Landing Checkpoint Protocol composition with hermetic reproducer (DONE)
+- 549-002-fix: Fix: Result-JSON control-character sanitization on write and tolerant parse on read (DONE)
+- 549-002: Result-JSON control-character sanitization on write and tolerant parse on read (DONE)
+- 549-003-fix-fix: Fix: Fix: Bounded dispatch-watchdog for stale spawnlocks with typed audit events (PAUSED)
+- 549-003-fix: Fix: Bounded dispatch-watchdog for stale spawnlocks with typed audit events (NO_GO)
+- 549-003: Bounded dispatch-watchdog for stale spawnlocks with typed audit events (NO_GO)
+- 549-004: End-to-end reliability regression suite documenting reproduce-to-fix chains (PAUSED)
+
+---

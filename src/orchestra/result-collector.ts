@@ -27,6 +27,7 @@ import { resolveTaskProvider } from './sprint-utils.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog } from '../core/utils.js';
+import { createResultJsonParseFailure, parseTaskResultJsonTolerantly } from './result-evaluator.js';
 
 // ─── Result watcher (fs.watch-based) ──────────────────────────────
 import { createResultWatcher } from './result-watcher.js';
@@ -272,12 +273,7 @@ export function providerDispatchHoldShouldComplete(
 
 function hasMalformedRawResult(path: string): boolean {
   if (!existsSync(path)) return false;
-  try {
-    JSON.parse(readFileSync(path, 'utf-8'));
-    return false;
-  } catch {
-    return true;
-  }
+  return parseTaskResultJsonTolerantly(readFileSync(path, 'utf-8')).state === 'parse-failure';
 }
 
 /**
@@ -1329,6 +1325,7 @@ export async function waitForResults(
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
       let authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+      let recoveredRawResult: TaskResult | undefined;
       if (
         !terminalRecoveryAttempted
         && authority.state === 'pending-settlement'
@@ -1344,8 +1341,20 @@ export async function waitForResults(
         }
       }
       const resultPath = authority.rawResultPath;
-      if (authority.result) {
-        const result = normalizeAuthoritativeTaskResult(authority, taskId);
+      if (!authority.result && existsSync(resultPath)) {
+        const parsed = parseTaskResultJsonTolerantly(readFileSync(resultPath, 'utf-8'));
+        if (parsed.state === 'parsed') {
+          recoveredRawResult = parsed.result;
+          if (parsed.sanitized) debugLog('collectResults:tolerantResultParse', `taskId=${taskId}`);
+        } else {
+          recoveredRawResult = createResultJsonParseFailure(taskId, parsed.reason);
+          debugLog('collectResults:resultParseFailure', `taskId=${taskId} ${parsed.reason}`);
+        }
+      }
+      if (authority.result || recoveredRawResult) {
+        const result = authority.result
+          ? normalizeAuthoritativeTaskResult(authority, taskId)
+          : recoveredRawResult;
         if (result) {
           // born-655 (TT550D): normalize the worker-reported taskId against the
           // filename-derived (authoritative) id at THIS single ingest chokepoint,
