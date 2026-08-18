@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9dec31184d044c1bb08766e026f673a9b5aa1e55e452363f6ace4576a498ad70"
+    "value": "dbf40f1e04e3892bacedd212e3902157847909c8dfd3f37dfa847b65d5bc4976"
   },
   "summary": {
     "total": 506,
@@ -4824,7 +4824,7 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "97d885b067c8b8e3f78d8f74544c959a777c272da17850da1a7efcb8d5125ec7",
-      "progressDigest": "a84a6b01fd9022bc141e2c12b1f85be883fedec7c2ea8d22117918c2e3ef61b7",
+      "progressDigest": "d8dd28f99c31ac380858e64e726972f1230a17be5cab55eb8596dccdbb217ac4",
       "terminalClosureDigest": null
     },
     {
@@ -23236,7 +23236,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Faz-1: user-facing katalog metinlerinde ADR-0xx sınıfı referans KALMAZ (geçerli karşılığı yoksa referans silinir, işlev cümlesi kalır — uydurma eşleme yok) + ratchet lint; `web` (kendi metniyle deprecated, serve sarmalayıcısı) kayıttan kalkar — bilinmeyen-komut önerisi serve gösterir, MCP parity bozulmaz; battery: katalogda ADR-0xx=0 + web kayıtsız + help temiz. Faz-2 (ayrı owner-disposition turu): 78→~35-40 kök hedefiyle aday listesi (dashboard→status --watch, watch→status/inspect, audit-verify→audit, autonomous-mission→autonomous, usage+limits→cost, openrouter-probe→models, plan-nl→do, test→start --test, runs→run list, alias sadeleşmeleri) — komut başına wiring+MASTER kanıtı şartı",
-      "evidence": "Owner admission+onay 2026-08-18 (analiz turu): canlı kanıt 78 top-level komut vs claude 14 / codex ~10; `process` desc \"ADR-022 CLI/MCP parity\" (yürürlükte yok — AI aracını olmayan referansa yönlendirir), nervous.recommendations \"(ADR-037)\", doctor --fix-image \"ADR-063\", agent --no-audit \"ADR-046\"; katalogda 9 ADR-0xx; `web` metni zaten \"deprecated — use deckent serve\". Kural: wired-olmayan/kapatılmamış hiçbir şey kaldırılmaz; her Faz-2 birleştirmesi ayrı owner disposition ister. FAZ-1 LANDED (sprint-563, 2026-08-18/19): (1) user-facing bayat-ADR temizliği — cli.process.desc 'ADR-022 parity' düştü (parity zaten makine-garantili), nervous.recommendations '(ADR-037)', doctor --fix-image 'ADR-063', agent --no-audit 'ADR-046' düz dile (563-001 DONE; uydurma eşleme yok); (2) `web` KALKTI — wiring-kanıtı: registerWeb tek tüketici index.ts, getMimeType yalnız test; katalog+registry+13 test güncel (563-002 GO-sınıfı; spec-düzeltmesi: Commander edit-distance 'web'→serve önerisi ÜRETMİYOR — ölçüldü, testler gerçeğe pinli); fix zinciri ölü-testin kendi dosyasında dar-scope'a takıldı → ders-15/a el-kapaması (web.test.ts silindi + index/cli-inventory pinleri, 337/337); (3) ratchet: lint-i18n-hardcode katalog-değeri ADR-\\d{2,3} FAIL + battery (563-003 DONE — tarayıcı yalnız en:/tr: değer literal'lerine çapalı, yorum false-positive'i yok). Gerçek-binary smoke: help'te web=0 + unknown-command + process ADR-0xx=0 + top-level 78→77 + ratchet exit 0. Run-defteri: ABORTED (002 fix-bütçesi komşu-pin duvarında — NO_GO taksonomisi A-sınıfı; pin-taraması pre-flight önlemi playbook'a girecek)",
+      "evidence": "Owner admission+onay 2026-08-18 (analiz turu): canlı kanıt 78 top-level komut vs claude 14 / codex ~10; `process` desc \"ADR-022 CLI/MCP parity\" (yürürlükte yok — AI aracını olmayan referansa yönlendirir), nervous.recommendations \"(ADR-037)\", doctor --fix-image \"ADR-063\", agent --no-audit \"ADR-046\"; katalogda 9 ADR-0xx; `web` metni zaten \"deprecated — use deckent serve\". Kural: wired-olmayan/kapatılmamış hiçbir şey kaldırılmaz; her Faz-2 birleştirmesi ayrı owner disposition ister. FAZ-1 LANDED (sprint-563, 2026-08-18/19): (1) user-facing bayat-ADR temizliği — cli.process.desc 'ADR-022 parity' düştü (parity zaten makine-garantili), nervous.recommendations '(ADR-037)', doctor --fix-image 'ADR-063', agent --no-audit 'ADR-046' düz dile (563-001 DONE; uydurma eşleme yok); (2) `web` KALKTI — wiring-kanıtı: registerWeb tek tüketici index.ts, getMimeType yalnız test; katalog+registry+13 test güncel (563-002 GO-sınıfı; spec-düzeltmesi: Commander edit-distance 'web'→serve önerisi ÜRETMİYOR — ölçüldü, testler gerçeğe pinli); fix zinciri ölü-testin kendi dosyasında dar-scope'a takıldı → ders-15/a el-kapaması (web.test.ts silindi + index/cli-inventory pinleri, 337/337); (3) ratchet: lint-i18n-hardcode katalog-değeri ADR-\\d{2,3} FAIL + battery (563-003 DONE — tarayıcı yalnız en:/tr: değer literal'lerine çapalı, yorum false-positive'i yok). Gerçek-binary smoke: help'te web=0 + unknown-command + process ADR-0xx=0 + top-level 78→77 + ratchet exit 0. Run-defteri: ABORTED (002 fix-bütçesi komşu-pin duvarında — NO_GO taksonomisi A-sınıfı; pin-taraması pre-flight önlemi playbook'a girecek). Landed-verify (Sol, 2026-08-19 TSİ 01:07 / 2026-08-18 UTC) 2/2 CONFIRMED: A=ratchet — CATALOG_STALE_ADR_RE /ADR-\\d{2,3}\\b/g digit-zorunlu sınıf ayrımı + existsSync katalog-guard'ı (`cross-verify-verdict:sha256:0227ac58e0deb0ff41f4bec0888bbdfcacf8d825e6be12bad386c3fa8c857165`); B=web-removal — index.ts'te registerWeb=0/yalnız registerServe + command-registry'de web girişi=0, tam-dosya hedefli (`cross-verify-verdict:sha256:26f2933ba76d8cc03dacee182c1b8307c9d82cf36b2c70020f42bd0e27e3a651`). Dürüst kayıt: ilk kompozisyon typed HOLD (limit_hold→evidence_expired — kesinti sonrası codex rate-limit snapshot'ı bayattı); tek gerçek provider-call ile kanıt tazelendi, fallback/self-verify yok",
       "updated": "2026-08-18"
     },
     {
@@ -26107,6 +26107,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "4508dde0b863d590142c81b3647633cb15aa3fdb359e747ea0dbddd14e224a00"
+    "value": "05a2d622e6186ed2d63bdda4d9934f38253f973c35174217e5a94152f5b6a5a4"
   }
 }
