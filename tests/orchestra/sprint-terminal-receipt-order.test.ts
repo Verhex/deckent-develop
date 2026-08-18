@@ -141,7 +141,7 @@ describe('fenced sprint terminal receipt archive boundary', () => {
     expect(artifactRaw.includes(nulChar)).toBe(false);
   });
 
-  it('preserves a settled NO_GO as failed and blocks cleanup without fabricating completion', () => {
+  it('refuses to publish a settled NO_GO as COMPLETE (typed fail-closed, was: published with BLOCKED eligibility)', () => {
     const sprintTask = task();
     const truth = buildFinalizerTerminalTruth({
       tasks: [sprintTask],
@@ -149,23 +149,17 @@ describe('fenced sprint terminal receipt archive boundary', () => {
       results: [result('NO_GO')],
     });
 
-    const publication = publishFencedSprintTerminalReceipt({
+    // A' terminal-publication fail-closed (sprint-537 wave, 2026-08-17): a run
+    // whose lineages did not complete can no longer be PUBLISHED as COMPLETE
+    // at all — the old behavior (publish + record BLOCKED eligibility) is
+    // superseded by the typed refusal; force-abort is the closure path.
+    expect(() => publishFencedSprintTerminalReceipt({
       projectRoot: projectRoot(),
       sprint: { id: 'sprint-487', number: 487, tasks: [sprintTask] } as Parameters<
         typeof publishFencedSprintTerminalReceipt
       >[0]['sprint'],
       truth,
-    });
-
-    expect(publication.terminalEvidence.logicalTasks).toEqual([
-      expect.objectContaining({ logicalTaskId: '487-002', state: 'FAILED' }),
-    ]);
-    expect(publication.terminalEvidence.completed).toEqual([]);
-    expect(publication.terminalEvidence.cleanupEligibility).toMatchObject({
-      state: 'BLOCKED',
-      candidate: false,
-      reasons: expect.arrayContaining(['LINEAGE_NOT_COMPLETED']),
-    });
+    })).toThrow(/TERMINAL_PUBLICATION_NOT_CLEANUP_CANDIDATE_BLOCKED/);
   });
 
   it('publishes test-mode terminal authority without invoking the learning finalizer', () => {

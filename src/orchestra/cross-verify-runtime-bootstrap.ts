@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { canonicalJson } from '../core/audit-writer.js';
 import {
@@ -29,6 +31,7 @@ import type {
   TaskResult,
 } from '../core/task-types.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
+import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 
 export interface CrossVerifyRuntimeBootstrapReady {
   readonly state: 'ready';
@@ -63,6 +66,31 @@ export interface BootstrapCrossVerifyRuntimeInput {
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function bootstrapHold(
+  input: BootstrapCrossVerifyRuntimeInput,
+  reasonCode: Extract<CrossVerifyRuntimeBootstrapResult, { state: 'hold' }>['reasonCode'],
+  detail: string,
+): Extract<CrossVerifyRuntimeBootstrapResult, { state: 'hold' }> {
+  const directory = join(input.projectRoot, '.analysis', 'xverify');
+  mkdirSync(directory, { recursive: true });
+  const path = join(directory, 'hold-details.jsonl');
+  const prior = existsSync(path) ? readFileSync(path, 'utf-8') : '';
+  const digestRef = `xverify-bootstrap-detail:sha256:${sha256(canonicalJson({
+    reasonCode,
+    detail,
+    taskId: input.task.id,
+  }))}`;
+  const record = JSON.stringify({
+    reasonCode,
+    detail,
+    at: new Date().toISOString(),
+    taskId: input.task.id,
+    digestRef,
+  });
+  atomicWriteFileSync(path, `${prior}${prior && !prior.endsWith('\n') ? '\n' : ''}${record}\n`);
+  return { state: 'hold', reasonCode, detail };
 }
 
 function requirementId(criterionId: string, statement: string): string {
@@ -106,11 +134,7 @@ export function bootstrapCrossVerifyRuntimeV2(
 ): CrossVerifyRuntimeBootstrapResult {
   const criteria = input.task.goNogo.items;
   if (!criteria || criteria.length === 0) {
-    return {
-      state: 'hold',
-      reasonCode: 'xverify_v2_structured_criteria_missing',
-      detail: input.task.id,
-    };
+    return bootstrapHold(input, 'xverify_v2_structured_criteria_missing', input.task.id);
   }
   const relativePaths = [...new Set(
     (input.task.scope.filesRead.length > 0
@@ -120,11 +144,7 @@ export function bootstrapCrossVerifyRuntimeV2(
       .filter(Boolean),
   )];
   if (relativePaths.length === 0) {
-    return {
-      state: 'hold',
-      reasonCode: 'xverify_v2_evidence_scope_missing',
-      detail: input.task.id,
-    };
+    return bootstrapHold(input, 'xverify_v2_evidence_scope_missing', input.task.id);
   }
 
   try {
@@ -166,11 +186,11 @@ export function bootstrapCrossVerifyRuntimeV2(
     });
     const built = buildCrossVerifyAdjudicationPromptV2(adjudicationContract);
     if (built.state === 'hold') {
-      return {
-        state: 'hold',
-        reasonCode: 'xverify_v2_prompt_ceiling_exceeded',
-        detail: `${built.promptChars}/${built.maxPromptChars}`,
-      };
+      return bootstrapHold(
+        input,
+        'xverify_v2_prompt_ceiling_exceeded',
+        `${built.promptChars}/${built.maxPromptChars}`,
+      );
     }
     const executionBinding: CrossVerifyAdjudicationExecutionBindingV2 = {
       protocol: adjudicationContract.protocol,
@@ -194,11 +214,11 @@ export function bootstrapCrossVerifyRuntimeV2(
     };
     if (CROSS_VERIFY_ADJUDICATION_RESPONSE_MAX_CHARS
       > CROSS_VERIFY_EVIDENCE_OUTPUT_MAX_CHARS) {
-      return {
-        state: 'hold',
-        reasonCode: 'xverify_v2_bootstrap_failed',
-        detail: 'semantic response ceiling exceeds durable raw-output ceiling',
-      };
+      return bootstrapHold(
+        input,
+        'xverify_v2_bootstrap_failed',
+        'semantic response ceiling exceeds durable raw-output ceiling',
+      );
     }
     return Object.freeze({
       state: 'ready',
@@ -209,10 +229,10 @@ export function bootstrapCrossVerifyRuntimeV2(
       executionBinding: Object.freeze(executionBinding),
     });
   } catch (error) {
-    return {
-      state: 'hold',
-      reasonCode: 'xverify_v2_bootstrap_failed',
-      detail: error instanceof Error ? error.message : String(error),
-    };
+    return bootstrapHold(
+      input,
+      'xverify_v2_bootstrap_failed',
+      error instanceof Error ? error.message : String(error),
+    );
   }
 }

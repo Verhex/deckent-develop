@@ -34,14 +34,16 @@ describe('resolveToolSurfaceOptions (Gap A — config → registry)', () => {
   });
 
   it('enabled:true → options; valid riskThreshold kept', () => {
-    expect(resolveToolSurfaceOptions({ enabled: true })).toEqual({ enabled: true });
+    // NT-06 (sprint-554): the resolver now always carries the fail-closed
+    // `progressive` flag (false unless config says literal true).
+    expect(resolveToolSurfaceOptions({ enabled: true })).toEqual({ enabled: true, progressive: false });
     expect(resolveToolSurfaceOptions({ enabled: true, riskThreshold: 'destructive' }))
-      .toEqual({ enabled: true, riskThreshold: 'destructive' });
+      .toEqual({ enabled: true, progressive: false, riskThreshold: 'destructive' });
   });
 
   it('INVALID riskThreshold is DROPPED (pre-fix it fell through and disabled the confirm gate — fail-open)', () => {
     const opts = resolveToolSurfaceOptions({ enabled: true, riskThreshold: 'high' });
-    expect(opts).toEqual({ enabled: true }); // dispatch falls back to its own 'moderate' default
+    expect(opts).toEqual({ enabled: true, progressive: false }); // dispatch falls back to its own 'moderate' default
   });
 });
 
@@ -51,8 +53,10 @@ describe('run.tsx composition pin (Gap A — the consumer-less default-ON bug cl
     expect(src).toContain('resolveToolSurfaceOptions(');
     const registryCall = src.slice(src.indexOf('registry: buildNativeToolRegistry({'));
     expect(registryCall.slice(0, 300)).toContain('toolSurface: toolSurfaceOpts');
-    // engine-level (bridge) injection — the parity resolver's plumbing
-    const engineCall = src.slice(src.indexOf('nativeEngine = createNativeEngine({'));
+    // engine-level (bridge) injection — the parity resolver's plumbing.
+    // (The composition call was renamed to createResolvedNativeEngine by the
+    // budget-wiring landing; the pin follows the current source.)
+    const engineCall = src.slice(src.indexOf('nativeEngine = createResolvedNativeEngine('));
     expect(engineCall.slice(0, 600)).toContain('toolSurface: toolSurfaceOpts');
   });
 });
@@ -159,7 +163,7 @@ describe('createParityExecImpl (Gap B — engine-parity nested dispatch)', () =>
 
 describe('call_tool end-to-end (registry handler → dispatch → parity exec)', () => {
   it('armed surface: call_tool on a safe registered tool executes for real', async () => {
-    const surface: ToolSurfaceOptions = { enabled: true };
+    const surface: ToolSurfaceOptions = { enabled: true, progressive: false };
     const reg = buildNativeToolRegistry({ cwd: () => tmpdir(), toolSurface: surface });
     // Arm exactly like the bridge does (shared-object fill-in after build):
     surface.execImpl = createParityExecImpl({
@@ -187,7 +191,7 @@ describe('call_tool end-to-end (registry handler → dispatch → parity exec)',
   it('REAL e2e: fake mcpBridge tool → call_tool handler → dispatch → parity → target handler, EXACTLY 1 prompt', async () => {
     const log: string[] = [];
     let targetRan = 0;
-    const surface: ToolSurfaceOptions = { enabled: true };
+    const surface: ToolSurfaceOptions = { enabled: true, progressive: false };
     const reg = buildNativeToolRegistry({
       cwd: () => tmpdir(),
       toolSurface: surface,

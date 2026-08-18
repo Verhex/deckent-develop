@@ -353,8 +353,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-18 (NT-06 progressive tool surface, sprint-554): +1 net —
   // tool-exposure, loop-exposure-wire and tool-surface-scale suites plus the
   // exposure module enter the graph; loop/session/bridge/registry changed content.
-  count: 14366,
-  digest: '336563c96fdfaaf233b7454350e2a7f515db52e7ba1698e92b1631f6544a7e2b',
+  // 2026-08-18 (556 landing full-suite debt payment): +4 — realigned suites
+  // (release/publish owner-contract pins, retirement pins, collector
+  // settlement-authority regression guard) changed graph content.
+  count: 14370,
+  digest: '895434a1e4b0fc32f971ad3ed2e5e7400981bd6eba4c4a6c6c854c7f5743423d',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -576,8 +579,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // production hashes moved.
   // 2026-08-18 (NT-06, sprint-554): +1 — src/agent/tools/exposure.ts enters the
   // inventory; loop/session/bridge/registry production hashes moved.
+  // 2026-08-18 (556 landing): production hashes moved — collector settlement
+  // guard, killSingle typed result, xverify channel truth, exposure optional.
   count: 1250,
-  digest: 'c6eada96c76ca90e801f77ada9d93774eb44bd6e1a36a17702b507ce4502ec5c',
+  digest: '66ca6490c058eb034a4a7450ae1b4aeb3e7fe0ada93b31082cdef52fe0b922e8',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

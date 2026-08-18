@@ -274,10 +274,10 @@ describe('D) Agent/Skill Selection Error Logging', () => {
       new URL('../../src/orchestra/sprint-planner.ts', import.meta.url),
       'utf-8',
     );
-    // Outer catch for pool loading failure
-    expect(source).toContain("debugLog('planSprint:temp-skill'");
-    // V1 skill-pool loop purged — skill failures flow through temp-skill catch below.
-    // Inner per-task catch for individual skill selection failure
+    // CATALOG-STATS-AUTHORITY-001 (2026-08-17): the temp-SKILL generation path
+    // is retired with project-conventions — only the temp-AGENT catch remains,
+    // and the retired debugLog tag must never come back.
+    expect(source).not.toContain("debugLog('planSprint:temp-skill'");
     expect(source).toContain("debugLog('planSprint:generateTempAgents'");
   });
 });

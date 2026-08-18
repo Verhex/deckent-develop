@@ -126,10 +126,15 @@ describe('local-llm command', () => {
     });
     const status = await getLocalLlmStatus({ loadConfigFn: async () => config, resolveProjectRootFn: () => '/project', fetchFn });
 
-    expect(status).toEqual({
+    // NT-07 (sprint-553): the status now additionally carries the boot-time
+    // effective-context resolution (configured 131072 stands — the fixture's
+    // /props-less server reports nothing, so config-only fallback is honest).
+    expect(status).toMatchObject({
       endpoint: 'http://127.0.0.9:19090/v1',
       healthy: true,
       models: [{ id: 'configured-qwen', ownedBy: 'llamacpp' }],
+      configuredContextSize: 131072,
+      effectiveContext: { effectiveContextSize: 131072 },
     });
     expect(fetchFn).toHaveBeenCalledWith('http://127.0.0.9:19090/health');
     expect(fetchFn).toHaveBeenCalledWith('http://127.0.0.9:19090/v1/models');

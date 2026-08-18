@@ -18,6 +18,10 @@
 // same-provider verifier. This module is string-free: operator-facing remedy
 // text is rendered by the CLI surface from the typed reason codes.
 
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { ResolvedConfig } from '../core/config-types.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 import type { ApprovalAuthorityRuntimeService } from '../core/approval-authority-runtime.js';
@@ -40,9 +44,40 @@ import type {
   ProviderEvidenceRefreshRequest,
 } from '../core/provider-evidence-producer.js';
 import type { DockerSpawnBackend } from './spawn-backend-docker.js';
+import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 
 const DEFAULT_DECISION_WINDOW_MS = 120_000;
 const DEFAULT_DECISION_POLL_MS = 2_000;
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function approvalValidationReason(error: AttendedExecutionApprovalError): string {
+  const structured = error as AttendedExecutionApprovalError & {
+    readonly reason?: unknown;
+    readonly validationReason?: unknown;
+  };
+  for (const candidate of [structured.validationReason, structured.reason]) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate;
+  }
+  return error.message.match(/\b(?:request-expired|session-expired|request-not-found|session-not-found)\b/u)?.[0]
+    ?? error.code.toLowerCase().replaceAll('_', '-');
+}
+
+function persistStaleApprovalHold(
+  projectRoot: string,
+  requestId: string,
+  validationReason: string,
+  at: string,
+): void {
+  const directory = join(projectRoot, '.analysis', 'xverify');
+  mkdirSync(directory, { recursive: true });
+  const path = join(directory, 'approval-validation-holds.jsonl');
+  const prior = existsSync(path) ? readFileSync(path, 'utf-8') : '';
+  const record = JSON.stringify({ requestId, validationReason, at });
+  atomicWriteFileSync(path, `${prior}${prior && !prior.endsWith('\n') ? '\n' : ''}${record}\n`);
+}
 
 export interface CrossVerifyEvidencePreparationInput {
   readonly projectRoot: string;
@@ -218,6 +253,10 @@ export async function prepareCrossVerifyCandidateEvidence(
     model: input.candidate.model,
     backendScope: `${billingMode === 'metered-api' ? 'api' : 'subscription'}:cli:docker` as never,
     executionProfileRef: runtime.executionProfileRef as never,
+    // The request digest must name this execution attempt, not merely the
+    // reusable provider/runtime coordinates. Same-run contenders still derive
+    // the same nonce and may adopt APR_DUPLICATE_ID; a later run cannot.
+    attemptNonce: sha256(`${input.runId}\0${runtime.runtimeFingerprint}`),
     budget: projection,
     ttl: Object.freeze({
       startsAt: nowDate.toISOString(),
@@ -263,6 +302,12 @@ export async function prepareCrossVerifyCandidateEvidence(
         case 'DECISION_NOT_ALLOWED':
           return hold('approval_rejected', requestId, [], { approvalRequestId: requestId });
         case 'DECISION_UNTRUSTED':
+          persistStaleApprovalHold(
+            input.projectRoot,
+            requestId,
+            approvalValidationReason(error),
+            now().toISOString(),
+          );
           return hold('approval_untrusted', requestId, [], { approvalRequestId: requestId });
         case 'APPROVAL_ALREADY_CONSUMED':
           return hold('approval_consumed', requestId, [], { approvalRequestId: requestId });

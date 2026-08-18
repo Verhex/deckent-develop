@@ -26,7 +26,7 @@
 // and tests (which inject `spawnVerifier`) never load them.
 
 import { join } from 'node:path';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
 import { ALL_PROVIDER_NAMES, TaskEvaluation } from '../core/types.js';
@@ -294,6 +294,8 @@ export type MandatoryCrossVerifyInvocationFactoryResult =
       readonly state: 'hold';
       readonly reasonCode: string;
       readonly authorityEvidenceRef: string;
+      /** Readable composition failure detail; the evidence ref remains authority. */
+      readonly detail?: string;
       readonly verifierProvider?: ProviderName;
       readonly verifierModel?: string;
     };
@@ -378,6 +380,78 @@ export const CROSS_VERIFY_TIMEOUT_MS = 120_000;
  * another worker/provider timeout.
  */
 const CROSS_VERIFY_LOG_FINALIZE_GRACE_MS = 2_000;
+const CROSS_VERIFY_RAW_OUTPUT_MAX_CHARS = 256 * 1024;
+
+interface CrossVerifyDetailRecord {
+  readonly reasonCode: string;
+  readonly detail: string;
+  readonly at: string;
+  readonly taskId: string;
+  readonly digestRef: string;
+}
+
+function appendXverifyDetailRecord(
+  projectRoot: string,
+  record: CrossVerifyDetailRecord,
+): void {
+  const directory = join(projectRoot, '.analysis', 'xverify');
+  mkdirSync(directory, { recursive: true });
+  const path = join(directory, 'hold-details.jsonl');
+  const prior = existsSync(path) ? readFileSync(path, 'utf-8') : '';
+  atomicWriteFileSync(
+    path,
+    `${prior}${prior && !prior.endsWith('\n') ? '\n' : ''}${JSON.stringify(record)}\n`,
+  );
+}
+
+export function persistCrossVerifyAdjudicationReport(
+  projectRoot: string,
+  taskId: string,
+  input: {
+    readonly output: string;
+    readonly adjudication: Readonly<CrossVerifyHostAdjudicationV2>;
+    readonly assertionBreakdown?: unknown;
+    readonly schemaRejected: boolean;
+  },
+): void {
+  const directory = join(projectRoot, '.analysis', 'xverify');
+  mkdirSync(directory, { recursive: true });
+  const report = {
+    version: 1,
+    taskId,
+    at: new Date().toISOString(),
+    schemaRejected: input.schemaRejected,
+    ...(input.schemaRejected
+      ? {
+          schemaRejectionReason: input.adjudication.reason,
+          rawProviderOutput: input.output.slice(0, CROSS_VERIFY_RAW_OUTPUT_MAX_CHARS),
+          rawProviderOutputTruncated: input.output.length > CROSS_VERIFY_RAW_OUTPUT_MAX_CHARS,
+        }
+      : { assertionBreakdown: input.assertionBreakdown ?? [] }),
+  };
+  atomicWriteFileSync(
+    join(directory, `task-${taskId}-adjudication.json`),
+    `${JSON.stringify(report, null, 2)}\n`,
+  );
+}
+
+export function settleCrossVerifyTwinProjection(
+  projectRoot: string,
+  verifierTaskId: string,
+  outcome: 'confirmed' | 'refuted' | 'unclear' | 'unavailable' | 'hold',
+): void {
+  const path = join(projectRoot, TASKS_DIR, `task-${verifierTaskId}.json`);
+  if (!existsSync(path)) return;
+  try {
+    const task = JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown>;
+    task.status = outcome === 'confirmed' || outcome === 'refuted' ? 'DONE' : 'FAILED';
+    task.resultMarker = `xverify-terminal:${outcome}`;
+    task.completedAt = new Date().toISOString();
+    atomicWriteFileSync(path, `${JSON.stringify(task, null, 2)}\n`);
+  } catch (error) {
+    debugLog('cross-verify:twin-settlement-write-failed', String(error));
+  }
+}
 const CROSS_VERIFY_LOG_POLL_MS = 50;
 // Finite claim adjudication is intentionally low-depth: written criteria and one
 // bounded evidence pass define the decision surface. This uses the existing
@@ -981,11 +1055,19 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
     );
     if (settledOutcome) {
       input.onExecutionEvidence?.(settledOutcome.execution);
+      const terminal = parseRefuteVerdict(settledOutcome.output).verdict;
+      settleCrossVerifyTwinProjection(input.projectRoot, verifierTaskId, terminal);
       return settledOutcome.output;
     }
+    settleCrossVerifyTwinProjection(input.projectRoot, verifierTaskId, 'unavailable');
     return hasTerminalVerdict ? lastNoteLine : '';
   }
   if (hasTerminalVerdict) {
+    settleCrossVerifyTwinProjection(
+      input.projectRoot,
+      verifierTaskId,
+      parseRefuteVerdict(lastNoteLine).verdict,
+    );
     return lastNoteLine;
   }
 
@@ -1012,11 +1094,17 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
       // inform an advisory verdict, but it cannot rewrite EXIT_WITHOUT_RESULT
       // into a synthetic DONE result or task status. Mandatory verification
       // must arrive through the host-owned settlement path above.
+      settleCrossVerifyTwinProjection(
+        input.projectRoot,
+        verifierTaskId,
+        parseRefuteVerdict(terminalVerdict).verdict,
+      );
       return terminalVerdict;
     }
   } catch (err) {
     debugLog('cross-verify:log-fallback-read-failed', String(err));
   }
+  settleCrossVerifyTwinProjection(input.projectRoot, verifierTaskId, 'unavailable');
   return '';
 }
 
@@ -1160,9 +1248,18 @@ export async function runCrossVerify(
           dispatchedVerifier = composed.verifierProvider;
           dispatchedVerifierModel = composed.verifierModel;
           const reason = `verifier-exact-invocation-composition-hold:${composed.reasonCode}`;
-          const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+          const detail = composed.detail ?? composed.reasonCode;
+          appendXverifyDetailRecord(projectRoot, {
+            reasonCode: composed.reasonCode,
+            detail,
+            at: new Date().toISOString(),
+            taskId: task.id,
+            digestRef: composed.authorityEvidenceRef,
+          });
+          const holdEvidence: CrossVerifyEvidence & { readonly detail: string } = {
             outcome: 'unavailable',
             reason,
+            detail,
             authorityEvidenceRef: composed.authorityEvidenceRef,
             ...(composed.verifierProvider
               ? { verifier: composed.verifierProvider }
@@ -1170,7 +1267,8 @@ export async function runCrossVerify(
             ...(composed.verifierModel
               ? { verifierModel: composed.verifierModel }
               : {}),
-          });
+          };
+          const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, holdEvidence);
           return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
         }
         mandatory = composed.composition;
@@ -1234,6 +1332,12 @@ export async function runCrossVerify(
           response: parsed.response,
           executionOutcome: coordinated.execution.outcome,
           providerDeclaredVerdict: parsed.providerDeclaredVerdict,
+        });
+        persistCrossVerifyAdjudicationReport(projectRoot, task.id, {
+          output: coordinated.output,
+          adjudication,
+          assertionBreakdown: parsed.response?.assertionResults,
+          schemaRejected: parsed.response === null,
         });
         let adjudicationReceiptRef: string;
         let validatedAdjudicationReceipt:

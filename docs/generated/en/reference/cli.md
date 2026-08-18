@@ -942,7 +942,7 @@ deckent web --dev
 > **Source-parsed** — extracted from `src/cli/commands/*.ts` `.command(...)` registrations.
 
 <!-- AUTOGEN:START id="cli-en" -->
-> 168 commands. Generated from `src/cli/commands/*.ts`.
+> 170 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -950,6 +950,7 @@ deckent web --dev
 | `deckent accept-panic <task-id>` | Approve a PanicGuard-blocked worker kill (writes IPC marker) |
 | `deckent activate <model>` | Allow a detected model to enter the routing pool |
 | `deckent activation` | Show recorded model activation decisions (unrecorded = active) |
+| `deckent active-set` | Show the resolved owner active execution set + snapshot digest |
 | `deckent add` | Add a new entry to the autonomous backlog |
 | `deckent add <cron> <action>` | Add a new scheduled flow (cron: 5-field expression, e.g. "* * * * * |
 | `deckent add <name> <cmdOrUrl> [args...]` | Add an MCP server (stdio or http) — writes to .mcp.json by scope |
@@ -1051,6 +1052,7 @@ deckent web --dev
 | `deckent plan <goal>` | Decompose a high-level goal into a lightweight autonomous backlog (Phase 1) |
 | `deckent plan-nl` | Turn a free-form goal into a DIRECTIVES.md scaffold (single-task template; preview by default) |
 | `deckent plugin` | Manage plugins |
+| `deckent policy [provider] [mode]` | Show or set a provider activation policy (implicit-active \| explicit-active) |
 | `deckent process` | Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity) |
 | `deckent publish <skillPath>` | Validate, sign (Ed25519) and publish a skill to the marketplace |
 | `deckent rbac` | Role-based access control — check permissions and list roles |

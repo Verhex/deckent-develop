@@ -146,13 +146,19 @@ describe('controller terminal handoff — receipt authority', () => {
 
   it('holds a settled NO_GO sprint instead of fabricating cleanup authority', () => {
     const root = projectRoot();
-    publishReceipt({ root, sprintId: 'sprint-488', verdict: 'NO_GO' });
+    // A' terminal-publication fail-closed (sprint-537 wave, 2026-08-17): the
+    // NO_GO run can no longer even MINT a COMPLETE receipt — publication is a
+    // typed refusal, so the handoff holds on the absent receipt instead of the
+    // old published-but-ineligible one. Cleanup authority is still never
+    // fabricated — the guard just moved one boundary earlier.
+    expect(() => publishReceipt({ root, sprintId: 'sprint-488', verdict: 'NO_GO' }))
+      .toThrow(/TERMINAL_PUBLICATION_NOT_CLEANUP_CANDIDATE_BLOCKED/);
 
     const authority = resolveSprintTerminalHandoff({
       projectRoot: root, sprintId: 'sprint-488', retroOutcome: metrics,
     });
 
-    expect(authority).toMatchObject({ state: 'HOLD', reasonCode: 'RECEIPT_CLEANUP_INELIGIBLE' });
+    expect(authority).toMatchObject({ state: 'HOLD', reasonCode: 'RECEIPT_MISSING' });
   });
 
   it('holds when no receipt was ever published', () => {

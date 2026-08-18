@@ -1,117 +1,140 @@
-# DIRECTIVES — NT-06 REAL progressive disclosure: bounded provider tool surface
+# DIRECTIVES — 7081 XVERIFY-CHANNEL-TRUTH: approval freshness, durable evidence, waiting signal, finalize termination truth
+
+> **SETTLED 2026-08-18 — NOT AN ACTIVE RUN.** sprint-556 closed 3/3 (001 DONE ·
+> 002/003 GO_WITH_TECH_DEBT, debts hand-closed by Brain) and landed together with
+> the full-suite debt payment (52 stale reds triaged: 1 real collector
+> settlement-authority bug fixed, 1 ADR format gap completed, rest realigned to
+> owner-approved behavior changes). Evidence: MASTER 7081 row. This file awaits
+> the next run's contract.
 
 ## Goal
 
-MASTER 7078 NT-06 (owner order 2026-08-18: "NT-06 ile başla"). Progressive disclosure
-is currently FAKE: the meta-tools (deckent_search_tools / deckent_describe_tool /
-deckent_call_tool) exist, but src/agent/loop.ts ships EVERY registered schema every
-round via registry.toNativeSchemas() — 46+ eager schemas per request, external MCPs on
-top (the incident baseline). This sprint makes the provider-facing tool surface
-config-gated, bounded and session-sticky: a core set + the meta-tools go eagerly; every
-other tool's schema enters the surface only after the model discovers it
-(describe/call), and discovery responses are bounded and cursor-capable. Package-4 exit
-gate: a 1000-tool catalog keeps eager schema bytes bounded without losing callability.
+MASTER 7081 (owner-admitted 2026-08-18: "bulgularında düzeltme izni verildi sonraki
+sprintte ele alınsın"). Six typed xverify/finalize failures across two days left ZERO
+actionable evidence and killed honest verification: (a) approval-pending blocks
+silently forever — `--timeout` never applies and no waiting signal prints; (b) the
+provider-evidence-probe approval requestId is deterministic and first-writer-wins, so
+a re-run adopts the PREVIOUS run's expired request/decision and dies
+`DECISION_UNTRUSTED` (repro aprp-da1e516f); (c) `xverify_v2_bootstrap_failed` buries
+the composition exception detail in a digest — zero durable raw record; (d) a
+schema-rejected adjudication response ("Expected object, received null") persists no
+raw provider output and no per-assertion breakdown, so nobody can see WHICH assertion
+was undecidable; (e) settled xverify twin tasks stay PENDING with no receipt and HOLD
+the clean gate; (f) finalize counts a worker-not-found (already dead) as
+"could-not-terminate" and HOLDs terminal settlement (three sprints needed hand
+settlement). This sprint closes all six with durable typed evidence.
 
 ## Execution Contract
 
 - No build and no repository-wide/full-suite test run during this sprint.
 - Parallel execution ADMITTED; single-writer chokepoints: ONLY task 1 writes
-  src/agent/tools/exposure.ts, src/agent/tools/registry.ts and
-  src/cli/repl/native-tool-registry.ts; ONLY task 2 writes src/agent/loop.ts and
-  src/cli/repl/native-agent-bridge.ts; ONLY task 3 writes its test file.
-- Flag-gate discipline (quality bar): the new behavior activates ONLY when effective
-  config `tool_surface.progressive === true` (fail-closed resolver, mirrors
-  resolveToolSurfaceOptions); flag absent/false → provider surface byte-identical to
-  today's full eager list. No blind default flip in this sprint.
-- Mechanism modules string-free; user-visible signals via getMessage en+tr; hermetic
-  tmpdir tests only; billing/usage counters never reset.
-- Use worker comms: write a sharedNotes summary of your landing; dependent tasks state
-  received handoffs in .result notes.
-- Smoke lines must NOT reference dist/ artifacts; the host builds post-sprint.
+  src/orchestra/cross-verify-evidence-preparation.ts,
+  src/orchestra/cross-verify-invocation-coordinator.ts,
+  src/orchestra/cross-verify-runtime-bootstrap.ts and
+  src/orchestra/cross-verify-runner.ts; ONLY task 2 writes
+  src/cli/commands/xverify.ts and src/cli/helpers/messages.ts; ONLY task 3 writes
+  src/cli/commands/kill.ts and src/cli/commands/finalize.ts.
+- Approval/authority semantics NEVER weaken: fail-closed stays fail-closed; a fresh
+  approval is still required per run; no auto-approve, no trust-bypass, no silent
+  fallback. The fixes add FRESHNESS and EVIDENCE, not leniency.
+- Billing/usage/audit counters never reset; durable writes are append/atomic
+  temp+rename; mechanism modules string-free; user-visible text via getMessage en+tr.
+- Hermetic tmpdir tests only. Use worker comms (sharedNotes + handoff notes).
 - Echo the policy digest in your .result as runPolicyEvidence exactly as the prompt's
   Result contract instructs.
 
-## Task 1: provider tool-exposure policy + registry surface view (NT-06 core)
-- Files: src/agent/tools/exposure.ts, src/agent/tools/registry.ts, src/cli/repl/native-tool-registry.ts, tests/agent/tool-exposure.test.ts
-- Scope: src/agent/, src/cli/repl/, tests/agent/
+## Task 1: approval freshness + durable adjudication evidence (channel authority core)
+- Files: src/orchestra/cross-verify-evidence-preparation.ts, src/orchestra/cross-verify-invocation-coordinator.ts, src/orchestra/cross-verify-runtime-bootstrap.ts, src/orchestra/cross-verify-runner.ts, tests/orchestra/cross-verify-channel-truth.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Provider: codex
 - Model: gpt-5.6-sol
 
 ### Description
-1. New src/agent/tools/exposure.ts: `createToolExposure(opts: {progressive: boolean})`
-   returning a session-scoped object { isExposed(name), reveal(name),
-   revealedNames() }. Non-progressive → everything exposed (byte-identical legacy).
-   Progressive → exposed = core-declared tools + already-revealed names; reveal() is
-   idempotent, session-sticky (NEVER un-reveals), and bounded by the registry's real
-   names (revealing an unknown name is a typed no-op, not a throw).
-2. ToolDefinition gains optional `exposure?: 'core' | 'discoverable'` (default
-   'discoverable' under progressive; irrelevant otherwise). ToolRegistry gains
-   `toNativeSchemas(filter?: (def) => boolean)` — no filter → exact current behavior
-   (pinned by existing tests untouched).
-3. native-tool-registry.ts: the three meta-tools and the direct exec core set the REPL
-   already registers are declared `exposure: 'core'` AT REGISTRATION (declaration at
-   source, not a config name list — KANUN 10). deckent_describe_tool and
-   deckent_call_tool handlers call exposure.reveal(name) for the named tool BEFORE
-   returning, so the described/called tool's schema rides the NEXT round.
-   deckent_search_tools results stay bounded (existing limit) and gain a stable
-   `cursor` continuation field when more hits exist (offset-based is acceptable; it
-   must be deterministic).
-4. `resolveToolSurfaceOptions` (or a sibling pure resolver) resolves
-   `tool_surface.progressive` fail-closed: only literal true enables.
-5. Hermetic tests: legacy mode byte-identical schemas; progressive mode exposes only
-   core+meta; describe→reveal→next-schema-list contains the tool; reveal idempotent +
-   unknown-name typed no-op; search cursor determinism.
+1. PROBE FRESHNESS: the provider-evidence-probe subject gains a per-run attempt nonce
+   (the existing runId/runtimeFingerprint is available at the call site) so the
+   requestId is unique per run — a re-run can NEVER adopt a previous run's expired
+   request/decision. The APR_DUPLICATE_ID adoption branch stays only for genuine
+   same-run concurrent contenders (same nonce). A found-but-stale decision keeps its
+   typed hold BUT the hold record now persists {requestId, validation reason
+   (request-expired/session-expired/…)} durably.
+2. BOOTSTRAP DETAIL TRUTH: every composition/bootstrap hold
+   (xverify_v2_bootstrap_failed, prompt-ceiling, evidence holds) writes one durable
+   JSON record (append, atomic) under the existing .analysis/xverify/ area:
+   {reasonCode, detail, at, taskId, digestRef} — the digest stays in the receipt, the
+   DETAIL becomes readable. The runner's hold path threads `composed.detail` through
+   instead of dropping it.
+3. RAW ADJUDICATION EVIDENCE: when the v2 adjudication response fails schema
+   validation, the RAW provider output (bounded, e.g. first 256KB) is persisted next
+   to the report before the unclear verdict is returned; the record carries the
+   schema-rejection reason. When validation SUCCEEDS, the per-assertion breakdown
+   (assertionId → supported/contradicted/undecidable + missing-evidence entries) is
+   persisted into the .analysis/xverify report file — the host disposition already
+   derives from it, so this is projection, not new authority.
+4. TWIN RECEIPT CLOSURE: when the runner reaches ANY terminal outcome (confirmed,
+   unclear, unavailable, hold), the xverify twin task record it created is settled
+   with a terminal status + result marker so the clean gate never reports a settled
+   twin as receipt-missing PENDING.
+5. Tests: nonce uniqueness across two composed runs (no adoption); stale-decision
+   hold persists validation reason; bootstrap hold writes readable detail record;
+   schema-reject persists raw output; per-assertion breakdown lands in the report;
+   twin task terminal after each outcome class.
 
-GO: suite green; tsc 0; progressive-off surface byte-identical; describe/call reveal
-proven by schema-list diff in tests.
-NO_GO: any config-name-list of tools, un-reveal path, or legacy-mode byte drift.
+GO: suite green; tsc 0; every typed hold path proven to leave a durable, readable
+record; fail-closed semantics byte-equivalent (no new allow path).
+NO_GO: any weakened approval check, auto-approve, or a hold that still leaves zero
+disk evidence.
 
-## Task 2: loop consumes the exposure view per round (NT-06 wire)
-- Files: src/agent/loop.ts, src/cli/repl/native-agent-bridge.ts, tests/agent/loop-exposure-wire.test.ts
-- Scope: src/agent/, src/cli/repl/, tests/agent/
+## Task 2: xverify CLI waiting signal + approval-phase timeout (depends on Task 1)
+- Files: src/cli/commands/xverify.ts, src/cli/helpers/messages.ts, tests/cli/xverify-waiting-signal.test.ts
+- Scope: src/cli/, tests/cli/
 - Provider: claude
 - Model: claude-opus-5
+- Dependencies: Task 1
 
 ### Description
-1. LoopDeps gains optional `getProviderToolSchemas?: () => NativeToolSchema[]`; the
-   loop's per-round `const toolSchemas = deps.registry.toNativeSchemas()` becomes
-   `deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas()` — schemas are
-   already re-read every round, so a tool revealed in round N appears in round N+1
-   with no other loop change. Admission arithmetic (NT-02) automatically prices the
-   smaller schema list; do not touch it.
-2. native-agent-bridge.ts (createNativeEngine): build the session ToolExposure from the
-   resolved toolSurface options (progressive flag), wire
-   `getProviderToolSchemas: () => registry.toNativeSchemas(def => exposure.isExposed(def.name))`
-   into createAgentSession's LoopDeps, and pass the SAME exposure object into the
-   registry builder seam Task 1 exposes so describe/call reveals feed the getter.
-   Progressive-off → do not construct the getter at all (legacy path untouched).
-3. Tests: fake registry with 5 tools (2 core) — round-1 request carries only core+meta
-   schemas; after a scripted describe tool-call, round-2 carries the revealed schema;
-   progressive-off carries all 5 both rounds; loop without the new dep behaves
-   byte-identically (regression pin).
+1. WAITING SIGNAL: while the run is blocked on a pending approval, the CLI prints ONE
+   typed line per approval request (new i18n keys en+tr):
+   "waiting-approval: <aprp-id> — decide via `deckent approvals decide <id>`" — the
+   16-minute silent block dies. The signal goes to stderr so `--json` stdout stays
+   machine-clean.
+2. APPROVAL-PHASE TIMEOUT: `--timeout` now bounds the approval wait too (not only
+   the provider call). On expiry the CLI reports the existing typed
+   approval_undecided hold (no new outcome class) with the aprp id in the message,
+   exit code unchanged for holds.
+3. The JSON output for every hold/skip now includes the `detail` field Task 1 makes
+   durable (skippedReason keeps its exact current value — additive field only).
+4. Tests: fake approval authority — pending → waiting line printed once per request;
+   timeout expiry → typed undecided with id; --json stdout parses clean with the
+   additive detail field; decided-fast path prints no waiting line.
 
-GO: suite green; tsc 0; round-over-round schema-list growth proven on the REAL loop
-with a scripted adapter.
-NO_GO: loop learning exposure semantics (it may only consume the getter), or
-progressive-off drift.
+GO: suite green; tsc 0; waiting line + bounded wait proven; --json backward
+compatible (existing keys byte-identical).
+NO_GO: polluted --json stdout, a second timeout flag, or any change to decision
+authority semantics.
 
-## Task 3: 1000-tool bounded-surface regression (depends on Tasks 1,2)
-- Files: tests/agent/tool-surface-scale.test.ts
-- Scope: tests/agent/
+## Task 3: finalize/kill already-terminated truth (depends on nothing)
+- Files: src/cli/commands/kill.ts, src/cli/commands/finalize.ts, tests/cli/finalize-termination-truth.test.ts
+- Scope: src/cli/, tests/cli/
 - Provider: claude
 - Model: claude-sonnet-5
 
 ### Description
-Generate a synthetic 1000-tool catalog (deterministic names/descriptions, no wall
-clock). Drive the REAL runAgentTurn with a scripted adapter in progressive mode:
-(a) round-1 serialized schema bytes stay under a named ceiling
-(BASELINE_MAX_EAGER_SCHEMA_BYTES) that is an order of magnitude below the full
-catalog's serialization — assert both numbers; (b) a scripted
-search→describe→call chain against one deep-catalog tool completes and the called
-tool's schema appears in the following round's request; (c) legacy mode with the same
-catalog ships all 1000 schemas (honest contrast assertion). Depends on Tasks 1-2;
-consume their sharedNotes handoffs and state them in .result notes.
+1. killSingle returns a TYPED result ('killed' | 'not-found' | 'failed') instead of
+   boolean — 'not-found' (backend reports no such worker/window) means the process is
+   already gone. Existing callers that only need "is it dead now" treat
+   killed|not-found as success. The not-found path still prints its current message
+   and still releases locks/status exactly as today.
+2. forceKillLiveWorkers counts 'not-found' as terminated (goal state reached:
+   no live worker), 'failed' (real kill error: permission, backend error) still
+   fails the sweep. Finalize therefore no longer HOLDs terminal settlement over
+   workers that are already dead — the three-sprint hand-settlement class dies.
+3. finalize prints a distinct typed line for already-dead workers (new i18n key
+   en+tr) so the operator sees the truth ("already terminated: ids"), never a fake
+   "terminated N workers".
+4. Tests: not-found → sweep success + finalize proceeds; real kill failure → sweep
+   fails + finalize HOLDs exactly as today; mixed case; message assertions via
+   getMessage keys (no hardcoded strings).
 
-GO: both scenarios deterministic and green; named-constant baselines asserted.
-NO_GO: assertions on exact serialized bytes that would break on unrelated description
-edits (use ceilings/ratios, not exact equality), or wall-clock reliance.
+GO: suite green; tsc 0; dead-worker finalize proceeds, real-failure finalize still
+HOLDs; i18n keys en+tr.
+NO_GO: treating a real kill failure as success, or any hardcoded user-facing string.

@@ -156,7 +156,25 @@ old `dist/` — apply your host adapter's restart/reconnect flow. Never build WH
 sprint is running (ESM cache + worker auth loss). A user-surface change is not DONE
 without proof run from the real binary (mock/unit green is not enough).
 
-## 13. A finding is not a work item: report it, let the owner decide
+## 13. Scoped-green debt is paid at landing — run the full suite at landing
+
+**Mistake:** Per sprint policy ("no full-suite during a sprint") three waves ran only
+scoped tests; at landing the full suite went red in 11 files / 18 tests — every one a
+STALE pin in an OLD test against the new behavior (truth-stats, model-identity, new
+envelope shapes).
+
+**Why:** A scoped run proves the change's OWN tests; it cannot see that the change
+altered behaviors other tests pin. That debt accumulates and is paid with interest at
+landing.
+
+**Correct usage:** A mandatory landing-chain step: the FULL suite (with the
+`VITEST_MAX_FORKS=2` memory cap). Triage every red: code bug or stale pin? Realign
+stale pins to the new behavior with a dated attribution comment (say WHICH wave
+changed it). Also: never add a new field as REQUIRED to a widely-constructed options
+type — add it optional with fail-closed semantics (consumers gate on `=== true`);
+otherwise every test literal churns.
+
+## 14. A finding is not a work item: report it, let the owner decide
 
 **Correct usage:** Every out-of-scope finding observed during work is reported as a
 single line; it never auto-enters MASTER — owner admission is required. Recurring
@@ -172,3 +190,6 @@ are reported to the owner the moment they are seen.
   progressive disclosure + the tier correction (554), the post-plan hand-edit
   conflict (555), the `- Dependencies:` syntax discovery + the channel-repair sprint
   (556), the xverify approval-wait/budget RCA, and the live Qwen trial findings (7083).
+- **2026-08-18 — sprint-556 landing update**: Lesson 13 added (scoped-green debt +
+  required-field churn) — source: paying off 11 files / 18 stale pins in one pass at
+  the 556 hand-closure.

@@ -12,6 +12,11 @@ platform-conditional tests.
 
 ## Categories
 
+Tests fall into three families: **Unix-Only** (skipped on Windows via
+`describe.skipIf(isWindows)`), **Windows-Only** (required-only on
+windows-native), and **All-Platforms** (no platform gate — the default; the
+generated block below closes with their exact count). The generated registry
+lists every gated file per platform:
 
 <!-- AUTOGEN:START id="platform-registry" -->
 _Derived by `scripts/gen-platform-registry.mjs` from `describe.skipIf` / `it.skipIf` gates and `process.platform` guards actually present across `tests/**/*.test.ts(x)`. Do not hand-edit this block — run `node scripts/gen-platform-registry.mjs --write` to regenerate; `tests/scripts/platform-registry.test.ts` fails closed when this block drifts from source truth._
@@ -126,10 +131,13 @@ Non-skip `if (process.platform ...)` branches inside test bodies — the test st
 
 | File | Line | Tag | Direction |
 |------|------|------|------|
+| `tests/agent/scratch-checkpoint.test.ts` | 49 | `windows-native` | asserts differently OFF windows-native |
+| `tests/agent/tool-result-broker.test.ts` | 204 | `windows-native` | asserts differently OFF windows-native |
 | `tests/api/token-redaction.test.ts` | 153 | `windows-native` | asserts differently OFF windows-native |
 | `tests/api/token-redaction.test.ts` | 195 | `windows-native` | asserts differently OFF windows-native |
 | `tests/api/token-redaction.test.ts` | 229 | `windows-native` | asserts differently OFF windows-native |
 | `tests/cli/at-ref.test.ts` | 328 | `windows-native` | asserts differently ON windows-native |
+| `tests/cli/native-agent-scratch-wire.test.ts` | 228 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/approval-broker.test.ts` | 87 | `windows-native` | asserts differently OFF windows-native |
 | `tests/core/deck-file-secret-lifecycle.test.ts` | 66 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/deck-file-secret-lifecycle.test.ts` | 76 | `windows-native` | asserts differently ON windows-native |
@@ -231,7 +239,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2581 of 2639 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2606 of 2667 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work

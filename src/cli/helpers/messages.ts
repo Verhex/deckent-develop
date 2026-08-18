@@ -943,6 +943,14 @@ const MESSAGES: MessageMap = {
     en: 'Candidate evidence preparation HOLD — reason: {reason}, detail: {detail}, evidence: {evidence}. The run continues; the composition will report the same typed hold.',
     tr: 'Aday kanıt hazırlığı HOLD — neden: {reason}, detay: {detail}, kanıt: {evidence}. Koşu devam ediyor; kompozisyon aynı typed hold\'u raporlayacak.',
   },
+  'xverify.prepare.waiting_approval': {
+    en: 'waiting-approval: {requestId} — decide via `deckent approvals decide {requestId}`',
+    tr: 'onay-bekleniyor: {requestId} — karar için: `deckent approvals decide {requestId}`',
+  },
+  'xverify.prepare.approval_wait_timeout': {
+    en: 'approval wait bounded by --timeout ({timeoutMs} ms) expired — request {requestId} is still undecided; reporting the typed approval_undecided hold.',
+    tr: '--timeout ile sınırlanan onay bekleyişi ({timeoutMs} ms) doldu — {requestId} isteği hâlâ karara bağlanmadı; typed approval_undecided hold raporlanıyor.',
+  },
   'xverify.remedy.limit_unit_unreservable': {
     en: 'The verifier is a subscription provider whose only limit windows are advisory percent-remaining — never numerically reservable, so the adjudication call cannot open a reservation. Either provision a metered/API path for the verifier (usd/token windows), or set cross_verify.allow_non_reservable_subscription_adjudication: true in the owner config to admit it via the typed non-reservable outcome.',
     tr: 'Hakem, tek limit penceresi advisory yüzde-kalan olan bir abonelik sağlayıcısı — sayısal olarak rezerve edilemez, bu yüzden adjudication çağrısı rezervasyon açamaz. Ya hakem için metered/API yolu sağlayın (usd/token pencereleri), ya da owner config\'inde cross_verify.allow_non_reservable_subscription_adjudication: true yaparak typed non-reservable sonucuyla kabul edin.',
@@ -1587,6 +1595,7 @@ const MESSAGES: MessageMap = {
   'finalize.incomplete_tasks': { en: 'Cannot finalize: {count} task(s) are still in progress ({ids}). Use --force to override.', tr: 'Sonlandırılamaz: {count} görev hâlâ sürüyor ({ids}). Geçersiz kılmak için --force kullanın.' },
   'finalize.force_incomplete_tasks': { en: 'Warning: forcing finalize with {count} in-progress task(s).', tr: 'Uyarı: {count} sürmekte olan görevle sonlandırma zorlanıyor.' },
   'finalize.workers_terminated': { en: 'Terminated {count} live worker(s): {ids}', tr: '{count} canlı worker sonlandırıldı: {ids}' },
+  'finalize.workers_already_terminated': { en: 'Already terminated: {count} worker(s) were already dead before the sweep ({ids})', tr: 'Zaten sonlandırılmıştı: {count} worker sweep öncesinde zaten ölüydü ({ids})' },
   'finalize.workers_termination_failed': { en: 'Cannot finalize: {count} worker(s) could not be terminated ({ids}); terminal settlement is on HOLD.', tr: 'Sonlandırılamaz: {count} worker sonlandırılamadı ({ids}); terminal settlement HOLD durumunda.' },
   'finalize.already_finalized': { en: 'Sprint {sprintId} has already been finalized. Use --force to re-finalize.', tr: 'Sprint {sprintId} zaten sonlandırıldı. Yeniden sonlandırmak için --force kullanın.' },
 

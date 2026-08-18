@@ -5,7 +5,7 @@
 Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.
 
 <!-- AUTOGEN:START id="mcp-tools-en" -->
-> 50 tools registered. Generated from `src/mcp/tools/*.ts`.
+> 51 tools registered. Generated from `src/mcp/tools/*.ts`.
 
 | Tool | Title | Description |
 |------|-------|-------------|
@@ -31,6 +31,7 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_help` | Deckent Help | Get runtime capabilities, current project state, and a recommended next action. |
 | `deckent_history` | Run History | Read archived run log files from .brain/sprints/. Returns the last N run markdown logs sorted by run ID, plus a trend analysis (improving/declining/stable) based on task completion rates across runs. Use to understand long-term project health, compare run performance, or review past decisions. Each run log contains task outcomes, model usage, and learning notes. |
 | `deckent_init` | Initialize Deckent | Initialize a Deckent project in the current directory. Creates all required directories (.deckent/, .brain/, .tasks/, .locks/, .claude/rules/) and configuration files (config.json, DECKENT.md, DIRECTIVES.md, brain files). Safe to re-run — existing config fields are preserved via merge, and files are only written if missing. After init, run deckent_set_directives → deckent_plan → deckent_start. |
+| `deckent_inspect` | Run Inspector | Inspect logical runs through the canonical inspector read-model (same projections as the |
 | `deckent_kill` | Kill Worker | Stop one or all running workers. Sets task status to PAUSED, removes heartbeat files, and releases any file locks owned by the task. Use when a worker is stuck (stale heartbeat), consuming too many resources, or needs to be restarted. After killing, run deckent_cleanup to remove task artifacts, then deckent_start to restart. CLI parity (ADR-022-V2 + Sprint 189 T-009): force + userExplicit are pass-through panic-guard bypass markers — even when both are set the bypass is only logged (audit-trail), kill itself still requires explicit user intent (feedback_sprint_kill_always_ask_user). |
 | `deckent_kpi` | KPI Scorecard | Show the KPI scorecard for a sprint (default) or trend series for a single KPI. |
 | `deckent_memory_manage` | Memory Manage | Manage project memory: insert a new entry, update fields on an existing entry, or |

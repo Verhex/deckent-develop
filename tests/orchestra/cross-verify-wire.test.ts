@@ -1019,7 +1019,7 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(JSON.parse(readFileSync(
       join(root, TASKS_DIR, 'task-276-001-xverify.json'),
       'utf-8',
-    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.PENDING });
+    ))).toMatchObject({ id: '276-001-xverify', status: 'FAILED' });
   });
 
   it('waits for a provider log finalized shortly after the wrapper marker', async () => {
@@ -1092,10 +1092,10 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(JSON.parse(readFileSync(
       join(root, TASKS_DIR, 'task-276-001-xverify.json'),
       'utf-8',
-    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.PENDING });
+    ))).toMatchObject({ id: '276-001-xverify', status: 'DONE' });
   });
 
-  it('keeps the verifier task pending when no terminal verdict exists', async () => {
+  it('settles the verifier twin FAILED (never fabricated DONE) when no terminal verdict exists', async () => {
     defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
       writeFileSync(
         join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
@@ -1157,7 +1157,7 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(JSON.parse(readFileSync(
       join(root, TASKS_DIR, 'task-276-001-xverify.json'),
       'utf-8',
-    ))).toMatchObject({ id: '276-001-xverify', status: 'PENDING' });
+    ))).toMatchObject({ id: '276-001-xverify', status: 'FAILED' });
   });
 
   it('waits through finalization and rejects a verdict followed by a later assistant continuation', async () => {

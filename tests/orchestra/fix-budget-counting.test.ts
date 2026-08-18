@@ -293,18 +293,20 @@ describe('the post-FIX pause fires when the admitted rounds run out', () => {
   // ROOTS. A root whose only repair was admitted-but-deferred is still NO_GO.
   const plannedRoots = [task('A', TaskStatus.NO_GO), task('B', TaskStatus.NO_GO)];
 
-  it('pauses when every planned root is left unresolved by the spent budget', () => {
+  it('does not pause a small run below the authored absolute count (scale-honest, PLANNER-TRUTH 2026-08-18)', () => {
     const decision = evaluateFixCircuitBreaker(
       plannedRoots,
       new Map([['A', TaskEvaluation.NO_GO], ['B', TaskEvaluation.NO_GO]]),
       DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
     );
 
-    expect(decision.shouldPause).toBe(true);
+    // 2/2 unresolved (100% ≥ 50%) but 2 < the authored absolute 5 — the old
+    // small-run down-scaling (ceil(2·50%)=1) is retired; both gates must be
+    // satisfied independently, so this run settles FAILED without a pause.
+    expect(decision.shouldPause).toBe(false);
     expect(decision.unresolvedTaskIds).toEqual(['A', 'B']);
     expect(decision.unresolvedRatioPercent).toBe(100);
-    // The absolute gate scales down for a small run: ceil(2 * 50%) = 1.
-    expect(decision.effectiveCountThreshold).toBe(1);
+    expect(decision.effectiveCountThreshold).toBe(5);
   });
 
   it('does not pause when the surviving repairs kept the ratio under policy', () => {

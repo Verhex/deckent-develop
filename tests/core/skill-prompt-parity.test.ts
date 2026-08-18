@@ -169,22 +169,21 @@ describe('522-011 S4 — worker prompt byte parity across the skill body migrati
     expect(held[0]).not.toHaveProperty('content');
   });
 
-  it('keeps the project-conventions fallback reachable — the HOLD is typed, not silent', async () => {
+  it('skips a legacy project-conventions assignment tolerantly — generation is retired', async () => {
     const root = makeProject();
-    installSkill(root, 'project-conventions', {}); // body missing → generation path
+    installSkill(root, 'project-conventions', {}); // body missing
 
     const currentPath = await resolveSkillPrompts(root, makeTask(['project-conventions']));
     const resolutions = resolveSkillPromptBodies(root, ['project-conventions']);
 
-    // Unchanged behaviour on the current path: content is GENERATED, not read.
-    expect(currentPath).toHaveLength(1);
-    expect(currentPath[0]!.name).toBe('project-conventions');
-    expect(currentPath[0]!.content).toContain('# Project Conventions (Auto-Generated)');
+    // CATALOG-STATS-AUTHORITY-001 (2026-08-17): project-conventions is no
+    // longer a skill — its content ships as the deterministic project-context
+    // prompt segment (task-builder → prompt-god-template). The prompt route
+    // now SKIPS a legacy assignment tolerantly: no regeneration, no phantom
+    // stats credit, no injected prompt.
+    expect(currentPath).toHaveLength(0);
 
-    // The migrated reader is a body reader only: it refuses, with the reason the
-    // caller's existing fallback branch keys on. Generation stays at the call
-    // site because it lives in `orchestra/` and ADR-D-004 C1 forbids `core/`
-    // from importing it.
+    // The body reader stays a reader: it refuses with the typed reason.
     expect(resolutions).toHaveLength(1);
     expect(resolutions[0]!.ok).toBe(false);
     expect(heldSkillResolutions(resolutions)[0]!.reasonCode).toBe('missing-file');

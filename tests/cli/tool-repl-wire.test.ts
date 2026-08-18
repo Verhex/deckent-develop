@@ -65,7 +65,8 @@ describe('deckent_search_tools', () => {
 
     const r = await searchDef.handler({ query: 'status' });
     expect(r.ok).toBe(true);
-    const hits = JSON.parse(r.output) as Array<{ name: string; category: string; risk: string }>;
+    // NT-06 (sprint-554): bounded envelope — hits ride under `results`.
+    const { results: hits } = JSON.parse(r.output) as { results: Array<{ name: string; category: string; risk: string }> };
     expect(hits.some((h) => h.name === 'deckent_status')).toBe(true);
   });
 
@@ -78,7 +79,9 @@ describe('deckent_search_tools', () => {
     // real-word substrings so it can never collide with a tool name/description.
     const r = await reg.get('deckent_search_tools')!.handler({ query: 'zzzqxjv' });
     expect(r.ok).toBe(true);
-    expect(JSON.parse(r.output)).toEqual([]);
+    // NT-06 (sprint-554): search results are now a bounded envelope with a
+    // deterministic continuation cursor (null when nothing follows).
+    expect(JSON.parse(r.output)).toEqual({ results: [], cursor: null });
   });
 });
 

@@ -197,7 +197,7 @@ beforeEach(() => {
     taskFilesPreserved: 0,
   });
   mockKillSingle.mockReset();
-  mockKillSingle.mockReturnValue(true);
+  mockKillSingle.mockReturnValue('killed');
 });
 
 afterEach(() => {
@@ -320,7 +320,7 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
 
   it('HOLDs before terminal settlement when an in-progress worker cannot be contained', async () => {
     seedCompleteSprint(root, { status: 'EXECUTING' });
-    mockKillSingle.mockReturnValue(false);
+    mockKillSingle.mockReturnValue('failed');
 
     await runFinalizeCli(['--force']);
 

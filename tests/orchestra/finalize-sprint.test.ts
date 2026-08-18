@@ -534,7 +534,7 @@ describe('finalizeSprint', () => {
     const results: TaskResult[] = [];
 
     await expect(finalizeSprint(PROJECT_ROOT, sprint, evaluations, results))
-      .rejects.toThrow(/TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE/);
+      .rejects.toThrow(/TERMINAL_PUBLICATION_ZERO_TASK_HOLD/);
   });
 
   it('should survive writeSprintLog failure', async () => {
@@ -625,7 +625,7 @@ describe('finalizeSprint', () => {
     ];
 
     await expect(finalizeSprint(PROJECT_ROOT, sprint, evaluations, results))
-      .rejects.toThrow(/TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE/);
+      .rejects.toThrow(/TERMINAL_PUBLICATION_NOT_CLEANUP_CANDIDATE/);
   });
 
   it('should combine all options correctly', async () => {

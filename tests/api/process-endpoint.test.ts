@@ -99,7 +99,10 @@ describe('/api/process/* routes', () => {
       status: 'held',
       providerAuthorityHold: {
         reasonCode: expect.stringMatching(
-          /^(policy_authority_unavailable|keyring_unavailable)$/u,
+          // candidate_authority_unavailable joined the typed HOLD family with
+          // the process-controller candidate-resolution wave (2026-08 — the
+          // hermetic fixture holds there before reaching policy/keyring).
+          /^(policy_authority_unavailable|keyring_unavailable|candidate_authority_unavailable)$/u,
         ),
         executionId: expect.stringMatching(/^proc-/u),
         authorityEvidenceRefs: [

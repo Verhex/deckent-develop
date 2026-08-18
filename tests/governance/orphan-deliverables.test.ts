@@ -492,11 +492,8 @@ const KNOWN_ORPHANS = [
   'src/core/notification-config.ts',
   'src/core/notification-providers/discord.ts',
   'src/core/notification-providers/slack.ts',
-  // OPERATION-001 O1 (2026-08-07): the canonical operation catalog landed with
-  // resolveOperation deliberately unconsumed — the O3 audit pins mediated=0 as
-  // the honest gap. Orphan by design until the ingress-wiring successor slice
-  // consumes it; recorded in MASTER 538 (CI-NIGHTLY-GREEN-001) evidence.
-  'src/core/operation-catalog/index.ts',
+  // OPERATION-001 O1 orphan CLOSED (2026-08-18 sweep): operation-catalog/index.ts
+  // gained a production consumer — removed from the allowlist by the live scan.
   // `src/core/provider-authority-composition.ts` and
   // `src/providers/claude-provider-evidence-sources.ts` closed on 2026-07-25:
   // provider-authority-runtime-bootstrap.ts constructs both, and Goal-v2
@@ -548,12 +545,17 @@ const KNOWN_ORPHANS = [
   'src/providers/cache-adapter-resource.ts',
   'src/providers/cache-adapter.ts',
   'src/sdk/index.ts',
-  'src/training/corpus-lint.ts',
+  // corpus-lint.ts orphan CLOSED (2026-08-18 sweep): gained a production consumer.
+  // 2026-08-18 sweep realign (+3, first full-suite pass since the sprint-512/
+  // closure-ledger landings; disposition pending under MASTER 7090 ORPHAN-WIRE):
+  'src/cli/commands/recover-helpers.ts',
+  'src/core/closure-ledger-types.ts',
+  'src/core/error-registry.ts',
 ].sort();
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(92); // 538 (2026-08-10): +1 operation-catalog/index.ts (O1 bilinçli-unwired, tarihli blok yukarıda)
+    expect(KNOWN_ORPHANS.length).toBe(93); // 2026-08-18 sweep: -2 wired (operation-catalog/index, corpus-lint) +3 new (recover-helpers, closure-ledger-types, error-registry — 7090 disposition bekler)
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

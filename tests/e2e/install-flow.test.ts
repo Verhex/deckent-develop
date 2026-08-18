@@ -39,8 +39,11 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 }));
 
 vi.mock('node:child_process', () => ({
+  // The fake version must satisfy the MANIFEST-derived Node floor (row 450:
+  // engines.node, currently >=24) — a stale 'v22.0.0' made the doctor check
+  // honestly fail (2026-08-18 realign).
   spawnSync: vi.fn().mockReturnValue({
-    status: 0, stdout: 'v22.0.0', stderr: '', pid: 1, signal: null, output: [],
+    status: 0, stdout: 'v24.0.0', stderr: '', pid: 1, signal: null, output: [],
   }),
   spawn: vi.fn(),
   fork: vi.fn(),

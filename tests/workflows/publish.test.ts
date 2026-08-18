@@ -117,15 +117,18 @@ describe('.github/workflows/release.yml', () => {
     expect(releaseContent).toContain("- 'v*'");
   });
 
-  it('should have contents: write for GitHub Release creation', () => {
-    expect(releaseContent).toContain('contents: write');
+  // 0.100.0 rebaseline (owner decision, 2026-08-14): canonical publishing is
+  // MANUAL — release.yml is a validation-only workflow. It performs no
+  // `npm publish`, creates no GitHub Release, and runs read-only (least
+  // privilege: no repo-write grant, no OIDC provenance token). The pins below
+  // fail closed if an automatic publish authority ever sneaks back in.
+  it('is validation-only — read-only permissions, no repo-write grant', () => {
+    expect(releaseContent).toContain('contents: read');
+    expect(releaseContent).not.toContain('contents: write');
+    expect(releaseContent).not.toContain('id-token: write');
   });
 
-  it('should have id-token: write for OIDC provenance', () => {
-    expect(releaseContent).toContain('id-token: write');
-  });
-
-  it('should publish with provenance and access public', () => {
-    expect(releaseContent).toContain('npm publish --provenance --access public');
+  it('performs no real npm publish (manual-publish owner contract)', () => {
+    expect(releaseContent).not.toMatch(/^\s*run:.*npm publish --provenance/m);
   });
 });

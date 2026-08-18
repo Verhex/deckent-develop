@@ -1341,7 +1341,13 @@ export async function waitForResults(
         }
       }
       const resultPath = authority.rawResultPath;
-      if (!authority.result && existsSync(resultPath)) {
+      // Tolerant raw recovery applies ONLY when the raw file IS the authority
+      // (legacy path whose strict parse failed → state 'absent'). A
+      // 'pending-settlement' task must keep WAITING for the host settlement —
+      // an early untrusted raw Docker DONE preempting it was the exact trust
+      // bypass this collector's settlement authority exists to prevent
+      // (regression pinned by result-collector-settlement-authority.test.ts).
+      if (!authority.result && authority.state !== 'pending-settlement' && existsSync(resultPath)) {
         const parsed = parseTaskResultJsonTolerantly(readFileSync(resultPath, 'utf-8'));
         if (parsed.state === 'parsed') {
           recoveredRawResult = parsed.result;

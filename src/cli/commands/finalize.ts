@@ -15,7 +15,7 @@ import { evaluateResultSync } from '../../orchestra/sprint-controller.js';
 import { loadConfig } from '../../core/config.js';
 import { debugLog } from '../../core/utils.js';
 import { print, printError } from '../helpers/output.js';
-import { killSingle } from './kill.js';
+import { killSingle, type KillSingleResult } from './kill.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
@@ -279,19 +279,33 @@ export function detectIncompleteTasks(tasks: Task[]): Task[] {
  * the other half of the Sprint-223 family). Best-effort per worker (a window/
  * container already gone is success, not failure); `deps.kill` is a seam so the
  * sweep is testable without tmux. COMPLETE may only be stamped after this sweep.
+ *
+ * 556-003: `kill` now returns a typed `KillSingleResult` instead of a boolean.
+ * 'not-found' (backend reports no such worker/window) means the goal state —
+ * no live worker — is already reached, so it settles into `killed`, not
+ * `failed`; only a genuine kill error ('failed', or an unexpected throw) still
+ * fails the sweep. `alreadyDead` is tracked separately so the caller can print
+ * the operator-facing truth instead of a fake "terminated N workers".
  */
 export function forceKillLiveWorkers(
   incomplete: readonly Task[],
-  kill: (taskId: string) => boolean,
-): { killed: string[]; failed: string[] } {
+  kill: (taskId: string) => KillSingleResult,
+): { killed: string[]; alreadyDead: string[]; failed: string[] } {
   const killed: string[] = [];
+  const alreadyDead: string[] = [];
   const failed: string[] = [];
   for (const t of incomplete) {
-    let ok = false;
-    try { ok = kill(t.id); } catch { ok = false; }
-    (ok ? killed : failed).push(t.id); // best-effort: sweep continues either way
+    const previousExitCode = process.exitCode;
+    let result: KillSingleResult = 'failed';
+    try { result = kill(t.id); } catch { result = 'failed'; } // best-effort: sweep continues either way
+    if (result === 'killed') killed.push(t.id);
+    else if (result === 'not-found') alreadyDead.push(t.id);
+    else failed.push(t.id);
+    // killSingle sets exitCode=1 on its own standalone 'not-found' CLI path;
+    // that signal must not leak into an otherwise-successful sweep.
+    if (result !== 'failed') process.exitCode = previousExitCode;
   }
-  return { killed, failed };
+  return { killed, alreadyDead, failed };
 }
 
 /** Detect mixed sprint IDs */
@@ -412,6 +426,12 @@ export function registerFinalize(program: Command): void {
               print(getMessage('finalize.workers_terminated', lang, {
                 count: String(sweep.killed.length),
                 ids: sweep.killed.join(', '),
+              }));
+            }
+            if (sweep.alreadyDead.length > 0) {
+              print(getMessage('finalize.workers_already_terminated', lang, {
+                count: String(sweep.alreadyDead.length),
+                ids: sweep.alreadyDead.join(', '),
               }));
             }
             if (sweep.failed.length > 0) {

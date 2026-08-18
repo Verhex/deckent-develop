@@ -867,9 +867,10 @@ export interface FixCircuitBreakerConfig {
   /** Enable the post-FIX unresolved-lineage pause gate. Default: true. */
   enabled: boolean;
   /**
-   * Absolute unresolved-lineage ceiling. The effective count threshold is
-   * scaled down for small runs by `min_unresolved_ratio_percent`.
-   * Default: 5.
+   * Absolute unresolved-lineage ceiling. Scale-honest (PLANNER-TRUTH,
+   * 2026-08-18): applied as authored — never scaled down for small runs, so a
+   * small sprint cannot trip the breaker before a genuine cascade reaches
+   * this count. Default: 5.
    */
   max_unresolved_tasks: number;
   /** Minimum unresolved root-task ratio required to pause. Default: 50. */

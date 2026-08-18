@@ -100,6 +100,8 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   // ─── Core ──────────────────────────────────────────────────────────────
   entry('init', 'Core', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_init']),
   entry('status', 'Core', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_status']),
+  // RUN-INSPECTOR-001: logical run listing + lineage detail read-model faces.
+  entry('inspect', 'Core', 'Oku', 'orchestra', ['cli', 'mcp'], ['deckent_inspect']),
   entry('doctor', 'Core', 'Oku', 'core', ['cli', 'mcp', 'repl'], ['deckent_doctor']),
   entry('cu-status', 'Core', 'Oku', 'core', ['cli']),
   entry('config', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_config']),

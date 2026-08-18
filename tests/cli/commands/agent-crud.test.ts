@@ -135,7 +135,10 @@ describe('agent CRUD commands', () => {
       await run(['agent', 'info', 'info-agent']);
       expect(output.some((o) => o.includes('info-agent'))).toBe(true);
       expect(output.some((o) => o.includes('claude-opus-4-8'))).toBe(true);
-      expect(output.some((o) => o.includes('95%'))).toBe(true);
+      // Catalog-stats truth (7014): info reads readCatalogStats — the
+      // manifest's self-declared successRate (95 above) is correctly IGNORED;
+      // with no recorded outcomes the honest display is 'never'.
+      expect(output.some((o) => o.includes('Success Rate: never'))).toBe(true);
     });
 
     it('should include PROMPT.md content', async () => {

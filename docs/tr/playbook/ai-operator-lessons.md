@@ -148,7 +148,25 @@ eski `dist/`'i cache'ler — host adapterının restart/reconnect akışını uy
 ÇALIŞIRKEN build alma (ESM cache + worker auth kaybı). User-surface değişikliği,
 gerçek binary'den koşturulmuş kanıt olmadan DONE değildir (mock/unit yeşili yetmez).
 
-## 13. Bulgu ≠ iş: raporla, owner karar versin
+## 13. Scoped-yeşil borcu landing'de ödenir — tam suite'i landing'de koş
+
+**Hata:** Sprint politikası gereği ("sprint sırasında full-suite yok") üç dalga boyunca
+yalnız scoped test koşuldu; landing'de tam suite 11 dosyada 18 kırmızı verdi — hepsi
+yeni davranışlara karşı bayatlamış ESKİ test pinleriydi (truth-stats, model-identity,
+yeni envelope shape'leri).
+
+**Neden:** Scoped koşu, değişikliğin KENDİ testlerini kanıtlar; değişikliğin başka
+testlerin pinlediği davranışları değiştirdiğini görmez. Bu borç birikir ve faiziyle
+landing'de ödenir.
+
+**Doğru kullanım:** Landing zincirinin zorunlu adımı: TAM suite (`VITEST_MAX_FORKS=2`
+bellek tavanıyla). Kırmızıları triage et: kod hatası mı, bayat pin mi? Bayat pinleri
+yeni davranışa tarihli açıklama yorumuyla hizala ("hangi dalga değiştirdi" yaz).
+Ayrıca: yaygın kullanılan bir options tipine yeni alanı REQUIRED ekleme — fail-closed
+semantikle (`=== true` tüketimi) optional ekle; aksi hâlde her test literal'i churn'e
+girer.
+
+## 14. Bulgu ≠ iş: raporla, owner karar versin
 
 **Doğru kullanım:** Çalışma sırasında görülen scope-dışı her bulgu tek satır olarak
 raporlanır; MASTER'a otomatik iş olarak girmez — owner admission'ı gerekir. Tekrarlayan
@@ -164,3 +182,6 @@ görülmez owner'a bildirilir.
   disclosure + tier-düzeltmesi (554), plan-sonrası el-edit çakışması (555),
   `- Dependencies:` sözdizimi keşfi + kanal-onarım sprint'i (556), xverify
   approval-bekleme/bütçe RCA'sı, Qwen canlı-tur bulguları (7083).
+- **2026-08-18 — sprint-556 landing güncellemesi**: Ders 13 eklendi (scoped-yeşil
+  borcu + required-alan churn'ü) — kaynak: 556 el-kapamasında 11 dosya / 18 bayat
+  pinin tek seferde ödenmesi.

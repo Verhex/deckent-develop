@@ -65,6 +65,12 @@ export function sanitizeResultJsonControlCharacters(raw: string): string {
   return sanitized;
 }
 
+/**
+ * Parse a worker `.result` JSON tolerantly: a strict parse first, then one
+ * retry with raw control characters inside string literals escaped (the
+ * sprint-549 class — a worker's notes carrying a literal control byte must
+ * degrade to a typed parse-failure, never crash collection).
+ */
 export function parseTaskResultJsonTolerantly(raw: string): TolerantResultJsonParse {
   try {
     return { state: 'parsed', result: JSON.parse(raw) as TaskResult, sanitized: false };
@@ -81,6 +87,11 @@ export function parseTaskResultJsonTolerantly(raw: string): TolerantResultJsonPa
   }
 }
 
+/**
+ * Build the synthetic NO_GO TaskResult recorded when a `.result` file cannot
+ * be parsed even tolerantly — the typed `RESULT_JSON_PARSE_FAILURE` marker
+ * keeps the failure visible to FIX instead of silently dropping the attempt.
+ */
 export function createResultJsonParseFailure(taskId: string, reason: string): TaskResult {
   return {
     taskId, workerId: 'brain-result-parser', filesChanged: [], linesAdded: 0,

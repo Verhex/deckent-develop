@@ -1098,7 +1098,7 @@ describe('waitForResults', () => {
     expect(results).toEqual([]);
   });
 
-  it('handles corrupt result files gracefully', async () => {
+  it('handles corrupt result files gracefully (typed parse-failure, sprint-549)', async () => {
     const sprint = makeSprint();
     mockedExistsSync.mockImplementation((p: string) => {
       if (typeof p === 'string' && p.endsWith('.timeout')) return false;
@@ -1106,8 +1106,17 @@ describe('waitForResults', () => {
     });
     mockedReadFileSync.mockReturnValue('NOT JSON');
 
+    // Tolerant-parse wave (2026-08-18): an unparseable .result no longer
+    // vanishes silently — it surfaces as a synthetic typed NO_GO so FIX can
+    // see it (RESULT_JSON_PARSE_FAILURE marker).
     const results = await waitForResults(ROOT, sprint, 1);
-    expect(results).toEqual([]);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      taskId: '001-001',
+      selfAssessment: 'NO_GO',
+      workerId: 'brain-result-parser',
+    });
+    expect(results[0]!.notes).toContain('RESULT_JSON_PARSE_FAILURE');
   });
 
   it('collects results for multiple tasks', async () => {

@@ -124,17 +124,19 @@ describe('born-610: MRR is NOT dependency-satisfying (single truth)', () => {
 describe('born-610 STATUS-TRUTH: finalize --force kills live workers (COMPLETE&active)', () => {
   it('forceKillLiveWorkers sweeps every in-progress task through the kill seam (best-effort)', () => {
     const killedIds: string[] = [];
+    // 556-003 termination truth: killSingle is typed now — 'killed' |
+    // 'not-found' (already dead = goal state reached) | 'failed' (real error).
     const sweep = forceKillLiveWorkers(
       [task('610-a', TaskStatus.EXECUTING), task('610-b', TaskStatus.CLAIMED), task('610-c', TaskStatus.EXECUTING)],
       (id) => {
-        if (id === '610-b') return false; // backend-aware killSingle: basarisiz = false
+        if (id === '610-b') return 'failed'; // backend-aware killSingle: gerçek kill hatası
         killedIds.push(id);
-        return true;
+        return 'killed';
       },
     );
     expect(killedIds).toEqual(['610-a', '610-c']);
     expect(sweep.killed).toEqual(['610-a', '610-c']);
-    expect(sweep.failed).toEqual(['610-b']); // already-gone = sweep continues, not aborts
+    expect(sweep.failed).toEqual(['610-b']); // real failure = sweep continues, not aborts
   });
 
   it('composition pin: the --force branch sweeps workers BEFORE finalizeSprint can stamp COMPLETE', () => {

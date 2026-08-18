@@ -68,8 +68,13 @@ describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wi
       POLICY,
     );
 
-    expect(paused).toBe(true);
-    expect(sprint.status).toBe(SprintStatus.PAUSED);
+    // Scale-honest breaker (sprint-546): the count gate is the ABSOLUTE
+    // authored max_unresolved_tasks — it is no longer scaled down for small
+    // sprints, so a single settled NOT_DISPATCHED lineage stays below the
+    // authored 5 and the breaker honestly does not pause. The lineage still
+    // settles FAILED; containment for cascades rides forcedByBlockedDependents.
+    expect(paused).toBe(false);
+    expect(sprint.status).not.toBe(SprintStatus.PAUSED);
   });
 
   it('pauses when post-FIX unresolved roots meet both count and ratio gates', () => {
@@ -85,7 +90,7 @@ describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wi
     expect(sprint.status).toBe(SprintStatus.PAUSED);
   });
 
-  it('scales the absolute gate for a three-task sprint', () => {
+  it('does NOT scale the absolute gate for a three-task sprint (scale-honest, sprint-546)', () => {
     const r = root();
     const sprint = makeSprint(3);
     const paused = applyCascadeCircuitBreaker(
@@ -94,8 +99,10 @@ describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wi
       evalsFor(sprint, [NG, NG, OK]),
       POLICY,
     );
-    expect(paused).toBe(true);
-    expect(sprint.status).toBe(SprintStatus.PAUSED);
+    // 2 unresolved of 3 (66% ≥ 50%) but 2 < the authored absolute 5 — the old
+    // down-scaling for small sprints is retired; the authored count stands.
+    expect(paused).toBe(false);
+    expect(sprint.status).not.toBe(SprintStatus.PAUSED);
   });
 
   it('does not pause when the unresolved ratio is below policy', () => {

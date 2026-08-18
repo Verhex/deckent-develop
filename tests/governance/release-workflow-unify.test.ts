@@ -416,14 +416,18 @@ function readWorkflow(filename: string): ParsedWorkflow {
 }
 
 describe('release-workflow-unify — live repo-wide pin', () => {
-  it('exactly one release-event-triggered workflow performs a real npm publish', () => {
+  // 0.100.0 rebaseline (owner decision, 2026-08-14): canonical publishing is
+  // MANUAL. NO workflow may carry a real npm publish anymore — release.yml is
+  // validation-only. The count pins below fail closed if an automatic publish
+  // authority ever returns without an explicit owner decision.
+  it('NO release-event-triggered workflow performs a real npm publish (manual-publish contract)', () => {
     const workflows = WORKFLOW_FILENAMES.map(readWorkflow);
-    expect(countPublishAuthorityWorkflows(workflows)).toBe(1);
+    expect(countPublishAuthorityWorkflows(workflows)).toBe(0);
   });
 
-  it('release.yml is the workflow that performs the real publish', () => {
+  it('release.yml performs no real publish (validation-only)', () => {
     const release = readWorkflow('release.yml');
-    expect(countRealPublishInvocations(release)).toBe(1);
+    expect(countRealPublishInvocations(release)).toBe(0);
   });
 
   it('publish.yml no longer performs a real npm publish (dry-run only)', () => {
@@ -452,30 +456,24 @@ describe('release.yml — build:all + validate:publish chain, in order', () => {
     expect(idx).toBeGreaterThanOrEqual(0);
   });
 
-  it('orders build:all → validate:publish → smoke test-gate → publish', () => {
+  // 0.100.0 rebaseline (owner decision, 2026-08-14): the chain ends at
+  // validation — there is no publish step to order after the smoke gate, and
+  // the workflow must never regain one without an explicit owner decision.
+  it('orders build:all → validate:publish, and carries NO publish step after them', () => {
     const buildIdx = findStepIndex(steps, (s) => (s.run ?? '') === 'npm run build:all');
     const validateIdx = findStepIndex(steps, (s) => (s.run ?? '').includes('npm run validate:publish'));
-    const smokeIdx = findStepIndex(steps, (s) => (s.run ?? '').includes('vitest run tests/governance/'));
     const publishIdx = findStepIndex(steps, (s) => hasRealNpmPublish(s.run));
 
     expect(buildIdx).toBeGreaterThanOrEqual(0);
     expect(validateIdx).toBeGreaterThan(buildIdx);
-    expect(smokeIdx).toBeGreaterThan(validateIdx);
-    expect(publishIdx).toBeGreaterThan(smokeIdx);
+    expect(publishIdx).toBe(-1);
   });
 
-  it('publish step preserves --provenance --access public via OIDC (no registry token — 414-001 SEC-06)', () => {
-    const publishStep = steps.find((s) => hasRealNpmPublish(s.run));
-    expect(publishStep).toBeDefined();
-    expect(publishStep!.run).toContain('--provenance');
-    expect(publishStep!.run).toContain('--access public');
-    const env = publishStep!.env as Record<string, unknown> | undefined;
-    expect(env?.NODE_AUTH_TOKEN).toBeUndefined();
-  });
-
-  it('publish step uses --ignore-scripts (suppresses prepublishOnly re-running plain build)', () => {
-    const publishStep = steps.find((s) => hasRealNpmPublish(s.run));
-    expect(publishStep!.run).toContain('--ignore-scripts');
+  it('carries no registry auth material (validation needs no token — SEC-06 posture keeps)', () => {
+    for (const s of steps) {
+      const env = s.env as Record<string, unknown> | undefined;
+      expect(env?.NODE_AUTH_TOKEN).toBeUndefined();
+    }
   });
 
   it('smoke test-gate is not a duplicate of the full staged multi-directory matrix', () => {
@@ -487,10 +485,10 @@ describe('release.yml — build:all + validate:publish chain, in order', () => {
     expect(dirMentions).toBeLessThan(9);
   });
 
-  it('permissions retain contents:write and id-token:write (GH Release + provenance)', () => {
+  it('permissions are read-only (0.100.0 rebaseline: no GH Release, no provenance token)', () => {
     const permissions = release.permissions as Record<string, unknown>;
-    expect(permissions.contents).toBe('write');
-    expect(permissions['id-token']).toBe('write');
+    expect(permissions.contents).toBe('read');
+    expect(permissions['id-token']).toBeUndefined();
   });
 });
 

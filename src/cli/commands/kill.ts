@@ -135,6 +135,14 @@ function detectTaskBackend(
   return detectTaskProvider(root, taskId) === 'claude' ? 'tmux' : 'subprocess';
 }
 
+/** Outcome of {@link killSingle}. `killSingle` itself only ever produces
+ * 'killed' or 'not-found' — a genuine backend error (permission, programming
+ * error) still throws, preserving the existing exception-based contract for
+ * the direct `kill <taskId>` CLI command and the `--all` cascade. 'failed' is
+ * part of the shared type so a caller like `forceKillLiveWorkers` (556-003)
+ * can turn a caught exception into the same typed vocabulary. */
+export type KillSingleResult = 'killed' | 'not-found' | 'failed';
+
 /** Kill a single worker and clean up its resources. Exported (born-610): the
  * finalize --force worker-sweep reuses this SAME backend-aware composition
  * (subprocess/docker-first for non-claude, tmux with subprocess-fallback, plus
@@ -145,7 +153,7 @@ export function killSingle(
   taskId: string,
   lang: string,
   configuredBackend?: BackendType,
-): boolean {
+): KillSingleResult {
   const backendName = detectTaskBackend(root, taskId, configuredBackend);
   let attemptedBackendName: string = backendName;
   try {
@@ -159,7 +167,7 @@ export function killSingle(
     updateTaskStatus(root, taskId, lang);
     releaseLocks(root, taskId, lang);
     cleanPromptFiles(root, taskId, lang);
-    return true;
+    return 'killed';
   } catch (error) {
     // Tmux is the resolved authority for this task. Only its typed
     // "window not found" error may be translated into the CLI's not-found
@@ -175,7 +183,7 @@ export function killSingle(
         updateTaskStatus(root, taskId, lang);
         releaseLocks(root, taskId, lang);
         cleanPromptFiles(root, taskId, lang);
-        return true;
+        return 'killed';
       } catch (tmuxError) {
         if (!(tmuxError instanceof TmuxError)) throw tmuxError;
       }
@@ -183,7 +191,7 @@ export function killSingle(
     if (!(error instanceof Error)) throw error;
     printError(new Error(getMessage('kill.worker_not_found', lang, { taskId })));
     process.exitCode = 1;
-    return false;
+    return 'not-found';
   }
 }
 
@@ -367,7 +375,10 @@ async function killAllCascade(
   let workersKilled = 0;
   for (const id of activeIds) {
     const previousExitCode = process.exitCode;
-    if (killSingle(root, id, lang, config.spawn_backend)) workersKilled++;
+    const result = killSingle(root, id, lang, config.spawn_backend);
+    // 'not-found' means the goal state (no live worker) is already reached —
+    // count it as killed, same as an explicit terminate (556-003).
+    if (result === 'killed' || result === 'not-found') workersKilled++;
     // One already-exited worker must not make a successful controller cascade
     // report a command-level failure.
     process.exitCode = previousExitCode;

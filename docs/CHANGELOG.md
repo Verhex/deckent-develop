@@ -14,6 +14,20 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint556] - 2026-08-18
+
+### Added
+
+- approval freshness + durable adjudication evidence (channel authority core)
+
+### Changed
+
+- xverify CLI waiting signal + approval-phase timeout (depends on Task 1) (completed with tech debt)
+- finalize/kill already-terminated truth (depends on nothing) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint554] - 2026-08-18
 
 ### Added

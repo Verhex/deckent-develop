@@ -16,7 +16,15 @@ describe('native local-llm transport', () => {
   });
 
   it('resolves the real streaming tool dispatcher under the local-llm identity and surfaces health', async () => {
-    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}', { status: 200 }));
+    // LOCAL-LLM-MODEL-IDENTITY-001: the status line now also verifies the exact
+    // model identity against the endpoint's /models — the fixture must publish
+    // the selected ID or the (correct) mismatch diagnostic is appended.
+    const fetchFn = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+      if (String(url).includes('/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'Qwen3.8-27B' }] }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
     const resolved = resolveNativeSelection(
       { provider: 'local-llm', model: 'Qwen3.8-27B' },
       { env: {}, config: { providers: { 'local-llm': { baseUrl: 'http://127.0.0.1:8080/v1' } } }, fetchFn },
@@ -45,9 +53,12 @@ describe('native local-llm transport', () => {
 
   it('reports an unhealthy endpoint without changing provider identity', async () => {
     const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}', { status: 503 }));
+    // LOCAL-LLM-MODEL-IDENTITY-001 (0-hardcode): there is no literal fallback
+    // model anymore — a model-less selection is a typed error, so the fixture
+    // authors native_model exactly like a real config would.
     const resolved = resolveNativeSelection(
       { provider: 'local-llm', model: null },
-      { env: {}, config: { providers: { 'local-llm': { endpoint: 'http://local.test/v1' } } }, fetchFn },
+      { env: {}, config: { native_model: 'Qwen3.8-27B', providers: { 'local-llm': { endpoint: 'http://local.test/v1' } } }, fetchFn },
     );
     expect(resolved).not.toHaveProperty('error');
     if ('error' in resolved) return;

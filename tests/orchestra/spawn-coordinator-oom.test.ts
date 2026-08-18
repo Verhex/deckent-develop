@@ -15,6 +15,10 @@ vi.mock('node:fs', () => ({
 }));
 vi.mock('node:os', () => ({
   totalmem: vi.fn(),
+  // The module graph under test now also pulls os.homedir/tmpdir (scratch/
+  // content-store seams, 2026-08-18 wave) — the mock must keep them defined.
+  homedir: vi.fn(() => '/tmp/fake-home'),
+  tmpdir: vi.fn(() => '/tmp'),
 }));
 
 import { readFileSync } from 'node:fs';

@@ -13,12 +13,20 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 693,
+  "total": 700,
   "mediated": 0,
-  "unmediated": 693,
-  "fileCount": 237,
+  "unmediated": 700,
+  "fileCount": 239,
   "byFile": {
     "src/agent/permission-store.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/agent/scratch-checkpoint.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/agent/tool-result-broker.ts": {
       "count": 1,
       "mediated": false
     },
@@ -423,7 +431,7 @@
       "mediated": false
     },
     "src/core/file-lock.ts": {
-      "count": 30,
+      "count": 31,
       "mediated": false
     },
     "src/core/flow-registry.ts": {
@@ -875,7 +883,7 @@
       "mediated": false
     },
     "src/orchestra/sprint-finalizer.ts": {
-      "count": 14,
+      "count": 15,
       "mediated": false
     },
     "src/orchestra/sprint-lifecycle.ts": {
@@ -911,7 +919,7 @@
       "mediated": false
     },
     "src/orchestra/task-builder.ts": {
-      "count": 3,
+      "count": 4,
       "mediated": false
     },
     "src/orchestra/task-mode-runner.ts": {
@@ -967,5 +975,5 @@
       "mediated": false
     }
   },
-  "digest": "76931266eac57f9c71b9b68c3c4d99ca3a85e4b652dc73d449b4f06e5ebecc95"
+  "digest": "c7c3ea9c3ae8e33e07da28097cc68d513f6ecfa9e101809d8a70a309f0b444d1"
 }

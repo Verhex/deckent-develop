@@ -99,94 +99,30 @@ function driftProjectStack(root: string): void {
 }
 
 describe('PLAN-generated skill durability across FIX/XFIX', () => {
-  it('persists the PLAN rendering so every repair prompt resolves identical content', async () => {
+  // ── RETIREMENT PINS (CATALOG-STATS-AUTHORITY-001, 2026-08-17) ─────────────
+  // The PLAN-generated project-conventions skill is retired: its content ships
+  // as the deterministic project-context prompt segment (task-builder →
+  // prompt-god-template). The three durability tests that pinned the persist
+  // machinery are superseded by the no-op contract below — persisting a skill
+  // body here only resurrected the ghost after every SPAWN.
+
+  it('persistPlanGeneratedProjectConventionsSkill is an honest no-op (returns false, writes nothing)', () => {
     const root = mkdtempSync(join(tmpdir(), 'deckent-generated-skill-'));
     try {
       writeProjectFixture(root);
-      expect(persistPlanGeneratedProjectConventionsSkill(root)).toBe(true);
-
-      const skillPath = join(root, '.deckent', 'skills', 'project-conventions', 'SKILL.md');
-      expect(existsSync(skillPath)).toBe(true);
-      const planContent = readFileSync(skillPath, 'utf8');
-
-      // The manifest lands next to the body, so the skill is pool-visible (and
-      // therefore forceSkills-resolvable) for the rest of the lineage.
-      const pooled = new SkillPoolManager(root).getSkill('project-conventions');
-      expect(pooled?.enabled).toBe(true);
-
-      const firstRound = makeTask();
-      const secondRound = makeTask({ id: '507-003-task-fix-2', fixForTaskId: firstRound.id });
-      const firstPrompts = await resolveSkillPrompts(root, firstRound);
-      const secondPrompts = await resolveSkillPrompts(root, secondRound);
-
-      expect(firstPrompts).toEqual([{ name: 'project-conventions', content: planContent }]);
-      expect(secondPrompts).toEqual(firstPrompts);
-      expect(buildWorkerPrompt(secondRound, undefined, secondPrompts, root)).toContain(planContent);
+      expect(persistPlanGeneratedProjectConventionsSkill(root)).toBe(false);
+      expect(existsSync(join(root, '.deckent', 'skills', 'project-conventions', 'SKILL.md'))).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it('keeps the PLAN body byte-identical after the project stack drifts mid-run', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'deckent-generated-skill-drift-'));
+  it('a legacy assignedSkills reference to the retired id resolves to a tolerant skip, not a prompt', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-generated-skill-legacy-'));
     try {
       writeProjectFixture(root);
-      expect(persistPlanGeneratedProjectConventionsSkill(root)).toBe(true);
-      const planContent = readFileSync(
-        join(root, '.deckent', 'skills', 'project-conventions', 'SKILL.md'),
-        'utf8',
-      );
-
-      driftProjectStack(root);
-
-      // Guard the guard: after the drift a fresh generation really would produce a
-      // different body, so the equality below can only hold by persistence — a
-      // regenerate-per-round implementation fails this case.
-      const drifted = detectProjectStack(root);
-      expect(drifted).not.toBeNull();
-      expect(getGeneratedContent(generateProjectConventionsSkill(drifted!))).not.toBe(planContent);
-
-      const laterRound = makeTask({ id: '507-003-task-fix-3', fixForTaskId: '507-003-task' });
-      expect(await resolveSkillPrompts(root, laterRound)).toEqual([
-        { name: 'project-conventions', content: planContent },
-      ]);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  it('delivers the persisted skill to a real FIX-round spawn that forces it', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'deckent-generated-skill-fix-spawn-'));
-    try {
-      writeProjectFixture(root);
-      mkdirSync(join(root, '.tasks'), { recursive: true });
-      expect(persistPlanGeneratedProjectConventionsSkill(root)).toBe(true);
-      const planContent = readFileSync(
-        join(root, '.deckent', 'skills', 'project-conventions', 'SKILL.md'),
-        'utf8',
-      );
-
-      const fixTask = makeTask({
-        id: '507-003-fix-round',
-        isPriorityFix: true,
-        fixForTaskId: '507-003-task',
-        forceSkills: ['project-conventions'],
-        budget: { maxTokens: 50_000, maxTurns: 3 },
-        budgetPolicy: { landingPolicy: { reserve_ratio: 0.25 } },
-      });
-      const captured: Array<{ taskId: string; prompt: string }> = [];
-
-      await spawnWorkers(root, makeSprint([fixTask]), makeConfig(), {
-        spawnBackend: makeCapturingBackend(captured),
-      });
-
-      // The forced skill resolved: no typed pre-dispatch hold was written.
-      expect(existsSync(join(root, '.tasks', 'task-507-003-fix-round.result'))).toBe(false);
-      expect(fixTask.status).not.toBe(TaskStatus.NO_GO);
-
-      const spawned = captured.find(c => c.taskId === '507-003-fix-round');
-      expect(spawned).toBeDefined();
-      expect(spawned!.prompt).toContain(planContent);
+      const legacyRound = makeTask({ id: '507-003-task-fix-2', fixForTaskId: '507-003-task' });
+      expect(await resolveSkillPrompts(root, legacyRound)).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

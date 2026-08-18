@@ -315,7 +315,7 @@ describe('finalize overhaul', () => {
     } as any);
     vi.mocked(containSprintRecoveryCoordinator).mockResolvedValue({ action: 'none' } as any);
     vi.mocked(runSprintRecoveryOperation).mockResolvedValue(undefined as any);
-    vi.mocked(killSingle).mockReturnValue(true as any);
+    vi.mocked(killSingle).mockReturnValue('killed' as any);
     vi.mocked(forceAbortSprint).mockReturnValue({
       outcome: 'ABORTED',
       receiptPublication: {},

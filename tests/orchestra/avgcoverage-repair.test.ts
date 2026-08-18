@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskEvaluation, SprintPhase, SprintStatus } from '../../src/core/types.js';
@@ -299,6 +299,22 @@ beforeEach(() => {
   PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-acr-'));
 });
 
+
+// 7014 CATALOG-STATS-AUTHORITY-001 (2026-08-18 realign): the finalizer no longer
+// writes agent/skill stats through saveAgentStats/saveSkillStats manifests — the
+// single truth sink is the atomic .deckent/stats/catalog-stats.json sidecar
+// (writeCatalogStatsTerminalOutcomes). The repaired 8d2 avgCoverage semantics
+// (phantom-zero exclusion, genuine-0%% as a real sample, history blend) moved
+// into mergeCatalogStatsEntry verbatim; these tests now read (and seed prior
+// history into) the sidecar instead of spying on the retired manifest writers.
+function readSidecar(root: string): { agents?: Record<string, Record<string, number>>; skills?: Record<string, Record<string, number>> } {
+  return JSON.parse(readFileSync(join(root, '.deckent', 'stats', 'catalog-stats.json'), 'utf-8'));
+}
+function seedSidecar(root: string, sidecar: Record<string, unknown>): void {
+  mkdirSync(join(root, '.deckent', 'stats'), { recursive: true });
+  writeFileSync(join(root, '.deckent', 'stats', 'catalog-stats.json'), JSON.stringify(sidecar), 'utf-8');
+}
+
 // ═══ Group A — agent block (sprint-finalizer "8d2" sync) ═══════════════════
 
 describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
@@ -327,18 +343,15 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
     // Real-disk proof the finalize actually settled (terminal receipt published).
     expect(existsSync(join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-591a-terminal-receipt.json'))).toBe(true);
 
-    expect(mockSaveAgent).toHaveBeenCalled();
-    // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
-    const saved = { stats: mockSaveAgent.mock.calls[0][1] };
+    const saved = { stats: readSidecar(PROJECT_ROOT).agents!['bug-fixer']! };
     // (90+80)/2 = 85 — NOT (90+0+80)/3 = 56.67 (the old phantom-zero-dilution result)
     expect(saved.stats.avgCoverage).toBeCloseTo(85, 5);
   });
 
   it('blends new coverage-bearing samples with prior real history, excluding this sprint\'s non-covered task from the weight', async () => {
-    mockGetAgent.mockReturnValue({
-      id: 'bug-fixer',
-      stats: { totalUses: 5, successRate: 1, avgCoverage: 70, lastUsedInSprint: 'sprint-500' },
-    });
+    mockGetAgent.mockReturnValue({ id: 'bug-fixer', stats: undefined });
+    // Prior real history lives in the sidecar truth source now, never the manifest.
+    seedSidecar(PROJECT_ROOT, { agents: { 'bug-fixer': { totalUses: 5, successCount: 5, successRate: 1, avgCoverage: 70, lastUsedInSprint: 'sprint-500' } } });
 
     const tasks = [
       makeTask('t1', { assignedAgent: 'bug-fixer' }),
@@ -354,18 +367,15 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
 
     await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
-    // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
-    const saved = { stats: mockSaveAgent.mock.calls[0][1] };
+    const saved = { stats: readSidecar(PROJECT_ROOT).agents!['bug-fixer']! };
     // (70*5 + 85*2) / (5+2) = 520/7 — the non-covered task contributes to NEITHER
     // the numerator nor the denominator.
     expect(saved.stats.avgCoverage).toBeCloseTo(520 / 7, 5);
   });
 
   it('treats a genuine 0% coverage result as a real sample, not a measurement gap', async () => {
-    mockGetAgent.mockReturnValue({
-      id: 'bug-fixer',
-      stats: { totalUses: 1, successRate: 1, avgCoverage: 99, lastUsedInSprint: 'sprint-500' },
-    });
+    mockGetAgent.mockReturnValue({ id: 'bug-fixer', stats: undefined });
+    seedSidecar(PROJECT_ROOT, { agents: { 'bug-fixer': { totalUses: 1, successCount: 1, successRate: 1, avgCoverage: 99, lastUsedInSprint: 'sprint-500' } } });
 
     const tasks = [makeTask('t1', { assignedAgent: 'bug-fixer' })];
     const results = [makeResult('t1', { coverage: 0 })];
@@ -373,8 +383,7 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
 
     await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
-    // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
-    const saved = { stats: mockSaveAgent.mock.calls[0][1] };
+    const saved = { stats: readSidecar(PROJECT_ROOT).agents!['bug-fixer']! };
     // (99*1 + 0*1) / (1+1) = 49.5 — proves the blend ran at all. The OLD code's
     // `if (avgCov > 0 ...)` guard treated a genuine 0% as falsy and skipped the
     // update entirely, leaving avgCoverage stale at 99.
@@ -405,8 +414,7 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
     // Real-disk proof the finalize actually settled (terminal receipt published).
     expect(existsSync(join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-591d-terminal-receipt.json'))).toBe(true);
 
-    expect(mockSaveSkill).toHaveBeenCalled();
-    const saved = { stats: mockSaveSkill.mock.calls[0][1] };
+    const saved = { stats: readSidecar(PROJECT_ROOT).skills!['typescript-expert']! };
     // (100+60)/2 = 80 — NOT diluted by t2's measurement gap, and no longer stuck at 0.
     expect(saved.stats.avgCoverage).toBeCloseTo(80, 5);
   });
@@ -420,7 +428,7 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
 
     await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
-    const saved = { stats: mockSaveSkill.mock.calls[0][1] };
+    const saved = { stats: readSidecar(PROJECT_ROOT).skills!['typescript-expert']! };
     expect(saved.stats.successCount).toBe(1);
     expect(saved.stats.avgCoverage).toBeCloseTo(100, 5);
   });

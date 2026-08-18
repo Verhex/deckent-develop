@@ -200,7 +200,7 @@ describe('kill multi-provider', () => {
     );
     const { killSingle } = await import('../../../src/cli/commands/kill.js');
 
-    expect(killSingle(fixture.root, 'codex-1', 'en')).toBe(true);
+    expect(killSingle(fixture.root, 'codex-1', 'en')).toBe('killed');
     expect(SpawnBackendFactory.create).toHaveBeenCalledWith({
       backend: 'subprocess',
       projectDir: fixture.root,

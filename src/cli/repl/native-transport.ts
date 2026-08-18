@@ -490,7 +490,8 @@ export function resolveNativeSelection(
  *  admission gate then has to deny). Generation headroom is NOT subtracted
  *  here — derivePromptBudget's output/safety reserves own that arithmetic.
  *  The per-provider literals at the bottom are last-resort fallbacks for a
- *  model the registry cannot advertise. */
+ *  model the registry cannot advertise: 24k for local Ollama slots (the
+ *  2026-07-07 empty-turn incident), 160k for hosted claude, 100k otherwise. */
 export function resolveContextBudgetTokens(
   providerName: string,
   config: { native_context_tokens?: unknown },

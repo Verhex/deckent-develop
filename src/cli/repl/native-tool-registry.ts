@@ -111,7 +111,11 @@ export function resolveRunFlowEnabled(raw: { run_flow_v2?: boolean } | undefined
  */
 export interface ToolSurfaceOptions {
   enabled: boolean;
-  progressive: boolean;
+  /** NT-06 progressive disclosure. OPTIONAL and fail-closed: every consumer
+   *  gates on `=== true`, so absent ≡ false — direct constructions (tests,
+   *  embedders) need not churn; resolveToolSurfaceOptions always emits it
+   *  explicitly. */
+  progressive?: boolean;
   exposure?: ToolExposure;
   confirm?: ConfirmFn;
   execImpl?: ExecImplFn;

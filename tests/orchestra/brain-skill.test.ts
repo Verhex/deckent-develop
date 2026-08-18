@@ -83,16 +83,19 @@ describe('planSprint — skill selection integration', () => {
     expect(sprint.tasks.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('WM-7 E1: no skill pool → planner still injects the generated project-conventions temp-skill', async () => {
+  it('no skill pool → NO ghost skill is injected (project-conventions retired, CATALOG-STATS-AUTHORITY-001)', async () => {
     const { planSprint } = await import('../../src/orchestra/brain.js');
     const config = makeConfig(tempDir);
     const context = makeContext('## Task 1: Test task\n- Scope: src/core/\n');
     const recommendation = makeRecommendation();
 
     const sprint = await planSprint(tempDir, config, context, recommendation, { mode: 'structured' });
-    // Without skill pool directory, skills default to empty array (initialized in createTask)
+    // 2026-08-17 retirement: project-conventions is the deterministic
+    // project-context prompt segment, never a routable/learnable skill — an
+    // always-matching pseudo-skill polluted the learning loop. Empty pool →
+    // empty assignments, no resurrection.
     for (const task of sprint.tasks) {
-      expect(task.assignedSkills).toEqual(['project-conventions']);
+      expect(task.assignedSkills).toEqual([]);
     }
   });
 
@@ -127,9 +130,20 @@ describe('planSprint — skill selection integration', () => {
     }), 'utf8');
 
     const sprint = await planSprint(tempDir, config, context, recommendation, { mode: 'structured' });
-    // At least one task should have skills assigned via trigger matching
-    const hasSkills = sprint.tasks.some(t => t.assignedSkills && t.assignedSkills.length > 0);
-    expect(hasSkills).toBe(true);
+    // Routing V3 (owner: "v2'yi tamamen kaldır"): assignment is deterministic
+    // vocabulary/content matching under the resolved governance mode — the old
+    // V2 trigger-keyword guarantee ("typescript" in the title ⇒ assignment) is
+    // retired, so a hermetic fixture may honestly assign nothing. The V3
+    // invariants that must hold instead: planning completes, assignments are
+    // always an array, and every assigned id exists in the real pool (no
+    // hallucinated/ghost ids — the CATALOG-STATS-AUTHORITY-001 class).
+    expect(sprint.tasks.length).toBeGreaterThanOrEqual(1);
+    for (const t of sprint.tasks) {
+      expect(Array.isArray(t.assignedSkills)).toBe(true);
+      for (const id of t.assignedSkills ?? []) {
+        expect(id).toBe('typescript-expert');
+      }
+    }
   });
 
   it('skill selection is non-fatal when import fails', async () => {

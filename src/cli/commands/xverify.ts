@@ -125,6 +125,79 @@ export interface XverifyDeps {
     root: string,
     config: ResolvedConfig,
   ) => ApprovalAuthorityRuntimeService | undefined;
+  /**
+   * Invoked ONCE per pending approval request while the run is actually
+   * blocked waiting for a decision. The CLI writes the typed waiting line to
+   * stderr here; the MCP twin passes nothing and stays silent.
+   */
+  onApprovalWaiting?: (info: { requestId: string }) => void;
+  /** Hermetic seam for the approval-poll backoff (no real timers in tests). */
+  sleepFn?: (ms: number) => Promise<void>;
+}
+
+// ─── Approval waiting signal ────────────────────────────────────────────
+//
+// `prepareCrossVerifyCandidateEvidence` owns the approval poll loop (it is
+// orchestra's, not this surface's — ADR-D-004 C3). The only seam it offers a
+// caller is `sleepFn`, and it calls that seam EXACTLY when the decision is
+// still missing. Hanging the signal there is therefore precise by
+// construction: a decision that is already on disk claims on the first try,
+// `sleepFn` is never invoked, and no waiting line is printed.
+
+/**
+ * Wraps a sleep so that each pending approval request announces itself once
+ * before the run blocks again. Ids come from the same `broker.list('pending')`
+ * surface `deckent approvals list` reads, so every printed id is one
+ * `deckent approvals decide <id>` accepts.
+ */
+export function createApprovalWaitSignal(input: {
+  listPendingRequestIds: () => readonly string[];
+  onWaiting: (requestId: string) => void;
+  sleepFn: (ms: number) => Promise<void>;
+}): (ms: number) => Promise<void> {
+  const announced = new Set<string>();
+  return async (ms: number): Promise<void> => {
+    for (const requestId of input.listPendingRequestIds()) {
+      if (announced.has(requestId)) continue;
+      announced.add(requestId);
+      input.onWaiting(requestId);
+    }
+    await input.sleepFn(ms);
+  };
+}
+
+/**
+ * Effective approval-decision window. `--timeout` BOUNDS the approval wait —
+ * it never extends it, and it is never a second flag: the operator's single
+ * timeout now caps the decision wait the same way it caps the provider call.
+ * `undefined` means "neither an authored window nor an operator timeout
+ * exists" and leaves the mechanism's own default untouched.
+ */
+export function resolveApprovalDecisionWindowMs(input: {
+  authoredWindowMs: number | undefined;
+  requestedTimeoutMs: number | undefined;
+}): number | undefined {
+  const { authoredWindowMs, requestedTimeoutMs } = input;
+  if (authoredWindowMs === undefined) return requestedTimeoutMs;
+  if (requestedTimeoutMs === undefined) return authoredWindowMs;
+  return Math.min(authoredWindowMs, requestedTimeoutMs);
+}
+
+/**
+ * Reads back the composition hold detail the runner durably merged into the
+ * evidence task result. Defensive on purpose: `detail` is written as an
+ * intersection over `CrossVerifyEvidence`, so it is not a declared field and
+ * must never be hard-cast. Any read failure is simply "no detail".
+ */
+function readDurableHoldDetail(root: string, taskId: string): string | null {
+  try {
+    const raw = readFileSync(join(root, '.tasks', `task-${taskId}.result`), 'utf-8');
+    const parsed = JSON.parse(raw) as { crossVerify?: { detail?: unknown } };
+    const detail = parsed.crossVerify?.detail;
+    return typeof detail === 'string' && detail.trim() ? detail : null;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Diff capture (default impl) ────────────────────────────────────────
@@ -306,6 +379,20 @@ export interface XverifyResult {
    * logical claim, so this is guidance, not a refusal.
    */
   remedy: string | null;
+  /**
+   * ADDITIVE (never a replacement): the exact durable hold detail behind a
+   * hold/skip. `skippedReason` keeps its exact prior value — a consumer that
+   * matched on it before still matches byte-for-byte.
+   *
+   * Source order:
+   *   1. the candidate-evidence preparation hold's `detailCode` — the root
+   *      cause, and on approval holds it IS the approval request id, so a
+   *      `--json` caller reads the exact id `deckent approvals decide` takes;
+   *   2. otherwise the composition hold detail the runner persists into
+   *      `.tasks/task-<id>.result` → `crossVerify.detail`.
+   * `null` when neither exists (a clean run has no hold detail to report).
+   */
+  detail: string | null;
 }
 
 // ─── Typed tier-floor refusal → operator language ───────────────────────────
@@ -551,7 +638,18 @@ export async function runXverifyForResult(
     }
   }
 
-  const timeoutMs = Number.parseInt(opts.timeout ?? '', 10) || 300_000;
+  // `requestedTimeoutMs` is what the operator actually authored (undefined when
+  // `--timeout` was omitted); `timeoutMs` keeps its exact prior default.
+  const requestedTimeoutMs = Number.parseInt(opts.timeout ?? '', 10) || undefined;
+  const timeoutMs = requestedTimeoutMs ?? 300_000;
+
+  // Human progress lines are diagnostics, not the machine payload. Under
+  // `--json` they move to stderr so stdout stays a single parseable document;
+  // without `--json` the operator-facing output is unchanged.
+  const emitProgress = (line: string): void => {
+    if (opts.json) process.stderr.write(`${line}\n`);
+    else print(line);
+  };
 
   const runCrossVerify = deps.runCrossVerifyFn
     ?? (await import('../../orchestra/cross-verify-runner.js')).runCrossVerify;
@@ -585,6 +683,7 @@ export async function runXverifyForResult(
   // Every missing authority is a typed resumable HOLD printed here; the run
   // still proceeds into the composition, whose own gate ladder stays the
   // single settlement authority (no fabricated evidence, no fallback).
+  let preparationHoldDetail: string | null = null;
   if (deps.providerAuthority?.state === 'ready' && authMode !== 'hybrid') {
     const prepare = deps.prepareCandidateEvidenceFn ?? prepareCrossVerifyCandidateEvidence;
     const openApproval = deps.openApprovalRuntimeFn ?? ((r: string, c: ResolvedConfig) => {
@@ -603,6 +702,22 @@ export async function runXverifyForResult(
     if (candidateProvider && candidateModel) {
       const approvalRuntime = openApproval(root, config);
       const lang = getLanguage(config.language);
+      // The 16-minute silent block: the run sat inside the approval poll loop
+      // with nothing on any stream, so the operator could not tell a pending
+      // decision from a hung process. One typed line per request, once.
+      const approvalWaitSignal = createApprovalWaitSignal({
+        listPendingRequestIds: () =>
+          approvalRuntime?.broker.list('pending').map((request) => request.id) ?? [],
+        onWaiting: (requestId) => deps.onApprovalWaiting?.({ requestId }),
+        sleepFn: deps.sleepFn ?? ((ms) => new Promise<void>((resolve) => { setTimeout(resolve, ms); })),
+      });
+      const authoredWindowMs = config.approval?.authority?.decision_window_seconds
+        ? config.approval.authority.decision_window_seconds * 1000
+        : undefined;
+      const decisionWindowMs = resolveApprovalDecisionWindowMs({
+        authoredWindowMs,
+        requestedTimeoutMs,
+      });
       const preparation: CrossVerifyEvidencePreparationResult = await prepare({
         projectRoot: root,
         config,
@@ -617,18 +732,27 @@ export async function runXverifyForResult(
           model: candidateModel,
         }),
         runId: `xverify:${id}`,
-        ...(config.approval?.authority?.decision_window_seconds
-          ? { decisionWindowMs: config.approval.authority.decision_window_seconds * 1000 }
-          : {}),
+        ...(decisionWindowMs !== undefined ? { decisionWindowMs } : {}),
+        sleepFn: approvalWaitSignal,
         ...(deps.nowFn ? { now: deps.nowFn } : {}),
       });
       if (preparation.state === 'hold') {
-        print(getMessage('xverify.prepare.hold', lang, {
+        preparationHoldDetail = preparation.detailCode;
+        // A bounded wait that expired is still the EXISTING typed
+        // approval_undecided hold — no new outcome class, no exit-code change.
+        // The extra line only names the bound that fired and the exact request.
+        if (preparation.reasonCode === 'approval_undecided' && requestedTimeoutMs !== undefined) {
+          emitProgress(getMessage('xverify.prepare.approval_wait_timeout', lang, {
+            timeoutMs: String(requestedTimeoutMs),
+            requestId: preparation.approvalRequestId ?? preparation.detailCode,
+          }));
+        }
+        emitProgress(getMessage('xverify.prepare.hold', lang, {
           reason: preparation.reasonCode,
           detail: preparation.detailCode,
           evidence: preparation.evidenceRefs.join(',') || '-',
         }));
-        print(getMessage(`xverify.remedy.${preparation.reasonCode}`, lang, {
+        emitProgress(getMessage(`xverify.remedy.${preparation.reasonCode}`, lang, {
           requestId: preparation.approvalRequestId ?? '-',
           producerReason: preparation.producerReasonCode ?? '-',
         }));
@@ -782,10 +906,22 @@ export async function runXverifyForResult(
     remedy,
     rejection: outcome.rejection ?? null,
     report: reportPath,
+    // Appended last on purpose: every key above keeps its exact prior position
+    // and value, so an existing `--json` consumer reads byte-identical fields.
+    detail: preparationHoldDetail ?? readDurableHoldDetail(root, id),
   };
 }
 
 // ─── CLI wrapper (thin: print + exit-code semantics over the shared core) ──
+
+/**
+ * Writes the typed waiting-approval line. ALWAYS stderr, `--json` or not: it is
+ * a liveness signal about a blocked run, never part of the machine payload, so
+ * `--json` stdout stays a single parseable document.
+ */
+export function printXverifyWaitingApproval(requestId: string, lang: string): void {
+  process.stderr.write(`${getMessage('xverify.prepare.waiting_approval', lang, { requestId })}\n`);
+}
 
 export async function runXverifyCommand(
   claim: string,
@@ -793,14 +929,21 @@ export async function runXverifyCommand(
   deps: XverifyDeps = {},
 ): Promise<void> {
   const lang = getLanguage(undefined);
+  // Progress lines never share stdout with a `--json` payload.
+  const printProgress = (line: string): void => {
+    if (opts.json) process.stderr.write(`${line}\n`);
+    else print(line);
+  };
   try {
     const result = await runXverifyForResult(claim, opts, {
       ...deps,
+      onApprovalWaiting: deps.onApprovalWaiting
+        ?? (({ requestId }) => { printXverifyWaitingApproval(requestId, lang); }),
       onDispatch: deps.onDispatch ?? (({ author, priority, finalOnlyContainment }) => {
-        print(getMessage('xverify.dispatching', lang, { author, priority: priority.join(' → ') }));
+        printProgress(getMessage('xverify.dispatching', lang, { author, priority: priority.join(' → ') }));
         // Visible risk evidence: a final-only verifier has no in-flight token cap.
         if (finalOnlyContainment) {
-          print(getMessage('xverify.final_only_risk', lang, {
+          printProgress(getMessage('xverify.final_only_risk', lang, {
             verifier: priority.join(' → '),
             seconds: String(finalOnlyContainment.maxWallClockSeconds),
           }));

@@ -13311,3 +13311,51 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 554-003: 1000-tool bounded-surface regression (depends on Tasks 1,2) (DONE)
 
 ---
+## Sprint 555 — sprint-555
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 555-001: approval freshness + durable adjudication evidence (channel authority core) (PENDING)
+- 555-002: xverify CLI waiting signal + approval-phase timeout (depends on Task 1) (PENDING)
+- 555-003: finalize/kill already-terminated truth (depends on nothing) (PENDING)
+
+---
+## Sprint 556 — sprint-556
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 2024s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 2023838ms |
+
+### Tasks
+
+- 556-001: approval freshness + durable adjudication evidence (channel authority core) (DONE)
+- 556-002: xverify CLI waiting signal + approval-phase timeout (depends on Task 1) (DONE)
+- 556-003: finalize/kill already-terminated truth (depends on nothing) (DONE)
+
+---

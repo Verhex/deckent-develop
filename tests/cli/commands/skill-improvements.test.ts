@@ -191,10 +191,14 @@ describe('skill improvements', () => {
       expect(output.some(o => o.includes('90%') || o.includes('success') || o.includes('Success'))).toBe(true);
     });
 
-    it('shows avg coverage with --stats', async () => {
+    it('shows the truth-source usage statistics with --stats', async () => {
+      // Catalog-stats truth (7014): --stats reads readCatalogStats — the
+      // OutcomeTracker-derived store — never the manifest's self-declared
+      // numbers. A fresh skill with no recorded outcomes shows zero/never.
       makeSkill('cov-skill');
       await run(['skill', 'info', 'cov-skill', '--stats']);
-      expect(output.some(o => o.includes('85') || o.includes('coverage'))).toBe(true);
+      expect(output.some(o => o.includes('Usage Statistics'))).toBe(true);
+      expect(output.some(o => o.includes('Total uses:'))).toBe(true);
     });
 
     it('does not show stats section without --stats flag', async () => {
@@ -203,10 +207,12 @@ describe('skill improvements', () => {
       expect(output.some(o => o.includes('Usage Statistics'))).toBe(false);
     });
 
-    it('shows last sprint with --stats', async () => {
+    it('shows last sprint with --stats (truth store, never manifest)', async () => {
+      // Catalog-stats truth (7014): the manifest's own lastUsedInSprint is not
+      // consulted; with no truth-store record the honest answer is 'never'.
       makeSkill('sprint-skill');
       await run(['skill', 'info', 'sprint-skill', '--stats']);
-      expect(output.some(o => o.includes('sprint-010'))).toBe(true);
+      expect(output.some(o => o.includes('Last sprint:') && o.includes('never'))).toBe(true);
     });
   });
 

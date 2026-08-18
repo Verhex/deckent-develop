@@ -63,7 +63,7 @@ Starting actual work is intentionally not presented as verified here. The audit 
 - DB-first memory with SQLite/FTS5, relation/history support, document freshness, KPI stores, recall, and export/backup operations. [Evidence: `src/core/memory-store.ts:100-338`; `src/core/memory-query.ts`; `src/cli/commands/memory.ts`; `src/cli/commands/recall.ts:11-20`]
 - Runtime-wide approval, authority, audit, scope, and immutable settlement contracts. [Evidence: `src/core/approval-broker.ts`; `src/orchestra/authority-enforcer.ts`; `src/core/task-settlement-authority.ts`; `src/core/invocation-receipt-store.ts:705-850`]
 - Native REPL, terminal dashboard, web/API server, Desktop, VS Code extension, connectors, CLI, and MCP surfaces. [Evidence: `src/cli/entry.ts:664-713`; `src/cli/commands/dashboard.ts:147-214`; `src/cli/commands/serve.ts:72-80`; `src/desktop`; `src/extensions/vscode`; `src/connectors`; `src/mcp`]
-- 215 visible CLI command paths under 75 top-level commands, 49 canonical MCP tools, 8 MCP resources, 21 built-in agents, and 30 built-in skills. The identity projection reports the same agent and skill counts. [Evidence: recursive `buildProgram()` and `TOOL_CATALOG` introspection plus filesystem counts, 2026-08-11; `.deckent/workspace/IDENTITY.md` `identity-summary` block]
+- 215 visible CLI command paths under 75 top-level commands, 51 canonical MCP tools, 8 MCP resources, 21 built-in agents, and 31 built-in skills. The identity projection reports the same agent and skill counts. [Evidence: recursive `buildProgram()` and `TOOL_CATALOG` introspection plus filesystem counts, 2026-08-18; `.deckent/workspace/IDENTITY.md` `identity-summary` block]
 
 ## Current repository truth
 
@@ -98,7 +98,7 @@ Deckent's three immutable laws are Dual Lens + Scale, Every Environment, and Nev
 License: MIT. [Evidence: `package.json:90-91`; `LICENSE`]
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-35599%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.100.0-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-35621%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.100.0-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 <!-- AUTOGEN:START id="stat-counts" -->
