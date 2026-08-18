@@ -578,7 +578,7 @@ export async function runUsageCommand(
 export function registerUsage(program: Command): void {
   program
     .command('usage')
-    .description('Show token/limit consumption from Claude Code transcripts')
+    .description(getMessage('cli.usage.desc', getLanguage(undefined)))
     .option('--sprint <N>', 'Show per-task breakdown for sprint N')
     .option('--since <ISO>', 'Window start (ISO date, e.g. 2026-06-01)')
     .option('--until <ISO>', 'Window end (ISO date, e.g. 2026-06-10)')

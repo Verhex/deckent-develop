@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { eventBus } from '../../orchestra/event-bus.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 const CHANNEL_KEYWORDS = [
   'PHASE',
@@ -24,10 +25,7 @@ export function registerWatch(server: McpServer): void {
     'deckent_watch',
     {
       title: 'Watch Sprint Events',
-      description:
-        'Subscribe to live sprint event stream via MCP logging notifications. ' +
-        'Returns initial backfill of recent events and then pushes new events as they arrive. ' +
-        'Auto-unsubscribes on client disconnect or error.',
+      description: mcpToolDescription('deckent_watch'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

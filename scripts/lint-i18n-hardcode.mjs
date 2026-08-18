@@ -9,9 +9,19 @@
 // (CLI side) or the t(key) bridge in src/desktop/src/main/i18n.ts (desktop
 // side — DESK-1, born-496).
 //
+// Second scan (559-005): src/cli/commands/*.ts + src/cli/index.ts +
+// src/mcp/tools/*.ts for commander `.description('...')` calls and
+// object-literal `description: '...'` properties that are a natural-language
+// literal instead of a getMessage(...)/mcpToolDescription(...) call result.
+// Both are string-first regexes: the captured argument/value must itself be a
+// quoted literal, so a `.description(getMessage('key', lang))` or
+// `description: mcpToolDescription('deckent_x')` call structurally never
+// matches (the character right after `(`/`:` is not a quote) — no separate
+// getMessage-skip needed for correctness on this scan.
+//
 // Exits 1 when a hit is found. Wired into `npm run lint` via lint:gates
 // (W7 terfi, 2026-07-07 — enforces the i18n-FIRST quality bar in CLAUDE.md;
-// desktop-glob added born-601/394-003).
+// desktop-glob added born-601/394-003; description scan added 559-005).
 //
 // ALLOWLIST doubles as the ratchet baseline: entries are either genuine
 // heuristic false positives OR pre-existing grandfathered debt (e.g. the
@@ -71,6 +81,20 @@ const TEMPLATE_RE = new RegExp(
   `(?:${OUTPUT_CALLS.join('|')})\\s*\\(\\s*\`([^\`]*)\``,
   'g'
 );
+
+// ── description-literal patterns (559-005) ──────────────────────────────────
+// `.description('...')` — commander command-description calls.
+const DESCRIPTION_CALL_SINGLE_RE = /\.description\(\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g;
+const DESCRIPTION_CALL_DOUBLE_RE = /\.description\(\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
+const DESCRIPTION_CALL_TEMPLATE_RE = /\.description\(\s*`([^`]*)`/g;
+
+// `description: '...'` — object-literal description properties (MCP
+// registerTool() descriptions, resource catalog entries, etc). `\b` before
+// `description` + `\s*:\s*` before the quote keeps this anchored to a
+// property-key position, not an arbitrary substring.
+const DESCRIPTION_PROP_SINGLE_RE = /\bdescription\s*:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g;
+const DESCRIPTION_PROP_DOUBLE_RE = /\bdescription\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
+const DESCRIPTION_PROP_TEMPLATE_RE = /\bdescription\s*:\s*`([^`]*)`/g;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -156,47 +180,91 @@ const desktopFiles = collectTsFilesRecursive(desktopMainDir)
 
 const scanTargets = [...cliFiles, ...desktopFiles];
 
+const mcpToolsDir = join(root, 'src', 'mcp', 'tools');
+const mcpToolsFiles = readdirSync(mcpToolsDir)
+  .filter((f) => f.endsWith('.ts'))
+  .sort()
+  .map((f) => ({ filePath: join(mcpToolsDir, f), relPath: `src/mcp/tools/${f}` }));
+
+const cliIndexFile = { filePath: join(root, 'src', 'cli', 'index.ts'), relPath: 'src/cli/index.ts' };
+
+// `.description(...)` scan targets (559-005) — CLI commands + the program
+// root + MCP tool modules. Kept as a separate target list from `scanTargets`
+// above: this scan does not cover desktop-main (commander/MCP description
+// surfaces don't exist there). Commander's command description is ALWAYS a
+// chained `.description(...)` call, in all three groups, so this list stays
+// the union.
+const descriptionCallScanTargets = [...cliFiles, cliIndexFile, ...mcpToolsFiles];
+
+// `description: '...'` object-literal-property scan targets — MCP tool
+// modules ONLY. src/cli/commands/*.ts also declares plenty of unrelated data
+// shapes with their own `description` field (DoctorFixAction, AgenticAction,
+// skill-manifest definitions, ...) that have nothing to do with a commander
+// or MCP-tool description; scanning those files for the bare `description:`
+// property would false-positive on every such data literal. MCP's
+// `server.registerTool({ description: ... })` is the one place this repo
+// uses an object-literal description property for a real tool/command
+// surface, so that is the only target for this pattern.
+const descriptionPropScanTargets = [...mcpToolsFiles];
+
 // ── Scan ──────────────────────────────────────────────────────────────────────
 
 /** @type {Array<{file: string, line: number, call: string, text: string}>} */
 const hits = [];
 
+/**
+ * Classify and record a hit in `hits` if the captured string is natural
+ * language and not already i18n-routed. Shared by both the output-call scan
+ * and the description-literal scan below.
+ * @param {string} content
+ * @param {string} relPath
+ * @param {RegExp} re
+ * @param {string} label  short label for the match kind
+ */
+function scanContentForHits(content, relPath, re, label) {
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    const raw = m[1];
+    if (!isNaturalLanguage(raw)) continue;
+
+    const lineNo = lineNumberOf(content, m.index);
+    const lineContent = content.split('\n')[lineNo - 1] ?? '';
+
+    // Skip lines that already resolve through the i18n catalog.
+    if (lineContent.includes('getMessage') || lineContent.includes('mcpToolDescription')) continue;
+
+    // Truncate display text to 60 chars
+    const displayText = raw.length > 60 ? raw.slice(0, 57) + '...' : raw;
+
+    hits.push({
+      file: relPath,
+      line: lineNo,
+      call: label,
+      text: displayText.replace(/\n/g, '\\n'),
+    });
+  }
+}
+
 for (const { filePath, relPath } of scanTargets) {
   const content = readFileSync(filePath, 'utf8');
+  scanContentForHits(content, relPath, SINGLE_QUOTE_RE, 'single-quote');
+  scanContentForHits(content, relPath, DOUBLE_QUOTE_RE, 'double-quote');
+  scanContentForHits(content, relPath, TEMPLATE_RE, 'template');
+}
 
-  /**
-   * Classify and record a hit if the string is natural language.
-   * @param {RegExp} re
-   * @param {string} label  short label for the output call type
-   */
-  const scanRe = (re, label) => {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(content)) !== null) {
-      const raw = m[1];
-      if (!isNaturalLanguage(raw)) continue;
+for (const { filePath, relPath } of descriptionCallScanTargets) {
+  const content = readFileSync(filePath, 'utf8');
+  scanContentForHits(content, relPath, DESCRIPTION_CALL_SINGLE_RE, 'description-call-single-quote');
+  scanContentForHits(content, relPath, DESCRIPTION_CALL_DOUBLE_RE, 'description-call-double-quote');
+  scanContentForHits(content, relPath, DESCRIPTION_CALL_TEMPLATE_RE, 'description-call-template');
+}
 
-      const lineNo = lineNumberOf(content, m.index);
-      const lineContent = content.split('\n')[lineNo - 1] ?? '';
-
-      // Skip lines that also call getMessage (allowed: already i18n-routed)
-      if (lineContent.includes('getMessage')) continue;
-
-      // Truncate display text to 60 chars
-      const displayText = raw.length > 60 ? raw.slice(0, 57) + '...' : raw;
-
-      hits.push({
-        file: relPath,
-        line: lineNo,
-        call: label,
-        text: displayText.replace(/\n/g, '\\n'),
-      });
-    }
-  };
-
-  scanRe(SINGLE_QUOTE_RE, 'single-quote');
-  scanRe(DOUBLE_QUOTE_RE, 'double-quote');
-  scanRe(TEMPLATE_RE, 'template');
+for (const { filePath, relPath } of descriptionPropScanTargets) {
+  const content = readFileSync(filePath, 'utf8');
+  scanContentForHits(content, relPath, DESCRIPTION_PROP_SINGLE_RE, 'description-prop-single-quote');
+  scanContentForHits(content, relPath, DESCRIPTION_PROP_DOUBLE_RE, 'description-prop-double-quote');
+  scanContentForHits(content, relPath, DESCRIPTION_PROP_TEMPLATE_RE, 'description-prop-template');
 }
 
 // ── Allowlist ─────────────────────────────────────────────────────────────────
@@ -239,6 +307,35 @@ const ALLOWLIST = [
   { file: 'src/cli/commands/serve.ts', contains: '[serve] provider bootstrap skipped', reason: DEBT_REASON },
 ];
 
+// 559-005 — MCP *resource* catalog metadata (deckent://dashboard etc, surfaced
+// via ListResources), a distinct semantic surface from the tool/command
+// description catalog 559-002/559-004 built: resources aren't invoked, have no
+// commander counterpart, and 559-004 explicitly scoped tool-level descriptions
+// only. Genuine pre-existing hits, out of this task's write scope
+// (scripts/lint-i18n-hardcode.mjs only) to migrate onto getMessage().
+const RESOURCE_DEBT_REASON =
+  '559-005 ratchet baseline — MCP resource-catalog description (RESOURCES[] in '
+  + 'src/mcp/tools/help.ts), not a tool/command description; distinct surface '
+  + 'from the getMessage/mcpToolDescription catalog, out of this script-only '
+  + 'task\'s write scope to migrate';
+
+ALLOWLIST.push(
+  { file: 'src/mcp/tools/help.ts', contains: 'Live sprint status: agents, progress, usage, alerts', reason: RESOURCE_DEBT_REASON },
+  { file: 'src/mcp/tools/help.ts', contains: 'Current DIRECTIVES.md content', reason: RESOURCE_DEBT_REASON },
+  { file: 'src/mcp/tools/help.ts', contains: 'Brain memory: sprint learnings and patterns', reason: RESOURCE_DEBT_REASON },
+  { file: 'src/mcp/tools/help.ts', contains: 'Tech debt register: open and resolved items', reason: RESOURCE_DEBT_REASON },
+  { file: 'src/mcp/tools/help.ts', contains: 'Resolved Deckent configuration', reason: RESOURCE_DEBT_REASON },
+  { file: 'src/mcp/tools/help.ts', contains: 'Latest sprint retrospective', reason: RESOURCE_DEBT_REASON },
+  { file: 'src/mcp/tools/help.ts', contains: 'Current .tasks/ directory listing', reason: RESOURCE_DEBT_REASON },
+  { file: 'src/mcp/tools/help.ts', contains: 'Registered agents: built-in and project-specific', reason: RESOURCE_DEBT_REASON },
+  // Pre-existing (uncommitted, concurrent-sprint) hit outside 559-005's write
+  // scope (src/cli/commands/skill-marketplace.ts is not scripts/lint-i18n-hardcode.mjs
+  // or scripts/lint-cli-mcp-parity.mjs) — unrelated to this task's
+  // `.description(`/`description:` mandate; grandfathered same as the
+  // desktop-main DEBT_REASON entries above.
+  { file: 'src/cli/commands/skill-marketplace.ts', contains: 'Registry unavailable. Showing local skills only.', reason: DEBT_REASON },
+);
+
 const allowed = (hit) =>
   ALLOWLIST.some((a) => a.file === hit.file && hit.text.includes(a.contains));
 const suppressed = hits.filter(allowed).length;
@@ -263,6 +360,7 @@ console.log('│' + ' i18n Hardcode Lint (gate)'.padEnd(W) + '│');
 console.log('└' + '─'.repeat(W) + '┘');
 console.log('');
 console.log(`  Files scanned  : ${scanTargets.length}  (${cliFiles.length} src/cli/commands + ${desktopFiles.length} src/desktop/src/main)`);
+console.log(`  Description scan: ${descriptionCallScanTargets.length} .description() targets (${cliFiles.length} src/cli/commands + 1 src/cli/index.ts + ${mcpToolsFiles.length} src/mcp/tools), ${descriptionPropScanTargets.length} description: targets (src/mcp/tools)`);
 console.log(`  Hits (gated)   : ${hits.length}${suppressed ? `  (+${suppressed} allowlisted)` : ''}`);
 console.log('');
 console.log(line);

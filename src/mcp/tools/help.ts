@@ -13,6 +13,7 @@ import {
 // only — referencing it at module-eval time would hit the index.ts↔help.ts
 // circular-import TDZ (index.ts imports registerHelpTool, help.ts imports TOOL_CATALOG).
 import { TOOL_CATALOG, type McpToolCatalogEntry } from './index.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 type HelpToolInfo = McpToolCatalogEntry;
 
@@ -171,11 +172,7 @@ export function registerHelpTool(server: McpServer): void {
     'deckent_help',
     {
       title: 'Deckent Help',
-      description:
-        'Get runtime capabilities, current project state, and a recommended next action. ' +
-        'Returns version, initialization state, sprint status, agent/skill counts, routing engine, ' +
-        'available workflows, and a full tool + resource catalog. ' +
-        'Use this when you are unsure what to do next or want to understand Deckent capabilities.',
+      description: mcpToolDescription('deckent_help'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

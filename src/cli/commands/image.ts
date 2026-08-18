@@ -232,11 +232,11 @@ function runBuild(args: string[], spawnImpl?: SpawnImpl): Promise<number> {
 export function registerImage(program: Command): void {
   const cmd = program
     .command('image')
-    .description('Worker Docker image management');
+    .description(getMessage('cli.image.desc', getLanguage(undefined)));
 
   cmd
     .command('build')
-    .description('Build the deckent-worker Docker image from the packaged Dockerfile.worker')
+    .description(getMessage('cli.image.build.desc', getLanguage(undefined)))
     .option('--tag <tag>', `Docker image tag to build (default: ${DEFAULT_WORKER_IMAGE})`)
     .option('--dry-run', 'Print the resolved Dockerfile path + build plan without building (no docker spawn)')
     .option('--with-codex', 'Install Codex CLI (INSTALL_CODEX=true build-arg)')

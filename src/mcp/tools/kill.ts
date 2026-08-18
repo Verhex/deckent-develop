@@ -9,6 +9,7 @@ import {
   releaseAllLocks,
   releaseAllSpawnLocks,
 } from '../../core/file-lock.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 interface TaskFileData {
   id?: string;
@@ -78,7 +79,7 @@ export function registerKillTool(server: McpServer): void {
     'deckent_kill',
     {
       title: 'Kill Worker',
-      description: 'Stop one or all running workers. Sets task status to PAUSED, removes heartbeat files, and releases any file locks owned by the task. Use when a worker is stuck (stale heartbeat), consuming too many resources, or needs to be restarted. After killing, run deckent_cleanup to remove task artifacts, then deckent_start to restart. CLI parity (ADR-022-V2 + Sprint 189 T-009): force + userExplicit are pass-through panic-guard bypass markers — even when both are set the bypass is only logged (audit-trail), kill itself still requires explicit user intent (feedback_sprint_kill_always_ask_user).',
+      description: mcpToolDescription('deckent_kill'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
         taskId: z.string().optional().describe('Specific task ID to kill (e.g. "059-001"). The worker for this task is stopped and its locks released.'),

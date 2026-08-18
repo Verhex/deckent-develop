@@ -22,7 +22,7 @@ import {
   parseMemoryString,
 } from '../../orchestra/spawn-backend-docker.js';
 import { print } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { PROJECT_CONFIG_PATH, RESOURCE_LOG_FILE } from '../../core/constants.js';
 
@@ -170,13 +170,18 @@ export function renderConfigLine(cfg: ResourcesRawConfig, lang: string): string 
 export function registerResources(program: Command): void {
   program
     .command('resources')
-    .description('Show live docker worker resource usage or analyze resource log')
+    .description(getMessage('cli.resources.desc', getLanguage(undefined)))
     .option('--log [path]', 'Show resource log summary (defaults to config log_path or .deckent/settings/resource-log.jsonl)')
     .option('--json', 'Output as JSON')
     .action(async (opts: { log?: string | boolean; json?: boolean }) => {
       const root = process.cwd();
       const lang = getLangFromConfig(root);
       const cfg  = loadResourcesRawConfig(root);
+      /** `--json` keeps stdout to one document; notices belong on stderr. */
+      const notice = (line: string): void => {
+        if (opts.json) process.stderr.write(`${line}\n`);
+        else print(line);
+      };
 
       // ── --log mode ─────────────────────────────────────────────────────
       if (opts.log !== undefined) {
@@ -187,7 +192,7 @@ export function registerResources(program: Command): void {
         const logPath = rawPath.startsWith('/') ? rawPath : join(root, rawPath);
 
         if (!existsSync(logPath)) {
-          print(getMessage('resources.log_not_found', lang, { path: logPath }));
+          notice(getMessage('resources.log_not_found', lang, { path: logPath }));
           return;
         }
 
@@ -195,7 +200,7 @@ export function registerResources(program: Command): void {
         try {
           content = readFileSync(logPath, 'utf-8');
         } catch {
-          print(getMessage('resources.log_not_found', lang, { path: logPath }));
+          notice(getMessage('resources.log_not_found', lang, { path: logPath }));
           return;
         }
 
@@ -223,9 +228,12 @@ export function registerResources(program: Command): void {
       try {
         samples = await monitor.sampleOnce();
       } catch {
-        // sampleOnce does not normally throw, but guard anyway
-        print(getMessage('resources.docker_unavailable', lang));
-        return;
+        // sampleOnce does not normally throw, but guard anyway. Under --json the
+        // notice goes to stderr and the empty snapshot still reaches stdout as one
+        // document (same shape as a successful, sample-less snapshot).
+        notice(getMessage('resources.docker_unavailable', lang));
+        if (!opts.json) return;
+        samples = [];
       }
 
       if (opts.json) {

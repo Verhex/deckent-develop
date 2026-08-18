@@ -2,6 +2,7 @@ import { snapshotSkillCatalog } from '../../core/skill-pool.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
 import type { CatalogEntityStats } from '../../core/catalog-stats-read-model.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 interface SkillManifest {
   id?: string;
@@ -49,12 +50,7 @@ export function registerSkillListTool(server: McpServer): void {
     'deckent_skill_list',
     {
       title: 'Skill List',
-      description:
-        'List all registered skills in the Deckent project. ' +
-        'Returns id, name, category, and trigger keywords for each skill. ' +
-        'Reads from .deckent/skills/ directory. ' +
-        'Use to understand which skills are available for task routing, check skill coverage, ' +
-        'or audit skill assignments before planning a sprint.',
+      description: mcpToolDescription('deckent_skill_list'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

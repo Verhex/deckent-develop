@@ -25,6 +25,7 @@ import { loadBacklog, validateBacklogEntry } from '../../orchestra/autonomous/ba
 import type { BacklogEntry, BacklogStatus } from '../../orchestra/autonomous/backlog-types.js';
 import { nextRun } from '../../core/scheduled-flow.js';
 import { autonomousPendingPath } from '../../core/constants.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Filesystem layout (mirrors autonomous.ts / cli/commands/autonomous.ts) ──
 
@@ -61,13 +62,7 @@ export function registerAutonomousBacklogTool(server: McpServer): void {
     'deckent_autonomous_backlog',
     {
       title: 'Autonomous Backlog',
-      description:
-        'Manage the autonomous engine backlog (.deckent/autonomous/backlog.json): list ' +
-        'entries, add a one-off or recurring task entry, or remove an entry by id. Talks ' +
-        'directly to the orchestra/autonomous/backlog.ts durable store (loadBacklog / ' +
-        'validateBacklogEntry / atomic write) — no cli/ layer dependency (ADR-D-004 C3). ' +
-        'See also deckent_autonomous_status (read-only engine status) and deckent_autonomous ' +
-        '(broader control surface incl. approve/reject/stop/capability entries).',
+      description: mcpToolDescription('deckent_autonomous_backlog'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['list', 'add', 'remove']).describe('Action to perform'),
@@ -162,11 +157,7 @@ export function registerAutonomousStatusTool(server: McpServer): void {
     'deckent_autonomous_status',
     {
       title: 'Autonomous Status',
-      description:
-        'Read-only autonomous engine status: backlog totals by status, stop-marker presence, ' +
-        'and pending-approval count. Reads .deckent/autonomous/{backlog.json,stop,pending.json} ' +
-        'directly, no engine process contact — same stateless shape as `deckent_autonomous ' +
-        'action=status`. See also deckent_autonomous_backlog for backlog mutation.',
+      description: mcpToolDescription('deckent_autonomous_status'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         root: z.string().optional().describe('Project root path (default: cwd)'),

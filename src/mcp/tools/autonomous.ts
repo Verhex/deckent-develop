@@ -19,6 +19,7 @@ import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js
 import { autonomousPendingPath } from '../../core/constants.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Filesystem layout (mirrors cli/commands/autonomous.ts) ──────────────────
 
@@ -102,14 +103,7 @@ export function registerAutonomousTool(server: McpServer): void {
     'deckent_autonomous',
     {
       title: 'Autonomous Engine',
-      description:
-        'Control the deckent autonomous execution engine: query status, start/stop ' +
-        'the loop, manage the backlog (add/list/remove), and resolve approval gates ' +
-        '(pending/approve/reject). Mirrors the `deckent autonomous` CLI subcommands. ' +
-        'Note: `start` spawns the real loop as a DETACHED background process (never ' +
-        'blocks this MCP stdio transport) — it reports spawned=false with an honest ' +
-        'reason instead of spawning when autonomous.enabled is not true in project ' +
-        'config, or when a previously-spawned loop is already alive.',
+      description: mcpToolDescription('deckent_autonomous'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum([

@@ -3,7 +3,7 @@ import type { Command } from 'commander';
 import { createHttpServer } from '../../api/server.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import { getDashboardStaticDir, dashboardIsBuilt } from '../helpers/dashboard-dir.js';
 
@@ -27,7 +27,7 @@ export function getMimeType(filePath: string): string {
 export function registerWeb(program: Command): void {
   program
     .command('web')
-    .description('Start web dashboard with API server (deprecated — use `deckent serve`)')
+    .description(getMessage('cli.web.desc', getLanguage(undefined)))
     .option('--port <number>', 'Port to listen on', '3100')
     .option('--dev', 'Development mode — use Vite dev server for frontend')
     .action((opts: WebOpts) => {

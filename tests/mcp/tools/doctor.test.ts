@@ -89,7 +89,9 @@ describe('MCP Tool: deckent_doctor', () => {
       registerDoctorTool(mock as unknown as McpServer);
       const tool = mock.tools.get('deckent_doctor')!;
       expect(tool.config.title).toBe('Health Check');
-      expect(tool.config.description).toContain('health check');
+      // 7085 (559-004): MCP descriptions come from the shared CLI catalog —
+      // this is the CLI `doctor` command's canonical description text.
+      expect(tool.config.description).toContain('Check system dependencies and health');
     });
 
     it('schema accepts includeProfile boolean', async () => {

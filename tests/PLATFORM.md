@@ -168,6 +168,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 |------|------|------|------|
 | `tests/blueprint/sprint-history.test.ts` | 11 | describe | `!BLUEPRINT_EXISTS` |
 | `tests/cli/cli-bin-invocation.test.ts` | 134 | describe | `!HAS_DIST` |
+| `tests/cli/cli-surface-truth-battery.test.ts` | 315 | describe | `NESTED_FORK_RUNNER` |
 | `tests/cli/gemini-parity-gated.test.ts` | 29 | describe | `!process.env['GEMINI_API_KEY']` |
 | `tests/cli/gemini-parity-gated.test.ts` | 357 | describe | `!process.env['GEMINI_API_KEY']` |
 | `tests/cli/recovery-lifecycle-binary.integration.test.ts` | 85 | describe | `NESTED_FORK_RUNNER` |
@@ -239,7 +240,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2606 of 2667 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2614 of 2676 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work

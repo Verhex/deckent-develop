@@ -677,7 +677,7 @@ export function registerSpawn(program: Command): void {
     // container exits — DockerSpawnBackend.monitorContainer keeps a `docker wait`
     // child alive, so the CLI process only returns once the worker is finished.
     // tmux/subprocess spawns remain fire-and-forget.
-    .description('Manually spawn a worker for a task (BLOCKS until the worker exits on the docker backend; fire-and-forget on tmux/subprocess)')
+    .description(getMessage('cli.spawn.desc', getLanguage(undefined)))
     .option('--force', 'Force respawn even if task is DONE or NO_GO')
     .option('--auto-approve', 'Enable auto-approve mode for the worker')
     .action(async (taskId: string, opts: { force?: boolean; autoApprove?: boolean }) => {

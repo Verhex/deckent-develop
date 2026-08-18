@@ -32,7 +32,7 @@ import { print } from '../helpers/output.js';
 import { formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 // ─── Config (raw-read, config.ts/config-types.ts out of scope — see header) ──
 
@@ -349,7 +349,7 @@ export async function runLimitsCommand(
 export function registerLimits(program: Command): void {
   program
     .command('limits')
-    .description('Check live subscription-window usage (session/week) and the configured start-gate thresholds')
+    .description(getMessage('cli.limits.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action(async (opts: LimitsCommandOpts) => {
       await runLimitsCommand(opts);

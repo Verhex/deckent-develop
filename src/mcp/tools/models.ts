@@ -9,6 +9,7 @@ import {
   type CatalogLoadOptions,
 } from '../../core/model-catalog.js';
 import type { ModelDefinition } from '../../core/model-registry.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -23,14 +24,7 @@ export function registerModelsTool(server: McpServer): void {
     'deckent_models',
     {
       title: 'Model Catalog',
-      description:
-        'Browse and manage the Deckent model catalog. ' +
-        'Actions: ' +
-        '"list" — list all available models (optionally filtered by provider); ' +
-        '"refresh" — force-refresh the catalog from models.dev and invalidate the 24h cache; ' +
-        '"tier" — look up the tier (premium_plus/premium/standard/economy) of a specific model. ' +
-        'Catalog sources: remote (models.dev live), cache (~/.deckent/cache/models-catalog.json 24h TTL), bundled (offline fallback). ' +
-        'ADR-022-v2: CLI/MCP parity with `deckent models` CLI command.',
+      description: mcpToolDescription('deckent_models'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

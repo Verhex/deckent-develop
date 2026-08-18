@@ -18,6 +18,7 @@ import { RegistryClient, type RegistrySkillEntry } from '../../core/marketplace/
 import type { ModelType } from '../../core/types.js';
 import { resolveCanonicalModelIdentity } from '../../core/model-registry.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 const SKILL_CATEGORY_VALUES = ['language', 'framework', 'tool', 'domain', 'workflow'] as const;
 
@@ -48,11 +49,7 @@ export function registerAgentManageTool(server: McpServer): void {
     'deckent_agent_manage',
     {
       title: 'Agent Manage',
-      description:
-        'Manage the agent pool: add a custom agent, remove one, or promote a temp agent ' +
-        '(generated for a sprint under .tasks/agents/) into the persistent pool at ' +
-        '.deckent/agents/temp-{id}/. Uses the existing AgentPoolManager API — no new agent ' +
-        'lifecycle concept. See also deckent_agent_list (read-only listing).',
+      description: mcpToolDescription('deckent_agent_manage'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['add', 'remove', 'promote']).describe('Action to perform'),
@@ -146,11 +143,7 @@ export function registerSkillManageTool(server: McpServer, deps: CatalogParityDe
     'deckent_skill_manage',
     {
       title: 'Skill Manage',
-      description:
-        'Manage the skill pool: add a custom skill, remove one, or list skills available in ' +
-        'the marketplace registry (falls back to local .deckent/skills/ listing when the ' +
-        'registry is unreachable). Uses the existing SkillPoolManager + RegistryClient APIs. ' +
-        'See also deckent_skill_list (read-only local listing).',
+      description: mcpToolDescription('deckent_skill_manage'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['add', 'remove', 'marketplace-list']).describe('Action to perform'),
@@ -227,11 +220,7 @@ export function registerMemoryManageTool(server: McpServer): void {
     'deckent_memory_manage',
     {
       title: 'Memory Manage',
-      description:
-        'Manage project memory: insert a new entry, update fields on an existing entry, or ' +
-        'trigger decay (soft-delete entries older than the retention window). Uses the ' +
-        'existing MemoryStore public API directly against .brain/memory.db. See also ' +
-        'deckent_memory_query (read-only search).',
+      description: mcpToolDescription('deckent_memory_manage'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['insert', 'update', 'decay-trigger']).describe('Action to perform'),

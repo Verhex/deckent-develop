@@ -249,7 +249,7 @@ export function runAuditRetention(
 export function registerAudit(program: Command): void {
   program
     .command('audit [sprint-id]')
-    .description('Run Brain Self-Audit Gate for a sprint, or query/export/retain audit log events (query | compliance | forward | retention)')
+    .description(getMessage('cli.audit.desc', getLanguage(undefined)))
     .option('--json', 'Output raw JSON only')
     .option('--sprint <id>', 'Sprint ID for audit query/compliance/forward/retention subcommands', 'sprint-001')
     .option('--tenant <id>', 'Filter audit events by tenant ID (used with query subcommand)')

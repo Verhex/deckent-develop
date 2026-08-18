@@ -5,7 +5,7 @@ import { killWorker, TmuxError, cleanupTmuxSocket } from '../../orchestra/tmux.j
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
 import { SpawnBackendFactory, type BackendType } from '../../orchestra/spawn-backend.js';
@@ -525,7 +525,7 @@ export async function shouldProceedKillAll(
 export function registerKill(program: Command): void {
   program
     .command('kill [taskId]')
-    .description('Kill a running worker')
+    .description(getMessage('cli.kill.desc', getLanguage(undefined)))
     .option('--all', 'Kill all active workers')
     .option('--force', 'Force kill (bypass panic guard)')
     .option('--user-explicit', 'Explicit user confirmation for panic kill override')

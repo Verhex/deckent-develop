@@ -28,7 +28,7 @@ import type { BrainPlanningMode, PlannerProof } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import {
   buildInterrogationQuestions,
   applyInterrogationAnswers,
@@ -123,7 +123,7 @@ export async function runInterrogation(
 export function registerPlan(program: Command): void {
   program
     .command('plan')
-    .description('Plan a sprint without executing it')
+    .description(getMessage('cli.plan.desc', getLanguage(undefined)))
     .option('--no-confirm', 'Skip confirmation, auto-approve plan')
     .option('-y, --yes', 'Non-interactive: auto-approve the plan (DRAFT → PENDING) without prompting')
     .option('--structured', 'Force structured parsing (skip AI)')

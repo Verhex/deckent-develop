@@ -12,7 +12,7 @@ import { runWizard } from '../helpers/wizard.js';
 import type { WizardStep } from '../helpers/wizard.js';
 import { detectProjectStack } from '../../core/stack-detector.js';
 import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import {
   runOnboardingWizard,
@@ -502,7 +502,7 @@ export async function runOnboardApply(root: string, opts: OnboardingApplyFlowOpt
 export function registerOnboard(program: Command): void {
   program
     .command('onboard')
-    .description('Run the onboarding wizard')
+    .description(getMessage('cli.onboard.desc', getLanguage(undefined)))
     .option('--non-interactive', 'Skip interactive prompts, use defaults')
     .option('--force', 'Re-run onboarding even if already initialized')
     .option('--plan-only', 'Print the onboarding plan without prompting (non-interactive, CI/test path)')

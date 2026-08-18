@@ -29,7 +29,7 @@ import {
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { print } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 // ─── Platform Detection (self-contained mirror — see computer-use-platform.ts's own
 // header for why this does NOT import connectors/capabilities/platform.ts: that module
@@ -206,7 +206,7 @@ export async function runCuStatusCommand(
 export function registerCuStatus(program: Command): void {
   program
     .command('cu-status')
-    .description('Show computer-use (TOOL-CU) status: flag state + per-capability availability')
+    .description(getMessage('cli.cu_status.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action(async (cmdOpts: CuStatusOptions) => {
       await runCuStatusCommand(cmdOpts);

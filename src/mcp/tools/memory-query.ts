@@ -5,16 +5,14 @@ import { z } from 'zod/v4';
 import { MemoryStore } from '../../core/memory-store.js';
 import { searchMemory } from '../../core/memory-query.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 export function registerMemoryQueryTool(server: McpServer): void {
   server.registerTool(
     'deckent_memory_query',
     {
       title: 'Memory Query',
-      description:
-        'Search project memory — ADRs, sprint learnings, patterns, technical debt. ' +
-        'Use when you need context about past decisions or how something was done. ' +
-        'Supports full-text search with Turkish normalization, type/status filters, and sprint range.',
+      description: mcpToolDescription('deckent_memory_query'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

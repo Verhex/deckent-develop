@@ -485,7 +485,7 @@ export function spawnChatProcess(
 export function registerChat(program: Command): void {
   program
     .command('chat')
-    .description('Start a conversational session with Deckent. Uses your installed AI CLI.')
+    .description(getMessage('cli.chat.desc', getLanguage(undefined)))
     .option('--tool <name>', 'AI CLI to launch (claude | codex | gemini)')
     .option('--local', 'Use a local LLM (Ollama) — reserved for T-190-009')
     .option('--check-mcp', 'Verify Deckent MCP is attached before starting (T-190-005)')

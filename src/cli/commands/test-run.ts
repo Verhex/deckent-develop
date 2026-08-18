@@ -87,7 +87,7 @@ export function formatTAP(tasks: Array<{ title: string; status: string }>): stri
 export function registerTestRun(program: Command): void {
   program
     .command('test')
-    .description('Run a test sprint (no retro, no memory update, no decay)')
+    .description(getMessage('cli.test_run.test.desc', getLanguage(undefined)))
     .option('--keep', 'Skip cleanup — leave task files in place')
     .option('--timeout <ms>', 'Maximum sprint duration in milliseconds', String(DEFAULT_TIMEOUT_MS))
     .option('--directives <file>', 'Path to a custom directives file (overrides DIRECTIVES.md)')

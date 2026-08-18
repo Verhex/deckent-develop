@@ -13359,3 +13359,59 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 556-003: finalize/kill already-terminated truth (depends on nothing) (DONE)
 
 ---
+## Sprint 558 — sprint-558
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 200s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 200421ms |
+
+### Tasks
+
+- 558-001-fix-fix: Fix: Fix: Canonical language authority — tek çözücü, dört yolun tasfiyesi (PAUSED)
+- 558-001-fix: Fix: Canonical language authority — tek çözücü, dört yolun tasfiyesi (PAUSED)
+- 558-001: Canonical language authority — tek çözücü, dört yolun tasfiyesi (NO_GO)
+- 558-002: CLI description kataloğu — 221 commander description'ı iki dilli tek kaynağa (NO_GO)
+- 558-003: --json çıktı sözleşmesi — stdout tek JSON dokümanı, insan-metni stderr'e (NO_GO)
+- 558-004: MCP tool description'ları aynı katalogdan + parity genişletmesi (NO_GO)
+- 558-005: Lint ratchet — .description hardcode taraması + parity gate genişletmesi (NO_GO)
+- 558-006: Hermetic surface battery — iki dilli sadakat + sözleşme envanteri (NO_GO)
+
+---
+## Sprint 559 — sprint-559
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 3910s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 3 |
+| Coverage | 0.0% |
+| Duration | 3910173ms |
+
+### Tasks
+
+- 559-001: Canonical language authority — tek çözücü, dört yolun tasfiyesi (DONE)
+- 559-002: CLI description kataloğu — 221 commander description'ı iki dilli tek kaynağa (NO_GO)
+- 559-003: --json çıktı sözleşmesi — stdout tek JSON dokümanı, insan-metni stderr'e (NO_GO)
+- 559-004: MCP tool description'ları aynı katalogdan + parity genişletmesi (NO_GO)
+- 559-005: Lint ratchet — .description hardcode taraması + parity gate genişletmesi (DONE)
+- 559-006: Hermetic surface battery — iki dilli sadakat + sözleşme envanteri (DONE)
+
+---

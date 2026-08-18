@@ -37,6 +37,7 @@ import { FEATURES_MANIFEST_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { detectLang } from '../helpers/i18n.js';
 import { print, printError, isNoColor } from '../helpers/output.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 /** Pinned half-wire ratchet baseline, relative to projectRoot. */
 export const TRUTH_BASELINE_FILE = '.deckent/truth-baseline.json';
@@ -386,7 +387,7 @@ export function runRatchet(
 export function registerTruth(program: Command): void {
   program
     .command('truth')
-    .description('Resolve the 4-level feature truth-chain (code → wired → enabled → proof) for manifest truth-blocks')
+    .description(getMessage('cli.truth.desc', getLanguage(undefined)))
     .option('--json', 'Output raw truth data as JSON')
     .option('--check', 'Ratchet new half-wire candidates against .deckent/truth-baseline.json (exit 1 = new, exit 2 = no baseline)')
     .option('--write', 'With --check: (re)write the pinned baseline to the current half-wire candidate set')

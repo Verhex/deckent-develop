@@ -92,7 +92,9 @@ describe('registerInitTool', () => {
       const tool = server.tools.get('deckent_init');
       const config = tool!.config as { title: string; description: string };
       expect(config.title).toBe('Initialize Deckent');
-      expect(config.description).toContain('Initialize a Deckent project');
+      // 7085 (559-004): MCP tool descriptions come from the shared CLI catalog —
+      // this is the CLI `init` command's canonical description text.
+      expect(config.description).toContain('Initialize a new Deckent project');
     });
 
     it('registers tool with inputSchema containing projectName, mode, language', async () => {

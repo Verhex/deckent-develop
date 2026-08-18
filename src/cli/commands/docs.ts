@@ -65,12 +65,12 @@ export function runDocsTrackCheck(
 export function registerDocs(program: Command): void {
   const docs = program
     .command('docs')
-    .description('Manage user-defined documents');
+    .description(getMessage('cli.docs.desc', getLanguage(undefined)));
 
   // ─── docs add ─────────────────────────────────────────────────────────
   docs
     .command('add <path>')
-    .description('Add a document to managed docs')
+    .description(getMessage('cli.docs.add.desc', getLanguage(undefined)))
     .option('--auto <sections>', 'Comma-separated auto-update section headings')
     .option('--protect <sections>', 'Comma-separated protected section headings')
     .option('--skills <skills>', 'Comma-separated skill IDs')
@@ -103,7 +103,7 @@ export function registerDocs(program: Command): void {
   // ─── docs remove ──────────────────────────────────────────────────────
   docs
     .command('remove <pathOrId>')
-    .description('Remove a document from managed docs')
+    .description(getMessage('cli.docs.remove.desc', getLanguage(undefined)))
     .action((pathOrId: string) => {
       const root = resolveProjectRoot();
       const removed = removeDoc(root, pathOrId);
@@ -117,7 +117,7 @@ export function registerDocs(program: Command): void {
   // ─── docs list ────────────────────────────────────────────────────────
   docs
     .command('list')
-    .description('List all managed documents')
+    .description(getMessage('cli.docs.list.desc', getLanguage(undefined)))
     .action(() => {
       const root = resolveProjectRoot();
       const config = loadDocsConfig(root);
@@ -143,7 +143,7 @@ export function registerDocs(program: Command): void {
   // ─── docs update ──────────────────────────────────────────────────────
   docs
     .command('update <pathOrId>')
-    .description('Update rules for an existing managed doc')
+    .description(getMessage('cli.docs.update.desc', getLanguage(undefined)))
     .option('--add-auto <sections>', 'Add auto-update sections (comma-separated)')
     .option('--add-protect <sections>', 'Add protected sections (comma-separated)')
     .option('--remove-auto <sections>', 'Remove auto sections (comma-separated)')
@@ -180,7 +180,7 @@ export function registerDocs(program: Command): void {
   // ─── docs run ─────────────────────────────────────────────────────────
   docs
     .command('run')
-    .description('Run managed doc updates without a sprint')
+    .description(getMessage('cli.docs.run.desc', getLanguage(undefined)))
     .option('--no-cache', 'Clear the doc cache before running')
     .action((opts: { cache?: boolean }) => {
       const root = resolveProjectRoot();
@@ -208,11 +208,11 @@ export function registerDocs(program: Command): void {
     });
 
   // ─── docs track (ADR-090) ─────────────────────────────────────────────
-  const track = docs.command('track').description('Track doc freshness (hash + DCR + stale)');
+  const track = docs.command('track').description(getMessage('cli.docs.track.desc', getLanguage(undefined)));
 
   track
     .command('scan')
-    .description('Hash + timestamp + rank all docs; write front-matter; sync memory.db')
+    .description(getMessage('cli.docs.scan.desc', getLanguage(undefined)))
     .option('--no-write', 'Do not modify front-matter (DB-only)')
     .option('--prune', 'Remove records for deleted docs')
     .option('--check', 'After scan, exit non-zero if any CRITICAL_STALE doc exists (CI gate)')
@@ -236,7 +236,7 @@ export function registerDocs(program: Command): void {
 
   track
     .command('status')
-    .description('Report tracked docs by rank + stale state')
+    .description(getMessage('cli.docs.status.desc', getLanguage(undefined)))
     .option('--stale', 'Only DRIFT/STALE/CRITICAL_STALE')
     .option('--rank <n>', 'Only docs with doc_rank <= n', parseInt)
     .option('--json', 'Raw JSON output')
@@ -254,7 +254,7 @@ export function registerDocs(program: Command): void {
 
   track
     .command('sync')
-    .description('Update memory.db only (no front-matter writes)')
+    .description(getMessage('cli.docs.sync.desc', getLanguage(undefined)))
     .action(async () => {
       const root = resolveProjectRoot();
       const lang = getLanguage();

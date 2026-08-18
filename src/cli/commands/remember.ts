@@ -5,13 +5,13 @@ import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 
 export function registerRemember(program: Command): void {
   program
     .command('remember <note>')
-    .description('Store a note in project memory')
+    .description(getMessage('cli.remember.desc', getLanguage(undefined)))
     .option('-t, --type <type>', 'Entry type (default: memory)', 'memory')
     .option('--tags <tags>', 'Comma-separated tags', '')
     .option('--title <title>', 'Entry title (default: first 60 chars of note)')

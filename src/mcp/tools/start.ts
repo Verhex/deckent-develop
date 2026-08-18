@@ -40,6 +40,7 @@ import { spawnDetachedDeckent } from '../../cli/helpers/detached-start.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { preflightProviderRoleExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 /**
  * Format an estimated duration (minutes) into a compact human string for the
@@ -64,7 +65,7 @@ export function registerStartTool(
     'deckent_start',
     {
       title: 'Start Run',
-      description: 'Start a full run in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE. Pre-spawn cost admission always runs: acknowledgeCost=true or force=true may acknowledge a numeric budget overrun, but cannot override unknown pricing or an unavailable gate. Returns immediately with a jobId — the run continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
+      description: mcpToolDescription('deckent_start'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).'),

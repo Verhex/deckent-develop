@@ -5,13 +5,14 @@ import {
   SprintRecoveryOperationError,
 } from '../../orchestra/sprint-recovery-operation.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 export function registerRecoverTool(server: McpServer): void {
   server.registerTool(
     'deckent_recover',
     {
       title: 'Sprint Recovery',
-      description: 'Recover from a crashed or stuck sprint. Runs audit, cleans orphan IPC directories (dead PIDs only), clears stale locks (>5min), and archives terminal task files. Active tasks are preserved. Use dryRun=true to preview before executing. DESTRUCTIVE: modifies .tasks/, .locks/, and .deckent/ directories.',
+      description: mcpToolDescription('deckent_recover'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
         sprintId: z.string().describe('Sprint ID to recover (e.g. "sprint-150")'),

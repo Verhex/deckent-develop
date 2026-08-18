@@ -31,6 +31,8 @@ vi.mock('../../../src/core/config.js', () => ({
 
 vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn((key: string) => `msg:${key}`),
+  getLanguage: () => 'en',
+  resolveLanguage: () => 'en',
 }));
 
 vi.mock('node:child_process', () => ({

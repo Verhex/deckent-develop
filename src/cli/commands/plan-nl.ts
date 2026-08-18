@@ -40,7 +40,7 @@ import { loadConfig } from '../../core/config.js';
 import type { ResolvedConfig, SprintSizeRecommendation } from '../../core/types.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
 
 export interface PlanNlCommandOptions {
@@ -124,7 +124,7 @@ function backupExistingDirectives(directivesPath: string): string | null {
 export function registerPlanNl(program: Command): void {
   program
     .command('plan-nl')
-    .description('Turn a free-form goal into a DIRECTIVES.md scaffold (single-task template; preview by default)')
+    .description(getMessage('cli.plan_nl.desc', getLanguage(undefined)))
     .argument('<goal>', 'Free-form description of what the sprint should accomplish')
     .option('--write', 'Write the scaffold to DIRECTIVES.md (any existing file is backed up first)')
     .action(async (goal: string, opts: PlanNlCommandOptions) => {

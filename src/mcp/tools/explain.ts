@@ -16,6 +16,7 @@ import {
   buildExplainOutput,
   formatDuration,
 } from '../../cli/commands/explain.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 /**
  * Load a sprint's retrospective content from the Memory V2 DB `retro` entry.
@@ -48,7 +49,7 @@ export function registerExplainTool(server: McpServer): void {
     'deckent_explain',
     {
       title: 'Sprint Explanation',
-      description: 'Explain what a sprint did in human-friendly language. Reads the sprint log from .brain/sprints/ and the retrospective from the Memory V2 DB to generate a summary including goal, task outcomes (completed/failed/tech debt), duration, and key learnings. Use after a sprint completes to get a quick overview. Supports specific sprint lookup, verbose mode for full details, and JSON output.',
+      description: mcpToolDescription('deckent_explain'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         sprintId: z.string().optional().describe('Show a specific sprint by ID (e.g. "042", "sprint-042"). If omitted, returns the latest sprint.'),

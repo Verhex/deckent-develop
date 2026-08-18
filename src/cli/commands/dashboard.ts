@@ -4,7 +4,7 @@ import type { Command } from 'commander';
 import type { DashboardState } from '../../core/types.js';
 import { DASHBOARD_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 // Canonical NO_COLOR check (R4-ISNOCOLOR SSOT) lives in ../helpers/output.ts.
@@ -147,7 +147,7 @@ export function readDashboardFile(dashPath: string): DashboardState | null {
 export function registerDashboard(program: Command): void {
   program
     .command('dashboard')
-    .description('Show terminal dashboard with auto-refresh (see also: deckent status --watch)')
+    .description(getMessage('cli.dashboard.desc', getLanguage(undefined)))
     .option('--interval <ms>', 'Refresh interval in milliseconds (used as fallback when fs.watch unavailable)', '2000')
     .option('--no-color', 'Disable ANSI colors (also respects NO_COLOR env var)')
     .option('--json', 'Output dashboard state as raw JSON and exit (shared format with deckent status --raw)')

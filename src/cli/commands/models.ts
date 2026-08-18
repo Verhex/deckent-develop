@@ -108,12 +108,12 @@ function sourceBadge(source: string): string {
 export function registerModels(program: Command): void {
   const models = program
     .command('models')
-    .description('Manage and browse the model catalog');
+    .description(getMessage('cli.models.desc', getLanguage(undefined)));
 
   // ── deckent models list [--provider <name>] ──────────────────────────────
   models
     .command('list')
-    .description('List available models from the catalog')
+    .description(getMessage('cli.models.list.desc', getLanguage(undefined)))
     .option('--provider <name>', 'Filter by provider (claude, codex, gemini, ollama)')
     .option('--offline', 'Use cached or bundled catalog without network')
     .action(async (opts: { provider?: string; offline?: boolean }) => {
@@ -162,7 +162,7 @@ export function registerModels(program: Command): void {
 
   models
     .command('activate <model>')
-    .description('Allow a detected model to enter the routing pool')
+    .description(getMessage('cli.models.activate.desc', getLanguage(undefined)))
     .requiredOption('--provider <name>', 'Provider that serves this model')
     .action((model: string, opts: { provider: string }) => {
       try {
@@ -176,7 +176,7 @@ export function registerModels(program: Command): void {
 
   models
     .command('deactivate <model>')
-    .description('Remove a model from the routing pool (detection still sees it)')
+    .description(getMessage('cli.models.deactivate.desc', getLanguage(undefined)))
     .requiredOption('--provider <name>', 'Provider that serves this model')
     .action((model: string, opts: { provider: string }) => {
       try {
@@ -190,7 +190,7 @@ export function registerModels(program: Command): void {
 
   models
     .command('activation')
-    .description('Show recorded model activation decisions (unrecorded = active)')
+    .description(getMessage('cli.models.activation.desc', getLanguage(undefined)))
     .action(() => {
       try {
         const records = withStore((store) => store.list());
@@ -220,7 +220,7 @@ export function registerModels(program: Command): void {
   // the hard limit is this active-set.
   models
     .command('policy [provider] [mode]')
-    .description('Show or set a provider activation policy (implicit-active | explicit-active)')
+    .description(getMessage('cli.models.policy.desc', getLanguage(undefined)))
     .action((provider: string | undefined, mode: string | undefined) => {
       try {
         const lang = getLanguage();
@@ -262,7 +262,7 @@ export function registerModels(program: Command): void {
   // evidence (OWNER-MODEL-POLICY-001) — the ground truth a run selects from.
   models
     .command('active-set')
-    .description('Show the resolved owner active execution set + snapshot digest')
+    .description(getMessage('cli.models.active_set.desc', getLanguage(undefined)))
     .action(() => {
       try {
         const lang = getLanguage();
@@ -290,7 +290,7 @@ export function registerModels(program: Command): void {
   // ── deckent models refresh ───────────────────────────────────────────────
   models
     .command('refresh')
-    .description('Force-refresh the model catalog (invalidates 24h cache)')
+    .description(getMessage('cli.models.refresh.desc', getLanguage(undefined)))
     .action(async () => {
       try {
         print(color('\x1b[2m', '  Refreshing model catalog…'));
@@ -316,7 +316,7 @@ export function registerModels(program: Command): void {
   // ── deckent models tier <model> ──────────────────────────────────────────
   models
     .command('tier <model>')
-    .description('Look up the tier of a specific model by ID or API ID')
+    .description(getMessage('cli.models.tier.desc', getLanguage(undefined)))
     .option('--offline', 'Use cached or bundled catalog without network')
     .action(async (modelId: string, opts: { offline?: boolean }) => {
       try {

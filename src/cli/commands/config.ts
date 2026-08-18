@@ -6,7 +6,7 @@ import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError, deepMerge, CONFIG_METADATA, listConfigByCategory } from '../../core/config.js';
 import { migrateConfig, setNestedValue, getNestedValue } from '../../core/config-migration.js';
 import { print, printError } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
@@ -72,7 +72,7 @@ export function importConfig(importPath: string, configPath: string): void {
 export function registerConfig(program: Command): void {
   const cmd = program
     .command('config')
-    .description('Show or modify project configuration')
+    .description(getMessage('cli.config.desc', getLanguage(undefined)))
     .option('--raw', 'Show raw project config without merging defaults')
     .action(async (opts: { raw?: boolean }) => {
       try {
@@ -109,7 +109,7 @@ export function registerConfig(program: Command): void {
 
   cmd
     .command('set <key> <value>')
-    .description('Set a configuration value')
+    .description(getMessage('cli.config.set.desc', getLanguage(undefined)))
     .action(async (key: string, value: string) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
@@ -150,7 +150,7 @@ export function registerConfig(program: Command): void {
 
   cmd
     .command('get <key>')
-    .description('Get a configuration value by key (supports dot notation)')
+    .description(getMessage('cli.config.get.desc', getLanguage(undefined)))
     .action(async (key: string) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
@@ -171,7 +171,7 @@ export function registerConfig(program: Command): void {
 
   cmd
     .command('export [file]')
-    .description('Export config to stdout or a file')
+    .description(getMessage('cli.config.export.desc', getLanguage(undefined)))
     .action((file?: string) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
@@ -189,7 +189,7 @@ export function registerConfig(program: Command): void {
 
   cmd
     .command('import <file>')
-    .description('Import config from a JSON file')
+    .description(getMessage('cli.config.import.desc', getLanguage(undefined)))
     .action((file: string) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
@@ -209,7 +209,7 @@ export function registerConfig(program: Command): void {
 
   cmd
     .command('list')
-    .description('List all config parameters grouped by category')
+    .description(getMessage('cli.config.list.desc', getLanguage(undefined)))
     .action(() => {
       const grouped = listConfigByCategory();
       const categories = Object.keys(grouped).sort();
@@ -227,7 +227,7 @@ export function registerConfig(program: Command): void {
 
   cmd
     .command('keys')
-    .description('List all config parameter keys')
+    .description(getMessage('cli.config.keys.desc', getLanguage(undefined)))
     .action(() => {
       const keys = Object.keys(CONFIG_METADATA).sort();
       for (const key of keys) {
@@ -237,7 +237,7 @@ export function registerConfig(program: Command): void {
 
   cmd
     .command('migrate')
-    .description('Migrate config.json to the latest full format (adds missing fields with defaults)')
+    .description(getMessage('cli.config.migrate.desc', getLanguage(undefined)))
     .option('--dry-run', 'Show what would be changed without modifying files')
     .action((opts: { dryRun?: boolean }) => {
       const root = resolveProjectRoot();

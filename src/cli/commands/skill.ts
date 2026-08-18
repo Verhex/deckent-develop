@@ -13,6 +13,7 @@ import { registerSkillMarketplace } from './skill-marketplace.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
 import { analyzeNewSkill, persistSkillActivation } from '../../orchestra/ecosystem-intelligence.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 // Note: `skill publish` is registered by registerSkillMarketplace() below —
 // the unified pipeline (sandbox + Ed25519 sign + registry upload) lives there.
 
@@ -239,12 +240,12 @@ function loadSourceMeta(skillDir: string): SkillSourceMeta | null {
 // ─── Registration ───────────────────────────────────────────────────
 
 export function registerSkill(program: Command): void {
-  const skillCmd = program.command('skill').description('Manage skill pool');
+  const skillCmd = program.command('skill').description(getMessage('cli.skill.desc', getLanguage(undefined)));
 
   // ─── skill list ─────────────────────────────────────────────────
   skillCmd
     .command('list')
-    .description('List all skills')
+    .description(getMessage('cli.skill.list.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .option('--category <cat>', 'Filter by category')
     .action(async (opts: { json?: boolean; category?: string }) => {
@@ -277,13 +278,15 @@ export function registerSkill(program: Command): void {
           skills = skills.filter((s) => s.category === opts.category);
         }
 
-        if (skills.length === 0) {
-          print('No skills found. Create one with: deckent skill create <name>');
+        // JSON first: an empty catalog is `[]` on stdout, not the human "create one"
+        // hint — the machine surface owes exactly one document.
+        if (opts.json) {
+          print(JSON.stringify(skills, null, 2));
           return;
         }
 
-        if (opts.json) {
-          print(JSON.stringify(skills, null, 2));
+        if (skills.length === 0) {
+          print('No skills found. Create one with: deckent skill create <name>');
           return;
         }
 
@@ -305,7 +308,7 @@ export function registerSkill(program: Command): void {
   // ─── skill create ───────────────────────────────────────────────
   skillCmd
     .command('create <name>')
-    .description('Create a custom skill')
+    .description(getMessage('cli.skill.create.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -349,7 +352,7 @@ export function registerSkill(program: Command): void {
   // ─── skill install ──────────────────────────────────────────────
   skillCmd
     .command('install <source>')
-    .description('Install a skill from local path or git URL (supports version pinning: url#tag)')
+    .description(getMessage('cli.skill.install.desc', getLanguage(undefined)))
     .option('--force', 'Overwrite existing')
     .action(async (source: string, opts: { force?: boolean }) => {
       try {
@@ -519,7 +522,7 @@ export function registerSkill(program: Command): void {
   // ─── skill update ──────────────────────────────────────────────
   skillCmd
     .command('update <name>')
-    .description('Update an installed skill from its original source')
+    .description(getMessage('cli.skill.update.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -592,7 +595,7 @@ export function registerSkill(program: Command): void {
   // ─── skill enable ──────────────────────────────────────────────
   skillCmd
     .command('enable <name>')
-    .description('Enable a skill')
+    .description(getMessage('cli.skill.enable.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -614,7 +617,7 @@ export function registerSkill(program: Command): void {
   // ─── skill disable ─────────────────────────────────────────────
   skillCmd
     .command('disable <name>')
-    .description('Disable a skill')
+    .description(getMessage('cli.skill.disable.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -636,7 +639,7 @@ export function registerSkill(program: Command): void {
   // ─── skill delete ──────────────────────────────────────────────
   skillCmd
     .command('delete <name>')
-    .description('Delete a skill')
+    .description(getMessage('cli.skill.delete.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -655,7 +658,7 @@ export function registerSkill(program: Command): void {
   // ─── skill info ───────────────────────────────────────────────
   skillCmd
     .command('info <name>')
-    .description('Show skill details')
+    .description(getMessage('cli.skill.info.desc', getLanguage(undefined)))
     .option('--stats', 'Show usage statistics')
     .action(async (name: string, opts: { stats?: boolean }) => {
       try {

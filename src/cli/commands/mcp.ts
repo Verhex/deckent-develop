@@ -26,6 +26,7 @@ import type { McpServerDef } from '../../mcp-client/types.js';
 import { detectLang } from '../helpers/i18n.js';
 import { formatTable, print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Scope handling ─────────────────────────────────────────────────
 
@@ -318,11 +319,11 @@ export function handleGet(name: string, opts: GetOptions): void {
 // ─── Registration (ADR-012 pattern) ─────────────────────────────────
 
 export function registerMcp(program: Command): void {
-  const mcpCmd = program.command('mcp').description('Manage MCP servers (Claude-parity)');
+  const mcpCmd = program.command('mcp').description(getMessage('cli.mcp.desc', getLanguage(undefined)));
 
   mcpCmd
     .command('add <name> <cmdOrUrl> [args...]')
-    .description('Add an MCP server (stdio or http) — writes to .mcp.json by scope')
+    .description(getMessage('cli.mcp.add.desc', getLanguage(undefined)))
     .option('--scope <scope>', 'Config scope: project | user | local', 'project')
     .option('--transport <transport>', 'Transport: stdio | http (auto-detected if omitted)')
     .option('--header <kv...>', 'HTTP header as key=value (repeatable)')
@@ -338,7 +339,7 @@ export function registerMcp(program: Command): void {
 
   mcpCmd
     .command('list')
-    .description('List registered MCP servers (merged: local > project > user)')
+    .description(getMessage('cli.mcp.list.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action((opts: ListOptions) => {
       try {
@@ -351,7 +352,7 @@ export function registerMcp(program: Command): void {
 
   mcpCmd
     .command('remove <name>')
-    .description('Remove an MCP server (searches all scopes if --scope omitted)')
+    .description(getMessage('cli.mcp.remove.desc', getLanguage(undefined)))
     .option('--scope <scope>', 'Restrict removal to scope: project | user | local')
     .action((name: string, opts: RemoveOptions) => {
       try {
@@ -364,7 +365,7 @@ export function registerMcp(program: Command): void {
 
   mcpCmd
     .command('get <name>')
-    .description('Show details for an MCP server (from merged view)')
+    .description(getMessage('cli.mcp.get.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action((name: string, opts: GetOptions) => {
       try {

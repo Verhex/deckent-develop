@@ -34,7 +34,7 @@ import { loadDeckSecrets } from '../../core/deck-file.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 // ─── Key resolution ─────────────────────────────────────────────────────
 
@@ -161,7 +161,7 @@ export async function runOpenRouterProbeCommand(
 export function registerOpenRouterProbe(program: Command): void {
   program
     .command('openrouter-probe')
-    .description('Live-probe OpenRouter free models via $DECK:OPENROUTER_API_KEY and refresh the local cache')
+    .description(getMessage('cli.openrouter_probe.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action(async (opts: OpenRouterProbeCommandOpts) => {
       await runOpenRouterProbeCommand(opts);

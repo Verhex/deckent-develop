@@ -19,6 +19,7 @@ import {
   type SelfDispatchPolicy,
   type PendingApprovalItem,
 } from '../../core/self-dispatch.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Self-dispatch wire (Sprint 209 — B11) ──────────────────────────────────
 // The flow daemon evaluates each FlowRuntime tick against a scheduled self-dispatch
@@ -136,12 +137,12 @@ export function handleEventDispatchTick(
 }
 
 export function registerFlow(program: Command): void {
-  const flowCmd = program.command('flow').description('Manage scheduled flows (process mode)');
+  const flowCmd = program.command('flow').description(getMessage('cli.flow.desc', getLanguage(undefined)));
 
   // ─── flow list ────────────────────────────────────────────────────
   flowCmd
     .command('list')
-    .description('List all scheduled flows')
+    .description(getMessage('cli.flow.list.desc', getLanguage(undefined)))
     .option('--tenant <id>', 'Filter by tenant ID')
     .option('--json', 'Output as JSON')
     .action((opts: { tenant?: string; json?: boolean }) => {
@@ -178,7 +179,7 @@ export function registerFlow(program: Command): void {
   // ─── flow add ─────────────────────────────────────────────────────
   flowCmd
     .command('add <cron> <action>')
-    .description('Add a new scheduled flow (cron: 5-field expression, e.g. "* * * * *")')
+    .description(getMessage('cli.flow.add.desc', getLanguage(undefined)))
     .option('--tenant <id>', 'Tenant ID', 'default')
     .action((cron: string, action: string, opts: { tenant: string }) => {
       try {
@@ -204,7 +205,7 @@ export function registerFlow(program: Command): void {
   // ─── flow run ─────────────────────────────────────────────────────
   flowCmd
     .command('run')
-    .description('Run the flow-runtime tick once (--once) or start the daemon')
+    .description(getMessage('cli.flow.run.desc', getLanguage(undefined)))
     .option('--once', 'Run a single FlowRuntime tick and exit')
     .option('--tenant <id>', 'Filter flows by tenant ID')
     .action((opts: { once?: boolean; tenant?: string }) => {
@@ -243,7 +244,7 @@ export function registerFlow(program: Command): void {
   // ─── flow approve ─────────────────────────────────────────────────
   flowCmd
     .command('approve <id>')
-    .description('Approve a pending event-triggered flow dispatch so it can proceed')
+    .description(getMessage('cli.flow.approve.desc', getLanguage(undefined)))
     .action((id: string) => {
       try {
         const root = resolveProjectRoot();

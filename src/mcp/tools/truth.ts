@@ -26,6 +26,7 @@ import {
   type FeatureTruthContext,
 } from '../../core/feature-truth.js';
 import { loadConfig } from '../../core/config.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 /** Pinned half-wire ratchet baseline, relative to projectRoot (mirrors CLI). */
 const TRUTH_BASELINE_FILE = '.deckent/truth-baseline.json';
@@ -76,11 +77,7 @@ export function registerTruthTool(server: McpServer): void {
     'deckent_truth',
     {
       title: 'Feature Truth Chain',
-      description:
-        'Resolve the 4-level feature truth-chain (code → wired → enabled → proof) for every truth-block ' +
-        'declared in .deckent/settings/features-manifest.json, and flag half-wire candidates (code shipped ' +
-        'but no production call-site). Read-only. Pass check=true to also diff half-wire candidates against ' +
-        'the pinned .deckent/truth-baseline.json ratchet.',
+      description: mcpToolDescription('deckent_truth'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

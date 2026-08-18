@@ -5,7 +5,7 @@ import { DIRECTIVES_FILE } from '../../core/constants.js';
 import { loadConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 /**
  * Count task blocks in DIRECTIVES.md content.
@@ -31,7 +31,7 @@ async function readStdin(): Promise<string> {
 export function registerSetDirectives(program: Command): void {
   program
     .command('set-directives')
-    .description('Write sprint goals to DIRECTIVES.md (content, file, or stdin)')
+    .description(getMessage('cli.set_directives.desc', getLanguage(undefined)))
     .option('--content <string>', 'Directive content to write directly')
     .option('--file <path>', 'Read content from a file')
     .action(async (opts: { content?: string; file?: string }) => {

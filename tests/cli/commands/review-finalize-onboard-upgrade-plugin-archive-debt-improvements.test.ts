@@ -122,6 +122,8 @@ vi.mock('../../../src/core/config.js', () => ({
 vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn().mockImplementation((_key: string, _lang: string, vars?: Record<string, string>) =>
     `Finalized sprint ${vars?.['sprintId'] ?? 'unknown'}`),
+  getLanguage: () => 'en',
+  resolveLanguage: () => 'en',
 }));
 
 vi.mock('../../../src/cli/helpers/config-reader.js', () => ({

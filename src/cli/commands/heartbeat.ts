@@ -9,6 +9,7 @@ import {
   stopDaemonByPid,
 } from '../../orchestra/heartbeat-daemon.js';
 import type { HeartbeatRunResult } from '../../orchestra/heartbeat-daemon.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 function printResult(result: HeartbeatRunResult): void {
   print(`Heartbeat complete: ${result.executed} executed, ${result.passed} passed, ${result.failed} failed (${result.total} total tasks)`);
@@ -21,7 +22,7 @@ function printResult(result: HeartbeatRunResult): void {
 export function registerHeartbeat(program: Command): void {
   program
     .command('heartbeat')
-    .description('Run proactive heartbeat tasks from .deckent/HEARTBEAT.md')
+    .description(getMessage('cli.heartbeat.desc', getLanguage(undefined)))
     .option('--daemon', 'Run in daemon mode (keeps running in foreground)')
     .option('--interval <minutes>', 'Heartbeat interval in minutes (default: 30)', '30')
     .option('--stop', 'Stop a running heartbeat daemon')

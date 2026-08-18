@@ -183,6 +183,38 @@ are reported to the owner the moment they are seen.
 
 ---
 
+## 15. Give directory-breadth scope; point-file scope strangles the fix chain
+
+**Wrong:** The task got only a point list of the files expected to change. The worker
+found the blocker in a neighboring file (a stale test pin, a second resolver) — no
+write authority, honest NO_GO. The FIX task inherited the SAME narrow scope → fix-fix
+hit the same wall → an unwinnable loop; the run paused (three consecutive sprints were
+wounded by this class).
+
+**Correct usage:** In DIRECTIVES, `Files:` is the focus list, but `Scope:` must be
+wide enough to cover the related directories and likely neighboring test/pin files
+(e.g. not just `tests/cli/lang-authority.test.ts` but `tests/cli/` +
+`tests/cli/helpers/`). For deliberate widening at start/resume there is the
+`--force-scope` flag — use it. If a worker leaves a `replan-proposal`, that is a
+scope-expansion request: don't let it sit — either re-plan with widened scope or close
+the blocker via the ADR-D-007 hand-completion seam.
+
+## 16. XVerify approval must be LIVE and per-run — an old approval never carries over to a new evidence refresh
+
+**Wrong:** XVerify was launched in the background and approval was attempted after the
+process exited (approvals are process-lifetime — it had evaporated). Second mistake: a
+retried run generated a NEW approval id; the approval given to the old id did not
+transfer to the new evidence-refresh request (`approval_untrusted` fail-closed
+rejection — correct behavior).
+
+**Correct usage:** While XVerify runs, watch stderr's `waiting-approval:<aprp-…>`
+signal LIVE and decide EVERY new id via `deckent approvals decide <id> --allow`
+before the process exits; a single run may request more than one approval (including
+evidence refresh). `limit_hold`/cooldown-class HOLDs clear themselves when the window
+passes — a HOLD is not closure; plan a calm retry.
+
+---
+
 ## Changelog (update after every sprint experience)
 
 - **2026-08-18 — first edition** (sprint-550…556 era): 13 lessons distilled. Source
@@ -193,3 +225,10 @@ are reported to the owner the moment they are seen.
 - **2026-08-18 — sprint-556 landing update**: Lesson 13 added (scoped-green debt +
   required-field churn) — source: paying off 11 files / 18 stale pins in one pass at
   the 556 hand-closure.
+- **2026-08-18 — sprint-558/559 wave**: Lesson 15 (directory-breadth scope +
+  `--force-scope` + reading the replan-proposal) and Lesson 16 (live xverify approval
+  discipline, per-run aprp ids, HOLD ≠ closure) added. Source incidents: 558's
+  fix-scope-inheritance deadlock and ABORTED force-finalize; resuming 559 via manual
+  spawn after an interruption; the terminal-lockup RCA's 3-run xverify composition
+  (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: re-run with the
+  approval-liveness lesson applied).

@@ -5,6 +5,7 @@ import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import { openApprovalAuthorityRuntime } from '../../core/approval-authority-runtime.js';
 import { loadConfig } from '../../core/config.js';
 import { wrapResponse } from '../helpers/format.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 /**
  * READ-ONLY approval inbox over MCP. It reuses the SAME canonical ApprovalBroker
@@ -19,12 +20,7 @@ export function registerApprovalsTool(server: McpServer): void {
     'deckent_approvals',
     {
       title: 'Approval Inbox (read-only)',
-      description:
-        'List pending runtime approval requests over the canonical ApprovalBroker read '
-        + 'model — the SAME source as the `deckent approvals list` CLI. READ-ONLY: this '
-        + 'surface never decides, allows, or denies; deciding stays CLI-only behind an '
-        + 'interactive live-authenticated TTY, so there is no self-approval path over MCP. '
-        + 'Returns each pending request id, summary, and expiry.',
+      description: mcpToolDescription('deckent_approvals'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       // No inputs: the response always carries both the machine-readable pending
       // array and a human summary, so there is nothing to toggle.

@@ -8,6 +8,7 @@ import {
 } from '../../api/terminal/audit-integrity.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 /**
  * `deckent audit-verify` — walk the audit HMAC chain in `.brain/memory.db`
@@ -21,7 +22,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 export function registerAuditVerify(program: Command): void {
   program
     .command('audit-verify')
-    .description('Verify the audit HMAC chain (I4 invariant — tamper-evident audit log)')
+    .description(getMessage('cli.audit_verify.desc', getLanguage(undefined)))
     .option('--json', 'Output raw JSON only')
     .action((opts: { json?: boolean }) => {
       const root = resolveProjectRoot();

@@ -5,7 +5,7 @@ import { BRAIN_DIR, SPRINTS_DIR, MEMORY_DB_FILE } from '../../core/constants.js'
 import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 
 // R4-SSOT: canonical RichSprintSummary lives in retro-parser.ts (consumed by
@@ -334,7 +334,7 @@ function loadPreviousRetro(root: string): string | null {
 export function registerRetro(program: Command): void {
   program
     .command('retro')
-    .description('Show the latest sprint retrospective')
+    .description(getMessage('cli.retro.desc', getLanguage(undefined)))
     .option('--raw', 'Show raw RETRO.md content without formatting')
     .option('--compare', 'Show delta comparison with previous sprint')
     .option('--json', 'Output results as JSON')
@@ -348,13 +348,20 @@ export function registerRetro(program: Command): void {
       if (opts.trend !== undefined) {
         const n = typeof opts.trend === 'string' ? parseInt(opts.trend, 10) : 5;
         const entries = loadSprintTrend(root, isNaN(n) ? 5 : n);
-        print(formatTrend(entries, lang));
+        // --trend had no machine surface and rendered the human chart even under
+        // --json; the raw trend entries are additive and leave the retro-summary
+        // schema untouched.
+        if (opts.json) print(JSON.stringify(entries, null, 2));
+        else print(formatTrend(entries, lang));
         return;
       }
 
       const content = loadLatestRetro(root);
       if (!content || !content.trim()) {
-        print(getMessage('retro.none_found', lang));
+        // No retro to serialize: stdout stays empty under --json, notice on stderr.
+        const noneFound = getMessage('retro.none_found', lang);
+        if (opts.json) process.stderr.write(`${noneFound}\n`);
+        else print(noneFound);
         return;
       }
 

@@ -57,6 +57,8 @@ vi.mock('../../../src/cli/helpers/messages.js', () => ({
     if (key === 'status.dashboard_read_failed') return 'Dashboard read failed.';
     return key;
   }),
+  getLanguage: () => 'en',
+  resolveLanguage: () => 'en',
 }));
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';

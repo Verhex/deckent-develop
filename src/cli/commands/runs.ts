@@ -28,7 +28,7 @@ import type { RetireSupersededReport } from '../../orchestra/run-flow-coordinato
 import { buildFlowStartSpawn } from '../helpers/detached-start.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import type { ActorContext } from '../../core/work-model.js';
 
@@ -272,7 +272,7 @@ export function buildRetireSupersededLines(report: RetireSupersededReport, lang:
 export function registerRuns(program: Command): void {
   program
     .command('runs')
-    .description('List run-flows (the multi-flow inbox) — plus per-run decide: --approve/--reject/--retire/--start')
+    .description(getMessage('cli.runs.desc', getLanguage(undefined)))
     .argument('[n]', 'Run to target: the list number, or (for decide flags) a unique flowId prefix')
     .option('--limit <n>', 'Show up to n inbox rows (default: the recent window; a flow-id prefix always resolves against every flow)', Number)
     .option('--close-stale', 'Classify stale runs (dead process / unverifiable record); dry-run unless --yes')

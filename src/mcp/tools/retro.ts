@@ -6,6 +6,7 @@ import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatRetroResponse, wrapResponse, type RetroData } from '../helpers/format.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 function extractHighlights(content: string): string[] {
   const highlights: string[] = [];
@@ -49,7 +50,7 @@ export function registerRetroTool(server: McpServer): void {
     'deckent_retro',
     {
       title: 'Sprint Retrospective',
-      description: 'Read a sprint retrospective from the Memory V2 DB (.brain/memory.db `retro` entries). Returns: full retrospective content (sprint ID, task outcomes, GO/NO_GO decisions, learnings, agent performance notes), plus up to 5 extracted highlights (bullet points). Use after a sprint completes to understand what went well, what failed, and what tech debt was created. Every sprint keeps its own retro entry — pass sprintId for an older one.',
+      description: mcpToolDescription('deckent_retro'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         sprintId: z.string().optional().describe('Read a specific sprint retrospective by sprint ID (e.g. "sprint-083"). If omitted, returns the most recent sprint retrospective.'),

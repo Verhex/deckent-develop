@@ -325,7 +325,7 @@ export async function runKpiCommand(
 export function registerKpi(program: Command): void {
   program
     .command('kpi')
-    .description('Show the KPI scorecard for the current (or a specific) sprint')
+    .description(getMessage('cli.kpi.desc', getLanguage(undefined)))
     .option('--sprint <id>', 'Sprint id to score (defaults to the current sprint)')
     .option('--trend <kpiId>', 'Show trend series for a specific KPI')
     .option('-n, --n <count>', 'Number of sprints to include in the trend (default 10)')

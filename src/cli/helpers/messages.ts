@@ -5865,10 +5865,955 @@ const MESSAGES: MessageMap = {
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },
   'desktop.theme.watch.night-watch': { en: 'Night watch', tr: 'Gece seyri' },
   'desktop.theme.watch.open-sea': { en: 'Open sea', tr: 'Açık deniz' },
+
+  // ─── CLI command descriptions (559-002: commander .description() single source) ───
+  'cli.gateway.listen.desc': {
+    en: 'Run the gateway listener in the foreground (attaches every paired connector)',
+    tr: 'Gateway dinleyicisini ön planda çalıştırın (eşleşmiş tüm connector\'lara bağlanır)',
+  },
+  'cli.gateway.start.desc': {
+    en: 'Start the gateway daemon in the background',
+    tr: 'Gateway daemon\'ını arka planda başlatın',
+  },
+  'cli.gateway.stop.desc': {
+    en: 'Stop the running gateway daemon',
+    tr: 'Çalışan gateway daemon\'ını durdurun',
+  },
+  'cli.gateway.status.desc': {
+    en: 'Show whether the gateway daemon is running',
+    tr: 'Gateway daemon\'ının çalışıp çalışmadığını gösterin',
+  },
+  'cli.gateway.pair.list.desc': {
+    en: 'List pending pairing requests',
+    tr: 'Bekleyen eşleşme isteklerini listeleyin',
+  },
+  'cli.gateway.pair.approve.desc': {
+    en: 'Approve a pairing request and bind it to a project',
+    tr: 'Bir eşleşme isteğini onaylayın ve bir projeye bağlayın',
+  },
+  'cli.gateway.pair.reject.desc': {
+    en: 'Reject a pending pairing request',
+    tr: 'Bekleyen bir eşleşme isteğini reddedin',
+  },
+  'cli.program.desc': {
+    en: 'AI agent orchestration system — your AI development team, orchestrated.',
+    tr: 'AI agent orkestrasyon sistemi — kendi AI geliştirme ekibiniz, orkestre edilmiş.',
+  },
+  'cli.agent.desc': {
+    en: 'Manage agent pool',
+    tr: 'Agent havuzunu yönetin',
+  },
+  'cli.agent.lint.desc': {
+    en: 'Lint the agent catalog: reachability, coverage gaps, capability overlaps (V3)',
+    tr: 'Agent kataloğunu denetleyin: erişilebilirlik, kapsam boşlukları, yetenek çakışmaları (V3)',
+  },
+  'cli.agent.list.desc': {
+    en: 'List all agents in the pool',
+    tr: 'Havuzdaki tüm agent\'ları listeleyin',
+  },
+  'cli.agent.stats.desc': {
+    en: 'Show sprint-by-sprint performance for an agent',
+    tr: 'Bir agent\'ın sprint bazında performansını gösterin',
+  },
+  'cli.agent.enable.desc': {
+    en: 'Enable an agent',
+    tr: 'Bir agent\'ı etkinleştirin',
+  },
+  'cli.agent.disable.desc': {
+    en: 'Disable an agent',
+    tr: 'Bir agent\'ı devre dışı bırakın',
+  },
+  'cli.agent.delete.desc': {
+    en: 'Delete an agent from the pool',
+    tr: 'Bir agent\'ı havuzdan silin',
+  },
+  'cli.agent.edit.desc': {
+    en: 'Edit an agent configuration',
+    tr: 'Bir agent yapılandırmasını düzenleyin',
+  },
+  'cli.agent.reclassify.desc': {
+    en: 'Reclassify a recorded task outcome (delta-applies agent/skill stats)',
+    tr: 'Kayıtlı bir görev sonucunu yeniden sınıflandırın (agent/skill istatistiklerine delta uygular)',
+  },
+  'cli.agent.info.desc': {
+    en: 'Show detailed agent information',
+    tr: 'Ayrıntılı agent bilgisini gösterin',
+  },
+  'cli.analyze.desc': {
+    en: 'Analyze project stack, size, and recommended methodology',
+    tr: 'Proje stack\'ini, boyutunu ve önerilen metodolojiyi analiz edin',
+  },
+  'cli.archive_debt.desc': {
+    en: 'Report tech-debt status (DB-first; resolved debt is auto-managed in memory.db)',
+    tr: 'Teknik borç durumunu raporlayın (DB-first; çözülen borç memory.db içinde otomatik yönetilir)',
+  },
+  'cli.attach.desc': {
+    en: 'Attach to the tmux orchestra session',
+    tr: 'tmux orchestra oturumuna bağlanın',
+  },
+  'cli.audit_verify.desc': {
+    en: 'Verify the audit HMAC chain (I4 invariant — tamper-evident audit log)',
+    tr: 'Audit HMAC zincirini doğrulayın (I4 invariant — kurcalamayı belli eden audit log)',
+  },
+  'cli.audit.desc': {
+    en: 'Run Brain Self-Audit Gate for a sprint, or query/export/retain audit log events (query | compliance | forward | retention)',
+    tr: 'Bir sprint için Brain Self-Audit Gate çalıştırın veya audit log olaylarını sorgulayın/dışa aktarın/saklayın (query | compliance | forward | retention)',
+  },
+  'cli.autonomous_mission.desc': {
+    en: 'Manage autonomous v2 missions — list missions, goal missions',
+    tr: 'Autonomous v2 mission\'larını yönetin — list mission\'lar, goal mission\'lar',
+  },
+  'cli.autonomous_mission.create_list.desc': {
+    en: 'Create a Type-1 list mission from N work-items',
+    tr: 'N iş-kaleminden Type-1 list mission oluşturun',
+  },
+  'cli.autonomous_mission.create_goal.desc': {
+    en: 'Create a Type-2 goal mission (runs until the goal is reached)',
+    tr: 'Type-2 goal mission oluşturun (hedefe ulaşılana kadar çalışır)',
+  },
+  'cli.autonomous_mission.list.desc': {
+    en: 'List all missions (summary table)',
+    tr: 'Tüm mission\'ları listeleyin (özet tablo)',
+  },
+  'cli.autonomous.desc': {
+    en: 'Autonomous runtime — authority-bounded continuous loop',
+    tr: 'Autonomous runtime — yetki sınırlı sürekli döngü',
+  },
+  'cli.autonomous.enable.desc': {
+    en: 'Enable autonomous mode (one command instead of editing config; default stays OFF)',
+    tr: 'Autonomous modu etkinleştirin (config düzenlemek yerine tek komut; varsayılan OFF kalır)',
+  },
+  'cli.autonomous.start.desc': {
+    en: 'Start the autonomous loop (default-deny + human-approval gate)',
+    tr: 'Autonomous döngüyü başlatın (default-deny + insan onayı kapısı)',
+  },
+  'cli.autonomous.plan.desc': {
+    en: 'Decompose a high-level goal into a lightweight autonomous backlog (Phase 1)',
+    tr: 'Üst düzey bir hedefi hafif bir autonomous backlog\'a ayrıştırın (Faz 1)',
+  },
+  'cli.autonomous.status.desc': {
+    en: 'Show autonomous runtime summary (pending + last audit events)',
+    tr: 'Autonomous runtime özetini gösterin (bekleyenler + son audit olayları)',
+  },
+  'cli.autonomous.stop.desc': {
+    en: 'Signal the autonomous loop to stop cleanly',
+    tr: 'Autonomous döngüye temiz şekilde durma sinyali gönderin',
+  },
+  'cli.autonomous.cleanup.desc': {
+    en: 'Sweep stray autonomous run-artifacts (task-run-*, _*.pid) from .tasks/',
+    tr: 'Başıboş autonomous run-artifact\'larını (task-run-*, _*.pid) .tasks/ içinden temizleyin',
+  },
+  'cli.autonomous.pending.desc': {
+    en: 'List parked approvals awaiting human accept/reject',
+    tr: 'İnsan kabul/ret kararı bekleyen park edilmiş onayları listeleyin',
+  },
+  'cli.autonomous.approve.desc': {
+    en: 'Approve a parked trigger — resolves the running loop\'s gate',
+    tr: 'Park edilmiş bir tetikleyiciyi onaylayın — çalışan döngünün kapısını çözer',
+  },
+  'cli.autonomous.reject.desc': {
+    en: 'Reject a parked trigger — resolves the running loop\'s gate',
+    tr: 'Park edilmiş bir tetikleyiciyi reddedin — çalışan döngünün kapısını çözer',
+  },
+  'cli.autonomous.backlog.desc': {
+    en: 'Manage the autonomous backlog (add / list / remove entries)',
+    tr: 'Autonomous backlog\'u yönetin (kayıt ekleyin / listeleyin / kaldırın)',
+  },
+  'cli.autonomous.add.desc': {
+    en: 'Add a new entry to the autonomous backlog',
+    tr: 'Autonomous backlog\'a yeni bir kayıt ekleyin',
+  },
+  'cli.autonomous.list.desc': {
+    en: 'List autonomous backlog entries',
+    tr: 'Autonomous backlog kayıtlarını listeleyin',
+  },
+  'cli.autonomous.remove.desc': {
+    en: 'Remove an entry from the autonomous backlog (positional id or --id)',
+    tr: 'Autonomous backlog\'dan bir kaydı kaldırın (konumsal id veya --id)',
+  },
+  'cli.chat.desc': {
+    en: 'Start a conversational session with Deckent. Uses your installed AI CLI.',
+    tr: 'Deckent ile sohbet oturumu başlatın. Kurulu AI CLI\'ınızı kullanır.',
+  },
+  'cli.checkpoint.desc': {
+    en: 'Manage human checkpoints — list, approve, or reject pending checkpoints',
+    tr: 'İnsan checkpoint\'lerini yönetin — bekleyenleri listeleyin, onaylayın veya reddedin',
+  },
+  'cli.checkpoint.list.desc': {
+    en: 'List all checkpoints',
+    tr: 'Tüm checkpoint\'leri listeleyin',
+  },
+  'cli.checkpoint.approve.desc': {
+    en: 'Approve a pending checkpoint',
+    tr: 'Bekleyen bir checkpoint\'i onaylayın',
+  },
+  'cli.checkpoint.reject.desc': {
+    en: 'Reject a pending checkpoint',
+    tr: 'Bekleyen bir checkpoint\'i reddedin',
+  },
+  'cli.cleanup.desc': {
+    en: 'Clean up after a sprint',
+    tr: 'Sprint sonrası temizlik yapın',
+  },
+  'cli.config_nervous.nervous.desc': {
+    en: 'Configure Nervous System authority mode and action overrides',
+    tr: 'Nervous System yetki modunu ve aksiyon override\'larını yapılandırın',
+  },
+  'cli.config_nervous.set.desc': {
+    en: 'Set a nervous system configuration value',
+    tr: 'Bir nervous system yapılandırma değeri atayın',
+  },
+  'cli.config_nervous.override.desc': {
+    en: 'Set a per-action policy override',
+    tr: 'Aksiyon bazlı bir policy override\'ı atayın',
+  },
+  'cli.config_nervous.list.desc': {
+    en: 'Show current authority matrix with all presets',
+    tr: 'Mevcut yetki matrisini tüm preset\'lerle gösterin',
+  },
+  'cli.config_nervous.reset.desc': {
+    en: 'Reset all action overrides to preset defaults',
+    tr: 'Tüm aksiyon override\'larını preset varsayılanlarına sıfırlayın',
+  },
+  'cli.config.desc': {
+    en: 'Show or modify project configuration',
+    tr: 'Proje yapılandırmasını görüntüleyin veya değiştirin',
+  },
+  'cli.config.set.desc': {
+    en: 'Set a configuration value',
+    tr: 'Bir yapılandırma değeri atayın',
+  },
+  'cli.config.get.desc': {
+    en: 'Get a configuration value by key (supports dot notation)',
+    tr: 'Anahtara göre bir yapılandırma değeri okuyun (nokta gösterimini destekler)',
+  },
+  'cli.config.export.desc': {
+    en: 'Export config to stdout or a file',
+    tr: 'Config\'i stdout\'a veya bir dosyaya aktarın',
+  },
+  'cli.config.import.desc': {
+    en: 'Import config from a JSON file',
+    tr: 'Config\'i bir JSON dosyasından içe aktarın',
+  },
+  'cli.config.list.desc': {
+    en: 'List all config parameters grouped by category',
+    tr: 'Tüm config parametrelerini kategoriye göre gruplu listeleyin',
+  },
+  'cli.config.keys.desc': {
+    en: 'List all config parameter keys',
+    tr: 'Tüm config parametre anahtarlarını listeleyin',
+  },
+  'cli.config.migrate.desc': {
+    en: 'Migrate config.json to the latest full format (adds missing fields with defaults)',
+    tr: 'config.json\'ı en güncel tam formata taşıyın (eksik alanları varsayılanlarla ekler)',
+  },
+  'cli.connect.desc': {
+    en: 'Diagnose provider/MCP/IDE/shell connection status (read-only — no changes are made)',
+    tr: 'Provider/MCP/IDE/shell bağlantı durumunu teşhis edin (salt-okunur — hiçbir değişiklik yapılmaz)',
+  },
+  'cli.cost.desc': {
+    en: 'User Safety Shield — cost management & estimation',
+    tr: 'User Safety Shield — maliyet yönetimi ve tahmini',
+  },
+  'cli.cost.show.desc': {
+    en: 'Display model pricing (read-only)',
+    tr: 'Model fiyatlandırmasını gösterin (salt-okunur)',
+  },
+  'cli.cost.update.desc': {
+    en: 'Fetch latest pricing from LiteLLM + OpenRouter',
+    tr: 'En güncel fiyatlandırmayı LiteLLM + OpenRouter\'dan çekin',
+  },
+  'cli.cost.budget.desc': {
+    en: 'View or set cost budgets',
+    tr: 'Maliyet bütçelerini görüntüleyin veya ayarlayın',
+  },
+  'cli.cu_status.desc': {
+    en: 'Show computer-use (TOOL-CU) status: flag state + per-capability availability',
+    tr: 'Computer-use (TOOL-CU) durumunu gösterin: flag durumu + yetenek bazında kullanılabilirlik',
+  },
+  'cli.dashboard.desc': {
+    en: 'Show terminal dashboard with auto-refresh (see also: deckent status --watch)',
+    tr: 'Terminal dashboard\'u otomatik yenilemeyle gösterin (ayrıca bkz. deckent status --watch)',
+  },
+  'cli.do.desc': {
+    en: 'Golden-flow: turn a goal into a sprint plan (dry-run preview by default; --run to actually start it)',
+    tr: 'Golden-flow: bir hedefi sprint planına dönüştürün (varsayılan dry-run önizleme; gerçekten başlatmak için --run)',
+  },
+  'cli.docs.desc': {
+    en: 'Manage user-defined documents',
+    tr: 'Kullanıcı tanımlı dokümanları yönetin',
+  },
+  'cli.docs.add.desc': {
+    en: 'Add a document to managed docs',
+    tr: 'Yönetilen dokümanlara bir doküman ekleyin',
+  },
+  'cli.docs.remove.desc': {
+    en: 'Remove a document from managed docs',
+    tr: 'Yönetilen dokümanlardan bir dokümanı kaldırın',
+  },
+  'cli.docs.list.desc': {
+    en: 'List all managed documents',
+    tr: 'Tüm yönetilen dokümanları listeleyin',
+  },
+  'cli.docs.update.desc': {
+    en: 'Update rules for an existing managed doc',
+    tr: 'Mevcut bir yönetilen dokümanın kurallarını güncelleyin',
+  },
+  'cli.docs.run.desc': {
+    en: 'Run managed doc updates without a sprint',
+    tr: 'Yönetilen doküman güncellemelerini sprint olmadan çalıştırın',
+  },
+  'cli.docs.track.desc': {
+    en: 'Track doc freshness (hash + DCR + stale)',
+    tr: 'Doküman tazeliğini izleyin (hash + DCR + stale)',
+  },
+  'cli.docs.scan.desc': {
+    en: 'Hash + timestamp + rank all docs; write front-matter; sync memory.db',
+    tr: 'Tüm dokümanları hash\'leyin, zaman damgalayın ve sıralayın; front-matter yazın; memory.db\'yi eşitleyin',
+  },
+  'cli.docs.status.desc': {
+    en: 'Report tracked docs by rank + stale state',
+    tr: 'İzlenen dokümanları rank ve stale durumuna göre raporlayın',
+  },
+  'cli.docs.sync.desc': {
+    en: 'Update memory.db only (no front-matter writes)',
+    tr: 'Yalnız memory.db\'yi güncelleyin (front-matter yazılmaz)',
+  },
+  'cli.doctor.desc': {
+    en: 'Check system dependencies and health',
+    tr: 'Sistem bağımlılıklarını ve sağlığını kontrol edin',
+  },
+  'cli.evolve.desc': {
+    en: 'Evolution analysis — cross-sprint trends and prompt suggestions',
+    tr: 'Evrim analizi — sprint\'ler arası eğilimler ve prompt önerileri',
+  },
+  'cli.evolve.report.desc': {
+    en: 'Show cross-sprint agent/skill trend report',
+    tr: 'Sprint\'ler arası agent/skill eğilim raporunu gösterin',
+  },
+  'cli.explain.desc': {
+    en: 'Explain what the last sprint did in human-friendly language',
+    tr: 'Son sprint\'in ne yaptığını insan diliyle açıklayın',
+  },
+  'cli.features.desc': {
+    en: 'List features from .deckent/settings/features-manifest.json by category',
+    tr: '.deckent/settings/features-manifest.json içindeki özellikleri kategoriye göre listeleyin',
+  },
+  'cli.flow.desc': {
+    en: 'Manage scheduled flows (process mode)',
+    tr: 'Zamanlanmış flow\'ları yönetin (process modu)',
+  },
+  'cli.flow.list.desc': {
+    en: 'List all scheduled flows',
+    tr: 'Tüm zamanlanmış flow\'ları listeleyin',
+  },
+  'cli.flow.add.desc': {
+    en: 'Add a new scheduled flow (cron: 5-field expression, e.g. "* * * * *")',
+    tr: 'Yeni bir zamanlanmış flow ekleyin (cron: 5 alanlı ifade, örn. "* * * * *")',
+  },
+  'cli.flow.run.desc': {
+    en: 'Run the flow-runtime tick once (--once) or start the daemon',
+    tr: 'Flow-runtime tick\'ini bir kez çalıştırın (--once) veya daemon\'ı başlatın',
+  },
+  'cli.flow.approve.desc': {
+    en: 'Approve a pending event-triggered flow dispatch so it can proceed',
+    tr: 'Bekleyen event-tetikli bir flow dispatch\'ini onaylayın ki ilerleyebilsin',
+  },
+  'cli.heartbeat.desc': {
+    en: 'Run proactive heartbeat tasks from .deckent/HEARTBEAT.md',
+    tr: '.deckent/HEARTBEAT.md içindeki proaktif heartbeat görevlerini çalıştırın',
+  },
+  'cli.help.help_info.desc': {
+    en: 'Show quick-reference help (localized)',
+    tr: 'Hızlı başvuru yardımını gösterin (yerelleştirilmiş)',
+  },
+  'cli.image.desc': {
+    en: 'Worker Docker image management',
+    tr: 'Worker Docker imajı yönetimi',
+  },
+  'cli.image.build.desc': {
+    en: 'Build the deckent-worker Docker image from the packaged Dockerfile.worker',
+    tr: 'deckent-worker Docker imajını paketlenmiş Dockerfile.worker\'dan derleyin',
+  },
+  'cli.init.desc': {
+    en: 'Initialize a new Deckent project',
+    tr: 'Yeni bir Deckent projesi başlatın',
+  },
+  'cli.kill.desc': {
+    en: 'Kill a running worker',
+    tr: 'Çalışan bir worker\'ı sonlandırın',
+  },
+  'cli.kpi.desc': {
+    en: 'Show the KPI scorecard for the current (or a specific) sprint',
+    tr: 'Mevcut (veya belirtilen) sprint için KPI karnesini gösterin',
+  },
+  'cli.limits.desc': {
+    en: 'Check live subscription-window usage (session/week) and the configured start-gate thresholds',
+    tr: 'Canlı abonelik-penceresi kullanımını (oturum/hafta) ve yapılandırılmış start-gate eşiklerini kontrol edin',
+  },
+  'cli.mcp.desc': {
+    en: 'Manage MCP servers (Claude-parity)',
+    tr: 'MCP sunucularını yönetin (Claude-parity)',
+  },
+  'cli.mcp.add.desc': {
+    en: 'Add an MCP server (stdio or http) — writes to .mcp.json by scope',
+    tr: 'Bir MCP sunucusu ekleyin (stdio veya http) — scope\'a göre .mcp.json dosyasına yazar',
+  },
+  'cli.mcp.list.desc': {
+    en: 'List registered MCP servers (merged: local > project > user)',
+    tr: 'Kayıtlı MCP sunucularını listeleyin (birleşik: local > project > user)',
+  },
+  'cli.mcp.remove.desc': {
+    en: 'Remove an MCP server (searches all scopes if --scope omitted)',
+    tr: 'Bir MCP sunucusunu kaldırın (--scope verilmezse tüm scope\'larda arar)',
+  },
+  'cli.mcp.get.desc': {
+    en: 'Show details for an MCP server (from merged view)',
+    tr: 'Bir MCP sunucusunun ayrıntılarını gösterin (birleşik görünümden)',
+  },
+  'cli.memory.desc': {
+    en: 'Memory V2 management',
+    tr: 'Memory V2 yönetimi',
+  },
+  'cli.memory.rebuild.desc': {
+    en: 'Rebuild memory.db from .brain/exports/*.md files',
+    tr: 'memory.db\'yi .brain/exports/*.md dosyalarından yeniden oluşturun',
+  },
+  'cli.memory.export.desc': {
+    en: 'Export memory.db to .brain/exports/*.md',
+    tr: 'memory.db\'yi .brain/exports/*.md olarak dışa aktarın',
+  },
+  'cli.memory.stats.desc': {
+    en: 'Show memory.db statistics',
+    tr: 'memory.db istatistiklerini gösterin',
+  },
+  'cli.memory.relations.desc': {
+    en: 'Manage memory relations',
+    tr: 'Memory ilişkilerini yönetin',
+  },
+  'cli.memory.list.desc': {
+    en: 'List all relations in memory.db',
+    tr: 'memory.db içindeki tüm ilişkileri listeleyin',
+  },
+  'cli.memory.review.desc': {
+    en: 'Review pending relations from backfill preview',
+    tr: 'Backfill önizlemesinden gelen bekleyen ilişkileri gözden geçirin',
+  },
+  'cli.models.desc': {
+    en: 'Manage and browse the model catalog',
+    tr: 'Model kataloğunu yönetin ve gezinin',
+  },
+  'cli.models.list.desc': {
+    en: 'List available models from the catalog',
+    tr: 'Katalogdaki kullanılabilir modelleri listeleyin',
+  },
+  'cli.models.activate.desc': {
+    en: 'Allow a detected model to enter the routing pool',
+    tr: 'Tespit edilen bir modelin routing havuzuna girmesine izin verin',
+  },
+  'cli.models.deactivate.desc': {
+    en: 'Remove a model from the routing pool (detection still sees it)',
+    tr: 'Bir modeli routing havuzundan çıkarın (tespit onu görmeye devam eder)',
+  },
+  'cli.models.activation.desc': {
+    en: 'Show recorded model activation decisions (unrecorded = active)',
+    tr: 'Kayıtlı model aktivasyon kararlarını gösterin (kayıtsız = aktif)',
+  },
+  'cli.models.policy.desc': {
+    en: 'Show or set a provider activation policy (implicit-active | explicit-active)',
+    tr: 'Bir provider aktivasyon policy\'sini gösterin veya ayarlayın (implicit-active | explicit-active)',
+  },
+  'cli.models.active_set.desc': {
+    en: 'Show the resolved owner active execution set + snapshot digest',
+    tr: 'Çözümlenmiş owner aktif execution set\'ini + snapshot digest\'ini gösterin',
+  },
+  'cli.models.refresh.desc': {
+    en: 'Force-refresh the model catalog (invalidates 24h cache)',
+    tr: 'Model kataloğunu zorla yenileyin (24 saatlik cache\'i geçersiz kılar)',
+  },
+  'cli.models.tier.desc': {
+    en: 'Look up the tier of a specific model by ID or API ID',
+    tr: 'Belirli bir modelin tier\'ını ID veya API ID ile sorgulayın',
+  },
+  'cli.nervous.desc': {
+    en: 'Nervous System dashboard — monitor, accept, reject proactive suggestions',
+    tr: 'Nervous System panosu — proaktif önerileri izleyin, kabul edin, reddedin',
+  },
+  'cli.nervous.enable.desc': {
+    en: 'Enable the Nervous System (one command; default stays OFF, human-approval preserved)',
+    tr: 'Nervous System\'i etkinleştirin (tek komut; varsayılan OFF kalır, insan onayı korunur)',
+  },
+  'cli.nervous.accept.desc': {
+    en: 'Accept a pending nervous system suggestion',
+    tr: 'Bekleyen bir nervous system önerisini kabul edin',
+  },
+  'cli.nervous.reject.desc': {
+    en: 'Reject a pending nervous system suggestion',
+    tr: 'Bekleyen bir nervous system önerisini reddedin',
+  },
+  'cli.nervous.edit.desc': {
+    en: 'Modify and accept a pending suggestion',
+    tr: 'Bekleyen bir öneriyi değiştirip kabul edin',
+  },
+  'cli.nervous.undo.desc': {
+    en: 'Undo a recent reversible action',
+    tr: 'Yakın zamanda yapılmış geri alınabilir bir aksiyonu geri alın',
+  },
+  'cli.nervous.history.desc': {
+    en: 'View nervous system action history',
+    tr: 'Nervous system aksiyon geçmişini görüntüleyin',
+  },
+  'cli.nervous.recommendations.desc': {
+    en: 'View the Brain inbox — nervous proposals awaiting disposition (ADR-037)',
+    tr: 'Brain gelen kutusunu görüntüleyin — karar bekleyen nervous önerileri (ADR-037)',
+  },
+  'cli.nervous.log.desc': {
+    en: 'View raw nervous system log',
+    tr: 'Ham nervous system log\'unu görüntüleyin',
+  },
+  'cli.nervous.accept_panic.desc': {
+    en: 'Approve a PanicGuard-blocked worker kill (writes IPC marker)',
+    tr: 'PanicGuard tarafından engellenmiş bir worker kill\'ini onaylayın (IPC marker yazar)',
+  },
+  'cli.nervous.baseline_refresh.desc': {
+    en: 'Refresh directives_protection baseline to current DIRECTIVES.md content',
+    tr: 'directives_protection baseline\'ını güncel DIRECTIVES.md içeriğine yenileyin',
+  },
+  'cli.onboard.desc': {
+    en: 'Run the onboarding wizard',
+    tr: 'Onboarding sihirbazını çalıştırın',
+  },
+  'cli.openrouter_probe.desc': {
+    en: 'Live-probe OpenRouter free models via $DECK:OPENROUTER_API_KEY and refresh the local cache',
+    tr: 'OpenRouter ücretsiz modellerini $DECK:OPENROUTER_API_KEY ile canlı yoklayın ve yerel cache\'i yenileyin',
+  },
+  'cli.output.desc': {
+    en: 'Show captured output for a specific worker task',
+    tr: 'Belirli bir worker görevi için yakalanan çıktıyı gösterin',
+  },
+  'cli.plan_nl.desc': {
+    en: 'Turn a free-form goal into a DIRECTIVES.md scaffold (single-task template; preview by default)',
+    tr: 'Serbest biçimli bir hedefi DIRECTIVES.md iskeletine dönüştürün (tek-görev şablonu; varsayılan önizleme)',
+  },
+  'cli.plan.desc': {
+    en: 'Plan a sprint without executing it',
+    tr: 'Bir sprint\'i çalıştırmadan planlayın',
+  },
+  'cli.plugin.desc': {
+    en: 'Manage plugins',
+    tr: 'Plugin\'leri yönetin',
+  },
+  'cli.plugin.install.desc': {
+    en: 'Install a plugin from npm, git URL, or local path',
+    tr: 'npm, git URL veya yerel yoldan bir plugin kurun',
+  },
+  'cli.plugin.remove.desc': {
+    en: 'Remove an installed plugin',
+    tr: 'Kurulu bir plugin\'i kaldırın',
+  },
+  'cli.plugin.update.desc': {
+    en: 'Update a plugin (remove existing and re-install from source)',
+    tr: 'Bir plugin\'i güncelleyin (mevcudu kaldırıp kaynağından yeniden kurar)',
+  },
+  'cli.plugin.list.desc': {
+    en: 'List installed plugins',
+    tr: 'Kurulu plugin\'leri listeleyin',
+  },
+  'cli.plugin.info.desc': {
+    en: 'Show plugin info (accepts absolute or relative path)',
+    tr: 'Plugin bilgisini gösterin (mutlak veya göreli yol kabul eder)',
+  },
+  'cli.plugin.test.desc': {
+    en: 'Test a plugin: validate manifest and entrypoint, run hooks if available',
+    tr: 'Bir plugin\'i test edin: manifest ve entrypoint doğrulanır, varsa hook\'lar çalıştırılır',
+  },
+  'cli.plugin.create.desc': {
+    en: 'Create a new plugin scaffold',
+    tr: 'Yeni bir plugin iskeleti oluşturun',
+  },
+  'cli.process.desc': {
+    en: 'Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity)',
+    tr: 'Process-mode execution yüzeyi — görev/yetenek gönderin ve durumlarını yoklayın (ADR-022 CLI/MCP parity)',
+  },
+  'cli.process.submit.desc': {
+    en: 'Submit an ExecutionRequest (policy-gated: read-only auto-runs, side-effecting parks for approval)',
+    tr: 'Bir ExecutionRequest gönderin (policy-gated: salt-okunur olanlar otomatik çalışır, yan etkili olanlar onay için park edilir)',
+  },
+  'cli.process.status.desc': {
+    en: 'Poll the status of a prior submission by executionId',
+    tr: 'Önceki bir gönderimin durumunu executionId ile yoklayın',
+  },
+  'cli.process.result.desc': {
+    en: 'Show the full result of a submission (status + lastResult)',
+    tr: 'Bir gönderimin tam sonucunu gösterin (status + lastResult)',
+  },
+  'cli.rbac.desc': {
+    en: 'Role-based access control — check permissions and list roles',
+    tr: 'Rol tabanlı erişim denetimi — izinleri kontrol edin ve rolleri listeleyin',
+  },
+  'cli.rbac.check.desc': {
+    en: 'Check whether a role has permission to perform an action',
+    tr: 'Bir rolün bir aksiyonu gerçekleştirme iznine sahip olup olmadığını kontrol edin',
+  },
+  'cli.rbac.roles.desc': {
+    en: 'List all roles and their effective permissions',
+    tr: 'Tüm rolleri ve etkin izinlerini listeleyin',
+  },
+  'cli.rbac.grant.desc': {
+    en: 'Assign a role to a user',
+    tr: 'Bir kullanıcıya rol atayın',
+  },
+  'cli.rbac.revoke.desc': {
+    en: 'Remove the role assignment for a user',
+    tr: 'Bir kullanıcının rol atamasını kaldırın',
+  },
+  'cli.recall.desc': {
+    en: 'Search project memory — ADRs, sprint learnings, patterns, debt',
+    tr: 'Proje belleğinde arayın — ADR\'ler, sprint öğrenimleri, pattern\'ler, borç',
+  },
+  'cli.remember.desc': {
+    en: 'Store a note in project memory',
+    tr: 'Proje belleğine bir not kaydedin',
+  },
+  'cli.resources.desc': {
+    en: 'Show live docker worker resource usage or analyze resource log',
+    tr: 'Canlı docker worker kaynak kullanımını gösterin veya kaynak log\'unu analiz edin',
+  },
+  'cli.resume.desc': {
+    en: 'Resume a sprint from its latest checkpoint',
+    tr: 'Bir sprint\'i son checkpoint\'inden devam ettirin',
+  },
+  'cli.retro.desc': {
+    en: 'Show the latest sprint retrospective',
+    tr: 'En son sprint retrospektifini gösterin',
+  },
+  'cli.review.desc': {
+    en: 'Review sprint tasks with evaluations',
+    tr: 'Sprint görevlerini değerlendirmeleriyle birlikte gözden geçirin',
+  },
+  'cli.run.desc': {
+    en: 'Run a single one-shot task without a sprint cycle',
+    tr: 'Sprint döngüsü olmadan tek seferlik bir görev çalıştırın',
+  },
+  'cli.runs.desc': {
+    en: 'List run-flows (the multi-flow inbox) — plus per-run decide: --approve/--reject/--retire/--start',
+    tr: 'Run-flow\'ları listeleyin (çoklu-flow gelen kutusu) — ayrıca run bazında karar: --approve/--reject/--retire/--start',
+  },
+  'cli.serve.desc': {
+    en: 'Start HTTP API server with SSE support',
+    tr: 'HTTP API sunucusunu SSE desteğiyle başlatın',
+  },
+  'cli.set_directives.desc': {
+    en: 'Write sprint goals to DIRECTIVES.md (content, file, or stdin)',
+    tr: 'Sprint hedeflerini DIRECTIVES.md dosyasına yazın (içerik, dosya veya stdin)',
+  },
+  'cli.skill_marketplace.search.desc': {
+    en: 'Search skills in the marketplace registry',
+    tr: 'Marketplace kayıt defterinde skill arayın',
+  },
+  'cli.skill_marketplace.publish.desc': {
+    en: 'Validate, sign (Ed25519) and publish a skill to the marketplace',
+    tr: 'Bir skill\'i doğrulayın, imzalayın (Ed25519) ve marketplace\'e yayınlayın',
+  },
+  'cli.skill.desc': {
+    en: 'Manage skill pool',
+    tr: 'Skill havuzunu yönetin',
+  },
+  'cli.skill.list.desc': {
+    en: 'List all skills',
+    tr: 'Tüm skill\'leri listeleyin',
+  },
+  'cli.skill.create.desc': {
+    en: 'Create a custom skill',
+    tr: 'Özel bir skill oluşturun',
+  },
+  'cli.skill.install.desc': {
+    en: 'Install a skill from local path or git URL (supports version pinning: url#tag)',
+    tr: 'Yerel yoldan veya git URL\'den bir skill kurun (sürüm sabitlemeyi destekler: url#tag)',
+  },
+  'cli.skill.update.desc': {
+    en: 'Update an installed skill from its original source',
+    tr: 'Kurulu bir skill\'i orijinal kaynağından güncelleyin',
+  },
+  'cli.skill.enable.desc': {
+    en: 'Enable a skill',
+    tr: 'Bir skill\'i etkinleştirin',
+  },
+  'cli.skill.disable.desc': {
+    en: 'Disable a skill',
+    tr: 'Bir skill\'i devre dışı bırakın',
+  },
+  'cli.skill.delete.desc': {
+    en: 'Delete a skill',
+    tr: 'Bir skill\'i silin',
+  },
+  'cli.skill.info.desc': {
+    en: 'Show skill details',
+    tr: 'Skill ayrıntılarını gösterin',
+  },
+  'cli.spawn.desc': {
+    en: 'Manually spawn a worker for a task (BLOCKS until the worker exits on the docker backend; fire-and-forget on tmux/subprocess)',
+    tr: 'Bir görev için elle worker başlatın (docker backend\'inde worker çıkana kadar BLOKLAR; tmux/subprocess\'te fire-and-forget)',
+  },
+  'cli.start.desc': {
+    en: 'Start a new sprint (optionally with a one-line description for zero-config mode)',
+    tr: 'Yeni bir sprint başlatın (zero-config mod için isteğe bağlı tek satırlık açıklamayla)',
+  },
+  'cli.sync.desc': {
+    en: 'Sync adapter files and detect out-of-band changes since last sprint',
+    tr: 'Adapter dosyalarını eşitleyin ve son sprint\'ten bu yana oluşan dış değişiklikleri tespit edin',
+  },
+  'cli.test_run.test.desc': {
+    en: 'Run a test sprint (no retro, no memory update, no decay)',
+    tr: 'Test sprint\'i çalıştırın (retro yok, memory güncellemesi yok, decay yok)',
+  },
+  'cli.truth.desc': {
+    en: 'Resolve the 4-level feature truth-chain (code → wired → enabled → proof) for manifest truth-blocks',
+    tr: 'Manifest truth-block\'ları için 4 seviyeli feature truth-chain\'i çözün (code → wired → enabled → proof)',
+  },
+  'cli.upgrade.desc': {
+    en: 'Self-update deckent',
+    tr: 'deckent\'i kendi kendine güncelleyin',
+  },
+  'cli.usage.desc': {
+    en: 'Show token/limit consumption from Claude Code transcripts',
+    tr: 'Claude Code transcript\'lerinden token/limit tüketimini gösterin',
+  },
+  'cli.watch.desc': {
+    en: 'Follow a live worker (docker logs / tmux pane / subprocess log) with --follow <taskId>, or open the tmux dashboard split',
+    tr: 'Canlı bir worker\'ı --follow <taskId> ile takip edin (docker logs / tmux pane / subprocess log) veya tmux dashboard split\'ini açın',
+  },
+  'cli.web.desc': {
+    en: 'Start web dashboard with API server (deprecated — use `deckent serve`)',
+    tr: 'Web dashboard\'u API sunucusuyla başlatın (kullanımdan kalktı — `deckent serve` kullanın)',
+  },
+
+  // ─── MCP tool descriptions (559-004) ────────────────────────────────────────
+  // A tool with a CLI counterpart SHARES that command's `cli.*.desc` /
+  // `<cmd>.desc` key above — the shared sentence has exactly one source, so the
+  // two surfaces cannot drift. The `mcp.<tool>.detail` keys below are ADDITIVE
+  // MCP-surface affordance (prerequisites, destructive warnings, action enums,
+  // return shape) appended to that shared sentence; they never restate it.
+  // `mcp.<tool>.desc` keys belong to tools with no commander counterpart.
+  // Binding table: src/mcp/tools/description-catalog.ts.
+  'mcp.init.detail': {
+    en: 'Creates every required directory (.deckent/, .brain/, .tasks/, .locks/, .claude/rules/) and configuration file (config.json, DECKENT.md, DIRECTIVES.md, brain files). Safe to re-run — existing config fields are preserved via merge and files are written only when missing. Next: deckent_set_directives → deckent_plan → deckent_start.',
+    tr: 'Gerekli tüm dizinleri (.deckent/, .brain/, .tasks/, .locks/, .claude/rules/) ve yapılandırma dosyalarını (config.json, DECKENT.md, DIRECTIVES.md, brain dosyaları) oluşturur. Yeniden çalıştırmak güvenlidir — mevcut config alanları merge ile korunur, dosyalar yalnızca eksikse yazılır. Sonraki adım: deckent_set_directives → deckent_plan → deckent_start.',
+  },
+  'mcp.set_directives.detail': {
+    en: 'The brain engine parses "## Task N:" or "## Görev N:" blocks into run tasks. Each block should carry: Model (an exact provider API ID, e.g. {modelId} — see deckent_models for the live catalog; legacy aliases [{legacyAliases}] are rejected), optional Provider (explicit ownership: {providers}, required when it cannot be inferred from the id prefix), Effort (low/normal/high), Skills, Files, Scope and Description. Prerequisite: deckent_init. Overwrites DIRECTIVES.md on every call; run deckent_plan afterwards to preview the tasks.',
+    tr: 'Brain motoru "## Task N:" veya "## Görev N:" bloklarını run görevlerine çevirir. Her blok şunları taşımalıdır: Model (tam provider API ID\'si, örn. {modelId} — canlı katalog için deckent_models; eski alias\'lar [{legacyAliases}] reddedilir), isteğe bağlı Provider (açık sahiplik: {providers}, id ön ekinden çıkarılamadığında zorunlu), Effort (low/normal/high), Skills, Files, Scope ve Description. Ön koşul: deckent_init. Her çağrıda DIRECTIVES.md üzerine yazar; ardından görevleri önizlemek için deckent_plan çalıştırın.',
+  },
+  'mcp.plan.detail': {
+    en: 'Reads DIRECTIVES.md, analyses the task blocks and returns the proposed task list with model assignments, wave breakdown and risk assessment — without executing anything. Use it to validate directives before deckent_start. Prerequisite: deckent_init + deckent_set_directives.',
+    tr: 'DIRECTIVES.md dosyasını okur, görev bloklarını çözümler ve önerilen görev listesini model atamaları, dalga dağılımı ve risk değerlendirmesiyle döndürür — hiçbir şey çalıştırmadan. deckent_start öncesi direktifleri doğrulamak için kullanın. Ön koşul: deckent_init + deckent_set_directives.',
+  },
+  'mcp.start.detail': {
+    en: 'Runs the complete lifecycle in the background: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE. Pre-spawn cost admission always runs: acknowledgeCost=true or force=true may acknowledge a numeric budget overrun but can never override unknown pricing or an unavailable gate. Returns immediately with a jobId while the run continues asynchronously — poll deckent_status and evaluate with deckent_review. Prerequisite: deckent_init + deckent_set_directives.',
+    tr: 'Tüm yaşam döngüsünü arka planda çalıştırır: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE. Spawn öncesi maliyet kabulü her zaman çalışır: acknowledgeCost=true veya force=true sayısal bütçe aşımını kabul edebilir, ancak bilinmeyen fiyatlandırmayı veya kullanılamayan bir gate\'i asla geçersiz kılamaz. Hemen bir jobId döndürür, run eşzamansız sürer — deckent_status ile izleyin, deckent_review ile değerlendirin. Ön koşul: deckent_init + deckent_set_directives.',
+  },
+  'mcp.status.detail': {
+    en: 'Returns agents (active workers with task assignments), progress (done/total, progress bar, ETA), alerts (stale workers, boundary violations, lock issues), job (background job state RUNNING/COMPLETE/FAILED plus sprintId and metrics), agentAssignments and skillAssignments. Safe to call at any time and to poll repeatedly; no prerequisite.',
+    tr: 'Şunları döndürür: agents (görev atamalarıyla aktif worker\'lar), progress (tamamlanan/toplam, ilerleme çubuğu, ETA), alerts (bayat worker, sınır ihlali, kilit sorunları), job (arka plan iş durumu RUNNING/COMPLETE/FAILED ile sprintId ve metrikler), agentAssignments ve skillAssignments. Her an çağrılabilir ve tekrar tekrar yoklanabilir; ön koşulu yoktur.',
+  },
+  'mcp.inspect.detail': {
+    en: 'Serves the exact projections the `deckent inspect --json` face serves. Without arguments: the run listing — the current run from the run-status authority plus archived runs from settlement records. With taskId: the task drill-down (task json, plan truncation flag, result evidence, heartbeat, lineage). Read-only; lifecycle always comes from the run-status authority and is never re-inferred here.',
+    tr: '`deckent inspect --json` yüzeyinin sunduğu projeksiyonların aynısını sunar. Argümansız: run listesi — run-status authority\'den güncel run ve settlement kayıtlarından arşivlenmiş run\'lar. taskId ile: görev ayrıntısı (task json, plan kırpma bayrağı, result kanıtı, heartbeat, lineage). Salt okunur; yaşam döngüsü daima run-status authority\'den gelir, burada yeniden çıkarsanmaz.',
+  },
+  'mcp.doctor.detail': {
+    en: 'Checks Node.js version, git availability, tmux installation, provider CLI auth, workspace directories (.deckent/, .brain/, .tasks/), brain memory budget, tech-debt level and stale lock files. Returns a healthScore (0-100) with per-check pass/fail status and recommendations. Use it when a run fails unexpectedly, or before starting a new one — fix what it reports, then re-run until healthScore reaches 100.',
+    tr: 'Node.js sürümünü, git kullanılabilirliğini, tmux kurulumunu, provider CLI kimlik doğrulamasını, workspace dizinlerini (.deckent/, .brain/, .tasks/), brain bellek bütçesini, teknik borç düzeyini ve bayat kilit dosyalarını denetler. Kontrol başına geçti/kaldı durumu ve önerilerle birlikte healthScore (0-100) döndürür. Bir run beklenmedik şekilde başarısız olduğunda veya yeni bir run öncesi kullanın — bildirilenleri düzeltip healthScore 100 olana dek yeniden çalıştırın.',
+  },
+  'mcp.retro.detail': {
+    en: 'Reads the retrospective from the Memory V2 DB (.brain/memory.db `retro` entries): full content (run ID, task outcomes, GO/NO_GO decisions, learnings, agent performance notes) plus up to 5 extracted highlights. Every run keeps its own retro entry — pass sprintId for an older one.',
+    tr: 'Retrospektifi Memory V2 veritabanından (.brain/memory.db `retro` kayıtları) okur: tam içerik (run ID, görev sonuçları, GO/NO_GO kararları, öğrenimler, agent performans notları) ve en fazla 5 öne çıkan madde. Her run kendi retro kaydını tutar — eski bir tanesi için sprintId geçin.',
+  },
+  'mcp.history.detail': {
+    en: 'Reads archived run logs from .brain/sprints/: the last N run markdown logs sorted by run ID, plus a trend analysis (improving/declining/stable) over task completion rates. Use it to understand long-term project health, compare run performance or review past decisions.',
+    tr: 'Arşivlenmiş run loglarını .brain/sprints/ dizininden okur: run ID\'ye göre sıralı son N markdown log ve görev tamamlama oranları üzerinden trend analizi (iyileşen/gerileyen/sabit). Uzun vadeli proje sağlığını anlamak, run performanslarını karşılaştırmak veya geçmiş kararları gözden geçirmek için kullanın.',
+  },
+  'mcp.analyze_project.detail': {
+    en: 'Detects language, framework, test framework, build tool, CI system, project size (by file count) and a methodology recommendation, then returns config suggestions such as plan mode and worker count. Useful before init to pick the right configuration, or to verify stack detection. Modifies no files.',
+    tr: 'Dili, framework\'ü, test framework\'ünü, build aracını, CI sistemini, proje boyutunu (dosya sayısına göre) ve önerilen metodolojiyi tespit eder; ardından plan modu ve worker sayısı gibi config önerileri döndürür. Doğru yapılandırmayı seçmek için init öncesi ya da stack tespitini doğrulamak için kullanışlıdır. Hiçbir dosyayı değiştirmez.',
+  },
+  'mcp.sync.detail': {
+    en: 'Ensures the AI adapter files (CLAUDE.md, AGENTS.md) import DECKENT.md as the single source of truth. Additive only — prepends the @DECKENT.md reference when missing and never overwrites existing content. Use it when an adapter file loses its Deckent reference after a manual edit or a merge conflict. Requires DECKENT.md to exist (run deckent_init first).',
+    tr: 'AI adapter dosyalarının (CLAUDE.md, AGENTS.md) tek doğruluk kaynağı olarak DECKENT.md\'yi içe aktarmasını sağlar. Yalnızca eklemeli — @DECKENT.md referansı eksikse başa ekler, mevcut içeriğin üzerine asla yazmaz. Bir adapter dosyası elle düzenleme veya merge çakışması sonrası Deckent referansını kaybettiğinde kullanın. DECKENT.md\'nin var olmasını gerektirir (önce deckent_init).',
+  },
+  'mcp.config.detail': {
+    en: 'Three actions against .deckent/config.json: "read" returns the fully resolved config (3-layer merge of defaults + global + project); "get" returns one key by dot-notation (e.g. "brain_provider", "max_workers"); "set" writes a key/value pair with validation. Common keys: brain_provider, worker_provider, max_workers, mode, routing_engine.',
+    tr: '.deckent/config.json üzerinde üç eylem: "read" tam çözümlenmiş config\'i döndürür (varsayılan + global + proje 3 katmanlı merge); "get" nokta gösterimiyle tek bir anahtarı döndürür (örn. "brain_provider", "max_workers"); "set" doğrulamayla bir anahtar/değer çifti yazar. Sık anahtarlar: brain_provider, worker_provider, max_workers, mode, routing_engine.',
+  },
+  'mcp.review.detail': {
+    en: 'For each task returns selfAssessment (the worker\'s own DONE/GO_WITH_TECH_DEBT/NO_GO), testsPassed, filesChanged, notes and the decision (approved/rejected/pending). GO means complete with passing tests, NO_GO means rework is needed, GO_WITH_TECH_DEBT means done with known follow-up. Use auto=true to approve every DONE task whose tests passed.',
+    tr: 'Her görev için şunları döndürür: selfAssessment (worker\'ın kendi DONE/GO_WITH_TECH_DEBT/NO_GO değerlendirmesi), testsPassed, filesChanged, notes ve karar (approved/rejected/pending). GO testleri geçen tamamlanmış işi, NO_GO yeniden çalışma gerektiğini, GO_WITH_TECH_DEBT bilinen takip işiyle tamamlandığını belirtir. Testleri geçen tüm DONE görevlerini otomatik onaylamak için auto=true kullanın.',
+  },
+  'mcp.run.detail': {
+    en: 'Creates a task JSON file and spawns a worker immediately, returning a jobId for tracking — no PLAN/EVALUATE/RETRO phases. Use it for a quick isolated task such as fixing one bug, writing a single test file or updating a doc, and monitor the spawned worker with deckent_status.',
+    tr: 'Bir task JSON dosyası oluşturup worker\'ı hemen başlatır ve izleme için jobId döndürür — PLAN/EVALUATE/RETRO fazları yoktur. Tek bir hatayı düzeltmek, tek bir test dosyası yazmak veya bir dokümanı güncellemek gibi hızlı ve izole işler için kullanın; başlatılan worker\'ı deckent_status ile izleyin.',
+  },
+  'mcp.kill.detail': {
+    en: 'Stops one or all running workers: sets task status to PAUSED, removes heartbeat files and releases every file lock the task owns. Use it for a stuck worker (stale heartbeat), a resource hog or a restart. Afterwards run deckent_cleanup to remove task artifacts, then deckent_start. force and userExplicit are pass-through panic-guard bypass markers — even when both are set the bypass is only recorded in the audit trail, and kill still requires explicit user intent.',
+    tr: 'Bir veya tüm çalışan worker\'ları durdurur: görev durumunu PAUSED yapar, heartbeat dosyalarını siler ve görevin sahip olduğu tüm dosya kilitlerini serbest bırakır. Takılmış (bayat heartbeat), aşırı kaynak tüketen veya yeniden başlatılması gereken worker\'lar için kullanın. Sonrasında görev artefaktlarını temizlemek için deckent_cleanup, ardından deckent_start çalıştırın. force ve userExplicit yalnızca aktarılan panic-guard bypass işaretleridir — ikisi de verilse bile bypass sadece audit trail\'e yazılır ve kill yine açık kullanıcı iradesi gerektirir.',
+  },
+  'mcp.cleanup.detail': {
+    en: 'Deletes every task file (.json, .plan, .hb, .result, .paused, .log) from .tasks/ and every lock file from .locks/. With decay=true it also runs memory decay on .brain/ files that exceed the line budget (trimming MEMORY.md, RETRO.md and run logs). Use dryRun=true first to preview exactly what would be deleted. Typically run after deckent_review, or before a fresh run following a kill.',
+    tr: '.tasks/ dizinindeki tüm görev dosyalarını (.json, .plan, .hb, .result, .paused, .log) ve .locks/ dizinindeki tüm kilit dosyalarını siler. decay=true ile satır bütçesini aşan .brain/ dosyalarında bellek decay\'i de çalıştırır (MEMORY.md, RETRO.md ve run loglarını kırpar). Neyin silineceğini görmek için önce dryRun=true kullanın. Genellikle deckent_review sonrası veya bir kill\'in ardından yeni run öncesi çalıştırılır.',
+  },
+  'mcp.help.detail': {
+    en: 'Returns version, initialization state, run status, agent/skill counts, routing engine, available workflows, a recommended next action and the full tool + resource catalog. Use it when you are unsure what to do next or want to understand Deckent\'s capabilities.',
+    tr: 'Sürümü, başlatma durumunu, run durumunu, agent/skill sayılarını, routing motorunu, kullanılabilir iş akışlarını, önerilen sonraki adımı ve tam araç + kaynak kataloğunu döndürür. Sonraki adımdan emin değilseniz veya Deckent\'in yeteneklerini anlamak istiyorsanız kullanın.',
+  },
+  'mcp.agent_list.detail': {
+    en: 'Serves the same read model `deckent agent list` renders, so both surfaces always agree. Each record carries the four catalog facets kept separate: enabled (owner intent), routable (dispatchable now, with typed reasons), validity (schema conformance) and provenance (declared source, observed layer, resolved path). Records the resolver rejected are reported as validity "invalid" with the resolver diagnostics rather than silently dropped; archived records are never listed.',
+    tr: '`deckent agent list` komutunun render ettiği read model\'in aynısını sunar, böylece iki yüzey daima uyuşur. Her kayıt ayrı tutulan dört katalog yüzünü taşır: enabled (owner iradesi), routable (şu an dispatch edilebilir mi, tipli gerekçelerle), validity (şema uyumu) ve provenance (bildirilen kaynak, gözlenen katman, çözümlenen yol). Resolver\'ın reddettiği kayıtlar sessizce düşürülmez, resolver tanılarıyla birlikte validity "invalid" olarak bildirilir; arşivlenmiş kayıtlar hiç listelenmez.',
+  },
+  'mcp.skill_list.detail': {
+    en: 'Returns id, name, category and trigger keywords for each skill, read from the .deckent/skills/ directory. Use it to see which skills are available for task routing, check skill coverage or audit skill assignments before planning a run.',
+    tr: 'Her skill için id, ad, kategori ve tetikleyici anahtar kelimeleri .deckent/skills/ dizininden okuyarak döndürür. Görev yönlendirmesi için hangi skill\'lerin kullanılabilir olduğunu görmek, skill kapsamını denetlemek veya run planlamadan önce skill atamalarını gözden geçirmek için kullanın.',
+  },
+  'mcp.checkpoint.detail': {
+    en: 'Checkpoints pause run execution at configured phases (plan/evaluate/fix) until a human approves or rejects. Use action=list to see what is pending, and action=approve or action=reject with sprintId and phase to respond.',
+    tr: 'Checkpoint\'ler run yürütmesini yapılandırılmış fazlarda (plan/evaluate/fix) bir insan onaylayana veya reddedene dek duraklatır. Bekleyenleri görmek için action=list, yanıt vermek için sprintId ve phase ile action=approve veya action=reject kullanın.',
+  },
+  'mcp.docs.detail': {
+    en: 'Actions: "add" registers a file, "remove" unregisters it, "list" shows all, "update" modifies section rules, "run" triggers doc updates without a run, "track-scan" performs a DB-only doc-tracking scan (hash + DCR + stale) and "track-status" lists tracked doc health. Auto sections receive generated content (metrics, debt, history); protected sections are never touched.',
+    tr: 'Eylemler: "add" bir dosyayı kaydeder, "remove" kaydını siler, "list" tümünü gösterir, "update" bölüm kurallarını değiştirir, "run" run olmadan doküman güncellemelerini tetikler, "track-scan" yalnızca DB üzerinden doküman izleme taraması yapar (hash + DCR + bayatlık) ve "track-status" izlenen doküman sağlığını listeler. Auto bölümler üretilen içerikle (metrikler, borç, geçmiş) güncellenir; korumalı bölümlere asla dokunulmaz.',
+  },
+  'mcp.explain.detail': {
+    en: 'Reads the run log from .brain/sprints/ and the retrospective from the Memory V2 DB to summarise goal, task outcomes (completed/failed/tech debt), duration and key learnings. Use it right after a run for a quick overview. Supports a specific run lookup, verbose mode for full detail and JSON output.',
+    tr: 'Run logunu .brain/sprints/ dizininden ve retrospektifi Memory V2 veritabanından okuyarak hedefi, görev sonuçlarını (tamamlandı/başarısız/teknik borç), süreyi ve temel öğrenimleri özetler. Bir run\'ın hemen ardından hızlı bakış için kullanın. Belirli bir run sorgusunu, tam ayrıntı için verbose modu ve JSON çıktısını destekler.',
+  },
+  'mcp.memory_query.detail': {
+    en: 'Use it when you need context about a past decision or how something was done. Supports full-text search with Turkish normalisation, type and status filters, and a run range.',
+    tr: 'Geçmiş bir karar veya bir işin nasıl yapıldığı hakkında bağlama ihtiyaç duyduğunuzda kullanın. Türkçe normalleştirmeli tam metin arama, tür ve durum filtreleri ile run aralığı destekler.',
+  },
+  'mcp.watch.detail': {
+    en: 'On this surface the stream is delivered as MCP logging notifications: an initial backfill of recent events followed by new events pushed as they arrive. Auto-unsubscribes on client disconnect or error.',
+    tr: 'Bu yüzeyde akış MCP logging bildirimleri olarak iletilir: önce yakın geçmiş olaylarının backfill\'i, ardından geldikçe iletilen yeni olaylar. İstemci bağlantısı koptuğunda veya hata oluştuğunda abonelik kendiliğinden sonlanır.',
+  },
+  'mcp.nervous_subscribe.desc': {
+    en: 'Subscribe to Nervous System notifications for the current run. Registers this MCP client for push notifications and surfaces currently pending PanicGuard kill approvals as PANIC_GUARD_KILL_PENDING events.',
+    tr: 'Güncel run için Nervous System bildirimlerine abone olun. Bu MCP istemcisini push bildirimlerine kaydeder ve bekleyen PanicGuard kill onaylarını PANIC_GUARD_KILL_PENDING olayları olarak yüzeye çıkarır.',
+  },
+  'mcp.nervous_accept.detail': {
+    en: 'The action is then executed by the Executor. An id of the form "panic:<taskId>" approves a PanicGuard-blocked kill.',
+    tr: 'Aksiyon ardından Executor tarafından çalıştırılır. "panic:<taskId>" biçimindeki bir id, PanicGuard tarafından engellenmiş bir kill\'i onaylar.',
+  },
+  'mcp.nervous_reject.detail': {
+    en: 'The action will NOT be executed. A reason may optionally be supplied.',
+    tr: 'Aksiyon çalıştırılmayacaktır. İsteğe bağlı olarak bir gerekçe verilebilir.',
+  },
+  'mcp.nervous_status.desc': {
+    en: 'Show the Nervous System dashboard: pending notifications, recent history and the current configuration.',
+    tr: 'Nervous System panosunu gösterin: bekleyen bildirimler, yakın geçmiş ve güncel yapılandırma.',
+  },
+  'mcp.nervous_config.detail': {
+    en: 'Reads or modifies the authority mode preset and the per-action overrides, and lists the available actions.',
+    tr: 'Yetki modu ön ayarını ve aksiyon bazlı override\'ları okur veya değiştirir, ayrıca kullanılabilir aksiyonları listeler.',
+  },
+  'mcp.feature_query.detail': {
+    en: 'Lists features by category (active, lightly_used, dormant, dead, all) or looks one up by ID, returning metadata including files, description and category. Reads .deckent/settings/features-manifest.json; regenerate it with `node scripts/sync-manifest.mjs`.',
+    tr: 'Özellikleri kategoriye göre (active, lightly_used, dormant, dead, all) listeler veya ID ile tek bir özelliği getirir; dosyalar, açıklama ve kategori dahil meta veriyi döndürür. .deckent/settings/features-manifest.json dosyasını okur; yeniden üretmek için `node scripts/sync-manifest.mjs` çalıştırın.',
+  },
+  'mcp.truth.detail': {
+    en: 'Covers every truth-block declared in .deckent/settings/features-manifest.json and flags half-wire candidates (code shipped but no production call-site). Read-only. Pass check=true to also diff those candidates against the pinned .deckent/truth-baseline.json ratchet.',
+    tr: '.deckent/settings/features-manifest.json içinde bildirilen her truth-block\'u kapsar ve half-wire adaylarını (kod var ama production çağrı noktası yok) işaretler. Salt okunur. Bu adayları sabitlenmiş .deckent/truth-baseline.json ratchet\'iyle karşılaştırmak için check=true geçin.',
+  },
+  'mcp.audit.detail': {
+    en: 'action="gate" (default) runs the Brain Self-Audit Gate for a run — tsc, vitest, honesty and observability checks — returning PASS or GATE_FAILURE and writing .deckent/<sprintId>-gate.json. action="query" filters audit-log events by channel/tenant with an optional limit. action="compliance" builds a compliance report (audit-chain integrity, RBAC, tenant isolation) over the retained trail. action="retention" plans retention via keepDays/keepCount and is dry-run by default with ZERO writes; apply=true is DESTRUCTIVE — it archives the planned partition and permanently deletes pruned events from the run event stream. The CLI "forward" subcommand (SIEM export) is intentionally not exposed over MCP because it requires network egress.',
+    tr: 'action="gate" (varsayılan) bir run için Brain Self-Audit Gate\'i çalıştırır — tsc, vitest, dürüstlük ve gözlemlenebilirlik kontrolleri — PASS veya GATE_FAILURE döndürür ve .deckent/<sprintId>-gate.json dosyasını yazar. action="query" audit-log olaylarını kanal/tenant ile, isteğe bağlı limitle filtreler. action="compliance" saklanan iz üzerinden uyumluluk raporu üretir (audit-chain bütünlüğü, RBAC, tenant izolasyonu). action="retention" keepDays/keepCount ile saklama planlar ve varsayılan olarak dry-run\'dır, HİÇBİR yazma yapmaz; apply=true DESTRUCTIVE\'dir — planlanan bölümü arşivler ve budanan olayları run olay akışından kalıcı olarak siler. CLI\'daki "forward" alt komutu (SIEM dışa aktarımı) ağ çıkışı gerektirdiği için MCP üzerinde bilinçli olarak sunulmaz.',
+  },
+  'mcp.recover.detail': {
+    en: 'Runs the audit, cleans orphan IPC directories (dead PIDs only), clears stale locks (>5 min) and archives terminal task files while preserving active tasks. Use dryRun=true to preview first. DESTRUCTIVE: it modifies .tasks/, .locks/ and .deckent/.',
+    tr: 'Audit\'i çalıştırır, öksüz IPC dizinlerini (yalnız ölü PID\'ler) temizler, bayat kilitleri (>5 dk) kaldırır ve terminal görev dosyalarını arşivlerken aktif görevleri korur. Önce önizlemek için dryRun=true kullanın. DESTRUCTIVE: .tasks/, .locks/ ve .deckent/ dizinlerini değiştirir.',
+  },
+  'mcp.models.detail': {
+    en: 'Actions: "list" lists available models (optionally filtered by provider); "refresh" force-refreshes the catalog from models.dev and invalidates the 24h cache; "tier" looks up a model\'s tier (premium_plus/premium/standard/economy). Catalog sources: remote (models.dev live), cache (~/.deckent/cache/models-catalog.json, 24h TTL) and bundled (offline fallback).',
+    tr: 'Eylemler: "list" kullanılabilir modelleri listeler (isteğe bağlı provider filtresiyle); "refresh" kataloğu models.dev üzerinden zorla yeniler ve 24 saatlik önbelleği geçersiz kılar; "tier" bir modelin katmanını (premium_plus/premium/standard/economy) getirir. Katalog kaynakları: uzak (models.dev canlı), önbellek (~/.deckent/cache/models-catalog.json, 24 saat TTL) ve gömülü (çevrimdışı yedek).',
+  },
+  'mcp.autonomous.detail': {
+    en: 'Query status, start or stop the loop, manage the backlog (add/list/remove) and resolve approval gates (pending/approve/reject). "start" spawns the real loop as a DETACHED background process and never blocks this MCP stdio transport — it reports spawned=false with an honest reason instead of spawning when autonomous.enabled is not true in project config, or when a previously spawned loop is still alive.',
+    tr: 'Durumu sorgular, döngüyü başlatır veya durdurur, backlog\'u yönetir (add/list/remove) ve onay kapılarını çözer (pending/approve/reject). "start" gerçek döngüyü DETACHED bir arka plan süreci olarak başlatır ve bu MCP stdio taşımasını asla bloke etmez — proje config\'inde autonomous.enabled true değilse veya daha önce başlatılmış bir döngü hâlâ canlıysa başlatmak yerine dürüst bir gerekçeyle spawned=false bildirir.',
+  },
+  'mcp.process.detail': {
+    en: 'action=submit injects an ExecutionRequest that is policy-gated — read-only capabilities auto-run while side-effecting ones park for approval; action=status and action=result poll a prior submission by executionId.',
+    tr: 'action=submit, policy ile kapılanan bir ExecutionRequest enjekte eder — salt okunur yetenekler kendiliğinden çalışır, yan etkili olanlar onay için park edilir; action=status ve action=result önceki bir gönderimi executionId ile yoklar.',
+  },
+  'mcp.usage.detail': {
+    en: 'Default: a last-7-day model-level summary (calls, tokens, limit-cost, cache hit%). With sprint: the per-task breakdown plus the cache-gate report for that run. With lineage: the canonical logical-root usage/billing aggregate (the same authority as core/lineage-usage-authority.ts) projected for caller-supplied tasks and attempts — no MCP-side billing recalculation.',
+    tr: 'Varsayılan: son 7 günün model düzeyinde özeti (çağrı, token, limit maliyeti, önbellek isabet %). sprint ile: o run için görev bazlı döküm ve cache-gate raporu. lineage ile: canonical logical-root kullanım/faturalama toplamı (core/lineage-usage-authority.ts ile aynı authority) çağıranın verdiği görev ve denemeler için projekte edilir — MCP tarafında yeniden faturalama hesabı yapılmaz.',
+  },
+  'mcp.xverify.detail': {
+    en: 'Both interactive sessions can call the advisory referee in-band: the verifier is always chosen to DIFFER from the declared author. Provider output is evidence only — the host derives CONFIRMED/REFUTED/UNCLEAR plus the authoritative ALLOW/NO-GO/HOLD disposition.',
+    tr: 'Her iki etkileşimli oturum da danışma hakemini hat içinde çağırabilir: doğrulayıcı daima bildirilen yazardan FARKLI seçilir. Sağlayıcı çıktısı yalnızca kanıttır — CONFIRMED/REFUTED/UNCLEAR ile yetkili ALLOW/NO-GO/HOLD disposition\'ını host türetir.',
+  },
+  'mcp.kpi.detail': {
+    en: 'Scorecard (default) returns { sprintId, kpis } with cost, token, cache, retry, completion and quality metrics. With the trend argument it returns { kpiId, series: [{ periodKey, value, status }] }. Delegates to KpiService as the single source; read-only.',
+    tr: 'Karne (varsayılan) maliyet, token, önbellek, yeniden deneme, tamamlanma ve kalite metrikleriyle { sprintId, kpis } döndürür. trend argümanıyla { kpiId, series: [{ periodKey, value, status }] } döndürür. Tek kaynak olarak KpiService\'e devreder; salt okunur.',
+  },
+  'mcp.cost.detail': {
+    en: 'Returns budget limits, per-model pricing (input/output per MTok) and today\'s spend from the resource log. Delegates to the project cost-config single source; read-only, with no cost math reimplemented here.',
+    tr: 'Bütçe limitlerini, model başına fiyatlandırmayı (MTok başına giriş/çıkış) ve kaynak logundan bugünkü harcamayı döndürür. Proje cost-config tek kaynağına devreder; salt okunur, burada maliyet hesabı yeniden uygulanmaz.',
+  },
+  'mcp.agent_manage.desc': {
+    en: 'Manage the agent pool: add a custom agent, remove one, or promote a temp agent (generated for a run under .tasks/agents/) into the persistent pool at .deckent/agents/temp-<id>/. Uses the existing AgentPoolManager API — no new agent lifecycle concept. See also deckent_agent_list for read-only listing.',
+    tr: 'Agent havuzunu yönetin: özel bir agent ekleyin, birini kaldırın veya geçici bir agent\'ı (bir run için .tasks/agents/ altında üretilmiş) .deckent/agents/temp-<id>/ kalıcı havuzuna terfi ettirin. Mevcut AgentPoolManager API\'sini kullanır — yeni bir agent yaşam döngüsü kavramı getirmez. Salt okunur listeleme için ayrıca deckent_agent_list.',
+  },
+  'mcp.skill_manage.desc': {
+    en: 'Manage the skill pool: add a custom skill, remove one, or list the skills available in the marketplace registry (falling back to the local .deckent/skills/ listing when the registry is unreachable). Uses the existing SkillPoolManager and RegistryClient APIs. See also deckent_skill_list for read-only local listing.',
+    tr: 'Skill havuzunu yönetin: özel bir skill ekleyin, birini kaldırın veya marketplace registry\'sinde kullanılabilir skill\'leri listeleyin (registry erişilemezse yerel .deckent/skills/ listesine düşer). Mevcut SkillPoolManager ve RegistryClient API\'lerini kullanır. Salt okunur yerel listeleme için ayrıca deckent_skill_list.',
+  },
+  'mcp.memory_manage.desc': {
+    en: 'Manage project memory: insert a new entry, update fields on an existing entry, or trigger decay (soft-deleting entries older than the retention window). Uses the existing MemoryStore public API directly against .brain/memory.db. See also deckent_memory_query for read-only search.',
+    tr: 'Proje belleğini yönetin: yeni kayıt ekleyin, mevcut bir kaydın alanlarını güncelleyin veya decay tetikleyin (saklama penceresinden eski kayıtları soft-delete eder). Mevcut MemoryStore genel API\'sini doğrudan .brain/memory.db üzerinde kullanır. Salt okunur arama için ayrıca deckent_memory_query.',
+  },
+  'mcp.autonomous_backlog.detail': {
+    en: 'Operates on .deckent/autonomous/backlog.json: list entries, add a one-off or recurring task entry, or remove an entry by id. Talks directly to the orchestra/autonomous/backlog.ts durable store (loadBacklog / validateBacklogEntry / atomic write) with no cli/ layer dependency (ADR-D-004 C3). See also deckent_autonomous_status and deckent_autonomous.',
+    tr: '.deckent/autonomous/backlog.json üzerinde çalışır: kayıtları listeler, tek seferlik veya yinelenen bir görev kaydı ekler ya da id ile bir kaydı kaldırır. cli/ katmanına bağımlı olmadan doğrudan orchestra/autonomous/backlog.ts kalıcı deposuyla konuşur (loadBacklog / validateBacklogEntry / atomik yazma; ADR-D-004 C3). Ayrıca deckent_autonomous_status ve deckent_autonomous.',
+  },
+  'mcp.autonomous_status.detail': {
+    en: 'Read-only: backlog totals by status, stop-marker presence and the pending-approval count, read straight from .deckent/autonomous/{backlog.json,stop,pending.json} with no engine process contact — the same stateless shape as deckent_autonomous action=status. See also deckent_autonomous_backlog for backlog mutation.',
+    tr: 'Salt okunur: duruma göre backlog toplamları, stop işaretçisinin varlığı ve bekleyen onay sayısı; doğrudan .deckent/autonomous/{backlog.json,stop,pending.json} dosyalarından, motor süreciyle temas kurmadan okunur — deckent_autonomous action=status ile aynı durumsuz şekil. Backlog değişikliği için ayrıca deckent_autonomous_backlog.',
+  },
+  'mcp.nervous_edit.detail': {
+    en: 'Builds an accept-with-edited-payload PLAN for a pending Nervous System notification and returns the plan only — nothing is executed here; applying it is a separate injectable step (nervous-bridge.ts applyNervousBridgePlan).',
+    tr: 'Bekleyen bir Nervous System bildirimi için düzenlenmiş-payload ile kabul PLANI üretir ve yalnız planı döndürür — burada hiçbir şey çalıştırılmaz; planı uygulamak ayrı ve enjekte edilebilir bir adımdır (nervous-bridge.ts applyNervousBridgePlan).',
+  },
+  'mcp.nervous_undo.detail': {
+    en: 'Builds an undo PLAN for the most recent reversible accepted action, or for a specific record id, and returns { supported: false, reason } when nothing undoable is found. Plan-only — never mutates the audit trail.',
+    tr: 'En son geri alınabilir kabul edilmiş aksiyon için ya da belirli bir kayıt id\'si için geri alma PLANI üretir; geri alınabilir bir şey bulunmazsa { supported: false, reason } döndürür. Yalnız plan — audit trail\'i asla değiştirmez.',
+  },
+  'mcp.autonomous_approve.detail': {
+    en: 'Targets a backlog entry parked by the G2/G3 policy gate as `policy: approval-required`, or any other parked trigger id. Exec-free: records the accept decision to .deckent/autonomous/{pending.json,decisions.json} through the approval-adapter public API; the running loop replays the trigger on its next cycle. Nothing is executed here. See also deckent_autonomous_reject and deckent_autonomous action=pending.',
+    tr: 'G2/G3 policy gate\'i tarafından `policy: approval-required` olarak park edilmiş bir backlog kaydını veya park edilmiş herhangi bir tetikleyici id\'sini hedefler. Çalıştırma içermez: kabul kararını approval-adapter genel API\'si üzerinden .deckent/autonomous/{pending.json,decisions.json} dosyalarına yazar; çalışan döngü tetikleyiciyi bir sonraki turunda yeniden oynatır. Burada hiçbir şey çalıştırılmaz. Ayrıca deckent_autonomous_reject ve deckent_autonomous action=pending.',
+  },
+  'mcp.autonomous_reject.detail': {
+    en: 'Targets a backlog entry parked by the G2/G3 policy gate as `policy: approval-required`, or any other parked trigger id. Exec-free: records the reject decision to .deckent/autonomous/{pending.json,decisions.json} through the approval-adapter public API; the running loop then never replays the trigger. Nothing is executed here. See also deckent_autonomous_approve and deckent_autonomous action=pending.',
+    tr: 'G2/G3 policy gate\'i tarafından `policy: approval-required` olarak park edilmiş bir backlog kaydını veya park edilmiş herhangi bir tetikleyici id\'sini hedefler. Çalıştırma içermez: ret kararını approval-adapter genel API\'si üzerinden .deckent/autonomous/{pending.json,decisions.json} dosyalarına yazar; çalışan döngü tetikleyiciyi bir daha oynatmaz. Burada hiçbir şey çalıştırılmaz. Ayrıca deckent_autonomous_approve ve deckent_autonomous action=pending.',
+  },
+  'mcp.execution_authority.detail': {
+    en: 'On this surface the reconcile path is limited to namespace-local Linux/WSL mount metadata and never changes execution authority itself. Dry-run by default; pass apply=true to write the reconciled mount metadata.',
+    tr: 'Bu yüzeyde uzlaştırma yolu namespace-local Linux/WSL mount metadata\'sıyla sınırlıdır ve execution authority\'nin kendisini asla değiştirmez. Varsayılan dry-run\'dır; uzlaştırılmış mount metadata\'sını yazmak için apply=true geçin.',
+  },
+  'mcp.approvals.detail': {
+    en: 'Serves the canonical ApprovalBroker read model — the SAME source as the CLI — and returns each pending request id, summary and expiry. READ-ONLY: this surface never decides, allows or denies. Deciding stays CLI-only behind an interactive live-authenticated TTY, so there is no self-approval path over MCP.',
+    tr: 'Canonical ApprovalBroker read model\'ini sunar — CLI ile AYNI kaynak — ve bekleyen her isteğin id\'sini, özetini ve son geçerlilik zamanını döndürür. SALT OKUNUR: bu yüzey asla karar vermez, izin vermez veya reddetmez. Karar vermek yalnız CLI\'da, etkileşimli canlı kimlik doğrulamalı TTY arkasında kalır; MCP üzerinden self-approval yolu yoktur.',
+  },
 };
 
 /** All catalog keys — lets tests/tools enumerate keys without re-parsing this source file. */
 export const MESSAGE_KEYS: readonly string[] = Object.freeze(Object.keys(MESSAGES));
+
+/**
+ * Languages a catalog key actually carries — lets tests/tools prove a key is a real
+ * bilingual pair instead of an English-only row that silently falls back for `tr`.
+ * Returns an empty list for an unknown key.
+ */
+export function getMessageLanguages(key: string): readonly string[] {
+  const entry = MESSAGES[key];
+  return Object.freeze(entry ? Object.keys(entry) : []);
+}
 
 // Row 450 twin (508-001 for `deckent doctor` -> 522-019 for the desktop
 // surface): the Node.js runtime floor comes from package.json's own
@@ -5929,26 +6874,30 @@ const SUPPORTED_LANGS = ['en', 'tr'] as const;
 
 /**
  * Determine the effective UI language.
- * Priority: configLanguage (if supported) > LC_ALL env > LANG env > 'en'
+ * Priority: DECKENT_LANGUAGE > DECKENT_LANG > configLanguage > LC_ALL > LANG > 'en'.
  * Normalizes locale-style values (e.g. "tr_TR" -> "tr").
  */
-export function getLanguage(configLanguage?: string): string {
-  // If a config language is supplied, normalize and check support
-  if (configLanguage !== undefined && configLanguage !== '') {
-    const normalized = configLanguage.slice(0, 2).toLowerCase();
-    if ((SUPPORTED_LANGS as readonly string[]).includes(normalized)) {
-      return normalized;
-    }
-  }
+export function resolveLanguage(configLanguage?: string): string {
+  const candidates = [
+    process.env['DECKENT_LANGUAGE'],
+    process.env['DECKENT_LANG'],
+    configLanguage,
+    process.env['LC_ALL'],
+    process.env['LANG'],
+  ];
 
-  // Fall back to environment variables
-  const envLang = process.env['LC_ALL'] ?? process.env['LANG'] ?? '';
-  if (envLang) {
-    const normalized = envLang.slice(0, 2).toLowerCase();
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const normalized = candidate.slice(0, 2).toLowerCase();
     if ((SUPPORTED_LANGS as readonly string[]).includes(normalized)) {
       return normalized;
     }
   }
 
   return 'en';
+}
+
+/** Backward-compatible language entrypoint. */
+export function getLanguage(configLanguage?: string): string {
+  return resolveLanguage(configLanguage);
 }

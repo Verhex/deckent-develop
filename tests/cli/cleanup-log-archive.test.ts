@@ -48,6 +48,8 @@ vi.mock('../../src/cli/helpers/output.js', () => ({
 
 vi.mock('../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn((_key: string) => _key),
+  getLanguage: () => 'en',
+  resolveLanguage: () => 'en',
 }));
 
 vi.mock('../../src/cli/helpers/config-reader.js', () => ({

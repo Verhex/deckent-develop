@@ -6,6 +6,7 @@ import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 /** Parsed sprint log data */
 export interface SprintSummary {
@@ -362,7 +363,7 @@ export function buildExplainOutput(summary: SprintSummary, learnings: RetroLearn
 export function registerExplain(program: Command): void {
   program
     .command('explain')
-    .description('Explain what the last sprint did in human-friendly language')
+    .description(getMessage('cli.explain.desc', getLanguage(undefined)))
     .option('--sprint <id>', 'Show a specific sprint by ID (e.g. 042)')
     .option('--task <taskId>', 'Show routing decision log for a specific task (e.g. 146-001)')
     .option('--json', 'Output results as JSON')
@@ -370,10 +371,22 @@ export function registerExplain(program: Command): void {
     .action((opts: { sprint?: string; task?: string; json?: boolean; verbose?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
+      /** `--json` keeps stdout to one document; every notice goes to stderr instead. */
+      const notice = (line: string): void => {
+        if (opts.json) process.stderr.write(`${line}\n`);
+        else print(line);
+      };
 
       // --task mode: show routing decision log for a specific task
       if (opts.task) {
         const output = buildTaskDecisionOutput(opts.task, root, lang);
+        if (opts.json) {
+          // --task had no machine surface at all (it printed the rendered human log
+          // even under --json); the document below is additive and leaves the
+          // sprint-mode schema untouched.
+          print(JSON.stringify({ taskId: opts.task, decisionLog: output ?? null }, null, 2));
+          return;
+        }
         if (!output) {
           print(`No decision log found for task ${opts.task}`);
           return;
@@ -388,7 +401,7 @@ export function registerExplain(program: Command): void {
         const filename = `sprint-${paddedId}.md`;
         const filePath = join(root, '.brain', 'sprints', filename);
         if (!existsSync(filePath)) {
-          print(`Sprint ${opts.sprint} not found`);
+          notice(`Sprint ${opts.sprint} not found`);
           return;
         }
         sprintFile = filename;
@@ -397,7 +410,7 @@ export function registerExplain(program: Command): void {
       }
 
       if (!sprintFile) {
-        print('No sprints found. Run `deckent start` to begin.');
+        notice('No sprints found. Run `deckent start` to begin.');
         return;
       }
 

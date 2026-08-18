@@ -6,13 +6,14 @@ import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { loadConfig, validatePartialConfig } from '../../core/config.js';
 import { setNestedValue, getNestedValue } from '../../core/config-migration.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 export function registerConfigTool(server: McpServer): void {
   server.registerTool(
     'deckent_config',
     {
       title: 'Config Manager',
-      description: 'Read, get, or set Deckent configuration values in .deckent/config.json. Three actions: "read" returns the full resolved config (3-layer merge of defaults + global + project); "get" returns a specific key using dot-notation (e.g. "brain_provider", "max_workers"); "set" writes a key-value pair with validation. Common keys: brain_provider (claude/codex/gemini), worker_provider, max_workers (number), mode (max_plan/pro_plan/api), routing_engine (v3).',
+      description: mcpToolDescription('deckent_config'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['read', 'get', 'set']).describe('Action: "read" returns full config, "get" returns one key value, "set" writes one key-value pair to .deckent/config.json'),

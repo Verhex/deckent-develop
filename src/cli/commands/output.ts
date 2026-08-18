@@ -130,7 +130,7 @@ export function registerOutput(
 ): void {
   program
     .command('output <taskId>')
-    .description('Show captured output for a specific worker task')
+    .description(getMessage('cli.output.desc', getLanguage(undefined)))
     .option('--tail <n>', 'Show last N lines (default: 50)', '50')
     .option('--follow', 'Follow output file (poll every 2 seconds)')
     .option('--sprint-id <sprintId>', 'Sprint ID to read from (defaults to current sprint)')
@@ -141,7 +141,11 @@ export function registerOutput(
       try {
         validateTaskId(taskId);
       } catch {
-        print(getMessage('output.invalid_task_id', lang, { taskId }));
+        // Rejected id: no payload exists, so --json leaves stdout empty and the
+        // diagnosis goes to stderr (exit code unchanged).
+        const invalid = getMessage('output.invalid_task_id', lang, { taskId });
+        if (opts.json) process.stderr.write(`${invalid}\n`);
+        else print(invalid);
         process.exitCode = 1;
         return;
       }
@@ -151,8 +155,11 @@ export function registerOutput(
       const filePath = resolveOutputPath(root, taskId, sprintId);
 
       if (!filePath) {
-        if (opts.json && settlement) {
-          print(JSON.stringify({ lines: [], settlement }, null, 2));
+        // Previously `opts.json && settlement`: with --json and no settlement the
+        // run fell through to the three human hint lines. The `settlement` key stays
+        // optional exactly as in --follow mode, so the document shape is unchanged.
+        if (opts.json) {
+          print(JSON.stringify({ lines: [], ...(settlement ? { settlement } : {}) }, null, 2));
           process.exitCode = 1;
           return;
         }
@@ -176,8 +183,8 @@ export function registerOutput(
       if (!opts.follow) {
         // One-shot read
         const lines = readTailLines(filePath, tailN);
-        if (opts.json && settlement) {
-          print(JSON.stringify({ lines, settlement }, null, 2));
+        if (opts.json) {
+          print(JSON.stringify({ lines, ...(settlement ? { settlement } : {}) }, null, 2));
         } else {
           print(formatLines(lines, !!opts.json));
           if (settlement) {

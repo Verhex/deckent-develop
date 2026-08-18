@@ -16,6 +16,7 @@ import { detectLang } from '../helpers/i18n.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { AgentPoolManager } from '../../core/agent-pool.js';
 import { SkillPoolManager } from '../../core/skill-pool.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Localized Help Content ─────────────────────────────────────────
 
@@ -179,7 +180,7 @@ export function getCapabilityCounts(root: string, overrideToolCount = 0): Capabi
 export function registerHelp(program: Command): void {
   program
     .command('help-info')
-    .description('Show quick-reference help (localized)')
+    .description(getMessage('cli.help.help_info.desc', getLanguage(undefined)))
     .alias('info')
     .option('--lang <lang>', 'Language override: en or tr')
     .action((opts: { lang?: string }) => {

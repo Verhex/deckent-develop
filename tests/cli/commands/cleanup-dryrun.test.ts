@@ -30,6 +30,8 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
 
 vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: (key: string) => key,
+  getLanguage: () => 'en',
+  resolveLanguage: () => 'en',
 }));
 
 import { registerCleanup } from '../../../src/cli/commands/cleanup.js';

@@ -55,6 +55,8 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-559 Learnings** (sprint-559): ## Sprint sprint-559 Learnings
+- CLI description kataloğu — 221 commander description'ı iki dilli tek kaynağa: NO_GO ...
 - **Sprint sprint-557 Learnings** (sprint-557): ## Sprint sprint-557 Learnings
 - REPL renewal surface — typed offer + /renew command (depends on Task 1): GO_WITH_TEC...
 - **Sprint sprint-556 Learnings** (sprint-556): ## Sprint sprint-556 Learnings
@@ -74,10 +76,6 @@
 - /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1): NO_GO — ...
 - **Sprint sprint-540 Learnings** (sprint-540): ## Sprint sprint-540 Learnings
 - live-ledger truth-sync — projections regen + test expectations + proposal regen: NO_...
-- **Sprint sprint-539 Learnings** (sprint-539): ## Sprint sprint-539 Learnings
-
-## Gains
-- 539-001 — phase5-writer.mjs — claim filing + verified append + projections...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -88,4 +86,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1983 | Generated: 2026-08-18_
+_Total entries: 2000 | Generated: 2026-08-18_

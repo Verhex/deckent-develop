@@ -712,7 +712,7 @@ function langOf(cmd: Command): string {
 export function registerNervous(program: Command): void {
   const nervousCmd = program
     .command('nervous')
-    .description('Nervous System dashboard — monitor, accept, reject proactive suggestions')
+    .description(getMessage('cli.nervous.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)');
 
   // Default action: show dashboard
@@ -724,7 +724,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous enable [--mode <preset>]
   nervousCmd
     .command('enable')
-    .description('Enable the Nervous System (one command; default stays OFF, human-approval preserved)')
+    .description(getMessage('cli.nervous.enable.desc', getLanguage(undefined)))
     .option('--mode <preset>', 'Authority preset (strict|balanced|autopilot|full-auto)')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: { mode?: string }, cmd: Command) => {
@@ -735,7 +735,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous accept <id>
   nervousCmd
     .command('accept <id>')
-    .description('Accept a pending nervous system suggestion')
+    .description(getMessage('cli.nervous.accept.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)')
     .action(async (id: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
@@ -745,7 +745,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous reject <id>
   nervousCmd
     .command('reject <id>')
-    .description('Reject a pending nervous system suggestion')
+    .description(getMessage('cli.nervous.reject.desc', getLanguage(undefined)))
     .option('--reason <text>', 'Rejection reason')
     .option('--lang <code>', 'Language override (en|tr)')
     .action(async (id: string, opts: { reason?: string }, cmd: Command) => {
@@ -756,7 +756,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous edit <id>
   nervousCmd
     .command('edit <id>')
-    .description('Modify and accept a pending suggestion')
+    .description(getMessage('cli.nervous.edit.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)')
     .action(async (id: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
@@ -766,7 +766,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous undo <action-id>
   nervousCmd
     .command('undo <action-id>')
-    .description('Undo a recent reversible action')
+    .description(getMessage('cli.nervous.undo.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((actionId: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
@@ -776,7 +776,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous history
   nervousCmd
     .command('history')
-    .description('View nervous system action history')
+    .description(getMessage('cli.nervous.history.desc', getLanguage(undefined)))
     .option('--limit <n>', 'Number of records to show', '20')
     .option('--since <duration>', 'Show records since (e.g. 1d, 2h, 30m)')
     .option('--lang <code>', 'Language override (en|tr)')
@@ -789,7 +789,7 @@ export function registerNervous(program: Command): void {
   nervousCmd
     .command('recommendations')
     .alias('recs')
-    .description('View the Brain inbox — nervous proposals awaiting disposition (ADR-037)')
+    .description(getMessage('cli.nervous.recommendations.desc', getLanguage(undefined)))
     .option('--all', 'Include dismissed recommendations (default: open only)')
     .option('--limit <n>', 'Number of records to show', '20')
     .option('--dismiss <id>', 'Dismiss an open recommendation by id (or unique rec- prefix)')
@@ -807,7 +807,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous log
   nervousCmd
     .command('log')
-    .description('View raw nervous system log')
+    .description(getMessage('cli.nervous.log.desc', getLanguage(undefined)))
     .option('--follow', 'Watch for new entries (live tail)')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: { follow?: boolean }, cmd: Command) => {
@@ -818,7 +818,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous accept-panic <task-id> (Sprint 180 W4-2)
   nervousCmd
     .command('accept-panic <task-id>')
-    .description('Approve a PanicGuard-blocked worker kill (writes IPC marker)')
+    .description(getMessage('cli.nervous.accept_panic.desc', getLanguage(undefined)))
     .option('--reason <text>', 'Optional reason for the approval')
     .action((taskId: string, opts: { reason?: string }) => {
       const root = resolveProjectRoot();
@@ -828,7 +828,7 @@ export function registerNervous(program: Command): void {
   // deckent nervous baseline-refresh (Sprint 177 Task 5)
   nervousCmd
     .command('baseline-refresh')
-    .description('Refresh directives_protection baseline to current DIRECTIVES.md content')
+    .description(getMessage('cli.nervous.baseline_refresh.desc', getLanguage(undefined)))
     .action(() => {
       const root = resolveProjectRoot();
       nervousBaselineRefresh({ root }).catch((err: unknown) => {

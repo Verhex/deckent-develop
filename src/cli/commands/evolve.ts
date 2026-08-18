@@ -49,11 +49,11 @@ function renderReport(report: CrossSprintReport): void {
 export function registerEvolve(program: Command): void {
   const evolve = program
     .command('evolve')
-    .description('Evolution analysis — cross-sprint trends and prompt suggestions');
+    .description(getMessage('cli.evolve.desc', getLanguage(undefined)));
 
   evolve
     .command('report')
-    .description('Show cross-sprint agent/skill trend report')
+    .description(getMessage('cli.evolve.report.desc', getLanguage(undefined)))
     .option('-n, --sprints <n>', 'Number of sprints to analyze', '10')
     .option('--json', 'Output as JSON')
     .action((opts: { sprints: string; json: boolean }) => {

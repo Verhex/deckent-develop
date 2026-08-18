@@ -10,6 +10,7 @@ import type { RetentionPolicy } from '../../core/audit-retention.js';
 import { runComplianceReport, runAuditRetention } from '../../cli/commands/audit.js';
 import { loadConfig } from '../../core/config.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 const MS_PER_DAY = 86_400_000;
 const DEFAULT_SPRINT = 'sprint-001'; // CLI --sprint default (cli/commands/audit.ts)
@@ -29,7 +30,7 @@ export function registerAuditTool(server: McpServer): void {
     'deckent_audit',
     {
       title: 'Sprint Audit',
-      description: 'Sprint audit multitool, mirrors the `deckent audit` CLI (ADR-022 parity). action="gate" (default): run the Brain Self-Audit Gate for a sprint — checks tsc, vitest, honesty violations, and observability; returns PASS or GATE_FAILURE and writes .deckent/{sprintId}-gate.json. action="query": filter audit-log events by channel/tenant with an optional result limit. action="compliance": build a compliance report (audit-chain integrity, RBAC, tenant isolation) over the retained audit trail. action="retention": plan audit-log retention via keepDays/keepCount — dry-run by default (ZERO writes); apply=true is DESTRUCTIVE: it archives the planned partition and permanently deletes pruned events from the sprint event stream. The CLI "forward" subcommand (SIEM export) is intentionally not exposed over MCP because it requires network egress.',
+      description: mcpToolDescription('deckent_audit'),
       // Widest-side-effect contract (row 490): action="gate" writes
       // .deckent/{sprintId}-gate.json and action="retention" apply=true permanently
       // prunes audit events — this tool is destructive, never read-only. MCP clients

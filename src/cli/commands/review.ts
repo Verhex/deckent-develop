@@ -6,6 +6,7 @@ import { TASKS_DIR, BRAIN_DIR } from '../../core/constants.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { readAuthoritativeTaskResult } from '../../orchestra/task-result-authority.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ async function handleRetryRespawn(state: ReviewState, root: string): Promise<voi
 export function registerReview(program: Command): void {
   program
     .command('review')
-    .description('Review sprint tasks with evaluations')
+    .description(getMessage('cli.review.desc', getLanguage(undefined)))
     .option('--auto', 'Auto-approve/reject based on task results')
     .option('--json', 'Output review state as JSON')
     .option('--approve-all', 'Approve all pending tasks')
@@ -193,9 +194,17 @@ export function registerReview(program: Command): void {
       try {
         const root = resolveProjectRoot();
         const tasks = loadTasks(root);
+        /**
+         * Under `--json` stdout is reserved for the review-state document; warnings
+         * and completion lines go to stderr instead of framing that document.
+         */
+        const notice = (line: string): void => {
+          if (opts.json) process.stderr.write(`${line}\n`);
+          else print(line);
+        };
 
         if (tasks.length === 0) {
-          print('No tasks found. Run a sprint first.');
+          notice('No tasks found. Run a sprint first.');
           return;
         }
 
@@ -204,7 +213,7 @@ export function registerReview(program: Command): void {
         // Mixed sprint detection
         const sprintIds = detectMixedSprints(tasks);
         if (sprintIds.length > 1) {
-          print(`Warning: Mixed sprint IDs detected: ${sprintIds.join(', ')}. Using ${sprintId}.`);
+          notice(`Warning: Mixed sprint IDs detected: ${sprintIds.join(', ')}. Using ${sprintId}.`);
         }
 
         let state = loadReviewState(root, sprintId);
@@ -236,7 +245,7 @@ export function registerReview(program: Command): void {
             }
           }
           saveReviewState(root, state);
-          print(`All pending tasks approved for sprint ${sprintId}.`);
+          notice(`All pending tasks approved for sprint ${sprintId}.`);
         } else if (opts.rejectAll) {
           for (const review of state.reviews) {
             if (review.decision === 'pending') {
@@ -246,7 +255,7 @@ export function registerReview(program: Command): void {
             }
           }
           saveReviewState(root, state);
-          print(`All pending tasks rejected for sprint ${sprintId}.`);
+          notice(`All pending tasks rejected for sprint ${sprintId}.`);
         } else if (opts.auto) {
           for (const review of state.reviews) {
             if (review.decision === 'pending') {
@@ -265,7 +274,7 @@ export function registerReview(program: Command): void {
           saveReviewState(root, state);
           // Handle retry respawn
           await handleRetryRespawn(state, root);
-          print(`Auto-review complete for sprint ${sprintId}.`);
+          notice(`Auto-review complete for sprint ${sprintId}.`);
         } else {
           // Interactive review
           await interactiveReview(state, root, tasks);

@@ -20,6 +20,7 @@ import { enrichResponse } from '../helpers/enrich.js';
 import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import { initializeWorkspaceArtifacts } from '../../orchestra/workspace-artifacts.js';
 import { detectProjectStack } from '../../core/stack-detector.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -49,7 +50,7 @@ export function registerInitTool(server: McpServer): void {
     'deckent_init',
     {
       title: 'Initialize Deckent',
-      description: 'Initialize a Deckent project in the current directory. Creates all required directories (.deckent/, .brain/, .tasks/, .locks/, .claude/rules/) and configuration files (config.json, DECKENT.md, DIRECTIVES.md, brain files). Safe to re-run — existing config fields are preserved via merge, and files are only written if missing. After init, run deckent_set_directives → deckent_plan → deckent_start.',
+      description: mcpToolDescription('deckent_init'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         projectName: z.string().optional().describe('Project name used in DECKENT.md header and PROJECT-IDENTITY.md. Defaults to current directory name if omitted.'),

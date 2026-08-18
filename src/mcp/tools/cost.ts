@@ -20,6 +20,7 @@ import {
   readSpendWindow,
 } from '../../core/cost-config-loader.js';
 import type { CostConfig } from '../../core/cost-config-loader.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Injectable deps ──────────────────────────────────────────────────────────
 
@@ -119,10 +120,7 @@ export function registerCostTool(server: McpServer, deps: CostToolDeps = {}): vo
     'deckent_cost',
     {
       title: 'Cost',
-      description:
-        'Show the cost configuration: budget limits, per-model pricing (input/output per MTok), ' +
-        "and today's spend from the resource log. " +
-        'Delegates to the project cost-config SSOT; read-only, no cost math reimplemented.',
+      description: mcpToolDescription('deckent_cost'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

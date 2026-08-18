@@ -55,6 +55,8 @@ vi.mock('../../../src/cli/helpers/messages.js', () => ({
     if (key === 'finalize.complete') return `Finalized ${vars?.sprintId}`;
     return key;
   }),
+  getLanguage: vi.fn().mockReturnValue('en'),
+  resolveLanguage: vi.fn().mockReturnValue('en'),
 }));
 
 vi.mock('../../../src/cli/helpers/config-reader.js', () => ({
@@ -107,7 +109,7 @@ import { killSingle } from '../../../src/cli/commands/kill.js';
 import { killWorker } from '../../../src/orchestra/tmux.js';
 import { evaluateResultSync } from '../../../src/orchestra/sprint-controller.js';
 import { loadConfig } from '../../../src/core/config.js';
-import { getMessage } from '../../../src/cli/helpers/messages.js';
+import { getMessage, getLanguage } from '../../../src/cli/helpers/messages.js';
 import { getLangFromConfig } from '../../../src/cli/helpers/config-reader.js';
 import { resolveProjectRoot } from '../../../src/cli/helpers/process.js';
 
@@ -166,6 +168,11 @@ async function runFinalize(args: string[]): Promise<void> {
 describe('review overhaul', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // resetAllMocks strips module-mock implementations; registration-time i18n
+    // (.description(getMessage(...))) needs these re-primed or commander's
+    // description(undefined) acts as a getter and breaks the builder chain.
+    vi.mocked(getMessage).mockImplementation((key: string) => key);
+    vi.mocked(getLanguage).mockReturnValue('en');
     vi.mocked(resolveProjectRoot).mockReturnValue('/mock/root');
     vi.mocked(formatTable).mockImplementation((headers: string[], rows: string[][]) => {
       return [headers.join(' | '), ...rows.map((r: string[]) => r.join(' | '))].join('\n');

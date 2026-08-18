@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 
@@ -14,8 +14,25 @@ import { getLangFromConfig } from '../../../src/cli/helpers/config-reader.js';
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
 
+// getLangFromConfig delegates to the canonical resolveLanguage chain
+// (DECKENT_LANGUAGE > DECKENT_LANG > config > LC_ALL > LANG > 'en'), so the
+// host environment must be pinned for these tests to be hermetic.
+const LANG_ENV_KEYS = ['DECKENT_LANGUAGE', 'DECKENT_LANG', 'LC_ALL', 'LANG'] as const;
+const savedEnv: Record<string, string | undefined> = {};
+
 beforeEach(() => {
   vi.resetAllMocks();
+  for (const key of LANG_ENV_KEYS) {
+    savedEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+});
+
+afterEach(() => {
+  for (const key of LANG_ENV_KEYS) {
+    if (savedEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = savedEnv[key];
+  }
 });
 
 describe('getLangFromConfig', () => {
@@ -50,10 +67,22 @@ describe('getLangFromConfig', () => {
     expect(getLangFromConfig(root)).toBe('en');
   });
 
-  it('should return the exact language value from config', () => {
+  it('should fall through to the environment chain for an unsupported config language', () => {
+    // Canonical contract (sprint-558 / 7085): an unsupported config value does
+    // not pass through raw — it falls to the next source in the chain.
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue(JSON.stringify({ language: 'fr' }));
-    expect(getLangFromConfig(root)).toBe('fr');
+    process.env['LANG'] = 'tr_TR.UTF-8';
+    expect(getLangFromConfig(root)).toBe('tr');
+    delete process.env['LANG'];
+    expect(getLangFromConfig(root)).toBe('en');
+  });
+
+  it('should be overridden by DECKENT_LANG env even when config is supported', () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReadFileSync.mockReturnValue(JSON.stringify({ language: 'tr' }));
+    process.env['DECKENT_LANG'] = 'en';
+    expect(getLangFromConfig(root)).toBe('en');
   });
 
   it('should read from PROJECT_CONFIG_PATH', () => {

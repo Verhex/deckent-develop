@@ -215,6 +215,9 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   // ─── REPL-only session UX (no cli/mcp equivalent) ───────────────────────
   entry('model', 'Core', 'Değiştir', 'providers', ['repl']),
   entry('provider', 'Core', 'Değiştir', 'providers', ['repl']),
+  // /renew renews only the WORKING budget epoch of a native session (7083);
+  // billing/usage/audit accrual is untouched — session-state mutation tier.
+  entry('renew', 'Core', 'Değiştir', 'cli', ['repl']),
   entry('approve', 'Core', 'Değiştir', 'cli', ['repl']),
   // /term switches the Ask/Run/Control session mode (term-mode.ts) — mutates
   // session state like /approve, hence the same Değiştir tier.

@@ -396,7 +396,7 @@ export function registerConfigNervous(program: Command): void {
   const nervousCmd = configCmd
     .command('nervous')
     .description(
-      'Configure Nervous System authority mode and action overrides',
+      getMessage('cli.config_nervous.nervous.desc', getLanguage(undefined)),
     )
     .option('--lang <code>', 'Language override (en|tr)')
     .action(async (_opts: unknown, cmd: Command) => {
@@ -407,7 +407,7 @@ export function registerConfigNervous(program: Command): void {
   // deckent config nervous set mode <preset>
   nervousCmd
     .command('set')
-    .description('Set a nervous system configuration value')
+    .description(getMessage('cli.config_nervous.set.desc', getLanguage(undefined)))
     .argument('<key>', 'Configuration key (e.g. mode)')
     .argument('<value>', 'Value to set')
     .option('--lang <code>', 'Language override (en|tr)')
@@ -425,7 +425,7 @@ export function registerConfigNervous(program: Command): void {
   // deckent config nervous override <ACTION_ID> <policy>
   nervousCmd
     .command('override <actionId> <policy>')
-    .description('Set a per-action policy override')
+    .description(getMessage('cli.config_nervous.override.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((actionId: string, policy: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
@@ -435,7 +435,7 @@ export function registerConfigNervous(program: Command): void {
   // deckent config nervous list
   nervousCmd
     .command('list')
-    .description('Show current authority matrix with all presets')
+    .description(getMessage('cli.config_nervous.list.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((_opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
@@ -445,7 +445,7 @@ export function registerConfigNervous(program: Command): void {
   // deckent config nervous reset
   nervousCmd
     .command('reset')
-    .description('Reset all action overrides to preset defaults')
+    .description(getMessage('cli.config_nervous.reset.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((_opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();

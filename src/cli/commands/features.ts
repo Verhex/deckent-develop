@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { FEATURES_MANIFEST_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 
 interface FeatureEntry {
@@ -90,7 +90,7 @@ export function registerFeatures(program: Command): void {
   program
     .command('features')
     .alias('feature-query')
-    .description('List features from .deckent/settings/features-manifest.json by category')
+    .description(getMessage('cli.features.desc', getLanguage(undefined)))
     .option('-c, --category <category>', 'Filter by category: active, lightly_used, dormant, dead, all', 'all')
     .option('--json', 'Output as JSON')
     .option('--id <featureId>', 'Show details for a specific feature')

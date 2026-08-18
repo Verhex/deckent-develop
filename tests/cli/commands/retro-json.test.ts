@@ -124,10 +124,18 @@ describe('retro --json', () => {
   });
 
   it('should handle empty retro gracefully', async () => {
+    // json-output-contract (559-003): with --json, stdout carries ONLY a JSON
+    // document — the no-retro notice moved to stderr, stdout stays empty.
     writeRetro('');
-    const program = buildProgram();
-    await program.parseAsync(['node', 'test', 'retro', '--json']);
-    // Should print the no-retro message, not JSON
-    expect(printOutput[0]).toContain('No retrospective found');
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const program = buildProgram();
+      await program.parseAsync(['node', 'test', 'retro', '--json']);
+      expect(printOutput).toHaveLength(0);
+      const stderrText = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+      expect(stderrText).toContain('No retrospective found');
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 });

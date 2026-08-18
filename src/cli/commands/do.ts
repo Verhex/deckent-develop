@@ -44,7 +44,7 @@ import { promptConfirm } from '../helpers/prompt.js';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import type { ResolvedConfig } from '../../core/types.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import type { PlanPreview, RunFlowContext } from '../../core/run-flow-contract.js';
 import {
   createRunFlowController as createRunFlowControllerImpl,
@@ -440,7 +440,7 @@ export function createDoSeams(
 export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
   program
     .command('do <goal>')
-    .description('Golden-flow: turn a goal into a sprint plan (dry-run preview by default; --run to actually start it)')
+    .description(getMessage('cli.do.desc', getLanguage(undefined)))
     .option('--run', 'Approve and start the sprint for real (default is a dry-run preview only)')
     .option('--yes', 'Non-interactive approval when RunFlow (terminal.run_flow_v2) is enabled — required together with --run to actually start; otherwise an honest reject (no interactive prompt)')
     .option('--force-scope', 'Bypass the pre-spawn scope gate (front-door mirror AND the detached child) — same consent as `deckent start --force-scope`')

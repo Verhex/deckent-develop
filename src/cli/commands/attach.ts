@@ -4,7 +4,7 @@ import { isSessionActive, attach, TmuxError } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 /** F) List all windows in the deckent tmux session */
 function listTmuxWindows(sessionName: string): string[] {
@@ -25,7 +25,7 @@ function isInsideTmux(): boolean {
 export function registerAttach(program: Command): void {
   program
     .command('attach')
-    .description('Attach to the tmux orchestra session')
+    .description(getMessage('cli.attach.desc', getLanguage(undefined)))
     .option('--list', 'List all tmux windows without attaching')
     .action(async (opts: { list?: boolean }) => {
       const root = resolveProjectRoot();

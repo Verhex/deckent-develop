@@ -21,7 +21,8 @@ import { z } from 'zod/v4';
 import { ALL_PROVIDER_NAMES } from '../../core/types.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { runXverifyForResult } from '../../cli/commands/xverify.js';
-import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { getMessage } from '../../cli/helpers/messages.js';
+import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
 
 export function registerXverifyTool(
   server: McpServer,
@@ -29,12 +30,12 @@ export function registerXverifyTool(
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
   } = {},
 ): void {
-  const lang = getLanguage(undefined);
+  const lang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_xverify',
     {
       title: getMessage('xverify.mcp.title', lang),
-      description: getMessage('xverify.mcp.description', lang),
+      description: mcpToolDescription('deckent_xverify'),
       annotations: {
         // Spawns a real verifier worker + writes a report file — not read-only.
         readOnlyHint: false,

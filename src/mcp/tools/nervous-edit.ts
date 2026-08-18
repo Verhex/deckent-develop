@@ -40,6 +40,7 @@ import {
   type NervousBridgePlanResult,
 } from '../../cli/repl/nervous-bridge.js';
 import { NervousHistory } from '../../nervous/history.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Disk-backed pending store (production reader) ─────────────────────────
 // nervous-bridge.ts's own banner deliberately deferred "a real disk/IPC-backed
@@ -183,11 +184,7 @@ export function registerNervousEditTool(server: McpServer): void {
     'deckent_nervous_edit',
     {
       title: 'Nervous Edit',
-      description:
-        'Build an accept-with-edited-payload PLAN for a pending Nervous System ' +
-        'notification (APPROVE-007b). Returns the plan only — nothing is ' +
-        'executed; applying it is a separate, injectable step ' +
-        '(nervous-bridge.ts applyNervousBridgePlan).',
+      description: mcpToolDescription('deckent_nervous_edit'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         id: z.string().describe('Pending notification ID, id-prefix, or shortCode to accept with an edited payload'),
@@ -215,11 +212,7 @@ export function registerNervousUndoTool(server: McpServer): void {
     'deckent_nervous_undo',
     {
       title: 'Nervous Undo',
-      description:
-        'Build an undo PLAN for the most recent reversible accepted Nervous ' +
-        'System action (or a specific record id). Returns ' +
-        '{ supported: false, reason } when nothing undoable is found. ' +
-        'Plan-only — never mutates the audit trail.',
+      description: mcpToolDescription('deckent_nervous_undo'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         id: z.string().optional().describe('Specific ExecutionRecord id to target (default: most recent reversible accepted action)'),

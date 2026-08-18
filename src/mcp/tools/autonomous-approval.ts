@@ -29,6 +29,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod/v4';
 import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js';
 import { autonomousPendingPath } from '../../core/constants.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Filesystem layout (mirrors autonomous.ts / autonomous-surface.ts) ──────
 
@@ -53,15 +54,7 @@ export function registerAutonomousApproveTool(server: McpServer): void {
     'deckent_autonomous_approve',
     {
       title: 'Autonomous Approve',
-      description:
-        'Approve a pending autonomous-engine trigger — a backlog entry parked by the ' +
-        'G2/G3 policy gate as `policy: approval-required` (or any other parked trigger ' +
-        'id). Exec-free: records the accept decision to ' +
-        '.deckent/autonomous/{pending.json,decisions.json} via the approval-adapter ' +
-        'public API; the running autonomous loop (or `deckent autonomous approve`) picks ' +
-        'it up and replays the trigger on its next cycle. Nothing is executed here. See ' +
-        'also deckent_autonomous_reject, deckent_autonomous_status (pendingApprovals ' +
-        'count), and deckent_autonomous action=pending (full listing).',
+      description: mcpToolDescription('deckent_autonomous_approve'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         id: z.string().optional().describe('Trigger/backlog-entry id to approve (alternative to triggerId)'),
@@ -94,15 +87,7 @@ export function registerAutonomousRejectTool(server: McpServer): void {
     'deckent_autonomous_reject',
     {
       title: 'Autonomous Reject',
-      description:
-        'Reject a pending autonomous-engine trigger — a backlog entry parked by the ' +
-        'G2/G3 policy gate as `policy: approval-required` (or any other parked trigger ' +
-        'id). Exec-free: records the reject decision to ' +
-        '.deckent/autonomous/{pending.json,decisions.json} via the approval-adapter ' +
-        'public API; the running autonomous loop (or `deckent autonomous reject`) picks ' +
-        'it up and never replays the trigger. Nothing is executed here. See also ' +
-        'deckent_autonomous_approve, deckent_autonomous_status (pendingApprovals count), ' +
-        'and deckent_autonomous action=pending (full listing).',
+      description: mcpToolDescription('deckent_autonomous_reject'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         id: z.string().optional().describe('Trigger/backlog-entry id to reject (alternative to triggerId)'),

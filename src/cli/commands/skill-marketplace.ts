@@ -11,6 +11,7 @@ import { loadOrGenerateKeypair, signMessage, bytesToHex } from '../../core/signa
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Registry Cache ───────────────────────────────────────────────────────────
 
@@ -95,7 +96,7 @@ export function registerSkillMarketplace(parentCmd: Command): void {
   // ─── skill search ────────────────────────────────────────────────────────
   parentCmd
     .command('search <query>')
-    .description('Search skills in the marketplace registry')
+    .description(getMessage('cli.skill_marketplace.search.desc', getLanguage(undefined)))
     .option('--category <cat>', 'Filter by category')
     .option('--json', 'Output as JSON')
     .option('--limit <n>', 'Max results per page', '20')
@@ -136,6 +137,20 @@ export function registerSkillMarketplace(parentCmd: Command): void {
         const localSkills = loadLocalSkills(root);
 
         if (localSkills.length > 0) {
+          // The offline fallback used to put its notice + a rendered table on stdout,
+          // which broke `--json` consumers exactly when the registry was down. The
+          // fallback now answers in the registry's own result shape (single page,
+          // local entries); the degradation notice moves to stderr.
+          if (opts.json) {
+            process.stderr.write('Registry unavailable. Showing local skills only.\n');
+            print(JSON.stringify({
+              skills: localSkills,
+              page: 1,
+              pages: 1,
+              total: localSkills.length,
+            }, null, 2));
+            return;
+          }
           print('Registry unavailable. Showing local skills only.');
           const headers = ['Name', 'Description', 'Version', 'Category'];
           const rows = localSkills.map((s) => [s.name, s.description, s.version, s.category]);
@@ -156,7 +171,7 @@ export function registerSkillMarketplace(parentCmd: Command): void {
   //   4. Registry upload (unless --dry-run)
   parentCmd
     .command('publish <skillPath>')
-    .description('Validate, sign (Ed25519) and publish a skill to the marketplace')
+    .description(getMessage('cli.skill_marketplace.publish.desc', getLanguage(undefined)))
     .option('--dry-run', 'Validate + sign without uploading to registry')
     .option('--key-dir <dir>', 'Custom keypair directory (default: ~/.deckent/keys)')
     .option('--no-sign', 'Skip Ed25519 signing (registry upload only)')

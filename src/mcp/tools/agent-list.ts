@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { buildAgentCatalogEntries } from '../../core/agent-catalog-projection.js';
 import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Agent catalog read model (row 7011, slice S4) ──────────────────────────
 //
@@ -28,16 +29,7 @@ export function registerAgentListTool(server: McpServer): void {
     'deckent_agent_list',
     {
       title: 'Agent List',
-      description:
-        'List every agent the Deckent agent-catalog resolver resolves for this project — ' +
-        'the same read model `deckent agent list` renders, so both surfaces always agree. ' +
-        'Each record carries the four catalog facets kept separate: enabled (owner intent), ' +
-        'routable (dispatchable now, with typed reasons), validity (schema conformance) and ' +
-        'provenance (declared source, observed layer, resolved path). ' +
-        'Records the resolver rejected are reported as validity "invalid" with the resolver ' +
-        'diagnostics rather than silently dropped; archived records are never listed. ' +
-        'Use to audit agent pool health, check which agents are actually dispatchable, or ' +
-        'understand routing assignments.',
+      description: mcpToolDescription('deckent_agent_list'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

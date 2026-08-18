@@ -14,10 +14,10 @@ import { getMessage, getLanguage } from '../helpers/messages.js';
 import type { EntryRelation } from '../../core/memory-types.js';
 
 export function registerMemory(program: Command): void {
-  const mem = program.command('memory').description('Memory V2 management');
+  const mem = program.command('memory').description(getMessage('cli.memory.desc', getLanguage(undefined)));
 
   mem.command('rebuild')
-    .description('Rebuild memory.db from .brain/exports/*.md files')
+    .description(getMessage('cli.memory.rebuild.desc', getLanguage(undefined)))
     .action(() => {
       const root = resolveProjectRoot();
       const brainDir = join(root, BRAIN_DIR);
@@ -88,7 +88,7 @@ export function registerMemory(program: Command): void {
     });
 
   mem.command('export')
-    .description('Export memory.db to .brain/exports/*.md')
+    .description(getMessage('cli.memory.export.desc', getLanguage(undefined)))
     .action(() => {
       const root = resolveProjectRoot();
       const lang = getLanguage();
@@ -121,7 +121,7 @@ export function registerMemory(program: Command): void {
     });
 
   mem.command('stats')
-    .description('Show memory.db statistics')
+    .description(getMessage('cli.memory.stats.desc', getLanguage(undefined)))
     .action(() => {
       const root = resolveProjectRoot();
       const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
@@ -149,7 +149,7 @@ export function registerMemory(program: Command): void {
 
   // ── Backup subcommand ─────────────────────────────────────────
   mem.command('backup')
-    .description(getMessage('memory.backup.desc', 'en'))
+    .description(getMessage('memory.backup.desc', getLanguage(undefined)))
     .option('--output <path>', 'Output path for backup file')
     .option('--checkpoint', 'Print WAL checkpoint info before backup (checkpoint always runs)')
     .action(async (opts: { output?: string; checkpoint?: boolean }) => {
@@ -199,10 +199,10 @@ export function registerMemory(program: Command): void {
     });
 
   // ── Relations subcommand ──────────────────────────────────────
-  const relations = mem.command('relations').description('Manage memory relations');
+  const relations = mem.command('relations').description(getMessage('cli.memory.relations.desc', getLanguage(undefined)));
 
   relations.command('list')
-    .description('List all relations in memory.db')
+    .description(getMessage('cli.memory.list.desc', getLanguage(undefined)))
     .action(() => {
       const root = resolveProjectRoot();
       const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
@@ -231,7 +231,7 @@ export function registerMemory(program: Command): void {
     });
 
   relations.command('review')
-    .description('Review pending relations from backfill preview')
+    .description(getMessage('cli.memory.review.desc', getLanguage(undefined)))
     .action(async () => {
       const root = resolveProjectRoot();
       const previewPath = join(root, BRAIN_DIR, MEMORY_EXPORTS_DIR, 'relations-backfill-preview.md');

@@ -7,7 +7,8 @@ import {
   type ExecutionLockMountAdoptionOptions,
   type ExecutionLockMountAdoptionResult,
 } from '../../core/file-lock.js';
-import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { getMessage } from '../../cli/helpers/messages.js';
+import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
 
 export interface ExecutionAuthorityToolDeps {
   readonly resolveProjectRoot?: () => string;
@@ -44,15 +45,12 @@ export function registerExecutionAuthorityTool(
   server: McpServer,
   deps: ExecutionAuthorityToolDeps = {},
 ): void {
-  const lang = getLanguage(undefined);
+  const lang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_execution_authority',
     {
       title: getMessage('execution_authority.mount_adopt.mcp_title', lang),
-      description: getMessage(
-        'execution_authority.mount_adopt.mcp_desc',
-        lang,
-      ),
+      description: mcpToolDescription('deckent_execution_authority'),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,

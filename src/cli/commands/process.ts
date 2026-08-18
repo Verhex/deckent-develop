@@ -142,11 +142,11 @@ export async function handleProcessResult(
 export function registerProcess(program: Command): void {
   const cmd = program
     .command('process')
-    .description('Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity)');
+    .description(getMessage('cli.process.desc', getLanguage(undefined)));
 
   cmd
     .command('submit <description>')
-    .description('Submit an ExecutionRequest (policy-gated: read-only auto-runs, side-effecting parks for approval)')
+    .description(getMessage('cli.process.submit.desc', getLanguage(undefined)))
     .option('--kind <kind>', 'Execution kind: task (default), sprint, capability')
     .option('--scope-dir <dir>', 'Scope directory for a code task (drives risk classification)')
     .option('--provider <provider>', 'Provider override')
@@ -164,7 +164,7 @@ export function registerProcess(program: Command): void {
 
   cmd
     .command('status <executionId>')
-    .description('Poll the status of a prior submission by executionId')
+    .description(getMessage('cli.process.status.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action(async (executionId: string, opts: ProcessStatusOptions) => {
@@ -178,7 +178,7 @@ export function registerProcess(program: Command): void {
 
   cmd
     .command('result <executionId>')
-    .description('Show the full result of a submission (status + lastResult)')
+    .description(getMessage('cli.process.result.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action(async (executionId: string, opts: ProcessResultOptions) => {

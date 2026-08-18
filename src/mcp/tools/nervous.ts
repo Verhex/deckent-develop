@@ -25,6 +25,7 @@ import {
   acceptPanicGuard,
   listPendingPanicEvents,
 } from '../../cli/commands/nervous.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Helper: Load nervous config from project ──────────────────────────────
 
@@ -386,10 +387,7 @@ export function registerNervousSubscribeTool(server: McpServer): void {
     'deckent_nervous_subscribe',
     {
       title: 'Nervous Subscribe',
-      description:
-        'Subscribe to Nervous System notifications for the current sprint. ' +
-        'Registers this MCP client for push notifications. Also surfaces ' +
-        'currently pending PanicGuard kill approvals as PANIC_GUARD_KILL_PENDING events (Sprint 180 W4-2).',
+      description: mcpToolDescription('deckent_nervous_subscribe'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         sprintId: z.string().optional().describe('Sprint ID to subscribe to (default: active sprint)'),
@@ -431,10 +429,7 @@ export function registerNervousAcceptTool(server: McpServer): void {
     'deckent_nervous_accept',
     {
       title: 'Nervous Accept',
-      description:
-        'Accept a pending Nervous System notification/action. ' +
-        'The action will be executed by the Executor. ' +
-        'Sprint 180 W4-2: id="panic:<taskId>" approves a PanicGuard-blocked kill.',
+      description: mcpToolDescription('deckent_nervous_accept'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         id: z.string().describe('Notification ID to accept, or "panic:<taskId>" for PanicGuard approval'),
@@ -499,9 +494,7 @@ export function registerNervousRejectTool(server: McpServer): void {
     'deckent_nervous_reject',
     {
       title: 'Nervous Reject',
-      description:
-        'Reject a pending Nervous System notification/action. ' +
-        'The action will NOT be executed. Optionally provide a reason.',
+      description: mcpToolDescription('deckent_nervous_reject'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         id: z.string().describe('Notification ID to reject'),
@@ -531,8 +524,7 @@ export function registerNervousStatusTool(server: McpServer): void {
     'deckent_nervous_status',
     {
       title: 'Nervous Status',
-      description:
-        'Show Nervous System dashboard: pending notifications, recent history, and current config.',
+      description: mcpToolDescription('deckent_nervous_status'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         root: z.string().optional().describe('Project root path'),
@@ -585,8 +577,7 @@ export function registerNervousConfigTool(server: McpServer): void {
     'deckent_nervous_config',
     {
       title: 'Nervous Config',
-      description:
-        'Read or modify Nervous System configuration: authority mode preset, action overrides, and list available actions.',
+      description: mcpToolDescription('deckent_nervous_config'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['read', 'set_preset', 'set_override', 'list_actions', 'reset'])

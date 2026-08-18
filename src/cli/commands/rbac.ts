@@ -6,6 +6,7 @@ import type { Command } from 'commander';
 import { can, isValidRole, PERMISSION_MATRIX } from '../../core/rbac.js';
 import type { Role, Permission } from '../../core/rbac.js';
 import { print, printError } from '../helpers/output.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 const DEFAULT_TENANT = 'default';
 
@@ -24,12 +25,12 @@ export function clearUserRoles(): void {
 export function registerRbac(program: Command): void {
   const rbac = program
     .command('rbac')
-    .description('Role-based access control — check permissions and list roles');
+    .description(getMessage('cli.rbac.desc', getLanguage(undefined)));
 
   // ── deckent rbac check <role> <action> ──────────────────────────────────────
   rbac
     .command('check <role> <action>')
-    .description('Check whether a role has permission to perform an action')
+    .description(getMessage('cli.rbac.check.desc', getLanguage(undefined)))
     .option('--tenant <id>', 'Tenant ID to check against', DEFAULT_TENANT)
     .action((role: string, action: string, opts: { tenant: string }) => {
       if (!isValidRole(role)) {
@@ -51,7 +52,7 @@ export function registerRbac(program: Command): void {
   // ── deckent rbac roles ───────────────────────────────────────────────────────
   rbac
     .command('roles')
-    .description('List all roles and their effective permissions')
+    .description(getMessage('cli.rbac.roles.desc', getLanguage(undefined)))
     .action(() => {
       const roleOrder: Role[] = ['viewer', 'operator', 'admin'];
       print('');
@@ -67,7 +68,7 @@ export function registerRbac(program: Command): void {
   // ── deckent rbac grant <user> <role> ────────────────────────────────────────
   rbac
     .command('grant <user> <role>')
-    .description('Assign a role to a user')
+    .description(getMessage('cli.rbac.grant.desc', getLanguage(undefined)))
     .action((user: string, role: string) => {
       if (!isValidRole(role)) {
         printError(new Error(`Unknown role: "${role}". Valid roles: admin, operator, viewer`));
@@ -82,7 +83,7 @@ export function registerRbac(program: Command): void {
   // ── deckent rbac revoke <user> ───────────────────────────────────────────────
   rbac
     .command('revoke <user>')
-    .description('Remove the role assignment for a user')
+    .description(getMessage('cli.rbac.revoke.desc', getLanguage(undefined)))
     .action((user: string) => {
       if (!userRoles.has(user)) {
         print(`  WARN     no role assigned to "${user}"`);

@@ -14,6 +14,17 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint559] - 2026-08-18
+
+### Added
+
+- Canonical language authority — tek çözücü, dört yolun tasfiyesi
+- Lint ratchet — .description hardcode taraması + parity gate genişletmesi
+- Hermetic surface battery — iki dilli sadakat + sözleşme envanteri
+
+
+_Tasks: 6 total, 3 done, 0 tech debt, 3 no-go_
+
 ## [sprint557] - 2026-08-18
 
 ### Added

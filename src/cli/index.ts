@@ -87,6 +87,7 @@ import {
   openTaskSettlementAuthority,
   openTaskSettlementProjection,
 } from '../core/task-settlement-authority.js';
+import { getLanguage, getMessage } from './helpers/messages.js';
 
 export interface CliProgramRuntime {
   readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
@@ -104,7 +105,7 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
 
   const program = new Command()
     .name('deckent')
-    .description('AI agent orchestration system — your AI development team, orchestrated.')
+    .description(getMessage('cli.program.desc', getLanguage(undefined)))
     .addHelpText('after', '\nRun `deckent info` for a localized (TR/EN) quick-reference of common commands.\n')
     .showSuggestionAfterError(true)
     .option('-V, --version', 'output the version number with splash')

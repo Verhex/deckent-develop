@@ -15,6 +15,7 @@ import { loadBacklog } from '../../orchestra/autonomous/backlog.js';
 import { buildProcessController } from '../../cli/helpers/process-runtime.js';
 import type { ProcessSubmitCtx } from '../../orchestra/process-controller.js';
 import type { CapabilityTarget } from '../../core/work-model.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 function backlogPath(root: string): string {
   return join(root, '.deckent', 'autonomous', 'backlog.json');
@@ -29,11 +30,7 @@ export function registerProcessTool(server: McpServer): void {
     'deckent_process',
     {
       title: 'Process Mode',
-      description:
-        'Process-mode execution surface (continuous request-handling for ERP / business ' +
-        'automation). action=submit injects an ExecutionRequest (policy-gated: read-only ' +
-        'capabilities auto-run, side-effecting ones park for approval); action=status|result ' +
-        'polls a prior submission by executionId.',
+      description: mcpToolDescription('deckent_process'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['submit', 'status', 'result']).describe('submit | status | result'),

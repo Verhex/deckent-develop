@@ -15,7 +15,7 @@ import { MemoryStore } from '../../core/memory-store.js';
 import { cleanup, runDecay } from '../../orchestra/brain.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { pruneExpiredNervousPending } from '../../core/pending-approvals.js';
 import { isExecutionLockAuthorityArtifactName } from '../../core/file-lock.js';
@@ -118,7 +118,7 @@ export function registerCleanup(program: Command): void {
   const registerLang = getLangFromConfig(resolveProjectRoot());
   program
     .command('cleanup')
-    .description('Clean up after a sprint')
+    .description(getMessage('cli.cleanup.desc', getLanguage(undefined)))
     .option('--decay', 'Force run memory decay (compress .brain/ files)')
     .option('--dry-run', 'Preview what would be deleted without actually deleting')
     .option('--sprint <id>', getMessage('cleanup.sprint_option', registerLang))

@@ -1708,11 +1708,11 @@ export function handlePending(opts: AutonomousPendingOptions): void {
 export function registerAutonomous(program: Command): void {
   const cmd = program
     .command('autonomous')
-    .description('Autonomous runtime — authority-bounded continuous loop');
+    .description(getMessage('cli.autonomous.desc', getLanguage(undefined)));
 
   cmd
     .command('enable')
-    .description('Enable autonomous mode (one command instead of editing config; default stays OFF)')
+    .description(getMessage('cli.autonomous.enable.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: AutonomousEnableOptions) => {
@@ -1726,7 +1726,7 @@ export function registerAutonomous(program: Command): void {
 
   cmd
     .command('start')
-    .description('Start the autonomous loop (default-deny + human-approval gate)')
+    .description(getMessage('cli.autonomous.start.desc', getLanguage(undefined)))
     .option('--interval-ms <ms>', 'Idle-tick sleep in ms', '1000')
     .option('--max-iterations <n>', 'Stop after N cycles (default: run until aborted)')
     .option('--root <path>', 'Project root override')
@@ -1742,7 +1742,7 @@ export function registerAutonomous(program: Command): void {
 
   cmd
     .command('plan <goal>')
-    .description('Decompose a high-level goal into a lightweight autonomous backlog (Phase 1)')
+    .description(getMessage('cli.autonomous.plan.desc', getLanguage(undefined)))
     .option('--from <ref>', 'Artifact reference: file or file#section (seed open checklist items)')
     .option('--policy <policy>', 'Default per-item policy', 'auto')
     .option('--max-items <n>', 'Max items (default 30)')
@@ -1771,7 +1771,7 @@ export function registerAutonomous(program: Command): void {
 
   cmd
     .command('status')
-    .description('Show autonomous runtime summary (pending + last audit events)')
+    .description(getMessage('cli.autonomous.status.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: AutonomousStatusOptions) => {
@@ -1785,7 +1785,7 @@ export function registerAutonomous(program: Command): void {
 
   cmd
     .command('stop')
-    .description('Signal the autonomous loop to stop cleanly')
+    .description(getMessage('cli.autonomous.stop.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: AutonomousStopOptions) => {
@@ -1799,7 +1799,7 @@ export function registerAutonomous(program: Command): void {
 
   cmd
     .command('cleanup')
-    .description('Sweep stray autonomous run-artifacts (task-run-*, _*.pid) from .tasks/')
+    .description(getMessage('cli.autonomous.cleanup.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: AutonomousCleanupOptions) => {
@@ -1813,7 +1813,7 @@ export function registerAutonomous(program: Command): void {
 
   cmd
     .command('pending')
-    .description('List parked approvals awaiting human accept/reject')
+    .description(getMessage('cli.autonomous.pending.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: AutonomousPendingOptions) => {
@@ -1827,7 +1827,7 @@ export function registerAutonomous(program: Command): void {
 
   cmd
     .command('approve <triggerId>')
-    .description('Approve a parked trigger — resolves the running loop\'s gate')
+    .description(getMessage('cli.autonomous.approve.desc', getLanguage(undefined)))
     .option('--reason <text>', 'Optional reason recorded with the decision')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
@@ -1842,7 +1842,7 @@ export function registerAutonomous(program: Command): void {
 
   cmd
     .command('reject <triggerId>')
-    .description('Reject a parked trigger — resolves the running loop\'s gate')
+    .description(getMessage('cli.autonomous.reject.desc', getLanguage(undefined)))
     .option('--reason <text>', 'Optional reason recorded with the decision')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
@@ -1858,11 +1858,11 @@ export function registerAutonomous(program: Command): void {
   // ─── backlog ──────────────────────────────────────────────────────────
   const backlog = cmd
     .command('backlog')
-    .description('Manage the autonomous backlog (add / list / remove entries)');
+    .description(getMessage('cli.autonomous.backlog.desc', getLanguage(undefined)));
 
   backlog
     .command('add')
-    .description('Add a new entry to the autonomous backlog')
+    .description(getMessage('cli.autonomous.add.desc', getLanguage(undefined)))
     .requiredOption('--id <id>', 'Unique entry id')
     .requiredOption('--title <title>', 'Human-readable title')
     .option('--kind <kind>', 'Entry kind: task (default), sprint, or capability', 'task')
@@ -1902,7 +1902,7 @@ export function registerAutonomous(program: Command): void {
 
   backlog
     .command('list')
-    .description('List autonomous backlog entries')
+    .description(getMessage('cli.autonomous.list.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: { root?: string; lang?: string }) => {
@@ -1928,7 +1928,7 @@ export function registerAutonomous(program: Command): void {
 
   backlog
     .command('remove [id]')
-    .description('Remove an entry from the autonomous backlog (positional id or --id)')
+    .description(getMessage('cli.autonomous.remove.desc', getLanguage(undefined)))
     .option('--id <id>', 'Entry id to remove (consistent with `backlog add --id`; alternative to the positional argument)')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')

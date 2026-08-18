@@ -34,7 +34,7 @@ import {
   SPRINT_STATE_FILE,
   TASKS_DIR,
 } from '../../core/constants.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import {
   clearProviderExecutionHolds,
@@ -247,7 +247,7 @@ function printResumeOutcome(outcome: RecoveryResumeOutcome, lang: string): void 
 export function registerResume(program: Command): void {
   const command = program
     .command('resume <sprintId>')
-    .description('Resume a sprint from its latest checkpoint')
+    .description(getMessage('cli.resume.desc', getLanguage(undefined)))
     .option('--auto-approve', 'Auto-approve all worker actions (skip permission prompts)', false)
     .option('--dry-run', 'Show what would be resumed without actually running', false)
     .option('--force-scope', getMessage('recover.force_scope_option', detectLang(resolveProjectRoot())), false)

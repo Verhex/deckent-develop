@@ -7,7 +7,7 @@
  * Split from init.ts (Sprint 144 Task 1).
  */
 
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, resolveLanguage } from '../helpers/messages.js';
 import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -108,25 +108,14 @@ export function formatNextSteps(language: string): string {
 }
 
 /**
- * Detect system locale from environment variables or Intl API.
- * Returns a 2-letter language code (e.g. 'en', 'tr').
+ * Detect the system language for wizard preselection.
+ * Delegates to the canonical resolveLanguage chain (DECKENT_LANGUAGE >
+ * DECKENT_LANG > LC_ALL > LANG > 'en') — the single language authority;
+ * only supported languages are ever suggested, so an unsupported locale
+ * falls back to 'en' instead of leaking a raw code the wizard can't use.
  */
 export function detectSystemLanguage(): string {
-  // Try LANG env var first (e.g. "tr_TR.UTF-8")
-  const langEnv = process.env['LANG'] ?? process.env['LANGUAGE'] ?? process.env['LC_ALL'] ?? process.env['LC_MESSAGES'];
-  if (langEnv) {
-    const match = /^([a-z]{2})/i.exec(langEnv);
-    if (match) return match[1]!.toLowerCase();
-  }
-  // Try Intl API
-  try {
-    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
-    const parts = locale.split('-');
-    if (parts[0]) return parts[0].toLowerCase();
-  } catch {
-    // Intl not available
-  }
-  return 'en';
+  return resolveLanguage(undefined);
 }
 
 /**

@@ -24,6 +24,7 @@ import type { KpiFormat } from '../../core/kpi/types.js';
 import type { ResultRow } from '../../core/kpi/kpi-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Injectable deps ──────────────────────────────────────────────────────────
 
@@ -109,11 +110,7 @@ export function registerKpiTool(server: McpServer, deps: KpiToolDeps = {}): void
     'deckent_kpi',
     {
       title: 'KPI Scorecard',
-      description:
-        'Show the KPI scorecard for a sprint (default) or trend series for a single KPI. ' +
-        'Scorecard: returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics. ' +
-        'Trend (when trend arg set): returns { kpiId, series: [{periodKey, value, status}] }. ' +
-        'Delegates to KpiService (SSOT); read-only.',
+      description: mcpToolDescription('deckent_kpi'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

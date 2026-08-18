@@ -9,13 +9,14 @@ import { addDoc, removeDoc, loadDocsConfig, saveDocsConfig } from '../../orchest
 import { runManagedDocUpdates, buildStandaloneDocContext } from '../../orchestra/managed-docs/managed-doc-runner.js';
 import { validatePath } from '../../core/validators.js';
 import { runDocsTrackScan, runDocsTrackStatus } from '../../cli/commands/docs.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 export function registerDocsTool(server: McpServer): void {
   server.registerTool(
     'deckent_docs',
     {
       title: 'Managed Docs',
-      description: 'Manage user-defined documents in sprint lifecycle. Actions: "add" registers a file; "remove" unregisters; "list" shows all; "update" modifies section rules; "run" triggers doc updates without a sprint; "track-scan" runs a DB-only doc-tracking scan (hash + DCR + stale); "track-status" lists tracked doc health. Auto sections are updated with generated content (metrics, debt, history, etc.). Protected sections are never touched.',
+      description: mcpToolDescription('deckent_docs'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         action: z.enum(['add', 'remove', 'list', 'update', 'run', 'track-scan', 'track-status']).describe('Action to perform'),

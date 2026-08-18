@@ -13,13 +13,14 @@ import {
   readRunInspectorTaskDetail,
   SPRINT_TASK_ID_RE,
 } from '../../core/run-inspector-read-model.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 export function registerInspectTool(server: McpServer): void {
   server.registerTool(
     'deckent_inspect',
     {
       title: 'Run Inspector',
-      description: 'Inspect logical runs through the canonical inspector read-model (same projections as the `deckent inspect` CLI). Without arguments: the run listing — current run from the run-status authority plus archived runs from settlement records. With taskId: the task drill-down (task json, plan truncation flag, result evidence, heartbeat, lineage). Read-only; lifecycle always comes from the run-status authority, never re-inferred.',
+      description: mcpToolDescription('deckent_inspect'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         taskId: z.string().optional().describe('Task id for the drill-down view (e.g. "541-001"). Omit for the run listing.'),

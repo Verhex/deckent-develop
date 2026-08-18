@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FEATURES_MANIFEST_FILE } from '../../core/constants.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 interface FeatureEntry {
   id: string;
@@ -44,10 +45,7 @@ export function registerFeatureQueryTool(server: McpServer): void {
     'deckent_feature_query',
     {
       title: 'Feature Query',
-      description:
-        'Query the Deckent feature manifest — list features by category (active, lightly_used, dormant, dead, all) ' +
-        'or look up a specific feature by ID. Returns feature metadata including files, description, and category. ' +
-        'Reads from .deckent/settings/features-manifest.json. Run `node scripts/sync-manifest.mjs` to regenerate.',
+      description: mcpToolDescription('deckent_feature_query'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

@@ -6,6 +6,7 @@ import { DIRECTIVES_FILE } from '../../core/constants.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { getActiveDirectivesProtection } from '../../nervous/observer.js';
 import { modelRegistry, LEGACY_MODEL_ALIASES } from '../../core/model-registry.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // 454-004: the tool description's Model example must teach an exact provider
 // API ID + explicit Provider ownership — never a retired alias
@@ -49,20 +50,13 @@ export function registerSetDirectivesTool(server: McpServer): void {
     'deckent_set_directives',
     {
       title: 'Set Directives',
-      description: `Write DIRECTIVES.md content. The brain engine parses "## Task N:" or "## Görev N:" blocks to create sprint tasks. Each block should include: Model (an exact provider API ID, e.g. ${DIRECTIVES_EXAMPLE_MODEL_ID} — see deckent_models for the live catalog; legacy aliases [${DIRECTIVES_REJECTED_LEGACY_ALIASES}] are rejected), optional Provider (explicit ownership: ${DIRECTIVES_PROVIDER_NAMES}, required when it can't be inferred from the id's prefix), Effort (low/normal/high), Skills (e.g. typescript-expert), Files, Scope (directory list), and Description. Example format:
-
-## Task 1: Add authentication middleware
-- Model: ${DIRECTIVES_EXAMPLE_MODEL_ID}
-- Provider: claude
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/middleware/auth.ts
-- Scope: src/middleware/
-
-### Description
-Implement JWT-based authentication middleware...
-
-Prerequisite: deckent_init must have been run. Overwrites DIRECTIVES.md each call. Run deckent_plan after to preview tasks.`,
+      description: mcpToolDescription('deckent_set_directives', {
+        vars: {
+          modelId: DIRECTIVES_EXAMPLE_MODEL_ID,
+          legacyAliases: DIRECTIVES_REJECTED_LEGACY_ALIASES,
+          providers: DIRECTIVES_PROVIDER_NAMES,
+        },
+      }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         content: z.string().describe('Formatted DIRECTIVES.md content with ## Task N: or ## Görev N: blocks. Each block needs Model (exact provider API ID — no legacy aliases), Effort, Skills, Files, Scope, and Description sub-sections; Provider is optional.'),

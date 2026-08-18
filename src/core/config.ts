@@ -2009,7 +2009,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   if (envMode) {
     config.mode = resolveMode(envMode) as PlanMode;
   }
-  const envLanguage = process.env['DECKENT_LANGUAGE'];
+  const envLanguage = process.env['DECKENT_LANGUAGE'] || process.env['DECKENT_LANG'];
   if (envLanguage) {
     config.language = envLanguage;
   }

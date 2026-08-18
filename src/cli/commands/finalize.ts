@@ -17,7 +17,7 @@ import { debugLog } from '../../core/utils.js';
 import { print, printError } from '../helpers/output.js';
 import { killSingle, type KillSingleResult } from './kill.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { readJsonSafe } from '../../core/utils.js';
 import { loadReviewState } from './review.js';
@@ -373,7 +373,7 @@ export function buildFinalizeSprintProjection(
 export function registerFinalize(program: Command): void {
   program
     .command('finalize')
-    .description(getMessage('finalize.description', 'en'))
+    .description(getMessage('finalize.description', getLanguage(undefined)))
     .option('--sprint <id>', getMessage('finalize.sprint_option', 'en'))
     .option('--skip-decay', getMessage('finalize.skip_decay_option', 'en'))
     .option('--skip-hooks', getMessage('finalize.skip_hooks_option', 'en'))

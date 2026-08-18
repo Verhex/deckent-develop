@@ -659,7 +659,7 @@ export function syncAgentCapabilities(root: string, dryRun = false): AgentCapabi
 export function registerSync(program: Command): void {
   program
     .command('sync')
-    .description('Sync adapter files and detect out-of-band changes since last sprint')
+    .description(getMessage('cli.sync.desc', getLanguage(undefined)))
     .option('--git-only', 'Only detect git changes (skip adapter file sync)')
     .option('--adapters-only', 'Only sync adapter files (skip git change detection)')
     .option('--dry-run', 'Preview changes without writing anything')

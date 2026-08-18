@@ -6,13 +6,13 @@ import { searchMemory } from '../../core/memory-query.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 
 export function registerRecall(program: Command): void {
   program
     .command('recall <query>')
-    .description('Search project memory — ADRs, sprint learnings, patterns, debt')
+    .description(getMessage('cli.recall.desc', getLanguage(undefined)))
     .option('-t, --type <types>', 'Filter by type (comma-separated: adr,memory,sprint,debt,pattern)', '')
     .option('-n, --limit <n>', 'Max results', '5')
     .option('--sprint-min <n>', 'Minimum sprint number')

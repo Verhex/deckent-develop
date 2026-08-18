@@ -13,7 +13,7 @@ import { runDoctorChecks } from './doctor.js';
 import { checkStartLimitGate } from './limits.js';
 import { print, printError, formatSprintSummary, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { providerAuthorityHoldRemedy } from './provider-authority.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
@@ -342,7 +342,7 @@ async function runStartEnvironmentPreflight(input: {
 export function registerStart(program: Command, runtime: StartCommandRuntime = {}): void {
   program
     .command('start [description]')
-    .description('Start a new sprint (optionally with a one-line description for zero-config mode)')
+    .description(getMessage('cli.start.desc', getLanguage(undefined)))
     .option('--auto-approve', 'Auto-approve worker actions (--dangerously-skip-permissions)')
     .option('--sandbox-mode', 'Run in sandbox mode (git stash + restore)')
     .option('--sandbox', 'Use sandbox spawn backend (memory-cap + path-jail isolation, no Docker required)')

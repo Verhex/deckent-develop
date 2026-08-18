@@ -5,16 +5,17 @@ import type { Command } from 'commander';
 import { loadPlugin, scanPlugins, createPlugin, installPlugin, removePlugin, listPlugins } from '../../core/plugin.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 export function registerPlugin(program: Command): void {
   const cmd = program
     .command('plugin')
-    .description('Manage plugins');
+    .description(getMessage('cli.plugin.desc', getLanguage(undefined)));
 
   // ─── plugin install ─────────────────────────────────────────────
   cmd
     .command('install <source>')
-    .description('Install a plugin from npm, git URL, or local path')
+    .description(getMessage('cli.plugin.install.desc', getLanguage(undefined)))
     .option('--force', 'Overwrite existing plugin')
     .action(async (source: string, _opts: { force?: boolean }) => {
       try {
@@ -33,7 +34,7 @@ export function registerPlugin(program: Command): void {
   // ─── plugin remove ──────────────────────────────────────────────
   cmd
     .command('remove <name>')
-    .description('Remove an installed plugin')
+    .description(getMessage('cli.plugin.remove.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -54,7 +55,7 @@ export function registerPlugin(program: Command): void {
   // ─── plugin update ──────────────────────────────────────────────
   cmd
     .command('update <source>')
-    .description('Update a plugin (remove existing and re-install from source)')
+    .description(getMessage('cli.plugin.update.desc', getLanguage(undefined)))
     .action(async (source: string) => {
       try {
         const root = resolveProjectRoot();
@@ -73,7 +74,7 @@ export function registerPlugin(program: Command): void {
   // ─── plugin list ────────────────────────────────────────────────
   cmd
     .command('list')
-    .description('List installed plugins')
+    .description(getMessage('cli.plugin.list.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action((opts: { json?: boolean }) => {
       try {
@@ -112,7 +113,7 @@ export function registerPlugin(program: Command): void {
   // ─── plugin info ────────────────────────────────────────────────
   cmd
     .command('info <dir>')
-    .description('Show plugin info (accepts absolute or relative path)')
+    .description(getMessage('cli.plugin.info.desc', getLanguage(undefined)))
     .action((dir: string) => {
       try {
         // Support relative paths: resolve relative to cwd
@@ -140,7 +141,7 @@ export function registerPlugin(program: Command): void {
   // ─── plugin test ────────────────────────────────────────────────
   cmd
     .command('test <name>')
-    .description('Test a plugin: validate manifest and entrypoint, run hooks if available')
+    .description(getMessage('cli.plugin.test.desc', getLanguage(undefined)))
     .action((name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -214,7 +215,7 @@ export function registerPlugin(program: Command): void {
   // ─── plugin create ──────────────────────────────────────────────
   cmd
     .command('create <name>')
-    .description('Create a new plugin scaffold')
+    .description(getMessage('cli.plugin.create.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();

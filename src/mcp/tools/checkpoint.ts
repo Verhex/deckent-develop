@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { validateSprintId, validatePhase, validatePath } from '../../core/validators.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ export function registerCheckpointTool(server: McpServer): void {
     'deckent_checkpoint',
     {
       title: 'Checkpoint Management',
-      description: 'List, approve, or reject human checkpoints in sprint lifecycle. Checkpoints pause sprint execution at configured phases (plan/evaluate/fix) until a human approves or rejects. Use action=list to see pending checkpoints, action=approve/reject with sprintId and phase to respond.',
+      description: mcpToolDescription('deckent_checkpoint'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['list', 'approve', 'reject']).describe('Action to perform: list all checkpoints, approve a pending checkpoint, or reject a pending checkpoint.'),

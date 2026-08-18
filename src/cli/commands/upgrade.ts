@@ -11,6 +11,7 @@ import {
   type SpawnImpl,
 } from '../../core/worker-image-check.js';
 import { handleImageBuild } from './image.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -463,7 +464,7 @@ export async function reprovisionWorkerImageAfterUpgrade(
 export function registerUpgrade(program: Command): void {
   program
     .command('upgrade')
-    .description('Self-update deckent')
+    .description(getMessage('cli.upgrade.desc', getLanguage(undefined)))
     .option('--check', 'Only check for updates, do not install')
     .option('--changelog', 'Show changelog for the latest version and exit')
     .option('--canary', 'Install from canary channel (pre-release)')

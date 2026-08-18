@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { analyzeProject } from '../../core/analyzer.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 function generateConfigSuggestion(analysis: Record<string, unknown>): string[] {
   const suggestions: string[] = [];
@@ -18,7 +19,7 @@ export function registerAnalyzeTool(server: McpServer): void {
     'deckent_analyze_project',
     {
       title: 'Analyze Project',
-      description: 'Analyze the current project to detect: language (TypeScript/JavaScript/Python/Go/Rust/etc.), framework (React/Express/FastAPI/etc.), test framework (vitest/jest/pytest/etc.), build tool (tsc/webpack/vite/etc.), CI system (GitHub Actions/GitLab CI/etc.), project size (small/medium/large based on file count), and methodology recommendation. Returns config suggestions (e.g. recommended plan mode, worker count). Useful before init to pick the right configuration, or to verify stack detection. Does not modify any files.',
+      description: mcpToolDescription('deckent_analyze_project'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => {

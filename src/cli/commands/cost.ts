@@ -24,6 +24,7 @@ import {
 import { updatePricing, formatUpdateResult } from '../../core/pricing-updater.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Subcommand: show ──────────────────────────────────────────────────────
 
@@ -212,11 +213,11 @@ async function runBudget(options: { set?: string; daily?: string; monthly?: stri
 // ─── Registration ──────────────────────────────────────────────────────────
 
 export function registerCostCommand(program: Command): void {
-  const cost = program.command('cost').description('User Safety Shield — cost management & estimation');
+  const cost = program.command('cost').description(getMessage('cli.cost.desc', getLanguage(undefined)));
 
   cost
     .command('show')
-    .description('Display model pricing (read-only)')
+    .description(getMessage('cli.cost.show.desc', getLanguage(undefined)))
     .option('--provider <name>', 'Filter by provider (anthropic, openai, google)')
     .option('--model <id>', 'Show single model details')
     .action(async (options) => {
@@ -225,7 +226,7 @@ export function registerCostCommand(program: Command): void {
 
   cost
     .command('update')
-    .description('Fetch latest pricing from LiteLLM + OpenRouter')
+    .description(getMessage('cli.cost.update.desc', getLanguage(undefined)))
     .option('--provider <name>', 'Update only this provider')
     .option('--dry-run', 'Preview changes without writing')
     .option('--skip-validation', 'Skip OpenRouter delta check')
@@ -235,7 +236,7 @@ export function registerCostCommand(program: Command): void {
 
   cost
     .command('budget')
-    .description('View or set cost budgets')
+    .description(getMessage('cli.cost.budget.desc', getLanguage(undefined)))
     .option('--set <usd>', 'Set sprint max budget in USD')
     .option('--daily <usd>', 'Set daily max budget in USD')
     .option('--monthly <usd>', 'Set monthly max budget in USD')

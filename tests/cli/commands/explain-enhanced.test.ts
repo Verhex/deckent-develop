@@ -24,6 +24,8 @@ vi.mock('../../../src/cli/helpers/config-reader.js', () => ({
 
 vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn((_key: string, _lang: string) => _key),
+  getLanguage: vi.fn().mockReturnValue('en'),
+  resolveLanguage: vi.fn().mockReturnValue('en'),
 }));
 
 // B8: `deckent explain` reads sprint learnings from memory.db `retro` entries.

@@ -107,7 +107,7 @@ const KNOWN_AGENT_DISCOVERY_SITES = [
   'raw-agent-directory-read:src/core/agent-pool.ts:885',
   'raw-agent-directory-read:src/core/agent-pool.ts:923',
   'raw-agent-directory-read:src/core/agent-pool.ts:951',
-  'raw-agent-directory-read:src/mcp/tools/help.ts:130',
+  'raw-agent-directory-read:src/mcp/tools/help.ts:131',
   'raw-agent-directory-read:src/monitor/auditor.ts:1101',
   'raw-agent-directory-read:src/orchestra/planner.ts:1596',
   'raw-agent-directory-read:src/orchestra/task-builder.ts:1218',

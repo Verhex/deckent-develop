@@ -1502,40 +1502,54 @@ describe('human-friendly init output', () => {
   // ─── Task 056-003: New UX features ──────────────────────────────────
 
   describe('detectSystemLanguage', () => {
+    // detectSystemLanguage delegates to the canonical resolveLanguage chain
+    // (DECKENT_LANGUAGE > DECKENT_LANG > LC_ALL > LANG > 'en') — the whole
+    // chain must be pinned for hermeticity.
+    const LANG_ENV_KEYS = ['DECKENT_LANGUAGE', 'DECKENT_LANG', 'LC_ALL', 'LANG'] as const;
+
+    const withPinnedLangEnv = (pins: Record<string, string>, fn: () => void): void => {
+      const saved: Record<string, string | undefined> = {};
+      for (const key of LANG_ENV_KEYS) {
+        saved[key] = process.env[key];
+        delete process.env[key];
+      }
+      for (const [key, value] of Object.entries(pins)) process.env[key] = value;
+      try {
+        fn();
+      } finally {
+        for (const key of LANG_ENV_KEYS) {
+          if (saved[key] === undefined) delete process.env[key];
+          else process.env[key] = saved[key]!;
+        }
+      }
+    };
+
     it('returns "tr" when LANG=tr_TR.UTF-8', async () => {
       const { detectSystemLanguage } = await import('../../../src/cli/commands/init.js');
-      const origLang = process.env['LANG'];
-      process.env['LANG'] = 'tr_TR.UTF-8';
-      const lang = detectSystemLanguage();
-      expect(lang).toBe('tr');
-      if (origLang === undefined) delete process.env['LANG'];
-      else process.env['LANG'] = origLang;
+      withPinnedLangEnv({ LANG: 'tr_TR.UTF-8' }, () => {
+        expect(detectSystemLanguage()).toBe('tr');
+      });
     });
 
     it('returns "en" when LANG=en_US.UTF-8', async () => {
       const { detectSystemLanguage } = await import('../../../src/cli/commands/init.js');
-      const origLang = process.env['LANG'];
-      process.env['LANG'] = 'en_US.UTF-8';
-      const lang = detectSystemLanguage();
-      expect(lang).toBe('en');
-      if (origLang === undefined) delete process.env['LANG'];
-      else process.env['LANG'] = origLang;
+      withPinnedLangEnv({ LANG: 'en_US.UTF-8' }, () => {
+        expect(detectSystemLanguage()).toBe('en');
+      });
     });
 
-    it('falls back to "en" when no LANG env and Intl unavailable', async () => {
+    it('prefers DECKENT_LANG over LANG (canonical chain)', async () => {
       const { detectSystemLanguage } = await import('../../../src/cli/commands/init.js');
-      const origLang = process.env['LANG'];
-      const origLCAll = process.env['LC_ALL'];
-      const origLanguage = process.env['LANGUAGE'];
-      delete process.env['LANG'];
-      delete process.env['LC_ALL'];
-      delete process.env['LANGUAGE'];
-      const lang = detectSystemLanguage();
-      expect(typeof lang).toBe('string');
-      expect(lang.length).toBeGreaterThanOrEqual(2);
-      if (origLang !== undefined) process.env['LANG'] = origLang;
-      if (origLCAll !== undefined) process.env['LC_ALL'] = origLCAll;
-      if (origLanguage !== undefined) process.env['LANGUAGE'] = origLanguage;
+      withPinnedLangEnv({ DECKENT_LANG: 'en', LANG: 'tr_TR.UTF-8' }, () => {
+        expect(detectSystemLanguage()).toBe('en');
+      });
+    });
+
+    it('falls back to "en" when no language env is set', async () => {
+      const { detectSystemLanguage } = await import('../../../src/cli/commands/init.js');
+      withPinnedLangEnv({}, () => {
+        expect(detectSystemLanguage()).toBe('en');
+      });
     });
   });
 

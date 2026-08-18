@@ -358,8 +358,15 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // settlement-authority regression guard) changed graph content.
   // 2026-08-18 (7083, sprint-557): same count, digest only — renewal +
   // bootstrap suites and session/bridge/run.tsx/registry content moved.
-  count: 14370,
-  digest: '3f08677957ee920d253a1f9ff35e6a0b39d6a5ad901655ba5e4b04341fed7d79',
+  // 2026-08-18 (7085 CLI-SURFACE-TRUTH, sprint-559): +6 — new suites
+  // (lang-authority, cli-description-catalog, json-output-contract,
+  // mcp-description-catalog, lint-cli-surface, cli-surface-truth-battery)
+  // enter the graph; ~80 CLI command files + messages.ts content moved.
+  // 2026-08-18 (559 landing debt): same count, digest only — mock realigns
+  // (getLanguage/resolveLanguage exports), census pin, retro-json stderr
+  // realign, doctor/init MCP catalog pins moved graph content.
+  count: 14376,
+  digest: '39269c779257b47bb051809acd2f805835e2cd02470b69f3cad18af6bc7f78d6',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -585,8 +592,13 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // guard, killSingle typed result, xverify channel truth, exposure optional.
   // 2026-08-18 (7083): session/bridge/run.tsx/native-tool-registry/slash
   // production hashes moved; membership unchanged.
-  count: 1250,
-  digest: 'd88b31163460639127e885c198aec6773cda6f8a9fb6e698bbdd5a74279c5361',
+  // 2026-08-18 (7085, sprint-559): +1 — src/mcp/tools/description-catalog.ts
+  // (MCP↔CLI shared description resolver) enters the inventory; ~80 CLI
+  // command files + messages.ts + mcp tools production hashes moved.
+  // 2026-08-18 (559 landing debt): same count, digest only — /renew registry
+  // entry (command-registry.ts) moved production content.
+  count: 1251,
+  digest: 'fe94001c92cee1eb40fa692b67e678b42d5e85eda6d8a570788626d5e2165437',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

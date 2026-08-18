@@ -175,6 +175,36 @@ görülmez owner'a bildirilir.
 
 ---
 
+## 15. Scope'u dizin-genişliğinde ver; nokta-dosya scope'u fix zincirini boğar
+
+**Yanlış:** Task'a yalnız değişecek dosyaların nokta listesi verildi. Worker bloklayıcıyı
+komşu dosyada buldu (bayat test pini, ikinci bir resolver) — yazma yetkisi yok, dürüst
+NO_GO. FIX task'ı ebeveynin AYNI dar scope'unu miras aldı → fix-fix de aynı duvara
+çarptı → çözülemez döngü; sprint duraklatıldı (arka arkaya üç sprint bu sınıftan yaralandı).
+
+**Doğru kullanım:** DIRECTIVES'te `Files:` odak listesidir ama `Scope:` ilgili dizinleri
+ve muhtemel komşu test/pin dosyalarını kapsayacak genişlikte verilir (ör. yalnız
+`tests/cli/lang-authority.test.ts` değil `tests/cli/` + `tests/cli/helpers/`).
+Başlatırken/sürdürürken bilinçli genişleme için `--force-scope` bayrağı vardır — kullan.
+Worker'ın `replan-proposal` bıraktığını görürsen bu bir scope-genişletme talebidir:
+kararı bekletme, ya genişletilmiş scope'la yeniden planla ya da bloklayıcıyı ADR-D-007
+el-tamamlamasıyla kapat.
+
+## 16. XVerify onayı CANLI kanaldan ve koşu başına — eski onay yeni kanıt-tazelemeye geçmez
+
+**Yanlış:** XVerify arka planda başlatıldı, süreç çıktıktan sonra onay verilmeye
+çalışıldı (onay süreç-ömürlü — buharlaşmıştı). İkinci hata: retry koşusu YENİ bir
+approval id üretti; eski id'ye verilmiş onay yeni kanıt-tazeleme isteğine geçmedi
+(`approval_untrusted` fail-closed reddi — doğru davranış).
+
+**Doğru kullanım:** XVerify koşarken stderr'deki `waiting-approval:<aprp-…>` sinyalini
+CANLI izle ve HER yeni id'yi süreç çıkmadan `deckent approvals decide <id> --allow`
+ile karara bağla; bir koşu birden çok onay isteyebilir (kanıt-tazeleme dahil).
+`limit_hold`/cooldown türü HOLD'lar pencere dolunca kendiliğinden açılır — HOLD kapanış
+değildir, sakin retry planla.
+
+---
+
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
 - **2026-08-18 — ilk sürüm** (sprint-550…556 dönemi): 13 ders damıtıldı. Kaynak
@@ -185,3 +215,10 @@ görülmez owner'a bildirilir.
 - **2026-08-18 — sprint-556 landing güncellemesi**: Ders 13 eklendi (scoped-yeşil
   borcu + required-alan churn'ü) — kaynak: 556 el-kapamasında 11 dosya / 18 bayat
   pinin tek seferde ödenmesi.
+- **2026-08-18 — sprint-558/559 dalgası**: Ders 15 (dizin-genişliği scope +
+  `--force-scope` + replan-proposal okuma) ve Ders 16 (xverify canlı-onay disiplini,
+  koşu-başına aprp, HOLD≠kapanış) eklendi. Kaynak olaylar: 558'in fix-scope-mirası
+  kilidi ve ABORTED force-finalize'ı; 559'un kesinti sonrası manuel spawn'la
+  sürdürülmesi; terminal-kilitlenme RCA'sının 3-koşu xverify kompozisyonu
+  (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: onay-canlılık dersiyle
+  yeniden koşuldu).

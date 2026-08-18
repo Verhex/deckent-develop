@@ -455,7 +455,7 @@ export function registerRun(
   const runCmd = program
     .command('run')
     .argument('<description>')
-    .description('Run a single one-shot task without a sprint cycle')
+    .description(getMessage('cli.run.desc', getLanguage(undefined)))
     .option('--model <model>', getMessage('run.opt_model', getLanguage(undefined)))
     .option('--provider <name>', getMessage('run.opt_provider', getLanguage(undefined), { providers: ALL_PROVIDER_NAMES.join('|') }))
     .option('--model-effort <level>', 'Native model reasoning-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in; unsupported/invalid levels are ignored')

@@ -344,7 +344,7 @@ export function registerInit(program: Command): void {
   const optionLang = getLanguage();
   program
     .command('init')
-    .description('Initialize a new Deckent project')
+    .description(getMessage('cli.init.desc', getLanguage(undefined)))
     .option('--auto', 'Auto-detect system, subscription, and project to generate recommendations')
     .option('--manual', 'Skip auto-detection, use interactive prompts only')
     .option('--cursor', 'Configure for Cursor IDE environment')

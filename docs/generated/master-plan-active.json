@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "492ffd9a15e1cd521343d54761cfe37bd409b8cc1a2f7b01825064c7deb59d9e"
+    "value": "9130a800a2392dd974dec332b0ad78f01e98172e772f6e57b299f38006f3880a"
   },
   "summary": {
-    "total": 503,
-    "active": 439,
+    "total": 504,
+    "active": 440,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 346,
+      "OPEN": 347,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 328,
+      "P0": 329,
       "P1": 138,
       "P2": 37
     },
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 8,
       "SURFACE": 1,
-      "TERMINAL": 17,
+      "TERMINAL": 18,
       "TOOL": 1,
       "TRUTH": 95,
       "XPLAT": 3
@@ -4791,7 +4791,18 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "ab74f09d8694e3f40f781d46ca2e02f8c427331cfbfa8e4c3013307972f6ba7f",
-      "progressDigest": "dc71f702f76dd9974ef3c6a1eada118b1369998b30264ff193d054455d57060d",
+      "progressDigest": "4077738462f0242270539db87e32a45335a0b6a7a08170284ec5d4b76aaf96ed",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7086,
+      "id": "NATIVE-CONTEXT-LIFECYCLE-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "c43ac9eb9a3e50e8cfb211b608cba70803c8729cd11372183fb8f89063f3743d",
+      "progressDigest": "c7335baaa0e8147ab8b3ad60292db81fa0e7c63f68e9acb25143cba9abfc6436",
       "terminalClosureDigest": null
     },
     {
@@ -5339,9 +5350,9 @@
       "program": "ROUTING",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-10",
+      "updated": "2026-08-18",
       "definitionDigest": "640d932c23638bb0a1aa51ce7dbc1255e50c0ea9f93f2bfff6b5e87bc7d45a5b",
-      "progressDigest": "6cb370c7e3bf116667c1e364ebb39f99475c1db0fd31ddaa9e62c88a2ef0d2ee",
+      "progressDigest": "59e25c5d8a4f564aa0272679e82c46d0c247e89b39b9f9ca8af918bb83d0ce5a",
       "terminalClosureDigest": null
     },
     {
@@ -22869,7 +22880,9 @@
         "LOCAL-LLM-MODEL-IDENTITY-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "NATIVE-CONTEXT-LIFECYCLE-001"
+      ],
       "gates": [
         "G1",
         "G2"
@@ -22887,7 +22900,8 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "LOCAL-LLM-MODEL-IDENTITY-001"
+        "LOCAL-LLM-MODEL-IDENTITY-001",
+        "NATIVE-CONTEXT-LIFECYCLE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Canonical native-agent execution budget mevcut execution_budget mimarisinin typed terminal profile'ı olarak çözülür (maxModelRounds/maxToolCalls/maxWallTimeMs/maxCumulativeTokens/maxNoProgressRounds/checkpointEvery*/outputReserve/safety-reserve; provider-adına hardcode YOK) ve config→resolver→terminal ingress→createNativeEngine→AgentSession→runAgentTurn zinciri canlı çalışır; first-class provider-neutral scratch checkpoint (session-scoped mkdtemp, cross-platform 0700/0600 adapter policy, atomic temp+rename, checksum, containment, bounded crash-recovery) → context-epoch compaction/continuation orphan tool-pairing üretmeden; usage/cost/wall/audit sayaçları ASLA resetlenmez (yalnız model working-context epoch'u yenilenir); local-llm effective context = model metadata × server config × host admission kesişimi, native_context_tokens türetilir, restart-required diagnostics dürüst; permission modes (suggest first-use session-grant, auto-edit, full-auto) direct/nested/MCP paritesiyle tek rule-store tüketir — critical floor (rm -rf, kill/cleanup, force-push, deny-rules, tenant/secret guard) full-auto'da bile ASLA bypass edilmez, her auto-decision audit event'lidir; no-progress/semantic-repeat convergence guard'ı checkpoint+synthesis+bounded-termination üçlemesiyle; tüm reason'lar typed + en/tr i18n; 60+ distinct tool-call'lu fixture final answer'a ulaşır, runaway fixture typed hard-cap'te durur; 17-sınıf hermetic battery + gerçek binary/PTY proof",
@@ -23088,7 +23102,39 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Dil authority'si tek zincirden çözülür (config `language` → env → fallback) ve HER CLI komutu + MCP tool açıklaması/çıktısı seçili dile sadıktır — canlı bulgu sınıfı ölür: `DECKENT_LANG=en` altında Türkçe status, `xverify --help` İngilizce iken kardeş helplerin Türkçe olması; help/description kataloğu tek kaynaktan iki dilli üretilir (commander description'ları getMessage'a bağlanır, hardcode taranır + lint'e girer); insan-vs-makine çıktı sözleşmesi: `--json` bayraklı her komutta stdout YALNIZ parse-edilebilir tek JSON dokümanıdır (progress/uyarı stderr'e), insan modunda tablo/renk serbest — 556'nın xverify stderr-ayrımı pattern'i yüzey geneline; kapsam envanteri + hermetic battery + gerçek-binary iki dilde smoke; MCP tool description'ları aynı katalogdan (CLI-MCP parity lint mevcut genişler)",
-      "evidence": "Owner admission + ÖNE ALMA (Alperen 2026-08-18): 'clide bir hata varsa veya eksik sende deckenti yanlış kullanır veya anlarsın' — AI-operatör CLI'ı yanlış anlarsa deckent'i yanlış kullanır; sıra: 7082'den ÖNCE, 7083 landing'inin hemen ardından; mevcut ilişkili satırlar 500/505 (I18N-SURFACE, runtime catalog) bu satırın authority tabanıdır, çakışma değil — 7085 CLI/MCP yüzey sözleşmesini kapatır, 505 katalog altyapısını",
+      "evidence": "Owner admission + ÖNE ALMA (Alperen 2026-08-18): 'clide bir hata varsa veya eksik sende deckenti yanlış kullanır veya anlarsın' — AI-operatör CLI'ı yanlış anlarsa deckent'i yanlış kullanır; sıra: 7082'den ÖNCE, 7083 landing'inin hemen ardından; mevcut ilişkili satırlar 500/505 (I18N-SURFACE, runtime catalog) bu satırın authority tabanıdır, çakışma değil — 7085 CLI/MCP yüzey sözleşmesini kapatır, 505 katalog altyapısını. LANDED (sprint-558 ABORTED→559 replan, 2026-08-18): (1) TEK canonical `resolveLanguage` zinciri DECKENT_LANGUAGE > DECKENT_LANG > config > LC_ALL > LANG > en — 5 bağımsız çözücü tasfiye (getLanguage/getLangFromConfig/getLangFromRoot delege, init-wizard detectSystemLanguage delege el-tamamlama); (2) 173 hardcode commander description → getMessage, 180 yeni `cli.*.desc` en+tr çifti + 7 açıklamasız gateway komutu dolduruldu + finalize/memory hardcode-'en' bug'ları öldü (559-002 DONE, byte-parity HEAD kanıtlı); (3) --json sözleşmesi: 11 dosyada 29 stdout sızıntısı → 0, allowlist'siz mekanik tarayıcı + 15 test, şema yalnız additive (559-003; 3 komşu-test bloklayıcı el-tamamlama: retro-json stderr hizası + 2 mock getLanguage + resetAllMocks tuzağı); (4) MCP 51/51 tool-level description aynı katalogdan fail-closed resolver'la (description-catalog.ts, 559-004; borç: 200 field-level .describe sayımlı); (5) lint-i18n-hardcode + lint-cli-mcp-parity genişledi, gerçek-repo exit 0 (559-005); (6) tek-nokta hermetik battery: tüm komut ağacı en+tr çift taraması + temsilci help iki dilde + DECKENT_LANG alias byte-eş + json dil-bağımsız (559-006). Gerçek-binary smoke: TR/EN status help sadık, DECKENT_LANG=en xverify EN, TR xverify TR, status/history --json tek geçerli JSON. Run-defteri: 558+559 ABORTED (honest-gate WORK_ATTRIBUTION_HOLD — paylaşımlı-ağaç kirliliği; kod gerçeği yeşil, ders 15/16 playbook'ta). Kalan borç sayımlı: 382 CLI .option() + 200 MCP field-level description ayrı paket",
+      "updated": "2026-08-18"
+    },
+    {
+      "order": 7086,
+      "id": "NATIVE-CONTEXT-LIFECYCLE-001",
+      "parent": "NATIVE-AGENT-HORIZON-001",
+      "program": "TERMINAL",
+      "outcome": "Native chat/agent context yaşam-döngüsü: ölçülmüş admission + dinamik output tavanı + hidden-reasoning bounded continuation + delta-checkpoint context epoch + yapılandırılmış @ref soyağacı + /renew epoch semantiği",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Uzun native chat/agent işi manuel `devam` olmadan, yanlış context uyarısı olmadan, sessiz durum kaybı olmadan akıcı; DÖRT failure sınıfı ayrışır ve typed kapanır: OUTPUT-CAP (outputReserve wire max_tokens olamaz; hidden reasoning typed metadata; bounded continuation + stitch; partial tool-call asla execute edilmez), GERÇEK INPUT OVERFLOW (provider-neutral wire ölçümü exact/üst-sınır etiketli + mahkûm istek gönderilmez; chars/4 authority değil), @REF ŞİŞMESİ (ham niyet / expanded payload / referans-descriptor+digest ayrı; checkpoint objective ham niyet+lineage), /RENEW (kümülatif billing/usage aynen + güvenli context-epoch tazelemesi); checkpoint isteği önceki özet + bounded delta (tam transcript değil) ve aynı admission zincirinden; 5 typed UX kodu en+tr + privacy-safe canonical audit; 11 incident-şekilli regresyon + fresh-build canlı local-Qwen + adapter paritesi + farklı-provider XVerify + terminal settlement",
+      "evidence": "Owner admission 2026-08-18: \"Codex analiz sonucu bunu da değerlendirerek sonraki sprinte dahil edelim\". Kanıt tabanı ÇİFT bağımsız RCA: Codex handoff receipt `.analysis/handoff-native-context-lifecycle-2026-08-18.json` (receiptDigest sha256:ab3a9a3a…, RCA scope digest sha256:8a8dea2c… bağımsız doğrulandı; kabul otoritesi `.analysis/native-context-lifecycle-rca-2026-08-18.md`) + Fable→Sol xverify 3/3 CONFIRMED (`0d4f3666…` probe config-şartlı + 100k hayalet tavan; `752b074e…` fitting hayalet tavana bağlı + tam-transcript checkpoint tıkanınca kendisi sığmaz; `897936bd…` renew transcript'e dokunmaz + max_tokens şartlı). Ölçülmüş incident'ler: 88,599 input / 131,072 n_ctx / 36k headroom VARKEN 4,096 output-cap'te boş-görünür length ×3; 222,682 vs 131,072 gerçek overflow (chars/4 126K demişti); 26 karakter ham → 99,353 karakter transcript. Planner not: Codex'in do denemesindeki Fable transport hatası bounded probe ile REPRODUCE EDİLEMEDİ (headless pong exit 0) — planner observability kaybı (typed hatanın no-usable-plan'a inmesi) bu satırın audit kapsamına dahil. Sıra: 7085 landing SONRASI ilk sprint (560); skill-unlock (9034+7121) onu izler",
       "updated": "2026-08-18"
     },
     {
@@ -24953,8 +24999,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Shipped builtin ve supported custom/imported skill'ler canonical valid V3 profile taşır; test-local profile reimplementation kalmaz; enabled=false, retired, quarantined, invalid, profile-less, contentless veya policy/tenant/scope-uyumsuz skill seçilmez; explicit force/exclude owner authority CLI, MCP, Terminal, sprint, FIX/XFIX ve single-task yollarında aynı sonucu verir; rejection typed reason taşır; manifest entrypoint ve referenced content gerçekten worker prompt'una ulaşmadan stats credit verilmez; honest-empty ve unavailable HOLD ayrışır; representative real-binary routing/prompt ve 1000-skill scale kanıtı vardır",
-      "evidence": "2026-08-10 code-truth: 31 effective skill'in valid profile sayısı 0 ve adapter profile olmayanların hepsini sessizce atlıyor; 81 yeşil test profile'ları yalnız test-local sabitte tutuyor; representative API+test runtime probe `api-builder` agentını seçerken skillIds boş döndü; direct V3 forceSkills `[testing-expert]` değerini boş listeyle overwrite ederken sprint-spawner sonradan union ediyor; V3 adapter enabled filtresi uygulamıyor",
-      "updated": "2026-08-10"
+      "evidence": "2026-08-10 code-truth: 31 effective skill'in valid profile sayısı 0 ve adapter profile olmayanların hepsini sessizce atlıyor; 81 yeşil test profile'ları yalnız test-local sabitte tutuyor; representative API+test runtime probe `api-builder` agentını seçerken skillIds boş döndü; direct V3 forceSkills `[testing-expert]` değerini boş listeyle overwrite ederken sprint-spawner sonradan union ediyor; V3 adapter enabled filtresi uygulamıyor. ÖNE-ALMA (Alperen 2026-08-18): \"görevlere skill injection yok — kaybımız devam ediyor\" — canlı kanıt sprint-558: task-558-001 assignedSkills=[] iken agent ataması çalışıyor; disk 30/30 skill'de profile alanı null (manifest yalnız V2 activation taşıyor), routing-plan-adapter yalnız valid profile kabul ettiğinden TÜM katalog her sprint'te görünmez; enjeksiyon tarafı canlı (sprint-spawner resolveSkillPrompts + typed HOLD) fakat seçim tarafı boş besliyor. Sıra: 7085 landing sonrası ilk paket = 9034+7121 çekirdeği (builtin 30 skill için canonical V3 profile üretimi + eligibility/typed-rejection + delivery-proof); owner eski analizleri getirecek, sprint planı onlarla birleşince yazılır",
+      "updated": "2026-08-18"
     },
     {
       "order": 9035,
@@ -25959,6 +26005,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "63f26d8471dce038e10cf2aa4916724f3ba639a557957c9dfac1c6aa8cd28f3e"
+    "value": "c3b5f660758fdf9e174f334609f807362323a79aea3bb5a81b687a2650be2d2f"
   }
 }

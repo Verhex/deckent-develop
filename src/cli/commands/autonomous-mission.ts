@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import { SqliteMissionStore } from '../../orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { createListMission } from '../../orchestra/autonomous/mission-store/mission-ingest.js';
@@ -260,12 +260,12 @@ export function handleListMissions(opts: ListMissionsOpts): void {
 export function registerAutonomousMission(program: Command): void {
   const grp = program
     .command('autonomous-mission')
-    .description('Manage autonomous v2 missions — list missions, goal missions');
+    .description(getMessage('cli.autonomous_mission.desc', getLanguage(undefined)));
 
   // create-list <title>
   grp
     .command('create-list <title>')
-    .description('Create a Type-1 list mission from N work-items')
+    .description(getMessage('cli.autonomous_mission.create_list.desc', getLanguage(undefined)))
     .option(
       '--item <kind:spec>',
       'Work item (repeatable): kind or kind:json-spec',
@@ -305,7 +305,7 @@ export function registerAutonomousMission(program: Command): void {
   // create-goal <goal>
   grp
     .command('create-goal <goal>')
-    .description('Create a Type-2 goal mission (runs until the goal is reached)')
+    .description(getMessage('cli.autonomous_mission.create_goal.desc', getLanguage(undefined)))
     .option('--accept <criteria>', 'Acceptance criteria string')
     .option('--title <title>', 'Mission title (defaults to goal text)')
     .option('--id <id>', 'Mission id (auto-generated if omitted)')
@@ -335,7 +335,7 @@ export function registerAutonomousMission(program: Command): void {
   // list
   grp
     .command('list')
-    .description('List all missions (summary table)')
+    .description(getMessage('cli.autonomous_mission.list.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .option('--tenant <tenant>', 'Filter by tenant')
     .action((opts: { json?: boolean; tenant?: string }) => {

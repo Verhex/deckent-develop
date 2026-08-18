@@ -32,6 +32,8 @@ vi.mock('../../src/cli/helpers/process.js', () => ({
 
 vi.mock('../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn().mockReturnValue('No active sprint.'),
+  getLanguage: () => 'en',
+  resolveLanguage: () => 'en',
 }));
 
 vi.mock('../../src/monitor/sprint-state.js', () => ({

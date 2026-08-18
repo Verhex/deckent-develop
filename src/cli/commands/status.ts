@@ -7,7 +7,7 @@ import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js'
 import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi , isDashboardOrphaned } from '../helpers/output.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, resolveLanguage } from '../helpers/messages.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { formatStatus, resolveOutputMode } from '../../core/output-formatter.js';
 import { eventBus } from '../../orchestra/event-bus.js';
@@ -565,15 +565,18 @@ function readDashboard(dashPath: string): DashboardState | null {
  * Falls back to 'en' if the config is missing or unreadable.
  */
 export function getLangFromRoot(root: string): string {
+  let configLanguage: string | undefined;
   try {
     const configPath = join(root, '.deckent', 'config.json');
-    if (!existsSync(configPath)) return 'en';
-    const raw = readFileSync(configPath, 'utf-8');
-    const cfg = JSON.parse(raw) as { language?: string };
-    return cfg.language === 'tr' ? 'tr' : 'en';
+    if (existsSync(configPath)) {
+      const raw = readFileSync(configPath, 'utf-8');
+      const cfg = JSON.parse(raw) as { language?: string };
+      configLanguage = cfg.language;
+    }
   } catch {
-    return 'en';
+    // fallback
   }
+  return resolveLanguage(configLanguage);
 }
 
 export function loadTaskFiles(root: string): Task[] {

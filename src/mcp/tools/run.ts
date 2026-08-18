@@ -21,6 +21,7 @@ import { createAttendedExecutionProposalMaterialFromTask } from '../../core/atte
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { preflightProviderExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
 import { orderedRoleProviders } from '../../core/provider.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 function generateJobId(): string {
   return `run-${Date.now().toString(36)}`;
@@ -37,7 +38,7 @@ export function registerRunTool(
     'deckent_run',
     {
       title: 'Run Task',
-      description: 'Run a single one-off task outside of a full sprint. Creates a task JSON file and spawns a Claude worker immediately. Returns a jobId for tracking. Use when you need a quick isolated task without the full sprint lifecycle overhead (no PLAN/EVALUATE/RETRO phases). Use deckent_status to monitor the spawned worker. Example: fix a specific bug, write a single test file, update a doc.',
+      description: mcpToolDescription('deckent_run'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         description: z.string().describe('Clear description of what the worker should do. Be specific: include file paths, expected outcome, and any constraints.'),

@@ -28,7 +28,7 @@ import {
 } from '../helpers/connect-wizard.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
 import { buildAuthStateReport, type AuthStateResult } from './doctor.js';
 
@@ -198,7 +198,7 @@ export function formatConnectReport(
 export function registerConnect(program: Command): void {
   program
     .command('connect')
-    .description('Diagnose provider/MCP/IDE/shell connection status (read-only — no changes are made)')
+    .description(getMessage('cli.connect.desc', getLanguage(undefined)))
     .option('--provider <name>', `Scope the report to a single provider (${CONNECT_PROVIDERS.join('|')})`)
     .option('--json', 'Output the report as JSON')
     .action(async (opts: ConnectCommandOptions) => {

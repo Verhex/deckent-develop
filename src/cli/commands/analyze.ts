@@ -29,7 +29,7 @@ export function registerAnalyze(program: Command): void {
   program
     .command('analyze')
     .alias('analyze-project')
-    .description('Analyze project stack, size, and recommended methodology')
+    .description(getMessage('cli.analyze.desc', getLanguage(undefined)))
     .option('--json', 'Output raw JSON')
     .option('--bootstrap-vocabulary', 'Derive and write the project routing-vocabulary layer (.deckent/routing/vocabulary.json)')
     .action(async (opts: { json?: boolean; bootstrapVocabulary?: boolean }) => {
@@ -54,11 +54,16 @@ export function registerAnalyze(program: Command): void {
         try {
           const bootstrap = bootstrapProjectVocabulary(root, detectProjectStack(root));
           const written = writeVocabulary(root, bootstrap.candidates.map((c) => c.domain));
-          print(getMessage('analyze.vocabulary_bootstrap', lang, {
+          // The bootstrap line is a side-effect notice, not part of the analysis
+          // payload: in --json mode the document on stdout is already closed, so the
+          // notice goes to stderr rather than trailing prose after the JSON.
+          const bootstrapLine = getMessage('analyze.vocabulary_bootstrap', lang, {
             count: String(bootstrap.candidates.length),
             status: written.status,
             path: written.path ?? '-',
-          }));
+          });
+          if (opts.json) process.stderr.write(`${bootstrapLine}\n`);
+          else print(bootstrapLine);
         } catch (error) {
           printError(error);
           process.exitCode = 1;

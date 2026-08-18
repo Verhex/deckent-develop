@@ -72,7 +72,7 @@ interface ServeOpts {
 export function registerServe(program: Command): void {
   program
     .command('serve')
-    .description('Start HTTP API server with SSE support')
+    .description(getMessage('cli.serve.desc', getLanguage(undefined)))
     .option('--port <number>', 'Port to listen on', '3100')
     .option('--dev', 'Enable dev proxy mode — expects Vite dev server on --dev-port')
     .option('--dev-port <number>', 'Vite dev server port for --dev proxy mode', '5173')

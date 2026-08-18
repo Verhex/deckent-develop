@@ -2,6 +2,7 @@ import type { Command } from 'commander';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getDebtItems } from '../../core/debt-store.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 /**
  * `deckent archive-debt` — report tech-debt status from the Memory V2 DB.
@@ -15,7 +16,7 @@ import { getDebtItems } from '../../core/debt-store.js';
 export function registerArchiveDebt(program: Command): void {
   program
     .command('archive-debt')
-    .description('Report tech-debt status (DB-first; resolved debt is auto-managed in memory.db)')
+    .description(getMessage('cli.archive_debt.desc', getLanguage(undefined)))
     .option('--count', 'Show only the open/resolved counts')
     .option('--before <sprint>', 'Also report resolved items originating before this sprint ID')
     .action((opts: { count?: boolean; before?: string }) => {

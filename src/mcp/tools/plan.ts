@@ -14,6 +14,7 @@ import type { BrainPlanningMode, PlannerProof, SprintSizeRecommendation } from '
 import { getMessage } from '../../cli/helpers/messages.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatPlanResponse, wrapResponse } from '../helpers/format.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 function computeModelDistribution(tasks: Array<{ model?: string }>): Record<string, number> {
   const dist: Record<string, number> = {};
@@ -36,7 +37,7 @@ export function registerPlanTool(server: McpServer): void {
     'deckent_plan',
     {
       title: 'Plan Sprint',
-      description: 'Preview a sprint plan based on current DIRECTIVES.md. Reads DIRECTIVES.md, analyzes task blocks, and returns a proposed task list with model assignments, wave breakdown, and risk assessment — without executing anything. Use this to validate your directives before running deckent_start. Prerequisite: deckent_init + deckent_set_directives must have been run.',
+      description: mcpToolDescription('deckent_plan'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         dryRun: z.boolean().optional().default(true).describe('Always dry-run for plan tool — tasks are never written to disk'),

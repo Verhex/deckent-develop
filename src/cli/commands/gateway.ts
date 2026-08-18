@@ -91,6 +91,7 @@ export function registerGateway(program: Command): void {
   const cmd = program.command('gateway').description(getMessage('gateway.group_desc', lang));
 
   cmd.command('listen')
+    .description(getMessage('cli.gateway.listen.desc', lang))
     .option('--lang <code>', 'Language override (en|tr)')
     .action(async (opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
@@ -106,6 +107,7 @@ export function registerGateway(program: Command): void {
     });
 
   cmd.command('start')
+    .description(getMessage('cli.gateway.start.desc', lang))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
@@ -124,6 +126,7 @@ export function registerGateway(program: Command): void {
     });
 
   cmd.command('stop')
+    .description(getMessage('cli.gateway.stop.desc', lang))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
@@ -138,6 +141,7 @@ export function registerGateway(program: Command): void {
     });
 
   cmd.command('status')
+    .description(getMessage('cli.gateway.status.desc', lang))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
@@ -150,11 +154,11 @@ export function registerGateway(program: Command): void {
     });
 
   const pair = cmd.command('pair').description(getMessage('gateway.pair_usage', getLanguage(undefined)));
-  pair.command('list').option('--lang <code>', 'Language override (en|tr)')
+  pair.command('list').description(getMessage('cli.gateway.pair.list.desc', lang)).option('--lang <code>', 'Language override (en|tr)')
     .action(async (opts: { lang?: string }) => { await handleGatewayPairList(opts); });
-  pair.command('approve <code> <project>').option('--lang <code>', 'Language override (en|tr)')
+  pair.command('approve <code> <project>').description(getMessage('cli.gateway.pair.approve.desc', lang)).option('--lang <code>', 'Language override (en|tr)')
     .action(async (code: string, project: string, opts: { lang?: string }) => { await handleGatewayPairApprove({ code, project, lang: opts.lang }); });
-  pair.command('reject <code>').option('--lang <code>', 'Language override (en|tr)')
+  pair.command('reject <code>').description(getMessage('cli.gateway.pair.reject.desc', lang)).option('--lang <code>', 'Language override (en|tr)')
     .action(async (code: string, opts: { lang?: string }) => { await handleGatewayPairReject({ code, lang: opts.lang }); });
 
   // Hidden child entry — spawned by the supervisor for per-project runtime, not for direct use.

@@ -65,11 +65,11 @@ function updateCheckpointStatus(root: string, sprintId: string, phase: string, s
 export function registerCheckpoint(program: Command): void {
   const cmd = program
     .command('checkpoint')
-    .description('Manage human checkpoints — list, approve, or reject pending checkpoints');
+    .description(getMessage('cli.checkpoint.desc', getLanguage(undefined)));
 
   cmd
     .command('list')
-    .description('List all checkpoints')
+    .description(getMessage('cli.checkpoint.list.desc', getLanguage(undefined)))
     .option('--pending', 'Show only pending checkpoints')
     .option('--json', 'Output as JSON')
     .option('--lang <code>', 'Language override (en|tr)')
@@ -83,11 +83,8 @@ export function registerCheckpoint(program: Command): void {
           checkpoints = checkpoints.filter(c => c.checkpoint.status === 'pending');
         }
 
-        if (checkpoints.length === 0) {
-          print(getMessage('checkpoint.list_empty', lang));
-          return;
-        }
-
+        // JSON first: an empty checkpoint list is `[]` on stdout, not the human
+        // "no checkpoints" line — the machine surface owes exactly one document.
         if (opts.json) {
           print(JSON.stringify(checkpoints.map(c => ({
             sprintId: c.sprintId,
@@ -96,6 +93,11 @@ export function registerCheckpoint(program: Command): void {
             summary: c.checkpoint.summary,
             createdAt: c.checkpoint.createdAt,
           })), null, 2));
+          return;
+        }
+
+        if (checkpoints.length === 0) {
+          print(getMessage('checkpoint.list_empty', lang));
           return;
         }
 
@@ -124,7 +126,7 @@ export function registerCheckpoint(program: Command): void {
 
   cmd
     .command('approve <sprintId> <phase>')
-    .description('Approve a pending checkpoint')
+    .description(getMessage('cli.checkpoint.approve.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((sprintId: string, phase: string, opts: { lang?: string }) => {
       try {
@@ -145,7 +147,7 @@ export function registerCheckpoint(program: Command): void {
 
   cmd
     .command('reject <sprintId> <phase>')
-    .description('Reject a pending checkpoint')
+    .description(getMessage('cli.checkpoint.reject.desc', getLanguage(undefined)))
     .option('--lang <code>', 'Language override (en|tr)')
     .action((sprintId: string, phase: string, opts: { lang?: string }) => {
       try {

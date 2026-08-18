@@ -220,13 +220,13 @@ export async function shouldProceedAgentDelete(
 }
 
 export function registerAgent(program: Command): void {
-  const agentCmd = program.command('agent').description('Manage agent pool');
+  const agentCmd = program.command('agent').description(getMessage('cli.agent.desc', getLanguage(undefined)));
   const registrationLang = getLanguage();
 
   // ─── agent lint (ROUTING-V3 Slice-1, 446) ────────────────────────
   agentCmd
     .command('lint')
-    .description('Lint the agent catalog: reachability, coverage gaps, capability overlaps (V3)')
+    .description(getMessage('cli.agent.lint.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action(async (opts: { json?: boolean }) => {
       try {
@@ -311,7 +311,7 @@ export function registerAgent(program: Command): void {
   // ─── agent list ─────────────────────────────────────────────────
   agentCmd
     .command('list')
-    .description('List all agents in the pool')
+    .description(getMessage('cli.agent.list.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action(async (opts: { json?: boolean }) => {
       try {
@@ -331,15 +331,17 @@ export function registerAgent(program: Command): void {
           return { ...agent, ...stats, successRate: stats.successRatio };
         });
 
-        if (agents.length === 0) {
-          print('No agents found. Create one with: deckent agent create <name>');
-          return;
-        }
-
+        // JSON first: the machine surface owes stdout exactly one document, and an
+        // empty catalog is the empty array — never the human "create one" hint.
         if (opts.json) {
           // The machine payload carries all four facets (§3.4); the table below is the
           // six-column human view and cannot show them without new i18n keys (see notes).
           print(JSON.stringify(agents, null, 2));
+          return;
+        }
+
+        if (agents.length === 0) {
+          print('No agents found. Create one with: deckent agent create <name>');
           return;
         }
 
@@ -448,7 +450,7 @@ export function registerAgent(program: Command): void {
   // ─── agent stats ────────────────────────────────────────────────
   agentCmd
     .command('stats <name>')
-    .description('Show sprint-by-sprint performance for an agent')
+    .description(getMessage('cli.agent.stats.desc', getLanguage(undefined)))
     .option('--json', 'Output as JSON')
     .action(async (name: string, opts: { json?: boolean }) => {
       try {
@@ -491,7 +493,7 @@ export function registerAgent(program: Command): void {
   // ─── agent enable ───────────────────────────────────────────────
   agentCmd
     .command('enable <name>')
-    .description('Enable an agent')
+    .description(getMessage('cli.agent.enable.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -510,7 +512,7 @@ export function registerAgent(program: Command): void {
   // ─── agent disable ──────────────────────────────────────────────
   agentCmd
     .command('disable <name>')
-    .description('Disable an agent')
+    .description(getMessage('cli.agent.disable.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();
@@ -529,7 +531,7 @@ export function registerAgent(program: Command): void {
   // ─── agent delete ──────────────────────────────────────────────
   agentCmd
     .command('delete <name>')
-    .description('Delete an agent from the pool')
+    .description(getMessage('cli.agent.delete.desc', getLanguage(undefined)))
     .option('--force', 'Skip the confirmation prompt')
     .action(async (name: string, opts: { force?: boolean }) => {
       try {
@@ -559,7 +561,7 @@ export function registerAgent(program: Command): void {
   // ─── agent edit ────────────────────────────────────────────────
   agentCmd
     .command('edit <name>')
-    .description('Edit an agent configuration')
+    .description(getMessage('cli.agent.edit.desc', getLanguage(undefined)))
     .option('--model <model>', 'Update model')
     .option('--description <desc>', 'Update description')
     .option('--enable', 'Enable the agent')
@@ -634,7 +636,7 @@ export function registerAgent(program: Command): void {
   // ─── agent reclassify ──────────────────────────────────────────
   agentCmd
     .command('reclassify')
-    .description('Reclassify a recorded task outcome (delta-applies agent/skill stats)')
+    .description(getMessage('cli.agent.reclassify.desc', getLanguage(undefined)))
     .requiredOption('--sprint <id>', 'Sprint id (e.g. sprint-191)')
     .requiredOption('--task <id>', 'Task id within the sprint')
     .requiredOption('--decision <decision>', 'New evaluation: DONE | GO_WITH_TECH_DEBT | NO_GO')
@@ -704,7 +706,7 @@ export function registerAgent(program: Command): void {
   // ─── agent info ────────────────────────────────────────────────
   agentCmd
     .command('info <name>')
-    .description('Show detailed agent information')
+    .description(getMessage('cli.agent.info.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
         const root = resolveProjectRoot();

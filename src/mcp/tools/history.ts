@@ -5,6 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatHistoryResponse, wrapResponse, type HistoryData } from '../helpers/format.js';
 import { collectSprintFiles } from '../../orchestra/sprint-reporter.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 function detectTrend(sprints: Array<{ id: string; content: string }>): string {
   if (sprints.length < 2) return 'insufficient_data';
@@ -30,7 +31,7 @@ export function registerHistoryTool(server: McpServer): void {
     'deckent_history',
     {
       title: 'Run History',
-      description: 'Read archived run log files from .brain/sprints/. Returns the last N run markdown logs sorted by run ID, plus a trend analysis (improving/declining/stable) based on task completion rates across runs. Use to understand long-term project health, compare run performance, or review past decisions. Each run log contains task outcomes, model usage, and learning notes.',
+      description: mcpToolDescription('deckent_history'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         last: z.number().min(1).max(50).optional().default(5).describe('Number of most recent runs to return (1-50, default: 5). Runs are sorted by sprint ID ascending.'),

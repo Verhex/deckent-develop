@@ -21,6 +21,7 @@ import type {
   LineageUsageAuthorityAggregate,
   LineageUsageAuthorityInput,
 } from '../../core/lineage-usage-authority.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 // ─── Injectable deps ────────────────────────────────────────────────────────
 
@@ -169,13 +170,7 @@ export function registerUsageTool(server: McpServer): void {
     'deckent_usage',
     {
       title: 'Usage',
-      description:
-        'Show token/limit consumption from Claude Code transcripts. ' +
-        'Default: last-7-day model-level summary (calls, tokens, limit-cost, cache hit%). ' +
-        'With sprint: per-task breakdown + cache gate report for that sprint. ' +
-        'With lineage: project the canonical logical-root usage/billing aggregate ' +
-        '(same authority as core/lineage-usage-authority.ts) for caller-supplied tasks/attempts — ' +
-        'no MCP-side billing recalculation.',
+      description: mcpToolDescription('deckent_usage'),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

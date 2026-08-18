@@ -20,6 +20,7 @@ import {
   runStatusReadModelMatchesAuthority,
   type CanonicalRunStatusReadModel,
 } from '../../core/run-status-read-model.js';
+import { mcpToolDescription } from './description-catalog.js';
 
 /**
  * Read the last N events from the event stream JSONL file.
@@ -364,7 +365,7 @@ export function registerStatusTool(server: McpServer): void {
     'deckent_status',
     {
       title: 'Run Status',
-      description: 'Get the current run dashboard status. Returns: agents (active worker list with task assignments), progress (done/total counts + progress bar + ETA), alerts (stale workers, boundary violations, lock issues), job (background job state: RUNNING/COMPLETE/FAILED + sprintId + metrics), agentAssignments (which agent handles which tasks), skillAssignments (which skills are active). Call repeatedly to poll progress. No prerequisite — safe to call anytime.',
+      description: mcpToolDescription('deckent_status'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption.'),

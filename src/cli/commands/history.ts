@@ -234,15 +234,28 @@ export function registerHistory(program: Command): void {
       const lang = detectLang(root);
       const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
 
+      /**
+       * `--json` owes stdout one document: "no history" is the empty record array,
+       * and the human line moves to stderr where prose is free.
+       */
+      const emptyHistory = (messageKey: string): void => {
+        if (opts.json) {
+          process.stderr.write(`${getMessage(messageKey, lang)}\n`);
+          print(JSON.stringify([], null, 2));
+          return;
+        }
+        print(getMessage(messageKey, lang));
+      };
+
       if (!existsSync(sprintsDir)) {
-        print(getMessage('history.no_history', lang));
+        emptyHistory('history.no_history');
         return;
       }
 
       let entries = collectSprintFiles(root);
 
       if (entries.length === 0) {
-        print(getMessage('history.no_history', lang));
+        emptyHistory('history.no_history');
         return;
       }
 
@@ -285,7 +298,7 @@ export function registerHistory(program: Command): void {
       }
 
       if (records.length === 0) {
-        print(getMessage('history.no_match', lang));
+        emptyHistory('history.no_match');
         return;
       }
 

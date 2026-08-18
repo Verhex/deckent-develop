@@ -6,6 +6,7 @@ import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECKENT_VERSION } from '../core/constants.js';
 import { registerTools } from './tools/index.js';
+import { setMcpToolDescriptionLanguage } from './tools/description-catalog.js';
 import { registerResources } from './resources/index.js';
 import { McpNotificationAdapter } from '../core/notify-adapters/mcp-adapter.js';
 import { NotifyDispatcher } from '../core/notification-dispatcher.js';
@@ -182,6 +183,11 @@ export function createServer(ctx?: DeckentMcpServerContext): McpServer {
     ttlMs: ctx?.ttlMs,
   };
   installWriterLeaseGate(server, gateCtx);
+
+  // 559-004: tool descriptions resolve from the shared MESSAGES catalog, so the
+  // surface language must be seeded from the canonical config-backed resolution
+  // BEFORE any tool registers — a description is read at registration time.
+  setMcpToolDescriptionLanguage(gateCtx.lang);
 
   registerTools(server, {
     ...(ctx?.attendedExecutionApprovalAuthority

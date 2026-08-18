@@ -11,6 +11,16 @@
 // Regenerate the baseline after an intentional change:
 //   node scripts/lint-cli-mcp-parity.mjs --update-baseline
 // Wired into `npm run lint` via lint:gates (W7 terfi, 2026-07-07).
+//
+// Description-key parity (559-005): beyond command-name parity above, also
+// checks that every `surface: 'cli-shared'` entry in
+// src/mcp/tools/description-catalog.ts's MCP_TOOL_DESCRIPTION_BINDINGS
+// declares a `key` that is genuinely the description key some CLI command
+// reads via `.description(getMessage('<key>', ...))` — catching key
+// drift/typo/rename desync between the two surfaces sharing one sentence
+// (559-002 CLI catalog + 559-004 MCP binding table). Same baseline-ratchet
+// discipline as the command-name gaps: new gaps fail, known ones live in
+// `descriptionKeyGaps` in the same baseline file.
 
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -79,6 +89,44 @@ for (const file of mcpFiles) {
     }
   }
 }
+
+// ── 2b. Parse MCP tool description-key bindings (559-005) ────────────────────
+
+/** @typedef {{ tool: string, key: string, surface: string }} DescriptionBinding */
+
+const descriptionCatalogPath = join(root, 'src', 'mcp', 'tools', 'description-catalog.ts');
+const descriptionCatalogContent = readFileSync(descriptionCatalogPath, 'utf8');
+
+/** @type {DescriptionBinding[]} */
+const descriptionBindings = [];
+{
+  const re = /(deckent_[a-zA-Z0-9_]+):\s*\{\s*key:\s*'([^']+)',\s*surface:\s*'([^']+)'/g;
+  let m;
+  while ((m = re.exec(descriptionCatalogContent)) !== null) {
+    descriptionBindings.push({ tool: m[1], key: m[2], surface: m[3] });
+  }
+}
+
+// Keys actually used as a real `.description(getMessage('<key>', ...))` call
+// site across the CLI surface — the single source of truth a cli-shared
+// binding's `key` must match.
+const usedDescriptionKeys = new Set();
+{
+  const re = /\.description\(\s*getMessage\(\s*'([^']+)'/g;
+  for (const file of [join(root, 'src', 'cli', 'index.ts'), ...cliFiles.map((f) => join(cliDir, f))]) {
+    const content = readFileSync(file, 'utf8');
+    let m;
+    re.lastIndex = 0;
+    while ((m = re.exec(content)) !== null) usedDescriptionKeys.add(m[1]);
+  }
+}
+
+// cli-shared bindings whose declared key is not actually read by any CLI
+// command's own `.description(getMessage(...))` call — key drift.
+const descriptionKeyGaps = descriptionBindings
+  .filter((b) => b.surface === 'cli-shared' && !usedDescriptionKeys.has(b.key))
+  .map((b) => `${b.tool}:${b.key}`)
+  .sort();
 
 // ── 3. Build parity map ───────────────────────────────────────────────────────
 
@@ -177,17 +225,21 @@ if (process.argv.includes('--update-baseline')) {
       'Accepted CLI↔MCP parity gaps. lint-cli-mcp-parity.mjs fails only on gaps NOT listed here. Regenerate: node scripts/lint-cli-mcp-parity.mjs --update-baseline',
     cliOnly: cliOnly.map((x) => x.cmd),
     mcpOnly: mcpOnly.map((x) => x.tool),
+    descriptionKeyGaps,
   };
   writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + '\n');
   console.log(
-    `✓ baseline updated: ${baseline.cliOnly.length} CLI-only + ${baseline.mcpOnly.length} MCP-only accepted (${BASELINE_PATH})`,
+    `✓ baseline updated: ${baseline.cliOnly.length} CLI-only + ${baseline.mcpOnly.length} MCP-only `
+    + `+ ${baseline.descriptionKeyGaps.length} description-key gap(s) accepted (${BASELINE_PATH})`,
   );
   process.exit(0);
 }
 
-let baseline = { cliOnly: [], mcpOnly: [] };
+let baseline = { cliOnly: [], mcpOnly: [], descriptionKeyGaps: [] };
 if (existsSync(BASELINE_PATH)) {
   baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  // Older baseline files predate 559-005 and won't carry this field.
+  baseline.descriptionKeyGaps ??= [];
 } else {
   console.error(`✗ baseline missing: ${BASELINE_PATH} — run with --update-baseline first`);
   process.exit(1);
@@ -197,6 +249,9 @@ const newCliOnly = cliOnly.filter((x) => !baseline.cliOnly.includes(x.cmd));
 const newMcpOnly = mcpOnly.filter((x) => !baseline.mcpOnly.includes(x.tool));
 const staleCli = baseline.cliOnly.filter((name) => !cliOnly.some((x) => x.cmd === name));
 const staleMcp = baseline.mcpOnly.filter((name) => !mcpOnly.some((x) => x.tool === name));
+
+const newDescriptionKeyGaps = descriptionKeyGaps.filter((g) => !baseline.descriptionKeyGaps.includes(g));
+const staleDescriptionKeyGaps = baseline.descriptionKeyGaps.filter((g) => !descriptionKeyGaps.includes(g));
 
 // ── 5. Report ─────────────────────────────────────────────────────────────────
 
@@ -210,16 +265,18 @@ console.log('└' + '─'.repeat(W) + '┘');
 console.log('');
 console.log(`  CLI commands scanned : ${cliCommands.size}`);
 console.log(`  MCP tools scanned    : ${mcpTools.size}`);
+console.log(`  cli-shared description bindings scanned : ${descriptionBindings.filter((b) => b.surface === 'cli-shared').length}`);
 console.log('');
 console.log(line);
 
 console.log(
-  `  Known-intentional gaps (baseline): ${baseline.cliOnly.length} CLI-only + ${baseline.mcpOnly.length} MCP-only`,
+  `  Known-intentional gaps (baseline): ${baseline.cliOnly.length} CLI-only + ${baseline.mcpOnly.length} MCP-only `
+  + `+ ${baseline.descriptionKeyGaps.length} description-key`,
 );
 console.log('');
 console.log(line);
 
-if (newCliOnly.length === 0 && newMcpOnly.length === 0) {
+if (newCliOnly.length === 0 && newMcpOnly.length === 0 && newDescriptionKeyGaps.length === 0) {
   console.log('  ✓ No NEW parity gaps beyond the accepted baseline.');
 } else {
   if (newCliOnly.length > 0) {
@@ -238,14 +295,26 @@ if (newCliOnly.length === 0 && newMcpOnly.length === 0) {
     }
     console.log('');
   }
+  if (newDescriptionKeyGaps.length > 0) {
+    console.log(`  ✗ NEW description-key gap (cli-shared key not read by any CLI command) — ${newDescriptionKeyGaps.length} item(s):`);
+    console.log('');
+    for (const gap of newDescriptionKeyGaps) {
+      console.log(`    ${gap}`);
+    }
+    console.log('');
+    console.log('  MCP_TOOL_DESCRIPTION_BINDINGS declares a cli-shared key that no CLI');
+    console.log('  command actually reads via .description(getMessage(\'<key>\', ...)) —');
+    console.log('  fix the key drift in src/mcp/tools/description-catalog.ts, or if');
+    console.log('  intentional, accept it below.');
+  }
   console.log('  Add the missing counterpart, or if the gap is intentional,');
   console.log('  accept it: node scripts/lint-cli-mcp-parity.mjs --update-baseline');
 }
 
-if (staleCli.length > 0 || staleMcp.length > 0) {
+if (staleCli.length > 0 || staleMcp.length > 0 || staleDescriptionKeyGaps.length > 0) {
   console.log('');
   console.log(
-    `  ⚠ Stale baseline entries (gap no longer exists): ${[...staleCli, ...staleMcp].join(', ')}`,
+    `  ⚠ Stale baseline entries (gap no longer exists): ${[...staleCli, ...staleMcp, ...staleDescriptionKeyGaps].join(', ')}`,
   );
   console.log('    Prune with: node scripts/lint-cli-mcp-parity.mjs --update-baseline');
 }
@@ -254,4 +323,4 @@ console.log('');
 console.log(line);
 console.log('');
 
-process.exit(newCliOnly.length > 0 || newMcpOnly.length > 0 ? 1 : 0);
+process.exit(newCliOnly.length > 0 || newMcpOnly.length > 0 || newDescriptionKeyGaps.length > 0 ? 1 : 0);

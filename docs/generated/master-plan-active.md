@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):492ffd9a15e1cd521343d54761cfe37bd409b8cc1a2f7b01825064c7deb59d9e`
+**Source digest:** `sha256(normalized-lf-utf8):9130a800a2392dd974dec332b0ad78f01e98172e772f6e57b299f38006f3880a`
 
-**Rows:** 503 total · 439 active · 64 terminal
+**Rows:** 504 total · 440 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 346 |
+| OPEN | 347 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -397,6 +397,7 @@
 | 7083 | `NATIVE-RUNFLOW-BOOTSTRAP-001` | OPEN | P0 | TERMINAL | — | — | Native terminal `deckent_propose_run` launch yolu — boş provider registry + session-budget dead-end düzeltmesi (Qwen canlı-tur bulguları) |
 | 7084 | `CLOSURE-OS-TRANSITION-TRUTH-001` | OPEN | P1 | TRUTH | — | — | Closure OS transition-brief truth-sync — projection drift, doküman drift, approval-claim kapsamlama (Codex denetim paketi) |
 | 7085 | `CLI-SURFACE-TRUTH-001` | OPEN | P0 | TERMINAL | — | — | CLI+MCP yüzey doğruluğu — komut açıklamaları tr/en dil seçimine sadık, insan-vs-JSON çıktı ayrımı sözleşmeli (owner öne-alma) |
+| 7086 | `NATIVE-CONTEXT-LIFECYCLE-001` | OPEN | P0 | TERMINAL | — | — | Native chat/agent context yaşam-döngüsü: ölçülmüş admission + dinamik output tavanı + hidden-reasoning bounded continuation + delta-checkpoint context epoch + yapılandırılmış @ref soyağacı + /renew epoch semantiği |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |

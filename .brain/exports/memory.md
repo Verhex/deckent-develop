@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-559 Learnings
+- Sprint sprint-559 Learnings: ## Sprint sprint-559 Learnings
+- CLI description kataloğu — 221 commander description'ı iki dilli tek kaynağa: NO_GO — All 5/5 Definition-of-Done items ticked with evidence.
+
+SCOPE: 222 commander .description() sites exist across src/cli/i
+- --json çıktı sözleşmesi — stdout tek JSON dokümanı, insan-metni stderr'e: NO_GO — CONTRACT: with --json active, stdout carries only a single parseable JSON document; prose, warnings and tables go to std
+- MCP tool description'ları aynı katalogdan + parity genişletmesi: NO_GO — MCP tool descriptions now resolve from the SAME MESSAGES catalog the CLI commander surface reads (the 559-002 single sou
+
+## Gains
+- 559-001 — Canonical language authority — tek çözücü, dört yolun tasfiyesi — All 6/6 Definition-of-Done checks satisfied.
+- 559-005 — Lint ratchet — .description hardcode taraması + parity gate genişletmesi — All 4/4 Definition-of-Done items ticked with evidence.
+- 559-006 — Hermetic surface battery — iki dilli sadakat + sözleşme envanteri — Wrote a single hermetic battery file tests/cli/cli-surface-truth-battery.test.ts (the only file i...
+
 ## Sprint sprint-557 Learnings
 - Sprint sprint-557 Learnings: ## Sprint sprint-557 Learnings
 - REPL renewal surface — typed offer + /renew command (depends on Task 1): GO_WITH_TECH_DEBT — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 (TSC_EXIT=0, first attempt). Targeted set 'npx vitest run tests

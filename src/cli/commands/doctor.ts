@@ -24,7 +24,7 @@ import { detectSubscription } from '../../core/subscription.js';
 import { print, formatDoctorResult, formatCIHealthSection } from '../helpers/output.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { readKeyringState, type KeyringReadState } from './provider-authority.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
 import { probeProviderAuth, type AuthProbeResult, type AuthProbeState } from '../../core/provider-auth-probe.js';
@@ -2260,7 +2260,7 @@ function resolveSpawnBackendForDoctor(root: string): string | undefined {
 export function registerDoctor(program: Command): void {
   program
     .command('doctor')
-    .description('Check system dependencies and health')
+    .description(getMessage('cli.doctor.desc', getLanguage(undefined)))
     .option('--profile', 'Show system profile information')
     .option('--legacy', 'Use legacy output format')
     .option('--json', 'Output results as JSON')
