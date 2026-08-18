@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "c9348ce71165eb2da4309140bb406b11be8ae76d1c4ebdef35b515f2a98cce83"
+    "value": "b600dedf1a2dd5f7ccd2c21e6427c94efce37092577ee079c8baf80b394ec253"
   },
   "summary": {
     "total": 505,
@@ -4813,7 +4813,7 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "b782179ff92aa3aa97c2e570e9b1a5bbf6dae19cfb73ddf7667697c72a369f4b",
-      "progressDigest": "d9fc1309609c761caae175f634766c5d4da769104a00a2d0c7f9328872c1e4b5",
+      "progressDigest": "37ed506f33dcb776cf7ee4db3dac47597f5a67967a640e481d7e2ae3c1f24e36",
       "terminalClosureDigest": null
     },
     {
@@ -23185,7 +23185,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Küçük @ref inline kalır (hız); toplam expansion ölçülen efektif bütçeyi aşınca otomatik tool-mediated moda düşer (REDDETME değil): prompt'a yalnız referans-descriptor'ları + 'read aracıyla parçalı oku' yönergesi girer; deckent_read_file offset/limit (satır-aralığı) destekler — 131K pencereli lokal model 1.2MB MASTER'ı 20 parçada okuyabilir; typed bilgilendirme (mevcut REFERENCE_EXPANSION sınıfı) en+tr; incident-şekilli battery: 149,503-token 3-dosya şekli artık overflow-ret DEĞİL akıcı araçlı-okuma turu üretir",
-      "evidence": "Owner admission + onay 2026-08-18 (canlı incident: `selam` ✓ sonrası 3-doküman @ref → INPUT_CONTEXT_OVERFLOW measured=149503 available=126976 — koruma DOĞRU çalıştı, davranış eksik: Claude Code dosyayı gömmez, model tool'la kendisi okur; context ≠ çalışma seti; orchestration tarafı zaten böyle — kırık tek yüzey native @ref full-inline). Ek bulgu aynı turdan: native render'da markdown tablo hizalaması bozuk (ayrı satır adayı). LANDED (sprint-562, 2026-08-18 — 3/3 logical task, finalize retro-adımı yine TERMINAL_EVIDENCE_HOLD [bulgu #2 örneği]): (1) `expandAtRefs` bütçe-bilinçli — opsiyonel expansionBudgetChars; bütçesiz yol byte-identical (pinli); sığmayan referans `[@ref-descriptor] path — bytes, lines, sha256:… — read it in slices` protokol satırına düşer; typed lineage (mode/digest/bytes/lines); app.tsx bütçeyi GERÇEK authority'den türetir (engine.getContextBudgetTokens — bridge expose'u ADR-D-007 el-tamamlaması, worker yarış-NO_GO'su fix-fix'te DONE'landı); (2) `deckent_read_file` ranged: {path, offset?, limit?} + totalLines meta, containment aynen (describe-tool pin realign); (3) typed bilgilendirme en+tr + battery: incident şekli (3 büyük ref + dar bütçe) → inline gövde YOK / 3 descriptor VAR / ölçülen istek bütçe ALTINDA (measureProviderRequest'le, admission tetiklenmez) / ranged dispatch gerçek registry'den. Landing: at-ref pinleri typed-lineage'a realign, projeksiyonlar regen, hermeticity dated-realign; suite yeşil. CANLI kanıt durumu ŞEFFAF: PTY reprosu 900s'de turn tamamlayamadı (trace yazılmadı — Qwen 27B üç-doküman araçlı-okuma turu uzun; kanıt hermetik battery + owner'ın canlı incident trace'i 17:28 chat-xln7e9: 5-char selam ✓ + 99,353-char expanded @ref belgesi); akıcı canlı tur owner'ın terminal-değerlendirme turunda doğrulanacak. Worker sprint'lerinde skill-delivery.json sidecar'ları İLK KEZ yazıldı (561 unlock meyvesi)",
+      "evidence": "Owner admission + onay 2026-08-18 (canlı incident: `selam` ✓ sonrası 3-doküman @ref → INPUT_CONTEXT_OVERFLOW measured=149503 available=126976 — koruma DOĞRU çalıştı, davranış eksik: Claude Code dosyayı gömmez, model tool'la kendisi okur; context ≠ çalışma seti; orchestration tarafı zaten böyle — kırık tek yüzey native @ref full-inline). Ek bulgu aynı turdan: native render'da markdown tablo hizalaması bozuk (ayrı satır adayı). LANDED (sprint-562, 2026-08-18 — 3/3 logical task, finalize retro-adımı yine TERMINAL_EVIDENCE_HOLD [bulgu #2 örneği]): (1) `expandAtRefs` bütçe-bilinçli — opsiyonel expansionBudgetChars; bütçesiz yol byte-identical (pinli); sığmayan referans `[@ref-descriptor] path — bytes, lines, sha256:… — read it in slices` protokol satırına düşer; typed lineage (mode/digest/bytes/lines); app.tsx bütçeyi GERÇEK authority'den türetir (engine.getContextBudgetTokens — bridge expose'u ADR-D-007 el-tamamlaması, worker yarış-NO_GO'su fix-fix'te DONE'landı); (2) `deckent_read_file` ranged: {path, offset?, limit?} + totalLines meta, containment aynen (describe-tool pin realign); (3) typed bilgilendirme en+tr + battery: incident şekli (3 büyük ref + dar bütçe) → inline gövde YOK / 3 descriptor VAR / ölçülen istek bütçe ALTINDA (measureProviderRequest'le, admission tetiklenmez) / ranged dispatch gerçek registry'den. Landing: at-ref pinleri typed-lineage'a realign, projeksiyonlar regen, hermeticity dated-realign; suite yeşil. CANLI kanıt durumu ŞEFFAF: PTY reprosu 900s'de turn tamamlayamadı (trace yazılmadı — Qwen 27B üç-doküman araçlı-okuma turu uzun; kanıt hermetik battery + owner'ın canlı incident trace'i 17:28 chat-xln7e9: 5-char selam ✓ + 99,353-char expanded @ref belgesi); akıcı canlı tur owner'ın terminal-değerlendirme turunda doğrulanacak. Worker sprint'lerinde skill-delivery.json sidecar'ları İLK KEZ yazıldı (561 unlock meyvesi). Landed-verify Sol kompozisyonu 2/2 CONFIRMED/ALLOW (commit 7f8f2338b): A bütçe-bilinçli descriptor kararı `cross-verify-verdict:sha256:9ac1dc08…`, B2 ranged-read şema/contentStore/1-based sözleşmesi `…340646a4…` (ilk B dürüst REFUTED `…ca795b3c` — iddia 'numeric' derken şema 'integer'; kod-birebir kelime dersi bir kez daha kanıtlandı)",
       "updated": "2026-08-18"
     },
     {
@@ -26056,6 +26056,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "c0e74b4e6409cbc6d083c2de3f900f20caeb5525a5283e9063027679583d8a26"
+    "value": "a38ae350ac1b7b3b7d945b43773782ad23db1ee0e5e307af61c624b543aafc60"
   }
 }
