@@ -92,6 +92,8 @@ function fixture(authExpiresAt = new Date(NOW.getTime() + 45_000)): ProbeFixture
     model: 'model-a',
     backendScope: 'docker',
     executionProfileRef: 'probe.profile',
+    // 7081 (sprint-556): required per-attempt freshness nonce.
+    attemptNonce: 'b'.repeat(64),
     budget: {
       billingMode: 'subscription',
       maxInputTokens: 100,

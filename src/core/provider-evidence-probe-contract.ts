@@ -52,6 +52,12 @@ export interface ProviderEvidenceProbeSubject {
   readonly model: string;
   readonly backendScope: ProbeBackendScope;
   readonly executionProfileRef: ExecutionProfileRef;
+  /** 7081 approval freshness (sprint-556): sha256 hex naming THIS execution
+   *  attempt (runId × runtimeFingerprint). The deterministic requestId digests
+   *  the whole subject, so same-run contenders still adopt APR_DUPLICATE_ID
+   *  while a later run can never resurrect a previous run's expired
+   *  request/decision (the DECISION_UNTRUSTED stale-adoption class). */
+  readonly attemptNonce: string;
   readonly budget: ReachabilityProbeBudget;
   readonly ttl: Readonly<ProbeTtlWindow>;
 }
@@ -198,7 +204,7 @@ export function isProviderEvidenceProbeSubject(
   return isRecord(value)
     && hasExactFields(value, [
       'kind', 'tenantId', 'projectId', 'provider', 'model', 'backendScope',
-      'executionProfileRef', 'budget', 'ttl',
+      'executionProfileRef', 'attemptNonce', 'budget', 'ttl',
     ])
     && value.kind === 'provider-evidence-probe'
     && isCanonicalId(value.tenantId)
@@ -207,6 +213,8 @@ export function isProviderEvidenceProbeSubject(
     && isNonEmptyString(value.model)
     && isProbeBackendScope(value.backendScope)
     && isExecutionProfileRef(value.executionProfileRef)
+    && typeof value.attemptNonce === 'string'
+    && /^[a-f0-9]{64}$/u.test(value.attemptNonce)
     && isReachabilityProbeBudget(value.budget)
     && isProbeTtlWindow(value.ttl);
 }

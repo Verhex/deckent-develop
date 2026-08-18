@@ -86,6 +86,8 @@ describe('provider evidence probe subjects and requests', () => {
       model: 'model-a',
       backendScope: 'backend:docker',
       executionProfileRef: 'profile:probe-a',
+      // 7081 (sprint-556): the per-attempt nonce is a REQUIRED subject field.
+      attemptNonce: 'a'.repeat(64),
       budget,
       ttl: {
         startsAt: '2026-08-12T00:00:00.000Z',
