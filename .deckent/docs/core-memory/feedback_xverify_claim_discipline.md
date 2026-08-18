@@ -31,3 +31,13 @@ truncated"). Kural: **koşu başına küçük kanıt seti** — tek küçük dos
 Kanıt: CONFIRMED receipt `…57448f5a` (tek-dosya koşusu) vs truncation-UNCLEAR
 `…48b9be1a`/`…e191d331` (8-dosya ve 3-dosya koşuları). Kalıcı çözüm (ranged/multi-read)
 7081-residual'dadır.
+
+## Owner konumlandırması (Alperen, 2026-08-18): verify GENİŞ ve KANIT'tır
+
+Dar-kanıt kuralı bir GEÇİCİ çözümdür, hedef daralması değildir. Verify'ın konumu:
+**geniş kapsam + kanıt-pozisyonu** — landing'in tüm kritik iddiaları doğrulanır ve her
+receipt MASTER evidence'ına işlenir. Genişlik, tek dev koşuyla değil (truncation),
+BİRDEN ÇOK dar koşunun KOMPOZİSYONUYLA sağlanır: iddia seti koşulara bölünür, her koşu
+CONFIRMED/receipt üretir, toplamı landing'in geniş doğrulamasıdır. Kalıcı çözüm
+(ranged/multi-read evidence access, 7081-residual) öncelikli işlerdendir — indiğinde
+tek koşuda geniş verify normalleşir.
