@@ -78,5 +78,85 @@
     "successRate": 0,
     "avgScore": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "workflow",
+        "proficiency": "primary"
+      },
+      {
+        "id": "jest",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "pytest",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "typescript",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "vitest",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      ".github/workflows/*.yml",
+      ".gitlab-ci.yml",
+      "actions",
+      "build",
+      "cargo.toml",
+      "ci",
+      "ci/cd testing expertise — regression detection, coverage analysis, test strategy",
+      "coverage",
+      "devops-engineer",
+      "go.mod",
+      "jest",
+      "lint",
+      "makefile",
+      "pipeline",
+      "pyproject.toml",
+      "pytest",
+      "pytest.ini",
+      "python-expert",
+      "regression",
+      "test",
+      "testing-expert",
+      "typescript",
+      "typescript-expert",
+      "vitest",
+      "vitest.config.*",
+      "workflow"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.943Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

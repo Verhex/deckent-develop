@@ -87,14 +87,62 @@ export interface SkillDefinition {
   activation?: ActivationConfig;
 }
 
+export interface SkillProfileFieldProvenance {
+  derivationVersion: 1;
+  fields: {
+    workTypes: SkillProfileProvenanceNote;
+    domains: SkillProfileProvenanceNote;
+    expertise: SkillProfileProvenanceNote;
+    deliverables: SkillProfileProvenanceNote;
+  };
+}
+
+export interface SkillProfileProvenanceNote {
+  sourceFields: readonly SkillProfileSourceField[];
+  note: 'canonical-profile-derived-from-manifest-source-metadata';
+}
+
+export type SkillProfileSourceField =
+  | 'category'
+  | 'triggers'
+  | 'stackDetection'
+  | 'composableWith'
+  | 'priority'
+  | 'description';
+
+export interface SkillProfileHoldDiagnostic {
+  disposition: 'HOLD';
+  reasonCode:
+    | 'invalid-manifest-profile'
+    | 'insufficient-source-metadata'
+    | 'derived-profile-invalid';
+  message: string;
+  issues: readonly CapabilityValidationIssue[];
+}
+
+/** Effective routing eligibility attached by the canonical catalog resolver. */
+export type SkillProfileDerivation =
+  | {
+      status: 'routable';
+      origin: 'manifest-profile' | 'derived-profile';
+      profile: SkillProfile;
+      provenance: SkillProfileFieldProvenance | null;
+    }
+  | {
+      status: 'unroutable';
+      origin: 'manifest-profile' | 'derived-profile';
+      profile: null;
+      diagnostic: SkillProfileHoldDiagnostic;
+    };
+
 // ─── V3 Profile State — carried as data, never decided (521-005) ────────────
 //
 // follow-up-works/skill-catalog-authority-design-2026-08-11.md §3.5 + OWNER
 // DECISIONS D5/D6 (2026-08-11, Alperen). The catalog REPORTS whether a skill
-// carries a usable V3 routing profile; it does not repair one, does not map a
-// legacy `activation` block onto one, and does not hide the skills that lack
-// one. Deriving a canonical profile (and any legacy-activation bridge) is row
-// 7121's authority — D6.
+// carries a usable V3 routing profile; it does not repair one and does not hide
+// skills that lack one. The catalog resolver calls the row-7121 authority in
+// skill-profile-derivation.ts before this state is projected. That derivation
+// never reads legacy `activation` as routability authority.
 //
 // The measured symptom this closes: 30 of 31 project skills carry no profile,
 // so `routing-plan-adapter.ts` silently drops them as V3 candidates while every
@@ -104,12 +152,10 @@ export interface SkillDefinition {
 /**
  * The three states a skill's V3 routing profile can be in.
  *
- * `absent` means the manifest carries no `profile` key at all; anything present
- * that {@link validateSkillProfile} rejects is `present-invalid`. The design's
- * fourth value (`unresolved`, for a legacy V2-activation skill awaiting an
- * owner-approved mapping) is deliberately NOT minted here: partitioning the
- * `absent` set on activation grounds is a reconciliation decision, and that is
- * row 7121's (D6).
+ * `absent` means the effective definition carries no `profile`; anything
+ * present that {@link validateSkillProfile} rejects is `present-invalid`.
+ * Derivation failures are expressed separately by the effective record's
+ * typed `routing` HOLD, never inferred here from legacy activation.
  */
 export type SkillProfileState = 'present-valid' | 'present-invalid' | 'absent';
 

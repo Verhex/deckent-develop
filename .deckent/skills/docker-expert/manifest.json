@@ -63,5 +63,70 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "review",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "tool",
+        "proficiency": "primary"
+      },
+      {
+        "id": "docker",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "docker-compose",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      ".dockerignore",
+      "ci-testing",
+      "compose",
+      "container",
+      "devops-engineer",
+      "docker",
+      "docker-compose",
+      "docker-compose.yaml",
+      "docker-compose.yml",
+      "dockerfile",
+      "dockerfile optimization, multi-stage builds, docker compose, networking, volumes, security",
+      "image",
+      "layer",
+      "multi-stage",
+      "network",
+      "registry",
+      "security-specialist",
+      "tool",
+      "volume"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.944Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

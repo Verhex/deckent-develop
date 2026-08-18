@@ -222,6 +222,15 @@ değildir, sakin retry planla.
   sürdürülmesi; terminal-kilitlenme RCA'sının 3-koşu xverify kompozisyonu
   (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: onay-canlılık dersiyle
   yeniden koşuldu).
+- **2026-08-18 — sprint-561 (skill-unlock) + native-probe teslimi**: Ders 15'in
+  üçüncü canlı örneği — `.deckent/skills/` persist yetkisi scope-gate'te düşünce
+  001 fix zinciri kazanamazdı; çözüm worker'ın KENDİ authority'sini izole
+  scratch-emit'le koşturan ADR-D-007 el-persist oldu (30/30, idempotens kanıtlı).
+  İki yeni bulgu sınıfı: provider AUTH kesintisi task'ı NO_GO'lar VE fix task'ı
+  budget'sız doğurur (spawn fail-closed bloklar — fix-builder boşluğu); llama.cpp
+  ROUTER bare /props'ta n_ctx=0 raporlar — probe model-scoped `props?model=`
+  birincil olmalı ve ŞARTSIZ bağlanmalı (config-gate'li probe, config'siz
+  oturumda sahte INPUT_CONTEXT_AUTHORITY_UNAVAILABLE üretir).
 - **2026-08-18 — sprint-560 (7086 context-lifecycle)**: Ders 16'ya iki ek işledi:
   commit-kimliği xverify iddiasına gömülmez (kanal evidence-digest'i zaten taşır)
   ve chokepoint dosyaları görevlere tahsis ederken ÜRETİCİ-TÜKETİCİ zincirini düşün —

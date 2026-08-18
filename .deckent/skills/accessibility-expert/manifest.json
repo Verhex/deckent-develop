@@ -58,5 +58,68 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "review",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      },
+      {
+        "id": "@axe-core/react",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "eslint-plugin-jsx-a11y",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "@axe-core/react",
+      "a11y",
+      "accessibility",
+      "alt-text",
+      "aria",
+      "contrast",
+      "domain",
+      "eslint-plugin-jsx-a11y",
+      "focus",
+      "frontend-design",
+      "keyboard",
+      "react-specialist",
+      "screen-reader",
+      "semantic-html",
+      "testing-expert",
+      "wcag",
+      "wcag 2.1 compliance, aria patterns, keyboard navigation, screen reader, color contrast"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.941Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

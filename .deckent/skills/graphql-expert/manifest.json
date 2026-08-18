@@ -66,5 +66,78 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "refactor",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "framework",
+        "proficiency": "primary"
+      },
+      {
+        "id": "@apollo/server",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "@graphql-codegen/cli",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "graphql",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "type-graphql",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      ".graphqlrc.yml",
+      "@apollo/server",
+      "@graphql-codegen/cli",
+      "api-builder",
+      "apollo",
+      "codegen",
+      "codegen.ts",
+      "codegen.yml",
+      "federation",
+      "framework",
+      "gql",
+      "graphql",
+      "graphql schema design, resolvers, subscriptions, federation, caching, code generation",
+      "mutation",
+      "performance-optimizer",
+      "resolver",
+      "schema",
+      "schema.graphql",
+      "subscription",
+      "testing-expert",
+      "type-graphql",
+      "typescript-expert"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.946Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

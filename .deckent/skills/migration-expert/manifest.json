@@ -52,5 +52,58 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "migrate",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "workflow",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "breaking-change",
+      "codemod",
+      "compat",
+      "deprecation",
+      "framework migration, version upgrades, breaking change resolution, codemods, incremental migration",
+      "git-expert",
+      "legacy",
+      "migrate",
+      "migration",
+      "testing-expert",
+      "typescript-expert",
+      "upgrade",
+      "version",
+      "workflow"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "manifest",
+      "migration",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.947Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

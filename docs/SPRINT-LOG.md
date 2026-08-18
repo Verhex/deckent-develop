@@ -13415,3 +13415,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 559-006: Hermetic surface battery — iki dilli sadakat + sözleşme envanteri (DONE)
 
 ---
+## Sprint 561 — sprint-561
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 2783s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 2783000ms |
+
+### Tasks
+
+- 561-001-fix-fix: Fix: Fix: Canonical V3 profile üretimi — 30 builtin skill routable olur (DONE)
+- 561-001-fix: Fix: Canonical V3 profile üretimi — 30 builtin skill routable olur (NO_GO)
+- 561-001: Canonical V3 profile üretimi — 30 builtin skill routable olur (DONE)
+- 561-002: Routing eligibility + typed rejection + lint (depends on Task 1) (GO_WITH_TECH_DEBT)
+- 561-003: Force/exclude tutarlılığı + delivery-proof (depends on Task 1) (GO_WITH_TECH_DEBT)
+- 561-004-fix: Fix: Uçtan-uca battery — assignedSkills dolu kanıtı (depends on Task 2, Task 3) (PENDING)
+- 561-004: Uçtan-uca battery — assignedSkills dolu kanıtı (depends on Task 2, Task 3) (NO_GO)
+
+---

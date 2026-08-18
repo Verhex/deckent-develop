@@ -57,5 +57,61 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "configure",
+        "proficiency": "primary"
+      },
+      {
+        "type": "build",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "framework",
+        "proficiency": "primary"
+      },
+      {
+        "id": "ink",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "cli-render",
+      "framework",
+      "ink",
+      "ink/react-cli patterns: static/anchor/input-pinned layout, raw-mode + no_color guards, testing without mounting ink",
+      "no-color",
+      "raw-mode",
+      "react-cli",
+      "react-specialist",
+      "static",
+      "stdin",
+      "terminal-ui",
+      "testing-expert",
+      "tui",
+      "typescript-expert",
+      "useinput"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.946Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

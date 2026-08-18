@@ -369,8 +369,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // (request-measurement, output-ceiling-parity, reasoning-continuation,
   // context-epoch-lineage, context-lifecycle-ux, context-lifecycle-battery)
   // + realigned admission/signal/renewal/transport pins; agent core content moved.
-  count: 14377,
-  digest: '20a46a298907c09e8f3e19a6d0c19618b9343a8d7eed713d0c2b5ece1360e334',
+  // 2026-08-18 (skill-unlock, sprint-561): +61 — new suites (profile
+  // derivation, routing eligibility, force-delivery, unlock battery, D10
+  // lint tests) + 25 task-builder mock realigns + probe/v1 fix pins.
+  count: 14438,
+  digest: '905b22bc60c517a1b2c944d025d2278a82770eab2ea16f19763077565694bbe3',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -605,8 +608,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // admission (context-budget, native-transport), ceiling parity (openai/
   // anthropic), continuation (loop/events/sse/types), epochs (session,
   // bridge, run.tsx) and lifecycle i18n (messages) production hashes moved.
-  count: 1251,
-  digest: '1ced8a02ef530c250dc166b87725114d2f1bbca6ae8f60dee2007f003ff965cd',
+  // 2026-08-18 (skill-unlock, sprint-561): +2 — skill-profile-derivation.ts
+  // (canonical V3 derivation authority) and the delivery-evidence surface in
+  // task-builder enter the inventory; adapter/pool/spawner/probe hashes moved.
+  count: 1253,
+  digest: 'd5960b1a7371e2dea8580887285316590885035ab40ecdfa8f03b64638b90110',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

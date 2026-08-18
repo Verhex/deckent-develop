@@ -14,6 +14,17 @@ vi.mock('../../src/core/constants.js', () => ({
 }));
 
 vi.mock('../../src/orchestra/task-builder.js', () => ({
+  // Plain functions (not vi.fn) so beforeEach resetAllMocks cannot strip the
+  // implementation the spawner depends on (skillDelivery.deliveredSkillIds).
+  writeSkillDeliveryEvidence: () => {},
+  applySkillDirectiveAuthority: (task: { assignedSkills?: string[] }) => task?.assignedSkills ?? [],
+  buildSkillDeliveryEvidence: (task: { id?: string; assignedSkills?: string[]; forceSkills?: string[] }, delivered?: readonly string[]) => ({
+    version: 1, taskId: task?.id ?? '', source: 'worker-prompt',
+    deliveredSkillIds: [...(delivered ?? [])],
+    assignedSkillIds: [...(task?.assignedSkills ?? [])],
+    forcedSkillIds: [...(task?.forceSkills ?? [])],
+    undeliveredForcedSkillIds: (task?.forceSkills ?? []).filter((id) => !(delivered ?? []).includes(id)),
+  }),
   buildWorkerPrompt: vi.fn().mockReturnValue('generic-prompt'),
 }));
 

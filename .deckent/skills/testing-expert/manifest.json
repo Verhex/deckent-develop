@@ -69,5 +69,78 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "workflow",
+        "proficiency": "primary"
+      },
+      {
+        "id": "cypress",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "jest",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "mocha",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "vitest",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "api-builder",
+      "assertion",
+      "coverage",
+      "cypress",
+      "database-migration",
+      "e2e",
+      "fixture",
+      "integration",
+      "jest",
+      "mocha",
+      "mock",
+      "python-expert",
+      "react-specialist",
+      "spec",
+      "stub",
+      "test",
+      "test pyramid, mocking strategies, coverage, ci integration, vitest/jest patterns",
+      "typescript-expert",
+      "vitest",
+      "workflow"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.950Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

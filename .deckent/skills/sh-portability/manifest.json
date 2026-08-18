@@ -64,5 +64,57 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "tool",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "container/wrapper shell scripting traps: $? masking, local, trap exit codes, timeout -k, untracked-git in diff detection",
+      "dash",
+      "devops-engineer",
+      "exit-code",
+      "local",
+      "posix-sh",
+      "sh-compat",
+      "shell",
+      "timeout",
+      "tool",
+      "trap",
+      "typescript-expert",
+      "untracked-git",
+      "wrapper-script"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.949Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

@@ -7,8 +7,12 @@
 // and the plan preview in front of Alperen — decides; nothing silent).
 
 import { AgentPoolManager } from '../core/agent-pool.js';
-import { SkillPoolManager } from '../core/skill-pool.js';
-import { validateCapabilities, validateSkillProfile } from '../core/routing/capability-vector.js';
+import { snapshotSkillCatalog } from '../core/skill-pool.js';
+import type { EffectiveSkill, SkillDispositionState } from '../core/skill-pool.js';
+import { deriveCanonicalSkillProfile } from '../core/skill-profile-derivation.js';
+import type { SkillDefinition, SkillProfileDerivation } from '../core/skill-types.js';
+import { validateCapabilities } from '../core/routing/capability-vector.js';
+import type { SkillProfile } from '../core/routing/capability-vector.js';
 import { loadVocabulary } from '../core/routing/vocabulary.js';
 import { loadPolicyPacks } from '../core/routing/policy-pack.js';
 import { readCellsSnapshot } from '../core/routing/learning-cells.js';
@@ -37,8 +41,138 @@ export interface RouteTasksV3Options {
    *  agents/skills — e.g. project-conventions — are V3-visible; absent = disk load). */
   pools?: {
     agents?: import('../core/agent-types.js').AgentPool;
-    skills?: Map<string, import('../core/skill-types.js').SkillDefinition>;
+    skills?: Map<string, SkillDefinition>;
   };
+}
+
+// ─── Skill routing eligibility — typed, never silent (row 9034) ──────────────
+//
+// Before this the adapter dropped every non-candidate skill with a bare
+// `continue`: a disabled/retired/quarantined skill and a skill whose profile
+// simply failed validation were indistinguishable from "considered and not
+// picked", and `enabled` was never consulted at all. Selection now runs over the
+// canonical S5 catalog projection (`snapshotSkillCatalog`) — or, for the
+// planner's in-memory pool, over the same 561-001 derivation authority — and
+// every exclusion produces a typed reason that reaches the plan surface.
+
+export type SkillRoutingRejectionReason =
+  | 'profile-missing'
+  | 'disabled'
+  | 'retired'
+  | 'quarantined'
+  | 'invalid-profile';
+
+export interface RouteTasksV3SkillRejection {
+  skillId: string;
+  reason: SkillRoutingRejectionReason;
+  /** Human-readable evidence behind the reason (diagnostic code + message). */
+  detail: string;
+  /** Which candidate source the row came from — catalog projection or in-memory pool. */
+  source: 'catalog' | 'pool';
+}
+
+/** One skill as the eligibility rule sees it, independent of where it came from. */
+interface SkillEligibilityCandidate {
+  skillId: string;
+  dispositionState: SkillDispositionState;
+  masked: boolean;
+  routing: SkillProfileDerivation;
+}
+
+export type SkillEligibilityVerdict =
+  | { admitted: true; skillId: string; profile: SkillProfile }
+  | { admitted: false; skillId: string; reason: SkillRoutingRejectionReason; detail: string };
+
+const DISPOSITION_REJECTION: Readonly<
+  Record<Exclude<SkillDispositionState, 'active'>, SkillRoutingRejectionReason>
+> = {
+  disabled: 'disabled',
+  quarantined: 'quarantined',
+  retired: 'retired',
+};
+
+/**
+ * The single V3 skill-candidacy rule. Disposition is checked before the profile
+ * so a retired skill is reported as retired rather than as a profile problem,
+ * and a masked row is refused fail-closed even if its disposition reads active.
+ */
+export function evaluateSkillRoutingEligibility(
+  candidate: SkillEligibilityCandidate,
+): SkillEligibilityVerdict {
+  const { skillId } = candidate;
+  if (candidate.dispositionState !== 'active') {
+    return {
+      admitted: false,
+      skillId,
+      reason: DISPOSITION_REJECTION[candidate.dispositionState],
+      detail: `disposition=${candidate.dispositionState}`,
+    };
+  }
+  if (candidate.masked) {
+    return { admitted: false, skillId, reason: 'quarantined', detail: 'masked catalog row' };
+  }
+  if (candidate.routing.status !== 'routable') {
+    const { reasonCode, message } = candidate.routing.diagnostic;
+    return {
+      admitted: false,
+      skillId,
+      // `insufficient-source-metadata` is the "there is no usable profile and
+      // none can be derived" class; the other two mean a profile existed and
+      // failed canonical V3 validation.
+      reason: reasonCode === 'insufficient-source-metadata' ? 'profile-missing' : 'invalid-profile',
+      detail: `${reasonCode}: ${message}`,
+    };
+  }
+  return { admitted: true, skillId, profile: candidate.routing.profile };
+}
+
+export type SkillRoutingCandidateSource =
+  | { source: 'catalog'; entries: readonly EffectiveSkill[] }
+  | { source: 'pool'; definitions: Iterable<SkillDefinition> };
+
+export interface SkillRoutingSelection {
+  skills: Array<{ skillId: string; profile: SkillProfile }>;
+  rejections: RouteTasksV3SkillRejection[];
+}
+
+/**
+ * Partition a skill source into V3 candidates and typed rejections. Every input
+ * row lands in exactly one of the two arrays — that total is the anti-silent-skip
+ * invariant the routing surface is judged on.
+ */
+export function selectRoutableSkills(input: SkillRoutingCandidateSource): SkillRoutingSelection {
+  const candidates: SkillEligibilityCandidate[] =
+    input.source === 'catalog'
+      ? input.entries.map((entry) => ({
+          skillId: entry.id,
+          dispositionState: entry.disposition.state,
+          masked: entry.masked,
+          routing: entry.routing,
+        }))
+      : [...input.definitions].map((definition) => ({
+          skillId: definition.id,
+          // An in-memory pool row has no disposition ledger behind it, so the
+          // same rule `resolveSkillCatalog` applies to a manifest applies here.
+          dispositionState: definition.enabled === false ? 'disabled' : 'active',
+          masked: false,
+          routing: deriveCanonicalSkillProfile(definition),
+        }));
+
+  const selection: SkillRoutingSelection = { skills: [], rejections: [] };
+  for (const candidate of candidates) {
+    const verdict = evaluateSkillRoutingEligibility(candidate);
+    if (verdict.admitted) {
+      selection.skills.push({ skillId: verdict.skillId, profile: verdict.profile });
+      continue;
+    }
+    selection.rejections.push({
+      skillId: verdict.skillId,
+      reason: verdict.reason,
+      detail: verdict.detail,
+      source: input.source,
+    });
+  }
+  return selection;
 }
 
 export interface RouteTasksV3Escalation {
@@ -55,6 +189,8 @@ export interface RouteTasksV3Result {
   escalations: RouteTasksV3Escalation[];
   /** Content-axis fallbacks (LLM gap → structural), for the plan report. */
   contentFallbacks: Array<{ taskId: string; reason: string }>;
+  /** Skills excluded from V3 candidacy, each with a typed reason (never silent). */
+  skillRejections: RouteTasksV3SkillRejection[];
 }
 
 /**
@@ -69,7 +205,9 @@ export async function routeTasksV3ForPlan(
   config: RoutingV3Config,
   options: RouteTasksV3Options = {},
 ): Promise<RouteTasksV3Result> {
-  const result: RouteTasksV3Result = { routed: [], escalations: [], contentFallbacks: [] };
+  const result: RouteTasksV3Result = {
+    routed: [], escalations: [], contentFallbacks: [], skillRejections: [],
+  };
 
   // ── Catalog ────────────────────────────────────────────────────────────
   const pool = options.pools?.agents ?? new AgentPoolManager(projectRoot).loadAgents();
@@ -85,13 +223,19 @@ export async function routeTasksV3ForPlan(
     });
   }
 
-  const skillPool = options.pools?.skills ?? new SkillPoolManager(projectRoot).loadSkills();
-  const skills: RouteCatalog['skills'][number][] = [];
-  for (const skill of skillPool.values()) {
-    const profile = (skill as unknown as Record<string, unknown>)['profile'];
-    const validation = profile ? validateSkillProfile(profile) : null;
-    if (!validation?.ok) continue;
-    skills.push({ skillId: skill.id, profile: validation.value });
+  // Skills: the canonical S5 projection on disk, or the planner's in-memory pool
+  // (generated temp skills never exist on disk at plan time). Both go through the
+  // one eligibility rule; nothing is dropped without a typed reason.
+  const selection = options.pools?.skills
+    ? selectRoutableSkills({ source: 'pool', definitions: options.pools.skills.values() })
+    : selectRoutableSkills({ source: 'catalog', entries: snapshotSkillCatalog(projectRoot).entries });
+  const skills: RouteCatalog['skills'][number][] = selection.skills;
+  result.skillRejections = selection.rejections;
+  for (const rejection of selection.rejections) {
+    debugLog(
+      'routing-plan-adapter:skill-rejected',
+      `${rejection.skillId} (${rejection.source}): ${rejection.reason} — ${rejection.detail}`,
+    );
   }
 
   const vocabulary = await loadVocabulary(projectRoot);

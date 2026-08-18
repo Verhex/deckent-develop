@@ -60,5 +60,82 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "refactor",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "review",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      },
+      {
+        "id": "drizzle",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "knex",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "prisma",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "sequelize",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "typeorm",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "api-builder",
+      "database",
+      "domain",
+      "drizzle",
+      "index",
+      "knex",
+      "migration",
+      "migration safety, schema design, query optimization, transaction management",
+      "model",
+      "performance-optimizer",
+      "prisma",
+      "python-expert",
+      "query",
+      "relation",
+      "schema",
+      "security-specialist",
+      "seed",
+      "sequelize",
+      "testing-expert",
+      "typeorm",
+      "typescript-expert"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "doc"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.944Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

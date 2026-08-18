@@ -62,5 +62,63 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "refactor",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "language",
+        "proficiency": "primary"
+      },
+      {
+        "id": "typescript",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "api-builder",
+      "database-migration",
+      "decorator",
+      "devops-engineer",
+      "documentation-writer",
+      "enum",
+      "generic",
+      "interface",
+      "language",
+      "module",
+      "performance-optimizer",
+      "react-specialist",
+      "security-specialist",
+      "testing-expert",
+      "tsconfig",
+      "tsconfig.json",
+      "type",
+      "typescript",
+      "typescript best practices, strict typing, utility types, error handling patterns"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.950Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

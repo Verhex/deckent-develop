@@ -4,8 +4,15 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { SkillDefinition, SkillCategory, SkillStats, SkillReferencedFile } from './skill-types.js';
+import type {
+  SkillDefinition,
+  SkillCategory,
+  SkillStats,
+  SkillReferencedFile,
+  SkillProfileDerivation,
+} from './skill-types.js';
 import { createDefaultSkillStats } from './skill-types.js';
+import { deriveCanonicalSkillProfile } from './skill-profile-derivation.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
 
@@ -334,6 +341,8 @@ export interface EffectiveSkill {
   /** Layer trail of the records this one shadowed, e.g. `['builtin@0.1.0']` (§3.6). */
   overrides: string[];
   statsSource: 'sidecar' | 'manifest' | 'defaults';
+  /** Canonical D5 routing projection; unroutable entries remain visible with a typed HOLD. */
+  routing: SkillProfileDerivation;
 }
 
 /**
@@ -363,7 +372,7 @@ function snapshotEntryKey(entry: EffectiveSkill): string {
     disposition: entry.disposition,
     masked: entry.masked,
     version: (entry.definition as { version?: unknown }).version ?? null,
-    profileState: (entry.definition as { routing?: { profileState?: unknown } }).routing?.profileState ?? null,
+    routing: entry.routing,
     sourcePath: entry.sourcePath,
     // Sidecar-affected fields (S8): omitting these made the with-sidecar
     // digest identical to the catalog-only one regardless of machine-local
@@ -609,6 +618,8 @@ export function resolveSkillCatalog(
     }
     normalizeSkillManifest(raw);
     const definition = raw as unknown as SkillDefinition;
+    const routing = deriveCanonicalSkillProfile(definition);
+    if (routing.status === 'routable') definition.profile = routing.profile;
     const record: EffectiveSkill = {
       id: parsedId.id,
       layer,
@@ -624,6 +635,7 @@ export function resolveSkillCatalog(
       sourcePath,
       overrides: [],
       statsSource: raw['stats'] !== undefined ? 'manifest' : 'defaults',
+      routing,
     };
     const group = candidates.get(record.id);
     if (group) group.push(record);

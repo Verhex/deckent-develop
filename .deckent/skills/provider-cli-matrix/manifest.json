@@ -57,5 +57,57 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "review",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "anthropic-sdk",
+      "buildargs",
+      "buildcommand",
+      "claude-cli",
+      "codex",
+      "domain",
+      "exit-code",
+      "gemini",
+      "output-format",
+      "provider-cli",
+      "provider-to-cli arg contracts (claude/codex/gemini): model-param, prompt-feed, output-format, exit-code honesty, silent-fallback ban, repro-before-red pattern",
+      "repro-before-red",
+      "silent-fallback",
+      "testing-expert",
+      "typescript-expert",
+      "usage-emit"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "doc"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.948Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

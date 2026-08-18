@@ -31,5 +31,43 @@
     "rules": [],
     "exclude": [],
     "minScore": 5
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "document",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "domain",
+      "schema-first api contract design for deckent's http/rpc surfaces: strict zod envelopes at the boundary, auth-middleware wiring, honest error shapes, docs/reference/api-surface.md contract alignment"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "doc"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.943Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

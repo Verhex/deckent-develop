@@ -59,5 +59,51 @@
     ],
     "exclude": [],
     "minScore": 5
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "review",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "workflow",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "frontend-design",
+      "getmessage",
+      "hardcoded string",
+      "i18n",
+      "i18n-first quality bar: every user-facing string through getmessage(key, lang, vars?) with en+tr pairs; mechanism modules stay string-free (labels injected by callers); honest fallback, no hardcoded tr/en literals",
+      "localization",
+      "typescript-expert",
+      "workflow"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.946Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { DeckentError } from '../core/errors.js';
-import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import type {
@@ -36,6 +36,8 @@ import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
 import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
+import { resolveSkillPromptBodies } from '../core/skill-loading.js';
+import { SkillPoolManager } from '../core/skill-pool.js';
 import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { searchMemory } from '../core/memory-query.js';
@@ -2207,6 +2209,267 @@ function readUpstreamHandoffs(task: Task, projectRoot: string): UpstreamHandoffE
   }
 }
 
+// ─── Skill Directive Authority + Delivery Proof (561-003) ────────────────────
+
+/**
+ * Apply the operator's explicit skill directives to a task's effective skill
+ * assignment. Idempotent, and the single authority every spawn path shares.
+ *
+ * 561-003 FORCE-EZME: routing (plan-time V3, the debt-manager FIX rotation, a
+ * mid-sprint reroute, the single-task `routeSingleTaskV3` path) assigns
+ * `task.assignedSkills` wholesale. When a routing result is empty — or simply
+ * does not happen to contain the forced id — an operator's explicit
+ * `- Skills: <id>` directive was silently erased on some paths and honoured on
+ * others, so the SAME force produced different worker prompts depending on how
+ * the task was launched. This function makes that outcome path-independent:
+ * exclusions are applied to the routing-derived set, and every forced id is
+ * unioned back in.
+ *
+ * Precedence: an id named in BOTH `forceSkills` and `excludeSkills` is kept —
+ * the positive directive is the operator's explicit selection, the exclusion
+ * only prunes what routing added.
+ *
+ * `task.forceSkills` is READ-ONLY here: an AUTO-assigned (routing-derived)
+ * skill is never promoted into the force set
+ * (GR-2026-08-08-DOGFOOD-RCPT2-01). A forced id whose SKILL.md cannot be
+ * resolved keeps its existing typed-HOLD treatment upstream — this function
+ * only preserves the DIRECTIVE, it never asserts deliverability.
+ *
+ * @returns the effective assigned-skill ids (also written back onto the task).
+ */
+export function applySkillDirectiveAuthority(task: Task): string[] {
+  const forced = task.forceSkills ?? [];
+  const current = task.assignedSkills ?? [];
+  const excluded = new Set((task.excludeSkills ?? []).filter(id => !forced.includes(id)));
+
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  for (const id of current) {
+    if (excluded.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(id);
+  }
+  for (const id of forced) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    merged.push(id);
+  }
+
+  const unchanged = merged.length === current.length && merged.every((id, i) => current[i] === id);
+  if (!unchanged) task.assignedSkills = merged;
+  return task.assignedSkills ?? merged;
+}
+
+/**
+ * Last-line recovery for a forced skill whose BODY never reached this render.
+ *
+ * `resolveSkillPrompts` (result-collector) loads bodies strictly from
+ * `task.assignedSkills`, so a path that overwrote the assignment before that
+ * call arrives here with the forced id restored on the record but with no
+ * content to inject. Read the missing bodies through the canonical catalog
+ * authority (`resolveSkillPromptBodies` → `SkillPoolManager.resolveBody`) — no
+ * parallel catalog or resolver is introduced.
+ *
+ * An administratively disabled skill (`enabled:false`) is NEVER revived here:
+ * that case is a distinct typed HOLD (487-023 FORCED-SKILL-LINEAGE) and
+ * silently injecting it because its file still reads would defeat the disable.
+ * Fail-soft — a catalog fault leaves the prompt exactly as it was.
+ */
+function recoverForcedSkillPrompts(
+  task: Task,
+  present: ReadonlyArray<{ name: string; content: string }>,
+  projectRoot: string,
+): Array<{ name: string; content: string }> {
+  const forced = task.forceSkills ?? [];
+  if (forced.length === 0) return [];
+  const have = new Set(present.map(p => p.name));
+  const missing = forced.filter(id => !have.has(id));
+  if (missing.length === 0) return [];
+
+  const recovered: Array<{ name: string; content: string }> = [];
+  try {
+    const pool = new SkillPoolManager(projectRoot);
+    for (const resolution of resolveSkillPromptBodies(projectRoot, missing)) {
+      if (!resolution.ok) continue;
+      if (pool.getSkill(resolution.skillId)?.enabled === false) continue;
+      recovered.push({ name: resolution.skillId, content: resolution.content });
+    }
+  } catch (e) {
+    debugLog('buildWorkerPrompt:recoverForcedSkillPrompts', e);
+  }
+  return recovered;
+}
+
+/**
+ * Resolve the skill-prompt blocks a worker prompt renders, from the blocks its
+ * caller resolved. Extracted from `buildWorkerPrompt` so the DECISION is a
+ * single shared authority rather than an inline local.
+ *
+ * Order of operations (unchanged from the inline original, plus the forced
+ * recovery step):
+ *  1. V2 tasks: DNA relevance filter, with forced ids restored when the filter
+ *     scored them 0 (487-023 — a narrow-domain forced skill must still reach
+ *     the prompt text, not just the task record).
+ *  2. Forced bodies missing entirely from the caller's set are recovered from
+ *     the catalog authority (see `recoverForcedSkillPrompts`).
+ *  3. Duplicate ids are collapsed so one skill's persona is never injected
+ *     twice (486-018 render-boundary defence, any caller).
+ */
+export function resolveDeliveredSkillPrompts(
+  task: Task,
+  skillPrompts?: Array<{ name: string; content: string }>,
+  projectRoot: string = process.cwd(),
+): Array<{ name: string; content: string }> | undefined {
+  const isV2 = task.routingMeta?.routingVersion === 'v2';
+  const rawDNA = task.routingMeta?.taskDNA;
+  let effective = skillPrompts;
+
+  // PCOMP-6 D4 (CC completion): the historical `> 1` guard meant a SINGLE
+  // assigned skill bypassed relevance filtering entirely — the exact corpus
+  // class where an irrelevant sh-portability/file-watch-hygiene body rode
+  // along on one-skill tasks (10/31 + 6/31). Post-441 the filter may return
+  // an empty list (empty skill block is a valid render), so every V2 task
+  // with any skills goes through it.
+  if (isV2 && rawDNA && skillPrompts && skillPrompts.length > 0) {
+    const dnaFiltered = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA, {
+      filesWrite: task.scope?.filesWrite,
+      taskText: `${task.title ?? ''}\n${task.description ?? ''}`,
+    });
+    // 487-023 FORCED-SKILL-LINEAGE: filterSkillPromptsByDNA scores each skill
+    // body by keyword affinity and drops anything scoring 0 — a narrow-domain
+    // forced skill can legitimately score 0 against task text/scope that never
+    // mentions its domain, and be silently dropped from the RENDERED prompt
+    // even though task.assignedSkills (and sprint-spawner's routing union)
+    // still lists it as assigned. An operator's explicit forceSkills id must
+    // always reach the actual worker prompt text, not just the task record.
+    const forcedIds = new Set(task.forceSkills ?? []);
+    const forcedDropped = forcedIds.size > 0
+      ? skillPrompts.filter(sp => forcedIds.has(sp.name) && !dnaFiltered.some(d => d.name === sp.name))
+      : [];
+    effective = forcedDropped.length > 0 ? [...dnaFiltered, ...forcedDropped] : dnaFiltered;
+  }
+
+  const recovered = recoverForcedSkillPrompts(task, effective ?? [], projectRoot);
+  if (recovered.length > 0) effective = [...(effective ?? []), ...recovered];
+
+  // 486-018 FORCED-SKILL-PRESERVE: forced + routing-added skill ids are
+  // Set-deduped upstream (sprint-spawner.ts routeSprintTasks), but this render
+  // boundary defends independently — an upstream duplicate id (any caller,
+  // not just sprint-spawner) must never inject the same skill's persona
+  // content twice into one worker prompt.
+  if (effective && effective.length > 1) {
+    const seenSkillNames = new Set<string>();
+    effective = effective.filter(sp => {
+      if (seenSkillNames.has(sp.name)) return false;
+      seenSkillNames.add(sp.name);
+      return true;
+    });
+  }
+
+  return effective;
+}
+
+/**
+ * Proof that a skill's content actually entered a worker prompt.
+ *
+ * 561-003 DELIVERY-PROOF: outcome learning credits a skill from the ASSIGNMENT
+ * (`sprint-finalizer.ts` reads `result.skillIds ?? task.assignedSkills`), but
+ * assignment and delivery are not the same set — `dedupeAgentNamedSkills`, the
+ * DNA relevance filter and an unresolvable body all remove a skill from the
+ * rendered prompt while leaving it on the record. `deliveredSkillIds` is taken
+ * from the render itself (`buildSkillBlock`'s own emitted names), so it is the
+ * exact set of ids whose SKILL.md body is in the prompt bytes.
+ */
+export interface SkillDeliveryEvidence {
+  readonly version: 1;
+  readonly taskId: string;
+  readonly source: 'worker-prompt';
+  /** Ids whose SKILL.md body is present in the rendered prompt. */
+  readonly deliveredSkillIds: string[];
+  /** `task.assignedSkills` as it stood at render time. */
+  readonly assignedSkillIds: string[];
+  /** The operator's explicit `- Skills:` selection. */
+  readonly forcedSkillIds: string[];
+  /** Forced ids that did NOT reach the prompt — never eligible for stat credit. */
+  readonly undeliveredForcedSkillIds: string[];
+}
+
+/** A caller-supplied sink `buildWorkerPrompt` fills with the rendered skill ids. */
+export interface SkillDeliveryProbe {
+  deliveredSkillIds: string[];
+}
+
+/** `.tasks/task-<id>.skill-delivery.json` — the delivery-proof sidecar path. */
+export function skillDeliveryEvidencePath(projectRoot: string, taskId: string): string {
+  return join(projectRoot, TASKS_DIR, `task-${taskId}.skill-delivery.json`);
+}
+
+/** Delivery-proof record (9034): exactly which skill ids REACHED the worker
+ *  prompt, alongside the assigned/forced sets — stats credit may only be
+ *  granted from this evidence, never from assignment alone. */
+export function buildSkillDeliveryEvidence(
+  task: Task,
+  deliveredSkillIds: readonly string[],
+): SkillDeliveryEvidence {
+  const delivered = Array.from(new Set(deliveredSkillIds));
+  const forced = task.forceSkills ?? [];
+  return {
+    version: 1,
+    taskId: task.id,
+    source: 'worker-prompt',
+    deliveredSkillIds: delivered,
+    assignedSkillIds: [...(task.assignedSkills ?? [])],
+    forcedSkillIds: [...forced],
+    undeliveredForcedSkillIds: forced.filter(id => !delivered.includes(id)),
+  };
+}
+
+/**
+ * Persist the delivery proof next to the task's other lifecycle artifacts.
+ * Atomic (temp + rename) so a concurrent reader never observes a partial file,
+ * and fail-soft so evidence recording can never break a spawn.
+ */
+export function writeSkillDeliveryEvidence(
+  projectRoot: string,
+  evidence: SkillDeliveryEvidence,
+): boolean {
+  const target = skillDeliveryEvidencePath(projectRoot, evidence.taskId);
+  const temp = `${target}.tmp`;
+  try {
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(temp, `${JSON.stringify(evidence, null, 2)}\n`, 'utf-8');
+    renameSync(temp, target);
+    return true;
+  } catch (e) {
+    debugLog('writeSkillDeliveryEvidence', e);
+    return false;
+  }
+}
+
+/**
+ * Read the delivery proof for a task, or `null` when none was recorded (a task
+ * spawned before this evidence existed, or a spawn that never reached the
+ * prompt). Consumers MUST treat `null` as "no proof", not as "nothing
+ * delivered".
+ */
+export function readSkillDeliveryEvidence(
+  projectRoot: string,
+  taskId: string,
+): SkillDeliveryEvidence | null {
+  try {
+    const target = skillDeliveryEvidencePath(projectRoot, taskId);
+    if (!existsSync(target)) return null;
+    const parsed = JSON.parse(readFileSync(target, 'utf-8')) as SkillDeliveryEvidence;
+    if (parsed.version !== 1 || parsed.taskId !== taskId || !Array.isArray(parsed.deliveredSkillIds)) {
+      return null;
+    }
+    return parsed;
+  } catch (e) {
+    debugLog('readSkillDeliveryEvidence', e);
+    return null;
+  }
+}
+
 /**
  * Build the full prompt string sent to a worker agent.
  *
@@ -2238,51 +2501,19 @@ export function buildWorkerPrompt(
     readonly planDigest: string;
     readonly sourceAuthority?: RunFlowPlanSourceAuthority;
   },
+  deliveryProbe?: SkillDeliveryProbe,
 ): string {
   const effort = resolveWorkerEffort(task);
 
-  // V2 routing: filter skill prompts to only those relevant to task intent.
-  const isV2 = task.routingMeta?.routingVersion === 'v2';
-  const rawDNA = task.routingMeta?.taskDNA;
-  let effectiveSkillPrompts = skillPrompts;
-  // PCOMP-6 D4 (CC completion): the historical `> 1` guard meant a SINGLE
-  // assigned skill bypassed relevance filtering entirely — the exact corpus
-  // class where an irrelevant sh-portability/file-watch-hygiene body rode
-  // along on one-skill tasks (10/31 + 6/31). Post-441 the filter may return
-  // an empty list (empty skill block is a valid render), so every V2 task
-  // with any skills goes through it.
-  if (isV2 && rawDNA && skillPrompts && skillPrompts.length > 0) {
-    const dnaFiltered = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA, {
-      filesWrite: task.scope?.filesWrite,
-      taskText: `${task.title ?? ''}\n${task.description ?? ''}`,
-    });
-    // 487-023 FORCED-SKILL-LINEAGE: filterSkillPromptsByDNA scores each skill
-    // body by keyword affinity and drops anything scoring 0 — a narrow-domain
-    // forced skill can legitimately score 0 against task text/scope that never
-    // mentions its domain, and be silently dropped from the RENDERED prompt
-    // even though task.assignedSkills (and sprint-spawner's routing union)
-    // still lists it as assigned. An operator's explicit forceSkills id must
-    // always reach the actual worker prompt text, not just the task record.
-    const forcedIds = new Set(task.forceSkills ?? []);
-    const forcedDropped = forcedIds.size > 0
-      ? skillPrompts.filter(sp => forcedIds.has(sp.name) && !dnaFiltered.some(d => d.name === sp.name))
-      : [];
-    effectiveSkillPrompts = forcedDropped.length > 0 ? [...dnaFiltered, ...forcedDropped] : dnaFiltered;
-  }
+  // 561-003 FORCE-EZME: the LAST boundary every spawn path crosses (sprint,
+  // debt-manager FIX, single-task/task-mode-runner, cli/run, mcp/tools/run).
+  // Repairing the record here makes an operator's force path-independent even
+  // when an upstream router replaced the assignment wholesale.
+  applySkillDirectiveAuthority(task);
 
-  // 486-018 FORCED-SKILL-PRESERVE: forced + routing-added skill ids are
-  // Set-deduped upstream (sprint-spawner.ts routeSprintTasks), but this render
-  // boundary defends independently — an upstream duplicate id (any caller,
-  // not just sprint-spawner) must never inject the same skill's persona
-  // content twice into one worker prompt.
-  if (effectiveSkillPrompts && effectiveSkillPrompts.length > 1) {
-    const seenSkillNames = new Set<string>();
-    effectiveSkillPrompts = effectiveSkillPrompts.filter(sp => {
-      if (seenSkillNames.has(sp.name)) return false;
-      seenSkillNames.add(sp.name);
-      return true;
-    });
-  }
+  // V2 relevance filter + forced restore + dedupe — the shared authority, so
+  // the spawner's delivery evidence and this render can never disagree.
+  const effectiveSkillPrompts = resolveDeliveredSkillPrompts(task, skillPrompts, projectRoot);
 
   // Load accepted ADRs from Memory V2 if available (best-effort) for the ADR block.
   let allAdrs: MemoryEntryV2[] | undefined;
@@ -2484,6 +2715,12 @@ export function buildWorkerPrompt(
 
   // Single accurate token estimate from the actual assembled prompt.
   task.estimatedTokens = artifact.metadata.estimatedTokens;
+
+  // 561-003 DELIVERY-PROOF: `artifact.metadata.skills` is emitted by
+  // `buildSkillBlock` while it writes the `--- <id> ---` blocks, so it is the
+  // rendered set itself — not a re-derivation of it. Handing that set back to
+  // the caller is what lets stat credit follow DELIVERY instead of assignment.
+  if (deliveryProbe) deliveryProbe.deliveredSkillIds = [...artifact.metadata.skills];
 
   // PCOMP-6 D2 (MASTER-PLAN 573): spawn-time prompt-contract linter —
   // WARN-ONLY rollout (Alperen 2026-07-14: warn → ölçüm → fail-closed).

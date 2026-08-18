@@ -65,5 +65,50 @@
   "promptInjection": {
     "position": "prepend",
     "maxTokens": 1500
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "review",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "auth",
+      "crypto",
+      "domain",
+      "injection",
+      "node.js/typescript secure-coding practices for implementation tasks: input validation, output encoding, authn/z, secret management, dependency security (extracted from security-auditor per pcomp-w5b)",
+      "sanitize",
+      "secure-coding",
+      "security",
+      "vulnerability"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "doc"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.949Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

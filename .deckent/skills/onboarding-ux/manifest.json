@@ -52,5 +52,57 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "configure",
+        "proficiency": "primary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "build",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "workflow",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "degrade-safe",
+      "first-run",
+      "init",
+      "ink-tui",
+      "onboarding",
+      "plan-before-apply",
+      "setup-flow",
+      "step-machine",
+      "teaser",
+      "testing-expert",
+      "typescript-expert",
+      "wizard",
+      "wizard step-machines, plan-before-apply config writes, injectable probes, degrade-safe startup teasers",
+      "workflow"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.947Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

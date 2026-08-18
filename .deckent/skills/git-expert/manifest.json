@@ -58,5 +58,64 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "configure",
+        "proficiency": "primary"
+      },
+      {
+        "type": "build",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "tool",
+        "proficiency": "primary"
+      },
+      {
+        "id": "git",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      ".git/config",
+      ".gitattributes",
+      ".gitignore",
+      "bisect",
+      "branch",
+      "cherry-pick",
+      "ci-testing",
+      "conflict",
+      "devops-engineer",
+      "git",
+      "git workflow, branch strategy, merge conflict resolution, rebase, hooks, bisect",
+      "hook",
+      "merge",
+      "rebase",
+      "stash",
+      "tag",
+      "tool"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.945Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

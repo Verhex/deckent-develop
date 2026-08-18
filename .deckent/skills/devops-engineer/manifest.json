@@ -56,5 +56,60 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "refactor",
+        "proficiency": "primary"
+      },
+      {
+        "type": "review",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "tool",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      ".github/workflows/",
+      "ci",
+      "deploy",
+      "docker",
+      "docker, ci/cd, github actions, infrastructure, deployment, monitoring",
+      "docker-compose.yml",
+      "dockerfile",
+      "infrastructure",
+      "kubernetes",
+      "nginx",
+      "performance-optimizer",
+      "pipeline",
+      "python-expert",
+      "security-specialist",
+      "terraform",
+      "tool",
+      "typescript-expert"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.944Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

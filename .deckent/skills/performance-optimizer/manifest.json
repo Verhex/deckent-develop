@@ -53,5 +53,59 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "refactor",
+        "proficiency": "primary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "migrate",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "bottleneck",
+      "bundle",
+      "cache",
+      "database-migration",
+      "devops-engineer",
+      "domain",
+      "latency",
+      "lazy-load",
+      "memory",
+      "optimize",
+      "performance",
+      "profiling",
+      "profiling, caching, big-o analysis, memory optimization, lazy loading, bundle optimization",
+      "react-specialist",
+      "typescript-expert"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "manifest",
+      "migration",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.947Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

@@ -56,5 +56,61 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "migrate",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      },
+      {
+        "id": "zod",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "api-builder",
+      "dispatch",
+      "domain",
+      "dual-consumer",
+      "envelope",
+      "handler-map",
+      "protocol",
+      "rpc",
+      "schema",
+      "testing-expert",
+      "typescript-expert",
+      "unknown-method",
+      "zod",
+      "zod-first rpc contracts: versioned envelope, method-catalog exhaustiveness, unknown-method honesty, never-throw dispatch, dual-consumer testing"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "doc",
+      "manifest",
+      "migration"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.948Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

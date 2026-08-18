@@ -151,7 +151,13 @@ import { updateDashboard } from '../monitor/auditor.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 
 // ─── Task Builder ─────────────────────────────────────────────────
-import { buildWorkerPrompt } from './task-builder.js';
+import {
+  buildWorkerPrompt,
+  applySkillDirectiveAuthority,
+  buildSkillDeliveryEvidence,
+  writeSkillDeliveryEvidence,
+  type SkillDeliveryProbe,
+} from './task-builder.js';
 import { hasSettlementReceipt } from './evaluation-audit-trail.js';
 
 // ─── Planner dependency normalization (323-031 wire) ──────────────
@@ -1051,6 +1057,16 @@ export async function spawnWorkers(
     });
 
     const agentPrompt = await resolveAgentPrompt(projectRoot, task);
+
+    // 561-003 FORCE-EZME: `resolveSkillPrompts` loads bodies strictly from
+    // `task.assignedSkills`, so the operator's force must be reinstated BEFORE
+    // it runs — otherwise a router that replaced the assignment (empty V3
+    // result, mid-sprint reroute, a disk-fresh reload) silently spawns without
+    // the forced body, while the very same directive is honoured on the plan-
+    // time path. Applied after `assertExactPlanTaskUnchanged` and idempotent,
+    // so an already-consistent approved artifact is left byte-identical.
+    applySkillDirectiveAuthority(task);
+
     const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
 
     // 486-018 FORCED-SKILL-PRESERVE: an operator's explicit forceSkills whose
@@ -1087,6 +1103,12 @@ export async function spawnWorkers(
       }
     }
 
+    // 561-003 DELIVERY-PROOF: the probe is filled from the prompt's OWN skill
+    // block, so `deliveredSkillIds` is the set of ids whose SKILL.md content is
+    // really in the bytes handed to the worker — not the assignment it was
+    // derived from. Persisted next to the task's other lifecycle artifacts so
+    // outcome learning can credit delivery instead of assignment.
+    const skillDeliveryProbe: SkillDeliveryProbe = { deliveredSkillIds: [] };
     const prompt = buildWorkerPrompt(
       task,
       agentPrompt,
@@ -1094,7 +1116,10 @@ export async function spawnWorkers(
       projectRoot,
       config,
       spawnOpts?.exactPlanAuthority,
+      skillDeliveryProbe,
     );
+    const skillDelivery = buildSkillDeliveryEvidence(task, skillDeliveryProbe.deliveredSkillIds);
+    writeSkillDeliveryEvidence(projectRoot, skillDelivery);
     const model = task.model;
     // Row 4061: same authority, same formatter as every other backend. The
     // canonical deriver always returns at least `.tasks/`, so the historical
@@ -1124,7 +1149,11 @@ export async function spawnWorkers(
         workerId: wid,
         model: task.model,
         agent: freshTask.assignedAgent ?? task.assignedAgent ?? 'generic',
-        skills: freshTask.assignedSkills ?? task.assignedSkills ?? [],
+        // 561-003 DELIVERY-PROOF: report what the worker actually received. The
+        // disk-fresh assignment can differ from the render (agent-named dedupe,
+        // DNA filter, an unresolvable body), and an observer reading assignment
+        // as delivery is exactly the phantom-credit gap this task closes.
+        skills: skillDelivery.deliveredSkillIds,
         scope: {
           directories: freshTask.scope?.directories ?? task.scope?.directories ?? [],
           filesWrite: freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],
@@ -2060,14 +2089,10 @@ export function routeSprintTasks(
     // compatible skills, but an operator's explicit forceSkills must never be
     // silently replaced by a routing-derived (or otherwise upstream-corrupted)
     // set — union it back in rather than trusting it survived unchanged.
-    const forcedSkillIds = task.forceSkills ?? [];
-    if (forcedSkillIds.length > 0) {
-      const current = task.assignedSkills ?? [];
-      const missingForced = forcedSkillIds.filter(id => !current.includes(id));
-      if (missingForced.length > 0) {
-        task.assignedSkills = Array.from(new Set([...current, ...forcedSkillIds]));
-      }
-    }
+    // 561-003: the union (plus exclusion pruning) now lives in the shared
+    // `applySkillDirectiveAuthority`, so this path and the spawn boundary can
+    // never drift into two different answers for the same directive.
+    applySkillDirectiveAuthority(task);
   }
 }
 
@@ -2091,7 +2116,16 @@ export function routeSprintTasksForExecution(
   journalContext: { projectRoot: string; sprintId: string },
   exactPlanAuthority?: ExactPlanSpawnAuthority,
 ): void {
-  if (exactPlanAuthority) return;
+  if (exactPlanAuthority) {
+    // 561-003 FORCE-EZME: skipping the mutable router is correct — re-deriving
+    // provider/agent after approval would be drift. Honouring the operator's
+    // own `- Skills:` directive is not routing, though: it is already bound in
+    // the approved artifact, so reinstating it is idempotent for a consistent
+    // plan and repairs the one case where an exact plan would otherwise be the
+    // single path that silently drops a force.
+    for (const task of tasks) applySkillDirectiveAuthority(task);
+    return;
+  }
   routeSprintTasks(tasks, config, availableProviders, journalContext);
 }
 

@@ -63,5 +63,56 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "refactor",
+        "proficiency": "primary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "build",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "tool",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "atomic-read",
+      "chokidar",
+      "debounce",
+      "dedup",
+      "file-watch",
+      "fs.watch",
+      "fs.watch + always-on poll fallback, unref'd handles, store-replay on attach, dedup and torn-write tolerance",
+      "performance-optimizer",
+      "poll-fallback",
+      "store-replay",
+      "tool",
+      "typescript-expert",
+      "unref",
+      "watcher"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.945Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

@@ -569,6 +569,16 @@
       "notes": "Enforces the i18n-FIRST quality bar from CLAUDE.md."
     },
     {
+      "file": "scripts/lint-skill-routing-eligibility.mjs",
+      "class": "gate",
+      "owner": "skill-routing-lint",
+      "npmScript": null,
+      "input": "src/orchestra/**/*.ts + src/core/**/*.ts routing-surface files (skill selection call-sites)",
+      "output": "exit 1 on a routing-surface skill selection that bypasses the canonical eligibility adapter (D10: rogue resolver = FAILURE)",
+      "expiry": "none — permanent skill-routing eligibility gate (9034, sprint-561)",
+      "notes": "Added by 561-002; registry entry hand-closed (ADR-D-007) because scripts/script-registry.json was outside the task write authority."
+    },
+    {
       "file": "scripts/lint-identity-md.mjs",
       "class": "gate",
       "owner": "identity-docs",

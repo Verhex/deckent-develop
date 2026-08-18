@@ -53,5 +53,57 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "refactor",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "workflow",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "cleanup",
+      "code simplification, dead code removal, dry/kiss enforcement, complexity reduction",
+      "complexity",
+      "dead-code",
+      "dry",
+      "extract",
+      "inline",
+      "kiss",
+      "performance-optimizer",
+      "reduce",
+      "refactor",
+      "simplify",
+      "testing-expert",
+      "typescript-expert",
+      "workflow"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.943Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

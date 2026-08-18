@@ -59,5 +59,59 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "document",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "review",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "language",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "api-builder",
+      "async",
+      "database-migration",
+      "devops-engineer",
+      "django",
+      "documentation-writer",
+      "fastapi",
+      "flask",
+      "language",
+      "pip",
+      "pyproject.toml",
+      "pytest",
+      "python",
+      "python best practices, type hints, async patterns, testing, modern tooling",
+      "requirements.txt",
+      "security-specialist",
+      "setup.py",
+      "testing-expert"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "doc"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.948Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

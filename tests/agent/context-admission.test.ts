@@ -273,6 +273,48 @@ describe('NT-07 boot-time effective context', () => {
     expect((await resolved.contextStatus?.())?.effectiveContextSize).toBe(8_192);
   });
 
+  it('router-aware probe: bare /props silent (n_ctx=0), model-scoped /props?model= reports — server ceiling wins with NO config knob', async () => {
+    // 7086-residual delivery: a llama.cpp ROUTER reports n_ctx=0 on the bare
+    // /props; the model-scoped query is the primary source and the probe is
+    // attached UNCONDITIONALLY (no authored config required).
+    const routerFetch = ((input: unknown) => {
+      const url = String(input);
+      const body = url.includes('props?model=')
+        ? { default_generation_settings: { n_ctx: 131_072 } }
+        : url.includes('props')
+          ? { default_generation_settings: { n_ctx: 0 } }
+          : { data: [] };
+      return Promise.resolve({ ok: true, json: async () => body });
+    }) as unknown as typeof globalThis.fetch;
+    const resolved = localLlm({ local_llm: { endpoint: 'http://127.0.0.1:18080' } }, routerFetch);
+    expect(resolved.contextStatus).toBeDefined();
+    expect((await resolved.contextStatus?.())?.effectiveContextSize).toBe(131_072);
+  });
+
+  it('a /v1 endpoint probes the SERVER ROOT — /props, never /v1/props (owner incident 2026-08-18)', async () => {
+    const urls: string[] = [];
+    const rootOnlyFetch = ((input: unknown) => {
+      const url = String(input);
+      urls.push(url);
+      if (/\/v1\/props|\/v1\/v1\//u.test(url)) return Promise.resolve({ ok: false, json: async () => ({}) });
+      const body = url.includes('props?model=')
+        ? { default_generation_settings: { n_ctx: 131_072 } }
+        : { default_generation_settings: { n_ctx: 0 } };
+      return Promise.resolve({ ok: true, json: async () => body });
+    }) as unknown as typeof globalThis.fetch;
+    const resolved = localLlm({ local_llm: { endpoint: 'http://127.0.0.1:18080/v1' } }, rootOnlyFetch);
+    expect((await resolved.contextStatus?.())?.effectiveContextSize).toBe(131_072);
+    expect(urls.some((u) => u.includes('/v1/props'))).toBe(false);
+  });
+
+  it('local_llm.contextSize alone is configured authority for the per-turn resolver (owner incident 2026-08-18)', () => {
+    expect(resolveContextBudgetTokens('local-llm', { local_llm: { contextSize: 131_072 } }, null, null)).toBe(131_072);
+    // Both knobs authored → narrowest wins, same as the boot probe.
+    expect(resolveContextBudgetTokens('local-llm', { native_context_tokens: 64_000, local_llm: { contextSize: 131_072 } }, null, null)).toBe(64_000);
+    // Non-local providers do not read the local_llm block.
+    expect(() => resolveContextBudgetTokens('claude', { local_llm: { contextSize: 131_072 } }, null, null)).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
+  });
+
   it('stays honestly config-only when the server does not report', async () => {
     const unreachable = localLlm({ native_context_tokens: 12_000 }, propsFetch(null, false));
     expect(await unreachable.contextStatus?.()).toBeNull();

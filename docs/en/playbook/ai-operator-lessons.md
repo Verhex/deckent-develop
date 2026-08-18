@@ -232,6 +232,16 @@ passes — a HOLD is not closure; plan a calm retry.
   spawn after an interruption; the terminal-lockup RCA's 3-run xverify composition
   (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: re-run with the
   approval-liveness lesson applied).
+- **2026-08-18 — sprint-561 (skill-unlock) + native-probe delivery**: the third
+  live instance of Lesson 15 — with `.deckent/skills/` write authority dropped by
+  the scope gate, the 001 fix chain could not win; the resolution was an
+  ADR-D-007 hand-persist driving the worker's OWN authority via an isolated
+  scratch emit (30/30, idempotence proven). Two new finding classes: a provider
+  AUTH outage NO_GOes the task AND spawns a budget-less fix task (spawn blocks
+  fail-closed — a fix-builder gap); a llama.cpp ROUTER reports n_ctx=0 on the
+  bare /props — the probe must query model-scoped `props?model=` first and be
+  attached UNCONDITIONALLY (a config-gated probe fabricates
+  INPUT_CONTEXT_AUTHORITY_UNAVAILABLE on unconfigured sessions).
 - **2026-08-18 — sprint-560 (7086 context-lifecycle)**: two additions folded into
   Lesson 16: never embed a commit identity inside an xverify claim (the channel
   already carries evidence digests), and when assigning chokepoint files to tasks

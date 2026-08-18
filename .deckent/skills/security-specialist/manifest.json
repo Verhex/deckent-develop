@@ -53,5 +53,56 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "review",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "api-builder",
+      "auth",
+      "csrf",
+      "devops-engineer",
+      "domain",
+      "encryption",
+      "jwt",
+      "owasp",
+      "owasp top 10, authentication, input validation, secret management, vulnerability prevention",
+      "python-expert",
+      "security",
+      "sql-injection",
+      "typescript-expert",
+      "vulnerability",
+      "xss"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "doc"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.949Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

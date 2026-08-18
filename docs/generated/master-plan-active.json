@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b1b59625f9a037f3b659e9970408fe4a5da2970c83ef4330a180df758ae264d6"
+    "value": "ea1011b20cfcac56d2cfa5d89ef8e7b3af36a1b648c4b2805011f3d6a58d744f"
   },
   "summary": {
     "total": 504,
@@ -5352,7 +5352,7 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "640d932c23638bb0a1aa51ce7dbc1255e50c0ea9f93f2bfff6b5e87bc7d45a5b",
-      "progressDigest": "59e25c5d8a4f564aa0272679e82c46d0c247e89b39b9f9ca8af918bb83d0ce5a",
+      "progressDigest": "eeab38cbd9cb71dfc79153ffef6d367e239616c6a01e40dd28df84aafb55a95e",
       "terminalClosureDigest": null
     },
     {
@@ -24999,7 +24999,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Shipped builtin ve supported custom/imported skill'ler canonical valid V3 profile taşır; test-local profile reimplementation kalmaz; enabled=false, retired, quarantined, invalid, profile-less, contentless veya policy/tenant/scope-uyumsuz skill seçilmez; explicit force/exclude owner authority CLI, MCP, Terminal, sprint, FIX/XFIX ve single-task yollarında aynı sonucu verir; rejection typed reason taşır; manifest entrypoint ve referenced content gerçekten worker prompt'una ulaşmadan stats credit verilmez; honest-empty ve unavailable HOLD ayrışır; representative real-binary routing/prompt ve 1000-skill scale kanıtı vardır",
-      "evidence": "2026-08-10 code-truth: 31 effective skill'in valid profile sayısı 0 ve adapter profile olmayanların hepsini sessizce atlıyor; 81 yeşil test profile'ları yalnız test-local sabitte tutuyor; representative API+test runtime probe `api-builder` agentını seçerken skillIds boş döndü; direct V3 forceSkills `[testing-expert]` değerini boş listeyle overwrite ederken sprint-spawner sonradan union ediyor; V3 adapter enabled filtresi uygulamıyor. ÖNE-ALMA (Alperen 2026-08-18): \"görevlere skill injection yok — kaybımız devam ediyor\" — canlı kanıt sprint-558: task-558-001 assignedSkills=[] iken agent ataması çalışıyor; disk 30/30 skill'de profile alanı null (manifest yalnız V2 activation taşıyor), routing-plan-adapter yalnız valid profile kabul ettiğinden TÜM katalog her sprint'te görünmez; enjeksiyon tarafı canlı (sprint-spawner resolveSkillPrompts + typed HOLD) fakat seçim tarafı boş besliyor. Sıra: 7085 landing sonrası ilk paket = 9034+7121 çekirdeği (builtin 30 skill için canonical V3 profile üretimi + eligibility/typed-rejection + delivery-proof); owner eski analizleri getirecek, sprint planı onlarla birleşince yazılır",
+      "evidence": "2026-08-10 code-truth: 31 effective skill'in valid profile sayısı 0 ve adapter profile olmayanların hepsini sessizce atlıyor; 81 yeşil test profile'ları yalnız test-local sabitte tutuyor; representative API+test runtime probe `api-builder` agentını seçerken skillIds boş döndü; direct V3 forceSkills `[testing-expert]` değerini boş listeyle overwrite ederken sprint-spawner sonradan union ediyor; V3 adapter enabled filtresi uygulamıyor. ÖNE-ALMA (Alperen 2026-08-18): \"görevlere skill injection yok — kaybımız devam ediyor\" — canlı kanıt sprint-558: task-558-001 assignedSkills=[] iken agent ataması çalışıyor; disk 30/30 skill'de profile alanı null (manifest yalnız V2 activation taşıyor), routing-plan-adapter yalnız valid profile kabul ettiğinden TÜM katalog her sprint'te görünmez; enjeksiyon tarafı canlı (sprint-spawner resolveSkillPrompts + typed HOLD) fakat seçim tarafı boş besliyor. Sıra: 7085 landing sonrası ilk paket = 9034+7121 çekirdeği (builtin 30 skill için canonical V3 profile üretimi + eligibility/typed-rejection + delivery-proof); owner eski analizleri getirecek, sprint planı onlarla birleşince yazılır. ÇEKİRDEK LANDED (sprint-561, 2026-08-18): (1) `skill-profile-derivation.ts` — manifest source metadata'sından deterministik/versioned canonical V3 profile, alan-provenance'lı; authored profile authoritative kalır; legacy activation ASLA routability'ye terfi etmez (7121 kararı); üretilemeyen → typed unroutable/HOLD; **30/30 builtin manifest'e profile PERSIST edildi** (ADR-D-007 el-persist — worker scope-gate'i .deckent/skills yazımını düşürmüştü; idempotens kanıtlı: 2. koşu 0-yeni/30-korunan; lint-manifests exit 0); (2) sessiz-atlama ÖLDÜ — evaluateSkillRoutingEligibility/selectRoutableSkills typed reason'larla (profile-missing/disabled/retired/quarantined/invalid-profile), enabled filtresi uygulanır, D10 lint'i `lint-skill-routing-eligibility.mjs` gerçek repo'da 222 dosya CLEAN (registry girişi el-kapama); (3) forceSkills-ezme bug'u öldü — applySkillDirectiveAuthority tek yetkili (boş-routing+force→force yaşar; exclude budar; force>exclude; idempotent; AUTO-skill force'a terfi etmez); delivery-proof: buildSkillDeliveryEvidence prompt'a GERÇEKTEN giren id'leri + teslim edilmeyen forced id'leri kaydeder; (4) battery 5/5 gerçek üretim zinciriyle (el-tamamlama — 004 worker'ı claude AUTH kesintisine düştü, fix task'ı budget'sız doğdu [bulgu]); assignedSkills DOLU kanıtı canlı. Run-defteri: ABORTED (001 lineage NO_GO — persist yetki boşluğu el-kapamayla kapandı; 004 AUTH_FAILED). 002/003 dürüst GO_WITH_TECH_DEBT",
       "updated": "2026-08-18"
     },
     {
@@ -26005,6 +26005,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "737d9a728204dded7b5de51e4bfbeb52f4254073cb9fa66cedd027e2f269d125"
+    "value": "fd87c2b672413ccd31a8e06924f33233ad49cb700a3e682715f4e31bfc0ffc96"
   }
 }

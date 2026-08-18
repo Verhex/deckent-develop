@@ -60,5 +60,76 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "document",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      },
+      {
+        "id": "express",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "fastify",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "hono",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "koa",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "api",
+      "cors",
+      "database-migration",
+      "documentation-writer",
+      "domain",
+      "endpoint",
+      "express",
+      "fastify",
+      "graphql",
+      "hono",
+      "koa",
+      "middleware",
+      "rest",
+      "restful api design, validation, error handling, openapi, versioning",
+      "route",
+      "security-specialist",
+      "testing-expert",
+      "typescript-expert",
+      "validation"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "doc"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.943Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

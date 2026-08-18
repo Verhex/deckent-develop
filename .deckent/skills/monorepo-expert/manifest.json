@@ -57,5 +57,74 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "tool",
+        "proficiency": "primary"
+      },
+      {
+        "id": "lerna",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "nx",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "turbo",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "build-cache",
+      "ci-testing",
+      "dependency-graph",
+      "devops-engineer",
+      "lerna",
+      "lerna.json",
+      "monorepo",
+      "monorepo management, turborepo, nx, workspace configuration, dependency graph, build caching",
+      "nx",
+      "nx.json",
+      "packages",
+      "pnpm-workspace",
+      "pnpm-workspace.yaml",
+      "tool",
+      "turbo",
+      "turbo.json",
+      "turborepo",
+      "typescript-expert",
+      "workspace"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.947Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

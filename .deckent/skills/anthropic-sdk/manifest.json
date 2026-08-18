@@ -64,5 +64,65 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "fix",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "framework",
+        "proficiency": "primary"
+      },
+      {
+        "id": "@anthropic-ai/sdk",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "claude_agent_sdk",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "@anthropic-ai/sdk",
+      "agent-sdk",
+      "anthropic",
+      "anthropic claude api, tool use, streaming, agent sdk, batch api patterns",
+      "api-builder",
+      "batch",
+      "claude",
+      "claude-api",
+      "claude_agent_sdk",
+      "framework",
+      "messages-api",
+      "streaming",
+      "testing-expert",
+      "tool-use",
+      "typescript-expert"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.942Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

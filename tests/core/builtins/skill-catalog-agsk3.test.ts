@@ -177,8 +177,11 @@ describe('AGSK-3 dilim-3: rpc-protocol + onboarding-ux catalog', () => {
       expect(readSkillMd(BUILTINS_DIR, spec.id)).toBe(readSkillMd(POOL_DIR, spec.id));
       // stats hariç karşılaştır: canlı havuzda sprint-finalizer stats'ı mutasyonlar
       // (born-605 stats-sidecar'a kadar); manifest'in geri kalanı bire-bir eş kalmalı.
-      const { stats: _b, ...builtinRest } = readManifest(BUILTINS_DIR, spec.id) as Record<string, unknown> & { stats?: unknown };
-      const { stats: _p, ...poolRest } = readManifest(POOL_DIR, spec.id) as Record<string, unknown> & { stats?: unknown };
+      // profile/profileProvenance da stats gibi canlı-havuz derived-state'idir:
+      // sprint-561 skill-unlock persist'i (canonical V3 derivation) yalnız
+      // project tree'ye yazar — builtin package tree authored kaynak kalır.
+      const { stats: _b, profile: _bp, profileProvenance: _bpp, ...builtinRest } = readManifest(BUILTINS_DIR, spec.id) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown };
+      const { stats: _p, profile: _pp, profileProvenance: _ppp, ...poolRest } = readManifest(POOL_DIR, spec.id) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown };
       expect(builtinRest).toEqual(poolRest);
     }
   });

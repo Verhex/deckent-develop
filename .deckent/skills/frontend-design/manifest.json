@@ -70,5 +70,66 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "review",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      },
+      {
+        "id": "tailwindcss",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "accessibility-expert",
+      "animation",
+      "css",
+      "dark-mode",
+      "design-system",
+      "domain",
+      "flexbox",
+      "grid",
+      "layout",
+      "postcss.config.js",
+      "react-specialist",
+      "responsive",
+      "tailwind",
+      "tailwind.config.js",
+      "tailwind.config.ts",
+      "tailwindcss",
+      "theme",
+      "typescript-expert",
+      "ui/ux design patterns, tailwind css, responsive layouts, animations, design systems"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.945Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

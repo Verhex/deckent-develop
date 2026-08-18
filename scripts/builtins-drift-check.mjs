@@ -80,6 +80,10 @@ export function normalizeManifestForCompare(value, depth = 0) {
     const out = {};
     for (const key of Object.keys(value).sort()) {
       if (depth === 0 && key === 'stats') continue; // 605: stats moved to gitignored sidecar
+      // sprint-561 skill-unlock: derived canonical V3 profile is persisted to
+      // the PROJECT pool only — like stats it is live derived-state, never an
+      // authored-drift signal against the builtin package tree.
+      if (depth === 0 && (key === 'profile' || key === 'profileProvenance')) continue;
       out[key] = normalizeManifestForCompare(value[key], depth + 1);
     }
     return out;

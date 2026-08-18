@@ -353,15 +353,64 @@ async function probeNativeContext(
   configuredContextSize: number | null,
   modelAdvertisedContext: number | null,
   fetchFn: typeof globalThis.fetch,
+  model?: string | null,
 ): Promise<EffectiveContextResult | null> {
-  try {
-    const response = await fetchFn(new URL('props', endpoint.endsWith('/') ? endpoint : `${endpoint}/`).toString());
+  // llama.cpp serves /props and /v1/models at the SERVER ROOT while the
+  // OpenAI-compatible endpoint is conventionally .../v1 — strip a trailing
+  // /v1 so a `local_llm.endpoint` of http://host:8080/v1 probes
+  // http://host:8080/props, not the nonexistent /v1/props (the 404 chain
+  // behind the model=unresolved INPUT_CONTEXT_AUTHORITY_UNAVAILABLE class).
+  const rootEndpoint = endpoint.replace(/\/v1\/?$/u, '');
+  const base = rootEndpoint.endsWith('/') ? rootEndpoint : `${rootEndpoint}/`;
+  const positiveCtx = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+  // Reachability is tracked separately from the reported value: an
+  // unreachable server yields null (probe failed — caller keeps its own
+  // authority chain), while a reachable-but-silent server falls through to
+  // the derive step so an authored config value can stand alone.
+  let reachable = false;
+  const propsCtx = async (url: string): Promise<number | null> => {
+    const response = await fetchFn(url);
     if (!response.ok) return null;
+    reachable = true;
     const body = await response.json() as { default_generation_settings?: { n_ctx?: unknown }; n_ctx?: unknown };
-    const reported = body.default_generation_settings?.n_ctx ?? body.n_ctx;
+    return positiveCtx(body.default_generation_settings?.n_ctx ?? body.n_ctx);
+  };
+  try {
+    // Router-aware probe order (7086-residual, owner delivery 2026-08-18):
+    // a llama.cpp ROUTER reports n_ctx=0 on the bare /props, so the
+    // model-scoped query is the primary source; the bare endpoint keeps
+    // single-model servers working; the /v1/models `--ctx-size` arg is the
+    // last honest server-side witness before giving up (null → the caller's
+    // typed refusal path, never an optimistic literal).
+    let reported: number | null = null;
+    if (model) {
+      reported = await propsCtx(new URL(`props?model=${encodeURIComponent(model)}`, base).toString()).catch(() => null);
+    }
+    if (reported === null) {
+      reported = await propsCtx(new URL('props', base).toString()).catch(() => null);
+    }
+    if (reported === null && model) {
+      reported = await (async () => {
+        const response = await fetchFn(new URL('v1/models', base).toString());
+        if (!response.ok) return null;
+        reachable = true;
+        const body = await response.json() as { data?: Array<{ id?: string; status?: { args?: unknown[] } }> };
+        const entry = body.data?.find((m) => m.id === model);
+        const args = Array.isArray(entry?.status?.args) ? entry.status.args : [];
+        for (let i = 0; i < args.length - 1; i++) {
+          if (args[i] === '--ctx-size' || args[i] === '-c') {
+            const parsed = Number.parseInt(String(args[i + 1]), 10);
+            return positiveCtx(parsed);
+          }
+        }
+        return null;
+      })().catch(() => null);
+    }
+    if (!reachable) return null;
     return deriveEffectiveContext({
       configuredContextSize,
-      serverReportedContext: typeof reported === 'number' ? reported : null,
+      serverReportedContext: reported,
       modelAdvertisedContext,
     });
   } catch {
@@ -550,7 +599,7 @@ export function resolveNativeSelection(
     const advertisedContext = registryContextTokens(selectedModel);
     const fetchFn = ctx.fetchFn ?? globalThis.fetch;
     const identity = async (): Promise<ProviderContextIdentity> => {
-      const status = await probeNativeContext(endpoint, configuredContextTokens ?? null, advertisedContext, fetchFn);
+      const status = await probeNativeContext(endpoint, configuredContextTokens ?? null, advertisedContext, fetchFn, selectedModel);
       if (!status) throw new ContextAuthorityUnavailableError('local-llm', selectedModel);
       const server = status.provenance.find((entry) => entry.source === 'server-reported' && entry.counted);
       const configured = status.provenance.find((entry) => entry.source === 'configured' && entry.counted);
@@ -570,17 +619,22 @@ export function resolveNativeSelection(
       }),
       endpointHealth: () => probeNativeEndpointHealth(endpoint, ctx.fetchFn),
       modelIdentity: () => validateNativeModelIdentity(selectedModel, endpoint, ctx.fetchFn ?? globalThis.fetch),
+      // 7086-residual (owner delivery 2026-08-18): the boot probe is
+      // UNCONDITIONAL — the server's real window must be discoverable even
+      // with no authored config knob; a config value composes as the
+      // narrowest ceiling when present. The config-gated attachment was the
+      // wiring gap behind the spurious INPUT_CONTEXT_AUTHORITY_UNAVAILABLE
+      // class on unconfigured local-llm sessions.
       ...(configuredContextTokens !== undefined
-        ? {
-            configuredContextSize: configuredContextTokens,
-            contextStatus: () => probeNativeContext(
-              endpoint,
-              configuredContextTokens,
-              advertisedContext,
-              ctx.fetchFn ?? globalThis.fetch,
-            ),
-          }
+        ? { configuredContextSize: configuredContextTokens }
         : {}),
+      contextStatus: () => probeNativeContext(
+        endpoint,
+        configuredContextTokens ?? null,
+        advertisedContext,
+        ctx.fetchFn ?? globalThis.fetch,
+        selectedModel,
+      ),
     };
   }
 
@@ -652,13 +706,21 @@ export function resolveNativeSelection(
  *  real model window and therefore cannot authorize a dispatch. */
 export function resolveContextBudgetTokens(
   providerName: string,
-  config: { native_context_tokens?: unknown },
+  config: { native_context_tokens?: unknown; local_llm?: { contextSize?: unknown } },
   effectiveContextTokens?: number | null,
   modelAdvertisedContextTokens?: number | null,
 ): number {
   const positive = (value: unknown): number | undefined =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
-  const configured = positive(config.native_context_tokens);
+  // Both authored knobs are configured authority — the same pair
+  // resolveConfiguredContextTokens composes for the boot probe. Omitting
+  // local_llm.contextSize here left an authored slot size invisible to the
+  // per-turn resolver (model=unresolved refusal with a fully configured server).
+  const authoredKnobs = [
+    positive(config.native_context_tokens),
+    providerName === 'local-llm' ? positive(config.local_llm?.contextSize) : undefined,
+  ].filter((v): v is number => v !== undefined);
+  const configured = authoredKnobs.length > 0 ? Math.min(...authoredKnobs) : undefined;
   const effective = providerName === 'local-llm' ? positive(effectiveContextTokens) : undefined;
   const advertised = positive(modelAdvertisedContextTokens);
   const ceilings = [effective, advertised].filter((v): v is number => v !== undefined);

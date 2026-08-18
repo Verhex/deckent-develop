@@ -53,5 +53,57 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "document",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "workflow",
+        "proficiency": "primary"
+      }
+    ],
+    "expertise": [
+      "api-builder",
+      "api-docs",
+      "changelog",
+      "docs",
+      "docs/",
+      "guide",
+      "jsdoc",
+      "python-expert",
+      "readme",
+      "readme.md",
+      "technical writing, readme structure, changelogs, jsdoc/tsdoc, api documentation",
+      "tutorial",
+      "typescript-expert",
+      "workflow"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.944Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }

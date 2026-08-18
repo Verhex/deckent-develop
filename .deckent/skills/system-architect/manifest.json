@@ -81,5 +81,71 @@
     "successRate": 0,
     "avgScore": 0,
     "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "build",
+        "proficiency": "primary"
+      },
+      {
+        "type": "refactor",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain",
+        "proficiency": "primary"
+      },
+      {
+        "id": "typescript",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "abstraction",
+      "api-builder",
+      "architecture",
+      "backward-compat",
+      "cargo.toml",
+      "config",
+      "domain",
+      "enterprise",
+      "enterprise system architecture patterns: registry design, config schema evolution, provider abstraction, tier-based routing, migration planning, backward compatibility strategies",
+      "go.mod",
+      "interface",
+      "migration",
+      "model",
+      "parametric",
+      "pattern",
+      "performance-optimizer",
+      "provider",
+      "pyproject.toml",
+      "registry",
+      "scalability",
+      "single-source",
+      "tier",
+      "tsconfig.json",
+      "typescript",
+      "typescript-expert"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 1,
+    "persistedAt": "2026-08-18T15:34:53.950Z",
+    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
   }
 }
