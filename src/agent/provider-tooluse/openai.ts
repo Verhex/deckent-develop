@@ -114,6 +114,9 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
         stream_options: { include_usage: true },
         messages: [{ role: 'system', content: req.system }, ...req.messages.map(toOpenAIMessage)],
       };
+      // NT-08 — the loop's reserved generation room, made explicit on the wire.
+      // Omitted when unset so an existing caller's body stays byte-identical.
+      if (req.outputCeilingTokens !== undefined) body['max_tokens'] = req.outputCeilingTokens;
       if (req.tools.length > 0) {
         body['tools'] = req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
       }

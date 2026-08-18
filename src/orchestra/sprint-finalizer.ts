@@ -43,6 +43,14 @@ type CatalogStatsEntry = Record<string, unknown> & {
 interface CatalogStatsSidecar extends Record<string, unknown> {
   agents?: Record<string, CatalogStatsEntry>;
   skills?: Record<string, CatalogStatsEntry>;
+  commsUsage?: Record<string, CatalogStatsCommsUsage>;
+}
+
+/** Per-attempt worker-comms usage (Sprint 278 COMM-1 fields), recorded once per taskId. */
+export interface CatalogStatsCommsUsage {
+  readonly sharedNotesWritten: number;
+  readonly handoffNotesWritten: number;
+  readonly handoffsReceived: boolean;
 }
 
 export interface CatalogStatsTerminalOutcome {
@@ -51,6 +59,31 @@ export interface CatalogStatsTerminalOutcome {
   readonly skillIds: readonly string[];
   readonly evaluation: TaskEvaluation.DONE | TaskEvaluation.GO_WITH_TECH_DEBT | TaskEvaluation.NO_GO;
   readonly coverage?: number;
+  readonly commsUsage?: CatalogStatsCommsUsage;
+}
+
+const ZERO_COMMS_USAGE: CatalogStatsCommsUsage = {
+  sharedNotesWritten: 0,
+  handoffNotesWritten: 0,
+  handoffsReceived: false,
+};
+
+/**
+ * Tolerant comms-usage extraction from a worker's `.result` (Sprint 551 551-002).
+ * Every field defaults to its zero value on absence or shape mismatch — no throw,
+ * so a legacy `.result` predating the Sprint 278 COMM-1 fields (or a future
+ * `handoffsReceived` field this parser doesn't know about yet) still yields a
+ * valid all-zero/false record instead of crashing the finalize pass.
+ */
+export function parseCommsUsageFromResult(result: TaskResult): CatalogStatsCommsUsage {
+  const raw = result as unknown as Record<string, unknown>;
+  const sharedNotes = raw.sharedNotes;
+  const handoffNotes = raw.handoffNotes;
+  return {
+    sharedNotesWritten: Array.isArray(sharedNotes) ? sharedNotes.length : 0,
+    handoffNotesWritten: typeof handoffNotes === 'string' && handoffNotes.trim().length > 0 ? 1 : 0,
+    handoffsReceived: raw.handoffsReceived === true,
+  };
 }
 
 export function collectCatalogStatsTerminalOutcomes(
@@ -77,6 +110,7 @@ export function collectCatalogStatsTerminalOutcomes(
       skillIds: result.skillIds ?? task.assignedSkills ?? [],
       evaluation,
       ...(typeof result.coverage === 'number' ? { coverage: result.coverage } : {}),
+      commsUsage: parseCommsUsageFromResult(result),
     });
   }
   return outcomes;
@@ -169,9 +203,18 @@ export function writeCatalogStatsTerminalOutcomes(
     skills[skillId] = mergeCatalogStatsEntry(skills[skillId], entityOutcomes, sprintId);
   }
 
+  // Comms usage is recorded once per attempt (taskId), not aggregated like the
+  // agent/skill entity stats above — an attempt's counters simply replace any
+  // prior entry under the same taskId. Folded into the SAME temp-write/rename
+  // pair below; this must never become a second sidecar write pass.
+  const commsUsage: Record<string, CatalogStatsCommsUsage> = { ...(current.commsUsage ?? {}) };
+  for (const outcome of outcomes) {
+    commsUsage[outcome.taskId] = outcome.commsUsage ?? ZERO_COMMS_USAGE;
+  }
+
   fileSystem.mkdir(statsDir);
   const tempPath = `${statsPath}.${process.pid}.${randomUUID()}.tmp`;
-  fileSystem.write(tempPath, `${JSON.stringify({ ...current, agents, skills }, null, 2)}\n`);
+  fileSystem.write(tempPath, `${JSON.stringify({ ...current, agents, skills, commsUsage }, null, 2)}\n`);
   fileSystem.rename(tempPath, statsPath);
 }
 

@@ -46,6 +46,20 @@ Approval requester'ları `brain`, `worker`, `auditor`, `nervous` veya `connector
 
 “Always allow” asla global değildir: grant; scope identity, approval scope, maximum risk ve expiry'ye bağlıdır. Current allow-scope module broker composition'ın downstream integration concern olduğunu açıkça söyler; module varlığı her approval ingress'in onu consume ettiğinin kanıtı değildir. [Kanıt: `src/core/approval-allowscope.ts:1-8,202-220`]
 
+Runtime approval core artık gerçek consumer'lar taşır: worker tool gate'leri external decision
+bekleyebilir, terminal kararları live authentication kullanır ve attended execution provider işi
+öncesinde exact dispatch'i verify-and-claim eder. Bu durum henüz tek universal product surface'i
+kanıtlamaz: Nervous normal/panic yolları ile tüm Terminal, Desktop, API, connector, CLI ve MCP
+projection'ları tamamen converge değildir. [Kanıt: `src/agent/permission-store.ts:214-280`;
+`src/core/approval-decision-ingress.ts:213-390`;
+`src/core/attended-execution-approval.ts:741-825`]
+
+Onaylı ürün yönü **tek attention-and-consent deneyimidir**. Nervous gözlemler, açıklar ve proposal
+üretir; exact human decision'ın sahibi ApprovalBroker'dır; executor yalnız verified authority
+tüketir; settlement gerçek sonucu raporlar. Signature'lar ikinci bir user-facing approval akışı
+olmak yerine bu deneyimin arkasındaki tamper-evident evidence olarak kalır. Bkz.
+[Nervous System](../guide/nervous-system.md).
+
 ### Archived identity/RBAC plan'larının yeniden doğrulanması
 
 Dört archived identity/RBAC plan, current completion certificate değil design intent ve dated task state anlatır. Current source tenant-aware `admin|operator|viewer` evaluator ile connector group→role→default permission mapping'i içerir; dolayısıyla “planned-only” durumları bayattır. Status yine `⚠️ kısmi`dır: enterprise RBAC default-off'tur, orchestration/approval/capability vocabulary'leri ayrıdır ve canonical cross-vocabulary mapping bu planlardan çıkarılmaz; OQ-23 olarak açıktır. [Kanıt: `src/core/rbac.ts:11-59,73-145`; `src/connectors/identity/role-map.ts:4-27`; `src/core/enterprise-config.ts:12-37`; archived identity/RBAC plan inventory]
@@ -61,6 +75,6 @@ Dört archived identity/RBAC plan, current completion certificate değil design 
 | Tool realpath containment | ✅ canlı primitive | Symlink-aware check vardır; canonical default/composition OQ-22'dir. |
 | Capability least privilege | ⚠️ opt-in | Grant veya `leastPrivilegeEnabled`/per-call enforcement verilmedikçe registry default permissive'dir. [Kanıt: `src/core/capability-broker.ts:78-93,132-145`] |
 | Role vocabulary unification | ⚠️ HOLD | Product RBAC `developer` içermez, capability role içerir; approval/orchestration başka set kullanır; mapping authority OQ-23'tür. |
-| Runtime-wide approval | ⚠️ kısmi | Policy ve broker component'leri vardır; allow-scope comment kapanmamış composition seam tanımlar. |
+| Runtime-wide approval | ⚠️ canlı core, kısmi convergence | Durable broker, authenticated decision ingress, worker gate ve exact attended-execution consumer'ları canlıdır; Nervous ve tüm kullanıcı yüzeyleri henüz tek tamamlanmış request→decision→effect→settlement yolunu paylaşmaz. |
 
 Exact ingress, enforcement mode, tenant context, audit sink ve managed host policy birlikte verify edilmeden repository-local policy'yi enterprise security boundary olarak tanımlamayın. [Kanıt: `AGENTS.md:124-128`; `src/core/tenant-context.ts:5-55`]

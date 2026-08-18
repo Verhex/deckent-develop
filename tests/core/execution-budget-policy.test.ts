@@ -344,3 +344,31 @@ describe('resolveXverifyAdjudicationPurposeProfile', () => {
     expect(Object.isFrozen(decision.profile)).toBe(true);
   });
 });
+
+describe('local-exempt final-only grant threading (sprint-550/551/552 SPAWN class)', () => {
+  it('local cost-class decision carries finalOnlyUsage when the owner grant covers the role', async () => {
+    const { resolveExecutionBudgetPolicy } = await import('../../src/core/execution-budget-policy.js');
+    const d = resolveExecutionBudgetPolicy({
+      policy: {
+        roles: { worker: { default: { maxTokens: 1000, maxTurns: 5 } } },
+        final_only_usage: { action: 'allow-wall-clock-containment', roles: ['worker'], max_wall_clock_seconds: 900 },
+      },
+      role: 'worker',
+      executionCostClass: 'local',
+      requestedBudget: { maxTokens: 1000, maxTurns: 5 },
+    });
+    expect(d.state).toBe('allow');
+    expect(d.finalOnlyUsage).toMatchObject({ maxWallClockSeconds: 900 });
+  });
+
+  it('local-exempt carries the final-only grant NEVER without the owner policy', async () => {
+    const { resolveExecutionBudgetPolicy } = await import('../../src/core/execution-budget-policy.js');
+    const d = resolveExecutionBudgetPolicy({
+      policy: undefined,
+      role: 'worker',
+      executionCostClass: 'local',
+    });
+    expect(d.state).toBe('allow');
+    expect(d.finalOnlyUsage).toBeUndefined();
+  });
+});

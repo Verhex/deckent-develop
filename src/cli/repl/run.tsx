@@ -24,7 +24,7 @@ import type { RunFlowMountLabels, DoSlashLabels } from './app.js';
 import { renderRunsCommand, buildInboxLabels, collectInboxRows } from './run-flow-inbox.js';
 import { executeInboxDecision } from '../commands/runs.js';
 import type { ResolvedConfig } from '../../core/types.js';
-import { buildTurnRecorder } from './trace-wire.js';
+import { buildTurnRecorder, resolveTraceEnabled } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
@@ -59,6 +59,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createLocalRpcTransport, buildReplRpcHandlers, runRpcDebugCommand } from './rpc-client.js';
 import { probeSubscriptionLimits } from '../../core/limit-preflight.js';
 import { resolveNativeAgentBudget } from '../../core/execution-budget-policy.js';
+import { modelRegistry } from '../../core/model-registry.js';
+import { attendedExecutionProjectId } from '../../core/attended-execution-approval.js';
 
 const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
 
@@ -535,6 +537,10 @@ export interface ReplTeardownDeps {
   runFlowResultWatch?: { dispose: () => void };
   memory?: { close: () => void };
   mcpBroker?: { disconnectAll: () => Promise<void> };
+  /** NT-03 (553-002) — tears down the native engine's scratch store (session.ts's
+   *  `close()`) with a bounded keep-for-recovery window; absent when the native
+   *  engine never mounted (legacy loop path). */
+  nativeEngineClose?: () => void;
   switcherExit: () => Promise<void>;
 }
 
@@ -568,6 +574,7 @@ export function buildReplTeardown(deps: ReplTeardownDeps): () => Promise<void> {
     try { deps.approvalChannel?.dispose(); } catch { /* already disposed */ }
     try { deps.runCompletionWatch?.dispose(); } catch { /* already disposed */ }
     try { deps.runFlowResultWatch?.dispose(); } catch { /* already disposed */ }
+    try { deps.nativeEngineClose?.(); } catch { /* best-effort */ }
     try { deps.memory?.close(); } catch { /* already closed */ }
     if (deps.mcpBroker) {
       try { await deps.mcpBroker.disconnectAll(); } catch { /* best-effort */ }
@@ -581,6 +588,11 @@ export function buildReplTeardown(deps: ReplTeardownDeps): () => Promise<void> {
  *  slow MCP close() (the SDK waits up to ~2s before escalating to SIGTERM,
  *  then up to another ~2s before SIGKILL) does not hang a plain `/exit`. */
 const REPL_TEARDOWN_TIMEOUT_MS = 5000;
+
+/** NT-03 (553-002) — bounded keep-for-recovery window for the native engine's
+ *  scratch store on REPL exit, so a crash-recovery read shortly after can still
+ *  see the last checkpoint before the store is actually deleted. */
+const NATIVE_SCRATCH_KEEP_MS = 10 * 60_000;
 
 /** Dependencies for {@link buildToolDispatcher} — every collaborator injected so
  *  the dispatch logic is unit-testable without mounting Ink (no ink-testing-library
@@ -898,7 +910,10 @@ export async function runInkRepl(
   // Native-agent engine (M5-NATIVE-FLIP, 376-003) — DEFAULT ON. Rolls back to
   // the legacy runChatNativeLoop path only via `--legacy-loop` or project
   // config `terminal.native_agent: false` (see isNativeAgentSelected above).
-  type NativeEngineType = ((input: string, cbs: { output: (t: string) => void; onTurnEnd: (s: { inputTokens: number; outputTokens: number }) => void }) => Promise<void>) | undefined;
+  // NT-03 (553-002) — reuses the bridge's own ReplEngine type (was a duplicated inline
+  // call signature missing setApprovalMode/close) so the teardown wiring below can call
+  // `nativeEngine?.close?.(...)` without a cast.
+  type NativeEngineType = ReplEngine | undefined;
   let nativeEngine: NativeEngineType;
   // Live native selection + the runtime switch (2026-07-07 incident fix): the
   // engine reads adapter/model/budget through getters, so /model — /provider
@@ -962,6 +977,24 @@ export async function runInkRepl(
       // Mutable backend the engine reads per turn (via the getters below).
       const live = { adapter: resolved.adapter, model: resolved.model, provider: resolved.providerName };
       nativeSelection = { provider: live.provider, model: live.model };
+      // NT-07 production wiring (sprint-553 hand-completion) — the boot-resolved
+      // effective context (server-reported, local-llm /props) feeds the context
+      // getter below. A runtime provider switch re-probes asynchronously; until
+      // that probe lands the getter honestly falls back to the config/registry
+      // ceilings instead of carrying a stale foreign-provider value.
+      let liveEffectiveContext: number | null = null;
+      const probeEffectiveContext = (
+        status: (() => Promise<{ effectiveContextSize: number } | null>) | undefined,
+      ): void => {
+        liveEffectiveContext = null;
+        if (!status) return;
+        void status()
+          .then((ctx) => { liveEffectiveContext = ctx?.effectiveContextSize ?? null; })
+          .catch(() => { /* probe optional — fallback ceilings stay honest */ });
+      };
+      try {
+        liveEffectiveContext = (await resolved.contextStatus?.())?.effectiveContextSize ?? null;
+      } catch { liveEffectiveContext = null; }
       nativeSwitch = (sel) => {
         // A bare `/model <id>` may imply a provider change (`/model fable` on
         // ollama → a claude attempt) — infer it only from unambiguous ids, so
@@ -982,20 +1015,36 @@ export async function runInkRepl(
         live.model = next.model;
         live.provider = next.providerName;
         nativeSelection = { provider: live.provider, model: live.model };
+        probeEffectiveContext(next.contextStatus);
         return { provider: live.provider, model: live.model };
       };
 
-      // Local-only training-trace recorder (SP-2) — opt-out via DECKENT_TRACE=0.
-      // Model is a getter: the trace stamps the model that ACTUALLY served the
-      // turn, not the boot-time one.
+      // NATIVE-AGENT-HORIZON-001 NT-03 (553-002) — the memory-session id when the chat
+      // DB opened, else a fresh native-only fallback; shared by the trace recorder below
+      // and the scratch-store ids so both name the SAME logical session.
+      const nativeSessionId = sessionId ?? `native-${Date.now()}`;
+      // Local-only training-trace recorder (SP-2). NT-13 (553-002): `training_trace.enabled`
+      // (effective config) is the AUTHORITY — DECKENT_TRACE can only force it OFF, never ON
+      // (see resolveTraceEnabled). Model is a getter: the trace stamps the model that
+      // ACTUALLY served the turn, not the boot-time one.
       const recordTurn = buildTurnRecorder({
-        enabled: process.env['DECKENT_TRACE'] !== '0',
+        enabled: resolveTraceEnabled(cfg as { training_trace?: { enabled?: boolean } }, process.env),
         dir: join(process.cwd(), '.deckent', 'traces'),
-        sessionId: sessionId ?? `native-${Date.now()}`,
+        sessionId: nativeSessionId,
         system: composeSystemPrompt({ cwd: process.cwd(), lang: lang as 'en' | 'tr' }),
         model: () => live.model,
         now: () => new Date().toISOString(),
       });
+      // NATIVE-AGENT-HORIZON-001 NT-03 (553-002) — scratch-session identity threaded into
+      // the bridge (which appends the fixed checkpointInstruction before calling
+      // createAgentSession). tenant_id authority: approval.authority.tenant_id, falling
+      // back to 'main' when unconfigured (single-tenant local REPL default).
+      const scratchTenantId = (cfg as { approval?: { authority?: { tenant_id?: string } } }).approval?.authority?.tenant_id ?? 'main';
+      const scratchIds = {
+        tenantId: scratchTenantId,
+        projectId: attendedExecutionProjectId(process.cwd()),
+        sessionId: nativeSessionId,
+      };
       const costCeilingUsd = resolveCostCeilingUsd(process.env, cfg as { native_cost_ceiling_usd?: unknown });
       // born-607 Gap-A: thread the resolved `tool_surface` config into the registry
       // (default-ON since a778151a but consumer-less until now — the 3 progressive-
@@ -1044,13 +1093,22 @@ export async function runInkRepl(
         model: resolved.model,
         getAdapter: () => live.adapter,
         getModel: () => live.model,
-        getContextBudgetTokens: () => resolveContextBudgetTokens(live.provider, nativeCfg),
+        // Owner directive 2026-08-18: the model's FULL advertised window is the
+        // usable ceiling (registry = single source, KANUN 10); config only
+        // narrows, and a live provider switch re-resolves via `live.model`.
+        getContextBudgetTokens: () => resolveContextBudgetTokens(
+          live.provider,
+          nativeCfg,
+          liveEffectiveContext,
+          modelRegistry.get(live.model)?.contextWindow ?? null,
+        ),
         lang: lang as 'en' | 'tr',
         confirm: (summary, toolName) => (confirmTrigger ? confirmTrigger(summary, toolName) : Promise.resolve('n')),
         toolSink: (info) => { if (toolSink) toolSink(info); },
         t: (key: string) => getMessage(key, lang),
         ...(costCeilingUsd !== undefined ? { costCeilingUsd } : {}),
         ...(recordTurn ? { recordTurn } : {}),
+        scratch: scratchIds,
       });
     }
   }
@@ -1138,6 +1196,7 @@ export async function runInkRepl(
     ...(runFlowResultWatch ? { runFlowResultWatch } : {}),
     ...(memory ? { memory } : {}),
     ...(mcpClientBroker ? { mcpBroker: mcpClientBroker } : {}),
+    ...(nativeEngine ? { nativeEngineClose: () => nativeEngine?.close?.({ keepForRecoveryMs: NATIVE_SCRATCH_KEEP_MS }) } : {}),
     switcherExit: () => switcher.exit(),
   });
   const unregisterTeardown = registerTeardown(teardown);

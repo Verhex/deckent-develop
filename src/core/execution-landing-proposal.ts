@@ -357,7 +357,11 @@ function buildAtomicProposalWriteStep(
   return [
     `proposal_path=${quoteBashArgument(path)}`,
     `proposal_json=${quoteBashArgument(serialized)}`,
-    'proposal_tmp="${proposal_path}.tmp.$$"',
+    // Brace-free bash on purpose: a `${...}` sequence in this generated script
+    // gets evaluated as a JS template by a downstream prompt-interpolation layer
+    // (the sprint-553-004 'ReferenceError: proposal_path is not defined' class),
+    // so every expansion here uses the `$name` form only.
+    'proposal_tmp="$proposal_path.tmp.$$"',
     'printf \'%s\' "$proposal_json" > "$proposal_tmp"',
     'mv -- "$proposal_tmp" "$proposal_path"',
   ].join('\n');

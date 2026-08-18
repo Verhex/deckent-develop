@@ -18,6 +18,13 @@ import { resolve, relative, isAbsolute, dirname, sep, parse, join } from 'node:p
 import { spawn } from 'node:child_process';
 import type { McpToolDispatcher } from './chat-native.js';
 import { DeckentError } from '../../core/errors.js';
+// NT-01/04/05 — the ONE tool-result containment chokepoint. Nothing this
+// dispatcher produces reaches the loop except through brokerToolResult.
+import {
+  brokerToolResult,
+  createSessionContentStore,
+  type ContentWriter,
+} from '../../agent/tool-result-broker.js';
 // 583/N4 — the ONE git surface (orchestra use-case service; cli→orchestra is
 // the allowed direction, ADR-D-004 C3). Both this dispatcher and `runs
 // --commit` consume it — no second git implementation.
@@ -177,6 +184,32 @@ export interface ToolExecOptions {
    * politikasının sahibidir). Default DEFAULT_BASH_TIMEOUT_MS (5dk).
    */
   bashTimeoutMs?: number;
+  /**
+   * NT-01/04 — where a tool result larger than the preview cap spills its full
+   * bytes. Inject the session scratch store to share one session directory;
+   * omitted → a lazy session-scoped mkdtemp store (createSessionContentStore).
+   */
+  contentStore?: ContentWriter;
+  /** NT-01/04 — preview budget in bytes. Default/clamp live in the broker. */
+  maxPreviewBytes?: number;
+}
+
+/**
+ * Optional server-side range read for deckent_read_file: `offset` is a 1-based
+ * starting LINE, `limit` a line count. Both optional and independently
+ * honoured; a non-finite/≤0 value is ignored rather than guessed at, so a
+ * malformed arg degrades to a full read instead of a silently wrong slice.
+ */
+function resolveLineRange(
+  rawOffset: unknown,
+  rawLimit: unknown,
+): { offset: number; limit: number | null } | null {
+  const offsetNum = Number(rawOffset);
+  const limitNum = Number(rawLimit);
+  const offset = rawOffset !== undefined && Number.isFinite(offsetNum) && offsetNum >= 1 ? Math.floor(offsetNum) : null;
+  const limit = rawLimit !== undefined && Number.isFinite(limitNum) && limitNum >= 1 ? Math.floor(limitNum) : null;
+  if (offset === null && limit === null) return null;
+  return { offset: offset ?? 1, limit };
 }
 
 /** İnsan-okur özet — onay prompt'unda gösterilir. Label'lar caller'dan (i18n). */
@@ -415,8 +448,13 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
     return abs;
   };
 
-  return {
-    async dispatch(name, args) {
+  const contentStore = opts.contentStore ?? createSessionContentStore();
+
+  // The raw tool surface. Still returns the same PROTOCOL strings it always
+  // did (`[deckent] …` / `[mcp-error] …` / `[deckent-denied] …`) — the
+  // containment + exit-truth pass happens once, in dispatch, so no branch here
+  // can leak an unbounded result to the loop.
+  const runTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
       try {
         if (SIDE_EFFECTING.has(name)) {
           const approved = await confirm(summarize(name, args, labels), name);
@@ -500,7 +538,15 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
             const abs = inScope(String(args['path'] ?? ''));
             if (!abs) return `[mcp-error] deckent_read_file: path out of scope or invalid`;
             if (!existsSync(abs)) return `[mcp-error] deckent_read_file: file not found: ${args['path']}`;
-            return readFileSync(abs, 'utf-8');
+            const text = readFileSync(abs, 'utf-8');
+            // NT-01 range read: a bounded slice costs the model nothing to ask
+            // for and keeps a 470k-char file out of the turn in the first place.
+            const range = resolveLineRange(args['offset'], args['limit']);
+            if (range === null) return text;
+            const allLines = text.split('\n');
+            const start = Math.min(range.offset - 1, allLines.length);
+            const end = range.limit === null ? allLines.length : Math.min(start + range.limit, allLines.length);
+            return allLines.slice(start, end).join('\n');
           }
           case 'deckent_write_file': {
             const abs = inScope(String(args['path'] ?? ''));
@@ -599,6 +645,19 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
         const msg = err instanceof Error ? err.message : String(err);
         return `[mcp-error] ${name}: ${msg}`;
       }
+  };
+
+  return {
+    async dispatch(name, args) {
+      // NT-01/04/05: the single exit. `ok:true` is only what this layer
+      // OBSERVED (no throw escaped runTool) — the broker downgrades it from
+      // the `[exit N]` / `[mcp-error]` / `[deckent-denied]` markers, so a
+      // failed bash never reaches the model as a success.
+      const output = await runTool(name, args);
+      return brokerToolResult(
+        { output, ok: true },
+        { store: contentStore, maxPreviewBytes: opts.maxPreviewBytes },
+      );
     },
   };
 }

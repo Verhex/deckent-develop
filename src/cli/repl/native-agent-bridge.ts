@@ -10,6 +10,7 @@ import { createAgentSession } from '../../agent/session.js';
 import { loadPolicy } from '../../agent/permission-policy.js';
 import { createRuleStore } from '../../agent/permission-store.js';
 import { createCostGuard } from '../../agent/guards/cost.js';
+import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import type { AgentEvent } from '../../agent/events.js';
@@ -60,6 +61,13 @@ export interface ReplEngine {
    * ReplEngine.
    */
   setApprovalMode?: (mode: ApprovalMode) => void;
+  /**
+   * NT-03 (553-002) — bridges REPL teardown to the AgentSession's own scratch-store
+   * teardown (session.ts's `close()`, itself a no-op when no `scratch` deps were
+   * supplied). Optional so a bare function value (test fake) still structurally
+   * satisfies ReplEngine, same rationale as `setApprovalMode` above.
+   */
+  close?: (options?: { keepForRecoveryMs?: number }) => void;
 }
 
 export interface NativeEngineDeps {
@@ -113,7 +121,35 @@ export interface NativeEngineDeps {
    * stays NOT_WIRED_EXEC (fail-closed).
    */
   toolSurface?: ToolSurfaceOptions;
+  /**
+   * NT-03 (553-002) — scratch-session identity (tenantId/projectId/sessionId). The
+   * caller (run.tsx) resolves the ids; this bridge appends the fixed
+   * `CHECKPOINT_INSTRUCTION` mechanism text (see below) before threading the full
+   * object into `createAgentSession`'s `scratch` dep. Absent → no scratch store
+   * opens (session.ts's own byte-identical pre-wire behavior).
+   */
+  scratch?: { tenantId: string; projectId: string; sessionId: string };
 }
+
+/**
+ * NT-03 (553-002) — fixed structured-checkpoint request sent to the provider as
+ * `system` when the loop asks the session layer for a scratch checkpoint
+ * (session.ts's `runWithCheckpoints`, on a `budget-checkpoint-request` event).
+ * English mechanism text is the PROVIDER contract, not user-facing i18n (quality-bar
+ * carve-out) — the model must reply with ONLY the JSON object below, matching
+ * `ScratchCheckpointPayload` (scratch-checkpoint.ts) exactly.
+ */
+const CHECKPOINT_INSTRUCTION =
+  'Summarize this session\'s progress as a single JSON object (no prose, no markdown fences) ' +
+  'matching exactly this shape: {"schemaVersion":1,"objective":string,"findings":string[],' +
+  '"evidenceRefs":string[],"decisions":string[],"unresolved":string[],"nextActions":string[],' +
+  '"inspectedAreas":string[],"toolResultDigests":string[],"cumulativeCounters":{[name: string]: number},' +
+  '"createdAt": ISO-8601 string}. Every array must contain short, concrete strings drawn from the ' +
+  'actual conversation so far. Return ONLY the JSON object.';
+
+/** NT-12 (553-002) — writeAuditEvent's partition for REPL-originated audit events;
+ *  mirrors process-runtime.ts's own 'process' partition for non-sprint-bound events. */
+const NATIVE_AGENT_AUDIT_PARTITION = 'repl';
 
 /** Format one drained ChatTurnPayload (ChatTurnQueue.drainAsTurns()) as the
  *  synthetic user-turn input fed back into the session — one coalesced bucket
@@ -321,6 +357,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
     ...(deps.getModel ? { getModel: deps.getModel } : {}),
     ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
+    ...(deps.scratch ? { scratch: { ...deps.scratch, checkpointInstruction: CHECKPOINT_INSTRUCTION } } : {}),
   });
 
   // born-607 CALLTOOL-EXEC-WIRE: arm `deckent_call_tool` with the engine-parity
@@ -365,6 +402,27 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         }
         case 'tool-result':
           deps.toolSink({ verb: `${ev.tool} — ${t('native.tool_ran')}`, target: '', ...(ev.ok ? {} : { failed: true }) });
+          break;
+        case 'permission-auto-decision':
+          // NT-12 (553-002) — the trace snapshot is NOT the audit record: every
+          // auto-decision (silent tierMap allow/deny, no confirm-queue round trip)
+          // is persisted durably here via the same hash-chained audit-writer every
+          // other subsystem uses (writeAuditEvent is itself fail-safe on I/O).
+          writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
+            tenantId: deps.scratch?.tenantId ?? 'local',
+            actor: 'native-agent',
+            action: `permission.auto-decision.${ev.decision}`,
+            target: ev.tool,
+            metadata: {
+              resource: ev.resource,
+              resourceClass: ev.resourceClass,
+              matchedRule: ev.matchedRule,
+              mode: ev.mode,
+              tier: ev.tier,
+              grantLifetime: ev.grantLifetime,
+              floor: ev.floor,
+            },
+          });
           break;
         case 'usage':
           // `+=`: session.send() yields one 'usage' event per loop.ts round
@@ -419,5 +477,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       };
   // born-493 (387-002) — see the ReplEngine.setApprovalMode doc comment above.
   engine.setApprovalMode = (mode) => session.setApprovalMode(mode);
+  // NT-03 (553-002) — see the ReplEngine.close doc comment above.
+  engine.close = (options) => session.close(options);
   return engine;
 }

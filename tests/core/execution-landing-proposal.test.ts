@@ -163,8 +163,13 @@ describe('execution landing proposal', () => {
     expect(segment).toContain('SAME assistant turn');
     expect(segment).toContain('stop early and report NO_GO');
     expect(segment).toContain('quote-safe composition');
-    expect(segment).toContain('proposal_tmp="${proposal_path}.tmp.$$"');
+    expect(segment).toContain('proposal_tmp="$proposal_path.tmp.$$"');
     expect(segment).toContain('mv -- "$proposal_tmp" "$proposal_path"');
+    // sprint-553-004 regression: a `${...}` sequence in this segment gets
+    // evaluated as a JS template by a downstream prompt-interpolation layer
+    // (ReferenceError: proposal_path is not defined) — the whole segment must
+    // stay brace-expansion-free forever.
+    expect(segment).not.toContain('${');
     expect(segment.length).toBeLessThan(3_500);
   });
 
@@ -180,6 +185,8 @@ describe('execution landing proposal', () => {
     expect(segment).toContain('only permitted project-file mutation');
     expect(segment).toContain('quote-safe composition');
     expect(segment).toContain('mv -- "$proposal_tmp" "$proposal_path"');
+    // sprint-553-004 regression (same class as the continuous-mode segment).
+    expect(segment).not.toContain('${');
     expect(segment).not.toContain('after your plan and after each coherent completed step');
     expect(segment.length).toBeLessThan(4_000);
   });

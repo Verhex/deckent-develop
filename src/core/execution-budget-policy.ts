@@ -608,12 +608,30 @@ export function resolveExecutionBudgetPolicy(input: {
   if (input.executionCostClass === 'local') {
     if (input.requestedBudget) assertBudget(input.requestedBudget, 'requested execution budget');
     const budget = input.requestedBudget ? Object.freeze(cloneBudget(input.requestedBudget)) : undefined;
+    const localPolicyDigest = createHash('sha256').update('local-exempt').digest('hex');
+    // The local-exempt shortcut still carries a live-ceiling budget, and a
+    // local OpenAI-compatible worker cannot meter usage incrementally — so the
+    // owner's final-only wall-clock grant must ride THIS branch too, or the
+    // spawn admission gate correctly refuses the worker (the sprint-550/551/552
+    // SPAWN failure class, 2026-08-18). Same three-condition rule as the
+    // standard branch below; no policy → no grant, never fabricated.
+    const localFinalOnly = input.policy?.final_only_usage;
+    const localFinalOnlyUsage = localFinalOnly?.action === 'allow-wall-clock-containment'
+      && localFinalOnly.roles?.includes(input.role)
+      && localFinalOnly.max_wall_clock_seconds !== undefined
+      ? Object.freeze({
+        maxWallClockSeconds: localFinalOnly.max_wall_clock_seconds,
+        profileRef: 'execution_budget.final_only_usage',
+        policyDigest: localPolicyDigest,
+      })
+      : undefined;
     return {
       state: 'allow',
       ...(budget ? { budget } : {}),
       profileRef: 'local-exempt',
-      policyDigest: createHash('sha256').update('local-exempt').digest('hex'),
+      policyDigest: localPolicyDigest,
       requestedNarrowing: budget !== undefined,
+      ...(localFinalOnlyUsage ? { finalOnlyUsage: localFinalOnlyUsage } : {}),
     };
   }
   if (!input.policy) {

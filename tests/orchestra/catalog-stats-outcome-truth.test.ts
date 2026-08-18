@@ -15,6 +15,7 @@ import type { Task, TaskResult } from '../../src/core/types.js';
 import {
   collectCatalogStatsTerminalOutcomes,
   writeCatalogStatsTerminalOutcomes,
+  parseCommsUsageFromResult,
   type CatalogStatsFileSystem,
 } from '../../src/orchestra/sprint-finalizer.js';
 
@@ -176,6 +177,135 @@ describe('catalog stats terminal outcome truth', () => {
     expect(JSON.parse(readFileSync(destination, 'utf-8'))).toMatchObject({
       agents: { 'agent-a': { totalUses: 1 }, 'agent-b': { totalUses: 1 } },
       skills: { 'skill-a': { totalUses: 1 }, 'skill-b': { totalUses: 1 } },
+    });
+  });
+
+  describe('comms usage telemetry (Sprint 551 551-002)', () => {
+    it('parses real comms counters from a result carrying sharedNotes/handoffNotes/handoffsReceived', () => {
+      const withComms = {
+        ...result('551-a'),
+        sharedNotes: [{ key: 'k1', value: 'v1' }, { key: 'k2', value: 'v2' }],
+        handoffNotes: 'downstream: use the new schema',
+        handoffsReceived: true,
+      } as unknown as TaskResult;
+
+      expect(parseCommsUsageFromResult(withComms)).toEqual({
+        sharedNotesWritten: 2,
+        handoffNotesWritten: 1,
+        handoffsReceived: true,
+      });
+    });
+
+    it('defaults comms counters to zero/false for a legacy result missing comms fields', () => {
+      expect(parseCommsUsageFromResult(result('551-b'))).toEqual({
+        sharedNotesWritten: 0,
+        handoffNotesWritten: 0,
+        handoffsReceived: false,
+      });
+    });
+
+    it('never throws on malformed comms shapes and still defaults to zero/false', () => {
+      const malformed = {
+        ...result('551-c'),
+        sharedNotes: 'not-an-array',
+        handoffNotes: '   ',
+      } as unknown as TaskResult;
+
+      expect(() => parseCommsUsageFromResult(malformed)).not.toThrow();
+      expect(parseCommsUsageFromResult(malformed)).toEqual({
+        sharedNotesWritten: 0,
+        handoffNotesWritten: 0,
+        handoffsReceived: false,
+      });
+    });
+
+    it('collectCatalogStatsTerminalOutcomes attaches commsUsage per outcome', () => {
+      const v3 = task('551-d');
+      const withComms = {
+        ...result(v3.id, { agentId: 'agent-x', skillIds: ['skill-x'] }),
+        sharedNotes: [{ key: 'k', value: 'v' }],
+        handoffNotes: 'note',
+        handoffsReceived: true,
+      } as unknown as TaskResult;
+
+      const outcomes = collectCatalogStatsTerminalOutcomes(
+        [v3],
+        new Map([[v3.id, TaskEvaluation.DONE]]),
+        new Map([[v3.id, withComms]]),
+      );
+
+      expect(outcomes).toMatchObject([
+        { taskId: v3.id, commsUsage: { sharedNotesWritten: 1, handoffNotesWritten: 1, handoffsReceived: true } },
+      ]);
+    });
+
+    it('records commsUsage once per taskId/attempt in the sidecar with single-write atomicity preserved', () => {
+      const root = projectRoot();
+      const destination = statsPath(root);
+      let writes = 0;
+      let renames = 0;
+      const fileSystem: CatalogStatsFileSystem = {
+        exists: path => existsSync(path),
+        read: path => readFileSync(path, 'utf-8'),
+        mkdir: path => mkdirSync(path, { recursive: true }),
+        write: (path, content) => {
+          writes += 1;
+          expect(path).not.toBe(destination);
+          writeFileSync(path, content, 'utf-8');
+        },
+        rename: (source, target) => {
+          renames += 1;
+          renameSync(source, target);
+        },
+      };
+
+      writeCatalogStatsTerminalOutcomes(root, 'sprint-551', [
+        {
+          taskId: 'attempt-one',
+          agentId: 'agent-a',
+          skillIds: ['skill-a'],
+          evaluation: TaskEvaluation.DONE,
+          commsUsage: { sharedNotesWritten: 3, handoffNotesWritten: 1, handoffsReceived: true },
+        },
+        {
+          taskId: 'attempt-two',
+          agentId: 'agent-b',
+          skillIds: ['skill-b'],
+          evaluation: TaskEvaluation.NO_GO,
+        },
+      ], fileSystem);
+
+      expect({ writes, renames }).toEqual({ writes: 1, renames: 1 });
+      const stats = JSON.parse(readFileSync(destination, 'utf-8')) as {
+        commsUsage: Record<string, { sharedNotesWritten: number; handoffNotesWritten: number; handoffsReceived: boolean }>;
+      };
+      expect(stats.commsUsage).toEqual({
+        'attempt-one': { sharedNotesWritten: 3, handoffNotesWritten: 1, handoffsReceived: true },
+        'attempt-two': { sharedNotesWritten: 0, handoffNotesWritten: 0, handoffsReceived: false },
+      });
+    });
+
+    it('preserves a legacy sidecar without a commsUsage section (byte-compatible upgrade)', () => {
+      const root = projectRoot();
+      mkdirSync(join(root, '.deckent', 'stats'), { recursive: true });
+      writeFileSync(statsPath(root), JSON.stringify({
+        version: 1,
+        agents: {},
+        skills: {},
+      }, null, 2));
+
+      writeCatalogStatsTerminalOutcomes(root, 'sprint-551', [
+        { taskId: 'fresh', agentId: 'agent-c', skillIds: [], evaluation: TaskEvaluation.DONE },
+      ]);
+
+      const stats = JSON.parse(readFileSync(statsPath(root), 'utf-8')) as {
+        version: number;
+        commsUsage: Record<string, unknown>;
+      };
+      expect(stats.version).toBe(1);
+      expect(stats.commsUsage).toEqual({
+        fresh: { sharedNotesWritten: 0, handoffNotesWritten: 0, handoffsReceived: false },
+      });
     });
   });
 });

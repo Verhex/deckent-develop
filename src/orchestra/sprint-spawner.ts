@@ -1298,12 +1298,25 @@ export async function spawnWorkers(
       if (typeof refresh === 'function') {
         await refresh.call(adapterRouted);
       }
-      assertLiveUsageBudgetSupport(
-        task.budget,
-        adapterRouted.liveUsageBudgetSupport,
-        adapterRouted.name,
-        adapterRouted.executionCostClass,
-      );
+      // Final-only wall-clock containment for HOST-ADAPTER providers (owner
+      // grant execution_budget.final_only_usage, roles-scoped — the exact same
+      // authority the docker branch consumes below). An OpenAI-compatible
+      // adapter reports usage only at stream end, so live token metering is
+      // impossible; with the owner's grant the HARD host-enforced containment
+      // is the adapter's SIGKILL timeout, bounded by the grant's wall clock.
+      const adapterFinalOnlyContainment =
+        adapterRouted.liveUsageBudgetSupport !== 'measured-stream'
+        && hasLiveUsageCeiling(task.budget)
+          ? task.budgetPolicy?.finalOnlyUsage
+          : undefined;
+      if (!adapterFinalOnlyContainment) {
+        assertLiveUsageBudgetSupport(
+          task.budget,
+          adapterRouted.liveUsageBudgetSupport,
+          adapterRouted.name,
+          adapterRouted.executionCostClass,
+        );
+      }
       assertExecutionLandingSupport({
         budget: task.budget,
         policy: task.budgetPolicy?.landingPolicy,
@@ -1321,7 +1334,14 @@ export async function spawnWorkers(
         projectDir: projectRoot,
         reasoningEffort,
         excludeDynamicPromptSections,
-        taskTimeoutSeconds,
+        // Under a final-only grant the wall clock IS the containment: never
+        // exceed the owner-authored ceiling, never disable the timeout.
+        taskTimeoutSeconds: adapterFinalOnlyContainment
+          ? Math.min(
+              taskTimeoutSeconds || adapterFinalOnlyContainment.maxWallClockSeconds,
+              adapterFinalOnlyContainment.maxWallClockSeconds,
+            )
+          : taskTimeoutSeconds,
         executionBudget: task.budget,
         executionLandingPolicy: task.budgetPolicy?.landingPolicy,
         executionAdmissionMode: task.budgetPolicy?.admissionMode,

@@ -15,7 +15,7 @@ import { grantPatternFor, type ApprovalMode } from './permission-types.js';
 import { ToolRegistry } from './tools/registry.js';
 import type { ToolResult } from './tools/types.js';
 import { Transcript } from './transcript.js';
-import type { ProviderAdapter, ProviderRequest, ProviderToolCall } from './provider-tooluse/types.js';
+import type { ProviderAdapter, ProviderMessage, ProviderRequest, ProviderToolCall } from './provider-tooluse/types.js';
 import {
   recursionExceeded,
   createNativeBudgetState,
@@ -26,7 +26,12 @@ import type { ResolvedNativeAgentBudget } from '../core/execution-budget-policy.
 import { checkSelfModifying } from './guards/self-modifying.js';
 import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
 import { classifyShellCommand } from './guards/shell-risk.js';
-import { fitMessagesToBudget, derivePromptBudget } from './context-budget.js';
+import {
+  fitMessagesToBudget,
+  derivePromptBudget,
+  estimateTokens,
+  estimateMessageTokens,
+} from './context-budget.js';
 import { matchRule } from './permission-types.js';
 
 export type PermissionResponse = { decision: 'once' | 'session' | 'always' | 'deny' };
@@ -131,8 +136,12 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // Client-side context fitting: drop the oldest messages (pairing-safe)
     // BEFORE the backend hits its window — a server-side truncation returns an
     // empty turn with HTTP 200 and looks like a dead REPL.
-    let messages = transcript.toProviderMessages();
+    const toolSchemas = deps.registry.toNativeSchemas();
     const rawBudget = deps.getContextBudgetTokens?.();
+    // NT-08: the generation room the prompt arithmetic reserves is also the
+    // ceiling the backend is told to respect (adapter → `max_tokens`).
+    const outputCeilingTokens = deps.nativeBudget?.outputReserveTokens ?? 0;
+    const contextSafetyReserveTokens = deps.nativeBudget?.contextSafetyReserveTokens ?? 0;
     // 548-004 production wiring: the visible reserve arithmetic — system prompt,
     // serialized tool schemas and the configured output/safety reserves all come
     // OUT of the context before transcript fitting, so the backend can never be
@@ -142,9 +151,9 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           derivePromptBudget({
             contextTokens: rawBudget,
             systemPrompt: system,
-            toolSchemas: deps.registry.toNativeSchemas(),
-            outputReserveTokens: deps.nativeBudget?.outputReserveTokens ?? 0,
-            contextSafetyReserveTokens: deps.nativeBudget?.contextSafetyReserveTokens ?? 0,
+            toolSchemas,
+            outputReserveTokens: outputCeilingTokens,
+            contextSafetyReserveTokens,
           }).promptBudgetTokens,
           // Floor: overheads (system prompt + tool schemas) may exceed a small
           // configured budget entirely — fitting must still keep a minimal
@@ -152,19 +161,84 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           Math.ceil(rawBudget * 0.25),
         )
       : rawBudget;
-    if (budget !== undefined && budget > 0) {
-      const fit = fitMessagesToBudget(messages, budget);
-      if (fit.droppedCount > 0) {
-        messages = fit.messages;
+
+    // NT-02 per-request admission: fitting alone cannot guarantee the request
+    // fits — the current turn (last user message onward) is force-kept whole so
+    // a single round of oversized tool results still overflows, and the 25%
+    // floor above deliberately keeps a window even when overheads swallow the
+    // context. Measure the ACTUAL request the way the wire will carry it.
+    const fixedOverheadTokens = estimateTokens(system)
+      + estimateTokens(JSON.stringify(toolSchemas))
+      + outputCeilingTokens
+      + contextSafetyReserveTokens;
+    const fitRequest = (source: readonly ProviderMessage[]): {
+      messages: ProviderMessage[];
+      droppedCount: number;
+      keptTokens: number;
+      requiredTokens: number;
+    } => {
+      const fit = budget !== undefined && budget > 0
+        ? fitMessagesToBudget(source, budget)
+        : { messages: [...source], droppedCount: 0, estimatedTokens: source.reduce((n, m) => n + estimateMessageTokens(m), 0) };
+      return {
+        messages: fit.messages,
+        droppedCount: fit.droppedCount,
+        keptTokens: fit.estimatedTokens,
+        requiredTokens: fixedOverheadTokens + fit.messages.reduce((n, m) => n + estimateMessageTokens(m), 0),
+      };
+    };
+    // Admission needs BOTH a known effective context and a resolved native
+    // budget — the latter is where the reserve arithmetic (output ceiling +
+    // safety reserve) comes from, and the production REPL always resolves one
+    // (run.tsx: resolveNativeAgentBudget, defaults when unauthored). A legacy
+    // caller with neither keeps the pre-NT-02 fitting behavior byte-identical.
+    const overContext = (requiredTokens: number): boolean =>
+      deps.nativeBudget !== undefined && rawBudget !== undefined && rawBudget > 0
+      && requiredTokens > rawBudget;
+
+    let fitted = fitRequest(transcript.toProviderMessages());
+    if (fitted.droppedCount > 0) {
+      yield {
+        type: 'notice',
+        code: 'context-compacted',
+        message: `context window near its limit — compacted ${fitted.droppedCount} oldest message(s) (~${fitted.keptTokens} tokens kept)`,
+      };
+    }
+    if (overContext(fitted.requiredTokens)) {
+      // Epoch-compaction path: ask the session layer ONCE to checkpoint (which
+      // may compact the transcript into a fresh epoch while this generator is
+      // suspended on the yield), then re-read + re-fit and judge again.
+      yield {
+        type: 'budget-checkpoint-request',
+        reason: 'token-pressure',
+        rounds: budgetState?.rounds ?? iterations,
+        toolCalls: budgetState?.toolCalls ?? 0,
+      };
+      // Re-fit silently: a consumer that ignored the checkpoint would otherwise
+      // get the identical compaction notice twice for one round.
+      fitted = fitRequest(transcript.toProviderMessages());
+      if (overContext(fitted.requiredTokens)) {
+        // Shipping this request would be a doomed call — the backend truncates
+        // server-side and returns an empty turn. Current-turn messages are
+        // NEVER dropped to make it fit; the typed denial is the honest outcome.
         yield {
-          type: 'notice',
-          code: 'context-compacted',
-          message: `context window near its limit — compacted ${fit.droppedCount} oldest message(s) (~${fit.estimatedTokens} tokens kept)`,
+          type: 'error',
+          code: 'native-context.admission-denied',
+          message: `context admission denied — request needs ~${fitted.requiredTokens} tokens, effective context is ${rawBudget}`,
         };
+        yield { type: 'turn-end' };
+        return;
       }
     }
+    const messages = fitted.messages;
 
-    const req: ProviderRequest = { system, messages, tools: deps.registry.toNativeSchemas(), model };
+    const req: ProviderRequest = {
+      system,
+      messages,
+      tools: toolSchemas,
+      model,
+      ...(outputCeilingTokens > 0 ? { outputCeilingTokens } : {}),
+    };
     let assistantText = '';
     let stopReason: string | undefined;
     const calls: ProviderToolCall[] = [];

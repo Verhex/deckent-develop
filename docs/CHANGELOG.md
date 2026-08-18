@@ -14,6 +14,39 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint553] - 2026-08-18
+
+> Run ABORTED (2/5 dogfood DONE); remainders hand-completed by Brain per owner
+> directive ("553 kalanlarını elle işle", ADR-D-007 seam) and landed together.
+
+### Added
+
+- universal tool-result containment broker — bounded envelope + exit-code truth (NT-01/04/05)
+- hard per-request context admission + output ceiling on the wire (NT-02/08)
+- scratch production wire, durable auto-decision audit, trace config authority (NT-03/12/13)
+- qwen-incident deterministic regression fixture + correction baseline document
+
+### Changed
+
+- context budget authority: registry model-advertised FULL window is the ceiling (opus/sonnet/fable 1M); config only narrows
+- worker/time budget caps loosened per owner directive (maxTokens 40M, cacheRead 60M, turns 300, docker/final-only 7200s)
+
+### Fixed
+
+- landing-proposal generated-bash `${...}` JS-interpolation protocol bug (brace-free + regression)
+
+
+_Tasks: 5 total, 2 done, 0 tech debt, 3 no-go_
+
+## [sprint551] - 2026-08-18
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
 ## [sprint546] - 2026-08-17
 
 ### Added

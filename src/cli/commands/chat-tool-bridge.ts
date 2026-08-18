@@ -22,6 +22,13 @@ import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import type { McpToolDispatcher } from './chat-native.js';
 import { spawnDetachedDeckent, type DetachedSpawnResult } from '../helpers/detached-start.js';
+// NT-01/04/05 — the ONE tool-result containment chokepoint.
+import {
+  brokerToolResult,
+  createSessionContentStore,
+  type ContentWriter,
+  type RawToolResult,
+} from '../../agent/tool-result-broker.js';
 
 // ─── Tool → CLI subcommand map ─────────────────────────────────────────────
 //
@@ -105,9 +112,49 @@ export function resolveSpawnTimeoutMs(cliArgs: readonly string[]): number {
 /** Async function that invokes the deckent CLI with the given args and returns combined stdout+stderr. */
 export type CliToolSpawnFn = (args: string[]) => Promise<string>;
 
+/**
+ * NT-05 — what the subprocess ACTUALLY did. The legacy {@link CliToolSpawnFn}
+ * shape (one merged, trimmed string) cannot express an exit code, so a command
+ * that failed was reported to the model as ordinary output. This is the shape
+ * the dispatcher uses in production; stdout and stderr stay separate channels.
+ */
+export interface CliSpawnOutcome {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+}
+
+/** Async function that invokes the deckent CLI and reports the real outcome. */
+export type CliToolSpawnOutcomeFn = (args: string[]) => Promise<CliSpawnOutcome>;
+
+/**
+ * NT-05 — typed rejection for a spawn killed by its own kill-budget, so the
+ * dispatcher classifies a timeout as `timeout` instead of sniffing the message
+ * text. The message is unchanged (`timed out after Ns`) — it is the documented
+ * protocol string the model and the existing tests both read.
+ */
+export class CliSpawnTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`timed out after ${timeoutMs / 1000}s`);
+    this.name = 'CliSpawnTimeoutError';
+  }
+}
+
 export interface CliToolDispatcherOptions {
-  /** Inject a fake spawn for hermetic tests; omit for the real child_process spawn. */
+  /**
+   * Inject a fake spawn for hermetic tests; omit for the real child_process
+   * spawn. LEGACY string seam: it carries no exit code, so a result from it is
+   * only classified by its output markers (see resolveExitTruth). Prefer
+   * `spawnOutcomeFn` when the test cares about exit truth.
+   */
   spawnFn?: CliToolSpawnFn;
+  /** Structured spawn seam (real exit code / signal). Default defaultSpawnOutcomeFn. */
+  spawnOutcomeFn?: CliToolSpawnOutcomeFn;
+  /** NT-01/04 — overflow content store; omitted → lazy session-scoped mkdtemp. */
+  contentStore?: ContentWriter;
+  /** NT-01/04 — preview budget in bytes. Default/clamp live in the broker. */
+  maxPreviewBytes?: number;
   /** Inject a fake detached-spawn for hermetic tests; omit for the real spawnDetachedDeckent. */
   spawnDetachedFn?: typeof spawnDetachedDeckent;
   /** Project root passed to spawnDetachedDeckent (recently-works log dir + child cwd). Defaults to process.cwd(). */
@@ -125,15 +172,23 @@ function resolveEntryPath(): string {
   return join(__dirname, '..', 'entry.js');
 }
 
-/** Exported for direct hermetic testing (tool-bridge-timeout.test.ts) — mocks node:child_process.spawn + fake timers. */
-export function defaultSpawnFn(args: string[]): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
+/**
+ * NT-05 — the real spawn. Resolves with the subprocess's honest outcome: the
+ * exit code, the terminating signal, and stdout/stderr as SEPARATE channels
+ * (they used to be concatenated into one buffer, which is why a command that
+ * wrote a fatal error to stderr and exited 1 looked identical to a successful
+ * one). Rejects with {@link CliSpawnTimeoutError} on the kill-budget and with
+ * the raw spawn error (code preserved, born-509) on an OS-level failure.
+ */
+export function defaultSpawnOutcomeFn(args: string[]): Promise<CliSpawnOutcome> {
+  return new Promise<CliSpawnOutcome>((resolve, reject) => {
     const entryPath = resolveEntryPath();
     const child = spawn(process.execPath, [entryPath, ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
     });
     let out = '';
+    let errOut = '';
     let settled = false;
     // Safety net: if a command runs past its budget (an unexpectedly slow or
     // auth-blocked subcommand), kill it and surface a tagged error rather than
@@ -144,12 +199,12 @@ export function defaultSpawnFn(args: string[]): Promise<string> {
       if (settled) return;
       settled = true;
       try { child.kill('SIGKILL'); } catch { /* already gone */ }
-      reject(new Error(`timed out after ${timeoutMs / 1000}s`));
+      reject(new CliSpawnTimeoutError(timeoutMs));
     }, timeoutMs);
     child.stdout?.setEncoding('utf-8');
     child.stderr?.setEncoding('utf-8');
     child.stdout?.on('data', (chunk: string) => { out += chunk; });
-    child.stderr?.on('data', (chunk: string) => { out += chunk; });
+    child.stderr?.on('data', (chunk: string) => { errOut += chunk; });
     // born-509 spawn-hardening: without this, a spawn-level failure (e.g. ENOENT)
     // is silently dropped and the promise hangs until the timeout fires instead
     // of surfacing the real error immediately.
@@ -159,13 +214,31 @@ export function defaultSpawnFn(args: string[]): Promise<string> {
       clearTimeout(timer);
       reject(err);
     });
-    child.once('close', () => {
+    child.once('close', (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(out.trim());
+      resolve({
+        stdout: out.trim(),
+        stderr: errOut.trim(),
+        exitCode: typeof code === 'number' ? code : null,
+        signal: signal ?? null,
+      });
     });
   });
+}
+
+/**
+ * Back-compatible string wrapper over {@link defaultSpawnOutcomeFn} — the
+ * legacy `CliToolSpawnFn` shape (stdout+stderr merged and trimmed, exit code
+ * dropped). Kept because it is the exported seam existing callers and the
+ * hermetic timeout tests use directly; production dispatch goes through the
+ * outcome function so exit truth survives.
+ */
+export function defaultSpawnFn(args: string[]): Promise<string> {
+  return defaultSpawnOutcomeFn(args).then((outcome) =>
+    [outcome.stdout, outcome.stderr].filter((part) => part.length > 0).join('\n'),
+  );
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -414,20 +487,34 @@ function formatDetachedStartMessage(
  * sprint/task never blocks the REPL turn — see isDetachedCommandClass.
  */
 export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): McpToolDispatcher {
-  const spawnFn = opts.spawnFn ?? defaultSpawnFn;
+  // A caller-injected legacy string fn wins (existing hermetic tests); nothing
+  // injected → the structured spawn, so production keeps the real exit code.
+  const spawnFn = opts.spawnFn;
+  const spawnOutcomeFn = opts.spawnOutcomeFn ?? defaultSpawnOutcomeFn;
   const spawnDetachedFn = opts.spawnDetachedFn ?? spawnDetachedDeckent;
   const labels: DetachedStartLabels = { ...DEFAULT_DETACHED_START_LABELS, ...opts.detachedLabels };
   const permissionDeniedLabel = opts.permissionDeniedLabel ?? DEFAULT_PERMISSION_DENIED_LABEL;
-  return {
-    async dispatch(name, args) {
+  const contentStore = opts.contentStore ?? createSessionContentStore();
+
+  const failure = (output: string, reason: RawToolResult['reason']): RawToolResult =>
+    ({ output, ok: false, reason });
+
+  const classifySpawnError = (name: string, err: unknown): RawToolResult => {
+    if (err instanceof CliSpawnTimeoutError) return failure(`[mcp-error] ${name}: ${err.message}`, 'timeout');
+    if (isPermissionDeniedError(err)) return failure(`[deckent-denied] ${name}: ${permissionDeniedLabel}`, 'denied');
+    const msg = err instanceof Error ? err.message : String(err);
+    return failure(`[mcp-error] ${name}: ${msg}`, 'spawn-error');
+  };
+
+  const runTool = async (name: string, args: Record<string, unknown>): Promise<RawToolResult> => {
       let cliArgs: string[];
       if (name === 'deckent_memory_query') {
         const query = typeof args['query'] === 'string' ? (args['query'] as string).trim() : '';
-        if (query.length === 0) return '[mcp-error] recall: query required';
+        if (query.length === 0) return failure('[mcp-error] recall: query required', 'tool-error');
         cliArgs = ['recall', query];
       } else {
         const built = cliArgsFor(name, args);
-        if (!built) return `[mcp-error] tool not allowed: ${name}`;
+        if (!built) return failure(`[mcp-error] tool not allowed: ${name}`, 'tool-error');
         cliArgs = built;
       }
       if (isDetachedCommandClass(cliArgs)) {
@@ -435,20 +522,46 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
           // 583/N5: REPL-chat-origin start/run/process-submit are interactive —
           // the detached child streams live worker activity (env twin).
           const result = spawnDetachedFn(cliArgs, { projectRoot: opts.projectRoot, liveTrace: true });
-          return formatDetachedStartMessage(cliArgs, result, labels);
+          // Fire-and-forget: the spawn SUCCEEDED, the sprint's own outcome is
+          // reported later through its log — never asserted here.
+          return { output: formatDetachedStartMessage(cliArgs, result, labels), ok: true };
         } catch (err) {
-          if (isPermissionDeniedError(err)) return `[deckent-denied] ${name}: ${permissionDeniedLabel}`;
-          const msg = err instanceof Error ? err.message : String(err);
-          return `[mcp-error] ${name}: ${msg}`;
+          return classifySpawnError(name, err);
         }
       }
       try {
-        return await spawnFn(cliArgs);
+        if (spawnFn !== undefined) {
+          // Legacy seam: no exit code exists, so ok is left to the output's own
+          // protocol markers rather than invented here.
+          return { output: await spawnFn(cliArgs), ok: true };
+        }
+        // NT-05: ok comes from the REAL exit code / signal — never from the
+        // mere fact that the promise resolved.
+        const outcome = await spawnOutcomeFn(cliArgs);
+        const failedBySignal = outcome.signal !== null;
+        const failedByExit = outcome.exitCode !== null && outcome.exitCode !== 0;
+        return {
+          output: outcome.stdout,
+          stderr: outcome.stderr,
+          exitCode: outcome.exitCode,
+          signal: outcome.signal,
+          ok: !failedBySignal && !failedByExit,
+          reason: failedBySignal ? 'signal' : failedByExit ? 'exit-code' : undefined,
+        };
       } catch (err) {
-        if (isPermissionDeniedError(err)) return `[deckent-denied] ${name}: ${permissionDeniedLabel}`;
-        const msg = err instanceof Error ? err.message : String(err);
-        return `[mcp-error] ${name}: ${msg}`;
+        return classifySpawnError(name, err);
       }
+  };
+
+  return {
+    async dispatch(name, args) {
+      // NT-01/04/05: the single exit — every bridged result is contained and
+      // exit-truthed here, so no branch above can hand the loop raw, unbounded
+      // output or a fabricated success.
+      return brokerToolResult(await runTool(name, args), {
+        store: contentStore,
+        maxPreviewBytes: opts.maxPreviewBytes,
+      });
     },
   };
 }

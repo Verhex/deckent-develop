@@ -1,5 +1,49 @@
 # Nervous System
 
+## Approvals ve Nervous tek ürün yeteneğidir
+
+Ürün vaadi basit: **Deckent otonom çalışır, insan ilgisi gerektiğini fark eder ve yetkili kişi
+karar vermeden kritik bir sınırı geçemez.** Kullanıcıların "Nervous" ve "Approvals" adlı iki ayrı
+sistemi işletmesi gerekmemelidir.
+
+Nervous dikkat katmanıdır: run ve project signal'larını izler, risk veya fırsatı fark eder, neden
+ilgi gerektiğini açıklar ve bir action önerir. Approvals consent katmanıdır: exact kritik action'ı
+bekletir, kararı yetkili kişiye gösterir ve allow veya deny sonucunu kaydeder. Allow sonrasında
+executor yalnız onaylanan action'ı uygular; settlement gerçekte ne olduğunu kaydeder. Proposal
+asla permission değildir; approval da action'ın başarıyla tamamlandığının kanıtı değildir.
+
+### Bugün çalışanlar
+
+- Runtime approval core canlıdır. Durable request/decision, authenticated terminal kararı,
+  expiry, worker risk gate'leri ve exact attended-execution claim'leri production consumer taşır.
+- Nervous observer, detector, proposal, CLI control ve persisted history taşır; fakat observer her
+  run tarafından universal biçimde sürülmez ve default olarak disabled'dır. Legacy normal ve
+  panic yolları henüz tek authority değildir.
+- Signed receipt'ler seçili governance workflow'ları için tamper-evident audit temeli sağlar.
+  Henüz her runtime approval'ın signature'ı değildir ve öyle satılmamalıdır.
+
+### Hedef deneyim
+
+1. Deckent bir durumu gözlemler ve neden ilgi gerektiğini açıklar.
+2. Tek attention inbox; önerilen action, risk, scope, cost, expiry ve olası etkiyi gösterir.
+3. Yetkili kişi exact action'ı bir kez allow veya deny eder.
+4. Deckent yalnız onaylanan action'ı uygular; authority eksik veya stale ise fail-closed olur.
+5. Aynı kayıt gerçek sonucu gösterir: applied, failed, expired, cancelled veya compensated.
+
+Terminal, Desktop, API, connector ve CLI aynı request, decision ve outcome state'ini tüketir. MCP
+güvenli read/notification yüzeyi olarak kalır ve agent'ın kendini onaylamasına izin vermez.
+Cryptographic signature bu deneyimin arkasındaki tamper-evident audit katmanıdır; normal
+kullanıcının anlaması gereken ikinci bir ceremony değildir.
+
+Müşteriye anlatılacak özet:
+
+> Deckent kendi başına çalışır; fakat kritik sınırları yalnız yetkili insan geçirebilir ve her
+> kritik karar ile sonuç sonradan kanıtlanabilir.
+
+Bu birleşik deneyim onaylı hedeftir, completion iddiası değildir. Açık iş; her Nervous
+proposal'ını tek ApprovalBroker üzerinden geçirip truthful effect settlement'a bağlayan production
+wiring'dir.
+
 ## Product-user perspektifi
 
 Nervous System proactive observer/detector/proposal/action subsystem'dır. Runtime ve repository signal'larını izler, finding'leri gruplar ve human-governed suggestion sunar. Locked action'lar üzerinde kendine authority vermez. [Kanıt: `src/nervous/observer.ts:1-49,84-180`; `src/nervous/executor.ts`; `src/core/config.ts:1736-1782`]

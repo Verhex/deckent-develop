@@ -13238,3 +13238,52 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 549-004: End-to-end reliability regression suite documenting reproduce-to-fix chains (PAUSED)
 
 ---
+## Sprint 551 — sprint-551
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 316s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 316166ms |
+
+### Tasks
+
+- 551-001: 551-001 (NO_GO)
+- 551-002: 551-002 (NO_GO)
+
+---
+## Sprint 553 — sprint-553
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 3 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 553-001: universal tool-result budget broker (NT-01/04/05 core) (DONE)
+- 553-002: scratch production wire + durable audit + trace config authority (NT-03/12/13) (NO_GO)
+- 553-003: context admission + output ceiling + boot-time effective context (NT-02/07/08) (DONE)
+- 553-004: incident regression fixture + typed reproduction (depends on Tasks 1,3) (NO_GO)
+- 553-005: correction baseline document (bounded probe task) (NO_GO)
+
+---

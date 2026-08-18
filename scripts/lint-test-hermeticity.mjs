@@ -345,8 +345,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // stale-spawnlock-watchdog and result-json-control-char-tolerance suites and
   // their import closures (spawn-coordinator, sanitize seam) enter the graph;
   // worker/collector/evaluator/file-lock/landing-proposal/spawner changed content.
-  count: 14358,
-  digest: 'a12fd22dea287f2f28cded995bc66d527dbbefcce0a4d597ed9f49b27ba0e59f',
+  // 2026-08-18 (NATIVE-AGENT-HORIZON-001 NT-correction, sprint-553 + Brain
+  // hand-completion): +7 — tool-result-broker, context-admission,
+  // native-agent-scratch-wire and qwen-incident-regression suites plus their
+  // import closures enter the graph; loop/transcript/native-transport/run.tsx/
+  // bridge/trace-wire/landing-proposal changed content.
+  count: 14365,
+  digest: '502c95efca1c840b5779330fb336b5027a449ec0a72a14bb2f9056162db12281',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -562,8 +567,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-18 (ORCHESTRA-RELIABILITY-001): same 1248 count, digest only —
   // worker/collector/evaluator/file-lock/landing-proposal/spawn-coordinator/
   // spawner production hashes moved; membership unchanged.
-  count: 1248,
-  digest: '3fcd0dbe56321ea16ec4246f1b71c3fa58757eb75eaa8bc76228d78db9dbc993',
+  // 2026-08-18 (NATIVE-AGENT-HORIZON-001 NT-correction, sprint-553): +1 —
+  // src/agent/tool-result-broker.ts enters the inventory; loop/transcript/
+  // native-transport/run.tsx/bridge/trace-wire/chat-tool-exec/chat-tool-bridge
+  // production hashes moved.
+  count: 1249,
+  digest: '18df42a8976d3d2f9806742d7bb90fb26d3e886e22135d61f576e8b85ccf1e6e',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

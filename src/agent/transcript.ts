@@ -36,10 +36,13 @@ export interface TranscriptEvictionPolicy {
 }
 
 /** Both ceilings sit well above any single provider's per-request context
- *  budget (24k-160k tokens, see native-transport.ts resolveContextBudgetTokens)
- *  — this is a raw memory safety net, not the live per-turn prompt fit. */
+ *  budget (up to the registry's largest advertised window — 1M-context Claude
+ *  5 / 2M-class models, see native-transport.ts resolveContextBudgetTokens) —
+ *  this is a raw memory safety net, not the live per-turn prompt fit. The old
+ *  500k token net silently undercut 1M-context models once the full advertised
+ *  window became the usable ceiling (owner directive 2026-08-18). */
 const DEFAULT_EVICTION_POLICY: Required<TranscriptEvictionPolicy> = {
-  maxTokens: 500_000,
+  maxTokens: 4_000_000,
   maxMessages: 4_000,
 };
 

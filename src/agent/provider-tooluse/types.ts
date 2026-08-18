@@ -29,6 +29,13 @@ export interface ProviderRequest {
   tools: NativeToolSchema[];
   /** Wire model id (API-pinned, e.g. 'claude-fable-5'). */
   model: string;
+  /** NT-08 — hard ceiling on the tokens the backend may GENERATE for this
+   *  request (OpenAI-compatible `max_tokens`). The loop sets it from the
+   *  resolved native budget's outputReserveTokens, so the room reserved by the
+   *  prompt-budget arithmetic is the same room the backend is allowed to use.
+   *  Absent → the field is omitted on the wire and the backend keeps its own
+   *  default (behavior unchanged for callers that never set it). */
+  outputCeilingTokens?: number;
 }
 
 export interface ProviderTextDelta { type: 'text-delta'; text: string; }
@@ -64,5 +71,9 @@ export function validateProviderRequest(req: unknown): string | null {
     if (typeof (m as ProviderMessage).content !== 'string') return 'message content must be a string';
   }
   if (!Array.isArray(r.tools)) return 'tools must be an array';
+  if (r.outputCeilingTokens !== undefined
+    && (!Number.isSafeInteger(r.outputCeilingTokens) || r.outputCeilingTokens <= 0)) {
+    return 'outputCeilingTokens must be a positive integer when present';
+  }
   return null;
 }

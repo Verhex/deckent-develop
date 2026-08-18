@@ -241,6 +241,17 @@ async function probeNativeContext(
   }
 }
 
+/** NT-07 — the CONFIGURED local-llm context ceiling: the narrowest of the
+ *  llama.cpp slot size (`local_llm.contextSize`) and the prompt-side override
+ *  (`native_context_tokens`). Undefined when neither knob is authored, so the
+ *  boot-time probe (and the status line) stay off exactly as before. */
+function resolveConfiguredContextTokens(config: NativeTransportConfig): number | undefined {
+  const candidates = [config.local_llm?.contextSize, config.native_context_tokens]
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
+    .map((v) => Math.floor(v));
+  return candidates.length > 0 ? Math.min(...candidates) : undefined;
+}
+
 /** Confidently infer the native provider a bare `/model <id>` implies, or null.
  *  Only canonical, unambiguous shapes count — `claude-*` → claude,
  *  `name:tag` → ollama, `gpt-*`/o-series → openai. Legacy aliases return null
@@ -393,18 +404,25 @@ export function resolveNativeSelection(
         provider: 'local-llm',
       };
     }
+    // NT-07 — boot-time effective context resolution lives HERE, at the
+    // local-llm resolution: the configured ceiling (narrowest authored knob) is
+    // probed against the server-reported n_ctx and reduced by
+    // deriveEffectiveContext's min rule with typed provenance. A server that
+    // does not report leaves the configured value standing (honest config-only
+    // fallback); a server that DOES report can only narrow it.
+    const configuredContextTokens = resolveConfiguredContextTokens(config);
     return {
       adapter: createOpenAIAdapter({ baseUrl: endpoint, name: 'local-llm' }),
       model: selectedModel,
       providerName: 'local-llm',
       endpointHealth: () => probeNativeEndpointHealth(endpoint, ctx.fetchFn),
       modelIdentity: () => validateNativeModelIdentity(selectedModel, endpoint, ctx.fetchFn ?? globalThis.fetch),
-      ...(typeof config.local_llm?.contextSize === 'number'
+      ...(configuredContextTokens !== undefined
         ? {
-            configuredContextSize: config.local_llm.contextSize,
+            configuredContextSize: configuredContextTokens,
             contextStatus: () => probeNativeContext(
               endpoint,
-              config.local_llm!.contextSize!,
+              configuredContextTokens,
               ctx.fetchFn ?? globalThis.fetch,
             ),
           }
@@ -463,20 +481,31 @@ export function resolveNativeSelection(
 }
 
 /** Prompt-side context budget (estimated tokens) for a provider selection.
- *  Explicit `native_context_tokens` config wins; defaults keep generation
- *  headroom BELOW each transport family's typical window — local Ollama slots
- *  default to 24k (the 2026-07-07 empty-turn incident), hosted APIs are 128k+. */
+ *  Authority order (owner directive 2026-08-18 — "use the model's full
+ *  context; config only narrows"): the usable window is the minimum of the
+ *  KNOWN ceilings — a boot-resolved effective context (server-reported,
+ *  local-llm) and the registry's model-advertised window — and explicit
+ *  `native_context_tokens` config may NARROW below that but never widen past
+ *  it (NT-07: a widened window is exactly the doomed request the loop's
+ *  admission gate then has to deny). Generation headroom is NOT subtracted
+ *  here — derivePromptBudget's output/safety reserves own that arithmetic.
+ *  The per-provider literals at the bottom are last-resort fallbacks for a
+ *  model the registry cannot advertise. */
 export function resolveContextBudgetTokens(
   providerName: string,
   config: { native_context_tokens?: unknown },
   effectiveContextTokens?: number | null,
+  modelAdvertisedContextTokens?: number | null,
 ): number {
-  const c = config.native_context_tokens;
-  if (typeof c === 'number' && Number.isFinite(c) && c > 0) return Math.floor(c);
-  if (providerName === 'local-llm' && typeof effectiveContextTokens === 'number'
-    && Number.isSafeInteger(effectiveContextTokens) && effectiveContextTokens > 0) {
-    return effectiveContextTokens;
-  }
+  const positive = (value: unknown): number | undefined =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+  const configured = positive(config.native_context_tokens);
+  const effective = providerName === 'local-llm' ? positive(effectiveContextTokens) : undefined;
+  const advertised = positive(modelAdvertisedContextTokens);
+  const ceilings = [effective, advertised].filter((v): v is number => v !== undefined);
+  const ceiling = ceilings.length > 0 ? Math.min(...ceilings) : undefined;
+  if (configured !== undefined) return ceiling !== undefined ? Math.min(configured, ceiling) : configured;
+  if (ceiling !== undefined) return ceiling;
   if (providerName === 'ollama') return 24_000;
   if (providerName === 'claude') return 160_000;
   return 100_000;
