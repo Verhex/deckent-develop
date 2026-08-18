@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):31767573b9e56ecc3e176773b4003550ec149111d827b702ae3aaf7691e97c3e`
+**Source digest:** `sha256(normalized-lf-utf8):bca0b8202663d9c3073a4291a4fb2fd1d93fd1a4ca407cdadd12603715e2dd0c`
 
-**Rows:** 500 total · 436 active · 64 terminal
+**Rows:** 502 total · 438 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 343 |
+| OPEN | 345 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -394,6 +394,8 @@
 | 7080 | `IDE-ADAPTER-001` | OPEN | P2 | SURFACE | `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | VS Code, JetBrains and future IDE adapters as non-canonical clients |
 | 7081 | `XVERIFY-CHANNEL-TRUTH-001` | OPEN | P1 | TRUTH | — | — | XVerify kanal + finalize settlement doğruluk düzeltmeleri (owner-admitted bulgu paketi) |
 | 7082 | `NATIVE-CONTENT-WORKSPACE-001` | OPEN | P1 | TERMINAL | — | — | Native chat global content workspace — `~/.deckent/tmp` session-foldered spill/scratch alanı + contentRef read-back (owner direktifi) |
+| 7083 | `NATIVE-RUNFLOW-BOOTSTRAP-001` | OPEN | P0 | TERMINAL | — | — | Native terminal `deckent_propose_run` launch yolu — boş provider registry + session-budget dead-end düzeltmesi (Qwen canlı-tur bulguları) |
+| 7084 | `CLOSURE-OS-TRANSITION-TRUTH-001` | OPEN | P1 | TRUTH | — | — | Closure OS transition-brief truth-sync — projection drift, doküman drift, approval-claim kapsamlama (Codex denetim paketi) |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |

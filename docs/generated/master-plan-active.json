@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "31767573b9e56ecc3e176773b4003550ec149111d827b702ae3aaf7691e97c3e"
+    "value": "bca0b8202663d9c3073a4291a4fb2fd1d93fd1a4ca407cdadd12603715e2dd0c"
   },
   "summary": {
-    "total": 500,
-    "active": 436,
+    "total": 502,
+    "active": 438,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 343,
+      "OPEN": 345,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,8 +21,8 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 326,
-      "P1": 137,
+      "P0": 327,
+      "P1": 138,
       "P2": 37
     },
     "byProgram": {
@@ -57,9 +57,9 @@
       "SCALE": 1,
       "SECURITY": 8,
       "SURFACE": 1,
-      "TERMINAL": 15,
+      "TERMINAL": 16,
       "TOOL": 1,
-      "TRUTH": 94,
+      "TRUTH": 95,
       "XPLAT": 3
     }
   },
@@ -4759,6 +4759,28 @@
       "updated": "2026-08-18",
       "definitionDigest": "919e0a1f0f239de8383f65fd2900e1edbec64f7e85ac5cd5480d6185798a3716",
       "progressDigest": "6295a343be8cd9e96c2080d6119d3101707d6511080199a12c324ff7c8ece444",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7083,
+      "id": "NATIVE-RUNFLOW-BOOTSTRAP-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "12c6f0590d94cc29c73929047b7896a27894a3b3ea8a48c931399379c1670220",
+      "progressDigest": "6dbeedfe23f6efcd83705ee212873853da5b4a8ece444971a1beb40d95630e4b",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7084,
+      "id": "CLOSURE-OS-TRANSITION-TRUTH-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "a3d700becca28d0c1e7c9c41519dbf6a852dcea2f8ae943c9d3dc18f41ff850f",
+      "progressDigest": "6e28059ad928d4c8e582c7698725a9473d2fba2997d5a45fb8c8a2529fc9fadf",
       "terminalClosureDigest": null
     },
     {
@@ -21995,6 +22017,8 @@
         "IDE-ADAPTER-001",
         "XVERIFY-CHANNEL-TRUTH-001",
         "NATIVE-CONTENT-WORKSPACE-001",
+        "NATIVE-RUNFLOW-BOOTSTRAP-001",
+        "CLOSURE-OS-TRANSITION-TRUTH-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -22040,6 +22064,8 @@
         "IDE-ADAPTER-001",
         "XVERIFY-CHANNEL-TRUTH-001",
         "NATIVE-CONTENT-WORKSPACE-001",
+        "NATIVE-RUNFLOW-BOOTSTRAP-001",
+        "CLOSURE-OS-TRANSITION-TRUTH-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -22955,6 +22981,69 @@
       "evidenceReceipts": [],
       "acceptance": "Native chat her oturum için GLOBAL deckent home altında (repo DIŞI) tenant/project/session-foldered bir workspace açar (0700/0600, atomic write); tool-result spill (contentRef), scratch checkpoint ve görünmez-yüzey authoring (DIRECTIVES-tarzı) TEK workspace authority'sinden yürür; model contentRef'i range-read ile geri OKUYABİLİR (offset/limit; tam içerik hiçbir zaman tek seferde context'e dönmez); bağlam takibi: workspace index'i oturumun ne yazdığını/sildiğini izler, retention/GC policy config-resolved (sınırsız birikme yok, kill-sonrası bounded recovery penceresi); typed denial YALNIZ son çare olur: spill → range-read → epoch compaction zinciri tüketilmeden istek reddedilmez; cross-platform path adapter (Law 2) + hermetic battery + gerçek-binary chat kanıtı",
       "evidence": "Owner direktifi (Alperen 2026-08-18): 'deckent native chat tmp folder açıp kullansın global .deckent/tmp klasöründe... bağlamını takip ederek oraya yazıp silebilir, kullanıcıya kusursuz UI deneyimi' — Claude Code/Codex spill+range-read+auto-compact deseninin deckent productization'ı; 553'ün containToolResult/contentRef mekanizması producer'dır, bu satır consumer/workspace authority'sini kapatır; sıra: 7081 ile aynı sonraki-sprint dalgası",
+      "updated": "2026-08-18"
+    },
+    {
+      "order": 7083,
+      "id": "NATIVE-RUNFLOW-BOOTSTRAP-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "Native terminal `deckent_propose_run` launch yolu — boş provider registry + session-budget dead-end düzeltmesi (Qwen canlı-tur bulguları)",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "`deckent_propose_run` native REPL'de gerçek plan-önizleme üretir: run-flow proposeRun yolu spawn.ts'in mevcut lazy-`bootstrapProviders` pattern'iyle (idempotent) registry'yi doldurur — `ProviderNotFoundError: claude` sınıfı ölür; targeted test (empty-registry → bootstrap → plan) + gerçek-binary native kanıt; İKİNCİ BULGU: native session budget tükendiğinde oturum kalıcı ölü-döngüye düşmez ('[Oturum süre bütçesi tükendi.]' + 0.0s her turda) — typed tükeniş sinyali BİR kez, sonrası epoch-renewal/checkpoint teklifi veya dürüst kapanış; wallTime/token session budget'ları da owner kısıt-gevşetme direktifine göre config'te yükseltilir",
+      "evidence": "Owner admission (Alperen 2026-08-18, Qwen 3.8 canlı-tur kanıt zinciri): kök neden native-tool-registry.ts:588 → run-flow-plan-service.ts:627 → run-proposal-compiler.ts:353/170 → planner.ts:641 → provider.ts:394; her entry point (do.ts:238, mcp plan/start, spawn.ts:399, serve.ts:141) bootstrap ederken YALNIZ native REPL yolu etmiyor; owner seçimi '3 — ikisi birlikte' (bootstrap fix + iş aynı run'da); öncelik: 7081 landing'inden hemen SONRA, 7082'den önce",
+      "updated": "2026-08-18"
+    },
+    {
+      "order": 7084,
+      "id": "CLOSURE-OS-TRANSITION-TRUTH-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TRUTH",
+      "outcome": "Closure OS transition-brief truth-sync — projection drift, doküman drift, approval-claim kapsamlama (Codex denetim paketi)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Closure projection'ları (level-lane.json, active.json, closure-health.json, owner-proposal) güncel MASTER'a regen + drift gate yeşil; CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md §'Phase-5 kurulmadı' ve sidecar-spec'in 'projection yok / ledger boş' kalıntıları canlı duruma truth-sync edilir (MASTER 3296 evidence supersede işaretli); 'approval yalnız CLI' iddiası kapsamlanır: bugün effective config'te api_decide kapalı olduğundan fiilen CLI-only, code-wide invariant DEĞİL (flag-gated fresh-OIDC HTTP decision endpoint'i mevcut) — doküman ifadesi bu gerçeğe çekilir; hiçbir ledger/run state mutation yok, yalnız projection+doc",
+      "evidence": "Codex denetim hükmü (2026-08-18): mekanizma zinciri COMPLETE (Phase-4→genesis→Phase-5 writer/signer, ilk batch canlı-gate OK, 8101+7140 DONE), brief roadmap'i OPEN — kalanlar: §10 adım-4 owner disposition + P0/P1/P2 re-triage TURU (classificationCoverage 0; OWNER KARARI gerekir, bu satır yalnız truth-sync yapar), §10 adım-3 residual (MASTER 1015/786 OPEN), STATE-PRUNE/DOCS-ARCHIVE/REPO-CLEANUP-APPLY blocked, RELEASE-001 blocked, 7-gün Closure Health + P50/P80 ETA yok; xverify yeni kapanışları 7081'e bağlı",
       "updated": "2026-08-18"
     },
     {
@@ -25825,6 +25914,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "c84f46280307712d2283134fba89235c35ae9f39dde28be15d62125bec7fe7c9"
+    "value": "0be0ba4cd8008469c3855153ab1976ec3d135cb6195ad3cc4249f70aaa833668"
   }
 }
