@@ -1,140 +1,117 @@
-# DIRECTIVES — 7081 XVERIFY-CHANNEL-TRUTH: approval freshness, durable evidence, waiting signal, finalize termination truth
-
-> **SETTLED 2026-08-18 — NOT AN ACTIVE RUN.** sprint-556 closed 3/3 (001 DONE ·
-> 002/003 GO_WITH_TECH_DEBT, debts hand-closed by Brain) and landed together with
-> the full-suite debt payment (52 stale reds triaged: 1 real collector
-> settlement-authority bug fixed, 1 ADR format gap completed, rest realigned to
-> owner-approved behavior changes). Evidence: MASTER 7081 row. This file awaits
-> the next run's contract.
+# DIRECTIVES — 7083 NATIVE-RUNFLOW-BOOTSTRAP: propose_run provider bootstrap + session-budget renewal (Qwen live-trial fixes)
 
 ## Goal
 
-MASTER 7081 (owner-admitted 2026-08-18: "bulgularında düzeltme izni verildi sonraki
-sprintte ele alınsın"). Six typed xverify/finalize failures across two days left ZERO
-actionable evidence and killed honest verification: (a) approval-pending blocks
-silently forever — `--timeout` never applies and no waiting signal prints; (b) the
-provider-evidence-probe approval requestId is deterministic and first-writer-wins, so
-a re-run adopts the PREVIOUS run's expired request/decision and dies
-`DECISION_UNTRUSTED` (repro aprp-da1e516f); (c) `xverify_v2_bootstrap_failed` buries
-the composition exception detail in a digest — zero durable raw record; (d) a
-schema-rejected adjudication response ("Expected object, received null") persists no
-raw provider output and no per-assertion breakdown, so nobody can see WHICH assertion
-was undecidable; (e) settled xverify twin tasks stay PENDING with no receipt and HOLD
-the clean gate; (f) finalize counts a worker-not-found (already dead) as
-"could-not-terminate" and HOLDs terminal settlement (three sprints needed hand
-settlement). This sprint closes all six with durable typed evidence.
+MASTER 7083 (owner admission 2026-08-18, live Qwen trial evidence; owner picked
+"ikisi birlikte"). Two defects killed the owner's live native-terminal trial:
+(1) `deckent_propose_run` is broken on the native REPL — it is the ONLY entry point
+that never calls `bootstrapProviders`, so run-flow planning dies
+`ProviderNotFoundError: "claude"` on an empty provider registry (proof chain:
+native-tool-registry.ts:588 → run-flow-plan-service.ts:627 → run-proposal-compiler →
+planner.ts resolveAdapter → provider.ts empty registry; every other entry point —
+do.ts:238, mcp plan/start, spawn.ts:397-405 lazy pattern, serve.ts — bootstraps).
+(2) When the session budget exhausts, the session falls into a PERMANENT dead loop:
+every subsequent turn returns "[Oturum süre bütçesi tükendi.]" in 0.0s forever —
+session.ts creates ONE NativeBudgetState and no renewal path exists. The owner's
+contract: typed exhaustion signal, then an explicit RENEWAL offer (renewable working
+epoch — billing/usage/audit counters NEVER reset) or honest closure; never a dead end.
 
 ## Execution Contract
 
 - No build and no repository-wide/full-suite test run during this sprint.
 - Parallel execution ADMITTED; single-writer chokepoints: ONLY task 1 writes
-  src/orchestra/cross-verify-evidence-preparation.ts,
-  src/orchestra/cross-verify-invocation-coordinator.ts,
-  src/orchestra/cross-verify-runtime-bootstrap.ts and
-  src/orchestra/cross-verify-runner.ts; ONLY task 2 writes
-  src/cli/commands/xverify.ts and src/cli/helpers/messages.ts; ONLY task 3 writes
-  src/cli/commands/kill.ts and src/cli/commands/finalize.ts.
-- Approval/authority semantics NEVER weaken: fail-closed stays fail-closed; a fresh
-  approval is still required per run; no auto-approve, no trust-bypass, no silent
-  fallback. The fixes add FRESHNESS and EVIDENCE, not leniency.
-- Billing/usage/audit counters never reset; durable writes are append/atomic
-  temp+rename; mechanism modules string-free; user-visible text via getMessage en+tr.
-- Hermetic tmpdir tests only. Use worker comms (sharedNotes + handoff notes).
+  src/agent/session.ts and src/agent/guards/recursion.ts; ONLY task 2 writes
+  src/cli/repl/native-agent-bridge.ts, src/cli/repl/run.tsx and
+  src/cli/helpers/messages.ts; ONLY task 3 writes src/cli/repl/native-tool-registry.ts.
+- Billing/usage/cost/audit counters NEVER reset by any renewal — only the WORKING
+  budget epoch renews, and ONLY on an explicit typed user action (no auto-renew, no
+  silent grant). Fail-closed stays fail-closed.
+- Mechanism modules string-free; user-visible text via getMessage en+tr; hermetic
+  tmpdir tests only; use worker comms (sharedNotes + handoff notes).
 - Echo the policy digest in your .result as runPolicyEvidence exactly as the prompt's
   Result contract instructs.
 
-## Task 1: approval freshness + durable adjudication evidence (channel authority core)
-- Files: src/orchestra/cross-verify-evidence-preparation.ts, src/orchestra/cross-verify-invocation-coordinator.ts, src/orchestra/cross-verify-runtime-bootstrap.ts, src/orchestra/cross-verify-runner.ts, tests/orchestra/cross-verify-channel-truth.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+## Task 1: session budget-exhaustion truth + renewable working epoch (core authority)
+- Files: src/agent/session.ts, src/agent/guards/recursion.ts, tests/agent/session-budget-renewal.test.ts
+- Scope: src/agent/, tests/agent/
 - Provider: codex
 - Model: gpt-5.6-sol
 
 ### Description
-1. PROBE FRESHNESS: the provider-evidence-probe subject gains a per-run attempt nonce
-   (the existing runId/runtimeFingerprint is available at the call site) so the
-   requestId is unique per run — a re-run can NEVER adopt a previous run's expired
-   request/decision. The APR_DUPLICATE_ID adoption branch stays only for genuine
-   same-run concurrent contenders (same nonce). A found-but-stale decision keeps its
-   typed hold BUT the hold record now persists {requestId, validation reason
-   (request-expired/session-expired/…)} durably.
-2. BOOTSTRAP DETAIL TRUTH: every composition/bootstrap hold
-   (xverify_v2_bootstrap_failed, prompt-ceiling, evidence holds) writes one durable
-   JSON record (append, atomic) under the existing .analysis/xverify/ area:
-   {reasonCode, detail, at, taskId, digestRef} — the digest stays in the receipt, the
-   DETAIL becomes readable. The runner's hold path threads `composed.detail` through
-   instead of dropping it.
-3. RAW ADJUDICATION EVIDENCE: when the v2 adjudication response fails schema
-   validation, the RAW provider output (bounded, e.g. first 256KB) is persisted next
-   to the report before the unclear verdict is returned; the record carries the
-   schema-rejection reason. When validation SUCCEEDS, the per-assertion breakdown
-   (assertionId → supported/contradicted/undecidable + missing-evidence entries) is
-   persisted into the .analysis/xverify report file — the host disposition already
-   derives from it, so this is projection, not new authority.
-4. TWIN RECEIPT CLOSURE: when the runner reaches ANY terminal outcome (confirmed,
-   unclear, unavailable, hold), the xverify twin task record it created is settled
-   with a terminal status + result marker so the clean gate never reports a settled
-   twin as receipt-missing PENDING.
-5. Tests: nonce uniqueness across two composed runs (no adoption); stale-decision
-   hold persists validation reason; bootstrap hold writes readable detail record;
-   schema-reject persists raw output; per-assertion breakdown lands in the report;
-   twin task terminal after each outcome class.
+1. EXHAUSTION TRUTH: when a turn terminates with any `native-budget.*` terminal code,
+   the AgentSession records a typed exhausted state {code, at, epoch}. A send() on an
+   exhausted session does NOT run the loop; it yields exactly ONE typed event
+   `session-budget-exhausted` carrying {code, epoch, renewalHint: true} and turn-end —
+   cheap, honest, and never the old silent 0.0s dead loop that re-enters the loop
+   only to die at round-start.
+2. RENEWABLE EPOCH: new session API `renewBudgetEpoch(): { epoch: number }` — creates
+   a FRESH NativeBudgetState (working counters only: rounds/toolCalls/wallTime start/
+   cumulativeTokens/noProgress/checkpoint cadence state), increments an epoch counter,
+   clears the exhausted state. Explicitly out of renewal: costGuard accrual, usage
+   totals, audit — assert in tests that the cost guard object is untouched by renewal.
+   Loop wiring: the session passes its CURRENT epoch's state into runAgentTurn (the
+   existing deps.nativeBudgetState seam — no loop change needed).
+3. recursion.ts: NativeBudgetState gains an optional creation helper accepting a start
+   time (already exists) — add nothing beyond what task needs; if no change is
+   genuinely required, leave the file byte-identical and say so in notes.
+4. Tests: terminal code → exhausted state; exhausted send() yields the single typed
+   event without invoking the adapter (spy: adapter.send never called); renew → next
+   send() runs normally with fresh working counters; cost guard identity/values
+   survive renewal untouched; epoch increments; double-renew idempotent-safe.
 
-GO: suite green; tsc 0; every typed hold path proven to leave a durable, readable
-record; fail-closed semantics byte-equivalent (no new allow path).
-NO_GO: any weakened approval check, auto-approve, or a hold that still leaves zero
-disk evidence.
+GO: suite green; tsc 0; adapter-never-called-when-exhausted proven; renewal restores
+a working turn; billing/cost objects byte-untouched by renewal.
+NO_GO: any auto-renew path, any reset of cost/usage/audit accounting, or the dead
+loop surviving.
 
-## Task 2: xverify CLI waiting signal + approval-phase timeout (depends on Task 1)
-- Files: src/cli/commands/xverify.ts, src/cli/helpers/messages.ts, tests/cli/xverify-waiting-signal.test.ts
-- Scope: src/cli/, tests/cli/
+## Task 2: REPL renewal surface — typed offer + /renew command (depends on Task 1)
+- Files: src/cli/repl/native-agent-bridge.ts, src/cli/repl/run.tsx, src/cli/helpers/messages.ts, tests/cli/native-budget-renewal-surface.test.ts
+- Scope: src/cli/repl/, src/cli/helpers/, tests/cli/
 - Provider: claude
 - Model: claude-opus-5
 - Dependencies: Task 1
 
 ### Description
-1. WAITING SIGNAL: while the run is blocked on a pending approval, the CLI prints ONE
-   typed line per approval request (new i18n keys en+tr):
-   "waiting-approval: <aprp-id> — decide via `deckent approvals decide <id>`" — the
-   16-minute silent block dies. The signal goes to stderr so `--json` stdout stays
-   machine-clean.
-2. APPROVAL-PHASE TIMEOUT: `--timeout` now bounds the approval wait too (not only
-   the provider call). On expiry the CLI reports the existing typed
-   approval_undecided hold (no new outcome class) with the aprp id in the message,
-   exit code unchanged for holds.
-3. The JSON output for every hold/skip now includes the `detail` field Task 1 makes
-   durable (skippedReason keeps its exact current value — additive field only).
-4. Tests: fake approval authority — pending → waiting line printed once per request;
-   timeout expiry → typed undecided with id; --json stdout parses clean with the
-   additive detail field; decided-fast path prints no waiting line.
+1. The bridge consumes Task 1's `session-budget-exhausted` event and renders ONE
+   user-facing offer line via new i18n keys (en+tr): which budget dimension exhausted
+   + "continue with `/renew` (billing continues; working limits restart) or close the
+   session" — localized through getMessage, mechanism text stays typed codes.
+2. ReplEngine gains optional `renewBudgetEpoch?: () => { epoch: number }` threading
+   session.renewBudgetEpoch (same optional-member pattern as setApprovalMode/close).
+3. run.tsx registers a `/renew` slash command on the native path only: calls the
+   engine seam, prints a typed confirmation line (i18n en+tr, includes new epoch
+   number). Legacy loop path: `/renew` prints an honest not-available line.
+4. Tests: exhausted event → exactly one offer line per exhaustion (dedup across
+   repeated sends); /renew → engine seam called + confirmation with epoch; non-native
+   path honest message; i18n keys exist in both languages (getMessage returns
+   non-key).
 
-GO: suite green; tsc 0; waiting line + bounded wait proven; --json backward
-compatible (existing keys byte-identical).
-NO_GO: polluted --json stdout, a second timeout flag, or any change to decision
-authority semantics.
+GO: suite green; tsc 0; offer-once + renew-roundtrip proven on a fake session.
+NO_GO: hardcoded user-facing strings, auto-renew, or offer spam on every send.
 
-## Task 3: finalize/kill already-terminated truth (depends on nothing)
-- Files: src/cli/commands/kill.ts, src/cli/commands/finalize.ts, tests/cli/finalize-termination-truth.test.ts
-- Scope: src/cli/, tests/cli/
+## Task 3: propose_run lazy provider bootstrap on the native path
+- Files: src/cli/repl/native-tool-registry.ts, tests/cli/native-propose-run-bootstrap.test.ts
+- Scope: src/cli/repl/, tests/cli/
 - Provider: claude
 - Model: claude-sonnet-5
 
 ### Description
-1. killSingle returns a TYPED result ('killed' | 'not-found' | 'failed') instead of
-   boolean — 'not-found' (backend reports no such worker/window) means the process is
-   already gone. Existing callers that only need "is it dead now" treat
-   killed|not-found as success. The not-found path still prints its current message
-   and still releases locks/status exactly as today.
-2. forceKillLiveWorkers counts 'not-found' as terminated (goal state reached:
-   no live worker), 'failed' (real kill error: permission, backend error) still
-   fails the sweep. Finalize therefore no longer HOLDs terminal settlement over
-   workers that are already dead — the three-sprint hand-settlement class dies.
-3. finalize prints a distinct typed line for already-dead workers (new i18n key
-   en+tr) so the operator sees the truth ("already terminated: ids"), never a fake
-   "terminated N workers".
-4. Tests: not-found → sweep success + finalize proceeds; real kill failure → sweep
-   fails + finalize HOLDs exactly as today; mixed case; message assertions via
-   getMessage keys (no hardcoded strings).
+1. The `deckent_propose_run` handler (native-tool-registry.ts:588 region) performs the
+   lazy, idempotent `bootstrapProviders(cfg, root)` before `controller.proposeRun` —
+   copy spawn.ts:397-405's exact pattern (dynamic import, loadConfig, best-effort
+   try/catch that falls through to the existing honest `[mcp-error]` path on fault;
+   never a new failure mode, never a retry loop). A registry that already has
+   providers must skip re-bootstrap work (bootstrapProviders is idempotent — assert,
+   do not re-implement).
+2. Hermetic test: a fake controller whose proposeRun records invocation order proves
+   (a) with an empty registry the handler invokes the bootstrap seam BEFORE
+   proposeRun (inject the bootstrap via a seam or module spy — no network, no real
+   providers), (b) bootstrap fault → the existing `[mcp-error] deckent_propose_run:`
+   honest error, no throw escape, (c) second call does not double-bootstrap
+   (idempotency observed at the seam).
+3. Smoke line for the host (do NOT run it yourself): real-binary native REPL
+   `deckent_propose_run` produces a plan preview instead of ProviderNotFoundError.
 
-GO: suite green; tsc 0; dead-worker finalize proceeds, real-failure finalize still
-HOLDs; i18n keys en+tr.
-NO_GO: treating a real kill failure as success, or any hardcoded user-facing string.
+GO: suite green; tsc 0; bootstrap-before-propose proven at a seam; fault path stays
+the existing typed [mcp-error].
+NO_GO: an unconditional re-bootstrap per call doing real work, or a new error shape.

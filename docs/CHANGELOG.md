@@ -14,6 +14,20 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint557] - 2026-08-18
+
+### Added
+
+- session budget-exhaustion truth + renewable working epoch (core authority)
+- propose_run lazy provider bootstrap on the native path
+
+### Changed
+
+- REPL renewal surface — typed offer + /renew command (depends on Task 1) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [sprint556] - 2026-08-18
 
 ### Added

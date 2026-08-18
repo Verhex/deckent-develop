@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "898560d9d2e037755bbbbe554d80c4e3603ac1f16862dda431e44a4a59c80108"
+    "value": "9d1462a129b221050d8bc10cc10358f8206890184d693f1ff212b4585a1255d0"
   },
   "summary": {
     "total": 502,
@@ -4769,7 +4769,7 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "12c6f0590d94cc29c73929047b7896a27894a3b3ea8a48c931399379c1670220",
-      "progressDigest": "6dbeedfe23f6efcd83705ee212873853da5b4a8ece444971a1beb40d95630e4b",
+      "progressDigest": "a467ee7441988fedb80921609d056ef133a92e14b63974a70dad906b706980a2",
       "terminalClosureDigest": null
     },
     {
@@ -23012,7 +23012,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`deckent_propose_run` native REPL'de gerçek plan-önizleme üretir: run-flow proposeRun yolu spawn.ts'in mevcut lazy-`bootstrapProviders` pattern'iyle (idempotent) registry'yi doldurur — `ProviderNotFoundError: claude` sınıfı ölür; targeted test (empty-registry → bootstrap → plan) + gerçek-binary native kanıt; İKİNCİ BULGU: native session budget tükendiğinde oturum kalıcı ölü-döngüye düşmez ('[Oturum süre bütçesi tükendi.]' + 0.0s her turda) — typed tükeniş sinyali BİR kez, sonrası epoch-renewal/checkpoint teklifi veya dürüst kapanış; wallTime/token session budget'ları da owner kısıt-gevşetme direktifine göre config'te yükseltilir",
-      "evidence": "Owner admission (Alperen 2026-08-18, Qwen 3.8 canlı-tur kanıt zinciri): kök neden native-tool-registry.ts:588 → run-flow-plan-service.ts:627 → run-proposal-compiler.ts:353/170 → planner.ts:641 → provider.ts:394; her entry point (do.ts:238, mcp plan/start, spawn.ts:399, serve.ts:141) bootstrap ederken YALNIZ native REPL yolu etmiyor; owner seçimi '3 — ikisi birlikte' (bootstrap fix + iş aynı run'da); öncelik: 7081 landing'inden hemen SONRA, 7082'den önce",
+      "evidence": "Owner admission (Alperen 2026-08-18, Qwen 3.8 canlı-tur kanıt zinciri): kök neden native-tool-registry.ts:588 → run-flow-plan-service.ts:627 → run-proposal-compiler.ts:353/170 → planner.ts:641 → provider.ts:394; her entry point (do.ts:238, mcp plan/start, spawn.ts:399, serve.ts:141) bootstrap ederken YALNIZ native REPL yolu etmiyor; owner seçimi '3 — ikisi birlikte' (bootstrap fix + iş aynı run'da); öncelik: 7081 landing'inden hemen SONRA, 7082'den önce SPRINT-557 LANDED (3/3 tier-doğru dogfood — 001 session-renewal=sol DONE · 002 REPL-yüzeyi=opus GO_WITH_TECH_DEBT (slash-katalog keşfedilebilirliği Brain el-kapaması) · 003 bootstrap=sonnet DONE; İLK TAM SELF-SETTLING RUN: detached child 3/3'ü settle edip kendisi arşivledi — 556 finalize-truth fix'inin canlı meyvesi, el-settlement gerekmedi; 2026-08-18): (1) session budget-tükeniş doğruluğu: terminal `native-budget.*` kodu session'ı typed exhausted state'e alır; tükenmiş send() adapter'ı HİÇ çağırmadan tek `session-budget-exhausted` event verir (0.0s ölü-döngü sınıfı ölür) · `renewBudgetEpoch()` yalnız working sayaçları tazeler — billing/usage/cost/audit BYTE-untouched (testle + dist-smoke ile pinli: turn1 ok → turn2 exhausted/adapter-çağrısız → renew epoch-2 → turn3 normal) · (2) REPL yüzeyi: tükeniş başına TEK i18n teklif satırı (en+tr) + `/renew` slash'ı (native-only; legacy'de dürüst not-available; katalog girdisi el-kapamada) · (3) `deckent_propose_run` lazy-idempotent `bootstrapProviders` (spawn.ts pattern'i birebir; boş-registry gate'li) — dist-smoke: registry 0→5, proposeRun'a ulaşıldı, ProviderNotFoundError sınıfı native yolda ÖLDÜ. ÖN-HAZIRLIK (owner kısıt-gevşetme): config `execution_budget.native_agent` 45dk→6saat / 2M→20M token / 120→400 round / 400→1200 tool-call (resolver'dan dist-smoke kanıtlı). Kanıt: 435 scoped test + tsc 0 + build yeşil + gates exit 0 + iki dist-smoke. BULGULAR: self-settling run coordinator pid/authority kaydını emekli etmiyor (stale-pid clean-gate HOLD'u; kill-0 kanıtıyla arşivlendi) · xverify twin'leri settle olsa da invocations.db receipt'i yazılmıyor (clean-gate NO_TASK_RECEIPT artığı — 7081-residual'a ek). KALAN: senin canlı PTY deneme turun (propose_run + 50+ tool-call + /renew akışı artık hazır)",
       "updated": "2026-08-18"
     },
     {
@@ -25914,6 +25914,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "65db1cacf656ea05e5261ae08add2ae25947733e6387de4bf238ca733088928b"
+    "value": "674019541c6e1cc699a6fcb8d8437dd5309c5e38da06e1a9e40f7299815999d6"
   }
 }

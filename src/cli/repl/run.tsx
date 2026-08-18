@@ -236,6 +236,76 @@ export function buildDoSlashLabels(t: (key: string) => string): DoSlashLabels {
 }
 
 /**
+ * NATIVE-BUDGET-RENEWAL (557-002) — real en/tr labels for the `/renew` slash:
+ * the confirmation printed after an explicit renewal (`{epoch}` template) and
+ * the honest "not available here" line for an engine with no renewal seam (the
+ * legacy loop path). Same "pull labels out of the call site" precedent as
+ * {@link buildDoSlashLabels} above.
+ */
+export interface RenewSlashLabels {
+  confirmed: string;   // "Working budget renewed — epoch {epoch}. …"
+  unavailable: string; // "/renew is not available on the legacy loop engine — …"
+}
+
+export function buildRenewSlashLabels(t: (key: string) => string): RenewSlashLabels {
+  return {
+    confirmed: t('native-budget.renew-confirmed'),
+    unavailable: t('native-budget.renew-unavailable'),
+  };
+}
+
+/**
+ * NATIVE-BUDGET-RENEWAL (557-002) — resolve a `/renew` line against an engine.
+ * Pure (no React/Ink, no I/O) so the decision is unit-testable without mounting
+ * Ink, the same pattern as {@link isNativeAgentSelected}/`resolveNativeSlash`.
+ *
+ * `/renew` is NOT in the slash catalog, so app.tsx's native slash bridge returns
+ * 'passthrough' for it and the raw text reaches the engine — which is exactly
+ * where {@link withRenewSlash} intercepts it. Returns `undefined` for anything
+ * that is not `/renew` (the caller then runs a normal turn), the honest
+ * not-available line when the engine exposes no `renewBudgetEpoch` seam (legacy
+ * loop engine / a bare-function engine), otherwise renews ONCE — explicitly,
+ * only because the user asked — and returns the confirmation carrying the new
+ * working-budget epoch.
+ */
+export function resolveRenewSlash(
+  trimmed: string,
+  engine: Pick<ReplEngine, 'renewBudgetEpoch'> | undefined,
+  labels: RenewSlashLabels,
+): string | undefined {
+  if (trimmed.trim().toLowerCase() !== '/renew') return undefined;
+  const renew = engine?.renewBudgetEpoch;
+  if (!renew) return labels.unavailable;
+  const { epoch } = renew();
+  return labels.confirmed.replace('{epoch}', String(epoch));
+}
+
+/**
+ * NATIVE-BUDGET-RENEWAL (557-002) — wrap an engine so a typed `/renew` turn is
+ * answered locally (engine seam + confirmation line, zero provider calls) and
+ * every other input passes straight through. Applied to the NATIVE engine only
+ * — the legacy loop path builds no engine here, so it never gains the command.
+ * The optional members are re-exposed so the existing `/approve` bridge
+ * (app.tsx) and the teardown's `close()` keep working through the wrapper.
+ */
+export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): ReplEngine {
+  const { setApprovalMode, close, renewBudgetEpoch } = engine;
+  const wrapped: ReplEngine = async (input, cbs) => {
+    const line = resolveRenewSlash(input, engine, labels);
+    if (line === undefined) {
+      await engine(input, cbs);
+      return;
+    }
+    cbs.output(line);
+    cbs.onTurnEnd({ inputTokens: 0, outputTokens: 0 });
+  };
+  if (setApprovalMode) wrapped.setApprovalMode = (mode) => setApprovalMode(mode);
+  if (close) wrapped.close = (options) => close(options);
+  if (renewBudgetEpoch) wrapped.renewBudgetEpoch = () => renewBudgetEpoch();
+  return wrapped;
+}
+
+/**
  * TERM5-UI (sprint-427, task 6) — real en/tr labels for the correlated
  * result-turn pushed once a job completion matches this REPL's OWN live
  * run-flow ({@link buildRunFlowResultEvent} below), sourced from messages.ts's
@@ -1112,6 +1182,13 @@ export async function runInkRepl(
       });
     }
   }
+
+  // NATIVE-BUDGET-RENEWAL (557-002) — register `/renew` on the native path ONLY.
+  // The command is answered by the wrapper (engine seam + localized confirmation,
+  // no provider turn); the legacy loop path builds no engine here and therefore
+  // never gains it. Renewal stays strictly user-initiated — the wrapper is the
+  // ONLY caller of the session's renewBudgetEpoch seam.
+  if (nativeEngine) nativeEngine = withRenewSlash(nativeEngine, buildRenewSlashLabels(t));
 
   // Alternate-screen mode (OPT-IN: DECKENT_ALTSCREEN=1). It fixed the WSL
   // drift/blank but REMOVES native scrollback — long replies couldn't be scrolled

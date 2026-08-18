@@ -1,5 +1,33 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-557 Learnings
+- Sprint sprint-557 Learnings: ## Sprint sprint-557 Learnings
+- REPL renewal surface — typed offer + /renew command (depends on Task 1): GO_WITH_TECH_DEBT — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 (TSC_EXIT=0, first attempt). Targeted set 'npx vitest run tests
+
+## Gains
+- 557-001 — session budget-exhaustion truth + renewable working epoch (core authority) — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0; exact targeted Vitest set passed 2/2 fi...
+- 557-003 — propose_run lazy provider bootstrap on the native path — Implemented the lazy, idempotent provider bootstrap for deckent_propose_run, mirroring spawn.ts:3...
+
+## Sprint sprint-556 Learnings
+- Sprint sprint-556 Learnings: ## Sprint sprint-556 Learnings
+- xverify CLI waiting signal + approval-phase timeout (depends on Task 1): GO_WITH_TECH_DEBT — WHAT LANDED (all four task items):
+1. WAITING SIGNAL — new i18n key `xverify.prepare.waiting_approval` (en+tr) renders e
+- finalize/kill already-terminated truth (depends on nothing): GO_WITH_TECH_DEBT — killSingle (kill.ts) now returns a typed KillSingleResult ('killed'|'not-found'|'failed') instead of boolean. It only ev
+
+## Gains
+- 556-001 — approval freshness + durable adjudication evidence (channel authority core) — Targeted suite green: 3 files, 31 tests passed.
+
+## Sprint sprint-554 Learnings
+- Sprint sprint-554 Learnings: ## Sprint sprint-554 Learnings
+- loop consumes the exposure view per round (NT-06 wire): GO_WITH_TECH_DEBT — HANDOFFS RECEIVED: none inbound at start (554-001 was still EXECUTING). I published .tasks/handoffs/554-002-to-554-001.j
+
+## Gains
+- 554-001 — provider tool-exposure policy + registry surface view (NT-06 core) — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0; npx vitest run tests/agent/tool-exposur...
+- 554-003 — 1000-tool bounded-surface regression (depends on Tasks 1,2) — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 (true exit code captured via separate in...
+
+## Sprint sprint-551 Learnings
+- Sprint sprint-551 Learnings: ## Sprint sprint-551 Learnings
+
 ## Sprint sprint-546 Learnings
 - Sprint sprint-546 Learnings: ## Sprint sprint-546 Learnings
 

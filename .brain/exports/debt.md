@@ -9,6 +9,11 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-557-002 | Tech debt from 557-002: LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 | normal | sprint-557 | resolved |
+| debt-556-003 | Tech debt from 556-003: killSingle (kill.ts) now returns a typed KillSingleResul | normal | sprint-556 | resolved |
+| debt-556-002 | Tech debt from 556-002: WHAT LANDED (all four task items):
+1. WAITING SIGNAL — n | normal | sprint-556 | resolved |
+| debt-554-002 | Tech debt from 554-002: HANDOFFS RECEIVED: none inbound at start (554-001 was st | normal | sprint-554 | resolved |
 | debt-545-002 | Tech debt from 545-002: LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 | normal | sprint-545 | resolved |
 | debt-545-004 | Tech debt from 545-004: LOCAL_VERIFIED: tsc exit 0; targeted tests exit 0; i18n  | normal | sprint-545 | resolved |
 | debt-544-002 | Tech debt from 544-002: LOCAL_VERIFIED: npx tsc --noEmit passed; npx vitest run  | normal | sprint-544 | resolved |

@@ -25,6 +25,7 @@ import {
   RUN_FLOW_ESCAPE_HATCH_NAMES,
 } from './cli-bridge-tool-specs.js';
 import type { RunFlowController } from './run-flow-controller.js';
+import { loadConfig } from '../../core/config.js';
 import type { McpToolDispatcher } from '../commands/chat-native.js';
 import { SkillPoolManager } from '../../core/skill-pool.js';
 import { SkillLoadingCache } from '../../core/skill-cache.js';
@@ -575,7 +576,7 @@ function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptio
  * per-tool confirm on this call itself. `generatePlanPreview` (424-001) is
  * READ-ONLY by construction, so this tool never writes a task file either.
  */
-function registerRunFlowProposalTool(registry: ToolRegistry, controller: RunFlowController): void {
+function registerRunFlowProposalTool(registry: ToolRegistry, controller: RunFlowController, cwd: () => string): void {
   registry.register({
     name: RUN_FLOW_PROPOSAL_TOOL_NAME,
     description: RUN_FLOW_PROPOSAL_TOOL_SPEC.description,
@@ -587,6 +588,29 @@ function registerRunFlowProposalTool(registry: ToolRegistry, controller: RunFlow
       const intentSummary = typeof args['intentSummary'] === 'string' ? args['intentSummary'].trim() : '';
       if (intentSummary.length === 0) {
         return { ok: false, output: '[mcp-error] deckent_propose_run: intentSummary is required' };
+      }
+      // 557-003: lazy, idempotent provider bootstrap — mirrors spawn.ts:397-405's
+      // `if (!adapter)` recovery exactly (dynamic import, loadConfig, best-effort
+      // try/catch that keeps whatever the registry already had and falls through
+      // to the existing honest [mcp-error] path below on fault). Unlike `deckent
+      // run`, this native path never calls bootstrapProviders at all today, so
+      // `controller.proposeRun` silently reached an empty provider registry.
+      // `providerRegistry.listProviders().length === 0` is the cheap outer gate
+      // (spawn.ts's `!adapter` equivalent) — bootstrapProviders is ALSO
+      // internally idempotent per-provider, so this never double-registers; the
+      // gate only avoids the loadConfig + bootstrap work entirely once the
+      // registry is already populated.
+      try {
+        const { providerRegistry, bootstrapProviders } = await import('../../core/provider.js');
+        if (providerRegistry.listProviders().length === 0) {
+          const root = cwd();
+          const cfg = await loadConfig(root);
+          await bootstrapProviders(cfg, root);
+        }
+      } catch {
+        // keep whatever the registry already had — fall through to
+        // controller.proposeRun, whose existing catch below reports the honest
+        // [mcp-error] if providers are still unavailable.
       }
       try {
         const context = await controller.proposeRun(intentSummary);
@@ -695,7 +719,7 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
   // OFF. When absent or false the block below never runs, so every
   // registration above this line stays byte-identical to pre-425-001.
   if (opts.runFlow?.enabled) {
-    registerRunFlowProposalTool(registry, opts.runFlow.controller);
+    registerRunFlowProposalTool(registry, opts.runFlow.controller, opts.cwd);
   }
 
   return registry;

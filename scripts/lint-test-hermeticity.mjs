@@ -356,8 +356,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-18 (556 landing full-suite debt payment): +4 — realigned suites
   // (release/publish owner-contract pins, retirement pins, collector
   // settlement-authority regression guard) changed graph content.
+  // 2026-08-18 (7083, sprint-557): same count, digest only — renewal +
+  // bootstrap suites and session/bridge/run.tsx/registry content moved.
   count: 14370,
-  digest: '895434a1e4b0fc32f971ad3ed2e5e7400981bd6eba4c4a6c6c854c7f5743423d',
+  digest: '3f08677957ee920d253a1f9ff35e6a0b39d6a5ad901655ba5e4b04341fed7d79',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -581,8 +583,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // inventory; loop/session/bridge/registry production hashes moved.
   // 2026-08-18 (556 landing): production hashes moved — collector settlement
   // guard, killSingle typed result, xverify channel truth, exposure optional.
+  // 2026-08-18 (7083): session/bridge/run.tsx/native-tool-registry/slash
+  // production hashes moved; membership unchanged.
   count: 1250,
-  digest: '66ca6490c058eb034a4a7450ae1b4aeb3e7fe0ada93b31082cdef52fe0b922e8',
+  digest: 'd88b31163460639127e885c198aec6773cda6f8a9fb6e698bbdd5a74279c5361',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

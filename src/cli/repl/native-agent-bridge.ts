@@ -6,7 +6,7 @@
 // lifecycle to the existing Sprint-285 confirm-queue (ConfirmTrigger) →
 // respondPermission. View-neutral mapping; the legacy path is untouched.
 
-import { createAgentSession } from '../../agent/session.js';
+import { createAgentSession, type AgentSessionEvent, type SessionBudgetExhaustedEvent } from '../../agent/session.js';
 import { loadPolicy } from '../../agent/permission-policy.js';
 import { createRuleStore } from '../../agent/permission-store.js';
 import { createCostGuard } from '../../agent/guards/cost.js';
@@ -14,7 +14,6 @@ import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import { createToolExposure } from '../../agent/tools/exposure.js';
-import type { AgentEvent } from '../../agent/events.js';
 import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
 import { decide, resolveTier } from '../../agent/permission.js';
 import { checkSelfModifying } from '../../agent/guards/self-modifying.js';
@@ -69,6 +68,17 @@ export interface ReplEngine {
    * satisfies ReplEngine, same rationale as `setApprovalMode` above.
    */
   close?: (options?: { keepForRecoveryMs?: number }) => void;
+  /**
+   * NATIVE-BUDGET-RENEWAL (557-002) — bridges the REPL's `/renew` slash to the
+   * AgentSession's OWN explicit working-budget renewal (session.ts's
+   * `renewBudgetEpoch()`). Renewal is ALWAYS user-driven: nothing in this bridge
+   * ever calls it, so an exhausted session stays exhausted until the user asks.
+   * It restarts only the working-budget epoch — billing/usage/cost counters are
+   * untouched by the session layer. Optional so a bare function value (test fake,
+   * legacy engine) still structurally satisfies ReplEngine, same rationale as
+   * `setApprovalMode`/`close` above.
+   */
+  renewBudgetEpoch?: () => { epoch: number };
 }
 
 export interface NativeEngineDeps {
@@ -250,6 +260,33 @@ export function localizeNativeAgentSignal(
   return localizeOrFallback(t, key, fallback);
 }
 
+/** NATIVE-BUDGET-RENEWAL (557-002) — i18n key of the single offer line shown when
+ *  a session's working budget is exhausted (`{dimension}` = the localized
+ *  `native-budget.*-exhausted` line for the dimension that ran out). */
+const RENEWAL_OFFER_KEY = 'native-budget.renewal-offer';
+
+/**
+ * NATIVE-BUDGET-RENEWAL (557-002) — per-session offer gate. session.ts keeps the
+ * exhaustion latched: EVERY further `send()` re-yields the same
+ * `session-budget-exhausted` event, so rendering it unconditionally would repeat
+ * the offer on every message the user types (offer spam = the task's explicit
+ * NO_GO). The gate fingerprints `code#epoch` and returns the localized line only
+ * the first time it sees one — a renewal advances the epoch, so a LATER
+ * exhaustion is a genuinely new offer and is shown again.
+ */
+export function createBudgetRenewalOffer(
+  t: (key: string) => string,
+): (event: SessionBudgetExhaustedEvent) => string | undefined {
+  let offered: string | undefined;
+  return (event) => {
+    const fingerprint = `${event.code}#${event.epoch}`;
+    if (fingerprint === offered) return undefined;
+    offered = fingerprint;
+    const dimension = localizeNativeAgentSignal(t, event.code, event.code);
+    return t(RENEWAL_OFFER_KEY).replace('{dimension}', dimension);
+  };
+}
+
 /**
  * born-607 — ENGINE-PARITY exec resolver for `deckent_call_tool`. A nested
  * dispatch (call_tool → target) is NOT a model-proposed tool_use, so the loop's
@@ -408,10 +445,14 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   const localizeSignal = (code: string | undefined, fallback: string): string =>
     localizeNativeAgentSignal(t, code, fallback);
 
+  // NATIVE-BUDGET-RENEWAL (557-002) — one gate per engine (per session), so the
+  // dedup survives across turns exactly as long as the exhaustion itself does.
+  const renewalOffer = createBudgetRenewalOffer(t);
+
   const runTurn: ReplEngine = async (input, cbs) => {
     let inputTokens = 0;
     let outputTokens = 0;
-    for await (const ev of session.send(input) as AsyncIterable<AgentEvent>) {
+    for await (const ev of session.send(input) as AsyncIterable<AgentSessionEvent>) {
       switch (ev.type) {
         case 'text-delta':
           cbs.output(ev.text);
@@ -459,6 +500,14 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         case 'error':
           cbs.output(`\n[${localizeSignal(ev.code, ev.message)}]`);
           break;
+        case 'session-budget-exhausted': {
+          // ONE offer per exhaustion (see createBudgetRenewalOffer) — the
+          // session refuses every further provider turn until the user types
+          // `/renew`; nothing here renews on the user's behalf.
+          const offer = renewalOffer(ev);
+          if (offer) cbs.output(`\n[${offer}]\n`);
+          break;
+        }
         case 'notice':
           // Honest degradation signal (truncated / context-compacted): visible
           // but non-fatal — silence here is what made a full context window
@@ -500,5 +549,8 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   engine.setApprovalMode = (mode) => session.setApprovalMode(mode);
   // NT-03 (553-002) — see the ReplEngine.close doc comment above.
   engine.close = (options) => session.close(options);
+  // NATIVE-BUDGET-RENEWAL (557-002) — see the ReplEngine.renewBudgetEpoch doc
+  // comment above; only run.tsx's explicit `/renew` slash ever calls this.
+  engine.renewBudgetEpoch = () => session.renewBudgetEpoch();
   return engine;
 }

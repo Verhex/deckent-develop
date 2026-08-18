@@ -23,7 +23,18 @@ import { ToolRegistry } from './tools/registry.js';
 import { Transcript } from './transcript.js';
 import type { ProviderAdapter, ProviderMessage } from './provider-tooluse/types.js';
 import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore } from './scratch-checkpoint.js';
-import { createNativeBudgetState } from './guards/recursion.js';
+import { createNativeBudgetState, type NativeBudgetState } from './guards/recursion.js';
+
+export type NativeBudgetTerminalCode = `native-budget.${string}`;
+
+export interface SessionBudgetExhaustedEvent {
+  type: 'session-budget-exhausted';
+  code: NativeBudgetTerminalCode;
+  epoch: number;
+  renewalHint: true;
+}
+
+export type AgentSessionEvent = AgentEvent | SessionBudgetExhaustedEvent;
 
 export interface AgentSessionDeps {
   adapter: ProviderAdapter;
@@ -52,7 +63,8 @@ export interface AgentSessionDeps {
 }
 
 export interface AgentSession {
-  send(userInput: string): AsyncIterable<AgentEvent>;
+  send(userInput: string): AsyncIterable<AgentSessionEvent>;
+  renewBudgetEpoch(): { epoch: number };
   respondPermission(id: string, response: PermissionResponse): void;
   cancel(): void;
   setApprovalMode(mode: ApprovalMode): void;
@@ -74,12 +86,17 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   let mode: ApprovalMode = deps.policy.defaultMode;
   let cancelled = false;
   let turnSequence = 0;
+  let budgetEpoch = 1;
+  let exhausted: { code: NativeBudgetTerminalCode; at: number; epoch: number } | undefined;
   const scratch: ScratchStore | undefined = deps.scratch ? openScratchStore(deps.scratch) : undefined;
   let checkpointDegradation: CheckpointReadResult | undefined;
 
-  async function* runWithCheckpoints(userInput: string, turnId: string): AsyncIterable<AgentEvent> {
+  async function* runWithCheckpoints(userInput: string, turnId: string): AsyncIterable<AgentSessionEvent> {
     const events = runAgentTurn(loopDeps, transcript, userInput);
     for await (const event of events) {
+      if (event.type === 'error' && isNativeBudgetTerminalCode(event.code)) {
+        exhausted = { code: event.code, at: Date.now(), epoch: budgetEpoch };
+      }
       yield event;
       if ((event as { type: string }).type !== 'budget-checkpoint-request' || !scratch || !deps.scratch) continue;
       try {
@@ -107,7 +124,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     }
   }
 
-  const nativeBudgetState = deps.nativeBudget ? createNativeBudgetState() : undefined;
+  const nativeBudgetState: NativeBudgetState | undefined = deps.nativeBudget ? createNativeBudgetState() : undefined;
   const loopDeps: LoopDeps = {
     adapter: deps.adapter,
     ...(deps.nativeBudget ? { nativeBudget: deps.nativeBudget } : {}),
@@ -137,13 +154,31 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   };
 
   return {
-    send(userInput: string): AsyncIterable<AgentEvent> {
+    send(userInput: string): AsyncIterable<AgentSessionEvent> {
       cancelled = false;
       pending.clear();
       preAnswers.clear();
+      if (exhausted) {
+        const event: SessionBudgetExhaustedEvent = {
+          type: 'session-budget-exhausted',
+          code: exhausted.code,
+          epoch: exhausted.epoch,
+          renewalHint: true,
+        };
+        return (async function* exhaustedTurn(): AsyncIterable<AgentSessionEvent> {
+          yield event;
+          yield { type: 'turn-end' };
+        })();
+      }
       const turnId = `turn-${++turnSequence}`;
       transcript.setNextUserMetadata({ turnId, origin: 'user' });
       return runWithCheckpoints(userInput, turnId);
+    },
+    renewBudgetEpoch(): { epoch: number } {
+      budgetEpoch++;
+      exhausted = undefined;
+      if (deps.nativeBudget) loopDeps.nativeBudgetState = createNativeBudgetState();
+      return { epoch: budgetEpoch };
     },
     respondPermission(id: string, response: PermissionResponse): void {
       const resolve = pending.get(id);
@@ -178,4 +213,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       scratch.close(keep > 0 ? { policy: 'keep-for-recovery', recoveryWindowMs: keep } : { policy: 'delete' });
     },
   };
+}
+
+function isNativeBudgetTerminalCode(code: string | undefined): code is NativeBudgetTerminalCode {
+  return code?.startsWith('native-budget.') === true;
 }

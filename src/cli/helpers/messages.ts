@@ -2828,6 +2828,22 @@ const MESSAGES: MessageMap = {
     en: 'Scratch checkpoint could not be saved; the session continues without checkpoint recovery.',
     tr: 'Scratch checkpoint kaydedilemedi; oturum checkpoint kurtarması olmadan sürüyor.',
   },
+  // NATIVE-BUDGET-RENEWAL (557-002) — the exhaustion offer + the `/renew` replies.
+  // `{dimension}` is one of the `native-budget.*-exhausted` lines above; a renewal
+  // restarts ONLY the working-budget epoch — billing/usage counters keep accruing,
+  // so the offer says so rather than implying a free reset.
+  'native-budget.renewal-offer': {
+    en: '{dimension} Continue with /renew (billing keeps counting; only the working limits restart) or close the session.',
+    tr: '{dimension} /renew ile devam edin (faturalama işlemeye devam eder; yalnız çalışma limitleri sıfırlanır) ya da oturumu kapatın.',
+  },
+  'native-budget.renew-confirmed': {
+    en: 'Working budget renewed — epoch {epoch}. Billing and usage counters keep accruing; only the working limits restarted.',
+    tr: 'Çalışma bütçesi yenilendi — dönem {epoch}. Faturalama ve kullanım sayaçları işlemeye devam eder; yalnız çalışma limitleri sıfırlandı.',
+  },
+  'native-budget.renew-unavailable': {
+    en: '/renew is not available on the legacy loop engine — restart without --legacy-loop (or set terminal.native_agent: true) to use it.',
+    tr: '/renew eski döngü motorunda kullanılamıyor — kullanmak için --legacy-loop olmadan yeniden başlatın (veya terminal.native_agent: true yapın).',
+  },
   'native-budget.remaining': {
     en: 'Remaining budget: {rounds} rounds · {toolCalls} tool calls.',
     tr: 'Kalan bütçe: {rounds} tur · {toolCalls} araç çağrısı.',

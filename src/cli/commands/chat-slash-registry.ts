@@ -337,6 +337,14 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     desc: 'Onay modu: suggest | auto-edit | full-auto',
   },
   {
+    // NATIVE-BUDGET-RENEWAL (7083, 557-002 discoverability closure): answered
+    // locally by the native engine wrapper (run.tsx withRenewSlash) BEFORE
+    // resolveSlash — listed here for /help + menu + Tab-complete only, no
+    // agenticTool, so resolveSlash falls through exactly like /model and /cd.
+    name: '/renew',
+    desc: 'Tükenen working-budget epoch\'unu yenile (billing sayaçları sürer)',
+  },
+  {
     // Meta-command: handled in app.tsx handleSubmit BEFORE resolveSlash
     // (parseTermCommand, term-mode.ts). Listed for /help + menu visibility +
     // Tab-complete only — no agenticTool, so resolveSlash falls through to

@@ -55,6 +55,13 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-557 Learnings** (sprint-557): ## Sprint sprint-557 Learnings
+- REPL renewal surface — typed offer + /renew command (depends on Task 1): GO_WITH_TEC...
+- **Sprint sprint-556 Learnings** (sprint-556): ## Sprint sprint-556 Learnings
+- xverify CLI waiting signal + approval-phase timeout (depends on Task 1): GO_WITH_TEC...
+- **Sprint sprint-554 Learnings** (sprint-554): ## Sprint sprint-554 Learnings
+- loop consumes the exposure view per round (NT-06 wire): GO_WITH_TECH_DEBT — HANDOFFS...
+- **Sprint sprint-551 Learnings** (sprint-551): ## Sprint sprint-551 Learnings
 - **Sprint sprint-546 Learnings** (sprint-546): ## Sprint sprint-546 Learnings
 
 ## Gains
@@ -71,14 +78,6 @@
 
 ## Gains
 - 539-001 — phase5-writer.mjs — claim filing + verified append + projections...
-- **Sprint sprint-538 Learnings** (sprint-538): ## Sprint sprint-538 Learnings
-
-## Gains
-- 538-001 — Phase-5 dry-run bundle builder + hermetic proof — npx tsc --noEm...
-- **Sprint sprint-537 Learnings** (sprint-537): ## Sprint sprint-537 Learnings
-- Canary no-op doc touch: GO_WITH_TECH_DEBT — Exact-byte disk readback passed via cmp;...
-- **Sprint sprint-536 Learnings** (sprint-536): ## Sprint sprint-536 Learnings
-- **Sprint sprint-535 Learnings** (sprint-535): ## Sprint sprint-535 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
@@ -89,4 +88,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1951 | Generated: 2026-08-17_
+_Total entries: 1983 | Generated: 2026-08-18_
