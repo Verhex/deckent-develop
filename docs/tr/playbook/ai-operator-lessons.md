@@ -1,0 +1,166 @@
+# Deckent AI-Operatör Dersleri — Saha Notları
+
+> **Yaşayan doküman.** Deckent'i bir AI ajanıyla (Claude, Codex, yerel model…) süren
+> herkes için: gerçek çalışma oturumlarında yapılan hataların ve çıkarılan derslerin
+> damıtılmış hâli. Her ders "Hata → Neden → Doğru kullanım" kalıbındadır. Deckent'i
+> süren modele de bu dokümanı bağlam olarak verin — aynı hataları tekrar etmesin.
+> Her sprint/çalışma deneyiminden sonra güncellenir (sondaki değişiklik günlüğüne bakın).
+> İngilizce karşılığı: `docs/en/playbook/ai-operator-lessons.md`.
+
+---
+
+## 1. Plan onaylandıktan sonra task artifact'lerine ASLA elle dokunma
+
+**Hata:** Plan onaylandıktan sonra `.tasks/task-XXX.json` dosyasına elle dependency
+eklendi. Run, `TASK_ARTIFACT_CONTENT_CONFLICT` ile hiçbir worker doğmadan öldü.
+
+**Neden:** `deckent plan` onayı bir plan-digest üretir; start makinesi artifact'leri bu
+digest'e karşı doğrular (exact-plan, fail-closed). Elle edit = digest uyuşmazlığı =
+dürüst red.
+
+**Doğru kullanım:** Dependency'ler DIRECTIVES.md'de task bloğunun altına satır olarak
+yazılır — parser bunu destekler:
+
+```markdown
+## Task 2: xverify CLI waiting signal (depends on Task 1)
+- Files: src/cli/commands/xverify.ts
+- Dependencies: Task 1
+```
+
+Başlıktaki "(depends on Task 1)" YALNIZ insan içindir; DAG'a `- Dependencies:` satırı
+girer. Plan çıktısındaki "Etkin dalgalar" satırından dependency'nin gerçekten dalgalara
+yansıdığını doğrula (`1:[1,3] 2:[2]` gibi).
+
+## 2. Model-tier yönlendirmesi: kritik yüzey → üst tier, kesin akış → alt tier
+
+**Hata:** Kritik loop-wiring görevi sonnet'e, deterministik test görevi en güçlü modele
+atandı. Owner düzeltti: "model ve görev seçimi aşırı başarısız".
+
+**Doğru kullanım:** Kapasite sırası (bu repo için): `gpt-5.6-sol > claude-opus-5 >
+claude-sonnet-5`; terra/luna = sonnet-eşdeğeri ve altı. Çekirdek tasarım / runtime
+authority / belirsizliği yüksek iş → üst tier. İyi-spesifiye test, fixture,
+deterministik dönüşüm, dokümantasyon → sonnet sınıfı. Planı başlatmadan ÖNCE atamaları
+bu kurala karşı gözden geçir.
+
+## 3. Disk kanıtı olmadan ilerleme iddiası yok
+
+**Hata:** "Sprint çalışıyor" varsayımıyla beklendi; gerçekte detached child sessizce
+ölmüştü (task'lar PENDING, heartbeat yok).
+
+**Doğru kullanım:** Canlılık iddiası şu dört kanıtın kesişimidir: heartbeat dosyası
+mtime'ı taze + process gerçekten yaşıyor (`kill -0` sınıfı kontrol) + log tail akıyor +
+`.result` diskte. Status/projection çıktısı kanıt DEĞİLDİR. Run-flow'un gerçek son
+durumu `.deckent/runtime/run-flow-store/<flowId>.events.jsonl` son satırındadır —
+`RUN_FAILED` oradan okunur.
+
+## 4. Bir hata = DUR; retry fırtınası yasak
+
+**Hata:** Bir sprint hatası üzerine, düzeltmenin hatalı yola gerçekten ulaştığı
+doğrulanmadan üç kez yeniden başlatıldı (biri stale `dist/` ile). Üç sprint çöpü doğdu.
+
+**Doğru kullanım:** İlk hatada dur. Tam-zincir kök-neden analizi offline yapılır:
+düzelt → test → build → dist'ten disk-kanıtı → TEK yeniden deneme. "Belki bu sefer
+olur" diye restart atılmaz. Stale `dist/` uyarısını (`DECKENT_BINARY_IDENTITY_WARN`)
+asla yok sayma — önce `npm run build`.
+
+## 5. Onay kuyruğunu İZLE — sessiz bekleme tuzağı
+
+**Hata:** `deckent xverify` 16 dakika "takıldı" sanıldı; gerçekte bir
+reachability-probe onayı (`aprp-…`) kuyruğa düşmüş, karar bekliyordu — hiçbir çıktı
+basılmadan.
+
+**Doğru kullanım:** Uzun süren her komutta ilk refleks: `deckent approvals list`.
+Onaylar tek-kullanımlıktır ve koşuya bağlıdır — eski bir koşunun onayı yenisine
+taşınmaz; her koşu kendi onayını ister. Karar canlı-doğrulamalı kanaldan verilir
+(interaktif `deckent approvals decide <id> --allow`). Otomasyonda bir izleyici döngü
+kurup yeni `aprp-` kayıtlarını anında yakala.
+
+## 6. Pipe, exit code'u maskeler
+
+**Hata:** `komut | tail; echo $?` — okunan şey `tail`'in exit'iydi; gerçek hata yutuldu.
+
+**Doğru kullanım:** Gerçek exit code'u ayrı yakala:
+`komut > out.log 2>&1; echo "EXIT=$?"`. Deckent'in kendi tool-result zinciri de aynı
+ilkeyle çalışır (exit-code truth): sen de betiklerinde aynı dürüstlüğü uygula.
+
+## 7. Hangi bütçe neyi öldürüyor — bil ve config'ten yönet
+
+**Hata:** Bir worker, aggregate token devre-kesicisiyle SIGKILL yedi; bir native oturum
+45 dk duvar-saatinde kalıcı ölü-döngüye düştü; bir verifier 100k token / 300s / sprint
+başına 1 doğrulama tavanında sürekli UNCLEAR kaldı.
+
+**Doğru kullanım:** Üç ayrı bütçe ailesi vardır ve üçü de `.deckent/config.json`
+`execution_budget` altından yönetilir (kodda sabit yok):
+- `roles.worker/brain/auditor` — sprint worker'larının token/turn tavanları
+- `native_agent` — native terminal oturumunun round/tool-call/duvar-saati/token profili
+- `purposes.*` (örn. `xverify-adjudication`) — amaç-özel tavanlar
+
+Uzun işte plan gecikmesi bütçe patlaması üretiyorsa tavanı config'te yükselt; kodu
+bükme, sessiz fallback ekleme.
+
+## 8. XVerify iddia disiplini: statik, diff'ten karar verilebilir, nokta-iddia
+
+**Hata:** "Regression testi loop'u iki kez sürüyor ve şunu kanıtlıyor" gibi
+çalışma-zamanı davranış iddiaları verildi — hakem diff'ten karar veremez, sonuç
+UNCLEAR/HOLD.
+
+**Doğru kullanım:** Commit'ten ÖNCE, `--files` + `--diff` + `--target` ile; her iddia
+dosya içeriğinden okunarak doğrulanabilir olmalı ("X dosyası Y fonksiyonunda Z
+parametresini bildirir" gibi). Evrensel iddialar ("hiçbir yerde X yok") makine-gate
+işidir, hakeme sorulmaz. HOLD/UNCLEAR kapanış DEĞİLDİR — dürüst kanıt olarak receipt'iyle
+kaydedilir; kapanış typed verdict + gerçek çağrı + usage + durable receipt ister.
+
+## 9. Scope dışına yazma — dürüst tech-debt bırak
+
+**İyi örnek (hatanın tersi):** Bir worker, görevinin gerektirdiği iki satırlık
+değişikliğin kendi `filesWrite` scope'u DIŞINDA olduğunu gördü; scope ihlali yapmak
+yerine `GO_WITH_TECH_DEBT` + tam tarifli açık-madde bıraktı ve handoff notu yazdı.
+Kapanış, yetkili el tarafından dakikalar içinde yapıldı.
+
+**Doğru kullanım:** Scope dışı keşif = `.result` notes'a yaz, inline düzeltme yapma.
+Bağımlı task'a `.tasks/handoffs/` üzerinden ihtiyaç bildir. Sahte DONE'dan dürüst
+NO_GO/tech-debt her zaman daha ucuzdur — FIX döngüsü bunun için vardır.
+
+## 10. Yaşam-döngüsü sırası: recover → finalize → cleanup — ve temiz `.tasks`
+
+**Hata:** `npm run build`, `.tasks` altında settle olmamış artifact'ler yüzünden
+clean-gate HOLD'una takıldı; cleanup "run-orphaned" ile reddetti.
+
+**Doğru kullanım:** Sıra her zaman: `deckent recover <sprint> --force` (gerekirse) →
+`deckent finalize --sprint <id> [--force]` → `deckent cleanup`. Kanıt dosyaları
+silinmez, `.tasks/archive/` altına taşınır. `rm .tasks/*` YASAKTIR — arşivleme
+kanonik komutla veya archive dizinine taşıyarak yapılır. Ölü xverify twin-task'ları
+da `.tasks`'ta kalıp clean-gate'i tutabilir — settle sonrası arşivle.
+
+## 11. MASTER-PLAN hücre grameri
+
+**Hata:** Evidence hücresine `core|discoverable` yazıldı — ham `|` hücreyi böldü, lint
+kırıldı. Bir başka append hücreyi 10.000 karakter sınırının üstüne taşırdı.
+
+**Doğru kullanım:** Hücre içinde ham pipe yok (`/` kullan); evidence bounded tutulur
+(sınır aşımında eski metni receipt kaybetmeden sıkıştır); her satır değişikliğinden
+sonra `npm run docs:master-plan` + `node scripts/lint-master-plan.mjs --check`.
+
+## 12. Build sonrası dünya değişir
+
+**Doğru kullanım:** Her kod değişikliğinden sonra build al; long-lived MCP process'i
+eski `dist/`'i cache'ler — host adapterının restart/reconnect akışını uygula. Sprint
+ÇALIŞIRKEN build alma (ESM cache + worker auth kaybı). User-surface değişikliği,
+gerçek binary'den koşturulmuş kanıt olmadan DONE değildir (mock/unit yeşili yetmez).
+
+## 13. Bulgu ≠ iş: raporla, owner karar versin
+
+**Doğru kullanım:** Çalışma sırasında görülen scope-dışı her bulgu tek satır olarak
+raporlanır; MASTER'a otomatik iş olarak girmez — owner admission'ı gerekir. Tekrarlayan
+darboğaz döngüleri (tek-worker'a düşme, FIX-erişilemez, attribution döngüsü) görülür
+görülmez owner'a bildirilir.
+
+---
+
+## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
+
+- **2026-08-18 — ilk sürüm** (sprint-550…556 dönemi): 13 ders damıtıldı. Kaynak
+  olaylar: retry-storm krizi (550-552), NT-correction dalgası (553), NT-06 progressive
+  disclosure + tier-düzeltmesi (554), plan-sonrası el-edit çakışması (555),
+  `- Dependencies:` sözdizimi keşfi + kanal-onarım sprint'i (556), xverify
+  approval-bekleme/bütçe RCA'sı, Qwen canlı-tur bulguları (7083).

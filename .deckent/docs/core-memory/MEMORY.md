@@ -26,6 +26,7 @@
 - [Kısır-döngü darboğazlarını bildir](feedback_report_bottleneck_loops.md) — max_workers=1/tek-task/FIX-erişilemez/attribution-döngüsü görülür görülmez Alperen'e raporlanır (2026-08-17).
 - [XVerify claim disiplini](feedback_xverify_claim_discipline.md) — verify COMMIT'ten ÖNCE --files+--diff ile; nokta-iddia + eşlik eden target; evrenseller makine-gate işi (2026-08-17).
 - [Worker model tier routing](feedback_worker_model_tier_routing.md) — sol > opus > sonnet; kritik yüzey→üst tier, sonnet→stabil/kesin akış; terra/luna=sonnet-eşdeğeri ve altı; plan atamaları başlatmadan önce bu kurala karşı doğrulanır (2026-08-18).
+- [AI-Operatör Dersleri dokümanı](feedback_ai_operator_lessons_doc.md) — docs/{tr,en}/playbook/ai-operator-lessons.md yaşayan doküman; her sprint deneyiminden sonra ders+changelog güncellenir, iki dil senkron (2026-08-18).
 ---
 
 **Referans kararlar (law değil — kalıcı proje-durumu):**
