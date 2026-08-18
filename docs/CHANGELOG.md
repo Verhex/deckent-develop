@@ -14,6 +14,20 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint554] - 2026-08-18
+
+### Added
+
+- provider tool-exposure policy + registry surface view (NT-06 core)
+- 1000-tool bounded-surface regression (depends on Tasks 1,2)
+
+### Changed
+
+- loop consumes the exposure view per round (NT-06 wire) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint553] - 2026-08-18
 
 > Run ABORTED (2/5 dogfood DONE); remainders hand-completed by Brain per owner

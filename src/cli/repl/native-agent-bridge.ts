@@ -13,6 +13,7 @@ import { createCostGuard } from '../../agent/guards/cost.js';
 import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
+import { createToolExposure } from '../../agent/tools/exposure.js';
 import type { AgentEvent } from '../../agent/events.js';
 import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
 import { decide, resolveTier } from '../../agent/permission.js';
@@ -341,6 +342,20 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // fork session-lifetime grant/deny state between direct and nested dispatch.
   const policy = loadPolicy(deps.cwd);
   const ruleStore = createRuleStore(deps.cwd);
+  // NT-06 progressive tool surface — this session's monotonic exposure view.
+  // Flag-gated on the RESOLVED `tool_surface.progressive` (resolveToolSurfaceOptions
+  // admits only a literal `true`, fail-closed): flag absent/false constructs NOTHING,
+  // so the provider surface stays the full eager list, byte-identical to pre-NT-06.
+  // Filled onto the shared ToolSurfaceOptions object in place — the SAME pattern
+  // `execImpl`/`confirm` use below, and the only seam available here: run.tsx (not
+  // this bridge) calls buildNativeToolRegistry, so that mutable options object is
+  // what actually reaches the registered meta-tools. deckent_describe_tool and
+  // deckent_call_tool read `opts.exposure` per call, so this assignment is what
+  // makes a describe/call reveal into THIS session's view.
+  const exposure = deps.toolSurface?.progressive === true
+    ? createToolExposure({ progressive: true }, deps.registry)
+    : undefined;
+  if (exposure && deps.toolSurface) deps.toolSurface.exposure = exposure;
   const session = createAgentSession({
     adapter: deps.adapter,
     registry: deps.registry,
@@ -357,6 +372,12 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
     ...(deps.getModel ? { getModel: deps.getModel } : {}),
     ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
+    // NT-06 consumer half (554-002 tech-debt closure, Brain hand-completion):
+    // the per-round provider schema view is the exposure filter — a tool
+    // revealed by describe/call in round N rides round N+1's request.
+    ...(exposure
+      ? { getProviderToolSchemas: () => deps.registry.toNativeSchemas((def) => exposure.isExposed(def.name)) }
+      : {}),
     ...(deps.scratch ? { scratch: { ...deps.scratch, checkpointInstruction: CHECKPOINT_INSTRUCTION } } : {}),
   });
 

@@ -116,3 +116,10 @@ asds
 selam deckent model kapsamın bağlamın nedir neler yapabilirisn
 deneme selam
 ● deckent [openai-compatible http 400 — exceed_context_size_error: request (222682 tokens) exceeds the available context size (131072 tokens), try increasing it] ⏱ 35.5s · 363 tok › deneme selam ● deckent [context penceresi limite yaklaştı — oturum yanıt verebilsin diye en eski mesajlar sıkıştırıldı] ne den böyle uyarı alıp duruyoruz
+Selam
+/resume 10
+/term control
+/approve full-auto
+3 yaplım ama onuput raporlarda tablolar kayıyor ona dikkat ve özen gösterelim
+devam
+2yi yapalım kendi fine tune eitim yolunu belirle bakalım

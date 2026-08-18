@@ -12,7 +12,7 @@ import { decide, resolveTier } from './permission.js';
 import type { PermissionPolicy } from './permission-policy.js';
 import type { GrantLifetime, RuleStore } from './permission-store.js';
 import { grantPatternFor, type ApprovalMode } from './permission-types.js';
-import { ToolRegistry } from './tools/registry.js';
+import { ToolRegistry, type NativeToolSchema } from './tools/registry.js';
 import type { ToolResult } from './tools/types.js';
 import { Transcript } from './transcript.js';
 import type { ProviderAdapter, ProviderMessage, ProviderRequest, ProviderToolCall } from './provider-tooluse/types.js';
@@ -65,6 +65,16 @@ export interface LoopDeps {
    *  of the backend silently truncating and returning an empty turn. Absent /
    *  <=0 → no client-side fitting. */
   getContextBudgetTokens?: () => number | undefined;
+  /** NT-06 progressive tool surface — the provider-visible schema list, re-read
+   *  by the caller's own view ONCE PER ROUND. The loop stays deliberately
+   *  ignorant of exposure/reveal semantics (that policy lives in
+   *  `tools/exposure.ts`, owned by the session layer): it only asks this getter
+   *  for "the tools the provider may see right now", so a tool revealed while
+   *  round N runs simply appears in round N+1's request — no other loop change,
+   *  and the NT-02 admission arithmetic below prices the smaller list for free.
+   *  Absent → the full eager `registry.toNativeSchemas()` dump (byte-identical
+   *  legacy behavior; the flag-off path never constructs a getter at all). */
+  getProviderToolSchemas?: () => NativeToolSchema[];
   /** current approval mode (read per-decision so setApprovalMode takes effect). */
   getMode: () => ApprovalMode;
   /** view→core suspension: resolve with the user's choice on an 'ask' decision. */
@@ -136,7 +146,9 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // Client-side context fitting: drop the oldest messages (pairing-safe)
     // BEFORE the backend hits its window — a server-side truncation returns an
     // empty turn with HTTP 200 and looks like a dead REPL.
-    const toolSchemas = deps.registry.toNativeSchemas();
+    // NT-06: re-read every round — this is what makes a mid-turn reveal visible
+    // on the NEXT request without any loop-side exposure state.
+    const toolSchemas = deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas();
     const rawBudget = deps.getContextBudgetTokens?.();
     // NT-08: the generation room the prompt arithmetic reserves is also the
     // ceiling the backend is told to respect (adapter → `max_tokens`).

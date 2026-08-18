@@ -12,6 +12,7 @@
 import { z, type ZodTypeAny } from 'zod';
 import { ToolRegistry } from '../../agent/tools/registry.js';
 import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent/tools/types.js';
+import type { ToolExposure, ToolExposureKind } from '../../agent/tools/exposure.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
 import { classifyTool } from './tool-permissions.js';
@@ -110,6 +111,8 @@ export function resolveRunFlowEnabled(raw: { run_flow_v2?: boolean } | undefined
  */
 export interface ToolSurfaceOptions {
   enabled: boolean;
+  progressive: boolean;
+  exposure?: ToolExposure;
   confirm?: ConfirmFn;
   execImpl?: ExecImplFn;
   riskThreshold?: CoreToolRiskLevel;
@@ -133,10 +136,10 @@ const VALID_RISK_THRESHOLDS: ReadonlySet<string> = new Set(['safe', 'moderate', 
  * finally arms `deckent_call_tool` with the engine-parity resolver.
  */
 export function resolveToolSurfaceOptions(
-  raw: { enabled?: boolean; riskThreshold?: string } | undefined,
+  raw: { enabled?: boolean; progressive?: boolean; riskThreshold?: string } | undefined,
 ): ToolSurfaceOptions | undefined {
   if (!raw || raw.enabled !== true) return undefined;
-  const opts: ToolSurfaceOptions = { enabled: true };
+  const opts: ToolSurfaceOptions = { enabled: true, progressive: raw.progressive === true };
   if (typeof raw.riskThreshold === 'string' && VALID_RISK_THRESHOLDS.has(raw.riskThreshold)) {
     opts.riskThreshold = raw.riskThreshold as CoreToolRiskLevel;
   }
@@ -219,6 +222,7 @@ function defineFromDispatcher(
   inputSchema: Record<string, unknown>,
   tier: ToolPermissionTier,
   dispatcher: McpToolDispatcher,
+  exposure?: ToolExposureKind,
 ): ToolDefinition {
   return {
     name,
@@ -227,6 +231,7 @@ function defineFromDispatcher(
     category: 'coding',
     tier,
     source: 'builtin',
+    ...(exposure ? { exposure } : {}),
     handler: async (args) => toolResultFrom(await dispatcher.dispatch(name, args)),
   };
 }
@@ -468,17 +473,26 @@ function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptio
       properties: {
         query: { type: 'string', description: 'Keyword(s) to search for.' },
         limit: { type: 'number', description: 'Max results (default 10).' },
+        cursor: { type: 'string', description: 'Continuation cursor returned by a previous search.' },
       },
       required: ['query'],
     },
     category: 'catalog',
     tier: 'silent',
     source: 'builtin',
+    exposure: 'core',
     handler: async (args) => {
       const query = typeof args['query'] === 'string' ? args['query'] : '';
-      const limit = typeof args['limit'] === 'number' ? args['limit'] : undefined;
-      const hits = searchIndex.searchTools(query, limit !== undefined ? { limit } : {});
-      return { ok: true, output: JSON.stringify(hits) };
+      const requestedLimit = typeof args['limit'] === 'number' && Number.isFinite(args['limit'])
+        ? Math.trunc(args['limit'])
+        : 10;
+      const limit = Math.max(1, Math.min(50, requestedLimit));
+      const rawCursor = typeof args['cursor'] === 'string' ? args['cursor'] : '';
+      const offset = /^\d+$/.test(rawCursor) ? Number(rawCursor) : 0;
+      const ranked = searchIndex.searchTools(query, { limit: offset + limit + 1 });
+      const results = ranked.slice(offset, offset + limit);
+      const cursor = ranked.length > offset + limit ? String(offset + limit) : null;
+      return { ok: true, output: JSON.stringify({ results, cursor }) };
     },
   });
 
@@ -493,10 +507,12 @@ function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptio
     category: 'catalog',
     tier: 'silent',
     source: 'builtin',
+    exposure: 'core',
     handler: async (args) => {
       const name = typeof args['name'] === 'string' ? args['name'] : '';
       const def = searchIndex.describeTool(name);
       if (!def) return { ok: false, output: `[mcp-error] deckent_describe_tool: unknown tool: ${name}` };
+      opts.exposure?.reveal(name);
       const params = summarizeEagerSchema(def.paramsSchema);
       return {
         ok: true,
@@ -526,8 +542,10 @@ function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptio
     // without that injection the default remains NOT_WIRED_EXEC → fail-closed.
     tier: 'silent',
     source: 'builtin',
+    exposure: 'core',
     handler: async (toolArgs) => {
       const name = typeof toolArgs['name'] === 'string' ? toolArgs['name'] : '';
+      opts.exposure?.reveal(name);
       const callArgs = (toolArgs['args'] && typeof toolArgs['args'] === 'object' && !Array.isArray(toolArgs['args']))
         ? (toolArgs['args'] as Record<string, unknown>)
         : {};
@@ -583,7 +601,7 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
   // Exec tools — NO confirm injected (single gate = AgentSession permission engine).
   const exec = createToolExecDispatcher({ cwd: opts.cwd });
   for (const name of ['deckent_read_file', 'deckent_list_dir', 'deckent_grep', 'deckent_glob', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash', 'deckent_git_status', 'deckent_git_log', 'deckent_git_diff', 'deckent_git_add', 'deckent_git_commit'] as const) {
-    registry.register(defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec));
+    registry.register(defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec, 'core'));
   }
 
   // CLI-bridge tools — the FULL dispatchable surface (born-596 TERM-TOOL-PARITY:

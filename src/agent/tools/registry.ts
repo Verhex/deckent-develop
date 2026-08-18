@@ -3,6 +3,7 @@
 // toNativeSchemas() emits the provider tool_use schema list for the loop.
 
 import { validateToolDefinition, type ToolDefinition } from './types.js';
+import type {} from './exposure.js';
 
 export interface NativeToolSchema {
   name: string;
@@ -29,8 +30,9 @@ export class ToolRegistry {
   }
 
   /** Provider-native tool_use schema list (Anthropic/OpenAI-compat shape). */
-  toNativeSchemas(): NativeToolSchema[] {
-    return this.list().map((t) => ({
+  toNativeSchemas(filter?: (def: ToolDefinition) => boolean): NativeToolSchema[] {
+    const definitions = filter ? this.list().filter(filter) : this.list();
+    return definitions.map((t) => ({
       name: t.name,
       description: t.description,
       input_schema: t.inputSchema,

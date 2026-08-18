@@ -43,6 +43,9 @@ export interface AgentSessionDeps {
   getAdapter?: () => ProviderAdapter;
   getModel?: () => string;
   getContextBudgetTokens?: () => number | undefined;
+  /** NT-06 progressive tool surface — per-round provider schema view (loop.ts
+   *  falls back to the full registry when absent). */
+  getProviderToolSchemas?: LoopDeps['getProviderToolSchemas'];
   /** NATIVE-AGENT-HORIZON-001: resolved multi-dimension session budget. */
   nativeBudget?: import('../core/execution-budget-policy.js').ResolvedNativeAgentBudget;
   scratch?: { tenantId: string; projectId: string; sessionId: string; checkpointInstruction: string };
@@ -120,6 +123,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
     ...(deps.getModel ? { getModel: deps.getModel } : {}),
     ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
+    ...(deps.getProviderToolSchemas ? { getProviderToolSchemas: deps.getProviderToolSchemas } : {}),
     getMode: () => mode,
     isCancelled: () => cancelled,
     requestPermission: (req) =>

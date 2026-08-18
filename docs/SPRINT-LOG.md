@@ -13287,3 +13287,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 553-005: correction baseline document (bounded probe task) (NO_GO)
 
 ---
+## Sprint 554 — sprint-554
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 836s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 835698ms |
+
+### Tasks
+
+- 554-001: provider tool-exposure policy + registry surface view (NT-06 core) (DONE)
+- 554-002: loop consumes the exposure view per round (NT-06 wire) (DONE)
+- 554-003: 1000-tool bounded-surface regression (depends on Tasks 1,2) (DONE)
+
+---

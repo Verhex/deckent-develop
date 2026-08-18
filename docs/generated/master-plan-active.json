@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9c8094be62cdd7e5c2baf29fbb4f9a59ec548ba63483c46d62b98015d8d00dbe"
+    "value": "d2d7977f52b3603316fd7cb3ce2c3418eb2ed448016c755c85e0e7faa24e188d"
   },
   "summary": {
-    "total": 498,
-    "active": 434,
+    "total": 500,
+    "active": 436,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 341,
+      "OPEN": 343,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 326,
-      "P1": 135,
+      "P1": 137,
       "P2": 37
     },
     "byProgram": {
@@ -57,9 +57,9 @@
       "SCALE": 1,
       "SECURITY": 8,
       "SURFACE": 1,
-      "TERMINAL": 14,
+      "TERMINAL": 15,
       "TOOL": 1,
-      "TRUTH": 93,
+      "TRUTH": 94,
       "XPLAT": 3
     }
   },
@@ -4725,7 +4725,7 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "9cdcc5427669732ef1027ab51f1e1b6c8c64c0d0dbad46389fa46f2164dc3c75",
-      "progressDigest": "5886eb5b36ea9d20359ab6650865af62b350f414ef81e46903362176da025627",
+      "progressDigest": "0e08e4294f59651221efe66f17a26800caa10e152a1858c8948abba3e7b2b4a8",
       "terminalClosureDigest": null
     },
     {
@@ -4737,6 +4737,28 @@
       "updated": "2026-07-26",
       "definitionDigest": "e1a68ce294446f310a194b7597349af4b2cc1ae1cefd584010ceb8eac30f1bed",
       "progressDigest": "cedd0426f0903a79e7281a69e75045c8ca47ec380b65886ee541ea00bc134cfc",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7081,
+      "id": "XVERIFY-CHANNEL-TRUTH-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "d452038ef69eb4a3a053a22a7234c04534ec2211ca423aee3389e17a1b9e2bf8",
+      "progressDigest": "eb5afc59ea84425aa0c7aa05e299b2e52f30d09b2a7af14a2935bea478dbe608",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7082,
+      "id": "NATIVE-CONTENT-WORKSPACE-001",
+      "program": "TERMINAL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "919e0a1f0f239de8383f65fd2900e1edbec64f7e85ac5cd5480d6185798a3716",
+      "progressDigest": "6295a343be8cd9e96c2080d6119d3101707d6511080199a12c324ff7c8ece444",
       "terminalClosureDigest": null
     },
     {
@@ -21971,6 +21993,8 @@
         "LOCAL-LLM-MODEL-IDENTITY-001",
         "NATIVE-AGENT-HORIZON-001",
         "IDE-ADAPTER-001",
+        "XVERIFY-CHANNEL-TRUTH-001",
+        "NATIVE-CONTENT-WORKSPACE-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -22014,6 +22038,8 @@
         "LOCAL-LLM-MODEL-IDENTITY-001",
         "NATIVE-AGENT-HORIZON-001",
         "IDE-ADAPTER-001",
+        "XVERIFY-CHANNEL-TRUTH-001",
+        "NATIVE-CONTENT-WORKSPACE-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -22826,7 +22852,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Canonical native-agent execution budget mevcut execution_budget mimarisinin typed terminal profile'ı olarak çözülür (maxModelRounds/maxToolCalls/maxWallTimeMs/maxCumulativeTokens/maxNoProgressRounds/checkpointEvery*/outputReserve/safety-reserve; provider-adına hardcode YOK) ve config→resolver→terminal ingress→createNativeEngine→AgentSession→runAgentTurn zinciri canlı çalışır; first-class provider-neutral scratch checkpoint (session-scoped mkdtemp, cross-platform 0700/0600 adapter policy, atomic temp+rename, checksum, containment, bounded crash-recovery) → context-epoch compaction/continuation orphan tool-pairing üretmeden; usage/cost/wall/audit sayaçları ASLA resetlenmez (yalnız model working-context epoch'u yenilenir); local-llm effective context = model metadata × server config × host admission kesişimi, native_context_tokens türetilir, restart-required diagnostics dürüst; permission modes (suggest first-use session-grant, auto-edit, full-auto) direct/nested/MCP paritesiyle tek rule-store tüketir — critical floor (rm -rf, kill/cleanup, force-push, deny-rules, tenant/secret guard) full-auto'da bile ASLA bypass edilmez, her auto-decision audit event'lidir; no-progress/semantic-repeat convergence guard'ı checkpoint+synthesis+bounded-termination üçlemesiyle; tüm reason'lar typed + en/tr i18n; 60+ distinct tool-call'lu fixture final answer'a ulaşır, runaway fixture typed hard-cap'te durur; 17-sınıf hermetic battery + gerçek binary/PTY proof",
-      "evidence": "ACİL ADMISSION (Alperen kararı 2026-08-17 — öncelikli iş ataması; sıra değişmedi, çalışma disiplini/handoff aynı; bitiminde Alperen'e deneme raporu). Kesin RCA (Codex, trace `.deckent/traces/chat-2026-08-17T20-18-15-173Z-e33p9i.jsonl`): DEFAULT_MAX_ITERATIONS=25 (src/agent/guards/recursion.ts) — Qwen 25 round'da 50 FARKLI tool call'la (47 bash + 2 grep + 1 read; byte-identical retry YOK) geniş analizi bitiremeden sabit guard'a çarptı ('recursion limit exceeded', 424s, 17067 tok); maxIterations seam'i LoopDeps→NativeEngineDeps'te VAR ama production ingress run.tsx geçmiyor; execution_budget.roles.worker.maxTurns=100 native loop'a bağlı değil. İkinci bulgu: 99.507 karakterlik user prompt transcriptte AYNI hash'le iki kez (~25k token israfı) — user-resend mi queue/replay mı üretim wiring'inden ayrıştırılacak, deckent-kaynaklıysa exactly-once turn append + trace'e turnId/origin/replayReason. Yalnız 25→100 değişikliği KABUL EDİLMEZ. PACKAGE-1 LANDED (sprint-547 dogfood + Brain el-tamamlaması, Alperen 'finalize edip elle bitirelim' talimatı, 2026-08-18): config-resolved `execution_budget.native_agent` profili (9 bağımsız boyut, bounded deep/extended default'lar: 120 round / 400 call / 45dk / 2M token / 8 no-progress / 20-round+60-call checkpoint kadansı; provider-adına hardcode YOK, loud validation) → loop'ta multi-dimension session budget (typed `native-budget.*` termination kodları; semantic-repeat no-progress guard'ı — distinct çağrılar tetiklemez; sayaçlar session-cumulative, epoch reset ASLA sıfırlamaz; legacy unwired yol byte-identical) → first-class scratch checkpoint (session-scoped mkdtemp, 0700/0600, atomic+checksum, containment, retention-5, keep-for-recovery) + context-epoch compaction (pairing-safe, orphan yok) + exactly-once turn append (turnId/origin; explicit-metadata'lı production yoluna sınırlı) → terminal ingress config→engine wiring + 9 en/tr i18n sinyali. Dogfood kaydı dürüst ABORTED (0/4 — 001 protokol Bash quote bug'ı + 004 bozuk-result-JSON kaynaklı FIX-dispatch stall'ı: iki YENİ bulgu [ölü worker spawnlock'ları bırakıyor + result'a ham kontrol karakteri + dispatch stall]; 003/004 işleri diskteydi, T1/T2 Brain el-koduyla). Kanıt: 63/63 paket bataryası + 228/228 tam agent suite, tsc 0, i18n lint 0, gates exit 0, dist smoke (gerçek config'ten 120/400/45dk çözünürlüğü + iki dilde render). KALAN (package 2): permission-mode closure (suggest/auto-edit/full-auto parity) + local-llm effective-context türetimi + gerçek 50+ tool-call PTY canlı proof — Alperen deneme raporu bu landing'le veriliyor. PACKAGE-2 LANDED (sprint-548 3/4 dogfood-DONE + Brain el-tamamlaması, 2026-08-18): parser-tabanlı shell-risk sınıflandırması (safe-read silent · modify confirm · destructive ALWAYS-floor; compound worst-wins; full-auto'da bile rm -rf sorar) → session/always grant'ları tool-wide '**' (exact-resource pattern bug'ı öldü — onay yağmuru biter) → her promptless karar 'permission-auto-decision' audit event'i → direct/nested/MCP parity testli → local-llm effective-context türetimi (conservative-minimum + provenance + restart-required diagnostics) → derivePromptBudget loop'a wire'landı (%25 taban). CANLI TEST BULGULARI DÜZELTİLDİ: cumulativeTokens quadratic re-count'u fresh-token deltasına geçti (118k-context oturumu 2M'i 17 round'da tüketip session'ı BRICK'liyordu) + %80'de token-pressure checkpoint (epoch compaction hard-stop'tan önce). SPAWN-fazı skill persistence'ı emekli — project-conventions hayaleti kökten kapandı. Kanıt: 343/343 battery + tsc 0 + i18n 0 + gates exit 0 + Sol PRE-COMMIT xverify CONFIRMED ('every authored GO criterion is supported', receipt cross-verify-verdict:sha256:a5ed120b07e62dfd793644a24d79fa0828363fb23765b291283e27c0b0921e01, 70826 gerçek token) — verify-önce-commit disiplininin ilk CONFIRMED'i. NT CORRECTION LEDGER (Codex kapsamlı analiz + Alperen admission 2026-08-18; yeni umbrella YOK — landed package-1/2 evidence'ı production-wiring correction receipt'i bekler, 'scratch wired/effective context live/audit durable/50+ ready' iddiaları gerçek-binary kanıta dek OPEN/HOLD): NT-01/04 tool-result containment yok (tek deckent_models çağrısı 470k karakter, trace u9nzq1) · NT-02 context aritmetiği taşıyor (yaklaşık 118k token tool-result, fitting current-turn'ü küçültemiyor) · NT-03 scratch checkpoint production'da DEAD WIRE (bridge createAgentSession'a scratch vermiyor) · NT-05 CLI/bash exit-code'suz ok:true · NT-06 progressive disclosure sahte (46+ şema her round) · NT-07 effective-context/identity diagnostics boot'ta çağrılmıyor · NT-08 output ceiling request'e gitmiyor · NT-09 /resume gerçek hydrate değil · NT-10 interrupt stream/subprocess'i durdurmuyor · NT-11 permission authority parçalı · NT-12 auto-decision audit durable değil · NT-13 trace config-authority ihlali (DECKENT_TRACE default-on, 187MB, 0644). 9-paket delivery planı mevcut owner-outcome'lara bağlanır (TERMINAL-TOOLS/SURFACE-CONTRACT/PROVIDER-CONNECTION/APPROVAL/MCP-TRUST/CONVERSATION-RUN/APP-SERVICE/TRAINING-TRACE/TERMINAL-REPL) — ana talimat: önce NT-01..NT-12 correction'ı, containment+scratch-wire+admission gerçek Qwen/PTY kanıtı vermeden UX'e geçilmez. KALAN: gerçek 50+ tool-call canlı PTY proof'u (Alperen deneme turu) SPRINT-553 NT-CORE LANDED (dogfood 2/5 + Brain el-tamamlaması, run dürüst ABORTED; Alperen '553 kalanlarını elle işle' talimatı, 2026-08-18): NT-01/04/05 tool-result-broker chokepoint (contain+render ≤64KB, exit-code truth, injected content-store, iki dispatcher route'lu) · NT-02/08 hard per-request admission (typed `native-context.admission-denied`, checkpoint-first) + `outputCeilingTokens`→max_tokens · NT-03 scratch production wire (run.tsx identity → bridge checkpointInstruction → createAgentSession; teardown close + 10dk recovery window) · NT-12 auto-decision durable audit (writeAuditEvent 'repl' partition) · NT-13 trace config-authority (resolveTraceEnabled: training_trace.enabled tek ON authority'si, DECKENT_TRACE yalnız OFF zorlar; 0600) · NT-07 production getter wiring (boot contextStatus + switch re-probe). FULL-CONTEXT AUTHORITY (Alperen 2026-08-18 'modelin elverdiği tam contexti kullanalım'): resolveContextBudgetTokens registry model-advertised window'u ceiling alır (opus/sonnet/fable = 1M, dist-smoke kanıtlı), config yalnız daraltır; global native_context_tokens=118000 knob'u kaldırıldı; Transcript safety-net 500k→4M. KISIT GEVŞETME (Alperen 'time kısıtlarını kaldıralım'): worker maxTokens 8M→40M, maxCacheReadTokens 10M→60M, maxTurns 100→300, docker_timeout 2700→7200, final_only_usage 1800→7200 (553-002'yi SIGKILL'leyen 1.967.550-remaining sınıfı kapandı). Qwen-incident deterministik regression fixture (sentetik 470.325+474.380 shape; containment-bounded request + typed denial) + landing-proposal brace-free protokol fix'i ve regression'ı + correction baseline dokümanı (docs/audits/native-terminal-correction-baseline-2026-08-18.md). Kanıt: 639 scoped test yeşil (392 agent + 120 cli + 127 orchestra), tsc 0, build yeşil, dist smoke (1M context + 40M budget gerçek config'ten çözüldü). BULGULAR: finalize ölü worker'ı 'sonlandırılamadı' sayıp terminal HOLD atıyor (worker-not-found terminated sayılmalı; el-settlement gerekti) · createDefaultConfig registry'de hardcoded models literal'i (KANUN 10 sınıfı; workaround authored providers.registry). KALAN: gerçek 50+ tool-call canlı PTY proof'u (Alperen deneme turu) + NT-06/09/10/11 paketleri PRE-COMMIT XVERIFY DURUMU (2026-08-18): üç dürüst Sol denemesi typed UNCLEAR/HOLD — (a) receipt `cross-verify-verdict:sha256:abf3ce5b099be719f949237d17c70c59c11408e85687cb26baacb4ceeadbd73c` (v2 yanıtı null-parse, 75.686 token), (b) `…852d1c6e2bf21bca6d7a905853436b6006b94ca6fc04cd38b72ffbefe0beb3bd` (runtime-davranış iddiası host-bound kanıttan undecidable — iddia-tasarım dersi, 68.946 token), (c) `…ab96d8cacc15e8a0778290157bec3033defc5703cdfc055c3b79d176f4a99575` (verifier missing-evidence haritası host'ça inaccurate, 69.563 token); HOLD kapanış DEĞİLDİR — landing kanıtı makine-gate zinciridir (639 test + tsc 0 + build + gates exit 0 + dist smoke). XVERIFY-KANAL BULGULARI (owner admission bekler): approval-pending'de --timeout uygulanmıyor + typed bekleme sinyali yok (sessiz süresiz blok) · null-parse'ta ham provider çıktısı persist edilmiyor (debug kanıtı kayboluyor) · adjudication per-assertion breakdown persist edilmiyor (hangi iddia undecidable görünmüyor)",
+      "evidence": "ACİL ADMISSION (Alperen kararı 2026-08-17 — öncelikli iş ataması; sıra değişmedi, çalışma disiplini/handoff aynı; bitiminde Alperen'e deneme raporu). Kesin RCA (Codex, trace `.deckent/traces/chat-2026-08-17T20-18-15-173Z-e33p9i.jsonl`): DEFAULT_MAX_ITERATIONS=25 (src/agent/guards/recursion.ts) — Qwen 25 round'da 50 FARKLI tool call'la (47 bash + 2 grep + 1 read; byte-identical retry YOK) geniş analizi bitiremeden sabit guard'a çarptı ('recursion limit exceeded', 424s, 17067 tok); maxIterations seam'i LoopDeps→NativeEngineDeps'te VAR ama production ingress run.tsx geçmiyor; execution_budget.roles.worker.maxTurns=100 native loop'a bağlı değil. İkinci bulgu: 99.507 karakterlik user prompt transcriptte AYNI hash'le iki kez (~25k token israfı) — user-resend mi queue/replay mı üretim wiring'inden ayrıştırılacak, deckent-kaynaklıysa exactly-once turn append + trace'e turnId/origin/replayReason. Yalnız 25→100 değişikliği KABUL EDİLMEZ. PACKAGE-1 LANDED (sprint-547 dogfood + Brain el-tamamlaması, Alperen 'finalize edip elle bitirelim' talimatı, 2026-08-18): config-resolved `execution_budget.native_agent` profili (9 bağımsız boyut, bounded deep/extended default'lar: 120 round / 400 call / 45dk / 2M token / 8 no-progress / 20-round+60-call checkpoint kadansı; provider-adına hardcode YOK, loud validation) → loop'ta multi-dimension session budget (typed `native-budget.*` termination kodları; semantic-repeat no-progress guard'ı — distinct çağrılar tetiklemez; sayaçlar session-cumulative, epoch reset ASLA sıfırlamaz; legacy unwired yol byte-identical) → first-class scratch checkpoint (session-scoped mkdtemp, 0700/0600, atomic+checksum, containment, retention-5, keep-for-recovery) + context-epoch compaction (pairing-safe, orphan yok) + exactly-once turn append (turnId/origin; explicit-metadata'lı production yoluna sınırlı) → terminal ingress config→engine wiring + 9 en/tr i18n sinyali. Dogfood kaydı dürüst ABORTED (0/4 — 001 protokol Bash quote bug'ı + 004 bozuk-result-JSON kaynaklı FIX-dispatch stall'ı: iki YENİ bulgu [ölü worker spawnlock'ları bırakıyor + result'a ham kontrol karakteri + dispatch stall]; 003/004 işleri diskteydi, T1/T2 Brain el-koduyla). Kanıt: 63/63 paket bataryası + 228/228 tam agent suite, tsc 0, i18n lint 0, gates exit 0, dist smoke (gerçek config'ten 120/400/45dk çözünürlüğü + iki dilde render). KALAN (package 2): permission-mode closure (suggest/auto-edit/full-auto parity) + local-llm effective-context türetimi + gerçek 50+ tool-call PTY canlı proof — Alperen deneme raporu bu landing'le veriliyor. PACKAGE-2 LANDED (sprint-548 3/4 dogfood-DONE + Brain el-tamamlaması, 2026-08-18): parser-tabanlı shell-risk sınıflandırması (safe-read silent · modify confirm · destructive ALWAYS-floor; compound worst-wins; full-auto'da bile rm -rf sorar) → session/always grant'ları tool-wide '**' (exact-resource pattern bug'ı öldü — onay yağmuru biter) → her promptless karar 'permission-auto-decision' audit event'i → direct/nested/MCP parity testli → local-llm effective-context türetimi (conservative-minimum + provenance + restart-required diagnostics) → derivePromptBudget loop'a wire'landı (%25 taban). CANLI TEST BULGULARI DÜZELTİLDİ: cumulativeTokens quadratic re-count'u fresh-token deltasına geçti (118k-context oturumu 2M'i 17 round'da tüketip session'ı BRICK'liyordu) + %80'de token-pressure checkpoint (epoch compaction hard-stop'tan önce). SPAWN-fazı skill persistence'ı emekli — project-conventions hayaleti kökten kapandı. Kanıt: 343/343 battery + tsc 0 + i18n 0 + gates exit 0 + Sol PRE-COMMIT xverify CONFIRMED ('every authored GO criterion is supported', receipt cross-verify-verdict:sha256:a5ed120b07e62dfd793644a24d79fa0828363fb23765b291283e27c0b0921e01, 70826 gerçek token) — verify-önce-commit disiplininin ilk CONFIRMED'i. NT CORRECTION LEDGER (Codex kapsamlı analiz + Alperen admission 2026-08-18; yeni umbrella YOK — landed package-1/2 evidence'ı production-wiring correction receipt'i bekler, 'scratch wired/effective context live/audit durable/50+ ready' iddiaları gerçek-binary kanıta dek OPEN/HOLD): NT-01/04 tool-result containment yok (tek deckent_models çağrısı 470k karakter, trace u9nzq1) · NT-02 context aritmetiği taşıyor (yaklaşık 118k token tool-result, fitting current-turn'ü küçültemiyor) · NT-03 scratch checkpoint production'da DEAD WIRE (bridge createAgentSession'a scratch vermiyor) · NT-05 CLI/bash exit-code'suz ok:true · NT-06 progressive disclosure sahte (46+ şema her round) · NT-07 effective-context/identity diagnostics boot'ta çağrılmıyor · NT-08 output ceiling request'e gitmiyor · NT-09 /resume gerçek hydrate değil · NT-10 interrupt stream/subprocess'i durdurmuyor · NT-11 permission authority parçalı · NT-12 auto-decision audit durable değil · NT-13 trace config-authority ihlali (DECKENT_TRACE default-on, 187MB, 0644). 9-paket delivery planı mevcut owner-outcome'lara bağlanır (TERMINAL-TOOLS/SURFACE-CONTRACT/PROVIDER-CONNECTION/APPROVAL/MCP-TRUST/CONVERSATION-RUN/APP-SERVICE/TRAINING-TRACE/TERMINAL-REPL) — ana talimat: önce NT-01..NT-12 correction'ı, containment+scratch-wire+admission gerçek Qwen/PTY kanıtı vermeden UX'e geçilmez. KALAN: gerçek 50+ tool-call canlı PTY proof'u (Alperen deneme turu) SPRINT-553 NT-CORE LANDED (dogfood 2/5 + Brain el-tamamlaması, run dürüst ABORTED; Alperen '553 kalanlarını elle işle' talimatı, 2026-08-18): NT-01/04/05 tool-result-broker chokepoint (contain+render ≤64KB, exit-code truth, injected content-store, iki dispatcher route'lu) · NT-02/08 hard per-request admission (typed `native-context.admission-denied`, checkpoint-first) + `outputCeilingTokens`→max_tokens · NT-03 scratch production wire (run.tsx identity → bridge checkpointInstruction → createAgentSession; teardown close + 10dk recovery window) · NT-12 auto-decision durable audit (writeAuditEvent 'repl' partition) · NT-13 trace config-authority (resolveTraceEnabled: training_trace.enabled tek ON authority'si, DECKENT_TRACE yalnız OFF zorlar; 0600) · NT-07 production getter wiring (boot contextStatus + switch re-probe). FULL-CONTEXT AUTHORITY (Alperen 2026-08-18): registry model-advertised window = ceiling (opus/sonnet/fable 1M, dist-smoke), config yalnız daraltır; 118k knob kaldırıldı; Transcript safety-net 500k→4M. KISIT GEVŞETME (Alperen): worker 8M→40M / cacheRead 10M→60M / turns 100→300 / docker+final-only 7200s (553-002 SIGKILL sınıfı kapandı). Qwen-incident deterministik regression fixture (sentetik 470.325+474.380 shape) + landing-proposal brace-free fix+regression + baseline dokümanı (docs/audits/native-terminal-correction-baseline-2026-08-18.md). Kanıt: 639 scoped test yeşil (392 agent + 120 cli + 127 orchestra), tsc 0, build yeşil, dist smoke (1M context + 40M budget gerçek config'ten çözüldü). BULGULAR: finalize ölü worker'ı 'sonlandırılamadı' sayıp terminal HOLD atıyor (worker-not-found terminated sayılmalı; el-settlement gerekti) · createDefaultConfig registry'de hardcoded models literal'i (KANUN 10 sınıfı; workaround authored providers.registry). KALAN: gerçek 50+ tool-call canlı PTY proof'u (Alperen deneme turu) + NT-06/09/10/11 paketleri PRE-COMMIT XVERIFY DURUMU (2026-08-18): üç dürüst Sol denemesi typed UNCLEAR/HOLD — (a) receipt `cross-verify-verdict:sha256:abf3ce5b099be719f949237d17c70c59c11408e85687cb26baacb4ceeadbd73c` (v2 yanıtı null-parse, 75.686 token), (b) `…852d1c6e2bf21bca6d7a905853436b6006b94ca6fc04cd38b72ffbefe0beb3bd` (runtime-davranış iddiası host-bound kanıttan undecidable — iddia-tasarım dersi, 68.946 token), (c) `…ab96d8cacc15e8a0778290157bec3033defc5703cdfc055c3b79d176f4a99575` (verifier missing-evidence haritası host'ça inaccurate, 69.563 token); HOLD kapanış DEĞİLDİR — landing kanıtı makine-gate zinciridir (639 test + tsc 0 + build + gates exit 0 + dist smoke). XVERIFY-KANAL BULGULARI (owner admission bekler): approval-pending'de --timeout uygulanmıyor + typed bekleme sinyali yok (sessiz süresiz blok) · null-parse'ta ham provider çıktısı persist edilmiyor (debug kanıtı kayboluyor) · adjudication per-assertion breakdown persist edilmiyor (hangi iddia undecidable görünmüyor) SPRINT-554 NT-06 LANDED (3/3 multi-provider dogfood — owner tier-direktifiyle düzeltilmiş atamalar: 001 exposure-core=sol DONE · 002 loop-wire=opus GO_WITH_TECH_DEBT · 003 scale-fixture=sonnet DONE — + Brain el-kapaması, 2026-08-18): gerçek progressive disclosure `tool_surface.progressive===true` fail-closed flag'i arkasında — ToolDefinition `exposure: core/discoverable` kaynak-deklarasyonu, session-sticky monotonic ToolExposure view (reveal idempotent, unknown typed no-op), describe/call reveal → sonraki round şeması, search bounded+cursor; loop yalnız `getProviderToolSchemas` getter'ını tüketir (exposure semantiği öğrenmez), NT-02 admission küçük listeyi otomatik fiyatlar; 002'nin dürüst scope-gap tech-debt'i (session.ts passthrough) Brain el-koduyla kapandı — bridge artık `createAgentSession`'a exposure-filtreli getter'ı geçiyor, production zinciri config→bridge→session→loop KAPALI. Kanıt: 388/51 battery (tool-exposure 9 + loop-exposure-wire 4 + tool-surface-scale 3 dahil; 1000-tool katalogda round-1 eager şema baytı ≥10x küçük, named-constant baseline), tsc 0, build yeşil, gates exit 0, dist smoke (round1 yalnız core → reveal → round2 büyür → flag-off tam yüzey). BULGU (7081 sınıfına ek kanıt): finalize 3/3-complete run'ı yine ABORTED etiketledi (orphan-settlement) · structured planner task dependency'yi title'dan parse etmiyor (elle bağlandı). Default flip AYRI karar — flag-gated doğrula-sonra-default kuralı gereği canlı PTY kanıtından sonra owner onayıyla NT-06 pre-commit xverify: tek dürüst Sol denemesi typed UNCLEAR/HOLD — receipt `cross-verify-verdict:sha256:e3276ca1dfeb5170a3a7245344a2e6c3e63a6f032df4c175b1f558fad6a98202` (68.753 token; 7081'deki 'inaccurate missing-evidence map' kanal sınıfının 4. örneği — kanal onarımı 7081'de owner-onaylı sonraki-sprint işi); landing kanıtı makine-gate zinciri",
       "updated": "2026-08-18"
     },
     {
@@ -22866,6 +22892,70 @@
       "acceptance": "Thin adapters, no second engine; capability matrix and honest support lifecycle",
       "evidence": "Legacy 64; native Deckent remains primary",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 7081,
+      "id": "XVERIFY-CHANNEL-TRUTH-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TRUTH",
+      "outcome": "XVerify kanal + finalize settlement doğruluk düzeltmeleri (owner-admitted bulgu paketi)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "XVerify CLI approval-pending durumda typed `waiting-approval:<id>` sinyali basar ve `--timeout` approval-bekleme fazında da uygulanır (sessiz süresiz blok ölür); adjudication yanıtı şema-reject olduğunda ham provider çıktısı durable persist edilir (debug/audit kanıtı kaybolmaz); adjudication sonucu per-assertion breakdown (supported/contradicted/undecidable + missing-evidence map) persist + raporlanır; sprint finalize worker-not-found'u already-terminated sayar (var olmayan process 'sonlandırılamadı' HOLD'u ölür); xverify twin task'ları verdict settle olduğunda terminal receipt alır (clean-gate PENDING artığı bırakmaz); dördü de regression-testli + gerçek CLI kanıtı",
+      "evidence": "Owner admission: Alperen 2026-08-18 'bulgularında düzeltme izni verildi sonraki sprintte ele alınsın' — NT-06 sprint'inden SONRAKİ sprint; kaynak kanıt: 7078 satırındaki üç HOLD receipt + 2026-08-18 el-settlement",
+      "updated": "2026-08-18"
+    },
+    {
+      "order": 7082,
+      "id": "NATIVE-CONTENT-WORKSPACE-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "Native chat global content workspace — `~/.deckent/tmp` session-foldered spill/scratch alanı + contentRef read-back (owner direktifi)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Native chat her oturum için GLOBAL deckent home altında (repo DIŞI) tenant/project/session-foldered bir workspace açar (0700/0600, atomic write); tool-result spill (contentRef), scratch checkpoint ve görünmez-yüzey authoring (DIRECTIVES-tarzı) TEK workspace authority'sinden yürür; model contentRef'i range-read ile geri OKUYABİLİR (offset/limit; tam içerik hiçbir zaman tek seferde context'e dönmez); bağlam takibi: workspace index'i oturumun ne yazdığını/sildiğini izler, retention/GC policy config-resolved (sınırsız birikme yok, kill-sonrası bounded recovery penceresi); typed denial YALNIZ son çare olur: spill → range-read → epoch compaction zinciri tüketilmeden istek reddedilmez; cross-platform path adapter (Law 2) + hermetic battery + gerçek-binary chat kanıtı",
+      "evidence": "Owner direktifi (Alperen 2026-08-18): 'deckent native chat tmp folder açıp kullansın global .deckent/tmp klasöründe... bağlamını takip ederek oraya yazıp silebilir, kullanıcıya kusursuz UI deneyimi' — Claude Code/Codex spill+range-read+auto-compact deseninin deckent productization'ı; 553'ün containToolResult/contentRef mekanizması producer'dır, bu satır consumer/workspace authority'sini kapatır; sıra: 7081 ile aynı sonraki-sprint dalgası",
+      "updated": "2026-08-18"
     },
     {
       "order": 7090,
@@ -25735,6 +25825,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "29b402bc7f2bc498fd36ec20c5590459b231ff108b466e9a3b5b23e7f375179f"
+    "value": "73fe7c57d9d501153c50da9fea16004dacbf37a3981b11301188c69d24c5e553"
   }
 }

@@ -350,8 +350,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // native-agent-scratch-wire and qwen-incident-regression suites plus their
   // import closures enter the graph; loop/transcript/native-transport/run.tsx/
   // bridge/trace-wire/landing-proposal changed content.
-  count: 14365,
-  digest: '502c95efca1c840b5779330fb336b5027a449ec0a72a14bb2f9056162db12281',
+  // 2026-08-18 (NT-06 progressive tool surface, sprint-554): +1 net —
+  // tool-exposure, loop-exposure-wire and tool-surface-scale suites plus the
+  // exposure module enter the graph; loop/session/bridge/registry changed content.
+  count: 14366,
+  digest: '336563c96fdfaaf233b7454350e2a7f515db52e7ba1698e92b1631f6544a7e2b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -571,8 +574,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // src/agent/tool-result-broker.ts enters the inventory; loop/transcript/
   // native-transport/run.tsx/bridge/trace-wire/chat-tool-exec/chat-tool-bridge
   // production hashes moved.
-  count: 1249,
-  digest: '18df42a8976d3d2f9806742d7bb90fb26d3e886e22135d61f576e8b85ccf1e6e',
+  // 2026-08-18 (NT-06, sprint-554): +1 — src/agent/tools/exposure.ts enters the
+  // inventory; loop/session/bridge/registry production hashes moved.
+  count: 1250,
+  digest: 'c6eada96c76ca90e801f77ada9d93774eb44bd6e1a36a17702b507ce4502ec5c',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

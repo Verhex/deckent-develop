@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):9c8094be62cdd7e5c2baf29fbb4f9a59ec548ba63483c46d62b98015d8d00dbe`
+**Source digest:** `sha256(normalized-lf-utf8):d2d7977f52b3603316fd7cb3ce2c3418eb2ed448016c755c85e0e7faa24e188d`
 
-**Rows:** 498 total · 434 active · 64 terminal
+**Rows:** 500 total · 436 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 341 |
+| OPEN | 343 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -392,6 +392,8 @@
 | 7077 | `LOCAL-LLM-MODEL-IDENTITY-001` | OPEN | P0 | PROVIDER | `OWNER-MODEL-POLICY-001` | — | Native terminal ↔ local-llm model identity — exact, discoverable, validated ve lifecycle-tutarlı |
 | 7078 | `NATIVE-AGENT-HORIZON-001` | OPEN | P0 | TERMINAL | `LOCAL-LLM-MODEL-IDENTITY-001` | — | Native terminal agent loop'una enterprise-grade long-horizon kapasite — config-resolved budget, scratch checkpoint/context-epoch continuation, permission-mode closure |
 | 7080 | `IDE-ADAPTER-001` | OPEN | P2 | SURFACE | `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | VS Code, JetBrains and future IDE adapters as non-canonical clients |
+| 7081 | `XVERIFY-CHANNEL-TRUTH-001` | OPEN | P1 | TRUTH | — | — | XVerify kanal + finalize settlement doğruluk düzeltmeleri (owner-admitted bulgu paketi) |
+| 7082 | `NATIVE-CONTENT-WORKSPACE-001` | OPEN | P1 | TERMINAL | — | — | Native chat global content workspace — `~/.deckent/tmp` session-foldered spill/scratch alanı + contentRef read-back (owner direktifi) |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
