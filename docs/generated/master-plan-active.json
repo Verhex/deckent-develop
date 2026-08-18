@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9130a800a2392dd974dec332b0ad78f01e98172e772f6e57b299f38006f3880a"
+    "value": "4440b7a56504b454939054394d00c6d311c11443d5b68c6e6dda2c5ce1bc73df"
   },
   "summary": {
     "total": 504,
@@ -4791,7 +4791,7 @@
       "state": "OPEN",
       "updated": "2026-08-18",
       "definitionDigest": "ab74f09d8694e3f40f781d46ca2e02f8c427331cfbfa8e4c3013307972f6ba7f",
-      "progressDigest": "4077738462f0242270539db87e32a45335a0b6a7a08170284ec5d4b76aaf96ed",
+      "progressDigest": "a08f7aa5108abdd5c1e0459b233e97a8924eb17f9a63f54a1b1d5ef0d693dac2",
       "terminalClosureDigest": null
     },
     {
@@ -23102,7 +23102,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Dil authority'si tek zincirden çözülür (config `language` → env → fallback) ve HER CLI komutu + MCP tool açıklaması/çıktısı seçili dile sadıktır — canlı bulgu sınıfı ölür: `DECKENT_LANG=en` altında Türkçe status, `xverify --help` İngilizce iken kardeş helplerin Türkçe olması; help/description kataloğu tek kaynaktan iki dilli üretilir (commander description'ları getMessage'a bağlanır, hardcode taranır + lint'e girer); insan-vs-makine çıktı sözleşmesi: `--json` bayraklı her komutta stdout YALNIZ parse-edilebilir tek JSON dokümanıdır (progress/uyarı stderr'e), insan modunda tablo/renk serbest — 556'nın xverify stderr-ayrımı pattern'i yüzey geneline; kapsam envanteri + hermetic battery + gerçek-binary iki dilde smoke; MCP tool description'ları aynı katalogdan (CLI-MCP parity lint mevcut genişler)",
-      "evidence": "Owner admission + ÖNE ALMA (Alperen 2026-08-18): 'clide bir hata varsa veya eksik sende deckenti yanlış kullanır veya anlarsın' — AI-operatör CLI'ı yanlış anlarsa deckent'i yanlış kullanır; sıra: 7082'den ÖNCE, 7083 landing'inin hemen ardından; mevcut ilişkili satırlar 500/505 (I18N-SURFACE, runtime catalog) bu satırın authority tabanıdır, çakışma değil — 7085 CLI/MCP yüzey sözleşmesini kapatır, 505 katalog altyapısını. LANDED (sprint-558 ABORTED→559 replan, 2026-08-18): (1) TEK canonical `resolveLanguage` zinciri DECKENT_LANGUAGE > DECKENT_LANG > config > LC_ALL > LANG > en — 5 bağımsız çözücü tasfiye (getLanguage/getLangFromConfig/getLangFromRoot delege, init-wizard detectSystemLanguage delege el-tamamlama); (2) 173 hardcode commander description → getMessage, 180 yeni `cli.*.desc` en+tr çifti + 7 açıklamasız gateway komutu dolduruldu + finalize/memory hardcode-'en' bug'ları öldü (559-002 DONE, byte-parity HEAD kanıtlı); (3) --json sözleşmesi: 11 dosyada 29 stdout sızıntısı → 0, allowlist'siz mekanik tarayıcı + 15 test, şema yalnız additive (559-003; 3 komşu-test bloklayıcı el-tamamlama: retro-json stderr hizası + 2 mock getLanguage + resetAllMocks tuzağı); (4) MCP 51/51 tool-level description aynı katalogdan fail-closed resolver'la (description-catalog.ts, 559-004; borç: 200 field-level .describe sayımlı); (5) lint-i18n-hardcode + lint-cli-mcp-parity genişledi, gerçek-repo exit 0 (559-005); (6) tek-nokta hermetik battery: tüm komut ağacı en+tr çift taraması + temsilci help iki dilde + DECKENT_LANG alias byte-eş + json dil-bağımsız (559-006). Gerçek-binary smoke: TR/EN status help sadık, DECKENT_LANG=en xverify EN, TR xverify TR, status/history --json tek geçerli JSON. Run-defteri: 558+559 ABORTED (honest-gate WORK_ATTRIBUTION_HOLD — paylaşımlı-ağaç kirliliği; kod gerçeği yeşil, ders 15/16 playbook'ta). Kalan borç sayımlı: 382 CLI .option() + 200 MCP field-level description ayrı paket",
+      "evidence": "Owner admission + ÖNE ALMA (Alperen 2026-08-18): 'clide bir hata varsa veya eksik sende deckenti yanlış kullanır veya anlarsın' — AI-operatör CLI'ı yanlış anlarsa deckent'i yanlış kullanır; sıra: 7082'den ÖNCE, 7083 landing'inin hemen ardından; mevcut ilişkili satırlar 500/505 (I18N-SURFACE, runtime catalog) bu satırın authority tabanıdır, çakışma değil — 7085 CLI/MCP yüzey sözleşmesini kapatır, 505 katalog altyapısını. LANDED (sprint-558 ABORTED→559 replan, 2026-08-18): (1) TEK canonical `resolveLanguage` zinciri DECKENT_LANGUAGE > DECKENT_LANG > config > LC_ALL > LANG > en — 5 bağımsız çözücü tasfiye (getLanguage/getLangFromConfig/getLangFromRoot delege, init-wizard detectSystemLanguage delege el-tamamlama); (2) 173 hardcode commander description → getMessage, 180 yeni `cli.*.desc` en+tr çifti + 7 açıklamasız gateway komutu dolduruldu + finalize/memory hardcode-'en' bug'ları öldü (559-002 DONE, byte-parity HEAD kanıtlı); (3) --json sözleşmesi: 11 dosyada 29 stdout sızıntısı → 0, allowlist'siz mekanik tarayıcı + 15 test, şema yalnız additive (559-003; 3 komşu-test bloklayıcı el-tamamlama: retro-json stderr hizası + 2 mock getLanguage + resetAllMocks tuzağı); (4) MCP 51/51 tool-level description aynı katalogdan fail-closed resolver'la (description-catalog.ts, 559-004; borç: 200 field-level .describe sayımlı); (5) lint-i18n-hardcode + lint-cli-mcp-parity genişledi, gerçek-repo exit 0 (559-005); (6) tek-nokta hermetik battery: tüm komut ağacı en+tr çift taraması + temsilci help iki dilde + DECKENT_LANG alias byte-eş + json dil-bağımsız (559-006). Gerçek-binary smoke: TR/EN status help sadık, DECKENT_LANG=en xverify EN, TR xverify TR, status/history --json tek geçerli JSON. Run-defteri: 558+559 ABORTED (honest-gate WORK_ATTRIBUTION_HOLD — paylaşımlı-ağaç kirliliği; kod gerçeği yeşil, ders 15/16 playbook'ta). Kalan borç sayımlı: 382 CLI .option() + 200 MCP field-level description ayrı paket. Landed-verify Sol kompozisyonu 2/2 CONFIRMED/ALLOW (commit 7d26520f2 sonrası): A dil-authority zinciri + delegasyonlar `cross-verify-verdict:sha256:6e02cfa7…`, B json-stderr sözleşmesi + MCP tek-katalog bağlaması `cross-verify-verdict:sha256:379e1ad1…` (gerçek Sol çağrıları, typed-host-adjudicated). İki iddia-yazım dersi kanıtla: commit-kimliği iddiaya gömülmez ve evrensel-yokluk xverify işi değildir — ikisi de önce UNCLEAR üretti, davranış iddiaları destekliyken",
       "updated": "2026-08-18"
     },
     {
@@ -26005,6 +26005,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "c3b5f660758fdf9e174f334609f807362323a79aea3bb5a81b687a2650be2d2f"
+    "value": "3d96ab53a4c2a69e0551f4e4cee7519bb6b2f9840fa8933c8d17a579770c0aae"
   }
 }
