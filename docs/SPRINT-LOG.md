@@ -13470,3 +13470,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 562-003: Typed UX + i18n + incident battery (depends on Task 1, Task 2) (DONE)
 
 ---
+## Sprint 563 — sprint-563
+
+**Status:** ABORTED
+**Date:** 2026-08-18
+**Duration:** 2212s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 2211720ms |
+
+### Tasks
+
+- 563-001: User-facing bayat-ADR temizliği (katalog + option açıklamaları) (DONE)
+- 563-002-fix-fix: Fix: Fix: `web` komutunun kaldırılması (kanıtlı-deprecated) (PAUSED)
+- 563-002-fix: Fix: `web` komutunun kaldırılması (kanıtlı-deprecated) (NO_GO)
+- 563-002: `web` komutunun kaldırılması (kanıtlı-deprecated) (NO_GO)
+- 563-003: Ratchet lint + yüzey battery (depends on Task 1, Task 2) (DONE)
+
+---

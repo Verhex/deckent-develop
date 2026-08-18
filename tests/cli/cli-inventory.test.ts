@@ -62,7 +62,7 @@ describe('CLI command inventory', () => {
     'init', 'start', 'plan', 'status', 'attach', 'spawn', 'kill',
     'retro', 'cleanup', 'doctor', 'config', 'history', 'plugin',
     'upgrade', 'onboard', 'analyze', 'archive-debt', 'dashboard',
-    'serve', 'web', 'sync', 'watch', 'run', 'test', 'agent',
+    'serve', 'sync', 'watch', 'run', 'test', 'agent',
     'skill', 'review', 'finalize', 'explain', 'set-directives',
     'heartbeat', 'checkpoint', 'docs', 'output', 'cost', 'recall',
     'remember', 'memory', 'resume', 'nervous',

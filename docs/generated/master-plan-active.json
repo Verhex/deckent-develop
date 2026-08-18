@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b600dedf1a2dd5f7ccd2c21e6427c94efce37092577ee079c8baf80b394ec253"
+    "value": "9dec31184d044c1bb08766e026f673a9b5aa1e55e452363f6ace4576a498ad70"
   },
   "summary": {
-    "total": 505,
-    "active": 441,
+    "total": 506,
+    "active": 442,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 348,
+      "OPEN": 349,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 330,
+      "P0": 331,
       "P1": 138,
       "P2": 37
     },
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 8,
       "SURFACE": 1,
-      "TERMINAL": 19,
+      "TERMINAL": 20,
       "TOOL": 1,
       "TRUTH": 95,
       "XPLAT": 3
@@ -4814,6 +4814,17 @@
       "updated": "2026-08-18",
       "definitionDigest": "b782179ff92aa3aa97c2e570e9b1a5bbf6dae19cfb73ddf7667697c72a369f4b",
       "progressDigest": "37ed506f33dcb776cf7ee4db3dac47597f5a67967a640e481d7e2ae3c1f24e36",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7088,
+      "id": "CLI-SURFACE-CONSOLIDATION-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-18",
+      "definitionDigest": "97d885b067c8b8e3f78d8f74544c959a777c272da17850da1a7efcb8d5125ec7",
+      "progressDigest": "a84a6b01fd9022bc141e2c12b1f85be883fedec7c2ea8d22117918c2e3ef61b7",
       "terminalClosureDigest": null
     },
     {
@@ -22053,6 +22064,7 @@
         "NATIVE-RUNFLOW-BOOTSTRAP-001",
         "CLOSURE-OS-TRANSITION-TRUTH-001",
         "CLI-SURFACE-TRUTH-001",
+        "CLI-SURFACE-CONSOLIDATION-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -22101,6 +22113,7 @@
         "NATIVE-RUNFLOW-BOOTSTRAP-001",
         "CLOSURE-OS-TRANSITION-TRUTH-001",
         "CLI-SURFACE-TRUTH-001",
+        "CLI-SURFACE-CONSOLIDATION-001",
         "ORPHAN-WIRE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
@@ -23094,7 +23107,9 @@
       "outcome": "CLI+MCP yüzey doğruluğu — komut açıklamaları tr/en dil seçimine sadık, insan-vs-JSON çıktı ayrımı sözleşmeli (owner öne-alma)",
       "priority": "P0",
       "dependsOn": [],
-      "dependents": [],
+      "dependents": [
+        "CLI-SURFACE-CONSOLIDATION-001"
+      ],
       "children": [],
       "gates": [
         "G1",
@@ -23186,6 +23201,42 @@
       "evidenceReceipts": [],
       "acceptance": "Küçük @ref inline kalır (hız); toplam expansion ölçülen efektif bütçeyi aşınca otomatik tool-mediated moda düşer (REDDETME değil): prompt'a yalnız referans-descriptor'ları + 'read aracıyla parçalı oku' yönergesi girer; deckent_read_file offset/limit (satır-aralığı) destekler — 131K pencereli lokal model 1.2MB MASTER'ı 20 parçada okuyabilir; typed bilgilendirme (mevcut REFERENCE_EXPANSION sınıfı) en+tr; incident-şekilli battery: 149,503-token 3-dosya şekli artık overflow-ret DEĞİL akıcı araçlı-okuma turu üretir",
       "evidence": "Owner admission + onay 2026-08-18 (canlı incident: `selam` ✓ sonrası 3-doküman @ref → INPUT_CONTEXT_OVERFLOW measured=149503 available=126976 — koruma DOĞRU çalıştı, davranış eksik: Claude Code dosyayı gömmez, model tool'la kendisi okur; context ≠ çalışma seti; orchestration tarafı zaten böyle — kırık tek yüzey native @ref full-inline). Ek bulgu aynı turdan: native render'da markdown tablo hizalaması bozuk (ayrı satır adayı). LANDED (sprint-562, 2026-08-18 — 3/3 logical task, finalize retro-adımı yine TERMINAL_EVIDENCE_HOLD [bulgu #2 örneği]): (1) `expandAtRefs` bütçe-bilinçli — opsiyonel expansionBudgetChars; bütçesiz yol byte-identical (pinli); sığmayan referans `[@ref-descriptor] path — bytes, lines, sha256:… — read it in slices` protokol satırına düşer; typed lineage (mode/digest/bytes/lines); app.tsx bütçeyi GERÇEK authority'den türetir (engine.getContextBudgetTokens — bridge expose'u ADR-D-007 el-tamamlaması, worker yarış-NO_GO'su fix-fix'te DONE'landı); (2) `deckent_read_file` ranged: {path, offset?, limit?} + totalLines meta, containment aynen (describe-tool pin realign); (3) typed bilgilendirme en+tr + battery: incident şekli (3 büyük ref + dar bütçe) → inline gövde YOK / 3 descriptor VAR / ölçülen istek bütçe ALTINDA (measureProviderRequest'le, admission tetiklenmez) / ranged dispatch gerçek registry'den. Landing: at-ref pinleri typed-lineage'a realign, projeksiyonlar regen, hermeticity dated-realign; suite yeşil. CANLI kanıt durumu ŞEFFAF: PTY reprosu 900s'de turn tamamlayamadı (trace yazılmadı — Qwen 27B üç-doküman araçlı-okuma turu uzun; kanıt hermetik battery + owner'ın canlı incident trace'i 17:28 chat-xln7e9: 5-char selam ✓ + 99,353-char expanded @ref belgesi); akıcı canlı tur owner'ın terminal-değerlendirme turunda doğrulanacak. Worker sprint'lerinde skill-delivery.json sidecar'ları İLK KEZ yazıldı (561 unlock meyvesi). Landed-verify Sol kompozisyonu 2/2 CONFIRMED/ALLOW (commit 7f8f2338b): A bütçe-bilinçli descriptor kararı `cross-verify-verdict:sha256:9ac1dc08…`, B2 ranged-read şema/contentStore/1-based sözleşmesi `…340646a4…` (ilk B dürüst REFUTED `…ca795b3c` — iddia 'numeric' derken şema 'integer'; kod-birebir kelime dersi bir kez daha kanıtlandı)",
+      "updated": "2026-08-18"
+    },
+    {
+      "order": 7088,
+      "id": "CLI-SURFACE-CONSOLIDATION-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "CLI+MCP yüzeyi sadeleşir ve tutarlılaşır: bayat sayısal-ADR referansları user-facing metinlerden ölür (Faz-1) + kanıtlı-deprecated komut kaldırımı + gruplama/birleştirme disposition turu (Faz-2)",
+      "priority": "P0",
+      "dependsOn": [
+        "CLI-SURFACE-TRUTH-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "CLI-SURFACE-TRUTH-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Faz-1: user-facing katalog metinlerinde ADR-0xx sınıfı referans KALMAZ (geçerli karşılığı yoksa referans silinir, işlev cümlesi kalır — uydurma eşleme yok) + ratchet lint; `web` (kendi metniyle deprecated, serve sarmalayıcısı) kayıttan kalkar — bilinmeyen-komut önerisi serve gösterir, MCP parity bozulmaz; battery: katalogda ADR-0xx=0 + web kayıtsız + help temiz. Faz-2 (ayrı owner-disposition turu): 78→~35-40 kök hedefiyle aday listesi (dashboard→status --watch, watch→status/inspect, audit-verify→audit, autonomous-mission→autonomous, usage+limits→cost, openrouter-probe→models, plan-nl→do, test→start --test, runs→run list, alias sadeleşmeleri) — komut başına wiring+MASTER kanıtı şartı",
+      "evidence": "Owner admission+onay 2026-08-18 (analiz turu): canlı kanıt 78 top-level komut vs claude 14 / codex ~10; `process` desc \"ADR-022 CLI/MCP parity\" (yürürlükte yok — AI aracını olmayan referansa yönlendirir), nervous.recommendations \"(ADR-037)\", doctor --fix-image \"ADR-063\", agent --no-audit \"ADR-046\"; katalogda 9 ADR-0xx; `web` metni zaten \"deprecated — use deckent serve\". Kural: wired-olmayan/kapatılmamış hiçbir şey kaldırılmaz; her Faz-2 birleştirmesi ayrı owner disposition ister. FAZ-1 LANDED (sprint-563, 2026-08-18/19): (1) user-facing bayat-ADR temizliği — cli.process.desc 'ADR-022 parity' düştü (parity zaten makine-garantili), nervous.recommendations '(ADR-037)', doctor --fix-image 'ADR-063', agent --no-audit 'ADR-046' düz dile (563-001 DONE; uydurma eşleme yok); (2) `web` KALKTI — wiring-kanıtı: registerWeb tek tüketici index.ts, getMimeType yalnız test; katalog+registry+13 test güncel (563-002 GO-sınıfı; spec-düzeltmesi: Commander edit-distance 'web'→serve önerisi ÜRETMİYOR — ölçüldü, testler gerçeğe pinli); fix zinciri ölü-testin kendi dosyasında dar-scope'a takıldı → ders-15/a el-kapaması (web.test.ts silindi + index/cli-inventory pinleri, 337/337); (3) ratchet: lint-i18n-hardcode katalog-değeri ADR-\\d{2,3} FAIL + battery (563-003 DONE — tarayıcı yalnız en:/tr: değer literal'lerine çapalı, yorum false-positive'i yok). Gerçek-binary smoke: help'te web=0 + unknown-command + process ADR-0xx=0 + top-level 78→77 + ratchet exit 0. Run-defteri: ABORTED (002 fix-bütçesi komşu-pin duvarında — NO_GO taksonomisi A-sınıfı; pin-taraması pre-flight önlemi playbook'a girecek)",
       "updated": "2026-08-18"
     },
     {
@@ -26056,6 +26107,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a38ae350ac1b7b3b7d945b43773782ad23db1ee0e5e307af61c624b543aafc60"
+    "value": "4508dde0b863d590142c81b3647633cb15aa3fdb359e747ea0dbddd14e224a00"
   }
 }

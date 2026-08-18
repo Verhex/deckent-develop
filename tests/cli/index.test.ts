@@ -22,7 +22,6 @@ vi.mock('../../src/cli/commands/analyze.js', () => ({ registerAnalyze: vi.fn() }
 vi.mock('../../src/cli/commands/archive-debt.js', () => ({ registerArchiveDebt: vi.fn() }));
 vi.mock('../../src/cli/commands/dashboard.js', () => ({ registerDashboard: vi.fn() }));
 vi.mock('../../src/cli/commands/serve.js', () => ({ registerServe: vi.fn() }));
-vi.mock('../../src/cli/commands/web.js', () => ({ registerWeb: vi.fn() }));
 vi.mock('../../src/cli/commands/sync.js', () => ({ registerSync: vi.fn() }));
 vi.mock('../../src/cli/commands/watch.js', () => ({ registerWatch: vi.fn() }));
 vi.mock('../../src/cli/commands/run.js', () => ({ registerRun: vi.fn() }));
@@ -56,7 +55,6 @@ import { registerAnalyze } from '../../src/cli/commands/analyze.js';
 import { registerArchiveDebt } from '../../src/cli/commands/archive-debt.js';
 import { registerDashboard } from '../../src/cli/commands/dashboard.js';
 import { registerServe } from '../../src/cli/commands/serve.js';
-import { registerWeb } from '../../src/cli/commands/web.js';
 import { registerSync } from '../../src/cli/commands/sync.js';
 import { registerWatch } from '../../src/cli/commands/watch.js';
 import { registerRun } from '../../src/cli/commands/run.js';
@@ -128,7 +126,6 @@ describe('CLI index — buildProgram()', () => {
     expect(registerArchiveDebt).toHaveBeenCalledTimes(1);
     expect(registerDashboard).toHaveBeenCalledTimes(1);
     expect(registerServe).toHaveBeenCalledTimes(1);
-    expect(registerWeb).toHaveBeenCalledTimes(1);
     expect(registerSync).toHaveBeenCalledTimes(1);
     expect(registerWatch).toHaveBeenCalledTimes(1);
     expect(registerRun).toHaveBeenCalledTimes(1);

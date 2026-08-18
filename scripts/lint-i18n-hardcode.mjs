@@ -30,7 +30,7 @@
 // gate's write scope to fix). Either way the effect is the same ratchet: a
 // hit matching an ALLOWLIST entry is suppressed, any NEW hit still fails.
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -95,6 +95,26 @@ const DESCRIPTION_CALL_TEMPLATE_RE = /\.description\(\s*`([^`]*)`/g;
 const DESCRIPTION_PROP_SINGLE_RE = /\bdescription\s*:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g;
 const DESCRIPTION_PROP_DOUBLE_RE = /\bdescription\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
 const DESCRIPTION_PROP_TEMPLATE_RE = /\bdescription\s*:\s*`([^`]*)`/g;
+
+// ── MESSAGES catalog stale-ADR ratchet patterns (563-003) ───────────────────
+// `en: '...'` / `tr: '...'` catalog-value literals in
+// src/cli/helpers/messages.ts ONLY — deliberately narrower than the
+// output-call/description scans above, which read arbitrary code. A raw
+// whole-file scan would false-positive on section-header code comments like
+// `// ─── process command (ADR-022 CLI/MCP parity) ───` (out of scope per
+// this sprint's run policy — comment-only legacy ADR ids are not this
+// ratchet's target); anchoring on the `en:`/`tr:` property prefix keeps the
+// scan on actual catalog VALUES, matching the task's "katalog değerlerinde"
+// (in catalog values) wording exactly.
+const CATALOG_VALUE_SINGLE_RE = /\b(?:en|tr)\s*:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g;
+const CATALOG_VALUE_DOUBLE_RE = /\b(?:en|tr)\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
+
+// Legacy numeric ADR ids (ADR-022, ADR-037, ...) — the class NOT covered by
+// the current ADR-G-0NN / ADR-D-0NN governance/design scheme. `\d{2,3}`
+// requires a DIGIT immediately after `ADR-`, so `ADR-G-020` / `ADR-D-004`
+// structurally never match (the character after `ADR-` there is a letter) —
+// no separate G/D-prefix exclusion needed for correctness.
+const CATALOG_STALE_ADR_RE = /ADR-\d{2,3}\b/g;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -267,6 +287,47 @@ for (const { filePath, relPath } of descriptionPropScanTargets) {
   scanContentForHits(content, relPath, DESCRIPTION_PROP_TEMPLATE_RE, 'description-prop-template');
 }
 
+// ── MESSAGES catalog stale-ADR ratchet scan (563-003) ───────────────────────
+
+/**
+ * Scan `en:`/`tr:` catalog-value literals for a legacy numeric ADR id and
+ * record every match in `hits`. Unlike scanContentForHits() above, this does
+ * NOT apply the natural-language length filter (an "ADR-022" hit is only 3
+ * letters, below MIN_LETTER_COUNT) and does NOT skip lines containing
+ * `getMessage` (catalog definitions never call getMessage on themselves).
+ * @param {string} content
+ * @param {string} relPath
+ * @param {RegExp} re
+ */
+function scanCatalogValuesForStaleAdr(content, relPath, re) {
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    const value = m[1];
+    const adrHits = value.match(CATALOG_STALE_ADR_RE) ?? [];
+    if (adrHits.length === 0) continue;
+    const lineNo = lineNumberOf(content, m.index);
+    for (const token of adrHits) {
+      hits.push({ file: relPath, line: lineNo, call: 'catalog-value-stale-adr', text: token });
+    }
+  }
+}
+
+const messagesCatalogFile = {
+  filePath: join(root, 'src', 'cli', 'helpers', 'messages.ts'),
+  relPath: 'src/cli/helpers/messages.ts',
+};
+{
+  // Fixture/partial trees (the 559-005 tmpdir suites) may not ship the
+  // catalog file at all — an absent catalog is simply zero catalog values to
+  // scan, never a crash that blanks the whole gate's stdout.
+  if (existsSync(messagesCatalogFile.filePath)) {
+  const content = readFileSync(messagesCatalogFile.filePath, 'utf8');
+  scanCatalogValuesForStaleAdr(content, messagesCatalogFile.relPath, CATALOG_VALUE_SINGLE_RE);
+  scanCatalogValuesForStaleAdr(content, messagesCatalogFile.relPath, CATALOG_VALUE_DOUBLE_RE);
+  }
+}
+
 // ── Allowlist ─────────────────────────────────────────────────────────────────
 // { file, contains, reason }. A hit is suppressed when hit.file === file AND
 // hit.text includes `contains`. Two kinds of entry live here, both suppressed
@@ -334,6 +395,23 @@ ALLOWLIST.push(
   // `.description(`/`description:` mandate; grandfathered same as the
   // desktop-main DEBT_REASON entries above.
   { file: 'src/cli/commands/skill-marketplace.ts', contains: 'Registry unavailable. Showing local skills only.', reason: DEBT_REASON },
+);
+
+// 563-003 — MESSAGES catalog stale-ADR ratchet baseline. 563-001 already
+// cleaned every USER-FACING legacy numeric ADR citation; the one surviving
+// hit is `workspace.worker.contract`'s generated worker-contract mechanism
+// text (mirrored into the digest-bound WORKER-GUIDE.md worker contract),
+// which cites `ADR-037` (scope.filesWrite write-authority) twice per
+// language. Not end-user CLI help text, out of this script-only task's
+// write scope to migrate. Any OTHER catalog value hit still fails the gate.
+const CATALOG_ADR_DEBT_REASON =
+  '563-003 ratchet baseline — generated worker-contract mechanism text '
+  + '(`workspace.worker.contract`) citing the legacy `ADR-037` scope-authority '
+  + 'id; not user-facing CLI help, out of this script-only task\'s write '
+  + 'scope to migrate';
+
+ALLOWLIST.push(
+  { file: 'src/cli/helpers/messages.ts', contains: 'ADR-037', reason: CATALOG_ADR_DEBT_REASON },
 );
 
 const allowed = (hit) =>

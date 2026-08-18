@@ -232,6 +232,16 @@ passes — a HOLD is not closure; plan a calm retry.
   spawn after an interruption; the terminal-lockup RCA's 3-run xverify composition
   (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: re-run with the
   approval-liveness lesson applied).
+- **2026-08-19 — sprint-563 + NO_GO taxonomy (Lesson 17: Pin-Scan Pre-Flight)**: of the
+  day's 9 NO_GOs, ZERO were wrong code; ~55% were one class — existing test pins of
+  changed/deleted symbols were missing from the task Files and the fix inherited the same
+  narrow scope. RULE: before every DIRECTIVES task, (1) list the exports it will change or
+  delete, (2) add EVERY `grep -rl <symbol> tests/` hit to Files, (3) a deleted file's own
+  test file goes into Files too, (4) keep a chokepoint's producer+consumer in one task.
+  Secondary classes: infra outage (AUTH/wrapper — the fix task is born budget-less,
+  recorded finding), producer-consumer splits, hand-edit races (closed by the owner rule).
+  Also: a worker may correct a spec assumption by measurement — Commander produces no
+  'web'→serve suggestion (edit distance), so the test pins reality.
 - **2026-08-18 — sprint-562 (@ref tool-mediated read) + owner rule**: an OWNER RULE
   enters the playbook: NO hand-edits to source/test files while a sprint/task is
   RUNNING — racing a worker pollutes attribution and produces dist-changed warnings;

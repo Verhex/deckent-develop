@@ -22,7 +22,6 @@ import { registerAnalyze } from './commands/analyze.js';
 import { registerArchiveDebt } from './commands/archive-debt.js';
 import { registerDashboard } from './commands/dashboard.js';
 import { registerServe } from './commands/serve.js';
-import { registerWeb } from './commands/web.js';
 import { registerSync } from './commands/sync.js';
 import { registerWatch } from './commands/watch.js';
 import { registerRun } from './commands/run.js';
@@ -147,7 +146,6 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerArchiveDebt(program);
   registerDashboard(program);
   registerServe(program);
-  registerWeb(program);
   registerSync(program);
   registerWatch(program);
   registerRun(program, {

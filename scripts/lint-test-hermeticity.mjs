@@ -375,8 +375,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-18 (7087 @ref tool-mediated read, sprint-562): same count,
   // digest only — at-ref budget/descriptor suites, ranged-read suite,
   // tool-mediated battery + realigned at-ref/describe-tool pins moved content.
-  count: 14438,
-  digest: '57d80eee701441a63890a56ae523039b2c3368787233dc49753aba7680379b7d',
+  // 2026-08-19 (7088 Faz-1, sprint-563): +2 — stale-adr scan/battery suites
+  // enter; web.test.ts retired; index/cli-inventory/messages pins moved.
+  count: 14440,
+  digest: 'e19ccc68df7420e691892e5480323b2c18535ae421a089fb90831ac6b999675b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -617,8 +619,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-18 (7087, sprint-562): same count, digest only — at-ref
   // budget/descriptor mode, app.tsx budget wiring, bridge getContextBudgetTokens
   // expose and ranged deckent_read_file moved production content.
-  count: 1253,
-  digest: 'e1ca0ee13a1d30a7f37a3bc847dcdc0a7e4c3aed9f2ec84c99e4aee0ed8938a5',
+  // 2026-08-19 (7088 Faz-1, sprint-563): -1 — web.ts leaves the inventory;
+  // messages/doctor/agent/index/command-registry hashes moved.
+  count: 1252,
+  digest: '80b5fe6c403cfc38639271e746bd33a48f6cc9b81ca76d1f6c80c38333c8515f',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

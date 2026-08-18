@@ -2268,7 +2268,7 @@ export function registerDoctor(program: Command): void {
     .option('--providers', 'Show detailed provider diagnostics (binary, version, auth) for Claude/Codex/Gemini')
     .option('--memory', 'Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers')
     .option('--ram-experiment', 'Show 6-worker × 2g RAM scenario verdict (Safe/Risky) based on current config and host RAM')
-    .option('--fix-image', 'Rebuild the worker docker image after an interactive confirmation (ADR-063 consent) when it is missing/stale')
+    .option('--fix-image', 'Rebuild the worker docker image after an interactive confirmation when it is missing/stale')
     .option('--fix', 'Preview safe repairs (missing .deckent/.tasks dirs, stale .deck-shadow permissions, missing/corrupt config, stale worker locks) — a closed whitelist, no delete-of-live-data/docker/login. Dry-run by default; combine with --yes to apply.')
     .option('-y, --yes', 'Apply the repairs listed by --fix (no effect without --fix)')
     .option('--dry-run', 'Explicit alias for the default --fix preview (no writes) — wins over --yes if both are passed')

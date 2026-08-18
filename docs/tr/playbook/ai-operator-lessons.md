@@ -222,6 +222,15 @@ değildir, sakin retry planla.
   sürdürülmesi; terminal-kilitlenme RCA'sının 3-koşu xverify kompozisyonu
   (A: `0d4f3666…` CONFIRMED, B: `752b074e…` CONFIRMED, C: onay-canlılık dersiyle
   yeniden koşuldu).
+- **2026-08-19 — sprint-563 + NO_GO taksonomisi (Ders-17: Pin-Taraması Pre-Flight)**: Günün
+  9 NO_GO'sunun SIFIRI yanlış koddu; ~%55'i tek sınıf — değişen/silinen sembollerin MEVCUT
+  test-pinleri görev Files'ında değildi ve fix aynı dar scope'u miras aldı. KURAL: her
+  DIRECTIVES görevinden önce (1) değişecek/silinecek export sembollerini listele,
+  (2) `grep -rl <sembol> tests/` çıkan HER dosyayı Files'a ekle, (3) silinen dosyanın kendi
+  test dosyası da Files'a, (4) chokepoint üretici+tüketici ucu aynı görevde. İkincil sınıflar:
+  altyapı kesintisi (AUTH/wrapper — fix budget'sız doğuyor, bulgu), üretici-tüketici ayrımı,
+  el-edit yarışı (owner kuralıyla kapandı). Ayrıca: spec varsayımını worker ölçümle
+  düzeltebilir — Commander 'web'→serve önerisi üretmiyor (edit-distance), test gerçeğe pinlenir.
 - **2026-08-18 — sprint-562 (@ref tool-mediated read) + owner kuralı**: OWNER KURALI
   playbook'a girdi: sprint/task ÇALIŞIRKEN kaynak/test dosyasına el-müdahalesi YOK —
   worker'la yarış hem attribution kirletir hem dist-değişti uyarısı üretir; el-tamamlaması

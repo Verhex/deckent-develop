@@ -152,7 +152,6 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('attach', 'Run', 'Çalıştır', 'cli', ['cli']),
   entry('spawn', 'Run', 'Çalıştır', 'agents', ['cli']),
   entry('serve', 'Run', 'Çalıştır', 'api', ['cli']),
-  entry('web', 'Run', 'Çalıştır', 'api', ['cli']),
   entry('watch', 'Run', 'Oku', 'monitor', ['cli', 'mcp'], ['deckent_watch']),
   entry('run', 'Run', 'Çalıştır', 'orchestra', ['cli', 'mcp'], ['deckent_run'], true),
   entry('task', 'Run', 'Değiştir', 'core', ['cli']),

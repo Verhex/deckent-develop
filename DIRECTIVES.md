@@ -1,109 +1,106 @@
-# DIRECTIVES — 7087 ATREF-TOOL-MEDIATED-READ: @ref bütçe-bilinçli descriptor modu + ranged deckent_read_file
+# DIRECTIVES — 7088 CLI-SURFACE-CONSOLIDATION Faz-1: bayat-ADR temizliği + web kaldırımı + ratchet
 
 ## Goal
 
-MASTER 7087 (owner onayı 2026-08-18). Canlı incident: 131K pencereli lokal Qwen'e
-3 doküman @ref'lendi → `INPUT_CONTEXT_OVERFLOW measured=149503 available=126976`
-(7086 admission'ı DOĞRU çalıştı; eksik olan davranış). Claude-Code paradigması:
-büyük dosya context'e GÖMÜLMEZ — model dosyayı read aracıyla KENDİ okur, parça
-parça. Mevcut mekanizma: src/cli/repl/at-ref.ts `expandAtRefs` (AT_REF_MAX_REFS=5,
-AT_REF_MAX_CHARS=32KB/dosya, full-inline) → app.tsx:1407 → bridge structured
-TurnInput (rawIntent/expandedPayload/references — 560-004 LANDED). Araç tarafı:
-native-tool-registry.ts `deckent_read_file` yalnız `{path}` — ranged okuma YOK.
-Hedef: küçük @ref inline kalır; ölçülen bütçeye sığmayan set otomatik
-tool-mediated moda düşer (descriptor + yönerge); read aracı satır-aralığı kazanır.
+MASTER 7088 (owner admission+onay 2026-08-18). Canlı kanıt: deckent 78 top-level
+komut (claude 14 / codex ~10); user-facing katalog metinlerinde YÜRÜRLÜKTE OLMAYAN
+sayısal-ADR referansları var — AI araçlarını olmayan kaynağa yönlendirir, proje
+ihlali doğurur: `cli.process.desc` "(ADR-022 CLI/MCP parity)" (messages.ts:6473-74
+en+tr), `cli.nervous.recommendations.desc` "(ADR-037)" (:6405-06), doctor
+`--fix-image` option'ı "ADR-063", agent `--no-audit` option'ı "ADR-046"; katalog
+genelinde 9 ADR-0xx. `web` komutu kendi metniyle deprecated ("deprecated — use
+`deckent serve`", :6624-27) ve 64 satırlık serve-sarmalayıcısıdır. Bu sprint
+YALNIZ Faz-1'dir: bayat-referans temizliği + web kaldırımı + ratchet lint.
+Faz-2 (gruplama/birleştirme) AYRI owner-disposition turudur — bu sprintte
+HİÇBİR komut birleştirilmez/taşınmaz.
 
 ## Execution Contract
 
 - No build and no repository-wide/full-suite test run during this sprint.
-- 7086 zinciri BOZULMAZ: ölçüm/admission (measureProviderRequest, typed
-  INPUT_CONTEXT_OVERFLOW) authority olarak kalır — bu paket admission'ı
-  ZAYIFLATMAZ, tetiklenmesini önler. Kümülatif billing/usage sayaçlarına dokunma.
-- i18n-FIRST: user-facing metin getMessage en+tr; `[@ref]` protokol satırları
-  mekanizma-string'i olarak İngilizce typed kalır (at-ref.ts:12 mevcut sözleşme).
-- Descriptor modu KAYIPSIZ: hangi referansın inline, hangisinin descriptor'a
-  düştüğü typed olarak references lineage'ına yazılır (560-004 yapısı).
+- Kaldırma kuralı (owner): YALNIZ `web` — kendi metniyle deprecated + salt
+  sarmalayıcı kanıtlı. Başka hiçbir komut kaldırılmaz/birleştirilmez.
+- Referans temizliği kuralı: geçerli ADR-G/D karşılığı KESİN biliniyorsa ona
+  çevrilir; bilinmiyorsa referans SİLİNİR ve açıklama işlevsel cümle olarak
+  kalır — UYDURMA EŞLEME YASAK. Kod-yorumlarındaki ADR-0xx'ler (models.ts:2-4,
+  doctor.ts iç yorumları vb.) BU SPRINTİN KAPSAMI DIŞIDIR (yalnız user-facing:
+  katalog metinleri + option/help açıklamaları); kalanlar sayımla raporlanır.
+- 7085 tek-katalog düzeni korunur: MCP, CLI anahtarını paylaşıyorsa metin tek
+  yerden değişir; mcp parity lint yeşil kalmalı.
+- i18n: en+tr çiftleri birlikte güncellenir; TR ürün-sesi.
 - Parallel execution ADMITTED; single-writer chokepoints: ONLY Task 1 writes
-  src/cli/repl/at-ref.ts + src/cli/repl/app.tsx; ONLY Task 2 writes
-  src/cli/repl/native-tool-registry.ts; messages.ts yazımı YALNIZ Task 3.
-- Hermetic tmpdir tests; async spawn; no spawnSync; scoped verification only.
-- Echo the policy digest in your .result as runPolicyEvidence exactly as the
-  prompt's Result contract instructs.
+  src/cli/helpers/messages.ts; ONLY Task 2 writes src/cli/index.ts +
+  src/cli/commands/web.ts (silme) + src/core/command-registry.ts; scripts/
+  yazımı YALNIZ Task 3.
+- Hermetic tmpdir tests; scoped verification only. Echo the policy digest in
+  your .result as runPolicyEvidence exactly as the prompt's Result contract
+  instructs.
 
-## Task 1: Bütçe-bilinçli @ref kararı — inline vs descriptor modu
-- Files: src/cli/repl/at-ref.ts, src/cli/repl/app.tsx, tests/cli/at-ref-budget.test.ts
-- Scope: src/cli/repl/, tests/cli/
-- Provider: codex
-- Model: gpt-5.6-sol
-
-### Description
-1. `expandAtRefs` bütçe-bilinçli olur: opsiyonel `expansionBudgetChars` parametresi
-   (caller'dan; yoksa mevcut davranış BYTE-IDENTICAL — geriye dönük güvenli).
-   Bütçe verildiğinde: referanslar sırayla inline edilir; TOPLAM expansion bütçeyi
-   aşacaksa kalan referanslar (ve gerekirse tümü) DESCRIPTOR moduna düşer —
-   inline içerik yerine `[@ref-descriptor] <path> — <bytes> bytes, <lines> lines,
-   sha256:<digest12> — read it in slices with deckent_read_file (offset/limit)`
-   protokol satırı. Sonuç yapısı hangi ref'in `inline` hangi ref'in `descriptor`
-   olduğunu typed taşır (mevcut AtRefExpansion şekli genişler; app.tsx tüketimi
-   uyumlanır).
-2. app.tsx:1407 çağrı yeri bütçeyi GERÇEK kaynaktan türetir: efektif context
-   penceresi (run.tsx'in getContextBudgetTokens zinciriyle aynı authority) −
-   çıktı/güvenlik rezervi − mevcut transcript tahmini → kalan alanın konservatif
-   payı (chars ≈ tokens×3 üst-sınır kuralı; iyimser katsayı YASAK). Authority
-   çözülemiyorsa (getter throw) mevcut inline davranış korunur — admission zaten
-   fail-closed (davranış gerilemez).
-3. Test (hermetik): küçük tek ref inline kalır (byte-parity); bütçeyi aşan set
-   descriptor'a düşer ve descriptor satırı path+bytes+digest taşır; karışık set
-   (ilk ref sığar, ikincisi düşer); bütçesiz çağrı mevcut snapshot'la byte-eş;
-   lineage typed alanları doğru.
-
-GO: tsc 0; scoped yeşil; incident-şekilli karar (3×~50K ref + ~120K bütçe →
-descriptor) kanıtlı. NO_GO: bütçesiz yol byte-değişirse veya descriptor kayıpsız
-lineage taşımazsa.
-
-## Task 2: deckent_read_file ranged-read — offset/limit satır-aralığı
-- Files: src/cli/repl/native-tool-registry.ts, tests/cli/native-read-ranged.test.ts
-- Scope: src/cli/repl/, tests/cli/
+## Task 1: User-facing bayat-ADR temizliği (katalog + option açıklamaları)
+- Files: src/cli/helpers/messages.ts, src/cli/commands/doctor.ts, src/cli/commands/agent.ts, tests/cli/stale-adr-surface.test.ts
+- Scope: src/cli/, tests/cli/
 - Provider: claude
 - Model: claude-opus-5
 
 ### Description
-1. `deckent_read_file` şeması genişler: `{path, offset?, limit?}` — offset =
-   1-tabanlı başlangıç satırı, limit = satır sayısı (default: baştan, mevcut
-   davranış). Dönüş, cat -n tarzı satır-numaralı içerik + `{totalLines, range}`
-   meta satırı (model kaç parça kaldığını bilsin). Mevcut path-containment/izin
-   katmanı AYNEN geçerli (read tier'ı değişmez).
-2. Büyük-dosya güvenliği: limit verilmemişse mevcut tek-parça davranış korunur
-   ama çıktı mevcut üst sınırı aşacaksa dürüst kesme işareti + totalLines meta
-   (sessiz kesme yok). Tool description'ı MCP/CLI kataloğu düzenine uygun
-   güncellenir (7085 tek-kaynak kuralı — description-catalog bağlaması varsa
-   oradan, yoksa mevcut yerinde metin + sayımlı not).
-3. Test (hermetik tmpdir): offset/limit dilimi doğru satırları döner; aralık-dışı
-   offset dürüst boş+meta; default yol regresyonsuz; 5,000 satırlık fixture 3
-   dilimde tam kapsanır (birleşim = bütün).
+1. messages.ts kataloğunda user-facing metin taşıyan TÜM ADR-0xx geçişleri
+   temizlenir (tarama-tabanlı; bilinen 4 + kalan 5'in user-facing olanları):
+   `cli.process.desc` → parity iddiası düz işlev cümlesine ("Process-mode
+   execution surface — submit tasks/capabilities and poll their status" yeter;
+   parity zaten lint'le makine-garantili); `cli.nervous.recommendations.desc`
+   → "(ADR-037)" silinir; en+tr birlikte. Worker-contract gibi mekanizma-metni
+   içindeki ADR-037/ADR-G referansları user-facing help DEĞİLDİR — dokunma,
+   sayımla raporla.
+2. doctor.ts `--fix-image` option açıklaması "ADR-063 consent" → "interactive
+   confirmation" düz dili; agent.ts `--no-audit` "ADR-046 audit-trail" →
+   "audit-trail" düz dili (option-açıklamaları 7085'te katalog-dışı kalmıştı —
+   yerinde düzelt, katalogla çakışma yok).
+3. Test (hermetik): MESSAGES kataloğunun tüm en+tr değerlerinde `ADR-0\d\d`
+   deseninin 0 olduğu mekanik tarama (allowlist'siz); doctor/agent option
+   metinlerinde de 0 (buildProgram üzerinden option-description taraması).
 
-GO: tsc 0; scoped yeşil; dilim-birleşim kanıtı. NO_GO: default davranış değişirse
-veya containment zayıflarsa.
+GO: tsc 0; scoped yeşil; tarama 0-hit. NO_GO: uydurma ADR eşlemesi yapılırsa
+veya işlev cümlesi kaybolursa.
 
-## Task 3: Typed UX + i18n + incident battery (depends on Task 1, Task 2)
-- Files: src/cli/repl/native-agent-bridge.ts, src/cli/helpers/messages.ts, tests/cli/atref-tool-mediated-battery.test.ts
-- Scope: src/cli/repl/, src/cli/helpers/, tests/cli/
+## Task 2: `web` komutunun kaldırılması (kanıtlı-deprecated)
+- Files: src/cli/index.ts, src/cli/commands/web.ts, src/core/command-registry.ts, src/cli/helpers/messages.ts, tests/cli/web-removal.test.ts
+- Scope: src/cli/, src/core/, tests/cli/
+- Provider: claude
+- Model: claude-opus-5
+- Dependencies: Task 1
+
+### Description
+1. Kaldırma-öncesi wiring kanıtı .result'a: web.ts'in serve'i sarmalamaktan
+   başka tükettiği/ürettiği yüzey olmadığı (import grafiği + grep) — varsa DUR
+   ve NO_GO ile raporla (owner kuralı).
+2. `registerWeb` çağrısı index.ts'ten, web.ts dosyası repodan, `web` girişi
+   command-registry.ts'ten kalkar; `cli.web.desc` anahtarları katalogdan
+   kalkar. `deckent web` artık Commander'ın bilinmeyen-komut önerisine düşer
+   (showSuggestionAfterError açık — serve önerilir; test bunu pinler).
+3. web'e referans veren testler/lint baseline'ları kendi scope'unda güncellenir;
+   scope-dışı kalıntı sayımla raporlanır (sessiz borç yok). MCP tarafında web
+   tool'u yoksa (kontrol et) parity etkilenmez — kanıtla.
+4. Test: buildProgram'da `web` kayıtlı DEĞİL; `deckent web` çağrısı hata +
+   serve önerisi; `serve` davranışı byte-regresyonsuz.
+
+GO: tsc 0; scoped yeşil; wiring-kanıtı .result'ta. NO_GO: web'in serve-dışı
+gerçek tüketicisi çıkarsa (kaldırma İPTAL, bulgu raporu).
+
+## Task 3: Ratchet lint + yüzey battery (depends on Task 1, Task 2)
+- Files: scripts/lint-i18n-hardcode.mjs, tests/cli/cli-surface-consolidation-battery.test.ts, tests/scripts/lint-stale-adr.test.ts
+- Scope: scripts/, tests/cli/, tests/scripts/
 - Provider: claude
 - Model: claude-sonnet-5
 - Dependencies: Task 1, Task 2
 
 ### Description
-1. Bridge, Task 1 lineage'ından descriptor-moduna düşen referans olduğunda BİR
-   typed bilgilendirme satırı basar (en+tr, getMessage): "N referans ölçülen
-   bütçeye sığmadı; araçlı parçalı okumaya geçildi" — mevcut
-   REFERENCE_EXPANSION sınıf ailesinin devamı olarak (ret mesajı DEĞİL, bilgi).
-2. Battery (hermetik, gerçek modüller — fixture-local reimplementation YOK):
-   (a) incident şekli: 3 büyük ref + dar bütçe → prompt'ta inline gövde YOK,
-   3 descriptor VAR, ölçülen istek bütçe ALTINDA (measureProviderRequest'le
-   doğrula — admission tetiklenmez); (b) descriptor yönergesindeki read aracı
-   gerçekten ranged çağrılabilir (registry'den dispatch, dilim döner);
-   (c) küçük-ref yolu regresyonsuz inline; (d) en+tr bilgilendirme satırı.
-3. Kapsam sayımı .result'a (sessiz borç yok).
+1. lint-i18n-hardcode.mjs'e dar ek: MESSAGES katalog değerlerinde `ADR-\d{2,3}\b`
+   (ADR-G/ADR-D önekli OLMAYAN sayısal sınıf) → FAIL (ratchet; mevcut
+   ALLOWLIST pattern'i — Faz-1 sonrası temiz taban, yeni giriş fail eder).
+   Sentetik fixture testi: ihlalli FAIL + temiz PASS; gerçek repo exit 0.
+2. Battery: (a) katalog en+tr değerlerinde sayısal-ADR 0 (Task 1 testinin
+   tek-nokta üstü); (b) `web` kayıtsız + öneri davranışı; (c) top-level komut
+   sayısı taramadan türetilip .result'a yazılır (78→77 beklenir — sayı koda
+   hardcode edilmez); (d) mcp parity lint'inin yeşil kaldığı (script exit 0).
 
-GO: battery yeşil; tsc 0; incident-şekli uçtan uca kanıtlı. NO_GO: herhangi bir
-halka mock'sa (UNWIRED) veya bilgilendirme ret gibi okunuyorsa.
+GO: her iki lint gerçek repo'da yeşil + battery yeşil; tsc 0.
+NO_GO: ratchet yeni-ihlali yakalayamıyorsa.

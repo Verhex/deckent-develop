@@ -641,7 +641,7 @@ export function registerAgent(program: Command): void {
     .requiredOption('--task <id>', 'Task id within the sprint')
     .requiredOption('--decision <decision>', 'New evaluation: DONE | GO_WITH_TECH_DEBT | NO_GO')
     .option('--reason <text>', 'Free-form justification for the audit trail')
-    .option('--no-audit', 'Skip writing the ADR-046 audit-trail entry to memory store')
+    .option('--no-audit', 'Skip writing the audit-trail entry to memory store')
     .action(async (opts: { sprint: string; task: string; decision: string; reason?: string; audit?: boolean }) => {
       try {
         const root = resolveProjectRoot();

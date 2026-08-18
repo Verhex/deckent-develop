@@ -4197,11 +4197,6 @@ const MESSAGES: MessageMap = {
   'config.migrate_backup': { en: 'Backup saved to: {path}', tr: 'Yedek kaydedildi: {path}' },
   'retro.none_found': { en: 'No retrospective found. Run `deckent start` to complete a run first.', tr: 'Retrospektif bulunamadı. Önce bir run tamamlamak için `deckent start` çalıştırın.' },
   'retro.no_previous_sprint': { en: 'No previous run found for comparison.', tr: 'Karşılaştırma için önceki run bulunamadı.' },
-  'web.deprecated_use_serve': { en: 'Note: `deckent web` is deprecated — please use `deckent serve` instead.', tr: 'Not: `deckent web` kullanımdan kaldırıldı — bunun yerine `deckent serve` kullanın.' },
-  'web.dev_server_hint': { en: 'Run \'cd src/dashboard && npm run dev\' for Vite dev server on port 5173', tr: 'Vite geliştirme sunucusu için 5173 portunda \'cd src/dashboard && npm run dev\' komutunu çalıştırın' },
-  'web.dashboard_not_found': { en: 'Warning: bundled dashboard not found at {name}', tr: 'Uyarı: paketlenmiş panel {name} konumunda bulunamadı' },
-  'web.build_dashboard_hint': { en: 'Run \'npm run build:dashboard\' (repo) or reinstall deckent. API still works.', tr: '\'npm run build:dashboard\' komutunu çalıştırın (repo) veya deckent\'i yeniden kurun. API yine de çalışır.' },
-  'web.listening': { en: 'Deckent Web Dashboard on http://localhost:{name}', tr: 'Deckent Web Paneli http://localhost:{name} adresinde çalışıyor' },
   'dashboard.sprint_line': { en: 'Run: {id} (#{number})', tr: 'Run: {id} (#{number})' },
   'dashboard.phase_status': { en: 'Phase: {phase}  Status: {status}', tr: 'Faz: {phase}  Durum: {status}' },
   'dashboard.col_id': { en: 'ID', tr: 'ID' },
@@ -6402,8 +6397,8 @@ const MESSAGES: MessageMap = {
     tr: 'Nervous system aksiyon geçmişini görüntüleyin',
   },
   'cli.nervous.recommendations.desc': {
-    en: 'View the Brain inbox — nervous proposals awaiting disposition (ADR-037)',
-    tr: 'Brain gelen kutusunu görüntüleyin — karar bekleyen nervous önerileri (ADR-037)',
+    en: 'View the Brain inbox — nervous proposals awaiting disposition',
+    tr: 'Brain gelen kutusunu görüntüleyin — karar bekleyen nervous önerileri',
   },
   'cli.nervous.log.desc': {
     en: 'View raw nervous system log',
@@ -6470,8 +6465,8 @@ const MESSAGES: MessageMap = {
     tr: 'Yeni bir plugin iskeleti oluşturun',
   },
   'cli.process.desc': {
-    en: 'Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity)',
-    tr: 'Process-mode execution yüzeyi — görev/yetenek gönderin ve durumlarını yoklayın (ADR-022 CLI/MCP parity)',
+    en: 'Process-mode execution surface — submit tasks/capabilities and poll their status',
+    tr: 'Process-mode execution yüzeyi — görev/yetenek gönderin ve durumlarını yoklayın',
   },
   'cli.process.submit.desc': {
     en: 'Submit an ExecutionRequest (policy-gated: read-only auto-runs, side-effecting parks for approval)',
@@ -6620,10 +6615,6 @@ const MESSAGES: MessageMap = {
   'cli.watch.desc': {
     en: 'Follow a live worker (docker logs / tmux pane / subprocess log) with --follow <taskId>, or open the tmux dashboard split',
     tr: 'Canlı bir worker\'ı --follow <taskId> ile takip edin (docker logs / tmux pane / subprocess log) veya tmux dashboard split\'ini açın',
-  },
-  'cli.web.desc': {
-    en: 'Start web dashboard with API server (deprecated — use `deckent serve`)',
-    tr: 'Web dashboard\'u API sunucusuyla başlatın (kullanımdan kalktı — `deckent serve` kullanın)',
   },
 
   // ─── MCP tool descriptions (559-004) ────────────────────────────────────────
