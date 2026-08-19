@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "88b5c33b9ac6bdaecf7910a1c8b2452a458b5819a9ae207134363c8f18f23a1a"
+    "value": "e540a9968b1215fd35e312d2c4d383e6e31c81ff5110fac2ae5c5b8105425584"
   },
   "summary": {
     "total": 511,
@@ -4890,7 +4890,7 @@
       "state": "OPEN",
       "updated": "2026-08-19",
       "definitionDigest": "b7e791329644b2466a5af8ff62463eb938abc581d482b5f2d5679a747d861fa3",
-      "progressDigest": "85e44c73eac61ab9c5ee21a46ed7b9d42c7318cba3b78ff4889cc20b5577b52a",
+      "progressDigest": "c9590440edbfb9cc0b6a46cbf8116c5318d2fb5786f184e5be6ecf1a715d73fb",
       "terminalClosureDigest": null
     },
     {
@@ -23504,7 +23504,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "FAZLAR (her faz A/B ölçüm + kalite-guard: aynı görev-seti, GO-oranı + çıktı-denetimi + Sol xverify): F0 kod-iddia mühürleri; F1 SIFIR-RİSK dörtlüsü — (a) landing-önsözünü sona taşı (coordinator tek-satır), (b) ADRlere worker-operative markerları, (c) skill-seçimini göreve-duyarlı yap/eşiği düzelt, (d) .plan kaldır + .hb tek-yazım → beklenen ~%25-40; F2 YAPISAL — --tools daraltma + --disable-slash-commands + .claude/{skills,agents} mount-dışı + reorderLeadingT0 ON → 18.264lük prefix küçülür+user-message stabil bloğu paylaşılır ~%20-30 ek; F3 SYSTEM-PROMPT MİMARİSİ — claude --bare -p --system-prompt-file <stabil-çekirdek> + CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 A/Bsi + capability-realizer --append-system-prompt hattı; codex: AGENTS.override.md/-c project-doc kontrolü + --ephemeral → paylaşılabilir-önek mimarisi (Anthropic resmi: exclude-dynamic zaten -p multi-user cache-reuse için); F4 tier-routing (basit-doküman→haiku) + turn-disiplini model-bazlı; F5 ürünleşme: görev-sınıfı prompt-profilleri (isInspectionOnly/isDocOnly deseni genelleştirme) config-resolved",
-      "evidence": "Owner emri: \"En önemli işimiz; tam yetki; her yolun kazancı/hızı/kaybı net ölçülsün ve doğrulansın; yapı düzelince 567-tarzı denemeler yeniden koşulur; CLAUDE.md worker-enjeksiyonu görev doğası gereği sorgulanacak\". Kanıt: sprint-567 cache-deneyi (6 ölçüm + USD receiptler; worker-arası .prompt-paylaşımı yok AMA 18.264lük CLI-prefix paylaşımı 563 loglarında İLK-ÇAĞRI cacheRead=18.264 olarak üç görevde kanıtlı) + Explore haritası 2026-08-19 + resmi doc: --bare/--system-prompt-file/CLAUDE_CODE_DISABLE_CLAUDE_MDS/exclude-dynamic (code.claude.com) + codex --ignore-user-config/--ephemeral/AGENTS.override.md",
+      "evidence": "Owner emri: \"En önemli işimiz; tam yetki; her yolun kazancı/hızı/kaybı net ölçülsün ve doğrulansın; yapı düzelince 567-tarzı denemeler yeniden koşulur; CLAUDE.md worker-enjeksiyonu görev doğası gereği sorgulanacak\". Kanıt: sprint-567 cache-deneyi (6 ölçüm + USD receiptler; worker-arası .prompt-paylaşımı yok AMA 18.264lük CLI-prefix paylaşımı 563 loglarında İLK-ÇAĞRI cacheRead=18.264 olarak üç görevde kanıtlı) + Explore haritası 2026-08-19 + resmi doc: --bare/--system-prompt-file/CLAUDE_CODE_DISABLE_CLAUDE_MDS/exclude-dynamic (code.claude.com) + codex --ignore-user-config/--ephemeral/AGENTS.override.md. **F0 MUHUR SONUCU 2026-08-19:** P1 (landing-onsozu onde + xverify-v2-istisnasi) CONFIRMED `…f4e859`; ilk-kosu REFUTED isabetliydi — evrensel kelimede istisna yakalandi (Ders-18 sinifi; iddia duzeltilip CONFIRMED); P2/P3/P4 durust-HOLD (`…961d11c` `…875de3e` `…293c481` — bilesik-iddia sinifi; birincil kanit saglam, bolunmus muhur F1 landed-verify ile).",
       "updated": "2026-08-19"
     },
     {
@@ -26337,6 +26337,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "c7dfe375f021e264f314fcfecb540d51921ea729b3651dab42e51e8d32952318"
+    "value": "c4e15b2d20da6535616acfb822647a70cb0667c5261362ffe4704c9ffbda4362"
   }
 }
