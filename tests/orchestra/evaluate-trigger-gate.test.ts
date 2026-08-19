@@ -22,7 +22,7 @@
  * evaluate-phase-idempotency.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, existsSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -353,11 +353,17 @@ describe('runEvaluatePhase — Pre-Dispatch Trigger Guard (Sprint 192 Task 192-0
     // assignedWorker, checkWorkerLiveness short-circuits to never-spawned
     // and the per-task loop exits via `continue`.
     const staleIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const hbPath = join(root, '.tasks', `task-${t1.id}.hb`);
     writeFileSync(
-      join(root, '.tasks', `task-${t1.id}.hb`),
+      hbPath,
       JSON.stringify({ workerId: 'w-192-008', timestamp: staleIso }),
       'utf-8',
     );
+    // 7094-F1d: `.hb` is a single spawn-time write in production, so its
+    // mtime equals its content timestamp. The probe-based liveness path
+    // reads file MTIME — a fixture written "now" would read alive and grant
+    // the 5-min poll budget this test is deliberately avoiding.
+    utimesSync(hbPath, new Date(staleIso), new Date(staleIso));
 
     await runEvaluatePhase(
       root, sprint, [], evaluations,

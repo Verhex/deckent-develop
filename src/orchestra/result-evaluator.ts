@@ -26,6 +26,7 @@ import {
   getRubric,
   coverageOptional,
   hasDeclaredTestCommand,
+  resolveRubricTaskType,
 } from './rubric-registry.js';
 import type { DiskVerifyResult } from './disk-verify.js';
 import { verifyDiskAgainstClaim } from './disk-verify.js';
@@ -257,7 +258,19 @@ export async function evaluateResult(result: TaskResult, task: Task, vitestJsonO
     return TaskEvaluation.NO_GO;
   }
 
-  // Step 1b: Bash unavailable tolerance — environment constraint, not code quality
+  // Step 1b: Doc tasks — test execution is not applicable, so an honest
+  // testsPassed:false must not gate the doc fast-path (sprint-573/574
+  // honesty fix: the old order sent honest doc results into the
+  // tests-failed NO_GO below, while a fabricated "tests passed" sailed
+  // through — punishing honesty). born-482: the fast-path still respects
+  // the honest-DEBT ceiling.
+  if (isDocTask(task)) {
+    return result.selfAssessment === 'GO_WITH_TECH_DEBT'
+      ? TaskEvaluation.GO_WITH_TECH_DEBT
+      : TaskEvaluation.DONE;
+  }
+
+  // Step 1c: Bash unavailable tolerance — environment constraint, not code quality
   // When Bash tool is unavailable (session-env ENOENT), worker cannot run tsc/vitest,
   // so testsPassed=false and coverage=0 are expected. Accept as GO_WITH_TECH_DEBT
   // if the worker's self-assessment is not NO_GO and code changes were applied.
@@ -266,14 +279,6 @@ export async function evaluateResult(result: TaskResult, task: Task, vitestJsonO
   }
 
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
-
-  // Step 2: Doc tasks — DONE if tests pass (skip coverage)
-  // born-482: doc fast-path respects the honest-DEBT ceiling too.
-  if (isDocTask(task)) {
-    return result.selfAssessment === 'GO_WITH_TECH_DEBT'
-      ? TaskEvaluation.GO_WITH_TECH_DEBT
-      : TaskEvaluation.DONE;
-  }
 
   // Step 3: Brain makes the final call based on objective criteria
   // Worker self-assessment is just a HINT, not the final decision
@@ -639,12 +644,49 @@ export const DEFAULT_RUBRIC: EvaluationRubric = {
   maxRetries: 0,
 };
 
-/** Score correctness based on testsPassed and selfAssessment */
-export function scoreCorrectness(result: TaskResult): RubricScore {
+/**
+ * True when test execution is applicable to this task's class — i.e. the
+ * task resolves to the code-development rubric. Audit / document-write
+ * tasks have no test surface, so `testsPassed` carries no quality signal
+ * for them. A faulted rubric-type lookup conservatively returns true
+ * (code-class behaviour), so the recovered-result reconstruction path
+ * (455-002) can call this without re-triggering the fault it is armoring
+ * against.
+ */
+function testsApplicableForTask(task: Task): boolean {
+  try {
+    return resolveRubricTaskType(task) === 'code-development';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Score correctness based on testsPassed and selfAssessment.
+ *
+ * Sprint-573/574 honesty fix: for non-code task classes (audit /
+ * document-write — resolved by the SAME authority rubric selection uses),
+ * test execution is not applicable, so the 60-point tests component is
+ * granted regardless of the reported `testsPassed` value. Before this,
+ * a doc worker honestly reporting `testsPassed:false` ("I ran no tests —
+ * there are none to run") scored 40/100 → NO_GO, while a sibling claiming
+ * "tests passed" (without running any) scored 100 → DONE: the evaluator
+ * punished honesty and rewarded fabrication, and every FIX attempt died on
+ * the same rule (4× NO_GO on one doc task, sprint-573). Granting BOTH
+ * branches the same score removes the honesty penalty AND the fabrication
+ * reward in one move. Code-development tasks keep the original behaviour
+ * unchanged. Deeper criterion redesign (evidence-backed test claims,
+ * go/nogo criterion alignment) is the separate owner-admitted
+ * evaluator-honesty MASTER item.
+ */
+export function scoreCorrectness(result: TaskResult, task?: Task): RubricScore {
   let score = 0;
   const reasons: string[] = [];
 
-  if (result.testsPassed) {
+  if (task && !testsApplicableForTask(task)) {
+    score += 60;
+    reasons.push('tests not applicable (doc/audit class)');
+  } else if (result.testsPassed) {
     score += 60;
     reasons.push('tests passed');
   } else {
@@ -1044,7 +1086,7 @@ export function scoreDocumentationQuality(result: TaskResult, _task: Task): Rubr
 /** Dispatch scoring for a named criterion */
 function scoreCriterion(name: string, result: TaskResult, task: Task): RubricScore {
   switch (name) {
-    case 'correctness': return scoreCorrectness(result);
+    case 'correctness': return scoreCorrectness(result, task);
     case 'test_coverage': return scoreTestCoverage(result);
     case 'scope_compliance': return scoreScopeCompliance(result, task);
     case 'documentation': return scoreDocumentation(result);
@@ -1483,6 +1525,16 @@ function evaluateWithRubricCore(
     decision = 'GO_WITH_TECH_DEBT';
   }
 
+  // Same ceiling for an honest worker NO_GO (sprint-573/574 honesty fix):
+  // with the tests component neutralized for non-code classes, a self-NO_GO
+  // doc result could otherwise score past passingScore and surface as a
+  // clean DONE. The worker's own NO_GO is the strongest negative signal the
+  // rubric has; only the evidence-backed reconcile probes (git-diff / tsc /
+  // vitest in reconcileEvaluationSpuriousNoGo) may lift it — never a score.
+  if (result.selfAssessment === 'NO_GO') {
+    decision = 'NO_GO';
+  }
+
   const evaluation: EvaluationResult = {
     decision,
     totalScore,
@@ -1779,7 +1831,7 @@ export function reconstructFromDurableEvidence(
     }
   };
 
-  const correctness = scoreOne('correctness', () => scoreCorrectness(result));
+  const correctness = scoreOne('correctness', () => scoreCorrectness(result, task));
   const coverage = scoreOne('test_coverage', () => scoreTestCoverage(result));
   const scope = scoreOne('scope_compliance', () => scoreScopeCompliance(result, task));
   const documentation = scoreOne('documentation', () => scoreDocumentation(result));
@@ -1802,7 +1854,9 @@ export function reconstructFromDurableEvidence(
   } else if (result.selfAssessment === 'NO_GO') {
     decision = 'NO_GO';
     veto = 'worker_self_no_go';
-  } else if (result.testsPassed === false) {
+  } else if (result.testsPassed === false && testsApplicableForTask(task)) {
+    // Non-code classes (doc/audit) run no tests — an honest testsPassed:false
+    // there is not a concrete failure (sprint-573/574 honesty fix).
     decision = 'NO_GO';
     veto = 'concrete_test_failed';
   } else if (!scope.passed) {

@@ -148,9 +148,25 @@ describe('evaluateResult (result-evaluator)', () => {
     expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('returns NO_GO for doc task when tests failed', async () => {
+  it('returns DONE for doc task even when testsPassed is honestly false (sprint-573/574 honesty fix)', async () => {
+    // Doc tasks run no tests — an honest `testsPassed:false` ("nothing to
+    // run") must not NO_GO the result. Before the fix this exact shape
+    // NO_GO'd 4 consecutive attempts of one doc task (573-006) while a
+    // sibling fabricating "tests passed" sailed through.
     const task = makeTask(['docs']);
     const result = makeResult({ testsPassed: false, selfAssessment: 'DONE' });
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+  });
+
+  it('doc task with honest testsPassed:false still respects the honest-DEBT ceiling', async () => {
+    const task = makeTask(['docs']);
+    const result = makeResult({ testsPassed: false, selfAssessment: 'GO_WITH_TECH_DEBT' });
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+  });
+
+  it('doc task with worker self-NO_GO stays NO_GO (honesty fix never overrides the worker verdict)', async () => {
+    const task = makeTask(['docs']);
+    const result = makeResult({ testsPassed: false, selfAssessment: 'NO_GO' });
     expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
@@ -418,6 +434,54 @@ describe('scoreCorrectness', () => {
     const result = makeResult({ testsPassed: false, selfAssessment: 'NO_GO' });
     const score = scoreCorrectness(result);
     expect(score.score).toBe(0);
+    expect(score.passed).toBe(false);
+  });
+
+  // ─── sprint-573/574 honesty fix: non-code classes ────────────────
+  function makeDocTask(): Task {
+    return makeTask(['docs'], {
+      scope: { directories: ['docs'], filesRead: [], filesWrite: ['docs/guide.md'] },
+    });
+  }
+
+  it('doc-class task: honest testsPassed:false scores the same as testsPassed:true (no honesty penalty, no fabrication reward)', () => {
+    const honest = scoreCorrectness(
+      makeResult({ testsPassed: false, selfAssessment: 'DONE' }), makeDocTask(),
+    );
+    const fabricated = scoreCorrectness(
+      makeResult({ testsPassed: true, selfAssessment: 'DONE' }), makeDocTask(),
+    );
+    expect(honest.score).toBe(100);
+    expect(honest.passed).toBe(true);
+    expect(honest.reason).toContain('tests not applicable');
+    expect(fabricated.score).toBe(honest.score);
+  });
+
+  it('doc-class task: selfAssessment component still differentiates (DONE > DEBT > NO_GO)', () => {
+    const debt = scoreCorrectness(
+      makeResult({ testsPassed: false, selfAssessment: 'GO_WITH_TECH_DEBT' }), makeDocTask(),
+    );
+    expect(debt.score).toBe(80);
+    const noGo = scoreCorrectness(
+      makeResult({ testsPassed: false, selfAssessment: 'NO_GO' }), makeDocTask(),
+    );
+    expect(noGo.score).toBe(60);
+    expect(noGo.passed).toBe(true); // criterion passes; worker self-NO_GO vetoes elsewhere
+  });
+
+  it('code-class task keeps the original tests-failed penalty (task supplied)', () => {
+    const task = makeTask(['src/core'], {
+      scope: { directories: ['src/core'], filesRead: [], filesWrite: ['src/core/a.ts'] },
+    });
+    const score = scoreCorrectness(makeResult({ testsPassed: false, selfAssessment: 'DONE' }), task);
+    expect(score.score).toBe(40);
+    expect(score.passed).toBe(false);
+    expect(score.reason).toContain('tests failed');
+  });
+
+  it('no task supplied keeps the original behaviour (backward compatible)', () => {
+    const score = scoreCorrectness(makeResult({ testsPassed: false, selfAssessment: 'DONE' }));
+    expect(score.score).toBe(40);
     expect(score.passed).toBe(false);
   });
 });

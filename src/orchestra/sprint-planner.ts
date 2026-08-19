@@ -46,7 +46,7 @@ import {
 } from '../core/execution-budget-derivation.js';
 import { createGoNoGoCriterionItem } from '../core/task-types.js';
 import { isUnconditionalRule } from './rule-evolver.js';
-import { resolveDebt } from './debt-manager.js';
+import { resolveDebt, isSuccessOnlyDebtNote } from './debt-manager.js';
 import { preflightCriticalDebt } from './debt-preflight.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
@@ -1373,6 +1373,17 @@ export function injectCriticalDebtTasks(
       continue;
     }
 
+    // sprint-573/574: a success-echo debt (note = pure verification evidence,
+    // no actionable gap) has nothing to fix. Typed class from the producer
+    // when present; the text fallback covers legacy rows written before the
+    // class existed. skippedNoop (never resolved) — like the noop-echo above,
+    // this is a classification, and a false positive must stay open.
+    if (item.class === 'success-echo'
+      || (item.class == null && isSuccessOnlyDebtNote(item.description))) {
+      skippedNoop.push(item.id);
+      continue;
+    }
+
     const hasOriginScope = !!item.originScope
       && (item.originScope.directories.length > 0 || item.originScope.filesWrite.length > 0);
 
@@ -1396,13 +1407,24 @@ export function injectCriticalDebtTasks(
     // slice) while the task DESCRIPTION carries the full note verbatim
     // instead of the old generic "Priority fix for critical debt item X"
     // placeholder — the worker sees exactly what was previously found.
-    const titleNote = item.description.length > 100
-      ? `${item.description.slice(0, 100)}…`
-      : item.description;
+    // sprint-573/574: strip the ledger's fixed evaluator preamble first — it
+    // is identical on every row and was eating most of the 100-char title
+    // budget, leaving titles that said nothing about the actual debt.
+    const strippedNote = item.description
+      .replace(/^Task evaluated as (DONE, but worker self-assessed GO_WITH_TECH_DEBT|GO_WITH_TECH_DEBT)\.\s*Notes:\s*/i, '');
+    const titleNote = strippedNote.length > 100
+      ? `${strippedNote.slice(0, 100)}…`
+      : strippedNote;
 
     tasks.push(createTask({
       title: `Fix debt: ${titleNote}`,
-      description: `${item.description}\n\n${scopeNote}`,
+      // sprint-573/574: debt notes routinely open with verification receipts
+      // before naming the residual gap; without this framing, fix workers
+      // read the green evidence, conclude "already done", and honestly no-op.
+      description: 'The debt note below may mix PRIOR verification evidence with the residual '
+        + 'gap description. Implement ONLY the residual/remaining gap(s); the green results '
+        + 'quoted are from the ORIGINAL task, not proof this debt is resolved.\n\n'
+        + `${item.description}\n\n${scopeNote}`,
       model: defaultModel,
       effort: 'high',
       priority: 'CRITICAL',

@@ -34,9 +34,12 @@ describe('Sprint-483 evaluation honesty negative replay', () => {
 
     expect(existsSync(replay.mandatoryArtifactPath)).toBe(false);
     const rawRubric = evaluateWithRubric(replay.negativeResult, replay.task);
-    // This is the Sprint-483 trap: the aggregate scorer looks debt-eligible.
-    // It is evidence input, never terminal authority by itself.
-    expect(rawRubric.decision).toBe('GO_WITH_TECH_DEBT');
+    // The Sprint-483 trap was that the aggregate scorer LOOKED debt-eligible
+    // for a worker self-NO_GO. The sprint-573/574 honesty fix closed that trap
+    // inside the rubric itself: a worker self-NO_GO is a ceiling the score can
+    // never raise, so the raw decision is now honestly NO_GO. The layers below
+    // (promotion refusal, settlement honesty) still guard the same contract.
+    expect(rawRubric.decision).toBe('NO_GO');
 
     const attemptedPromotion = enforceRecoveryBornEvaluationHonesty(
       replay.negativeResult,

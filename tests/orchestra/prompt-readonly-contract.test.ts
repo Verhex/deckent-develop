@@ -100,7 +100,7 @@ describe('inspection-only worker prompt contract', () => {
 
   it('preserves the ordinary code-task compiler path', () => {
     const task = makeInspectionTask();
-    task.type = 'implementation';
+    task.type = 'code-development';
     task.scope.filesRead = [];
     task.scope.filesWrite = ['src/core/live-execution-budget.ts'];
     const { prompt } = buildTaskPrompt(task, { effort: 'low' });

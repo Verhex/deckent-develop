@@ -2180,10 +2180,15 @@ describe('buildWorkerPrompt heartbeat instruction (Sprint 14)', () => {
 
 // ─── Sprint 19: buildWorkerPrompt UTC timestamp instruction ────────
 describe('buildWorkerPrompt UTC timestamp instruction (Sprint 19)', () => {
-  it('instructs worker to use new Date().toISOString() for UTC timestamp', () => {
+  it('instructs worker to write a UTC ISO timestamp (7094-F1d single-write heartbeat wording)', () => {
+    // The Sprint-19 wording carried the literal `new Date().toISOString()`;
+    // the F1d single-write heartbeat protocol states the same contract in
+    // prose ("a UTC ISO timestamp") — the pin follows the contract, not the
+    // retired code literal.
     const task = makeTask({ id: '019-002' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('new Date().toISOString()');
+    expect(prompt).toContain('a UTC ISO timestamp');
+    expect(prompt).toContain('ONCE');
   });
 
   it('instructs worker to use UTC ISO 8601 format', () => {

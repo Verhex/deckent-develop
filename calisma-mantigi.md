@@ -83,3 +83,29 @@
   byte-exact prefix + cache_salt=tenant; ölçüm süreyle · Cursor → usage/cache alanları
   DOKÜMANTE DEĞİL; ölç-ve-öğren, çarpan varsayma.
 - İlke: tek global ayar yok — provider×ortam profili config-resolved (F5 ürün özelliğiyle birleşir).
+
+## 3-tur stabilite + 7094-R onarım paketi (2026-08-19)
+- **Stabilite (571 ref vs R1/572·R2/573·R3/574):** mimarinin kontrol ettiği metrikler
+  ±%4 stabil (taze-input 3.38-3.52k; basit-cW 11-13k); kapsamlı-görev $0.78-1.18
+  salınımı davranışsal (tur-sayısı×cRead korele; F4-tier/turn işi). Kalite yapılı
+  (rehber 283-603 satır / 34-86 H2). R2/R3 debt-istilasıyla yarıda durdu → temiz
+  6/6 tur yalnız R1; owner kararı: F3 ürün-default'u 3 TAM temiz tur + kusursuz
+  analiz olmadan AÇILMAZ.
+- **NO_GO kök-neden (maliyet-değişikliği DEĞİL, kanıtlı):** DOC_WRITE correctness
+  `testsPassed`e bağlıydı → dürüst `false` yazan doc-worker NO_GO, "tests passed"
+  uyduran DONE (571/573 kanıtı; 573-006 attempt+3 fix aynı cezayla düştü ~$0.93).
+- **Debt+dependency 5-halka zinciri (owner endişesi doğrulandı):** (1) başarı-raporu
+  notlu debt doğumu → (2) escalateDebt her kapanışta critical'e geri yükseltir
+  (deprioritize workaround tek-tur ömürlü) → (3) plana debt-prepend slot kaydırır →
+  (4) "Task N"/integer ref debt-DAHİL listeye indexlenirdi → görevler debt'e bağlanır
+  (573-004←573-001 disk-kanıt scheduler-shadow) → (5) debt-fix NO_GO → FIX-bütçe
+  biter → breaker zinciri parked (4/8 görev hiç koşmadı, R2+R3 aynı).
+- **7094-R düzeltmeleri (owner onayı; tek MASTER satırı):** D1 resolveDependencyRef
+  index-formları directive-only alt-liste (task-builder) · D2-minimal doc/audit
+  sınıfında testsPassed nötr + self-NO_GO tavanı + legacy doc fast-path öne
+  (result-evaluator; kapsamlısı ayrı EVALUATOR-HONESTY maddesi) · D3 success-echo
+  DebtClass (üretim stamp + injector skip + başlık-önek soyma + fix-description
+  çerçevesi) · D4 = kod değişikliği GEREKMEDİ kanıtı (breaker/redispatch/unblock
+  zinciri sağlam; blokaj D1-remap belirtisiydi) + blockedDependencyEdges teşhisi.
+- **Ders:** ölçüm-sprintleri arasında finalize→escalateDebt yan-etkisi var; ardışık
+  deney turlarında debt-yönetimi tur-BAŞINA yapılmalı (tek seferlik yetmez).

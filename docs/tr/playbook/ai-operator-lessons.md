@@ -237,10 +237,57 @@ dürüst sonuç `VERIFIED filesChanged=[]`; (4) engine'in sunduğu tipli termina
 (`finalize --force` → ABORTED, hiçbir unresolved COMPLETE'e yükselmez); (5) el-editleri
 geri uygula + testleri yeniden koş. Sonuç fabrikasyonsuz dürüst kapanıştır.
 
+## 19. Evaluator dürüstlüğü cezalandırmasın — test-uygulanamaz görev sınıfında `testsPassed` sinyal değildir
+
+**Vaka (sprint 568-574):** Doküman görevinde "araç çalıştırmak yasak" kısıtı altında
+dürüstçe `testsPassed:false` yazan worker'lar DOC_WRITE correctness kuralınca NO_GO
+edildi; "tests passed" uyduran kardeş görevler DONE geçti. 573-006'da attempt + 3 fix
+DÖRDÜ de aynı cezayla düştü (~$0.93 boşa) — kusur worker'da değil kuralda olduğundan
+fix döngüsü çıkışsızdı.
+
+**Neden:** `scoreCorrectness` her görev sınıfında `testsPassed`e 60 puan bağlıyordu;
+doc/audit sınıfında test yüzeyi yoktur — alan orada kalite sinyali değil, dürüstlük
+turnusoludur ve tersine çalışır.
+
+**Doğru kullanım:** Doc/audit sınıfında `testsPassed` nötrdür (dürüst false = uyduran
+true — ikisi de aynı puan; yalan primi de ceza da yok). Worker'ın kendi NO_GO beyanı
+ise tavandır: rubrik puanı onu asla DONE'a yükseltemez; yalnız kanıt-tabanlı reconcile
+probe'ları kaldırabilir. Bir görev sınıfında art arda aynı gerekçeli NO_GO görürsen
+worker'ı değil evaluator kuralını sorgula.
+
+## 20. NO_GO→debt→"Task N" kayması zinciri — index-form dependency debt-prepend'e karşı savunmasızdı
+
+**Vaka (sprint 572-574 stabilite koşusu):** R1'in kapanışı `escalateDebt` ile eski
+debt'leri critical'e geri yükseltti (deprioritize workaround'u tek-tur ömürlü); R2
+planına 2 debt-fix PREPEND edildi; `- Dependencies: Task 1` referansı debt-DAHİL
+listeye index'lendiği için dürüst görevler debt-fix'lere bağlandı (`573-004←573-001`,
+scheduler-shadow disk kanıtı); başarı-raporu-notlu debt-fix'ler dürüst NO_GO'layınca
+FIX bütçesi bitti ve 8 görevin 4'ü hiç koşmadan run park edildi — R3 aynı kaderi
+birebir tekrarladı (kartopu).
+
+**Neden:** Beş halkanın her biri tek başına makul; bileşimi felaket. Kök kod defekti
+"Task N"/integer ref'lerin debt dahil tam-listeye index'lenmesiydi (yazar debt
+prepend'lerini GÖREMEZ — numaralandırması directive'e göredir).
+
+**Doğru kullanım:** (1) Index-form ref'ler artık yalnız directive alt-listesine
+bağlanır (7094-R D1); debt'e bilerek bağlanmak istersen açık slot-id yaz. (2) Ardışık
+ölçüm/deney koşularında debt yönetimi TUR BAŞINA yapılır — tek seferlik deprioritize
+escalation'a yenilir. (3) Success-echo debt (notu salt başarı kanıtı) artık
+injector'da atlanır; bir "Fix debt" görevi doğuyorsa notunda eyleme dönüştürülebilir
+eksik aranır. (4) Breaker pause mesajındaki `bloke←kök` kenarları hangi zincirin
+parked ettiğini söyler — teşhise oradan başla.
+
 ---
 
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-08-19 — 7094-R onarım paketi (sprint 572-574 stabilite koşusu)**: Ders 19
+  (evaluator dürüstlük-cezası: doc/audit sınıfında `testsPassed` nötr, self-NO_GO
+  tavan) ve Ders 20 (NO_GO→debt→"Task N" kayması 5-halka zinciri; index-form ref'ler
+  directive-only, success-echo debt skip, tur-başına debt yönetimi) eklendi. Kaynak
+  olaylar: 573-006'nın 4× aynı-gerekçeli NO_GO'su, 573/574'te 4/8 görevin parked
+  kalması, `573-004←573-001` scheduler-shadow kanıtı, escalateDebt'in deprioritize
+  workaround'unu tek turda geri alması.
 - **2026-08-19 — sprint-564 (NATIVE-SESSION-LEDGER) + E091 kurtarma vakası**: Ders 17
   bölümleşti (564'te uygulandı: komşu-pin NO_GO=0) ve Ders 18 eklendi (exit-0 + bozuk
   `.result` settlement kilidi: teşhis zinciri, içerik-verbatim encoding onarımı,

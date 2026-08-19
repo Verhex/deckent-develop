@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
@@ -62,6 +62,14 @@ function writeHb(
       ...extra,
     }),
     'utf-8',
+  );
+  // 7094-F1d: production writes `.hb` ONCE at spawn, so file mtime equals the
+  // content timestamp. The liveness probe consulted on the unavailable path
+  // reads MTIME — a fixture written "now" with STALE_TS content would probe
+  // alive and mask the staleness these cases pin.
+  utimesSync(
+    join(root, '.tasks', `task-${taskId}.hb`),
+    new Date(STALE_TS), new Date(STALE_TS),
   );
 }
 

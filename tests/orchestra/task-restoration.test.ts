@@ -3,7 +3,7 @@
 // resume skip-DONE, respawn stale workers, and idempotent checkpoint writes.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -67,7 +67,17 @@ function writeHbFile(root: string, taskId: string, timestamp: string, extra: Par
     progress: 50,
     ...extra,
   };
-  writeFileSync(join(root, '.tasks', `task-${taskId}.hb`), JSON.stringify(hb));
+  const hbPath = join(root, '.tasks', `task-${taskId}.hb`);
+  writeFileSync(hbPath, JSON.stringify(hb));
+  // 7094-F1d: the `.hb` file is a SINGLE spawn-time write in production, so
+  // its mtime equals its content timestamp. detectStaleWorkers now consults
+  // the liveness probe (whose L3 signal reads file MTIME) before trusting the
+  // content timestamp — a fixture written "now" with an old content timestamp
+  // would read as a fresh heartbeat and mask staleness the test is pinning.
+  const stamp = new Date(timestamp);
+  if (!Number.isNaN(stamp.getTime())) {
+    utimesSync(hbPath, stamp, stamp);
+  }
 }
 
 function writeResultFile(root: string, taskId: string): void {

@@ -30,6 +30,13 @@ export interface FixCircuitBreakerDecision {
   readonly effectiveCountThreshold: number;
   readonly unresolvedTaskIds: readonly string[];
   readonly blockedDependentTaskIds: readonly string[];
+  /**
+   * Diagnostic edges "blockedId←failedRootId" for every blocked dependent —
+   * WHY each task is parked, not just that it is (sprint-573/574: four tasks
+   * were reported blocked with no visible cause; the root turned out to be a
+   * dependency-ref remap onto debt prepends, invisible from the id list alone).
+   */
+  readonly blockedDependencyEdges: readonly string[];
   readonly forcedByBlockedDependents: boolean;
 }
 
@@ -394,29 +401,36 @@ export function evaluateFixCircuitBreaker(
   const effectiveCountThreshold = policy.max_unresolved_tasks;
   const unresolvedSet = new Set(unresolvedTaskIds);
   const rootsById = new Map(logicalRoots.map(task => [task.id, task]));
-  const dependsOnUnresolvedLineage = (task: Task): boolean => {
+  // Returns the FIRST unresolved lineage root reached through the task's
+  // (transitive) dependencies, or null — the id doubles as the diagnostic
+  // edge target so operators see WHY a dependent is parked.
+  const findUnresolvedLineageBlocker = (task: Task): string | null => {
     const pending = [...(task.dependencies ?? [])];
     const seen = new Set<string>();
     while (pending.length > 0) {
       const dependencyId = pending.pop();
       if (!dependencyId || seen.has(dependencyId)) continue;
       seen.add(dependencyId);
-      if (unresolvedSet.has(dependencyId)) return true;
+      if (unresolvedSet.has(dependencyId)) return dependencyId;
       const dependency = rootsById.get(dependencyId);
       if (dependency?.dependencies) pending.push(...dependency.dependencies);
     }
-    return false;
+    return null;
   };
+  const blockedDependencyEdges: string[] = [];
   const blockedDependentTaskIds = logicalRoots
-    .filter(task =>
-      (
+    .filter(task => {
+      if (!(
         task.status === TaskStatus.PENDING
         || task.status === TaskStatus.PAUSED
         || evaluations.get(task.id) === TaskEvaluation.DEFERRED
         || evaluations.get(task.id) === TaskEvaluation.NOT_DISPATCHED
-      )
-      && dependsOnUnresolvedLineage(task),
-    )
+      )) return false;
+      const blocker = findUnresolvedLineageBlocker(task);
+      if (blocker === null) return false;
+      blockedDependencyEdges.push(`${task.id}←${blocker}`);
+      return true;
+    })
     .map(task => task.id);
   const forcedByBlockedDependents =
     unresolvedTasks > 0 && blockedDependentTaskIds.length > 0;
@@ -435,6 +449,7 @@ export function evaluateFixCircuitBreaker(
     effectiveCountThreshold,
     unresolvedTaskIds: Object.freeze(unresolvedTaskIds),
     blockedDependentTaskIds: Object.freeze(blockedDependentTaskIds),
+    blockedDependencyEdges: Object.freeze(blockedDependencyEdges),
     forcedByBlockedDependents,
   };
 }

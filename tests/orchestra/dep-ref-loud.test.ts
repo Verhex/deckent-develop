@@ -79,6 +79,59 @@ describe('resolveDependencyRef — "Task N" / "task N" human-natural form (born-
   });
 });
 
+// ─── Sprint 573/574 canlı-vakası — debt-prepend index drift ────────────────
+//
+// Brain prepends critical-debt fix tasks (isPriorityFix: true) at the head of
+// the sprint. Index-form refs ("Task N", bare integer) must count ONLY the
+// authored directive tasks: the DIRECTIVES author numbers their own "## Task
+// N:" headings and cannot see debt prepends. Before this fix, "Task 1" in a
+// 2-debt sprint resolved to the FIRST DEBT task — chaining honest directive
+// tasks onto un-fixable debt lineages (sprint-573: 4 of 8 tasks never ran,
+// run parked by the post-FIX circuit breaker).
+const DEBT_PREPENDED_TASKS = [
+  { id: '573-001', title: 'Fix debt: repl surface hardening', isPriorityFix: true },
+  { id: '573-002', title: 'Fix debt: trace-wire cleanup', isPriorityFix: true },
+  { id: '573-003', title: 'API-1 — Build the REST API endpoint' },
+  { id: '573-004', title: 'API-2 — Write integration tests for the endpoint' },
+  { id: '573-005', title: 'API-3 — Document the new endpoint in the API reference' },
+];
+
+describe('resolveDependencyRef — index forms skip debt prepends (sprint-573/574)', () => {
+  it('"Task 1" binds to the first AUTHORED task, not the first debt prepend', () => {
+    expect(resolveDependencyRef('Task 1', DEBT_PREPENDED_TASKS)).toBe('573-003');
+  });
+
+  it('"Task 2" binds to the second authored task', () => {
+    expect(resolveDependencyRef('Task 2', DEBT_PREPENDED_TASKS)).toBe('573-004');
+  });
+
+  it('bare integer "0" (0-based) also skips debt prepends', () => {
+    expect(resolveDependencyRef('0', DEBT_PREPENDED_TASKS)).toBe('573-003');
+  });
+
+  it('out-of-range against the directive sublist stays undefined', () => {
+    // 5 total tasks but only 3 authored — "Task 4" must NOT spill into
+    // absolute-list indexing.
+    expect(resolveDependencyRef('Task 4', DEBT_PREPENDED_TASKS)).toBeUndefined();
+  });
+
+  it('explicit plan-slot id still reaches a debt task when intentionally named', () => {
+    expect(resolveDependencyRef('573-001', DEBT_PREPENDED_TASKS)).toBe('573-001');
+  });
+
+  it('title-prefix labels keep binding by title, debt present or not', () => {
+    expect(resolveDependencyRef('API-2', DEBT_PREPENDED_TASKS)).toBe('573-004');
+  });
+
+  it('resolveTaskDependenciesLoud carries the same directive-only indexing', () => {
+    const { resolved, warnings } = resolveTaskDependenciesLoud(
+      '573-005', ['Task 1', 'Task 2'], DEBT_PREPENDED_TASKS,
+    );
+    expect(resolved).toEqual(['573-003', '573-004']);
+    expect(warnings).toHaveLength(0);
+  });
+});
+
 describe('resolveDependencyRef — existing ref styles unaffected (regression guard)', () => {
   it('plan-slot id still resolves by exact id match', () => {
     expect(resolveDependencyRef('358-002', SAMPLE_TASKS)).toBe('358-002');

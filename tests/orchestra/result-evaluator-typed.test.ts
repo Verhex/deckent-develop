@@ -240,12 +240,11 @@ describe('evaluateWithRubric — Sprint 154 typed scenarios', () => {
     expect(evaluation.decision).toBe('NO_GO');
   });
 
-  it('doc-write task with failing tests + NO_GO self-assessment → GO_WITH_TECH_DEBT or NO_GO (degraded)', () => {
-    // When tests fail and worker self-assesses NO_GO, scoreCorrectness drops
-    // to zero. Combined with thin notes, the doc-write rubric must not
-    // produce a clean DONE — it should land in the degraded band
-    // (GO_WITH_TECH_DEBT or NO_GO depending on partial credit from the
-    // other criteria).
+  it('doc-write task with NO_GO self-assessment → NO_GO (worker self-verdict ceiling)', () => {
+    // Sprint-573/574 honesty fix: testsPassed carries no signal for the
+    // doc-write class, so the score alone can clear passingScore — but the
+    // worker's own NO_GO is a ceiling the rubric may never raise. Only the
+    // evidence-backed reconcile probes (git-diff/tsc/vitest) may lift it.
     const task = makeTask({
       directories: [SMOKE_DIR],
       filesWrite: [SMOKE_FILE],
@@ -260,8 +259,7 @@ describe('evaluateWithRubric — Sprint 154 typed scenarios', () => {
 
     const evaluation = evaluateWithRubric(result, task);
 
-    expect(['GO_WITH_TECH_DEBT', 'NO_GO']).toContain(evaluation.decision);
-    expect(evaluation.totalScore).toBeLessThan(70);
+    expect(evaluation.decision).toBe('NO_GO');
   });
 
   it('audit task missing the report file falls back gracefully (no crash)', () => {

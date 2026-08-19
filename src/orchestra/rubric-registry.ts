@@ -71,9 +71,10 @@ export const AUDIT_RUBRIC: EvaluationRubric = {
  * Document-write rubric — for narrative `docs/` content.
  *
  * Coverage is also irrelevant here. We grade correctness (worker
- * self-assessment + tests trivially pass), word count (target met),
- * scope compliance (no source files touched), and documentation quality
- * (heading structure).
+ * self-assessment; test execution is not applicable to this class, so
+ * `testsPassed` carries no signal — sprint-573/574 honesty fix), word
+ * count (target met), scope compliance (no source files touched), and
+ * documentation quality (heading structure).
  *
  * @security Same override prohibition as CODE_RUBRIC.
  */
@@ -202,10 +203,20 @@ export const PROOF_OF_FUNCTION_CRITERION = {
   evaluator: 'pattern',
 } as const;
 
+/**
+ * Resolve the rubric task type exactly the way {@link getRubric} does:
+ * canonical `task.type` (TaskKind) via the SSOT adapter when present, else
+ * scope-shape {@link detectTaskType}. Exported so evaluator criteria that
+ * need class awareness (e.g. tests-applicability in correctness scoring)
+ * classify with the SAME authority the rubric selection uses — never a
+ * parallel re-derivation that can drift.
+ */
+export function resolveRubricTaskType(task: Task): RubricTaskType {
+  return task.type != null ? taskKindToRubric(task.type) : detectTaskType(task);
+}
+
 export function getRubric(task: Task): EvaluationRubric {
-  // Canonical path: task.type (TaskKind) set by task-builder → derive RubricTaskType via SSOT adapter.
-  // Fallback: scope-shape detectTaskType for tasks without a canonical type (backward-compatible).
-  const rubricType = task.type != null ? taskKindToRubric(task.type) : detectTaskType(task);
+  const rubricType = resolveRubricTaskType(task);
   const base = RUBRIC_REGISTRY[rubricType];
   // Tier-1 (user-surface) tasks get the proof-of-function criterion appended.
   // Return a fresh object so the frozen base rubric is never mutated; Tier-0

@@ -1237,7 +1237,12 @@ export function applyCascadeCircuitBreaker(
   const reason = decision.forcedByBlockedDependents
     ? getMessage('pause.exhausted_repair_blocks_dependents_reason', lang, {
         unresolvedTasks: decision.unresolvedTaskIds.join(', '),
-        blockedTasks: decision.blockedDependentTaskIds.join(', '),
+        // Edge form "blocked←failedRoot" — WHY each dependent is parked
+        // (sprint-573/574 diagnostic gap). Same placeholder, richer value;
+        // falls back to bare ids if edges are ever absent.
+        blockedTasks: decision.blockedDependencyEdges.length > 0
+          ? decision.blockedDependencyEdges.join(', ')
+          : decision.blockedDependentTaskIds.join(', '),
       })
     : getMessage('pause.post_fix_circuit_breaker_reason', lang, {
         unresolved: String(decision.unresolvedTasks),

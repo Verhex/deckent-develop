@@ -285,6 +285,34 @@ function getSprintNumber(sprintId: string): number {
  */
 type DebtSource = 'evaluator' | 'self';
 
+// ─── Success-echo classification (sprint-573/574) ─────────────────────
+// Verification-evidence markers workers actually write (observed in the live
+// debt ledger: LOCAL_VERIFIED / SCOPED_GREEN prefixes, green test counts,
+// unpiped exit codes) …
+const DEBT_SUCCESS_SIGNAL_RE =
+  /LOCAL_VERIFIED|SCOPED_GREEN|tests?\s+pass(ed)?|\d+\/\d+\s+(tests?\s+)?pass|exit(ed)?\s+0|all\s+green|CONFIRMED|LANDED/i;
+// … versus actionable-gap language that makes a follow-up fix task
+// meaningful. Both lists are deliberately broad on the GAP side: any gap hit
+// keeps the debt injectable (false negatives are cheap — the fix task simply
+// runs; a false POSITIVE would silently drop real work, so it must be rare).
+const DEBT_GAP_SIGNAL_RE =
+  /remaining|residual|missing|TODO|not\s+(yet\s+)?implemented|incomplete|unresolved|still\s+(fails?|open|broken|missing)|follow[- ]?up|gap|left\s+(open|undone)|known\s+(issue|limitation)|deferred|out\s+of\s+scope|debt:/i;
+
+/**
+ * True when a GO_WITH_TECH_DEBT note carries ONLY success evidence and no
+ * actionable-gap language — a "success echo". A fix task built from such a
+ * note has nothing to fix: the sprint-573/574 live case spawned workers whose
+ * entire brief was a success report; they honestly NO_GO'd, exhausted the FIX
+ * budget and parked the run. Producer side stamps `metadata.class:
+ * 'success-echo'`; the injector (sprint-planner) skips the class WITHOUT
+ * resolving, and applies this same text test as a fallback for legacy rows
+ * written before the class existed.
+ */
+export function isSuccessOnlyDebtNote(note: string | undefined): boolean {
+  if (!note) return false;
+  return DEBT_SUCCESS_SIGNAL_RE.test(note) && !DEBT_GAP_SIGNAL_RE.test(note);
+}
+
 /**
  * Insert a debt-ledger row for a task, keyed by `debt-${task.id}` (idempotent
  * — a pre-existing row with the same id is never duplicated). Shared by both
@@ -363,8 +391,14 @@ function recordDebtEntry(
         // the honest-closure `verified-no-result` classification is a separate
         // Brain-level lifecycle concern (see 362-001 result notes) and is not set
         // here. NOTE: additive only — retroactively unaffects rows already written
-        // without originScope.
-        class: isTimeoutPartial ? 'timeout-partial' : 'standard',
+        // without originScope. `success-echo` (sprint-573/574): a note that is
+        // pure verification evidence with no actionable gap never becomes an
+        // injectable fix task.
+        class: isTimeoutPartial
+          ? 'timeout-partial'
+          : isSuccessOnlyDebtNote(String(result.notes ?? ''))
+            ? 'success-echo'
+            : 'standard',
         originScope: {
           directories: [...(task.scope?.directories ?? [])],
           filesWrite: [...(task.scope?.filesWrite ?? [])],

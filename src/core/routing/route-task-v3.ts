@@ -405,7 +405,13 @@ function skillDomainOverlap(requirement: RequirementVector, space: MatchSpace): 
     const declared = space.domains.find((d) => d.id === rd.id)
       ?? space.domains.find((d) => d.id === '*');
     if (declared && declared.proficiency !== 'never') {
-      overlap += rd.weight * PROFICIENCY_SCORE[declared.proficiency];
+      // A requirement domain only exists here because path evidence matched
+      // (producePositional skips domains with no evidence). Its weight is the
+      // matched share of filesWrite — which is 0 for a directories-only scope
+      // (totalWrites=0), NOT "no intersection". Treat evidence-with-zero-weight
+      // as presence (weight 1) so directories-only tasks keep skill selection;
+      // weighted tasks are unchanged (7094-R landing find, brain-skill pin).
+      overlap += (rd.weight > 0 ? rd.weight : 1) * PROFICIENCY_SCORE[declared.proficiency];
     }
   }
   return overlap;

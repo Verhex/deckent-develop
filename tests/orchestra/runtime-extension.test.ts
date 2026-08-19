@@ -5,7 +5,7 @@
 // Map. All time inputs are injected for deterministic tests.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -111,6 +111,14 @@ describe('evaluateRuntimeExtension', () => {
     // Heartbeat 120s old — past the 90s threshold.
     const hbIso = new Date(FIXED_NOW_MS - 120_000).toISOString();
     writeHeartbeat(projectRoot, TASK_ID, hbIso);
+    // 7094-F1d: the denial now comes from the worker-liveness probe (file
+    // MTIME, real clock), not the in-file timestamp age. Align the fixture's
+    // mtime with its content timestamp — in production the single spawn-time
+    // `.hb` write makes them equal; a fixture written "now" would probe alive.
+    utimesSync(
+      join(projectRoot, TASKS_DIR, `task-${TASK_ID}.hb`),
+      new Date(hbIso), new Date(hbIso),
+    );
 
     const decision = evaluateRuntimeExtension(
       projectRoot, SPRINT_ID, TASK_ID, makeConfig(true), state, clock,

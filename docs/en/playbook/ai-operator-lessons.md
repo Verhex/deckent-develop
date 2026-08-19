@@ -252,10 +252,58 @@ credits YOUR work to the dead worker — the honest outcome is
 (5) re-apply your edits and re-run the tests. The result is an honest,
 fabrication-free closure.
 
+## 19. The evaluator must never punish honesty — `testsPassed` carries no signal in test-inapplicable task classes
+
+**Case (sprints 568-574):** Under a "no tool execution" doc-task constraint, workers
+that honestly wrote `testsPassed:false` were NO_GO'd by the DOC_WRITE correctness
+rule, while sibling tasks fabricating "tests passed" sailed through as DONE. On
+573-006, the attempt plus THREE fix rounds all fell to the same penalty (~$0.93
+wasted) — the defect was in the rule, not the workers, so the fix loop had no exit.
+
+**Why:** `scoreCorrectness` tied 60 points to `testsPassed` in every task class;
+doc/audit classes have no test surface — there the field is not a quality signal
+but an honesty litmus, and it works in reverse.
+
+**Correct usage:** In doc/audit classes `testsPassed` is neutral (honest false =
+fabricated true — same score; no fabrication premium, no honesty penalty). The
+worker's own NO_GO is a ceiling: a rubric score can never raise it to DONE; only
+evidence-backed reconcile probes may lift it. When you see repeated same-reason
+NO_GOs in one task class, interrogate the evaluator rule before the workers.
+
+## 20. The NO_GO→debt→"Task N" drift chain — index-form dependencies were defenceless against debt prepends
+
+**Case (sprints 572-574 stability runs):** R1's closure re-escalated old debts to
+critical via `escalateDebt` (the deprioritize workaround lives exactly one round);
+R2's plan got 2 debt-fixes PREPENDED; `- Dependencies: Task 1` refs were indexed
+into the debt-INCLUSIVE list, so honest directive tasks got chained onto debt-fixes
+(`573-004←573-001`, scheduler-shadow disk evidence); success-report-noted debt-fixes
+honestly NO_GO'd, the FIX budget burned out, and 4 of 8 tasks never ran before the
+run was parked — R3 repeated the exact same fate (snowball).
+
+**Why:** Each of the five links is individually reasonable; the composition is a
+disaster. The root code defect was "Task N"/integer refs indexing the full list
+including debt — the DIRECTIVES author cannot see debt prepends; their numbering
+follows the directive.
+
+**Correct usage:** (1) Index-form refs now bind only to the directive sublist
+(7094-R D1); to intentionally depend on a debt task, write its explicit slot id.
+(2) In consecutive measurement/experiment runs, manage debt PER ROUND — a one-time
+deprioritize loses to escalation. (3) Success-echo debt (a note that is pure success
+evidence) is now skipped by the injector; when a "Fix debt" task is born, look for
+an actionable gap in its note. (4) The breaker pause message's `blocked←root` edges
+tell you which chain parked the run — start diagnosis there.
+
 ---
 
 ## Changelog (update after every sprint experience)
 
+- **2026-08-19 — the 7094-R repair package (sprints 572-574 stability runs)**:
+  Lesson 19 added (the evaluator honesty penalty: `testsPassed` neutral in doc/audit
+  classes, worker self-NO_GO as a ceiling) and Lesson 20 added (the NO_GO→debt→
+  "Task N" drift chain in five links; directive-only index refs, success-echo debt
+  skip, per-round debt management). Source events: 573-006's 4× same-reason NO_GO,
+  4/8 tasks parked in both 573 and 574, the `573-004←573-001` scheduler-shadow
+  evidence, escalateDebt undoing the deprioritize workaround within one round.
 - **2026-08-19 — sprint-564 (NATIVE-SESSION-LEDGER) + the E091 recovery case**:
   Lesson 17 promoted to its own section (applied in 564: neighbour-pin NO_GO = 0)
   and Lesson 18 added (the exit-0 + corrupt-`.result` settlement deadlock: the

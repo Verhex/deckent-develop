@@ -869,11 +869,15 @@ function titleHasRefToken(title: string, ref: string): boolean {
  * `task.id`, surviving the auto-debt prepend offset drift (Sprint 176/178).
  *
  * Resolution order:
- *   1. Pure integer (`"0"`, `"1"`, …) → 0-based index into `tasks` (325-001).
+ *   1. Pure integer (`"0"`, `"1"`, …) → 0-based index into the DIRECTIVE
+ *      tasks only — entries with `isPriorityFix === true` (auto-injected
+ *      debt-fix prepends) are excluded from the index space (325-001,
+ *      index-base fix sprint-573/574 evidence).
  *   2. Human-natural `"Task N"` / `"task N"` (born-458) → 1-based index into
- *      `tasks`, matching the `## Task N:` heading numbering DIRECTIVES.md
- *      authors actually write (`"Task 1"` is the first task). Distinct
- *      literal shape from #1 so the two never collide.
+ *      the same directive-only sublist, matching the `## Task N:` heading
+ *      numbering DIRECTIVES.md authors actually write (`"Task 1"` is the
+ *      first authored task — never a debt prepend the author cannot see).
+ *      Distinct literal shape from #1 so the two never collide.
  *   3. Plan-slot ID (`NNN-NNN`) → exact `task.id` lookup. Returns the id
  *      when a task with that exact id exists, otherwise undefined. (Back-
  *      compat: legacy DIRECTIVES that hard-code slot IDs still work — but
@@ -886,31 +890,40 @@ function titleHasRefToken(title: string, ref: string): boolean {
  * caller — batch callers should prefer `resolveTaskDependenciesLoud`, which
  * reports every unresolved ref instead of swallowing it.
  *
- * Why title-prefix is preferred: Brain prepends critical-debt fix tasks at
- * the head of the sprint, which shifts every subsequent plan-slot ID by N.
+ * Why index forms skip debt prepends: Brain prepends critical-debt fix tasks
+ * at the head of the sprint, which shifts every subsequent plan-slot ID by N.
  * Hard-coded refs like `"178-002"` then silently point at the wrong disk
- * task. Title-prefix labels (`"W1-1"`) bind to the directive task itself,
- * so they remain correct even after debt-prepend.
+ * task, and (before the sprint-573/574 fix) `"Task N"`/integer refs bound to
+ * the debt-shifted position instead of the authored task — chaining honest
+ * directive tasks onto un-fixable debt lineages and parking whole runs.
+ * Title-prefix labels (`"W1-1"`) bind to the directive task itself, so they
+ * were always safe; index forms now share that safety by indexing only the
+ * directive sublist.
  *
  * @param ref Raw dependency reference parsed from DIRECTIVES.
  * @param tasks All tasks already created for the sprint (debt + directive)
  *   — typically passed in after the planner finishes constructing the task
- *   list. Only `id` and `title` are read.
+ *   list. Only `id`, `title` and `isPriorityFix` are read.
  */
 export function resolveDependencyRef(
   ref: string,
-  tasks: ReadonlyArray<{ id: string; title: string }>,
+  tasks: ReadonlyArray<{ id: string; title: string; isPriorityFix?: boolean }>,
 ): string | undefined {
   if (typeof ref !== 'string') return undefined;
   const trimmed = ref.trim();
   if (!trimmed) return undefined;
   if (DEPENDENCY_REF_RESERVED.has(trimmed.toUpperCase())) return undefined;
 
+  // Index-form refs ("0" / "Task 3") count only authored directive tasks:
+  // auto-injected debt-fix prepends are invisible to the DIRECTIVES author,
+  // so they must be invisible to the author's numbering too.
+  const directiveTasks = tasks.filter(t => t.isPriorityFix !== true);
+
   // Pure integer → 0-based index into the task list (e.g. "0" resolves to the first task's id).
   // This handles `- Dependencies: 0` refs where the planner emits a list index instead of a slot-id.
   if (/^\d+$/.test(trimmed)) {
     const idx = Number.parseInt(trimmed, 10);
-    return tasks[idx]?.id;
+    return directiveTasks[idx]?.id;
   }
 
   // born-458: human-natural "Task N" / "task N" form → 1-based index into the
@@ -921,7 +934,7 @@ export function resolveDependencyRef(
   const taskNMatch = TASK_N_RE.exec(trimmed);
   if (taskNMatch) {
     const n = Number.parseInt(taskNMatch[1]!, 10);
-    return tasks[n - 1]?.id;
+    return directiveTasks[n - 1]?.id;
   }
 
   if (PLAN_SLOT_ID_RE.test(trimmed)) {
@@ -944,7 +957,7 @@ export function resolveDependencyRef(
  */
 export function resolveTaskDependencies(
   refs: ReadonlyArray<string>,
-  tasks: ReadonlyArray<{ id: string; title: string }>,
+  tasks: ReadonlyArray<{ id: string; title: string; isPriorityFix?: boolean }>,
 ): string[] {
   const seen = new Set<string>();
   const resolved: string[] = [];
@@ -1006,7 +1019,7 @@ export interface ResolveTaskDependenciesLoudResult {
 export function resolveTaskDependenciesLoud(
   ownerTaskId: string,
   refs: ReadonlyArray<string>,
-  tasks: ReadonlyArray<{ id: string; title: string }>,
+  tasks: ReadonlyArray<{ id: string; title: string; isPriorityFix?: boolean }>,
   options: ResolveTaskDependenciesLoudOptions = {},
 ): ResolveTaskDependenciesLoudResult {
   const seen = new Set<string>();
@@ -1067,7 +1080,7 @@ export function resolveTaskDependenciesLoud(
  *   stderr per-task by `resolveTaskDependenciesLoud`, unless strict threw first).
  */
 export function normalizeStructuredTaskDependencies(
-  tasks: Array<{ id: string; title: string; dependencies: string[] }>,
+  tasks: Array<{ id: string; title: string; dependencies: string[]; isPriorityFix?: boolean }>,
   options: ResolveTaskDependenciesLoudOptions = {},
 ): { warnings: DependencyRefWarning[] } {
   const warnings: DependencyRefWarning[] = [];

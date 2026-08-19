@@ -388,8 +388,16 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-19 (7094-F1 Fable-subprocess dalgası): same 14464 count, digest
   // only — F1a/F1c/F1d pin realignments (landing-coordinator order, routing
   // domain-overlap pins, plan/hb protocol pins) moved tracked content.
-  count: 14464,
-  digest: '991e2c26cfe6d0ab34d94e1034d309b6333c7350d58c3a116dfc0eb9d1c1c9a3',
+  // 2026-08-19 (7094-R debt/dependency onarım paketi): +1 — the
+  // debt-injection-success-echo suite enters (pure in-memory fixtures);
+  // dep-ref-loud gains debt-prepend index pins, result-evaluator gains the
+  // doc-honesty pins, task-lineage gains blocked-edge pins (content moves).
+  // 2026-08-19 (7094-R full-suite triage): +2 — F1d fixture-mtime alignment
+  // (utimesSync write sites in task-restoration + evaluate-trigger-gate +
+  // runtime-extension + liveness-adopt count as tracked writes); brain/
+  // honesty-replay/brain-skill pins realigned to the F1d/573-ceiling wording.
+  count: 14467,
+  digest: 'ab1fc6e8993140b4d8d062c7cdfd86d62a32528d1ad79862282743fa75eefa20',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -644,8 +652,17 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // route-task-v3 domain-overlap, prompt-template plan/hb text, nervous
   // stale-worker veto, timeout-watcher/sprint-phases/sprint-checkpoint/status
   // probe wiring moved production content.
+  // 2026-08-19 (7094-R debt/dependency onarım paketi): same 1256 count,
+  // digest only — task-builder directive-only index refs, result-evaluator
+  // doc-honesty + self-NO_GO ceiling, debt-manager success-echo classifier,
+  // sprint-planner injector skip/title/description, task-lineage blocked
+  // edges, sprint-controller edge-form pause reason moved production content.
+  // 2026-08-19 (7094-R landing find): same 1256 count, digest only —
+  // route-task-v3 skillDomainOverlap treats evidence-with-zero-weight
+  // (directories-only scope, totalWrites=0) as presence so those tasks keep
+  // skill selection.
   count: 1256,
-  digest: 'd2b4438e6ee45968e09b9c679cf5ccccfd5fbc7b275764f2aca71ab3009de121',
+  digest: 'bf640fc150a80e74add86488eb90c8522df0281a4d3c44df574b6274094d65fc',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

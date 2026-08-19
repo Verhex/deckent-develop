@@ -148,9 +148,16 @@ export enum DebtPriority {
  *   not a deliberate shortcut, so a forced fix task only spawns a no-op worker
  *   that re-injects every sprint (the debt-361-001-fix phantom loop). Genuine
  *   incompleteness resurfaces later as a concrete, actionable failure. (Sprint 364.)
+ * - `success-echo`: the GO_WITH_TECH_DEBT note carries ONLY success evidence
+ *   (verification receipts, green test counts) and no actionable-gap language.
+ *   A forced fix task built from it has nothing to fix — the sprint-573/574
+ *   live case spawned workers whose entire brief was a success report, who
+ *   then honestly NO_GO'd, burned the FIX budget and parked the run. Skipped
+ *   by the injector WITHOUT resolving (text classification — a false positive
+ *   must stay open for re-evaluation, mirroring the born-603 noop-echo rule).
  * - `standard`: regular debt that needs a fix task (default when class is absent).
  */
-export type DebtClass = 'verified-no-result' | 'timeout-partial' | 'standard';
+export type DebtClass = 'verified-no-result' | 'timeout-partial' | 'success-echo' | 'standard';
 
 /**
  * Origin scope captured when the debt was created. Used by the auto-debt

@@ -294,8 +294,27 @@ describe('post-FIX circuit breaker', () => {
       totalTasks: 4,
       unresolvedTasks: 2,
       blockedDependentTaskIds: ['dependent'],
+      // sprint-573/574 diagnostic: WHY each dependent is parked, as an edge.
+      blockedDependencyEdges: ['dependent←blocked-root'],
       forcedByBlockedDependents: true,
     });
+  });
+
+  it('reports transitive blockage as an edge to the failed ROOT, not the intermediate', () => {
+    const tasks = [
+      task('failed-root', TaskStatus.NO_GO),
+      task('middle', TaskStatus.PENDING, { dependencies: ['failed-root'] }),
+      task('leaf', TaskStatus.PENDING, { dependencies: ['middle'] }),
+    ];
+    const evaluations = new Map([
+      ['failed-root', TaskEvaluation.NO_GO],
+      ['middle', TaskEvaluation.NOT_DISPATCHED],
+      ['leaf', TaskEvaluation.NOT_DISPATCHED],
+    ]);
+
+    const decision = evaluateFixCircuitBreaker(tasks, evaluations, policy);
+    expect(decision.blockedDependencyEdges).toContain('middle←failed-root');
+    expect(decision.blockedDependencyEdges).toContain('leaf←failed-root');
   });
 
   it('never pauses through the configured thresholds when the policy is disabled', () => {
