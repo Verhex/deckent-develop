@@ -32,6 +32,15 @@
 //              configured API-key presence, which remains unverified.
 //   - gemini : installed CLI exposes no auth-status subcommand. OAuth/API-key
 //              presence is reported as present but authentication remains unknown.
+//   - cursor : `cursor-agent status` — same text-parse discipline as codex: the
+//              exit code alone is NOT a signal, so stdout is parsed and the
+//              logged-OUT vocabulary is matched FIRST (a "Not logged in" line
+//              also contains the logged-IN substring). No API-key env
+//              short-circuit is claimed: this environment could not verify a
+//              cursor key contract, and inventing one would be invented
+//              confidence. NOTE the binary is `cursor-agent` — the bare
+//              `cursor` name is the editor/IDE `detected_env` namespace and is
+//              deliberately never spawned here.
 //
 // PSL-6-WIRE (Sprint 356, row 206): the original `{ state, detail }` shape only
 // answers "logged in or not". It cannot tell "CLI/creds missing entirely" apart
@@ -54,7 +63,7 @@ import { join } from 'node:path';
 import { scrubCrossProviderEnv } from './provider.js';
 
 /** Providers this probe understands. Anything else → 'unknown'. */
-export type AuthProbeProvider = 'claude' | 'codex' | 'gemini';
+export type AuthProbeProvider = 'claude' | 'codex' | 'gemini' | 'cursor';
 
 /** Tri-state login result. */
 export type AuthProbeState = 'logged-in' | 'logged-out' | 'unknown';
@@ -380,6 +389,92 @@ async function probeCodex(
   };
 }
 
+// ─── cursor ──────────────────────────────────────────────────────────────────
+
+/**
+ * The Cursor CLI's local auth-status contract. The executable is `cursor-agent`
+ * (NOT `cursor`, which is the editor/IDE namespace).
+ */
+export const CURSOR_CLI_BIN = 'cursor-agent';
+export const CURSOR_AUTH_STATUS_ARGS = ['status'] as const;
+
+const CURSOR_LOGGED_OUT = /not\s+logged\s+in|not\s+authenticated|logged\s+out|no\s+active\s+session/i;
+const CURSOR_LOGGED_IN = /logged\s+in|authenticated/i;
+
+/**
+ * Canonical parser for `cursor-agent status`. Kept separate from the codex
+ * classifier (two call-sites, independent vendor vocabularies) but follows the
+ * same two rules: logged-out text wins the substring trap, and a positive login
+ * needs exit 0 as well as the matching text — a status line alone from a
+ * non-zero run is not proof of a usable session.
+ */
+export function classifyCursorAuthStatus(
+  status: number | null,
+  output: string,
+): AuthProbeState {
+  if (CURSOR_LOGGED_OUT.test(output)) return 'logged-out';
+  if (status === 0 && CURSOR_LOGGED_IN.test(output)) return 'logged-in';
+  return 'unknown';
+}
+
+/** Cursor session via `cursor-agent status` — stdout parse, never the exit code alone. */
+async function probeCursor(
+  spawnImpl: AuthProbeSpawnImpl,
+  env: NodeJS.ProcessEnv,
+  timeoutMs: number,
+): Promise<AuthProbeResult> {
+  const childEnv = await buildAuthProbeChildEnv(env);
+  const res = await spawnImpl(CURSOR_CLI_BIN, CURSOR_AUTH_STATUS_ARGS, {
+    timeoutMs,
+    env: childEnv,
+  });
+  if (res.spawnError) {
+    return {
+      state: 'unknown',
+      detail: 'cursor-agent CLI not available',
+      present: false,
+      authenticated: false,
+      method: 'none',
+    };
+  }
+  if (res.timedOut) {
+    return {
+      state: 'unknown',
+      detail: 'cursor-agent status timed out',
+      present: 'unknown',
+      authenticated: 'unknown',
+      method: 'none',
+    };
+  }
+
+  const state = classifyCursorAuthStatus(res.status, res.stdout ?? '');
+  if (state === 'logged-out') {
+    return {
+      state: 'logged-out',
+      detail: 'cursor-agent status: not logged in — run: cursor-agent login',
+      present: true,
+      authenticated: false,
+      method: 'none',
+    };
+  }
+  if (state === 'logged-in') {
+    return {
+      state: 'logged-in',
+      detail: 'cursor-agent status: logged in',
+      present: true,
+      authenticated: true,
+      method: 'subscription',
+    };
+  }
+  return {
+    state: 'unknown',
+    detail: 'cursor-agent status: indeterminate output',
+    present: true,
+    authenticated: 'unknown',
+    method: 'none',
+  };
+}
+
 // ─── gemini ──────────────────────────────────────────────────────────────────
 
 /**
@@ -462,12 +557,12 @@ function probeGemini(
 /**
  * Probe whether a provider is ACTUALLY logged in (distinct from "CLI installed").
  *
- * Cheap and provider-call-free: Claude and Codex use their bounded local status
- * contracts; Gemini can only report credential presence because its installed CLI
- * has no auth-status subcommand. Never logs or returns raw status/account metadata
+ * Cheap and provider-call-free: Claude, Codex and Cursor use their bounded local
+ * status contracts; Gemini can only report credential presence because its installed
+ * CLI has no auth-status subcommand. Never logs or returns raw status/account metadata
  * or secret values. Returns 'unknown' whenever validity cannot be proven.
  *
- * @param provider 'claude' | 'codex' | 'gemini' (any other value → 'unknown').
+ * @param provider 'claude' | 'codex' | 'gemini' | 'cursor' (any other value → 'unknown').
  * @param opts     Injectable seams (spawnImpl / readFileImpl / env / homeDir / timeoutMs)
  *                 for hermetic testing; all default to real implementations.
  */
@@ -488,6 +583,8 @@ export async function probeProviderAuth(
       return probeCodex(spawnImpl, env, timeoutMs);
     case 'gemini':
       return probeGemini(readFile, env, home);
+    case 'cursor':
+      return probeCursor(spawnImpl, env, timeoutMs);
     default:
       return {
         state: 'unknown',

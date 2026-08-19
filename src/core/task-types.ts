@@ -4,7 +4,7 @@
 
 import { createHash } from 'node:crypto';
 
-import { modelRegistry, registerCodexParityModels } from './model-registry.js';
+import { modelRegistry, registerCodexParityModels, registerCursorParityModels } from './model-registry.js';
 import type { TaskKind, ActorContext, ExecutionBudget } from './work-model.js';
 import type { ProviderBillingEvidence } from './provider-billing-evidence.js';
 import type { ExecutionBudgetRole, ExecutionLandingPolicyConfig } from './config-types.js';
@@ -31,6 +31,7 @@ import type {
 export type ClaudeModel = string & {};
 export type OpenAIModel = string & {};
 export type GeminiModel = string & {};
+export type CursorModel = string & {};
 
 /**
  * Union of all supported model identifiers across providers.
@@ -61,7 +62,7 @@ export type ModelType = string & {};
  * `ProviderNameExt` (core/types.ts) and `RegistryProviderName`
  * (core/model-registry-types.ts) — they are hand-mirrored.
  */
-export type ProviderName = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter' | 'local-llm';
+export type ProviderName = 'claude' | 'codex' | 'gemini' | 'cursor' | 'ollama' | 'openrouter' | 'local-llm';
 
 /**
  * Mapping from each provider to its supported model list.
@@ -86,6 +87,10 @@ export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = Ob
     },
     gemini: {
       get: () => modelRegistry.getByProvider('gemini').map(m => m.id) as readonly ModelType[],
+      enumerable: true,
+    },
+    cursor: {
+      get: () => modelRegistry.getByProvider('cursor').map(m => m.id) as readonly ModelType[],
       enumerable: true,
     },
     // ollama models are registered lazily by providers/ollama.ts; getter reads
@@ -124,6 +129,10 @@ export const ALL_MODELS: readonly ModelType[] = modelRegistry.getAllModelIds() a
  */
 export function getAllKnownModelIds(): readonly string[] {
   registerCodexParityModels();
+  // 7091 (565 hand-completion): the cursor family is the same opt-in class —
+  // without this validation-time registration `--verifier-model
+  // cursor-grok-4.6-*` resolved as "Unknown model" (live smoke 2026-08-19).
+  registerCursorParityModels();
   return modelRegistry.getAllModelIds();
 }
 
@@ -197,6 +206,11 @@ export function isOpenAIModel(model: ModelType): model is OpenAIModel {
  */
 export function isGeminiModel(model: ModelType): model is GeminiModel {
   return modelRegistry.get(model)?.provider === 'gemini';
+}
+
+/** Type guard: checks whether a model belongs to the Cursor provider. */
+export function isCursorModel(model: ModelType): model is CursorModel {
+  return modelRegistry.get(model)?.provider === 'cursor';
 }
 
 /**

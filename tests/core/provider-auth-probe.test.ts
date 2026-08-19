@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyCodexAuthStatus,
+  classifyCursorAuthStatus,
   CODEX_AUTH_STATUS_ARGS,
+  CURSOR_AUTH_STATUS_ARGS,
+  CURSOR_CLI_BIN,
   probeProviderAuth,
   type AuthProbeSpawnImpl,
   type AuthProbeSpawnResult,
@@ -236,6 +239,80 @@ describe('probeProviderAuth — codex (CLI based)', () => {
       state: 'unknown', present: true, authenticated: 'unknown', method: 'api-key',
     });
     expect(res.detail ?? '').not.toContain('sk-openai-SECRET');
+  });
+});
+
+describe('probeProviderAuth — cursor (CLI based)', () => {
+  it('spawns `cursor-agent status` — never the bare `cursor` editor binary', async () => {
+    const { impl, calls } = spawnStub({ status: 0, stdout: 'Logged in as a@b.c\n', timedOut: false });
+    await probeProviderAuth('cursor', { env: {}, spawnImpl: impl });
+    expect(CURSOR_CLI_BIN).toBe('cursor-agent');
+    expect(CURSOR_AUTH_STATUS_ARGS).toEqual(['status']);
+    expect(calls[0]).toEqual({ command: 'cursor-agent', args: ['status'] });
+  });
+
+  it('uses one canonical command and rejects positive text on non-zero exit', () => {
+    expect(classifyCursorAuthStatus(2, 'Logged in as a@b.c')).toBe('unknown');
+    expect(classifyCursorAuthStatus(0, 'Not logged in')).toBe('logged-out');
+  });
+
+  it('logged-in: typed result carries authenticated=true and a subscription method', async () => {
+    const { impl } = spawnStub({ status: 0, stdout: 'Logged in as a@b.c\n', timedOut: false });
+    const res = await probeProviderAuth('cursor', { env: {}, spawnImpl: impl });
+    expect(res).toMatchObject({
+      state: 'logged-in', present: true, authenticated: true, method: 'subscription',
+    });
+  });
+
+  it('logged-out from "Not logged in" stdout EVEN with exit 0 (substring-trap guard)', async () => {
+    const { impl } = spawnStub({ status: 0, stdout: 'Not logged in\n', timedOut: false });
+    const res = await probeProviderAuth('cursor', { env: {}, spawnImpl: impl });
+    expect(res).toMatchObject({
+      state: 'logged-out', present: true, authenticated: false, method: 'none',
+    });
+    expect(res.detail).toMatch(/cursor-agent login/);
+  });
+
+  it('unknown on indeterminate stdout (no login keywords)', async () => {
+    const { impl } = spawnStub({ status: 0, stdout: 'some unrelated output\n', timedOut: false });
+    const res = await probeProviderAuth('cursor', { env: {}, spawnImpl: impl });
+    expect(res).toMatchObject({ state: 'unknown', present: true, authenticated: 'unknown' });
+  });
+
+  it('unknown on probe timeout', async () => {
+    const { impl } = spawnStub({ status: null, stdout: '', timedOut: true });
+    const res = await probeProviderAuth('cursor', { env: {}, spawnImpl: impl, timeoutMs: 10 });
+    expect(res.state).toBe('unknown');
+    expect(res.detail).toMatch(/timed out/i);
+  });
+
+  it('unknown when the cursor-agent CLI is missing (spawnError)', async () => {
+    const { impl } = spawnStub({ status: null, stdout: '', timedOut: false, spawnError: true });
+    const res = await probeProviderAuth('cursor', { env: {}, spawnImpl: impl });
+    expect(res).toMatchObject({ state: 'unknown', present: false, method: 'none' });
+    expect(res.detail).toMatch(/not available/i);
+  });
+
+  it('scrubs every canonical provider credential from the cursor status child env', async () => {
+    let observedEnv: NodeJS.ProcessEnv | undefined;
+    const impl: AuthProbeSpawnImpl = async (_command, _args, opts) => {
+      observedEnv = opts.env;
+      return { status: 0, stdout: 'Logged in\n', timedOut: false };
+    };
+    const res = await probeProviderAuth('cursor', {
+      env: {
+        PATH: '/safe/bin',
+        HOME: '/safe/home',
+        ANTHROPIC_API_KEY: 'foreign-anthropic',
+        OPENAI_API_KEY: 'foreign-openai',
+      },
+      spawnImpl: impl,
+    });
+
+    expect(observedEnv).toMatchObject({ PATH: '/safe/bin', HOME: '/safe/home' });
+    expect(observedEnv).not.toHaveProperty('ANTHROPIC_API_KEY');
+    expect(observedEnv).not.toHaveProperty('OPENAI_API_KEY');
+    expect(res.detail ?? '').not.toContain('foreign-anthropic');
   });
 });
 

@@ -159,6 +159,7 @@ export function isTmuxProvider(providerName: ProviderName): boolean {
 export function isAdapterProvider(providerName: ProviderName): boolean {
   return providerName === 'ollama'
     || providerName === 'codex'
+    || providerName === 'cursor'
     || providerName === 'gemini'
     || providerName === 'openrouter'
     || providerName === 'local-llm';

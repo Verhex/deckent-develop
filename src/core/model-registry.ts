@@ -407,6 +407,108 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
   },
 ] as const;
 
+// ─── Cursor parity family (FAZ-1, deliberately narrow) ────────────────────
+/**
+ * Provider ownership label for the Cursor CLI (`cursor-agent`) family.
+ *
+ * TECH DEBT — DELETE ON UNION LANDING. `RegistryProviderName`
+ * (`model-registry-types.ts`) does not carry `'cursor'` yet; that union edit is
+ * the exclusive write authority of the sprint-565 provider-union spine task,
+ * a file THIS task may not touch. The assertion below is the ONE place that
+ * gap is absorbed, and it is compile-time only: every provider comparison in
+ * this module and its consumers is plain string equality, so catalog behaviour
+ * is already final. Once `'cursor'` joins the union the assertion becomes
+ * redundant (it keeps compiling either way) and should be inlined back to a
+ * bare `'cursor'` literal.
+ */
+const CURSOR_PROVIDER = 'cursor' as RegistryProviderName;
+
+/**
+ * Cursor CLI parity family. Opt-in exactly like {@link CODEX_PARITY_MODELS}:
+ * NOT part of `BUILTIN_MODELS` / `CANONICAL_MODELS`, so the bundled-catalog
+ * invariants (15 builtin models, 3 default providers) hold unchanged and no
+ * default routing surface gains a cursor candidate implicitly.
+ *
+ * FAZ-1 scope is intentionally narrow — only the `cursor-grok-4.6-*` effort
+ * family, whose `cursor-` prefix is unambiguous for provider inference.
+ * Collision-prone ids (a Cursor-hosted `gpt-*`/`claude-*` alias) are a later
+ * phase and MUST NOT be added here without re-deriving inference precedence.
+ *
+ * Every tier is EXPLICIT rather than inferred: `inferTierFromId` has no notion
+ * of Cursor's reasoning-effort suffixes and would flatten all four ids to
+ * `standard` (pinned as a regression in the parametric tests).
+ *
+ * Context window is a CONSERVATIVE planning envelope, not a measured fact: no
+ * live capability probe has run for this family yet (the real-binary Tier-1
+ * smoke is post-sprint). It is used for context-fit planning only and must be
+ * corrected from probe evidence rather than widened by assumption.
+ *
+ * Pricing: Cursor bills through the user's plan and publishes no per-token
+ * tariff, so `costPerMillion` is structurally zero and `pricingEvidenceRef` is
+ * deliberately UNSET. That is not a silent zero — it is the typed signal the
+ * cost path reads: `cost-calculator` settles this provider as `subscription`
+ * (billed USD $0, quota-tracked), and if a caller ever forces metered `api`
+ * billing the missing evidence makes it refuse to price the task explicitly
+ * instead of presenting unknown spend as free.
+ */
+export const CURSOR_MODELS: readonly ModelDefinition[] = [
+  {
+    id: 'cursor-grok-4.6-low',
+    apiId: 'cursor-grok-4.6-low',
+    provider: CURSOR_PROVIDER,
+    tier: 'economy',
+    // Sole GA model in cursor/economy — the designation is explicit anyway so a
+    // later addition to this tier cannot silently inherit it by registration order.
+    preferredForTier: true,
+    contextWindow: 256_000,
+    costPerMillion: { input: 0, output: 0 },
+    // Reasoning-effort suffix selects DEPTH, not presence: the whole family is
+    // a reasoning model. Vision is false because the FAZ-1 CLI adapter carries
+    // no image-input path; `codeExecution` is true because `cursor-agent` runs
+    // commands in the workspace.
+    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: true, reasoning: true },
+    // 'ga', not 'preview': `getByProviderAndTier` filters to status === 'ga', so
+    // a preview entry would register successfully yet stay INVISIBLE to tier
+    // resolution — registered-but-unroutable. Status describes catalog
+    // availability; whether THIS account may call it is a separately measured
+    // entitlement fact the catalog must never assert.
+    status: 'ga',
+  },
+  {
+    id: 'cursor-grok-4.6-medium',
+    apiId: 'cursor-grok-4.6-medium',
+    provider: CURSOR_PROVIDER,
+    tier: 'standard',
+    preferredForTier: true,
+    contextWindow: 256_000,
+    costPerMillion: { input: 0, output: 0 },
+    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: true, reasoning: true },
+    status: 'ga',
+  },
+  {
+    id: 'cursor-grok-4.6-high',
+    apiId: 'cursor-grok-4.6-high',
+    provider: CURSOR_PROVIDER,
+    tier: 'premium',
+    preferredForTier: true,
+    contextWindow: 256_000,
+    costPerMillion: { input: 0, output: 0 },
+    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: true, reasoning: true },
+    status: 'ga',
+  },
+  {
+    id: 'cursor-grok-4.6-xhigh',
+    apiId: 'cursor-grok-4.6-xhigh',
+    provider: CURSOR_PROVIDER,
+    tier: 'premium_plus',
+    preferredForTier: true,
+    contextWindow: 256_000,
+    costPerMillion: { input: 0, output: 0 },
+    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: true, reasoning: true },
+    status: 'ga',
+  },
+] as const;
+
 export const CANONICAL_MODELS: readonly ModelDefinition[] = [
   ...BUILTIN_MODELS,
   ...CODEX_PARITY_MODELS,
@@ -436,6 +538,14 @@ export function inferProviderFromId(id: string): RegistryProviderNameExt | undef
   // OpenRouter gateway, never an invitation to strip the vendor prefix.
   if (lid.includes('/')) {
     return 'openrouter';
+  }
+  // Cursor CLI ids are namespaced by a `cursor-` prefix and must be matched
+  // BEFORE the vendor branches below: a Cursor-hosted id may embed another
+  // vendor's family name (`cursor-gpt-…`, `cursor-claude-…`) and would then be
+  // attributed to the wrong provider. The prefix is exact — a bare `cursor`
+  // or a `cursorless-…` id stays unowned rather than being claimed by substring.
+  if (lid.startsWith('cursor-')) {
+    return CURSOR_PROVIDER;
   }
   if (lid.startsWith('claude-')) {
     return 'claude';
@@ -841,6 +951,18 @@ export function registerOllamaModels(registry: ModelRegistry = modelRegistry): v
 // re-registering a model is a no-op since `register()` simply re-Map.sets it.
 export function registerCodexParityModels(registry: ModelRegistry = modelRegistry): void {
   for (const def of CODEX_PARITY_MODELS) {
+    registry.register(def);
+  }
+}
+
+// ─── Opt-in: register Cursor parity models on a target registry ───────────
+// Mirrors registerCodexParityModels() immediately above. Not called at module
+// load (see CURSOR_MODELS): a Cursor provider bootstrap calls this to make the
+// `cursor-grok-4.6-*` family first-class, so a registry that never bootstraps
+// Cursor keeps its bundled-catalog invariants byte-identical. Idempotent —
+// `register()` simply re-Map.sets each definition.
+export function registerCursorParityModels(registry: ModelRegistry = modelRegistry): void {
+  for (const def of CURSOR_MODELS) {
     registry.register(def);
   }
 }

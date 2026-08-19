@@ -27,15 +27,25 @@
 
 import { detectCliVersion, parseSemverFromOutput } from './provider.js';
 import type { AuthProbeProvider, AuthProbeState } from './provider-auth-probe.js';
+import { getProviderCliInfo } from './provider-packages.js';
 
 /**
- * The three CLI-backed providers this module discovers — reuses
- * {@link AuthProbeProvider} rather than redefining the same
- * `'claude' | 'codex' | 'gemini'` tuple a third time (it already backs both
- * `provider-auth-probe.ts` and, transitively, the `/connect` wizard's
- * `ConnectProviderName`).
+ * The CLI-backed providers this module discovers — still derived from
+ * {@link AuthProbeProvider} rather than redefining the tuple a third time.
+ *
+ * HELD-BACK (task-565-007, blocked on write authority — NOT a design choice):
+ * `AuthProbeProvider` now also covers `cursor` (the probe understands
+ * `cursor-agent status`), but discovery cannot follow yet. `onboarding-wizard.ts`
+ * re-exports this union as `OnboardingProviderName` and feeds it straight into
+ * `McpHost`-typed MCP-attach APIs (`detectAttachStatus`/`getAttachCommand`), and
+ * cursor has no MCP-attach contract in `mcp-attach.ts`. Widening here without
+ * `src/cli/helpers/onboarding-wizard.ts` (McpHost narrowing, 3 sites) and
+ * `tests/cli/onboarding-wizard.test.ts` (pins the 3-tuple, 2 cases) in scope
+ * lands 3 type errors + 2 red tests in files this task may not write. The
+ * exclusion is explicit — and tied to `AuthProbeProvider`, so it cannot silently
+ * drift — rather than a re-typed literal tuple that hides the gap.
  */
-export type DiscoverableProviderName = AuthProbeProvider;
+export type DiscoverableProviderName = Exclude<AuthProbeProvider, 'cursor'>;
 
 /** Fixed iteration order — every discovery result array is built from this tuple. */
 export const DISCOVERABLE_PROVIDERS: readonly DiscoverableProviderName[] = ['claude', 'codex', 'gemini'];
@@ -70,10 +80,18 @@ export interface DiscoverProvidersProbes {
   auth?: ProviderAuthStateProbe;
 }
 
-const defaultVersionProbe: ProviderVersionProbe = (name) => detectCliVersion(name);
+/**
+ * The provider id is not guaranteed to be the executable name — cursor's CLI
+ * ships as `cursor-agent`, while the bare `cursor` name belongs to the
+ * editor/IDE namespace — so the binary is resolved through the provider-packages
+ * SSOT instead of being assumed from the id. Identity-mapped for the three
+ * providers listed above today; correct by construction when the union widens.
+ */
+const defaultVersionProbe: ProviderVersionProbe = (name) =>
+  detectCliVersion(getProviderCliInfo(name).binName);
 
 /**
- * Discover the three CLI-backed providers over PATH.
+ * Discover the CLI-backed providers over PATH.
  *
  * For each of {@link DISCOVERABLE_PROVIDERS}: runs `probes.version` (default:
  * real `detectCliVersion`) to determine `present`/raw version output, then

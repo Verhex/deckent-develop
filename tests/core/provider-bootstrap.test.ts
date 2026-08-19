@@ -48,6 +48,18 @@ vi.mock('../../src/providers/gemini.js', () => ({
   }),
 }));
 
+vi.mock('../../src/providers/cursor.js', () => ({
+  createCursorAdapter: vi.fn().mockReturnValue({
+    name: 'cursor',
+    supportedModels: [],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('cursor-agent --mode ask'),
+  }),
+}));
+
 // Mock deck-file for .deck secret loading tests
 vi.mock('../../src/core/deck-file.js', () => ({
   loadDeckSecrets: vi.fn().mockReturnValue({}),
@@ -145,7 +157,7 @@ describe('bootstrapProviders', () => {
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
       for (const name of result.registered) {
-        expect(['claude', 'codex', 'gemini', 'ollama']).toContain(name);
+        expect(['claude', 'codex', 'cursor', 'gemini', 'ollama']).toContain(name);
       }
     });
 
@@ -246,8 +258,8 @@ describe('bootstrapProviders', () => {
         s => !s.reason.includes('Configured brain_provider')
       ).length;
       // Sprint 202 Task 202-001: Ollama joined detectAvailableProviders so the
-      // upper bound is now 4 (claude, codex, gemini, ollama).
-      expect(totalHandled).toBeLessThanOrEqual(4);
+      // Cursor Agent is now a first-class auto-detected CLI provider.
+      expect(totalHandled).toBeLessThanOrEqual(5);
     });
 
     it('should include reason string for each skipped provider', async () => {

@@ -761,7 +761,7 @@ export function estimateTokenUsage(task: Task, result: TaskResult): TokenUsage {
  * two. {@link waitForCliLog} closes that race so enrichment reads the REAL envelope
  * instead of falling through to the fabricated heuristic.
  */
-const CLI_USAGE_LOG_PROVIDERS = new Set(['claude', 'codex', 'gemini']);
+const CLI_USAGE_LOG_PROVIDERS = new Set(['claude', 'codex', 'cursor', 'gemini']);
 
 /** Wait (bounded) for a CLI worker's `.log` to be written + non-empty. Returns as soon
  *  as it appears, or after `timeoutMs` (then enrichment falls back to the heuristic). */

@@ -18,6 +18,7 @@ import { createCliToolDispatcher } from './chat-tool-bridge.js';
 import { resolveChatAdapter } from './chat-provider-parity.js';
 import { ClaudeAdapter, type ProviderDetectResult } from '../../providers/claude.js';
 import { CodexAdapter } from '../../providers/codex.js';
+import { CursorAdapter } from '../../providers/cursor.js';
 import { GeminiAdapter } from '../../providers/gemini.js';
 import { OllamaAdapter } from '../../providers/ollama.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
@@ -40,7 +41,7 @@ import {
 
 // ─── Types ──────────────────────────────────────────────────────────
 
-export type ChatTool = 'claude' | 'codex' | 'gemini';
+export type ChatTool = 'claude' | 'codex' | 'cursor' | 'gemini';
 
 export interface ChatOptions {
   tool?: ChatTool;
@@ -75,7 +76,7 @@ const NO_PROVIDER_MESSAGE =
   '  • deckent serve          — open dashboard chat in your browser';
 
 /** Priority order — first ready provider wins during auto-detect. */
-const PROVIDER_PRIORITY: readonly ChatTool[] = ['claude', 'codex', 'gemini'];
+const PROVIDER_PRIORITY: readonly ChatTool[] = ['claude', 'codex', 'cursor', 'gemini'];
 
 /**
  * Run the command-mode native surface through the same provider/tool-use
@@ -309,6 +310,7 @@ export async function probeProviders(projectRoot: string): Promise<ProviderProbe
   const adapters: Record<ChatTool, { detect: () => Promise<ProviderDetectResult> }> = {
     claude: new ClaudeAdapter(projectRoot),
     codex: new CodexAdapter(projectRoot),
+    cursor: new CursorAdapter(projectRoot),
     gemini: new GeminiAdapter(projectRoot),
   };
 

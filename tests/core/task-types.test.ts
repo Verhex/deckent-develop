@@ -1,11 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { TaskEvaluation } from '../../src/core/task-types.js';
+import { PROVIDER_MODEL_MAP, TaskEvaluation, isCursorModel } from '../../src/core/task-types.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 import {
   collectDeferredStats,
   buildDeferredSection,
 } from '../../src/orchestra/sprint-reporter.js';
 
 describe('Sprint 192 Task 192-010 — TaskEvaluation.DEFERRED + retro reporting', () => {
+  it('reads Cursor models live from the registry', () => {
+    const id = 'cursor-test-live-getter';
+    modelRegistry.register({
+      id,
+      apiId: id,
+      provider: 'cursor',
+      tier: 'standard',
+      contextWindow: 1,
+      costPerMillion: { input: 0, output: 0 },
+      capabilities: {},
+      status: 'ga',
+    });
+
+    try {
+      expect(PROVIDER_MODEL_MAP.cursor).toContain(id);
+      expect(isCursorModel(id)).toBe(true);
+    } finally {
+      modelRegistry.unregister(id);
+    }
+  });
+
   // ─── Test 1: enum extended with DEFERRED ────────────────────────────
   it('exposes TaskEvaluation.DEFERRED alongside legacy members', () => {
     expect(TaskEvaluation.DEFERRED).toBe('DEFERRED');

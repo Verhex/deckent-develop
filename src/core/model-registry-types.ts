@@ -9,7 +9,7 @@
  *  ids can be registered at all — `ModelDefinition.provider` is typed to this
  *  union, so without it no OpenRouter model could enter the registry and
  *  `isModelAvailable(*, 'openrouter')` was structurally always false. */
-export type RegistryProviderName = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter' | 'local-llm';
+export type RegistryProviderName = 'claude' | 'codex' | 'gemini' | 'cursor' | 'ollama' | 'openrouter' | 'local-llm';
 
 /** Config-extensible registry ownership, including keyless local runtimes. */
 export type RegistryProviderNameExt = RegistryProviderName;

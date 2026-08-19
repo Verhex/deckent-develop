@@ -29,6 +29,17 @@ describe('buildProviderCommand', () => {
     expect(cmd).not.toContain('--dangerously-skip-permissions');
   });
 
+  it('cursor: read-only ask mode, JSON output, apiId, then positional prompt', () => {
+    const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.cursor, 'grok-4.6', P);
+    expect(cmd).toBe(`cursor-agent --mode ask -p --trust --output-format json --model grok-4.6 -- "$(cat ${P})"`);
+  });
+
+  it('cursor: execution permission is explicit and never default-on', () => {
+    expect(buildProviderCommand(PROVIDER_COMMAND_SPECS.cursor, 'grok-4.6', P)).not.toContain('--force');
+    expect(buildProviderCommand(PROVIDER_COMMAND_SPECS.cursor, 'grok-4.6', P, { autoApprove: true }))
+      .toBe(`cursor-agent --mode ask -p --trust --output-format json --model grok-4.6 --force -- "$(cat ${P})"`);
+  });
+
   it('claude: stdin prompt (-p -), apiId, allowedTools + dangerously-skip-permissions on autoApprove', () => {
     const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, { autoApprove: true, allowedTools: 'Read,Write' });
     expect(cmd).toBe('claude -p - --output-format json --model claude-opus-4-8 --allowedTools "Read,Write" --dangerously-skip-permissions');
@@ -71,12 +82,14 @@ describe('buildProviderCommand', () => {
     expect(PROVIDER_COMMAND_SPECS.claude.promptFeed).toBe('stdin');
     expect(PROVIDER_COMMAND_SPECS.codex.promptFeed).toBe('stdin');
     expect(PROVIDER_COMMAND_SPECS.gemini.promptFeed).toBe('inline');
+    expect(PROVIDER_COMMAND_SPECS.cursor.promptFeed).toBe('argument');
   });
 
   it('oauthHomeDir per provider (for container auth mount)', () => {
     expect(PROVIDER_COMMAND_SPECS.claude.oauthHomeDir).toBe('.claude');
     expect(PROVIDER_COMMAND_SPECS.codex.oauthHomeDir).toBe('.codex');
     expect(PROVIDER_COMMAND_SPECS.gemini.oauthHomeDir).toBe('.gemini');
+    expect(PROVIDER_COMMAND_SPECS.cursor.oauthHomeDir).toBeNull();
   });
 
   // F1-RE (Sprint 252): model reasoning-effort appended when resolved + supported.
@@ -127,12 +140,14 @@ describe('getProviderCommandSpec', () => {
     expect(getProviderCommandSpec('codex')?.binary).toBe('codex');
     expect(getProviderCommandSpec('gemini')?.binary).toBe('gemini');
     expect(getProviderCommandSpec('claude')?.binary).toBe('claude');
+    expect(getProviderCommandSpec('cursor')?.binary).toBe('cursor-agent');
   });
 
   it('declares live-usage capability separately from final usage output', () => {
     expect(getProviderCommandSpec('claude')?.liveUsage).toBe('incremental');
     expect(getProviderCommandSpec('codex')?.liveUsage).toBe('final-only');
     expect(getProviderCommandSpec('gemini')?.liveUsage).toBe('final-only');
+    expect(getProviderCommandSpec('cursor')?.liveUsage).toBe('final-only');
   });
   it('returns null for an unknown/host-only provider (e.g. ollama) → caller honest-fails', () => {
     expect(getProviderCommandSpec('ollama')).toBeNull();
@@ -158,6 +173,11 @@ describe('resolveToolScopeEnforcement — runtime tool-scope truth', () => {
 
   it('gemini (allowedToolsFlag null) + write scope → UNENFORCED', () => {
     expect(resolveToolScopeEnforcement('gemini', ['src/x.ts']).reasonCode)
+      .toBe('RUNTIME_TOOL_SCOPE_UNENFORCED');
+  });
+
+  it('cursor (allowedToolsFlag null) + write scope → UNENFORCED', () => {
+    expect(resolveToolScopeEnforcement('cursor', ['src/x.ts']).reasonCode)
       .toBe('RUNTIME_TOOL_SCOPE_UNENFORCED');
   });
 

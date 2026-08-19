@@ -458,6 +458,7 @@ export function getProviderPartialHint(name: string): string {
     case 'codex': return 'set OPENAI_API_KEY';
     case 'gemini': return 'set GOOGLE_API_KEY';
     case 'claude': return 'run `claude login`';
+    case 'cursor': return 'run `cursor-agent login`';
     case 'ollama': return 'pull a model: `ollama pull qwen2.5-coder:7b`';
     default: return 'configure authentication';
   }
@@ -538,6 +539,9 @@ export function formatProviderDiagnosticsActionable(
  */
 export function getProviderInstallHint(name: string): string {
   // Single source of truth: package mapping lives in provisioner.planInstall.
+  // A binary-only CLI (no npm package) surfaces its vendor-installer
+  // instruction verbatim — never a fabricated `npm i -g` line.
+  if (name === 'cursor') return `install: ${planInstall('cursor').instruction}`;
   if (name !== 'claude' && name !== 'codex' && name !== 'gemini') return '';
   const pkg = planInstall(name).args[2];
   return `install: npm i -g ${pkg}`;
@@ -569,7 +573,7 @@ export function buildConnectorHealthResults(providers: DetectedProvider[]): Heal
 // Provider Health section.
 
 /** Providers probeProviderAuth understands — anything else is left unprobed. */
-const AUTH_PROBE_PROVIDERS = new Set(['claude', 'codex', 'gemini']);
+const AUTH_PROBE_PROVIDERS = new Set(['claude', 'codex', 'gemini', 'cursor']);
 /** Short per-probe timeout so `deckent doctor` never stalls on a hung CLI. */
 const DOCTOR_AUTH_PROBE_TIMEOUT_MS = 2_000;
 
@@ -626,6 +630,9 @@ function getProviderLoginCmd(name: string): string {
     case 'claude': return 'claude login';
     case 'codex': return 'codex login';
     case 'gemini': return 'gemini';
+    // Explicit row: the default would emit `cursor login`, but `cursor` is the
+    // editor/IDE binary — the CLI that owns the session is `cursor-agent`.
+    case 'cursor': return 'cursor-agent login';
     default: return `${name} login`;
   }
 }
@@ -1696,6 +1703,7 @@ function getProviderHint(name: string): string {
     case 'gemini': return ' (set GOOGLE_API_KEY to enable)';
     case 'codex': return ' (set OPENAI_API_KEY to enable)';
     case 'claude': return ' (install Claude CLI: npm i -g @anthropic-ai/claude-code)';
+    case 'cursor': return ` (${getProviderInstallHint('cursor')})`;
     default: return '';
   }
 }
@@ -1775,6 +1783,11 @@ export function getProviderTips(providers: DetectedProvider[]): string[] {
         case 'claude':
           tips.push('Install Claude CLI (npm i -g @anthropic-ai/claude-code) to enable Claude as a provider.');
           break;
+        // NOTE: no `case 'cursor'` here yet. `p.name` is typed `ProviderName`
+        // (src/core/types.ts), which does not include 'cursor' on disk, so the
+        // case is a TS2678 today. It lands together with the ProviderName
+        // widening — see task-565-007 result notes. `getProviderHint` above
+        // takes a plain `string` and already carries the cursor row.
       }
     }
   }

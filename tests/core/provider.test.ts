@@ -8,6 +8,7 @@ import {
 } from '../../src/core/provider.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
+import { ALL_PROVIDER_NAMES } from '../../src/core/types.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,10 @@ function makeAdapter(name: string, models: ModelType[] = ['opus', 'sonnet', 'hai
 // ─── ProviderAdapter interface shape ─────────────────────────────────────────
 
 describe('ProviderAdapter interface', () => {
+  it('includes cursor in the canonical provider-name spine', () => {
+    expect(ALL_PROVIDER_NAMES).toContain('cursor');
+  });
+
   it('should define required properties', () => {
     const adapter = makeAdapter('test-provider');
     expect(typeof adapter.name).toBe('string');

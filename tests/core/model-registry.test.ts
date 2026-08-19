@@ -3,6 +3,7 @@ import {
   ModelRegistry,
   BUILTIN_MODELS,
   modelRegistry,
+  registerCursorParityModels,
   type ModelDefinition,
   type ModelTier,
   type RegistryProviderName,
@@ -646,6 +647,90 @@ describe('ModelRegistry', () => {
         expect(m.status).toBe('ga');
       }
     });
+  });
+});
+
+// ─── Cursor parity family (FAZ-1, opt-in) ────────────────────────────
+// Every assertion runs on a FRESH ModelRegistry: registerCursorParityModels()
+// defaults to the singleton, and mutating it here would leak into the
+// canonical-catalog pins below (and into every other suite sharing the module).
+//
+// `'cursor'` is asserted onto RegistryProviderName in one place per file until
+// the provider-union spine task lands it in model-registry-types.ts — see the
+// CURSOR_PROVIDER note in src/core/model-registry.ts.
+const CURSOR: RegistryProviderName = 'cursor' as RegistryProviderName;
+
+describe('Cursor parity family', () => {
+  let registry: ModelRegistry;
+
+  beforeEach(() => {
+    registry = new ModelRegistry();
+    registerCursorParityModels(registry);
+  });
+
+  it('registers exactly the four cursor-grok-4.6 effort ids', () => {
+    const cursor = registry.getByProvider(CURSOR);
+    expect(cursor).toHaveLength(4);
+    expect(cursor.map(m => m.id).sort()).toEqual([
+      'cursor-grok-4.6-high',
+      'cursor-grok-4.6-low',
+      'cursor-grok-4.6-medium',
+      'cursor-grok-4.6-xhigh',
+    ]);
+  });
+
+  it('assigns every tier explicitly rather than by inference', () => {
+    const tiers = Object.fromEntries(
+      registry.getByProvider(CURSOR).map(m => [m.id, m.tier]),
+    );
+    expect(tiers).toEqual({
+      'cursor-grok-4.6-low': 'economy',
+      'cursor-grok-4.6-medium': 'standard',
+      'cursor-grok-4.6-high': 'premium',
+      'cursor-grok-4.6-xhigh': 'premium_plus',
+    });
+  });
+
+  it('designates exactly one preferred model per tier and resolves it', () => {
+    const tiers: ModelTier[] = ['economy', 'standard', 'premium', 'premium_plus'];
+    for (const tier of tiers) {
+      const preferred = registry
+        .getByProvider(CURSOR)
+        .filter(m => m.tier === tier && m.preferredForTier === true);
+      expect(preferred).toHaveLength(1);
+      // status must be 'ga' or tier resolution would not see it at all.
+      expect(registry.getByProviderAndTier(CURSOR, tier)?.id).toBe(preferred[0]!.id);
+    }
+  });
+
+  it('keeps identity canonical and pricing evidence honestly absent', () => {
+    for (const m of registry.getByProvider(CURSOR)) {
+      expect(m.apiId).toBe(m.id);
+      expect(m.status).toBe('ga');
+      // Plan-billed: structural $0, and NO fabricated pricing evidence — the
+      // cost path reads the missing ref as "never price this as metered API".
+      expect(m.costPerMillion).toEqual({ input: 0, output: 0 });
+      expect(m.pricingEvidenceRef).toBeUndefined();
+    }
+  });
+
+  it('is opt-in: the bundled catalog invariants are untouched', () => {
+    // The registration helper above ran on `registry`, never on the singleton.
+    expect(BUILTIN_MODELS.some(m => (m.provider as string) === 'cursor')).toBe(false);
+    expect(modelRegistry.getByProvider(CURSOR)).toHaveLength(0);
+    expect(modelRegistry.getAllProviders()).toHaveLength(3);
+
+    const untouched = new ModelRegistry();
+    expect(untouched.getByProvider(CURSOR)).toHaveLength(0);
+    expect(untouched.getAllProviders()).toHaveLength(3);
+    // Opting in adds the family without displacing any canonical entry.
+    expect(registry.getAllModelIds()).toHaveLength(untouched.getAllModelIds().length + 4);
+    expect(registry.getAllProviders()).toHaveLength(4);
+  });
+
+  it('is idempotent', () => {
+    registerCursorParityModels(registry);
+    expect(registry.getByProvider(CURSOR)).toHaveLength(4);
   });
 });
 

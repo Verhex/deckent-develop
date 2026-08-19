@@ -14,9 +14,9 @@
 //     spawn — `sh`/`bash` are intentionally absent (no shell interpolation).
 
 import { spawnSync } from 'node:child_process';
-import { PROVIDER_PACKAGES } from './provider-packages.js';
+import { BINARY_ONLY_PROVIDER_PACKAGES, PROVIDER_PACKAGES } from './provider-packages.js';
 
-export type ToolId = 'claude' | 'codex' | 'gemini' | 'tmux' | 'node' | 'docker';
+export type ToolId = 'claude' | 'codex' | 'gemini' | 'cursor' | 'tmux' | 'node' | 'docker';
 export type LinuxPkgManager = 'apt' | 'dnf' | 'pacman';
 export type InstallMethod = 'npm-global' | 'os-package' | 'manual';
 
@@ -81,6 +81,19 @@ export function planInstall(tool: ToolId, opts: PlanOptions = {}): InstallPlan {
       command: 'npm',
       args: ['install', '-g', pkg],
       instruction: `npm install -g ${pkg}`,
+    };
+  }
+  if (tool === 'cursor') {
+    // No npm package exists for the Cursor CLI, so there is no safe silent
+    // auto-install path — the vendor installer is surfaced as an instruction
+    // the user runs explicitly (same honesty rule as node/docker below).
+    const info = BINARY_ONLY_PROVIDER_PACKAGES.cursor;
+    return {
+      tool,
+      method: 'manual',
+      command: info.binName,
+      args: [],
+      instruction: info.installHint,
     };
   }
   if (tool === 'tmux') {
@@ -182,14 +195,19 @@ const DOCTOR_NAME_TO_TOOL: Readonly<Record<string, ToolId>> = Object.freeze({
 });
 
 /** Derive the set of provisionable missing tools from provider detection
- *  (claude/codex/gemini) plus failed doctor checks. Deduped. */
+ *  (claude/codex/gemini/cursor) plus failed doctor checks. Deduped. A
+ *  binary-only CLI still lands here: `planInstall` reports it as a `manual`
+ *  step instead of silently pretending an install path exists. */
 export function collectMissingTools(
   providers: ReadonlyArray<{ name: string; available: boolean }>,
   doctorChecks: ReadonlyArray<{ name: string; passed: boolean; required: boolean }>,
 ): ToolId[] {
   const set = new Set<ToolId>();
   for (const p of providers) {
-    if (!p.available && (p.name === 'claude' || p.name === 'codex' || p.name === 'gemini')) {
+    if (
+      !p.available &&
+      (p.name === 'claude' || p.name === 'codex' || p.name === 'gemini' || p.name === 'cursor')
+    ) {
       set.add(p.name);
     }
   }

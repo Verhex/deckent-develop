@@ -84,6 +84,28 @@ describe('parametric model resolution (F1-PD)', () => {
       expect(inferProviderFromId('o5-mini')).toBe('codex');
       expect(inferProviderFromId('gemini-9.0-pro')).toBe('gemini');
       expect(inferProviderFromId('qwen3:8b')).toBe('ollama');
+      expect(inferProviderFromId('cursor-grok-4.6-high')).toBe('cursor');
+    });
+
+    it('matches the cursor- namespace before the vendor branches', () => {
+      // A Cursor-hosted id may embed another vendor's family name. Precedence,
+      // not the vendor token, decides ownership — otherwise these land on codex
+      // and claude and get dispatched through the wrong adapter.
+      expect(inferProviderFromId('cursor-gpt-5-style-id')).toBe('cursor');
+      expect(inferProviderFromId('cursor-claude-style-id')).toBe('cursor');
+      // The prefix is exact: substring matches stay unowned.
+      expect(inferProviderFromId('cursorless-model')).toBeUndefined();
+      expect(inferProviderFromId('cursor')).toBeUndefined();
+    });
+
+    it('cannot infer the cursor effort tier — why the catalog sets it explicitly', () => {
+      // Regression pin, NOT desired behaviour: inferTierFromId has no notion of
+      // Cursor's reasoning-effort suffixes, so all four ids flatten to
+      // 'standard'. CURSOR_MODELS therefore declares every tier explicitly; if
+      // this pin ever changes, that decision must be revisited deliberately.
+      for (const effort of ['low', 'medium', 'high', 'xhigh']) {
+        expect(inferTierFromId(`cursor-grok-4.6-${effort}`)).toBe('standard');
+      }
     });
 
     it('infers tier from the id naming convention', () => {

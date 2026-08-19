@@ -35,7 +35,8 @@ export type OllamaModel = string & {};
 /** Extended provider name — includes local Ollama and the OpenRouter HTTP
  *  gateway. Hand-mirrored with `ProviderName` (core/task-types.ts) and
  *  `RegistryProviderName` (core/model-registry-types.ts). */
-export type ProviderNameExt = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter' | 'local-llm';
+// Provider `cursor` is distinct from the IDE/environment `DetectedEnv` cursor namespace.
+export type ProviderNameExt = 'claude' | 'codex' | 'gemini' | 'cursor' | 'ollama' | 'openrouter' | 'local-llm';
 
 /** Runtime list of every provider Deckent knows about, including local Ollama
  *  and OpenRouter (OPENROUTER-PROVIDER, row 477). */
@@ -43,6 +44,7 @@ export const ALL_PROVIDER_NAMES: readonly ProviderNameExt[] = [
   'claude',
   'codex',
   'gemini',
+  'cursor',
   'ollama',
   'openrouter',
   'local-llm',

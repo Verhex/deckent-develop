@@ -36,6 +36,16 @@ const PROVIDER_CAPABILITIES: Record<ProviderName, ProviderCapability> = {
     maxContextTokens: 1_047_576,
     costPerMillionTokens: { input: 2, output: 8 },
   },
+  // Cursor's opt-in Grok catalog currently proves these provider-level facts:
+  // 256k context, streaming/tool execution, no vision, and subscription billing.
+  cursor: {
+    streaming: true,
+    toolUse: true,
+    vision: false,
+    codeExecution: true,
+    maxContextTokens: 256_000,
+    costPerMillionTokens: { input: 0, output: 0 },
+  },
   gemini: {
     streaming: true,
     toolUse: true,

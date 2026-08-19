@@ -12,6 +12,7 @@ import {
 } from '../core/provider-evidence-source-registry.js';
 import { createClaudeHostSubscriptionEvidenceSourceRegistrations } from './claude-provider-evidence-sources.js';
 import { createCodexHostSubscriptionEvidenceSourceRegistrations } from './codex-provider-evidence-sources.js';
+import { createCursorHostSubscriptionEvidenceSourceRegistrations } from './cursor-provider-evidence-sources.js';
 
 export interface LocalProviderAuthorityRuntimeBootstrapOptions {
   readonly env?: GlobalScopeEnv;
@@ -63,6 +64,10 @@ export function createLocalProviderEvidenceSourceRegistrations(
         ? { dockerReachabilityTransport: options.codexDockerReachabilityTransport }
         : {}),
     }),
+    // 7091 FAZ-1: cursor registers honest typed stubs on both backends (no
+    // durable state contract, no limit CLI, no live probe transport proven yet)
+    // so the scope resolves as REGISTERED-but-held instead of source-unavailable.
+    ...createCursorHostSubscriptionEvidenceSourceRegistrations({ env, platform }),
   ]);
 }
 

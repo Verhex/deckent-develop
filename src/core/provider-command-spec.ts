@@ -55,8 +55,10 @@ export interface ProviderCommandSpec {
    *               (claude `-p -`, codex `exec` with no positional).
    *  - 'inline' → the prompt is embedded as `"$(cat <promptPath>)"` via
    *               {@link PROMPT_CAT_TOKEN} (gemini `-p`).
+   *  - 'argument' → the prompt is appended as a positional argument after all
+   *                 provider/model flags (cursor-agent).
    */
-  promptFeed: 'stdin' | 'inline';
+  promptFeed: 'stdin' | 'inline' | 'argument';
   /**
    * Host OAuth/session dir (relative to HOME) to mount into the container so the
    * CLI can authenticate (claude `.claude`, codex `.codex`, gemini `.gemini`),
@@ -151,6 +153,21 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     excludeDynamicPromptSectionsFlag: null, // gemini CLI has no equivalent flag
     liveUsage: 'final-only',
   },
+  cursor: {
+    binary: 'cursor-agent',
+    baseArgs: ['--mode', 'ask', '-p', '--trust', '--output-format', 'json'],
+    modelFlag: '--model',
+    approvalArgs: ['--force'],
+    allowedToolsFlag: null,
+    availableToolsFlag: null,
+    isolatedContextArgs: [],
+    promptFeed: 'argument',
+    // The CLI contract proves session auth but not its on-disk home directory.
+    oauthHomeDir: null,
+    reasoningEffortArgs: null,
+    excludeDynamicPromptSectionsFlag: null,
+    liveUsage: 'final-only',
+  },
 };
 
 /**
@@ -201,6 +218,12 @@ export function buildProviderCommand(
   // spec declares the flag (claude). Others have `excludeDynamicPromptSectionsFlag: null`.
   if (opts.excludeDynamicPromptSections && spec.excludeDynamicPromptSectionsFlag) {
     parts.push(spec.excludeDynamicPromptSectionsFlag);
+  }
+  if (spec.promptFeed === 'argument') {
+    // SEC-1 (2026-08-19): `--` stops option parsing so a prompt beginning with
+    // `-` can never smuggle a flag into the provider CLI (cursor-agent honors
+    // it — real-binary proven; the separator is inert for a non-dash prompt).
+    parts.push('--', `"$(cat ${promptPath})"`);
   }
   return parts.join(' ');
 }

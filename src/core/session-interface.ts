@@ -26,6 +26,11 @@ const AUTH_ENV_VARS: Record<ProviderName, string | null> = {
   openrouter: null,
   // Keyless loopback OpenAI-compatible runtime; reachability is the authority.
   'local-llm': null,
+  // cursor-agent is session-auth (`cursor-agent login`, like claude). It does
+  // accept CURSOR_API_KEY as an optional override, but that variable is never
+  // required for an authenticated install — a non-null entry would make health
+  // checks probe an env var that is intentionally unset on login-based setups.
+  cursor: null,
 };
 
 /** Health check result for a single provider */

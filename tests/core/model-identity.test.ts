@@ -51,6 +51,12 @@ describe('canonical provider API model identity', () => {
   it('never treats an unowned unknown ID as Claude', () => {
     expect(inferProviderFromId('future-model-v9')).toBeUndefined();
     expect(() => buildParametricModel('future-model-v9')).toThrow(/Provider ownership is required/);
+    // The cursor- namespace claims a HOST, not a model family: a bare vendor id
+    // that Cursor happens to serve is still unowned until someone names the
+    // provider explicitly. Inferring ownership from the family name would mint
+    // a cursor identity for an id that may be dispatched anywhere.
+    expect(inferProviderFromId('grok-4.6-high')).toBeUndefined();
+    expect(() => buildParametricModel('grok-4.6-high')).toThrow(/Provider ownership is required/);
   });
 
   it('preserves an unambiguous or explicitly owned parametric API ID byte-for-byte', () => {

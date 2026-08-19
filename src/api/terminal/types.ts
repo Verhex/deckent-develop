@@ -1,6 +1,6 @@
 export type TenantId = string; // "local" today; future: real tenant id (#3 seam)
 export type SessionKind = 'ai' | 'deckent' | 'shell';
-export type AiTool = 'claude' | 'gemini' | 'codex';
+export type AiTool = 'claude' | 'gemini' | 'codex' | 'cursor';
 
 export interface CreateSessionInput {
   kind: SessionKind;

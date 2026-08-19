@@ -382,8 +382,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // fixtures), scratch-checkpoint recovery-reuse/reaper fixtures, the
   // registry contentStore spill pin and the bridge nextTurnIndex continuity
   // pin; app-surface/trace-wire pins moved content. Prior: 7088 Faz-1 (14440).
-  count: 14449,
-  digest: '9d8bec26ca1fc86afb12fc628fe993dbc47ebdb461e2e71e224a2d689dca7ad6',
+  // 2026-08-19 (7091 CURSOR-PROVIDER, sprint-565 + el-kapama): +15 — cursor
+  // adapter/spec/capability/discovery/auth-probe suites + cursor-evidence-sources
+  // stub suite enter; provider pins realigned. Prior: 7089 (14449).
+  count: 14464,
+  digest: 'ffa9c97876e31db0a69d319c40e3b72d1d9f5d3ac60826b40ef6a78bae447f18',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -631,8 +634,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (canonical CC-parity slug) enter the inventory; scratch-checkpoint,
   // tool-result-broker, session, identity, loop, bridge, app.tsx, run.tsx,
   // native-tool-registry, trace-wire and session-usage-store hashes moved.
-  count: 1254,
-  digest: '4ebe8d5cd941fd0b412655ca3ee6be6debfda0b4ba2a3868ee056372ef3e59e8',
+  // 2026-08-19 (7091 CURSOR-PROVIDER, sprint-565 + el-kapama): +2 —
+  // providers/cursor.ts (adapter) and providers/cursor-provider-evidence-sources.ts
+  // enter the inventory; spine/spec/registry/auth/doctor/bootstrap hashes moved.
+  count: 1256,
+  digest: '90636b01ca5a85fc5ba7301b6643050a48e0ee419988b57b55833f7f8910e52e',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

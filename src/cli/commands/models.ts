@@ -41,14 +41,20 @@ function colorTier(tier: string): string {
   return color(code, label.padEnd(9));
 }
 
+/** Known provider display colors — also the SINGLE source for the provider
+ *  names quoted in `--provider` help, so the list can never drift out of sync
+ *  with what the command can actually colorize. Unlisted providers still render
+ *  (uncolored); this map is presentation metadata, not an allowlist. */
+const PROVIDER_COLORS: Record<string, string> = {
+  claude: '\x1b[36m',
+  codex:  '\x1b[32m',
+  gemini: '\x1b[33m',
+  ollama: '\x1b[35m',
+  cursor: '\x1b[34m',
+};
+
 function colorProvider(provider: string): string {
-  const providerColors: Record<string, string> = {
-    claude: '\x1b[36m',
-    codex:  '\x1b[32m',
-    gemini: '\x1b[33m',
-    ollama: '\x1b[35m',
-  };
-  const code = providerColors[provider] ?? '\x1b[0m';
+  const code = PROVIDER_COLORS[provider] ?? '\x1b[0m';
   return color(code, provider.padEnd(8));
 }
 
@@ -114,7 +120,10 @@ export function registerModels(program: Command): void {
   models
     .command('list')
     .description(getMessage('cli.models.list.desc', getLanguage(undefined)))
-    .option('--provider <name>', 'Filter by provider (claude, codex, gemini, ollama)')
+    .option(
+      '--provider <name>',
+      `Filter by provider (${Object.keys(PROVIDER_COLORS).join(', ')})`,
+    )
     .option('--offline', 'Use cached or bundled catalog without network')
     .action(async (opts: { provider?: string; offline?: boolean }) => {
       try {

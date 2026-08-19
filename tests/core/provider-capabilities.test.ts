@@ -61,35 +61,36 @@ describe('provider-capabilities', () => {
     // capability flags differ from claude/codex/gemini (streaming=true,
     // toolUse=false, vision=false, codeExecution=false, cost=0), so per-cap
     // expected counts vary — see each `it` block.
-    it('returns all six providers for streaming', () => {
+    it('returns all seven providers for streaming', () => {
       const providers = getProvidersWithCapability('streaming');
       expect(providers).toContain('claude');
       expect(providers).toContain('codex');
       expect(providers).toContain('gemini');
+      expect(providers).toContain('cursor');
       expect(providers).toContain('ollama');
       expect(providers).toContain('openrouter');
       expect(providers).toContain('local-llm');
-      expect(providers).toHaveLength(6);
+      expect(providers).toHaveLength(7);
     });
 
     it('returns claude/codex/gemini/openrouter/local-llm for toolUse (ollama: false)', () => {
       const providers = getProvidersWithCapability('toolUse');
-      expect(providers).toHaveLength(5);
+      expect(providers).toHaveLength(6);
       expect(providers).not.toContain('ollama');
       expect(providers).toContain('openrouter');
       expect(providers).toContain('local-llm');
     });
 
-    it('returns all 6 providers for maxContextTokens (non-zero)', () => {
+    it('returns all 7 providers for maxContextTokens (non-zero)', () => {
       const providers = getProvidersWithCapability('maxContextTokens');
-      expect(providers).toHaveLength(6);
+      expect(providers).toHaveLength(7);
     });
 
-    it('returns all 6 providers for costPerMillionTokens', () => {
+    it('returns all 7 providers for costPerMillionTokens', () => {
       // costPerMillionTokens is treated as "always has this capability" when
       // the value is a non-null object — Ollama's {input:0,output:0} counts.
       const providers = getProvidersWithCapability('costPerMillionTokens');
-      expect(providers).toHaveLength(6);
+      expect(providers).toHaveLength(7);
     });
   });
 
@@ -132,12 +133,13 @@ describe('provider-capabilities', () => {
   // ─── getAllProviders ──────────────────────────────────────────────
 
   describe('getAllProviders', () => {
-    it('returns all six providers, including openrouter and local-llm', () => {
+    it('returns all seven providers, including cursor, openrouter and local-llm', () => {
       const all = getAllProviders();
-      expect(all).toHaveLength(6);
+      expect(all).toHaveLength(7);
       expect(all).toContain('claude');
       expect(all).toContain('codex');
       expect(all).toContain('gemini');
+      expect(all).toContain('cursor');
       expect(all).toContain('ollama');
       expect(all).toContain('openrouter');
       expect(all).toContain('local-llm');

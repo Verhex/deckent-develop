@@ -79,12 +79,19 @@ describe('detectAvailableProviders', () => {
     process.env = { ...originalEnv };
   });
 
-  it('returns array of 4 providers (claude, codex, gemini, ollama)', async () => {
+  it('returns all auto-detected providers including cursor', async () => {
     // Sprint 202 Task 202-001: Ollama is now a 1st-class detection target.
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(1, '') as ReturnType<typeof spawnSync>);
     const providers = await detectAvailableProviders();
-    expect(providers).toHaveLength(4);
-    expect(providers.map(p => p.name)).toEqual(['claude', 'codex', 'gemini', 'ollama']);
+    expect(providers).toHaveLength(5);
+    expect(providers.map(p => p.name)).toEqual(['claude', 'codex', 'cursor', 'gemini', 'ollama']);
+  });
+
+  it('detects Cursor Agent from cursor-agent on PATH', async () => {
+    vi.mocked(spawnSync).mockImplementation((cmd: string) =>
+      makeSpawnResult(cmd === 'cursor-agent' ? 0 : 1, cmd === 'cursor-agent' ? '2026.08.11' : '') as ReturnType<typeof spawnSync>);
+    const cursor = (await detectAvailableProviders()).find(p => p.name === 'cursor')!;
+    expect(cursor).toMatchObject({ available: true, version: '2026.08.11', authMethod: 'session' });
   });
 
   it('detects Claude as available when CLI returns success', async () => {

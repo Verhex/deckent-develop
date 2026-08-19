@@ -6,6 +6,7 @@ import {
   type ProviderResponse,
   type SubscriptionSpawnFn,
 } from './chat-native.js';
+import { ALL_PROVIDER_NAMES } from '../../core/types.js';
 
 // ─── Provider Parity — unified adapter resolver ─────────────────────────────
 //
@@ -18,6 +19,7 @@ import {
 export type ParityProviderName =
   | 'claude'
   | 'codex'
+  | 'cursor'
   | 'gemini'
   | 'ollama'
   | 'openai-compatible';
@@ -48,9 +50,10 @@ export interface ResolveChatAdapterOptions {
 
 // ─── CLI-spawn adapter (claude / codex / gemini) ─────────────────────────
 
-function cliExtraArgs(name: 'claude' | 'codex' | 'gemini'): readonly string[] {
+function cliExtraArgs(name: 'claude' | 'codex' | 'cursor' | 'gemini'): readonly string[] {
   switch (name) {
     case 'codex':  return ['exec', '--full-auto'];
+    case 'cursor': return ['--mode', 'ask', '-p', '--trust', '--output-format', 'json'];
     case 'gemini': return ['-p'];
     case 'claude': return ['--print'];
   }
@@ -90,7 +93,7 @@ function subscriptionExitError(binary: string, exitCode: number, collectedText: 
 }
 
 function buildCliSpawnAdapter(
-  name: 'claude' | 'codex' | 'gemini',
+  name: 'claude' | 'codex' | 'cursor' | 'gemini',
   spawnFn: SubscriptionSpawnFn,
 ): ChatProviderAdapter {
   const binary = name;
@@ -255,6 +258,7 @@ export function resolveChatAdapter(
   switch (provider) {
     case 'claude':
     case 'codex':
+    case 'cursor':
     case 'gemini':
       return buildCliSpawnAdapter(provider, spawnFn);
 
@@ -267,7 +271,7 @@ export function resolveChatAdapter(
     default:
       throw new Error(
         `Unknown REPL provider: "${String(provider)}". ` +
-        `Valid providers: claude, codex, gemini, ollama, openai-compatible.`,
+        `Valid providers: ${[...ALL_PROVIDER_NAMES, 'openai-compatible'].join(', ')}.`,
       );
   }
 }

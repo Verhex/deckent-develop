@@ -31,6 +31,7 @@ import type {
 } from '../core/provider-evidence-probe-contract.js';
 import { createClaudeAdapter } from '../providers/claude.js';
 import { createCodexAdapter } from '../providers/codex.js';
+import { createCursorAdapter } from '../providers/cursor.js';
 import { createGeminiAdapter } from '../providers/gemini.js';
 import { buildSuggestedImageCmd } from '../core/worker-image-check.js';
 import { LOCKS_DIR, TASKS_DIR } from '../core/constants.js';
@@ -2734,6 +2735,7 @@ export const WORKER_NODE_OPTIONS = 'NODE_OPTIONS=--max-old-space-size-percentage
 const USAGE_ADAPTER_FACTORIES: Record<string, (root: string) => { extractUsage?: (raw: string) => unknown }> = {
   claude: createClaudeAdapter,
   codex: createCodexAdapter,
+  'cursor-agent': createCursorAdapter,
   gemini: createGeminiAdapter,
 };
 
@@ -2985,6 +2987,7 @@ export function getProviderBinaryForModel(model: ModelType): string {
   const provider = getProviderForModel(model);
   if (provider === 'claude') return 'claude';
   if (provider === 'codex') return 'codex';
+  if (provider === 'cursor') return 'cursor-agent';
   if (provider === 'gemini') return 'gemini';
   if (provider === 'ollama') {
     throw createDockerLifecycleError(

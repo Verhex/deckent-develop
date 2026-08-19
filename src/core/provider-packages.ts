@@ -56,3 +56,60 @@ export function isCliProviderId(value: string): value is CliProviderId {
 export function getProviderPackage(id: CliProviderId): ProviderPackageInfo {
   return PROVIDER_PACKAGES[id];
 }
+
+// ─── Binary-only provider CLIs (vendor installer, never npm) ─────────────
+//
+// PROVIDER_PACKAGES above is — by name, by doc and by its own test invariant
+// (`installHint === 'npm install -g ' + npmPkg`) — the SSOT for CLIs published
+// on the npm registry. Some vendor CLIs are simply not distributed there, so
+// forcing them into that record would require either inventing an npm name
+// that does not exist or breaking the derived-installHint invariant. Both are
+// dishonest, so binary-only CLIs get their own explicit registry and the two
+// are read through one accessor ({@link getProviderCliInfo}).
+
+/** Provider CLIs distributed ONLY as a vendor binary (no npm package). */
+export type BinaryOnlyProviderId = 'cursor';
+
+export interface BinaryOnlyProviderInfo {
+  /** Never published on npm — `null` is the honest value, not a placeholder name. */
+  readonly npmPkg: null;
+  /** Executable name on PATH. NOTE: cursor's CLI binary is `cursor-agent`; the
+   *  bare `cursor` name belongs to the editor/IDE `detected_env` namespace. */
+  readonly binName: string;
+  /** Vendor-installer pointer — never an `npm install` line. */
+  readonly installHint: string;
+}
+
+/**
+ * Single source of truth for provider CLIs that ship outside npm. Values MUST
+ * match the executable spawned by the matching provider adapter.
+ */
+export const BINARY_ONLY_PROVIDER_PACKAGES: Readonly<Record<BinaryOnlyProviderId, BinaryOnlyProviderInfo>> =
+  Object.freeze({
+    cursor: Object.freeze({
+      npmPkg: null,
+      binName: 'cursor-agent',
+      installHint: 'https://cursor.com/cli — official Cursor CLI installer, not published on npm',
+    }),
+  });
+
+/** Every CLI-backed provider id — npm-published or vendor-binary. */
+export type ProviderCliId = CliProviderId | BinaryOnlyProviderId;
+
+const BINARY_ONLY_PROVIDER_IDS: readonly BinaryOnlyProviderId[] = Object.freeze(
+  Object.keys(BINARY_ONLY_PROVIDER_PACKAGES) as BinaryOnlyProviderId[],
+);
+
+/** Type guard — narrows an arbitrary string to a binary-only (non-npm) provider CLI id. */
+export function isBinaryOnlyProviderId(value: string): value is BinaryOnlyProviderId {
+  return (BINARY_ONLY_PROVIDER_IDS as readonly string[]).includes(value);
+}
+
+/**
+ * Unified CLI identity lookup across both registries — the single place a
+ * caller resolves "what binary do I spawn / how is this CLI installed?" for a
+ * provider, without having to know whether it comes from npm.
+ */
+export function getProviderCliInfo(id: ProviderCliId): ProviderPackageInfo | BinaryOnlyProviderInfo {
+  return isBinaryOnlyProviderId(id) ? BINARY_ONLY_PROVIDER_PACKAGES[id] : PROVIDER_PACKAGES[id];
+}

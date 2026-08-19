@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2957d4ee86b2a157b89e7d395e0a10728e85d681cd8f3f8dce01fcbe786a3c0b"
+    "value": "d812223dad1c5b3dc7f3e641b3642060893c636758a63401e1ea866ee622998c"
   },
   "summary": {
-    "total": 509,
-    "active": 445,
+    "total": 510,
+    "active": 446,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 352,
+      "OPEN": 353,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 333,
+      "P0": 334,
       "P1": 139,
       "P2": 37
     },
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 111,
+      "KERNEL": 112,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -4857,7 +4857,7 @@
       "state": "OPEN",
       "updated": "2026-08-19",
       "definitionDigest": "be5a85b105b1a8ee8589233849cb6de3138f8c0cda95a9f5af24327bd3812366",
-      "progressDigest": "8ff903e3719b8778d096c3100d66d5d91d1f832cfac34524f1b42d5840975527",
+      "progressDigest": "68299b2c8e717aa244322519c1bd2f208b9d204cd8d8ca432be247b6cfc51b98",
       "terminalClosureDigest": null
     },
     {
@@ -4869,6 +4869,17 @@
       "updated": "2026-08-19",
       "definitionDigest": "79a2ae78edb697329300455380f7e4aba2448c604a3b70be9a2ce3b3f4bf8dcf",
       "progressDigest": "e562fc53a727e10f111a6559d27f3df2b562758ecca878d091f3e737d631530f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7093,
+      "id": "TOKEN-ACCOUNTING-TRUTH-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-19",
+      "definitionDigest": "c040cad1927723f3b354c7744cc9baf49c83cc3c1a726f72dbe85cc0806ca5d6",
+      "progressDigest": "b48e0c0acc4821976e3392b69f1d560148442db8dae98abe76fdcfe956a769eb",
       "terminalClosureDigest": null
     },
     {
@@ -22102,6 +22113,7 @@
         "ORPHAN-WIRE-001",
         "CURSOR-PROVIDER-001",
         "RECOVERY-TRUTH-001",
+        "TOKEN-ACCOUNTING-TRUTH-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -22154,6 +22166,7 @@
         "ORPHAN-WIRE-001",
         "CURSOR-PROVIDER-001",
         "RECOVERY-TRUTH-001",
+        "TOKEN-ACCOUNTING-TRUTH-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -23382,7 +23395,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "(1) Provider adapter: `--mode ask -p --trust --output-format json` non-interaktif sözleşmesi üzerinden send/usage; read-only verifier izolasyonu `--mode ask`. (2) Registry: cursor katalog modelleri (`cursor-grok-4.6-*`, `gpt-5.6-sol-*` vb.) owner active-set disiplinine tabi. (3) XVerify: `--verifier cursor --verifier-model cursor-grok-4.6-high` uçtan uca typed kapanış (verdict+call+usage+receipt). (4) Limit: Cursor üyelik limiti admission'a bağlanır; hardcode eşik yok",
-      "evidence": "Owner admission 2026-08-19 (\"cursor provider olarak kabul edip modellerini kullanabilirsin; xverify'da grok 4.6 cursor üzerinden deneyebilirsin; önce test edip sonra işleri güncelle\"). Ön-test kanıtları (2026-08-19): `cursor-agent` v2026.08.11 login'li (owner hesabı); `--list-models` 40+ model (grok-4.6 low→xhigh ±fast); gerçek çağrı grok-4.6-high → `OK` (text) + gpt-5.6-sol-high → JSON `{\"result\":\"PING\",\"usage\":{\"inputTokens\":3,\"outputTokens\":5,…}}` — provider-reported usage MEVCUT; dizin-güven (`--trust`) gerekli. HOST-BOOTSTRAP LANDED 2026-08-19: `.cursor/mcp.json` (deckent-mcp kaydı) + `.cursor/rules/deckent.mdc` (alwaysApply pure adapter + DECKENT-DEV-CONTROL + OPERATING-POLICY blokları) resmi generator+lint --write ile üretildi; lint-operating-policy HOST_RELATIVE_PATHS 3-host oldu (Cursor drift-gate) — 225 pin-test yeşil; çift-doğrulama: Cursor/grok-4.6 5/5 SUPPORTED + Sol 3/3 CONFIRMED (`…cf85f23` `…c0dba6b` `…8b6a0c`; bileşik-koşu dürüst UNCLEAR `…f4e9b`)",
+      "evidence": "Owner admission 2026-08-19 (\"cursor provider olarak kabul edip modellerini kullanabilirsin; xverify'da grok 4.6 cursor üzerinden deneyebilirsin; önce test edip sonra işleri güncelle\"). Ön-test kanıtları (2026-08-19): `cursor-agent` v2026.08.11 login'li (owner hesabı); `--list-models` 40+ model (grok-4.6 low→xhigh ±fast); gerçek çağrı grok-4.6-high → `OK` (text) + gpt-5.6-sol-high → JSON `{\"result\":\"PING\",\"usage\":{\"inputTokens\":3,\"outputTokens\":5,…}}` — provider-reported usage MEVCUT; dizin-güven (`--trust`) gerekli. HOST-BOOTSTRAP LANDED 2026-08-19: `.cursor/mcp.json` (deckent-mcp kaydı) + `.cursor/rules/deckent.mdc` (alwaysApply pure adapter + DECKENT-DEV-CONTROL + OPERATING-POLICY blokları) resmi generator+lint --write ile üretildi; lint-operating-policy HOST_RELATIVE_PATHS 3-host oldu (Cursor drift-gate) — 225 pin-test yeşil; çift-doğrulama: Cursor/grok-4.6 5/5 SUPPORTED + Sol 3/3 CONFIRMED (`…cf85f23` `…c0dba6b` `…8b6a0c`; bileşik-koşu dürüst UNCLEAR `…f4e9b`) **FAZ-1 CORE LANDED 2026-08-19 (sprint-565 ABORTED-dürüst 3/10 + ADR-D-007 el-kapama):** spine (union+capabilities+PROVIDER_MODEL_MAP) · CursorAdapter+komut-spec+factory/routing kayıtları · dar katalog (cursor-grok-4.6 ×4, explicit tier) · auth-probe/discovery/doctor · evidence-sources dürüst-stub çift-backend + bootstrap wiring; el-kapamalar: session-interface AUTH_ENV_VARS.cursor (Explore-haritasının kaçırdığı exhaustive Record — 5. fix-scope vakası) + getAllKnownModelIds registerCursorParityModels wiring + **SEC-1 argument-injection kapandı** (`--` end-of-options, gerçek-binary kanıtlı, adapter+spec+pin). Smoke zinciri typed-dürüst: enum ✓ → registry-çözüm ✓ → tier-floor hold ✓ (high=premium<fable) → `docker_provider_cli_unavailable` (imajda cursor-agent yok = residual-010). 250/250 scoped yeşil; tsc 0. Yeni defekt bulgusu: resume projection-divergence — worker sidecar`ları (*.skill-delivery, *.replan-proposal) plan-projeksiyon karşılaştırmasında tanınmıyor → resume imkânsız (7092-aday); xv-stub/NO_TASK_RECEIPT kilidi 13 dosyaya büyüdü. Residual: 009 i18n+battery · 010 Dockerfile/INSTALL_CURSOR + imaj + docker gerçek-koşu",
       "updated": "2026-08-19"
     },
     {
@@ -23415,6 +23428,38 @@
       "evidenceReceipts": [],
       "acceptance": "Her defekt: reproducer test + fix + gerçek-koşu kanıtı; paket zorla-feature taşımaz; (3) için clean-gate'in receipt-yokluğu kilidi hem üretici (xverify) hem tüketici (gate mesajı remediation yolu gösterir) ucundan çözülür",
       "evidence": "Owner admission 2026-08-19 (\"Evet — tek paket satırı\"); kanıt zinciri MASTER 7089 LANDED bloğu + sprint-564 E091 kurtarma kaydı (corrupt-result forensik yedeği scratchpad, closure `…947df2e5` dönemi)",
+      "updated": "2026-08-19"
+    },
+    {
+      "order": 7093,
+      "id": "TOKEN-ACCOUNTING-TRUTH-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "KERNEL",
+      "outcome": "Cross-provider token-sayaç doğruluğu: worker result/status/kpi/cost görünümlerine akan tokenUsage TEK kanonik semantikte birleşir (inputTokens=FRESH cache-DIŞI, cacheReadTokens ayrı, totalTokens her zaman dolu). Kanıtlı defekt (2026-08-19, sprint-565 canlı verisi): `source: host-runtime-budget` yolu (docker budget-monitor akışı) codex `input_tokens`ını CACHE-DAHİL ham haliyle inputTokens alanına yazıyor — adapter extractUsage yolundaki sprint-497 normalizasyonu (codex.ts:707-730, input−cached) bu katmanda ATLANIYOR; claude yolu (`source: cli-log`) ise kanonik-doğru (disjoint). Sonuç: aynı sütun codex-task'ta cache-dahil (örn. in=243.965/cacheRead=205.312 → gerçek fresh≈38.653), claude-task'ta fresh (in=8.952/cacheRead=4.528.245) — karşılaştırma ve maliyet %500+ yanıltıcı. İkincil: totalTokens her iki yolda undefined kalıyor",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "(1) host-runtime-budget observe/settle zinciri normalizeUsage kanonik sözleşmesinden geçer (codex: fresh=input−cached; tek dönüşüm noktası, çift-sayım yok); (2) totalTokens her result'ta dolu (provider-toplamı öncelikli); (3) status/kpi/cost görünümleri fresh+cacheRead+cacheCreate+out ayrımını etiketli gösterir; (4) regresyon: iki provider fixture'ıyla aynı formül pinlenir; mevcut budget-eşik semantiği (hangi sayıya karşı ölçülüyor) davranış-değişikliği ayrı owner-onayına tabi — bu iş ÖNCE raporlar",
+      "evidence": "Owner admission 2026-08-19 (token-sayaç uçurumu sorusu; \"analiz et, çözüm önerilerini iş planına dahil et\"). Analiz kanıtı: sprint-565 canlı result.tokenUsage verileri (9 codex + 2 claude task) + codex.ts:707-730 normalize yorumu (sprint-497 %78-overstatement vakası) + token-usage.ts kanonik sözleşme. **OWNER-BLOCKING (2026-08-19): bu analiz neticelenmeden yeni görev alınmaz; elle düzeltme YOK; landing-sonrası xverify'lı doğrulanmış kök-neden zorunlu. Owner hipotezi analiz-sorusu: turn-toplama çift-sayım mı (90+100=190) yoksa per-call billing gerçeği mi (n×cache-read) — tek-worker izole deney + toplama-kodu kanıtı + CLI-envelope semantiği üçlüsüyle karara bağlanacak; claude cache 1-worker mı üst-üste 2-worker mı sorusu dahil.** Ön-not: Claude-içi \"uçurum\" (in≈9k vs cacheRead≈7.2M) ön-analizde DEFEKT DEĞİL görünüyor — Anthropic disjoint raporlar, cache verimli çalışıyor; sayaç doğru",
       "updated": "2026-08-19"
     },
     {
@@ -26247,6 +26292,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "79494f565c4e53ca7261c79ce0a8529eed684e9d73f99fea5998b080692157d3"
+    "value": "3fa69d0fc1a965bd3a2a0200e1c3cd7b1134935777816f27ea19bdadab7c0426"
   }
 }

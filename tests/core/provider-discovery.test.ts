@@ -28,6 +28,14 @@ describe('DISCOVERABLE_PROVIDERS', () => {
   it('is exactly claude, codex, gemini in that order', () => {
     expect(DISCOVERABLE_PROVIDERS).toEqual(['claude', 'codex', 'gemini']);
   });
+
+  // task-565-007: `cursor` is a supported AuthProbeProvider but is deliberately
+  // NOT discoverable yet — `onboarding-wizard.ts` aliases this union straight
+  // onto `McpHost` and cursor has no MCP-attach contract. This pins the honest
+  // held-back state so the gap cannot be forgotten OR silently widened.
+  it('excludes cursor until the onboarding/MCP-host consumers can accept it', () => {
+    expect(DISCOVERABLE_PROVIDERS).not.toContain('cursor');
+  });
 });
 
 // ─── discoverProviders — fake-probe matrix ─────────────────────────────────
@@ -36,7 +44,7 @@ describe('discoverProviders — fake-probe matrix', () => {
   it('reports present:false, version:undefined for every provider when the version probe finds nothing', async () => {
     const version: ProviderVersionProbe = () => undefined;
     const results = await discoverProviders({ version });
-    expect(results).toHaveLength(3);
+    expect(results).toHaveLength(DISCOVERABLE_PROVIDERS.length);
     for (const r of results) {
       expect(r.present).toBe(false);
       expect(r.version).toBeUndefined();
@@ -99,10 +107,10 @@ describe('discoverProviders — fake-probe matrix', () => {
     const version: ProviderVersionProbe = (name) => (name === 'claude' ? '1.0.0' : undefined);
     const auth = vi.fn(async () => 'logged-in' as AuthProbeState);
     const results = await discoverProviders({ version, auth });
-    // Presence and auth are independent probes — auth is queried for all three
-    // providers regardless of CLI presence (a caller may still want to know
+    // Presence and auth are independent probes — auth is queried for every
+    // provider regardless of CLI presence (a caller may still want to know
     // "logged in via env var" even when the CLI binary itself is absent).
-    expect(auth).toHaveBeenCalledTimes(3);
+    expect(auth).toHaveBeenCalledTimes(DISCOVERABLE_PROVIDERS.length);
     const codex = results.find((r) => r.name === 'codex')!;
     expect(codex.present).toBe(false);
     expect(codex.authState).toBe('logged-in');
@@ -159,7 +167,7 @@ describe('discoverProviders — default probes', () => {
     } as unknown as ReturnType<typeof spawnSync>);
 
     const results = await discoverProviders();
-    expect(results).toHaveLength(3);
+    expect(results).toHaveLength(DISCOVERABLE_PROVIDERS.length);
     for (const r of results) {
       expect(r.present).toBe(false);
       expect(r.authState).toBe('unknown');
@@ -186,15 +194,19 @@ describe('discoverProviders — default probes', () => {
 
 // ─── shape-compat with the /connect wizard's ConnectProviderDetection ─────
 //
-// `src/cli/helpers/connect-wizard.ts` is out of this task's read/write scope,
-// so this is a LOCAL structural mirror (not an import) of its
-// `ConnectProviderDetection` shape — `{ name, cliAvailable, version?,
-// authState }`. If `ProviderDiscoveryResult` ever drifts from that shape
-// (field renamed, authState union diverges), this assignability check fails
-// to compile — a pure compile-time guard, no runtime behavior.
+// LOCAL structural mirror (not an import) of `src/cli/helpers/connect-wizard.ts`'s
+// `ConnectProviderDetection` shape — `{ name, cliAvailable, version?, authState }`.
+// If `ProviderDiscoveryResult` ever drifts from that shape (field renamed,
+// authState union diverges), this assignability check fails to compile — a pure
+// compile-time guard, no runtime behavior.
+//
+// The `name` field is mirrored as `DiscoverableProviderName` rather than a
+// hand-written literal union so that this guard tracks the discovery union
+// automatically the day it widens (task-565-007: `cursor` is held back — see
+// provider-discovery.ts's type doc).
 
 interface ConnectProviderDetectionLike {
-  name: 'claude' | 'codex' | 'gemini';
+  name: DiscoverableProviderName;
   cliAvailable: boolean;
   version?: string;
   authState: AuthProbeState;

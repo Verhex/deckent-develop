@@ -480,6 +480,20 @@ export interface ActualCostUsage {
  */
 const LOCAL_PROVIDER_NAMES = new Set(['ollama', 'local', 'self-hosted', 'vllm']);
 
+/**
+ * Providers whose CLI surface is billed exclusively through the user's plan and
+ * that publish no per-token tariff, so cost-config can carry no pricing row for
+ * them (identity classification, not a pricing hard-code — an explicit
+ * cost-config entry still wins everywhere below).
+ *
+ * Their incremental USD is STRUCTURALLY zero, which is a different fact from
+ * "price unknown". Keeping the two apart is the whole point: a subscription run
+ * settles as `billingMode:'subscription'` with a pricing source that names WHY
+ * it is zero, while a genuinely unpriced model keeps reporting `unknown-model:`.
+ * Neither path may emit a bare, unexplained $0.
+ */
+const SUBSCRIPTION_ONLY_PROVIDER_NAMES = new Set(['cursor']);
+
 /** Decide whether a run was on-device/self-hosted — config-first, provider-name fallback. */
 function isLocalInference(
   provider: string | undefined,
@@ -505,14 +519,20 @@ function isLocalInference(
  *
  * Cross-provider: pricing is resolved by {@link findModel} (model id/alias across
  * every provider in `config`), so the deckent `provider` name (`'claude'`/`'codex'`/
- * `'gemini'`/`'ollama'`) need not match the cost-config provider key (`'anthropic'`/…)
- * — the `provider` argument is used only to detect local inference.
+ * `'gemini'`/`'ollama'`/`'cursor'`) need not match the cost-config provider key
+ * (`'anthropic'`/…) — the `provider` argument is used only to classify inference
+ * economics: on-device (local) versus plan-billed
+ * ({@link SUBSCRIPTION_ONLY_PROVIDER_NAMES}) versus metered.
  *
  * `config` is injected (not loaded from disk) so the function stays pure and tests
  * stay hermetic (ADR-087), consistent with {@link estimateSprintCost}.
  *
  * Behaviour:
  *  - local/self-hosted  → `{ usd:0, pricingSource:'local', isLocal:true }` (even with tokens).
+ *  - plan-billed CLI    → `{ usd:0, billingMode:'subscription',
+ *                          pricingSource:'subscription-provider:<p>' }` when the provider is
+ *                          subscription-only and carries no cost-config row: the zero is
+ *                          structural and labelled as such, never an unpriced gap.
  *  - unknown model      → `{ usd:0, pricingSource:'unknown-model:<m>', isLocal:false }` — never
  *                          silently priced, so the caller can surface the gap honestly.
  *  - metered            → per-token sum (input + output + cache_read + cache_creation), with the
@@ -533,6 +553,20 @@ export function calculateActualCost(
   // Local/self-hosted inference → no metered billing, regardless of token counts.
   if (isLocalInference(provider, found, config)) {
     return { usd: 0, currency: 'USD', pricingSource: 'local', isLocal: true };
+  }
+
+  // Subscription-only provider with no cost-config row → the $0 is structural,
+  // not a gap. Labelling it `unknown-model:` would read as missing pricing data
+  // and invite someone to "fix" it with a fabricated tariff; the honest
+  // settlement names the billing authority instead.
+  if (!found && provider && SUBSCRIPTION_ONLY_PROVIDER_NAMES.has(provider.toLowerCase())) {
+    return {
+      usd: 0,
+      currency: 'USD',
+      billingMode: 'subscription',
+      pricingSource: `subscription-provider:${provider.toLowerCase()}`,
+      isLocal: false,
+    };
   }
 
   // Unknown model → cannot price. Report honestly rather than silently charging $0.
@@ -577,7 +611,15 @@ function calculateTaskCost(
     task.billingMode
       ?? providerConfig?.default_billing_mode
       ?? providerConfig?.billing_modes_supported[0]
-      ?? (provider === 'ollama' ? 'local' : 'api');
+      // Last-resort default for a registry-known model the cost-config does not
+      // catalogue: on-device inference is local, a plan-billed CLI provider is
+      // subscription (so the pricing-evidence gate below does not reject it as
+      // unpriced API spend), everything else stays metered API.
+      ?? (provider === 'ollama'
+        ? 'local'
+        : SUBSCRIPTION_ONLY_PROVIDER_NAMES.has(provider.toLowerCase())
+          ? 'subscription'
+          : 'api');
 
   // Pricing evidence is an execution prerequisite only for metered API
   // billing. A registry-known subscription/local/free-tier model has a

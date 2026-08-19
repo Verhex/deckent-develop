@@ -703,6 +703,17 @@ function detectCodex(): DetectedProvider {
   };
 }
 
+function detectCursor(): DetectedProvider {
+  const version = detectCliVersion('cursor-agent');
+  return {
+    name: 'cursor',
+    available: version !== undefined,
+    version,
+    authMethod: version !== undefined ? 'session' : 'none',
+    models: [...PROVIDER_MODEL_MAP.cursor],
+  };
+}
+
 /**
  * Detect Ollama local-server availability.
  *
@@ -793,6 +804,7 @@ export async function detectAvailableProviders(): Promise<DetectedProvider[]> {
   return [
     detectClaude(),
     detectCodex(),
+    detectCursor(),
     detectGemini(),
     ollama,
   ];
@@ -1542,6 +1554,10 @@ export async function bootstrapProviders(
     codex: async () => {
       const { createCodexAdapter } = await import('../providers/codex.js');
       return createCodexAdapter(root, { credentialEnvKeys });
+    },
+    cursor: async () => {
+      const { createCursorAdapter } = await import('../providers/cursor.js');
+      return createCursorAdapter(root, { credentialEnvKeys });
     },
     gemini: async () => {
       const { createGeminiAdapter } = await import('../providers/gemini.js');

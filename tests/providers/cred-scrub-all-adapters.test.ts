@@ -49,6 +49,8 @@ import { OllamaAdapter } from '../../src/providers/ollama.js';
 import { OpenAICompatibleAdapter } from '../../src/providers/openai-compatible.js';
 import { OpenRouterProvider } from '../../src/providers/openrouter.js';
 import { GeminiAdapter } from '../../src/providers/gemini.js';
+import { CursorAdapter } from '../../src/providers/cursor.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
 
@@ -390,6 +392,23 @@ describe('§C standalone injectable adapters — zero cross-provider leak', () =
     expect(env['GEMINI_API_KEY']).toBe('DECKENT_GOOGLE_API_KEY-HOST');
     for (const key of ALL_KEYS.filter((key) => key !== 'GEMINI_API_KEY')) {
       expect(env[key], `Gemini worker must not see provider credential ${key}`).toBeUndefined();
+    }
+    expect(env['PATH']).toBe(process.env['PATH']);
+  });
+
+  it('CursorAdapter.spawn() scrubs every provider credential for session auth', () => {
+    const spawnImpl = vi.fn().mockReturnValue(makeMockChild());
+    vi.spyOn(modelRegistry, 'getByProvider').mockReturnValue([{ id: 'cursor-test' }] as never);
+    const adapter = new CursorAdapter(projectDir, {
+      spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,
+      credentialEnvKeys: ALL_KEYS,
+    });
+
+    adapter.spawn('t-cursor-gap', 'cursor-test' as ModelType, 'prompt');
+
+    const env = spawnedEnv(spawnImpl as unknown as MockInstance);
+    for (const key of ALL_KEYS) {
+      expect(env[key], `Cursor worker must not see provider credential ${key}`).toBeUndefined();
     }
     expect(env['PATH']).toBe(process.env['PATH']);
   });

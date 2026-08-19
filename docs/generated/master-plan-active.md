@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):2957d4ee86b2a157b89e7d395e0a10728e85d681cd8f3f8dce01fcbe786a3c0b`
+**Source digest:** `sha256(normalized-lf-utf8):d812223dad1c5b3dc7f3e641b3642060893c636758a63401e1ea866ee622998c`
 
-**Rows:** 509 total · 445 active · 64 terminal
+**Rows:** 510 total · 446 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 352 |
+| OPEN | 353 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -404,6 +404,7 @@
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
 | 7091 | `CURSOR-PROVIDER-001` | OPEN | P1 | TERMINAL | — | — | Cursor bir provider olur: `cursor-agent` CLI provider-neutral runtime contract'ına adapter olarak girer; model katalog/registry entegrasyonu config-resolved (KANUN 10 + ModelActivationStore explicit-active uyumlu, koda model-literal girmez); xverify `--verifier` yüzeyine `cursor` eklenir (birincil hedef: grok-4.6 — codex'ten TAMAMEN bağımsız model ailesi = üçüncü bağımsız verify rotası); usage/limit çözümü cursor-agent JSON `usage` alanından (provider-reported, kapanış-zinciri uyumlu) |
 | 7092 | `RECOVERY-TRUTH-001` | OPEN | P0 | KERNEL | — | — | Sprint-564 E091 vakasının 7 kurtarma/settlement doğruluk defekti TEK recovery paketi olarak kapanır (KANUN 6 — paket yalnız kendi closure'ını taşır): (1) worker-result JSON-encoding gate'i — worker `.result` yazarken JSON doğrulanır, notes içi ham kontrol-karakteri/escape'siz tırnak üretimde reddedilir; (2) exit-0 + corrupt-result kör noktası — monitor'ün onarım dalı exit koduna değil parse-sonucuna bağlanır (spawn-backend-docker.ts:7187 sınıfı); (3) xverify CONFIRMED-koşu stub'ı PENDING+NO_TASK_RECEIPT kalıyor → clean-gate/build kilidi (kısır-döngü sınıfı) — xverify runner task-receipt + terminal statü yazar; (4) finalize task-dosyası statülerini terminal'e yazmıyor (cleanup'a kadar clean HOLD); (5) landing-proposal tüketim yüzeyi yok; (6) `review` ACTIVE-run "Invalid Docker result settlement reference" crash; (7) scheduler continuous-idle — Paused task cascadeSkip'siz, run terminal'e akmıyor |
+| 7093 | `TOKEN-ACCOUNTING-TRUTH-001` | OPEN | P0 | KERNEL | — | — | Cross-provider token-sayaç doğruluğu: worker result/status/kpi/cost görünümlerine akan tokenUsage TEK kanonik semantikte birleşir (inputTokens=FRESH cache-DIŞI, cacheReadTokens ayrı, totalTokens her zaman dolu). Kanıtlı defekt (2026-08-19, sprint-565 canlı verisi): `source: host-runtime-budget` yolu (docker budget-monitor akışı) codex `input_tokens`ını CACHE-DAHİL ham haliyle inputTokens alanına yazıyor — adapter extractUsage yolundaki sprint-497 normalizasyonu (codex.ts:707-730, input−cached) bu katmanda ATLANIYOR; claude yolu (`source: cli-log`) ise kanonik-doğru (disjoint). Sonuç: aynı sütun codex-task'ta cache-dahil (örn. in=243.965/cacheRead=205.312 → gerçek fresh≈38.653), claude-task'ta fresh (in=8.952/cacheRead=4.528.245) — karşılaştırma ve maliyet %500+ yanıltıcı. İkincil: totalTokens her iki yolda undefined kalıyor |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
 | 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
