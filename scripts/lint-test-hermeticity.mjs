@@ -666,8 +666,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // adr-selector governing-tier marker slice + pointer, and the
   // worker-default rule template realigned to the F1d protocol (the
   // finalize→regenerateRules producer had been re-emitting the pre-F1d text).
+  // 2026-08-20 (7094-F2b): same 1256 count, digest only — spawn-backend-docker
+  // adds --disable-slash-commands to the F3 core args (deckent-owned
+  // composition drops the CLI slash/skill catalog from the worker prefix).
   count: 1256,
-  digest: '97be23befc2ce7dfdec65a74400298dcfad46de398fecf22ac36bce41f36e2ea',
+  digest: '07aa9652ecb2321a2d8390567f8eda1c5c9ad4a95f749d17c099b1ae9db7345c',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

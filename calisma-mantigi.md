@@ -132,3 +132,16 @@
   approvals decide pseudo-TTY (script -qec) + --reason owner-delegated iziyle
   veriliyor; bir istekte 'canlı yeniden-doğrulama yok' fail-closed'u görüldü
   (tutarsız) → xverify-ux finding.
+
+## F2b --disable-slash-commands (2026-08-19 gece, sprint-579)
+- F3-core moduna bağlı tek bayrak (deckent-owned composition bileşiği): CLI
+  slash+skill kataloğu prefix'ten düştü. TEK-KOŞU ölçüm (taban F4a-bandı):
+  **taze-input 3.38k → 1.23k (-%64)**; basit-görev cW 11.1-11.4k → 9.1k (-%20),
+  cR 71.7-72k → 67.9k; basit USD $0.177-0.191 → **$0.153-0.155**; kapsamlı
+  $0.734 (band-altı), cR 138.6k (band-altı). F2a'daki cW-patlaması YOK (farklı
+  katman). 6/6 DONE (2. kez); kalite 386 satır/46 H2 band-içi. 005-kronik yine
+  fix yedi ($0.76) — F2b-bağımsız. KÜMÜLATİF (567→): basit -%60, kapsamlı -%67.
+- Not: workspace-mount repo `.claude/skills+agents`'ını (ilgisiz tasarım
+  katalogları) her worker'a taşıyordu — bayrak bunu da kesiyor. F2c (agent
+  kataloğu ayrı maskeleme / --safe-mode) beklenen marjı küçük → sonraki dalga.
+- Bot restart yapıldı (pid 1439833, taze dist).

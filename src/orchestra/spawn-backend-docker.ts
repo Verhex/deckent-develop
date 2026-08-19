@@ -5795,7 +5795,18 @@ export class DockerSpawnBackend implements SpawnBackend {
       // the default system prompt, and CLAUDE.md loading is disabled via the
       // official CLAUDE_CODE_DISABLE_CLAUDE_MDS env (injected below) — auth
       // and the normal tool set stay intact.
-      coreArgs = ['--system-prompt-file', `${CONTAINER_WORKSPACE}/.tasks/${coreName}`];
+      // 7094-F2b (measured with the F3 core, 2026-08-19): under deckent-owned
+      // composition the CLI's own slash-command/skill catalog is dead prefix
+      // weight — deckent injects task-relevant skills through the prompt
+      // itself (F1c domain-overlap selection), never through the CLI catalog
+      // (the workspace mount was feeding unrelated repo design skills to
+      // every worker). Rides WITH systemPromptCore so the two ship as one
+      // "deckent-owned composition" mode; plain (core-off) spawns keep the
+      // stock catalog untouched.
+      coreArgs = [
+        '--system-prompt-file', `${CONTAINER_WORKSPACE}/.tasks/${coreName}`,
+        '--disable-slash-commands',
+      ];
     }
     const dockerSpec: ProviderCommandSpec = providerBinary === 'claude'
       ? { ...spec, baseArgs: [...coreArgs, ...claudeStreamJsonBaseArgs(spec.baseArgs)] }
