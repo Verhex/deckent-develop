@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d812223dad1c5b3dc7f3e641b3642060893c636758a63401e1ea866ee622998c"
+    "value": "3aee4cac45360d9b240fd7462b87e460e980bff3390aa98be8be0f43e2075625"
   },
   "summary": {
     "total": 510,
@@ -4879,7 +4879,7 @@
       "state": "OPEN",
       "updated": "2026-08-19",
       "definitionDigest": "c040cad1927723f3b354c7744cc9baf49c83cc3c1a726f72dbe85cc0806ca5d6",
-      "progressDigest": "b48e0c0acc4821976e3392b69f1d560148442db8dae98abe76fdcfe956a769eb",
+      "progressDigest": "b683d955965caf2560f7813530415b366b5f843da58636283c37e7787ad1ece3",
       "terminalClosureDigest": null
     },
     {
@@ -23459,7 +23459,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "(1) host-runtime-budget observe/settle zinciri normalizeUsage kanonik sözleşmesinden geçer (codex: fresh=input−cached; tek dönüşüm noktası, çift-sayım yok); (2) totalTokens her result'ta dolu (provider-toplamı öncelikli); (3) status/kpi/cost görünümleri fresh+cacheRead+cacheCreate+out ayrımını etiketli gösterir; (4) regresyon: iki provider fixture'ıyla aynı formül pinlenir; mevcut budget-eşik semantiği (hangi sayıya karşı ölçülüyor) davranış-değişikliği ayrı owner-onayına tabi — bu iş ÖNCE raporlar",
-      "evidence": "Owner admission 2026-08-19 (token-sayaç uçurumu sorusu; \"analiz et, çözüm önerilerini iş planına dahil et\"). Analiz kanıtı: sprint-565 canlı result.tokenUsage verileri (9 codex + 2 claude task) + codex.ts:707-730 normalize yorumu (sprint-497 %78-overstatement vakası) + token-usage.ts kanonik sözleşme. **OWNER-BLOCKING (2026-08-19): bu analiz neticelenmeden yeni görev alınmaz; elle düzeltme YOK; landing-sonrası xverify'lı doğrulanmış kök-neden zorunlu. Owner hipotezi analiz-sorusu: turn-toplama çift-sayım mı (90+100=190) yoksa per-call billing gerçeği mi (n×cache-read) — tek-worker izole deney + toplama-kodu kanıtı + CLI-envelope semantiği üçlüsüyle karara bağlanacak; claude cache 1-worker mı üst-üste 2-worker mı sorusu dahil.** Ön-not: Claude-içi \"uçurum\" (in≈9k vs cacheRead≈7.2M) ön-analizde DEFEKT DEĞİL görünüyor — Anthropic disjoint raporlar, cache verimli çalışıyor; sayaç doğru",
+      "evidence": "Owner admission 2026-08-19 (token-sayaç uçurumu sorusu; \"analiz et, çözüm önerilerini iş planına dahil et\"). Analiz kanıtı: sprint-565 canlı result.tokenUsage verileri (9 codex + 2 claude task) + codex.ts:707-730 normalize yorumu (sprint-497 %78-overstatement vakası) + token-usage.ts kanonik sözleşme. **OWNER-BLOCKING (2026-08-19): bu analiz neticelenmeden yeni görev alınmaz; elle düzeltme YOK; landing-sonrası xverify'lı doğrulanmış kök-neden zorunlu. Owner hipotezi analiz-sorusu: turn-toplama çift-sayım mı (90+100=190) yoksa per-call billing gerçeği mi (n×cache-read) — tek-worker izole deney + toplama-kodu kanıtı + CLI-envelope semantiği üçlüsüyle karara bağlanacak; claude cache 1-worker mı üst-üste 2-worker mı sorusu dahil.** **ANALİZ NETİCELENDİ 2026-08-19 (xverify-mühürlü 3/3 CONFIRMED — `…b4fd8b8` `…9837fb3` `…fd0c6102`):** (S2-çift-sayım) YOK — claude yolu TEK final envelope okur, turn-toplamaz (token-counter.ts, T1-CONFIRMED); birincil kanıt: 565-007 result.tokenUsage == CLI kendi billing-envelope BAYT-AYNI (opus in:9.486/out:81.865/cacheRead:7.247.569/cacheCreate:179.063 + providerReportedUsd $6.849 — provider-envelope kaynak, deckent hesaplamadı). (S1-üst-üste-binme) YOK — her attempt kendi konteyner-log fd'si + kendi settlement receipt'i; 006 ($4.35) ve 007 ($6.85) ayrı sayılar taşıyor. (S3-billing-gerçeği) EVET: agent-loop her model-çağrısında tüm transkripti yeniden gönderir, her çağrının cache-read'i ayrı faturalanır — \"90+10=100\" değil \"n-çağrı × bağlam\" Anthropic fiyat-modelinin kendisi (repo-belgeli: 496 kaydı tek turn.completed input 101.859 içinde cached 66.560, T3-CONFIRMED). MALİYET GERÇEĞİ: claude-opus worker-task ≈ $4-7/task API-fiyat karşılığı (subscription'da flat; API-anahtarlı üründe gerçek fatura). Kalan DÜZELTME işi bu satırın (1)-(4) kabulü: codex host-runtime-budget yolu ham cache-dahil input yazıyor (in:1.451.577/cacheRead:1.336.064 → gerçek taze 115.513; adapter-normalize sprint-497 yolu atlanıyor, T2-CONFIRMED normalize doğru YERDE var) + totalTokens boş. MALİYET-AZALTIM ürün-mimarisi (turn-başı-tam-bağlam pahalılığı: compaction/trimming, tool-batching, tier-routing, cache-write sabitleme) AYRI owner-karar paketi — bu satır yalnız sayaç-doğruluğunu taşır. Ön-not: Claude-içi \"uçurum\" DEFEKT DEĞİL doğrulandı — Anthropic disjoint raporlar, cache verimli çalışıyor; sayaç doğru",
       "updated": "2026-08-19"
     },
     {
@@ -26292,6 +26292,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "3fa69d0fc1a965bd3a2a0200e1c3cd7b1134935777816f27ea19bdadab7c0426"
+    "value": "a7f8df644697ad35775eecd235f2ff00f4d97e8aa96d8f4838e850e7928a1079"
   }
 }
