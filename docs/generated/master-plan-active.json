@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3aee4cac45360d9b240fd7462b87e460e980bff3390aa98be8be0f43e2075625"
+    "value": "88b5c33b9ac6bdaecf7910a1c8b2452a458b5819a9ae207134363c8f18f23a1a"
   },
   "summary": {
-    "total": 510,
-    "active": 446,
+    "total": 511,
+    "active": 447,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 353,
+      "OPEN": 354,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 334,
+      "P0": 335,
       "P1": 139,
       "P2": 37
     },
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 112,
+      "KERNEL": 113,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -4880,6 +4880,17 @@
       "updated": "2026-08-19",
       "definitionDigest": "c040cad1927723f3b354c7744cc9baf49c83cc3c1a726f72dbe85cc0806ca5d6",
       "progressDigest": "b683d955965caf2560f7813530415b366b5f843da58636283c37e7787ad1ece3",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7094,
+      "id": "WORKER-PROMPT-COST-ARCHITECTURE-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-19",
+      "definitionDigest": "b7e791329644b2466a5af8ff62463eb938abc581d482b5f2d5679a747d861fa3",
+      "progressDigest": "85e44c73eac61ab9c5ee21a46ed7b9d42c7318cba3b78ff4889cc20b5577b52a",
       "terminalClosureDigest": null
     },
     {
@@ -22114,6 +22125,7 @@
         "CURSOR-PROVIDER-001",
         "RECOVERY-TRUTH-001",
         "TOKEN-ACCOUNTING-TRUTH-001",
+        "WORKER-PROMPT-COST-ARCHITECTURE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -22167,6 +22179,7 @@
         "CURSOR-PROVIDER-001",
         "RECOVERY-TRUTH-001",
         "TOKEN-ACCOUNTING-TRUTH-001",
+        "WORKER-PROMPT-COST-ARCHITECTURE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -23460,6 +23473,38 @@
       "evidenceReceipts": [],
       "acceptance": "(1) host-runtime-budget observe/settle zinciri normalizeUsage kanonik sözleşmesinden geçer (codex: fresh=input−cached; tek dönüşüm noktası, çift-sayım yok); (2) totalTokens her result'ta dolu (provider-toplamı öncelikli); (3) status/kpi/cost görünümleri fresh+cacheRead+cacheCreate+out ayrımını etiketli gösterir; (4) regresyon: iki provider fixture'ıyla aynı formül pinlenir; mevcut budget-eşik semantiği (hangi sayıya karşı ölçülüyor) davranış-değişikliği ayrı owner-onayına tabi — bu iş ÖNCE raporlar",
       "evidence": "Owner admission 2026-08-19 (token-sayaç uçurumu sorusu; \"analiz et, çözüm önerilerini iş planına dahil et\"). Analiz kanıtı: sprint-565 canlı result.tokenUsage verileri (9 codex + 2 claude task) + codex.ts:707-730 normalize yorumu (sprint-497 %78-overstatement vakası) + token-usage.ts kanonik sözleşme. **OWNER-BLOCKING (2026-08-19): bu analiz neticelenmeden yeni görev alınmaz; elle düzeltme YOK; landing-sonrası xverify'lı doğrulanmış kök-neden zorunlu. Owner hipotezi analiz-sorusu: turn-toplama çift-sayım mı (90+100=190) yoksa per-call billing gerçeği mi (n×cache-read) — tek-worker izole deney + toplama-kodu kanıtı + CLI-envelope semantiği üçlüsüyle karara bağlanacak; claude cache 1-worker mı üst-üste 2-worker mı sorusu dahil.** **ANALİZ NETİCELENDİ 2026-08-19 (xverify-mühürlü 3/3 CONFIRMED — `…b4fd8b8` `…9837fb3` `…fd0c6102`):** (S2-çift-sayım) YOK — claude yolu TEK final envelope okur, turn-toplamaz (token-counter.ts, T1-CONFIRMED); birincil kanıt: 565-007 result.tokenUsage == CLI kendi billing-envelope BAYT-AYNI (opus in:9.486/out:81.865/cacheRead:7.247.569/cacheCreate:179.063 + providerReportedUsd $6.849 — provider-envelope kaynak, deckent hesaplamadı). (S1-üst-üste-binme) YOK — her attempt kendi konteyner-log fd'si + kendi settlement receipt'i; 006 ($4.35) ve 007 ($6.85) ayrı sayılar taşıyor. (S3-billing-gerçeği) EVET: agent-loop her model-çağrısında tüm transkripti yeniden gönderir, her çağrının cache-read'i ayrı faturalanır — \"90+10=100\" değil \"n-çağrı × bağlam\" Anthropic fiyat-modelinin kendisi (repo-belgeli: 496 kaydı tek turn.completed input 101.859 içinde cached 66.560, T3-CONFIRMED). MALİYET GERÇEĞİ: claude-opus worker-task ≈ $4-7/task API-fiyat karşılığı (subscription'da flat; API-anahtarlı üründe gerçek fatura). Kalan DÜZELTME işi bu satırın (1)-(4) kabulü: codex host-runtime-budget yolu ham cache-dahil input yazıyor (in:1.451.577/cacheRead:1.336.064 → gerçek taze 115.513; adapter-normalize sprint-497 yolu atlanıyor, T2-CONFIRMED normalize doğru YERDE var) + totalTokens boş. MALİYET-AZALTIM ürün-mimarisi (turn-başı-tam-bağlam pahalılığı: compaction/trimming, tool-batching, tier-routing, cache-write sabitleme) AYRI owner-karar paketi — bu satır yalnız sayaç-doğruluğunu taşır. Ön-not: Claude-içi \"uçurum\" DEFEKT DEĞİL doğrulandı — Anthropic disjoint raporlar, cache verimli çalışıyor; sayaç doğru",
+      "updated": "2026-08-19"
+    },
+    {
+      "order": 7094,
+      "id": "WORKER-PROMPT-COST-ARCHITECTURE-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "KERNEL",
+      "outcome": "**EN-ÖNEMLİ-İŞ (owner emri 2026-08-19, tam yetki):** worker prompt/maliyet mimarisi — kaliteden 0 kayıpla hedef ~%80 maliyet düşüşü; her çözüm yolunun kazanç/hız/kayıp üçlüsü 567-tarzı tekrar-koşularla ÖLÇÜLÜR ve xverify ile MÜHÜRLENIR; milyon-ölçek solo→enterprise herkes için doğru çözüm (LAW 1-2). Ölçülmüş taban (sprint-563 gerçek logları): maliyetin %91-95i cache-read; turn 10-50; task $1.15-4.81; kararlı CLI-prefix tam 18.264 tok (32 tool-şeması+34 slash+19 skill+8 agent kataloğu); .prompt 9.5-16.8k tok — %36 TAM ADR gövdesi (adr_render operative AÇIK ama ADRlerde worker-operative marker YOK → kesim çalışmıyor) + %21 göreve-DUYARSIZ 3 sabit skill (alfabetik-ilk-üç; 11 promptun 8inde bayt-aynı 14.207B) + %5 landing-önsözü EN BAŞTA (bayt-209da attempt-nonce → arkasındaki 15.211Blık bayt-aynı blok cache-hit alamıyor); CLAUDE.md 17.719B worker önekine giriyor (kapatma yok); .plan sıfır host-doğrulama + .hb yalnız existsSync → turn-katlanabilir; codexte scope-zorlama YOK + prefix stabilize edilemiyor + AGENTS.md 19.325B önek adayı",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "FAZLAR (her faz A/B ölçüm + kalite-guard: aynı görev-seti, GO-oranı + çıktı-denetimi + Sol xverify): F0 kod-iddia mühürleri; F1 SIFIR-RİSK dörtlüsü — (a) landing-önsözünü sona taşı (coordinator tek-satır), (b) ADRlere worker-operative markerları, (c) skill-seçimini göreve-duyarlı yap/eşiği düzelt, (d) .plan kaldır + .hb tek-yazım → beklenen ~%25-40; F2 YAPISAL — --tools daraltma + --disable-slash-commands + .claude/{skills,agents} mount-dışı + reorderLeadingT0 ON → 18.264lük prefix küçülür+user-message stabil bloğu paylaşılır ~%20-30 ek; F3 SYSTEM-PROMPT MİMARİSİ — claude --bare -p --system-prompt-file <stabil-çekirdek> + CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 A/Bsi + capability-realizer --append-system-prompt hattı; codex: AGENTS.override.md/-c project-doc kontrolü + --ephemeral → paylaşılabilir-önek mimarisi (Anthropic resmi: exclude-dynamic zaten -p multi-user cache-reuse için); F4 tier-routing (basit-doküman→haiku) + turn-disiplini model-bazlı; F5 ürünleşme: görev-sınıfı prompt-profilleri (isInspectionOnly/isDocOnly deseni genelleştirme) config-resolved",
+      "evidence": "Owner emri: \"En önemli işimiz; tam yetki; her yolun kazancı/hızı/kaybı net ölçülsün ve doğrulansın; yapı düzelince 567-tarzı denemeler yeniden koşulur; CLAUDE.md worker-enjeksiyonu görev doğası gereği sorgulanacak\". Kanıt: sprint-567 cache-deneyi (6 ölçüm + USD receiptler; worker-arası .prompt-paylaşımı yok AMA 18.264lük CLI-prefix paylaşımı 563 loglarında İLK-ÇAĞRI cacheRead=18.264 olarak üç görevde kanıtlı) + Explore haritası 2026-08-19 + resmi doc: --bare/--system-prompt-file/CLAUDE_CODE_DISABLE_CLAUDE_MDS/exclude-dynamic (code.claude.com) + codex --ignore-user-config/--ephemeral/AGENTS.override.md",
       "updated": "2026-08-19"
     },
     {
@@ -26292,6 +26337,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a7f8df644697ad35775eecd235f2ff00f4d97e8aa96d8f4838e850e7928a1079"
+    "value": "c7dfe375f021e264f314fcfecb540d51921ea729b3651dab42e51e8d32952318"
   }
 }
