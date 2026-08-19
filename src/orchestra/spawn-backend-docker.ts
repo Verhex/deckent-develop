@@ -3750,9 +3750,28 @@ export function deriveWorkerWriteTargets(scope: WorkerWriteScopeInput | undefine
  * list. Formatting only — it makes no scope decision, so both call sites emit a
  * byte-identical flag for a byte-identical target list.
  */
+/**
+ * The ONE worker tool-name list. `formatAllowedToolsFlag` renders the
+ * permission allowlist from it (with write-target qualifiers) and
+ * `WORKER_AVAILABLE_TOOLS` renders the schema-narrowing `--tools` value from
+ * it — one source, two projections, no parallel literals.
+ */
+const WORKER_TOOL_NAMES = ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'] as const;
+
+/**
+ * 7094-F2a (owner-approved 2026-08-19): the `--tools` value for a worker.
+ * `--allowedTools` only gates permissions — the CLI still loads its FULL
+ * tool-schema catalog (32 tools; the measured 18,264-token stable prefix,
+ * sprint-563 logs); `--tools` narrows the provider-visible schema itself to
+ * the tools a worker can actually use.
+ */
+export const WORKER_AVAILABLE_TOOLS: string = WORKER_TOOL_NAMES.join(',');
+
 export function formatAllowedToolsFlag(writeTargets: readonly string[]): string {
   const targets = writeTargets.join(',');
-  return `Read,Write(${targets}),Edit(${targets}),Bash,Glob,Grep`;
+  const qualified = WORKER_TOOL_NAMES
+    .map((name) => (name === 'Write' || name === 'Edit' ? `${name}(${targets})` : name));
+  return qualified.join(',');
 }
 
 /**
@@ -5768,9 +5787,16 @@ export class DockerSpawnBackend implements SpawnBackend {
       // scope, not trusted verbatim from opts.allowedTools — see the
       // ALLOWLIST-SSOT block comment above resolveAllowedTools.
       allowedTools: this.resolveAllowedTools(dir, taskId, opts?.allowedTools),
-      // `availableTools` narrows the provider-visible schema itself. It is
-      // protocol-scoped by the caller (xverify-v1) and distinct from the
-      // write/permission authority above.
+      // `availableTools` narrows the provider-visible schema itself — distinct
+      // from the write/permission authority above. 7094-F2a MEASURED AND
+      // REJECTED (2026-08-19, sprint-568 vs 569 single-variable A/B): defaulting
+      // claude workers to the six-name `--tools` set RAISED cost +20-38% —
+      // cacheWrite +70% (21.5k→36.6k simple-task), fresh input collapsed
+      // 3.38k→~6 (the excluded-dynamic first-message block became cached
+      // 1.25×-priced write), cacheRead +38%. The narrowed schema changes the
+      // CLI's prompt/cache composition unfavorably; the 32-tool catalog prefix
+      // was already cache-shared across workers. Default stays undefined; a
+      // protocol-scoped caller (xverify-v1) still sets it explicitly.
       availableTools: opts?.availableTools,
       isolatedContext: opts?.isolatedContext,
       autoApprove: true,

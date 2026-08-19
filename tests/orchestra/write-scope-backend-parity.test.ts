@@ -22,6 +22,7 @@ import {
   buildDockerAllowedTools,
   deriveWorkerWriteTargets,
   formatAllowedToolsFlag,
+  WORKER_AVAILABLE_TOOLS,
 } from '../../src/orchestra/spawn-backend-docker.js';
 
 interface Fixture {
@@ -150,5 +151,16 @@ describe('write-target derivation parity across backends (row 4061)', () => {
         expect(permitted.has(target)).toBe(true);
       }
     }
+  });
+
+  // 7094-F2a: --tools narrows the provider-visible SCHEMA to the same six
+  // names the allowlist qualifies — one WORKER_TOOL_NAMES source, two
+  // projections. The allowlist rendering itself must stay byte-identical.
+  it('WORKER_AVAILABLE_TOOLS is the unqualified projection of the same tool-name source (7094-F2a)', () => {
+    expect(WORKER_AVAILABLE_TOOLS).toBe('Read,Write,Edit,Bash,Glob,Grep');
+    const flag = formatAllowedToolsFlag(['.tasks/', 'src/x.ts']);
+    expect(flag).toBe('Read,Write(.tasks/,src/x.ts),Edit(.tasks/,src/x.ts),Bash,Glob,Grep');
+    const unqualified = flag.replace(/\([^)]*\)/g, '');
+    expect(unqualified).toBe(WORKER_AVAILABLE_TOOLS);
   });
 });

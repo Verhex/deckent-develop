@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6f8e82d6e78fbeea051c2c165f38b8fbb81b2b4ad9fdc93c7f5734075629a531"
+    "value": "94c82c7091af535e2da714744ec297c306c11e37fb855c4c6f284a3f97b1d5c1"
   },
   "summary": {
-    "total": 511,
-    "active": 447,
+    "total": 512,
+    "active": 448,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 354,
+      "OPEN": 355,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -23,7 +23,7 @@
     "byPriority": {
       "P0": 335,
       "P1": 139,
-      "P2": 37
+      "P2": 38
     },
     "byProgram": {
       "API": 5,
@@ -47,7 +47,7 @@
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
-      "PRODUCT": 18,
+      "PRODUCT": 19,
       "PROMPT": 6,
       "PROVIDER": 7,
       "RELEASE": 4,
@@ -4890,7 +4890,18 @@
       "state": "OPEN",
       "updated": "2026-08-19",
       "definitionDigest": "b7e791329644b2466a5af8ff62463eb938abc581d482b5f2d5679a747d861fa3",
-      "progressDigest": "7d74d47ac025e91cb8e0d7a6f967a7533bc11373ffdd68dbff4a5afac9244dfe",
+      "progressDigest": "6802e573d858119d223ee570a2010636627af6b41f51cb58f70353b6c15b10ba",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7095,
+      "id": "AGENT-PERMISSION-MATRIX-001",
+      "program": "PRODUCT",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-19",
+      "definitionDigest": "78bfe302ec2387711429d12ba5e9b601b180d72c955d54dc9c2d69f5fbce8d0b",
+      "progressDigest": "52f82c7d00ef41fab76f094c84fa153a3018311f1000a6a9b29251b3d372752e",
       "terminalClosureDigest": null
     },
     {
@@ -22126,6 +22137,7 @@
         "RECOVERY-TRUTH-001",
         "TOKEN-ACCOUNTING-TRUTH-001",
         "WORKER-PROMPT-COST-ARCHITECTURE-001",
+        "AGENT-PERMISSION-MATRIX-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -22180,6 +22192,7 @@
         "RECOVERY-TRUTH-001",
         "TOKEN-ACCOUNTING-TRUTH-001",
         "WORKER-PROMPT-COST-ARCHITECTURE-001",
+        "AGENT-PERMISSION-MATRIX-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -23504,7 +23517,39 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "FAZLAR (her faz A/B ölçüm + kalite-guard: aynı görev-seti, GO-oranı + çıktı-denetimi + Sol xverify): F0 kod-iddia mühürleri; F1 SIFIR-RİSK dörtlüsü — (a) landing-önsözünü sona taşı (coordinator tek-satır), (b) ADRlere worker-operative markerları, (c) skill-seçimini göreve-duyarlı yap/eşiği düzelt, (d) .plan kaldır + .hb tek-yazım → beklenen ~%25-40; F2 YAPISAL — --tools daraltma + --disable-slash-commands + .claude/{skills,agents} mount-dışı + reorderLeadingT0 ON → 18.264lük prefix küçülür+user-message stabil bloğu paylaşılır ~%20-30 ek; F3 SYSTEM-PROMPT MİMARİSİ — claude --bare -p --system-prompt-file <stabil-çekirdek> + CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 A/Bsi + capability-realizer --append-system-prompt hattı; codex: AGENTS.override.md/-c project-doc kontrolü + --ephemeral → paylaşılabilir-önek mimarisi (Anthropic resmi: exclude-dynamic zaten -p multi-user cache-reuse için); F4 tier-routing (basit-doküman→haiku) + turn-disiplini model-bazlı; F5 ürünleşme: görev-sınıfı prompt-profilleri (isInspectionOnly/isDocOnly deseni genelleştirme) config-resolved",
-      "evidence": "Owner emri: \"En önemli işimiz; tam yetki; her yolun kazancı/hızı/kaybı net ölçülsün ve doğrulansın; yapı düzelince 567-tarzı denemeler yeniden koşulur; CLAUDE.md worker-enjeksiyonu görev doğası gereği sorgulanacak\". Kanıt: sprint-567 cache-deneyi (6 ölçüm + USD receiptler; worker-arası .prompt-paylaşımı yok AMA 18.264lük CLI-prefix paylaşımı 563 loglarında İLK-ÇAĞRI cacheRead=18.264 olarak üç görevde kanıtlı) + Explore haritası 2026-08-19 + resmi doc: --bare/--system-prompt-file/CLAUDE_CODE_DISABLE_CLAUDE_MDS/exclude-dynamic (code.claude.com) + codex --ignore-user-config/--ephemeral/AGENTS.override.md. **F0 MUHUR SONUCU 2026-08-19:** P1 (landing-onsozu onde + xverify-v2-istisnasi) CONFIRMED `…f4e859`; ilk-kosu REFUTED isabetliydi — evrensel kelimede istisna yakalandi (Ders-18 sinifi; iddia duzeltilip CONFIRMED); P2/P3/P4 durust-HOLD (`…961d11c` `…875de3e` `…293c481` — bilesik-iddia sinifi; birincil kanit saglam, bolunmus muhur F1 landed-verify ile). **F1 LANDED 2026-08-19 (Fable-subprocess + codex-muhur, owner yurutme-modeli):** (a) landing-onsozu SONA — nonce artik prefix kirmiyor, CONFIRMED `…ac6a1c2` (ilk REFUTED: kendi yorum-literalim — Ders-18 3. vaka); (c) skill-secimi domain-kesisim sarti + durust-bos + wildcard-saygi, 3/3 CONFIRMED `…e9091c` `…d7674c1` `…c6fd93` (kok: profil-turetimi her skille build:primary veriyor → alfabetik-ilk-3, 565te 11 promptta bayt-ayni 14.207B); (d) .plan kaldirildi + .hb tek-yazim + OWNER ara-madde tuketici-taramasi (listener/client/server): 6 KIRILIR bulundu ve duzeltildi — nervous stale-worker probe-vetosu (auto-respawn onlendi), sprint-checkpoint unavailable→probe (412-003 yanlis-kill onlendi), evaluateRuntimeExtension probe-tabanli, timeout-watcher progressing=diff, status.ts probeProven (566/567 bayat-worker yanlis-alarminin KOKU buydu), planWarning gurultusu + temp-agent eksik-inis kapatildi; muhurler 4/6 CONFIRMED `…02f880` `…6aac045` `…051398` `…31ee7058` + 2 durust-HOLD `…4c149` `…f86dc7` (buyuk-dosya verifier evidence-map sinifi — ranged-read-verifier residual kaniti). Kalan kozmetik/degrade residual: ageMs semantigi (NOVA 30sn esigi, WorkerCard relativeTime), Writing-code etiketi donmasi, auditor Signal-C olumu, worker-liveness L3-L5 oy-disi karari, SSE currentAction tek-olay. Testler: 143+379+270+54 yesil; tsc 0; hermetic digest-only. **F1 A/B OLCUMU 2026-08-19 (sprint-567 taban vs sprint-568 F1-sonrasi; ayni DIRECTIVES bayt-uyumlu, ayni 6 gorev/zincir/model — tek degisken F1):** toplam USD (fixler dahil) $5.138 → $3.634 = **-%29.3**; cekirdek-6 $4.674 → $3.358 = -%28.2. Gorev-bazli: 001-opus-kapsamli $2.238→$1.323 (-%41; cWrite 145.8k→77.8k, cRead 871.8k→507.4k) · 002 $0.380→$0.256 (-%33) · 003 $0.368→$0.259 (-%30) · 005-denetim $0.965→$0.773 (-%20) · 006 $0.388→$0.288 (-%26). Yapisal kanit: basit-gorev cacheWRITE (yeni onek) 29.3k→21.5k (-%27 — durust-bos skill + plansiz protokol .prompt kuculmesi); basit-gorev sureleri 57-67sn→26-39sn (~-%45); taze-input ~3.38k sabit (determinizm korundu). Anomali-notu: 568-004 ilk attempt cWrite 51.9k (2× sinif) + bir fix aldi; fix-attempt 21.2k NORMAL sinifta — tek-vaka, F1d-protokole worker-uyum gozlemi olarak kayitli. %80 hedefe kalan kaldiraclar: F2 (18.264 CLI-prefix daraltma) + F3 (bare/system-prompt-file + CLAUDE.md-0) + F1b ADR-marker (owner-karar) + F4 tier-routing.",
+      "evidence": "Owner emri: \"En önemli işimiz; tam yetki; her yolun kazancı/hızı/kaybı net ölçülsün ve doğrulansın; yapı düzelince 567-tarzı denemeler yeniden koşulur; CLAUDE.md worker-enjeksiyonu görev doğası gereği sorgulanacak\". Kanıt: sprint-567 cache-deneyi (6 ölçüm + USD receiptler; worker-arası .prompt-paylaşımı yok AMA 18.264lük CLI-prefix paylaşımı 563 loglarında İLK-ÇAĞRI cacheRead=18.264 olarak üç görevde kanıtlı) + Explore haritası 2026-08-19 + resmi doc: --bare/--system-prompt-file/CLAUDE_CODE_DISABLE_CLAUDE_MDS/exclude-dynamic (code.claude.com) + codex --ignore-user-config/--ephemeral/AGENTS.override.md. **F0 MUHUR SONUCU 2026-08-19:** P1 (landing-onsozu onde + xverify-v2-istisnasi) CONFIRMED `…f4e859`; ilk-kosu REFUTED isabetliydi — evrensel kelimede istisna yakalandi (Ders-18 sinifi; iddia duzeltilip CONFIRMED); P2/P3/P4 durust-HOLD (`…961d11c` `…875de3e` `…293c481` — bilesik-iddia sinifi; birincil kanit saglam, bolunmus muhur F1 landed-verify ile). **F1 LANDED 2026-08-19 (Fable-subprocess + codex-muhur, owner yurutme-modeli):** (a) landing-onsozu SONA — nonce artik prefix kirmiyor, CONFIRMED `…ac6a1c2` (ilk REFUTED: kendi yorum-literalim — Ders-18 3. vaka); (c) skill-secimi domain-kesisim sarti + durust-bos + wildcard-saygi, 3/3 CONFIRMED `…e9091c` `…d7674c1` `…c6fd93` (kok: profil-turetimi her skille build:primary veriyor → alfabetik-ilk-3, 565te 11 promptta bayt-ayni 14.207B); (d) .plan kaldirildi + .hb tek-yazim + OWNER ara-madde tuketici-taramasi (listener/client/server): 6 KIRILIR bulundu ve duzeltildi — nervous stale-worker probe-vetosu (auto-respawn onlendi), sprint-checkpoint unavailable→probe (412-003 yanlis-kill onlendi), evaluateRuntimeExtension probe-tabanli, timeout-watcher progressing=diff, status.ts probeProven (566/567 bayat-worker yanlis-alarminin KOKU buydu), planWarning gurultusu + temp-agent eksik-inis kapatildi; muhurler 4/6 CONFIRMED `…02f880` `…6aac045` `…051398` `…31ee7058` + 2 durust-HOLD `…4c149` `…f86dc7` (buyuk-dosya verifier evidence-map sinifi — ranged-read-verifier residual kaniti). Kalan kozmetik/degrade residual: ageMs semantigi (NOVA 30sn esigi, WorkerCard relativeTime), Writing-code etiketi donmasi, auditor Signal-C olumu, worker-liveness L3-L5 oy-disi karari, SSE currentAction tek-olay. Testler: 143+379+270+54 yesil; tsc 0; hermetic digest-only. **F1 A/B OLCUMU 2026-08-19 (sprint-567 taban vs sprint-568 F1-sonrasi; ayni DIRECTIVES bayt-uyumlu, ayni 6 gorev/zincir/model — tek degisken F1):** toplam USD (fixler dahil) $5.138 → $3.634 = **-%29.3**; cekirdek-6 $4.674 → $3.358 = -%28.2. Gorev-bazli: 001-opus-kapsamli $2.238→$1.323 (-%41; cWrite 145.8k→77.8k, cRead 871.8k→507.4k) · 002 $0.380→$0.256 (-%33) · 003 $0.368→$0.259 (-%30) · 005-denetim $0.965→$0.773 (-%20) · 006 $0.388→$0.288 (-%26). Yapisal kanit: basit-gorev cacheWRITE (yeni onek) 29.3k→21.5k (-%27 — durust-bos skill + plansiz protokol .prompt kuculmesi); basit-gorev sureleri 57-67sn→26-39sn (~-%45); taze-input ~3.38k sabit (determinizm korundu). Anomali-notu: 568-004 ilk attempt cWrite 51.9k (2× sinif) + bir fix aldi; fix-attempt 21.2k NORMAL sinifta — tek-vaka, F1d-protokole worker-uyum gozlemi olarak kayitli. %80 hedefe kalan kaldiraclar: F2 (18.264 CLI-prefix daraltma) + F3 (bare/system-prompt-file + CLAUDE.md-0) + F1b ADR-marker (owner-karar) + F4 tier-routing. **F2a OLCULDU VE REDDEDILDI 2026-08-19 (568 vs 569 tek-degisken A/B):** claude workerlarina default `--tools Read,Write,Edit,Bash,Glob,Grep` vermek maliyeti ARTIRDI: toplam +%20-38 (001 $1.323→$1.570, 002 $0.256→$0.351, 003 $0.259→$0.357, 006 $0.288→$0.364); basit-gorev cacheWrite 21.5k→36.6k (+%70), taze-input 3.38k→~6 COKTU (excluded-dynamic ilk-mesaj blogu 1.25×-fiyatli cache-write oldu), cacheRead +%38 — daraltilmis sema CLI prompt/cache kompozisyonunu aleyhte degistiriyor; 32-tool katalog oneki zaten workerlar-arasi paylasimliydi. Default REVERT edildi (opts-override korunur, WORKER_AVAILABLE_TOOLS sabiti + 15/15 pin kalici); muhur denemeleri 3× durust-HOLD `…6e0a2c` `…af27949` `…861e863` (buyuk-dosya verifier-evidence-map sinifi, 5-7. vakalar). Kalite-notu: 6/6 DONE, dokumanlar saglikli (rehber 30.4KB kopyalandi — icerik-kalite arsivi scratchpad/f2a-docs). Tekrarlanan desen: 004-sonnet-soguk ilk attempt 2. kez fix aldi (568+569) — F1d-protokol-uyum arastirma maddesi. F2 rotasinin kalani (mount-disi .claude/{skills,agents}, --disable-slash-commands) AYRI tek-degisken olculecek; oncelik F3e kayar.",
+      "updated": "2026-08-19"
+    },
+    {
+      "order": 7095,
+      "id": "AGENT-PERMISSION-MATRIX-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "PRODUCT",
+      "outcome": "**Post-productization iyilestirme (owner 2026-08-19; URUN KAPSAMINDA DEGIL — bitmis/urunlesmis deckent uzerine):** enterprise-seviye, cok-detayli permission mimarisi: (1) worker TOOLLARI yonetilebilir olur (bugunku 7094-F2a sabit WORKER_AVAILABLE_TOOLS projeksiyonu matris-cozumlu hale gelir); (2) SABIT agent tanimlarina dokulmus **agent×skill matrisi** — agent ise gore skillini matristen alir; (3) agent, isin dogasi geregi VEYA agent-bazli permissionla dogar (orn. yalniz-Read denetci agent); dangerously-skip-permissions sinifinin yerini kademeli permission-dogumu alir; (4) app/CLI uzerinden musteri-customize; permission yapisini istemeyen OFF yapar — OFF ise worker FULL toolla dogar (bugunku davranis, sorun degil); (5) solo→team→enterprise profilleri (LAW 1-2), config-resolved, tek global ayar yok",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Kabul: matris semasi + agent-tanimi entegrasyonu + permission-dogum zinciri (spawn argv uretimine kadar) + OFF-yolu bayt-parite testi + enterprise customize yuzeyi (app/CLI) + docs",
+      "evidence": "Owner admission 2026-08-19 (\"permission hiyerarsisini sabit agentlara dokecegiz... enterprise icin sart... off olursa full toolla dogsun... urun kapsaminda degil\"). Baglam-kaniti: bugun tum providerlar dangerously-skip sinifiyla doguyor (provider-command-spec approvalArgs); 7094-F2a --tools daraltmasi bu matrisin ilk sabit-projeksiyonu",
       "updated": "2026-08-19"
     },
     {
@@ -26337,6 +26382,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "32c877ab0a2c0926a530840651dbc8f4cfaa089bede81a5095559202fede8360"
+    "value": "518c2e909155e751104c41f3989b00116db44f2d1539500a481559005d116f52"
   }
 }

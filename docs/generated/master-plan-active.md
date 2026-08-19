@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):6f8e82d6e78fbeea051c2c165f38b8fbb81b2b4ad9fdc93c7f5734075629a531`
+**Source digest:** `sha256(normalized-lf-utf8):94c82c7091af535e2da714744ec297c306c11e37fb855c4c6f284a3f97b1d5c1`
 
-**Rows:** 511 total · 447 active · 64 terminal
+**Rows:** 512 total · 448 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 354 |
+| OPEN | 355 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -406,6 +406,7 @@
 | 7092 | `RECOVERY-TRUTH-001` | OPEN | P0 | KERNEL | — | — | Sprint-564 E091 vakasının 7 kurtarma/settlement doğruluk defekti TEK recovery paketi olarak kapanır (KANUN 6 — paket yalnız kendi closure'ını taşır): (1) worker-result JSON-encoding gate'i — worker `.result` yazarken JSON doğrulanır, notes içi ham kontrol-karakteri/escape'siz tırnak üretimde reddedilir; (2) exit-0 + corrupt-result kör noktası — monitor'ün onarım dalı exit koduna değil parse-sonucuna bağlanır (spawn-backend-docker.ts:7187 sınıfı); (3) xverify CONFIRMED-koşu stub'ı PENDING+NO_TASK_RECEIPT kalıyor → clean-gate/build kilidi (kısır-döngü sınıfı) — xverify runner task-receipt + terminal statü yazar; (4) finalize task-dosyası statülerini terminal'e yazmıyor (cleanup'a kadar clean HOLD); (5) landing-proposal tüketim yüzeyi yok; (6) `review` ACTIVE-run "Invalid Docker result settlement reference" crash; (7) scheduler continuous-idle — Paused task cascadeSkip'siz, run terminal'e akmıyor |
 | 7093 | `TOKEN-ACCOUNTING-TRUTH-001` | OPEN | P0 | KERNEL | — | — | Cross-provider token-sayaç doğruluğu: worker result/status/kpi/cost görünümlerine akan tokenUsage TEK kanonik semantikte birleşir (inputTokens=FRESH cache-DIŞI, cacheReadTokens ayrı, totalTokens her zaman dolu). Kanıtlı defekt (2026-08-19, sprint-565 canlı verisi): `source: host-runtime-budget` yolu (docker budget-monitor akışı) codex `input_tokens`ını CACHE-DAHİL ham haliyle inputTokens alanına yazıyor — adapter extractUsage yolundaki sprint-497 normalizasyonu (codex.ts:707-730, input−cached) bu katmanda ATLANIYOR; claude yolu (`source: cli-log`) ise kanonik-doğru (disjoint). Sonuç: aynı sütun codex-task'ta cache-dahil (örn. in=243.965/cacheRead=205.312 → gerçek fresh≈38.653), claude-task'ta fresh (in=8.952/cacheRead=4.528.245) — karşılaştırma ve maliyet %500+ yanıltıcı. İkincil: totalTokens her iki yolda undefined kalıyor |
 | 7094 | `WORKER-PROMPT-COST-ARCHITECTURE-001` | OPEN | P0 | KERNEL | — | — | **EN-ÖNEMLİ-İŞ (owner emri 2026-08-19, tam yetki):** worker prompt/maliyet mimarisi — kaliteden 0 kayıpla hedef ~%80 maliyet düşüşü; her çözüm yolunun kazanç/hız/kayıp üçlüsü 567-tarzı tekrar-koşularla ÖLÇÜLÜR ve xverify ile MÜHÜRLENIR; milyon-ölçek solo→enterprise herkes için doğru çözüm (LAW 1-2). Ölçülmüş taban (sprint-563 gerçek logları): maliyetin %91-95i cache-read; turn 10-50; task $1.15-4.81; kararlı CLI-prefix tam 18.264 tok (32 tool-şeması+34 slash+19 skill+8 agent kataloğu); .prompt 9.5-16.8k tok — %36 TAM ADR gövdesi (adr_render operative AÇIK ama ADRlerde worker-operative marker YOK → kesim çalışmıyor) + %21 göreve-DUYARSIZ 3 sabit skill (alfabetik-ilk-üç; 11 promptun 8inde bayt-aynı 14.207B) + %5 landing-önsözü EN BAŞTA (bayt-209da attempt-nonce → arkasındaki 15.211Blık bayt-aynı blok cache-hit alamıyor); CLAUDE.md 17.719B worker önekine giriyor (kapatma yok); .plan sıfır host-doğrulama + .hb yalnız existsSync → turn-katlanabilir; codexte scope-zorlama YOK + prefix stabilize edilemiyor + AGENTS.md 19.325B önek adayı |
+| 7095 | `AGENT-PERMISSION-MATRIX-001` | OPEN | P2 | PRODUCT | — | — | **Post-productization iyilestirme (owner 2026-08-19; URUN KAPSAMINDA DEGIL — bitmis/urunlesmis deckent uzerine):** enterprise-seviye, cok-detayli permission mimarisi: (1) worker TOOLLARI yonetilebilir olur (bugunku 7094-F2a sabit WORKER_AVAILABLE_TOOLS projeksiyonu matris-cozumlu hale gelir); (2) SABIT agent tanimlarina dokulmus **agent×skill matrisi** — agent ise gore skillini matristen alir; (3) agent, isin dogasi geregi VEYA agent-bazli permissionla dogar (orn. yalniz-Read denetci agent); dangerously-skip-permissions sinifinin yerini kademeli permission-dogumu alir; (4) app/CLI uzerinden musteri-customize; permission yapisini istemeyen OFF yapar — OFF ise worker FULL toolla dogar (bugunku davranis, sorun degil); (5) solo→team→enterprise profilleri (LAW 1-2), config-resolved, tek global ayar yok |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
 | 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
