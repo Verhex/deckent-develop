@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f7aad7f81789042d9712071bda16bb61fc66786d9cbd3261a1a3294e74fedc4a`
+**Source digest:** `sha256(normalized-lf-utf8):c9d828a7f1532ff46b150fb5571ed22de3551e57fbd6dadc8a160441ff6e1b66`
 
-**Rows:** 507 total · 443 active · 64 terminal
+**Rows:** 508 total · 444 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 350 |
+| OPEN | 351 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -402,6 +402,7 @@
 | 7088 | `CLI-SURFACE-CONSOLIDATION-001` | OPEN | P0 | TERMINAL | `CLI-SURFACE-TRUTH-001` | — | CLI+MCP yüzeyi sadeleşir ve tutarlılaşır: bayat sayısal-ADR referansları user-facing metinlerden ölür (Faz-1) + kanıtlı-deprecated komut kaldırımı + gruplama/birleştirme disposition turu (Faz-2) |
 | 7089 | `NATIVE-SESSION-LEDGER-001` | OPEN | P0 | TERMINAL | `NATIVE-CONTEXT-LIFECYCLE-001` | — | Native terminal CC/Codex-paritesinde kalıcı session-ledger + uçucu yazboz (karatahta) kazanır: `~/.deckent/projects/<slug>/<session>.jsonl` per-turn mesaj+model+usage (append-only, /resume kaynağı) · `$TMPDIR/deckent/<slug>/<session>/scratchpad/` system-prompt'a enjekte uçucu çalışma alanı · full-fidelity session log training-trace'ten ayrılır · eski kayıtlar (.brain chat + .deckent/traces) dual-read, migrasyon YOK · /tmp deckent-* litter hijyeni aynı pakette |
 | 7090 | `ORPHAN-WIRE-001` | BLOCKED | P0 | TRUTH | `REPO-CLEANUP-001`, `SURFACE-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Production import graph orphan disposition and wiring |
+| 7091 | `CURSOR-PROVIDER-001` | OPEN | P1 | TERMINAL | — | — | Cursor bir provider olur: `cursor-agent` CLI provider-neutral runtime contract'ına adapter olarak girer; model katalog/registry entegrasyonu config-resolved (KANUN 10 + ModelActivationStore explicit-active uyumlu, koda model-literal girmez); xverify `--verifier` yüzeyine `cursor` eklenir (birincil hedef: grok-4.6 — codex'ten TAMAMEN bağımsız model ailesi = üçüncü bağımsız verify rotası); usage/limit çözümü cursor-agent JSON `usage` alanından (provider-reported, kapanış-zinciri uyumlu) |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
 | 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |

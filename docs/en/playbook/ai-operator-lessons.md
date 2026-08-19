@@ -167,10 +167,12 @@ envelope shapes).
 altered behaviors other tests pin. That debt accumulates and is paid with interest at
 landing.
 
-**Correct usage:** A mandatory landing-chain step: the FULL suite (with the
-`VITEST_MAX_FORKS=2` memory cap). Triage every red: code bug or stale pin? Realign
-stale pins to the new behavior with a dated attribution comment (say WHICH wave
-changed it). Also: never add a new field as REQUIRED to a widely-constructed options
+**Correct usage:** The FULL suite (with the `VITEST_MAX_FORKS=2` memory cap) is the
+landing debt-payment step — **its cadence is once every 3 landings by owner decision
+(Alperen 2026-08-19)**; the landings in between rely on scoped tests plus the gates
+(hermetic, i18n, operating-policy, master-plan). Triage every red of the full run:
+code bug or stale pin? Realign stale pins to the new behavior with a dated
+attribution comment (say WHICH wave changed it). Also: never add a new field as REQUIRED to a widely-constructed options
 type — add it optional with fail-closed semantics (consumers gate on `=== true`);
 otherwise every test literal churns.
 
@@ -215,8 +217,55 @@ passes — a HOLD is not closure; plan a calm retry.
 
 ---
 
+## 17. Pin-Scan Pre-Flight — a changed symbol's existing test pins belong in the task's Files
+
+**Rule:** Before every DIRECTIVES task: (1) list the export symbols the task will
+change or delete, (2) add EVERY file returned by `grep -rln <symbol> tests/` to the
+task's Files, (3) a deleted file's own test file goes into Files too, (4) a
+chokepoint's producer and consumer ends ride in the same task. Source: ~55% of
+sprint-563's 9 NO_GOs were this single class; sprint-564 applied the rule and
+neighbour-pin NO_GOs dropped to ZERO — proven effective.
+
+## 18. Exit-0 + corrupt `.result` = an invisible settlement deadlock — diagnose along the evidence chain, repair content-verbatim
+
+**Case (sprint-564):** A worker wrote raw newlines plus unescaped embedded JSON into
+the `notes` field → the `.result` was invalid JSON. Because the container exited
+**0**, the host's "overwrite corrupt result with NO_GO" branch never fired (it only
+runs on exit≠0). The attribution reconcile died on its first `JSON.parse`, the
+finalization returned silently WITHOUT writing closure, and every
+`recover --resume` threw `E091:recovery-settlement-timeout` — the error message sat
+three layers away from the root cause.
+
+**Diagnosis discipline:** On E091, follow the chain in order: does the settlement
+attempt dir contain `closure.json`/`settled.json` → if not, which step of the
+monitor's finalize path returns early → hand-parse that step's input (the
+`.result`). Three commands: `ls <settlement-attempt-dir>`,
+`docker ps -a | grep <task>`, `node -e "JSON.parse(...)"`.
+
+**Repair discipline (ADR-D-007):** (1) Take a forensic backup; (2) repair ONLY the
+`.result`'s encoding — content and verdict stay byte-meaning verbatim (NO_GO stays
+NO_GO); (3) if your hand-edits touched the attempt's scoped files, temporarily
+restore the spawn-baseline blobs (`git cat-file blob <hash>`) so attribution never
+credits YOUR work to the dead worker — the honest outcome is
+`VERIFIED filesChanged=[]`; (4) use the engine's own typed terminal
+(`finalize --force` → ABORTED, no unresolved lineage promoted to COMPLETE);
+(5) re-apply your edits and re-run the tests. The result is an honest,
+fabrication-free closure.
+
+---
+
 ## Changelog (update after every sprint experience)
 
+- **2026-08-19 — sprint-564 (NATIVE-SESSION-LEDGER) + the E091 recovery case**:
+  Lesson 17 promoted to its own section (applied in 564: neighbour-pin NO_GO = 0)
+  and Lesson 18 added (the exit-0 + corrupt-`.result` settlement deadlock: the
+  diagnosis chain, content-verbatim encoding repair, honest zero-work attribution
+  via baseline blob-restore, and the `finalize --force` ABORTED terminal). Source
+  incidents: the 004 chain's 3× honest NO_GO (fix-scope-inheritance, 2nd live
+  case), the fix-fix corrupt result, the `recover --resume` E091 loop, the
+  ADR-D-007 hand-closure (bridge `nextTurnIndex` + single-namespace ContentWriter
+  wiring), and the clean-gate's xverify PENDING-stub/NO_TASK_RECEIPT lock (a new
+  vicious-loop class finding).
 - **2026-08-18 — first edition** (sprint-550…556 era): 13 lessons distilled. Source
   incidents: the retry-storm crisis (550-552), the NT-correction wave (553), NT-06
   progressive disclosure + the tier correction (554), the post-plan hand-edit

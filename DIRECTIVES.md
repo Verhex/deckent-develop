@@ -112,7 +112,7 @@ kanıtlı. NO_GO: gerçek homedir'e yazan test veya tam-transcript kopyası yaz�
    ile geçirilir; session.ts `scratch.info.root`'u loop deps'e bağlar.
 5. Testler: reaper penceresi (taze dizin KALIR, bayat silinir, fail-open),
    deterministik-kök recovery reuse, broker close→dizin süpürülebilir,
-   composeSystemPrompt scratchDir'li/siz iki mod (identity.test.ts pini).
+   composeSystemPrompt scratchDir'li/siz iki mod (tests/agent/identity.test.ts pini).
 
 GO: tsc 0; scoped yeşil; reaper fail-open kanıtlı; 10-dk semantiği korunmuş.
 NO_GO: hijyen hatasının oturumu düşürmesi veya scratch dışı dizin silme riski.

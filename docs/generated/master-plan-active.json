@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f7aad7f81789042d9712071bda16bb61fc66786d9cbd3261a1a3294e74fedc4a"
+    "value": "c9d828a7f1532ff46b150fb5571ed22de3551e57fbd6dadc8a160441ff6e1b66"
   },
   "summary": {
-    "total": 507,
-    "active": 443,
+    "total": 508,
+    "active": 444,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 350,
+      "OPEN": 351,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 332,
-      "P1": 138,
+      "P1": 139,
       "P2": 37
     },
     "byProgram": {
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 8,
       "SURFACE": 1,
-      "TERMINAL": 21,
+      "TERMINAL": 22,
       "TOOL": 1,
       "TRUTH": 95,
       "XPLAT": 3
@@ -4833,9 +4833,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-18",
+      "updated": "2026-08-19",
       "definitionDigest": "7f28adbabbf3ee1ae2b852a5804e5d8e5ef4afdba2dbd6373e5cc7def1de9e45",
-      "progressDigest": "ecbd9510f0a3781b7c70494b2dc8ff4cbd40269e87723d6b865f2570b0f5f078",
+      "progressDigest": "65532948d760fae721a1e9b9d8808a85497d50b7e351eb563389941b2c8902ff",
       "terminalClosureDigest": null
     },
     {
@@ -4847,6 +4847,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "6580d65877d2b535593bfac8ca97169721790b3e2fb2b6ad7f416c883ad64cdc",
       "progressDigest": "795c475d477a643f708e071988acbead28b6a01d5f19b276f0cb8fd67a4b0177",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7091,
+      "id": "CURSOR-PROVIDER-001",
+      "program": "TERMINAL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-19",
+      "definitionDigest": "be5a85b105b1a8ee8589233849cb6de3138f8c0cda95a9f5af24327bd3812366",
+      "progressDigest": "d3d68435f9fa2965f04a36f75139a617a0f8e60300012a4417213d68ebda359d",
       "terminalClosureDigest": null
     },
     {
@@ -22078,6 +22089,7 @@
         "CLI-SURFACE-CONSOLIDATION-001",
         "NATIVE-SESSION-LEDGER-001",
         "ORPHAN-WIRE-001",
+        "CURSOR-PROVIDER-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -22128,6 +22140,7 @@
         "CLI-SURFACE-CONSOLIDATION-001",
         "NATIVE-SESSION-LEDGER-001",
         "ORPHAN-WIRE-001",
+        "CURSOR-PROVIDER-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -23286,8 +23299,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "(1) Ledger: her turn delta-mesajlar+model+provider-reported usage tek JSONL satırı (0600); reader re-hydrate + session listesi; canonical proje-slug tek helper (paralel türetim ölür). (2) Native `/resume` transcript'i GERÇEKTEN re-hydrate eder (bugün yalnız pointer değişiyor) — ledger birincil, legacy memory.db chat dual-read fallback. (3) Karatahta: scratch-checkpoint kökü `$TMPDIR/deckent/<slug>/<session>/scratchpad/` altına taşınır, composeSystemPrompt'a scratchDir enjekte, 10-dk keep-for-recovery KORUNUR ama gerçek reaper alır (bugün hiç silinmiyor); tool-content store teardown kazanır. (4) traces O(n²) tam-transcript kopyası ölür (~200MB kanıtlı). (5) `cleanup --tmp`: bilinen-önek + yaş-eşikli güvenli litter süpürme (i18n en+tr). Hermetik testler + battery; hiçbir path/pencere literal'i koda gömülmez (constants/config-resolved)",
-      "evidence": "Owner admission 2026-08-18 (onaylı mimari + 'onaylandı. başla.' sıra-2; CC/Codex nasıl yönetiyorsa aynısı, ekstra yük yok). Ölçüm kanıtları: CC 437MB projects + Codex 2.4GB sessions emsal; /tmp'de 1508 deckent-* (1489 test-artığı; 19 üretim sızıntısı = 12 scratch-checkpoint keep-for-recovery-no-reap + 7 tool-content teardown'sız); turn-başı token bugün diske YAZILMIYOR (bridge onTurnEnd↔recordTurn yan yana ama bağlantısız); native /resume re-hydrate etmiyor (yalnız activeSessionIdRef); traces tek dosya 3.5MB×O(n²), dizin ~200MB; üç uyumsuz proje-slug türetimi tespitli",
-      "updated": "2026-08-18"
+      "evidence": "Owner admission 2026-08-18 (onaylı mimari + 'onaylandı. başla.' sıra-2; CC/Codex nasıl yönetiyorsa aynısı, ekstra yük yok). Ölçüm kanıtları: CC 437MB projects + Codex 2.4GB sessions emsal; /tmp'de 1508 deckent-* (1489 test-artığı; 19 üretim sızıntısı = 12 scratch-checkpoint keep-for-recovery-no-reap + 7 tool-content teardown'sız); turn-başı token bugün diske YAZILMIYOR (bridge onTurnEnd↔recordTurn yan yana ama bağlantısız); native /resume re-hydrate etmiyor (yalnız activeSessionIdRef); traces tek dosya 3.5MB×O(n²), dizin ~200MB; üç uyumsuz proje-slug türetimi tespitli. **LANDED 2026-08-19 (1)-(4):** sprint-564 dürüst ABORTED (3/5 DONE; 004-lineage 3× dürüst NO_GO — fix-scope-inheritance 2. canlı vaka; 005 bloke) + ADR-D-007 el-kapama: bridge `hydrateTranscript` `nextTurnIndex` devamlılığı (ilk post-resume turn ledger turnCount'tan devam, regresyon `[0,5,6,7]`) + ContentWriter tek-namespace üretim wiring'i (run.tsx tek store → registry shared-dispatcher + createAgentSession teardown; kanıt: 147 scoped yeşil + gerçek-dist smoke: spill `tool-content/<sha>.bin` 0700 → close süpürür). Kurtarma-onarımı (ADR-D-007): fix-fix `.result` corrupt-JSON (notes içinde ham newline + escape'siz gömülü JSON) YALNIZ-encoding onarıldı (içerik/NO_GO verbatim; forensik yedek scratchpad) + scoped 2 dosya spawn-baseline blob-restore → attribution VERIFIED filesChanged=[] (sıfır-iş dürüst, el-işi worker'a atfedilmedi) → `finalize --force` ABORTED-terminal. Yeni defekt bulguları (owner-admission bekler): worker-result JSON-encoding gate'i YOK · exit-0+corrupt-result kör noktası (onarım dalı yalnız exit≠0, spawn-backend-docker.ts:7187) · xverify CONFIRMED-koşu stub'ı PENDING+NO_TASK_RECEIPT kalıyor → clean-gate/build kilidi (kısır-döngü sınıfı) · finalize task-dosyası statülerini terminal'e yazmıyor (cleanup'a kadar clean-gate HOLD) · landing-proposal tüketim yüzeyi yok · `review` ACTIVE-run \"Invalid Docker result settlement reference\" crash · scheduler continuous-idle (Paused task cascadeSkip'siz). Landed-verify (Sol, gpt-5.6-sol, 2026-08-19): 4/4 CONFIRMED/allow — A bridge-nextTurnIndex `cross-verify-verdict:sha256:…22fedf25` · Bi registry-contentStore `…ce77ed9d` · Bii bridge-contentStore `…f44f5e03` · Biii run.tsx-tek-değişken `…7b7c601502`; dürüst kayıt: bileşik-B 2× UNCLEAR/hold (`…baba4c45`, `…5fcb6f9`) + kelime-hatası 1× (`…8e7979a` — \"verbatim\" kod gerçeğinden sapıyordu) → ders: nokta-iddia bölmesi + kod-birebir kelime. Kalan: (5) `cleanup --tmp` + i18n + battery = 005-residual (sıradaki dogfood paketi)",
+      "updated": "2026-08-19"
     },
     {
       "order": 7090,
@@ -23326,6 +23339,38 @@
       "acceptance": "Each deliverable wired, intentionally public or owner-disposed; fresh-clone reachability proof",
       "evidence": "Waits cleanup manifest and surface cutover",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 7091,
+      "id": "CURSOR-PROVIDER-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "Cursor bir provider olur: `cursor-agent` CLI provider-neutral runtime contract'ına adapter olarak girer; model katalog/registry entegrasyonu config-resolved (KANUN 10 + ModelActivationStore explicit-active uyumlu, koda model-literal girmez); xverify `--verifier` yüzeyine `cursor` eklenir (birincil hedef: grok-4.6 — codex'ten TAMAMEN bağımsız model ailesi = üçüncü bağımsız verify rotası); usage/limit çözümü cursor-agent JSON `usage` alanından (provider-reported, kapanış-zinciri uyumlu)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "(1) Provider adapter: `--mode ask -p --trust --output-format json` non-interaktif sözleşmesi üzerinden send/usage; read-only verifier izolasyonu `--mode ask`. (2) Registry: cursor katalog modelleri (`cursor-grok-4.6-*`, `gpt-5.6-sol-*` vb.) owner active-set disiplinine tabi. (3) XVerify: `--verifier cursor --verifier-model cursor-grok-4.6-high` uçtan uca typed kapanış (verdict+call+usage+receipt). (4) Limit: Cursor üyelik limiti admission'a bağlanır; hardcode eşik yok",
+      "evidence": "Owner admission 2026-08-19 (\"cursor provider olarak kabul edip modellerini kullanabilirsin; xverify'da grok 4.6 cursor üzerinden deneyebilirsin; önce test edip sonra işleri güncelle\"). Ön-test kanıtları (2026-08-19): `cursor-agent` v2026.08.11 login'li (owner hesabı); `--list-models` 40+ model (grok-4.6 low→xhigh ±fast); gerçek çağrı grok-4.6-high → `OK` (text) + gpt-5.6-sol-high → JSON `{\"result\":\"PING\",\"usage\":{\"inputTokens\":3,\"outputTokens\":5,…}}` — provider-reported usage MEVCUT; dizin-güven (`--trust`) gerekli",
+      "updated": "2026-08-19"
     },
     {
       "order": 7100,
@@ -26157,6 +26202,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0301764361e4f6a57c443185a92b098e3dabbb5c7729f887c3f54e987e97709c"
+    "value": "c2a1e74ee138de19002edc7569ed00344c2a94886f5149c792de82a8589260e0"
   }
 }

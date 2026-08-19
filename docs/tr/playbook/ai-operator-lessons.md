@@ -159,9 +159,11 @@ yeni envelope shape'leri).
 testlerin pinlediği davranışları değiştirdiğini görmez. Bu borç birikir ve faiziyle
 landing'de ödenir.
 
-**Doğru kullanım:** Landing zincirinin zorunlu adımı: TAM suite (`VITEST_MAX_FORKS=2`
-bellek tavanıyla). Kırmızıları triage et: kod hatası mı, bayat pin mi? Bayat pinleri
-yeni davranışa tarihli açıklama yorumuyla hizala ("hangi dalga değiştirdi" yaz).
+**Doğru kullanım:** TAM suite (`VITEST_MAX_FORKS=2` bellek tavanıyla) landing borç-ödeme
+adımıdır — **kadans owner kararıyla 3 landing'de birdir (Alperen 2026-08-19)**; aradaki
+landinglerde scoped testler + gate'ler (hermetic, i18n, operating-policy, master-plan)
+yeterlidir. Full koşunun kırmızılarını triage et: kod hatası mı, bayat pin mi? Bayat
+pinleri yeni davranışa tarihli açıklama yorumuyla hizala ("hangi dalga değiştirdi" yaz).
 Ayrıca: yaygın kullanılan bir options tipine yeni alanı REQUIRED ekleme — fail-closed
 semantikle (`=== true` tüketimi) optional ekle; aksi hâlde her test literal'i churn'e
 girer.
@@ -205,8 +207,48 @@ değildir, sakin retry planla.
 
 ---
 
+## 17. Pin-Taraması Pre-Flight — değişen sembolün test-pinleri görev Files'ına
+
+**Kural:** Her DIRECTIVES görevinden önce (1) değişecek/silinecek export sembollerini
+listele, (2) `grep -rln <sembol> tests/` çıkan HER dosyayı görevin Files'ına ekle,
+(3) silinen dosyanın kendi test dosyası da Files'a, (4) chokepoint'in üretici+tüketici
+ucu aynı görevde. Kaynak: sprint-563'te 9 NO_GO'nun ~%55'i bu tek sınıftı;
+sprint-564'te kural uygulandı ve komşu-pin NO_GO'su SIFIR çıktı — kanıtlı işe yarıyor.
+
+## 18. Exit-0 + bozuk `.result` = görünmez settlement kilidi — teşhis kanıt zinciriyle, onarım içerik-verbatim
+
+**Vaka (sprint-564):** Worker `notes` alanına ham newline + escape'siz gömülü JSON yazdı
+→ `.result` geçersiz JSON. Konteyner exit **0** olduğundan host'un "bozuk-result'ı NO_GO
+ile ez" dalı hiç tetiklenmedi (o dal yalnız exit≠0'da). Attribution reconcile ilk
+`JSON.parse`'ta patladı, finalization closure YAZMADAN sessiz döndü, `recover --resume`
+her seferinde `E091:recovery-settlement-timeout` attı — hata mesajı kök nedenden üç
+katman uzaktaydı.
+
+**Teşhis disiplini:** E091 gördüğünde sırayla İZLE: settlement attempt dizininde
+`closure.json`/`settled.json` var mı → yoksa monitor'ün finalize yolunda hangi adım
+erken `return` ediyor → o adımın girdisini (`.result`) elle parse et. Üç komut:
+`ls <settlement-attempt-dir>`, `docker ps -a | grep <task>`, `node -e "JSON.parse(...)"`.
+
+**Onarım disiplini (ADR-D-007):** (1) Forensik yedek al; (2) `.result`'ın YALNIZ
+encoding'ini onar — içerik/verdict bayt-anlamıyla verbatim kalır (NO_GO → NO_GO);
+(3) el-editlerin scoped dosyalara değdiyse spawn-baseline blob'larını (`git cat-file
+blob <hash>`) geçici geri koy ki attribution ölü worker'a SENİN işini atfetmesin —
+dürüst sonuç `VERIFIED filesChanged=[]`; (4) engine'in sunduğu tipli terminali kullan
+(`finalize --force` → ABORTED, hiçbir unresolved COMPLETE'e yükselmez); (5) el-editleri
+geri uygula + testleri yeniden koş. Sonuç fabrikasyonsuz dürüst kapanıştır.
+
+---
+
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-08-19 — sprint-564 (NATIVE-SESSION-LEDGER) + E091 kurtarma vakası**: Ders 17
+  bölümleşti (564'te uygulandı: komşu-pin NO_GO=0) ve Ders 18 eklendi (exit-0 + bozuk
+  `.result` settlement kilidi: teşhis zinciri, içerik-verbatim encoding onarımı,
+  baseline blob-restore ile dürüst sıfır-iş attribution, `finalize --force` ABORTED
+  terminali). Kaynak olaylar: 004 zincirinin 3× dürüst NO_GO'su (fix-scope-inheritance
+  2. vaka), fix-fix'in corrupt-result'u, `recover --resume` E091 döngüsü, ADR-D-007
+  el-kapama (bridge `nextTurnIndex` + ContentWriter tek-namespace wiring), clean-gate'in
+  xverify PENDING-stub/NO_TASK_RECEIPT kilidi (yeni kısır-döngü sınıfı bulgusu).
 - **2026-08-18 — ilk sürüm** (sprint-550…556 dönemi): 13 ders damıtıldı. Kaynak
   olaylar: retry-storm krizi (550-552), NT-correction dalgası (553), NT-06 progressive
   disclosure + tier-düzeltmesi (554), plan-sonrası el-edit çakışması (555),

@@ -13496,3 +13496,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 563-003: Ratchet lint + yüzey battery (depends on Task 1, Task 2) (DONE)
 
 ---
+## Sprint 564 — sprint-564
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 22646s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 22645978ms |
+
+### Tasks
+
+- 564-001: Canonical proje-slug + session-ledger store (append/read/list) (DONE)
+- 564-002: Yazboz (karatahta) — scratch kökü + gerçek reaper + broker teardown + system-prompt enjeksiyonu (GO_WITH_TECH_DEBT)
+- 564-003: Ledger wiring — turn-başı usage kalıcılaşır + trace O(n²) ölür + hydrate seam (DONE)
+- 564-004-fix-fix: Fix: Fix: Native `/resume` gerçek re-hydration + picker dual-read (PAUSED)
+- 564-004-fix: Fix: Native `/resume` gerçek re-hydration + picker dual-read (PAUSED)
+- 564-004: Native `/resume` gerçek re-hydration + picker dual-read (NO_GO)
+- 564-005: `cleanup --tmp` litter hijyeni + i18n + uçtan-uca battery (PAUSED)
+
+---
