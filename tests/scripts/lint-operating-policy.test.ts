@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   checkOperatingPolicy,
   writeHostBlocks,
@@ -86,6 +86,8 @@ describe('lint-operating-policy — host projection parity + capsule hygiene', (
     mkdirSync(join(root, 'docs', 'governance'), { recursive: true });
     writeFileSync(join(root, CANONICAL_RELATIVE_PATH), canonicalDoc(BLOCK), 'utf-8');
     for (const host of HOST_RELATIVE_PATHS) {
+      // Cursor host lives under .cursor/rules/ — nested host paths need their dir.
+      mkdirSync(dirname(join(root, host)), { recursive: true });
       writeFileSync(join(root, host), hostDoc(BLOCK), 'utf-8');
     }
   });

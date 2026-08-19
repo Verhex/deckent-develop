@@ -1,0 +1,66 @@
+---
+description: Deckent repo-development adapter — operating contract + Deckent integration (pure adapter, SSOT=DECKENT.md)
+globs: **/*
+alwaysApply: true
+---
+# Deckent Integration (Cursor host adapter)
+
+This project uses Deckent for multi-agent sprint orchestration. This file is the
+Cursor host adapter (ADR-G-004): a pure reference layer — content authority stays
+in DECKENT.md / CLAUDE.md / docs/governance/deckent-dev-operating-policy.md.
+
+<!-- DECKENT-DEV-CONTROL:START -->
+SCHEMA_VERSION=1
+DOGFOOD_MODE=ON
+WORKSPACE_MODE=MAIN
+DELIVERY_MODE=DIRECT_MAIN
+PR_REQUIRED=false
+MERGE_QUEUE_REQUIRED=false
+REMOTE_CI_MODE=ADVISORY
+LOCAL_VERIFICATION_MODE=REQUIRED
+EXECUTION_AUTHORITY=FABLE
+ANALYSIS_AUTHORITY=CODEX
+OWNER_AUTHORITY=ALPEREN
+DECISION_REF=owner-live-2026-08-17-direct-main
+<!-- DECKENT-DEV-CONTROL:END -->
+
+<!-- OPERATING-POLICY:START source=docs/governance/deckent-dev-operating-policy.md -->
+## Deckent-dev Execution Mode (operating policy projection)
+
+Canonical source: `docs/governance/deckent-dev-operating-policy.md` — read it before any
+run-touching work. Dogfood mode is a repository-development policy, not a Deckent user feature.
+
+- Active mode values live ONLY in the machine-readable `DECKENT-DEV-CONTROL` block at the top
+  of this file (gate: `scripts/lint-operating-policy.mjs`). Authority: Alperen's live
+  instruction, else that block. Never infer the mode from retained DIRECTIVES, old sprint
+  state, capsules, config flags, or prior chat context. Only Alperen changes the mode.
+- DOGFOOD_MODE=ON: implement through Deckent Goal/Mission/Flow/Run/Do; direct edits only via
+  the typed ADR-D-007 recovery seam; a degraded engine never silently flips the mode OFF
+  (declare DOGFOOD_HEALTH=DEGRADED, run one bounded recovery package, return to dogfood).
+- DOGFOOD_MODE=OFF: never create or mutate Deckent sprint/run/task/settlement state; with
+  WORKSPACE_MODE=MAIN work directly on root `main` and land per DELIVERY_MODE; worktrees and
+  PRs are optional mechanisms for genuine parallel work or collaboration/release, never a
+  daily admission gate. Every quality, i18n, wiring-closure, hermetic-test and
+  real-binary-proof rule still applies.
+- One ACTIVE product outcome at a time. Other outcomes are reported as findings, never
+  implemented in-session. Findings classify as BLOCKS_CURRENT_DONE (fix in-package),
+  RELATED_BUT_NONBLOCKING (report only) or UNRELATED (one-line finding; never auto-enters
+  MASTER — owner admission required).
+- One implementation pass + one independent verification pass per outcome; a further audit
+  needs NEW disk/CI evidence. After GO, the next step is landing, not another design round.
+- Local targeted verification is REQUIRED before landing; remote CI is ADVISORY — never wait
+  on it or let it block execution. Report CI results by named class — SCOPED_GREEN,
+  PR_CLOSURE_GREEN, MERGE_GROUP_GREEN, MAIN_POSTMERGE_GREEN; "required green" is never
+  "repo green"; report LOCAL_VERIFIED and REMOTE_ADVISORY separately.
+- Handoff between agents happens via the versioned handoff receipt (schema in the canonical
+  policy), never by relaying transcripts; the owner is not a message bus.
+<!-- OPERATING-POLICY:END -->
+
+## Rules
+- Read DIRECTIVES.md for current sprint goals
+- Follow task scope boundaries
+- Run tests before reporting completion
+- Role rules auto-attach by glob: brain.mdc (.tasks/**, .brain/**, DIRECTIVES.md) · worker-default.mdc + karpathy-discipline.mdc (src/**, tests/**) · auditor.mdc (.dashboard, .locks/*)
+
+## Context
+@DECKENT.md

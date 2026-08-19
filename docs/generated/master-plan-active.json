@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "c9d828a7f1532ff46b150fb5571ed22de3551e57fbd6dadc8a160441ff6e1b66"
+    "value": "2957d4ee86b2a157b89e7d395e0a10728e85d681cd8f3f8dce01fcbe786a3c0b"
   },
   "summary": {
-    "total": 508,
-    "active": 444,
+    "total": 509,
+    "active": 445,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 351,
+      "OPEN": 352,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 332,
+      "P0": 333,
       "P1": 139,
       "P2": 37
     },
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 110,
+      "KERNEL": 111,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -4857,7 +4857,18 @@
       "state": "OPEN",
       "updated": "2026-08-19",
       "definitionDigest": "be5a85b105b1a8ee8589233849cb6de3138f8c0cda95a9f5af24327bd3812366",
-      "progressDigest": "d3d68435f9fa2965f04a36f75139a617a0f8e60300012a4417213d68ebda359d",
+      "progressDigest": "8ff903e3719b8778d096c3100d66d5d91d1f832cfac34524f1b42d5840975527",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7092,
+      "id": "RECOVERY-TRUTH-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-19",
+      "definitionDigest": "79a2ae78edb697329300455380f7e4aba2448c604a3b70be9a2ce3b3f4bf8dcf",
+      "progressDigest": "e562fc53a727e10f111a6559d27f3df2b562758ecca878d091f3e737d631530f",
       "terminalClosureDigest": null
     },
     {
@@ -22090,6 +22101,7 @@
         "NATIVE-SESSION-LEDGER-001",
         "ORPHAN-WIRE-001",
         "CURSOR-PROVIDER-001",
+        "RECOVERY-TRUTH-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -22141,6 +22153,7 @@
         "NATIVE-SESSION-LEDGER-001",
         "ORPHAN-WIRE-001",
         "CURSOR-PROVIDER-001",
+        "RECOVERY-TRUTH-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -23369,7 +23382,39 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "(1) Provider adapter: `--mode ask -p --trust --output-format json` non-interaktif sözleşmesi üzerinden send/usage; read-only verifier izolasyonu `--mode ask`. (2) Registry: cursor katalog modelleri (`cursor-grok-4.6-*`, `gpt-5.6-sol-*` vb.) owner active-set disiplinine tabi. (3) XVerify: `--verifier cursor --verifier-model cursor-grok-4.6-high` uçtan uca typed kapanış (verdict+call+usage+receipt). (4) Limit: Cursor üyelik limiti admission'a bağlanır; hardcode eşik yok",
-      "evidence": "Owner admission 2026-08-19 (\"cursor provider olarak kabul edip modellerini kullanabilirsin; xverify'da grok 4.6 cursor üzerinden deneyebilirsin; önce test edip sonra işleri güncelle\"). Ön-test kanıtları (2026-08-19): `cursor-agent` v2026.08.11 login'li (owner hesabı); `--list-models` 40+ model (grok-4.6 low→xhigh ±fast); gerçek çağrı grok-4.6-high → `OK` (text) + gpt-5.6-sol-high → JSON `{\"result\":\"PING\",\"usage\":{\"inputTokens\":3,\"outputTokens\":5,…}}` — provider-reported usage MEVCUT; dizin-güven (`--trust`) gerekli",
+      "evidence": "Owner admission 2026-08-19 (\"cursor provider olarak kabul edip modellerini kullanabilirsin; xverify'da grok 4.6 cursor üzerinden deneyebilirsin; önce test edip sonra işleri güncelle\"). Ön-test kanıtları (2026-08-19): `cursor-agent` v2026.08.11 login'li (owner hesabı); `--list-models` 40+ model (grok-4.6 low→xhigh ±fast); gerçek çağrı grok-4.6-high → `OK` (text) + gpt-5.6-sol-high → JSON `{\"result\":\"PING\",\"usage\":{\"inputTokens\":3,\"outputTokens\":5,…}}` — provider-reported usage MEVCUT; dizin-güven (`--trust`) gerekli. HOST-BOOTSTRAP LANDED 2026-08-19: `.cursor/mcp.json` (deckent-mcp kaydı) + `.cursor/rules/deckent.mdc` (alwaysApply pure adapter + DECKENT-DEV-CONTROL + OPERATING-POLICY blokları) resmi generator+lint --write ile üretildi; lint-operating-policy HOST_RELATIVE_PATHS 3-host oldu (Cursor drift-gate) — 225 pin-test yeşil; çift-doğrulama: Cursor/grok-4.6 5/5 SUPPORTED + Sol 3/3 CONFIRMED (`…cf85f23` `…c0dba6b` `…8b6a0c`; bileşik-koşu dürüst UNCLEAR `…f4e9b`)",
+      "updated": "2026-08-19"
+    },
+    {
+      "order": 7092,
+      "id": "RECOVERY-TRUTH-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "KERNEL",
+      "outcome": "Sprint-564 E091 vakasının 7 kurtarma/settlement doğruluk defekti TEK recovery paketi olarak kapanır (KANUN 6 — paket yalnız kendi closure'ını taşır): (1) worker-result JSON-encoding gate'i — worker `.result` yazarken JSON doğrulanır, notes içi ham kontrol-karakteri/escape'siz tırnak üretimde reddedilir; (2) exit-0 + corrupt-result kör noktası — monitor'ün onarım dalı exit koduna değil parse-sonucuna bağlanır (spawn-backend-docker.ts:7187 sınıfı); (3) xverify CONFIRMED-koşu stub'ı PENDING+NO_TASK_RECEIPT kalıyor → clean-gate/build kilidi (kısır-döngü sınıfı) — xverify runner task-receipt + terminal statü yazar; (4) finalize task-dosyası statülerini terminal'e yazmıyor (cleanup'a kadar clean HOLD); (5) landing-proposal tüketim yüzeyi yok; (6) `review` ACTIVE-run \"Invalid Docker result settlement reference\" crash; (7) scheduler continuous-idle — Paused task cascadeSkip'siz, run terminal'e akmıyor",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Her defekt: reproducer test + fix + gerçek-koşu kanıtı; paket zorla-feature taşımaz; (3) için clean-gate'in receipt-yokluğu kilidi hem üretici (xverify) hem tüketici (gate mesajı remediation yolu gösterir) ucundan çözülür",
+      "evidence": "Owner admission 2026-08-19 (\"Evet — tek paket satırı\"); kanıt zinciri MASTER 7089 LANDED bloğu + sprint-564 E091 kurtarma kaydı (corrupt-result forensik yedeği scratchpad, closure `…947df2e5` dönemi)",
       "updated": "2026-08-19"
     },
     {
@@ -26202,6 +26247,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "c2a1e74ee138de19002edc7569ed00344c2a94886f5149c792de82a8589260e0"
+    "value": "79494f565c4e53ca7261c79ce0a8529eed684e9d73f99fea5998b080692157d3"
   }
 }
