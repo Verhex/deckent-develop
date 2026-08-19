@@ -2709,6 +2709,10 @@ export function buildWorkerPrompt(
     verifyCommands,
     toolAllowlist,
     personaRenderMode: effectiveConfig?.prompt?.persona_render,
+    // 7094-F3 (flag-gated, default off): when the worker core rides
+    // --system-prompt-file, the inline T0 anchor blocks are suppressed here —
+    // the spawn path emits the same content via buildWorkerCoreSystemPrompt.
+    coreExternalized: effectiveConfig?.prompt?.worker_core_system_prompt === true,
     exactExecutionAuthority,
   };
   const artifact = buildTaskPrompt(task, ctx);

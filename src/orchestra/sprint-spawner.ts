@@ -4,6 +4,7 @@
 //   routeSprintTasks()
 
 // ─── Node Builtins ─────────────────────────────────────────────────
+import { buildWorkerCoreSystemPrompt } from './prompt-god-template.js';
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
@@ -1257,6 +1258,10 @@ export async function spawnWorkers(
     // F3.1: prefix-stable claude system prompt (config-global, default true). Passed
     // to every spawn path; only claude arg-builders emit the flag, others ignore it.
     const excludeDynamicPromptSections = config.prompt?.exclude_dynamic_system_prompt_sections !== false;
+    // 7094-F3 (default off): externalized worker core → --bare --system-prompt-file.
+    const systemPromptCore = config.prompt?.worker_core_system_prompt === true
+      ? buildWorkerCoreSystemPrompt(task)
+      : undefined;
     const approvalExpectedDispatch = (
       backendName: string,
     ): AttendedExecutionApprovalExpectedDispatch | undefined => {
@@ -1428,6 +1433,7 @@ export async function spawnWorkers(
         projectDir: projectRoot,
         reasoningEffort,
         excludeDynamicPromptSections,
+        systemPromptCore,
         taskTimeoutSeconds,
         executionBudget: task.budget,
         executionLandingPolicy: task.budgetPolicy?.landingPolicy,

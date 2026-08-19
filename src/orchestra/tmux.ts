@@ -26,6 +26,8 @@ export interface SpawnOptions {
   reasoningEffort?: string;
   /** F3.1: add claude `--exclude-dynamic-system-prompt-sections` (prefix-stable cache). Opt-in. */
   excludeDynamicPromptSections?: boolean;
+  /** 7094-F3 (flag-gated): worker core for `claude --bare --system-prompt-file`. */
+  systemPromptCore?: string;
 }
 
 // ─── TmuxError ──────────────────────────────────────────────────────

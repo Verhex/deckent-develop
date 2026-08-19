@@ -231,6 +231,17 @@ export interface SprintContext {
    */
   leadingT0Reorder?: boolean;
   /**
+   * 7094-F3 (flag-gated, default OFF — `prompt.worker_core_system_prompt`):
+   * the task-invariant T0 cognitive-anchor blocks (karpathy/turn-economy/
+   * pipe-exit/artifact-reuse + npm-advisory) are EXTERNALIZED to a stable
+   * system-prompt file (`claude --bare --system-prompt-file …`) and therefore
+   * skipped here, so the stdin prompt carries only task-specific content.
+   * The externalized content comes from {@link buildWorkerCoreSystemPrompt} —
+   * the SAME constants, one source. Never blind-default-on (F2a lesson:
+   * composition changes are measured, not assumed).
+   */
+  coreExternalized?: boolean;
+  /**
    * The repo's tracked files (`git ls-files`) at sprint time — F2.1b.
    *
    * When present and non-empty, {@link buildScopeBlock} splits the WRITE authority
@@ -409,6 +420,30 @@ If a pack/build artifact already exists under \`.tasks/artifacts/<sprint>/\`, RE
  * docker-mount specific, but unauthorized dependency mutation is out of scope
  * in every backend.
  */
+/**
+ * 7094-F3 — the task-invariant worker CORE as a standalone system prompt.
+ *
+ * Renders the SAME constants the inline T0 path pushes (one source, two
+ * projections — the F2a WORKER_TOOL_NAMES precedent): karpathy + turn-economy
+ * + pipe-exit + artifact-reuse, plus the npm advisory for code-class tasks.
+ * Consumed by the docker spawn path when `prompt.worker_core_system_prompt`
+ * is on: the content rides `claude --bare --system-prompt-file <file>` while
+ * `ctx.coreExternalized` suppresses the duplicate inline blocks. Variants
+ * mirror the inline classifier exactly: inspection-only tasks get the
+ * read-only discipline, doc-only tasks drop the npm advisory.
+ */
+export function buildWorkerCoreSystemPrompt(task: Task): string {
+  const isInspectionOnly =
+    (task.scope?.filesWrite?.length ?? 0) === 0 &&
+    (task.scope?.filesRead?.length ?? 0) > 0;
+  if (isInspectionOnly) return READ_ONLY_DISCIPLINE_BLOCK;
+  const isDocOnly = task.type
+    ? task.type === 'documentation' || task.type === 'design' || task.type === 'audit'
+    : detectTaskType(task) !== 'code-development';
+  const core = `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`;
+  return isDocOnly ? core : `${core}\n\n${NPM_ADVISORY_BLOCK}`;
+}
+
 const NPM_ADVISORY_BLOCK = `## Dependency-Mutation Advisory (npm / yarn / pnpm)
 NEVER run a package-manager command that mutates node_modules or a lockfile in this workspace: \`npm install\`, \`npm ci\`, \`npm rebuild\`, \`npm update\`, \`npm prune\`, \`npm dedupe\`, \`npm link\`, or any yarn/pnpm equivalent. The workspace is mounted from the host — your environment's ABI differs from the host's, and repo .npmrc settings (e.g. \`ignore-scripts=true\`) silently destroy native bindings for every process that shares node_modules. This has caused a real production incident (a worker's \`npm install\` deleted the better-sqlite3 native binding and took down all database access host-wide).
 
@@ -570,6 +605,7 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   // literal `${IDEMPOTENCY_KEY}` placeholder to the worker.
   const idempotencyKey = computeIdempotencyKey(task);
   const defaultOrder = renderSegments({
+    coreExternalized: ctx.coreExternalized === true,
     agentBlock,
     skillBlock,
     projectContextBlock,
@@ -1685,6 +1721,8 @@ ${PRODUCTION_WIRING_REPORTING_CONTRACT}`;
 // ─── Template Renderer ─────────────────────────────────────────────────
 
 interface RenderInput {
+  /** 7094-F3: core blocks externalized to --system-prompt-file — skip inline. */
+  coreExternalized?: boolean;
   agentBlock: string;
   skillBlock: string;
   /** Deterministic project-context data block — rendered right after skills. */
@@ -2039,7 +2077,7 @@ export function resolveTargetedTestPaths(
 }
 
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { agentBlock, skillBlock, projectContextBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
+  const { coreExternalized, agentBlock, skillBlock, projectContextBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -2276,7 +2314,9 @@ ${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task
   // noise that dilutes the one constraint that matters (scope). Skip it for doc-only
   // tasks — the doc/code T0 prefix already diverges (verify-steps), so this adds no
   // new cache split. Every non-doc task keeps the full advisory verbatim.
-  if (!isDocOnlyTask && !isInspectionOnlyTask) push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
+  if (!isDocOnlyTask && !isInspectionOnlyTask && !coreExternalized) {
+    push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
+  }
 
   // Smoke note (WP-16) — Tier-1 Proof-of-Function context. Emitted next to the
   // VERIFY STEPS (its natural home) only when the task carries a Smoke: directive.
@@ -2323,9 +2363,11 @@ CRITICAL: never exit without writing the .result file — even on failure, write
   // out of this task's write scope, so these task-invariant cognitive-anchor blocks
   // share the segment instead. (PIPE_EXIT_BLOCK is separately ≤400-char pinned; the
   // Turn Economy ≤1200 footprint pin measures its own constant and is unaffected.)
-  push('T0', 'karpathy', isInspectionOnlyTask
-    ? READ_ONLY_DISCIPLINE_BLOCK
-    : `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
+  if (!coreExternalized) {
+    push('T0', 'karpathy', isInspectionOnlyTask
+      ? READ_ONLY_DISCIPLINE_BLOCK
+      : `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
+  }
 
   // Shared Context (Sprint 278 COMM-1 / 278-003) — appended LAST, after every
   // shared/structural section, so this per-spawn-variable block sits in the most

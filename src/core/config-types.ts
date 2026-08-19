@@ -1602,6 +1602,14 @@ export interface PromptConfig {
    * pre-F3.1 spawn args byte-for-byte.
    */
   exclude_dynamic_system_prompt_sections?: boolean;
+  /**
+   * 7094-F3 (default: false — measured-not-assumed, F2a lesson): externalize
+   * the task-invariant worker CORE blocks to a stable file and start claude
+   * workers with `--bare --system-prompt-file <core>` — CLAUDE.md/skills/hooks
+   * auto-discovery off, composition fully deckent-owned. OFF keeps today's
+   * spawn args and prompt byte-for-byte.
+   */
+  worker_core_system_prompt?: boolean;
 }
 
 // ─── Nervous System Config Types ────────────────────────────────────

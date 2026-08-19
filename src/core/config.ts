@@ -279,6 +279,7 @@ export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   // other per-machine sections move to the first user message). Verified via
   // real-binary smoke; opt-out with `false`.
   exclude_dynamic_system_prompt_sections: true,
+  worker_core_system_prompt: false,
 };
 
 /**

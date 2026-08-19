@@ -129,6 +129,9 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
    * context. Currently consumed only by provider specs that declare support.
    */
   availableTools?: string;
+  /** 7094-F3 (flag-gated): task-invariant worker core content for
+   *  `claude --bare --system-prompt-file <file>`; absent → today's args. */
+  systemPromptCore?: string;
   /**
    * Run with the provider's isolated finite-context flags. This is opt-in and
    * protocol-scoped; ordinary implementation workers keep their existing

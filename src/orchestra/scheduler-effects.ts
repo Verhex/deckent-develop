@@ -28,6 +28,7 @@
 // collaborators (prompt resolution, write-target computation) are passed in
 // via `SpawnTaskDeps` instead of imported.
 
+import { buildWorkerCoreSystemPrompt } from './prompt-god-template.js';
 import { readFileSync, writeFileSync, existsSync, renameSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
@@ -629,6 +630,10 @@ export async function executeSpawnTask(
     && !finalOnlyUsageContainment;
   const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
   const excludeDynamicPromptSections = config?.prompt?.exclude_dynamic_system_prompt_sections !== false;
+  // 7094-F3 (default off): externalized worker core → --bare --system-prompt-file.
+  const systemPromptCore = config?.prompt?.worker_core_system_prompt === true
+    ? buildWorkerCoreSystemPrompt(task)
+    : undefined;
   const approvalExpectedDispatch = (
     backendName: string,
   ): AttendedExecutionApprovalExpectedDispatch | undefined => {
@@ -768,6 +773,7 @@ export async function executeSpawnTask(
       projectDir: projectRoot,
       reasoningEffort,
       excludeDynamicPromptSections,
+      systemPromptCore,
       taskTimeoutSeconds,
       executionBudget: task.budget,
       executionLandingPolicy: task.budgetPolicy?.landingPolicy,

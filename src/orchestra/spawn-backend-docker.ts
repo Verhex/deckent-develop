@@ -5776,8 +5776,29 @@ export class DockerSpawnBackend implements SpawnBackend {
     // (token-usage capture unaffected) and why it does NOT touch the shared
     // spec (tmux.ts's claude command is untouched). codex/gemini keep spec as-is
     // (their docker-parity is a tracked follow-up, not silently changed here).
+    // 7094-F3 (flag-gated via opts.systemPromptCore, default absent): the
+    // task-invariant worker core rides `--bare --system-prompt-file <file>` —
+    // auto-discovery (CLAUDE.md/skills/hooks/MCP) off, composition fully
+    // deckent-owned. The core file is content-addressed so an unchanged core
+    // maps to the same path across workers (stable system-prompt identity).
+    let coreArgs: readonly string[] = [];
+    if (providerBinary === 'claude' && opts?.systemPromptCore) {
+      const coreDigest = createHash('sha256').update(opts.systemPromptCore, 'utf-8')
+        .digest('hex').slice(0, 12);
+      const coreName = `.worker-core-${coreDigest}.md`;
+      const coreHostPath = join(tasksDir, coreName);
+      if (!existsSync(coreHostPath)) writeFileSync(coreHostPath, opts.systemPromptCore, 'utf-8');
+      // F3-v2 (measured 2026-08-19, sprint-570): `--bare` also bypassed
+      // credential discovery in the container (init apiKeySource:"none" →
+      // "Not logged in", two $0 honest NO_GOs, scheduler fail-fast). The
+      // composition goal is met WITHOUT bare: --system-prompt-file replaces
+      // the default system prompt, and CLAUDE.md loading is disabled via the
+      // official CLAUDE_CODE_DISABLE_CLAUDE_MDS env (injected below) — auth
+      // and the normal tool set stay intact.
+      coreArgs = ['--system-prompt-file', `${CONTAINER_WORKSPACE}/.tasks/${coreName}`];
+    }
     const dockerSpec: ProviderCommandSpec = providerBinary === 'claude'
-      ? { ...spec, baseArgs: claudeStreamJsonBaseArgs(spec.baseArgs) }
+      ? { ...spec, baseArgs: [...coreArgs, ...claudeStreamJsonBaseArgs(spec.baseArgs)] }
       : spec;
     // IMMUTABLE — deckent workers run with full autonomy (autoApprove). The spec
     // maps that to the correct per-provider flag (claude --dangerously-skip-
@@ -5805,7 +5826,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       reasoningEffort: opts?.reasoningEffort,
       // F3.1: prefix-stable system prompt inside the container (per-machine sections
       // → first user message). Only the claude spec emits the flag; others ignore it.
-      excludeDynamicPromptSections: opts?.excludeDynamicPromptSections,
+      // F3: with --system-prompt-file the default system prompt is replaced,
+      // so the exclude-dynamic flag is meaningless — drop it for a clean argv.
+      excludeDynamicPromptSections: opts?.systemPromptCore
+        ? undefined
+        : opts?.excludeDynamicPromptSections,
     });
     // WORKER-GIT-GUARD (381-001): shadow `git` inside the container with a
     // denylist shim (stash/reset/checkout/clean/rebase/commit/revert -> exit
@@ -6118,6 +6143,13 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Pass Deckent worker context env vars (for SIGTERM handler in worker.ts)
     dockerArgs.push('-e', `DECKENT_TASK_ID=${taskId}`);
     dockerArgs.push('-e', `DECKENT_PROJECT_ROOT=${CONTAINER_WORKSPACE}`);
+    // 7094-F3-v2: when the worker core rides --system-prompt-file, CLAUDE.md
+    // memory loading is disabled via the official env switch (code.claude.com
+    // env-vars) instead of --bare, which also killed credential discovery
+    // (sprint-570 measured: apiKeySource "none" → "Not logged in").
+    if (opts?.systemPromptCore && providerBinary === 'claude') {
+      dockerArgs.push('-e', 'CLAUDE_CODE_DISABLE_CLAUDE_MDS=1');
+    }
     // Adaptive timeout: pass computed timeout to container as env var
     dockerArgs.push('-e', `TASK_TIMEOUT=${effectiveTimeout}`);
     // Sprint 156 T-006: stable per-spawn idempotency key — promptId is already a fresh
