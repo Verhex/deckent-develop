@@ -131,13 +131,15 @@ Non-skip `if (process.platform ...)` branches inside test bodies — the test st
 
 | File | Line | Tag | Direction |
 |------|------|------|------|
-| `tests/agent/scratch-checkpoint.test.ts` | 49 | `windows-native` | asserts differently OFF windows-native |
-| `tests/agent/tool-result-broker.test.ts` | 204 | `windows-native` | asserts differently OFF windows-native |
+| `tests/agent/scratch-checkpoint.test.ts` | 68 | `windows-native` | asserts differently OFF windows-native |
+| `tests/agent/tool-result-broker.test.ts` | 207 | `windows-native` | asserts differently OFF windows-native |
+| `tests/agent/tool-result-broker.test.ts` | 222 | `windows-native` | asserts differently OFF windows-native |
 | `tests/api/token-redaction.test.ts` | 153 | `windows-native` | asserts differently OFF windows-native |
 | `tests/api/token-redaction.test.ts` | 195 | `windows-native` | asserts differently OFF windows-native |
 | `tests/api/token-redaction.test.ts` | 229 | `windows-native` | asserts differently OFF windows-native |
 | `tests/cli/at-ref.test.ts` | 328 | `windows-native` | asserts differently ON windows-native |
-| `tests/cli/native-agent-scratch-wire.test.ts` | 228 | `windows-native` | asserts differently ON windows-native |
+| `tests/cli/native-agent-scratch-wire.test.ts` | 251 | `windows-native` | asserts differently ON windows-native |
+| `tests/cli/repl/session-ledger.test.ts` | 139 | `windows-native` | asserts differently OFF windows-native |
 | `tests/core/approval-broker.test.ts` | 87 | `windows-native` | asserts differently OFF windows-native |
 | `tests/core/deck-file-secret-lifecycle.test.ts` | 66 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/deck-file-secret-lifecycle.test.ts` | 76 | `windows-native` | asserts differently ON windows-native |
@@ -240,7 +242,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2631 of 2693 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2632 of 2695 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work

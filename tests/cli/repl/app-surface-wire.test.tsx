@@ -23,11 +23,14 @@ import {
   RESUME_RECENT_LIMIT,
   buildResumePickerLines,
   chatSessionsToRecords,
+  hydrateNativeResume,
+  mergeResumeSessionRecords,
   resolveResumeCommand,
   renderBusyDecision,
   steerNotesToInputs,
   type ReplLabels,
 } from '../../../src/cli/repl/app.js';
+import { appendLedgerTurn } from '../../../src/cli/repl/session-ledger.js';
 import { listRecentSessions, type SessionRecord } from '../../../src/cli/helpers/session-resume.js';
 import {
   initialBusyControlsState,
@@ -138,6 +141,73 @@ describe('chatSessionsToRecords — ChatSessionSummary → SessionRecord mapping
   });
 });
 
+describe('native resume — ledger-first dual-read re-hydration (564-004)', () => {
+  const roots: string[] = [];
+  const makeRoot = (): string => {
+    const root = mkdtempSync(join(tmpdir(), 'native-resume-'));
+    roots.push(root);
+    return root;
+  };
+  afterEach(() => {
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('hydrates ledger messages byte-for-byte and never consults legacy on collision', () => {
+    const rootDir = makeRoot();
+    const cwd = join(rootDir, 'project');
+    const messages = [
+      { role: 'user' as const, content: 'ledger question' },
+      { role: 'assistant' as const, content: 'ledger answer' },
+    ];
+    appendLedgerTurn({
+      rootDir, cwd, sessionId: 'shared', turnIndex: 0,
+      ts: '2026-08-18T00:00:00.000Z', provider: 'p', model: 'm', messagesDelta: messages,
+      usage: { inputTokens: 3, outputTokens: 7 },
+    });
+    const hydrateTranscript = vi.fn();
+    const getChatHistory = vi.fn(() => [{ role: 'user', content: 'legacy shadow' }]);
+
+    const result = hydrateNativeResume('shared', cwd, { hydrateTranscript }, { getChatHistory }, { rootDir });
+
+    expect(result).toMatchObject({ source: 'ledger', messages, turnCount: 1, outputTokens: 7 });
+    expect(hydrateTranscript).toHaveBeenCalledOnce();
+    // 564-004 hand-completion — the ledger row count rides along so the bridge
+    // recorder continues turn numbering after the hydrated rows.
+    expect(hydrateTranscript).toHaveBeenCalledWith(messages, { nextTurnIndex: 1 });
+    expect(getChatHistory).not.toHaveBeenCalled();
+  });
+
+  it('falls back to legacy history and converts only provider-compatible chat roles', () => {
+    const rootDir = makeRoot();
+    const cwd = join(rootDir, 'project');
+    const hydrateTranscript = vi.fn();
+    const getChatHistory = vi.fn(() => [
+      { role: 'user', content: 'legacy question' },
+      { role: 'assistant', content: 'legacy answer' },
+    ]);
+
+    const result = hydrateNativeResume('legacy-only', cwd, { hydrateTranscript }, { getChatHistory }, { rootDir });
+
+    expect(result).toMatchObject({ source: 'legacy', turnCount: 1, outputTokens: 0 });
+    expect(hydrateTranscript).toHaveBeenCalledWith([
+      { role: 'user', content: 'legacy question' },
+      { role: 'assistant', content: 'legacy answer' },
+    ]);
+  });
+
+  it('deduplicates picker ids with ledger precedence', () => {
+    const merged = mergeResumeSessionRecords(
+      [record('sprint-only')],
+      [record('shared', { title: 'ledger title', status: 'chat' })],
+      [record('shared', { title: 'legacy title', status: 'chat' }), record('legacy-only', { status: 'chat' })],
+    );
+    expect([...merged.disk, ...merged.resumable].map((entry) => entry.id)).toEqual([
+      'sprint-only', 'shared', 'legacy-only',
+    ]);
+    expect(merged.resumable.find((entry) => entry.id === 'shared')?.title).toBe('ledger title');
+  });
+});
+
 // ─── resolveResumeCommand — picker decisions (merge with loop-side /resume) ──
 
 describe('resolveResumeCommand — /resume picker decision matrix', () => {
@@ -174,7 +244,7 @@ describe('resolveResumeCommand — /resume picker decision matrix', () => {
     if (decision.kind === 'switch') expect(decision.sessionId).not.toBe(launchSessionId);
   });
 
-  it('numeric pick of a chat row → switch AND forward the RESOLVED id to the loop', () => {
+  it('numeric pick of a resumable row → switch for direct hydration (never the raw typed id)', () => {
     const decision = resolveResumeCommand('3', disk, chat, NO_LABELS);
     expect(decision).toMatchObject({ kind: 'switch', sessionId: 'chat-abc', forwardToLoop: true });
   });

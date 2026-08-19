@@ -19,7 +19,8 @@ import { loadPolicy } from '../../agent/permission-policy.js';
 import { createRuleStore } from '../../agent/permission-store.js';
 import { createCostGuard } from '../../agent/guards/cost.js';
 import { writeAuditEvent } from '../../core/audit-writer.js';
-import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
+import type { ProviderAdapter, ProviderMessage, ProviderRequest } from '../../agent/provider-tooluse/types.js';
+import type { ContentWriter } from '../../agent/tool-result-broker.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import { createToolExposure } from '../../agent/tools/exposure.js';
 import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
@@ -37,7 +38,13 @@ import type { ToolRiskLevel as CoreToolRiskLevel } from '../../core/tool-registr
 import type { ApprovalMode } from '../../agent/permission-types.js';
 import type { ToolInfo } from './app.js';
 import type { ChatTurnQueue, ChatTurnPayload } from './chat-turn-queue.js';
+import type { TurnRecordMeta } from './trace-wire.js';
 import type { resolveNativeAgentBudget } from '../../core/execution-budget-policy.js';
+
+/** Provider name recorded when the caller supplied no `getProvider` resolver —
+ *  an honest sentinel, never a guessed provider id (a hardcoded provider name
+ *  on a record path is exactly the drift the ledger exists to prevent). */
+const UNRESOLVED_PROVIDER = 'unknown';
 
 /** The view's engine contract (same shape the legacy runChatNativeLoop satisfies).
  *  `onTurnEnd` intentionally stays `{inputTokens, outputTokens}` — no `elapsedMs`, unlike
@@ -94,6 +101,30 @@ export interface ReplEngine {
    *  same structural reasons as the members above; absent → the caller keeps
    *  its legacy inline behavior (fail-safe, never fail-open). */
   getContextBudgetTokens?: () => number | undefined;
+  /**
+   * 7089 (NATIVE-SESSION-LEDGER) — load a previously-recorded transcript back
+   * into this engine so a resumed session continues the SAME conversation
+   * instead of starting blind. The messages ride VERBATIM ahead of every
+   * subsequent provider request (and ahead of its token measurement), in the
+   * order given. Calling it again REPLACES the hydrated prefix; hydrating an
+   * empty array clears it and restores byte-identical un-hydrated behavior.
+   *
+   * The hydrated prefix is context the provider sees, not history this session
+   * produced, so it is deliberately NOT re-emitted to `recordTurn` — the ledger
+   * rows it came from are already on disk. Optional for the same structural
+   * reasons as the members above.
+   *
+   * `options.nextTurnIndex` (564-004 hand-completion) — continues the recorder's
+   * monotonic turn numbering after the hydrated rows: the FIRST post-resume turn
+   * is recorded at this index instead of restarting at 0, so ledger ordering
+   * keys never collide with the rows the prefix came from. Only a non-negative
+   * integer is honored; absent/invalid → numbering is left untouched (fail-safe:
+   * a legacy-history resume has no ledger rows to collide with and keeps 0).
+   */
+  hydrateTranscript?: (
+    messages: import('../../agent/provider-tooluse/types.js').ProviderMessage[],
+    options?: { nextTurnIndex?: number },
+  ) => void;
 }
 
 export interface NativeEngineDeps {
@@ -107,6 +138,10 @@ export interface NativeEngineDeps {
    *  cross-turn transcript) survives the switch; only the backend swaps. */
   getAdapter?: () => ProviderAdapter;
   getModel?: () => string;
+  /** Live provider name for the same switch seam — stamped on every recorded
+   *  turn so a ledger row names the backend that actually served it. Absent →
+   *  {@link UNRESOLVED_PROVIDER}. */
+  getProvider?: () => string;
   getContextBudgetTokens?: () => number | undefined;
   /** The existing confirm-queue trigger (run.tsx confirmTrigger). 'y'|'a'|'n'. */
   confirm: (summary: string, toolName: string) => Promise<'y' | 'a' | 'n'>;
@@ -121,8 +156,23 @@ export interface NativeEngineDeps {
   usdPerMillionTokens?: number;
   /** Localizer (run.tsx: (key) => getMessage(key, lang)). Defaults to identity. */
   t?: (key: string) => string;
-  /** Optional: called with the full transcript after each completed turn (trace recording). */
-  recordTurn?: (messages: import('../../agent/provider-tooluse/types.js').ProviderMessage[]) => void;
+  /**
+   * Called with the full cross-turn transcript AND this turn's accounting after
+   * each completed turn. 7089 (NATIVE-SESSION-LEDGER) unified what used to be
+   * two half-seams: the `inputTokens`/`outputTokens` the turn accumulated (the
+   * born-520 `+=` discipline) now reach the record layer through `meta.usage`
+   * instead of dying at `onTurnEnd`, so the number rendered on screen and the
+   * number persisted to disk are the same number.
+   *
+   * The transcript stays FULL here on purpose: a recorder owns its own delta
+   * cursor (trace-wire.ts `createDeltaCursor`) and needs the whole transcript to
+   * detect a context-epoch compaction. The bg-turn path below routes through the
+   * same `runTurn`, so a synthetic turn carries this contract identically.
+   */
+  recordTurn?: (
+    messages: import('../../agent/provider-tooluse/types.js').ProviderMessage[],
+    meta: TurnRecordMeta,
+  ) => void;
   /**
    * TERM2-WIRE (356-011) — caller-owned ChatTurnQueue instance. This bridge only
    * calls its public API (READ-ONLY: never edits chat-turn-queue.ts); the
@@ -155,6 +205,15 @@ export interface NativeEngineDeps {
    * opens (session.ts's own byte-identical pre-wire behavior).
    */
   scratch?: { tenantId: string; projectId: string; sessionId: string };
+  /**
+   * 7089 (564-002 hand-completion) — the SAME session-scoped overflow store the
+   * caller anchored into `buildNativeToolRegistry`, threaded here so
+   * `createAgentSession` owns its teardown: `session.close()` closes it, and a
+   * keep-for-recovery close leaves it alive exactly as long as the scratch
+   * namespace (checkpoints may still cite its contentRefs). Absent → nothing to
+   * close (the dispatcher's legacy store reaps itself by prefix).
+   */
+  contentStore?: ContentWriter;
 }
 
 /**
@@ -565,8 +624,33 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     ? createToolExposure({ progressive: true }, deps.registry)
     : undefined;
   if (exposure && deps.toolSurface) deps.toolSurface.exposure = exposure;
+
+  // 7089 (NATIVE-SESSION-LEDGER) — the re-hydration seam. `session.ts` owns the
+  // Transcript and exposes no seed, so hydration is applied at the ONE boundary
+  // this bridge does own: every provider request (and its token measurement)
+  // gets the hydrated messages prepended VERBATIM. Empty prefix → the request
+  // object is passed through untouched, so an un-hydrated session stays
+  // byte-identical to pre-7089.
+  const hydrated: ProviderMessage[] = [];
+  const withHydratedPrefix = (req: ProviderRequest): ProviderRequest =>
+    (hydrated.length === 0 ? req : { ...req, messages: [...hydrated, ...req.messages] });
+  const hydrating = (base: ProviderAdapter): ProviderAdapter => ({
+    get name() { return base.name; },
+    ...(base.requestMeasurement
+      // Measure the request the backend will actually receive — a measurement
+      // that ignored the prefix would under-count and fail admission OPEN.
+      ? {
+          requestMeasurement: {
+            measure: (req: ProviderRequest, signal: AbortSignal) =>
+              base.requestMeasurement!.measure(withHydratedPrefix(req), signal),
+          },
+        }
+      : {}),
+    send: (req: ProviderRequest) => base.send(withHydratedPrefix(req)),
+  });
+
   const session = createAgentSession({
-    adapter: deps.adapter,
+    adapter: hydrating(deps.adapter),
     registry: deps.registry,
     policy,
     ruleStore,
@@ -578,7 +662,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     ...((deps.nativeBudget?.maxModelRounds ?? deps.maxIterations) !== undefined
       ? { maxIterations: deps.nativeBudget?.maxModelRounds ?? deps.maxIterations }
       : {}),
-    ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
+    ...(deps.getAdapter ? { getAdapter: (): ProviderAdapter => hydrating(deps.getAdapter!()) } : {}),
     ...(deps.getModel ? { getModel: deps.getModel } : {}),
     ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
     // NT-06 consumer half (554-002 tech-debt closure, Brain hand-completion):
@@ -588,6 +672,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       ? { getProviderToolSchemas: () => deps.registry.toNativeSchemas((def) => exposure.isExposed(def.name)) }
       : {}),
     ...(deps.scratch ? { scratch: { ...deps.scratch, checkpointInstruction: CHECKPOINT_INSTRUCTION } } : {}),
+    ...(deps.contentStore ? { contentStore: deps.contentStore } : {}),
   });
 
   // born-607 CALLTOOL-EXEC-WIRE: arm `deckent_call_tool` with the engine-parity
@@ -620,6 +705,11 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // NATIVE-BUDGET-RENEWAL (557-002) — one gate per engine (per session), so the
   // dedup survives across turns exactly as long as the exhaustion itself does.
   const renewalOffer = createBudgetRenewalOffer(t);
+
+  // 7089 — monotonic per-session turn index stamped on every recorded turn
+  // (real and bg-synthetic alike, since both run through `runTurn`). It is the
+  // ledger's ordering key, so it must never restart or skip within a session.
+  let turnIndex = 0;
 
   const runTurn: ReplEngine = async (input, cbs) => {
     let inputTokens = 0;
@@ -768,7 +858,17 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       }
     }
     cbs.onTurnEnd({ inputTokens, outputTokens });
-    if (deps.recordTurn) deps.recordTurn(session.transcript());
+    // 7089 — ONE seam: the same accumulated counters `onTurnEnd` just reported
+    // now ride into the record layer, so usage reaches disk instead of dying at
+    // the view boundary.
+    if (deps.recordTurn) {
+      deps.recordTurn(session.transcript(), {
+        usage: { inputTokens, outputTokens },
+        model: deps.getModel?.() ?? deps.model,
+        provider: deps.getProvider?.() ?? UNRESOLVED_PROVIDER,
+        turnIndex: turnIndex++,
+      });
+    }
   };
 
   // TERM2-WIRE (356-011): bg-turns wiring is fully OFF by default — no queue
@@ -804,5 +904,17 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   engine.renewBudgetEpoch = () => session.renewBudgetEpoch();
   // 7087 — see the ReplEngine.getContextBudgetTokens doc comment above.
   if (deps.getContextBudgetTokens) engine.getContextBudgetTokens = deps.getContextBudgetTokens;
+  // 7089 — the SINGLE re-hydration entrypoint (app.tsx's native `/resume`).
+  // Defensive copies: the caller's array/messages stay its own.
+  engine.hydrateTranscript = (messages, options) => {
+    hydrated.splice(0, hydrated.length, ...messages.map((message) => ({ ...message })));
+    // 564-004 hand-completion — recordTurn continuity: a ledger resume passes
+    // its on-disk row count so the next recorded turn continues the session's
+    // ordering key instead of restarting at 0 (see the interface doc above).
+    if (options?.nextTurnIndex !== undefined
+      && Number.isInteger(options.nextTurnIndex) && options.nextTurnIndex >= 0) {
+      turnIndex = options.nextTurnIndex;
+    }
+  };
   return engine;
 }

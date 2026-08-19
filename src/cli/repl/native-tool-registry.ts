@@ -84,6 +84,15 @@ export interface NativeToolRegistryOptions {
    * `registerRunFlowProposalTool`.
    */
   runFlow?: RunFlowRegistryOptions;
+  /**
+   * 7089 (564-002 hand-completion) — session-scoped tool-result overflow store
+   * for the SHARED exec dispatcher. The caller (run.tsx) anchors it at the
+   * session's scratch root (`resolveScratchRoot(...).root`), so overflow bytes
+   * live in the SAME swept namespace as the scratch checkpoints instead of a
+   * second orphan `mkdtemp` dir. Absent → the dispatcher's own legacy
+   * per-process store (byte-identical pre-wire behavior).
+   */
+  contentStore?: ContentWriter;
 }
 
 export interface RunFlowRegistryOptions {
@@ -786,7 +795,10 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
   const registry = new ToolRegistry();
 
   // Exec tools — NO confirm injected (single gate = AgentSession permission engine).
-  const exec = createToolExecDispatcher({ cwd: opts.cwd });
+  const exec = createToolExecDispatcher({
+    cwd: opts.cwd,
+    ...(opts.contentStore ? { contentStore: opts.contentStore } : {}),
+  });
   for (const name of ['deckent_read_file', 'deckent_list_dir', 'deckent_grep', 'deckent_glob', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash', 'deckent_git_status', 'deckent_git_log', 'deckent_git_diff', 'deckent_git_add', 'deckent_git_commit'] as const) {
     const def = defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec, 'core');
     // 562-002: read_file keeps its tier/exposure/definition and only swaps the

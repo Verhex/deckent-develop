@@ -31,6 +31,8 @@ import type {
 import { decideProviderAdmission, estimateTokens, measureProviderRequest } from './context-budget.js';
 import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore } from './scratch-checkpoint.js';
 import { createNativeBudgetState, type NativeBudgetState } from './guards/recursion.js';
+import type { ContentWriter } from './tool-result-broker.js';
+import { projectSlug } from '../core/project-slug.js';
 
 export type NativeBudgetTerminalCode = `native-budget.${string}`;
 
@@ -187,7 +189,20 @@ export interface AgentSessionDeps {
   getProviderToolSchemas?: LoopDeps['getProviderToolSchemas'];
   /** NATIVE-AGENT-HORIZON-001: resolved multi-dimension session budget. */
   nativeBudget?: import('../core/execution-budget-policy.js').ResolvedNativeAgentBudget;
-  scratch?: { tenantId: string; projectId: string; sessionId: string; checkpointInstruction: string };
+  /** `slug` is the canonical project-directory slug (`projectSlug()`); absent →
+   *  it is derived from `cwd`, so every session of one project shares — and the
+   *  reaper sweeps — one scratch namespace. */
+  scratch?: {
+    tenantId: string;
+    projectId: string;
+    sessionId: string;
+    checkpointInstruction: string;
+    slug?: string;
+  };
+  /** Tool-result overflow store. Owned by the caller (it is built with the
+   *  registry, before the session exists — see `resolveScratchRoot`), but
+   *  CLOSED here so scratch teardown sweeps one namespace, not two. */
+  contentStore?: ContentWriter;
 }
 
 export interface AgentSession {
@@ -224,7 +239,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   let budgetEpoch = 1;
   let exhausted: { code: NativeBudgetTerminalCode; at: number; epoch: number } | undefined;
   const scratchDeps = deps.scratch;
-  const scratch: ScratchStore | undefined = scratchDeps ? openScratchStore(scratchDeps) : undefined;
+  const scratch: ScratchStore | undefined = scratchDeps
+    ? openScratchStore({ ...scratchDeps, slug: scratchDeps.slug ?? projectSlug(deps.cwd) })
+    : undefined;
   let checkpointDegradation: CheckpointReadResult | undefined;
   /** Messages the LAST epoch compaction installed — the checkpoint delta is
    *  strictly everything after them, so a checkpoint never re-reads its own
@@ -504,6 +521,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     cwd: deps.cwd,
     model: deps.model,
     lang: deps.lang,
+    ...(scratch ? { scratchDir: scratch.info.root } : {}),
     maxIterations: deps.maxIterations,
     costGuard: deps.costGuard,
     ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
@@ -581,8 +599,14 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     },
     latestCheckpoint(): CheckpointReadResult { return checkpointDegradation ?? scratch?.readLatestCheckpoint() ?? { status: 'empty' }; },
     close(options = {}): void {
-      if (!scratch) return;
       const keep = options.keepForRecoveryMs ?? 0;
+      // Fail-open, and only on a real teardown: a kept scratchpad's checkpoints
+      // may still cite contentRefs, so the content store survives exactly as
+      // long as the recovery window that the reaper later enforces.
+      if (keep <= 0) {
+        try { deps.contentStore?.close?.(); } catch { /* teardown hygiene never fails a close */ }
+      }
+      if (!scratch) return;
       scratch.close(keep > 0 ? { policy: 'keep-for-recovery', recoveryWindowMs: keep } : { policy: 'delete' });
     },
   };

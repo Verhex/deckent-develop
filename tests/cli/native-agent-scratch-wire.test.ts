@@ -82,8 +82,31 @@ describe('native-agent-bridge scratch/audit/close wiring (553-002)', () => {
       confirm: async () => 'y',
       toolSink: () => {},
     });
-    const passedDeps = createAgentSession.mock.calls[0]![0] as { scratch?: unknown };
+    const passedDeps = createAgentSession.mock.calls[0]![0] as { scratch?: unknown; contentStore?: unknown };
     expect(passedDeps.scratch).toBeUndefined();
+    // 564-002 hand-completion — no caller store → nothing threaded (the
+    // dispatcher's legacy store reaps itself by prefix; session closes nothing).
+    expect(passedDeps.contentStore).toBeUndefined();
+  });
+
+  it('threads the caller-owned contentStore into createAgentSession by identity (564-002 hand-completion)', () => {
+    createAgentSession.mockReturnValue(fakeSession);
+    const dir = tmpdir();
+    const store = { write: () => ({ path: '(stub)', sha256: 'x' }), close: vi.fn() };
+    createNativeEngine({
+      adapter: noopAdapter(),
+      registry: buildNativeToolRegistry({ cwd: () => dir, contentStore: store }),
+      cwd: dir,
+      model: 'm',
+      lang: 'en',
+      confirm: async () => 'y',
+      toolSink: () => {},
+      contentStore: store,
+    });
+    const passedDeps = createAgentSession.mock.calls[0]![0] as { contentStore?: unknown };
+    // SAME object, not a copy — session.close() must close the very store the
+    // registry's shared dispatcher spills into (one namespace, one teardown).
+    expect(passedDeps.contentStore).toBe(store);
   });
 
   it('persists a permission-auto-decision event to the durable audit sink', async () => {

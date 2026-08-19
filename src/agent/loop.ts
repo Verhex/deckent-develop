@@ -55,6 +55,10 @@ export interface LoopDeps {
   cwd: string;
   model: string;
   lang?: 'en' | 'tr';
+  /** Session scratchpad root, threaded into the per-turn system prompt so the
+   *  model knows where the volatile blackboard is. Absent → the composed prompt
+   *  stays byte-identical to the pre-scratchpad behavior. */
+  scratchDir?: string;
   maxIterations?: number;
   /** NATIVE-AGENT-HORIZON-001: config-resolved multi-dimension session budget.
    *  Absent → the legacy single-round guard below stays byte-identical. */
@@ -117,7 +121,11 @@ export function writeTargets(args: Record<string, unknown>): string[] {
 
 export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, userInput: string): AsyncIterable<AgentEvent> {
   transcript.appendUser(userInput);
-  const system = composeSystemPrompt({ cwd: deps.cwd, lang: deps.lang });
+  const system = composeSystemPrompt({
+    cwd: deps.cwd,
+    lang: deps.lang,
+    ...(deps.scratchDir !== undefined ? { scratchDir: deps.scratchDir } : {}),
+  });
   let iterations = 0;
   const budgetState = deps.nativeBudget
     ? (deps.nativeBudgetState ?? createNativeBudgetState())

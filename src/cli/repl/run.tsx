@@ -24,8 +24,11 @@ import type { RunFlowMountLabels, DoSlashLabels } from './app.js';
 import { renderRunsCommand, buildInboxLabels, collectInboxRows } from './run-flow-inbox.js';
 import { executeInboxDecision } from '../commands/runs.js';
 import type { ResolvedConfig } from '../../core/types.js';
-import { buildTurnRecorder, resolveTraceEnabled } from './trace-wire.js';
+import { buildLedgerRecorder, buildTurnRecorder, composeTurnRecorders, resolveTraceEnabled } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
+import { resolveScratchRoot } from '../../agent/scratch-checkpoint.js';
+import { createSessionContentStore } from '../../agent/tool-result-broker.js';
+import { projectSlug } from '../../core/project-slug.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
 import { createToolExecDispatcher, walkProjectFiles, readIgnoredDirs, resolveRealPathLenient } from '../commands/chat-tool-exec.js';
@@ -1093,18 +1096,6 @@ export async function runInkRepl(
       // DB opened, else a fresh native-only fallback; shared by the trace recorder below
       // and the scratch-store ids so both name the SAME logical session.
       const nativeSessionId = sessionId ?? `native-${Date.now()}`;
-      // Local-only training-trace recorder (SP-2). NT-13 (553-002): `training_trace.enabled`
-      // (effective config) is the AUTHORITY — DECKENT_TRACE can only force it OFF, never ON
-      // (see resolveTraceEnabled). Model is a getter: the trace stamps the model that
-      // ACTUALLY served the turn, not the boot-time one.
-      const recordTurn = buildTurnRecorder({
-        enabled: resolveTraceEnabled(cfg as { training_trace?: { enabled?: boolean } }, process.env),
-        dir: join(process.cwd(), '.deckent', 'traces'),
-        sessionId: nativeSessionId,
-        system: composeSystemPrompt({ cwd: process.cwd(), lang: lang as 'en' | 'tr' }),
-        model: () => live.model,
-        now: () => new Date().toISOString(),
-      });
       // NATIVE-AGENT-HORIZON-001 NT-03 (553-002) — scratch-session identity threaded into
       // the bridge (which appends the fixed checkpointInstruction before calling
       // createAgentSession). tenant_id authority: approval.authority.tenant_id, falling
@@ -1115,6 +1106,64 @@ export async function runInkRepl(
         projectId: attendedExecutionProjectId(process.cwd()),
         sessionId: nativeSessionId,
       };
+      // 7089 (564-002 hand-completion) — ONE session-scoped overflow store,
+      // anchored at the session's scratch root so tool-result spill bytes live
+      // in the same swept namespace as the checkpoints (single-namespace
+      // hygiene; no second orphan mkdtemp dir). The SAME writer goes to the
+      // registry's shared exec dispatcher AND to the engine, whose session
+      // close() owns its teardown. Fail-soft: an unresolvable layout degrades
+      // to the store's legacy per-process layout instead of killing the REPL.
+      const sessionContentStore = ((): ReturnType<typeof createSessionContentStore> => {
+        try {
+          return createSessionContentStore({
+            dir: resolveScratchRoot({ ...scratchIds, slug: projectSlug(process.cwd()) }).root,
+          });
+        } catch {
+          return createSessionContentStore();
+        }
+      })();
+      // 7089 — the trace must record the system prompt the model ACTUALLY received.
+      // loop.ts composes it with the session's resolved scratch dir, which does not
+      // exist at boot, so this resolves the SAME canonical layout the session opens
+      // (openScratchStore delegates to resolveScratchRoot with these very ids) rather
+      // than reimplementing the path. Fail-soft: an unresolvable layout degrades to the
+      // scratch-less prompt instead of killing the turn.
+      const nativeSystemPrompt = (): string => {
+        let scratchDir: string | undefined;
+        try {
+          scratchDir = resolveScratchRoot({ ...scratchIds, slug: projectSlug(process.cwd()) }).root;
+        } catch { scratchDir = undefined; }
+        return composeSystemPrompt({
+          cwd: process.cwd(),
+          lang: lang as 'en' | 'tr',
+          ...(scratchDir !== undefined ? { scratchDir } : {}),
+        });
+      };
+      // Local-only training-trace recorder (SP-2). NT-13 (553-002): `training_trace.enabled`
+      // (effective config) is the AUTHORITY — DECKENT_TRACE can only force it OFF, never ON
+      // (see resolveTraceEnabled). Model and system are getters: the trace stamps what
+      // ACTUALLY served the turn, not the boot-time snapshot.
+      const traceRecorder = buildTurnRecorder({
+        enabled: resolveTraceEnabled(cfg as { training_trace?: { enabled?: boolean } }, process.env),
+        dir: join(process.cwd(), '.deckent', 'traces'),
+        sessionId: nativeSessionId,
+        system: nativeSystemPrompt,
+        model: () => live.model,
+        now: () => new Date().toISOString(),
+      });
+      // 7089 (NATIVE-SESSION-LEDGER) — the session ledger writes on EVERY turn, with no
+      // flag: it is the durable full-fidelity record of this session (message delta +
+      // billed usage), and tying it to a training flag would mean a user's own history
+      // and token accounting silently vanish. The training trace keeps its own gate above
+      // and is now a training artifact only.
+      const recordTurn = composeTurnRecorders(
+        buildLedgerRecorder({
+          sessionId: nativeSessionId,
+          cwd: process.cwd(),
+          now: () => new Date().toISOString(),
+        }),
+        traceRecorder,
+      );
       const costCeilingUsd = resolveCostCeilingUsd(process.env, cfg as { native_cost_ceiling_usd?: unknown });
       // born-607 Gap-A: thread the resolved `tool_surface` config into the registry
       // (default-ON since a778151a but consumer-less until now — the 3 progressive-
@@ -1154,6 +1203,7 @@ export async function runInkRepl(
         adapter: resolved.adapter,
         registry: buildNativeToolRegistry({
           cwd: () => process.cwd(),
+          contentStore: sessionContentStore,
           ...(mcpBridge ? { mcpBridge } : {}),
           ...(toolSurfaceOpts ? { toolSurface: toolSurfaceOpts } : {}),
           ...(runFlowController ? { runFlow: { enabled: true, controller: runFlowController } } : {}),
@@ -1163,6 +1213,9 @@ export async function runInkRepl(
         model: resolved.model,
         getAdapter: () => live.adapter,
         getModel: () => live.model,
+        // 7089 — the ledger row names the backend that actually served the turn,
+        // and follows a live `/provider` switch.
+        getProvider: () => live.provider,
         // Owner directive 2026-08-18: the model's FULL advertised window is the
         // usable ceiling (registry = single source, KANUN 10); config only
         // narrows, and a live provider switch re-resolves via `live.model`.
@@ -1179,6 +1232,7 @@ export async function runInkRepl(
         ...(costCeilingUsd !== undefined ? { costCeilingUsd } : {}),
         ...(recordTurn ? { recordTurn } : {}),
         scratch: scratchIds,
+        contentStore: sessionContentStore,
       });
     }
   }

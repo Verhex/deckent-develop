@@ -46,6 +46,26 @@ function defaultSoul(): string {
 export interface ComposeOptions {
   cwd: string;
   lang?: 'en' | 'tr';
+  /** Session scratchpad root (`ScratchStoreInfo.root`). Present → the mechanism
+   *  section below is injected; absent → the prompt is byte-identical to before. */
+  scratchDir?: string;
+}
+
+/**
+ * Mechanism section describing the volatile per-session scratchpad.
+ *
+ * STRING POLICY: this is model-facing PROTOCOL text, not a localization
+ * surface — the same rule `tool-result-broker.ts` documents for its
+ * `[deckent] …` markers. It stays English on every `lang`, and user-facing
+ * text still belongs in `messages.ts`.
+ */
+export function scratchpadSection(scratchDir: string): string {
+  return [
+    `SCRATCHPAD (mechanism): a per-session scratch directory exists at ${scratchDir}.`,
+    'Use it for intermediate notes, checkpoints and bulky intermediate artifacts instead of carrying them in the conversation.',
+    'It is volatile: everything under it is swept when the session ends, and any copy kept for recovery is swept once the recovery window expires.',
+    'Never store there anything that must outlive the session, and never treat a path outside it as scratch space.',
+  ].join(' ');
 }
 
 /**
@@ -56,6 +76,7 @@ export interface ComposeOptions {
 export function composeSystemPrompt(opts: ComposeOptions): string {
   const isEnglish = opts.lang === 'en';
   const parts: string[] = [isEnglish ? IMMUTABLE_CORE_EN : IMMUTABLE_CORE];
+  if (opts.scratchDir !== undefined && opts.scratchDir !== '') parts.push(scratchpadSection(opts.scratchDir));
 
   const soul = readIfExists(join(opts.cwd, '.deckent', 'soul.md')) ?? defaultSoul();
   parts.push(soul);

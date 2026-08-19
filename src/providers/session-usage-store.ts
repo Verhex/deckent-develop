@@ -25,6 +25,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ProviderName, TokenUsage } from '../core/task-types.js';
+import { projectSlug } from '../core/project-slug.js';
+
+export { projectSlug as slugifyProjectPath } from '../core/project-slug.js';
 
 // ─── Query ───────────────────────────────────────────────────────────────────
 
@@ -64,19 +67,8 @@ export interface NativeUsageQuery {
   sessionRoot?: string;
 }
 
-// ─── Slug ────────────────────────────────────────────────────────────────────
-
-/**
- * Claude Code stores each project's transcripts under
- * `~/.claude/projects/{slug}` where `slug` is the absolute cwd with every
- * non-alphanumeric char replaced by `-` (e.g. `/workspace` → `-workspace`).
- */
-export function slugifyProjectPath(absPath: string): string {
-  return absPath.replace(/[^a-zA-Z0-9]/g, '-');
-}
-
 function defaultClaudeSessionRoot(projectRoot: string): string {
-  return join(homedir(), '.claude', 'projects', slugifyProjectPath(projectRoot));
+  return join(homedir(), '.claude', 'projects', projectSlug(projectRoot));
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────

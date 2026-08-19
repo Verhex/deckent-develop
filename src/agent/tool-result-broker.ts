@@ -25,7 +25,7 @@
 // `[deckent] truncated (…)` returns. User-facing text stays in messages.ts.
 
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -89,6 +89,14 @@ export interface ContentWriteReceipt {
  */
 export interface ContentWriter {
   write(bytes: Buffer): ContentWriteReceipt;
+  /**
+   * Release whatever backing storage this writer created. Optional because a
+   * store may be memory-backed or externally owned (an in-repo caller supplies
+   * its own inline writer); a filesystem-backed store MUST implement it so the
+   * session teardown path can sweep it. Implementations are idempotent and
+   * fail-open — teardown hygiene never throws into a closing session.
+   */
+  close?(): void;
 }
 
 /** The canonical, budget-bounded shape every tool result reaches the loop as. */
@@ -297,22 +305,35 @@ export function brokerToolResult(raw: RawToolResult, opts: ContainToolResultOpti
 
 // ─── Standalone session content store ───────────────────────────────────────
 
+/** Leaf directory the store creates when it is anchored to a session scratch root. */
+export const CONTENT_STORE_DIR = 'tool-content';
+
 /**
- * Session-scoped fallback content store: a lazily-created `mkdtemp` directory
- * under the OS temp dir (never the source tree, never a hardcoded `/tmp`),
- * 0700 on POSIX, files 0600, written temp+rename so a reader never observes a
- * partial file. Lazy on purpose — a session whose tool results all stay under
- * the preview cap never creates a directory at all.
+ * Session-scoped content store: a lazily-created directory (never the source
+ * tree, never a hardcoded `/tmp`), 0700 on POSIX, files 0600, written
+ * temp+rename so a reader never observes a partial file. Lazy on purpose — a
+ * session whose tool results all stay under the preview cap never creates a
+ * directory at all.
+ *
+ * `dir` anchors the store to the session scratch root (`ScratchStoreInfo.root`):
+ * the bytes then land at `<scratchRoot>/tool-content`, inside the same namespace
+ * the scratch reaper sweeps, so overflow content has exactly one owner and one
+ * teardown path. Without `dir` the legacy `mkdtemp`-under-`tmpdir()` layout is
+ * kept byte-identical for callers that have no scratch session.
  *
  * Mode bits are best-effort: Windows has no POSIX mode, so a chmod failure is
  * tolerated rather than turning a working session into a hard error.
  */
-export function createSessionContentStore(opts: { prefix?: string } = {}): ContentWriter {
+export function createSessionContentStore(opts: { dir?: string; prefix?: string } = {}): ContentWriter {
   const prefix = opts.prefix ?? 'deckent-tool-content-';
+  const anchor = opts.dir;
   let root: string | null = null;
   const ensureRoot = (): string => {
     if (root !== null) return root;
-    const created = mkdtempSync(join(tmpdir(), prefix));
+    const created = anchor === undefined
+      ? mkdtempSync(join(tmpdir(), prefix))
+      : join(anchor, CONTENT_STORE_DIR);
+    if (anchor !== undefined) mkdirSync(created, { recursive: true, mode: 0o700 });
     if (process.platform !== 'win32') {
       try { chmodSync(created, 0o700); } catch { /* best-effort */ }
     }
@@ -331,6 +352,14 @@ export function createSessionContentStore(opts: { prefix?: string } = {}): Conte
         try { chmodSync(target, 0o600); } catch { /* best-effort */ }
       }
       return { path: target, sha256 };
+    },
+    /** Removes ONLY a directory this store actually created; idempotent, and
+     *  fail-open so a teardown error never propagates into session close. */
+    close(): void {
+      const created = root;
+      root = null;
+      if (created === null) return;
+      try { rmSync(created, { recursive: true, force: true }); } catch { /* best-effort teardown */ }
     },
   };
 }

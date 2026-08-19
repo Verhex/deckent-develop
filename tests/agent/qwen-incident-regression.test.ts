@@ -75,7 +75,9 @@ function syntheticPayload(label: string, chars: number): string {
   return marker.repeat(Math.ceil(chars / marker.length)).slice(0, chars);
 }
 
-/** In-memory ContentWriter — real digests, zero fs. */
+/** In-memory ContentWriter — real digests, zero fs. `close()` is the teardown
+ *  seam a filesystem-backed store uses to sweep its directory; the in-memory
+ *  pin releases its retained receipts so the contract stays exercised here too. */
 function memContentStore(): { store: ContentWriter; writes: ContentWriteReceipt[] } {
   const writes: ContentWriteReceipt[] = [];
   return {
@@ -86,6 +88,7 @@ function memContentStore(): { store: ContentWriter; writes: ContentWriteReceipt[
         writes.push(receipt);
         return receipt;
       },
+      close(): void { writes.length = 0; },
     },
     writes,
   };

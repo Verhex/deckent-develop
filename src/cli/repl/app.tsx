@@ -22,6 +22,8 @@ import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
 import type { ReplEngine } from './native-agent-bridge.js';
+import type { ProviderMessage } from '../../agent/provider-tooluse/types.js';
+import { listLedgerSessions, readLedgerSession, type LedgerStoreOptions } from './session-ledger.js';
 import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 import { measuredOnTurnEnd } from './native-elapsed.js';
@@ -203,6 +205,74 @@ export function chatSessionsToRecords(summaries: readonly ChatSessionSummaryLike
   }));
 }
 
+/** Merge every resumable source into one picker namespace. Ledger entries are
+ * authoritative on id collisions; legacy memory and sprint-job projections
+ * remain readable without migrating or deleting either source. */
+export function mergeResumeSessionRecords(
+  disk: readonly SessionRecord[],
+  ledger: readonly SessionRecord[],
+  legacy: readonly SessionRecord[],
+): { disk: SessionRecord[]; resumable: SessionRecord[] } {
+  const ledgerIds = new Set(ledger.map((record) => record.id));
+  const seen = new Set(ledgerIds);
+  const resumable = [...ledger];
+  for (const record of legacy) {
+    if (seen.has(record.id)) continue;
+    seen.add(record.id);
+    resumable.push(record);
+  }
+  return {
+    disk: disk.filter((record) => !ledgerIds.has(record.id) && !seen.has(record.id)),
+    resumable,
+  };
+}
+
+export interface NativeResumeResult {
+  source: 'ledger' | 'legacy' | 'missing';
+  messages: ProviderMessage[];
+  turnCount: number;
+  outputTokens: number;
+}
+
+/** Ledger-first native re-hydration with an in-place legacy dual-read fallback. */
+export function hydrateNativeResume(
+  sessionId: string,
+  cwd: string,
+  engine: Pick<ReplEngine, 'hydrateTranscript'>,
+  memory?: Pick<ChatMemoryAdapter, 'getChatHistory'>,
+  ledgerOptions: LedgerStoreOptions = {},
+): NativeResumeResult {
+  const ledger = readLedgerSession(sessionId, { ...ledgerOptions, cwd });
+  if (ledger.turnCount > 0) {
+    // 564-004 hand-completion — the ledger's on-disk row count continues the
+    // bridge recorder's turn numbering, so post-resume rows never restart at 0
+    // and collide with the rows just hydrated. The legacy branch below stays
+    // offset-free on purpose: its session has no ledger rows yet, and turnCount
+    // there counts user messages, not ledger lines.
+    engine.hydrateTranscript?.(ledger.messages, { nextTurnIndex: ledger.turnCount });
+    return {
+      source: 'ledger',
+      messages: ledger.messages,
+      turnCount: ledger.turnCount,
+      outputTokens: ledger.totals.outputTokens,
+    };
+  }
+  const messages = (memory?.getChatHistory(sessionId) ?? [])
+    .filter((message): message is { role: 'user' | 'assistant'; content: string } =>
+      (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string')
+    .map((message): ProviderMessage => ({ role: message.role, content: message.content }));
+  if (messages.length > 0) {
+    engine.hydrateTranscript?.(messages);
+    return {
+      source: 'legacy',
+      messages,
+      turnCount: messages.filter((message) => message.role === 'user').length,
+      outputTokens: 0,
+    };
+  }
+  return { source: 'missing', messages: [], turnCount: 0, outputTokens: 0 };
+}
+
 /** Compact an ISO timestamp to `YYYY-MM-DD HH:MM`; falls back to the raw value
  * (same display rule as chat-resume.ts's private shortTime). */
 function shortSessionTime(iso: string): string {
@@ -245,8 +315,8 @@ export type ResumeCommandDecision =
  * - no local sessions at all → 'passthrough' (loop behavior byte-identical);
  * - bare `/resume` → 'list' (the numbered picker, teaser-aligned);
  * - resolved pick → 'switch' — a chat-session pick sets forwardToLoop so the
- *   caller re-queues `/resume <id>` and the loop's REAL transcript/session
- *   switch machinery runs; a sprint-session pick switches locally;
+ *   caller loads the resolved id directly; it is never re-queued as a model
+ *   turn. A sprint-session-only pick switches locally;
  * - unknown literal id → 'passthrough' (the loop may know it, e.g. an older
  *   chat session beyond the picker window);
  * - numeric out-of-range / ambiguous → 'reject' — forwarding a NUMBER would
@@ -1384,7 +1454,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   useEffect(() => {
     if (!replSurfaceEnabled || recentSessions.current !== null) return;
     recentSessions.current = listRecentSessions(props.cwd, RESUME_RECENT_LIMIT);
-    const lines = buildResumePickerLines(recentSessions.current, [], labels);
+    const merged = mergeResumeSessionRecords(
+      recentSessions.current,
+      chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, { cwd: props.cwd })),
+      chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
+    );
+    const lines = buildResumePickerLines(merged.disk, merged.resumable, labels);
     if (lines.length > 0) pushTurn('bg', lines.join('\n'));
     // labels/props.cwd are mount-stable (run.tsx passes literals); the ref
     // guard makes this one-shot even if the deps ever re-fired.
@@ -1652,10 +1727,26 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // memory-backed /resume, byte-identical (also the whole flag-off path).
       const resume = trimmed.match(/^\/resume(?:\s+(.*))?$/i);
       if (resume) {
-        const chatRecords = chatSessionsToRecords(
-          memory?.listChatSessions ? memory.listChatSessions(RESUME_RECENT_LIMIT) : [],
+        const merged = mergeResumeSessionRecords(
+          recentSessions.current ?? [],
+          chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, { cwd: props.cwd })),
+          chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
         );
-        const decision = resolveResumeCommand(resume[1] ?? '', recentSessions.current ?? [], chatRecords, labels);
+        const decision = resolveResumeCommand(resume[1] ?? '', merged.disk, merged.resumable, labels);
+        const literalId = (resume[1] ?? '').trim();
+        if (decision.kind === 'passthrough' && literalId.length > 0 && nativeEngine?.hydrateTranscript) {
+          pushTurn('user', trimmed);
+          const hydrated = hydrateNativeResume(literalId, props.cwd, nativeEngine, memory);
+          if (hydrated.source === 'missing') {
+            pushTurn('seg', (labels.resumeNotFound ?? 'session not found: {arg}').replace('{arg}', literalId));
+          } else {
+            setActiveSessionId(literalId);
+            activeSessionIdRef.current = literalId;
+            setSessionTok(hydrated.outputTokens);
+            pushTurn('seg', (labels.resumeSwitched ?? 'resumed: {id}').replace('{id}', literalId));
+          }
+          return;
+        }
         if (decision.kind !== 'passthrough') {
           pushTurn('user', trimmed);
           if (decision.kind === 'list') {
@@ -1666,12 +1757,18 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             setActiveSessionId(decision.sessionId);
             activeSessionIdRef.current = decision.sessionId;
             if (decision.forwardToLoop) {
-              // Chat-session pick: hand the RESOLVED id to the loop so its real
-              // transcript/session-switch machinery runs (behavior-merge — the
-              // loop treats a non-numeric arg as a literal session id).
-              queue.current!.enqueue(`/resume ${decision.sessionId}`);
-              setQueued([...queue.current!.snapshot()]);
-              if (wake.current) { const w = wake.current; wake.current = null; w(); }
+              if (nativeEngine?.hydrateTranscript) {
+                const hydrated = hydrateNativeResume(decision.sessionId, props.cwd, nativeEngine, memory);
+                setSessionTok(hydrated.outputTokens);
+                pushTurn('seg', decision.line);
+              } else {
+                // Legacy engine retains its own command parser; native mode
+                // never takes this branch and therefore never leaks /resume
+                // into a provider turn.
+                queue.current!.enqueue(`/resume ${decision.sessionId}`);
+                setQueued([...queue.current!.snapshot()]);
+                if (wake.current) { const w = wake.current; wake.current = null; w(); }
+              }
             } else {
               // Sprint-session pick: switch the active session pointer locally
               // (deep context-load for sprint sessions is loop-side follow-up).

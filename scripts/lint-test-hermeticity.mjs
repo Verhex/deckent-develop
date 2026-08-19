@@ -377,8 +377,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tool-mediated battery + realigned at-ref/describe-tool pins moved content.
   // 2026-08-19 (7088 Faz-1, sprint-563): +2 — stale-adr scan/battery suites
   // enter; web.test.ts retired; index/cli-inventory/messages pins moved.
-  count: 14440,
-  digest: 'e19ccc68df7420e691892e5480323b2c18535ae421a089fb90831ac6b999675b',
+  // 2026-08-19 (7089 NATIVE-SESSION-LEDGER, sprint-564 + ADR-D-007 el-kapama):
+  // +9 — session-ledger + project-slug suites enter (tmpdir/injected-root
+  // fixtures), scratch-checkpoint recovery-reuse/reaper fixtures, the
+  // registry contentStore spill pin and the bridge nextTurnIndex continuity
+  // pin; app-surface/trace-wire pins moved content. Prior: 7088 Faz-1 (14440).
+  count: 14449,
+  digest: '9d8bec26ca1fc86afb12fc628fe993dbc47ebdb461e2e71e224a2d689dca7ad6',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -621,8 +626,13 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // expose and ranged deckent_read_file moved production content.
   // 2026-08-19 (7088 Faz-1, sprint-563): -1 — web.ts leaves the inventory;
   // messages/doctor/agent/index/command-registry hashes moved.
-  count: 1252,
-  digest: '80b5fe6c403cfc38639271e746bd33a48f6cc9b81ca76d1f6c80c38333c8515f',
+  // 2026-08-19 (7089 NATIVE-SESSION-LEDGER, sprint-564 + ADR-D-007 el-kapama):
+  // +2 — session-ledger.ts (per-turn JSONL chat ledger) and project-slug.ts
+  // (canonical CC-parity slug) enter the inventory; scratch-checkpoint,
+  // tool-result-broker, session, identity, loop, bridge, app.tsx, run.tsx,
+  // native-tool-registry, trace-wire and session-usage-store hashes moved.
+  count: 1254,
+  digest: '4ebe8d5cd941fd0b412655ca3ee6be6debfda0b4ba2a3868ee056372ef3e59e8',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

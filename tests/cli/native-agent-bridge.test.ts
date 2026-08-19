@@ -143,4 +143,32 @@ describe('createNativeEngine', () => {
       { role: 'assistant', content: 'hi' },
     ]);
   });
+
+  it('hydrateTranscript nextTurnIndex continues recordTurn numbering across a resume (564-004)', async () => {
+    const adapter = scripted([
+      [{ type: 'text-delta', text: 'a' }, { type: 'done' }],
+      [{ type: 'text-delta', text: 'b' }, { type: 'done' }],
+      [{ type: 'text-delta', text: 'c' }, { type: 'done' }],
+      [{ type: 'text-delta', text: 'd' }, { type: 'done' }],
+    ]);
+    const indices: number[] = [];
+    const engine = createNativeEngine({
+      adapter, registry: buildNativeToolRegistry({ cwd: () => tmpdir() }), cwd: tmpdir(), model: 'm', lang: 'en',
+      confirm: async () => 'y', toolSink: () => {},
+      recordTurn: (_messages, meta) => indices.push(meta.turnIndex),
+    });
+    // Fresh session: numbering starts at 0.
+    await engine('one', { output: () => {}, onTurnEnd: () => {} });
+    // Ledger resume with 5 rows on disk: the FIRST post-resume turn records at
+    // 5, the next at 6 — never restarting at 0 over the hydrated rows.
+    engine.hydrateTranscript!([{ role: 'user', content: 'prior' }], { nextTurnIndex: 5 });
+    await engine('two', { output: () => {}, onTurnEnd: () => {} });
+    await engine('three', { output: () => {}, onTurnEnd: () => {} });
+    // Absent/invalid options never touch the counter (legacy-resume fail-safe).
+    engine.hydrateTranscript!([{ role: 'user', content: 'again' }]);
+    engine.hydrateTranscript!([{ role: 'user', content: 'bad' }], { nextTurnIndex: -1 });
+    engine.hydrateTranscript!([{ role: 'user', content: 'bad' }], { nextTurnIndex: 2.5 });
+    await engine('four', { output: () => {}, onTurnEnd: () => {} });
+    expect(indices).toEqual([0, 5, 6, 7]);
+  });
 });

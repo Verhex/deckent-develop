@@ -34,6 +34,28 @@ describe('buildNativeToolRegistry', () => {
     }
   });
 
+  it('threads opts.contentStore into the SHARED exec dispatcher — an over-cap read spills its full bytes there (564-002 hand-completion)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ntr-spill-'));
+    try {
+      // 20_000 bytes > DEFAULT_MAX_PREVIEW_BYTES (16_384) → the broker MUST hand
+      // the full bytes to the session store while rendering a bounded preview.
+      const big = 'A'.repeat(20_000);
+      writeFileSync(join(dir, 'big.txt'), big);
+      const spilled: Buffer[] = [];
+      const reg = buildNativeToolRegistry({
+        cwd: () => dir,
+        contentStore: {
+          write(bytes) { spilled.push(bytes); return { path: '(stub)', sha256: 'x' }; },
+        },
+      });
+      await reg.get('deckent_read_file')!.handler({ path: 'big.txt' });
+      expect(spilled.length).toBeGreaterThan(0);
+      expect(spilled.some((b) => b.toString('utf8') === big)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('marks a dispatcher error string as ok:false', async () => {
     const reg = buildNativeToolRegistry({ cwd: () => tmpdir() });
     const r = await reg.get('deckent_read_file')!.handler({ path: '../escape.txt' });

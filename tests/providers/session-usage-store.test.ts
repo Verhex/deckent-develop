@@ -185,5 +185,6 @@ describe('session-usage-store · readNativeUsage', () => {
   it('slugifies an absolute cwd to the Claude projects dir name', () => {
     expect(slugifyProjectPath('/workspace')).toBe('-workspace');
     expect(slugifyProjectPath('/Users/foo/my-project')).toBe('-Users-foo-my-project');
+    expect(slugifyProjectPath('C:\\Users\\Al Peren\\deckent')).toBe('C--Users-Al-Peren-deckent');
   });
 });

@@ -53,6 +53,25 @@ describe('buildTurnRecorder — TRN-2 redaction + fail-soft', () => {
     expect(existsSync(join(badDir, 's.jsonl'))).toBe(false);
   });
 
+  it('redacts a secret that first appears in a later DELTA record (7089 delta strategy)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'trn2-red-delta-')); dirs.push(dir);
+    const rec = buildTurnRecorder({ enabled: true, dir, sessionId: 'sess-delta', system: 'SYS', model: 'm', now: () => 'T' });
+    const secret = `sk-${'c'.repeat(24)}`;
+    const turn1 = [{ role: 'user' as const, content: 'harmless' }];
+    rec!(turn1);
+    rec!([...turn1, { role: 'assistant', content: `here: ${secret}` }]);
+    const raw = readFileSync(join(dir, 'sess-delta.jsonl'), 'utf-8');
+    expect(raw).not.toContain(secret);
+    expect(raw).toContain('[REDACTED]');
+    // The second line is a delta: it carries the system message + the ONE new
+    // message, never a re-copy of turn 1 (the O(n²) that 7089 killed).
+    const lines = raw.split('\n').filter((l) => l.trim().length > 0);
+    expect(lines).toHaveLength(2);
+    const second = JSON.parse(lines[1]!);
+    expect(second.messages).toHaveLength(2);
+    expect(second.nativeTrace).toMatchObject({ v: 1, shape: 'delta' });
+  });
+
   it('flag OFF stays byte-identical — no recorder, no writes', () => {
     const dir = mkdtempSync(join(tmpdir(), 'trn2-off-')); dirs.push(dir);
     const rec = buildTurnRecorder({ enabled: false, dir, sessionId: 'sess-off', system: 'SYS', model: 'm', now: () => 'T' });

@@ -13,21 +13,21 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 701,
+  "total": 704,
   "mediated": 0,
-  "unmediated": 701,
-  "fileCount": 239,
+  "unmediated": 704,
+  "fileCount": 240,
   "byFile": {
     "src/agent/permission-store.ts": {
       "count": 1,
       "mediated": false
     },
     "src/agent/scratch-checkpoint.ts": {
-      "count": 3,
+      "count": 4,
       "mediated": false
     },
     "src/agent/tool-result-broker.ts": {
-      "count": 1,
+      "count": 2,
       "mediated": false
     },
     "src/agent/trace-recorder.ts": {
@@ -291,6 +291,10 @@
       "mediated": false
     },
     "src/cli/repl/input-history.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/cli/repl/session-ledger.ts": {
       "count": 1,
       "mediated": false
     },
@@ -975,5 +979,5 @@
       "mediated": false
     }
   },
-  "digest": "30d5bd72686bfb9c82494d436e37aa4d1186047d206f9e7c84b1c57ad458e5e1"
+  "digest": "04eb6bf58c40933cd340ea57095f40fa5c05c2891004d16c0d169cc079d2a063"
 }

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -34,6 +34,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // The store now owns its teardown — closing it is what keeps a run from
+  // leaving one content directory per test behind in the OS temp namespace.
+  store.close?.();
   rmSync(workDir, { recursive: true, force: true });
 });
 
@@ -204,6 +207,40 @@ describe('createSessionContentStore — session-scoped, atomic, sha256-named', (
     if (process.platform !== 'win32') {
       expect(statSync(receipt.path).mode & 0o777).toBe(0o600);
     }
+  });
+
+  it('anchors its content directory inside the session scratch root when given one', () => {
+    const scratchRoot = join(workDir, 'deckent', 'slug', 'sess-1', 'scratchpad');
+    mkdirSync(scratchRoot, { recursive: true });
+    const anchored = createSessionContentStore({ dir: scratchRoot });
+
+    // Lazy: no directory exists until something actually overflows.
+    expect(existsSync(join(scratchRoot, 'tool-content'))).toBe(false);
+
+    const receipt = anchored.write(Buffer.from('overflow bytes', 'utf8'));
+    expect(receipt.path).toBe(join(scratchRoot, 'tool-content', `content-${receipt.sha256}.bin`));
+    if (process.platform !== 'win32') {
+      expect(statSync(join(scratchRoot, 'tool-content')).mode & 0o777).toBe(0o700);
+    }
+
+    // close() releases exactly what it created, leaving the scratch root — the
+    // reaper's unit — intact and sweepable as ONE namespace.
+    anchored.close?.();
+    expect(existsSync(join(scratchRoot, 'tool-content'))).toBe(false);
+    expect(existsSync(scratchRoot)).toBe(true);
+  });
+
+  it('close() is idempotent and a no-op when nothing was ever written', () => {
+    const unused = createSessionContentStore({ dir: join(workDir, 'never-used') });
+    expect(() => { unused.close?.(); unused.close?.(); }).not.toThrow();
+    expect(existsSync(join(workDir, 'never-used'))).toBe(false);
+
+    const used = createSessionContentStore({ dir: workDir });
+    used.write(Buffer.from('x', 'utf8'));
+    used.close?.();
+    used.close?.();
+    expect(existsSync(join(workDir, 'tool-content'))).toBe(false);
+    expect(existsSync(workDir)).toBe(true);
   });
 });
 
