@@ -224,3 +224,38 @@ describe('PromptConfig — adr_render field', () => {
     }
   });
 });
+
+// ─── 7094-F1b: governing-tier honors author-pinned markers ───────────
+
+function makeGoverningRelevance(adrId: string, title: string): AdrRelevance {
+  return { adrId, title, score: 0.95, matchReasons: ['explicit-ref'] };
+}
+
+describe('buildAdrPromptSection — governing tier + operative markers (7094-F1b)', () => {
+  it('governing ADR WITH markers renders the pinned slice + full-text pointer, not the full body', () => {
+    const adrs = [makeGoverningRelevance('adr-001', 'TypeScript + ESM')];
+    const section = buildAdrPromptSection(adrs, 'full', MOCK_ADRS, 'operative');
+
+    expect(section).toContain('Use TypeScript with `"type": "module"`');
+    expect(section).not.toContain('Preamble content before operative section.');
+    expect(section).not.toContain('Additional notes after operative section.');
+    expect(section).toContain('governing ADR — full text incl. amendment history:');
+  });
+
+  it('governing ADR WITHOUT markers keeps the FULL body (zero-loss default preserved)', () => {
+    const adrs = [makeGoverningRelevance('adr-008', 'Brain Merkezi Import — Tek Yönlü Bağımlılık')];
+    const section = buildAdrPromptSection(adrs, 'full', MOCK_ADRS, 'operative');
+
+    expect(section).toContain('Brain is the only module that imports from tmux, auditor, worker.');
+    expect(section).toContain('Circular imports cause undefined behavior');
+    expect(section).not.toContain('governing ADR — full text');
+  });
+
+  it("adrRender='full' ignores markers even for governing ADRs (legacy path unchanged)", () => {
+    const adrs = [makeGoverningRelevance('adr-001', 'TypeScript + ESM')];
+    const section = buildAdrPromptSection(adrs, 'full', MOCK_ADRS, 'full');
+
+    expect(section).toContain('Preamble content before operative section.');
+    expect(section).toContain('Additional notes after operative section.');
+  });
+});

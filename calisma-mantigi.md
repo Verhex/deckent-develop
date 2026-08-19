@@ -109,3 +109,26 @@
   zinciri sağlam; blokaj D1-remap belirtisiydi) + blockedDependencyEdges teşhisi.
 - **Ders:** ölçüm-sprintleri arasında finalize→escalateDebt yan-etkisi var; ardışık
   deney turlarında debt-yönetimi tur-BAŞINA yapılmalı (tek seferlik yetmez).
+
+## F4a Turn-Economy v2 + F1b ADR-marker (2026-08-19 gece)
+- **F4a (LANDED-aday):** TURN_ECONOMY_BLOCK'a madde 5-6 (tek-Write üretimi;
+  yazılanı geri-okumama; basit görevde 2-tur ideali). 3-koşu kanıtı (575/576/577):
+  kapsamlı cR 264-428k → 150-240k (bandın TÜMÜ aşağı; en kötü F4a-cR < en iyi
+  F3-cR), out 18-25.6k → 13.7-17.4k, USD $0.72-0.97 (F3-ort ~$0.96'ya karşı
+  ort $0.83, -%14; kümülatif 567→ -%57..-%68). Kalite 378-415 satır/44-87 H2
+  bandında. cW artışı (tek-Write büyük blok) net-USD'yi bozmuyor. Kalan varyans
+  ±%16 davranışsal. Kronikler F4a'dan bağımsız sürüyor: 004-soğuk-fix (S1,S2),
+  005-denetim rubrik-DIŞI NO_GO (575 attempt-1 92.5/5-passed'a rağmen; 577'de
+  fix-bütçe→006 bloke — pause mesajı D4 kenarıyla '577-006←577-005' İLK ÜRETİM
+  görünümü). 005-sınıfı → 7097/7092 finding; audit-rationale gate-kaynağını
+  taşımıyor (teşhis eksiği) → 7092 finding.
+- **F1b (LANDED-aday):** governing-tier artık yazar-pinli worker-operative
+  marker'a saygılı (marker-slice + amendment-history pointer'ı); markersız ADR
+  tam-gövde (zero-loss varsayılan). 48/50 ADR'ye mekanik marker (## Decision
+  bölgesi; adr-d-013 + adr-g-039 Decision'sız → tam-gövde; yedek:
+  scratchpad/adr-backup-20260819). Uçtan-uca kanıt sprint-578 gerçek .prompt:
+  iki governing-ADR slice+pointer ile girdi; ADR bölümü 37.9KB→17.3KB (-%54).
+- Onay-devri notu: owner 'onay yetkisi devredildi' (2026-08-19 gece);
+  approvals decide pseudo-TTY (script -qec) + --reason owner-delegated iziyle
+  veriliyor; bir istekte 'canlı yeniden-doğrulama yok' fail-closed'u görüldü
+  (tutarsız) → xverify-ux finding.

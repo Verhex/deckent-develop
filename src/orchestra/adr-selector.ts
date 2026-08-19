@@ -700,10 +700,26 @@ export function buildAdrPromptSection(
         continue;
       }
 
-      // Reaching here in 'operative' render means the ADR is GOVERNING (Tier-1):
-      // it keeps its FULL body — the task's contract is zero-loss by policy
-      // (W4 spec + feedback_prompt_completeness_over_brevity). 'full' render
-      // (legacy callers) also lands here unchanged.
+      // Reaching here in 'operative' render means the ADR is GOVERNING (Tier-1).
+      // 7094-F1b (owner-approved 2026-08-19): an author-pinned
+      // worker-operative marker now bounds the governing body too — the
+      // author's pin IS the zero-loss worker contract (decision + binding
+      // rules), and the pointer keeps the full amendment history reachable.
+      // An ADR with NO markers keeps the FULL body (the W4 zero-loss default
+      // + feedback_prompt_completeness_over_brevity stays the safe fallback).
+      // 'full' render (legacy callers) is unaffected: markers are only
+      // honored under adrRender === 'operative'.
+      if (adrRender === 'operative') {
+        const governingMarked = extractMarkedSlice(rawContent);
+        if (governingMarked) {
+          const distilledHead = distillActiveConstraint(rawContent, entry?.summary);
+          const head = distilledHead ? `**Active constraint:** ${distilledHead}\n\n` : '';
+          sections.push(
+            `## ${adr.adrId}: ${adr.title}\n\n${head}${governingMarked}\n\n[governing ADR — full text incl. amendment history: ${resolveAdrPointerText(adr.adrId, adrDocsDir)}]`,
+          );
+          continue;
+        }
+      }
       const content = rawContent;
       // WP-20: surface the operative constraint as a 1-line head ABOVE the full
       // body. The body (amendment history included) stays contiguous below it, so

@@ -661,8 +661,13 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // route-task-v3 skillDomainOverlap treats evidence-with-zero-weight
   // (directories-only scope, totalWrites=0) as presence so those tasks keep
   // skill selection.
+  // 2026-08-19 (7094-F4a+F1b): same 1256 count, digest only —
+  // TURN_ECONOMY_BLOCK rules 5-6 (single-Write authoring, two-turn shape),
+  // adr-selector governing-tier marker slice + pointer, and the
+  // worker-default rule template realigned to the F1d protocol (the
+  // finalize→regenerateRules producer had been re-emitting the pre-F1d text).
   count: 1256,
-  digest: 'bf640fc150a80e74add86488eb90c8522df0281a4d3c44df574b6274094d65fc',
+  digest: '97be23befc2ce7dfdec65a74400298dcfad46de398fecf22ac36bce41f36e2ea',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

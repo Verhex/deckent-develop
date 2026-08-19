@@ -366,7 +366,9 @@ Every conversation turn re-sends cached context — fewer turns beats fewer toke
 1. Batch independent read/search tool calls (Read + Grep + Glob) into the SAME turn — never issue them one-by-one across turns when none depends on another's output.
 2. Do not re-read a file already in your context unless its on-disk state changed since your last read.
 3. Run lint/build + targeted tests once per logical block of edits, not after every micro-edit — the max-3-attempt verify rule above already caps retries; do not burn turns on early, incomplete verify runs.
-4. Plan silently before your first edit (Karpathy #1) — 7094-F1d: no separate plan file is written; gather every target file's content in ONE turn (parallel reads) before you start editing.`;
+4. Plan silently before your first edit (Karpathy #1) — 7094-F1d: no separate plan file is written; gather every target file's content in ONE turn (parallel reads) before you start editing.
+5. Produce each NEW output file in ONE Write call — compose the complete content silently first, then write it once. Never grow a file through a chain of Write-then-Edit turns, and never re-open a file you just wrote to check it: the successful Write result IS the confirmation (7094-F4: every extra authoring turn replays the full cached context at cost).
+6. A simple single-deliverable task is TWO turns total: turn 1 = heartbeat + the complete deliverable (batched writes); turn 2 = the result file. Aim for that shape whenever the task allows it.`;
 
 /**
  * Pipe-exit honesty directive (TT555 — task 421-002, waste-class (a)).
