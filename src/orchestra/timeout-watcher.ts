@@ -190,13 +190,19 @@ export class TimeoutWatcher {
   /**
    * Check whether a worker is making progress.
    *
-   * Progress = heartbeat file updated within freshness threshold
-   *           AND git diff line count exceeds minimum.
+   * Progress = git diff line count exceeds minimum.
+   *
+   * 7094-F1d (2026-08-19): the heartbeat is a SINGLE write at worker start —
+   * the file's in-file timestamp freezes at spawn by contract, so a
+   * `heartbeatFresh` conjunct forced `progressing=false` for every worker
+   * after `heartbeat_freshness_seconds` no matter how much real work the
+   * diff showed. The diff is the honest, F1d-independent progress signal;
+   * `heartbeatFresh` stays reported for observability but no longer gates.
    */
   checkProgress(workerId: string): ProgressCheck {
     const heartbeatFresh = this.isHeartbeatFresh(workerId);
     const diffLines = this.getGitDiffLines();
-    const progressing = heartbeatFresh && diffLines >= this.config.min_diff_lines;
+    const progressing = diffLines >= this.config.min_diff_lines;
 
     return { heartbeatFresh, diffLines, progressing };
   }

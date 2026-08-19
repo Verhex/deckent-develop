@@ -16,14 +16,14 @@ philosophy as adapted for AI-agent workflows.
 
 - Read the full task description, goNogo criteria, and ALL files in scope.filesRead before touching a single line.
 - Identify every ADR constraint that applies to the task — check `.brain/exports/decisions.md` or the injected ADR list.
-- Write the execution plan (`.tasks/task-XXX.plan`) BEFORE touching source files. The plan must list: files to change, expected deltas, and how each change maps to the task's goCriteria.
+- Plan BEFORE touching source files — silently (7094-F1d: no `.plan` file is written; the host never read one). The plan must still name: files to change, expected deltas, and how each change maps to the task's goCriteria.
 - List assumptions explicitly in the plan. An assumption you cannot verify becomes a risk; name it so Brain can catch it.
 - If the task description is ambiguous, resolve ambiguity from the goCriteria — not from guesswork.
 - Re-read the relevant existing code one more time after planning and before editing. Understanding the existing pattern prevents introducing drift.
 - Never assume a file is empty or trivial — 10 seconds reading saves 10 minutes debugging.
 
 **Anti-patterns to avoid:**
-- Starting to code before finishing plan.md
+- Starting to code before the silent plan is complete
 - Skipping ADR check because this looks like a simple task
 - Treating existing code as legacy that needs rewriting by default
 
@@ -97,7 +97,7 @@ philosophy as adapted for AI-agent workflows.
 Before writing the first line of code:
 - [ ] Read full task + all scope files
 - [ ] Identified all relevant ADRs
-- [ ] Written execution plan (.plan file)
+- [ ] Planned silently (files, deltas, goCriteria mapping)
 - [ ] Listed explicit assumptions
 
 Before each code block:

@@ -183,8 +183,10 @@ describe('TimeoutWatcher', () => {
     });
 
     const result = watcher.checkProgress('w-145-019');
+    // 7094-F1d: the heartbeat is a single spawn-time write — a frozen
+    // timestamp no longer negates real progress; the diff is the signal.
     expect(result.heartbeatFresh).toBe(false);
-    expect(result.progressing).toBe(false);
+    expect(result.progressing).toBe(true);
   });
 
   // ─── Test 6: runtime_extension_enabled=false → immediate kill ────
@@ -285,7 +287,7 @@ describe('TimeoutWatcher', () => {
   });
 
   // ─── Test 11: missing heartbeat file → not progressing ───────────
-  it('should return progressing=false when no heartbeat file', () => {
+  it('reports heartbeatFresh=false when no heartbeat file, but diff still counts as progress (7094-F1d)', () => {
     vi.mocked(existsSync).mockReturnValue(false);
     vi.mocked(execSync).mockReturnValue(GIT_DIFF_STAT_OUTPUT);
 
@@ -295,7 +297,7 @@ describe('TimeoutWatcher', () => {
 
     const result = watcher.checkProgress('w-145-019');
     expect(result.heartbeatFresh).toBe(false);
-    expect(result.progressing).toBe(false);
+    expect(result.progressing).toBe(true);
   });
 });
 

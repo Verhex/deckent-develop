@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e540a9968b1215fd35e312d2c4d383e6e31c81ff5110fac2ae5c5b8105425584"
+    "value": "e1b0ca00641670ce3677af60b2f036552f3c008673b2637d314e2f70c59b852d"
   },
   "summary": {
     "total": 511,
@@ -4890,7 +4890,7 @@
       "state": "OPEN",
       "updated": "2026-08-19",
       "definitionDigest": "b7e791329644b2466a5af8ff62463eb938abc581d482b5f2d5679a747d861fa3",
-      "progressDigest": "c9590440edbfb9cc0b6a46cbf8116c5318d2fb5786f184e5be6ecf1a715d73fb",
+      "progressDigest": "8e591461221214eff71446584b2af03ca1f7a6d40c4aa88335db4f80ce79fdbb",
       "terminalClosureDigest": null
     },
     {
@@ -23504,7 +23504,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "FAZLAR (her faz A/B ölçüm + kalite-guard: aynı görev-seti, GO-oranı + çıktı-denetimi + Sol xverify): F0 kod-iddia mühürleri; F1 SIFIR-RİSK dörtlüsü — (a) landing-önsözünü sona taşı (coordinator tek-satır), (b) ADRlere worker-operative markerları, (c) skill-seçimini göreve-duyarlı yap/eşiği düzelt, (d) .plan kaldır + .hb tek-yazım → beklenen ~%25-40; F2 YAPISAL — --tools daraltma + --disable-slash-commands + .claude/{skills,agents} mount-dışı + reorderLeadingT0 ON → 18.264lük prefix küçülür+user-message stabil bloğu paylaşılır ~%20-30 ek; F3 SYSTEM-PROMPT MİMARİSİ — claude --bare -p --system-prompt-file <stabil-çekirdek> + CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 A/Bsi + capability-realizer --append-system-prompt hattı; codex: AGENTS.override.md/-c project-doc kontrolü + --ephemeral → paylaşılabilir-önek mimarisi (Anthropic resmi: exclude-dynamic zaten -p multi-user cache-reuse için); F4 tier-routing (basit-doküman→haiku) + turn-disiplini model-bazlı; F5 ürünleşme: görev-sınıfı prompt-profilleri (isInspectionOnly/isDocOnly deseni genelleştirme) config-resolved",
-      "evidence": "Owner emri: \"En önemli işimiz; tam yetki; her yolun kazancı/hızı/kaybı net ölçülsün ve doğrulansın; yapı düzelince 567-tarzı denemeler yeniden koşulur; CLAUDE.md worker-enjeksiyonu görev doğası gereği sorgulanacak\". Kanıt: sprint-567 cache-deneyi (6 ölçüm + USD receiptler; worker-arası .prompt-paylaşımı yok AMA 18.264lük CLI-prefix paylaşımı 563 loglarında İLK-ÇAĞRI cacheRead=18.264 olarak üç görevde kanıtlı) + Explore haritası 2026-08-19 + resmi doc: --bare/--system-prompt-file/CLAUDE_CODE_DISABLE_CLAUDE_MDS/exclude-dynamic (code.claude.com) + codex --ignore-user-config/--ephemeral/AGENTS.override.md. **F0 MUHUR SONUCU 2026-08-19:** P1 (landing-onsozu onde + xverify-v2-istisnasi) CONFIRMED `…f4e859`; ilk-kosu REFUTED isabetliydi — evrensel kelimede istisna yakalandi (Ders-18 sinifi; iddia duzeltilip CONFIRMED); P2/P3/P4 durust-HOLD (`…961d11c` `…875de3e` `…293c481` — bilesik-iddia sinifi; birincil kanit saglam, bolunmus muhur F1 landed-verify ile).",
+      "evidence": "Owner emri: \"En önemli işimiz; tam yetki; her yolun kazancı/hızı/kaybı net ölçülsün ve doğrulansın; yapı düzelince 567-tarzı denemeler yeniden koşulur; CLAUDE.md worker-enjeksiyonu görev doğası gereği sorgulanacak\". Kanıt: sprint-567 cache-deneyi (6 ölçüm + USD receiptler; worker-arası .prompt-paylaşımı yok AMA 18.264lük CLI-prefix paylaşımı 563 loglarında İLK-ÇAĞRI cacheRead=18.264 olarak üç görevde kanıtlı) + Explore haritası 2026-08-19 + resmi doc: --bare/--system-prompt-file/CLAUDE_CODE_DISABLE_CLAUDE_MDS/exclude-dynamic (code.claude.com) + codex --ignore-user-config/--ephemeral/AGENTS.override.md. **F0 MUHUR SONUCU 2026-08-19:** P1 (landing-onsozu onde + xverify-v2-istisnasi) CONFIRMED `…f4e859`; ilk-kosu REFUTED isabetliydi — evrensel kelimede istisna yakalandi (Ders-18 sinifi; iddia duzeltilip CONFIRMED); P2/P3/P4 durust-HOLD (`…961d11c` `…875de3e` `…293c481` — bilesik-iddia sinifi; birincil kanit saglam, bolunmus muhur F1 landed-verify ile). **F1 LANDED 2026-08-19 (Fable-subprocess + codex-muhur, owner yurutme-modeli):** (a) landing-onsozu SONA — nonce artik prefix kirmiyor, CONFIRMED `…ac6a1c2` (ilk REFUTED: kendi yorum-literalim — Ders-18 3. vaka); (c) skill-secimi domain-kesisim sarti + durust-bos + wildcard-saygi, 3/3 CONFIRMED `…e9091c` `…d7674c1` `…c6fd93` (kok: profil-turetimi her skille build:primary veriyor → alfabetik-ilk-3, 565te 11 promptta bayt-ayni 14.207B); (d) .plan kaldirildi + .hb tek-yazim + OWNER ara-madde tuketici-taramasi (listener/client/server): 6 KIRILIR bulundu ve duzeltildi — nervous stale-worker probe-vetosu (auto-respawn onlendi), sprint-checkpoint unavailable→probe (412-003 yanlis-kill onlendi), evaluateRuntimeExtension probe-tabanli, timeout-watcher progressing=diff, status.ts probeProven (566/567 bayat-worker yanlis-alarminin KOKU buydu), planWarning gurultusu + temp-agent eksik-inis kapatildi; muhurler 4/6 CONFIRMED `…02f880` `…6aac045` `…051398` `…31ee7058` + 2 durust-HOLD `…4c149` `…f86dc7` (buyuk-dosya verifier evidence-map sinifi — ranged-read-verifier residual kaniti). Kalan kozmetik/degrade residual: ageMs semantigi (NOVA 30sn esigi, WorkerCard relativeTime), Writing-code etiketi donmasi, auditor Signal-C olumu, worker-liveness L3-L5 oy-disi karari, SSE currentAction tek-olay. Testler: 143+379+270+54 yesil; tsc 0; hermetic digest-only.",
       "updated": "2026-08-19"
     },
     {
@@ -26337,6 +26337,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "c4e15b2d20da6535616acfb822647a70cb0667c5261362ffe4704c9ffbda4362"
+    "value": "38f733ebba43647a79c816039bdf46e7cdadd89822b5037a52b5d9aa9f730a2b"
   }
 }

@@ -331,7 +331,7 @@ const READ_ONLY_DISCIPLINE_BLOCK = `## Karpathy Discipline (read-only)
 4. **Goal-driven** — report only evidence you observed; an unproven criterion is never DONE.
 
 ## Turn Economy
-Every conversation turn re-sends cached context. Batch the scoped file reads and independent read-only checks in the SAME turn. Reuse an existing .plan; if it is absent, create it once together with the initial heartbeat rather than spending a separate turn. Write the result once after the evidence set is complete.
+Every conversation turn re-sends cached context. Batch the scoped file reads and independent read-only checks in the SAME turn. Plan silently before acting — no plan file is required. Write the result once after the evidence set is complete.
 
 ## Command-Exit Honesty
 Do not pipe an evidentiary command to a pager such as \`tail\` or \`head\`, because that can mask the command's exit status. Capture the original command status and output directly.`;
@@ -355,7 +355,7 @@ Every conversation turn re-sends cached context — fewer turns beats fewer toke
 1. Batch independent read/search tool calls (Read + Grep + Glob) into the SAME turn — never issue them one-by-one across turns when none depends on another's output.
 2. Do not re-read a file already in your context unless its on-disk state changed since your last read.
 3. Run lint/build + targeted tests once per logical block of edits, not after every micro-edit — the max-3-attempt verify rule above already caps retries; do not burn turns on early, incomplete verify runs.
-4. When drafting your .plan file, gather every target file's content in ONE turn (parallel reads) before writing the plan.`;
+4. Plan silently before your first edit (Karpathy #1) — 7094-F1d: no separate plan file is written; gather every target file's content in ONE turn (parallel reads) before you start editing.`;
 
 /**
  * Pipe-exit honesty directive (TT555 — task 421-002, waste-class (a)).
@@ -1058,7 +1058,7 @@ export function buildScopeBlock(
   // are lifecycle artifacts, always writable, and never counted as scope mutations
   // (the auditor already whitelists them — this makes the prompt match the audit).
   const tasksExemptionNote =
-    `\n\nSeparately, your worker-protocol files under \`.tasks/\` (your \`.plan\`, \`.hb\`, \`.result\`, and a \`.question\` if you escalate) are lifecycle artifacts, NOT project changes — they are always writable and are exempt from this scope audit. Writing them is required and never counts as touching a file outside your scope.`;
+    `\n\nSeparately, your worker-protocol files under \`.tasks/\` (your \`.hb\`, \`.result\`, and a \`.question\` if you escalate) are lifecycle artifacts, NOT project changes — they are always writable and are exempt from this scope audit. Writing them is required and never counts as touching a file outside your scope.`;
 
   // MASTER-PLAN 668 — bounded discovery. Read scope limits what you may CHANGE;
   // it never licensed scanning the whole repository to find it. Measured
@@ -2142,13 +2142,13 @@ ${dodBlock}${idempotencyBlock}`);
   if (isInspectionOnlyTask) {
     push('T2', 'what-to-do', `## What To Do (inspection-only)
 1. Read the exact filesRead targets and task acceptance criteria before acting.
-2. Reuse .tasks/task-${task.id}.plan when it exists. If absent, create it once together with the initial heartbeat; do not rewrite it in a separate turn.
+2. Plan silently — no plan file is written (7094-F1d: the host never reads one).
 3. Batch independent read-only inspection commands. Do not create or modify any project file.
 4. Record evidence for each acceptance criterion, then write .tasks/task-${task.id}.result.`);
   } else {
     push('T2', 'what-to-do', `## What To Do
 1. Read the task scope carefully — understand what files you may touch
-2. Write your execution plan to .tasks/task-${task.id}.plan BEFORE coding — outline your approach, files to modify, and expected changes
+2. Plan silently BEFORE coding — outline your approach, files to modify, and expected changes in your head or scratch reasoning; do NOT write a separate plan file (7094-F1d: the host never reads one, and the write costs a full cached-context turn)
 3. Write the code changes described above
 4. Doc-impact: if your change makes any doc/ADR text stale, do NOT edit docs outside your write authority — add a \`docImpact:\` line to your .result \`notes\` naming the doc + what became stale (the orchestrator turns these into follow-up tasks). Only edit a doc that is explicitly IN your write list.
 5. Report: write your result file to .tasks/task-${task.id}.result`);
@@ -2291,11 +2291,13 @@ ${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task
 
   // Heartbeat — WP-18 (DASH-RT-1 complement): the worker must keep currentAction
   // fresh so the dashboard shows live progress instead of a stuck "Starting…".
-  push('T2', 'heartbeat', isInspectionOnlyTask ? `## Heartbeat
-Create .tasks/task-${task.id}.hb before inspection with workerId "w-${task.id}", status "EXECUTING". Update it at significant evidence steps with an incremented sequence, UTC ISO timestamp, and a concise read-only currentAction such as "inspecting scoped files" or "writing result".` : `## Heartbeat
-Create .tasks/task-${task.id}.hb BEFORE starting work with workerId "w-${task.id}", status "EXECUTING".
-Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).
-At EVERY significant step, also update the \`currentAction\` field to a short human-readable phrase (e.g. "planning", "editing src/x.ts", "running targeted tests", "writing result") — this drives the live dashboard view, so a stale currentAction reads as a stuck worker.`);
+  // 7094-F1d: single-write heartbeat. The host only ever checks the file's
+  // EXISTENCE (result-evaluator hasHeartbeatFile) and never reads its
+  // mtime/sequence (heartbeat-monitor documents this), so periodic re-writes
+  // only burned cached-context turns. One write at start is the whole
+  // protocol; batch it with your first real tool call.
+  push('T2', 'heartbeat', `## Heartbeat
+Create .tasks/task-${task.id}.hb ONCE, before ${isInspectionOnlyTask ? 'inspection' : 'starting work'}, with workerId "w-${task.id}", status "EXECUTING", a UTC ISO timestamp, and a short currentAction. That single write is the entire heartbeat protocol — do NOT spend further turns updating it; batch the write together with your first real tool call.`);
 
   // Result + self-assessment — single authority section. Folds the former
   // separate "## Result File" and "## Honest Self-Assessment" sections so the

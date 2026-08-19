@@ -70,7 +70,8 @@ describe('inspection-only worker prompt contract', () => {
     for (const path of makeInspectionTask().scope.filesRead) expect(prompt).toContain(`  - ${path}`);
     expect(prompt).toContain('PROJECT WRITE authority: NONE');
     expect(prompt).toContain('A directory above never grants Write/Edit permission');
-    expect(prompt).toContain('.tasks/task-readonly-001.plan');
+    // 7094-F1d: no plan file is mandated anymore — the host never read one.
+    expect(prompt).not.toContain('.tasks/task-readonly-001.plan');
     expect(prompt).toContain('.tasks/task-readonly-001.hb');
     expect(prompt).toContain('.tasks/task-readonly-001.result');
 

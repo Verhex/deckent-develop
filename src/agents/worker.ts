@@ -496,11 +496,9 @@ export function submitInProcessWorkerHeartbeatObservation(
 export function writeResult(projectRoot: string, result: TaskResult, sprintId?: string): void {
   ensureDir(join(projectRoot, TASKS_DIR));
 
-  const planPath = planFilePath(projectRoot, result.taskId);
-  if (!existsSync(planPath)) {
-    console.warn(`[deckent] WARNING: task ${result.taskId} — .plan file missing. Workers should write .tasks/task-{id}.plan before coding.`);
-    (result as TaskResult & { planWarning?: string }).planWarning = 'missing';
-  }
+  // 7094-F1d (2026-08-19): the .plan file is no longer part of the worker
+  // protocol (the host never read one), so the old missing-plan warning was
+  // pure noise on every result; `planWarning` had zero consumers repo-wide.
 
   // ── Worker Self-Honesty (Sprint 165 Task 1 — Bug X) ──────────────
   // A worker that claims DONE but reports linesAdded=0 + testsPassed=false

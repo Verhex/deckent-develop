@@ -1243,12 +1243,12 @@ describe('writeResult .plan soft warning', () => {
 
     writeResult('/project', result);
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('.plan file missing'));
-
-    // Check planWarning field in written result
+    // 7094-F1d: the .plan file left the worker protocol — no warning, no
+    // planWarning field (it never had a consumer).
+    expect(warnSpy).not.toHaveBeenCalled();
     const writeCall = mockedWriteFileSync.mock.calls[0]!;
     const writtenResult = JSON.parse(writeCall[1] as string);
-    expect(writtenResult.planWarning).toBe('missing');
+    expect(writtenResult.planWarning).toBeUndefined();
 
     warnSpy.mockRestore();
   });

@@ -484,6 +484,35 @@ describe('routeTaskV3 — deterministic end-to-end', () => {
     expect(decision.skillIds).toEqual(['core-build-skill']);
     expect(decision.personaSlices).toEqual(['implementation', 'default']); // build → alias
   });
+
+  // 7094-F1c: the generic workType axis alone can no longer attach a skill —
+  // real domain overlap with THIS task is required (sprint-565 measured case:
+  // derivation gives nearly every skill a leading `build:primary`, so all 11
+  // prompts carried the same alphabetically-first three skills).
+  it('skills: generic build:primary with NO domain overlap is honest-empty (7094-F1c)', async () => {
+    const catalog: RouteCatalog = {
+      ...catalogOf(builder),
+      skills: [
+        { skillId: 'aaa-generic-skill', profile: { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: 'docs', proficiency: 'primary' }], expertise: [], deliverables: [] } },
+        { skillId: 'bbb-generic-skill', profile: { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: 'security', proficiency: 'primary' }], expertise: [], deliverables: [] } },
+      ],
+    };
+    // requirement domain is core-runtime — neither skill overlaps → NO skills,
+    // never the alphabetical tie-break winners.
+    const decision = await routeTaskV3(BUILD_TASK, catalog, { config: CONFIG, requirement: req({}) });
+    expect(decision.skillIds).toEqual([]);
+  });
+
+  it('skills: an explicit `*` domain declaration still attaches (owner-authored wildcard, 7094-F1c)', async () => {
+    const catalog: RouteCatalog = {
+      ...catalogOf(builder),
+      skills: [
+        { skillId: 'everywhere-skill', profile: { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: '*', proficiency: 'secondary' }], expertise: [], deliverables: [] } },
+      ],
+    };
+    const decision = await routeTaskV3(BUILD_TASK, catalog, { config: CONFIG, requirement: req({}) });
+    expect(decision.skillIds).toEqual(['everywhere-skill']);
+  });
 });
 
 // ─── journal + replay ────────────────────────────────────────────────────────

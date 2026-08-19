@@ -7,9 +7,9 @@ paths: ["src/**","tests/**"]
 - ADR constraints included in the task prompt or resolved from `.brain/memory.db` are mandatory; absence from a prompt is not permission to violate accepted ADRs
 - If you need to query project memory: relevant ADRs and past learnings are provided by Brain via MemoryStore
 - If your implementation would violate an accepted ADR → stop, write NO_GO, propose ADR amendment
-- Write execution plan to `.tasks/task-XXX.plan` before coding
+- Plan silently before coding — no plan file (7094-F1d: the host never reads one; the write only burned a cached-context turn)
 - Check `.locks/` before writing any file
-- Update heartbeat (`.tasks/task-XXX.hb`) on every file change
+- Write heartbeat (`.tasks/task-XXX.hb`) ONCE at start (7094-F1d: the host only checks its existence, never its mtime)
 - Stay within your assigned scope — do not touch files outside it
 - Run the exact scoped verification declared by the task and effective policy; do not launch a full build or full suite unless the run explicitly permits and requires it
 - Document changes in relevant docs
@@ -56,7 +56,7 @@ Accepted: **ADR-D-001**, **ADR-D-002**, **ADR-D-004**, **ADR-D-005**, **ADR-D-00
 MUST follow @karpathy-discipline.md when generating code.
 
 Before writing any code line, validate against all four disciplines:
-1. **Think Before Coding** — read + plan first, list ADR constraints, write .plan file
+1. **Think Before Coding** — read + plan first (silently), list ADR constraints
 2. **Simplicity First** — prefer existing patterns, YAGNI, avoid premature abstractions
 3. **Surgical Changes** — stay in scope.filesWrite, minimum-diff, preserve existing behavior
 4. **Goal-Driven Execution** — every change must map to a goCriteria item; honest self-assessment

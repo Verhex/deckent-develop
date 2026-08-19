@@ -2363,13 +2363,14 @@ describe('buildWorkerPrompt — Honest Self-Assessment injection', () => {
     expect(prompt).toContain('"Code written"');
   });
 
-  it('includes .plan file instruction in "What To Do" section', () => {
+  it('mandates silent planning and NO plan file in "What To Do" (7094-F1d)', () => {
     const task = makeTask({ id: '139-021' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('.plan BEFORE coding');
-    expect(prompt).toContain('task-139-021.plan');
-    // .plan step should come before "Write the code changes" step
-    const planIndex = prompt.indexOf('.plan BEFORE coding');
+    // 7094-F1d: the host never read a .plan; the mandated file write only
+    // burned a full cached-context turn per task. Planning stays, the file goes.
+    expect(prompt).toContain('Plan silently BEFORE coding');
+    expect(prompt).not.toContain('task-139-021.plan');
+    const planIndex = prompt.indexOf('Plan silently BEFORE coding');
     const codeIndex = prompt.indexOf('Write the code changes');
     expect(planIndex).toBeLessThan(codeIndex);
   });

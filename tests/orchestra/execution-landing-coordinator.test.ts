@@ -416,10 +416,13 @@ describe('Docker execution landing coordinator', () => {
     });
     expect(prepared.prompt).toContain('Budget Landing Checkpoint Protocol');
     expect(prepared.prompt).toContain(settlementRef.attemptId);
-    expect(prepared.prompt.indexOf('Budget Landing Checkpoint Protocol'))
-      .toBeLessThan(prepared.prompt.indexOf('## Primary Task Prompt'));
-    expect(prepared.prompt.indexOf('## Primary Task Prompt'))
-      .toBeLessThan(prepared.prompt.indexOf('ORIGINAL WORKER PROMPT'));
+    // 7094-F1a: the nonce-bearing landing segment rides AFTER the task prompt
+    // (stable-prefix order — Sol seal …f4e859); the task prompt itself is the
+    // prefix, so it must start the composed prompt verbatim.
+    expect(prepared.prompt.startsWith('ORIGINAL WORKER PROMPT')).toBe(true);
+    expect(prepared.prompt.indexOf('ORIGINAL WORKER PROMPT'))
+      .toBeLessThan(prepared.prompt.indexOf('Budget Landing Checkpoint Protocol'));
+    expect(prepared.prompt).not.toContain('## Primary Task Prompt');
     expect(prepared.prompt).toContain('FIRST lifecycle action');
     expect(prepared.context).not.toBeNull();
 

@@ -8,6 +8,8 @@
 
 import type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../../core/config.js';
+import { checkWorkerLiveness } from '../../orchestra/worker-liveness.js';
+import type { Task } from '../../core/task-types.js';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
@@ -15,11 +17,17 @@ import { join, dirname } from 'node:path';
  * Activity-truth (Alperen, 2026-08-12 — nervous false-positive seli düzeltmesi):
  * worker kontratı hb'yi DOSYA DEĞİŞİMİNDE yazar; uzun okuma/analiz turlarında
  * `.hb` meşru olarak sessizdir ama worker `.partial-result`, `.landing-proposal.json`,
- * `.plan` ve `.log` artefaktlarına yazmaya devam eder. Staleness kararı hb-dosyası
+ * `.log` artefaktlarına yazmaya devam eder. Staleness kararı hb-dosyası
  * tek başına değil, bu artefakt kümesinin EN TAZE mtime'ı üzerinden verilir;
  * `.result` varsa worker settle olmuştur ve hiç aday değildir (projection lag).
+ *
+ * 7094-F1d (2026-08-19): `.plan` artık hiç yazılmıyor (listeden düştü) ve
+ * docker backend'de KOŞU SIRASINDA host'ta hiçbir dosya tazelenmiyor (tek-yazım
+ * hb; `.log` yalnız container çıkışında yazılır) — bu yüzden mtime-bayatlığı tek
+ * başına respawn'a yetmez: canlı container probe'u (`checkWorkerLiveness` L2)
+ * stale kararını VETO eder (KANUN 15: probe > mtime).
  */
-const ACTIVITY_SUFFIXES = ['.hb', '.partial-result', '.landing-proposal.json', '.plan', '.log'] as const;
+const ACTIVITY_SUFFIXES = ['.hb', '.partial-result', '.landing-proposal.json', '.log'] as const;
 
 function lastActivityMs(projectRoot: string, taskId: string, reportedHbIso: string): number | null {
   if (!projectRoot) return new Date(reportedHbIso).getTime();
@@ -118,6 +126,21 @@ export class StaleWorkerDetector {
       if (ctx.now.getTime() - activityMs <= threshold) {
         this.notifiedEpisodes.delete(w.id); // aktivite tazelendi — episode sıfırla
         return false;
+      }
+      // 7094-F1d liveness veto: file mtimes freeze at spawn on the docker
+      // backend, so a LIVE container outranks any stale-mtime verdict — never
+      // propose respawning a worker whose container is provably running.
+      if (ctx.projectRoot) {
+        try {
+          const probe = checkWorkerLiveness(
+            { id: w.taskId, assignedWorker: w.id } as Task,
+            ctx.projectRoot,
+          );
+          if (probe.status === 'alive') {
+            this.notifiedEpisodes.delete(w.id);
+            return false;
+          }
+        } catch { /* probe error — fall through to the mtime verdict */ }
       }
       // Stale — ama bu episode zaten bildirildiyse tekrar basma.
       if (this.notifiedEpisodes.get(w.id) === activityMs) return false;

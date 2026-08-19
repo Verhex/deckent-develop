@@ -8,6 +8,7 @@ import { join } from 'node:path';
 
 import { DECKENT_DIR, TASKS_DIR, BRAIN_DIR, RECENT_WORKS_DIR } from '../core/constants.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
+import { checkWorkerLiveness } from './worker-liveness.js';
 import type { Sprint } from '../core/types.js';
 import { SprintPhase, SprintStatus } from '../core/types.js';
 import type { Task } from '../core/types.js';
@@ -606,6 +607,19 @@ export function detectStaleWorkers(
     }
     if ('unavailable' in vote) {
       debugLog('sprint-checkpoint:detectStaleWorkers', vote.reason); // honest, not silent
+      // 7094-F1d (2026-08-19): the heartbeat is a SINGLE spawn-time write, so
+      // the mtime/timestamp fallback below would brand every healthy docker
+      // worker stale after thresholdMs and resume would kill it (the exact
+      // 412-003 wrong-kill class this module exists to prevent). When the
+      // record-based host signal is unavailable, probe the container itself
+      // before trusting a frozen timestamp: a live container is never stale.
+      try {
+        const probe = checkWorkerLiveness(
+          { id: worker.taskId, assignedWorker: worker.workerId } as Task,
+          projectRoot,
+        );
+        if (probe.status === 'alive') continue;
+      } catch { /* probe error — fall through to the timestamp fallback */ }
     }
     // Host says dead OR host-signal-unavailable → honest fallback to the
     // pre-existing timestamp staleness check (unchanged behavior).

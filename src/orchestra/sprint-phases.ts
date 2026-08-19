@@ -1512,11 +1512,22 @@ export function evaluateRuntimeExtension(
   }
 
   const hbMs = new Date(timestamp).getTime();
-  if (!Number.isFinite(hbMs)) {
+  // A future-dated heartbeat (container clock skew beyond a minute) is not
+  // trustworthy identity evidence either.
+  if (!Number.isFinite(hbMs) || hbMs > now() + 60_000) {
     return { granted: false, reason: 'invalid_heartbeat', extensionCount: used, extensionMs: 0 };
   }
-  const ageSeconds = (now() - hbMs) / 1000;
-  if (ageSeconds > RUNTIME_EXTENSION_HEARTBEAT_FRESH_S) {
+  // 7094-F1d (2026-08-19): the heartbeat is a single spawn-time write, so its
+  // in-file timestamp age can no longer prove liveness — at timeout the age
+  // ALWAYS exceeded the freshness window and extensions were never granted.
+  // The honest liveness signal is the worker-liveness probe (live container /
+  // growing log / partial-result vote); the stale-age gate applies only when
+  // that probe cannot decide, and a provably-dead worker is still refused.
+  const probe = checkWorkerLiveness(
+    { id: taskId, assignedWorker: `w-${taskId}` } as Task,
+    projectRoot,
+  );
+  if (probe.status === 'dead') {
     return { granted: false, reason: 'stale_heartbeat', extensionCount: used, extensionMs: 0 };
   }
 

@@ -4,6 +4,7 @@ import type { Command } from 'commander';
 import { AgentStatus, SprintPhase, SprintStatus, TaskStatus } from '../../core/types.js';
 import type { AgentInfo, DashboardState, Task } from '../../core/types.js';
 import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
+import { checkWorkerLiveness } from '../../orchestra/worker-liveness.js';
 import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi , isDashboardOrphaned } from '../helpers/output.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -224,6 +225,8 @@ export interface WorkerLivenessProjectionOptions {
   readonly nowMs?: number;
   readonly lang?: string;
   readonly isProcessAlive?: (pid: number) => boolean;
+  /** 7094-F1d: root for the container/log liveness probe (default: cwd). */
+  readonly projectRoot?: string;
 }
 
 const ACTIVE_AGENT_STATUSES = new Set<AgentStatus>([
@@ -261,7 +264,22 @@ export function projectWorkerLiveness(
       && heartbeatAgeMs < options.heartbeatTimeoutMs;
     const pid = (agent as WorkerProcessProjection).pid;
     const processProven = typeof pid === 'number' && processAlive(pid);
-    if (heartbeatFresh || processProven) {
+    // 7094-F1d (2026-08-19): the heartbeat is a single spawn-time write, so
+    // heartbeatFresh goes false ~2min into every healthy run; and the pid
+    // fallback was structurally dead (AgentInfo never carries a pid). Probe
+    // the worker itself (live container / growing log / partial-result vote)
+    // before branding it stale — this was the exact source of the 566/567
+    // "Bayat worker … doğrulanamadı" false alarms.
+    const probeProven = ((): boolean => {
+      if (heartbeatFresh || processProven || !agent.taskId) return false;
+      try {
+        return checkWorkerLiveness(
+          { id: agent.taskId, assignedWorker: agent.id } as Task,
+          options.projectRoot ?? process.cwd(),
+        ).status === 'alive';
+      } catch { return false; }
+    })();
+    if (heartbeatFresh || processProven || probeProven) {
       provenActive += 1;
       return agent;
     }

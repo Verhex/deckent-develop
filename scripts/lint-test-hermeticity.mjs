@@ -385,8 +385,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-19 (7091 CURSOR-PROVIDER, sprint-565 + el-kapama): +15 — cursor
   // adapter/spec/capability/discovery/auth-probe suites + cursor-evidence-sources
   // stub suite enter; provider pins realigned. Prior: 7089 (14449).
+  // 2026-08-19 (7094-F1 Fable-subprocess dalgası): same 14464 count, digest
+  // only — F1a/F1c/F1d pin realignments (landing-coordinator order, routing
+  // domain-overlap pins, plan/hb protocol pins) moved tracked content.
   count: 14464,
-  digest: 'ffa9c97876e31db0a69d319c40e3b72d1d9f5d3ac60826b40ef6a78bae447f18',
+  digest: '991e2c26cfe6d0ab34d94e1034d309b6333c7350d58c3a116dfc0eb9d1c1c9a3',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -637,8 +640,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-19 (7091 CURSOR-PROVIDER, sprint-565 + el-kapama): +2 —
   // providers/cursor.ts (adapter) and providers/cursor-provider-evidence-sources.ts
   // enter the inventory; spine/spec/registry/auth/doctor/bootstrap hashes moved.
+  // 2026-08-19 (7094-F1): same 1256 count, digest only — coordinator order,
+  // route-task-v3 domain-overlap, prompt-template plan/hb text, nervous
+  // stale-worker veto, timeout-watcher/sprint-phases/sprint-checkpoint/status
+  // probe wiring moved production content.
   count: 1256,
-  digest: '90636b01ca5a85fc5ba7301b6643050a48e0ee419988b57b55833f7f8910e52e',
+  digest: 'd2b4438e6ee45968e09b9c679cf5ccccfd5fbc7b275764f2aca71ab3009de121',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

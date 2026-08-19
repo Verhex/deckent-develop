@@ -38,7 +38,7 @@ import type {
   RoutingDecisionV3,
   ScoredCandidate,
 } from './decision-types.js';
-import { matchSpace } from './capability-vector.js';
+import { matchSpace, type MatchSpace } from './capability-vector.js';
 import type { SkillProfile } from './capability-vector.js';
 import { parseSubtype } from './vocabulary-builtin.js';
 
@@ -388,6 +388,29 @@ function buildEscalation(
 }
 
 /** Skills ride the same axes (content + positional; numerical N/A for knowledge). */
+/**
+ * 7094-F1c (owner-approved 2026-08-19): a skill's DOMAIN overlap with the
+ * requirement — Σ(requirement weight × declared proficiency credit). The
+ * generic workType axis cannot discriminate skills: profile derivation gives
+ * nearly every priority≥5 skill a leading `primary` workType
+ * (skill-profile-derivation.ts deriveWorkTypes), so on sprint-565 all 11
+ * prompts carried the SAME alphabetically-first three skills (byte-identical
+ * 14,207B block, measured) — pure tie-break noise, zero task relevance. An
+ * explicit `*` domain declaration still counts (it is an owner-authored
+ * "applies everywhere", not derivation inflation).
+ */
+function skillDomainOverlap(requirement: RequirementVector, space: MatchSpace): number {
+  let overlap = 0;
+  for (const rd of requirement.positional.domains) {
+    const declared = space.domains.find((d) => d.id === rd.id)
+      ?? space.domains.find((d) => d.id === '*');
+    if (declared && declared.proficiency !== 'never') {
+      overlap += rd.weight * PROFICIENCY_SCORE[declared.proficiency];
+    }
+  }
+  return overlap;
+}
+
 function selectSkills(
   requirement: RequirementVector,
   catalog: RouteCatalog,
@@ -400,10 +423,17 @@ function selectSkills(
       const positional = scorePositional(requirement, space, {
         knownDomainIds: catalog.vocabulary.knownDomainIds,
       });
-      return { skillId: skill.skillId, fit: (content.score + positional.score) / 2 };
+      return {
+        skillId: skill.skillId,
+        fit: (content.score + positional.score) / 2,
+        overlap: skillDomainOverlap(requirement, space),
+      };
     })
-    .filter((s) => s.fit >= SKILL_FIT_FLOOR)
-    .sort((a, b) => b.fit - a.fit || a.skillId.localeCompare(b.skillId));
+    // 7094-F1c: the fit floor alone let generically-declared skills through on
+    // every task; a skill now also needs REAL domain overlap with this task.
+    // No requirement domains, or no overlapping skill → honest-empty.
+    .filter((s) => s.fit >= SKILL_FIT_FLOOR && s.overlap > 0)
+    .sort((a, b) => b.fit - a.fit || b.overlap - a.overlap || a.skillId.localeCompare(b.skillId));
   // Honest-empty (sprint-441 contract): nothing above the floor → NO skills.
   return scored.slice(0, maxSkills).map((s) => s.skillId);
 }

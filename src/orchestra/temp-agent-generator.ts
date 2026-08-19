@@ -336,7 +336,7 @@ export function renderAgentPromptMd(
   lines.push('');
   lines.push('### Think Before Coding');
   lines.push('- Read the task JSON, scope, and the GO/NO-GO criteria first.');
-  lines.push('- Write your execution plan to `.tasks/task-XXX.plan` before touching code.');
+  lines.push('- Plan silently before touching code — no plan file is written (7094-F1d: the host never reads one).');
   lines.push('- Identify the minimum set of files needed to satisfy the criteria.');
   lines.push('');
   lines.push('### Simplicity First');

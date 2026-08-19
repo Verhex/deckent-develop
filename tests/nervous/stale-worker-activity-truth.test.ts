@@ -84,8 +84,9 @@ describe('stale-worker activity truth (2026-08-12)', () => {
     const oldHb = new Date(start - 10 * THRESHOLD).toISOString();
     const d = new StaleWorkerDetector(THRESHOLD);
     expect(d.detect(ctx(start, oldHb))).not.toBeNull();
-    // worker canlandı: taze plan yazıyor → stale değil, episode sıfırlanır
-    touch('task-900-001.plan', start + 60_000);
+    // worker canlandı: taze partial-result yazıyor → stale değil, episode
+    // sıfırlanır (7094-F1d: .plan protokolden çıktı, aktivite listesinde değil)
+    touch('task-900-001.partial-result', start + 60_000);
     expect(d.detect(ctx(start + 90_000, oldHb))).toBeNull();
     // sonra YENİDEN uzun sessizlik → yeni episode, yeniden bildirir
     const later = start + 60_000 + 10 * THRESHOLD;

@@ -204,13 +204,22 @@ export function prepareDockerExecutionLanding(input: {
     );
   }
   const mode = budgetPolicy.admissionMode;
+  // 7094-F1a (owner-approved, 2026-08-19): the landing segment embeds a
+  // per-attempt nonce (taskId + attemptId at ~byte 209), so placing it FIRST
+  // broke the provider prompt-cache prefix for everything after it — the
+  // byte-identical ~15.2KB skills/context block never got a cache hit
+  // (measured, sprint-565 archive; Sol seal cross-verify-verdict:…f4e859).
+  // The segment now rides AFTER the task prompt: same content, same host
+  // enforcement (mtime barrier), stable-prefix-friendly order. The segment
+  // carries its own protocol heading, so the old Primary-Task-Prompt divider
+  // line is no longer emitted anywhere.
   const prompt = input.terminalProtocol === 'xverify-v2-host-only'
     ? input.prompt
-    : `${buildExecutionLandingProposalPromptSegment(
+    : `${input.prompt}\n\n${buildExecutionLandingProposalPromptSegment(
         input.task.id,
         input.settlementRef.attemptId,
         input.terminalProtocol === 'xverify-v1' ? 'finite-adjudication' : 'continuous',
-      )}\n\n## Primary Task Prompt\n\n${input.prompt}`;
+      )}`;
   const requestedProvider = input.task.provider ?? input.calledProvider;
   const requestedModel = input.task.forceModel ?? input.task.model;
   const resolvedProvider = budgetPolicy.resolvedProvider === 'unknown'
