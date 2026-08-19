@@ -1020,6 +1020,15 @@ export interface TaskResult {
   coverage: number;
   selfAssessment: SelfAssessment;
   notes: string;
+  /**
+   * 7097-B4: the worker's OWN structured statement of what remains undone
+   * when selfAssessment is GO_WITH_TECH_DEBT — the residual gap ONLY, never
+   * the success narrative. The debt ledger prefers this field over the full
+   * `notes` blob (sprint-573/574 live case: debt rows whose note was a pure
+   * success report spawned unfixable "Fix debt" tasks that burned the FIX
+   * budget). Optional: absent on DONE/NO_GO results and on legacy workers.
+   */
+  residualDebt?: string;
   /** Agent ID that produced this result */
   agentId?: string;
   /** Skill IDs used during this task execution */

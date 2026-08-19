@@ -335,3 +335,72 @@ describe('evaluateWithRubric — Sprint 154 typed scenarios', () => {
     expect(evaluation.rubricScores[0]?.criterion).toBe('correctness');
   });
 });
+
+// ─── 7097-B3: unevidenced test-claim ceiling (code class only) ───────
+
+describe('evaluateWithRubric — unevidenced test-claim ceiling (7097-B3)', () => {
+  function makeCodeTask() {
+    return makeTask({
+      directories: ['src/core'],
+      filesWrite: ['src/core/widget.ts'],
+    });
+  }
+
+  it('code task: bare testsPassed:true with NO evidence caps DONE at GO_WITH_TECH_DEBT', () => {
+    // A plain code task with coverage:null dies at schema validation — the
+    // reachable fabrication shape is the coverage-OPTIONAL code task (e.g.
+    // a bug-fixer-assigned fix): schema tolerates the missing number, the
+    // 227-001 reweight lifts the score to DONE, and "tests passed" stands
+    // on nothing. Exactly the sprint-568..575 fix-worker pattern
+    // ("verification task — tests passed") the ceiling must catch.
+    const task = makeCodeTask();
+    task.assignedAgent = 'bug-fixer';
+    const result = withNullCoverage(makeResult({
+      testsPassed: true,
+      filesChanged: ['src/core/widget.ts'],
+      notes: 'Implemented the widget as requested.',
+      selfAssessment: 'DONE',
+    }));
+    const evaluation = evaluateWithRubric(result, task);
+    expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
+  });
+
+  it('code task: a test-run trace in notes keeps DONE (evidence honored)', () => {
+    const result = makeResult({
+      testsPassed: true,
+      coverage: 0,
+      filesChanged: ['src/core/widget.ts'],
+      notes: 'npx vitest run passed 19/19; npx tsc --noEmit exit 0.',
+      selfAssessment: 'DONE',
+    });
+    const evaluation = evaluateWithRubric(result, makeCodeTask());
+    expect(evaluation.decision).toBe('DONE');
+  });
+
+  it('code task: changed test file + measured coverage keep DONE (ceiling stays inert on evidence)', () => {
+    // coverage 0 would independently drag the test_coverage criterion into
+    // the DEBT band — that is rubric math, not the ceiling. A measured
+    // coverage plus a touched test file isolates the ceiling's behaviour.
+    const result = makeResult({
+      testsPassed: true,
+      coverage: 78,
+      filesChanged: ['src/core/widget.ts', 'tests/core/widget.test.ts'],
+      notes: 'done',
+      selfAssessment: 'DONE',
+    });
+    const evaluation = evaluateWithRubric(result, makeCodeTask());
+    expect(evaluation.decision).toBe('DONE');
+  });
+
+  it('doc task: the ceiling is inert (testsPassed already neutral for the class)', () => {
+    const task = makeTask({ directories: [SMOKE_DIR], filesWrite: [SMOKE_FILE] });
+    const result = withNullCoverage(makeResult({
+      testsPassed: true,
+      filesChanged: [SMOKE_FILE],
+      notes: 'Wrote the doc. This documentation summarizes the module thoroughly with several sections and detailed explanations for readers.',
+      selfAssessment: 'DONE',
+    }));
+    const evaluation = evaluateWithRubric(result, task);
+    expect(evaluation.decision).toBe('DONE');
+  });
+});

@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "373c333058481f0351d70e57c1d77a5d818ef60491673d676616b4b614538a9f"
+    "value": "36ddaec5834fd9952ad2d75cae72325497c9ac330c634484483379b7fc4a10b8"
   },
   "summary": {
     "total": 515,
@@ -4923,7 +4923,7 @@
       "state": "OPEN",
       "updated": "2026-08-19",
       "definitionDigest": "2824d334605c5e3b6a14596ef3364b336535189f2818e316526dd2307851bed6",
-      "progressDigest": "f082000e06271ec9d6ac490d0184bce9374a01dd0559017d6c10ae3627cd1904",
+      "progressDigest": "32abfc8a2890a5a5ac20714084aa337e77a9e8af0b00be062103af0470d4c491",
       "terminalClosureDigest": null
     },
     {
@@ -23652,7 +23652,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Kabul: uygulanabilirlik matrisi semasi + kanit-istekli test-iddiasi + goNogo↔rubrik tek-authority + residualDebt semasi (producer worker-template + consumer debt-ledger + evaluator) + dongusel-NO_GO regresyon fixture'lari (573-006 vakasi pin) + iki-provider fixture parite",
-      "evidence": "Owner admission 2026-08-19 (7096 karar mesaji). Kanit-tabani: 7096 satirinin evaluations/sprint-568..574 kayitlari; result-evaluator.ts scoreCorrectness/DOC_WRITE_RUBRIC bugunku minimal hali",
+      "evidence": "Owner admission 2026-08-19 (7096 karar mesaji). Kanit-tabani: 7096 satirinin evaluations/sprint-568..574 kayitlari; result-evaluator.ts scoreCorrectness/DOC_WRITE_RUBRIC bugunku minimal hali. **ONE ALINDI + CEKIRDEK UYGULANDI 2026-08-20 (owner: '7097'yi one al, oradan sur'):** (KOK-NEDEN KESIF) 575-581 gocmen-kronigi ('5/5-passed 92.5 ama NO_GO', gorevden goreve tasiniyor) katman katman izlendi ve YAKALANDI: safeRubricReconcile/enforceRecoveryBornEvaluationHonesty'nin `hasConcreteEvaluationFailure` vetosu SINIF-KORUYDU — `testsPassed===false` doc/audit gorevinde de terminal-NO_GO sayiliyordu (D2'nin kapattigi cezanin sarmalayici-katmandaki ikizi; durust-false yazan worker kimse o dusuyordu = yarim-stokastikligin sebebi). FIX: veto testsApplicableForTaskClass ile sinif-bilincli (tek-authority export; markersiz cagiran eski davranis) + preserveNoGo artik typed `concrete_failure_veto` satiri birakiyor. (B1 verdict-source zinciri) rubrik-kararini deigstiren 11 nokta (honest-gate, ci-guardian ×3, cross-verify ×3, verify-delta, adr-compliance, recovery-honesty, repair-authority) typed cause yaziyor; ana/extension/grace/fix-fazi audit'leri `post-rubric:` zincirini tasiyor — kor-teshis sinifi kalici kapandi. (B3) kanitsiz-test-iddiasi tavani: CODE-sinifinda ciplak testsPassed:true (test-dosyasi yok + coverage yok + notes'ta kosu-izi yok) DONE'u GO_WITH_TECH_DEBT'e sinirlar (EVAL-DEBT-CEILING ailesinin 3. uyesi; bilerek NO_GO degil — fix-dongusu dogurmaz; ulasilabilir sahtecilik sekli coverage-optional code-gorevleri, 571 fix-deseni pinli). (B4) typed residualDebt: TaskResult alani + worker-sozlesmesi satiri (DEBT'te zorunlu, yalniz kalan-eksik) + debt-ledger residual'i tercih eder + typed-residual asla success-echo sayilmaz. KANIT KOSUSU sprint-582: **6/6 DONE, 0 fix, 0 NO_GO — deney-serisinin ILK tamamen temiz turu**; doc-audit'ler 'tests not applicable' ile DONE. Testler 175+207 evaluator bataryasi + 36 komsu yesil; tsc 0; gates yesil. Muhurler: KOK-NEDEN veto-fix CONFIRMED `…02ac4c6106bf`; B3-tavan durust-HOLD (buyuk-dosya 15. vaka; 4 pin birincil kanit). Kalan (bu satirda ACIK): goNogo↔rubrik tek-authority (madde 3) + uygulanabilirlik-matrisinin deklaratif semasi (madde 2'nin kalici bicimi; bugun rubrik-registry sinif-ayrimi + D2/B3/veto-fix'leriyle fiilen kapali) + reconstruct-yolu DEFAULT_RUBRIC agirlik kalintisi (dusuk-deger finding)",
       "updated": "2026-08-19"
     },
     {
@@ -26517,6 +26517,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a2e94374b604cda11a3967824599ec014dc3aba03e6062bdfe52426ff3d1b27e"
+    "value": "94f3bfd682bb38b260b5f89a8eb2633b4fc6670b1b3eac5374d0ae4515578e6e"
   }
 }

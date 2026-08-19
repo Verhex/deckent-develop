@@ -662,6 +662,34 @@ function testsApplicableForTask(task: Task): boolean {
 }
 
 /**
+ * 7097 root-cause export: the EVALUATE wrappers (sprint-phases
+ * `hasConcreteEvaluationFailure` / recovery-honesty boundary) treated
+ * `testsPassed === false` as a class-blind terminal veto — the LAST
+ * surviving honesty penalty after D2: a doc worker honestly reporting
+ * "no tests to run" scored 5/5 in the rubric and was then flipped to
+ * NO_GO by the wrapper (sprints 575-581, the migrating chronic). Exported
+ * so those wrappers classify with the SAME authority the rubric uses.
+ */
+export { testsApplicableForTask as testsApplicableForTaskClass };
+
+/**
+ * 7097-B3: does the result carry ANY evidence backing a `testsPassed: true`
+ * claim? Three independent signals, any one suffices (deliberately generous
+ * — the ceiling this feeds must only catch the bare, evidence-free claim,
+ * never punish a worker who reported real runs tersely):
+ *  - a test file among filesChanged (the worker touched the test surface);
+ *  - a measured coverage number > 0;
+ *  - a test-run trace in notes (counts like "19/19", a runner name, or a
+ *    "tests passed/green/exit 0" phrase adjacent to the run report).
+ */
+function hasTestClaimEvidence(result: TaskResult): boolean {
+  if (result.filesChanged?.some(f => f.includes('.test.') || f.includes('.spec.'))) return true;
+  if (typeof result.coverage === 'number' && result.coverage > 0) return true;
+  const notes = coerceNotesToString(result.notes);
+  return /\b\d+\s*\/\s*\d+\b|vitest|jest|pytest|go test|cargo test|npx tsc|tsc --noEmit|exit(ed)?\s+0|tests?\s+(all\s+)?(pass(ed)?|green)/i.test(notes);
+}
+
+/**
  * Score correctness based on testsPassed and selfAssessment.
  *
  * Sprint-573/574 honesty fix: for non-code task classes (audit /
@@ -1533,6 +1561,25 @@ function evaluateWithRubricCore(
   // vitest in reconcileEvaluationSpuriousNoGo) may lift it — never a score.
   if (result.selfAssessment === 'NO_GO') {
     decision = 'NO_GO';
+  }
+
+  // 7097-B3 (unevidenced test-claim ceiling — third member of the
+  // EVAL-DEBT-CEILING family): the sprint-568..575 replays showed
+  // `testsPassed: true` with zero supporting evidence sailing to DONE while
+  // honest reporters lost — the exact fabrication incentive the honesty
+  // programme kills. For CODE-class tasks, a bare `testsPassed: true` with
+  // no test evidence anywhere (no test files changed, no measured coverage,
+  // no test-output trace in notes) caps the verdict at GO_WITH_TECH_DEBT —
+  // deliberately NOT NO_GO (no fix loop is spawned for what may be sloppy
+  // reporting), and deliberately inert for doc/audit classes where the
+  // field is already neutral.
+  if (
+    decision === 'DONE'
+    && result.testsPassed === true
+    && testsApplicableForTask(task)
+    && !hasTestClaimEvidence(result)
+  ) {
+    decision = 'GO_WITH_TECH_DEBT';
   }
 
   const evaluation: EvaluationResult = {

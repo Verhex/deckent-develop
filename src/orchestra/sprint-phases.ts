@@ -117,7 +117,7 @@ import { showSplashIfEnabled } from '../cli/helpers/splash.js';
 import { calculateMetrics } from './sprint-reporter.js';
 
 // ─── Rubric-Based Evaluation ─────────────────────────────────────
-import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo, applyTechDebtDowngrade, reconstructFromDurableEvidence } from './result-evaluator.js';
+import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo, applyTechDebtDowngrade, reconstructFromDurableEvidence, testsApplicableForTaskClass } from './result-evaluator.js';
 
 // ─── Honest Result Gate (Sprint 165 Task 1 — Bug X Fix) ─────────
 // Single canonical honesty boundary. Applied before evaluateWithRubric
@@ -316,8 +316,11 @@ export async function safeRubricReconcile(
 ): Promise<EvaluationResult> {
   try {
     const scored = evaluateWithRubric(result, task, undefined, projectRoot);
-    if (hasConcreteEvaluationFailure(result)) {
-      return preserveNoGo(scored);
+    if (hasConcreteEvaluationFailure(result, task)) {
+      return preserveNoGo(
+        scored,
+        `concrete failure evidence (selfAssessment=${result.selfAssessment}, testsPassed=${String(result.testsPassed)}, attribution=${result.workAttribution?.state ?? 'n/a'})`,
+      );
     }
     const reconciled = await reconcileEvaluationSpuriousNoGo(
       scored, result, task, projectRoot);
@@ -337,6 +340,7 @@ export async function safeRubricReconcile(
     const reconstruction = enforceRecoveryBornEvaluationHonesty(
       result,
       reconstructFromDurableEvidence(result, task, msg),
+      task,
     );
     try {
       const sidFault = getCurrentSprintId(projectRoot) ?? sprintIdFallback;
@@ -364,17 +368,40 @@ export async function safeRubricReconcile(
   }
 }
 
-/** Concrete worker/host evidence is a terminal veto, independent of rubric score. */
-function hasConcreteEvaluationFailure(result: TaskResult): boolean {
+/**
+ * Concrete worker/host evidence is a terminal veto, independent of rubric
+ * score. 7097 root-cause fix (sprints 575-581 migrating chronic): the
+ * `testsPassed === false` clause is only concrete evidence for task classes
+ * that HAVE a test surface — for doc/audit tasks an honest `false` means
+ * "nothing to run", and treating it as failure flipped 5/5-passed rubric
+ * DONEs to untraceable NO_GOs after D2 had already fixed the criterion
+ * itself. Classified with the same authority the rubric uses
+ * (testsApplicableForTaskClass). When no task is supplied (legacy callers),
+ * the conservative code-class behaviour is kept.
+ */
+function hasConcreteEvaluationFailure(result: TaskResult, task?: Task): boolean {
   return result.selfAssessment === 'NO_GO'
-    || result.testsPassed === false
+    || (result.testsPassed === false && (!task || testsApplicableForTaskClass(task)))
     || result.workAttribution?.state === 'HOLD';
 }
 
-function preserveNoGo(evaluation: EvaluationResult): EvaluationResult {
-  return evaluation.decision === 'NO_GO'
-    ? evaluation
-    : { ...evaluation, decision: 'NO_GO' };
+function preserveNoGo(evaluation: EvaluationResult, cause?: string): EvaluationResult {
+  if (evaluation.decision === 'NO_GO') return evaluation;
+  // 7097-B1 (wrapper-level visibility): a veto that flips the rubric verdict
+  // must leave a typed trace in the score list — the audit record renders it
+  // with zero threshold/weight, so totals are untouched but the deciding
+  // layer is finally readable from disk.
+  const vetoRow = {
+    criterion: 'concrete_failure_veto',
+    score: 0,
+    passed: false,
+    reason: cause ?? 'concrete worker/host failure evidence — rubric verdict overridden to NO_GO',
+  };
+  return {
+    ...evaluation,
+    decision: 'NO_GO',
+    rubricScores: [...evaluation.rubricScores, vetoRow],
+  };
 }
 
 /**
@@ -402,8 +429,11 @@ function hasExactRecoveryProof(
 export function enforceRecoveryBornEvaluationHonesty(
   result: TaskResult,
   evaluation: EvaluationResult,
+  task?: Task,
 ): EvaluationResult {
-  return hasConcreteEvaluationFailure(result) ? preserveNoGo(evaluation) : evaluation;
+  return hasConcreteEvaluationFailure(result, task)
+    ? preserveNoGo(evaluation, 'recovery-born honesty boundary: concrete failure evidence')
+    : evaluation;
 }
 
 /**
@@ -842,6 +872,7 @@ export function writeTaskEvaluationAudit(
   evaluation: TaskEvaluation,
   rubricResult?: EvaluationResult,
   rationaleOverride?: string,
+  postRubricCauses?: readonly string[],
 ): void {
   try {
     const rubricScores = rubricResult?.rubricScores ?? [];
@@ -851,9 +882,17 @@ export function writeTaskEvaluationAudit(
       ? toAuditSchemaValidation(task, rubricScores)
       : { valid: false, missingFields: ['result'], coverageRelaxed: false };
     const auditDecision = toAuditDecision(evaluation);
-    const rationale = rationaleOverride ?? buildDecisionRationale(
+    // 7097-B1 (verdict-source chain): when a post-rubric layer changed the
+    // verdict, the audit record must SAY WHICH ONE — sprint-575/577/579 live
+    // case: three "5/5 passed, 92.5" records ended NO_GO with a rationale
+    // that only restated the score, so the deciding layer was untraceable
+    // from disk. Causes are appended to (never replace) the base rationale.
+    const causeSuffix = postRubricCauses && postRubricCauses.length > 0
+      ? ` | post-rubric: ${postRubricCauses.join(' → ')}`
+      : '';
+    const rationale = (rationaleOverride ?? buildDecisionRationale(
       auditDecision, totalScore, auditCriteria, auditSchema,
-    );
+    )) + causeSuffix;
     writeEvaluationAudit(projectRoot, sprintId, task.id, 1, {
       ruleSet: toAuditRuleSet(task),
       schemaValidation: auditSchema,
@@ -1832,6 +1871,13 @@ export async function runEvaluatePhase(
         let evaluation = runtimeBudgetAuthority
           ? TaskEvaluation.NO_GO
           : toTaskEvaluation(rubricResult);
+        // 7097-B1: every layer below that overrides the rubric verdict pushes
+        // a typed cause here; writeTaskEvaluationAudit appends the chain to
+        // the audit rationale so the deciding layer is traceable from disk.
+        const postRubricCauses: string[] = [];
+        if (runtimeBudgetAuthority) {
+          postRubricCauses.push('runtime-budget-authority:NO_GO');
+        }
 
         // PROMOTE-W1b: flag-gated partial promotion (default-off).
         // Runs BEFORE the honest-gate lock so genuine rubric-NO_GO+isPartialPromotable
@@ -1844,7 +1890,7 @@ export async function runEvaluatePhase(
             evaluation === TaskEvaluation.NO_GO &&
             rubricResult.isPartialPromotable === true &&
             gated.honest &&
-            !hasConcreteEvaluationFailure(result) &&
+            !hasConcreteEvaluationFailure(result, task) &&
             result.workAttribution?.state === 'VERIFIED' &&
             !runtimeBudgetAuthority
           ) {
@@ -1886,6 +1932,7 @@ export async function runEvaluatePhase(
         // re-introduce the bug). Lock to NO_GO when violation was detected.
         if (!gated.honest) {
           evaluation = TaskEvaluation.NO_GO;
+          postRubricCauses.push(`honest-gate:${gated.violation ?? 'violation'}:NO_GO`);
         }
 
         // CI regression check: run after initial evaluation (non-fatal)
@@ -1902,15 +1949,18 @@ export async function runEvaluatePhase(
                 const hasOverlap = tscErrorFiles.some(f => taskFiles.has(f));
                 if (hasOverlap) {
                   evaluation = TaskEvaluation.NO_GO;
+                  postRubricCauses.push('ci-guardian:tsc-fail-overlap:NO_GO');
                 }
               }
               // targeted test failure + block_on_test_fail → downgrade to NO_GO
               if (!ciCheckResult.targetedTestsPassed && ciGuardianConfig.block_on_test_fail) {
                 evaluation = TaskEvaluation.NO_GO;
+                postRubricCauses.push('ci-guardian:targeted-tests-fail:NO_GO');
               }
               // If not downgraded to NO_GO, at least mark as tech debt
               if (evaluation !== TaskEvaluation.NO_GO && evaluation === TaskEvaluation.DONE) {
                 evaluation = TaskEvaluation.GO_WITH_TECH_DEBT;
+                postRubricCauses.push('ci-guardian:regression:GO_WITH_TECH_DEBT');
               }
               // Annotate result with regression info
               (result as TaskResult & { regressionDetected?: boolean }).regressionDetected = true;
@@ -2042,6 +2092,7 @@ export async function runEvaluatePhase(
             );
             if (mandatoryCrossVerify) {
               evaluation = TaskEvaluation.NO_GO;
+              postRubricCauses.push('cross-verify:mandatory-ceiling:NO_GO');
               const ceilingNote = [
                 '[cross-verify:mandatory-hold]',
                 'outcome=unavailable',
@@ -2128,6 +2179,7 @@ export async function runEvaluatePhase(
                 `task=${task.id} outcome=${xvResult.outcome} → NO_GO (enforce_refuted)`,
               );
               evaluation = TaskEvaluation.NO_GO;
+              postRubricCauses.push(`cross-verify:enforced:${xvResult.outcome}:NO_GO`);
               const enfNote = [
                 '[cross-verify:enforced-no-go]',
                 `outcome=${xvResult.outcome}`,
@@ -2140,6 +2192,7 @@ export async function runEvaluatePhase(
             debugLog('runEvaluatePhase:crossVerify', e);
             if (mandatoryCrossVerify) {
               evaluation = TaskEvaluation.NO_GO;
+              postRubricCauses.push('cross-verify:runtime-fault:NO_GO');
               const detail = e instanceof Error ? e.message : String(e);
               const failureNote = [
                 '[cross-verify:mandatory-hold]',
@@ -2183,6 +2236,9 @@ export async function runEvaluatePhase(
                 evaluation = downgrade.decision === 'NO_GO'
                   ? TaskEvaluation.NO_GO
                   : TaskEvaluation.GO_WITH_TECH_DEBT;
+                postRubricCauses.push(
+                  `verify-delta:ratio=${downgrade.completionRatio}:${downgrade.decision}`,
+                );
                 try {
                   const sidVd = getCurrentSprintId(projectRoot) ?? sprint.id;
                   writeEvent(
@@ -2221,6 +2277,9 @@ export async function runEvaluatePhase(
             );
             if (adrVerdict.pass === false) {
               evaluation = TaskEvaluation.NO_GO;
+              postRubricCauses.push(
+                `adr-compliance:${adrVerdict.violations.map(v => v.adrId).join('+')}:NO_GO`,
+              );
               const reason = adrVerdict.violations
                 .map(v => `${v.adrId}: ${v.description}`)
                 .join('; ');
@@ -2239,10 +2298,19 @@ export async function runEvaluatePhase(
         if (runtimeBudgetAuthority) {
           evaluation = TaskEvaluation.NO_GO;
         }
-        evaluation = toTaskEvaluation(enforceRecoveryBornEvaluationHonesty(
-          result,
-          { ...rubricResult, decision: toAuditDecision(evaluation) },
-        ));
+        {
+          const beforeHonesty = evaluation;
+          evaluation = toTaskEvaluation(enforceRecoveryBornEvaluationHonesty(
+            result,
+            { ...rubricResult, decision: toAuditDecision(evaluation) },
+            task,
+          ));
+          if (evaluation !== beforeHonesty) {
+            postRubricCauses.push(
+              `recovery-born-honesty:${toAuditDecision(beforeHonesty)}→${toAuditDecision(evaluation)}`,
+            );
+          }
+        }
         const runtimeBudgetAuthorityReason = runtimeBudgetAuthority
           ? `host_runtime_budget_exhausted:${runtimeBudgetAuthority.settlementRef.attemptId}`
           : undefined;
@@ -2281,6 +2349,7 @@ export async function runEvaluatePhase(
           evaluation,
           rubricResult,
           runtimeBudgetAuthorityReason,
+          postRubricCauses,
         );
 
         // DECKENT→USER:NOTIFY (Hot Fix H6) — task-done / task-no-go, fail-safe
@@ -2409,16 +2478,26 @@ export async function runEvaluatePhase(
               `task=${task.id} produced .result during extension window`,
             );
             const rubricResult = await safeRubricReconcile(projectRoot, sprint.id, task, lateResult);
+            // 7097-B1: this late-result branch writes its own audit record —
+            // tag the path and any settle-driven verdict change so a chronic
+            // "5/5 passed but NO_GO" here is traceable to THIS branch.
+            const lateCauses: string[] = ['path:late-result-extension'];
+            const preSettle = toTaskEvaluation(rubricResult);
             const evaluation = settleEvaluationWithRepairAuthority(
               projectRoot,
               task,
-              toTaskEvaluation(rubricResult),
+              preSettle,
               lateResult,
               initialFixPolicy,
             );
+            if (evaluation !== preSettle) {
+              lateCauses.push(`repair-authority:${toAuditDecision(preSettle)}→${toAuditDecision(evaluation)}`);
+            }
             evaluations.set(task.id, evaluation);
             evaluatedThisInvocation.add(task.id);
-            writeTaskEvaluationAudit(projectRoot, sprint.id, task, evaluation, rubricResult);
+            writeTaskEvaluationAudit(
+              projectRoot, sprint.id, task, evaluation, rubricResult, undefined, lateCauses,
+            );
             continue;
           }
           debugLog(
@@ -2508,16 +2587,24 @@ export async function runEvaluatePhase(
               `task=${task.id} produced .result during grace window`,
             );
             const graceRubric = await safeRubricReconcile(projectRoot, sprint.id, task, graceResult);
+            // 7097-B1: tag this branch too (see the late-result-extension twin).
+            const graceCauses: string[] = ['path:alive-grace-poll'];
+            const preGrace = toTaskEvaluation(graceRubric);
             const graceEval = settleEvaluationWithRepairAuthority(
               projectRoot,
               task,
-              toTaskEvaluation(graceRubric),
+              preGrace,
               graceResult,
               initialFixPolicy,
             );
+            if (graceEval !== preGrace) {
+              graceCauses.push(`repair-authority:${toAuditDecision(preGrace)}→${toAuditDecision(graceEval)}`);
+            }
             evaluations.set(task.id, graceEval);
             evaluatedThisInvocation.add(task.id);
-            writeTaskEvaluationAudit(projectRoot, sprint.id, task, graceEval, graceRubric);
+            writeTaskEvaluationAudit(
+              projectRoot, sprint.id, task, graceEval, graceRubric, undefined, graceCauses,
+            );
             continue;
           }
           debugLog(
@@ -2832,9 +2919,15 @@ export function recordFixEvaluationAudit(
     const auditCriteria = toAuditCriterionScores(fixTask, fixRubricResult.rubricScores);
     const auditSchema = toAuditSchemaValidation(fixTask, fixRubricResult.rubricScores);
     const auditDecision = toAuditDecision(fixEval);
+    // 7097-B1 (fix-phase twin): when the settled verdict differs from the raw
+    // rubric decision, say so — the FIX ledger produced the same untraceable
+    // "N/N passed but NO_GO" records as EVALUATE (sprint-580 live case).
+    const fixCauseSuffix = fixRubricResult.decision !== auditDecision
+      ? ` | post-rubric: fix-phase-settle:${fixRubricResult.decision}→${auditDecision}`
+      : '';
     const rationale = buildDecisionRationale(
       auditDecision, fixRubricResult.totalScore, auditCriteria, auditSchema,
-    );
+    ) + fixCauseSuffix;
     const payload = {
       ruleSet: toAuditRuleSet(fixTask),
       schemaValidation: auditSchema,

@@ -396,8 +396,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // (utimesSync write sites in task-restoration + evaluate-trigger-gate +
   // runtime-extension + liveness-adopt count as tracked writes); brain/
   // honesty-replay/brain-skill pins realigned to the F1d/573-ceiling wording.
+  // 2026-08-20 (7097 evaluator-honesty package): same 14467 count, digest
+  // only — typed-suite gains the B3 unevidenced-claim ceiling pins; existing
+  // evaluator pins' tracked content moved.
   count: 14467,
-  digest: 'ab1fc6e8993140b4d8d062c7cdfd86d62a32528d1ad79862282743fa75eefa20',
+  digest: '3df2dc4b8d3f98737dc94ead16136ddd1f029a0e26580ba006c138aeaf3b11e9',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -669,8 +672,14 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-20 (7094-F2b): same 1256 count, digest only — spawn-backend-docker
   // adds --disable-slash-commands to the F3 core args (deckent-owned
   // composition drops the CLI slash/skill catalog from the worker prefix).
+  // 2026-08-20 (7097 evaluator-honesty package): same 1256 count, digest
+  // only — result-evaluator (B3 ceiling, residualDebt-aware evidence,
+  // testsApplicableForTaskClass export), sprint-phases (verdict-source
+  // chain, class-aware concrete-failure veto), debt-manager (residualDebt
+  // ledger preference), task-types/prompt-template (residualDebt field +
+  // contract line) moved production content.
   count: 1256,
-  digest: '07aa9652ecb2321a2d8390567f8eda1c5c9ad4a95f749d17c099b1ae9db7345c',
+  digest: '34193a6e11de0a26ef2b46190e3ebe80d59f92b2d48b0264c9d8fb3f23bbfc6e',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

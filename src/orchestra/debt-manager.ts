@@ -356,15 +356,24 @@ function recordDebtEntry(
     const evalLabel = source === 'self'
       ? 'Task evaluated as DONE, but worker self-assessed GO_WITH_TECH_DEBT'
       : 'Task evaluated as GO_WITH_TECH_DEBT';
+    // 7097-B4: the worker's typed residual-gap statement is the ledger's
+    // preferred content — a debt row should carry the GAP, not the success
+    // narrative (sprint-573/574: full-notes rows read as pure success reports
+    // and spawned unfixable fix tasks). Full notes stay reachable as context.
+    const residual = typeof result.residualDebt === 'string' && result.residualDebt.trim().length > 0
+      ? result.residualDebt.trim()
+      : null;
     const title = isTimeoutPartial
       ? `Timeout-partial from ${task.id}: worker killed mid-execution, work accepted`
-      : `Tech debt from ${task.id}: ${result.notes}`;
+      : `Tech debt from ${task.id}: ${residual ?? result.notes}`;
     const content = isTimeoutPartial
       ? `Worker for ${task.id} was killed mid-execution (TIMEOUT_WITH_WORK); reconciliation `
         + `accepted the partial diff into the tree (GO_WITH_TECH_DEBT). There is no described `
         + `code defect to fix, so no forced follow-up is injected — any genuine incompleteness `
         + `resurfaces later as a concrete, actionable failure. Original worker note: ${result.notes}`
-      : `${evalLabel}. Notes: ${result.notes}`;
+      : residual
+        ? `${evalLabel}. Residual gap (worker-typed): ${residual}\n\n[Full worker notes for context]: ${result.notes}`
+        : `${evalLabel}. Notes: ${result.notes}`;
     store.insert({
       id: debtId,
       type: 'debt',
@@ -394,9 +403,11 @@ function recordDebtEntry(
         // without originScope. `success-echo` (sprint-573/574): a note that is
         // pure verification evidence with no actionable gap never becomes an
         // injectable fix task.
+        // 7097-B4: a typed residual gap is definitionally NOT a success echo
+        // — the classifier only runs for legacy notes-shaped rows.
         class: isTimeoutPartial
           ? 'timeout-partial'
-          : isSuccessOnlyDebtNote(String(result.notes ?? ''))
+          : !residual && isSuccessOnlyDebtNote(String(result.notes ?? ''))
             ? 'success-echo'
             : 'standard',
         originScope: {

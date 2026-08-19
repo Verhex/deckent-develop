@@ -2349,6 +2349,7 @@ Write .tasks/task-${task.id}.result with: taskId, workerId ("w-${task.id}"), fil
 Field shapes (strict — a wrong shape here breaks the orchestrator's result parser for the whole sprint):
 - \`notes\`: a SINGLE string, never an array or object. For multiple points, join them into ONE string using \`\\n\` newlines — do NOT write \`["point one", "point two"]\` or \`{"a": "..."}\`.
 - \`selfAssessment\`: exactly one of the three string literals \`"DONE"\`, \`"GO_WITH_TECH_DEBT"\`, \`"NO_GO"\` — never an array, never any other value.
+- \`residualDebt\`: REQUIRED whenever selfAssessment is \`"GO_WITH_TECH_DEBT"\` — ONE short paragraph naming ONLY what remains undone and where (file/area). Never restate what succeeded; the success evidence belongs in \`notes\`. Omit the field entirely for \`"DONE"\` and \`"NO_GO"\`.
 - \`filesChanged\`: an array of file-path strings, e.g. \`["src/foo.ts", "tests/foo.test.ts"]\`.
 - \`testsPassed\`: one boolean (\`true\` or \`false\`), never a command array.
 - \`coverage\`: one finite number from 0 to 100; use \`0\` to mean "not measured", never omit the field.

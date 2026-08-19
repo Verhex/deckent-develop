@@ -145,3 +145,13 @@
   katalogları) her worker'a taşıyordu — bayrak bunu da kesiyor. F2c (agent
   kataloğu ayrı maskeleme / --safe-mode) beklenen marjı küçük → sonraki dalga.
 - Bot restart yapıldı (pid 1439833, taze dist).
+
+## 7097 çekirdek paketi (2026-08-20 gece) — kroniğin ölümü
+- KÖK: hasConcreteEvaluationFailure sınıf-körüydü (testsPassed===false → sarmalayıcı-NO_GO,
+  doc'ta bile) — '5/5-passed NO_GO' göçmen-kroniğinin gerçek adresi; D2'nin kriter-içi
+  düzeltmesinin sarmalayıcı-ikizi. FIX: sınıf-bilinçli veto + typed concrete_failure_veto izi.
+- B1: 11 override-noktası typed cause; ana/extension/grace/fix audit'leri post-rubric zinciri.
+- B3: kanıtsız-test-iddiası tavanı (CODE; DONE→DEBT; kanıt=test-dosyası|coverage|koşu-izi).
+- B4: residualDebt alanı (tip+sözleşme+ledger-tercihi+echo-muafiyeti).
+- KANIT: sprint-582 = 6/6 DONE, 0 fix, 0 NO_GO — İLK tamamen temiz tur (F3 '3 temiz tur'
+  hedefinin 1.si). 580/581 blokajları D4-kenarlarıyla temiz-kayıtlıydı (580-005←580-004...).
