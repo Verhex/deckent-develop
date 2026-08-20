@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { EVALUATIONS_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { fromRubricDecision, type NormativeVerdict } from '../core/verdict-types.js';
+import type { AcceptanceOutcome } from '../core/acceptance-matrix.js';
 
 /**
  * Rule-set identifier mirroring rubric-registry TaskType but in the
@@ -79,6 +80,13 @@ export interface EvaluationAuditRecord {
    * until their surfaces migrate.
    */
   normativeVerdict: NormativeVerdict;
+  /**
+   * Acceptance-matrix OBSERVE stamp (task-kind × verdict policy outcome).
+   * Present when the caller could classify the task and the verdict is
+   * decidable (procedural HOLDs carry none — they are outside the policy).
+   * Observation only in this slice: the action never changes the decision.
+   */
+  acceptance?: AcceptanceOutcome;
   decisionRationale: string;
 }
 
@@ -93,6 +101,8 @@ export interface EvaluationAuditInput {
   criterionScores: AuditCriterionScore[];
   totalScore: number;
   decision: AuditDecision;
+  /** Acceptance-matrix OBSERVE stamp — see {@link EvaluationAuditRecord.acceptance}. */
+  acceptance?: AcceptanceOutcome;
   /** Optional override; default built via {@link buildDecisionRationale}. */
   decisionRationale?: string;
   /** Optional override (testing); defaults to `new Date().toISOString()`. */
@@ -192,6 +202,7 @@ export function writeEvaluationAudit(
     totalScore: input.totalScore,
     decision: input.decision,
     normativeVerdict: fromRubricDecision(input.decision),
+    ...(input.acceptance !== undefined ? { acceptance: input.acceptance } : {}),
     decisionRationale,
   };
 

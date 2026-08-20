@@ -415,8 +415,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-20 (ADR-G-040 verdict vocabulary + decision wave): −3 — the
   // chat-suite child_process mocks' rework retired three unresolved write
   // sites; the verdict-types suite's tmpdir fixture is tracked clean.
-  count: 14468,
-  digest: 'cfd6ec6f8fa65a67bcf10ac8591fb8afe501f9deffa239c0d539c83311ca9a19',
+  // 2026-08-20 (acceptance-matrix slice): +2 — the acceptance-matrix audit
+  // suite's two tmpdir fixture writes (observe-stamp + unstamped-HOLD pins).
+  count: 14470,
+  digest: '75180edacc39f4299f092ac6a337e13db7bb4cf040a2b273f1c43b72fea46963',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -716,8 +718,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-20 (ADR-G-040): +1 — the new verdict-types vocabulary module;
   // evaluation-audit-trail gained the normativeVerdict projection and the
   // decision-wave moved chat/test-discovery production content.
-  count: 1258,
-  digest: '470f0872797d49abb16ba3fef3f5a93903a244f52e947db4fe88b9e493757ec3',
+  // 2026-08-20 (acceptance-matrix slice): +1 — the new acceptance-matrix
+  // policy module; rubric-registry gained resolveCanonicalTaskKind,
+  // sprint-phases/audit-trail gained the observe stamp, and the criterion
+  // kernel's adapter union moved to its canonical core home.
+  count: 1259,
+  digest: 'f8db0d3fb93ce6b6b0c6962357a5825d9f59b38f16b938542c5c491ec823c54f',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

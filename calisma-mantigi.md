@@ -327,3 +327,29 @@ Muhur-2: codex CONFIRMED cross-verify-verdict:sha256:84e88e13...e6f7945e (karar-
   (3) rapor/CLI yuzeyinde normatif goruntuleme; (4) legacy enum'larin
   projeksiyona indirilmesi.
 Muhur-3: codex CONFIRMED cross-verify-verdict:sha256:dc4f3d5b...646e2efd (ADR-G-040 verdict-vocabulary dilimi)
+
+## Kabul-Matrisi dilimi (ADR-G-040 tamamlayici; 2026-08-20)
+- SSOT src/core/acceptance-matrix.ts: task-kind × decidable-verdict →
+  ACCEPT · ROUTE(adapter) · REJECT. HOLD tip-disi (DecidableVerdict) —
+  prosedurel non-verdict asla policy-kabul degil. ConfirmationAdapter
+  sozlugu kanonik evine indi (criterion-kernel re-export, KANUN 10).
+- Default enterprise-safe: her kind CONFIRMED/QUALIFIED→ACCEPT,
+  UNDECIDABLE→ROUTE(llm), FAILED→REJECT; SECURITY sert (QUALIFIED ve
+  UNDECIDABLE→ROUTE(human)).
+- normalizeAcceptanceOverride: gecersiz kural typed-sebeple DUSER (ROUTE
+  adaptersiz, adapter ROUTE'suz, bilinmeyen kind/verdict/action) — bozuk
+  policy-satiri kabulu sessizce genisletemez/daraltamaz.
+- OBSERVE wiring: writeTaskEvaluationAudit rubrik-authority'siyle siniflar
+  (resolveCanonicalTaskKind: task.type ?? detect-lift; drift'siz tek kaynak)
+  ve karar-kaydina acceptance-damgasi basar; HOLD-projeksiyonu damgasiz;
+  karar akisi degismez. Enforcement + config-yuzeyi + adapter-runtime
+  SONRAKI dilim (kodsuz enforce-anahtari = sahte-enablement, koymadik).
+- Tutarlilik-notu (bilincli): DEFERRED/NOT_DISPATCHED audit-decision'i
+  legacy olarak NO_GO'ya iner → kayitta normativeVerdict=FAILED ama
+  acceptance-damgasi YOK; damga-yoklugu HOLD'lugun izi. AuditDecision'a
+  DEFERRED eklemek legacy-migration dilimine.
+- MASTER-lint dersi (tekrar): hucre-icinde literal '|' satiri tablodan
+  dusurur (DEPENDENCY_MISSING olarak gorunur) — '·' kullan.
+- Pin: 5 policy + 2 audit-wiring + 206 komsu; tsc 0; hermetic +2 unresolved
+  (2 tmpdir pin) +1 prod-modul belgeli.
+Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-matrisi dilimi; onay=0 taze-reachability)

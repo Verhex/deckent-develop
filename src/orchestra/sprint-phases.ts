@@ -179,7 +179,10 @@ import {
   coverageOptional,
   detectTaskType,
   getRubric,
+  resolveCanonicalTaskKind,
 } from './rubric-registry.js';
+import { fromTaskEvaluation } from '../core/verdict-types.js';
+import { resolveAcceptance } from '../core/acceptance-matrix.js';
 
 // ─── Dependency Cascade / Unblock Wire (Sprint 156 — Task 003) ───
 // applyCascadeToSprint + applyUnblockToSprint were exported from
@@ -893,12 +896,21 @@ export function writeTaskEvaluationAudit(
     const rationale = (rationaleOverride ?? buildDecisionRationale(
       auditDecision, totalScore, auditCriteria, auditSchema,
     )) + causeSuffix;
+    // Acceptance-matrix OBSERVE stamp (ADR-G-040 companion): classify with
+    // the rubric's own authority and record what the policy WOULD do for
+    // this (kind × verdict). Procedural HOLD projections stay unstamped —
+    // they are outside the policy by type.
+    const normative = fromTaskEvaluation(evaluation);
+    const acceptance = normative === 'HOLD'
+      ? undefined
+      : resolveAcceptance(resolveCanonicalTaskKind(task), normative);
     writeEvaluationAudit(projectRoot, sprintId, task.id, 1, {
       ruleSet: toAuditRuleSet(task),
       schemaValidation: auditSchema,
       criterionScores: auditCriteria,
       totalScore,
       decision: auditDecision,
+      ...(acceptance !== undefined ? { acceptance } : {}),
       decisionRationale: rationale,
     });
   } catch (e) { debugLog('writeTaskEvaluationAudit', e); }

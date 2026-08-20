@@ -9,7 +9,7 @@
 // description text. Worker prompt/title language never influences routing.
 
 import type { Task, EvaluationRubric } from '../core/types.js';
-import { taskKindToRubric, type RubricTaskType } from '../core/work-model.js';
+import { taskKindToRubric, type RubricTaskType, type TaskKind } from '../core/work-model.js';
 import { inferStackFromFiles, isCoverageMeasurable } from '../core/coverage-adapters.js';
 
 /**
@@ -213,6 +213,20 @@ export const PROOF_OF_FUNCTION_CRITERION = {
  */
 export function resolveRubricTaskType(task: Task): RubricTaskType {
   return task.type != null ? taskKindToRubric(task.type) : detectTaskType(task);
+}
+
+/**
+ * Canonical TaskKind with the SAME authority chain as rubric selection:
+ * an explicit task.type wins verbatim; otherwise the rubric 3-class
+ * detection is lifted back to its canonical counterpart (`document-write`
+ * is the rubric-view name of `documentation`, ADR-G-028). Consumers that
+ * need the 11-kind vocabulary (acceptance matrix) classify HERE — never a
+ * parallel re-derivation that can drift from what the rubric judged.
+ */
+export function resolveCanonicalTaskKind(task: Task): TaskKind {
+  if (task.type != null) return task.type;
+  const rubricType = detectTaskType(task);
+  return rubricType === 'document-write' ? 'documentation' : rubricType;
 }
 
 export function getRubric(task: Task): EvaluationRubric {

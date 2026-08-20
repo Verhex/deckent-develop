@@ -20,13 +20,15 @@ import { join } from 'node:path';
 
 import type { Task, TaskResult } from '../core/types.js';
 import type { GoNoGoCriterionItem } from '../core/task-types.js';
+import type { ConfirmationAdapter } from '../core/acceptance-matrix.js';
 
 /**
  * How a criterion's satisfaction is confirmed. Only `deterministic` runs in
  * this kernel today; `code`, `llm` and `human` are the adapter families the
- * Evaluation Surface grows into (brief §3.5 capability table).
+ * Evaluation Surface grows into (brief §3.5 capability table). The union's
+ * canonical home is core/acceptance-matrix.ts (single vocabulary source).
  */
-export type CriterionConfirmationMode = 'deterministic' | 'code' | 'llm' | 'human';
+export type CriterionConfirmationMode = ConfirmationAdapter;
 
 export type CriterionStatus = 'satisfied' | 'unsatisfied' | 'undecidable';
 
