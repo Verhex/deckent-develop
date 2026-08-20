@@ -423,8 +423,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // shadowing regression pin writes a second sibling rollout fixture.
   // 2026-08-20 (D1 federated inbox): same 14473 count, digest only — the
   // federation suite's tmpdir store fixtures are tracked clean.
+  // 2026-08-20 (DE1 short codes): same 14473 count, digest only — the
+  // short-code suite is pure-compute; tracked content moved.
   count: 14473,
-  digest: '7f1e8642c54d8824b9142f7574ae5a400659bea5aaf33e7b12592b6e00c91f3a',
+  digest: '4bcbe39c41ab07eea0398e75cf146c3480ac5e6f83efdada651c6edf9920a3aa',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -736,8 +738,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (bounded newest-named candidate list + single-read descent).
   // 2026-08-20 (D1 federated inbox): +1 — the new approval-inbox-federation
   // module; approvals CLI/MCP gained the federated read-only section.
-  count: 1263,
-  digest: '226c8b052db2117ab6d85de196d0def933ccdf1138d5bc9ff5c476ae3c282230',
+  // 2026-08-20 (DE1 short codes): +1 — the new approval-short-code module;
+  // approvals CLI/MCP rows gained the #code prefix and decide gained
+  // fail-closed short-code resolution.
+  count: 1264,
+  digest: '039b3e28d3ba19069a539d80ba56a6abd8fa4530fb75469224ab612b0ac15cff',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

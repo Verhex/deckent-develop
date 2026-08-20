@@ -910,8 +910,8 @@ const MESSAGES: MessageMap = {
     tr: 'Bekleyen onay isteği yok',
   },
   'approvals.pending_line': {
-    en: '⏳ {id} — {summary} (valid until {expiresAt})',
-    tr: '⏳ {id} — {summary} (son geçerlilik: {expiresAt})',
+    en: '⏳ #{code} · {id} — {summary} (valid until {expiresAt})',
+    tr: '⏳ #{code} · {id} — {summary} (son geçerlilik: {expiresAt})',
   },
   'approvals.decide_context': {
     en: 'You are deciding: {summary}\n  Target: {provider}/{model} · {backendScope}\n  Ceiling: at most {maxTokens} tokens · at most {timeoutSec}s of run time\n  What it grants: ONE single limited reachability check of exactly this target — nothing else\n  Valid until: {expiresAt}',
@@ -2919,13 +2919,21 @@ const MESSAGES: MessageMap = {
     en: 'Unknown --tool "{tool}". Expected one of: {valid}.',
     tr: 'Bilinmeyen --tool "{tool}". Beklenen: {valid}.',
   },
+  'approvals.code_unknown': {
+    en: 'Short code #{code} matches no CURRENT pending request (codes never outlive the inbox — list again or use the full id).',
+    tr: '#{code} kısa-kodu ŞU ANKİ bekleyen isteklerle eşleşmiyor (kodlar kutudan uzun yaşamaz — yeniden listeleyin ya da tam id kullanın).',
+  },
+  'approvals.code_ambiguous': {
+    en: 'Short code #{code} is ambiguous here ({ids}) — use the full id.',
+    tr: '#{code} kısa-kodu burada belirsiz ({ids}) — tam id kullanın.',
+  },
   'approvals.federated.header': {
     en: '— other pending decisions (federated inbox, read-only) —',
     tr: '— diğer bekleyen kararlar (federe kutu, salt-okunur) —',
   },
   'approvals.federated.row': {
-    en: '[{origin}] {id} — {summary}  ·  decide: {hint}',
-    tr: '[{origin}] {id} — {summary}  ·  karar: {hint}',
+    en: '#{code} · [{origin}] {id} — {summary}  ·  decide: {hint}',
+    tr: '#{code} · [{origin}] {id} — {summary}  ·  karar: {hint}',
   },
   'approvals.federated.row_unreadable': {
     en: '[{origin}] {id} — UNREADABLE store (visible, not decidable here)',

@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
+import { shortCodeFor } from '../../core/approval-short-code.js';
 import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { openApprovalAuthorityRuntime } from '../../core/approval-authority-runtime.js';
 import { loadConfig } from '../../core/config.js';
@@ -39,6 +40,7 @@ export function registerApprovalsTool(server: McpServer): void {
         .map(item => ({
           origin: item.origin,
           id: item.id,
+          shortCode: shortCodeFor(item.id),
           summary: item.summary,
           decideHint: getMessage(item.decideHintKey, lang),
           ...(item.requestedAt ? { requestedAt: item.requestedAt } : {}),
@@ -71,12 +73,13 @@ export function registerApprovalsTool(server: McpServer): void {
       try {
         const pending = opened.service.broker.list('pending').map(request => ({
           id: request.id,
+          shortCode: shortCodeFor(request.id),
           summary: request.summary,
           expiresAt: request.expiresAt,
         }));
         const summary = pending.length === 0
           ? getMessage('approvals.none_pending', lang)
-          : pending.map(request => getMessage('approvals.pending_line', lang, request)).join('\n');
+          : pending.map(request => getMessage('approvals.pending_line', lang, { ...request, code: request.shortCode })).join('\n');
         return wrapMcp({ pending, federated, authority: 'ready' as const }, summary);
       } finally {
         opened.service.close();

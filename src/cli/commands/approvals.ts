@@ -12,6 +12,7 @@
 
 import { createInterface } from 'node:readline/promises';
 import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
+import { looksLikeShortCode, normalizeShortCode, resolveShortCode, shortCodeFor } from '../../core/approval-short-code.js';
 import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { userInfo } from 'node:os';
 import type { Command } from 'commander';
@@ -119,6 +120,7 @@ export function registerApprovalsCommand(program: Command): void {
         } else {
           for (const request of pending) {
             print(getMessage('approvals.pending_line', language, {
+              code: shortCodeFor(request.id),
               id: request.id,
               summary: request.summary,
               expiresAt: request.expiresAt,
@@ -146,6 +148,7 @@ export function registerApprovalsCommand(program: Command): void {
             origin: item.origin, id: item.id,
           })
           : getMessage('approvals.federated.row', language, {
+            code: shortCodeFor(item.id),
             origin: item.origin,
             id: item.id,
             summary: item.summary,
@@ -160,7 +163,8 @@ export function registerApprovalsCommand(program: Command): void {
     .option('--allow', getMessage('approvals.opt_allow', lang))
     .option('--deny', getMessage('approvals.opt_deny', lang))
     .option('--reason <text>', getMessage('approvals.opt_reason', lang))
-    .action(async (requestId: string, opts: ApprovalsDecideOpts) => {
+    .action(async (requestIdArg: string, opts: ApprovalsDecideOpts) => {
+      let requestId = requestIdArg;
       const root = resolveProjectRoot();
       const config = await loadConfig(root);
       const language = getLanguage(config.language);
@@ -194,6 +198,28 @@ export function registerApprovalsCommand(program: Command): void {
         return;
       }
       try {
+        // DE1 short-code resolution: addressing sugar only — resolves against
+        // the CURRENT broker pending set; unknown/stale codes fail closed and
+        // an ambiguous code demands the full id (never a guess).
+        if (looksLikeShortCode(requestId)) {
+          const pendingIds = opened.service.broker.list('pending').map(r => r.id);
+          const resolution = resolveShortCode(requestId, pendingIds);
+          if (resolution.state === 'resolved') {
+            requestId = resolution.id;
+          } else if (resolution.state === 'ambiguous') {
+            printError(new Error(getMessage('approvals.code_ambiguous', language, {
+              code: normalizeShortCode(requestId), ids: resolution.ids.join(', '),
+            })));
+            process.exitCode = 1;
+            return;
+          } else {
+            printError(new Error(getMessage('approvals.code_unknown', language, {
+              code: normalizeShortCode(requestId),
+            })));
+            process.exitCode = 1;
+            return;
+          }
+        }
         const action = opts.allow ? 'allow' as const : 'deny' as const;
         const actionLabel = getMessage(
           action === 'allow' ? 'approvals.action_allow' : 'approvals.action_deny',

@@ -472,3 +472,8 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   approval-rules.json (git-izlenir, typed sema, critical TIP-DISI, decidedBy:
   rule:<id> auditli, autonomous-baglari SOKULEBILIR kural; sistem kendine kural
   yazamaz; --always yalniz routine). Dilimler DE1→DE2→DE3, 3-asama muhurlu.
+- DE1 KISA-KOD dilimi LANDED (uc-asama: tasarim `…23868d35` / uygulama
+  `…3a67e585` / sonuc `…1eacd4f5`): 5-char Crockford kod her satirda (broker+
+  federe+MCP), decide kod-cozumu fail-closed (yalniz o-anki pending; ambiguous
+  tam-id ister); kimlik/MAC/kanal aynen. Gercek-binary '#BSJ1F' kaniti +
+  bilinmeyen-kod TR typed-reddi.
