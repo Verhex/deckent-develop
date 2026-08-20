@@ -167,3 +167,12 @@
 - 3/3 temiz-tur şartı yerine geldi → `worker_core_system_prompt` default true
   (config.ts; F2b bayrağı da core'la birlikte). false = stok-CLI bayt-parite.
 - .tasks tamamen temizlendi (246 xv-stub arşivde: .tasks/archive/xverify-2026-08-20).
+
+## F3 iki-yol wiring denetimi (owner sorusu, 2026-08-20)
+- Unit: loadConfig 3 merge-yolu (bölümsüz/kısmi/explicit-false) doğru değer ✓.
+- Canary kaldırıldı (.deckent/config.json'dan explicit-true silindi) — default-yol CANLI.
+- Gerçek-koşu kanıtı: sprint-585 (DEFAULT) worker argv = --system-prompt-file
+  .worker-core-641605c0e840.md + --disable-slash-commands, 1/1 DONE;
+  sprint-586 (EXPLICIT-FALSE) worker argv = core-args YOK (stok-CLI), 1/1 DONE.
+- xverify kararı: GEREKSİZ — kanıt sınıfı mekanik/grep-doğrulanabilir (argv+pin+unit);
+  mühür nokta-iddia gerektiren yorum-katmanı taşımıyor.
