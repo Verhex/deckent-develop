@@ -13,6 +13,7 @@
 import { createInterface } from 'node:readline/promises';
 import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
 import { looksLikeShortCode, normalizeShortCode, resolveShortCode, shortCodeFor } from '../../core/approval-short-code.js';
+import { loadApprovalRules, matchApprovalRule, promoteRuleFromDecision, saveApprovalRules } from '../../core/approval-rules.js';
 import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { userInfo } from 'node:os';
 import type { Command } from 'commander';
@@ -45,6 +46,7 @@ interface ApprovalsDecideOpts {
   allow?: boolean;
   deny?: boolean;
   reason?: string;
+  always?: boolean;
 }
 
 /**
@@ -113,6 +115,8 @@ export function registerApprovalsCommand(program: Command): void {
         process.exitCode = 1;
         return;
       }
+      const rules = loadApprovalRules(root);
+      if (rules.fault) print(getMessage('approvals.rules_fault', language));
       try {
         const pending = opened.service.broker.list('pending');
         if (pending.length === 0) {
@@ -125,6 +129,12 @@ export function registerApprovalsCommand(program: Command): void {
               summary: request.summary,
               expiresAt: request.expiresAt,
             }));
+            const matched = matchApprovalRule(request, rules.rules);
+            if (matched) {
+              print(getMessage('approvals.rule_advice', language, {
+                ruleId: matched.id, decision: matched.decision,
+              }));
+            }
           }
         }
       } finally {
@@ -163,6 +173,7 @@ export function registerApprovalsCommand(program: Command): void {
     .option('--allow', getMessage('approvals.opt_allow', lang))
     .option('--deny', getMessage('approvals.opt_deny', lang))
     .option('--reason <text>', getMessage('approvals.opt_reason', lang))
+    .option('--always', getMessage('approvals.opt_always', lang))
     .action(async (requestIdArg: string, opts: ApprovalsDecideOpts) => {
       let requestId = requestIdArg;
       const root = resolveProjectRoot();
@@ -275,6 +286,22 @@ export function registerApprovalsCommand(program: Command): void {
             action: actionLabel,
           }));
           if (action === 'allow') print(getMessage('approvals.decided_effect', language));
+          // DE2a --always promotion: an EXPLICIT owner decision becomes a
+          // persistent, removable routine-tier rule. Never system-minted;
+          // advisory until the rule authorization envelope lands (D2b).
+          if (opts.always === true) {
+            const rule = promoteRuleFromDecision({
+              requestId,
+              decision: action,
+              createdBy: userInfo().username,
+              reason: opts.reason ?? 'promoted via --always',
+            });
+            const existing = loadApprovalRules(root);
+            saveApprovalRules(root, [...existing.rules, rule]);
+            print(getMessage('approvals.rule_promoted', language, {
+              ruleId: rule.id, decision: rule.decision, idPrefix: rule.match.idPrefix,
+            }));
+          }
           return;
         }
         printError(new Error(getMessage('approvals.decision_refused', language, {
@@ -287,4 +314,73 @@ export function registerApprovalsCommand(program: Command): void {
         opened.service.close();
       }
     });
+
+  const rules = approvals
+    .command('rules')
+    .description(getMessage('approvals.rules_desc', lang));
+
+  rules
+    .command('list')
+    .description(getMessage('approvals.rules_list_desc', lang))
+    .action(() => {
+      const root = resolveProjectRoot();
+      const language = getLanguage(undefined);
+      const loaded = loadApprovalRules(root);
+      if (loaded.fault) print(getMessage('approvals.rules_fault', language));
+      if (loaded.rules.length === 0) {
+        print(getMessage('approvals.rules_none', language));
+        return;
+      }
+      for (const rule of loaded.rules) {
+        print(getMessage('approvals.rules_row', language, {
+          id: rule.id,
+          state: getMessage(rule.disabled === true
+            ? 'approvals.rules_state_disabled'
+            : 'approvals.rules_state_active', language),
+          decision: rule.decision,
+          idPrefix: rule.match.idPrefix,
+          summaryIncludes: rule.match.summaryIncludes ? `~"${rule.match.summaryIncludes}"` : '',
+          tier: rule.match.riskTierMax,
+          createdBy: rule.createdBy,
+          source: rule.source,
+          reason: rule.reason,
+        }));
+      }
+    });
+
+  const mutateRule = (
+    id: string,
+    action: 'disable' | 'enable' | 'remove',
+  ): void => {
+    const root = resolveProjectRoot();
+    const language = getLanguage(undefined);
+    const loaded = loadApprovalRules(root);
+    const target = loaded.rules.find(rule => rule.id === id);
+    if (!target) {
+      printError(new Error(getMessage('approvals.rules_not_found', language, { id })));
+      process.exitCode = 1;
+      return;
+    }
+    const next = action === 'remove'
+      ? loaded.rules.filter(rule => rule.id !== id)
+      : loaded.rules.map(rule => rule.id !== id ? rule : {
+        ...rule,
+        disabled: action === 'disable' ? true : undefined,
+        ...(action === 'disable'
+          ? { disabledAt: new Date().toISOString(), disabledBy: userInfo().username }
+          : { disabledAt: undefined, disabledBy: undefined }),
+      });
+    saveApprovalRules(root, next);
+    print(getMessage('approvals.rules_updated', language, { id, action }));
+  };
+
+  rules.command('disable <id>')
+    .description(getMessage('approvals.rules_disable_desc', lang))
+    .action((id: string) => mutateRule(id, 'disable'));
+  rules.command('enable <id>')
+    .description(getMessage('approvals.rules_enable_desc', lang))
+    .action((id: string) => mutateRule(id, 'enable'));
+  rules.command('remove <id>')
+    .description(getMessage('approvals.rules_remove_desc', lang))
+    .action((id: string) => mutateRule(id, 'remove'));
 }

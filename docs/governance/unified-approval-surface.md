@@ -199,9 +199,11 @@ typed `LOOP_BUDGET_EXHAUSTED` park (never silent).
 L5 **Approval SLA**: pending age thresholds per class → escalate channel
 (re-notify → alternate channel → park-with-alert); starvation becomes visible,
 never eternal.
-L6 **Supervisor**: `deckent loops` surface (list/health/restart) + documented OS
-service templates (systemd/launchd/Task Scheduler) per EVERY-ENVIRONMENT; crash →
-supervisor restart with backoff; reboot → service brings loops back.
+L6 **Supervisor**: NO new `deckent loops` surface (owner correction 2026-08-20 —
+absorb, never invent): loop list/health/restart capabilities extend the EXISTING
+`deckent autonomous` / `deckent process` / `deckent do` surfaces; plus documented
+OS service templates (systemd/launchd/Task Scheduler) per EVERY-ENVIRONMENT;
+crash → supervisor restart with backoff; reboot → service brings loops back.
 L7 **Blocker taxonomy as data**: the measured taxonomy (parked-approval,
 provider-authority-hold, recovery-hold, occurrence-authority, lease-lost, sprint
 PAUSED classes, checkpoint timeout, cost/budget stops, cascade breaker, panic gate,

@@ -2919,6 +2919,54 @@ const MESSAGES: MessageMap = {
     en: 'Unknown --tool "{tool}". Expected one of: {valid}.',
     tr: 'Bilinmeyen --tool "{tool}". Beklenen: {valid}.',
   },
+  'approvals.rules_desc': {
+    en: 'Persistent approval rules (approval-rules.json) — list, disable, enable, remove',
+    tr: 'Kalıcı onay kuralları (approval-rules.json) — listele, devre-dışı bırak, etkinleştir, sil',
+  },
+  'approvals.rules_list_desc': {
+    en: 'List rules with status',
+    tr: 'Kuralları durumlarıyla listele',
+  },
+  'approvals.rules_none': {
+    en: 'No approval rules recorded.',
+    tr: 'Kayıtlı onay kuralı yok.',
+  },
+  'approvals.rules_row': {
+    en: '{id} · {state} · {decision} {idPrefix}* {summaryIncludes} · tier≤{tier} · by {createdBy} ({source}) — {reason}',
+    tr: '{id} · {state} · {decision} {idPrefix}* {summaryIncludes} · seviye≤{tier} · {createdBy} ({source}) — {reason}',
+  },
+  'approvals.rules_state_active': { en: 'active', tr: 'aktif' },
+  'approvals.rules_state_disabled': { en: 'DISABLED', tr: 'DEVRE-DIŞI' },
+  'approvals.rules_disable_desc': {
+    en: 'Disable a rule (kept for audit; re-enable any time)',
+    tr: 'Kuralı devre-dışı bırak (denetim için saklanır; her an yeniden etkinleştirilebilir)',
+  },
+  'approvals.rules_enable_desc': { en: 'Re-enable a disabled rule', tr: 'Devre-dışı kuralı yeniden etkinleştir' },
+  'approvals.rules_remove_desc': { en: 'Remove a rule permanently', tr: 'Kuralı kalıcı olarak sil' },
+  'approvals.rules_updated': {
+    en: '{id}: {action} recorded.',
+    tr: '{id}: {action} kaydedildi.',
+  },
+  'approvals.rules_not_found': {
+    en: 'Rule {id} not found.',
+    tr: '{id} kuralı bulunamadı.',
+  },
+  'approvals.rules_fault': {
+    en: 'WARNING: approval-rules.json is partially unreadable — invalid entries are ignored, never treated as authority.',
+    tr: 'UYARI: approval-rules.json kısmen okunamıyor — geçersiz girdiler yok sayılır, asla otorite sayılmaz.',
+  },
+  'approvals.rule_advice': {
+    en: '   ↳ rule {ruleId} would {decision} this (advisory — automatic application arrives with the rule authorization envelope, D2b)',
+    tr: '   ↳ {ruleId} kuralı bunu {decision} yapardı (öneri — otomatik uygulama rule-yetki zarfıyla gelir, D2b)',
+  },
+  'approvals.opt_always': {
+    en: 'after deciding, promote this decision into a persistent routine-tier rule (approval-rules.json)',
+    tr: 'karardan sonra bu kararı kalıcı routine-seviye kurala terfi ettir (approval-rules.json)',
+  },
+  'approvals.rule_promoted': {
+    en: 'Rule {ruleId} recorded: {decision} {idPrefix}* — remove any time with: deckent approvals rules remove {ruleId}',
+    tr: '{ruleId} kuralı kaydedildi: {decision} {idPrefix}* — istediğin an sil: deckent approvals rules remove {ruleId}',
+  },
   'approvals.code_unknown': {
     en: 'Short code #{code} matches no CURRENT pending request (codes never outlive the inbox — list again or use the full id).',
     tr: '#{code} kısa-kodu ŞU ANKİ bekleyen isteklerle eşleşmiyor (kodlar kutudan uzun yaşamaz — yeniden listeleyin ya da tam id kullanın).',

@@ -425,8 +425,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // federation suite's tmpdir store fixtures are tracked clean.
   // 2026-08-20 (DE1 short codes): same 14473 count, digest only — the
   // short-code suite is pure-compute; tracked content moved.
-  count: 14473,
-  digest: '4bcbe39c41ab07eea0398e75cf146c3480ac5e6f83efdada651c6edf9920a3aa',
+  // 2026-08-20 (DE2a rules): drift from the approval-rules suite fixtures.
+  count: 14476,
+  digest: 'a4853a6e8acf13a60da751985e6431a24b45167dfc9122700b5326a3a432ad1d',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -741,8 +742,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-20 (DE1 short codes): +1 — the new approval-short-code module;
   // approvals CLI/MCP rows gained the #code prefix and decide gained
   // fail-closed short-code resolution.
-  count: 1264,
-  digest: '039b3e28d3ba19069a539d80ba56a6abd8fa4530fb75469224ab612b0ac15cff',
+  // 2026-08-20 (DE2a rules): +1 — the approval-rules store module; CLI
+  // gained the rules subcommands, --always promotion and advisory lines.
+  count: 1265,
+  digest: '7ee05d07126b0dcb03484de5a858f8cc82014c7c3664c869d070d6ce59b4e96d',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

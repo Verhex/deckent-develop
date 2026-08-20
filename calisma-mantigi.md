@@ -477,3 +477,11 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   federe+MCP), decide kod-cozumu fail-closed (yalniz o-anki pending; ambiguous
   tam-id ister); kimlik/MAC/kanal aynen. Gercek-binary '#BSJ1F' kaniti +
   bilinmeyen-kod TR typed-reddi.
+- DE2a KURAL-STORE dilimi LANDED (durust-asamalama: motor ADVISORY; otomatik-
+  karar zarf-varyanti D2b): tam-sema dogrulama (hakem kismi-dogrulamayi HAKLI
+  REFUTED'ladi — 'authority-girdisi kismen guvenilmez' dersi kalici), critical
+  tip-disi, --always terfisi provenance'li, rules-CLI sokulebilirlik kaniti
+  gercek-binary'de. L6 'deckent loops' IPTAL-amendment'i islendi (absorbe:
+  autonomous/process/do). Muhurler: impl `…05fdd63f` / sonuc `…60d6aa1f`.
+- MIKRO-DERS: muhur-target'i yazmadan once HER dosya `wc -l` ile olculur —
+  bugun 4 kosu aralik-hatasina gitti; kural artik ritueldir.
