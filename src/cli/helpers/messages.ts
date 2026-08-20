@@ -2919,6 +2919,94 @@ const MESSAGES: MessageMap = {
     en: 'Unknown --tool "{tool}". Expected one of: {valid}.',
     tr: 'Bilinmeyen --tool "{tool}". Beklenen: {valid}.',
   },
+  'confirmations.cmd_desc': {
+    en: 'Custom-confirmation inbox — pending acceptance-matrix routes (llm/human/code adapters)',
+    tr: 'Custom-confirmation kutusu — bekleyen kabul-matrisi yönlendirmeleri (llm/insan/kod adapterları)',
+  },
+  'confirmations.list_desc': {
+    en: 'List pending confirmation requests',
+    tr: 'Bekleyen confirmation isteklerini listele',
+  },
+  'confirmations.list_empty': {
+    en: 'No pending confirmations.',
+    tr: 'Bekleyen confirmation yok.',
+  },
+  'confirmations.list_row': {
+    en: '{id} · {adapter} · {kind}·{verdict} · task {taskId} ({sprintId}) — {statement}',
+    tr: '{id} · {adapter} · {kind}·{verdict} · görev {taskId} ({sprintId}) — {statement}',
+  },
+  'confirmations.decide_desc': {
+    en: 'Decide one HUMAN-adapter confirmation (interactive terminal, single-shot)',
+    tr: 'Bir INSAN-adapter confirmation kararı ver (interaktif terminal, tek atış)',
+  },
+  'confirmations.run_desc': {
+    en: 'Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime)',
+    tr: 'Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime)',
+  },
+  'confirmations.opt_confirm': {
+    en: 'record a CONFIRMED verdict',
+    tr: 'CONFIRMED verdict kaydet',
+  },
+  'confirmations.opt_reject': {
+    en: 'record a FAILED verdict',
+    tr: 'FAILED verdict kaydet',
+  },
+  'confirmations.opt_reason': {
+    en: 'why (recorded verbatim on the settlement)',
+    tr: 'gerekçe (settlement üzerine aynen kaydedilir)',
+  },
+  'confirmations.opt_run_id': {
+    en: 'run a single pending llm confirmation',
+    tr: 'tek bir bekleyen llm confirmation isteğini işle',
+  },
+  'confirmations.opt_run_author': {
+    en: 'author provider when the request carries none',
+    tr: 'istek yazar-sağlayıcı taşımıyorsa kullanılacak sağlayıcı',
+  },
+  'confirmations.opt_run_timeout': {
+    en: 'verifier timeout in milliseconds',
+    tr: 'hakem zaman aşımı (milisaniye)',
+  },
+  'confirmations.llm_reason': {
+    en: 'cross-provider adjudication verdict={verdict}',
+    tr: 'çapraz-sağlayıcı hakemlik verdict={verdict}',
+  },
+  'confirmations.err_not_pending': {
+    en: 'Confirmation {id} is not pending (unknown or already settled).',
+    tr: '{id} confirmation isteği beklemede değil (bilinmiyor ya da zaten karara bağlanmış).',
+  },
+  'confirmations.err_wrong_adapter': {
+    en: 'Confirmation {id} belongs to the {adapter} adapter — this surface only handles {expected}.',
+    tr: '{id} confirmation isteği {adapter} adapterına ait — bu yüzey yalnız {expected} işler.',
+  },
+  'confirmations.err_flag_required': {
+    en: 'Exactly one of --confirm / --reject is required, together with --reason.',
+    tr: '--confirm / --reject bayraklarından tam olarak biri ve --reason zorunludur.',
+  },
+  'confirmations.err_no_tty': {
+    en: 'Decision refused: no interactive terminal present (a confirmation decision needs a live human).',
+    tr: 'Karar reddedildi: interaktif terminal yok (confirmation kararı canlı insan ister).',
+  },
+  'confirmations.confirm_prompt': {
+    en: 'Authenticate to record this decision: type "yes" if you are the authority at this terminal: ',
+    tr: 'Kararı kaydetmek için kimliğini doğrula: bu terminaldeki yetkili olarak onaylıyorsan "yes" yaz: ',
+  },
+  'confirmations.decided': {
+    en: '{id} settled: {verdict} (by {decidedBy}) — {reason}',
+    tr: '{id} karara bağlandı: {verdict} ({decidedBy}) — {reason}',
+  },
+  'confirmations.run_skip_author': {
+    en: '{id} skipped: no author provider recorded — pass --author to adjudicate it.',
+    tr: '{id} atlandı: yazar sağlayıcı kaydı yok — hakemlik için --author verin.',
+  },
+  'confirmations.run_unclear': {
+    en: '{id} stays pending: adjudication returned {verdict} (no settlement without a decisive verdict).',
+    tr: '{id} beklemede kalıyor: hakemlik {verdict} döndürdü (kesin verdict olmadan settlement yok).',
+  },
+  'confirmations.run_none': {
+    en: 'No pending llm-adapter confirmations.',
+    tr: 'Bekleyen llm-adapter confirmation yok.',
+  },
   'chat.tool_cli_missing': {
     en: 'Provider "{tool}" CLI not found in PATH. {details}',
     tr: '"{tool}" sağlayıcısının CLI aracı PATH üzerinde bulunamadı. {details}',

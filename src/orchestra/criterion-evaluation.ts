@@ -142,7 +142,12 @@ function evaluateItem(
 export function hasUnsalvageableContractFailure(
   rubricScores: readonly { criterion: string; passed: boolean }[],
 ): boolean {
-  return rubricScores.some(row => !row.passed && row.criterion.startsWith('goNogo:'));
+  // `goNogo:` — deterministic typed-contract evidence (this kernel).
+  // `acceptance:` — an enforced acceptance-policy REJECT (ADR-G-040): a
+  // policy decision the owner configured; worker-reported signals and green
+  // probe runs are equally unrelated evidence against it.
+  return rubricScores.some(row => !row.passed
+    && (row.criterion.startsWith('goNogo:') || row.criterion.startsWith('acceptance:')));
 }
 
 /**

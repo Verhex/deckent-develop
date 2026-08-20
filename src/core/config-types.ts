@@ -6,6 +6,7 @@ import type { NotificationConfig } from './notifications.js';
 import type { ModelType, ProviderName, EvaluationRubric } from './task-types.js';
 import type { ModelStrategy } from './mode-presets.js';
 import type { ModelTier } from './model-equivalence.js';
+import type { AcceptanceMatrixOverride } from './acceptance-matrix.js';
 import type { ErpRuntimeConfig } from './erp/factory.js';
 import type { BotCapabilitiesConfig } from '../connectors/capabilities/types.js';
 import type { ApprovalPolicyRule } from './approval-policy.js';
@@ -1325,6 +1326,15 @@ export interface DeckentConfig {
   // ─── Rubric-Based Evaluation ──────────────────────────────────────
   /** Custom evaluation rubric overrides (merged with DEFAULT_RUBRIC) */
   evaluation_rubric?: Partial<EvaluationRubric>;
+  /** ADR-G-040 acceptance-matrix per-cell overrides (task-kind × verdict →
+   *  ACCEPT/ROUTE/REJECT). Invalid rules are dropped with typed reasons at
+   *  resolution time — a malformed line never changes acceptance silently. */
+  acceptance_matrix?: AcceptanceMatrixOverride;
+  /** Acceptance-policy mode: 'observe' stamps audit records only (default);
+   *  'enforce' lets the policy cap/route the verdict (REJECT caps at NO_GO
+   *  unsalvageably; ROUTE downgrades DONE to tech-debt and persists a typed
+   *  ConfirmationRequest for the adapter surface). */
+  acceptance_enforcement?: 'observe' | 'enforce';
   /** Max retries when rubric evaluation fails (default: 0, max: 3) */
   rubric_max_retries?: number;
 
@@ -1954,6 +1964,8 @@ export interface ResolvedConfig {
   // Rubric-Based Evaluation
   evaluation_rubric?: Partial<EvaluationRubric>;
   rubric_max_retries?: number;
+  acceptance_matrix?: AcceptanceMatrixOverride;
+  acceptance_enforcement?: 'observe' | 'enforce';
   // Routing Engine v3 (legacy v1/v2 values migrate at config ingress)
   routing_engine?: 'v3';
   routing_config?: {

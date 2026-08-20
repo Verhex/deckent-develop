@@ -417,8 +417,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // sites; the verdict-types suite's tmpdir fixture is tracked clean.
   // 2026-08-20 (acceptance-matrix slice): +2 — the acceptance-matrix audit
   // suite's two tmpdir fixture writes (observe-stamp + unstamped-HOLD pins).
-  count: 14470,
-  digest: '75180edacc39f4299f092ac6a337e13db7bb4cf040a2b273f1c43b72fea46963',
+  // 2026-08-20 (adapter-runtime slice): +2 — the acceptance-enforcement
+  // suite's confirmation-store tmpdir fixtures (create/settle + CLI decide).
+  count: 14472,
+  digest: 'df991d9064f264e9cef55691a9b1f3a63fe12edf21ff609695f13a5fa13aa550',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -722,8 +724,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // policy module; rubric-registry gained resolveCanonicalTaskKind,
   // sprint-phases/audit-trail gained the observe stamp, and the criterion
   // kernel's adapter union moved to its canonical core home.
-  count: 1259,
-  digest: 'f8db0d3fb93ce6b6b0c6962357a5825d9f59b38f16b938542c5c491ec823c54f',
+  // 2026-08-20 (adapter-runtime slice): +3 — confirmation-store,
+  // acceptance-enforcement and the `deckent confirmations` CLI; config
+  // gained the acceptance fields and sprint-phases the enforce wiring.
+  count: 1262,
+  digest: 'ded9635fc62b3406708a29b1a501a233a28f31503fc3b6bfb20a1cadbbbe7000',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

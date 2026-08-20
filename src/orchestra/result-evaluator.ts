@@ -1589,10 +1589,23 @@ function evaluateWithRubricCore(
   // a decisive typed-contract failure (a no-go item provably holding, or a
   // go item's required evidence provably absent) caps the verdict at NO_GO,
   // joining the EVAL-DEBT-CEILING family with criterion-level audit rows.
+  let contractSummary: EvaluationResult['contractSummary'];
   if (_projectRoot) {
     try {
       const contract = evaluateGoNogoCriteria(task, result, _projectRoot);
       if (contract) {
+        // Kernel summary for the acceptance-enforcement layer (pure data):
+        // undecidable items are the ROUTE trigger there — never a penalty here.
+        contractSummary = {
+          decided: contract.decided,
+          total: contract.total,
+          undecidableItems: contract.items
+            .filter(item => item.status === 'undecidable')
+            .map(item => ({
+              itemId: item.itemId,
+              statement: task.goNogo?.items?.find(i => i.id === item.itemId)?.statement ?? item.itemId,
+            })),
+        };
         for (const item of contract.items) {
           rubricScores.push({
             criterion: `goNogo:${item.itemId}`,
@@ -1613,6 +1626,7 @@ function evaluateWithRubricCore(
     totalScore,
     rubricScores,
     retryCount: merged.maxRetries,
+    ...(contractSummary !== undefined ? { contractSummary } : {}),
   };
 
   // Sprint 163 T-001: Spurious NO_GO reconciliation wire restore.

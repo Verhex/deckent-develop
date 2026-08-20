@@ -1754,6 +1754,8 @@ export function createDefaultConfig(): DeckentConfig {
     // Rubric-Based Evaluation
     evaluation_rubric: undefined,
     rubric_max_retries: 0,
+    acceptance_matrix: undefined,
+    acceptance_enforcement: 'observe',
     // Adaptive Thresholds
     adaptive_thresholds: false,
     agent_min_score: 5,
@@ -2152,6 +2154,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Rubric-Based Evaluation
     evaluation_rubric: config.evaluation_rubric,
     rubric_max_retries: config.rubric_max_retries,
+    acceptance_matrix: config.acceptance_matrix,
+    acceptance_enforcement: config.acceptance_enforcement,
     // Routing Engine v3
     routing_engine: config.routing_engine,
     routing_config: config.routing_config,

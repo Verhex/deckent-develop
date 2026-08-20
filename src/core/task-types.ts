@@ -836,6 +836,17 @@ export interface EvaluationResult {
   filesOutOfScope?: string[];
   /** True when filesInScope is non-empty — partial promotion is possible. Only set on NO_GO. */
   isPartialPromotable?: boolean;
+  /**
+   * EVALUATION-001 criterion-kernel summary (set when the task carries typed
+   * goNogo items and a projectRoot was supplied). Pure data for the
+   * acceptance-enforcement layer: undecidable items are the ROUTE trigger —
+   * the kernel itself never routes or penalizes.
+   */
+  contractSummary?: {
+    decided: number;
+    total: number;
+    undecidableItems: Array<{ itemId: string; statement: string }>;
+  };
 }
 
 // ─── Token Usage ────────────────────────────────────────────────────

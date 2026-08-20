@@ -75,6 +75,7 @@ import { registerLimits } from './commands/limits.js';
 import { registerOpenRouterProbe } from './commands/openrouter-probe.js';
 import { registerXverifyCommand } from './commands/xverify.js';
 import { registerApprovalsCommand } from './commands/approvals.js';
+import { registerConfirmationsCommand } from './commands/confirmations.js';
 import { registerProviderAuthorityCommand } from './commands/provider-authority.js';
 import { registerExecutionAuthorityCommand } from './commands/execution-authority.js';
 import { registerCuStatus } from './commands/cu-status.js';
@@ -221,6 +222,7 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
       : {}),
   });
   registerApprovalsCommand(program);
+  registerConfirmationsCommand(program);
   registerProviderAuthorityCommand(program);
   registerExecutionAuthorityCommand(program);
   registerCuStatus(program);

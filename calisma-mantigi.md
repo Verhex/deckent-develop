@@ -353,3 +353,48 @@ Muhur-3: codex CONFIRMED cross-verify-verdict:sha256:dc4f3d5b...646e2efd (ADR-G-
 - Pin: 5 policy + 2 audit-wiring + 206 komsu; tsc 0; hermetic +2 unresolved
   (2 tmpdir pin) +1 prod-modul belgeli.
 Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-matrisi dilimi; onay=0 taze-reachability)
+
+## Adapter-Runtime + Enforcement dilimi (ADR-G-040; 2026-08-20)
+- acceptance-enforcement.ts (SAF post-rubrik katman): observe=dokunmaz;
+  enforce REJECT -> NO_GO tavani + 'acceptance:reject:<kind>' satiri
+  (salvage-gecirmez: guard oneki 'acceptance:' ile genisledi) + B1 typed
+  cause; enforce ROUTE -> DONE'u GWTD'ye indirir ('temiz DONE, onay borcu
+  varken erken-kapanis olurdu') + 'acceptance:route:<adapter>' bilgi-satiri
+  + ConfirmationRequest NIYETI (kernel undecidable-statement'lari; yoksa
+  goCriteria) + authorProvider result.tokenUsage'dan (yoksa YOK — uydurma
+  default yasak); ROUTE NO_GO'da asla atesslenmez.
+- confirmation-store.ts: .deckent/runtime/confirmations/{pending,settled};
+  deterministik cnf-id (sprint+task+item-set+adapter); idempotent create
+  (settled da kazanir — EVALUATE re-run karari diriltmez); tek-atis atomic
+  settle (rename).
+- Wiring: YALNIZ ana EVALUATE dali (runtime-budget authority atlar;
+  extension/grace/ingest bu dilimde observe-damgali — SINIR, sonraki
+  mikro-dilim). Audit-damgasi enforcement-sonucunu enforced-bayragiyla
+  verbatim tasir.
+- CLI `deckent confirmations`: list · decide (YALNIZ human; interaktif-TTY
+  'yes' dogrulamasi, TTY yoksa fail-closed — approvals sozlesmesi) · run
+  (YALNIZ llm; runXverifyForResult koprusuyle capraz-saglayici hakemlik;
+  CONFIRMED/REFUTED settle, UNCLEAR durustce pending kalir). code-adapter
+  ilan edildi, kosulamaz — pending kalir, verdict uydurulmaz. i18n en+tr.
+- Config: acceptance_matrix + acceptance_enforcement ('observe' default) —
+  iki interface + merge; enforce-anahtari artik GERCEK kodla geldi.
+- Kanit: 5 enforcement + 229 dilim+komsu + 234 config pinleri yesil; tsc 0;
+  hermetic +2/+3 belgeli; Tier-1 gercek-binary smoke: `deckent
+  confirmations list` -> 'No pending confirmations.' + help (yeni dist).
+- MUHUR-5a REFUTED (degerli): ilk muhur-denemesi codex tarafindan HAKLI
+  curutuldu — confirmations CLI'da option-aciklamalari ('record a CONFIRMED
+  verdict' vb.) hardcoded kalmisti; '--help' user-facing'dir, i18n-FIRST
+  ihlali + iddia-metni ('all user-facing text via catalog') yanlisti.
+  REFUTED-receipt `…5fe1644d` kayitta. Fix: 6 option-aciklamasi
+  confirmations.opt_* anahtarlarina (en+tr) tasindi; yeniden-olcum kosuldu.
+  DERS: yeni-CLI iddiasinda 'tum user-facing metin' cumlesi option/summary
+  metinlerini de kapsar — hakem tam bunu okudu.
+- MUHUR-5 ZINCIRI TAMAMLANDI: REFUTED(option-desc) → fix → UNCLEAR(truncation;
+  dar-slice dersi: dev-dosyayi ASLA tam-dosya evidence yapma, ranged ver) →
+  REFUTED(llm settle-reason literal — 'kayda yazilan ama ekrana render edilen
+  metin de user-facing'dir') → fix → UNCLEAR(iddia-parcasinin kanit-dilimi
+  yoksa hakem durustce undecidable der — iddiadaki HER cumleye dilim esle) →
+  CONFIRMED `…567070eaf7`. Dort receipt de kayitta; hakem iki gercek i18n
+  ihlali yakaladi. XVerify-claim disiplinine iki yeni kural: (1) 'tum
+  user-facing metin' iddiasi option-help + kayit-render metinlerini kapsar;
+  (2) iddia-cumle ↔ evidence-dilim birebir eslesmeli.

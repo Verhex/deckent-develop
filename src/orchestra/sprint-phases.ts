@@ -183,6 +183,8 @@ import {
 } from './rubric-registry.js';
 import { fromTaskEvaluation } from '../core/verdict-types.js';
 import { resolveAcceptance } from '../core/acceptance-matrix.js';
+import { applyAcceptanceEnforcement, type AcceptanceEnforcementResult } from './acceptance-enforcement.js';
+import { createConfirmationRequest } from '../core/confirmation-store.js';
 
 // ─── Dependency Cascade / Unblock Wire (Sprint 156 — Task 003) ───
 // applyCascadeToSprint + applyUnblockToSprint were exported from
@@ -876,6 +878,7 @@ export function writeTaskEvaluationAudit(
   rubricResult?: EvaluationResult,
   rationaleOverride?: string,
   postRubricCauses?: readonly string[],
+  acceptanceEnforcement?: AcceptanceEnforcementResult,
 ): void {
   try {
     const rubricScores = rubricResult?.rubricScores ?? [];
@@ -896,14 +899,17 @@ export function writeTaskEvaluationAudit(
     const rationale = (rationaleOverride ?? buildDecisionRationale(
       auditDecision, totalScore, auditCriteria, auditSchema,
     )) + causeSuffix;
-    // Acceptance-matrix OBSERVE stamp (ADR-G-040 companion): classify with
-    // the rubric's own authority and record what the policy WOULD do for
-    // this (kind × verdict). Procedural HOLD projections stay unstamped —
-    // they are outside the policy by type.
+    // Acceptance-matrix stamp (ADR-G-040): when the caller ran the
+    // enforcement layer its outcome (with the enforced flag) is recorded
+    // verbatim; otherwise classify with the rubric's own authority and
+    // record what the policy WOULD do (observe). Procedural HOLD
+    // projections stay unstamped — they are outside the policy by type.
     const normative = fromTaskEvaluation(evaluation);
-    const acceptance = normative === 'HOLD'
-      ? undefined
-      : resolveAcceptance(resolveCanonicalTaskKind(task), normative);
+    const acceptance = acceptanceEnforcement
+      ? { ...acceptanceEnforcement.outcome, enforced: acceptanceEnforcement.enforced }
+      : normative === 'HOLD'
+        ? undefined
+        : resolveAcceptance(resolveCanonicalTaskKind(task), normative);
     writeEvaluationAudit(projectRoot, sprintId, task.id, 1, {
       ruleSet: toAuditRuleSet(task),
       schemaValidation: auditSchema,
@@ -1877,12 +1883,9 @@ export async function runEvaluatePhase(
         // module (see helper doc comment). Exact host runtime-budget authority
         // skips that recovery probe: immutable containment is not a spurious
         // worker NO_GO and must not spend more host work trying to promote it.
-        const rubricResult: EvaluationResult = runtimeBudgetAuthority
+        let rubricResult: EvaluationResult = runtimeBudgetAuthority
           ? evaluateWithRubric(result, task, undefined, projectRoot)
           : await safeRubricReconcile(projectRoot, sprint.id, task, result);
-        let evaluation = runtimeBudgetAuthority
-          ? TaskEvaluation.NO_GO
-          : toTaskEvaluation(rubricResult);
         // 7097-B1: every layer below that overrides the rubric verdict pushes
         // a typed cause here; writeTaskEvaluationAudit appends the chain to
         // the audit rationale so the deciding layer is traceable from disk.
@@ -1890,6 +1893,32 @@ export async function runEvaluatePhase(
         if (runtimeBudgetAuthority) {
           postRubricCauses.push('runtime-budget-authority:NO_GO');
         }
+        // ADR-G-040 acceptance-enforcement (post-rubric policy layer, main
+        // EVALUATE branch only in this slice — extension/grace/ingest stay
+        // observe-stamped). Immutable runtime-budget containment is never
+        // policy-adjustable, so that authority skips the layer entirely.
+        let acceptanceEnforcement: AcceptanceEnforcementResult | undefined;
+        if (!runtimeBudgetAuthority) {
+          acceptanceEnforcement = applyAcceptanceEnforcement(
+            rubricResult, task, result, sprint.id, config);
+          rubricResult = acceptanceEnforcement.evaluation;
+          if (acceptanceEnforcement.postRubricCause) {
+            postRubricCauses.push(acceptanceEnforcement.postRubricCause);
+          }
+          if (acceptanceEnforcement.pendingConfirmation) {
+            try {
+              const created = createConfirmationRequest(projectRoot, {
+                ...acceptanceEnforcement.pendingConfirmation,
+                requestedAt: now(),
+              });
+              debugLog('acceptance-enforcement',
+                `task=${task.id} confirmation ${created.id} ${created.created ? 'created' : 'already-known'} (adapter=${acceptanceEnforcement.outcome.adapter})`);
+            } catch (e) { debugLog('acceptance-enforcement:persist', e); }
+          }
+        }
+        let evaluation = runtimeBudgetAuthority
+          ? TaskEvaluation.NO_GO
+          : toTaskEvaluation(rubricResult);
 
         // PROMOTE-W1b: flag-gated partial promotion (default-off).
         // Runs BEFORE the honest-gate lock so genuine rubric-NO_GO+isPartialPromotable
@@ -2362,6 +2391,7 @@ export async function runEvaluatePhase(
           rubricResult,
           runtimeBudgetAuthorityReason,
           postRubricCauses,
+          acceptanceEnforcement,
         );
 
         // DECKENT→USER:NOTIFY (Hot Fix H6) — task-done / task-no-go, fail-safe
