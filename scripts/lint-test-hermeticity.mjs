@@ -419,8 +419,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // suite's two tmpdir fixture writes (observe-stamp + unstamped-HOLD pins).
   // 2026-08-20 (adapter-runtime slice): +2 — the acceptance-enforcement
   // suite's confirmation-store tmpdir fixtures (create/settle + CLI decide).
-  count: 14472,
-  digest: 'df991d9064f264e9cef55691a9b1f3a63fe12edf21ff609695f13a5fa13aa550',
+  // 2026-08-20 (codex usage-log selection fix): +1 — the probe-debris
+  // shadowing regression pin writes a second sibling rollout fixture.
+  count: 14473,
+  digest: 'a1280abbf7c80fce90104592e9ce6966ed6c47e40851a7cc915751df913bc82d',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -727,8 +729,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-20 (adapter-runtime slice): +3 — confirmation-store,
   // acceptance-enforcement and the `deckent confirmations` CLI; config
   // gained the acceptance fields and sprint-phases the enforce wiring.
+  // 2026-08-20 (codex usage-log selection fix): same 1262 count, digest
+  // only — codex-provider-evidence-sources moved production content
+  // (bounded newest-named candidate list + single-read descent).
   count: 1262,
-  digest: 'ded9635fc62b3406708a29b1a501a233a28f31503fc3b6bfb20a1cadbbbe7000',
+  digest: 'afbba8e8b5ed1bfeae5f138224253ef8743e3d858ce434efaf4fb68a54f10bce',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

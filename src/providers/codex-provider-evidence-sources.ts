@@ -373,22 +373,51 @@ function boundedEntries(dir: string): readonly string[] | null {
 }
 
 /**
- * Newest rollout log under a date-partitioned `sessions/` tree.
+ * How many newest-named leaf logs the usage reader may try. Short-lived codex
+ * sessions (a few seconds — exactly the shape of OUR OWN verifier probes) can
+ * close without ever writing a `rate_limits` snapshot; picking only THE
+ * greatest-named file then starves the limit source on its own probe debris
+ * (measured live 2026-08-20: two ~86KB snapshot-less rollouts shadowed a
+ * 15.7MB snapshot-rich session and every verifier candidacy fell to
+ * `source_unavailable`). A bounded candidate list keeps the read finite while
+ * surviving that shape.
+ */
+const MAX_SESSION_LOG_CANDIDATES = 5;
+
+/**
+ * Newest rollout logs under a date-partitioned `sessions/` tree.
  *
  * codex partitions by zero-padded date segments and prefixes each log with its
  * own timestamp, so "greatest name per level" is a deterministic newest-first
- * descent that needs at most {@link MAX_SESSION_DESCENT} bounded readdir calls —
- * never a recursive tree walk.
+ * descent that needs at most {@link MAX_SESSION_DESCENT}+1 bounded readdir
+ * calls — never a recursive tree walk. At the LEAF level this returns the
+ * newest-named `limit` entries (newest first) instead of only the greatest
+ * one, so a snapshot-less short session cannot shadow its siblings.
  */
-function newestSessionLog(sessionsDir: string, pathApi: typeof posix): string | null {
+function newestSessionLogs(
+  sessionsDir: string,
+  pathApi: typeof posix,
+  limit: number,
+): string[] {
   let current = sessionsDir;
+  // Each directory is read exactly ONCE: the greatest child's listing is
+  // probed to detect the leaf level and then CARRIED into the next iteration
+  // instead of being re-read, keeping the total at MAX_SESSION_DESCENT+1
+  // bounded readdir calls.
+  let names = boundedEntries(current);
   for (let level = 0; level < MAX_SESSION_DESCENT; level += 1) {
-    const names = boundedEntries(current);
-    if (names === null || names.length === 0) return level === 0 ? null : current;
-    const greatest = [...names].sort().at(-1)!;
-    current = pathApi.join(current, greatest);
+    if (names === null || names.length === 0) return level === 0 ? [] : [current];
+    const sorted = [...names].sort();
+    const next = pathApi.join(current, sorted.at(-1)!);
+    const nextNames = boundedEntries(next);
+    if (nextNames === null) {
+      // Leaf directory: its entries are the log files themselves.
+      return sorted.slice(-limit).reverse().map(name => pathApi.join(current, name));
+    }
+    current = next;
+    names = nextNames;
   }
-  return current;
+  return [current];
 }
 
 function rateLimitWindow(value: unknown): CodexRateLimitWindow | null {
@@ -455,32 +484,37 @@ function readCodexUsageState(
 ): CodexUsageState {
   if (paths === null) return { kind: 'unavailable', reason: 'location-unresolved' };
   const pathApi = platform === 'win32' ? win32 : posix;
-  const log = newestSessionLog(paths.sessionsDir, pathApi);
-  if (log === null) return { kind: 'unavailable', reason: 'sessions-absent' };
-  const read = readBoundedTail(log, MAX_USAGE_TAIL_BYTES, false);
-  if (read === null) return { kind: 'unavailable', reason: 'log-absent' };
-
-  const lines = read.text.split('\n');
-  // A tail read can start mid-line; that fragment is never a parseable event.
-  if (read.partial) lines.shift();
-  const bounded = lines.slice(-MAX_EVENT_LINES);
-  for (let index = bounded.length - 1; index >= 0; index -= 1) {
-    const line = bounded[index]?.trim();
-    if (line === undefined || line === '') continue;
-    const event = parseObject(line);
-    if (event === null) continue;
-    const snapshot = findRateLimitSnapshot(event, 0);
-    if (snapshot === null) continue;
-    const primary = rateLimitWindow(snapshot['primary']);
-    const secondary = rateLimitWindow(snapshot['secondary']);
-    return {
-      kind: 'snapshot',
-      stateDigest: digest('usage-state', JSON.stringify({ primary, secondary })),
-      primary,
-      secondary,
-    };
+  const logs = newestSessionLogs(paths.sessionsDir, pathApi, MAX_SESSION_LOG_CANDIDATES);
+  if (logs.length === 0) return { kind: 'unavailable', reason: 'sessions-absent' };
+  let sawReadableLog = false;
+  for (const log of logs) {
+    const read = readBoundedTail(log, MAX_USAGE_TAIL_BYTES, false);
+    if (read === null) continue;
+    sawReadableLog = true;
+    const lines = read.text.split('\n');
+    // A tail read can start mid-line; that fragment is never a parseable event.
+    if (read.partial) lines.shift();
+    const bounded = lines.slice(-MAX_EVENT_LINES);
+    for (let index = bounded.length - 1; index >= 0; index -= 1) {
+      const line = bounded[index]?.trim();
+      if (line === undefined || line === '') continue;
+      const event = parseObject(line);
+      if (event === null) continue;
+      const snapshot = findRateLimitSnapshot(event, 0);
+      if (snapshot === null) continue;
+      const primary = rateLimitWindow(snapshot['primary']);
+      const secondary = rateLimitWindow(snapshot['secondary']);
+      return {
+        kind: 'snapshot',
+        stateDigest: digest('usage-state', JSON.stringify({ primary, secondary })),
+        primary,
+        secondary,
+      };
+    }
+    // No snapshot in this candidate's bounded tail — try the next-newest
+    // sibling (short probe sessions legitimately never write one).
   }
-  return { kind: 'unavailable', reason: 'no-rate-limit-snapshot' };
+  return { kind: 'unavailable', reason: sawReadableLog ? 'no-rate-limit-snapshot' : 'log-absent' };
 }
 
 function percentWindow(

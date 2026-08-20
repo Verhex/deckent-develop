@@ -1,9 +1,10 @@
 # Unified Approval Surface & Perpetual Autonomous Operation — Design
 
-**Status:** DESIGN — **DOGRULANACAK / UNVERIFIED** (owner manual verification pending,
-Alperen directive 2026-08-20: verifier routes unavailable — codex usage-source down,
-cursor docker-CLI unwired [7091], gemini CANCELLED as a verifier [API-only service]).
-No claim in §1 may be treated as CONFIRMED until the owner or a live verifier seals it.
+**Status:** DESIGN — **SEALED** (design-stage xverify: codex CONFIRMED
+`cross-verify-verdict:sha256:7043476a326d2c73969cdb0b83344598f07c44abf02206af86fd1589691c21a3`,
+2026-08-20 — after the verifier corrected one attribution: the stop MARKER lives in the
+CLI layer's wrapped sleep, not in runtime-loop). Gemini is CANCELLED as a verifier
+(API-only service); cursor's docker verifier CLI remains the 7091 residual.
 (owner-commissioned 2026-08-20; implementation slices land under
 MASTER 4056 APPROVAL-SURFACE-UNIFICATION-001 and 3112 AUTONOMOUS-PERPETUAL-001).
 **Owner problem statement:** approvals are scattered across `deckent approvals`,
@@ -75,8 +76,9 @@ violations in MCP nervous/autonomous decision messages (EN), checkpoint notify
 ### 1.3 Autonomous/perpetual infrastructure (measured)
 
 A real perpetual loop already exists: `runAutonomousLoop`
-(`src/orchestra/autonomous/runtime-loop.ts:510-545`, `for(;;)` + interval sleep + stop
-marker), trigger sources backlog/scheduled-flow/reactive/work-generator, hand-written
+(`src/orchestra/autonomous/runtime-loop.ts:510-545`, `for(;;)` + interval sleep +
+abort/max-iteration guards; the stop MARKER is checked by the CLI layer's sleep,
+`src/cli/commands/autonomous.ts:1370-1374`), trigger sources backlog/scheduled-flow/reactive/work-generator, hand-written
 dependency-free cron (`src/core/scheduled-flow.ts:46,140`), recurring re-enqueue
 (`backlog.ts:207`), durable webhook inbox (`webhook-reactive-source.ts:47`), repo-watch
 and Nervous observer (cron tick + fs.watch + event bus, `observer.ts:125-397`),
@@ -234,5 +236,8 @@ UNVERIFIED — five codex attempts returned typed HOLD (`candidate_not_eligible`
 ← limit `source_unavailable`: the usage window could not be read at all, not a
 saturation), gemini is CANCELLED as a verifier (API-only service, no
 subscription CLI), cursor's docker verifier CLI is the planned 7091 residual.
-Owner decision: the inventory claims in §1 stay marked DOGRULANACAK and the
-owner verifies them manually; the HOLD reports live in `.analysis/xverify/`.
+Design-stage seal COMPLETED: codex CONFIRMED `…691c21a3` after the verifier
+channel itself was repaired (the probe-debris shadowing defect below) and after
+the verifier corrected the stop-marker attribution — both corrections are part
+of this document's §1.3 now. The intermediate HOLD/REFUTED reports remain in
+`.analysis/xverify/` as the honest chain.

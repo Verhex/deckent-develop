@@ -339,6 +339,36 @@ describe('CodexAccountIdentityAuthority', () => {
 });
 
 describe('CodexUsageStateLimitEvidenceSource', () => {
+  // 2026-08-20 live incident pin: two short (seconds-lived) verifier-probe
+  // sessions closed WITHOUT ever writing a rate_limits snapshot, and their
+  // greater lexicographic names shadowed the snapshot-rich real session —
+  // every codex verifier candidacy fell to `source_unavailable` on our own
+  // probe debris. The reader now tries the newest-named leaf candidates
+  // (bounded) instead of only the single greatest name.
+  it('survives a snapshot-less greatest-named sibling (probe-debris shadowing)', async () => {
+    const fx = stateDir();
+    writeSessionLog(fx.path, [
+      JSON.stringify({ type: 'session_meta', payload: { id: 'session-real' } }),
+      usageEvent(7, 12),
+    ]);
+    const day = join(fx.path, 'sessions', '2026', '08', '12');
+    // Lexicographically GREATER than the snapshot-rich log, no rate_limits.
+    writeFileSync(
+      join(day, 'rollout-2026-08-12T09-05-00-zzz.jsonl'),
+      `${JSON.stringify({ type: 'session_meta', payload: { id: 'probe' } })}\n`,
+      'utf8',
+    );
+    const source = new CodexUsageStateLimitEvidenceSource({
+      env: fx.env,
+      platform: 'linux',
+      now: () => NOW,
+    });
+
+    const observed = await source.observe(limitInput());
+    expect(observed.state).toBe('known');
+    expect(observed.windows.map(w => w.consumed)).toEqual([7, 12]);
+  });
+
   it('projects the newest persisted rate-limit snapshot into both display windows', async () => {
     const fx = stateDir();
     writeSessionLog(fx.path, [

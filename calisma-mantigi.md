@@ -432,3 +432,21 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   yazildi (owner manuel dogrulayacak) — 49600c70f reapply + isaretler.
 - ACIK KALEM: codex usage-source arizasi (11:26'dan beri) — ayri teshis
   gerektirir (docker-ici codex CLI usage okumasi mi, servis mi).
+
+## Kanal-onarimi + muhur-zinciri kapanisi (2026-08-20, owner '1 oneri kabul')
+- CODEX KOKU KESIN: newestSessionLog greatest-name secimi, hakem-denemelerinin
+  KENDI saniyelik snapshot'siz rollout'lariyla golgelendi (leksikografik;
+  mtime degil — ls -t yaniltir) -> limit source_unavailable -> TUM codex
+  adayligi kilit. Kota %1'deydi. FIX: bounded newest-named aday-listesi (5) +
+  her dizin TAM BIR kez okunur (hakem cift-readdir'i REFUTED'ladi — hakli;
+  tek-okuma tasima duzeltmesi). Pin 42/42.
+- MUHUR-ZINCIRI: fix REFUTED `…855ebd49` -> duzeltme -> CONFIRMED `…655e8022b`
+  (kanalin canli-kaniti; kisir-dongu kirildi). TASARIM: UNCLEAR (iddia-3
+  dilim-eksigi) -> REFUTED (stop-marker atfi YANLISTI — hakem duzeltti:
+  marker CLI-sleep'inde autonomous.ts:1370, runtime-loop'ta degil; dokuman
+  duzeltildi) -> CONFIRMED `…691c21a3`. DOGRULANACAK-isaretleri receipt'lerle
+  degistirildi; 4090'a fix-blogu.
+- DERSLER: (1) hakem 4 turda 4 gercek hata yakaladi (2 i18n + readdir-siniri
+  + stop-marker atfi) — asama-bazli muhur degerini kanitladi; (2) ls -t ile
+  isim-sirali secim farkli — canlilik/teshis iddialarinda secim-kuralini oku;
+  (3) xv-artigi build-clean'i HOLD'lar — muhur-sonrasi arsivleme ritueli.
