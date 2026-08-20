@@ -399,22 +399,3 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   user-facing metin' iddiasi option-help + kayit-render metinlerini kapsar;
   (2) iddia-cumle ↔ evidence-dilim birebir eslesmeli.
 - DERS (commit-hijyeni): commit -m çift-tırnaklı mesajda backtick shell-substitution çalıştırır (89e66dcba'da 'NEW `deckent confirmations` CLI' boş kaldı — kozmetik, kod sağlam). Mesajları tek-tırnak/heredoc'la yaz.
-
-## Tek-Onay-Yuzeyi + Sonsuz-Loop programi — TASARIM dalgasi (owner-komisyonu 2026-08-20)
-- Envanter: 2 paralel agent — (A) 11 dagitik onay-yuzeyi + guclu ApprovalBroker
-  cekirdegi (MAC+TTL+tombstone) + yazilmis-ama-bagsiz kanallar (telegram/slack/
-  teams relay, vscode decide handler) + auth/TTL-asimetrisi + i18n ihlalleri;
-  (B) gercek for(;;) autonomous loop + el-yazimi cron + webhook/repo/nervous
-  tetikleyiciler + run-on-approve replay MEVCUT; bosluklar: supervisor,
-  occurrence-ledger, loop-heartbeat, kumulatif tavan, approval-SLA.
-- Tasarim: docs/governance/unified-approval-surface.md — ilke ABSORBE ET
-  (ikinci broker asla); typed origin/riskTier/blocking zarfi; karar-kanal
-  matrisi (MCP yalniz read-only+routine-ack, §12.2 korunur — genisletme
-  owner-amendment); federated-read-once (D1) sonra origin-bazli karar-gocu
-  (D2a/b) sonra kanal-tamamlama (D3) TTL/SLA (D4) emeklilik (D5); loop-govenansi
-  L1-L7. MASTER: 4056 (APPROVAL-001 alti) + 3112 (AUTONOMOUS-CONTROL-PLANE alti).
-- TASARIM-MUHRU: 3 hakem-yolu typed-HOLD (codex limit-doygun candidate_not_
-  eligible — GUNUN FRENI DOGRU CALISTI; gemini scope yok; cursor docker-CLI
-  unwired). HOLD=kapanis-degil; ACIK kalem MASTER 4056'da. DERS: yogun muhur
-  gunlerinde verifier-butcesi de planlanmali; cursor-docker dilimi (7091)
-  hakem-cesitliligi icin oncelik kazandi.

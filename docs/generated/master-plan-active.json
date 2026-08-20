@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "525c0361ce3be005d9e2246307829baa081aaf9549a099f2c5071fd7280787fc"
+    "value": "2d2640d36aa1961ec81d9e4e762434507de88ee326545a13aa5a80781c24d5d1"
   },
   "summary": {
-    "total": 517,
-    "active": 453,
+    "total": 515,
+    "active": 451,
     "terminal": 64,
     "receipts": 186,
     "byState": {
-      "OPEN": 360,
+      "OPEN": 358,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,14 +21,14 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 338,
+      "P0": 336,
       "P1": 140,
       "P2": 39
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 15,
-      "AUTHORITY": 49,
+      "AUTHORITY": 48,
       "CODEX": 44,
       "CONNECTOR": 2,
       "COST": 5,
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 117,
+      "KERNEL": 116,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -2177,17 +2177,6 @@
       "terminalClosureDigest": null
     },
     {
-      "order": 3112,
-      "id": "AUTONOMOUS-PERPETUAL-001",
-      "program": "KERNEL",
-      "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-20",
-      "definitionDigest": "e8cbff40fa86a28c1d43b80a07bda349505ea0562561b12c43f50df3246c5500",
-      "progressDigest": "f1055b87abe9cb1a50bdf5e07cf9c49066c2a401f739fdd1b7b15ff911ff2cb8",
-      "terminalClosureDigest": null
-    },
-    {
       "order": 3120,
       "id": "GOAL-CANARY-001",
       "program": "KERNEL",
@@ -3692,17 +3681,6 @@
       "updated": "2026-08-10",
       "definitionDigest": "df8eeea7014c5fb2a263771ddd333673ca038e36940e976389e53a918c36b0c5",
       "progressDigest": "b93eb721b56c16aa3d22331bb49f6f6dcd600f8d97bb3296325d9911d387bf77",
-      "terminalClosureDigest": null
-    },
-    {
-      "order": 4056,
-      "id": "APPROVAL-SURFACE-UNIFICATION-001",
-      "program": "AUTHORITY",
-      "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-20",
-      "definitionDigest": "0ba1e6d63b6ff3abadcae7bd8b826ddaf101d318664313d9590cef3e0cb93208",
-      "progressDigest": "23d6130f788ed4703798e984ff0d675ec0487faeb2b28139ff9d5a89836bd3dc",
       "terminalClosureDigest": null
     },
     {
@@ -14417,9 +14395,7 @@
         "AUTONOMOUS-OBSERVABILITY-001",
         "AUTONOMOUS-SCHEDULER-FAIRNESS-001"
       ],
-      "children": [
-        "AUTONOMOUS-PERPETUAL-001"
-      ],
+      "children": [],
       "gates": [
         "G2",
         "G1"
@@ -14440,49 +14416,12 @@
         "MISSION-KIND-001",
         "AUTONOMOUS-STATE-AUTHORITY-001",
         "AUTONOMOUS-TENANT-AUTHORITY-001",
-        "APPROVAL-DECISION-AUTHORITY-001",
-        "AUTONOMOUS-PERPETUAL-001"
+        "APPROVAL-DECISION-AUTHORITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "`autonomous.engine`, tenant pool, timeout ve bütün state path'leri typed/validated/documented effective config olur; CLI, MCP, API, Terminal, connectors, Dashboard ve Process aynı v2 application service/read modelini tüketir; legacy backlog/pending/decisions tek seferlik digest-bound, transactional, resumable ve rollback-safe migration receipt'iyle taşınır; cutover sonrası hiçbir v1 writer kalmaz ve eski dosyalar ancak owner-approved disposition manifestiyle archive/delete edilir",
       "evidence": "2026-08-10 code/disk truth: config `engine=v2` olduğu halde yalnız start v2'ye route ediyor; CLI status/backlog/approval, API `/api/autonomous/*`, üç MCP ailesi, Dashboard AutonomousPage ve Process legacy JSON authoritysini kullanıyor; real binary status v2 DB yerine 3 done+2 failed legacy entry gösterdi; DB'de `legacy` mission yok ve mevcut backlog bir sonraki başarılı v2 bootta import adayıdır",
       "updated": "2026-08-10"
-    },
-    {
-      "order": 3112,
-      "id": "AUTONOMOUS-PERPETUAL-001",
-      "parent": "AUTONOMOUS-CONTROL-PLANE-001",
-      "program": "KERNEL",
-      "outcome": "Sonsuz-dongulu otonom operasyon govenansi: zamanli izleyiciler + olay-tetikli surecler kesintisiz, kanitli ve frenli kosar — L1 LoopHandle+lease (v2 MissionEngineLease genellemesi) · L2 loop-heartbeat dosyasi (Kanun-15 canlilik-kaniti) + loop death-sweep · L3 occurrence-ledger (ADR-G-039 ertelenen dilim; cron kadanslari materialize+dedup+missed-policy skip/coalesce/backfill) · L4 loop-basi kumulatif harcama tavani (typed LOOP_BUDGET_EXHAUSTED park) · L5 approval-SLA/escalation (pending-yasi esikleri; starvation gorunur olur) · L6 supervisor (deckent loops yuzeyi + systemd/launchd/TaskScheduler sablonlari, EVERY-ENVIRONMENT) · L7 blocker-taksonomisi typed-registry (olculmus siniflar AI-okur kod+doc olur)",
-      "priority": "P0",
-      "dependsOn": [
-        "APPROVAL-SURFACE-UNIFICATION-001"
-      ],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G2",
-        "G1"
-      ],
-      "state": "OPEN",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "0",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [
-        "APPROVAL-SURFACE-UNIFICATION-001"
-      ],
-      "evidenceReceipts": [],
-      "acceptance": "Kabul: L1..L7 sirali dilimler; cikis-kaniti 24 saatlik gercek scheduled-watcher canary'si — restart/reboot'tan lease+heartbeat+occurrence+budget kanit-zinciriyle sag cikar; v2 runTask HOLD-stub closure'i (3111 kabulu) on-kosuldur; her dilim xverify-muhurlu",
-      "evidence": "Tasarim: docs/governance/unified-approval-surface.md §1.3+§3.4 (envanter: gercek for(;;) loop + el-yazimi cron + webhook/repo/nervous tetikleyiciler + run-on-approve replay MEVCUT; durust bosluklar: supervisor yok, occurrence-ledger yok [v2 guard'i TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED ile parkliyor], loop-heartbeat yok, kumulatif tavan yok, approval-SLA yok, FlowScheduler state in-memory, v1 fence'siz)",
-      "updated": "2026-08-20"
     },
     {
       "order": 3120,
@@ -18991,8 +18930,7 @@
         "APPROVAL-READ-CROSSPLATFORM-PROOF-001",
         "APPROVAL-INGRESS-UNKNOWN-ID-001",
         "APPROVAL-DECISION-AUTHORITY-001",
-        "NERVOUS-APPROVAL-SETTLEMENT-001",
-        "APPROVAL-SURFACE-UNIFICATION-001"
+        "NERVOUS-APPROVAL-SETTLEMENT-001"
       ],
       "gates": [
         "G2",
@@ -19017,8 +18955,7 @@
         "APPROVAL-READ-CROSSPLATFORM-PROOF-001",
         "APPROVAL-INGRESS-UNKNOWN-ID-001",
         "APPROVAL-DECISION-AUTHORITY-001",
-        "NERVOUS-APPROVAL-SETTLEMENT-001",
-        "APPROVAL-SURFACE-UNIFICATION-001"
+        "NERVOUS-APPROVAL-SETTLEMENT-001"
       ],
       "evidenceReceipts": [
         "GR-2026-08-08-APPROVAL-T1-01",
@@ -19105,7 +19042,6 @@
         "CAPABILITY-001"
       ],
       "dependents": [
-        "APPROVAL-SURFACE-UNIFICATION-001",
         "AUTONOMOUS-CONTROL-PLANE-001",
         "GROUND-TRUTH-OVERRIDE-AUTHORITY-001",
         "NERVOUS-APPROVAL-SETTLEMENT-001"
@@ -19152,7 +19088,6 @@
         "TENANT-001"
       ],
       "dependents": [
-        "APPROVAL-SURFACE-UNIFICATION-001",
         "NERVOUS-EFFECT-OUTCOME-TRUTH-001"
       ],
       "children": [],
@@ -19180,46 +19115,6 @@
       "acceptance": "Nervous normal/panic ve tüm CLI/MCP/Terminal/Desktop/API/connector ingressleri tek ApprovalBroker ve versioned state machine tüketir; yalnız exact durable pending request karar alır; principal, tenant, operation, revision, expiry ve nonce bind edilir; CAS ile ilk terminal karar kazanır; pending→decision→effect→settlement causal receipt'i crash/restart sonrası korunur; accept/reject/edit/undo paritylidir; unknown, duplicate, conflicting, expired ve orphan kararlar typed fail-closed olur; hiçbir transport dosyası effect doğrulanmadan resolved/dismissed olmaz; every-environment race/recovery proof'u pass olur",
       "evidence": "2026-08-10 disk/code RCA ve Alperen onayı: normal Nervous IPC, runtime ApprovalBroker ve legacy Panic IPC üç ayrı authority. Panic accept `panic-ipc/pending` yazarken gate yalnız `panic-ipc/resolved/<task>.json` okuyor; diskte 69 accepted pending ve 15 rejected resolved marker var, source panic event seti yok. Normal resolved 185 dosyada 22 duplicated ID ve altı mixed accepted/rejected logical ID bulundu; 10 dakikalık orphan age-out effect olmadan resolved üretebiliyor. API/MCP ingressleri unknown ID veya namespace-confused taskId kabul edebiliyor; API write hatasını yutup 200 success döndürüyor; CLI/MCP pending görünümünü executor consumptiondan önce kaldırabiliyor. Approval bridge/action modülleri source-present fakat production-unwired",
       "updated": "2026-08-10"
-    },
-    {
-      "order": 4056,
-      "id": "APPROVAL-SURFACE-UNIFICATION-001",
-      "parent": "APPROVAL-001",
-      "program": "AUTHORITY",
-      "outcome": "Tek onay-yuzeyi: TUM onay/karar ureticileri (confirmations cnf- · nervous+panic · autonomous trigger · checkpoint · cost/prompt/scope gate-ack · bot act-park · runflow-consent · gateway-pairing · settlement-review) runtime-wide durable ApprovalBroker'a typed origin/riskTier/blocking zarfiyla baglanir; karar her kanaldan (CLI-TTY · Desktop/OIDC · REPL · Telegram/Slack/Teams relay · VSCode RPC; MCP yalniz read-only + routine-ack sinifi, §12.2 korunur) risk-tier matrisiyle verilir; auth-asimetrisi kapanir (checkpoint/nervous/autonomous auth'suz dosya-mutasyonu emekli), her pending TTL+typed timeout-disposition tasir, NO-AUTO-APPROVE genellesir",
-      "priority": "P0",
-      "dependsOn": [
-        "APPROVAL-DECISION-AUTHORITY-001",
-        "NERVOUS-APPROVAL-SETTLEMENT-001"
-      ],
-      "dependents": [
-        "AUTONOMOUS-PERPETUAL-001"
-      ],
-      "children": [],
-      "gates": [
-        "G2",
-        "G1"
-      ],
-      "state": "OPEN",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "0",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [
-        "APPROVAL-DECISION-AUTHORITY-001",
-        "NERVOUS-APPROVAL-SETTLEMENT-001"
-      ],
-      "evidenceReceipts": [],
-      "acceptance": "Kabul: D1 federated-inbox (tek list TUM pending'i origin'li gosterir, davranis-degisimi sifir) → D2a/b karar-federasyonu (parity-pinli, legacy decide delege) → D3 kanal-tamamlama (Telegram/Slack/Teams relay CANLI + VSCode decide wired + gercek-cihaz kaniti) → D4 TTL/SLA normalizasyonu (suresiz-pending sinifi kalmaz) → D5 legacy-emeklilik + i18n-borc kapanisi; her dilim xverify-muhurlu (owner sarti: tasarim+uygulama+sonuc)",
-      "evidence": "Tasarim: docs/governance/unified-approval-surface.md (owner-komisyonu 2026-08-20; envanter 2 paralel agent + dosya:satir kanitli — guclu cekirdek: approval-contract MAC+TTL+tombstone; dagitik ikinci katman: 11 yuzey tablolu; yazilmis-ama-bagsiz: telegram/slack/teams relay + vscode decide handler). Ilke: ABSORBE ET, ikinci broker ASLA (KANUN 10 authority-uygulamasi). TASARIM-MUHRU DURUMU (durust kayit 2026-08-20): envanter-iddialari xverify'a tasindi; UC hakem-yolu da typed-HOLD — codex advisory-limit block-ratio doygun (candidate_not_eligible — gunun 10+ muhru sonrasi fren DOGRU calisti), gemini provider-scope kaniti yok, cursor docker-CLI unwired (7091 kalan dilim: docker_provider_cli_unavailable). HOLD kapanis DEGIL — tasarim-muhru ilk uygun hakem-penceresinde kosulacak ACIK kalem; uc HOLD-raporu .analysis/xverify'da",
-      "updated": "2026-08-20"
     },
     {
       "order": 4060,
@@ -26622,6 +26517,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f3d2bbe7150e3417e1d2c76a0a776ec93848f61c29a0a37098aeca32aad622c6"
+    "value": "003fb8731e3dac1562b2250158690f5669cb1a83dbd4a6e0460ba6f60feb3342"
   }
 }

@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):525c0361ce3be005d9e2246307829baa081aaf9549a099f2c5071fd7280787fc`
+**Source digest:** `sha256(normalized-lf-utf8):2d2640d36aa1961ec81d9e4e762434507de88ee326545a13aa5a80781c24d5d1`
 
-**Rows:** 517 total · 453 active · 64 terminal
+**Rows:** 515 total · 451 active · 64 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 360 |
+| OPEN | 358 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -186,7 +186,6 @@
 | 3100 | `GOAL-CRASH-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001` | — | Goal claim/effect/settlement crash idempotency |
 | 3110 | `GOAL-CUTOVER-001` | OPEN | P0 | KERNEL | `GOAL-DAG-001`, `MISSION-KIND-001` | — | Autonomous plan and legacy backlog migration into canonical missions |
 | 3111 | `AUTONOMOUS-CONTROL-PLANE-001` | OPEN | P0 | KERNEL | `MISSION-KIND-001`, `AUTONOMOUS-STATE-AUTHORITY-001`, `AUTONOMOUS-TENANT-AUTHORITY-001`, `APPROVAL-DECISION-AUTHORITY-001` | — | Canonical autonomous v2 control plane ve lossless legacy retirement |
-| 3112 | `AUTONOMOUS-PERPETUAL-001` | OPEN | P0 | KERNEL | `APPROVAL-SURFACE-UNIFICATION-001` | — | Sonsuz-dongulu otonom operasyon govenansi: zamanli izleyiciler + olay-tetikli surecler kesintisiz, kanitli ve frenli kosar — L1 LoopHandle+lease (v2 MissionEngineLease genellemesi) · L2 loop-heartbeat dosyasi (Kanun-15 canlilik-kaniti) + loop death-sweep · L3 occurrence-ledger (ADR-G-039 ertelenen dilim; cron kadanslari materialize+dedup+missed-policy skip/coalesce/backfill) · L4 loop-basi kumulatif harcama tavani (typed LOOP_BUDGET_EXHAUSTED park) · L5 approval-SLA/escalation (pending-yasi esikleri; starvation gorunur olur) · L6 supervisor (deckent loops yuzeyi + systemd/launchd/TaskScheduler sablonlari, EVERY-ENVIRONMENT) · L7 blocker-taksonomisi typed-registry (olculmus siniflar AI-okur kod+doc olur) |
 | 3120 | `GOAL-CANARY-001` | BLOCKED | P0 | KERNEL | `GOAL-POLICY-001`, `GOAL-ACCEPTANCE-001`, `GOAL-PROVIDER-001`, `GOAL-CRASH-001`, `GOAL-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | Goal-v2 approval, dependency, receipt and recovery canaries |
 | 3130 | `RUNFLOW-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `KERNEL-SETTLEMENT-001` | — | Durable RunFlow coordinator as sole proposal/approval/run authority |
 | 3131 | `RUNFLOW-STORE-RECONCILIATION-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `STATE-RETENTION-001` | — | Canonical RunFlow store için read-purity, complete legacy reconciliation ve versioned migration authority |
@@ -298,7 +297,6 @@
 | 4053 | `APPROVAL-INGRESS-UNKNOWN-ID-001` | VERIFY | P0 | AUTHORITY | — | — | Unknown/forged approval id fail-closed at the API and MCP ingress |
 | 4054 | `APPROVAL-DECISION-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `CAPABILITY-001` | — | Protected approval decisionları için worker-dışı, zorunlu ve doğrulanmış human authority chain |
 | 4055 | `NERVOUS-APPROVAL-SETTLEMENT-001` | OPEN | P0 | AUTHORITY | `APPROVAL-DECISION-AUTHORITY-001`, `PRINCIPAL-001`, `TENANT-001` | — | Nervous proposal, approval ve effect için tek runtime-wide first-writer-wins settlement authority |
-| 4056 | `APPROVAL-SURFACE-UNIFICATION-001` | OPEN | P0 | AUTHORITY | `APPROVAL-DECISION-AUTHORITY-001`, `NERVOUS-APPROVAL-SETTLEMENT-001` | — | Tek onay-yuzeyi: TUM onay/karar ureticileri (confirmations cnf- · nervous+panic · autonomous trigger · checkpoint · cost/prompt/scope gate-ack · bot act-park · runflow-consent · gateway-pairing · settlement-review) runtime-wide durable ApprovalBroker'a typed origin/riskTier/blocking zarfiyla baglanir; karar her kanaldan (CLI-TTY · Desktop/OIDC · REPL · Telegram/Slack/Teams relay · VSCode RPC; MCP yalniz read-only + routine-ack sinifi, §12.2 korunur) risk-tier matrisiyle verilir; auth-asimetrisi kapanir (checkpoint/nervous/autonomous auth'suz dosya-mutasyonu emekli), her pending TTL+typed timeout-disposition tasir, NO-AUTO-APPROVE genellesir |
 | 4060 | `TOOL-AUTHORITY-001` | VERIFY | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
 | 4061 | `WRITE-SCOPE-BACKEND-PARITY-001` | OPEN | P0 | AUTHORITY | — | — | Worker write-target türetimi tüm spawn backend'lerinde tek authority'den gelir |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
