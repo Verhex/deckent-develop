@@ -398,3 +398,4 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   ihlali yakaladi. XVerify-claim disiplinine iki yeni kural: (1) 'tum
   user-facing metin' iddiasi option-help + kayit-render metinlerini kapsar;
   (2) iddia-cumle ↔ evidence-dilim birebir eslesmeli.
+- DERS (commit-hijyeni): commit -m çift-tırnaklı mesajda backtick shell-substitution çalıştırır (89e66dcba'da 'NEW `deckent confirmations` CLI' boş kaldı — kozmetik, kod sağlam). Mesajları tek-tırnak/heredoc'la yaz.
