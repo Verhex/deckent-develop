@@ -47,8 +47,10 @@ describe('PROVIDER_MODEL_MAP', () => {
   });
 
   it('has every canonical provider including OpenRouter and local-llm', () => {
-    expect(Object.keys(PROVIDER_MODEL_MAP)).toHaveLength(6);
-    expect(Object.keys(PROVIDER_MODEL_MAP).sort()).toEqual(['claude', 'codex', 'gemini', 'local-llm', 'ollama', 'openrouter']);
+    // ddc523bf0 cursor adapter: PROVIDER_MODEL_MAP gained a 'cursor' getter
+    // (7091 FAZ-1 spine) — 6 providers became 7.
+    expect(Object.keys(PROVIDER_MODEL_MAP)).toHaveLength(7);
+    expect(Object.keys(PROVIDER_MODEL_MAP).sort()).toEqual(['claude', 'codex', 'cursor', 'gemini', 'local-llm', 'ollama', 'openrouter']);
   });
 });
 

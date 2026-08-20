@@ -47,7 +47,12 @@ function preparationInput(projectRoot: string, runId: string, approval: object) 
       service: {
         tenantId: 'tenant-a',
         projectId: 'project-a',
-        truthStore: { getLatestReachability: vi.fn(() => null) },
+        truthStore: {
+          getLatestReachability: vi.fn(() => null),
+          // 7081 carousel layer-2: preparation now asks account-agnostically
+          // for fresh reachability before the approval step.
+          getLatestReachabilityAnyAccount: vi.fn(() => null),
+        },
         evidenceProducer: { refresh: vi.fn() },
       },
     },

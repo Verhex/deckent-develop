@@ -199,13 +199,15 @@ describe.skipIf(DIST_ABSENT)(
 
         // Structural guarantee independent of host installs — same contract
         // tests/e2e/provider-smoke.test.ts asserts on detectAvailableProviders().
-        expect(parsed.providers).toHaveLength(4);
+        // ddc523bf0 cursor adapter: detectCursor joined detection (7091 FAZ-1),
+        // so the doctor surface reports 5 providers instead of 4.
+        expect(parsed.providers).toHaveLength(5);
         const providerNames = parsed.providers.map((p) => p.name).sort();
-        expect(providerNames).toEqual(['claude', 'codex', 'gemini', 'ollama']);
+        expect(providerNames).toEqual(['claude', 'codex', 'cursor', 'gemini', 'ollama']);
 
-        expect(parsed.providerAuth).toHaveLength(4);
+        expect(parsed.providerAuth).toHaveLength(5);
         expect(parsed.providerAuth.map(item => item.provider).sort()).toEqual(providerNames);
-        expect(parsed.providerSummary.total).toBe(4);
+        expect(parsed.providerSummary.total).toBe(5);
         expect(parsed.providerSummary.ready).toBe(parsed.providerAuth.filter(item => item.ready).length);
         expect(parsed.providerSummary.authWarningCount).toBe(
           parsed.providerAuth.filter(item => item.state === 'logged-out' || item.state === 'unknown').length,

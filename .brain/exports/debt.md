@@ -9,6 +9,15 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-567-004 | Tech debt from 567-004: Created deneme-kontrol/selam.md with a '# Selam' heading | normal | sprint-567 | resolved |
+| debt-565-006 | Tech debt from 565-006: LOCAL_VERIFIED (unpiped exit codes, no pager): `npx tsc  | normal | sprint-565 | resolved |
+| debt-565-007 | Tech debt from 565-007: LANDED (verified):
+(1) provider-auth-probe.ts — AuthProb | normal | sprint-565 | resolved |
+| debt-564-002 | Tech debt from 564-002: VERIFY EVIDENCE (both run unpiped, exit code read on the | normal | sprint-564 | resolved |
+| debt-562-002-fix | Tech debt from 562-002-fix: 562-002-fix implemented deckent_read_file ranged rea | critical | sprint-562 | resolved |
+| debt-561-002 | Tech debt from 561-002: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t | critical | sprint-561 | resolved |
+| debt-561-003 | Tech debt from 561-003: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r | critical | sprint-561 | resolved |
+| debt-560-002 | Tech debt from 560-002: LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 | normal | sprint-560 | resolved |
 | debt-557-002 | Tech debt from 557-002: LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 | normal | sprint-557 | resolved |
 | debt-556-003 | Tech debt from 556-003: killSingle (kill.ts) now returns a typed KillSingleResul | normal | sprint-556 | resolved |
 | debt-556-002 | Tech debt from 556-002: WHAT LANDED (all four task items):

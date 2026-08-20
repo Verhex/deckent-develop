@@ -705,8 +705,10 @@ describe('createLocalProviderEvidenceSourceRegistrations', () => {
     );
     const registry = new ProviderEvidenceSourceRegistry(registrations);
 
+    // 7091 FAZ-1 (ddc523bf0): the cursor adapter registers its account +
+    // reachability sources through the same single bootstrap producer.
     expect(registrations.map(registration => registration.provider).sort())
-      .toEqual(['claude', 'codex', 'codex']);
+      .toEqual(['claude', 'codex', 'codex', 'cursor', 'cursor']);
     expect(registry.resolve(EXACT_SCOPE)).toMatchObject({
       provider: 'codex',
       sources: {

@@ -15,6 +15,7 @@ import type { RateLimitState } from '../core/token-quota.js';
 import type { OutcomeTracker } from './outcome-tracker.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { debugLog } from '../core/utils.js';
+import { hasUnsalvageableContractFailure } from './criterion-evaluation.js';
 import { spawn } from 'node:child_process';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -763,6 +764,7 @@ export type RubricReconciliationReason =
   | 'worker_self_no_go'
   | 'concrete_test_failed'
   | 'concrete_scope_violation'
+  | 'concrete_contract_failure'
   | 'rubric_threshold_not_met'
   | 'unsupported_self_assessment'
   | 'heuristic_no_go_overridden';
@@ -879,6 +881,20 @@ export function reconcileRubricNoGo(
       reconciled: false,
       reason: 'concrete_test_failed',
       notes: 'Concrete failure: testsPassed=false — NO_GO preserved (test_failed)',
+      rubricAverage,
+      coverage,
+    };
+  }
+
+  // Concrete failure: a deterministic typed-contract criterion provably
+  // failed (EVALUATION-001 kernel, `goNogo:<id>` row) → NO_GO stands. Disk
+  // evidence is not salvageable by worker-self-reported signals.
+  if (hasUnsalvageableContractFailure(rubricResult.rubricScores)) {
+    return {
+      decision: 'NO_GO',
+      reconciled: false,
+      reason: 'concrete_contract_failure',
+      notes: 'Concrete failure: typed goNogo contract criterion deterministically unsatisfied — NO_GO preserved (contract evidence beats worker-reported signals)',
       rubricAverage,
       coverage,
     };

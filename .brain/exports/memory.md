@@ -1,5 +1,115 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-587 Learnings
+- Sprint sprint-587 Learnings: ## Sprint sprint-587 Learnings
+
+## Gains
+- 587-001 — V3 assignedSkills force-preserving merge (kaynak-tarafı) — Force-preserving merge landed at BOTH V3 assignedSkills write sites.
+- 587-002 — brain-skill test-literal → kanonik SKILL_PROFILE_VERSION — Replaced the test-local profileVersion: 3 literal in tests/orchestra/brain-skill.test.ts (line ~1...
+
+## Sprint sprint-586 Learnings
+- Sprint sprint-586 Learnings: ## Sprint sprint-586 Learnings
+
+## Gains
+- 586-001 — Mini not — Successfully created deneme-kontrol/f3-kanit.md with a 3-line Turkish greeting note.
+
+## Sprint sprint-585 Learnings
+- Sprint sprint-585 Learnings: ## Sprint sprint-585 Learnings
+
+## Gains
+- 585-001 — Mini not — Created deneme-kontrol/f3-kanit.md with 3-line Turkish greeting: 'Merhaba ve hoş geldiniz! / Bu b...
+
+## Sprint sprint-584 Learnings
+- Sprint sprint-584 Learnings: ## Sprint sprint-584 Learnings
+
+## Gains
+- 584-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-kontrol/ olusturuldu ve deckent-arac-rehberi.md yazildi (Turkce).
+- 584-002 — Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) — deneme-kontrol/merhaba-dunya.md olusturuldu: "# Merhaba Dunya" basligi ve tek satirlik Turkce sel...
+- 584-003 — Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) — deneme-kontrol/opus-3-notu.md olusturuldu: "# Opus-3 Notu" basligi ve tek satirlik Turkce selam c...
+- 584-004 — Selam dokümanı (sonnet özdeş-basit — taban ölçümü) — Wrote deneme-kontrol/selam.md with a '# Selam' heading and one greeting sentence, per the single-...
+- 584-005 — Denetim raporu (yalnız-okuma analiz) — Yalniz deneme-kontrol/deckent-arac-rehberi.md okundu (baska dosya okunmadi, komut calistirilmadi)...
+- 584-006 — Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) — deneme-kontrol/sonnet-3-notu.md dosyasi olusturuldu: '# Sonnet-3 Notu' basligi ve bir selam cumle...
+
+## Sprint sprint-583 Learnings
+- Sprint sprint-583 Learnings: ## Sprint sprint-583 Learnings
+
+## Gains
+- 583-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-kontrol/ olusturuldu ve deckent-arac-rehberi.md yazildi (Turkce).
+- 583-002 — Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) — deneme-kontrol/merhaba-dunya.md olusturuldu: "# Merhaba Dunya" basligi ve tek selam cumlesi.
+- 583-003 — Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) — deneme-kontrol/opus-3-notu.md olusturuldu: "# Opus-3 Notu" basligi ve tek selam cumlesi.
+- 583-004 — Selam dokümanı (sonnet özdeş-basit — taban ölçümü) — Created deneme-kontrol/selam.md with a '# Selam' header and one greeting sentence, per the single...
+- 583-005 — Denetim raporu (yalnız-okuma analiz) — Read only deneme-kontrol/deckent-arac-rehberi.md (no other file, no command executed) and wrote d...
+- 583-006 — Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) — Wrote deneme-kontrol/sonnet-3-notu.md with a "# Sonnet-3 Notu" heading and a short Turkish greeti...
+
+## Sprint sprint-582 Learnings
+- Sprint sprint-582 Learnings: ## Sprint sprint-582 Learnings
+
+## Gains
+- 582-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-kontrol/ olusturuldu ve deckent-arac-rehberi.md Turkce yazildi: deckent'in ne oldugunu anl...
+- 582-002 — Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) — deneme-kontrol/merhaba-dunya.md olusturuldu: "# Merhaba Dunya" basligi (Turkce karakterlerle) ve ...
+- 582-003 — Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) — deneme-kontrol/opus-3-notu.md olusturuldu: "# Opus-3 Notu" basligi ve bir selam cumlesi.
+- 582-004 — Selam dokümanı (sonnet özdeş-basit — taban ölçümü) — Created deneme-kontrol/selam.md with a '# Selam' heading and a single greeting sentence, as requi...
+- 582-005 — Denetim raporu (yalnız-okuma analiz) — Read only deneme-kontrol/deckent-arac-rehberi.md (no other file, no command run) and wrote deneme...
+- 582-006 — Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) — Wrote deneme-kontrol/sonnet-3-notu.md with the required '# Sonnet-3 Notu' heading and a short gre...
+
+## Sprint sprint-579 Learnings
+- Sprint sprint-579 Learnings: ## Sprint sprint-579 Learnings
+
+## Gains
+- 579-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — Yeni dosya: deneme-kontrol/deckent-arac-rehberi.md (Turkce).
+- 579-002 — Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) — deneme-kontrol/merhaba-dunya.md olusturuldu: "# Merhaba Dunya" basligi (Turkce karakterlerle) ve ...
+- 579-003 — Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) — deneme-kontrol/opus-3-notu.md olusturuldu: "# Opus-3 Notu" basligi ve tek cumlelik selam.
+- 579-004 — Selam dokümanı (sonnet özdeş-basit — taban ölçümü) — Created deneme-kontrol/selam.md with a '# Selam' heading and one greeting sentence, per the simpl...
+- 579-005 — Denetim raporu (yalnız-okuma analiz) — Denetim raporu deneme-kontrol/denetim-raporu.md dosyasina yazildi.
+- 579-006 — Sonnet-3 notu (özdeş-basit — sonnet zincir sonu)
+
+## Sprint sprint-578 Learnings
+- Sprint sprint-578 Learnings: ## Sprint sprint-578 Learnings
+
+## Gains
+- 578-001 — ADR-uygunluk notu (basit — tek dosya) — ADR-uygunluk notu başarıyla oluşturuldu.
+
+## Sprint sprint-575 Learnings
+- Sprint sprint-575 Learnings: ## Sprint sprint-575 Learnings
+
+## Gains
+- 575-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-kontrol/deckent-arac-rehberi.md olusturuldu: Turkce giris (deckent nedir, run/sprint dongu...
+- 575-002 — Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) — deneme-kontrol/merhaba-dunya.md olusturuldu: "# Merhaba Dünya" basligi + tek selam cumlesi.
+- 575-003 — Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) — deneme-kontrol/opus-3-notu.md olusturuldu: "# Opus-3 Notu" basligi + tek selam cumlesi.
+- 575-004 — Selam dokümanı (sonnet özdeş-basit — taban ölçümü) — Wrote deneme-kontrol/selam.md with a '# Selam' heading and one greeting sentence.
+- 575-005 — Denetim raporu (yalnız-okuma analiz) — deneme-kontrol/deckent-arac-rehberi.md okunarak (bu görevde okunan TEK dosya, hicbir komut calist...
+- 575-006 — Sonnet-3 notu (özdeş-basit — sonnet zincir sonu)
+
+## Sprint sprint-567 Learnings
+- Sprint sprint-567 Learnings: ## Sprint sprint-567 Learnings
+- Selam dokümanı (sonnet özdeş-basit — taban ölçümü): GO_WITH_TECH_DEBT — Created deneme-kontrol/selam.md with a '# Selam' heading and one greeting sentence, per task scope. No tools executed be
+
+## Gains
+- 567-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-kontrol/deckent-arac-rehberi.md yazildi (567 satir, 29 KB, Turkce).
+- 567-002 — Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) — deneme-kontrol/merhaba-dunya.md olusturuldu: '# Merhaba Dunya' basligi + bir selam cumlesi (3 sat...
+- 567-003 — Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) — deneme-kontrol/opus-3-notu.md olusturuldu: '# Opus-3 Notu' basligi + bir selam cumlesi (3 satir).
+- 567-005 — Denetim raporu (yalnız-okuma analiz) — Read only deneme-kontrol/deckent-arac-rehberi.md (no other file, no command executed) and wrote d...
+- 567-006 — Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) — Wrote deneme-kontrol/sonnet-3-notu.md with the required '# Sonnet-3 Notu' heading and one greetin...
+
+## Sprint sprint-562 Learnings
+- Sprint sprint-562 Learnings: ## Sprint sprint-562 Learnings
+- deckent_read_file ranged-read — offset/limit satır-aralığı: GO_WITH_TECH_DEBT — Host runtime-budget evidence is not terminally measurable: state=unmeasurable, terminal=true, attemptId=0fa0b7b1-cb03-47
+
+## Gains
+- 562-001 — Bütçe-bilinçli @ref kararı — inline vs descriptor modu — npx tsc --noEmit: PASS.
+- 562-003 — Typed UX + i18n + incident battery (depends on Task 1, Task 2)
+
+## Sprint sprint-560 Learnings
+- Sprint sprint-560 Learnings: ## Sprint sprint-560 Learnings
+- Dinamik output tavanı + adapter paritesi (depends on Task 1): GO_WITH_TECH_DEBT — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0 (unpiped, exit read directly). Targeted set npx vitest run test
+
+## Gains
+- 560-001 — Provider-neutral istek ölçümü + typed admission authority — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0; exact targeted Vitest set passed 3 file...
+- 560-003 — Hidden-reasoning farkındalığı + bounded continuation + atomik tool güvenliği (depends on Task 2) — NO_GO — production wiring authority gap.
+- 560-004 — Context epoch'ları + yapılandırılmış @ref soyağacı + /renew semantiği (depends on Task 1) — LOCAL_VERIFIED / SCOPED_GREEN: `npx tsc --noEmit` exited 0.
+- 560-005 — Typed UX + i18n + canonical audit (depends on Task 3, Task 4)
+- 560-006 — Incident-şekilli hermetik battery — 11 regresyon kanıtı (depends on Task 5)
+
 ## Sprint sprint-559 Learnings
 - Sprint sprint-559 Learnings: ## Sprint sprint-559 Learnings
 - CLI description kataloğu — 221 commander description'ı iki dilli tek kaynağa: NO_GO — All 5/5 Definition-of-Done items ticked with evidence.

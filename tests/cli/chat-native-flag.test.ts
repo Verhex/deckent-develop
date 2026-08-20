@@ -7,6 +7,11 @@ import { EventEmitter } from 'node:events';
 const hoisted = vi.hoisted(() => ({
   runNativeLoopMock: vi.fn(),
   spawnMock: vi.fn(),
+  // ddc523bf0 cursor adapter: probeProviders constructs a REAL CursorAdapter
+  // whose constructor captures `spawnSync` from node:child_process. Default
+  // impl reports cursor-agent as absent (status 1) so the cursor probe is
+  // deterministically not-ready regardless of the host PATH. Never reset.
+  spawnSyncMock: vi.fn(() => ({ status: 1, stdout: '', stderr: '' })),
   claudeDetect: vi.fn(),
   codexDetect: vi.fn(),
   geminiDetect: vi.fn(),
@@ -23,6 +28,8 @@ vi.mock('../../src/cli/commands/chat-native.js', () => ({
 
 vi.mock('node:child_process', () => ({
   spawn: hoisted.spawnMock,
+  // ddc523bf0 cursor adapter: the real CursorAdapter imports spawnSync too.
+  spawnSync: hoisted.spawnSyncMock,
 }));
 
 vi.mock('../../src/providers/claude.js', () => ({

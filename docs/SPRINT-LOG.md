@@ -13524,3 +13524,654 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 564-005: `cleanup --tmp` litter hijyeni + i18n + uçtan-uca battery (PAUSED)
 
 ---
+## Sprint 565 — sprint-565
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 2708s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 2707540ms |
+
+### Tasks
+
+- 565-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: 562-002-fix implemented deckent_read_file ranged read en… (DONE)
+- 565-002-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t… (PENDING)
+- 565-002: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t… (NO_GO)
+- 565-003-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r… (PENDING)
+- 565-003: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r… (NO_GO)
+- 565-004-fix-fix: Fix: Fix: Provider-union spine + capabilities satırı (compile-blocking küme tek görevde) (PAUSED)
+- 565-004-fix: Fix: Provider-union spine + capabilities satırı (compile-blocking küme tek görevde) (NO_GO)
+- 565-004: Provider-union spine + capabilities satırı (compile-blocking küme tek görevde) (NO_GO)
+- 565-005-fix-fix: Fix: Fix: CursorAdapter + komut-spec + factory/routing kayıtları (PAUSED)
+- 565-005-fix: Fix: CursorAdapter + komut-spec + factory/routing kayıtları (NO_GO)
+- 565-005: CursorAdapter + komut-spec + factory/routing kayıtları (NO_GO)
+- 565-006: Model katalog (dar FAZ-1) + provider/tier çıkarımı + maliyet (GO_WITH_TECH_DEBT)
+- 565-007: Auth-probe + discovery + connect/doctor/packages yüzeyi (GO_WITH_TECH_DEBT)
+- 565-008: Evidence-sources + runtime-bootstrap kaydı (xverify admission kapısı) (PENDING)
+- 565-009: i18n bakiyeleri + xverify-cursor battery (PENDING)
+- 565-010: Worker-image kurulum yolu (Dockerfile + image-check) (PENDING)
+
+---
+## Sprint 566 — sprint-566
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 566-001-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t… (PAUSED)
+- 566-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t… (NO_GO)
+- 566-002-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r… (PAUSED)
+- 566-002: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r… (NO_GO)
+- 566-003: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (NO_GO)
+- 566-004: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (PAUSED)
+- 566-005: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (PAUSED)
+- 566-006-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (PENDING)
+- 566-006: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (NO_GO)
+- 566-007: Denetim raporu (yalnız-okuma analiz) (PAUSED)
+- 566-008-fix: Fix: Sonnet-3 notu (özdeş-basit — bağımsız kontrol) (PENDING)
+- 566-008: Sonnet-3 notu (özdeş-basit — bağımsız kontrol) (NO_GO)
+
+---
+## Sprint 567 — sprint-567
+
+**Status:** COMPLETE
+**Date:** 2026-08-19
+**Duration:** 803s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 802565ms |
+
+### Tasks
+
+- 567-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 567-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 567-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 567-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 567-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 567-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (DONE)
+
+---
+## Sprint 568 — sprint-568
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 751s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 751372ms |
+
+### Tasks
+
+- 568-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 568-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 568-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 568-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 568-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 568-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 568-006-fix: Fix: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PENDING)
+- 568-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (NO_GO)
+
+---
+## Sprint 569 — sprint-569
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 737s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 737251ms |
+
+### Tasks
+
+- 569-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 569-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 569-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 569-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 569-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 569-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 569-006-fix: Fix: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PENDING)
+- 569-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (NO_GO)
+
+---
+## Sprint 570 — sprint-570
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 170s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 169696ms |
+
+### Tasks
+
+- 570-001-fix: Fix: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (PENDING)
+- 570-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (NO_GO)
+- 570-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (PAUSED)
+- 570-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (PAUSED)
+- 570-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (PENDING)
+- 570-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (NO_GO)
+- 570-005: Denetim raporu (yalnız-okuma analiz) (PAUSED)
+- 570-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PAUSED)
+
+---
+## Sprint 571 — sprint-571
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 701s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 700587ms |
+
+### Tasks
+
+- 571-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 571-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 571-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 571-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 571-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 571-005-fix: Fix: Denetim raporu (yalnız-okuma analiz) (PENDING)
+- 571-005: Denetim raporu (yalnız-okuma analiz) (NO_GO)
+- 571-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PAUSED)
+
+---
+## Sprint 572 — sprint-572
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 577s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 576706ms |
+
+### Tasks
+
+- 572-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 572-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 572-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 572-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 572-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 572-005-fix: Fix: Denetim raporu (yalnız-okuma analiz) (PENDING)
+- 572-005: Denetim raporu (yalnız-okuma analiz) (NO_GO)
+- 572-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PAUSED)
+
+---
+## Sprint 573 — sprint-573
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 444s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 444089ms |
+
+### Tasks
+
+- 573-001-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t… (PAUSED)
+- 573-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t… (NO_GO)
+- 573-002-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r… (PAUSED)
+- 573-002: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r… (NO_GO)
+- 573-003: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 573-004: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (PAUSED)
+- 573-005: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (PAUSED)
+- 573-006-fix-fix-fix: Fix: Fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (PAUSED)
+- 573-006-fix-fix: Fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (NO_GO)
+- 573-006-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (NO_GO)
+- 573-006: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 573-007: Denetim raporu (yalnız-okuma analiz) (PAUSED)
+- 573-008: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PAUSED)
+
+---
+## Sprint 574 — sprint-574
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 480s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 479531ms |
+
+### Tasks
+
+- 574-001-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t… (PAUSED)
+- 574-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted set (t… (NO_GO)
+- 574-002-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r… (PAUSED)
+- 574-002: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: LOCAL_VERIFIED: `npx tsc --noEmit` exit 0 (unpiped, $? r… (NO_GO)
+- 574-003: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 574-004: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (PAUSED)
+- 574-005: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (PAUSED)
+- 574-006-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 574-006: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 574-007: Denetim raporu (yalnız-okuma analiz) (PAUSED)
+- 574-008: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PAUSED)
+
+---
+## Sprint 575 — sprint-575
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 532s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 531742ms |
+
+### Tasks
+
+- 575-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 575-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 575-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 575-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 575-005-fix: Fix: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 575-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 575-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (DONE)
+
+---
+## Sprint 576 — sprint-576
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 649s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 649331ms |
+
+### Tasks
+
+- 576-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 576-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 576-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 576-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 576-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 576-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 576-006-fix: Fix: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PENDING)
+- 576-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (NO_GO)
+
+---
+## Sprint 577 — sprint-577
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 489s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 488713ms |
+
+### Tasks
+
+- 577-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 577-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 577-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 577-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 577-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 577-005-fix: Fix: Denetim raporu (yalnız-okuma analiz) (PENDING)
+- 577-005: Denetim raporu (yalnız-okuma analiz) (NO_GO)
+- 577-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PAUSED)
+
+---
+## Sprint 578 — sprint-578
+
+**Status:** COMPLETE
+**Date:** 2026-08-19
+**Duration:** 57s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 57228ms |
+
+### Tasks
+
+- 578-001: ADR-uygunluk notu (basit — tek dosya) (DONE)
+
+---
+## Sprint 579 — sprint-579
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 605s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 604595ms |
+
+### Tasks
+
+- 579-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 579-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 579-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 579-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 579-005-fix: Fix: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 579-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 579-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (DONE)
+
+---
+## Sprint 580 — sprint-580
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 507s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 507124ms |
+
+### Tasks
+
+- 580-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 580-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 580-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 580-004-fix-fix-fix: Fix: Fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (PAUSED)
+- 580-004-fix-fix: Fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (NO_GO)
+- 580-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (NO_GO)
+- 580-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 580-005: Denetim raporu (yalnız-okuma analiz) (PAUSED)
+- 580-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PAUSED)
+
+---
+## Sprint 581 — sprint-581
+
+**Status:** ABORTED
+**Date:** 2026-08-19
+**Duration:** 571s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 571007ms |
+
+### Tasks
+
+- 581-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 581-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 581-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 581-004-fix: Fix: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 581-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 581-005-fix: Fix: Denetim raporu (yalnız-okuma analiz) (PENDING)
+- 581-005: Denetim raporu (yalnız-okuma analiz) (NO_GO)
+- 581-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (PAUSED)
+
+---
+## Sprint 582 — sprint-582
+
+**Status:** COMPLETE
+**Date:** 2026-08-19
+**Duration:** 431s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 430802ms |
+
+### Tasks
+
+- 582-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 582-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 582-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 582-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 582-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 582-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (DONE)
+
+---
+## Sprint 583 — sprint-583
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 429s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 428651ms |
+
+### Tasks
+
+- 583-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 583-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 583-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 583-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 583-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 583-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (DONE)
+
+---
+## Sprint 584 — sprint-584
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 407s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 407418ms |
+
+### Tasks
+
+- 584-001: Deckent araç rehberi (kapsamlı — cache'i dolduran iş) (DONE)
+- 584-002: Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A) (DONE)
+- 584-003: Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B) (DONE)
+- 584-004: Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (DONE)
+- 584-005: Denetim raporu (yalnız-okuma analiz) (DONE)
+- 584-006: Sonnet-3 notu (özdeş-basit — sonnet zincir sonu) (DONE)
+
+---
+## Sprint 585 — sprint-585
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 46s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 46277ms |
+
+### Tasks
+
+- 585-001: Mini not (DONE)
+
+---
+## Sprint 586 — sprint-586
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 35s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 34886ms |
+
+### Tasks
+
+- 586-001: Mini not (DONE)
+
+---
+## Sprint 587 — sprint-587
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 347s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 347271ms |
+
+### Tasks
+
+- 587-001: V3 assignedSkills force-preserving merge (kaynak-tarafı) (DONE)
+- 587-002: brain-skill test-literal → kanonik SKILL_PROFILE_VERSION (DONE)
+
+---

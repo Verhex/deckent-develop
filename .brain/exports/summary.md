@@ -55,27 +55,44 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
-- **Sprint sprint-559 Learnings** (sprint-559): ## Sprint sprint-559 Learnings
-- CLI description kataloğu — 221 commander description'ı iki dilli tek kaynağa: NO_GO ...
-- **Sprint sprint-557 Learnings** (sprint-557): ## Sprint sprint-557 Learnings
-- REPL renewal surface — typed offer + /renew command (depends on Task 1): GO_WITH_TEC...
-- **Sprint sprint-556 Learnings** (sprint-556): ## Sprint sprint-556 Learnings
-- xverify CLI waiting signal + approval-phase timeout (depends on Task 1): GO_WITH_TEC...
-- **Sprint sprint-554 Learnings** (sprint-554): ## Sprint sprint-554 Learnings
-- loop consumes the exposure view per round (NT-06 wire): GO_WITH_TECH_DEBT — HANDOFFS...
-- **Sprint sprint-551 Learnings** (sprint-551): ## Sprint sprint-551 Learnings
-- **Sprint sprint-546 Learnings** (sprint-546): ## Sprint sprint-546 Learnings
+- **Sprint sprint-587 Learnings** (sprint-587): ## Sprint sprint-587 Learnings
 
 ## Gains
-- 546-001 — scale-honest post-FIX circuit breaker — npx tsc --noEmit passed....
-- **Sprint sprint-544 Learnings** (sprint-544): ## Sprint sprint-544 Learnings
-- core — bounded log-tail lineage: GO_WITH_TECH_DEBT — Implemented additive bounded lo...
-- **Sprint sprint-542 Learnings** (sprint-542): ## Sprint sprint-542 Learnings
-- API face — inspector runs endpoints (depends on Task 1): NO_GO — Added GET /api/insp...
-- **Sprint sprint-541 Learnings** (sprint-541): ## Sprint sprint-541 Learnings
-- /api/sprint/* cutover + sprint-live-service retirement (depends on Task 1): NO_GO — ...
-- **Sprint sprint-540 Learnings** (sprint-540): ## Sprint sprint-540 Learnings
-- live-ledger truth-sync — projections regen + test expectations + proposal regen: NO_...
+- 587-001 — V3 assignedSkills force-preserving merge (kaynak-tarafı) — Force...
+- **Sprint sprint-586 Learnings** (sprint-586): ## Sprint sprint-586 Learnings
+
+## Gains
+- 586-001 — Mini not — Successfully created deneme-kontrol/f3-kanit.md with ...
+- **Sprint sprint-585 Learnings** (sprint-585): ## Sprint sprint-585 Learnings
+
+## Gains
+- 585-001 — Mini not — Created deneme-kontrol/f3-kanit.md with 3-line Turkis...
+- **Sprint sprint-584 Learnings** (sprint-584): ## Sprint sprint-584 Learnings
+
+## Gains
+- 584-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-k...
+- **Sprint sprint-583 Learnings** (sprint-583): ## Sprint sprint-583 Learnings
+
+## Gains
+- 583-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-k...
+- **Sprint sprint-582 Learnings** (sprint-582): ## Sprint sprint-582 Learnings
+
+## Gains
+- 582-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-k...
+- **Sprint sprint-579 Learnings** (sprint-579): ## Sprint sprint-579 Learnings
+
+## Gains
+- 579-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — Yeni dos...
+- **Sprint sprint-578 Learnings** (sprint-578): ## Sprint sprint-578 Learnings
+
+## Gains
+- 578-001 — ADR-uygunluk notu (basit — tek dosya) — ADR-uygunluk notu başarı...
+- **Sprint sprint-575 Learnings** (sprint-575): ## Sprint sprint-575 Learnings
+
+## Gains
+- 575-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-k...
+- **Sprint sprint-567 Learnings** (sprint-567): ## Sprint sprint-567 Learnings
+- Selam dokümanı (sonnet özdeş-basit — taban ölçümü): GO_WITH_TECH_DEBT — Created dene...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -86,4 +103,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2000 | Generated: 2026-08-18_
+_Total entries: 2062 | Generated: 2026-08-20_

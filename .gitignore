@@ -25,6 +25,9 @@ coverage/
 .brain/memory.db.backup-*
 .brain/sprints/
 
+# Connector media artifacts (bot-received photos/files — personal data, never committed)
+.deckent/artifacts/
+
 # Sprint runtime artifacts (Memory V2 DB-first — content in memory.db)
 .brain/archive/sprint-*-tasks/
 .brain/archive/sprint-*.md

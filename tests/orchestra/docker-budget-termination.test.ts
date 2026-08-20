@@ -167,6 +167,9 @@ describe('Docker runtime-budget result reconciliation', () => {
       outputTokens: 2,
       cacheReadTokens: 3,
       cacheCreationTokens: 4,
+      // 7093 truth wave: host-budget projections carry the provider-reported
+      // total so downstream cost surfaces stop re-deriving it.
+      totalTokens: 10,
       source: 'host-runtime-budget',
       provider: 'claude',
       model: 'claude-sonnet-4-20250514',
@@ -228,6 +231,8 @@ describe('Docker runtime-budget result reconciliation', () => {
       outputTokens: 22,
       cacheReadTokens: 33,
       cacheCreationTokens: 44,
+      // 7093 truth wave: see the veto pin above.
+      totalTokens: 110,
       source: 'host-runtime-budget',
       provider: 'claude',
       model: 'claude-sonnet-4-20250514',

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { BrainContext, Sprint, ResolvedConfig, SprintSizeRecommendation, Task } from '../../src/core/types.js';
 import { DebtPriority, SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
+import { SKILL_PROFILE_VERSION } from '../../src/core/routing/capability-vector.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ describe('planSprint — skill selection integration', () => {
       // ROUTING-V3 (S3): skills attach via matching profiles, not V2 triggers —
       // this is the custom-skill authoring contract a real user follows.
       profile: {
-        profileVersion: 3,
+        profileVersion: SKILL_PROFILE_VERSION,
         workTypes: [
           { type: 'build', proficiency: 'able' },
           { type: 'fix', proficiency: 'able' },

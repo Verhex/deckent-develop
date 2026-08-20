@@ -304,9 +304,13 @@ describe('live sprint terminal settlement HOLD', () => {
     const audit = JSON.parse(
       readFileSync(evaluationAuditPath(root, sprint.id, taskId, 1), 'utf-8'),
     ) as { decision?: string; decisionRationale?: string };
+    // 7097-B1 verdict-source chain: post-rubric flips append their typed
+    // cause — the budget veto now leaves a readable trace after the base
+    // rationale instead of an unexplained NO_GO.
     expect(audit).toMatchObject({
       decision: 'NO_GO',
-      decisionRationale: `host_runtime_budget_exhausted:${ref.attemptId}`,
+      decisionRationale:
+        `host_runtime_budget_exhausted:${ref.attemptId} | post-rubric: runtime-budget-authority:NO_GO`,
     });
   });
 

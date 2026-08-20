@@ -30,6 +30,7 @@ import {
 } from './rubric-registry.js';
 import type { DiskVerifyResult } from './disk-verify.js';
 import { verifyDiskAgainstClaim } from './disk-verify.js';
+import { evaluateGoNogoCriteria, hasUnsalvageableContractFailure } from './criterion-evaluation.js';
 import {
   detectDishonestResult,
   emitDishonestResultEvent,
@@ -1582,6 +1583,31 @@ function evaluateWithRubricCore(
     decision = 'GO_WITH_TECH_DEBT';
   }
 
+  // EVALUATION-001 first brick (7097 item-3, 2026-08-20): the task's own
+  // typed goNogo.items contract participates in the verdict. Deterministic
+  // kernel only — undecidable items are NEVER a penalty (honesty programme);
+  // a decisive typed-contract failure (a no-go item provably holding, or a
+  // go item's required evidence provably absent) caps the verdict at NO_GO,
+  // joining the EVAL-DEBT-CEILING family with criterion-level audit rows.
+  if (_projectRoot) {
+    try {
+      const contract = evaluateGoNogoCriteria(task, result, _projectRoot);
+      if (contract) {
+        for (const item of contract.items) {
+          rubricScores.push({
+            criterion: `goNogo:${item.itemId}`,
+            score: item.status === 'satisfied' ? 100 : item.status === 'unsatisfied' ? 0 : 50,
+            passed: item.status !== 'unsatisfied',
+            reason: `${item.polarity} · ${item.mode} · ${item.status} — ${item.evidence.join('; ')}`,
+          });
+        }
+        if (contract.decisiveNoGo) {
+          decision = 'NO_GO';
+        }
+      }
+    } catch { /* criterion kernel is read-only best-effort; a fault never blocks the rubric */ }
+  }
+
   const evaluation: EvaluationResult = {
     decision,
     totalScore,
@@ -1706,6 +1732,11 @@ async function reconcileEvaluationSpuriousNoGoCore(
 ): Promise<EvaluationResult> {
   if (evaluation.decision !== 'NO_GO' || !projectRoot) return evaluation;
   if (result.workAttribution?.state === 'HOLD') return evaluation;
+  // EVALUATION-001: a deterministic typed-contract failure is CONCRETE disk
+  // evidence — green tsc/vitest/git-diff probes are unrelated evidence against
+  // "required file provably absent" / "no-go condition provably holds", so
+  // this recovery path never runs for it (probes are skipped entirely).
+  if (hasUnsalvageableContractFailure(evaluation.rubricScores)) return evaluation;
 
   const oomNotes = coerceNotesToString(result.notes);
   const isOomKilled =

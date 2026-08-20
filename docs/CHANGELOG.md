@@ -14,6 +14,130 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint587] - 2026-08-20
+
+### Added
+
+- V3 assignedSkills force-preserving merge (kaynak-tarafı)
+- brain-skill test-literal → kanonik SKILL_PROFILE_VERSION
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
+## [sprint586] - 2026-08-20
+
+### Added
+
+- Mini not
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint585] - 2026-08-20
+
+### Added
+
+- Mini not
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint584] - 2026-08-20
+
+### Added
+
+- Deckent araç rehberi (kapsamlı — cache'i dolduran iş)
+- Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A)
+- Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B)
+- Selam dokümanı (sonnet özdeş-basit — taban ölçümü)
+- Denetim raporu (yalnız-okuma analiz)
+- Sonnet-3 notu (özdeş-basit — sonnet zincir sonu)
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [sprint583] - 2026-08-20
+
+### Added
+
+- Deckent araç rehberi (kapsamlı — cache'i dolduran iş)
+- Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A)
+- Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B)
+- Selam dokümanı (sonnet özdeş-basit — taban ölçümü)
+- Denetim raporu (yalnız-okuma analiz)
+- Sonnet-3 notu (özdeş-basit — sonnet zincir sonu)
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [sprint582] - 2026-08-19
+
+### Added
+
+- Deckent araç rehberi (kapsamlı — cache'i dolduran iş)
+- Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A)
+- Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B)
+- Selam dokümanı (sonnet özdeş-basit — taban ölçümü)
+- Denetim raporu (yalnız-okuma analiz)
+- Sonnet-3 notu (özdeş-basit — sonnet zincir sonu)
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [sprint579] - 2026-08-19
+
+### Added
+
+- Deckent araç rehberi (kapsamlı — cache'i dolduran iş)
+- Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A)
+- Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B)
+- Selam dokümanı (sonnet özdeş-basit — taban ölçümü)
+- Denetim raporu (yalnız-okuma analiz)
+- Sonnet-3 notu (özdeş-basit — sonnet zincir sonu)
+
+
+_Tasks: 6 total, 5 done, 0 tech debt, 1 no-go_
+
+## [sprint578] - 2026-08-19
+
+### Added
+
+- ADR-uygunluk notu (basit — tek dosya)
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint575] - 2026-08-19
+
+### Added
+
+- Deckent araç rehberi (kapsamlı — cache'i dolduran iş)
+- Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A)
+- Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B)
+- Selam dokümanı (sonnet özdeş-basit — taban ölçümü)
+- Denetim raporu (yalnız-okuma analiz)
+- Sonnet-3 notu (özdeş-basit — sonnet zincir sonu)
+
+
+_Tasks: 6 total, 5 done, 0 tech debt, 1 no-go_
+
+## [sprint567] - 2026-08-19
+
+### Added
+
+- Deckent araç rehberi (kapsamlı — cache'i dolduran iş)
+- Merhaba Dünya (özdeş-basit — cache-hit ölçüm noktası A)
+- Opus-3 notu (özdeş-basit — cache-hit ölçüm noktası B)
+- Denetim raporu (yalnız-okuma analiz)
+- Sonnet-3 notu (özdeş-basit — sonnet zincir sonu)
+
+### Changed
+
+- Selam dokümanı (sonnet özdeş-basit — taban ölçümü) (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 1 tech debt, 0 no-go_
+
 ## [sprint562] - 2026-08-18
 
 ### Added

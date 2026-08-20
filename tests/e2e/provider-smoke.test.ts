@@ -442,14 +442,16 @@ describe('Model Equivalence Smoke Tests', () => {
 // ─── Provider Detection ───────────────────────────────────────────────────────
 
 describe('Provider Detection Smoke Tests', () => {
-  it('detectAvailableProviders returns array of 4 providers (claude, codex, gemini, ollama)', async () => {
+  it('detectAvailableProviders returns array of 5 providers (claude, codex, cursor, gemini, ollama)', async () => {
     // Sprint 202 Task 202-001: ollama joined detectAvailableProviders.
+    // ddc523bf0 cursor adapter: detectCursor joined too (7091 FAZ-1) — 4 → 5.
     const providers = await detectAvailableProviders();
-    expect(providers).toHaveLength(4);
+    expect(providers).toHaveLength(5);
 
     const names = providers.map((p) => p.name);
     expect(names).toContain('claude');
     expect(names).toContain('codex');
+    expect(names).toContain('cursor');
     expect(names).toContain('gemini');
     expect(names).toContain('ollama');
   }, 15_000);
@@ -464,7 +466,12 @@ describe('Provider Detection Smoke Tests', () => {
       // Ollama models are registered lazily by providers/ollama.ts side-effect
       // and may be empty if the adapter module has not been imported in this
       // test environment — accept empty for ollama only.
-      if (p.name === 'ollama') {
+      // ddc523bf0 cursor adapter: CURSOR_MODELS is an opt-in catalog family
+      // (not part of CANONICAL_MODELS), so the registry carries no cursor
+      // model by default yet (7091 FAZ-1) — same zero-model exemption as
+      // ollama. Remove 'cursor' from this exemption once the 7091 model
+      // registration lands in the default registry.
+      if (p.name === 'ollama' || p.name === 'cursor') {
         expect(p.models.length).toBeGreaterThanOrEqual(0);
       } else {
         expect(p.models.length).toBeGreaterThan(0);

@@ -36,6 +36,7 @@ import {
   type SkillDeliveryProbe,
 } from '../../src/orchestra/task-builder.js';
 import { routeSprintTasks, routeSprintTasksForExecution } from '../../src/orchestra/sprint-spawner.js';
+import { mergeForcePreservingSkillIds } from '../../src/orchestra/routing-plan-adapter.js';
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -344,5 +345,88 @@ describe('delivery evidence sidecar', () => {
 
   it('returns null when no proof was recorded — absence is not "nothing delivered"', () => {
     expect(readSkillDeliveryEvidence(root, 'never-spawned')).toBeNull();
+  });
+});
+
+// ─── 5. 587-001 — the V3 assignment seam itself ─────────────────────────────
+//
+// Everything above proves the DOWNSTREAM repair (buildWorkerPrompt /
+// routeSprintTasks put a lost force back). These pins lock the seam where the
+// loss used to happen: both V3 sites — routeTasksV3ForPlan (routing-plan-
+// adapter.ts) and task-mode-runner's direct routeSingleTaskV3 call — now
+// assign through mergeForcePreservingSkillIds instead of overwriting
+// task.assignedSkills wholesale.
+
+describe('mergeForcePreservingSkillIds — force survives the V3 write (587-001)', () => {
+  it('a V3 decision that omits the forced id can no longer erase it', () => {
+    const task = makeTask({ forceSkills: ['forced-skill'] });
+    expect(mergeForcePreservingSkillIds(task, ['routed-skill'])).toEqual([
+      'forced-skill',
+      'routed-skill',
+    ]);
+  });
+
+  it('an EMPTY V3 decision still leaves the force standing', () => {
+    const task = makeTask({ forceSkills: ['forced-skill'] });
+    expect(mergeForcePreservingSkillIds(task, [])).toEqual(['forced-skill']);
+  });
+
+  it('orders force first, then the V3-derived ids, with no duplicates', () => {
+    const task = makeTask({ forceSkills: ['forced-a', 'forced-b', 'forced-a'] });
+    expect(mergeForcePreservingSkillIds(task, ['forced-b', 'routed-skill', 'routed-skill']))
+      .toEqual(['forced-a', 'forced-b', 'routed-skill']);
+  });
+
+  it('excludeSkills prunes a V3-derived id', () => {
+    const task = makeTask({ excludeSkills: ['drop-me'] });
+    expect(mergeForcePreservingSkillIds(task, ['drop-me', 'keep-me'])).toEqual(['keep-me']);
+  });
+
+  it('excludeSkills can NEVER remove a forced id — the directive force wins', () => {
+    const task = makeTask({ forceSkills: ['forced-skill'], excludeSkills: ['forced-skill'] });
+    expect(mergeForcePreservingSkillIds(task, [])).toEqual(['forced-skill']);
+    expect(mergeForcePreservingSkillIds(task, ['forced-skill', 'routed-skill']))
+      .toEqual(['forced-skill', 'routed-skill']);
+  });
+
+  it('passes a V3 decision through untouched when no directive is declared', () => {
+    const bare = makeTask();
+    expect(mergeForcePreservingSkillIds(bare, ['routed-a', 'routed-b']))
+      .toEqual(['routed-a', 'routed-b']);
+    expect(mergeForcePreservingSkillIds(bare, [])).toEqual([]);
+    // AUTO-assignment is never promoted into forceSkills by the merge.
+    expect(bare.forceSkills).toBeUndefined();
+  });
+
+  it('is idempotent — re-merging an already-merged assignment is stable', () => {
+    const task = makeTask({ forceSkills: ['forced-skill'], excludeSkills: ['drop-me'] });
+    const first = mergeForcePreservingSkillIds(task, ['drop-me', 'routed-skill']);
+    expect(first).toEqual(['forced-skill', 'routed-skill']);
+    expect(mergeForcePreservingSkillIds(task, first)).toEqual(first);
+  });
+
+  it('agrees with applySkillDirectiveAuthority on the effective SET (both authorities, one outcome)', () => {
+    const merged = makeTask({
+      forceSkills: ['forced-skill'],
+      excludeSkills: ['drop-me'],
+      assignedSkills: mergeForcePreservingSkillIds(
+        { forceSkills: ['forced-skill'], excludeSkills: ['drop-me'] },
+        ['drop-me', 'routed-skill'],
+      ),
+    });
+    const before = [...merged.assignedSkills!];
+    // The render-time authority must find nothing left to repair.
+    expect(applySkillDirectiveAuthority(merged)).toEqual(before);
+    expect([...before].sort()).toEqual(['forced-skill', 'routed-skill']);
+  });
+
+  it('task-mode-runner site — the direct-V3 assignment keeps the force', () => {
+    // Exactly the shape of task-mode-runner.ts:
+    //   task.assignedSkills = mergeForcePreservingSkillIds(task, v3.skillIds)
+    const task = makeTask({ forceSkills: ['forced-skill'], assignedSkills: ['stale-skill'] });
+    const v3SkillIds: string[] = ['routed-skill'];
+    task.assignedSkills = mergeForcePreservingSkillIds(task, v3SkillIds);
+    expect(task.assignedSkills).toEqual(['forced-skill', 'routed-skill']);
+    expect(task.assignedSkills).not.toContain('stale-skill');
   });
 });

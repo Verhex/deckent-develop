@@ -34,7 +34,6 @@ import { buildWorkerPrompt } from './task-builder.js';
 import { enrichResultCost, enrichResultTokenUsage, resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 import { eventBus } from './event-bus.js';
 import { TASKS_DIR } from '../core/constants.js';
-import type { UserOverride } from '../core/routing-types.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
@@ -309,25 +308,20 @@ export async function runTaskMode(
   try {
     const routingVersion = config.routing_engine ?? 'v3';
     if (routingVersion === 'v3') {
-
-      const overrides: UserOverride[] = [];
-      if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
-        overrides.push({
-          source: 'task-directive',
-          forceAgent: task.forceAgent,
-          forceSkills: task.forceSkills,
-          excludeSkills: task.excludeSkills,
-          excludeAgents: task.excludeAgent,
-          priority: 3,
-        });
-      }
+      // 587-001: the `overrides: UserOverride[]` array that used to be built
+      // here was never passed to routeSingleTaskV3 — dead code that read as if
+      // the directives were honoured. The directives ARE honoured, but through
+      // their real seams: forceAgent rides task.forceAgent into the V3
+      // verifier, and forceSkills/excludeSkills ride the force-preserving
+      // merge below (which replaces the old wholesale `= v3.skillIds` write
+      // that could erase an operator's forced skill).
 
       // ROUTING-V3 (S3 cut-over): the V2 engine is retired — single-task
       // routing goes through the vector pipeline (structural content, no LLM).
-      const { routeSingleTaskV3 } = await import('./routing-plan-adapter.js');
+      const { routeSingleTaskV3, mergeForcePreservingSkillIds } = await import('./routing-plan-adapter.js');
       const v3 = await routeSingleTaskV3(task, projectRoot);
       task.assignedAgent = v3.agentId;
-      task.assignedSkills = v3.skillIds;
+      task.assignedSkills = mergeForcePreservingSkillIds(task, v3.skillIds);
     }
   } catch (routingErr) {
     debugLog('task-mode:routing', `V2 routing failed, using generic fallback: ${routingErr}`);

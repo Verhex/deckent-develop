@@ -13,9 +13,9 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 704,
+  "total": 705,
   "mediated": 0,
-  "unmediated": 704,
+  "unmediated": 705,
   "fileCount": 240,
   "byFile": {
     "src/agent/permission-store.ts": {
@@ -867,7 +867,7 @@
       "mediated": false
     },
     "src/orchestra/spawn-backend-docker.ts": {
-      "count": 26,
+      "count": 27,
       "mediated": false
     },
     "src/orchestra/spawn-backend-mock.ts": {
@@ -979,5 +979,5 @@
       "mediated": false
     }
   },
-  "digest": "04eb6bf58c40933cd340ea57095f40fa5c05c2891004d16c0d169cc079d2a063"
+  "digest": "eb6d14cccc0d1a0b2256c1405acf6f6e0c37257e13080211de443754f89dc193"
 }

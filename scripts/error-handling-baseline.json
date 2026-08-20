@@ -73,7 +73,7 @@
     },
     {
       "file": "src/cli/commands/chat-provider-parity.ts",
-      "fingerprint": "5f74c616c2df006c82d7062fbedc4a4a57e2e4b626c1806a211c9dd35fc8864d",
+      "fingerprint": "5e2940ce2815c5fc2307eea600971eb1e9fa925cf1ee1028115387dcabdf9dfb",
       "count": 1
     },
     {
@@ -610,11 +610,6 @@
       "file": "src/core/provider-truth.ts",
       "fingerprint": "60901a4ddf6cdac6e874becc8a8c94d1670ecf0e1b216f3f025ba4bdab2a33c6",
       "count": 2
-    },
-    {
-      "file": "src/core/provider-truth.ts",
-      "fingerprint": "637316ad072566e0391ddd9a244e115b0a764bc7a85e7329b244adcbff6f9b35",
-      "count": 1
     },
     {
       "file": "src/core/provider-truth.ts",

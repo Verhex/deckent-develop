@@ -12,6 +12,14 @@ const hoisted = vi.hoisted(() => {
     codexDetect: vi.fn(),
     geminiDetect: vi.fn(),
     spawnMock: vi.fn(),
+    // ddc523bf0 cursor adapter: probeProviders constructs a REAL CursorAdapter
+    // (unlike claude/codex/gemini, which are class-mocked below) and its
+    // constructor captures `spawnSync` from node:child_process. The default
+    // impl reports the cursor-agent binary as absent (status 1), so cursor
+    // probes deterministically not-ready and the mocked providers keep
+    // driving selection — independent of any cursor-agent on the host PATH.
+    // Never reset in resetMocks(): the impl IS the deterministic environment.
+    spawnSyncMock: vi.fn(() => ({ status: 1, stdout: '', stderr: '' })),
     printMock: vi.fn(),
     printErrorMock: vi.fn(),
     registeredHooks,
@@ -32,6 +40,8 @@ const hoisted = vi.hoisted(() => {
 
 vi.mock('node:child_process', () => ({
   spawn: hoisted.spawnMock,
+  // ddc523bf0 cursor adapter: the real CursorAdapter imports spawnSync too.
+  spawnSync: hoisted.spawnSyncMock,
 }));
 
 vi.mock('../../src/providers/claude.js', () => ({
@@ -109,15 +119,19 @@ function resetMocks(): void {
 describe('probeProviders', () => {
   beforeEach(resetMocks);
 
-  it('returns detect results in claude → codex → gemini order', async () => {
+  it('returns detect results in claude → codex → cursor → gemini order', async () => {
     hoisted.claudeDetect.mockResolvedValue({ binary: true, auth: true, ready: true });
     hoisted.codexDetect.mockResolvedValue({ binary: false, auth: false, ready: false });
     hoisted.geminiDetect.mockResolvedValue({ binary: true, auth: false, ready: 'partial' });
 
     const probes = await probeProviders('/project');
-    expect(probes.map(p => p.tool)).toEqual(['claude', 'codex', 'gemini']);
+    // ddc523bf0 cursor adapter: cursor joined PROVIDER_PRIORITY between codex
+    // and gemini — the real adapter's detect() runs against the spawnSync mock
+    // (binary absent), so its probe is deterministically not-ready.
+    expect(probes.map(p => p.tool)).toEqual(['claude', 'codex', 'cursor', 'gemini']);
     expect(probes[0].detect.ready).toBe(true);
-    expect(probes[2].detect.ready).toBe('partial');
+    expect(probes[2].detect.ready).toBe(false);
+    expect(probes[3].detect.ready).toBe('partial');
   });
 
   it('swallows adapter detect() errors and reports as not-ready', async () => {

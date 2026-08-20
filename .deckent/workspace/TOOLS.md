@@ -72,7 +72,7 @@ Toplam: 51
 <!-- DECKENT:CONTRACT:END id="tools" -->
 
 ## CLI Commands
-<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="a1677c4a4e78ddf261bc247df54df67c7530946bc71cb85481dd55995385af76" -->
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="c9efc0e64adfdca0da529ded566393364035cb74957ffd26bd0b5a981d239e0c" -->
 Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper module dosya adları dışlanır.
 
 | Komut | Kategori | Risk | Yüzeyler |
@@ -153,8 +153,7 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent upgrade` | Core | Çalıştır | cli |
 | `deckent usage` | Core | Oku | cli, mcp, repl |
 | `deckent watch` | Run | Oku | cli, mcp |
-| `deckent web` | Run | Çalıştır | cli |
 | `deckent xverify` | Core | Oku | cli, mcp |
 
-Toplam: 78
+Toplam: 77
 <!-- DECKENT:CONTRACT:END id="tools" -->

@@ -94,7 +94,10 @@ function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
     testsPassed: true,
     coverage: null as unknown as number,
     selfAssessment: 'DONE',
-    notes: 'Detailed notes explaining what changed and why the fix works as expected in this regression scenario.',
+    // 7097-B3 unevidenced-claim ceiling: the "perfect" fixture must carry a
+    // real run trace or its bare testsPassed:true caps DONE at tech-debt —
+    // this suite pins score variance, not the evidence ceiling.
+    notes: 'Detailed notes explaining what changed and why the fix works as expected in this regression scenario. Verified with vitest run: 8/8 tests passed (exit 0).',
     ...overrides,
   };
 }

@@ -215,3 +215,66 @@
 - Ders: 'reuse' yolu hiç canlı koşmamış yol sınıfıydı — üç ayrı katman kilidi
   ancak canlı-çift-koşu döngüsüyle söküldü; her ara-adım typed-hold verdiği
   için teşhis hep diskten okundu.
+
+## Evaluation-Surface dalgası (2026-08-20, owner-yön mesajı)
+- OWNER KONUMLANDIRMASI 9040/EVALUATION-001 satırına işlendi: universal
+  deterministik çekirdek + task-kind girişli + custom-confirmation adapterları
+  (kod/LLM/insan; desteklenmeyen mod typed-HOLD) + TÜM ingress'lerde
+  (start/run/runs/do/autonomous) TEK evaluation-authority; ERP↔solo aynı kalite.
+  Yeni root YOK (brief-§3.5 kararı): dilimler 9040+GOAL-ACCEPTANCE+KERNEL-
+  SETTLEMENT+SPRINT-HONESTY altında.
+- İLK TUĞLA (7097-madde-3) KODLANDI: src/orchestra/criterion-evaluation.ts —
+  typed goNogo.items deterministik çekirdeği (dosya-yolu/ranged-gramer kanıtı;
+  prose=dürüst-undecidable, ASLA ceza; any-of semantiği adjudication'la aynı) +
+  rubrik-köprüsü (goNogo:<id> audit-satırları + decisive typed-contract failure
+  → NO_GO tavanı; projectRoot'suz çağıran etkilenmez). 9+198 test yeşil.
+  Güvenli-devreye-alma: mevcut tüm items prose'lu → etkisiz; dosya-yollu
+  sözleşme yazıldıkça etkinleşir.
+- 7098 DOGFOOD-CANARY (587→…): İLK koşu PLAN prompt-gate'inde dürüst BLOCK ile
+  değerli defekt yakaladı: phantom-tail suppressor ÇAPRAZ-SATIR kör — prose'daki
+  bare dosya-adı (brain-skill.test.ts), Files'taki tam-yola rağmen kök-seviye
+  hayalet sayılıp test-discoverability BLOCK üretti (task-builder
+  isPhantomTailToken satır-lokal). Finding: suppressor'a görev-bütünü extracted
+  seti. Workaround: direktif-prose'unda hep tam-yol.
+- CANARY-2 (sprint-587) TAMAMLANDI: direktif-prose tam-yolla duzeltilince ayni
+  gate temiz gecti; 2/2 DONE, 0 fix, 0 NO_GO; CHANGELOG sprint587 bolumunu
+  finalizer kendisi yazdi (dogfood zinciri ucta uca calisti).
+- SALVAGE-GECIRMEZLIK (madde-3'un 2. yarisi, muhur-oncesi oz-denetimde
+  yakalandi): decisive typed-contract NO_GO'su iki salvage kapisinda
+  yumusatilabiliyordu — (1) reconcileRubricNoGo heuristik-salvage'i yuksek
+  worker-raporlu coverage'da GO_WITH_TECH_DEBT'e cekebiliyordu (testim
+  coverage:0 ile esige takilip boslugu gizlemisti); (2)
+  reconcileEvaluationSpuriousNoGo gercek tsc/vitest probe'lariyla DONE'a bile
+  cevirebiliyordu. Ders: yesil test-kosusu 'dosya provably yok' iddiasina
+  karsi ILGISIZ kanittir. Fix: hasUnsalvageableContractFailure (kernel'de,
+  yapisal-tipli) + reconcileRubricNoGo 'concrete_contract_failure' terminal-
+  dali + spurious-core probe-oncesi kacis; pin: yuksek-coverage DONE +
+  contract-failure -> iki kapida da NO_GO korunur.
+- MUHUR: codex CONFIRMED `cross-verify-verdict:sha256:e8b96e9d…852f1972` —
+  onay-sonrasi ILK denemede (probe-approval katman-2 akisi uretimde dogrulandi:
+  TTL dolmus kayit -> probe_approval_required -> delegated decide -> CONFIRMED).
+- Hermetic baseline'lar ilerletildi (unresolved digest-only 14471; production
+  inventory 1256->1257 yeni kernel modulu); MASTER 7097 madde-3 blogu +
+  7098 canary blogu (OPEN+UYGULANDI pattern'i — DONE statusu closure-OS
+  settlement-receipt zinciri istiyor, dogru boyle); projeksiyon senkron.
+- KADANS FULL-SUITE MUTABAKATI (3-landing kurali, bugun 3.): ilk kosu 38
+  kirmizi / 36963 yesil cikti. Teshis-fani (2 paralel agent + el): kirmizilarin
+  SIFIRI bugunku evaluation-dalgasindan; 4 sinif birikmis borc: (A) dunku
+  7097-B1 post-rubric zinciri + 7093 totalTokens + karusel katman-2 mock'u +
+  B3-tavaninin fixture-etkisi — 6 dosya pin/mock/fixture hizalandi (fixture'lara
+  gercek kosu-izi eklendi; testlerin amaci korunarak); (B) cursor-landing'inin
+  (ddc523bf0, sprint-565) test borcu — 7 dosya: spawnSync mock'lari + 4->5
+  provider pinleri (agent-hizalamasi, 127 yesil); (C) baseline/ratchet
+  projeksiyon borcu — error-ratchet (yeni fingerprint + 2 stale dusum),
+  operation-ingress --write, docs:platform, census satir-pini, closure-ledger
+  projeksiyon regen (append-only gate OK — ledger event'lerine dokunulmadi),
+  hermetic digest'ler final-agacta; (D) ADR-G-039 kaydinda Context alani hic
+  yazilmamis — memory.db'ye tek-UPDATE onarim script'iyle (idempotent,
+  scratchpad'de) Context eklendi + memory export regen, decisions 12/12.
+- DERS (playbook adayi): her landing'de scoped-yesil yetiyor ama cursor gibi
+  genis-yuzeyli landing'lerde full-suite kadansi beklemek borcu katliyor;
+  genis-yuzey landing'i kadans-sayacini SIFIRLAMALI (kendi full-suite'ini
+  kosmali).
+- Finding (RELATED_BUT_NONBLOCKING): NO_PROVIDER_MESSAGE (chat.ts:68) cursor'i
+  aramasina ragmen listede gostermiyor (ddc523bf0 eksigi; i18n-FIRST'e de
+  aykiri hardcode) — owner-admission bekler.

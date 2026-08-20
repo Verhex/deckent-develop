@@ -405,8 +405,15 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-20 (7081 carousel layer-2): same 14471 count, digest only —
   // preparation/truth-store/producer pins realigned to the approval-skip +
   // canonical-refresh reuse contract.
+  // 2026-08-20 (EVALUATION-001 first brick + 7098 canary): same 14471 count,
+  // digest only — criterion-evaluation kernel suite (tmpdir fixtures) plus
+  // the canary-landed skill-force-delivery/forced-skill-lineage-wire pins.
+  // 2026-08-20 (cadence full-suite reconciliation): same 14471 count, digest
+  // only — salvage-gate pins, chat-suite spawnSync mocks and the 7093/7091
+  // pin realignments moved tracked test content; measured on the final
+  // landing tree.
   count: 14471,
-  digest: '53989a384cea76cab171911532b50bc1fb043f515821b6cd32bc8e680fb9dc8b',
+  digest: '5a2af230c32ef643c3068dd73015eed4c2386804c6b7e537428c60198bbfd9fe',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -696,8 +703,15 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // truth-store account-agnostic lookup, producer probe-gated approval
   // requirement (nullable approval on refresh), preparation approval-skip +
   // canonical-refresh reuse moved production content.
-  count: 1256,
-  digest: 'cdd9e6814102e6734b232df0401b88e48d99f782dbafbcf37eebcd3ef829a682',
+  // 2026-08-20 (EVALUATION-001 first brick + 7098 canary): +1 — the new
+  // criterion-evaluation deterministic kernel module; result-evaluator
+  // rubric bridge and the canary's task-mode-runner/routing-plan-adapter
+  // force-preserving merge moved production content.
+  // 2026-08-20 (salvage-gate closure): same 1257 count, digest only — the
+  // contract-failure guards in mid-sprint-adapter/result-evaluator and the
+  // kernel's hasUnsalvageableContractFailure export moved production content.
+  count: 1257,
+  digest: 'a43f80090c4ecf437f92b6f83cd56f4331b232d9f9c434f484a31b790037c008',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

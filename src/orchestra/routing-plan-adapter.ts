@@ -291,7 +291,9 @@ export async function routeTasksV3ForPlan(
       });
 
       task.assignedAgent = decision.agentId;
-      task.assignedSkills = [...decision.skillIds];
+      // 587-001: never a wholesale overwrite — an operator's forceSkills
+      // directive outlives whatever V3 picked (see mergeForcePreservingSkillIds).
+      task.assignedSkills = mergeForcePreservingSkillIds(task, decision.skillIds);
       const storyWorkType = decision.story.steps[0]?.detail['workType'];
       task.routingMeta = {
         routingVersion: 'v3',
@@ -372,6 +374,46 @@ export interface RouteSingleTaskV3Result {
   workType: string;
   escalation: string | null;
   storySummary: string;
+}
+
+/**
+ * 587-001 FORCE-PRESERVING-MERGE — the single V3 assignment rule.
+ *
+ * Both V3 write sites (`routeTasksV3ForPlan` above and task-mode-runner's
+ * direct `routeSingleTaskV3` call) used to do a WHOLESALE overwrite —
+ * `task.assignedSkills = <v3 ids>` — which silently erased an operator's
+ * `- Skills:` directive whenever the router did not happen to pick the same
+ * ids. Every V3 write goes through this merge instead:
+ *
+ *   final = forceSkills ++ (v3 decision \ excludeSkills)   — deduped, force first
+ *
+ * `excludeSkills` prunes ONLY router-derived ids: an explicit force beats an
+ * explicit exclude for the same id, because a directive force is the strongest
+ * operator signal on the record. That is the same precedence as
+ * `applySkillDirectiveAuthority` (task-builder.ts), which stays the downstream
+ * render-time authority — this merge is idempotent under it.
+ */
+export function mergeForcePreservingSkillIds(
+  task: Pick<Task, 'forceSkills' | 'excludeSkills'>,
+  routedSkillIds: readonly string[],
+): string[] {
+  const forced = task.forceSkills ?? [];
+  const forcedSet = new Set(forced);
+  const excluded = new Set((task.excludeSkills ?? []).filter((id) => !forcedSet.has(id)));
+
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  for (const id of forced) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    merged.push(id);
+  }
+  for (const id of routedSkillIds) {
+    if (seen.has(id) || excluded.has(id)) continue;
+    seen.add(id);
+    merged.push(id);
+  }
+  return merged;
 }
 
 /**

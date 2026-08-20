@@ -9,6 +9,12 @@ const hoisted = vi.hoisted(() => ({
   codexDetect: vi.fn(),
   geminiDetect: vi.fn(),
   spawnMock: vi.fn(),
+  // ddc523bf0 cursor adapter: probeProviders constructs a REAL CursorAdapter
+  // whose constructor captures `spawnSync` from node:child_process. Default
+  // impl reports cursor-agent as absent (status 1) so the cursor probe is
+  // deterministically not-ready (matches this file's all-not-ready premise)
+  // regardless of the host PATH. Never reset.
+  spawnSyncMock: vi.fn(() => ({ status: 1, stdout: '', stderr: '' })),
   printMock: vi.fn(),
   printErrorMock: vi.fn(),
 }));
@@ -17,6 +23,8 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('node:child_process', () => ({
   spawn: hoisted.spawnMock,
+  // ddc523bf0 cursor adapter: the real CursorAdapter imports spawnSync too.
+  spawnSync: hoisted.spawnSyncMock,
 }));
 
 vi.mock('../../src/providers/claude.js', () => ({
@@ -103,6 +111,10 @@ describe('chat no-CLI fallback UX', () => {
     expect(msg).toContain('claude');
     expect(msg).toContain('codex');
     expect(msg).toContain('gemini');
+    // ddc523bf0 cursor adapter: cursor IS probed (PROVIDER_PRIORITY) but
+    // NO_PROVIDER_MESSAGE in chat.ts does not list it yet — known product-side
+    // gap, tracked as a finding; do not pin 'cursor' here until the message
+    // itself is updated.
     process.exitCode = origExitCode as number;
   });
 

@@ -187,7 +187,8 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 | `tests/config/nervous-faz1-smoke.test.ts` | 42 | it | `!nervousEnabled` |
 | `tests/core/builtins/catalog-sync-parity.test.ts` | 93 | it | `!inPool` |
 | `tests/core/builtins/catalog-sync-parity.test.ts` | 122 | it | `!inPool` |
-| `tests/core/cross-verify-evidence-broker.test.ts` | 186 | describe | `!pinnedRuntimeAvailable` |
+| `tests/core/cross-verify-evidence-broker.test.ts` | 187 | describe | `!pinnedRuntimeAvailable` |
+| `tests/core/cross-verify-evidence-broker.test.ts` | 598 | describe | `!pinnedRuntimeAvailable` |
 | `tests/core/nervous-enabled-integration.test.ts` | 38 | it | `!hasProjectConfig \|\| !projectNervousEnabled` |
 | `tests/dashboard/dashboard-build-smoke.test.ts` | 59 | it | `!BUILD_OUTPUT_PRESENT` |
 | `tests/dashboard/dashboard-build-smoke.test.ts` | 66 | it | `!BUILD_OUTPUT_PRESENT` |
@@ -242,7 +243,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2632 of 2695 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2637 of 2700 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work

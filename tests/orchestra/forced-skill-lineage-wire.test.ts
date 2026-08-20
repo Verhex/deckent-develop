@@ -38,6 +38,7 @@ import type { TaskDNA } from '../../src/core/routing-types.js';
 
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import { routeSprintTasks } from '../../src/orchestra/sprint-spawner.js';
+import { mergeForcePreservingSkillIds } from '../../src/orchestra/routing-plan-adapter.js';
 
 function makeLightTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -374,6 +375,8 @@ vi.mock('../../src/core/skill-pool.js', () => ({
     loadSkills: vi.fn().mockReturnValue(new Map()),
     getSkill: vi.fn().mockReturnValue(undefined),
   })),
+  // 587-001: routing-plan-adapter.ts (imported by Part 4) binds this export.
+  snapshotSkillCatalog: vi.fn().mockReturnValue({ entries: [] }),
 }));
 
 vi.mock('../../src/core/skill-selector.js', () => ({
@@ -624,5 +627,70 @@ describe('spawnWorkers — forced skill honest NO_GO (487-023 FORCED-SKILL-LINEA
 
     expect(mockBackend.spawn).toHaveBeenCalledTimes(1);
     expect(task.status).not.toBe(TaskStatus.NO_GO);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Part 4 — 587-001: the V3 ASSIGNMENT choke point.
+//
+// Parts 1–3 prove the lineage AFTER assignment. The upstream hole was the
+// assignment itself: both V3 sites wrote `task.assignedSkills` wholesale from
+// the router's decision —
+//   routing-plan-adapter.ts  `task.assignedSkills = [...decision.skillIds]`
+//   task-mode-runner.ts      `task.assignedSkills = v3.skillIds`
+// — so a forced id the router did not pick was gone before any of the repairs
+// above ever ran. Both sites now assign through mergeForcePreservingSkillIds.
+// ═══════════════════════════════════════════════════════════════════
+
+describe('V3 assignment sites merge instead of overwriting (587-001)', () => {
+  it('plan site — a decision without the forced id keeps it (force first, then routed)', () => {
+    const task = makeLightTask({ forceSkills: ['testing-expert'], assignedSkills: ['stale'] });
+    // Shape of routing-plan-adapter.ts's write.
+    task.assignedSkills = mergeForcePreservingSkillIds(task, ['routed-skill']);
+    expect(task.assignedSkills).toEqual(['testing-expert', 'routed-skill']);
+  });
+
+  it('single-task site — an EMPTY V3 result cannot erase the force', () => {
+    const task = makeLightTask({ forceSkills: ['testing-expert'], assignedSkills: ['testing-expert'] });
+    // Shape of task-mode-runner.ts's write, with routeSingleTaskV3 returning nothing.
+    task.assignedSkills = mergeForcePreservingSkillIds(task, []);
+    expect(task.assignedSkills).toEqual(['testing-expert']);
+  });
+
+  it('both sites agree on the same effective assignment for the same inputs', () => {
+    const planTask = makeLightTask({ forceSkills: ['testing-expert'] });
+    const runTask = makeLightTask({ forceSkills: ['testing-expert'] });
+    planTask.assignedSkills = mergeForcePreservingSkillIds(planTask, ['routed-skill']);
+    runTask.assignedSkills = mergeForcePreservingSkillIds(runTask, ['routed-skill']);
+    expect(planTask.assignedSkills).toEqual(runTask.assignedSkills);
+  });
+
+  it('excludeSkills prunes a routed id but never the forced one (directive force wins)', () => {
+    const task = makeLightTask({
+      forceSkills: ['testing-expert'],
+      excludeSkills: ['testing-expert', 'unwanted-skill'],
+    });
+    task.assignedSkills = mergeForcePreservingSkillIds(task, ['unwanted-skill', 'routed-skill']);
+    expect(task.assignedSkills).toEqual(['testing-expert', 'routed-skill']);
+  });
+
+  it('a routed id is never duplicated when the operator also forced it', () => {
+    const task = makeLightTask({ forceSkills: ['testing-expert'] });
+    task.assignedSkills = mergeForcePreservingSkillIds(task, ['testing-expert', 'routed-skill']);
+    expect(task.assignedSkills!.filter(id => id === 'testing-expert')).toHaveLength(1);
+  });
+
+  it('no directives — the V3 decision is assigned verbatim (no behaviour change)', () => {
+    const task = makeLightTask({ assignedSkills: ['stale'] });
+    task.assignedSkills = mergeForcePreservingSkillIds(task, ['routed-a', 'routed-b']);
+    expect(task.assignedSkills).toEqual(['routed-a', 'routed-b']);
+  });
+
+  it('the merged assignment still survives routeSprintTasks (Part 2 lineage, end-to-end)', () => {
+    const task = makeLightTask({ forceSkills: ['testing-expert'] });
+    task.assignedSkills = mergeForcePreservingSkillIds(task, ['routed-skill']);
+    routeSprintTasks([task], {} as unknown as ResolvedConfig, ['claude', 'codex', 'gemini']);
+    expect(task.assignedSkills).toContain('testing-expert');
+    expect(task.assignedSkills).toContain('routed-skill');
   });
 });

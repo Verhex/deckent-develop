@@ -57,7 +57,11 @@ function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
     testsPassed: true,
     coverage: 90,
     selfAssessment: 'DONE',
-    notes: 'A reasonably detailed note that explains the change and references the rubric reweight behavior to satisfy the documentation criterion threshold for testing purposes.',
+    // 7097-B3 unevidenced-claim ceiling: a bare testsPassed:true with no
+    // run trace caps DONE at GO_WITH_TECH_DEBT, so the "all-good" fixture
+    // now carries the evidence a real worker reports (a vitest run trace) —
+    // this suite pins the renormalization math, not the evidence ceiling.
+    notes: 'A reasonably detailed note that explains the change and references the rubric reweight behavior to satisfy the documentation criterion threshold for testing purposes. Verified with vitest run: 12/12 tests passed (exit 0).',
     ...overrides,
   };
 }

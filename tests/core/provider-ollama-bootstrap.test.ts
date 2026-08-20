@@ -107,11 +107,14 @@ describe('detectAvailableProviders — Ollama detection', () => {
     expect(ollama!.available).toBe(false);
   });
 
-  it('lists ollama alongside claude/codex/gemini (4 providers total)', async () => {
+  it('lists ollama alongside claude/codex/cursor/gemini (5 providers total)', async () => {
     stubFetch(() => new Response('{"models":[]}', { status: 200 }));
     const providers = await detectAvailableProviders();
     const names = providers.map(p => p.name).sort();
-    expect(names).toEqual(['claude', 'codex', 'gemini', 'ollama']);
+    // ddc523bf0 cursor adapter: detectCursor joined detectAvailableProviders
+    // (7091 FAZ-1) — 4 providers became 5. The spawnSync mock above keeps the
+    // cursor CLI detector deterministic (reported absent) like the others.
+    expect(names).toEqual(['claude', 'codex', 'cursor', 'gemini', 'ollama']);
   });
 
   it('respects DECKENT_OLLAMA_HOST env override', async () => {
