@@ -460,3 +460,15 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   / uygulama `…cf4930c5` (ilk denemede) / sonuc `…60fce97a` (gercek-binary
   bos/dolu/geri-bos kanit-dosyasiyla; gecici checkpoint-fixture yazilip
   silindi). Pin 3+48; hermetic +1 modul.
+
+## Karar-Ergonomisi tasarim-eki + solution-architect skill (owner 2026-08-20)
+- YENI SKILL .claude/skills/solution-architect/SKILL.md: dunyanin-en-zeki-cozum-
+  mimari kimligi kalici checklist olarak (olc-sonra-ciz · absorbe-et ·
+  ergonomi=guvenlik · kolaylik!=yetki · sokulebilir-otomasyon · negative-space ·
+  asama-muhur · 3-Yasa). Tasarim islerinde varsayilan.
+- Tasarim-eki doc §3.5 (muhur CONFIRMED `…23868d35`): 5-char Crockford kisa-kod
+  (her yuzeyde AYNI; bayat-kod fail-closed; nervous-uretici D2b'de absorbe);
+  kaynak·neden·kod karti; sohbette buton + y/n (critical view-only+deep-link);
+  approval-rules.json (git-izlenir, typed sema, critical TIP-DISI, decidedBy:
+  rule:<id> auditli, autonomous-baglari SOKULEBILIR kural; sistem kendine kural
+  yazamaz; --always yalniz routine). Dilimler DE1→DE2→DE3, 3-asama muhurlu.

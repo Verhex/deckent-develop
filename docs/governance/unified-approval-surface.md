@@ -208,6 +208,62 @@ PAUSED classes, checkpoint timeout, cost/budget stops, cascade breaker, panic ga
 stop marker) becomes a typed registry consumed by loops, status surfaces and docs —
 AI-legible codes with resolution paths.
 
+### 3.5 Decision ergonomics (owner mandate 2026-08-20, solution-architect identity)
+
+Ergonomics is a SECURITY property: a decision that is hard to give gets skipped,
+deferred or rubber-stamped. Mandates: nobody types a 64-char sha256; every surface
+shows source · reason · code at a glance; chat surfaces decide with buttons or
+`y <code>` / `n <code>`; recurring decisions can be promoted to persistent,
+trackable, REMOVABLE rules. Convenience NEVER widens authority: short codes are
+addressing sugar only — identity mechanisms, MAC envelopes and the risk-tier
+channel matrix are untouched, and critical-tier items can never be decided by a
+rule, a timeout or a button habit.
+
+**Short code.** Deterministic human code per pending item: first 25 bits of
+sha256(requestId) → 5 chars of Crockford base32 (no O/0, I/1 confusion; ~33M
+space vs tens of concurrent pendings; on collision extend to 6-7 chars). The SAME
+code on every surface (CLI, REPL, desktop, Telegram). `decide` accepts short code
+OR full id; short codes resolve only against the CURRENT pending set (a stale
+code is a typed fail-closed rejection). Nervous's existing 5-char code generator
+is ABSORBED by this contract in D2b (no second generator remains).
+
+**Card triple.** One line everywhere:
+`#K7X2M · [checkpoint] sprint-9/plan · reason: PLAN phase asks a human · decide: deckent approvals decide K7X2M --allow`
+
+**Chat surfaces.** Inline Approve/Deny buttons (nonce-bound callbacks) for
+routine/elevated; critical renders view-only with a deep-link to a live-auth
+surface. Text fallback: `y K7X2M` / `n K7X2M`. An "always approve this kind"
+button exists ONLY for routine tier and only PROPOSES a rule (below).
+
+**approval-rules.json.** Persistent, trackable, removable automation:
+`.deckent/settings/approval-rules.json` (tracked like settings — auditable in
+git; no secrets inside):
+
+```
+{ schemaVersion: 1, rules: [{
+    id: 'rule-<8hex>', createdAt, createdBy, reason,
+    match: { origin, actionPattern?, riskTierMax: 'routine' | 'elevated' },
+    decision: 'allow' | 'deny',
+    source: 'manual' | 'promoted-from:<requestId>',
+    expiresAt?, disabled?, disabledAt?, disabledBy?
+}]}
+```
+
+Engine invariants: (i) critical is TYPE-EXCLUDED from riskTierMax — no rule can
+ever match it; (ii) every rule application writes an audit row and the decision
+envelope carries `decidedBy: 'rule:<id>'` — no invisible automation; (iii)
+approvals bound to autonomous flows are represented as rules in the SAME file,
+so `rules disable|remove` detaches them later — automation that cannot be
+unwound is a design defect; (iv) NO-AUTO-APPROVE generalizes: a rule is born
+only from an explicit owner `--always` promotion or manual authoring, never
+minted by the system itself. CLI: `deckent approvals rules
+list|show|disable|enable|remove` + `decide --always` (routine-tier promotion).
+
+Slices: **DE1** short-code generator + card format on CLI list/decide and
+federated rows; **DE2** approval-rules store + engine on the broker decide path
++ rules CLI + `--always` promotion; **DE3** chat buttons + y/n (merges into D3).
+Each slice carries design/implementation/result seals.
+
 ## 4. Slices (each lands with tests + gates + xverify seal)
 
 | Slice | Content | Exit proof |
@@ -218,10 +274,18 @@ AI-legible codes with resolution paths.
 | D3 | channel completion: Telegram/Slack/Teams relay wired live; VS Code decide wired; gate-acks formalized as routine-ack class | real-device proof per channel; seal |
 | D4 | TTL + timeout-disposition normalization (confirmations/autonomous/pairing get TTLs; SLA escalation L5) | no pending item without expiry; seal |
 | D5 | legacy decision-surface retirement + i18n debt closure (measured violations) + docs | grep-proof: one decision path per origin; seal |
+| DE1 | short codes + source·reason·code card on every listing/decide | same code across surfaces; stale-code fail-closed; seal |
+| DE2 | approval-rules.json store + engine + rules CLI + --always promotion | rule-decided envelopes carry decidedBy:rule; rules removable; critical type-excluded; seal |
+| DE3 | chat buttons + y/n short text (merged into D3 wiring) | real-device proof; seal |
 | L-slices | 3112: L1..L7 in order (lease/heartbeat → occurrence ledger → cumulative budget → SLA → supervisor → taxonomy registry) | real perpetual canary: 24h scheduled watcher loop surviving restart with full evidence chain; seal |
 
 ## 5. Explicitly out of scope / owner decision points
 
+- Decision-ergonomics negative space: critical-tier automation stays impossible
+  under EVERY convenience (rule, timeout, button habit) — changing that is a
+  constitution-level owner amendment, not a slice. approval-rules.json is
+  git-tracked by default (enterprise auditability); the owner may opt it into
+  gitignore. Biometric/2FA decision channels are future work, not designed here.
 - Widening MCP decision power beyond the routine-ack class (operating-rule §12.2
   amendment — owner-only).
 - Voice connectors (no approval surface exists; future channel).
