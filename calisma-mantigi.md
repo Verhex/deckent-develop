@@ -155,3 +155,10 @@
 - B4: residualDebt alanı (tip+sözleşme+ledger-tercihi+echo-muafiyeti).
 - KANIT: sprint-582 = 6/6 DONE, 0 fix, 0 NO_GO — İLK tamamen temiz tur (F3 '3 temiz tur'
   hedefinin 1.si). 580/581 blokajları D4-kenarlarıyla temiz-kayıtlıydı (580-005←580-004...).
+
+## TEMİZ-TUR SAYACI: 3/3 (2026-08-20 sabah)
+- 582 (7097 kanıt-koşusu) + 583 + 584 teyit turları: üçü de 6/6 attempt-1 DONE,
+  0 fix, 0 NO_GO — veto-fix sonrası kronik tamamen öldü. Kanıt-manifesti
+  .analysis/clean-rounds-582-584.md (18 kayıt). 584 çekirdek-6 = $1.806
+  (567 $4.674 → -%61; kapsamlı $0.663 → -%70). Kalite band-içi.
+- F3 ürün-default kararı owner önünde (şart yerine geldi: 3 tam temiz tur).
