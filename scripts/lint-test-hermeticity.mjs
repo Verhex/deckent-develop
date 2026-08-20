@@ -429,8 +429,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-20 (D2a bridge): drift from the decision-federation suite fixtures.
   // 2026-08-20 (sprint-589 i18n factory package): tracked content moved.
   // 2026-08-20 (590 + D2b-1): status-output suite + federation fixtures.
-  count: 14477,
-  digest: '0832bddaa88638d936a96557f6330f95076284b499efab9e6e338dfcb5e80daf',
+  // 2026-08-20 (591 i18n wave + D2b-2a rules engine): +1 — the rules-engine
+  // suite's tmpdir approval-rules fixtures; the new approvals-endpoint API
+  // suite is tracked clean.
+  // 2026-08-20 (D2b-2a live-proof fixes): same 14478 count, digest only —
+  // the rules-engine suite gained the end-to-end broker/ingress and
+  // consumer-validation pins (tracked content moved).
+  count: 14478,
+  digest: 'c1e6b03b4ca6bffeea0d5fab608383dede9a2fcaff3bbee1ecd54819432a5c5b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -753,8 +759,14 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // surfaces moved user-facing text into the catalog.
   // 2026-08-20 (590 + D2b-1): bridge moved to orchestra + origins extended;
   // status output localized.
-  count: 1266,
-  digest: '304be2def09f9d3518a3b2e1b3bd28fd2ce868a8fa183de3c46931259a619010',
+  // 2026-08-20 (591 + D2b-2a): +1 REAL production module —
+  // src/core/approval-rules-engine.ts (rule-decision authenticator + allowlist);
+  // six gate/MCP/API surfaces moved user-facing text into the catalog.
+  // 2026-08-20 (D2b-2a live-proof fixes): same 1267 count, digest only —
+  // ingress rule-actor pre-check branch + ruleSessions consumer routing +
+  // runtime wiring moved tracked production content.
+  count: 1267,
+  digest: '2144bf01f608583e7af897a16d630d2ce51b1d802851416cda2c8d08b8a83c5b',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

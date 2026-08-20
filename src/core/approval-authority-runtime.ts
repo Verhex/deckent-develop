@@ -2,6 +2,7 @@ import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { ApprovalBroker } from './approval-broker.js';
+import { RuleEngineApprovalAuthenticator } from './approval-rules-engine.js';
 import {
   ApprovalDecisionAuthority,
   ApprovalDecisionIngress,
@@ -152,7 +153,11 @@ export class ApprovalAuthorityRuntimeService {
   ) {
     assertIdentity(tenantId, 'tenantId');
     const sessionAuthority = new ApprovalLiveSessionAuthority(sessions);
-    this.decisionAuthority = new ApprovalDecisionAuthority(custody, sessionAuthority);
+    this.decisionAuthority = new ApprovalDecisionAuthority(
+      custody,
+      sessionAuthority,
+      new RuleEngineApprovalAuthenticator(projectRoot, now),
+    );
     this.attendedExecutionApprovalAuthority = new AttendedExecutionApprovalAuthority(
       projectRoot,
       broker,
@@ -224,6 +229,30 @@ export class ApprovalAuthorityRuntimeService {
       authenticator,
       integrity: this.custody,
       channel: input.channel,
+      now: this.now,
+    }).decide(command);
+  }
+
+  /**
+   * D2b-2a: decide one pending request by the rules engine — the SAME
+   * ApprovalDecisionIngress and MAC envelope as a human decision, with the
+   * RuleEngineApprovalAuthenticator as the identity boundary. The caller
+   * supplies the projectRoot the rules file lives under.
+   */
+  async decideByRules(
+    projectRoot: string,
+    command: ApprovalDecisionCommand,
+  ): Promise<ApprovalDecisionIngressOutcome> {
+    if (this.closed) throw createExecutionAuthorityError('APPROVAL_AUTHORITY_RUNTIME_CLOSED');
+    const request = this.broker.getRequest(command.requestId);
+    if (!request || request.tenantId !== this.tenantId) {
+      return { kind: 'rejected', reason: request ? 'unauthorized' : 'unknown-request' };
+    }
+    return new ApprovalDecisionIngress({
+      broker: this.broker,
+      authenticator: new RuleEngineApprovalAuthenticator(projectRoot, this.now),
+      integrity: this.custody,
+      channel: 'rules-engine',
       now: this.now,
     }).decide(command);
   }

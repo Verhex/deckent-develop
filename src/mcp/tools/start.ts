@@ -40,7 +40,7 @@ import { spawnDetachedDeckent } from '../../cli/helpers/detached-start.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { preflightProviderRoleExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, getMcpToolDescriptionLanguage } from './description-catalog.js';
 
 /**
  * Format an estimated duration (minutes) into a compact human string for the
@@ -61,24 +61,25 @@ export function registerStartTool(
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
   } = {},
 ): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_start',
     {
-      title: 'Start Run',
+      title: getMessage('mcp.start.title', registerLang),
       description: mcpToolDescription('deckent_start'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).'),
-        acknowledgeCost: z.boolean().optional().default(false).describe('Acknowledge a numeric over-budget estimate. Unknown pricing or an unavailable gate still blocks. Equivalent to CLI --force from the cost-gate perspective.'),
-        acknowledgeScopePaths: z.boolean().optional().default(false).describe('Bypass the pre-spawn SCOPE gate (Dimension B). By default a run is blocked before spawn when a task\'s filesWrite path does not exist and looks like a typo/wrong-directory (an orphan-file mode). Set true to allow such paths as intentional new files. Equivalent to CLI --force-scope; independent of acknowledgeCost/force.'),
-        acknowledgePromptGate: z.boolean().optional().default(false).describe('Bypass the plan-time G-series prompt gate BLOCK (persona-capability / decision-space / scope-contract findings — born-628). By default a run halts at PLAN when a task\'s finalized (persona × intent) fit fails a hard lint. Set true to allow such tasks to spawn anyway. Equivalent to CLI --force-prompt-gate; independent of acknowledgeCost/force/acknowledgeScopePaths.'),
-        dryRun: z.boolean().optional().default(false).describe('Plan the run without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
-        force: z.boolean().optional().default(false).describe('Skip the sprint-lock pre-flight and acknowledge a numeric cost overrun. Unknown pricing or an unavailable cost gate still blocks. Equivalent to CLI --force.'),
-        timeout: z.number().int().positive().optional().describe('Run maximum duration in milliseconds (default: 30 minutes = 1800000). Run is marked TIMEOUT if workers do not complete within this window.'),
-        sandbox: z.boolean().optional().default(false).describe('Run in sandbox mode: stashes local git changes before spawning and restores them after the run completes. Safe experimentation — no permanent changes on failure.'),
-        flowId: z.string().optional().describe('TERM-FLOW-UNIFY (426-001): consume an approved RunFlow snapshot instead of planning fresh — requires revision, planDigest and config.terminal.run_flow_v2=true. Must be supplied together with revision + planDigest.'),
-        revision: z.number().int().optional().describe('RunFlow proposal revision to CAS-verify against the approved snapshot (used with flowId).'),
-        planDigest: z.string().optional().describe('RunFlow planDigest to CAS-verify against the approved snapshot (used with flowId).'),
+        autoApprove: z.boolean().optional().default(false).describe(getMessage('mcp.start.auto_approve_desc', registerLang)),
+        acknowledgeCost: z.boolean().optional().default(false).describe(getMessage('mcp.start.acknowledge_cost_desc', registerLang)),
+        acknowledgeScopePaths: z.boolean().optional().default(false).describe(getMessage('mcp.start.acknowledge_scope_paths_desc', registerLang)),
+        acknowledgePromptGate: z.boolean().optional().default(false).describe(getMessage('mcp.start.acknowledge_prompt_gate_desc', registerLang)),
+        dryRun: z.boolean().optional().default(false).describe(getMessage('mcp.start.dry_run_desc', registerLang)),
+        force: z.boolean().optional().default(false).describe(getMessage('mcp.start.force_desc', registerLang)),
+        timeout: z.number().int().positive().optional().describe(getMessage('mcp.start.timeout_desc', registerLang)),
+        sandbox: z.boolean().optional().default(false).describe(getMessage('mcp.start.sandbox_desc', registerLang)),
+        flowId: z.string().optional().describe(getMessage('mcp.start.flow_id_desc', registerLang)),
+        revision: z.number().int().optional().describe(getMessage('mcp.start.revision_desc', registerLang)),
+        planDigest: z.string().optional().describe(getMessage('mcp.start.plan_digest_desc', registerLang)),
       }),
     },
     async ({ autoApprove, acknowledgeCost, acknowledgeScopePaths, acknowledgePromptGate, dryRun, force, timeout, sandbox, flowId, revision, planDigest }) => {
@@ -215,7 +216,7 @@ export function registerStartTool(
         const flowFlagsGiven = [flowId, revision, planDigest].filter(v => v !== undefined).length;
         if (flowFlagsGiven > 0) {
           if (flowFlagsGiven !== 3) {
-            const message = 'flowId, revision and planDigest must be supplied together.';
+            const message = getMessage('mcp.start.flow_params_incomplete', getLanguage(config.language));
             return {
               content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
                 { error: true, success: false, code: 'RUN_FLOW_INCOMPLETE_PARAMS', message },
@@ -225,7 +226,7 @@ export function registerStartTool(
             };
           }
           if (config.terminal?.run_flow_v2 !== true) {
-            const message = 'flowId requires config.terminal.run_flow_v2 = true.';
+            const message = getMessage('mcp.start.flow_v2_disabled', getLanguage(config.language));
             return {
               content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
                 { error: true, success: false, code: 'RUN_FLOW_V2_DISABLED', message },
@@ -395,7 +396,12 @@ export function registerStartTool(
             const errData = {
               error: true,
               success: false,
-              message: `Run already running (PID ${lockInfo.pid}, env: ${lockInfo.env}, run: ${lockInfo.sprintId}, started: ${lockInfo.acquiredAt}). Use force=true to override.`,
+              message: getMessage('mcp.start.lock_already_running', getLanguage(config.language), {
+                pid: String(lockInfo.pid),
+                env: lockInfo.env,
+                sprintId: lockInfo.sprintId,
+                acquiredAt: lockInfo.acquiredAt,
+              }),
             };
             const errSummary = formatErrorResponse({ message: errData.message });
             return {
@@ -440,7 +446,7 @@ export function registerStartTool(
                 sprintId: sprint.id,
                 taskCount: sprint.tasks.length,
                 tasks: taskList,
-                message: 'Dry-run complete. No workers spawned. Review tasks, then call deckent_start without dryRun to execute.',
+                message: getMessage('mcp.start.dry_run_complete', getLanguage(config.language)),
               })),
             }],
           };
@@ -543,7 +549,7 @@ export function registerStartTool(
             });
             if (spendWarn) {
               writeEvent(root, planForCost.id, 'brain', 'user', spendWarn.type, { ...spendWarn, sprintId: planForCost.id });
-              notifyAsync('progress', planForCost.id, 'Cost limit warning', spendWarn.message);
+              notifyAsync('progress', planForCost.id, getMessage('mcp.start.cost_limit_warning_title', getLanguage(config.language)), spendWarn.message);
               debugLog('start:costGate:spendWarn', spendWarn);
             }
 
@@ -648,12 +654,12 @@ export function registerStartTool(
           success: true,
           jobId,
           status: 'RUNNING',
-          message: 'Run started in background. Use deckent_status to track progress.',
+          message: getMessage('mcp.start.run_started', getLanguage(config.language)),
           activeWorkers: 0,
           queuedTasks: 0,
           estimatedDuration: sprintEstimate
             ? formatEstimatedDuration(sprintEstimate.estimatedMin)
-            : '~10-30 minutes',
+            : getMessage('mcp.start.estimated_duration_fallback', getLanguage(config.language)),
           estimatedDurationMin: sprintEstimate?.estimatedMin,
         };
 
@@ -667,8 +673,12 @@ export function registerStartTool(
           }],
         };
       } catch (error) {
+        const errLang = getLanguage();
         const message = error instanceof BrainError
-          ? `Run failed at phase ${error.phase ?? 'unknown'}: ${error.message}`
+          ? getMessage('mcp.start.run_failed_at_phase', errLang, {
+              phase: error.phase ?? getMessage('mcp.start.phase_unknown', errLang),
+              message: error.message,
+            })
           : error instanceof Error ? error.message : String(error);
         const code = (
           typeof error === 'object'

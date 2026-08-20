@@ -56,6 +56,10 @@
 | adr-g-040 | Normative Verdict Vocabulary (Single-Word Evaluation Statuses) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-591 Learnings** (sprint-591): ## Sprint sprint-591 Learnings
+
+## Gains
+- 591-001 — cost-gate kullanıcı-metinleri i18n — Moved every human-readable ...
 - **Sprint sprint-590 Learnings** (sprint-590): ## Sprint sprint-590 Learnings
 - status blocked-satırı — i18n + neden-dürüst ifade: GO_WITH_TECH_DEBT — Moved the 3 h...
 - **Sprint sprint-589 Learnings** (sprint-589): ## Sprint sprint-589 Learnings
@@ -90,10 +94,6 @@
 
 ## Gains
 - 579-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — Yeni dos...
-- **Sprint sprint-578 Learnings** (sprint-578): ## Sprint sprint-578 Learnings
-
-## Gains
-- 578-001 — ADR-uygunluk notu (basit — tek dosya) — ADR-uygunluk notu başarı...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -104,4 +104,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2070 | Generated: 2026-08-20_
+_Total entries: 2073 | Generated: 2026-08-20_

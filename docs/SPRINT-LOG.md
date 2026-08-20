@@ -14222,3 +14222,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 590-001: status blocked-satırı — i18n + neden-dürüst ifade (DONE)
 
 ---
+## Sprint 591 — sprint-591
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 1796s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1796410ms |
+
+### Tasks
+
+- 591-001: cost-gate kullanıcı-metinleri i18n (DONE)
+- 591-002: prompt-gate kullanıcı-metinleri i18n (DONE)
+- 591-003: scope-gate kullanıcı-metinleri i18n (DONE)
+- 591-004: MCP autonomous ana-tool metinleri i18n (DONE)
+- 591-005: MCP start-tool metinleri i18n (DONE)
+- 591-006: api/server approvals hata-metinleri i18n (DONE)
+
+---

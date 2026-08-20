@@ -214,6 +214,10 @@ export class ApprovalDecisionAuthority {
   constructor(
     private readonly integrity: ApprovalDecisionIntegrityAuthority,
     private readonly sessions: LiveApprovalAuthenticator,
+    /** D2b-2a: verifier for `approval-rules-engine:v1` envelopes. When absent,
+     * rule envelopes fall through to `sessions` and fail closed — a consumer
+     * that has not been wired for rule decisions never trusts one. */
+    private readonly ruleSessions?: LiveApprovalAuthenticator,
   ) {}
 
   validate(
@@ -236,8 +240,16 @@ export class ApprovalDecisionAuthority {
     if (!safeDigestEqual(authorization.commandDigest, expectedCommandDigest)) {
       return { ok: false, reason: 'command-digest-mismatch' };
     }
+    // Rule-engine branch (D2b-2a): an automated decision's actor is the rule
+    // id, never the request's user — the self-approval identity equality is
+    // replaced by the STRICTER live-rule session proof below (isSessionActive
+    // re-derives the rule from the current file, so a removed/disabled rule
+    // fails here). The branch is discriminated by the engine's authorityRef
+    // AND the rule-actor prefix; everything else keeps the human contract.
+    const isRuleDecision = authorization.actorId.startsWith('rule:')
+      && authorization.authorityRef === 'approval-rules-engine:v1';
     if (decision.decidedBy !== authorization.actorId
-      || request.userId !== authorization.actorId
+      || (!isRuleDecision && request.userId !== authorization.actorId)
       || request.tenantId !== authorization.tenantId) {
       return { ok: false, reason: 'identity-mismatch' };
     }
@@ -261,7 +273,11 @@ export class ApprovalDecisionAuthority {
       action: decision.decision,
       channel: decision.channel,
     };
-    if (!this.sessions.isSessionActive(proofFromAuthorization(authorization), context, now)) {
+    const sessionAuthority = authorization.authorityRef === 'approval-rules-engine:v1'
+      && this.ruleSessions
+      ? this.ruleSessions
+      : this.sessions;
+    if (!sessionAuthority.isSessionActive(proofFromAuthorization(authorization), context, now)) {
       return { ok: false, reason: 'session-inactive' };
     }
     return { ok: true, authorization };
@@ -319,8 +335,14 @@ export class ApprovalDecisionIngress {
     if (now.getTime() >= Date.parse(request.expiresAt)) {
       return { kind: 'expired', requestId: request.id, expiresAt: request.expiresAt };
     }
+    // Rule decisions (D2b-2a) mint `rule:<id>` actors under the engine's
+    // authorityRef; only the self-approval userId equality is waived for them
+    // — tenant, freshness and the digest-bound session proof still apply.
+    const isRuleActor = live !== null
+      && live.actorId.startsWith('rule:')
+      && live.authorityRef === 'approval-rules-engine:v1';
     if (!live
-      || live.actorId !== request.userId
+      || (!isRuleActor && live.actorId !== request.userId)
       || live.tenantId !== request.tenantId
       || !live.sessionRef
       || !live.authorityRef

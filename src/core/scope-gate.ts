@@ -17,6 +17,16 @@
  * `--force-scope` (CLI).
  */
 
+// ADR-008: importing the pure-leaf `messages.ts` i18n utility into core is safe —
+// the enforced check only flags `core/ → orchestra/`. Mirrors the precedent in
+// `src/core/cost-gate.ts` (591-001).
+import { getMessage } from '../cli/helpers/messages.js';
+
+/** Normalize a caller-supplied UI language to a supported value. Default 'en'. */
+function normalizeLang(lang?: string): string {
+  return lang === 'tr' ? 'tr' : 'en';
+}
+
 export interface ScopeGateTask {
   id: string;
   scope: { filesWrite?: string[]; filesRead?: string[]; directories?: string[] };
@@ -54,6 +64,8 @@ export interface ScopeGateInput {
    * decision, not something this evaluator decides for itself.
    */
   resolveSuggestions?: boolean;
+  /** UI language for `reason`/`message`/`greenfieldNotice` fields on the result. Default 'en'. */
+  lang?: string;
 }
 
 /**
@@ -338,6 +350,7 @@ function findTrackedAncestor(
  */
 export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
   const { tasks, trackedFiles, acknowledgeScopePaths, resolveSuggestions } = input;
+  const lang = normalizeLang(input.lang);
 
   const tracked = new Set(trackedFiles);
   const byBasename = new Map<string, string[]>();
@@ -378,7 +391,7 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     declaredDirs: readonly string[] = [],
   ): ScopePathVerdict => {
     if (tracked.has(path) || (role === 'read' && plannedWrites.has(path))) {
-      return { taskId, path, role, classification: 'confirmed', reason: 'exists in the repo' };
+      return { taskId, path, role, classification: 'confirmed', reason: getMessage('scope_gate.reason.confirmed', lang) };
     }
     if (GLOB_MAGIC_RE.test(path)) {
       const re = globToRegExp(path);
@@ -387,13 +400,13 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
         return {
           taskId, path, role,
           classification: 'confirmed',
-          reason: `scope pattern matching ${matchCount} tracked file(s)`,
+          reason: getMessage('scope_gate.reason.glob_confirmed', lang, { count: String(matchCount) }),
         };
       }
       return {
         taskId, path, role,
         classification: 'suspect',
-        reason: 'glob pattern matches no tracked file — likely a wrong-directory pattern',
+        reason: getMessage('scope_gate.reason.glob_no_match', lang),
       };
     }
     const b = basename(path);
@@ -440,8 +453,7 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
       return {
         taskId, path, role,
         classification: 'new-plausible',
-        reason: 'parallel-tree mirror: this task declared both this directory and the '
-          + 'directory holding the same-named file',
+        reason: getMessage('scope_gate.reason.parallel_tree_mirror', lang),
       };
     }
     if (siblings && siblings.length > 0 && !COMMON_BASENAMES.has(b.toLowerCase()) && !testMirrorInTrackedDir) {
@@ -450,18 +462,18 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
         taskId, path, role,
         classification: 'suspect',
         suggestion,
-        reason: `no such file; a file with the same name exists at ${suggestion}`,
+        reason: getMessage('scope_gate.reason.wrong_dir_suggestion', lang, { suggestion }),
       };
     }
     const parent = dirname(path);
     if (parent === '' || trackedDirs.has(parent)) {
-      return { taskId, path, role, classification: 'new-plausible', reason: 'new file in an existing directory' };
+      return { taskId, path, role, classification: 'new-plausible', reason: getMessage('scope_gate.reason.new_plausible', lang) };
     }
     if (greenfield) {
       return {
         taskId, path, role,
         classification: 'new-plausible',
-        reason: 'greenfield repo (no tracked directories) — path validation has no signal',
+        reason: getMessage('scope_gate.reason.greenfield', lang),
       };
     }
     // born-629c (407-004) — intentional-new-directory carve-out: a brand-new
@@ -485,9 +497,11 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
           return {
             taskId, path, role,
             classification: 'new-plausible',
-            reason: `new directory '${parent}' — no such directory yet, but its established tracked `
-              + `ancestor '${ancestorInfo.ancestor}' (${ancestorFileCount} tracked files) makes this look `
-              + 'like an intentional new directory, not a typo (WARN, not blocked)',
+            reason: getMessage('scope_gate.reason.intentional_new_dir', lang, {
+              parent,
+              ancestor: ancestorInfo.ancestor,
+              count: String(ancestorFileCount),
+            }),
           };
         }
       }
@@ -495,7 +509,7 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     return {
       taskId, path, role,
       classification: 'suspect',
-      reason: `no such file and its directory '${parent}' is not in the repo`,
+      reason: getMessage('scope_gate.reason.invented_dir', lang, { parent }),
     };
   };
 
@@ -531,7 +545,7 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
         path: s.path,
         action: 'drop-duplicate',
         replacement: s.suggestion,
-        reason: `duplicate of '${s.suggestion}', already planned as a write in the same task`,
+        reason: getMessage('scope_gate.resolution.drop_duplicate', lang, { suggestion: s.suggestion }),
       });
       continue;
     }
@@ -543,7 +557,7 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
         path: s.path,
         action: 'auto-replace',
         replacement: s.suggestion,
-        reason: `unambiguous — '${s.suggestion}' is the only tracked file with this basename`,
+        reason: getMessage('scope_gate.resolution.auto_replace', lang, { suggestion: s.suggestion }),
       });
     }
     // else: 2+ same-basename candidates — left unresolved (rule c).
@@ -557,11 +571,15 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
   if (blockingWriteSuspects.length > 0 && !acknowledgeScopePaths) {
     const shown = blockingWriteSuspects.slice(0, MAX_LISTED_SUSPECTS);
     const list = shown.map(s => {
-      const hint = s.suggestion ? ` → did you mean '${s.suggestion}'?` : '';
+      const hint = s.suggestion
+        ? getMessage('scope_gate.message.hint_suggestion', lang, { suggestion: s.suggestion })
+        : '';
       return `  • [${s.taskId}] ${s.path} (${s.reason})${hint}`;
     }).join('\n');
     const more = blockingWriteSuspects.length > shown.length
-      ? `\n  … and ${blockingWriteSuspects.length - shown.length} more`
+      ? `\n  ${getMessage('scope_gate.message.more_suspects', lang, {
+          count: String(blockingWriteSuspects.length - shown.length),
+        })}`
       : '';
     return {
       ok: false,
@@ -570,9 +588,8 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
       verdicts,
       resolutions,
       message:
-        `Scope gate: ${blockingWriteSuspects.length} write path(s) do not exist and look like a typo or wrong directory:\n${list}${more}\n` +
-        `If these are intentional new files, override with acknowledgeScopePaths=true (MCP) / --force-scope (CLI). ` +
-        `If a path should be an existing file, fix the DIRECTIVES scope before spawning.`,
+        `${getMessage('scope_gate.message.header', lang, { count: String(blockingWriteSuspects.length) })}\n${list}${more}\n` +
+        getMessage('scope_gate.message.footer', lang),
     };
   }
 
@@ -596,9 +613,9 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     ...(greenfieldUnvalidated > 0
       ? {
           greenfield: true,
-          greenfieldNotice:
-            `Scope gate: greenfield repo (no tracked directories) — ${greenfieldUnvalidated} write path(s) ` +
-            `could not be validated against tracked files; proceeding advisory-only (born-584).`,
+          greenfieldNotice: getMessage('scope_gate.notice.greenfield', lang, {
+            count: String(greenfieldUnvalidated),
+          }),
         }
       : {}),
   };

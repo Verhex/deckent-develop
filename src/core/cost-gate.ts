@@ -20,6 +20,15 @@ import {
 } from './cost-calculator.js';
 import { readSpendWindow, type CostConfig } from './cost-config-loader.js';
 import type { ExecutionBudget } from './work-model.js';
+// ADR-008: importing the pure-leaf `messages.ts` i18n utility into core is safe —
+// the enforced check only flags `core/ → orchestra/`. No cycle (messages.ts is a
+// leaf). Mirrors the precedent in `src/core/directive-interrogator.ts`.
+import { getMessage } from '../cli/helpers/messages.js';
+
+/** Normalize a caller-supplied UI language to a supported value. Default 'en'. */
+function normalizeLang(lang?: string): string {
+  return lang === 'tr' ? 'tr' : 'en';
+}
 
 // ─── Input / Output Types ───────────────────────────────────────────────────
 
@@ -42,6 +51,8 @@ export interface CostGateInput {
    * Backward-safe: absent → existing behavior using only config sprint budget.
    */
   budget?: ExecutionBudget;
+  /** UI language for `message` fields on the result. Default 'en'. */
+  lang?: string;
 }
 
 export interface CostGatePass {
@@ -112,6 +123,7 @@ export const DEFAULT_AUTO_CONFIRM_THRESHOLD_USD = 2;
  */
 export function evaluateCostGate(input: CostGateInput): CostGateResult {
   const { tasks, costConfig, acknowledgeCost, estimateOptions, budget } = input;
+  const lang = normalizeLang(input.lang);
 
   const estimate = estimateSprintCost(tasks, costConfig, estimateOptions ?? {});
 
@@ -150,8 +162,9 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
       estimatedUsd,
       budgetUsd: effectiveBudgetUsd,
       unpricedModels: estimate.unpricedModels,
-      message: `Pricing evidence is unavailable for model(s): ${estimate.unpricedModels.join(', ')}. `
-        + 'Supply fresh provider/model pricing evidence before execution; acknowledgeCost does not override unknown pricing.',
+      message: getMessage('cost_gate.pricing_unknown', lang, {
+        models: estimate.unpricedModels.join(', '),
+      }),
     };
   }
 
@@ -166,19 +179,20 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
       budgetUsd: effectiveBudgetUsd,
       estimatedTokens: estimatedTotalTokens,
       budgetTokens: requestMaxTokens,
-      message:
-        `Sprint estimated ${estimatedTotalTokens.toLocaleString()} tokens exceeds per-request token limit ${requestMaxTokens.toLocaleString()}. ` +
-        `Raise the request budget.maxTokens or set acknowledgeCost=true (MCP) / --force (CLI).`,
+      message: getMessage('cost_gate.token_limit_exceeded', lang, {
+        estimatedTokens: estimatedTotalTokens.toLocaleString(),
+        budgetTokens: requestMaxTokens.toLocaleString(),
+      }),
     };
   }
 
   if (exceedsEffectiveBudget && !acknowledgeCost) {
     const isRequestBudgetBinding =
       requestMaxUsd !== undefined && requestMaxUsd < sprintBudgetUsd;
-    const overrideHint = isRequestBudgetBinding
-      ? `Raise the request budget.maxUsd or set acknowledgeCost=true (MCP) / --force (CLI).`
-      : `Override with acknowledgeCost=true (MCP) / --force (CLI) or raise cost_limits.sprint_max_usd in .deckent/cost-config.json.`;
-    const budgetSource = isRequestBudgetBinding ? ` (per-request limit)` : ``;
+    const budgetMessageVars = {
+      estimatedUsd: `$${estimatedUsd.toFixed(2)}`,
+      budgetUsd: `$${effectiveBudgetUsd.toFixed(2)}`,
+    };
 
     return {
       ok: false,
@@ -187,9 +201,9 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
       estimate,
       estimatedUsd,
       budgetUsd: effectiveBudgetUsd,
-      message:
-        `Sprint cost $${estimatedUsd.toFixed(2)} exceeds budget $${effectiveBudgetUsd.toFixed(2)}${budgetSource}. ` +
-        overrideHint,
+      message: isRequestBudgetBinding
+        ? getMessage('cost_gate.budget_exceeded_request', lang, budgetMessageVars)
+        : getMessage('cost_gate.budget_exceeded_sprint', lang, budgetMessageVars),
     };
   }
 
@@ -215,6 +229,8 @@ export interface SpendGateCheckInput {
   sprintEstimateUsd: number;
   /** Loaded cost config (provides daily_max_usd, monthly_max_usd, enforce_spend_gate). */
   costConfig: CostConfig;
+  /** UI language for the `message` field on the result. Default 'en'. */
+  lang?: string;
 }
 
 export interface CostLimitWarnEvent {
@@ -250,6 +266,7 @@ export interface CostLimitWarnEvent {
 export function checkSpendGate(input: SpendGateCheckInput): CostLimitWarnEvent | null {
   const { spentDayUsd, spentMonthUsd, sprintEstimateUsd, costConfig } = input;
   const limits = costConfig.cost_limits;
+  const lang = normalizeLang(input.lang);
 
   if (!limits.enforce_spend_gate) return null;
 
@@ -263,10 +280,12 @@ export function checkSpendGate(input: SpendGateCheckInput): CostLimitWarnEvent |
       sprintEstimateUsd,
       projectedUsd: projectedDay,
       limitUsd: limits.daily_max_usd,
-      message:
-        `Projected daily spend $${projectedDay.toFixed(2)} exceeds daily limit ` +
-        `$${limits.daily_max_usd.toFixed(2)} (spent $${spentDayUsd.toFixed(2)} + ` +
-        `sprint estimate $${sprintEstimateUsd.toFixed(2)}).`,
+      message: getMessage('cost_gate.spend_warn_day', lang, {
+        projected: `$${projectedDay.toFixed(2)}`,
+        limit: `$${limits.daily_max_usd.toFixed(2)}`,
+        spent: `$${spentDayUsd.toFixed(2)}`,
+        sprintEstimate: `$${sprintEstimateUsd.toFixed(2)}`,
+      }),
     };
   }
 
@@ -281,10 +300,12 @@ export function checkSpendGate(input: SpendGateCheckInput): CostLimitWarnEvent |
         sprintEstimateUsd,
         projectedUsd: projectedMonth,
         limitUsd: limits.monthly_max_usd,
-        message:
-          `Projected monthly spend $${projectedMonth.toFixed(2)} exceeds monthly limit ` +
-          `$${limits.monthly_max_usd.toFixed(2)} (spent $${spentMonthUsd.toFixed(2)} + ` +
-          `sprint estimate $${sprintEstimateUsd.toFixed(2)}).`,
+        message: getMessage('cost_gate.spend_warn_month', lang, {
+          projected: `$${projectedMonth.toFixed(2)}`,
+          limit: `$${limits.monthly_max_usd.toFixed(2)}`,
+          spent: `$${spentMonthUsd.toFixed(2)}`,
+          sprintEstimate: `$${sprintEstimateUsd.toFixed(2)}`,
+        }),
       };
     }
   }
@@ -308,6 +329,8 @@ export interface SpendWarnAtSpawnInput {
    * (Mirrors the injectable seam of `emitFinalizeSpendAdvisory`.)
    */
   readSpendWindow?: (root: string, window: 'day' | 'month') => number;
+  /** UI language for the `message` field on the result. Default 'en'. */
+  lang?: string;
 }
 
 /**
@@ -348,6 +371,7 @@ export function evaluateSpendWarnAtSpawn(
     spentMonthUsd: readSpend(root, 'month'),
     sprintEstimateUsd,
     costConfig,
+    lang: input.lang,
   });
 }
 

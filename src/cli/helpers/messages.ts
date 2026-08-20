@@ -3145,6 +3145,18 @@ const MESSAGES: MessageMap = {
     en: 'Rule {id} not found.',
     tr: '{id} kuralı bulunamadı.',
   },
+  'approvals.rules_apply_desc': {
+    en: 'Apply active rules to the current pending inbox (routine-tier automatable kinds only)',
+    tr: 'Aktif kuralları bekleyen kutuya uygula (yalnız routine-seviye otomatikleştirilebilir türler)',
+  },
+  'approvals.rules_applied': {
+    en: '#{code} {id}: {action} by {ruleId} — {result}',
+    tr: '#{code} {id}: {ruleId} ile {action} — {result}',
+  },
+  'approvals.rules_apply_none': {
+    en: 'No pending request is automatable by the active rules.',
+    tr: 'Aktif kurallarla otomatikleştirilebilecek bekleyen istek yok.',
+  },
   'approvals.rules_fault': {
     en: 'WARNING: approval-rules.json is partially unreadable — invalid entries are ignored, never treated as authority.',
     tr: 'UYARI: approval-rules.json kısmen okunamıyor — geçersiz girdiler yok sayılır, asla otorite sayılmaz.',
@@ -3755,6 +3767,117 @@ const MESSAGES: MessageMap = {
     tr: 'Otonom Durum',
   },
 
+  // ─── deckent_autonomous (combined engine tool, 591-004 i18n) ────────────
+  'autonomous.mcp_engine.title': {
+    en: 'Autonomous Engine',
+    tr: 'Otonom Motor',
+  },
+  'autonomous.mcp_engine.action_desc': {
+    en: 'Action to perform. status=query engine state; start=spawn the real autonomous loop as a '
+      + 'detached background process (honest no-op if disabled/already running — see spawned field); '
+      + 'stop=write stop marker; backlog_add/list/remove=manage work queue; '
+      + 'pending=list parked approvals; approve/reject=resolve a parked trigger.',
+    tr: 'Gerçekleştirilecek aksiyon. status=motor durumunu sorgular; start=gerçek otonom döngüyü '
+      + 'ayrık (detached) bir arka plan süreci olarak başlatır (devre dışıysa/zaten çalışıyorsa dürüst '
+      + 'bir no-op — bkz. spawned alanı); stop=durdurma işareti yazar; backlog_add/list/remove=iş '
+      + 'kuyruğunu yönetir; pending=bekleyen onayları listeler; approve/reject=bekleyen bir '
+      + 'tetikleyiciyi çözümler.',
+  },
+  'autonomous.mcp_engine.id_desc': {
+    en: 'Entry/trigger id — required for backlog_add, backlog_remove, approve, reject',
+    tr: 'Kayıt/tetikleyici id’si — backlog_add, backlog_remove, approve, reject için gerekli',
+  },
+  'autonomous.mcp_engine.title_desc': {
+    en: 'Entry title — required for backlog_add',
+    tr: 'Kayıt başlığı — backlog_add için gerekli',
+  },
+  'autonomous.mcp_engine.kind_desc': {
+    en: 'Entry kind (task=inline description, sprint=directives ref, capability=F8 broker verb). Default: task',
+    tr: 'Kayıt türü (task=satır içi açıklama, sprint=directives referansı, capability=F8 broker fiili). Varsayılan: task',
+  },
+  'autonomous.mcp_engine.description_desc': {
+    en: 'Task description or directives ref — used by backlog_add',
+    tr: 'Görev açıklaması veya directives referansı — backlog_add tarafından kullanılır',
+  },
+  'autonomous.mcp_engine.policy_desc': {
+    en: 'Execution policy for backlog_add. Default: auto',
+    tr: 'backlog_add için çalıştırma politikası. Varsayılan: auto',
+  },
+  'autonomous.mcp_engine.cron_desc': {
+    en: '5-field cron expression for backlog_add — entry recurs at this cadence (omit for one-off)',
+    tr: 'backlog_add için 5 alanlı cron ifadesi — kayıt bu sıklıkta tekrarlanır (tek seferlik için boş bırakın)',
+  },
+  'autonomous.mcp_engine.capability_desc': {
+    en: 'kind=capability: dotted verb to invoke (e.g. fs.read, db.query) — backlog_add',
+    tr: 'kind=capability: çağrılacak noktalı fiil (örn. fs.read, db.query) — backlog_add',
+  },
+  'autonomous.mcp_engine.capability_args_desc': {
+    en: 'kind=capability: JSON object of handler args — backlog_add',
+    tr: 'kind=capability: handler argümanlarının JSON nesnesi — backlog_add',
+  },
+  'autonomous.mcp_engine.connector_desc': {
+    en: 'kind=capability: preferred backend/connector id (e.g. odoo, imap) — backlog_add',
+    tr: 'kind=capability: tercih edilen backend/connector id’si (örn. odoo, imap) — backlog_add',
+  },
+  'autonomous.mcp_engine.trigger_id_desc': {
+    en: 'Trigger ID to approve or reject (alternative to `id` for approve/reject)',
+    tr: 'Onaylanacak veya reddedilecek tetikleyici ID’si (approve/reject için `id`ye alternatif)',
+  },
+  'autonomous.mcp_engine.reason_desc': {
+    en: 'Reason recorded with approve/reject decision',
+    tr: 'Approve/reject kararıyla birlikte kaydedilecek gerekçe',
+  },
+  'autonomous.mcp_engine.start_already_running': {
+    en: 'Autonomous loop already running (pid {pid}, started {startedAt}). Not spawning a '
+      + 'duplicate — use action=stop to signal it to exit cleanly.',
+    tr: 'Otonom döngü zaten çalışıyor (pid {pid}, başlangıç {startedAt}). Yinelenen bir süreç '
+      + 'başlatılmıyor — temiz çıkış için action=stop kullanın.',
+  },
+  'autonomous.mcp_engine.start_disabled': {
+    en: 'Autonomous mode is disabled (config.autonomous.enabled is not true) — no loop was '
+      + 'spawned. Enable it first (`deckent autonomous enable`), then call start again.',
+    tr: 'Otonom mod kapalı (config.autonomous.enabled true değil) — hiçbir döngü başlatılmadı. '
+      + 'Önce etkinleştirin (`deckent autonomous enable`), sonra start’ı tekrar çağırın.',
+  },
+  'autonomous.mcp_engine.start_spawn_failed': {
+    en: 'Failed to spawn the autonomous loop: {message}',
+    tr: 'Otonom döngü başlatılamadı: {message}',
+  },
+  'autonomous.mcp_engine.start_spawned': {
+    en: 'Autonomous loop spawned as a detached background process (pid {pid}). Use '
+      + 'action=status to check progress, action=stop to signal a clean stop.',
+    tr: 'Otonom döngü ayrık (detached) bir arka plan süreci olarak başlatıldı (pid {pid}). '
+      + 'İlerlemeyi kontrol etmek için action=status, temiz durdurma için action=stop kullanın.',
+  },
+  'autonomous.mcp_engine.start_no_pid': {
+    en: 'Autonomous loop spawn requested, but the child process reported no pid — it may have failed to start.',
+    tr: 'Otonom döngü başlatma isteği gönderildi, ancak alt süreç pid bildirmedi — başlatılamamış olabilir.',
+  },
+  'autonomous.mcp_engine.id_required_backlog_add': {
+    en: 'id is required for backlog_add',
+    tr: 'backlog_add için id gerekli',
+  },
+  'autonomous.mcp_engine.title_required_backlog_add': {
+    en: 'title is required for backlog_add',
+    tr: 'backlog_add için title gerekli',
+  },
+  'autonomous.mcp_engine.id_required_backlog_remove': {
+    en: 'id is required for backlog_remove',
+    tr: 'backlog_remove için id gerekli',
+  },
+  'autonomous.mcp_engine.id_required_approve': {
+    en: 'triggerId (or id) is required for approve',
+    tr: 'approve için triggerId (veya id) gerekli',
+  },
+  'autonomous.mcp_engine.id_required_reject': {
+    en: 'triggerId (or id) is required for reject',
+    tr: 'reject için triggerId (veya id) gerekli',
+  },
+  'autonomous.mcp_engine.unknown_action': {
+    en: 'Unknown action: {action}',
+    tr: 'Bilinmeyen aksiyon: {action}',
+  },
+
   // ─── autonomous-mission command (Sprint 296 — Task 296-001 i18n) ─────────
   'autonomous_mission.create_list.created': {
     en: 'Mission created: {id} — {title} ({count} item(s))',
@@ -4151,6 +4274,27 @@ const MESSAGES: MessageMap = {
   'api.approval.decision_failed': {
     en: 'Approval decision failed: {error}',
     tr: 'Approval kararı başarısız oldu: {error}',
+  },
+  // 591-006: approvals-route (not decision-boundary) human-readable strings —
+  // GET /api/approvals/:id and POST /api/approvals/:id/decision's own
+  // id/lookup/gate errors. Deliberately `api.approvals.*` (plural) to stay
+  // distinct from the decision-boundary `api.approval.*` (singular) family
+  // above.
+  'api.approvals.invalid_id': {
+    en: 'Invalid approval id',
+    tr: 'Geçersiz approval id\'si',
+  },
+  'api.approvals.not_found': {
+    en: 'Approval not found',
+    tr: 'Approval bulunamadı',
+  },
+  'api.approvals.api_decide_disabled': {
+    en: 'Approval API decisions are disabled — set approval.api_decide: true in .deckent/config.json to enable POST /api/approvals/:id/decision',
+    tr: 'Approval API kararları kapalı — POST /api/approvals/:id/decision\'ı etkinleştirmek için .deckent/config.json içinde approval.api_decide: true ayarlayın',
+  },
+  'api.approvals.already_decided': {
+    en: 'Approval already {category}',
+    tr: 'Approval zaten {category}',
   },
   'autonomous.approval_request_summary': {
     en: 'Approve Goal-v2 item {id}: {title}',
@@ -4613,6 +4757,94 @@ const MESSAGES: MessageMap = {
   'prompt_gate.test_not_discoverable_fix': {
     en: 'Move the test under a configured include path or amend {config}; do not dispatch workers with a proof command the runner cannot discover.',
     tr: 'Testi yapılandırılmış bir include yoluna taşıyın veya {config} dosyasını düzenleyin; runner\'ın keşfedemediği proof komutuyla worker dispatch etmeyin.',
+  },
+  'prompt_gate.capability_message': {
+    en: "Agent '{agentId}' is a review/advisory persona that is denied the Write tool, but this task writes source code — it cannot produce the diff.",
+    tr: "'{agentId}' agent'ı Write tool'u reddedilmiş bir review/advisory persona, ama bu görev kaynak kod yazıyor — diff üretemez.",
+  },
+  'prompt_gate.capability_fix': {
+    en: "Route to an implementer persona (bug-fixer / api-builder / the domain's implementer).",
+    tr: "Bir implementer persona'ya yönlendirin (bug-fixer / api-builder / domain'in implementer'ı).",
+  },
+  'prompt_gate.mandate_message': {
+    en: "Agent 'refactorer' carries a \"zero functional changes\" mandate, but this task's intent is '{intent}' (behavior-changing) — the persona fights the task.",
+    tr: "'refactorer' agent'ı \"zero functional changes\" mandate'i taşıyor, ama bu görevin intent'i '{intent}' (davranış değiştiren) — persona görevle çelişiyor.",
+  },
+  'prompt_gate.mandate_fix': {
+    en: "Route to bug-fixer (corrective) or the domain implementer; keep refactorer for intent='refactor' only.",
+    tr: "bug-fixer'a (düzeltici) veya domain implementer'ına yönlendirin; refactorer'ı yalnız intent='refactor' için saklayın.",
+  },
+  'prompt_gate.role_message': {
+    en: "Agent '{agentId}' is a {role} persona, but this task is construction work (writes source) — a review stance ≠ building the feature and risks a mismatched approach.",
+    tr: "'{agentId}' agent'ı bir {role} persona, ama bu görev construction işi (kaynak yazıyor) — review duruşu ≠ özelliği inşa etmek ve uyumsuz bir yaklaşım riski taşır.",
+  },
+  'prompt_gate.role_fix_security': {
+    en: "Route to an implementer (bug-fixer / api-builder) + the 'secure-coding' skill — the auditor persona reviews security, it does not build it.",
+    tr: "Bir implementer'a (bug-fixer / api-builder) + 'secure-coding' skill'ine yönlendirin — auditor persona güvenliği denetler, inşa etmez.",
+  },
+  'prompt_gate.role_fix_generic': {
+    en: "Route to an implementer persona for the task's domain.",
+    tr: "Görevin domain'i için bir implementer persona'ya yönlendirin.",
+  },
+  'prompt_gate.domain_mismatch_fallback': {
+    en: 'agent domain ≠ task domain',
+    tr: "agent domain'i ≠ görev domain'i",
+  },
+  'prompt_gate.domain_message': {
+    en: "Agent '{agentId}' domain mismatch: {mismatch}.",
+    tr: "'{agentId}' agent'ı domain uyumsuzluğu: {mismatch}.",
+  },
+  'prompt_gate.domain_fix': {
+    en: "Consider '{suggestedAgent}'.",
+    tr: "'{suggestedAgent}' değerlendirin.",
+  },
+  'prompt_gate.decision_space_message': {
+    en: 'goCriteria offers a choice ("…VEYA/OR…"); when scope enables only one branch this hands the worker a false decision and invites hesitation.',
+    tr: 'goCriteria bir seçim sunuyor ("…VEYA/OR…"); scope yalnız bir dalı mümkün kıldığında bu worker\'a yanlış bir karar verir ve tereddüde davet eder.',
+  },
+  'prompt_gate.decision_space_fix': {
+    en: 'State a preferred order ("prefer X; if infeasible, Y") or split into two goCriteria items.',
+    tr: 'Tercih edilen bir sıra belirtin ("önce X; imkansızsa Y") veya iki ayrı goCriteria maddesine bölün.',
+  },
+  'prompt_gate.premise_message': {
+    en: "Premise may be stale: the description claims '{symbol}' is missing/absent, but it occurs {count}× in the repo — the fix may already exist.",
+    tr: "Premise bayat olabilir: description '{symbol}' sembolünün eksik/yok olduğunu iddia ediyor, ama repo'da {count} kez geçiyor — fix zaten var olabilir.",
+  },
+  'prompt_gate.premise_fix': {
+    en: "Verify '{symbol}' against the codebase before implementing; if it already exists, narrow the task to the true remaining gap (or close it).",
+    tr: "Implement etmeden önce '{symbol}' sembolünü codebase'e karşı doğrulayın; zaten varsa görevi gerçek kalan boşluğa daraltın (veya kapatın).",
+  },
+  'prompt_gate.scope_silent_drop_warning_message': {
+    en: 'Write authority would silently shrink at render time: {warning}',
+    tr: 'Write authority render zamanında sessizce küçülür: {warning}',
+  },
+  'prompt_gate.scope_silent_drop_warning_fix': {
+    en: 'Qualify the path (directory prefix) or fix the entry in DIRECTIVES — the worker would never see this file in its WRITE list.',
+    tr: 'Yolu niteleyin (dizin prefix\'i) veya DIRECTIVES\'teki girdiyi düzeltin — worker bu dosyayı WRITE listesinde asla göremez.',
+  },
+  'prompt_gate.scope_silent_drop_rejected_message': {
+    en: 'Write path rejected by the scope sanitizer (absolute/traversal): "{path}"',
+    tr: 'Write yolu scope sanitizer tarafından reddedildi (absolute/traversal): "{path}"',
+  },
+  'prompt_gate.scope_silent_drop_rejected_fix': {
+    en: 'Use a repo-relative path without ".." segments.',
+    tr: '".." segmenti içermeyen repo-relative bir yol kullanın.',
+  },
+  'prompt_gate.satisfiability_message': {
+    en: '[{code}] {message}',
+    tr: '[{code}] {message}',
+  },
+  'prompt_gate.satisfiability_fix_proof_path_missing': {
+    en: "Fix the proof command's path or add '{path}' to scope.filesWrite (new-file proofs are legitimate only with write authority).",
+    tr: "Proof komutunun yolunu düzeltin veya '{path}' dosyasını scope.filesWrite'a ekleyin (yeni-dosya proof'ları yalnız write authority ile geçerlidir).",
+  },
+  'prompt_gate.satisfiability_fix_mentioned_not_writable': {
+    en: "Add '{path}' to scope.filesWrite/directories, or reword the task so it does not require writing it.",
+    tr: "'{path}' dosyasını scope.filesWrite/directories'e ekleyin, veya görevi onu yazmayı gerektirmeyecek şekilde yeniden ifade edin.",
+  },
+  'prompt_gate.satisfiability_fix_declared_unchanged': {
+    en: "'{path}' is declared unchanged but is in filesWrite — drop it from the write list or drop the declaration.",
+    tr: "'{path}' değişmedi olarak belirtilmiş ama filesWrite içinde — write listesinden çıkarın veya beyanı kaldırın.",
   },
   'resume.invalid_sprint_id': { en: 'Invalid run id: {sprintId}', tr: 'Geçersiz run kimliği: {sprintId}' },
   'resume.checkpoint_missing': { en: 'No checkpoint found for run "{sprintId}".', tr: '"{sprintId}" run\'ı için checkpoint bulunamadı.' },
@@ -7153,6 +7385,82 @@ const MESSAGES: MessageMap = {
     en: 'Runs the complete lifecycle in the background: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE. Pre-spawn cost admission always runs: acknowledgeCost=true or force=true may acknowledge a numeric budget overrun but can never override unknown pricing or an unavailable gate. Returns immediately with a jobId while the run continues asynchronously — poll deckent_status and evaluate with deckent_review. Prerequisite: deckent_init + deckent_set_directives.',
     tr: 'Tüm yaşam döngüsünü arka planda çalıştırır: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE. Spawn öncesi maliyet kabulü her zaman çalışır: acknowledgeCost=true veya force=true sayısal bütçe aşımını kabul edebilir, ancak bilinmeyen fiyatlandırmayı veya kullanılamayan bir gate\'i asla geçersiz kılamaz. Hemen bir jobId döndürür, run eşzamansız sürer — deckent_status ile izleyin, deckent_review ile değerlendirin. Ön koşul: deckent_init + deckent_set_directives.',
   },
+  // ─── deckent_start (591-005 i18n) ───────────────────────────────────
+  'mcp.start.title': { en: 'Start Run', tr: 'Run Başlat' },
+  'mcp.start.auto_approve_desc': {
+    en: 'Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).',
+    tr: 'Worker araç çağrılarını --dangerously-skip-permissions ile otomatik onaylar. CLI varsayılanı false\'tur; yalnızca çağıran run\'ın güvenli olduğunu onayladığında true verin (CLI/MCP parity — ADR-022-V2).',
+  },
+  'mcp.start.acknowledge_cost_desc': {
+    en: 'Acknowledge a numeric over-budget estimate. Unknown pricing or an unavailable gate still blocks. Equivalent to CLI --force from the cost-gate perspective.',
+    tr: 'Sayısal bütçe aşımı tahminini kabul eder. Bilinmeyen fiyatlandırma veya kullanılamayan bir gate yine de engeller. Cost-gate açısından CLI --force ile eşdeğerdir.',
+  },
+  'mcp.start.acknowledge_scope_paths_desc': {
+    en: 'Bypass the pre-spawn SCOPE gate (Dimension B). By default a run is blocked before spawn when a task\'s filesWrite path does not exist and looks like a typo/wrong-directory (an orphan-file mode). Set true to allow such paths as intentional new files. Equivalent to CLI --force-scope; independent of acknowledgeCost/force.',
+    tr: 'Spawn öncesi SCOPE gate\'ini (Dimension B) atlar. Varsayılan olarak, bir görevin filesWrite yolu mevcut değilse ve typo/yanlış-dizin gibi görünüyorsa (orphan-file modu) run spawn öncesi engellenir. Bu yolları kasıtlı yeni dosyalar olarak kabul etmek için true verin. CLI --force-scope ile eşdeğerdir; acknowledgeCost/force\'tan bağımsızdır.',
+  },
+  'mcp.start.acknowledge_prompt_gate_desc': {
+    en: 'Bypass the plan-time G-series prompt gate BLOCK (persona-capability / decision-space / scope-contract findings — born-628). By default a run halts at PLAN when a task\'s finalized (persona × intent) fit fails a hard lint. Set true to allow such tasks to spawn anyway. Equivalent to CLI --force-prompt-gate; independent of acknowledgeCost/force/acknowledgeScopePaths.',
+    tr: 'Plan-zamanı G-serisi prompt gate BLOCK\'unu atlar (persona-capability / decision-space / scope-contract bulguları — born-628). Varsayılan olarak, bir görevin nihai (persona × intent) uyumu sert bir lint\'i geçemediğinde run PLAN\'da durur. Bu tür görevlerin yine de spawn olmasına izin vermek için true verin. CLI --force-prompt-gate ile eşdeğerdir; acknowledgeCost/force/acknowledgeScopePaths\'ten bağımsızdır.',
+  },
+  'mcp.start.dry_run_desc': {
+    en: 'Plan the run without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.',
+    tr: 'Worker başlatmadan run\'ı planlar. İncelemeniz için planlanan görev listesini döndürür. Hiçbir worker başlatılmaz, hiçbir dosya değişmez.',
+  },
+  'mcp.start.force_desc': {
+    en: 'Skip the sprint-lock pre-flight and acknowledge a numeric cost overrun. Unknown pricing or an unavailable cost gate still blocks. Equivalent to CLI --force.',
+    tr: 'Sprint-lock ön kontrolünü atlar ve sayısal bir maliyet aşımını kabul eder. Bilinmeyen fiyatlandırma veya kullanılamayan bir cost gate yine de engeller. CLI --force ile eşdeğerdir.',
+  },
+  'mcp.start.timeout_desc': {
+    en: 'Run maximum duration in milliseconds (default: 30 minutes = 1800000). Run is marked TIMEOUT if workers do not complete within this window.',
+    tr: 'Run\'ın azami süresi (milisaniye, varsayılan: 30 dakika = 1800000). Worker\'lar bu pencere içinde tamamlanmazsa run TIMEOUT olarak işaretlenir.',
+  },
+  'mcp.start.sandbox_desc': {
+    en: 'Run in sandbox mode: stashes local git changes before spawning and restores them after the run completes. Safe experimentation — no permanent changes on failure.',
+    tr: 'Sandbox modunda çalışır: spawn öncesi yerel git değişikliklerini stash\'ler, run tamamlandığında geri yükler. Güvenli deneme — başarısızlıkta kalıcı değişiklik olmaz.',
+  },
+  'mcp.start.flow_id_desc': {
+    en: 'TERM-FLOW-UNIFY (426-001): consume an approved RunFlow snapshot instead of planning fresh — requires revision, planDigest and config.terminal.run_flow_v2=true. Must be supplied together with revision + planDigest.',
+    tr: 'TERM-FLOW-UNIFY (426-001): sıfırdan planlamak yerine onaylı bir RunFlow snapshot\'ını tüketir — revision, planDigest ve config.terminal.run_flow_v2=true gerektirir. revision + planDigest ile birlikte sağlanmalıdır.',
+  },
+  'mcp.start.revision_desc': {
+    en: 'RunFlow proposal revision to CAS-verify against the approved snapshot (used with flowId).',
+    tr: 'Onaylı snapshot\'a karşı CAS-doğrulaması yapılacak RunFlow proposal revizyonu (flowId ile kullanılır).',
+  },
+  'mcp.start.plan_digest_desc': {
+    en: 'RunFlow planDigest to CAS-verify against the approved snapshot (used with flowId).',
+    tr: 'Onaylı snapshot\'a karşı CAS-doğrulaması yapılacak RunFlow planDigest\'i (flowId ile kullanılır).',
+  },
+  'mcp.start.flow_params_incomplete': {
+    en: 'flowId, revision and planDigest must be supplied together.',
+    tr: 'flowId, revision ve planDigest birlikte sağlanmalıdır.',
+  },
+  'mcp.start.flow_v2_disabled': {
+    en: 'flowId requires config.terminal.run_flow_v2 = true.',
+    tr: 'flowId için config.terminal.run_flow_v2 = true gerekir.',
+  },
+  'mcp.start.lock_already_running': {
+    en: 'Run already running (PID {pid}, env: {env}, run: {sprintId}, started: {acquiredAt}). Use force=true to override.',
+    tr: 'Run zaten çalışıyor (PID {pid}, env: {env}, run: {sprintId}, başlangıç: {acquiredAt}). Geçersiz kılmak için force=true kullanın.',
+  },
+  'mcp.start.dry_run_complete': {
+    en: 'Dry-run complete. No workers spawned. Review tasks, then call deckent_start without dryRun to execute.',
+    tr: 'Dry-run tamamlandı. Worker başlatılmadı. Görevleri inceleyin, ardından çalıştırmak için deckent_start\'ı dryRun olmadan çağırın.',
+  },
+  'mcp.start.run_started': {
+    en: 'Run started in background. Use deckent_status to track progress.',
+    tr: 'Run arka planda başlatıldı. İlerlemeyi izlemek için deckent_status kullanın.',
+  },
+  'mcp.start.estimated_duration_fallback': {
+    en: '~10-30 minutes',
+    tr: '~10-30 dakika',
+  },
+  'mcp.start.run_failed_at_phase': {
+    en: 'Run failed at phase {phase}: {message}',
+    tr: 'Run {phase} fazında başarısız oldu: {message}',
+  },
+  'mcp.start.phase_unknown': { en: 'unknown', tr: 'bilinmiyor' },
+  'mcp.start.cost_limit_warning_title': { en: 'Cost limit warning', tr: 'Maliyet limiti uyarısı' },
   'mcp.status.detail': {
     en: 'Returns agents (active workers with task assignments), progress (done/total, progress bar, ETA), alerts (stale workers, boundary violations, lock issues), job (background job state RUNNING/COMPLETE/FAILED plus sprintId and metrics), agentAssignments and skillAssignments. Safe to call at any time and to poll repeatedly; no prerequisite.',
     tr: 'Şunları döndürür: agents (görev atamalarıyla aktif worker\'lar), progress (tamamlanan/toplam, ilerleme çubuğu, ETA), alerts (bayat worker, sınır ihlali, kilit sorunları), job (arka plan iş durumu RUNNING/COMPLETE/FAILED ile sprintId ve metrikler), agentAssignments ve skillAssignments. Her an çağrılabilir ve tekrar tekrar yoklanabilir; ön koşulu yoktur.',
@@ -7340,6 +7648,104 @@ const MESSAGES: MessageMap = {
   'mcp.approvals.detail': {
     en: 'Serves the canonical ApprovalBroker read model — the SAME source as the CLI — and returns each pending request id, summary and expiry. READ-ONLY: this surface never decides, allows or denies. Deciding stays CLI-only behind an interactive live-authenticated TTY, so there is no self-approval path over MCP.',
     tr: 'Canonical ApprovalBroker read model\'ini sunar — CLI ile AYNI kaynak — ve bekleyen her isteğin id\'sini, özetini ve son geçerlilik zamanını döndürür. SALT OKUNUR: bu yüzey asla karar vermez, izin vermez veya reddetmez. Karar vermek yalnız CLI\'da, etkileşimli canlı kimlik doğrulamalı TTY arkasında kalır; MCP üzerinden self-approval yolu yoktur.',
+  },
+
+  // ─── cost gate result/warning messages (task 591-001) ─────────────────
+  // Human-readable sentences for src/core/cost-gate.ts. Typed codes
+  // (COST_GATE_EXCEEDED, COST_PRICING_UNKNOWN, ceilingTripped, …) stay as-is —
+  // only the prose `message` fields resolve through this family.
+  'cost_gate.pricing_unknown': {
+    en: 'Pricing evidence is unavailable for model(s): {models}. Supply fresh provider/model pricing evidence before execution; acknowledgeCost does not override unknown pricing.',
+    tr: 'Model(ler) için fiyatlandırma kanıtı mevcut değil: {models}. Çalıştırmadan önce güncel sağlayıcı/model fiyatlandırma kanıtı sağlayın; acknowledgeCost bilinmeyen fiyatlandırmayı geçersiz kılmaz.',
+  },
+  'cost_gate.token_limit_exceeded': {
+    en: 'Sprint estimated {estimatedTokens} tokens exceeds per-request token limit {budgetTokens}. Raise the request budget.maxTokens or set acknowledgeCost=true (MCP) / --force (CLI).',
+    tr: 'Sprint tahmini {estimatedTokens} token, istek başına token limiti {budgetTokens} değerini aşıyor. İstek budget.maxTokens değerini artırın veya acknowledgeCost=true (MCP) / --force (CLI) ayarlayın.',
+  },
+  'cost_gate.budget_exceeded_sprint': {
+    en: 'Sprint cost {estimatedUsd} exceeds budget {budgetUsd}. Override with acknowledgeCost=true (MCP) / --force (CLI) or raise cost_limits.sprint_max_usd in .deckent/cost-config.json.',
+    tr: 'Sprint maliyeti {estimatedUsd}, bütçe {budgetUsd} değerini aşıyor. acknowledgeCost=true (MCP) / --force (CLI) ile geçersiz kılın veya .deckent/cost-config.json içindeki cost_limits.sprint_max_usd değerini artırın.',
+  },
+  'cost_gate.budget_exceeded_request': {
+    en: 'Sprint cost {estimatedUsd} exceeds budget {budgetUsd} (per-request limit). Raise the request budget.maxUsd or set acknowledgeCost=true (MCP) / --force (CLI).',
+    tr: 'Sprint maliyeti {estimatedUsd}, bütçe {budgetUsd} (istek başına limit) değerini aşıyor. İstek budget.maxUsd değerini artırın veya acknowledgeCost=true (MCP) / --force (CLI) ayarlayın.',
+  },
+  'cost_gate.spend_warn_day': {
+    en: 'Projected daily spend {projected} exceeds daily limit {limit} (spent {spent} + sprint estimate {sprintEstimate}).',
+    tr: 'Öngörülen günlük harcama {projected}, günlük limit {limit} değerini aşıyor (harcanan {spent} + sprint tahmini {sprintEstimate}).',
+  },
+  'cost_gate.spend_warn_month': {
+    en: 'Projected monthly spend {projected} exceeds monthly limit {limit} (spent {spent} + sprint estimate {sprintEstimate}).',
+    tr: 'Öngörülen aylık harcama {projected}, aylık limit {limit} değerini aşıyor (harcanan {spent} + sprint tahmini {sprintEstimate}).',
+  },
+
+  // ─── scope gate result/reason messages (task 591-003) ─────────────────
+  // Human-readable sentences for src/core/scope-gate.ts. Typed codes
+  // (SCOPE_GATE_SUSPECT, ScopePathClass values, etc.) stay as-is — only the
+  // prose `reason`/`message`/`greenfieldNotice` fields resolve through this family.
+  'scope_gate.reason.confirmed': {
+    en: 'exists in the repo',
+    tr: 'repoda mevcut',
+  },
+  'scope_gate.reason.glob_confirmed': {
+    en: 'scope pattern matching {count} tracked file(s)',
+    tr: 'scope pattern {count} takip edilen dosya ile eşleşiyor',
+  },
+  'scope_gate.reason.glob_no_match': {
+    en: 'glob pattern matches no tracked file — likely a wrong-directory pattern',
+    tr: 'glob pattern hiçbir takip edilen dosyayla eşleşmiyor — muhtemelen yanlış dizin pattern\'i',
+  },
+  'scope_gate.reason.parallel_tree_mirror': {
+    en: 'parallel-tree mirror: this task declared both this directory and the directory holding the same-named file',
+    tr: 'paralel-ağaç yansıması: bu görev hem bu dizini hem de aynı isimli dosyayı barındıran dizini bildirdi',
+  },
+  'scope_gate.reason.wrong_dir_suggestion': {
+    en: 'no such file; a file with the same name exists at {suggestion}',
+    tr: 'böyle bir dosya yok; aynı isimde bir dosya {suggestion} konumunda mevcut',
+  },
+  'scope_gate.reason.new_plausible': {
+    en: 'new file in an existing directory',
+    tr: 'mevcut bir dizinde yeni dosya',
+  },
+  'scope_gate.reason.greenfield': {
+    en: 'greenfield repo (no tracked directories) — path validation has no signal',
+    tr: 'greenfield repo (takip edilen dizin yok) — yol doğrulamasının sinyali yok',
+  },
+  'scope_gate.reason.intentional_new_dir': {
+    en: 'new directory \'{parent}\' — no such directory yet, but its established tracked ancestor \'{ancestor}\' ({count} tracked files) makes this look like an intentional new directory, not a typo (WARN, not blocked)',
+    tr: 'yeni dizin \'{parent}\' — henüz böyle bir dizin yok, ancak yerleşik takip edilen üst dizini \'{ancestor}\' ({count} takip edilen dosya) bunun bir yazım hatası değil kasıtlı yeni bir dizin olduğunu gösteriyor (UYARI, engellenmedi)',
+  },
+  'scope_gate.reason.invented_dir': {
+    en: 'no such file and its directory \'{parent}\' is not in the repo',
+    tr: 'böyle bir dosya yok ve \'{parent}\' dizini repoda değil',
+  },
+  'scope_gate.resolution.drop_duplicate': {
+    en: 'duplicate of \'{suggestion}\', already planned as a write in the same task',
+    tr: '\'{suggestion}\' ile aynı; aynı görevde zaten yazma olarak planlanmış',
+  },
+  'scope_gate.resolution.auto_replace': {
+    en: 'unambiguous — \'{suggestion}\' is the only tracked file with this basename',
+    tr: 'net — \'{suggestion}\' bu basename\'e sahip tek takip edilen dosya',
+  },
+  'scope_gate.message.header': {
+    en: 'Scope gate: {count} write path(s) do not exist and look like a typo or wrong directory:',
+    tr: 'Scope gate: {count} yazma yolu mevcut değil ve yazım hatası veya yanlış dizin gibi görünüyor:',
+  },
+  'scope_gate.message.hint_suggestion': {
+    en: ' → did you mean \'{suggestion}\'?',
+    tr: ' → şunu mu demek istediniz: \'{suggestion}\'?',
+  },
+  'scope_gate.message.more_suspects': {
+    en: '… and {count} more',
+    tr: '… ve {count} tane daha',
+  },
+  'scope_gate.message.footer': {
+    en: 'If these are intentional new files, override with acknowledgeScopePaths=true (MCP) / --force-scope (CLI). If a path should be an existing file, fix the DIRECTIVES scope before spawning.',
+    tr: 'Bunlar kasıtlı yeni dosyalarsa, acknowledgeScopePaths=true (MCP) / --force-scope (CLI) ile geçersiz kılın. Bir yol mevcut bir dosya olmalıysa, spawn etmeden önce DIRECTIVES scope\'unu düzeltin.',
+  },
+  'scope_gate.notice.greenfield': {
+    en: 'Scope gate: greenfield repo (no tracked directories) — {count} write path(s) could not be validated against tracked files; proceeding advisory-only (born-584).',
+    tr: 'Scope gate: greenfield repo (takip edilen dizin yok) — {count} yazma yolu takip edilen dosyalara karşı doğrulanamadı; sadece danışma amaçlı devam ediliyor (born-584).',
   },
 };
 

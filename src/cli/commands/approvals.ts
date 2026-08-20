@@ -14,6 +14,7 @@ import { createInterface } from 'node:readline/promises';
 import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
 import { looksLikeShortCode, normalizeShortCode, resolveShortCode, shortCodeFor } from '../../core/approval-short-code.js';
 import { loadApprovalRules, matchApprovalRule, promoteRuleFromDecision, saveApprovalRules } from '../../core/approval-rules.js';
+import { liveRuleFor } from '../../core/approval-rules-engine.js';
 import { isDecisionFederatedOrigin, mirrorFederatedItemToBroker, settleFederatedDecision, type DecisionFederatedOrigin } from '../../orchestra/approval-decision-federation.js';
 import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { userInfo } from 'node:os';
@@ -418,6 +419,53 @@ export function registerApprovalsCommand(program: Command): void {
     saveApprovalRules(root, next);
     print(getMessage('approvals.rules_updated', language, { id, action }));
   };
+
+  rules.command('apply')
+    .description(getMessage('approvals.rules_apply_desc', lang))
+    .action(async () => {
+      const root = resolveProjectRoot();
+      const config = await loadConfig(root);
+      const language = getLanguage(config.language);
+      const authority = config.approval?.authority;
+      if (authority?.enabled !== true) {
+        printError(new Error(getMessage('approvals.authority_disabled', language)));
+        process.exitCode = 1;
+        return;
+      }
+      const opened = openApprovalAuthorityRuntime({
+        projectRoot: root, tenantId: authority.tenant_id,
+      });
+      if (opened.state !== 'ready') {
+        printError(new Error(getMessage('approvals.runtime_hold', language, {
+          reason: opened.reasonCode, detail: opened.detailCode,
+        })));
+        process.exitCode = 1;
+        return;
+      }
+      try {
+        const now = new Date();
+        let applied = 0;
+        for (const request of opened.service.broker.list('pending')) {
+          const rule = liveRuleFor(root, request, now);
+          if (!rule) continue;
+          const action = rule.decision === 'allow' ? 'allow' as const : 'deny' as const;
+          const outcome = await opened.service.decideByRules(root, {
+            requestId: request.id,
+            action,
+            idempotencyKey: `rules-engine:${request.id}:${action}`,
+            reason: rule.reason,
+          });
+          applied += 1;
+          print(getMessage('approvals.rules_applied', language, {
+            code: shortCodeFor(request.id), id: request.id, action,
+            ruleId: rule.id, result: outcome.kind,
+          }));
+        }
+        if (applied === 0) print(getMessage('approvals.rules_apply_none', language));
+      } finally {
+        opened.service.close();
+      }
+    });
 
   rules.command('disable <id>')
     .description(getMessage('approvals.rules_disable_desc', lang))

@@ -19,7 +19,8 @@ import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js
 import { autonomousPendingPath } from '../../core/constants.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { getMessage } from '../../cli/helpers/messages.js';
+import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
 
 // ─── Filesystem layout (mirrors cli/commands/autonomous.ts) ──────────────────
 
@@ -99,10 +100,11 @@ function isAutonomousEnabled(root: string): boolean {
 // ─── Tool registration ────────────────────────────────────────────────────────
 
 export function registerAutonomousTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_autonomous',
     {
-      title: 'Autonomous Engine',
+      title: getMessage('autonomous.mcp_engine.title', registerLang),
       description: mcpToolDescription('deckent_autonomous'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
@@ -116,46 +118,38 @@ export function registerAutonomousTool(server: McpServer): void {
           'pending',
           'approve',
           'reject',
-        ]).describe(
-          'Action to perform. ' +
-          'status=query engine state; start=spawn the real autonomous loop as a detached ' +
-          'background process (honest no-op if disabled/already running — see spawned field); ' +
-          'stop=write stop marker; backlog_add/list/remove=manage work queue; ' +
-          'pending=list parked approvals; approve/reject=resolve a parked trigger.',
-        ),
-        root: z.string().optional().describe('Project root path (default: cwd)'),
+        ]).describe(getMessage('autonomous.mcp_engine.action_desc', registerLang)),
+        root: z.string().optional().describe(getMessage('autonomous.mcp.root_desc', registerLang)),
         // backlog_add / backlog_remove / approve / reject
-        id: z.string().optional().describe(
-          'Entry/trigger id — required for backlog_add, backlog_remove, approve, reject',
-        ),
+        id: z.string().optional().describe(getMessage('autonomous.mcp_engine.id_desc', registerLang)),
         // backlog_add
-        title: z.string().optional().describe('Entry title — required for backlog_add'),
+        title: z.string().optional().describe(getMessage('autonomous.mcp_engine.title_desc', registerLang)),
         kind: z.enum(['task', 'sprint', 'capability']).optional().default('task').describe(
-          'Entry kind (task=inline description, sprint=directives ref, capability=F8 broker verb). Default: task',
+          getMessage('autonomous.mcp_engine.kind_desc', registerLang),
         ),
         description: z.string().optional().default('').describe(
-          'Task description or directives ref — used by backlog_add',
+          getMessage('autonomous.mcp_engine.description_desc', registerLang),
         ),
         policy: z.enum(['auto', 'approval-required', 'risk-tagged']).optional().default('auto').describe(
-          'Execution policy for backlog_add. Default: auto',
+          getMessage('autonomous.mcp_engine.policy_desc', registerLang),
         ),
         cron: z.string().optional().describe(
-          '5-field cron expression for backlog_add — entry recurs at this cadence (omit for one-off)',
+          getMessage('autonomous.mcp_engine.cron_desc', registerLang),
         ),
         capability: z.string().optional().describe(
-          'kind=capability: dotted verb to invoke (e.g. fs.read, db.query) — backlog_add',
+          getMessage('autonomous.mcp_engine.capability_desc', registerLang),
         ),
         capabilityArgs: z.string().optional().describe(
-          'kind=capability: JSON object of handler args — backlog_add',
+          getMessage('autonomous.mcp_engine.capability_args_desc', registerLang),
         ),
         connector: z.string().optional().describe(
-          'kind=capability: preferred backend/connector id (e.g. odoo, imap) — backlog_add',
+          getMessage('autonomous.mcp_engine.connector_desc', registerLang),
         ),
         // approve / reject (prefer `triggerId`, fall back to `id`)
         triggerId: z.string().optional().describe(
-          'Trigger ID to approve or reject (alternative to `id` for approve/reject)',
+          getMessage('autonomous.mcp_engine.trigger_id_desc', registerLang),
         ),
-        reason: z.string().optional().describe('Reason recorded with approve/reject decision'),
+        reason: z.string().optional().describe(getMessage('autonomous.mcp_engine.reason_desc', registerLang)),
       }),
     },
     async ({
@@ -237,9 +231,10 @@ export function registerAutonomousTool(server: McpServer): void {
               pid: existingPid.pid,
               startedAt: existingPid.startedAt,
               stopMarkerCleared: wasMarked,
-              message: `Autonomous loop already running (pid ${existingPid.pid}, started ` +
-                `${existingPid.startedAt}). Not spawning a duplicate — use action=stop to ` +
-                'signal it to exit cleanly.',
+              message: getMessage('autonomous.mcp_engine.start_already_running', lang, {
+                pid: String(existingPid.pid),
+                startedAt: existingPid.startedAt,
+              }),
             });
             return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };
           }
@@ -253,10 +248,7 @@ export function registerAutonomousTool(server: McpServer): void {
               action: 'start',
               spawned: false,
               stopMarkerCleared: wasMarked,
-              message:
-                'Autonomous mode is disabled (config.autonomous.enabled is not true) — no ' +
-                'loop was spawned. Enable it first (`deckent autonomous enable`), then call ' +
-                'start again.',
+              message: getMessage('autonomous.mcp_engine.start_disabled', lang),
             });
             return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };
           }
@@ -279,7 +271,7 @@ export function registerAutonomousTool(server: McpServer): void {
               action: 'start',
               spawned: false,
               stopMarkerCleared: wasMarked,
-              message: `Failed to spawn the autonomous loop: ${message}`,
+              message: getMessage('autonomous.mcp_engine.start_spawn_failed', lang, { message }),
             });
             return {
               content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
@@ -306,10 +298,8 @@ export function registerAutonomousTool(server: McpServer): void {
             startedAt,
             stopMarkerCleared: wasMarked,
             message: pid !== undefined
-              ? `Autonomous loop spawned as a detached background process (pid ${pid}). ` +
-                'Use action=status to check progress, action=stop to signal a clean stop.'
-              : 'Autonomous loop spawn requested, but the child process reported no pid — ' +
-                'it may have failed to start.',
+              ? getMessage('autonomous.mcp_engine.start_spawned', lang, { pid: String(pid) })
+              : getMessage('autonomous.mcp_engine.start_no_pid', lang),
           });
           return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };
         }
@@ -324,8 +314,8 @@ export function registerAutonomousTool(server: McpServer): void {
 
         // ── backlog_add ───────────────────────────────────────────────────────
         if (action === 'backlog_add') {
-          if (!id) throw new Error('id is required for backlog_add');
-          if (!title) throw new Error('title is required for backlog_add');
+          if (!id) throw new Error(getMessage('autonomous.mcp_engine.id_required_backlog_add', lang));
+          if (!title) throw new Error(getMessage('autonomous.mcp_engine.title_required_backlog_add', lang));
           backlogAdd({
             root,
             id,
@@ -356,7 +346,7 @@ export function registerAutonomousTool(server: McpServer): void {
 
         // ── backlog_remove ────────────────────────────────────────────────────
         if (action === 'backlog_remove') {
-          if (!id) throw new Error('id is required for backlog_remove');
+          if (!id) throw new Error(getMessage('autonomous.mcp_engine.id_required_backlog_remove', lang));
           backlogRemove({ root, id, lang });
           const enriched = enrichResponse('autonomous', { action: 'backlog_remove', id, removed: true });
           return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };
@@ -377,7 +367,7 @@ export function registerAutonomousTool(server: McpServer): void {
         // ── approve ───────────────────────────────────────────────────────────
         if (action === 'approve') {
           const tid = triggerId ?? id;
-          if (!tid) throw new Error('triggerId (or id) is required for approve');
+          if (!tid) throw new Error(getMessage('autonomous.mcp_engine.id_required_approve', lang));
           const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
           gate.accept(tid, reason);
           const enriched = enrichResponse('autonomous', {
@@ -391,7 +381,7 @@ export function registerAutonomousTool(server: McpServer): void {
         // ── reject ────────────────────────────────────────────────────────────
         if (action === 'reject') {
           const tid = triggerId ?? id;
-          if (!tid) throw new Error('triggerId (or id) is required for reject');
+          if (!tid) throw new Error(getMessage('autonomous.mcp_engine.id_required_reject', lang));
           const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
           gate.reject(tid, reason);
           const enriched = enrichResponse('autonomous', {
@@ -405,7 +395,10 @@ export function registerAutonomousTool(server: McpServer): void {
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({ error: true, message: `Unknown action: ${action}` }),
+            text: JSON.stringify({
+              error: true,
+              message: getMessage('autonomous.mcp_engine.unknown_action', lang, { action }),
+            }),
           }],
           isError: true,
         };

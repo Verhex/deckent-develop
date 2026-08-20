@@ -35,6 +35,7 @@ import { validatePersonaTaskMatch } from './task-builder.js';
 import { sanitizeScope } from './scope-sanitizer.js';
 import { lintScopeSatisfiability } from './scope-satisfiability.js';
 import { isRealPathCandidate } from '../core/task-builder-scope.js';
+import { getMessage } from '../cli/helpers/messages.js';
 
 export type {
   PromptGateFinding,
@@ -67,6 +68,8 @@ export interface PromptGateInput {
   trackedFiles?: readonly string[];
   /** Pre-localized, adapter-backed findings produced by planner I/O preflight. */
   preflightFindings?: readonly PromptGateFinding[];
+  /** UI language for this gate's own finding messages/suggestions (getMessage-normalized). Defaults to 'en'. */
+  lang?: string;
 }
 
 /**
@@ -153,7 +156,7 @@ export function isConstructionTask(task: Task): boolean {
  * ANY Write-denied agent — including future ones — is caught; the id-set is the fallback
  * for an absent/tool-empty agent def.
  */
-function lintCapability(task: Task, agentId: string, agent?: AgentDefinition): PromptGateFinding | null {
+function lintCapability(task: Task, agentId: string, lang: string, agent?: AgentDefinition): PromptGateFinding | null {
   const writeDenied = (agent?.deniedTools?.includes('Write') ?? false) || WRITE_DENIED_AGENTS.has(agentId);
   if (!writeDenied || !isConstructionTask(task)) return null;
   return {
@@ -161,13 +164,13 @@ function lintCapability(task: Task, agentId: string, agent?: AgentDefinition): P
     lint: 'persona-capability',
     level: 'block',
     agentId,
-    message: `Agent '${agentId}' is a review/advisory persona that is denied the Write tool, but this task writes source code — it cannot produce the diff.`,
-    suggestion: `Route to an implementer persona (bug-fixer / api-builder / the domain's implementer).`,
+    message: getMessage('prompt_gate.capability_message', lang, { agentId }),
+    suggestion: getMessage('prompt_gate.capability_fix', lang),
   };
 }
 
 /** G1a-mandate (WARN): refactorer's zero-functional-change mandate on a behavior-changing task. */
-function lintMandate(task: Task, agentId: string): PromptGateFinding | null {
+function lintMandate(task: Task, agentId: string, lang: string): PromptGateFinding | null {
   if (!PRESERVE_BEHAVIOR_AGENTS.has(agentId)) return null;
   const intent = intentOf(task);
   // refactorer is appropriate ONLY for refactor-labeled work; anything else is a
@@ -179,13 +182,13 @@ function lintMandate(task: Task, agentId: string): PromptGateFinding | null {
     lint: 'persona-mandate',
     level: 'warn',
     agentId,
-    message: `Agent 'refactorer' carries a "zero functional changes" mandate, but this task's intent is '${intent}' (behavior-changing) — the persona fights the task.`,
-    suggestion: `Route to bug-fixer (corrective) or the domain implementer; keep refactorer for intent='refactor' only.`,
+    message: getMessage('prompt_gate.mandate_message', lang, { intent }),
+    suggestion: getMessage('prompt_gate.mandate_fix', lang),
   };
 }
 
 /** G1a-role (WARN): a reviewer/analyst persona (Write-allowed hybrid) on construction work. */
-function lintRole(task: Task, agent: AgentDefinition): PromptGateFinding | null {
+function lintRole(task: Task, agent: AgentDefinition, lang: string): PromptGateFinding | null {
   const agentId = agent.id;
   if (WRITE_DENIED_AGENTS.has(agentId)) return null; // handled as a BLOCK by lintCapability
   const role = getAgentRole(agent);
@@ -197,29 +200,32 @@ function lintRole(task: Task, agent: AgentDefinition): PromptGateFinding | null 
     lint: 'persona-role',
     level: 'warn',
     agentId,
-    message: `Agent '${agentId}' is a ${role} persona, but this task is construction work (writes source) — a review stance ≠ building the feature and risks a mismatched approach.`,
+    message: getMessage('prompt_gate.role_message', lang, { agentId, role }),
     suggestion: isSec
-      ? `Route to an implementer (bug-fixer / api-builder) + the 'secure-coding' skill — the auditor persona reviews security, it does not build it.`
-      : `Route to an implementer persona for the task's domain.`,
+      ? getMessage('prompt_gate.role_fix_security', lang)
+      : getMessage('prompt_gate.role_fix_generic', lang),
   };
 }
 
 /** G1a-domain (WARN): compose the existing HIGH domain-mismatch check into the plan-time surface. */
-function lintDomain(task: Task, agent: AgentDefinition): PromptGateFinding | null {
+function lintDomain(task: Task, agent: AgentDefinition, lang: string): PromptGateFinding | null {
   const r = validatePersonaTaskMatch(agent, task);
   if (r.valid || r.severity !== 'HIGH') return null;
+  const mismatch = r.mismatch?.join('; ') ?? getMessage('prompt_gate.domain_mismatch_fallback', lang);
   return {
     taskId: task.id,
     lint: 'persona-domain',
     level: 'warn',
     agentId: agent.id,
-    message: `Agent '${agent.id}' domain mismatch: ${r.mismatch?.join('; ') ?? 'agent domain ≠ task domain'}.`,
-    suggestion: r.suggestedAgent ? `Consider '${r.suggestedAgent}'.` : undefined,
+    message: getMessage('prompt_gate.domain_message', lang, { agentId: agent.id, mismatch }),
+    suggestion: r.suggestedAgent
+      ? getMessage('prompt_gate.domain_fix', lang, { suggestedAgent: r.suggestedAgent })
+      : undefined,
   };
 }
 
 /** G1d-decision-space (WARN): goCriteria presents a false choice (X VEYA/OR Y). */
-function lintDecisionSpace(task: Task): PromptGateFinding | null {
+function lintDecisionSpace(task: Task, lang: string): PromptGateFinding | null {
   const g = task.goNogo?.goCriteria ?? '';
   if (!FALSE_CHOICE_RE.test(g)) return null;
   return {
@@ -227,8 +233,8 @@ function lintDecisionSpace(task: Task): PromptGateFinding | null {
     lint: 'decision-space',
     level: 'warn',
     agentId: task.assignedAgent ?? 'generic',
-    message: `goCriteria offers a choice ("…VEYA/OR…"); when scope enables only one branch this hands the worker a false decision and invites hesitation.`,
-    suggestion: `State a preferred order ("prefer X; if infeasible, Y") or split into two goCriteria items.`,
+    message: getMessage('prompt_gate.decision_space_message', lang),
+    suggestion: getMessage('prompt_gate.decision_space_fix', lang),
   };
 }
 
@@ -255,7 +261,7 @@ const PREMISE_PRESENT_THRESHOLD = 2;
  * "add Ed25519 keygen" when `@noble/ed25519` signing already shipped). WARN-only and
  * conservative (code-identifier shape + present-threshold) to keep false positives low.
  */
-function lintPremise(task: Task, probeRepo: (symbol: string) => number): PromptGateFinding[] {
+function lintPremise(task: Task, probeRepo: (symbol: string) => number, lang: string): PromptGateFinding[] {
   const desc = task.description ?? '';
   if (!desc) return [];
   const seen = new Set<string>();
@@ -278,8 +284,8 @@ function lintPremise(task: Task, probeRepo: (symbol: string) => number): PromptG
         lint: 'premise',
         level: 'warn',
         agentId: task.assignedAgent ?? 'generic',
-        message: `Premise may be stale: the description claims '${symbol}' is missing/absent, but it occurs ${count}× in the repo — the fix may already exist.`,
-        suggestion: `Verify '${symbol}' against the codebase before implementing; if it already exists, narrow the task to the true remaining gap (or close it).`,
+        message: getMessage('prompt_gate.premise_message', lang, { symbol, count: String(count) }),
+        suggestion: getMessage('prompt_gate.premise_fix', lang, { symbol }),
       });
     }
   }
@@ -313,7 +319,7 @@ function extractProofCommands(...texts: Array<string | undefined>): string[] {
  * 397-011 (README.md/README-TR.md) and 397-012 (.secrets-baseline) failures, and the
  * sanitizer's warnings previously had zero consumers.
  */
-function lintScopeSilentDrop(task: Task, trackedRootFiles: ReadonlySet<string>): PromptGateFinding[] {
+function lintScopeSilentDrop(task: Task, trackedRootFiles: ReadonlySet<string>, lang: string): PromptGateFinding[] {
   const filesWrite = task.scope?.filesWrite ?? [];
   if (filesWrite.length === 0) return [];
   const sanitized = sanitizeScope(filesWrite, trackedRootFiles);
@@ -325,9 +331,8 @@ function lintScopeSilentDrop(task: Task, trackedRootFiles: ReadonlySet<string>):
       lint: 'scope-silent-drop',
       level: 'block',
       agentId,
-      message: `Write authority would silently shrink at render time: ${w}`,
-      suggestion:
-        'Qualify the path (directory prefix) or fix the entry in DIRECTIVES — the worker would never see this file in its WRITE list.',
+      message: getMessage('prompt_gate.scope_silent_drop_warning_message', lang, { warning: w }),
+      suggestion: getMessage('prompt_gate.scope_silent_drop_warning_fix', lang),
     });
   }
   for (const r of sanitized.rejected) {
@@ -336,15 +341,15 @@ function lintScopeSilentDrop(task: Task, trackedRootFiles: ReadonlySet<string>):
       lint: 'scope-silent-drop',
       level: 'block',
       agentId,
-      message: `Write path rejected by the scope sanitizer (absolute/traversal): "${r}"`,
-      suggestion: 'Use a repo-relative path without ".." segments.',
+      message: getMessage('prompt_gate.scope_silent_drop_rejected_message', lang, { path: r }),
+      suggestion: getMessage('prompt_gate.scope_silent_drop_rejected_fix', lang),
     });
   }
   return out;
 }
 
 /** G1b (sprint-399 wiring): task-text ↔ write-authority satisfiability lint. */
-function lintSatisfiability(task: Task, trackedFiles: readonly string[]): PromptGateFinding[] {
+function lintSatisfiability(task: Task, trackedFiles: readonly string[], lang: string): PromptGateFinding[] {
   const goCriteria = task.goNogo?.goCriteria ?? '';
   const description = task.description ?? '';
   const findings = lintScopeSatisfiability({
@@ -367,13 +372,13 @@ function lintSatisfiability(task: Task, trackedFiles: readonly string[]): Prompt
     lint: 'scope-satisfiability' as const,
     level: f.severity === 'BLOCK' ? 'block' as const : 'warn' as const,
     agentId,
-    message: `[${f.code}] ${f.message}`,
+    message: getMessage('prompt_gate.satisfiability_message', lang, { code: f.code, message: f.message }),
     suggestion:
       f.code === 'PROOF_PATH_MISSING'
-        ? `Fix the proof command's path or add '${f.path}' to scope.filesWrite (new-file proofs are legitimate only with write authority).`
+        ? getMessage('prompt_gate.satisfiability_fix_proof_path_missing', lang, { path: f.path })
         : f.code === 'MENTIONED_NOT_WRITABLE'
-          ? `Add '${f.path}' to scope.filesWrite/directories, or reword the task so it does not require writing it.`
-          : `'${f.path}' is declared unchanged but is in filesWrite — drop it from the write list or drop the declaration.`,
+          ? getMessage('prompt_gate.satisfiability_fix_mentioned_not_writable', lang, { path: f.path })
+          : getMessage('prompt_gate.satisfiability_fix_declared_unchanged', lang, { path: f.path }),
   }));
 }
 
@@ -386,6 +391,7 @@ function lintSatisfiability(task: Task, trackedFiles: readonly string[]): Prompt
  */
 export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
   const findings: PromptGateFinding[] = [...(input.preflightFindings ?? [])];
+  const lang = input.lang ?? 'en';
 
   // Built once for the whole plan (hoisted — advisor hygiene note, sprint-399).
   const trackedRootFiles = input.trackedFiles
@@ -398,35 +404,35 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
     if (agentId !== 'generic') {
       const agent = input.agentPool.get(agentId);
 
-      const cap = lintCapability(task, agentId, agent);
+      const cap = lintCapability(task, agentId, lang, agent);
       if (cap) findings.push(cap);
 
-      const man = lintMandate(task, agentId);
+      const man = lintMandate(task, agentId, lang);
       if (man) findings.push(man);
 
       if (agent) {
         // Role lint is redundant once capability already blocked the same task.
         if (!cap) {
-          const role = lintRole(task, agent);
+          const role = lintRole(task, agent, lang);
           if (role) findings.push(role);
         }
-        const dom = lintDomain(task, agent);
+        const dom = lintDomain(task, agent, lang);
         if (dom) findings.push(dom);
       }
     }
 
-    const dec = lintDecisionSpace(task);
+    const dec = lintDecisionSpace(task, lang);
     if (dec) findings.push(dec);
 
     if (input.probeRepo) {
-      findings.push(...lintPremise(task, input.probeRepo));
+      findings.push(...lintPremise(task, input.probeRepo, lang));
     }
 
     // sprint-399 scope-contract lints — only with a real tracked-file list (fail-soft:
     // no git signal → no findings, never a false block on e.g. a non-git workspace).
     if (input.trackedFiles && input.trackedFiles.length > 0 && trackedRootFiles) {
-      findings.push(...lintScopeSilentDrop(task, trackedRootFiles));
-      findings.push(...lintSatisfiability(task, input.trackedFiles));
+      findings.push(...lintScopeSilentDrop(task, trackedRootFiles, lang));
+      findings.push(...lintSatisfiability(task, input.trackedFiles, lang));
     }
   }
 

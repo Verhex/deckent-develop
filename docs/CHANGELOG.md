@@ -14,6 +14,20 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint591] - 2026-08-20
+
+### Added
+
+- cost-gate kullanıcı-metinleri i18n
+- prompt-gate kullanıcı-metinleri i18n
+- scope-gate kullanıcı-metinleri i18n
+- MCP autonomous ana-tool metinleri i18n
+- MCP start-tool metinleri i18n
+- api/server approvals hata-metinleri i18n
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
 ## [sprint590] - 2026-08-20
 
 

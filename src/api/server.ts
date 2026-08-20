@@ -1407,15 +1407,16 @@ async function handleRequest(
     // GET /api/approvals/:id — single entry detail. maskedArgs-only; raw
     // args are NEVER resolved (resolveRawArgs is never called from here).
     if (url.startsWith('/api/approvals/')) {
+      const lookupLang = getLanguage();
       const id = parseApprovalLookupId(url.slice('/api/approvals/'.length));
       if (!id) {
-        sendError(res, 400, 'Invalid approval id');
+        sendError(res, 400, getMessage('api.approvals.invalid_id', lookupLang));
         return;
       }
       const store = new ApprovalStore(projectRoot);
       const found = findApprovalEntry(store, id);
       if (!found) {
-        sendError(res, 404, 'Approval not found');
+        sendError(res, 404, getMessage('api.approvals.not_found', lookupLang));
         return;
       }
       sendJson(res, serializeApprovalEntry(found.category, found.entry));
@@ -1822,7 +1823,7 @@ async function handleRequest(
       const approvalLang = getLanguage();
       const id = parseApprovalLookupId(url.slice('/api/approvals/'.length, -'/decision'.length));
       if (!id) {
-        sendError(res, 400, 'Invalid approval id');
+        sendError(res, 400, getMessage('api.approvals.invalid_id', approvalLang));
         return;
       }
 
@@ -1830,7 +1831,7 @@ async function handleRequest(
         sendError(
           res,
           403,
-          'Approval API decisions are disabled — set approval.api_decide: true in .deckent/config.json to enable POST /api/approvals/:id/decision',
+          getMessage('api.approvals.api_decide_disabled', approvalLang),
         );
         return;
       }
@@ -1861,11 +1862,13 @@ async function handleRequest(
       const decisionStore = approvalAuthority?.runtime.store ?? new ApprovalStore(projectRoot);
       const found = findApprovalEntry(decisionStore, id);
       if (!found) {
-        sendError(res, 404, 'Approval not found');
+        sendError(res, 404, getMessage('api.approvals.not_found', approvalLang));
         return;
       }
       if (found.category !== 'pending') {
-        sendError(res, 409, `Approval already ${found.category}`);
+        sendError(res, 409, getMessage('api.approvals.already_decided', approvalLang, {
+          category: found.category,
+        }));
         return;
       }
       if (!approvalAuthority) {
