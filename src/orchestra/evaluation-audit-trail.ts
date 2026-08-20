@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path';
 
 import { EVALUATIONS_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
+import { fromRubricDecision, type NormativeVerdict } from '../core/verdict-types.js';
 
 /**
  * Rule-set identifier mirroring rubric-registry TaskType but in the
@@ -71,6 +72,13 @@ export interface EvaluationAuditRecord {
   criterionScores: AuditCriterionScore[];
   totalScore: number;
   decision: AuditDecision;
+  /**
+   * ADR-G-040 normative projection of `decision` (single-word vocabulary
+   * shared by every evaluation surface). Derived here at write time — the
+   * legacy 3-value decision stays authoritative for this record's readers
+   * until their surfaces migrate.
+   */
+  normativeVerdict: NormativeVerdict;
   decisionRationale: string;
 }
 
@@ -183,6 +191,7 @@ export function writeEvaluationAudit(
     criterionScores: input.criterionScores,
     totalScore: input.totalScore,
     decision: input.decision,
+    normativeVerdict: fromRubricDecision(input.decision),
     decisionRationale,
   };
 

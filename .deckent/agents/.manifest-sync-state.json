@@ -5,40 +5,40 @@
   },
   "agents": {
     "api-designer": {
-      "builtinHash": "09271232f69e71a141c2e45a4f3dc2309c9c3423",
-      "syncedAt": "2026-07-14T21:20:57.189Z"
+      "builtinHash": "33e0b091ed7394a9a62a1a09e62d2d012f101d72",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     },
     "architect": {
-      "builtinHash": "bcb70c1f5d848c30cb651ace8c724138d412e9b7",
-      "syncedAt": "2026-07-14T21:20:57.189Z"
+      "builtinHash": "8baa0e98576616be4ef2a3cd7b51fb3fb833bd82",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     },
     "architecture-planner": {
-      "builtinHash": "1bb2bcd127570f17f9e344b0aaa8d11d94cfb3d9",
-      "syncedAt": "2026-07-18T15:01:00.300Z"
+      "builtinHash": "c46211d7dd7a955495a5ebf88cafe40e3953dbb0",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     },
     "data-engineer": {
-      "builtinHash": "a0b7bf5560d2146efdcb58f44a7daa5f4c446269",
-      "syncedAt": "2026-07-14T21:20:57.189Z"
+      "builtinHash": "53c8828035d8cf2f505fe9bce23fd84e5525c41d",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     },
     "i18n-specialist": {
-      "builtinHash": "224e137e13381e4b06f531b1aa60bfb7d6018b0e",
-      "syncedAt": "2026-07-18T15:01:00.300Z"
+      "builtinHash": "202fce87f359c4dca7d1d2f1b2165d3ecb92ef0d",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     },
     "implementer": {
-      "builtinHash": "a08d77c97a82fa383199187b0e87db69697a76ad",
-      "syncedAt": "2026-07-18T15:01:00.300Z"
+      "builtinHash": "1cd004cfb716e0db447e2ebf0c597e49369ef772",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     },
     "observability-engineer": {
-      "builtinHash": "d83983e006eb0e0e064c758239f752d8314a7eef",
-      "syncedAt": "2026-07-18T15:01:00.300Z"
+      "builtinHash": "0bc476e13e660e1aa0dac02ae6b51fc161a0d08b",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     },
     "refactorer": {
-      "builtinHash": "f9ceb2a5059117e32b2d241ad4b7640b83b0e8d7",
-      "syncedAt": "2026-07-14T21:20:57.189Z"
+      "builtinHash": "7a0dd9549070fc59b58adc506d59276da47b0e96",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     },
     "terminal-ux-engineer": {
-      "builtinHash": "0c382bbb00cfc1bacb34710a7487fb348ca6c7fc",
-      "syncedAt": "2026-07-14T21:20:57.189Z"
+      "builtinHash": "889398f37a13cfae60127c4afdaddf1fa8cfe8f5",
+      "syncedAt": "2026-08-20T10:35:20.294Z"
     }
   }
 }

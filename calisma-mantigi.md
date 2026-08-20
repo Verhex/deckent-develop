@@ -298,3 +298,32 @@
   tr+en senkron + changelog.
 - KARAR-4: artifacts-gitignore + flake yonetimi onaylandi, ek is yok.
 Muhur-2: codex CONFIRMED cross-verify-verdict:sha256:84e88e13...e6f7945e (karar-1 anafor-fix + karar-2 i18n/cursor)
+
+## ADR-G-040 Normatif Verdict Sozlugu — ilk dilim (2026-08-20)
+- Owner: statuler normatif + HER STATU TEK KELIME; CONFIRMED_WITH_DEBT
+  reddedildi, secim: QUALIFIED (denetim-dili 'qualified opinion'; cekince
+  typed residualDebt'te tasinir). Sozluk: CONFIRMED · QUALIFIED · UNDECIDABLE
+  · FAILED · HOLD.
+- SSOT: src/core/verdict-types.ts — frozen liste; TAM legacy->normatif
+  donusumler (TaskEvaluation: DEFERRED/NOT_DISPATCHED->HOLD; criterion-status;
+  xverify: REFUTED->FAILED, UNCLEAR->UNDECIDABLE, unavailable->HOLD;
+  selfAssessment bilinmeyen->null). Kayipli yon toTaskEvaluation KASITLI
+  PARTIAL: UNDECIDABLE/HOLD -> null — sessiz ikame=uydurma-verdict yasak.
+- GERCEK WIRING (davranis-notr): EvaluationAuditRecord.normativeVerdict
+  (required) + writeEvaluationAudit tek-noktada damgalar -> tum EVALUATE
+  dallari otomatik; legacy decision okuyuculari icin authority kalir,
+  goc dilim-dilim (big-bang rename YOK — 64 DONE-satirli MASTER lint +
+  ledger + docs koruma nedeni).
+- ADR-G-040 memory.db'ye eklendi (039-satiri sablonu; Context/Decision
+  formatli; export 12/12 yesil). Rule-dosyasi ADR-index'leri bir sonraki
+  finalize/regenerate'te kendiliginden guncellenir.
+- Pinler: 5 esleme-tablosu + gercek-yazim (tmpdir persisted JSON'da
+  normativeVerdict=QUALIFIED) + komsu audit-trail 13/13; hermetic -3
+  (chat-mock rework'u uc unresolved site emekliye ayirdi) + prod-inventory
+  +1 (yeni modul) belgeli ratchet.
+- SONRAKI DILIMLER (tasarim-sirasi): (1) kabul-matrisi semasi
+  (task-kind × verdict routing policy — config alani + typed default'lar);
+  (2) criterion-kernel/xverify yuzeylerinin normatif okuyuculari;
+  (3) rapor/CLI yuzeyinde normatif goruntuleme; (4) legacy enum'larin
+  projeksiyona indirilmesi.
+Muhur-3: codex CONFIRMED cross-verify-verdict:sha256:dc4f3d5b...646e2efd (ADR-G-040 verdict-vocabulary dilimi)

@@ -412,8 +412,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // only — salvage-gate pins, chat-suite spawnSync mocks and the 7093/7091
   // pin realignments moved tracked test content; measured on the final
   // landing tree.
-  count: 14471,
-  digest: '5a2af230c32ef643c3068dd73015eed4c2386804c6b7e537428c60198bbfd9fe',
+  // 2026-08-20 (ADR-G-040 verdict vocabulary + decision wave): −3 — the
+  // chat-suite child_process mocks' rework retired three unresolved write
+  // sites; the verdict-types suite's tmpdir fixture is tracked clean.
+  count: 14468,
+  digest: 'cfd6ec6f8fa65a67bcf10ac8591fb8afe501f9deffa239c0d539c83311ca9a19',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -710,8 +713,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-20 (salvage-gate closure): same 1257 count, digest only — the
   // contract-failure guards in mid-sprint-adapter/result-evaluator and the
   // kernel's hasUnsalvageableContractFailure export moved production content.
-  count: 1257,
-  digest: 'a43f80090c4ecf437f92b6f83cd56f4331b232d9f9c434f484a31b790037c008',
+  // 2026-08-20 (ADR-G-040): +1 — the new verdict-types vocabulary module;
+  // evaluation-audit-trail gained the normativeVerdict projection and the
+  // decision-wave moved chat/test-discovery production content.
+  count: 1258,
+  digest: '470f0872797d49abb16ba3fef3f5a93903a244f52e947db4fe88b9e493757ec3',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

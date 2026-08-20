@@ -53,6 +53,7 @@
 | ADR-G-037 | Execution Budget Landing, Continuation & Metering Authority | accepted |
 | ADR-G-038 | Goal-v2 Normalized Dependency Authority & Bounded Reconciliation | accepted |
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
+| adr-g-040 | Normative Verdict Vocabulary (Single-Word Evaluation Statuses) | accepted |
 
 ## Recent Learnings
 - **Sprint sprint-587 Learnings** (sprint-587): ## Sprint sprint-587 Learnings
@@ -103,4 +104,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2062 | Generated: 2026-08-20_
+_Total entries: 2063 | Generated: 2026-08-20_

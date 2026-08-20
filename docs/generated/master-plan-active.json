@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5cc7d6bed6da84b097ed13dbcb95327400582e4599a2d3782b60a3e7356f02ad"
+    "value": "122c942bde83790c064fbcd5deba6b99891b999d7794af9125766482a46db0e3"
   },
   "summary": {
     "total": 515,
@@ -5517,7 +5517,7 @@
       "state": "OPEN",
       "updated": "2026-08-20",
       "definitionDigest": "d3687b7daefeef050420e72756805fc228bf8e7c832b780137ecce5010da12bc",
-      "progressDigest": "3b1370d1582712f117cea85c3ae583ff2b72951112fb66f4b2f2a4a2a383c3e1",
+      "progressDigest": "9a405458880b93d032ac13a5f29e82f0c3cdbcc79cd7cb122b83b3a1afc55970",
       "terminalClosureDigest": null
     },
     {
@@ -25693,7 +25693,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Code, live, user and independent-verifier evidence never conflated; false GO/NO_GO calibrated",
-      "evidence": "Xverify and Brain evaluation residuals. **OWNER MIMARI-KONUMLANDIRMA 2026-08-20 (canli direktif): EVALUATION SURFACE — kurumsal ve solo ayni kusursuzlukta.** Cerceve: (1) UNIVERSAL DETERMINISTIK CEKIRDEK — is/sonuc/kriter degerlendirmesi typed-criterion tabanli, giris TASK-KIND'dir (giris-seviye birinci-sinif yapi); (2) is-ozelinde CUSTOM CONFIRMATION adapterlari — kod-sureci (test/build/smoke), AI-LLM judge, INSAN onayi; her mod typed, desteklenmeyen mod durust typed-HOLD (brief §3.5 capability-adapter tablosunun evaluator-yuzu; ERP surec-eval'i ile kisisel-asistan ayni kalite); (3) TEK-YUZEY ESITLEME — start/run/runs/do/autonomous TUM ingress'ler AYNI evaluation-authority'sinden gecer (SURFACE-CUTOVER'in eval-dilimi; ayri yuzey ayri evaluator ASLA); (4) girdi-cikti sozlesmesi birinci-sinif: TaskKind→criterion-seti→confirmation-mode→typed verdict+verdict-source zinciri (7096-B1 zaten canli). Ilk dilim = 7097-madde-3 (goNogo.items typed-criterion'lari deterministik cekirdege baglanir — bugun evaluator items'a HIC dokunmuyor, serbest-metin heuristigi; kesif 2026-08-20). Brief-§3.5 karari geregi yeni root ACILMAZ; is bu satir + GOAL-ACCEPTANCE-001 + KERNEL-SETTLEMENT-001 + SPRINT-HONESTY-001 altinda dilimlenir",
+      "evidence": "Xverify and Brain evaluation residuals. **OWNER MIMARI-KONUMLANDIRMA 2026-08-20 (canli direktif): EVALUATION SURFACE — kurumsal ve solo ayni kusursuzlukta.** Cerceve: (1) UNIVERSAL DETERMINISTIK CEKIRDEK — is/sonuc/kriter degerlendirmesi typed-criterion tabanli, giris TASK-KIND'dir (giris-seviye birinci-sinif yapi); (2) is-ozelinde CUSTOM CONFIRMATION adapterlari — kod-sureci (test/build/smoke), AI-LLM judge, INSAN onayi; her mod typed, desteklenmeyen mod durust typed-HOLD (brief §3.5 capability-adapter tablosunun evaluator-yuzu; ERP surec-eval'i ile kisisel-asistan ayni kalite); (3) TEK-YUZEY ESITLEME — start/run/runs/do/autonomous TUM ingress'ler AYNI evaluation-authority'sinden gecer (SURFACE-CUTOVER'in eval-dilimi; ayri yuzey ayri evaluator ASLA); (4) girdi-cikti sozlesmesi birinci-sinif: TaskKind→criterion-seti→confirmation-mode→typed verdict+verdict-source zinciri (7096-B1 zaten canli). Ilk dilim = 7097-madde-3 (goNogo.items typed-criterion'lari deterministik cekirdege baglanir — bugun evaluator items'a HIC dokunmuyor, serbest-metin heuristigi; kesif 2026-08-20). Brief-§3.5 karari geregi yeni root ACILMAZ; is bu satir + GOAL-ACCEPTANCE-001 + KERNEL-SETTLEMENT-001 + SPRINT-HONESTY-001 altinda dilimlenir **VERDICT-VOCABULARY DILIMI UYGULANDI 2026-08-20 (ADR-G-040; owner: statuler normatif + TEK KELIME; CONFIRMED_WITH_DEBT reddedildi -> QUALIFIED secildi):** kanonik sozluk CONFIRMED · QUALIFIED · UNDECIDABLE · FAILED · HOLD; SSOT src/core/verdict-types.ts (frozen liste + TAM legacy->normatif donusumler: TaskEvaluation/rubrik/selfAssessment/criterion-status/xverify; kayipli normatif->legacy yon null doner — sessiz ikame=uydurma-verdict yasak). GERCEK WIRING (davranis-notr): writeEvaluationAudit her kalici audit-kaydina normativeVerdict projeksiyonu damgalar (tum EVALUATE dallari tek noktadan kazanir; legacy decision kendi yuzeyinde authority kalir, okuyucular dilim dilim goc eder). Kabul-matrisi (task-kind × verdict routing) bu sozlugun ustune sonraki dilimde. Pin: 5+13 yesil (eslesme-tablosu + gercek-yazim kaniti), tsc 0. Muhur: codex CONFIRMED `cross-verify-verdict:sha256:dc4f3d5be582d7e637d23a2423b83e7d4c538815e4cf25aeed4a5e2c646e2efd`.",
       "updated": "2026-08-20"
     },
     {
@@ -26517,6 +26517,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "22f07d39ed6d44f550768cccfdbd9b814a23636dc77d472c18af06af2f318ef3"
+    "value": "62485ebb87fedc2c0db107ad4f1327f1470047c2413fc140bfa88c346127e8cd"
   }
 }

@@ -5381,3 +5381,26 @@ Status: accepted. Owner: Alperen. Date: 2026-07-23.
 **Context:** Provider dispatch previously leaned on per-process, unversioned key material: secrets and the ProviderTruth/ProviderLimit ledgers had no fixed custody boundary, no rotation story and no account pseudonymization, so a copied ledger or leaked path could silently mint dispatch authority or correlate accounts across tenants. The provider-truth programme (signed reachability/limit stores feeding the cross-verify evidence chain) required one explicit custody, rotation and composition contract before any signer went live.
 
 **Decision:** Provider dispatch authority is host-global and versioned. Secret keyring revisions live only below the platform dataDir; ProviderTruth and ProviderLimit ledgers live below stateDir. The keyring has one active signing key, retired verify-only keys, an immutable account-pseudonym root, content-chained append-only revisions, and exact key IDs on every signed store record. HKDF-SHA256 domain separation is mandatory for truth integrity, limit integrity, and account pseudonymization. Raw account identity is never persisted; correlation is tenant/provider/auth-mode scoped HMAC. A missing or unsafe keyring, missing tenant/policy/account/producer authority, unknown historical key, or unverifiable schema causes a typed pre-dispatch HOLD; it never selects another key or fallback provider. Solo mode may default tenant to local; enterprise mode without an explicit verified tenant must HOLD. Legacy Truth/Limit schema migration is explicit, transactional, owner-run, and never constructor-implicit. Composition may boot the control plane unavailable, but cannot grant provider dispatch until all authorities are present. Key rotation and schema key-id support are one coherent delivery boundary. Approval ingress, recurring-trigger occurrence ledger, and sealed evidence archive remain separate dependent slices under their already approved contracts.
+
+
+---
+
+## adr-g-040: Normative Verdict Vocabulary (Single-Word Evaluation Statuses)
+
+**Status:** accepted
+
+# ADR-G-040: Normative Verdict Vocabulary (Single-Word Evaluation Statuses)
+
+**Status:** accepted
+
+**Sprint:** _hand-coded slice (owner-directed, 2026-08-20)_
+
+**Class:** ADR-G · **Scope:** global+project · **Immutable:** no · **Source:** user · **Enforcement-Level:** hard
+
+---
+
+Status: accepted. Owner: Alperen. Date: 2026-08-20.
+
+**Context:** The evaluation surface grew beyond the original 3-value task verdict (GO / NO_GO / GO_WITH_TECH_DEBT): the criterion kernel speaks satisfied/unsatisfied/undecidable, cross-verify speaks CONFIRMED/REFUTED/UNCLEAR/HOLD, workers self-report DONE/GO_WITH_TECH_DEBT/NO_GO, and the surface-equalization programme (EVALUATION-001) needs one vocabulary that reads identically for an ERP process evaluation and a solo assistant task. Multi-word composites were rejected by the owner: every status must be a single word.
+
+**Decision:** One normative verdict vocabulary of exactly five single words — CONFIRMED (proven pass) · QUALIFIED (pass with a typed reservation, audit-sense "qualified opinion"; the reservation travels in TaskResult.residualDebt) · UNDECIDABLE (honestly undecidable on present evidence; the routing signal toward a code/llm/human confirmation adapter, never a penalty) · FAILED (proven fail) · HOLD (procedural: authority/evidence chain incomplete; never a closure). SSOT module: src/core/verdict-types.ts (frozen list + total legacy→normative converters; the lossy normative→legacy direction returns null instead of guessing — a silent substitution is a fabricated verdict). Migration is layered, never big-bang: legacy vocabularies remain authoritative on their surfaces and each surface migrates by carrying the normative projection alongside first (evaluation audit records carry normativeVerdict since this slice), then flipping readers. Acceptance-policy widening (task-kind x verdict routing matrix) builds on this vocabulary in the Evaluation Surface slices.
