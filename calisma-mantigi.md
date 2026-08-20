@@ -176,3 +176,31 @@
   sprint-586 (EXPLICIT-FALSE) worker argv = core-args YOK (stok-CLI), 1/1 DONE.
 - xverify kararı: GEREKSİZ — kanıt sınıfı mekanik/grep-doğrulanabilir (argv+pin+unit);
   mühür nokta-iddia gerektiren yorum-katmanı taşımıyor.
+
+## Doğruluk & Mühür Altyapısı dalgası (2026-08-20 sabah) — 7093 + ranged-verifier + karusel
+- **7093 UYGULANDI:** usageCounts artık ŞEMA-bazlı fresh-input (inclusive-cache
+  anahtarı varsa input−cached; sprint-497 kuralının sayaç-katmanına inişi;
+  codex 12×-şişkinlik canlı-şekli pinli, anthropic disjoint korunur, gemini
+  cachedContentTokenCount alt-küme düzeltildi — eski pin YANLIŞ semantiği
+  kodluyordu). host-runtime-budget + cli-log yollarında totalTokens dolu.
+  Kabul-3 notu: normalize sonrası sütunlar provider-bağımsız aynı anlamda —
+  'etiket' ihtiyacının kökü kalktı.
+- **Ranged-read-verifier UYGULANDI (17-HOLD sınıfının kökü):** --target artık
+  prompt-prozu değil BİRİNCİ-SINIF kanıt: broker'da writeCrossVerifyDecodedSlice
+  (pinli decoded-blob'dan CAS-slice), bootstrap ranged-requirement (`path:S-E`
+  grameri) → slice-entry (locator+slice-sha), CLI requirement-yükünü slice'a
+  bağlar, prompt tek-kaynak mount'a işaret eder. CANLI KANIT: 2×-UNCLEAR D1
+  iddiası slice'la İLK denemede CONFIRMED `…4d7d4ecadac9`; toplam 4 ardışık
+  slice-mühür CONFIRMED. Ek ders: kod değişince mühür-iddiası YENİDEN ölçülür
+  — bayat-satır iddiasını Sol doğru REFUTED etti (verifier ayırt-gücü kanıtı).
+- **Onay-karuseli — katman-1 ÇÖZÜLDÜ:** kök zinciri: reachability-expiry =
+  min(ttl, approval-expiry, LIMIT-expiry) → 60sn limit-snapshot'ı kaydı
+  öldürüyordu; ara-adımda approval-penceresi (~5dk) kaldı; FINAL sözleşme:
+  kayıt-ömrü = ttl (onay penceresi probe'un YAPILMA sınırı — freshness-assert
+  + one-shot claim korunur; clamp'ler kalktı). Disk-kanıt: TTL 53s→291s→1800s.
+  Producer default 60s→30dk + config `cross_verify.reachability_ttl_ms` +
+  composition passthrough.
+- **Katman-2 AÇIK (7081-kalan):** onay-İSTEĞİ reuse-kontrolünden ÖNCE
+  üretiliyor (evidence-preparation approval'ı koşulsuz topluyor) — taze kayıt
+  varken bile istek doğuyor; düzeltme: preparation'a approval-öncesi
+  taze-kayıt ön-kontrolü. Ayrıca pseudo-TTY 'untrusted' tutarsızlığı finding.

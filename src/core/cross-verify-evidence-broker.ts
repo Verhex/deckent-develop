@@ -1724,3 +1724,99 @@ export function writeCrossVerifyVerdictReceiptAtomic(
   );
   return persisted;
 }
+
+// ─── 7094/7081 ranged-read-verifier: bounded decoded slice ─────────────────
+//
+// 17 honest-HOLD cases (sprints 567-584) shared one shape: a large file
+// entered the evidence manifest as a FULL-file snapshot, the assertion's
+// evidence requirement bound to that full-file sha, and the verifier could
+// not build an exact citation/missing-evidence map over thousands of lines.
+// The author's `--target path:START-END` excerpt existed only as prompt
+// prose — never as first-class evidence. This helper turns an authored line
+// range into a content-addressed decoded artifact the verifier can read and
+// cite directly: the slice is cut FROM the already-pinned decoded full-file
+// blob (never from the live worktree), written under the same
+// `decoded/<sha>` CAS rule, and re-verified like every other artifact.
+
+export interface CrossVerifyDecodedSliceInput {
+  readonly projectRoot: string;
+  readonly settlementRef: TaskResultSettlementRefV1;
+  /** Bare hex contentSha256 of the PINNED full-file decoded artifact. */
+  readonly sourceContentSha256: string;
+  /** 1-based inclusive line range inside the pinned artifact. */
+  readonly startLine: number;
+  readonly endLine: number;
+}
+
+export interface CrossVerifyDecodedSliceReceipt {
+  /** Bare hex sha256 of the slice content (its decoded/ file name). */
+  readonly contentSha256: string;
+  readonly byteLength: number;
+  readonly lineCount: number;
+}
+
+export function writeCrossVerifyDecodedSlice(
+  input: CrossVerifyDecodedSliceInput,
+): CrossVerifyDecodedSliceReceipt {
+  if (
+    !Number.isInteger(input.startLine)
+    || !Number.isInteger(input.endLine)
+    || input.startLine < 1
+    || input.endLine < input.startLine
+  ) {
+    throw new CrossVerifyEvidenceBrokerError(
+      'EVIDENCE_LIMIT_EXCEEDED',
+      `Cross-verify decoded slice range is invalid: ${input.startLine}-${input.endLine}`,
+    );
+  }
+  const { brokerDirectory } = resolveAuthorityDirectories(
+    input.projectRoot,
+    input.settlementRef,
+    { createBroker: false, createBlobs: false },
+  );
+  const decodedDirectory = assertPrivateDirectory(
+    join(brokerDirectory, DECODED_DIRECTORY),
+    brokerDirectory,
+  );
+  const source = readPinnedBoundedFile(
+    decodedDirectory,
+    input.sourceContentSha256,
+    CROSS_VERIFY_EVIDENCE_MAX_FILE_BYTES,
+    false,
+  );
+  if (source === null) {
+    throw new CrossVerifyEvidenceBrokerError(
+      'SOURCE_CHANGED',
+      `Cross-verify decoded source artifact is missing: ${input.sourceContentSha256}`,
+    );
+  }
+  const sourceSha = createHash('sha256').update(source).digest('hex');
+  if (sourceSha !== input.sourceContentSha256) {
+    throw new CrossVerifyEvidenceBrokerError(
+      'SOURCE_CHANGED',
+      `Cross-verify decoded source artifact failed content-address re-verification: ${input.sourceContentSha256}`,
+    );
+  }
+  const lines = source.toString('utf8').split(/\r?\n/u);
+  if (input.endLine > lines.length) {
+    throw new CrossVerifyEvidenceBrokerError(
+      'EVIDENCE_LIMIT_EXCEEDED',
+      `Cross-verify decoded slice range ${input.startLine}-${input.endLine} exceeds source line count ${lines.length}`,
+    );
+  }
+  const sliceContent = lines.slice(input.startLine - 1, input.endLine).join('\n');
+  const sliceBuffer = Buffer.from(sliceContent, 'utf8');
+  const contentSha256 = createHash('sha256').update(sliceBuffer).digest('hex');
+  createRawFileFirstWriterWins(join(decodedDirectory, contentSha256), sliceBuffer);
+  verifyDecodedEvidenceArtifact(
+    decodedDirectory,
+    contentSha256,
+    sliceBuffer.byteLength,
+    CROSS_VERIFY_EVIDENCE_MAX_FILE_BYTES,
+  );
+  return Object.freeze({
+    contentSha256,
+    byteLength: sliceBuffer.byteLength,
+    lineCount: input.endLine - input.startLine + 1,
+  });
+}

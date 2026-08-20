@@ -647,6 +647,9 @@ export function reconcileDockerRuntimeBudgetResult(
     outputTokens: counters.outputTokens,
     cacheReadTokens: counters.cacheReadTokens,
     cacheCreationTokens: counters.cacheCreationTokens,
+    // 7093: totalTokens is never left empty — the guard's own aggregate
+    // (fresh input + output + both cache legs) is the host-measured total.
+    totalTokens: counters.totalTokens,
     source: 'host-runtime-budget',
     ...(previousUsage?.provider ? { provider: previousUsage.provider } : {}),
     ...(previousUsage?.model ? { model: previousUsage.model } : {}),
@@ -714,6 +717,9 @@ function projectDockerRuntimeBudgetUsage(
     outputTokens: counters.outputTokens,
     cacheReadTokens: counters.cacheReadTokens,
     cacheCreationTokens: counters.cacheCreationTokens,
+    // 7093: totalTokens is never left empty (see reconcileDockerRuntimeBudgetResult).
+    totalTokens: counters.inputTokens + counters.outputTokens
+      + counters.cacheReadTokens + counters.cacheCreationTokens,
     source: 'host-runtime-budget',
     ...(previousUsage?.provider || identity?.provider
       ? { provider: previousUsage?.provider ?? identity!.provider }

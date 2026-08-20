@@ -843,6 +843,13 @@ export interface EvaluationResult {
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
+  /**
+   * 7093 TOKEN-ACCOUNTING-TRUTH: aggregate token count (fresh input + output
+   * + both cache legs; provider-reported total preferred when available).
+   * Optional-additive for legacy results; every host-side usage writer fills
+   * it so accounting views never re-derive it inconsistently.
+   */
+  totalTokens?: number;
   cacheReadTokens?: number;
   /**
    * Cache-CREATION (write) tokens — the limit-dominant cost the heuristic

@@ -114,6 +114,9 @@ export interface ProviderAuthorityCompositionOptions {
   readonly terminationEvidenceVerifier?: ProviderLimitStoreOptions['terminationEvidenceVerifier'];
   readonly sourceResolver?: ProviderEvidenceSourceResolver;
   readonly receiptLedger?: InvocationReceiptLedger;
+  /** 7094/7081: reachability-evidence freshness window (ms); config-resolved
+   *  from `cross_verify.reachability_ttl_ms`, producer default when absent. */
+  readonly reachabilityTtlMs?: number;
 }
 
 export interface ProviderAuthorityRuntimeServiceOptions {
@@ -129,6 +132,9 @@ export interface ProviderAuthorityRuntimeServiceOptions {
   readonly sourceRegistrations: readonly ProviderEvidenceSourceRegistration[];
   /** Hermetic/test seam; production callers omit it. */
   readonly receiptStoreOptions?: InvocationReceiptStoreOptions;
+  /** 7094/7081: reachability-evidence freshness window (ms); config-resolved
+   *  from `cross_verify.reachability_ttl_ms`, producer default when absent. */
+  readonly reachabilityTtlMs?: number;
 }
 
 export interface ProviderAuthorityRuntimeScope {
@@ -252,6 +258,7 @@ function openReadyComposition(input: {
   >;
   readonly sourceResolver: ProviderEvidenceSourceResolver;
   readonly receiptLedger: InvocationReceiptLedger;
+  readonly reachabilityTtlMs?: number;
 }): ProviderAuthorityCompositionReady {
   let truthStore: ProviderTruthStore | null = null;
   let limitStore: ProviderLimitStore | null = null;
@@ -283,6 +290,9 @@ function openReadyComposition(input: {
       sourceResolver: input.sourceResolver,
       policyResolver: input.policyResolver,
       now: input.now,
+      ...(input.reachabilityTtlMs !== undefined
+        ? { reachabilityTtlMs: input.reachabilityTtlMs }
+        : {}),
     });
     let closed = false;
     return {
@@ -354,6 +364,9 @@ export function composeProviderAuthority(
       projectId: options.projectId,
       keyring,
       stateDir: scope.stateDir,
+      ...(options.reachabilityTtlMs !== undefined
+        ? { reachabilityTtlMs: options.reachabilityTtlMs }
+        : {}),
       now: options.now,
       receiptLedger: options.receiptLedger,
       sourceResolver: options.sourceResolver,
@@ -459,6 +472,9 @@ export class ProviderAuthorityRuntimeService {
         projectId: receiptStore.projectId,
         keyring,
         stateDir: scope.stateDir,
+        ...(options.reachabilityTtlMs !== undefined
+          ? { reachabilityTtlMs: options.reachabilityTtlMs }
+          : {}),
         now: options.now,
         receiptLedger: receiptStore,
         sourceResolver: sourceRegistry,

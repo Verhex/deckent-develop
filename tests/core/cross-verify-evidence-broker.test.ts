@@ -36,6 +36,7 @@ import {
   readCrossVerifyEvidenceReceipt,
   readCrossVerifyVerdictReceipt,
   writeCrossVerifyVerdictReceiptAtomic,
+  writeCrossVerifyDecodedSlice,
 } from '../../src/core/cross-verify-evidence-broker.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
@@ -589,6 +590,61 @@ describe.skipIf(!pinnedRuntimeAvailable)(
         .toBeLessThanOrEqual(CROSS_VERIFY_EVIDENCE_MAX_RECEIPT_BYTES);
       expect(readFileSync(crossVerifyEvidenceReceiptPath(ref)).byteLength)
         .toBeLessThanOrEqual(CROSS_VERIFY_EVIDENCE_MAX_RECEIPT_BYTES);
+    });
+  },
+);
+
+// ─── 7094/7081 ranged-read-verifier: bounded decoded slices ─────────────
+describe.skipIf(!pinnedRuntimeAvailable)(
+  'writeCrossVerifyDecodedSlice (bounded evidence)',
+  () => {
+    it('cuts a content-addressed slice from the pinned decoded blob', () => {
+      const { projectRoot, ref, fenceTokenHash } = fixture('xverify-slice-task');
+      mkdirSync(join(projectRoot, 'src'));
+      const body = ['line one', 'line two', 'line three', 'line four', 'line five'].join('\n');
+      writeFileSync(join(projectRoot, 'src', 'big.ts'), body);
+      const claim = claimCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot, settlementRef: ref, fenceTokenHash,
+        relativePaths: ['src/big.ts'],
+      });
+      const evidence = captureCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot, settlementRef: ref, claim,
+      });
+      const source = evidence.manifest.entries[0]!;
+
+      const slice = writeCrossVerifyDecodedSlice({
+        projectRoot, settlementRef: ref,
+        sourceContentSha256: source.contentSha256,
+        startLine: 2, endLine: 4,
+      });
+      const expected = ['line two', 'line three', 'line four'].join('\n');
+      expect(slice.lineCount).toBe(3);
+      expect(slice.byteLength).toBe(Buffer.byteLength(expected));
+      expect(slice.contentSha256)
+        .toBe(createHash('sha256').update(expected, 'utf8').digest('hex'));
+      // The slice lives in decoded/ under its own content address.
+      const decodedPath = join(
+        crossVerifyEvidenceBrokerDirectory(ref), 'decoded', slice.contentSha256,
+      );
+      expect(readFileSync(decodedPath, 'utf-8')).toBe(expected);
+    });
+
+    it('rejects a range beyond the source line count with a typed error', () => {
+      const { projectRoot, ref, fenceTokenHash } = fixture('xverify-slice-range');
+      mkdirSync(join(projectRoot, 'src'));
+      writeFileSync(join(projectRoot, 'src', 'small.ts'), 'only\ntwo');
+      const claim = claimCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot, settlementRef: ref, fenceTokenHash,
+        relativePaths: ['src/small.ts'],
+      });
+      const evidence = captureCrossVerifyEvidenceSnapshotAtomic({
+        projectRoot, settlementRef: ref, claim,
+      });
+      expect(() => writeCrossVerifyDecodedSlice({
+        projectRoot, settlementRef: ref,
+        sourceContentSha256: evidence.manifest.entries[0]!.contentSha256,
+        startLine: 1, endLine: 99,
+      })).toThrowError(/exceeds source line count/u);
     });
   },
 );

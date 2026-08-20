@@ -211,9 +211,12 @@ describe('xverify UX — bounded --target', () => {
     });
 
     expect(result.remedy).toBeNull(); // a target counts as attached evidence
-    expect(evidenceContext).toContain(`### Target: ${relPath} (lines 2-4)`);
-    expect(evidenceContext).toContain('const before = 1;');
-    expect(evidenceContext).toContain('function target() {');
+    // 7094/7081 ranged-read-verifier: the target announces its bounded range
+    // and points at the evidence mount; slice CONTENT is no longer pasted into
+    // the prompt (single evidence source — the content-addressed mount).
+    expect(evidenceContext).toContain(`### Target: ${relPath}:2-4 (lines 2-4)`);
+    expect(evidenceContext).toContain('read it from the evidence mount');
+    expect(evidenceContext).not.toContain('const before = 1;');
     expect(evidenceContext).not.toContain('const unrelated = 0;');
     expect(evidenceContext).not.toContain('const after = 2;');
   });
@@ -245,9 +248,8 @@ describe('xverify UX — bounded --target', () => {
       }),
     });
 
-    expect(evidenceContext).toContain(`### Target: ${relPath} (symbol target (lines 3-5))`);
-    expect(evidenceContext).toContain('function target() {');
-    expect(evidenceContext).toContain('  return 42;');
+    expect(evidenceContext).toContain(`### Target: ${relPath}:3-5 (symbol target (lines 3-5))`);
+    expect(evidenceContext).not.toContain('function target() {');
     expect(evidenceContext).not.toContain('const after = 2;');
   });
 
@@ -278,8 +280,8 @@ describe('xverify UX — bounded --target', () => {
       }),
     });
 
-    expect(evidenceContext).toContain(`### Target: ${relPath} (symbol bareStatement (lines 7-7))`);
-    expect(evidenceContext).toContain('const bareStatement = 3;');
+    expect(evidenceContext).toContain(`### Target: ${relPath}:7-7 (symbol bareStatement (lines 7-7))`);
+    expect(evidenceContext).not.toContain('const bareStatement = 3;');
   });
 
   it('dedups a target path already present via --files into a single scope entry', async () => {

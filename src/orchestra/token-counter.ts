@@ -101,6 +101,9 @@ export function extractTokenUsageFromClaudeCli(raw: unknown): TokenUsage | null 
     outputTokens: out,
     cacheReadTokens,
     cacheCreationTokens,
+    // 7093: totalTokens filled on the cli-log path too (fresh input + output
+    // + both cache legs — Anthropic reports these fields disjoint).
+    totalTokens: inp + out + cacheReadTokens + cacheCreationTokens,
     source: 'cli-log',
     provider: 'claude',
     ...(model ? { model: model as TokenUsage['model'] } : {}),

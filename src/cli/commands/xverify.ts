@@ -249,6 +249,9 @@ interface ResolvedTarget {
   path: string;
   locatorDescription: string;
   content: string;
+  /** 1-based inclusive resolved line range (symbol targets resolve to lines too). */
+  startLine: number;
+  endLine: number;
 }
 
 function parseTargetSpec(spec: string): { path: string; locator: string } {
@@ -320,6 +323,8 @@ function resolveTarget(root: string, spec: string): ResolvedTarget {
       path: relPath,
       locatorDescription: `lines ${extracted.startLine}-${extracted.endLine}`,
       content: extracted.content,
+      startLine: extracted.startLine,
+      endLine: extracted.endLine,
     };
   }
   if (TARGET_SYMBOL_RE.test(locator)) {
@@ -328,6 +333,8 @@ function resolveTarget(root: string, spec: string): ResolvedTarget {
       path: relPath,
       locatorDescription: `symbol ${locator} (lines ${extracted.startLine}-${extracted.endLine})`,
       content: extracted.content,
+      startLine: extracted.startLine,
+      endLine: extracted.endLine,
     };
   }
   throw new TargetSpecError('xverify.err.target_invalid_spec', { spec });
@@ -532,21 +539,33 @@ export async function runXverifyForResult(
   const diffText = opts.diff
     ? (deps.captureDiffFn ?? defaultCaptureDiff)(root, filesFromFlag)
     : undefined;
+  // 7094/7081 ranged-read-verifier: targets are NO LONGER pasted into the
+  // prompt as prose. Each resolved target becomes a ranged evidence
+  // requirement (`path:START-END` — the runtime-bootstrap grammar), which the
+  // v2 bootstrap turns into a first-class bounded decoded slice the verifier
+  // reads and cites directly. Single evidence source (the content-addressed
+  // mount) — no prompt/blob double-presentation drift.
   const targetsText = resolvedTargets.length > 0
-    ? resolvedTargets.map((t) => [
-        `### Target: ${t.path} (${t.locatorDescription})`,
-        '```',
-        t.content,
-        '```',
-      ].join('\n')).join('\n\n')
+    ? resolvedTargets.map((t) =>
+        `### Target: ${t.path}:${t.startLine}-${t.endLine} (${t.locatorDescription}) — read it from the evidence mount`,
+      ).join('\n')
     : undefined;
   const evidenceContext = [diffText, targetsText].filter((p): p is string => Boolean(p)).join('\n\n') || undefined;
   const hasEvidence = filesChanged.length > 0 || Boolean(opts.diff) || resolvedTargets.length > 0;
 
+  // Requirement load: bare paths for --files entries WITHOUT a bounded target;
+  // ranged requirements for every resolved target. A path that appears in both
+  // is evidenced by its slice(s) — binding the requirement to the full-file
+  // sha of a large file was the mechanical cause of the honest-HOLD class.
+  const targetPaths = new Set(resolvedTargets.map((t) => t.path));
+  const evidenceRequirements = [
+    ...filesFromFlag.filter((f) => !targetPaths.has(f)),
+    ...resolvedTargets.map((t) => `${t.path}:${t.startLine}-${t.endLine}`),
+  ];
   const criterion = createGoNoGoCriterionItem({
     polarity: 'go',
     statement: claim,
-    evidenceRequirements: filesChanged,
+    evidenceRequirements: evidenceRequirements.length > 0 ? evidenceRequirements : filesChanged,
   });
   const task: Task = {
     id,

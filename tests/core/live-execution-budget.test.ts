@@ -187,15 +187,17 @@ describe('LiveExecutionBudgetGuard', () => {
       measurableEvents: 1,
       counters: {
         turns: 1,
-        inputTokens: 100,
+        // 7093: codex `input_tokens` INCLUDES its cached subset — counters
+        // carry FRESH input (100 − 30) under the normalizeUsage contract.
+        inputTokens: 70,
         outputTokens: 20,
         cacheReadTokens: 30,
-        totalTokens: 150,
+        totalTokens: 120,
       },
     });
   });
 
-  it('measures Gemini final-only usageMetadata including cached content', () => {
+  it('measures Gemini final-only usageMetadata with fresh input (cached subset separated)', () => {
     const guard = new LiveExecutionBudgetGuard({ maxTurns: 2, maxTokens: 100 });
     const terminal = normalizeStreamEvent({
       response: 'done',
@@ -207,12 +209,15 @@ describe('LiveExecutionBudgetGuard', () => {
     }, 'gemini');
 
     expect(guard.observe(terminal).state).toBe('within-budget');
+    // 7093: Gemini's cachedContentTokenCount is a SUBSET of promptTokenCount
+    // (inclusive schema) — counters carry fresh input (10 − 5) so the same
+    // column means the same thing across providers.
     expect(guard.snapshot().counters).toMatchObject({
       turns: 1,
-      inputTokens: 10,
+      inputTokens: 5,
       outputTokens: 3,
       cacheReadTokens: 5,
-      totalTokens: 18,
+      totalTokens: 13,
     });
   });
 
@@ -359,5 +364,60 @@ describe('LiveExecutionBudgetGuard', () => {
       executor: 'subprocess',
       approvalEvidenceRef: 'approval://owner/decision-1',
     })).toThrow('exact final dispatch binding');
+  });
+});
+
+// ─── 7093 TOKEN-ACCOUNTING-TRUTH: fresh-input schema normalization ───
+//
+// counts.inputTokens is FRESH input under the same provider-neutral contract
+// normalizeUsage/the codex adapter enforce (sprint-497 rule). OpenAI/codex
+// schemas report input INCLUSIVE of the cached subset; Anthropic reports the
+// two fields disjoint. Detection is schema-based (which cache key is present),
+// never provider-name-based.
+describe('usage schema normalization — fresh input (7093)', () => {
+  it('codex inclusive schema: cached_input_tokens subtracts from input_tokens', () => {
+    const guard = new LiveExecutionBudgetGuard({ maxInputTokens: 1_000_000 });
+    const decision = guard.observe(claudeBlock('codex-1', {
+      input_tokens: 1_451_577,
+      output_tokens: 2_000,
+      cached_input_tokens: 1_336_064,
+    }));
+    // sprint-565 live shape: real fresh input is 115,513 — the raw inclusive
+    // number previously overstated the same column by ~12×.
+    expect(decision.counters.inputTokens).toBe(115_513);
+    expect(decision.counters.cacheReadTokens).toBe(1_336_064);
+    expect(decision.counters.totalTokens).toBe(115_513 + 2_000 + 1_336_064);
+  });
+
+  it('anthropic disjoint schema: input_tokens stays untouched', () => {
+    const guard = new LiveExecutionBudgetGuard({ maxInputTokens: 1_000_000 });
+    const decision = guard.observe(claudeBlock('claude-1', {
+      input_tokens: 8_952,
+      output_tokens: 500,
+      cache_read_input_tokens: 4_528_245,
+    }));
+    expect(decision.counters.inputTokens).toBe(8_952);
+    expect(decision.counters.cacheReadTokens).toBe(4_528_245);
+  });
+
+  it('openai nested prompt_tokens_details.cached_tokens also subtracts', () => {
+    const guard = new LiveExecutionBudgetGuard({ maxInputTokens: 1_000_000 });
+    const decision = guard.observe({
+      type: 'usage',
+      content: {
+        type: 'assistant',
+        message: {
+          id: 'oai-1',
+          usage: {
+            prompt_tokens: 174_820,
+            completion_tokens: 5_163,
+            prompt_tokens_details: { cached_tokens: 140_032 },
+          },
+          content: [{ type: 'text' }],
+        },
+        request_id: 'req-oai-1',
+      },
+    });
+    expect(decision.counters.inputTokens).toBe(174_820 - 140_032);
   });
 });

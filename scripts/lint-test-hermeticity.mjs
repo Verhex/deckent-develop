@@ -399,8 +399,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-20 (7097 evaluator-honesty package): same 14467 count, digest
   // only — typed-suite gains the B3 unevidenced-claim ceiling pins; existing
   // evaluator pins' tracked content moved.
-  count: 14467,
-  digest: '3df2dc4b8d3f98737dc94ead16136ddd1f029a0e26580ba006c138aeaf3b11e9',
+  // 2026-08-20 (7093+7081 truth wave): +4 — the broker slice suite writes
+  // two pinned-fixture files and the schema-normalization pins land in
+  // live-execution-budget; token-counter/xverify-ux pins realigned.
+  count: 14471,
+  digest: 'e7b81f880048d7db499929379542943de17f34887348d3d599edc2e7a042dc44',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -678,8 +681,16 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // chain, class-aware concrete-failure veto), debt-manager (residualDebt
   // ledger preference), task-types/prompt-template (residualDebt field +
   // contract line) moved production content.
+  // 2026-08-20 (7093+7081 truth wave): same 1256 count, digest only —
+  // live-execution-budget fresh-input schema rule, budget projections
+  // totalTokens, token-counter cli-log total, broker decoded-slice export,
+  // runtime-bootstrap ranged entries, xverify CLI ranged requirements,
+  // composition reachabilityTtlMs passthrough + 30-min producer default.
+  // 2026-08-20 (7081 approval-carousel layer-1): same 1256 count, digest
+  // only — provider-truth reachability lifetime = ttl (admission clamps
+  // removed; approval window enforced as run-window via freshness assertion).
   count: 1256,
-  digest: '34193a6e11de0a26ef2b46190e3ebe80d59f92b2d48b0264c9d8fb3f23bbfc6e',
+  digest: 'e50f0629384c7fd6d96fc9f2ad41c93b29555fc31499737a769334c175253f31',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

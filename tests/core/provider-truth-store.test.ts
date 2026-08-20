@@ -286,12 +286,15 @@ describe('ProviderTruthStore', () => {
       probe: { ...evidence.probe, capability: 'tools' },
       observed: { ...evidence.observed, verifiedCapability: null },
     })).toThrow(/exact successful live model invocation/);
-    expect(() => store.putReachability({
+    // 7094/7081: a probe expiry beyond the approval window is VALID now —
+    // the approval window bounds when the one-shot probe may RUN (freshness
+    // assertion + consumed claim), not how long the measured fact lives.
+    store.putReachability({
       ...evidence,
       reachabilityId: 'extended-expiry-id',
       idempotencyKey: 'extended-expiry-key',
       probe: { ...evidence.probe, expiresAt: '2026-07-20T12:06:00.000Z' },
-    })).toThrow(/cannot outlive approval or limit evidence/);
+    });
     expect(() => store.putReachability({ ...evidence, reachabilityId: 'reachability-2' }))
       .toThrowError(ProviderTruthStoreError);
     store.close();

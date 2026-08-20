@@ -116,6 +116,14 @@ export interface CrossVerifyConfig {
   /** Provider priority order for verifier selection (default: ['codex','gemini','claude']). */
   verifier_priority?: string[];
   /**
+   * 7094/7081 xverify-ux: freshness window (ms) for owner-approved provider
+   * reachability evidence. The old fixed 60s guaranteed an approval carousel
+   * (every verifier run outlives 60s, so each xverify re-asked for a one-shot
+   * approval). Default: 1_800_000 (30 min). Composition threads this into the
+   * evidence producer; absent = producer default.
+   */
+  reachability_ttl_ms?: number;
+  /**
    * Enforce a REFUTED verdict as a real block (default false → advisory-only).
    * When true, a high-stakes DONE/GO_WITH_TECH_DEBT task that the adversarial
    * verifier REFUTES is downgraded to NO_GO by the evaluation layer, triggering

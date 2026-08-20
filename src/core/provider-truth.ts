@@ -477,15 +477,20 @@ export async function probeExactModelReachability(
     ({ state, reasonCode } = mapFailure(observation.outcome));
   }
 
-  const admissionExpiries = [request.admission.approvalExpiresAt, request.admission.limits.expiresAt]
-    .map(value => {
-      if (value === null) return Number.POSITIVE_INFINITY;
-      const parsed = Date.parse(value);
-      return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
-    });
-  const expiresAtMs = state === 'known'
-    ? Math.min(completed.getTime() + request.ttlMs, ...admissionExpiries)
-    : completed.getTime() + request.ttlMs;
+  // 7094/7081 xverify-ux fix (2026-08-20): a reachability row's LIFETIME is
+  // its ttlMs — admission evidence no longer clamps it. The old
+  // min(ttl, approvalExpiresAt, limits.expiresAt) clamp conflated two
+  // different authorities: the approval window bounds WHEN the one-shot
+  // probe may run (enforced separately by the positive-proof freshness
+  // assertion: grantedAt ≤ completedAt ≤ approvalExpiresAt, and the one-shot
+  // claim is consumed), and the limit snapshot bounds quota decisions (the
+  // reuse path re-reads a live probe-scoped limit admission on EVERY reuse).
+  // Neither says how long the MEASURED reachability fact stays useful — with
+  // the clamp, a 60s limit snapshot (then a ~5min approval request window)
+  // killed the row before the NEXT verification run even started, so every
+  // xverify re-asked the owner for a fresh one-shot approval (the observed
+  // carousel across the D1-D4/F4a/clean-round seal sessions).
+  const expiresAtMs = completed.getTime() + request.ttlMs;
   const result: ReachabilityResult = {
     schemaVersion: PROVIDER_TRUTH_SCHEMA_VERSION,
     reachabilityId: dependencies.idFactory?.() ?? randomUUID(),
@@ -660,12 +665,9 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
     throw new Error('Live proof requires fresh approval, limit and budget evidence');
   }
   if (positive) {
-    const proofExpiry = Date.parse(result.probe.expiresAt);
-    const approvalExpiry = Date.parse(result.admission.approvalExpiresAt!);
-    const limitExpiry = Date.parse(result.admission.limits.expiresAt!);
-    if (proofExpiry > Math.min(approvalExpiry, limitExpiry)) {
-      throw new Error('Live proof cannot outlive approval or limit evidence');
-    }
+    // 7094/7081: no expiry clamp against admission evidence — the freshness
+    // assertion above already proves the probe RAN inside the approval
+    // window; the row's lifetime is its ttl (see probeExactModelReachability).
   }
   if (positive && (result.auth.mode === 'unknown' || result.backend.executionBackend === 'unknown')) {
     throw new Error('Unknown auth or execution backend cannot carry live proof');

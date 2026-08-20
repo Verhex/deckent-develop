@@ -226,7 +226,14 @@ export type ProviderEvidenceRefreshResult =
   | ProviderEvidenceRefreshReady;
 
 const DEFAULT_LIMIT_MAX_TTL_MS = 60_000;
-const DEFAULT_REACHABILITY_TTL_MS = 60_000;
+// 7094/7081 xverify-ux fix (2026-08-20): the old 60s TTL guaranteed an
+// approval carousel — every owner-approved probe result went stale before the
+// NEXT verification run even started (a single verifier run takes 60-300s),
+// so each xverify asked for a fresh one-shot approval (observed across the
+// D1-D4/F4a seal sessions). Reusing a fresh liveProven row is already the
+// §12.2 freshness contract; only the window was wrong. Config-resolved via
+// `cross_verify.reachability_ttl_ms`; this constant is the resolver fallback.
+const DEFAULT_REACHABILITY_TTL_MS = 1_800_000;
 const DEFAULT_ACCOUNT_IDENTITY_MAX_TTL_MS = 60_000;
 const SINGLEFLIGHT_RETRY_DELAYS_MS = [2, 4, 8] as const;
 const ACCOUNT_IDENTITY_KINDS = new Set<ProviderAccountIdentityKind>([

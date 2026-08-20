@@ -252,15 +252,35 @@ describe('provider truth contract', () => {
     expect(verified).toMatchObject({ state: 'known', reachable: true, liveProven: true });
   });
 
-  it('never lets reachability TTL outlive approval or limit evidence', async () => {
-    const result = await probeExactModelReachability(request({ ttlMs: 600_000 }), {
+  it('reachability lifetime is its ttl — admission evidence no longer clamps it (7094/7081)', async () => {
+    // A short-lived limit snapshot (60s) used to clamp the reachability row
+    // itself, so every follow-up verification run re-asked the owner for a
+    // one-shot probe approval (the observed approval carousel). Quota
+    // freshness is re-read on every reuse by the evidence producer, so only
+    // the approval window bounds the row's life.
+    const base = request({ ttlMs: 600_000 });
+    const result = await probeExactModelReachability({
+      ...base,
+      admission: {
+        ...base.admission,
+        limits: {
+          ...base.admission.limits,
+          expiresAt: '2026-07-20T12:00:30.000Z',
+        },
+      },
+    }, {
       probe: async () => ({
         outcome: 'succeeded', calledProvider: 'openrouter', calledModel: 'anthropic/claude-fable-5',
         providerRequestRefHash: null, latencyMs: 4,
       }),
       now: () => T0,
     });
-    expect(result.probe.expiresAt).toBe('2026-07-20T12:05:00.000Z');
+    // 7094/7081 final contract: the row's lifetime is its ttl — neither the
+    // 12:00:30 limit expiry nor the 12:05 approval expiry clamps it. The
+    // approval window still bounds WHEN the probe may run (freshness
+    // assertion), and the one-shot claim is consumed; the measured fact
+    // itself lives ttlMs.
+    expect(result.probe.expiresAt).toBe(new Date(T0.getTime() + 600_000).toISOString());
   });
 
   it('expires evidence to stale and never carries a live proof across scope', async () => {

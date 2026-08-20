@@ -34,6 +34,8 @@ describe('token-counter — extractTokenUsageFromClaudeCli', () => {
       outputTokens: 3200,
       cacheReadTokens: 89000,
       cacheCreationTokens: 1024,
+      // 7093: cli-log path now fills the aggregate (fresh in + out + both cache legs).
+      totalTokens: 15420 + 3200 + 89000 + 1024,
       source: 'cli-log',
       provider: 'claude',
       model: 'claude-opus-4-7',
@@ -201,6 +203,7 @@ describe('token-counter — tryLoadCliLogTokens', () => {
       outputTokens: 333,
       cacheReadTokens: 4444,
       cacheCreationTokens: 0,
+      totalTokens: 9999 + 333 + 4444,
       source: 'cli-log',
       provider: 'claude',
       model: 'claude-opus-4-7',

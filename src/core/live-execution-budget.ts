@@ -95,7 +95,7 @@ function firstCount(record: Record<string, unknown>, ...keys: string[]): number 
 }
 
 function usageCounts(usage: Record<string, unknown>): LiveUsageObservation['counts'] {
-  const inputTokens = firstCount(usage, 'input_tokens', 'inputTokens', 'prompt_tokens', 'promptTokenCount', 'prompt_eval_count');
+  const rawInputTokens = firstCount(usage, 'input_tokens', 'inputTokens', 'prompt_tokens', 'promptTokenCount', 'prompt_eval_count');
   const outputTokens = firstCount(usage, 'output_tokens', 'outputTokens', 'completion_tokens', 'candidatesTokenCount', 'eval_count');
   const cacheReadTokens = firstCount(
     usage,
@@ -106,6 +106,23 @@ function usageCounts(usage: Record<string, unknown>): LiveUsageObservation['coun
     'cachedContentTokenCount',
   );
   const cacheCreationTokens = firstCount(usage, 'cache_creation_input_tokens', 'cacheCreationTokens', 'cache_write_tokens');
+  // 7093 TOKEN-ACCOUNTING-TRUTH: `counts.inputTokens` is FRESH input — the
+  // same provider-neutral contract normalizeUsage/codex-adapter enforce
+  // (sprint-497 rule, codex.ts). OpenAI/codex schemas report input INCLUSIVE
+  // of the cached subset (`cached_input_tokens` /
+  // `prompt_tokens_details.cached_tokens` / Gemini `cachedContentTokenCount`
+  // inside `promptTokenCount`), whereas Anthropic reports `input_tokens` and
+  // `cache_read_input_tokens` as disjoint. Detection is SCHEMA-based, never
+  // provider-name-based: only the inclusive-schema cache keys subtract.
+  // Before this, the docker budget monitor fed raw inclusive input into the
+  // host-runtime-budget counters, so the same result column meant fresh on
+  // claude tasks and cache-inclusive on codex tasks (sprint-565 live case:
+  // in=1,451,577 with cacheRead=1,336,064 → real fresh 115,513).
+  const inclusiveCached = firstCount(usage, 'cached_input_tokens', 'cachedContentTokenCount')
+    || count((asRecord(usage['prompt_tokens_details']) ?? {})['cached_tokens']);
+  const inputTokens = inclusiveCached > 0
+    ? Math.max(rawInputTokens - inclusiveCached, 0)
+    : rawInputTokens;
   return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens };
 }
 
