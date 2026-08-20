@@ -70,9 +70,9 @@ export function registerCheckpoint(program: Command): void {
   cmd
     .command('list')
     .description(getMessage('cli.checkpoint.list.desc', getLanguage(undefined)))
-    .option('--pending', 'Show only pending checkpoints')
-    .option('--json', 'Output as JSON')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--pending', getMessage('checkpoint.pending_option', getLanguage(undefined)))
+    .option('--json', getMessage('checkpoint.json_option', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('checkpoint.lang_option', getLanguage(undefined)))
     .action((opts: { pending?: boolean; json?: boolean; lang?: string }) => {
       try {
         const lang = getLanguage(opts.lang);
@@ -127,7 +127,7 @@ export function registerCheckpoint(program: Command): void {
   cmd
     .command('approve <sprintId> <phase>')
     .description(getMessage('cli.checkpoint.approve.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('checkpoint.lang_option', getLanguage(undefined)))
     .action((sprintId: string, phase: string, opts: { lang?: string }) => {
       try {
         const lang = getLanguage(opts.lang);
@@ -148,7 +148,7 @@ export function registerCheckpoint(program: Command): void {
   cmd
     .command('reject <sprintId> <phase>')
     .description(getMessage('cli.checkpoint.reject.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('checkpoint.lang_option', getLanguage(undefined)))
     .action((sprintId: string, phase: string, opts: { lang?: string }) => {
       try {
         const lang = getLanguage(opts.lang);

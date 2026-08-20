@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerNervousTools } from '../../src/mcp/tools/nervous.js';
+import { loadConfig } from '../../src/core/config.js';
 
 // ─── Test Utilities ─────────────────────────────────────────────────────────
 
@@ -101,6 +102,10 @@ describe('Nervous System MCP Tools', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    // 589-001: registerNervousTools now resolves a display language via
+    // loadConfig() on every handler call — restoreAllMocks() wipes the
+    // module-factory mockResolvedValue below, so it must be re-armed here.
+    vi.mocked(loadConfig).mockResolvedValue({ nervous_system: { mode: 'balanced', enabled: true } } as Awaited<ReturnType<typeof loadConfig>>);
     const mock = createMockServer();
     tools = mock.tools;
     registerNervousTools(mock.server);

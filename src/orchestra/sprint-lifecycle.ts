@@ -595,12 +595,14 @@ export async function waitForHumanApproval(
   await writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2), 'utf-8');
   debugLog('waitForHumanApproval', `Checkpoint written: ${checkpointPath} — waiting for approval (timeout ${timeoutMs}ms)`);
 
+  const lang = detectLang(projectRoot);
+
   // DECKENT→USER:NOTIFY (Hot Fix H6) — human-checkpoint-required (critical, immediate)
   try {
     void notify(
       'human-checkpoint-required',
       sprintId,
-      `Onay bekleniyor: ${phase}`,
+      getMessage('checkpoint.notify_pending_title', lang, { phase }),
       summary,
     );
   } catch (e) { debugLog('waitForHumanApproval:notify', e); }
@@ -641,8 +643,11 @@ export async function waitForHumanApproval(
         void notify(
           'human-checkpoint-required',
           sprintId,
-          `[Hatırlatma] Onay hâlâ bekleniyor: ${phase}`,
-          `${summary} — ${elapsedMinutes} dakikadır onay bekliyor.`,
+          getMessage('checkpoint.notify_escalation_title', lang, { phase }),
+          getMessage('checkpoint.notify_escalation_summary', lang, {
+            summary,
+            elapsedMinutes: String(elapsedMinutes),
+          }),
         );
       } catch (e) { debugLog('waitForHumanApproval:escalationNotify', e); }
     }
@@ -669,8 +674,11 @@ export async function waitForHumanApproval(
     void notify(
       'human-checkpoint-required',
       sprintId,
-      `[TIMEOUT] Onay alınamadı: ${phase}`,
-      `${summary} — ${Math.round(timeoutMs / 60_000)} dakika içinde onay/red gelmedi, sprint parklanıyor (ABORTED).`,
+      getMessage('checkpoint.notify_timeout_title', lang, { phase }),
+      getMessage('checkpoint.notify_timeout_summary', lang, {
+        summary,
+        timeoutMinutes: String(Math.round(timeoutMs / 60_000)),
+      }),
     );
   } catch (e) { debugLog('waitForHumanApproval:timeoutNotify', e); }
 

@@ -29,7 +29,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod/v4';
 import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js';
 import { autonomousPendingPath } from '../../core/constants.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { loadConfig } from '../../core/config.js';
+import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
 
 // ─── Filesystem layout (mirrors autonomous.ts / autonomous-surface.ts) ──────
 
@@ -50,23 +52,26 @@ function fail(message: string) {
 // ─── deckent_autonomous_approve ──────────────────────────────────────────────
 
 export function registerAutonomousApproveTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_autonomous_approve',
     {
-      title: 'Autonomous Approve',
+      title: getMessage('autonomous.mcp_approve.title', registerLang),
       description: mcpToolDescription('deckent_autonomous_approve'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        id: z.string().optional().describe('Trigger/backlog-entry id to approve (alternative to triggerId)'),
-        triggerId: z.string().optional().describe('Trigger/backlog-entry id to approve (preferred over id)'),
-        reason: z.string().optional().describe('Reason recorded with the approve decision'),
-        root: z.string().optional().describe('Project root path (default: cwd)'),
+        id: z.string().optional().describe(getMessage('autonomous.mcp_approve.id_desc', registerLang)),
+        triggerId: z.string().optional().describe(getMessage('autonomous.mcp_approve.trigger_id_desc', registerLang)),
+        reason: z.string().optional().describe(getMessage('autonomous.mcp_approve.reason_desc', registerLang)),
+        root: z.string().optional().describe(getMessage('autonomous.mcp.root_desc', registerLang)),
       }),
     },
     async ({ id, triggerId, reason, root: rootParam }) => {
       const root = rootParam ?? process.cwd();
+      const appConfig = await loadConfig(root);
+      const lang = getLanguage(appConfig.language);
       const tid = triggerId ?? id;
-      if (!tid) return fail('triggerId (or id) is required for approve.');
+      if (!tid) return fail(getMessage('autonomous.mcp_approve.id_required', lang));
 
       try {
         const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root), projectRoot: root });
@@ -83,23 +88,26 @@ export function registerAutonomousApproveTool(server: McpServer): void {
 // ─── deckent_autonomous_reject ───────────────────────────────────────────────
 
 export function registerAutonomousRejectTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_autonomous_reject',
     {
-      title: 'Autonomous Reject',
+      title: getMessage('autonomous.mcp_reject.title', registerLang),
       description: mcpToolDescription('deckent_autonomous_reject'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        id: z.string().optional().describe('Trigger/backlog-entry id to reject (alternative to triggerId)'),
-        triggerId: z.string().optional().describe('Trigger/backlog-entry id to reject (preferred over id)'),
-        reason: z.string().optional().describe('Reason recorded with the reject decision'),
-        root: z.string().optional().describe('Project root path (default: cwd)'),
+        id: z.string().optional().describe(getMessage('autonomous.mcp_reject.id_desc', registerLang)),
+        triggerId: z.string().optional().describe(getMessage('autonomous.mcp_reject.trigger_id_desc', registerLang)),
+        reason: z.string().optional().describe(getMessage('autonomous.mcp_reject.reason_desc', registerLang)),
+        root: z.string().optional().describe(getMessage('autonomous.mcp.root_desc', registerLang)),
       }),
     },
     async ({ id, triggerId, reason, root: rootParam }) => {
       const root = rootParam ?? process.cwd();
+      const appConfig = await loadConfig(root);
+      const lang = getLanguage(appConfig.language);
       const tid = triggerId ?? id;
-      if (!tid) return fail('triggerId (or id) is required for reject.');
+      if (!tid) return fail(getMessage('autonomous.mcp_reject.id_required', lang));
 
       try {
         const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root), projectRoot: root });

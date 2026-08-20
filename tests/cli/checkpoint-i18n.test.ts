@@ -77,4 +77,50 @@ describe('checkpoint CLI i18n (MSG-003)', () => {
     );
     expect(tr).toContain('reddedildi');
   });
+
+  it('--help option descriptions default to English (no hardcoded literal survives)', () => {
+    const savedLanguage = process.env['DECKENT_LANGUAGE'];
+    const savedLang = process.env['DECKENT_LANG'];
+    delete process.env['DECKENT_LANGUAGE'];
+    delete process.env['DECKENT_LANG'];
+    try {
+      const program = new Command();
+      registerCheckpoint(program);
+      const checkpointCmd = program.commands.find(c => c.name() === 'checkpoint');
+      const listCmd = checkpointCmd?.commands.find(c => c.name() === 'list');
+      const approveCmd = checkpointCmd?.commands.find(c => c.name() === 'approve');
+      const rejectCmd = checkpointCmd?.commands.find(c => c.name() === 'reject');
+      expect(listCmd?.helpInformation()).toContain('Show only pending checkpoints');
+      expect(listCmd?.helpInformation()).toContain('Output as JSON');
+      expect(listCmd?.helpInformation()).toContain('Language override (en|tr)');
+      expect(approveCmd?.helpInformation()).toContain('Language override (en|tr)');
+      expect(rejectCmd?.helpInformation()).toContain('Language override (en|tr)');
+    } finally {
+      if (savedLanguage === undefined) delete process.env['DECKENT_LANGUAGE'];
+      else process.env['DECKENT_LANGUAGE'] = savedLanguage;
+      if (savedLang === undefined) delete process.env['DECKENT_LANG'];
+      else process.env['DECKENT_LANG'] = savedLang;
+    }
+  });
+
+  it('--help option descriptions are localized when DECKENT_LANGUAGE=tr', () => {
+    const savedLanguage = process.env['DECKENT_LANGUAGE'];
+    process.env['DECKENT_LANGUAGE'] = 'tr';
+    try {
+      const program = new Command();
+      registerCheckpoint(program);
+      const checkpointCmd = program.commands.find(c => c.name() === 'checkpoint');
+      const listCmd = checkpointCmd?.commands.find(c => c.name() === 'list');
+      const approveCmd = checkpointCmd?.commands.find(c => c.name() === 'approve');
+      const rejectCmd = checkpointCmd?.commands.find(c => c.name() === 'reject');
+      expect(listCmd?.helpInformation()).toContain('Sadece bekleyen checkpoint\'leri göster');
+      expect(listCmd?.helpInformation()).toContain('JSON olarak çıktıla');
+      expect(listCmd?.helpInformation()).toContain('Dil geçersiz kılma değeri (en|tr)');
+      expect(approveCmd?.helpInformation()).toContain('Dil geçersiz kılma değeri (en|tr)');
+      expect(rejectCmd?.helpInformation()).toContain('Dil geçersiz kılma değeri (en|tr)');
+    } finally {
+      if (savedLanguage === undefined) delete process.env['DECKENT_LANGUAGE'];
+      else process.env['DECKENT_LANGUAGE'] = savedLanguage;
+    }
+  });
 });

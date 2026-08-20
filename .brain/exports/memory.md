@@ -1,11 +1,24 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-589 Learnings
+- Sprint sprint-589 Learnings: ## Sprint sprint-589 Learnings
+
+## Gains
+- 589-001 — MCP nervous karar-mesajları i18n — Scanned src/mcp/tools/nervous.ts for every English hardcoded user-facing string (template literal...
+- 589-002 — MCP autonomous karar-mesajları i18n — Moved every hardcoded English user-facing string in autonomous-approval.ts and autonomous-surface...
+- 589-003 — sprint-lifecycle checkpoint-notify hardcode i18n — Moved the 5 hardcoded Turkish notify strings in waitForHumanApproval (sprint-lifecycle.ts, ~line ...
+- 589-004 — checkpoint CLI option-desc i18n — checkpoint.ts's remaining hardcoded English strings were the commander .option() descriptions for...
+
 ## Sprint sprint-587 Learnings
 - Sprint sprint-587 Learnings: ## Sprint sprint-587 Learnings
 
 ## Gains
 - 587-001 — V3 assignedSkills force-preserving merge (kaynak-tarafı) — Force-preserving merge landed at BOTH V3 assignedSkills write sites.
 - 587-002 — brain-skill test-literal → kanonik SKILL_PROFILE_VERSION — Replaced the test-local profileVersion: 3 literal in tests/orchestra/brain-skill.test.ts (line ~1...
+- Out-of-band Changes: ## Out-of-band Changes
+- 3 commit(s) since Sprint #587
+- Modified: .brain/exports/debt.md, .brain/exports/decisions.md, .brain/exports/memory.md, .brain/exports/summary.md, .codex/rules/worker-default.md, .cursor/rules/deckent.mdc, .cursor/rules/worker-default.mdc, .deckent/provider-execution-observations.db, .deckent/runtime/prompt-authority/execution-authority.jsonl, .deckent/settings/features-manifest.json, .deckent/settings/repl-history, .deckent/workspace/TOOLS.md, .gemini/rules/worker-default.md, .gitignore, AGENTS.md, CLAUDE.md, calisma-mantigi.md, docs/CHANGELOG.md, docs/MASTER-PLAN.md, docs/SPRINT-LOG.md, docs/en/playbook/ai-operator-lessons.md, docs/generated/master-plan-active.json, docs/generated/master-plan-active.md, docs/governance/closure-classification-owner-proposal.md, docs/governance/closure-projections/current.json, docs/governance/deckent-dev-operating-policy.md, docs/tr/playbook/ai-operator-lessons.md, scripts/error-handling-baseline.json, scripts/lint-test-hermeticity.mjs, scripts/operation-ingress-baseline.json, src/cli/commands/chat.ts, src/cli/helpers/messages.ts, src/core/test-discovery-contract.ts, src/orchestra/mid-sprint-adapter.ts, src/orchestra/result-evaluator.ts, src/orchestra/routing-plan-adapter.ts, src/orchestra/task-mode-runner.ts, tests/PLATFORM.md, tests/cli/chat-native-flag.test.ts, tests/cli/chat-no-cli-fallback.test.ts, tests/cli/chat.test.ts, tests/core/model-types.test.ts, tests/core/provider-ollama-bootstrap.test.ts, tests/core/test-discovery-contract.test.ts, tests/e2e/cli-smoke.e2e.test.ts, tests/e2e/provider-smoke.test.ts, tests/governance/agent-discovery-census.test.ts, tests/orchestra/brain-integrity-regression.test.ts, tests/orchestra/brain-skill.test.ts, tests/orchestra/cross-verify-channel-truth.test.ts, and 6 more...
+- New: .deckent/models.db-shm, .deckent/models.db-wal, docs/governance/closure-projections/bundles/b15a3b3d6f4b3170939a73d0d32ee34c8ecd011b427097dfbd5699a331ab5714/active.json, docs/governance/closure-projections/bundles/b15a3b3d6f4b3170939a73d0d32ee34c8ecd011b427097dfbd5699a331ab5714/born.json, docs/governance/closure-projections/bundles/b15a3b3d6f4b3170939a73d0d32ee34c8ecd011b427097dfbd5699a331ab5714/bundle-manifest.json, docs/governance/closure-projections/bundles/b15a3b3d6f4b3170939a73d0d32ee34c8ecd011b427097dfbd5699a331ab5714/closure-health.json, docs/governance/closure-projections/bundles/b15a3b3d6f4b3170939a73d0d32ee34c8ecd011b427097dfbd5699a331ab5714/level-lane.json, follow-up-works/typescript-static-architecture-diagnosis-2026-08-13.md, src/orchestra/criterion-evaluation.ts, tests/orchestra/criterion-evaluation.test.ts
 
 ## Sprint sprint-586 Learnings
 - Sprint sprint-586 Learnings: ## Sprint sprint-586 Learnings
@@ -755,10 +768,6 @@ toke
 - 448-003 — Alt dizinlerdeki (a6-sinav-u1 ve u4-olcum) bugünkü md dosyalarını keşfet ve envanter JSON üret — Successfully scanned .analysis/a6-sinav-u1/ and .analysis/u4-olcum/ recursively.
 - 448-004 — Envanterlerden Türkçe kısa özet-notu md dosyasını derle — İki envanter JSON'u (inventory-root-2026-07-18.json ve inventory-subdirs-2026-07-18.json) okundu;...
 - 448-005 — Özet-notu bütünlük doğrulaması ve link-lint entegrasyon kontrolü — 4 kontrol kalemi TAM kapsamlı çalıştırıldı, hepsi kanıt satırlarıyla verify-2026-07-18.md'ye yazı...
-- Out-of-band Changes: ## Out-of-band Changes
-- 3 commit(s) since Sprint #448
-- Modified: docs/CHANGELOG.md, docs/MASTER-PLAN.md, docs/analysis/583-kabul-gunlugu.md, package.json, src/desktop/src/renderer/app.ts, src/desktop/src/renderer/nova/CommandScene.tsx, src/desktop/src/renderer/styles.css, src/desktop/src/shared/theme-tokens.ts
-- New: scripts/nova-tasarim-loop.mjs, src/desktop/src/renderer/nova/scene-state.ts, src/desktop/src/renderer/shell/dev-hash-session.ts, src/desktop/tests/dev-hash-session.test.ts, src/desktop/tests/nova-contrast.test.ts, src/desktop/tests/nova-scene-state.test.ts
 
 ## Sprint sprint-447 Learnings
 - Sprint sprint-447 Learnings: ## Sprint sprint-447 Learnings

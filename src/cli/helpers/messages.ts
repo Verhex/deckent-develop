@@ -2153,6 +2153,40 @@ const MESSAGES: MessageMap = {
     en: 'Checkpoint not found: {sprintId}/{phase}',
     tr: 'Checkpoint bulunamadı: {sprintId}/{phase}',
   },
+  // ─── checkpoint notify (589-003, waitForHumanApproval) ───────────────
+  'checkpoint.notify_pending_title': {
+    en: 'Approval pending: {phase}',
+    tr: 'Onay bekleniyor: {phase}',
+  },
+  'checkpoint.notify_escalation_title': {
+    en: '[Reminder] Approval still pending: {phase}',
+    tr: '[Hatırlatma] Onay hâlâ bekleniyor: {phase}',
+  },
+  'checkpoint.notify_escalation_summary': {
+    en: '{summary} — pending approval for {elapsedMinutes} minute(s).',
+    tr: '{summary} — {elapsedMinutes} dakikadır onay bekliyor.',
+  },
+  'checkpoint.notify_timeout_title': {
+    en: '[TIMEOUT] Approval not received: {phase}',
+    tr: '[TIMEOUT] Onay alınamadı: {phase}',
+  },
+  'checkpoint.notify_timeout_summary': {
+    en: '{summary} — no approval/rejection within {timeoutMinutes} minutes; the run is being parked (ABORTED).',
+    tr: '{summary} — {timeoutMinutes} dakika içinde onay/red gelmedi, sprint parklanıyor (ABORTED).',
+  },
+  // ─── checkpoint CLI option descriptions (589-004) ─────────────────────
+  'checkpoint.pending_option': {
+    en: 'Show only pending checkpoints',
+    tr: 'Sadece bekleyen checkpoint\'leri göster',
+  },
+  'checkpoint.json_option': {
+    en: 'Output as JSON',
+    tr: 'JSON olarak çıktıla',
+  },
+  'checkpoint.lang_option': {
+    en: 'Language override (en|tr)',
+    tr: 'Dil geçersiz kılma değeri (en|tr)',
+  },
   // ─── nervous command (MSG-002, §4G) ──────────────────────────────────
   'nervous.dashboard_title': { en: '🧠 Deckent Nervous System', tr: '🧠 Deckent Nervous System' },
   'nervous.no_pending': { en: 'No pending notifications.', tr: 'Bekleyen bildirim yok.' },
@@ -2344,6 +2378,152 @@ const MESSAGES: MessageMap = {
   'config_nervous.unknown_key': {
     en: 'Unknown nervous config key: "{key}". Supported: mode',
     tr: 'Bilinmeyen nervous config anahtarı: "{key}". Desteklenen: mode',
+  },
+
+  // ─── nervous MCP tools (589-001) ──────────────────────────────────────
+  'nervous.mcp.id_required': { en: 'id is required', tr: 'id gerekli' },
+  'nervous.mcp.invalid_notification_id': {
+    en: 'Invalid notification ID: {id}',
+    tr: 'Geçersiz bildirim ID\'si: {id}',
+  },
+  'nervous.mcp.accept_stub': {
+    en: 'Notification {id} accepted (nervous inactive — history-only stub).',
+    tr: 'Bildirim {id} kabul edildi (nervous devre dışı — yalnızca geçmiş kaydı).',
+  },
+  'nervous.mcp.accept_queued': {
+    en: 'Notification {id} accepted. Action queued for Executor.',
+    tr: 'Bildirim {id} kabul edildi. Eylem Executor için kuyruğa alındı.',
+  },
+  'nervous.mcp.reject_stub': {
+    en: 'Notification {id} rejected (nervous inactive — history-only stub).',
+    tr: 'Bildirim {id} reddedildi (nervous devre dışı — yalnızca geçmiş kaydı).',
+  },
+  'nervous.mcp.reject_queued': {
+    en: 'Notification {id} rejected. Decision queued for Executor.',
+    tr: 'Bildirim {id} reddedildi. Karar Executor için kuyruğa alındı.',
+  },
+  'nervous.mcp.reject_reason_suffix': {
+    en: ' Reason: {reason}',
+    tr: ' Sebep: {reason}',
+  },
+  'nervous.mcp.subscribed': {
+    en: 'Subscribed to Nervous System notifications{sprintSuffix}',
+    tr: 'Nervous System bildirimlerine abone olundu{sprintSuffix}',
+  },
+  'nervous.mcp.subscribed_for_sprint': {
+    en: ' for {sprintId}',
+    tr: ' — {sprintId} için',
+  },
+  'nervous.mcp.panic_task_id_required': {
+    en: 'panic: id requires a non-empty taskId',
+    tr: 'panic: id boş olmayan bir taskId gerektirir',
+  },
+  'nervous.mcp.panic_queued': {
+    en: 'PanicGuard approval queued for task {taskId}.',
+    tr: '{taskId} görevi için PanicGuard onayı kuyruğa alındı.',
+  },
+  'nervous.mcp.subscribe.title': { en: 'Nervous Subscribe', tr: 'Nervous Abone Ol' },
+  'nervous.mcp.subscribe.sprint_id_desc': {
+    en: 'Sprint ID to subscribe to (default: active sprint)',
+    tr: 'Abone olunacak Sprint ID (varsayılan: aktif sprint)',
+  },
+  'nervous.mcp.subscribe.root_desc': {
+    en: 'Project root path (for panic event scan)',
+    tr: 'Proje kök dizini (panic olay taraması için)',
+  },
+  'nervous.mcp.accept.title': { en: 'Nervous Accept', tr: 'Nervous Kabul Et' },
+  'nervous.mcp.accept.id_desc': {
+    en: 'Notification ID to accept, or "panic:<taskId>" for PanicGuard approval',
+    tr: 'Kabul edilecek bildirim ID\'si veya PanicGuard onayı için "panic:<taskId>"',
+  },
+  'nervous.mcp.accept.root_desc': {
+    en: 'Project root path (for panic approval IPC write)',
+    tr: 'Proje kök dizini (panic onay IPC yazımı için)',
+  },
+  'nervous.mcp.reject.title': { en: 'Nervous Reject', tr: 'Nervous Reddet' },
+  'nervous.mcp.reject.id_desc': {
+    en: 'Notification ID to reject',
+    tr: 'Reddedilecek bildirim ID\'si',
+  },
+  'nervous.mcp.reject.reason_desc': { en: 'Reason for rejection', tr: 'Reddetme sebebi' },
+  'nervous.mcp.reject.root_desc': {
+    en: 'Project root path (for IPC queue write)',
+    tr: 'Proje kök dizini (IPC kuyruğu yazımı için)',
+  },
+  'nervous.mcp.status.title': { en: 'Nervous Status', tr: 'Nervous Durumu' },
+  'nervous.mcp.root_desc': { en: 'Project root path', tr: 'Proje kök dizini' },
+  'nervous.mcp.config.title': { en: 'Nervous Config', tr: 'Nervous Yapılandırması' },
+  'nervous.mcp.config.action_desc': {
+    en: 'Config action: read current, set authority preset, set per-action override, list all actions, or reset overrides',
+    tr: 'Yapılandırma eylemi: mevcut değeri oku, yetki preseti ayarla, eylem-bazlı override ayarla, tüm eylemleri listele veya override\'ları sıfırla',
+  },
+  'nervous.mcp.config.preset_desc': {
+    en: 'Authority mode preset (required for set_preset)',
+    tr: 'Yetki modu preseti (set_preset için gerekli)',
+  },
+  'nervous.mcp.config.overrides_desc': {
+    en: 'Action overrides map { actionId: policy } (for set_override)',
+    tr: 'Eylem override haritası { actionId: policy } (set_override için)',
+  },
+  'nervous.mcp.config.preset_required': {
+    en: 'preset is required for set_preset',
+    tr: 'set_preset için preset gerekli',
+  },
+  'nervous.mcp.config.invalid_preset': {
+    en: 'Invalid preset: {preset}',
+    tr: 'Geçersiz preset: {preset}',
+  },
+  'nervous.mcp.config.preset_set': {
+    en: 'Authority mode set to: {preset}',
+    tr: 'Yetki modu ayarlandı: {preset}',
+  },
+  'nervous.mcp.config.overrides_required': {
+    en: 'overrides map is required for set_override',
+    tr: 'set_override için overrides haritası gerekli',
+  },
+  'nervous.mcp.config.overrides_updated': {
+    en: 'Action overrides updated',
+    tr: 'Eylem override\'ları güncellendi',
+  },
+  'nervous.mcp.config.reset_done': {
+    en: 'Nervous config reset to defaults (balanced, no overrides)',
+    tr: 'Nervous yapılandırması varsayılana sıfırlandı (balanced, override yok)',
+  },
+  'nervous.mcp.config.unknown_action': {
+    en: 'Unknown action: {action}',
+    tr: 'Bilinmeyen eylem: {action}',
+  },
+  'nervous.mcp.compensate.no_action_available': {
+    en: 'No compensating action available for "{actionId}" — Nervous only recommends this action (ADR-037); the underlying resource was never modified directly by Nervous, so there is nothing on disk to reverse.',
+    tr: '"{actionId}" için telafi eylemi yok — Nervous bu eylemi yalnızca önerir (ADR-037); ilgili kaynak Nervous tarafından doğrudan değiştirilmedi, bu yüzden diskte geri alınacak bir şey yok.',
+  },
+  'nervous.mcp.compensate.no_reversal_impl': {
+    en: '"{actionId}" has no reversal implementation — treat as unavailable, not success.',
+    tr: '"{actionId}" için geri alma uygulaması yok — başarı değil, kullanılamaz olarak değerlendirin.',
+  },
+  'nervous.mcp.compensate.no_sprint_id': {
+    en: 'ORPHAN_TASK_ARCHIVE record has no payload.sprintId — cannot locate the archive directory to restore from.',
+    tr: 'ORPHAN_TASK_ARCHIVE kaydında payload.sprintId yok — geri yüklenecek arşiv dizini bulunamıyor.',
+  },
+  'nervous.mcp.compensate.no_archive_dir': {
+    en: 'No archive directory found at {archiveDir} — already restored, or never archived.',
+    tr: '{archiveDir} konumunda arşiv dizini bulunamadı — zaten geri yüklenmiş veya hiç arşivlenmemiş.',
+  },
+  'nervous.mcp.compensate.archive_empty': {
+    en: 'Archive directory {archiveDir} is empty — nothing to restore.',
+    tr: '{archiveDir} arşiv dizini boş — geri yüklenecek bir şey yok.',
+  },
+  'nervous.mcp.compensate.all_conflict': {
+    en: 'All {count} archived file(s) already exist in .tasks/ — restore skipped to avoid overwriting live files.',
+    tr: 'Arşivlenmiş {count} dosyanın tümü .tasks/ içinde zaten var — canlı dosyaların üzerine yazmamak için geri yükleme atlandı.',
+  },
+  'nervous.mcp.compensate.restored_with_conflicts': {
+    en: 'Restored {restored} file(s) from {archiveDir} to .tasks/ ({skipped} skipped — already present).',
+    tr: '{archiveDir} konumundan .tasks/ dizinine {restored} dosya geri yüklendi ({skipped} atlandı — zaten mevcut).',
+  },
+  'nervous.mcp.compensate.restored': {
+    en: 'Restored {restored} file(s) from {archiveDir} to .tasks/.',
+    tr: '{archiveDir} konumundan .tasks/ dizinine {restored} dosya geri yüklendi.',
   },
 
   // ─── spawn command ─────────────────────────────────────────────────
@@ -3453,6 +3633,112 @@ const MESSAGES: MessageMap = {
   'autonomous.backlog.list_row': {
     en: '  - [{status}] {id}: {title} (kind:{kind} policy:{policy})',
     tr: '  - [{status}] {id}: {title} (tür:{kind} politika:{policy})',
+  },
+
+  // ─── autonomous MCP tools (Sprint 589 Task 589-002 i18n — autonomous-approval.ts / autonomous-surface.ts) ──
+  'autonomous.mcp.root_desc': {
+    en: 'Project root path (default: cwd)',
+    tr: 'Proje kök yolu (varsayılan: cwd)',
+  },
+  'autonomous.mcp_approve.title': {
+    en: 'Autonomous Approve',
+    tr: 'Otonom Onayla',
+  },
+  'autonomous.mcp_approve.id_desc': {
+    en: 'Trigger/backlog-entry id to approve (alternative to triggerId)',
+    tr: 'Onaylanacak trigger/backlog kaydı id’si (triggerId’ye alternatif)',
+  },
+  'autonomous.mcp_approve.trigger_id_desc': {
+    en: 'Trigger/backlog-entry id to approve (preferred over id)',
+    tr: 'Onaylanacak trigger/backlog kaydı id’si (id yerine tercih edilir)',
+  },
+  'autonomous.mcp_approve.reason_desc': {
+    en: 'Reason recorded with the approve decision',
+    tr: 'Onay kararıyla birlikte kaydedilecek gerekçe',
+  },
+  'autonomous.mcp_approve.id_required': {
+    en: 'triggerId (or id) is required for approve.',
+    tr: 'Onaylamak için triggerId (veya id) gerekli.',
+  },
+  'autonomous.mcp_reject.title': {
+    en: 'Autonomous Reject',
+    tr: 'Otonom Reddet',
+  },
+  'autonomous.mcp_reject.id_desc': {
+    en: 'Trigger/backlog-entry id to reject (alternative to triggerId)',
+    tr: 'Reddedilecek trigger/backlog kaydı id’si (triggerId’ye alternatif)',
+  },
+  'autonomous.mcp_reject.trigger_id_desc': {
+    en: 'Trigger/backlog-entry id to reject (preferred over id)',
+    tr: 'Reddedilecek trigger/backlog kaydı id’si (id yerine tercih edilir)',
+  },
+  'autonomous.mcp_reject.reason_desc': {
+    en: 'Reason recorded with the reject decision',
+    tr: 'Ret kararıyla birlikte kaydedilecek gerekçe',
+  },
+  'autonomous.mcp_reject.id_required': {
+    en: 'triggerId (or id) is required for reject.',
+    tr: 'Reddetmek için triggerId (veya id) gerekli.',
+  },
+  'autonomous.mcp_backlog.title': {
+    en: 'Autonomous Backlog',
+    tr: 'Otonom Backlog',
+  },
+  'autonomous.mcp_backlog.action_desc': {
+    en: 'Action to perform',
+    tr: 'Gerçekleştirilecek aksiyon',
+  },
+  'autonomous.mcp_backlog.id_desc': {
+    en: 'Entry id — required for add/remove',
+    tr: 'Kayıt id’si — add/remove için gerekli',
+  },
+  'autonomous.mcp_backlog.entry_title_desc': {
+    en: 'Entry title — required for add',
+    tr: 'Kayıt başlığı — add için gerekli',
+  },
+  'autonomous.mcp_backlog.kind_desc': {
+    en: 'Entry kind (task=inline description, sprint=directives ref, capability=F8 broker verb — capability entries additionally need spec.capabilityTarget, not settable here; use deckent_autonomous for those). Default: task',
+    tr: 'Kayıt türü (task=satır içi açıklama, sprint=directives referansı, capability=F8 broker fiili — capability kayıtları ayrıca spec.capabilityTarget gerektirir, burada ayarlanamaz; bunun için deckent_autonomous kullanın). Varsayılan: task',
+  },
+  'autonomous.mcp_backlog.description_desc': {
+    en: 'Task description or directives ref — used by action=add',
+    tr: 'Görev açıklaması veya directives referansı — action=add tarafından kullanılır',
+  },
+  'autonomous.mcp_backlog.policy_desc': {
+    en: 'Execution policy for action=add. Default: auto',
+    tr: 'action=add için çalıştırma politikası. Varsayılan: auto',
+  },
+  'autonomous.mcp_backlog.cron_desc': {
+    en: '5-field cron expression — entry recurs at this cadence (omit for one-off). Validated at intake; a malformed expression is rejected immediately.',
+    tr: '5 alanlı cron ifadesi — kayıt bu sıklıkta tekrarlanır (tek seferlik için boş bırakın). Girişte doğrulanır; hatalı bir ifade hemen reddedilir.',
+  },
+  'autonomous.mcp_backlog.id_required_add': {
+    en: 'id is required for action=add.',
+    tr: 'action=add için id gerekli.',
+  },
+  'autonomous.mcp_backlog.title_required_add': {
+    en: 'title is required for action=add.',
+    tr: 'action=add için title gerekli.',
+  },
+  'autonomous.mcp_backlog.invalid_cron': {
+    en: 'Invalid cron "{cron}": {error}',
+    tr: 'Geçersiz cron "{cron}": {error}',
+  },
+  'autonomous.mcp_backlog.duplicate': {
+    en: 'Entry "{id}" already exists.',
+    tr: '"{id}" kaydı zaten var.',
+  },
+  'autonomous.mcp_backlog.id_required_remove': {
+    en: 'id is required for action=remove.',
+    tr: 'action=remove için id gerekli.',
+  },
+  'autonomous.mcp_backlog.not_found': {
+    en: 'Entry "{id}" not found.',
+    tr: '"{id}" kaydı bulunamadı.',
+  },
+  'autonomous.mcp_status.title': {
+    en: 'Autonomous Status',
+    tr: 'Otonom Durum',
   },
 
   // ─── autonomous-mission command (Sprint 296 — Task 296-001 i18n) ─────────

@@ -56,6 +56,10 @@
 | adr-g-040 | Normative Verdict Vocabulary (Single-Word Evaluation Statuses) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-589 Learnings** (sprint-589): ## Sprint sprint-589 Learnings
+
+## Gains
+- 589-001 — MCP nervous karar-mesajları i18n — Scanned src/mcp/tools/nervous...
 - **Sprint sprint-587 Learnings** (sprint-587): ## Sprint sprint-587 Learnings
 
 ## Gains
@@ -92,8 +96,6 @@
 
 ## Gains
 - 575-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-k...
-- **Sprint sprint-567 Learnings** (sprint-567): ## Sprint sprint-567 Learnings
-- Selam dokümanı (sonnet özdeş-basit — taban ölçümü): GO_WITH_TECH_DEBT — Created dene...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -104,4 +106,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2063 | Generated: 2026-08-20_
+_Total entries: 2066 | Generated: 2026-08-20_

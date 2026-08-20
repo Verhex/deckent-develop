@@ -25,7 +25,9 @@ import {
   acceptPanicGuard,
   listPendingPanicEvents,
 } from '../../cli/commands/nervous.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
+import { loadConfig } from '../../core/config.js';
+import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 
 // ─── Helper: Load nervous config from project ──────────────────────────────
 
@@ -118,14 +120,17 @@ export async function handleNervousAccept(
   input: NervousAcceptInput,
 ): Promise<NervousAcceptResult> {
   const id = input.id?.trim() ?? '';
+  const root = input.root ?? process.cwd();
+  const appConfig = await loadConfig(root);
+  const lang = getLanguage(appConfig.language);
+
   if (!id) {
-    throw new Error('id is required');
+    throw new Error(getMessage('nervous.mcp.id_required', lang));
   }
   if (!isValidNotificationId(id)) {
-    throw new Error(`Invalid notification ID: ${id}`);
+    throw new Error(getMessage('nervous.mcp.invalid_notification_id', lang, { id }));
   }
 
-  const root = input.root ?? process.cwd();
   const config = loadNervousConfig(root);
 
   // Existing-history check (legacy informational field)
@@ -142,7 +147,7 @@ export async function handleNervousAccept(
       notificationId: id,
       queued: false,
       existsInHistory,
-      message: `Notification ${id} accepted (nervous inactive — history-only stub).`,
+      message: getMessage('nervous.mcp.accept_stub', lang, { id }),
     };
   }
 
@@ -161,7 +166,7 @@ export async function handleNervousAccept(
     notificationId: id,
     queued: true,
     existsInHistory,
-    message: `Notification ${id} accepted. Action queued for Executor.`,
+    message: getMessage('nervous.mcp.accept_queued', lang, { id }),
     ipcFile,
   };
 }
@@ -174,16 +179,20 @@ export async function handleNervousReject(
   input: NervousRejectInput,
 ): Promise<NervousRejectResult> {
   const id = input.id?.trim() ?? '';
+  const root = input.root ?? process.cwd();
+  const appConfig = await loadConfig(root);
+  const lang = getLanguage(appConfig.language);
+
   if (!id) {
-    throw new Error('id is required');
+    throw new Error(getMessage('nervous.mcp.id_required', lang));
   }
   if (!isValidNotificationId(id)) {
-    throw new Error(`Invalid notification ID: ${id}`);
+    throw new Error(getMessage('nervous.mcp.invalid_notification_id', lang, { id }));
   }
 
-  const root = input.root ?? process.cwd();
   const config = loadNervousConfig(root);
   const reason = input.reason ?? null;
+  const reasonSuffix = reason ? getMessage('nervous.mcp.reject_reason_suffix', lang, { reason }) : '';
 
   if (!config.enabled) {
     return {
@@ -191,7 +200,7 @@ export async function handleNervousReject(
       notificationId: id,
       queued: false,
       reason,
-      message: `Notification ${id} rejected (nervous inactive — history-only stub).${reason ? ` Reason: ${reason}` : ''}`,
+      message: `${getMessage('nervous.mcp.reject_stub', lang, { id })}${reasonSuffix}`,
     };
   }
 
@@ -207,7 +216,7 @@ export async function handleNervousReject(
     notificationId: id,
     queued: true,
     reason,
-    message: `Notification ${id} rejected. Decision queued for Executor.${reason ? ` Reason: ${reason}` : ''}`,
+    message: `${getMessage('nervous.mcp.reject_queued', lang, { id })}${reasonSuffix}`,
     ipcFile,
   };
 }
@@ -262,14 +271,14 @@ export interface NervousCompensatingHistorySink {
   markUndone(originalId: string, compensationDetail: Record<string, unknown>): Promise<void>;
 }
 
-function reverseOrphanTaskArchive(record: ExecutionRecord, root: string): NervousCompensatingResult {
+function reverseOrphanTaskArchive(record: ExecutionRecord, root: string, lang: string): NervousCompensatingResult {
   const sprintId = record.payload['sprintId'];
   if (typeof sprintId !== 'string' || sprintId.length === 0) {
     return {
       applied: false,
       recordId: record.id,
       actionId: record.actionId,
-      detail: 'ORPHAN_TASK_ARCHIVE record has no payload.sprintId — cannot locate the archive directory to restore from.',
+      detail: getMessage('nervous.mcp.compensate.no_sprint_id', lang),
     };
   }
 
@@ -279,7 +288,7 @@ function reverseOrphanTaskArchive(record: ExecutionRecord, root: string): Nervou
       applied: false,
       recordId: record.id,
       actionId: record.actionId,
-      detail: `No archive directory found at ${archiveDir} — already restored, or never archived.`,
+      detail: getMessage('nervous.mcp.compensate.no_archive_dir', lang, { archiveDir }),
     };
   }
 
@@ -289,7 +298,7 @@ function reverseOrphanTaskArchive(record: ExecutionRecord, root: string): Nervou
       applied: false,
       recordId: record.id,
       actionId: record.actionId,
-      detail: `Archive directory ${archiveDir} is empty — nothing to restore.`,
+      detail: getMessage('nervous.mcp.compensate.archive_empty', lang, { archiveDir }),
     };
   }
 
@@ -314,7 +323,7 @@ function reverseOrphanTaskArchive(record: ExecutionRecord, root: string): Nervou
       applied: false,
       recordId: record.id,
       actionId: record.actionId,
-      detail: `All ${conflicts.length} archived file(s) already exist in .tasks/ — restore skipped to avoid overwriting live files.`,
+      detail: getMessage('nervous.mcp.compensate.all_conflict', lang, { count: String(conflicts.length) }),
     };
   }
 
@@ -323,25 +332,29 @@ function reverseOrphanTaskArchive(record: ExecutionRecord, root: string): Nervou
     recordId: record.id,
     actionId: record.actionId,
     detail: conflicts.length > 0
-      ? `Restored ${restored.length} file(s) from ${archiveDir} to .tasks/ (${conflicts.length} skipped — already present).`
-      : `Restored ${restored.length} file(s) from ${archiveDir} to .tasks/.`,
+      ? getMessage('nervous.mcp.compensate.restored_with_conflicts', lang, {
+        restored: String(restored.length),
+        archiveDir,
+        skipped: String(conflicts.length),
+      })
+      : getMessage('nervous.mcp.compensate.restored', lang, { restored: String(restored.length), archiveDir }),
     restoredFiles: restored,
   };
 }
 
-function computeCompensatingAction(record: ExecutionRecord, root: string): NervousCompensatingResult {
+function computeCompensatingAction(record: ExecutionRecord, root: string, lang: string): NervousCompensatingResult {
   if (!SELF_EXECUTED_REVERSIBLE_ACTION_IDS.has(record.actionId)) {
     return {
       applied: false,
       recordId: record.id,
       actionId: record.actionId,
-      detail: `No compensating action available for "${record.actionId}" — Nervous only recommends this action (ADR-037); the underlying resource was never modified directly by Nervous, so there is nothing on disk to reverse.`,
+      detail: getMessage('nervous.mcp.compensate.no_action_available', lang, { actionId: record.actionId }),
     };
   }
 
   switch (record.actionId) {
     case 'ORPHAN_TASK_ARCHIVE':
-      return reverseOrphanTaskArchive(record, root);
+      return reverseOrphanTaskArchive(record, root, lang);
     default:
       // Defensive: a future id added to SELF_EXECUTED_REVERSIBLE_ACTION_IDS
       // without a matching case here must stay honest, not silently succeed.
@@ -349,7 +362,7 @@ function computeCompensatingAction(record: ExecutionRecord, root: string): Nervo
         applied: false,
         recordId: record.id,
         actionId: record.actionId,
-        detail: `"${record.actionId}" has no reversal implementation — treat as unavailable, not success.`,
+        detail: getMessage('nervous.mcp.compensate.no_reversal_impl', lang, { actionId: record.actionId }),
       };
   }
 }
@@ -368,7 +381,9 @@ export async function runNervousCompensatingAction(
   root: string,
   historySink?: NervousCompensatingHistorySink,
 ): Promise<NervousCompensatingResult> {
-  const result = computeCompensatingAction(record, root);
+  const appConfig = await loadConfig(root);
+  const lang = getLanguage(appConfig.language);
+  const result = computeCompensatingAction(record, root, lang);
   if (result.applied) {
     const sink = historySink ?? new NervousHistory(root);
     await sink.markUndone(record.id, {
@@ -383,21 +398,24 @@ export async function runNervousCompensatingAction(
 // ─── Tool Registrations ─────────────────────────────────────────────────────
 
 export function registerNervousSubscribeTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_nervous_subscribe',
     {
-      title: 'Nervous Subscribe',
+      title: getMessage('nervous.mcp.subscribe.title', registerLang),
       description: mcpToolDescription('deckent_nervous_subscribe'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        sprintId: z.string().optional().describe('Sprint ID to subscribe to (default: active sprint)'),
-        root: z.string().optional().describe('Project root path (for panic event scan)'),
+        sprintId: z.string().optional().describe(getMessage('nervous.mcp.subscribe.sprint_id_desc', registerLang)),
+        root: z.string().optional().describe(getMessage('nervous.mcp.subscribe.root_desc', registerLang)),
       }),
     },
     async ({ sprintId, root: rootParam }) => {
       const subId = sprintId ?? 'all';
       subscribers.add(subId);
       const root = rootParam ?? process.cwd();
+      const appConfig = await loadConfig(root);
+      const lang = getLanguage(appConfig.language);
 
       // Sprint 180 W4-2: include currently pending PanicGuard approval events
       // so MCP subscribers see PANIC_GUARD_KILL_PENDING immediately on subscribe.
@@ -409,13 +427,15 @@ export function registerNervousSubscribeTool(server: McpServer): void {
         ? pendingPanics.filter(p => p.sprintId === sprintId)
         : pendingPanics;
 
+      const sprintSuffix = sprintId ? getMessage('nervous.mcp.subscribed_for_sprint', lang, { sprintId }) : '';
+
       return {
         content: [{
           type: 'text' as const,
           text: JSON.stringify({
             subscribed: true,
             sprintId: subId,
-            message: `Subscribed to Nervous System notifications${sprintId ? ` for ${sprintId}` : ''}`,
+            message: getMessage('nervous.mcp.subscribed', lang, { sprintSuffix }),
             pendingPanics: filteredPanics,
           }),
         }],
@@ -425,21 +445,26 @@ export function registerNervousSubscribeTool(server: McpServer): void {
 }
 
 export function registerNervousAcceptTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_nervous_accept',
     {
-      title: 'Nervous Accept',
+      title: getMessage('nervous.mcp.accept.title', registerLang),
       description: mcpToolDescription('deckent_nervous_accept'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        id: z.string().describe('Notification ID to accept, or "panic:<taskId>" for PanicGuard approval'),
-        root: z.string().optional().describe('Project root path (for panic approval IPC write)'),
+        id: z.string().describe(getMessage('nervous.mcp.accept.id_desc', registerLang)),
+        root: z.string().optional().describe(getMessage('nervous.mcp.accept.root_desc', registerLang)),
       }),
     },
     async ({ id, root: rootParam }) => {
+      const root = rootParam ?? process.cwd();
+      const appConfig = await loadConfig(root);
+      const lang = getLanguage(appConfig.language);
+
       if (!id || id.trim() === '') {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'id is required' }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: getMessage('nervous.mcp.id_required', lang) }) }],
           isError: true,
         };
       }
@@ -449,11 +474,10 @@ export function registerNervousAcceptTool(server: McpServer): void {
         const taskId = id.slice('panic:'.length).trim();
         if (!taskId) {
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'panic: id requires a non-empty taskId' }) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: getMessage('nervous.mcp.panic_task_id_required', lang) }) }],
             isError: true,
           };
         }
-        const root = rootParam ?? process.cwd();
         const { markerPath, marker } = acceptPanicGuard(root, taskId, 'user-mcp');
         return {
           content: [{
@@ -465,7 +489,7 @@ export function registerNervousAcceptTool(server: McpServer): void {
               taskId,
               markerPath,
               acceptedAt: marker.acceptedAt,
-              message: `PanicGuard approval queued for task ${taskId}.`,
+              message: getMessage('nervous.mcp.panic_queued', lang, { taskId }),
             }),
           }],
         };
@@ -490,16 +514,17 @@ export function registerNervousAcceptTool(server: McpServer): void {
 }
 
 export function registerNervousRejectTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_nervous_reject',
     {
-      title: 'Nervous Reject',
+      title: getMessage('nervous.mcp.reject.title', registerLang),
       description: mcpToolDescription('deckent_nervous_reject'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        id: z.string().describe('Notification ID to reject'),
-        reason: z.string().optional().describe('Reason for rejection'),
-        root: z.string().optional().describe('Project root path (for IPC queue write)'),
+        id: z.string().describe(getMessage('nervous.mcp.reject.id_desc', registerLang)),
+        reason: z.string().optional().describe(getMessage('nervous.mcp.reject.reason_desc', registerLang)),
+        root: z.string().optional().describe(getMessage('nervous.mcp.reject.root_desc', registerLang)),
       }),
     },
     async ({ id, reason, root: rootParam }) => {
@@ -520,14 +545,15 @@ export function registerNervousRejectTool(server: McpServer): void {
 }
 
 export function registerNervousStatusTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_nervous_status',
     {
-      title: 'Nervous Status',
+      title: getMessage('nervous.mcp.status.title', registerLang),
       description: mcpToolDescription('deckent_nervous_status'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        root: z.string().optional().describe('Project root path'),
+        root: z.string().optional().describe(getMessage('nervous.mcp.root_desc', registerLang)),
       }),
     },
     async ({ root: rootParam }) => {
@@ -573,24 +599,27 @@ export function registerNervousStatusTool(server: McpServer): void {
 }
 
 export function registerNervousConfigTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_nervous_config',
     {
-      title: 'Nervous Config',
+      title: getMessage('nervous.mcp.config.title', registerLang),
       description: mcpToolDescription('deckent_nervous_config'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['read', 'set_preset', 'set_override', 'list_actions', 'reset'])
-          .describe('Config action: read current, set authority preset, set per-action override, list all actions, or reset overrides'),
+          .describe(getMessage('nervous.mcp.config.action_desc', registerLang)),
         preset: z.enum(['strict', 'balanced', 'autopilot', 'full-auto']).optional()
-          .describe('Authority mode preset (required for set_preset)'),
+          .describe(getMessage('nervous.mcp.config.preset_desc', registerLang)),
         overrides: z.record(z.string(), z.string()).optional()
-          .describe('Action overrides map { actionId: policy } (for set_override)'),
-        root: z.string().optional().describe('Project root path'),
+          .describe(getMessage('nervous.mcp.config.overrides_desc', registerLang)),
+        root: z.string().optional().describe(getMessage('nervous.mcp.root_desc', registerLang)),
       }),
     },
     async ({ action, preset, overrides, root: rootParam }) => {
       const root = rootParam ?? process.cwd();
+      const appConfig = await loadConfig(root);
+      const lang = getLanguage(appConfig.language);
 
       if (action === 'read') {
         const config = loadNervousConfig(root);
@@ -618,14 +647,14 @@ export function registerNervousConfigTool(server: McpServer): void {
       if (action === 'set_preset') {
         if (!preset) {
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'preset is required for set_preset' }) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: getMessage('nervous.mcp.config.preset_required', lang) }) }],
             isError: true,
           };
         }
         const validModes: AuthorityMode[] = ['strict', 'balanced', 'autopilot', 'full-auto'];
         if (!validModes.includes(preset as AuthorityMode)) {
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Invalid preset: ${preset}` }) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: getMessage('nervous.mcp.config.invalid_preset', lang, { preset }) }) }],
             isError: true,
           };
         }
@@ -633,7 +662,7 @@ export function registerNervousConfigTool(server: McpServer): void {
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({ action: 'set_preset', preset, message: `Authority mode set to: ${preset}` }),
+            text: JSON.stringify({ action: 'set_preset', preset, message: getMessage('nervous.mcp.config.preset_set', lang, { preset }) }),
           }],
         };
       }
@@ -641,7 +670,7 @@ export function registerNervousConfigTool(server: McpServer): void {
       if (action === 'set_override') {
         if (!overrides || Object.keys(overrides).length === 0) {
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'overrides map is required for set_override' }) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: getMessage('nervous.mcp.config.overrides_required', lang) }) }],
             isError: true,
           };
         }
@@ -649,7 +678,7 @@ export function registerNervousConfigTool(server: McpServer): void {
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({ action: 'set_override', overrides, message: 'Action overrides updated' }),
+            text: JSON.stringify({ action: 'set_override', overrides, message: getMessage('nervous.mcp.config.overrides_updated', lang) }),
           }],
         };
       }
@@ -659,13 +688,13 @@ export function registerNervousConfigTool(server: McpServer): void {
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({ action: 'reset', message: 'Nervous config reset to defaults (balanced, no overrides)' }),
+            text: JSON.stringify({ action: 'reset', message: getMessage('nervous.mcp.config.reset_done', lang) }),
           }],
         };
       }
 
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Unknown action: ${action}` }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: getMessage('nervous.mcp.config.unknown_action', lang, { action }) }) }],
         isError: true,
       };
     },

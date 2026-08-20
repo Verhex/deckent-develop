@@ -14175,3 +14175,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 587-002: brain-skill test-literal → kanonik SKILL_PROFILE_VERSION (DONE)
 
 ---
+## Sprint 589 — sprint-589
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 1122s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1122301ms |
+
+### Tasks
+
+- 589-001: MCP nervous karar-mesajları i18n (DONE)
+- 589-002: MCP autonomous karar-mesajları i18n (DONE)
+- 589-003: sprint-lifecycle checkpoint-notify hardcode i18n (DONE)
+- 589-004: checkpoint CLI option-desc i18n (DONE)
+
+---

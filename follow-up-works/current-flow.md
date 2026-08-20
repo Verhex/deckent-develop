@@ -4,7 +4,7 @@
 > korusun diye buraya düşer, bitince "BİTTİ" işaretlenir ya da satır silinir.
 
 ## Aktif (şimdi)
-- [ ] Sprint-589 (i18n-paketi, dogfood) gözetimi — 2/4 DONE; bitince: sonuç-doğrula → landing (gates+commit) → gerekirse mühür.
+- [x] BİTTİ — Sprint-589 i18n-paketi: 4/4 DONE, 0 fix; Brain-doğrulama (tsc 0, 38/38, hardcode-grep 0); mühür codex CONFIRMED `…15b6e8a8`; landed.
 - [ ] D2b-1 el-kodlama: nervous+autonomous karar-federasyonu (decision-federation origins'e ekle + settle-back: NervousIpcQueue.writeApproval / autonomous decisions.json; nervous kısa-kod üreticisi absorbe) → 3-aşama mühür → landing.
 
 ## Kuyruk (MASTER 4056 sırası)

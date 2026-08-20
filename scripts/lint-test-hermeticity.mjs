@@ -427,8 +427,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // short-code suite is pure-compute; tracked content moved.
   // 2026-08-20 (DE2a rules): drift from the approval-rules suite fixtures.
   // 2026-08-20 (D2a bridge): drift from the decision-federation suite fixtures.
+  // 2026-08-20 (sprint-589 i18n factory package): tracked content moved.
   count: 14477,
-  digest: '935ede7f1ca3bc696ee4786d2a91721bca737106388382f5c40a9763b6cb400c',
+  digest: '5b40060b7a4cc1f7d6406f22d41b7a7f36e50378de981499fd12759cea2525b8',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -747,8 +748,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // gained the rules subcommands, --always promotion and advisory lines.
   // 2026-08-20 (D2a bridge): +1 — the approval-decision-federation module;
   // approvals decide gained the mirror + settle-back path.
+  // 2026-08-20 (sprint-589 i18n factory package): mcp/lifecycle/checkpoint
+  // surfaces moved user-facing text into the catalog.
   count: 1266,
-  digest: '34d4689d052982cbc75e206a926027d5eed9716e50768a84e41a6038a13485fd',
+  digest: 'be78819522510f189df61a3135d3944531b82c9d45d38e8de669541bab1740a8',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

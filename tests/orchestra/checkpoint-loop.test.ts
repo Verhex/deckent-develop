@@ -20,6 +20,8 @@ import {
   writePhaseCheckpoint,
   computeEventStreamOffset,
 } from '../../src/orchestra/sprint-checkpoint.js';
+import { waitForHumanApproval, resetInterruptState } from '../../src/orchestra/sprint-lifecycle.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
 
@@ -213,3 +215,85 @@ describe('Sprint 161 T-002 — Checkpoint Loop Runtime Wire', () => {
     }
   });
 });
+
+// 589-003 — the `waitForHumanApproval` checkpoint-notify texts (pending,
+// escalation, timeout) used to be hardcoded Turkish literals. They now
+// resolve through getMessage()'s `checkpoint.notify_*` key family (en+tr),
+// with `lang` found via the existing detectLang() resolution. These tests
+// pin the key contract directly (both langs, correct var interpolation)
+// and confirm no bare literal Turkish text leaks through when lang='en'.
+describe('589-003 — checkpoint notify texts route through getMessage (checkpoint.notify_*)', () => {
+  it('checkpoint.notify_pending_title interpolates {phase} in en and tr', () => {
+    expect(getMessage('checkpoint.notify_pending_title', 'en', { phase: 'plan' }))
+      .toBe('Approval pending: plan');
+    expect(getMessage('checkpoint.notify_pending_title', 'tr', { phase: 'plan' }))
+      .toBe('Onay bekleniyor: plan');
+  });
+
+  it('checkpoint.notify_escalation_title/summary interpolate {phase}/{summary}/{elapsedMinutes} in en and tr', () => {
+    expect(getMessage('checkpoint.notify_escalation_title', 'en', { phase: 'evaluate' }))
+      .toBe('[Reminder] Approval still pending: evaluate');
+    expect(getMessage('checkpoint.notify_escalation_title', 'tr', { phase: 'evaluate' }))
+      .toBe('[Hatırlatma] Onay hâlâ bekleniyor: evaluate');
+
+    expect(getMessage('checkpoint.notify_escalation_summary', 'en', {
+      summary: 'Ready for review',
+      elapsedMinutes: '30',
+    })).toBe('Ready for review — pending approval for 30 minute(s).');
+    expect(getMessage('checkpoint.notify_escalation_summary', 'tr', {
+      summary: 'Ready for review',
+      elapsedMinutes: '30',
+    })).toBe('Ready for review — 30 dakikadır onay bekliyor.');
+  });
+
+  it('checkpoint.notify_timeout_title/summary interpolate {phase}/{summary}/{timeoutMinutes} in en and tr', () => {
+    expect(getMessage('checkpoint.notify_timeout_title', 'en', { phase: 'fix' }))
+      .toBe('[TIMEOUT] Approval not received: fix');
+    expect(getMessage('checkpoint.notify_timeout_title', 'tr', { phase: 'fix' }))
+      .toBe('[TIMEOUT] Onay alınamadı: fix');
+
+    expect(getMessage('checkpoint.notify_timeout_summary', 'en', {
+      summary: 'Ready for review',
+      timeoutMinutes: '240',
+    })).toBe('Ready for review — no approval/rejection within 240 minutes; the run is being parked (ABORTED).');
+    expect(getMessage('checkpoint.notify_timeout_summary', 'tr', {
+      summary: 'Ready for review',
+      timeoutMinutes: '240',
+    })).toBe('Ready for review — 240 dakika içinde onay/red gelmedi, sprint parklanıyor (ABORTED).');
+  });
+
+  it('en lang never leaks the Turkish literal (guards against a re-introduced hardcode)', () => {
+    const enPending = getMessage('checkpoint.notify_pending_title', 'en', { phase: 'plan' });
+    const enEscalationTitle = getMessage('checkpoint.notify_escalation_title', 'en', { phase: 'plan' });
+    const enTimeoutTitle = getMessage('checkpoint.notify_timeout_title', 'en', { phase: 'plan' });
+    for (const text of [enPending, enEscalationTitle, enTimeoutTitle]) {
+      expect(text).not.toMatch(/Onay|Hatırlatma|dakika/);
+    }
+  });
+
+  it('waitForHumanApproval still resolves false on bounded timeout after the getMessage migration (regression smoke)', async () => {
+    resetInterruptState();
+    const root = mkdirTempForApproval();
+    try {
+      const result = await waitForHumanApproval(
+        root,
+        'sprint-589',
+        'plan',
+        'Regression smoke summary',
+        { timeoutMs: 60, pollIntervalMs: 15, escalationIntervalMs: 10_000 },
+      );
+      expect(result).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+function mkdirTempForApproval(): string {
+  const dir = join(
+    tmpdir(),
+    `deckent-test-checkpoint-notify-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}

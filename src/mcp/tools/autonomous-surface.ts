@@ -25,7 +25,9 @@ import { loadBacklog, validateBacklogEntry } from '../../orchestra/autonomous/ba
 import type { BacklogEntry, BacklogStatus } from '../../orchestra/autonomous/backlog-types.js';
 import { nextRun } from '../../core/scheduled-flow.js';
 import { autonomousPendingPath } from '../../core/constants.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { loadConfig } from '../../core/config.js';
+import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
 
 // ─── Filesystem layout (mirrors autonomous.ts / cli/commands/autonomous.ts) ──
 
@@ -58,37 +60,37 @@ function fail(message: string) {
 // ─── deckent_autonomous_backlog ───────────────────────────────────────────────
 
 export function registerAutonomousBacklogTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_autonomous_backlog',
     {
-      title: 'Autonomous Backlog',
+      title: getMessage('autonomous.mcp_backlog.title', registerLang),
       description: mcpToolDescription('deckent_autonomous_backlog'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
-        action: z.enum(['list', 'add', 'remove']).describe('Action to perform'),
-        root: z.string().optional().describe('Project root path (default: cwd)'),
-        id: z.string().optional().describe('Entry id — required for add/remove'),
-        title: z.string().optional().describe('Entry title — required for add'),
+        action: z.enum(['list', 'add', 'remove']).describe(getMessage('autonomous.mcp_backlog.action_desc', registerLang)),
+        root: z.string().optional().describe(getMessage('autonomous.mcp.root_desc', registerLang)),
+        id: z.string().optional().describe(getMessage('autonomous.mcp_backlog.id_desc', registerLang)),
+        title: z.string().optional().describe(getMessage('autonomous.mcp_backlog.entry_title_desc', registerLang)),
         kind: z.enum(['task', 'sprint', 'capability']).optional().default('task').describe(
-          'Entry kind (task=inline description, sprint=directives ref, capability=F8 broker ' +
-          'verb — capability entries additionally need spec.capabilityTarget, not settable ' +
-          'here; use deckent_autonomous for those). Default: task',
+          getMessage('autonomous.mcp_backlog.kind_desc', registerLang),
         ),
         description: z.string().optional().default('').describe(
-          'Task description or directives ref — used by action=add',
+          getMessage('autonomous.mcp_backlog.description_desc', registerLang),
         ),
         policy: z.enum(['auto', 'approval-required', 'risk-tagged']).optional().default('auto').describe(
-          'Execution policy for action=add. Default: auto',
+          getMessage('autonomous.mcp_backlog.policy_desc', registerLang),
         ),
         cron: z.string().optional().describe(
-          '5-field cron expression — entry recurs at this cadence (omit for one-off). ' +
-          'Validated at intake; a malformed expression is rejected immediately.',
+          getMessage('autonomous.mcp_backlog.cron_desc', registerLang),
         ),
       }),
     },
     async ({ action, root: rootParam, id, title, kind, description, policy, cron }) => {
       const root = rootParam ?? process.cwd();
       const path = backlogPath(root);
+      const appConfig = await loadConfig(root);
+      const lang = getLanguage(appConfig.language);
 
       try {
         if (action === 'list') {
@@ -97,19 +99,22 @@ export function registerAutonomousBacklogTool(server: McpServer): void {
         }
 
         if (action === 'add') {
-          if (!id) return fail('id is required for action=add.');
-          if (!title) return fail('title is required for action=add.');
+          if (!id) return fail(getMessage('autonomous.mcp_backlog.id_required_add', lang));
+          if (!title) return fail(getMessage('autonomous.mcp_backlog.title_required_add', lang));
           if (cron !== undefined) {
             try {
               nextRun(cron, new Date());
             } catch (err) {
-              return fail(`Invalid cron "${cron}": ${err instanceof Error ? err.message : String(err)}`);
+              return fail(getMessage('autonomous.mcp_backlog.invalid_cron', lang, {
+                cron,
+                error: err instanceof Error ? err.message : String(err),
+              }));
             }
           }
 
           const bl = loadBacklog(path);
           if (bl.entries.some((e) => e.id === id)) {
-            return fail(`Entry "${id}" already exists.`);
+            return fail(getMessage('autonomous.mcp_backlog.duplicate', lang, { id }));
           }
 
           const entry: BacklogEntry = {
@@ -133,12 +138,12 @@ export function registerAutonomousBacklogTool(server: McpServer): void {
         }
 
         // action === 'remove'
-        if (!id) return fail('id is required for action=remove.');
+        if (!id) return fail(getMessage('autonomous.mcp_backlog.id_required_remove', lang));
         const bl = loadBacklog(path);
         const before = bl.entries.length;
         bl.entries = bl.entries.filter((e) => e.id !== id);
         if (bl.entries.length === before) {
-          return fail(`Entry "${id}" not found.`);
+          return fail(getMessage('autonomous.mcp_backlog.not_found', lang, { id }));
         }
         mkdirSync(dirname(path), { recursive: true });
         atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
@@ -153,14 +158,15 @@ export function registerAutonomousBacklogTool(server: McpServer): void {
 // ─── deckent_autonomous_status ────────────────────────────────────────────────
 
 export function registerAutonomousStatusTool(server: McpServer): void {
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_autonomous_status',
     {
-      title: 'Autonomous Status',
+      title: getMessage('autonomous.mcp_status.title', registerLang),
       description: mcpToolDescription('deckent_autonomous_status'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        root: z.string().optional().describe('Project root path (default: cwd)'),
+        root: z.string().optional().describe(getMessage('autonomous.mcp.root_desc', registerLang)),
       }),
     },
     async ({ root: rootParam }) => {
