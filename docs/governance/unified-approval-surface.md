@@ -1,6 +1,10 @@
 # Unified Approval Surface & Perpetual Autonomous Operation — Design
 
-**Status:** DESIGN (owner-commissioned 2026-08-20; implementation slices land under
+**Status:** DESIGN — **DOGRULANACAK / UNVERIFIED** (owner manual verification pending,
+Alperen directive 2026-08-20: verifier routes unavailable — codex usage-source down,
+cursor docker-CLI unwired [7091], gemini CANCELLED as a verifier [API-only service]).
+No claim in §1 may be treated as CONFIRMED until the owner or a live verifier seals it.
+(owner-commissioned 2026-08-20; implementation slices land under
 MASTER 4056 APPROVAL-SURFACE-UNIFICATION-001 and 3112 AUTONOMOUS-PERPETUAL-001).
 **Owner problem statement:** approvals are scattered across `deckent approvals`,
 `deckent confirmations`, Nervous accept/reject, autonomous approve/reject, checkpoint,
@@ -221,8 +225,14 @@ AI-legible codes with resolution paths.
 - Voice connectors (no approval surface exists; future channel).
 - v2 `runTask` executor closure is 3111's own acceptance, a 3112 prerequisite.
 
-## 6. Design-step seal
+## 6. Stage-based verification contract (owner directive, hardened 2026-08-20)
 
-The inventory claims in §1 are disk-verifiable (file:line). Seal target: this
-document §1.1–§1.3 against the cited sources. Implementation and result steps carry
-their own seals per slice (owner directive: xverify at every step).
+Design, implementation and RESULT are three SEPARATE verification processes —
+a result-stage seal never substitutes for the design- or implementation-stage
+seal; each stage seals BEFORE its closure. Current design-stage status:
+UNVERIFIED — five codex attempts returned typed HOLD (`candidate_not_eligible`
+← limit `source_unavailable`: the usage window could not be read at all, not a
+saturation), gemini is CANCELLED as a verifier (API-only service, no
+subscription CLI), cursor's docker verifier CLI is the planned 7091 residual.
+Owner decision: the inventory claims in §1 stay marked DOGRULANACAK and the
+owner verifies them manually; the HOLD reports live in `.analysis/xverify/`.

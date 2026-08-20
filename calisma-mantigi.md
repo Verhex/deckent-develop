@@ -418,3 +418,17 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   unwired). HOLD=kapanis-degil; ACIK kalem MASTER 4056'da. DERS: yogun muhur
   gunlerinde verifier-butcesi de planlanmali; cursor-docker dilimi (7091)
   hakem-cesitliligi icin oncelik kazandi.
+
+## Owner-duzeltme turu: muhursuz-landing reddi + DOGRULANACAK-statusu (2026-08-20)
+- IHLAL KABUL: 58da7d603 muhursuz pushlanmisti; owner reddetti, revert edildi
+  (65e382a57). Ders feedback_xverify_claim_discipline'a iki amendment olarak
+  islendi: (1) muhur HOLD ise adim KAPANMAZ — dur + bildir; (2) ASAMA-BAZLI
+  muhur: tasarim/uygulama/sonuc AYRI surecler, sonuc-muhru ikame edemez.
+- KOK-DUZELTMESI: codex 'limit-doygun' teshisim YANLISTI — provider-limits
+  ledger'i source_unavailable gosteriyor (usage-penceresi hic okunamiyor,
+  windows bos). 5 deneme typed-HOLD; retry (secenek-1) de basarisiz.
+- OWNER KARARLARI: gemini verifier IPTAL (yalniz API hizmeti); cursor-docker
+  hakem-dilimi zaten planli (7091); bulgular MASTER'a DOGRULANACAK-statusuyle
+  yazildi (owner manuel dogrulayacak) — 49600c70f reapply + isaretler.
+- ACIK KALEM: codex usage-source arizasi (11:26'dan beri) — ayri teshis
+  gerektirir (docker-ici codex CLI usage okumasi mi, servis mi).

@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "525c0361ce3be005d9e2246307829baa081aaf9549a099f2c5071fd7280787fc"
+    "value": "866fad4c9a6e2de1f25a34e35a6a510ba9565155da301a8e6e8708d8802275f1"
   },
   "summary": {
     "total": 517,
@@ -2184,7 +2184,7 @@
       "state": "OPEN",
       "updated": "2026-08-20",
       "definitionDigest": "e8cbff40fa86a28c1d43b80a07bda349505ea0562561b12c43f50df3246c5500",
-      "progressDigest": "f1055b87abe9cb1a50bdf5e07cf9c49066c2a401f739fdd1b7b15ff911ff2cb8",
+      "progressDigest": "cda7ea0ff3a70ad1d5d5937d2e6b7055a092bc9eb591d7f2c9cd22f4829d82b4",
       "terminalClosureDigest": null
     },
     {
@@ -3702,7 +3702,7 @@
       "state": "OPEN",
       "updated": "2026-08-20",
       "definitionDigest": "0ba1e6d63b6ff3abadcae7bd8b826ddaf101d318664313d9590cef3e0cb93208",
-      "progressDigest": "23d6130f788ed4703798e984ff0d675ec0487faeb2b28139ff9d5a89836bd3dc",
+      "progressDigest": "a9548104d4823c14fb5b3291e238d969c1afb4f4baf440748009456591546ee1",
       "terminalClosureDigest": null
     },
     {
@@ -14481,7 +14481,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Kabul: L1..L7 sirali dilimler; cikis-kaniti 24 saatlik gercek scheduled-watcher canary'si — restart/reboot'tan lease+heartbeat+occurrence+budget kanit-zinciriyle sag cikar; v2 runTask HOLD-stub closure'i (3111 kabulu) on-kosuldur; her dilim xverify-muhurlu",
-      "evidence": "Tasarim: docs/governance/unified-approval-surface.md §1.3+§3.4 (envanter: gercek for(;;) loop + el-yazimi cron + webhook/repo/nervous tetikleyiciler + run-on-approve replay MEVCUT; durust bosluklar: supervisor yok, occurrence-ledger yok [v2 guard'i TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED ile parkliyor], loop-heartbeat yok, kumulatif tavan yok, approval-SLA yok, FlowScheduler state in-memory, v1 fence'siz)",
+      "evidence": "**STATU: DOGRULANACAK (owner-manuel)** — Tasarim: docs/governance/unified-approval-surface.md §1.3+§3.4 (envanter: gercek for(;;) loop + el-yazimi cron + webhook/repo/nervous tetikleyiciler + run-on-approve replay MEVCUT; durust bosluklar: supervisor yok, occurrence-ledger yok [v2 guard'i TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED ile parkliyor], loop-heartbeat yok, kumulatif tavan yok, approval-SLA yok, FlowScheduler state in-memory, v1 fence'siz)",
       "updated": "2026-08-20"
     },
     {
@@ -19218,7 +19218,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Kabul: D1 federated-inbox (tek list TUM pending'i origin'li gosterir, davranis-degisimi sifir) → D2a/b karar-federasyonu (parity-pinli, legacy decide delege) → D3 kanal-tamamlama (Telegram/Slack/Teams relay CANLI + VSCode decide wired + gercek-cihaz kaniti) → D4 TTL/SLA normalizasyonu (suresiz-pending sinifi kalmaz) → D5 legacy-emeklilik + i18n-borc kapanisi; her dilim xverify-muhurlu (owner sarti: tasarim+uygulama+sonuc)",
-      "evidence": "Tasarim: docs/governance/unified-approval-surface.md (owner-komisyonu 2026-08-20; envanter 2 paralel agent + dosya:satir kanitli — guclu cekirdek: approval-contract MAC+TTL+tombstone; dagitik ikinci katman: 11 yuzey tablolu; yazilmis-ama-bagsiz: telegram/slack/teams relay + vscode decide handler). Ilke: ABSORBE ET, ikinci broker ASLA (KANUN 10 authority-uygulamasi). TASARIM-MUHRU DURUMU (durust kayit 2026-08-20): envanter-iddialari xverify'a tasindi; UC hakem-yolu da typed-HOLD — codex advisory-limit block-ratio doygun (candidate_not_eligible — gunun 10+ muhru sonrasi fren DOGRU calisti), gemini provider-scope kaniti yok, cursor docker-CLI unwired (7091 kalan dilim: docker_provider_cli_unavailable). HOLD kapanis DEGIL — tasarim-muhru ilk uygun hakem-penceresinde kosulacak ACIK kalem; uc HOLD-raporu .analysis/xverify'da",
+      "evidence": "Tasarim: docs/governance/unified-approval-surface.md (owner-komisyonu 2026-08-20; envanter 2 paralel agent + dosya:satir kanitli — guclu cekirdek: approval-contract MAC+TTL+tombstone; dagitik ikinci katman: 11 yuzey tablolu; yazilmis-ama-bagsiz: telegram/slack/teams relay + vscode decide handler). Ilke: ABSORBE ET, ikinci broker ASLA (KANUN 10 authority-uygulamasi). **STATU: DOGRULANACAK (owner-manuel; Alperen talimati 2026-08-20)** — tasarim-muhru 5 codex denemesinde typed-HOLD (candidate_not_eligible; KOK duzeltildi: limit-doygunlugu DEGIL, usage-kaynagi source_unavailable — pencere hic okunamiyor), gemini verifier IPTAL (yalniz API hizmeti, subscription-CLI degil — owner karari), cursor docker-CLI 7091 kalan-dilimi. Envanter-iddialari owner manuel dogrulayana VEYA canli hakem muhurleyene kadar CONFIRMED SAYILMAZ; HOLD-raporlari .analysis/xverify'da. Ilk mühürsuz landing (58da7d603) owner tarafindan reddedildi ve revert edildi (65e382a57) — bu yeniden-landing owner-talimatli DOGRULANACAK-statulu kapanistir. ASAMA-BAZLI-MUHUR SERTLESTIRMESI (owner 2026-08-20): tasarim/uygulama/sonuc AYRI muhur surecleridir; sonuc-muhru oncekileri ikame edemez — her dilimde uc asama ayri kapanir",
       "updated": "2026-08-20"
     },
     {
@@ -26622,6 +26622,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f3d2bbe7150e3417e1d2c76a0a776ec93848f61c29a0a37098aeca32aad622c6"
+    "value": "520cdcc002dc9fbfafe1282348eda68e8eb9936d5e73a45d66b618fa05ed3d25"
   }
 }
