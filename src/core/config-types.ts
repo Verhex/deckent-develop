@@ -1603,11 +1603,17 @@ export interface PromptConfig {
    */
   exclude_dynamic_system_prompt_sections?: boolean;
   /**
-   * 7094-F3 (default: false — measured-not-assumed, F2a lesson): externalize
-   * the task-invariant worker CORE blocks to a stable file and start claude
-   * workers with `--bare --system-prompt-file <core>` — CLAUDE.md/skills/hooks
-   * auto-discovery off, composition fully deckent-owned. OFF keeps today's
-   * spawn args and prompt byte-for-byte.
+   * 7094-F3 deckent-owned worker composition (default: true — owner decision
+   * 2026-08-20 after the measured bar was met: three consecutive fully clean
+   * rounds, sprints 582/583/584, each 6/6 attempt-1 DONE with zero fixes;
+   * cumulative cost vs the 567 baseline: comprehensive -70%, simple ~-60%).
+   * Externalizes the task-invariant worker CORE to a content-addressed file
+   * and starts claude workers with `--system-prompt-file <core>` +
+   * `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` + `--disable-slash-commands` (F2b) —
+   * composition fully deckent-owned; auth and the stock tool set stay intact
+   * (the F3-v1 `--bare` variant was measured and rejected: it broke
+   * credential discovery). Set false to restore the stock-CLI composition
+   * byte-for-byte (the pre-F3 spawn args and prompt).
    */
   worker_core_system_prompt?: boolean;
 }

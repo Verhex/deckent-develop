@@ -279,7 +279,10 @@ export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   // other per-machine sections move to the first user message). Verified via
   // real-binary smoke; opt-out with `false`.
   exclude_dynamic_system_prompt_sections: true,
-  worker_core_system_prompt: false,
+  // 7094-F3→product default (owner 2026-08-20): three consecutive fully clean
+  // measurement rounds (582/583/584) met the owner's bar — deckent-owned
+  // worker composition is now the default for every claude docker worker.
+  worker_core_system_prompt: true,
 };
 
 /**

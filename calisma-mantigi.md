@@ -162,3 +162,8 @@
   .analysis/clean-rounds-582-584.md (18 kayıt). 584 çekirdek-6 = $1.806
   (567 $4.674 → -%61; kapsamlı $0.663 → -%70). Kalite band-içi.
 - F3 ürün-default kararı owner önünde (şart yerine geldi: 3 tam temiz tur).
+
+## F3 ÜRÜN-DEFAULT = TRUE (owner 2026-08-20)
+- 3/3 temiz-tur şartı yerine geldi → `worker_core_system_prompt` default true
+  (config.ts; F2b bayrağı da core'la birlikte). false = stok-CLI bayt-parite.
+- .tasks tamamen temizlendi (246 xv-stub arşivde: .tasks/archive/xverify-2026-08-20).
