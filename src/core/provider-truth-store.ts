@@ -668,6 +668,50 @@ export class ProviderTruthStore {
     return materializeReachability(this.verifyReachabilityRow(row), at);
   }
 
+  /**
+   * 7081 approval-carousel layer-2: account-agnostic freshness lookup for the
+   * pre-approval reuse check. The evidence-preparation caller does not know
+   * which account the probe would resolve to (that resolution lives inside
+   * the producer's evidence sources), so its exact-scope query with
+   * `accountRefHash: null` could NEVER match a row written with a real
+   * account hash — the fresh row existed and the operator was still asked for
+   * a new one-shot approval on every run. This variant matches every scope
+   * dimension EXCEPT the account hash. It is a should-we-ask-for-approval
+   * gate only: the producer's own reuse path re-validates under the full
+   * exact scope (including the resolved account) before any evidence is used.
+   */
+  getLatestReachabilityAnyAccount(
+    query: Omit<ExactReachabilityQuery, 'accountRefHash'>,
+    at = this.now(),
+  ): ReachabilityResult | null {
+    this.assertScope(query);
+    const row = this.db.prepare(`
+      SELECT * FROM reachability_results
+      WHERE tenant_id = @tenant_id AND project_id = @project_id
+        AND provider = @provider AND model = @model AND auth_mode = @auth_mode
+        AND transport = @transport AND execution_backend = @execution_backend
+        AND ${nullableEqualSql('endpoint_ref_hash')}
+        AND ${nullableEqualSql('runtime_fingerprint')}
+        AND execution_profile_ref = @execution_profile_ref
+        AND capability = @capability
+      ORDER BY completed_at DESC, inserted_seq DESC LIMIT 1
+    `).get({
+      tenant_id: query.tenantId,
+      project_id: query.projectId,
+      provider: query.provider,
+      model: query.model,
+      auth_mode: query.authMode,
+      transport: query.transport,
+      execution_backend: query.executionBackend,
+      endpoint_ref_hash: query.endpointRefHash,
+      runtime_fingerprint: query.runtimeFingerprint,
+      execution_profile_ref: query.executionProfileRef,
+      capability: query.capability,
+    }) as ReachabilityRow | undefined;
+    if (!row) return null;
+    return materializeReachability(this.verifyReachabilityRow(row), at);
+  }
+
   private verifyReachabilityRow(row: ReachabilityRow): ReachabilityResult {
     if (!this.verifyIntegrity(
       'reachability', row.integrity_key_id, row.payload_json, row.payload_hash, row.integrity_version,

@@ -76,7 +76,7 @@ function providerAuthority(service: Record<string, unknown>) {
     service: {
       tenantId: 'local',
       projectId: 'project-prep-0001',
-      truthStore: { getLatestReachability: vi.fn(() => null) },
+      truthStore: { getLatestReachability: vi.fn(() => null), getLatestReachabilityAnyAccount: vi.fn(() => null) },
       evidenceProducer: { refresh: vi.fn() },
       ...service,
     },
@@ -204,23 +204,37 @@ describe('prepareCrossVerifyCandidateEvidence', () => {
     });
   });
 
-  it('reuses fresh known∧reachable evidence without approval or probe', async () => {
+  it('fresh known∧reachable evidence skips APPROVAL but still runs the canonical refresh (7081 layer-2)', async () => {
+    // The old early-return skipped refresh entirely, so the fresh LIMIT
+    // snapshot the downstream verifier-candidate projection requires was
+    // never written and the composition held with authority_failure. The
+    // final contract: fresh evidence skips only the one-shot approval; the
+    // refresh runs with approval:null and the producer's own exact-scope
+    // reuse settles it.
     const root = projectRoot();
     const row = await mintFreshRow(root);
-    const refresh = vi.fn();
+    const refresh = vi.fn(async () => ({
+      state: 'ready' as const,
+      authorityEvidenceRef: 'producer:ready',
+      limit: null,
+      reachability: row,
+      receiptRef: 'invocation-receipt:reuse',
+    }));
     const submit = vi.fn();
     const result = await prepareCrossVerifyCandidateEvidence(baseInput(root, {
       providerAuthority: providerAuthority({
-        truthStore: { getLatestReachability: vi.fn(() => row) },
+        truthStore: { getLatestReachability: vi.fn(() => row), getLatestReachabilityAnyAccount: vi.fn(() => row) },
         evidenceProducer: { refresh },
       }),
       approvalRuntime: {
         attendedExecutionApprovalAuthority: { submitProviderEvidenceProbe: submit },
       },
     }));
-    expect(result).toMatchObject({ state: 'ready', reused: true });
+    expect(result).toMatchObject({ state: 'ready' });
     expect(submit).not.toHaveBeenCalled();
-    expect(refresh).not.toHaveBeenCalled();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    const request = refresh.mock.calls[0]![0] as { approval: { evidenceRef: string | null } };
+    expect(request.approval.evidenceRef).toBeNull();
   });
 
   it('holds on the owner budget profile before any approval is requested', async () => {

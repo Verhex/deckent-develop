@@ -171,10 +171,15 @@ export interface ProviderEvidenceRefreshRequest {
   readonly authMode: InvocationAuthMode;
   readonly backend: ReachabilityBackendScope;
   readonly executionProfile: ProviderExecutionProfile;
+  /**
+   * 7081 layer-2: nullable — a refresh that reuses fresh evidence needs no
+   * one-shot approval; a REAL probe without one holds with the typed
+   * probe_approval_required (see refreshChecked).
+   */
   readonly approval: {
-    readonly evidenceRef: string;
-    readonly grantedAt: string;
-    readonly expiresAt: string;
+    readonly evidenceRef: string | null;
+    readonly grantedAt: string | null;
+    readonly expiresAt: string | null;
   };
   readonly budget: {
     readonly evidenceRef: string;
@@ -191,6 +196,8 @@ export interface ProviderEvidenceRefreshRequest {
 
 export type ProviderEvidenceHoldReason =
   | 'account_authority_hold'
+  /** 7081 layer-2: a real probe needs the one-shot owner approval; fresh-evidence reuse never reaches this. */
+  | 'probe_approval_required'
   | 'source_bundle_unavailable'
   | 'limit_policy_unavailable'
   | 'limit_source_failure'
@@ -530,7 +537,14 @@ export class ProviderEvidenceProducer {
     requireIdentity('callId', request.callId);
     assertCanonicalProviderId(request.provider);
     assertCanonicalModelApiId(request.model);
-    assertOpaqueEvidenceRef('approval evidence', request.approval.evidenceRef, true);
+    // 7081 approval-carousel layer-2 (2026-08-20): approval evidence is only
+    // REQUIRED when a real probe is about to fire — requiring it at entry
+    // made the fresh-evidence reuse path unreachable without a new one-shot
+    // approval (the preparation layer had already stopped asking when a
+    // fresh row existed, and this assert then failed the whole refresh with
+    // authority_failure). Shape is still validated here when present; the
+    // presence requirement moves to the probe branch below.
+    assertOpaqueEvidenceRef('approval evidence', request.approval.evidenceRef, false);
     assertOpaqueEvidenceRef('budget evidence', request.budget.evidenceRef, true);
     if (!isReachabilityProbeBudget(request.budget.projection)) {
       return hold('authority_failure', 'budget-projection-invalid');
@@ -748,6 +762,13 @@ export class ProviderEvidenceProducer {
       return hold('limit_hold', priorReachability.reasonCode, limit, priorReachability, priorReceipt);
     }
 
+    // 7081 layer-2: past this point a REAL probe fires — the one-shot owner
+    // approval is required exactly here (fresh-evidence reuse above never
+    // reaches this branch). Missing approval is the honest typed hold the
+    // preparation layer already knows how to remedy, never authority_failure.
+    if (request.approval.evidenceRef === null || request.approval.evidenceRef === '') {
+      return hold('probe_approval_required', 'probe-approval-missing', limit, priorReachability ?? null, null);
+    }
     const identity = this.probeInvocationIdentity(exactReachabilityScope, priorReachability);
     const invocationId = this.invocationId(identity);
     const reachabilityId = `reach-${digest(identity.scopeDigest, identity.freshnessEpoch).slice(0, 32)}`;

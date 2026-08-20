@@ -193,14 +193,20 @@ export async function prepareCrossVerifyCandidateEvidence(
   // 2 — fresh-evidence reuse: a known∧reachable row inside its TTL needs no new
   // approval and no probe. The producer re-checks this under its singleflight
   // lock too; this pre-check only avoids pointless operator approval prompts.
+  // 7081 approval-carousel layer-2 (2026-08-20): this lookup is ACCOUNT-
+  // AGNOSTIC — the account hash is resolved inside the producer's evidence
+  // sources, so the old exact-scope query with `accountRefHash: null` never
+  // matched a row written with a real hash, and every run re-asked the owner
+  // for a one-shot approval even while a fresh row sat in the store. The
+  // producer's full exact-scope reuse remains the authority for actually
+  // USING the evidence.
   const nowDate = now();
-  const freshRow = service.truthStore.getLatestReachability({
+  const freshRow = service.truthStore.getLatestReachabilityAnyAccount({
     tenantId: service.tenantId,
     projectId: service.projectId,
     provider: input.candidate.provider,
     model: input.candidate.model,
     authMode: billingModeOf(input.config) === 'metered-api' ? 'api' : 'subscription',
-    accountRefHash: null,
     transport: backendScope.transport,
     executionBackend: backendScope.executionBackend,
     endpointRefHash: null,
@@ -208,15 +214,18 @@ export async function prepareCrossVerifyCandidateEvidence(
     executionProfileRef: runtime.executionProfileRef,
     capability: 'inference',
   }, nowDate);
+  // 7081 layer-2 (final form): a fresh row must NOT short-circuit the whole
+  // preparation — the canonical refresh (step 5) also writes the fresh LIMIT
+  // snapshot the verifier-candidate projection requires (min-freshness), so
+  // skipping it produced authority_failure holds downstream. A fresh row only
+  // skips the APPROVAL step: the producer's own exact-scope reuse then
+  // returns ready without a probe, and a real probe (no fresh row at the
+  // producer's scope) holds with the honest typed probe_approval_required.
+  let skipApprovalForFreshEvidence = false;
   if (freshRow) {
     const evidence = toReachabilityEvidence(freshRow, nowDate);
     if (evidence.state === 'known' && evidence.reachable) {
-      return Object.freeze({
-        state: 'ready' as const,
-        reused: true,
-        executionProfileRef: runtime.executionProfileRef,
-        evidenceRefs: Object.freeze([...freshRow.evidenceRefs]),
-      });
+      skipApprovalForFreshEvidence = true;
     }
   }
 
@@ -241,8 +250,16 @@ export async function prepareCrossVerifyCandidateEvidence(
   const budgetEvidenceRef = `execution-budget:${profileDecision.policyDigest}`;
 
   // 4 — probe authorization: request → live-authenticated decision → single-use
-  // claim. The CLI invocation itself is never a decision.
-  if (!input.approvalRuntime) {
+  // claim. The CLI invocation itself is never a decision. Skipped entirely
+  // when fresh reachability evidence exists (7081 layer-2): no probe will
+  // fire, so no one-shot approval is owed.
+  if (!skipApprovalForFreshEvidence && !input.approvalRuntime) {
+    return hold('approval_authority_unavailable', 'approval-authority-not-composed');
+  }
+  let claim: ProviderEvidenceProbeApprovalClaimV1 | null = null;
+  if (!skipApprovalForFreshEvidence) {
+  const approvalRuntime = input.approvalRuntime;
+  if (!approvalRuntime) {
     return hold('approval_authority_unavailable', 'approval-authority-not-composed');
   }
   const subject = Object.freeze({
@@ -265,7 +282,7 @@ export async function prepareCrossVerifyCandidateEvidence(
       ).toISOString(),
     }),
   });
-  const approvalAuthority = input.approvalRuntime.attendedExecutionApprovalAuthority;
+  const approvalAuthority = approvalRuntime.attendedExecutionApprovalAuthority;
   const requestId = providerEvidenceProbeApprovalRequestId(subject);
   try {
     approvalAuthority.submitProviderEvidenceProbe({
@@ -285,7 +302,6 @@ export async function prepareCrossVerifyCandidateEvidence(
 
   const deadline = nowDate.getTime() + (input.decisionWindowMs ?? DEFAULT_DECISION_WINDOW_MS);
   const pollMs = input.decisionPollMs ?? DEFAULT_DECISION_POLL_MS;
-  let claim: ProviderEvidenceProbeApprovalClaimV1 | null = null;
   for (;;) {
     try {
       claim = approvalAuthority.verifyAndClaimProviderEvidenceProbe(requestId, subject);
@@ -316,9 +332,15 @@ export async function prepareCrossVerifyCandidateEvidence(
       }
     }
   }
+  }
 
   // 5 — canonical refresh: freshness epoch, durable singleflight, cooldown and
-  // truth/receipt persistence all live inside the producer.
+  // truth/receipt persistence all live inside the producer. Runs on BOTH
+  // paths (7081 layer-2): with a claim it may probe; without one (fresh
+  // evidence pre-checked) it re-writes the fresh LIMIT snapshot the
+  // downstream verifier-candidate projection requires and reuses the fresh
+  // reachability row under its own exact scope — a real probe without a
+  // claim holds with the typed probe_approval_required, never a failure.
   const refreshRequest: ProviderEvidenceRefreshRequest = {
     idempotencyKey: `xverify-prep:${runtime.runtimeFingerprint}`,
     runId: input.runId,
@@ -337,11 +359,13 @@ export async function prepareCrossVerifyCandidateEvidence(
         executionBackend: 'docker',
       }],
     },
-    approval: {
-      evidenceRef: claim.evidenceRef,
-      grantedAt: claim.grantedAt,
-      expiresAt: claim.expiresAt,
-    },
+    approval: claim
+      ? {
+          evidenceRef: claim.evidenceRef,
+          grantedAt: claim.grantedAt,
+          expiresAt: claim.expiresAt,
+        }
+      : { evidenceRef: null, grantedAt: null, expiresAt: null },
     budget: {
       evidenceRef: budgetEvidenceRef,
       projection,

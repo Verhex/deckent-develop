@@ -402,8 +402,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-20 (7093+7081 truth wave): +4 — the broker slice suite writes
   // two pinned-fixture files and the schema-normalization pins land in
   // live-execution-budget; token-counter/xverify-ux pins realigned.
+  // 2026-08-20 (7081 carousel layer-2): same 14471 count, digest only —
+  // preparation/truth-store/producer pins realigned to the approval-skip +
+  // canonical-refresh reuse contract.
   count: 14471,
-  digest: 'e7b81f880048d7db499929379542943de17f34887348d3d599edc2e7a042dc44',
+  digest: '53989a384cea76cab171911532b50bc1fb043f515821b6cd32bc8e680fb9dc8b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -689,8 +692,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-20 (7081 approval-carousel layer-1): same 1256 count, digest
   // only — provider-truth reachability lifetime = ttl (admission clamps
   // removed; approval window enforced as run-window via freshness assertion).
+  // 2026-08-20 (7081 carousel layer-2): same 1256 count, digest only —
+  // truth-store account-agnostic lookup, producer probe-gated approval
+  // requirement (nullable approval on refresh), preparation approval-skip +
+  // canonical-refresh reuse moved production content.
   count: 1256,
-  digest: 'e50f0629384c7fd6d96fc9f2ad41c93b29555fc31499737a769334c175253f31',
+  digest: 'cdd9e6814102e6734b232df0401b88e48d99f782dbafbcf37eebcd3ef829a682',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

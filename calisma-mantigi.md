@@ -204,3 +204,14 @@
   üretiliyor (evidence-preparation approval'ı koşulsuz topluyor) — taze kayıt
   varken bile istek doğuyor; düzeltme: preparation'a approval-öncesi
   taze-kayıt ön-kontrolü. Ayrıca pseudo-TTY 'untrusted' tutarsızlığı finding.
+
+## Karusel katman-2 KAPANDI (2026-08-20)
+- Üç kilit: (1) preparation ön-kontrolü account-agnostik (null-hash sorgusu
+  satırı hiç bulamıyordu), (2) producer'da onay yalnız gerçek-probe anında
+  (probe_approval_required typed-hold; reuse onaysız ready), (3) erken-dönüş
+  yerine onay-atlama + kanonik refresh (taze limit-yazımı — candidate-projection
+  min-freshness şartı; erken-dönüş authority_failure üretiyordu).
+- KESİN KANIT: mühür-çifti onay=1/CONFIRMED → **onay=0/CONFIRMED** (…944858500a06).
+- Ders: 'reuse' yolu hiç canlı koşmamış yol sınıfıydı — üç ayrı katman kilidi
+  ancak canlı-çift-koşu döngüsüyle söküldü; her ara-adım typed-hold verdiği
+  için teşhis hep diskten okundu.
