@@ -111,10 +111,10 @@ describe('chat no-CLI fallback UX', () => {
     expect(msg).toContain('claude');
     expect(msg).toContain('codex');
     expect(msg).toContain('gemini');
-    // ddc523bf0 cursor adapter: cursor IS probed (PROVIDER_PRIORITY) but
-    // NO_PROVIDER_MESSAGE in chat.ts does not list it yet — known product-side
-    // gap, tracked as a finding; do not pin 'cursor' here until the message
-    // itself is updated.
+    // Owner decision 2026-08-20: the message now lists every probed provider
+    // (cursor included) and comes from the i18n catalog with a real install hint.
+    expect(msg).toContain('cursor');
+    expect(msg).toContain('https://cursor.com/cli');
     process.exitCode = origExitCode as number;
   });
 

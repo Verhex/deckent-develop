@@ -278,3 +278,23 @@
 - Finding (RELATED_BUT_NONBLOCKING): NO_PROVIDER_MESSAGE (chat.ts:68) cursor'i
   aramasina ragmen listede gostermiyor (ddc523bf0 eksigi; i18n-FIRST'e de
   aykiri hardcode) — owner-admission bekler.
+
+## Owner karar-turu 2026-08-20 (ikinci dalga): DOGFOOD ON + 4 karar + statu-normatiflestirme sorusu
+- DOGFOOD_MODE=ON teyidi islendi: DECISION_REF=owner-live-2026-08-20-dogfood-on-canary-587
+  (CLAUDE.md + AGENTS.md + .cursor parity + canonical policy anchor; lint-operating-policy OK).
+  Evaluator-TASARIM dilimi owner-talimatiyla EL-KODLAMA + xverify-muhurlu istisna.
+- KARAR-1 'fixlensin' (canary-bulgusu) — GERCEK KOK DUZELTMESI: dunku teshisim
+  (isPhantomTailToken satir-lokal) YANLISTI; scope zaten yalniz Files-satirlarindan
+  cikiyor. Gercek kok: core/test-discovery-contract.ts extractPlannedTestPaths
+  description/goCriteria'daki BARE test-dosya-adini ayri planli-yol saniyordu
+  (anafor-korlugu). Fix: ayni gorevde tam-yollu karsiligi olan bare ad suzulur;
+  karsiliksiz bare ad durust BLOCK kalir. Pin 6/6. DERS: ilk-teshis dogrulanmadan
+  MASTER'a kok-neden yazma — bulgu-metni 'fix adayi' asamasindayken bile mekanizma
+  iddiasi disk-kanitla dogrulanmali (kanun 15'in teshis-metnine genislemesi).
+- KARAR-2 'cozulsun' (NO_PROVIDER_MESSAGE): i18n katalogina tasindi (3 yeni anahtar
+  en+tr), cursor + gercek install-hint eklendi; unknown-tool metni PROVIDER_PRIORITY'den
+  turetiliyor (hardcode listesi kalkti). MASTER 7091'e ek-dilim blogu.
+- KARAR-3 'ok': Playbook Ders-21 (genis-yuzeyli landing kadans-sayacini sifirlar)
+  tr+en senkron + changelog.
+- KARAR-4: artifacts-gitignore + flake yonetimi onaylandi, ek is yok.
+Muhur-2: codex CONFIRMED cross-verify-verdict:sha256:84e88e13...e6f7945e (karar-1 anafor-fix + karar-2 i18n/cursor)

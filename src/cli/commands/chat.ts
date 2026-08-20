@@ -24,7 +24,7 @@ import { OllamaAdapter } from '../../providers/ollama.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { loadConfig } from '../../core/config.js';
 import { loadDeckSecrets } from '../../core/deck-file.js';
-import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
+import { PROVIDER_PACKAGES, BINARY_ONLY_PROVIDER_PACKAGES } from '../../core/provider-packages.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import type { ChatTurn } from '../../core/memory-types.js';
 import { print, printError } from '../helpers/output.js';
@@ -65,15 +65,17 @@ interface ProviderProbe {
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const NO_PROVIDER_MESSAGE =
-  'No AI CLI found. Searched: claude (Anthropic), codex (OpenAI), gemini (Google).\n' +
-  'Install options:\n' +
-  `  • claude  — https://claude.ai/download  (npm: ${PROVIDER_PACKAGES.claude.installHint})\n` +
-  `  • codex   — ${PROVIDER_PACKAGES.codex.installHint}\n` +
-  `  • gemini  — ${PROVIDER_PACKAGES.gemini.installHint}\n` +
-  'Alternatives:\n' +
-  '  • deckent chat --native  — built-in chat (no host CLI required)\n' +
-  '  • deckent serve          — open dashboard chat in your browser';
+// i18n + cursor parity (owner decision 2026-08-20): the searched-provider
+// list is the real probe set — cursor included since ddc523bf0 — and the
+// user-facing text lives in the message catalog, not a hardcoded literal.
+function noProviderMessage(lang: string): string {
+  return getMessage('chat.no_provider_found', lang, {
+    claudeHint: PROVIDER_PACKAGES.claude.installHint,
+    codexHint: PROVIDER_PACKAGES.codex.installHint,
+    geminiHint: PROVIDER_PACKAGES.gemini.installHint,
+    cursorHint: BINARY_ONLY_PROVIDER_PACKAGES.cursor.installHint,
+  });
+}
 
 /** Priority order — first ready provider wins during auto-detect. */
 const PROVIDER_PRIORITY: readonly ChatTool[] = ['claude', 'codex', 'cursor', 'gemini'];
@@ -618,15 +620,19 @@ export function registerChat(program: Command): void {
       let chosen: ProviderProbe | null;
       if (opts.tool) {
         if (!PROVIDER_PRIORITY.includes(opts.tool)) {
-          printError(new Error(`Unknown --tool "${opts.tool}". Expected one of: claude, codex, gemini.`));
+          printError(new Error(getMessage('chat.unknown_tool', lang, {
+            tool: opts.tool,
+            valid: PROVIDER_PRIORITY.join(', '),
+          })));
           process.exitCode = 1;
           return;
         }
         const match = probes.find(p => p.tool === opts.tool);
         if (!match || !match.detect.binary) {
-          printError(new Error(
-            `Provider "${opts.tool}" CLI not found in PATH. ${NO_PROVIDER_MESSAGE}`,
-          ));
+          printError(new Error(getMessage('chat.tool_cli_missing', lang, {
+            tool: opts.tool,
+            details: noProviderMessage(lang),
+          })));
           process.exitCode = 1;
           return;
         }
@@ -634,7 +640,7 @@ export function registerChat(program: Command): void {
       } else {
         chosen = selectProvider(probes);
         if (!chosen) {
-          printError(new Error(NO_PROVIDER_MESSAGE));
+          printError(new Error(noProviderMessage(lang)));
           process.exitCode = 1;
           return;
         }

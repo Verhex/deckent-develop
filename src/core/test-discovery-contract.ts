@@ -229,6 +229,20 @@ export function extractPlannedTestPaths(task: Task): string[] {
       if (path) paths.add(path);
     }
   }
+  // Anaphora suppression (7098 canary finding, owner-admitted fix
+  // 2026-08-20): prose routinely refers back to a fully-qualified planned
+  // test by its bare filename ("brain-skill.test.ts içindeki …"). When the
+  // SAME task also carries the qualified path (in Files/scope or prose),
+  // the bare name is a shortened reference to it — not a second, root-level
+  // planned file — so treating it as one produced a false
+  // test-discoverability BLOCK. A bare name with no qualified counterpart
+  // is still a genuine root-level plan and keeps blocking honestly.
+  for (const candidate of [...paths]) {
+    if (candidate.includes('/')) continue;
+    if ([...paths].some(other => other !== candidate && other.endsWith(`/${candidate}`))) {
+      paths.delete(candidate);
+    }
+  }
   return [...paths].sort();
 }
 

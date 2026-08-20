@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "c5f2078908212f84bfa9b94ef11e10cb24c59557ea9221f315831cbb2fcfdcb8"
+    "value": "5cc7d6bed6da84b097ed13dbcb95327400582e4599a2d3782b60a3e7356f02ad"
   },
   "summary": {
     "total": 515,
@@ -4855,9 +4855,9 @@
       "program": "TERMINAL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-19",
+      "updated": "2026-08-20",
       "definitionDigest": "be5a85b105b1a8ee8589233849cb6de3138f8c0cda95a9f5af24327bd3812366",
-      "progressDigest": "68299b2c8e717aa244322519c1bd2f208b9d204cd8d8ca432be247b6cfc51b98",
+      "progressDigest": "cbaf881a5ce7f37b964b6f661894008a152d46e49f4f18583100fc1c408e10c1",
       "terminalClosureDigest": null
     },
     {
@@ -4934,7 +4934,7 @@
       "state": "OPEN",
       "updated": "2026-08-20",
       "definitionDigest": "ab591e96a7ecea61d5481cbc6eb7e9224c4e1dd2af7b3a2603fdc65b0b46bdaa",
-      "progressDigest": "1bd20054b6bf0332d9b7067c5e077e1caa11bc177707a99339e4345083988fae",
+      "progressDigest": "0cd65c1788be77f44b003355b8178dd95917ec466a22fae28e61fbfd1b09dbdd",
       "terminalClosureDigest": null
     },
     {
@@ -23460,8 +23460,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "(1) Provider adapter: `--mode ask -p --trust --output-format json` non-interaktif sözleşmesi üzerinden send/usage; read-only verifier izolasyonu `--mode ask`. (2) Registry: cursor katalog modelleri (`cursor-grok-4.6-*`, `gpt-5.6-sol-*` vb.) owner active-set disiplinine tabi. (3) XVerify: `--verifier cursor --verifier-model cursor-grok-4.6-high` uçtan uca typed kapanış (verdict+call+usage+receipt). (4) Limit: Cursor üyelik limiti admission'a bağlanır; hardcode eşik yok",
-      "evidence": "Owner admission 2026-08-19 (\"cursor provider olarak kabul edip modellerini kullanabilirsin; xverify'da grok 4.6 cursor üzerinden deneyebilirsin; önce test edip sonra işleri güncelle\"). Ön-test kanıtları (2026-08-19): `cursor-agent` v2026.08.11 login'li (owner hesabı); `--list-models` 40+ model (grok-4.6 low→xhigh ±fast); gerçek çağrı grok-4.6-high → `OK` (text) + gpt-5.6-sol-high → JSON `{\"result\":\"PING\",\"usage\":{\"inputTokens\":3,\"outputTokens\":5,…}}` — provider-reported usage MEVCUT; dizin-güven (`--trust`) gerekli. HOST-BOOTSTRAP LANDED 2026-08-19: `.cursor/mcp.json` (deckent-mcp kaydı) + `.cursor/rules/deckent.mdc` (alwaysApply pure adapter + DECKENT-DEV-CONTROL + OPERATING-POLICY blokları) resmi generator+lint --write ile üretildi; lint-operating-policy HOST_RELATIVE_PATHS 3-host oldu (Cursor drift-gate) — 225 pin-test yeşil; çift-doğrulama: Cursor/grok-4.6 5/5 SUPPORTED + Sol 3/3 CONFIRMED (`…cf85f23` `…c0dba6b` `…8b6a0c`; bileşik-koşu dürüst UNCLEAR `…f4e9b`) **FAZ-1 CORE LANDED 2026-08-19 (sprint-565 ABORTED-dürüst 3/10 + ADR-D-007 el-kapama):** spine (union+capabilities+PROVIDER_MODEL_MAP) · CursorAdapter+komut-spec+factory/routing kayıtları · dar katalog (cursor-grok-4.6 ×4, explicit tier) · auth-probe/discovery/doctor · evidence-sources dürüst-stub çift-backend + bootstrap wiring; el-kapamalar: session-interface AUTH_ENV_VARS.cursor (Explore-haritasının kaçırdığı exhaustive Record — 5. fix-scope vakası) + getAllKnownModelIds registerCursorParityModels wiring + **SEC-1 argument-injection kapandı** (`--` end-of-options, gerçek-binary kanıtlı, adapter+spec+pin). Smoke zinciri typed-dürüst: enum ✓ → registry-çözüm ✓ → tier-floor hold ✓ (high=premium<fable) → `docker_provider_cli_unavailable` (imajda cursor-agent yok = residual-010). 250/250 scoped yeşil; tsc 0. Yeni defekt bulgusu: resume projection-divergence — worker sidecar`ları (*.skill-delivery, *.replan-proposal) plan-projeksiyon karşılaştırmasında tanınmıyor → resume imkânsız (7092-aday); xv-stub/NO_TASK_RECEIPT kilidi 13 dosyaya büyüdü. Residual: 009 i18n+battery · 010 Dockerfile/INSTALL_CURSOR + imaj + docker gerçek-koşu",
-      "updated": "2026-08-19"
+      "evidence": "Owner admission 2026-08-19 (\"cursor provider olarak kabul edip modellerini kullanabilirsin; xverify'da grok 4.6 cursor üzerinden deneyebilirsin; önce test edip sonra işleri güncelle\"). Ön-test kanıtları (2026-08-19): `cursor-agent` v2026.08.11 login'li (owner hesabı); `--list-models` 40+ model (grok-4.6 low→xhigh ±fast); gerçek çağrı grok-4.6-high → `OK` (text) + gpt-5.6-sol-high → JSON `{\"result\":\"PING\",\"usage\":{\"inputTokens\":3,\"outputTokens\":5,…}}` — provider-reported usage MEVCUT; dizin-güven (`--trust`) gerekli. HOST-BOOTSTRAP LANDED 2026-08-19: `.cursor/mcp.json` (deckent-mcp kaydı) + `.cursor/rules/deckent.mdc` (alwaysApply pure adapter + DECKENT-DEV-CONTROL + OPERATING-POLICY blokları) resmi generator+lint --write ile üretildi; lint-operating-policy HOST_RELATIVE_PATHS 3-host oldu (Cursor drift-gate) — 225 pin-test yeşil; çift-doğrulama: Cursor/grok-4.6 5/5 SUPPORTED + Sol 3/3 CONFIRMED (`…cf85f23` `…c0dba6b` `…8b6a0c`; bileşik-koşu dürüst UNCLEAR `…f4e9b`) **FAZ-1 CORE LANDED 2026-08-19 (sprint-565 ABORTED-dürüst 3/10 + ADR-D-007 el-kapama):** spine (union+capabilities+PROVIDER_MODEL_MAP) · CursorAdapter+komut-spec+factory/routing kayıtları · dar katalog (cursor-grok-4.6 ×4, explicit tier) · auth-probe/discovery/doctor · evidence-sources dürüst-stub çift-backend + bootstrap wiring; el-kapamalar: session-interface AUTH_ENV_VARS.cursor (Explore-haritasının kaçırdığı exhaustive Record — 5. fix-scope vakası) + getAllKnownModelIds registerCursorParityModels wiring + **SEC-1 argument-injection kapandı** (`--` end-of-options, gerçek-binary kanıtlı, adapter+spec+pin). Smoke zinciri typed-dürüst: enum ✓ → registry-çözüm ✓ → tier-floor hold ✓ (high=premium<fable) → `docker_provider_cli_unavailable` (imajda cursor-agent yok = residual-010). 250/250 scoped yeşil; tsc 0. Yeni defekt bulgusu: resume projection-divergence — worker sidecar`ları (*.skill-delivery, *.replan-proposal) plan-projeksiyon karşılaştırmasında tanınmıyor → resume imkânsız (7092-aday); xv-stub/NO_TASK_RECEIPT kilidi 13 dosyaya büyüdü. Residual: 009 i18n+battery · 010 Dockerfile/INSTALL_CURSOR + imaj + docker gerçek-koşu **EK-DILIM UYGULANDI 2026-08-20 (owner admission '2- cozulsun'; kadans-mutabakat finding'i):** chat NO_PROVIDER_MESSAGE + unknown-tool metinleri hardcode'dan i18n katalogina tasindi (chat.no_provider_found / chat.unknown_tool / chat.tool_cli_missing, en+tr) ve probe-gercekligiyle esitlendi: cursor artik arananlar listesinde + gercek install-hint (BINARY_ONLY_PROVIDER_PACKAGES.cursor). Pin: chat-no-cli-fallback cursor+hint iceriyor; chat suite'leri 20/20 + 5/5 yesil, tsc 0. Ortak muhur (karar-1+2 tek xverify): codex CONFIRMED `cross-verify-verdict:sha256:84e88e13aa0d14f778b01d11f7b0c69cc7fb64f890c712891f686277e6f7945e`.",
+      "updated": "2026-08-20"
     },
     {
       "order": 7092,
@@ -23684,7 +23684,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Kabul: literal kanonik-kaynaktan; iki overwrite-site force-preserving merge + pin testleri; mevcut buildWorkerPrompt guard davranisi regresyonsuz",
-      "evidence": "Kaynak: debt-561-002 + debt-561-003 residual notlari (dogrulama 2026-08-19: literal ve iki overwrite-site diskte duruyor); uc debt ayni kararla resolved (562-002-fix bayat — 7087 ATREF LANDED kanitiyla) **UYGULANDI 2026-08-20 — ILK DOGFOOD-CANARY (sprint-587):** iki is Deckent'in kendi 8-faz akisiyla kosuldu, 2/2 DONE, 0 fix, 0 NO_GO. (1) profileVersion literal'i kanonik SKILL_PROFILE_VERSION import'una cekildi (brain-skill 13/13 yesil); (2) routing-plan-adapter.ts + task-mode-runner.ts V3 yazim-siteleri force-preserving merge (set-agreement pini: applySkillDirectiveAuthority ile sira-farkli/kume-esit; 61/61 hedef + 67 komsu-consumer yesil, tsc 0). CANARY-BULGUSU (owner-karari bekleyen finding, is DEGIL — kanun 4): ilk kosu PLAN prompt-gate'inde DURUST BLOCK uretti — task-builder isPhantomTailToken SATIR-LOKAL oldugu icin direktif-prose'undaki bare test-dosya-adi, Files satirindaki tam-yola ragmen kok-seviye hayalet sayildi (yanlis-pozitif test-discoverability); workaround: prose'da hep tam-yol; kalici fix adayi: phantom-suppressor'a gorev-butunu extracted seti.",
+      "evidence": "Kaynak: debt-561-002 + debt-561-003 residual notlari (dogrulama 2026-08-19: literal ve iki overwrite-site diskte duruyor); uc debt ayni kararla resolved (562-002-fix bayat — 7087 ATREF LANDED kanitiyla) **UYGULANDI 2026-08-20 — ILK DOGFOOD-CANARY (sprint-587):** iki is Deckent'in kendi 8-faz akisiyla kosuldu, 2/2 DONE, 0 fix, 0 NO_GO. (1) profileVersion literal'i kanonik SKILL_PROFILE_VERSION import'una cekildi (brain-skill 13/13 yesil); (2) routing-plan-adapter.ts + task-mode-runner.ts V3 yazim-siteleri force-preserving merge (set-agreement pini: applySkillDirectiveAuthority ile sira-farkli/kume-esit; 61/61 hedef + 67 komsu-consumer yesil, tsc 0). CANARY-BULGUSU KALICI FIX UYGULANDI (owner admission 2026-08-20: '1- fixlensin'): GERCEK KOK ilk teshisten FARKLI cikti — phantom-tail degil, core/test-discovery-contract.ts extractPlannedTestPaths ANAFOR-KORLUGU: prose'daki bare test-dosya-adi (tam-yollu planli teste kisaltilmis atif) ayri kok-seviye 'planned path' sanilip yanlis-pozitif test-discoverability BLOCK uretiyordu. FIX: anafor-bastirma — ayni gorevde tam-yollu karsiligi olan bare ad suzulur; karsiliksiz bare ad DURUST BLOCK olarak kalir (gercek-pozitif korunur). Pin: canary-vakasi + karsiliksiz-bare vakasi, 6/6 yesil; ilk teshisin duzeltilmesi calisma-mantigi'na islendi. Ortak muhur (karar-1+2 tek xverify): codex CONFIRMED `cross-verify-verdict:sha256:84e88e13aa0d14f778b01d11f7b0c69cc7fb64f890c712891f686277e6f7945e`.",
       "updated": "2026-08-20"
     },
     {
@@ -26517,6 +26517,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a486b0112c0bdb12b61995e0fb725cea7e27b80cea4ca974d419df292937360e"
+    "value": "22f07d39ed6d44f550768cccfdbd9b814a23636dc77d472c18af06af2f318ef3"
   }
 }

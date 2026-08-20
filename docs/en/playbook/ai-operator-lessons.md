@@ -295,8 +295,40 @@ tell you which chain parked the run — start diagnosis there.
 
 ---
 
+## 21. A wide-surface landing RESETS the cadence counter — full-suite debt compounds silently
+
+**Case (2026-08-20 cadence reconciliation):** The cadence full-suite (every 3rd
+landing) came back 38 red / 36,963 green. The diagnosis fan-out showed ZERO of the
+reds came from that day's evaluation wave; all of it was unaligned debt from earlier
+landings — the biggest being the cursor-provider landing (sprint-565): 7 test files
+(spawnSync mocks, 4→5 provider pins) had never been updated, plus prior waves'
+pins outside their scoped batteries (post-rubric chain, totalTokens projections,
+truthStore mock) and 7 baseline/projection gates.
+
+**Why:** Scoped-green plus gates is enough for a narrow wave; but a wide-surface
+landing (adding a PROVIDER) touches pins in dozens of distant suites. Waiting for
+the cadence lets that debt accumulate invisibly, and whoever owns the 3rd landing
+pays the diagnosis bill for 38 reds that are not theirs (2 parallel diagnosis
+agents + ~1 hour of reconciliation).
+
+**Correct usage:** (1) A wide-surface landing (new provider, new status vocabulary,
+broad rename) does NOT wait for the cadence — it runs its own full suite and resets
+the counter. (2) On a cadence red, the first question is "mine or accumulated" —
+import-intersection evidence against the changed files (re-run on a clean HEAD tree)
+settles the classification. (3) Reconciliation alignments preserve the fixture's
+PURPOSE: when the B3 ceiling breaks a fixture, the right move is adding a real run
+trace to the fixture, not loosening the verdict. (4) A single-instance flake under
+suite load (run-flow-store WAL lock) is confirmed by isolated re-run — recorded,
+not counted as red.
+
+---
+
 ## Changelog (update after every sprint experience)
 
+- **2026-08-20 — EVALUATION-001 first brick + cadence reconciliation**: Added
+  Lesson 21 (a wide-surface landing resets the cadence counter; classify
+  mine-vs-accumulated first on a cadence red; align while preserving fixture
+  purpose; confirm suite-load flakes by isolated re-run).
 - **2026-08-19 — the 7094-R repair package (sprints 572-574 stability runs)**:
   Lesson 19 added (the evaluator honesty penalty: `testsPassed` neutral in doc/audit
   classes, worker self-NO_GO as a ceiling) and Lesson 20 added (the NO_GO→debt→

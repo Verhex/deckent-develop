@@ -3,7 +3,9 @@
 **Statü:** CANONICAL (owner-approved, Alperen 2026-08-17 — dört onay: kanun 3/4/6 amendment ·
 DOGFOOD_MODE=OFF + Paket A→B sırası · Paket B ürün-kodu çerçevesi · landing/disposition;
 amendment aynı gün: `DECISION_REF=owner-live-2026-08-17-direct-main` — direct-main çalışma,
-PR/merge-queue optional, remote CI advisory).
+PR/merge-queue optional, remote CI advisory; DOGFOOD ON-dönüşü Alperen 2026-08-20:
+`DECISION_REF=owner-live-2026-08-20-dogfood-on-canary-587` — sprint-587 canary 2/2 DONE
+terminal settlement kanıtıyla açık owner ON kararı).
 **Aktif mode değerleri:** YALNIZ `AGENTS.md`/`CLAUDE.md` başındaki machine-readable
 `DECKENT-DEV-CONTROL` bloğundadır (tek persisted projection; gate doğrular). Bu doküman mode
 değerini PROSE olarak taşımaz; çelişki durumunda canlı Alperen kararı → control block kazanır.
@@ -55,7 +57,7 @@ kararıdır. **Yalnız Alperen değiştirir**; agent öneri sunabilir, mutation 
   production-wiring closure, hermetic test ve real-binary proof kuralları AYNEN geçerlidir;
   kapanış Git commit/PR/CI kanıtıyla olur. OFF ≠ düşük kalite; yalnız execution controller
   Deckent değildir.
-- **Güncel karar:** control block'ta (`DECISION_REF=owner-live-2026-08-17-direct-main`).
+- **Güncel karar:** control block'ta (`DECISION_REF=owner-live-2026-08-20-dogfood-on-canary-587`).
   **ON-dönüş koşulu:** Paket B DONE — runPolicyAuthority task-carried wiring + Codex/Fable/Qwen
   policy-digest parity hermetic testi + tek no-op dogfood canary'nin terminal settlement'ı;
   canary öncesi `CANARY_READY` raporu verilir ve Alperen'in açık ON kararı beklenir (tek owner

@@ -31,6 +31,22 @@ describe('test discovery contract preflight', () => {
       .toEqual(['deneme/task-001/example.test.ts']);
   });
 
+  // 7098 canary finding (owner-admitted fix 2026-08-20): prose referring back
+  // to a qualified planned test by its bare filename is an anaphor, not a
+  // second root-level planned file.
+  it('suppresses a bare-filename anaphor when the qualified path is also planned', () => {
+    const anaphoric = task('002', 'tests/orchestra/brain-skill.test.ts');
+    anaphoric.description += ' Replace the literal inside brain-skill.test.ts with the canonical constant.';
+    expect(extractPlannedTestPaths(anaphoric))
+      .toEqual(['tests/orchestra/brain-skill.test.ts']);
+  });
+
+  it('keeps a bare filename with no qualified counterpart (genuine root-level plan)', () => {
+    const bare = task('003', 'src/core/config.ts');
+    bare.description = 'Write orphan.test.ts covering the new branch.';
+    expect(extractPlannedTestPaths(bare)).toEqual(['orphan.test.ts']);
+  });
+
   it('blocks the Run 475 failure class before dispatch', () => {
     const root = mkdtempSync(join(tmpdir(), 'deckent-test-contract-'));
     onTestFinished(() => rmSync(root, { recursive: true, force: true }));

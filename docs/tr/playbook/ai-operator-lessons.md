@@ -279,8 +279,38 @@ parked ettiğini söyler — teşhise oradan başla.
 
 ---
 
+## 21. Genis-yuzeyli landing kadans-sayacini SIFIRLAR — full-suite borcu katlanarak birikir
+
+**Vaka (2026-08-20 kadans mutabakati):** Full-suite kadansi (3 landing'de bir) geregi
+kosulan suite 38 kirmizi / 36.963 yesil verdi. Teshis-fani sonucu: kirmizilarin SIFIRI
+o gunku evaluation-dalgasindan; tamami onceki landing'lerin hizalanmamis borcuydu —
+en buyugu cursor-provider landing'i (sprint-565): 7 test dosyasi (spawnSync mock'lari,
+4→5 provider pinleri) hic guncellenmemisti; ustune dunku dalgalarin scoped-battery
+DISI pinleri (post-rubric zinciri, totalTokens projeksiyonu, truthStore mock'u) ve
+7 baseline/projeksiyon gate'i eklendi.
+
+**Neden:** Scoped-yesil + gate'ler dar-dalga icin yeter; ama PROVIDER ekleme gibi
+genis-yuzeyli bir landing onlarca uzak suite'in pinine dokunur. Kadans bekleyince bu
+borc gorunmez birikir ve 3. landing'in sahibi, kendisinden olmayan 38 kirmizinin
+teshis-faturasini oder (2 paralel teshis-agent'i + ~1 saat mutabakat).
+
+**Dogru kullanim:** (1) Genis-yuzeyli landing (yeni provider, yeni statu-sozlugu,
+genis rename) kadans-sayacini BEKLEMEZ — kendi full-suite'ini kosar ve sayaci
+sifirlar. (2) Kadans-suite kirmizisinda ilk soru "benim mi, birikmis mi" — degisen
+dosyalarla import-kesisimi kaniti (temiz HEAD agacinda tekrar-kosum) siniflandirmayi
+kesinlestirir. (3) Mutabakat hizalamalari fixture'in AMACINI korur: B3-tavani
+fixture'i kirdiginda dogru hamle karari gevsetmek degil fixture'a gercek kosu-izi
+eklemektir. (4) Suite-yuku altinda tek-instance flake (run-flow-store WAL kilidi)
+izole tekrar-kosumla teyit edilir — kirmizi sayilmaz, kayda gecer.
+
+---
+
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-08-20 — EVALUATION-001 ilk tugla + kadans mutabakati**: Ders 21 eklendi
+  (genis-yuzeyli landing kadans-sayacini sifirlar; kadans kirmizisinda once
+  benim-mi-birikmis-mi siniflandirmasi; fixture-amaci korunarak hizalama;
+  suite-yuku flake'i izole teyit).
 - **2026-08-19 — 7094-R onarım paketi (sprint 572-574 stabilite koşusu)**: Ders 19
   (evaluator dürüstlük-cezası: doc/audit sınıfında `testsPassed` nötr, self-NO_GO
   tavan) ve Ders 20 (NO_GO→debt→"Task N" kayması 5-halka zinciri; index-form ref'ler

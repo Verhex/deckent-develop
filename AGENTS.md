@@ -21,7 +21,7 @@ LOCAL_VERIFICATION_MODE=REQUIRED
 EXECUTION_AUTHORITY=FABLE
 ANALYSIS_AUTHORITY=CODEX
 OWNER_AUTHORITY=ALPEREN
-DECISION_REF=owner-live-2026-08-17-direct-main
+DECISION_REF=owner-live-2026-08-20-dogfood-on-canary-587
 <!-- DECKENT-DEV-CONTROL:END -->
 
 > Yukarıdaki blok aktif repo-development mode değerlerinin TEK persisted projection'ıdır

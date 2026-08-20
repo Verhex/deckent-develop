@@ -2911,6 +2911,18 @@ const MESSAGES: MessageMap = {
     en: '[chat-native] error: {message}',
     tr: '[chat-native] hata: {message}',
   },
+  'chat.no_provider_found': {
+    en: 'No AI CLI found. Searched: claude (Anthropic), codex (OpenAI), gemini (Google), cursor (Cursor).\nInstall options:\n  • claude  — https://claude.ai/download  (npm: {claudeHint})\n  • codex   — {codexHint}\n  • gemini  — {geminiHint}\n  • cursor  — {cursorHint}\nAlternatives:\n  • deckent chat --native  — built-in chat (no host CLI required)\n  • deckent serve          — open dashboard chat in your browser',
+    tr: 'AI CLI bulunamadı. Arananlar: claude (Anthropic), codex (OpenAI), gemini (Google), cursor (Cursor).\nKurulum seçenekleri:\n  • claude  — https://claude.ai/download  (npm: {claudeHint})\n  • codex   — {codexHint}\n  • gemini  — {geminiHint}\n  • cursor  — {cursorHint}\nAlternatifler:\n  • deckent chat --native  — yerleşik sohbet (host CLI gerekmez)\n  • deckent serve          — dashboard sohbetini tarayıcıda aç',
+  },
+  'chat.unknown_tool': {
+    en: 'Unknown --tool "{tool}". Expected one of: {valid}.',
+    tr: 'Bilinmeyen --tool "{tool}". Beklenen: {valid}.',
+  },
+  'chat.tool_cli_missing': {
+    en: 'Provider "{tool}" CLI not found in PATH. {details}',
+    tr: '"{tool}" sağlayıcısının CLI aracı PATH üzerinde bulunamadı. {details}',
+  },
   'chat.agentic_no_match': {
     en: '[agentic] no matching intent — falling back to chat.',
     tr: '[agentic] eşleşen niyet yok — sohbete dönülüyor.',
