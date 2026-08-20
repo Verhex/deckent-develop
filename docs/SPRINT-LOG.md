@@ -14200,3 +14200,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 589-004: checkpoint CLI option-desc i18n (DONE)
 
 ---
+## Sprint 590 — sprint-590
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 321s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 321328ms |
+
+### Tasks
+
+- 590-001: status blocked-satırı — i18n + neden-dürüst ifade (DONE)
+
+---

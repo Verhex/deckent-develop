@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-590-001 | Tech debt from 590-001: tests/cli/helpers/human-status.test.ts has 2 failing ass | normal | sprint-590 | resolved |
 | debt-567-004 | Tech debt from 567-004: Created deneme-kontrol/selam.md with a '# Selam' heading | normal | sprint-567 | resolved |
 | debt-565-006 | Tech debt from 565-006: LOCAL_VERIFIED (unpiped exit codes, no pager): `npx tsc  | normal | sprint-565 | resolved |
 | debt-565-007 | Tech debt from 565-007: LANDED (verified):

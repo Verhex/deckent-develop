@@ -66,7 +66,7 @@ describe('listFederatedPendingItems', () => {
     expect(byOrigin['autonomous-trigger']).toMatchObject({
       id: 'trg-1', decideHintKey: 'approvals.federated.hint_autonomous',
     });
-    expect(byOrigin['nervous']).toMatchObject({ id: 'AB12C', summary: 'stale lock detected' });
+    expect(byOrigin['nervous']).toMatchObject({ id: 'ntf-1', summary: 'stale lock detected [AB12C]' });
     expect(byOrigin['checkpoint']!.id).toBe('checkpoint-sprint-9-plan');
     expect(byOrigin['panic-guard']!.id).toBe('panic:900-001-123');
     expect(byOrigin['gateway-pairing']).toMatchObject({ id: 'PAIR42' });

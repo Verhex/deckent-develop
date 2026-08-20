@@ -97,8 +97,12 @@ function nervousRows(projectRoot: string): FederatedPendingItem[] {
     if (typeof record?.id !== 'string') return [];
     return [{
       origin: 'nervous' as const,
-      id: record.shortCode ?? record.id,
-      summary: record.title ?? record.message ?? record.id,
+      // Real notification id (D2b-1): the DE1 short-code generator addresses
+      // every row uniformly, so the legacy nervous 5-char code is no longer
+      // used as an identity — it stays visible in the summary as an alias.
+      id: record.id,
+      summary: (record.title ?? record.message ?? record.id)
+        + (record.shortCode ? ` [${record.shortCode}]` : ''),
       decideHintKey: 'approvals.federated.hint_nervous',
       ...(record.createdAt ? { requestedAt: record.createdAt } : {}),
     }];

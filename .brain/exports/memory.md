@@ -1,5 +1,9 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-590 Learnings
+- Sprint sprint-590 Learnings: ## Sprint sprint-590 Learnings
+- status blocked-satırı — i18n + neden-dürüst ifade: GO_WITH_TECH_DEBT — Moved the 3 hardcode lines in formatHumanStatus (src/cli/helpers/output.ts) -- blocked, next, and stale-dashboard-warnin
+
 ## Sprint sprint-589 Learnings
 - Sprint sprint-589 Learnings: ## Sprint sprint-589 Learnings
 

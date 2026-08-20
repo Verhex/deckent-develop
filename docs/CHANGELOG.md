@@ -14,6 +14,16 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint590] - 2026-08-20
+
+
+### Changed
+
+- status blocked-satırı — i18n + neden-dürüst ifade (completed with tech debt)
+
+
+_Tasks: 1 total, 1 done, 1 tech debt, 0 no-go_
+
 ## [sprint589] - 2026-08-20
 
 ### Added

@@ -1508,6 +1508,20 @@ const MESSAGES: MessageMap = {
     en: 'Handoffs: {pending} pending / {executed} executed',
     tr: 'Handoff\'lar: {pending} bekliyor / {executed} tamamlandı',
   },
+  // Neutral-honest wording (task 590-001): does NOT claim "dependencies" as
+  // the sole cause — blocked also covers file-collision ordering.
+  'status.blocked': {
+    en: 'Blocked: {n} task(s) waiting (dependencies or file-collision ordering)',
+    tr: 'Bekleyen: {n} görev (bağımlılık ya da dosya-çakışması sıralaması)',
+  },
+  'status.next_waiting': {
+    en: 'Next: {n} task(s) will start as workers free up',
+    tr: 'Sıradaki: {n} görev worker boşaldıkça başlayacak',
+  },
+  'status.stale_warning': {
+    en: 'Warning: Dashboard data is {age} old — may be stale',
+    tr: 'Uyarı: Dashboard verisi {age} eski — bayat olabilir',
+  },
 
   // ─── cleanup command ─────────────────────────────────────────────────
   'cleanup.sprint_option': {

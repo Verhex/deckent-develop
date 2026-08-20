@@ -14,7 +14,7 @@ import { createInterface } from 'node:readline/promises';
 import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
 import { looksLikeShortCode, normalizeShortCode, resolveShortCode, shortCodeFor } from '../../core/approval-short-code.js';
 import { loadApprovalRules, matchApprovalRule, promoteRuleFromDecision, saveApprovalRules } from '../../core/approval-rules.js';
-import { isDecisionFederatedOrigin, mirrorFederatedItemToBroker, settleFederatedDecision, type DecisionFederatedOrigin } from '../../core/approval-decision-federation.js';
+import { isDecisionFederatedOrigin, mirrorFederatedItemToBroker, settleFederatedDecision, type DecisionFederatedOrigin } from '../../orchestra/approval-decision-federation.js';
 import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { userInfo } from 'node:os';
 import type { Command } from 'commander';
@@ -318,7 +318,7 @@ export function registerApprovalsCommand(program: Command): void {
           }));
           if (action === 'allow') print(getMessage('approvals.decided_effect', language));
           if (settleBackOrigin) {
-            const settled = settleFederatedDecision(
+            const settled = await settleFederatedDecision(
               root, settleBackOrigin, requestId, action,
               opts.reason ?? 'decided via unified approvals surface');
             if (settled.state === 'settled') {

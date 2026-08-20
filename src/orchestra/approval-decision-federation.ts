@@ -21,13 +21,18 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 
-import type { ApprovalBroker } from './approval-broker.js';
-import type { ApprovalRequest } from './approval-contract.js';
-import { settleConfirmation, readConfirmation } from './confirmation-store.js';
-import type { FederatedPendingItem } from './approval-inbox-federation.js';
+import type { ApprovalBroker } from '../core/approval-broker.js';
+import type { ApprovalRequest } from '../core/approval-contract.js';
+import { settleConfirmation, readConfirmation } from '../core/confirmation-store.js';
+import type { FederatedPendingItem } from '../core/approval-inbox-federation.js';
+import { makeApprovalGate } from './autonomous/approval-adapter.js';
+import { NervousIpcQueue } from '../nervous/ipc-queue.js';
 
-/** Origins whose decision path this bridge federates today. */
-export const DECISION_FEDERATED_ORIGINS = Object.freeze(['confirmation', 'checkpoint'] as const);
+/** Origins whose decision path this bridge federates today (D2a+D2b-1).
+ * panic-guard stays out deliberately: it is a safety floor with its own
+ * explicit surface; bot-action/gateway-pairing wait for their D2b-2 turn. */
+export const DECISION_FEDERATED_ORIGINS = Object.freeze(
+  ['confirmation', 'checkpoint', 'nervous', 'autonomous-trigger'] as const);
 export type DecisionFederatedOrigin = (typeof DECISION_FEDERATED_ORIGINS)[number];
 
 export function isDecisionFederatedOrigin(
@@ -93,13 +98,13 @@ export type SettleBackOutcome =
  * Write the broker-made decision BACK into the legacy store so existing
  * consumers observe it exactly as before the migration.
  */
-export function settleFederatedDecision(
+export async function settleFederatedDecision(
   projectRoot: string,
   origin: DecisionFederatedOrigin,
   legacyId: string,
   action: 'allow' | 'deny',
   reason: string,
-): SettleBackOutcome {
+): Promise<SettleBackOutcome> {
   if (origin === 'confirmation') {
     const found = readConfirmation(projectRoot, legacyId);
     if (!found || found.state !== 'pending') {
@@ -112,6 +117,41 @@ export function settleFederatedDecision(
       decidedAt: new Date().toISOString(),
     });
     return { state: 'settled', origin };
+  }
+  if (origin === 'nervous') {
+    // ABSORB the nervous decision channel: the same IPC queue the CLI/MCP
+    // accept path writes — the executor's poll loop picks it up unchanged.
+    try {
+      const queue = new NervousIpcQueue(projectRoot);
+      await queue.writeApproval({
+        notificationId: legacyId,
+        decision: action === 'allow' ? 'accepted' : 'rejected',
+        reason,
+      });
+      return { state: 'settled', origin };
+    } catch {
+      return { state: 'failed', reason: 'nervous-ipc-write-failed' };
+    }
+  }
+  if (origin === 'autonomous-trigger') {
+    // ABSORB the autonomous gate authority: guardKnownPending + audit +
+    // decisions.json format all live there; a forged/stale id is refused
+    // fail-closed by UnknownApprovalRequestError.
+    try {
+      const gate = makeApprovalGate({
+        pendingPath: join(projectRoot, '.deckent', 'autonomous', 'pending.json'),
+      });
+      if (action === 'allow') gate.accept(legacyId, reason);
+      else gate.reject(legacyId, reason);
+      return { state: 'settled', origin };
+    } catch (error) {
+      return {
+        state: 'failed',
+        reason: error instanceof Error && 'code' in error
+          ? String((error as { code: unknown }).code)
+          : 'autonomous-gate-failed',
+      };
+    }
   }
   // checkpoint — the legacy id IS the file basename; the sprint-lifecycle
   // poll reads `status`, so the write shape must stay byte-compatible.

@@ -1,69 +1,33 @@
-# DIRECTIVES — i18n-borç paketi (dogfood-dalga; owner-onaylı dönüş 2026-08-20)
+# DIRECTIVES — status blocked-etiket dürüstlüğü (dogfood-fabrika; yetki-devri 2026-08-20)
 
 ## Goal
 
-Onay-yüzeyi envanterinin (docs/governance/unified-approval-surface.md) ölçtüğü
-i18n-FIRST ihlallerini kapatmak: kullanıcıya görünen hiçbir metin hardcode kalmaz;
-tümü `getMessage(key, lang)` (src/cli/helpers/messages.ts, en+tr) üzerinden gelir.
-Davranış değişmez — YALNIZ metin-kaynağı değişir; metin-değişiminden kırılan test
-pinleri amaç korunarak yeni anahtar-metnine hizalanır. messages.ts'e yalnız EKLEME
-yapılır; mevcut anahtarlar değiştirilmez. Görevler PARALEL koşar;
-src/cli/helpers/messages.ts ortak dosyadır — file-lock sırası beklenir, lock
-beklemek NO_GO nedeni değildir. Prose'da dosya-adı DAİMA tam-yol yazılır.
+`deckent status` çıktısındaki blocked-satırı bugün koşulsuz "blocked by
+dependencies" diyor (src/cli/helpers/output.ts satır ~640, hardcode-EN) — oysa
+bir görev dependency DIŞINDA file-collision sıralaması ya da başka admission
+nedeniyle de bekleyebilir (sprint-589'da yaşandı: dependencies=[] iken 3 görev
+collision yüzünden bekledi ve etiket yanılttı). Metin hem i18n'e taşınacak hem
+neden-dürüst olacak. Davranış değişmez; yalnız metin-kaynağı ve ifade düzelir.
 
-## Task 1: MCP nervous karar-mesajları i18n
+## Task 1: status blocked-satırı — i18n + neden-dürüst ifade
 
 ### Description
-src/mcp/tools/nervous.ts içindeki İngilizce hardcode kullanıcı-mesajları (accept/
-reject/panic sonuç-metinleri; dosyadaki TÜM template-literal kullanıcı-metinlerini
-tara) getMessage anahtarlarına taşınır; anahtarlar src/cli/helpers/messages.ts'e
-en+tr eklenir (`nervous.*` ailesi komşu-desenine uy).
-- Files: src/mcp/tools/nervous.ts, src/cli/helpers/messages.ts, tests/mcp/nervous-tools.test.ts
-- Test: npx vitest run tests/mcp/nervous-tools.test.ts
+src/cli/helpers/output.ts içindeki hardcode blocked-satırı ("Blocked: N task(s)
+blocked by dependencies") getMessage anahtarına taşınır (src/cli/helpers/messages.ts,
+en+tr, `status.*` ailesi komşu-desenine uy). Metin neden-iddiası TAŞIMAZ —
+nötr-dürüst ifade kullanılır: en "Blocked: {n} task(s) waiting (dependencies or
+file-collision ordering)" / tr "Bekleyen: {n} görev (bağımlılık ya da
+dosya-çakışması sıralaması)". Aynı fonksiyondaki komşu hardcode satırlar
+("Next: ... will start as workers free up" ve stale-warning) da AYNI görevde
+aynı aileyle i18n'e taşınır. Çoğul-ekleri anahtar-metin içinde {n} ile çözülür
+(İngilizce tekil/çoğul için mevcut kataloğun kullandığı desene bak; yoksa tek
+metinde "task(s)" biçimi kabul).
+- Files: src/cli/helpers/output.ts, src/cli/helpers/messages.ts, tests/cli/status-output.test.ts
+- Not: tests/cli/status-output.test.ts YENİ oluşturulur (mevcut değil) — blocked/next satır-render'ını hermetik pinler (tmpdir/fixture, spawnSync yok).
+- Test: npx vitest run tests/cli/status-output.test.ts
 - Model: claude-sonnet-5
 
 ### GO Criteria
-src/mcp/tools/nervous.ts içinde kullanıcıya dönen hiçbir İngilizce hardcode metin
-kalmaz; tests/mcp/nervous-tools.test.ts yeşil; tsc --noEmit temiz.
-
-## Task 2: MCP autonomous karar-mesajları i18n
-
-### Description
-src/mcp/tools/autonomous-approval.ts ve src/mcp/tools/autonomous-surface.ts
-içindeki İngilizce hardcode kullanıcı-mesajları getMessage anahtarlarına taşınır
-(en+tr, `autonomous.*` ailesi). src/mcp/tools/autonomous.ts bu pakette KAPSAM DIŞI.
-- Files: src/mcp/tools/autonomous-approval.ts, src/mcp/tools/autonomous-surface.ts, src/cli/helpers/messages.ts, tests/mcp/autonomous-approval.test.ts
-- Test: npx vitest run tests/mcp/autonomous-approval.test.ts
-- Model: claude-sonnet-5
-
-### GO Criteria
-İki dosyada kullanıcıya dönen İngilizce hardcode metin kalmaz;
-tests/mcp/autonomous-approval.test.ts yeşil; tsc --noEmit temiz.
-
-## Task 3: sprint-lifecycle checkpoint-notify hardcode i18n
-
-### Description
-src/orchestra/sprint-lifecycle.ts içindeki Türkçe hardcode notify-metni
-(satır ~603: "Onay bekleniyor: ..." ve aynı bloktaki eşleri) getMessage
-anahtarına taşınır (en+tr, `checkpoint.*` ailesi); lang mevcut çözümle bulunur.
-- Files: src/orchestra/sprint-lifecycle.ts, src/cli/helpers/messages.ts, tests/orchestra/checkpoint-loop.test.ts
-- Test: npx vitest run tests/orchestra/checkpoint-loop.test.ts
-- Model: claude-sonnet-5
-
-### GO Criteria
-src/orchestra/sprint-lifecycle.ts'te kullanıcıya görünen hardcode TR/EN metin
-kalmaz; tests/orchestra/checkpoint-loop.test.ts yeşil; tsc --noEmit temiz.
-
-## Task 4: checkpoint CLI option-desc i18n
-
-### Description
-src/cli/commands/checkpoint.ts içindeki İngilizce hardcode option/komut
-açıklamaları ve kullanıcı-mesajları getMessage anahtarlarına taşınır (en+tr;
-`--help` çıktısı da kullanıcı-yüzüdür; `checkpoint.*` / `cli.checkpoint.*` ailesi).
-- Files: src/cli/commands/checkpoint.ts, src/cli/helpers/messages.ts, tests/cli/checkpoint-i18n.test.ts
-- Test: npx vitest run tests/cli/checkpoint-i18n.test.ts
-- Model: claude-sonnet-5
-
-### GO Criteria
-src/cli/commands/checkpoint.ts'te İngilizce hardcode kullanıcı-metni kalmaz;
-tests/cli/checkpoint-i18n.test.ts yeşil; tsc --noEmit temiz.
+src/cli/helpers/output.ts'te blocked/next/stale satırları hardcode değildir ve
+blocked-metni "dependencies" tek-nedenini iddia etmez;
+tests/cli/status-output.test.ts yeşil (yeni metne pin dahil); tsc --noEmit temiz.

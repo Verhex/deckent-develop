@@ -7,7 +7,7 @@ import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { ProviderConfigAliasConflictError } from '../../core/provider-config-canonicalizer.js';
 import { isColorSuppressed } from './theme.js';
-import { detectLang } from './i18n.js';
+import { detectLang, getLanguage } from './i18n.js';
 import { getMessage } from './messages.js';
 
 /**
@@ -473,6 +473,14 @@ export function formatStandaloneStatus(tasks: Task[], sprintId?: string): string
 export function formatHumanStatus(input: HumanStatusInput): string {
   const { dashboard, tasks, sprintTitle, sprintStartedAt } = input;
   const now = input.nowMs ?? Date.now();
+  // Only resolve language from the on-disk project config when a
+  // projectRoot is explicitly supplied (real CLI callers always pass one).
+  // Falling back to detectLang(process.cwd()) here would read whatever
+  // .deckent/config.json happens to exist in the current working directory
+  // (e.g. this repo's own config), which is wrong for callers that
+  // intentionally omit projectRoot — env-only resolution (getLanguage())
+  // is the correct default for those.
+  const lang = input.projectRoot ? detectLang(input.projectRoot) : getLanguage();
   const lines: string[] = [];
 
   // ─── W0-TRUTH (#491) COMPLETE-gate ───────────────
@@ -630,20 +638,20 @@ export function formatHumanStatus(input: HumanStatusInput): string {
     const dashAge = now - new Date(dashboard.updatedAt).getTime();
     if (dashAge > 60_000) {
       lines.push('');
-      lines.push(color('\x1b[33m', `Warning: Dashboard data is ${formatElapsed(dashAge)} old \u2014 may be stale`));
+      lines.push(color('\x1b[33m', getMessage('status.stale_warning', lang, { age: formatElapsed(dashAge) })));
     }
   }
 
   // ─── Blocked ─────────────────────────────────────
   if (p.blocked > 0) {
     lines.push('');
-    lines.push(`Blocked: ${p.blocked} task${p.blocked !== 1 ? 's' : ''} blocked by dependencies`);
+    lines.push(getMessage('status.blocked', lang, { n: String(p.blocked) }));
   }
 
   // ─── Next ────────────────────────────────────────
   if (waitingTasks.length > 0) {
     lines.push('');
-    lines.push(`Next: ${waitingTasks.length} task${waitingTasks.length !== 1 ? 's' : ''} will start as workers free up`);
+    lines.push(getMessage('status.next_waiting', lang, { n: String(waitingTasks.length) }));
   }
 
   // ─── Verbose: Agent/Skill detail ─────────────────
