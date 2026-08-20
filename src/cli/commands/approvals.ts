@@ -11,6 +11,8 @@
 // envelope, and adds no second decision protocol.
 
 import { createInterface } from 'node:readline/promises';
+import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
+import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { userInfo } from 'node:os';
 import type { Command } from 'commander';
 
@@ -114,17 +116,41 @@ export function registerApprovalsCommand(program: Command): void {
         const pending = opened.service.broker.list('pending');
         if (pending.length === 0) {
           print(getMessage('approvals.none_pending', language));
-          return;
-        }
-        for (const request of pending) {
-          print(getMessage('approvals.pending_line', language, {
-            id: request.id,
-            summary: request.summary,
-            expiresAt: request.expiresAt,
-          }));
+        } else {
+          for (const request of pending) {
+            print(getMessage('approvals.pending_line', language, {
+              id: request.id,
+              summary: request.summary,
+              expiresAt: request.expiresAt,
+            }));
+          }
         }
       } finally {
         opened.service.close();
+      }
+      // D1 federated inbox (APPROVAL-SURFACE-UNIFICATION-001): surface every
+      // OTHER surface's pending decisions here too — read-only, origin-tagged,
+      // with each surface's CURRENT decision command. Decision paths are
+      // untouched (migration is D2).
+      const federated = listFederatedPendingItems(root, {
+        gatewayHomeDir: gatewayHome(),
+      });
+      print(getMessage('approvals.federated.header', language));
+      if (federated.length === 0) {
+        print(getMessage('approvals.federated.none', language));
+        return;
+      }
+      for (const item of federated) {
+        print(item.unreadable
+          ? getMessage('approvals.federated.row_unreadable', language, {
+            origin: item.origin, id: item.id,
+          })
+          : getMessage('approvals.federated.row', language, {
+            origin: item.origin,
+            id: item.id,
+            summary: item.summary,
+            hint: getMessage(item.decideHintKey, language),
+          }));
       }
     });
 

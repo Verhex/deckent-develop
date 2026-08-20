@@ -421,8 +421,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // suite's confirmation-store tmpdir fixtures (create/settle + CLI decide).
   // 2026-08-20 (codex usage-log selection fix): +1 — the probe-debris
   // shadowing regression pin writes a second sibling rollout fixture.
+  // 2026-08-20 (D1 federated inbox): same 14473 count, digest only — the
+  // federation suite's tmpdir store fixtures are tracked clean.
   count: 14473,
-  digest: 'a1280abbf7c80fce90104592e9ce6966ed6c47e40851a7cc915751df913bc82d',
+  digest: '7f1e8642c54d8824b9142f7574ae5a400659bea5aaf33e7b12592b6e00c91f3a',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -732,8 +734,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-20 (codex usage-log selection fix): same 1262 count, digest
   // only — codex-provider-evidence-sources moved production content
   // (bounded newest-named candidate list + single-read descent).
-  count: 1262,
-  digest: 'afbba8e8b5ed1bfeae5f138224253ef8743e3d858ce434efaf4fb68a54f10bce',
+  // 2026-08-20 (D1 federated inbox): +1 — the new approval-inbox-federation
+  // module; approvals CLI/MCP gained the federated read-only section.
+  count: 1263,
+  digest: '226c8b052db2117ab6d85de196d0def933ccdf1138d5bc9ff5c476ae3c282230',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

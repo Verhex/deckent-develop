@@ -2919,6 +2919,50 @@ const MESSAGES: MessageMap = {
     en: 'Unknown --tool "{tool}". Expected one of: {valid}.',
     tr: 'Bilinmeyen --tool "{tool}". Beklenen: {valid}.',
   },
+  'approvals.federated.header': {
+    en: '— other pending decisions (federated inbox, read-only) —',
+    tr: '— diğer bekleyen kararlar (federe kutu, salt-okunur) —',
+  },
+  'approvals.federated.row': {
+    en: '[{origin}] {id} — {summary}  ·  decide: {hint}',
+    tr: '[{origin}] {id} — {summary}  ·  karar: {hint}',
+  },
+  'approvals.federated.row_unreadable': {
+    en: '[{origin}] {id} — UNREADABLE store (visible, not decidable here)',
+    tr: '[{origin}] {id} — OKUNAMAYAN depo (görünür; burada karar verilemez)',
+  },
+  'approvals.federated.none': {
+    en: 'No pending decisions on any other surface.',
+    tr: 'Diğer yüzeylerde bekleyen karar yok.',
+  },
+  'approvals.federated.hint_confirmation': {
+    en: 'deckent confirmations decide|run',
+    tr: 'deckent confirmations decide|run',
+  },
+  'approvals.federated.hint_autonomous': {
+    en: 'deckent autonomous approve|reject <id>',
+    tr: 'deckent autonomous approve|reject <id>',
+  },
+  'approvals.federated.hint_nervous': {
+    en: 'deckent nervous accept|reject <code>',
+    tr: 'deckent nervous accept|reject <kod>',
+  },
+  'approvals.federated.hint_panic': {
+    en: 'deckent nervous accept <panic-id>',
+    tr: 'deckent nervous accept <panic-id>',
+  },
+  'approvals.federated.hint_checkpoint': {
+    en: 'deckent checkpoint approve|reject',
+    tr: 'deckent checkpoint approve|reject',
+  },
+  'approvals.federated.hint_bot': {
+    en: 'chat: approve|reject <id>',
+    tr: 'sohbet: approve|reject <id>',
+  },
+  'approvals.federated.hint_pairing': {
+    en: 'deckent gateway (pairing approve)',
+    tr: 'deckent gateway (eşleşme onayı)',
+  },
   'confirmations.cmd_desc': {
     en: 'Custom-confirmation inbox — pending acceptance-matrix routes (llm/human/code adapters)',
     tr: 'Custom-confirmation kutusu — bekleyen kabul-matrisi yönlendirmeleri (llm/insan/kod adapterları)',

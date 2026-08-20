@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b6d3bc54e5967bd78caf5b887739eee4c390fcf629804c4c0d0d92c107e2555d"
+    "value": "789545b1a70546eaa7189388b89930739529d66483643702031aa787e1d7da6c"
   },
   "summary": {
     "total": 517,
@@ -3702,7 +3702,7 @@
       "state": "OPEN",
       "updated": "2026-08-20",
       "definitionDigest": "0ba1e6d63b6ff3abadcae7bd8b826ddaf101d318664313d9590cef3e0cb93208",
-      "progressDigest": "77faf3d5e40289165fc34cae027c3d1eaddb01e7e6643f8958c5b0068f4d9c17",
+      "progressDigest": "018f1524fc8b11c45b5df74a10512f0c5f9692b07eaa11f376ef6adf025844c0",
       "terminalClosureDigest": null
     },
     {
@@ -19218,7 +19218,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Kabul: D1 federated-inbox (tek list TUM pending'i origin'li gosterir, davranis-degisimi sifir) → D2a/b karar-federasyonu (parity-pinli, legacy decide delege) → D3 kanal-tamamlama (Telegram/Slack/Teams relay CANLI + VSCode decide wired + gercek-cihaz kaniti) → D4 TTL/SLA normalizasyonu (suresiz-pending sinifi kalmaz) → D5 legacy-emeklilik + i18n-borc kapanisi; her dilim xverify-muhurlu (owner sarti: tasarim+uygulama+sonuc)",
-      "evidence": "Tasarim: docs/governance/unified-approval-surface.md (owner-komisyonu 2026-08-20; envanter 2 paralel agent + dosya:satir kanitli — guclu cekirdek: approval-contract MAC+TTL+tombstone; dagitik ikinci katman: 11 yuzey tablolu; yazilmis-ama-bagsiz: telegram/slack/teams relay + vscode decide handler). Ilke: ABSORBE ET, ikinci broker ASLA (KANUN 10 authority-uygulamasi). **TASARIM-MUHRU TAMAMLANDI 2026-08-20:** codex CONFIRMED `cross-verify-verdict:sha256:7043476a326d2c73969cdb0b83344598f07c44abf02206af86fd1589691c21a3` — hakem-kanali probe-debris defekti (4090-blogu) onarilarak GERI GETIRILDI; hakem bir atif-hatasini da duzeltti (stop-marker runtime-loop'ta degil CLI-sleep'inde) ve dokuman duzeltildi. Ara HOLD/REFUTED zinciri .analysis/xverify'da durust kayit. Gemini verifier IPTAL (yalniz API); cursor docker-CLI 7091 kalani. Ilk muhursuz landing (58da7d603) owner'ca reddedilip revert edilmisti (65e382a57) — muhurlu yeniden-kapanis budur. ASAMA-BAZLI-MUHUR SERTLESTIRMESI (owner 2026-08-20): tasarim/uygulama/sonuc AYRI muhur surecleridir; sonuc-muhru oncekileri ikame edemez — her dilimde uc asama ayri kapanir",
+      "evidence": "Tasarim: docs/governance/unified-approval-surface.md (owner-komisyonu 2026-08-20; envanter 2 paralel agent + dosya:satir kanitli — guclu cekirdek: approval-contract MAC+TTL+tombstone; dagitik ikinci katman: 11 yuzey tablolu; yazilmis-ama-bagsiz: telegram/slack/teams relay + vscode decide handler). Ilke: ABSORBE ET, ikinci broker ASLA (KANUN 10 authority-uygulamasi). **TASARIM-MUHRU TAMAMLANDI 2026-08-20:** codex CONFIRMED `cross-verify-verdict:sha256:7043476a326d2c73969cdb0b83344598f07c44abf02206af86fd1589691c21a3` — hakem-kanali probe-debris defekti (4090-blogu) onarilarak GERI GETIRILDI; hakem bir atif-hatasini da duzeltti (stop-marker runtime-loop'ta degil CLI-sleep'inde) ve dokuman duzeltildi. Ara HOLD/REFUTED zinciri .analysis/xverify'da durust kayit. Gemini verifier IPTAL (yalniz API); cursor docker-CLI 7091 kalani. Ilk muhursuz landing (58da7d603) owner'ca reddedilip revert edilmisti (65e382a57) — muhurlu yeniden-kapanis budur. **D1 UYGULANDI 2026-08-20 (ASAMA-BAZLI UC MUHUR):** src/core/approval-inbox-federation.ts — 7 fail-soft READ-ONLY okuyucu (confirmations · autonomous pending · nervous pending · panic markers · pending-checkpoint'ler · bot-action parklari · gateway-pairing) origin-etiketli satirlara projeler; bozuk depo typed-unreadable satiri (asla crash/gizleme); karar-yollari DOKUNULMADI (D2 isi). CLI `deckent approvals list` broker-bolumu AYNEN + federe bolum (i18n en+tr, karar-ipucu komutlariyla); MCP read-only inbox ayni federe satirlari tasir (decide yuzeyi yine YOK). Pin: 3 federasyon + 48 komsu yesil, tsc 0, hermetic +1-modul belgeli. Gercek-binary kanit: bos/dolu/geri-bos uc durum .analysis/xverify/d1-result-proof.txt. MUHURLER — tasarim: `…691c21a3` (ortak); uygulama: codex CONFIRMED `cross-verify-verdict:sha256:dd5c1e023dcea06bc9d844aa7af06ec6b67d99bb35070b3bd47dd317cf4930c5`; sonuc: codex CONFIRMED `cross-verify-verdict:sha256:6ffdf5598dc88aac2fb8412299dcd6a050b6346c9830c3c75416530460fce97a`.. ASAMA-BAZLI-MUHUR SERTLESTIRMESI (owner 2026-08-20): tasarim/uygulama/sonuc AYRI muhur surecleridir; sonuc-muhru oncekileri ikame edemez — her dilimde uc asama ayri kapanir",
       "updated": "2026-08-20"
     },
     {
@@ -26622,6 +26622,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "58f2caf28632e6cd6e7e2eedf42ae8a718535a73e7594f82e8143eb325a6d785"
+    "value": "9051626a76654b7f1fb035d58db19740e0b4cd37f13da59d58187d47a84fb279"
   }
 }

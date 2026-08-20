@@ -450,3 +450,13 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   + stop-marker atfi) — asama-bazli muhur degerini kanitladi; (2) ls -t ile
   isim-sirali secim farkli — canlilik/teshis iddialarinda secim-kuralini oku;
   (3) xv-artigi build-clean'i HOLD'lar — muhur-sonrasi arsivleme ritueli.
+
+## D1 Federated-Inbox dilimi LANDED (2026-08-20, owner 'OKEYDIR')
+- approval-inbox-federation.ts: 7 fail-soft read-only okuyucu -> origin-etiketli
+  satirlar + i18n karar-ipucu; bozuk depo typed-unreadable (crash/gizleme yok);
+  karar-yollari dokunulmadi. CLI list broker-bolumu aynen + federe bolum; MCP
+  inbox ayni satirlari tasir (decide yine yok).
+- ASAMA-BAZLI UC MUHUR (owner-sozlesmesi ilk tam uygulama): tasarim `…691c21a3`
+  / uygulama `…cf4930c5` (ilk denemede) / sonuc `…60fce97a` (gercek-binary
+  bos/dolu/geri-bos kanit-dosyasiyla; gecici checkpoint-fixture yazilip
+  silindi). Pin 3+48; hermetic +1 modul.

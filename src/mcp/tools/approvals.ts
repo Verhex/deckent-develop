@@ -2,6 +2,8 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
+import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { openApprovalAuthorityRuntime } from '../../core/approval-authority-runtime.js';
 import { loadConfig } from '../../core/config.js';
 import { wrapResponse } from '../helpers/format.js';
@@ -31,9 +33,20 @@ export function registerApprovalsTool(server: McpServer): void {
       const config = await loadConfig(root);
       const lang = getLanguage(config.language);
       const authority = config.approval?.authority;
+      // D1 federated inbox: other surfaces' pending decisions are visible on
+      // MCP too (read-only rows with origin + current decide-command hint).
+      const federated = listFederatedPendingItems(root, { gatewayHomeDir: gatewayHome() })
+        .map(item => ({
+          origin: item.origin,
+          id: item.id,
+          summary: item.summary,
+          decideHint: getMessage(item.decideHintKey, lang),
+          ...(item.requestedAt ? { requestedAt: item.requestedAt } : {}),
+          ...(item.unreadable ? { unreadable: true } : {}),
+        }));
       if (authority?.enabled !== true) {
         return wrapMcp(
-          { pending: [], authority: 'disabled' as const },
+          { pending: [], federated, authority: 'disabled' as const },
           getMessage('approvals.authority_disabled', lang),
         );
       }
@@ -64,7 +77,7 @@ export function registerApprovalsTool(server: McpServer): void {
         const summary = pending.length === 0
           ? getMessage('approvals.none_pending', lang)
           : pending.map(request => getMessage('approvals.pending_line', lang, request)).join('\n');
-        return wrapMcp({ pending, authority: 'ready' as const }, summary);
+        return wrapMcp({ pending, federated, authority: 'ready' as const }, summary);
       } finally {
         opened.service.close();
       }
