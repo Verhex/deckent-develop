@@ -485,3 +485,11 @@ Muhur-4: codex CONFIRMED cross-verify-verdict:sha256:d108ab2e...040aab82 (kabul-
   autonomous/process/do). Muhurler: impl `…05fdd63f` / sonuc `…60d6aa1f`.
 - MIKRO-DERS: muhur-target'i yazmadan once HER dosya `wc -l` ile olculur —
   bugun 4 kosu aralik-hatasina gitti; kural artik ritueldir.
+- D2a KARAR-FEDERASYONU LANDED: confirmation+checkpoint kararlari broker'in
+  canli-oturum ingress'inden (auth-asimetrisi KAPANDI — checkpoint'in
+  auth'suz dosya-mutasyonu ve confirmations'in ciplak TTY-yes'i broker
+  kimlik+MAC zarfina yukseldi); lazy-mirror (kendi id, 24h pencere) +
+  byte-uyumlu settle-back (mevcut tuketiciler degismedi); kisa-kod birlesik
+  kumede cozulur; goc-disi origin typed-red. UCTAN-UCA gercek-binary kanit:
+  #CT4WG -> canli-TTY -> broker-karari -> legacy approved. Muhurler: impl
+  `…33e73025` / sonuc `…12052c65`.

@@ -14,6 +14,7 @@ import { createInterface } from 'node:readline/promises';
 import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
 import { looksLikeShortCode, normalizeShortCode, resolveShortCode, shortCodeFor } from '../../core/approval-short-code.js';
 import { loadApprovalRules, matchApprovalRule, promoteRuleFromDecision, saveApprovalRules } from '../../core/approval-rules.js';
+import { isDecisionFederatedOrigin, mirrorFederatedItemToBroker, settleFederatedDecision, type DecisionFederatedOrigin } from '../../core/approval-decision-federation.js';
 import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { userInfo } from 'node:os';
 import type { Command } from 'commander';
@@ -209,14 +210,22 @@ export function registerApprovalsCommand(program: Command): void {
         return;
       }
       try {
-        // DE1 short-code resolution: addressing sugar only — resolves against
-        // the CURRENT broker pending set; unknown/stale codes fail closed and
-        // an ambiguous code demands the full id (never a guess).
+        // DE1+D2a resolution: short codes resolve against the UNION of the
+        // broker pending set and the federated pending items (the same code
+        // renders everywhere, so it must resolve everywhere). A full id that
+        // the broker does not know is likewise looked up in the federated
+        // set. Unknown/stale fails closed; ambiguity demands the full id.
+        const federatedPending = listFederatedPendingItems(root, {
+          gatewayHomeDir: gatewayHome(),
+        }).filter(item => item.unreadable !== true);
+        let federatedTarget = federatedPending.find(item => item.id === requestId);
         if (looksLikeShortCode(requestId)) {
-          const pendingIds = opened.service.broker.list('pending').map(r => r.id);
-          const resolution = resolveShortCode(requestId, pendingIds);
+          const brokerIds = opened.service.broker.list('pending').map(r => r.id);
+          const federatedIds = federatedPending.map(item => item.id);
+          const resolution = resolveShortCode(requestId, [...brokerIds, ...federatedIds]);
           if (resolution.state === 'resolved') {
             requestId = resolution.id;
+            federatedTarget = federatedPending.find(item => item.id === resolution.id);
           } else if (resolution.state === 'ambiguous') {
             printError(new Error(getMessage('approvals.code_ambiguous', language, {
               code: normalizeShortCode(requestId), ids: resolution.ids.join(', '),
@@ -230,6 +239,28 @@ export function registerApprovalsCommand(program: Command): void {
             process.exitCode = 1;
             return;
           }
+        }
+        // D2a decision federation: a confirmation/checkpoint target is
+        // lazily mirrored into the broker and decided through the SAME
+        // live-session ingress (auth asymmetry closed); other origins stay
+        // on their surfaces until D2b — typed refusal, never a guess.
+        let settleBackOrigin: DecisionFederatedOrigin | undefined;
+        if (federatedTarget && !opened.service.broker.getRequest(federatedTarget.id)) {
+          if (!isDecisionFederatedOrigin(federatedTarget.origin)) {
+            printError(new Error(getMessage('approvals.origin_not_migrated', language, {
+              id: federatedTarget.id,
+              origin: federatedTarget.origin,
+              hint: getMessage(federatedTarget.decideHintKey, language),
+            })));
+            process.exitCode = 1;
+            return;
+          }
+          mirrorFederatedItemToBroker(opened.service.broker, federatedTarget, {
+            tenantId: authority.tenant_id ?? 'main',
+          });
+          settleBackOrigin = federatedTarget.origin;
+        } else if (federatedTarget && isDecisionFederatedOrigin(federatedTarget.origin)) {
+          settleBackOrigin = federatedTarget.origin;
         }
         const action = opts.allow ? 'allow' as const : 'deny' as const;
         const actionLabel = getMessage(
@@ -286,6 +317,20 @@ export function registerApprovalsCommand(program: Command): void {
             action: actionLabel,
           }));
           if (action === 'allow') print(getMessage('approvals.decided_effect', language));
+          if (settleBackOrigin) {
+            const settled = settleFederatedDecision(
+              root, settleBackOrigin, requestId, action,
+              opts.reason ?? 'decided via unified approvals surface');
+            if (settled.state === 'settled') {
+              print(getMessage('approvals.settleback_done', language, {
+                origin: settleBackOrigin, legacyId: requestId,
+              }));
+            } else {
+              printError(new Error(getMessage('approvals.settleback_failed', language, {
+                origin: settleBackOrigin, reason: settled.reason,
+              })));
+            }
+          }
           // DE2a --always promotion: an EXPLICIT owner decision becomes a
           // persistent, removable routine-tier rule. Never system-minted;
           // advisory until the rule authorization envelope lands (D2b).

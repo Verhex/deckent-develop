@@ -2967,6 +2967,18 @@ const MESSAGES: MessageMap = {
     en: 'Rule {ruleId} recorded: {decision} {idPrefix}* — remove any time with: deckent approvals rules remove {ruleId}',
     tr: '{ruleId} kuralı kaydedildi: {decision} {idPrefix}* — istediğin an sil: deckent approvals rules remove {ruleId}',
   },
+  'approvals.origin_not_migrated': {
+    en: '{id} belongs to the {origin} surface — its decision path migrates to the broker in D2b; for now decide it with: {hint}',
+    tr: '{id} {origin} yüzeyine ait — karar yolu D2b ile broker yüzeyine taşınacak; şimdilik şuradan karar ver: {hint}',
+  },
+  'approvals.settleback_done': {
+    en: '↳ {origin} store settled back ({legacyId}).',
+    tr: '↳ {origin} deposuna karar geri yazıldı ({legacyId}).',
+  },
+  'approvals.settleback_failed': {
+    en: 'WARNING: broker decision recorded but the {origin} settle-back failed ({reason}) — resolve the legacy store manually.',
+    tr: 'UYARI: broker kararı kaydedildi ama {origin} geri-yazımı başarısız ({reason}) — legacy depoyu elle çözün.',
+  },
   'approvals.code_unknown': {
     en: 'Short code #{code} matches no CURRENT pending request (codes never outlive the inbox — list again or use the full id).',
     tr: '#{code} kısa-kodu ŞU ANKİ bekleyen isteklerle eşleşmiyor (kodlar kutudan uzun yaşamaz — yeniden listeleyin ya da tam id kullanın).',
