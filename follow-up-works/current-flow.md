@@ -41,6 +41,7 @@
 - [ ] 7091 cursor-docker hakem-CLI (hakem-çeşitliliği).
 
 ## Blocker/not
+- MINI-İŞ (devir-öncesi kayıt 2026-08-21): bot-daemon listen-child stdout'u /dev/null — relay/karar logları görünmez (D3-tanısını zorlaştırdı); bot-daemon.ts spawn'ına log-dosyası ver. D5/temizlik-dalgası adayı.
 - FINDING (7092 RECOVERY-TRUTH canlı-vakası, 2026-08-21): `recover <id> --force` task-dosyalarını arşivlerken resume-checkpoint'i de taşıyor → status-projection PAUSED-artığı kalıyor ama `--resume` "checkpoint bulunamadı" veriyor. Sprint-595'te yaşandı (işin kendisi el-fix+worker-fix'le kapandı; yalnız settlement-projection takılı). 7092 tasarımına girdi-vakası.
 
 ## DEVİR-PAKETİ 2026-08-21 (aktif handoff-pointer'ı — protokol §4.1)
