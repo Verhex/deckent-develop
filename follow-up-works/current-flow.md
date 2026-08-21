@@ -48,6 +48,7 @@
 - handoffId: ah-2026-08-21-codex-rotation · state: PREPARED (epoch 1→2)
 - receipt: docs/execution/handoffs/ah-2026-08-21-codex-rotation/0001-prepared.json
   digest sha256:eff13394ec14417a9503f84fc6bc5555dceb58a5925f615dd61ac426f70ff914
-- SIRA: Codex `node scripts/authority-handoff.mjs verify --handoff ah-2026-08-21-codex-rotation`
-  (fallback-rules/authority-handoff.md §6 doğrulama-prosedürüyle) → Fable `commit`.
-  COMMITTED'a dek yürütücü FABLE'dır (split-brain yasağı).
+- **COMMITTED (epoch 2) — 2026-08-21: EXECUTION_AUTHORITY = CODEX (gpt-5.6-sol).**
+  Zincir: 0001-prepared `…f70ff914` → 0002-verified `…` (Codex bağımsız-doğrulamalı) →
+  0003-committed `sha256:b0148d1bac9f9e06fc6c50058b6bbae5f9038c0a457aa09f4e987479b5da51cb`.
+  Fable aynı-scope mutation'ı KESTİ (gözlem/handoff-desteği modunda). İlk-iş: D4 envanteri.

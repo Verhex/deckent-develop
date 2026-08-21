@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "GENERAL-EXECUTION-SUPERVISION",
+  "role": "supervisor",
+  "baseSha": "309853724c4017c6accff3f7d33e1d5391bdb54c",
+  "headSha": "309853724c4017c6accff3f7d33e1d5391bdb54c",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:cbddebcb8f0ee98fc1651649e9379b3713a9dbc9ec53f329184e78d8f414c12e",
+  "filesChanged": [],
+  "verification": [],
+  "findings": [],
+  "openActions": [
+    "D4 TTL/SLA normalizasyonu (envanter→dalga)",
+    "9040 enforce-canary",
+    "7092 RECOVERY-TRUTH (2 canlı-vaka kayıtlı)",
+    "prefix+F2c default-ON ek-ölçüm raporu (owner-karar paketi)",
+    "Slack/Teams provizyon-sonrası kanal-kanıtları"
+  ],
+  "recommendedNextAction": "D4 envanter-ölçümüyle başla (süresiz-pending sınıfları; tasarım docs/governance/unified-approval-surface.md §D4)",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-08-21-codex-rotation",
+    "sequence": 3,
+    "transition": "COMMITTED",
+    "transitionActor": "transferor",
+    "currentAuthorityEpoch": 1,
+    "proposedAuthorityEpoch": 2,
+    "previousReceiptDigest": "sha256:6a4cf5b170935f92022e0e47b297049926c8676e72755a6ce3ac5575bdb86f89",
+    "from": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-fable-5",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:043e638c57f9ae849367e8d15e80be340f708472d78ce2481687ac0ab0569cd9"
+    },
+    "to": {
+      "hostId": "claude-code-cli",
+      "providerId": "codex",
+      "modelApiId": "gpt-5.6-sol",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:043e638c57f9ae849367e8d15e80be340f708472d78ce2481687ac0ab0569cd9"
+    },
+    "trigger": {
+      "reasonCode": "PROVIDER_LIMIT_OR_CAPACITY",
+      "authorityRef": "owner-live-instruction"
+    },
+    "authorityScope": {
+      "goalId": "n/a",
+      "missionId": "n/a",
+      "flowId": "n/a",
+      "runId": "n/a",
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "deckent-dev fabrika-yürütümü: MASTER-kuyruğu (D4 TTL/SLA, 9040, 7092, prefix/F2c default-ON ölçümleri, 7091 residual) + günlük ritüeller (fallback-rules/authority-handoff.md + AGENTS.md sözleşmeleriyle)"
+      ],
+      "excludes": [
+        "owner-only kararlar; closure-ledger imzası; destructive/anayasal işler; Slack/Teams secret-provizyonu"
+      ]
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-08-21T10:42:44.973Z",
+      "repoStateRef": "git:c19b1193b38c1cc64ab6491281373879a626e66e:dirty=1",
+      "runtimeStateRef": "see follow-up-works/current-flow.md",
+      "approvalStateRef": "deckent approvals list @ observedAt",
+      "verificationStateRef": "see MASTER + .analysis/xverify",
+      "buildStateRef": "build:all@309853724c4017c6accff3f7d33e1d5391bdb54c",
+      "ssotStateRef": "docs/MASTER-PLAN.md + follow-up-works/current-flow.md"
+    }
+  },
+  "receiptDigest": "sha256:b0148d1bac9f9e06fc6c50058b6bbae5f9038c0a457aa09f4e987479b5da51cb"
+}
