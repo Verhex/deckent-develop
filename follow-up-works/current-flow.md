@@ -42,3 +42,11 @@
 
 ## Blocker/not
 - FINDING (7092 RECOVERY-TRUTH canlı-vakası, 2026-08-21): `recover <id> --force` task-dosyalarını arşivlerken resume-checkpoint'i de taşıyor → status-projection PAUSED-artığı kalıyor ama `--resume` "checkpoint bulunamadı" veriyor. Sprint-595'te yaşandı (işin kendisi el-fix+worker-fix'le kapandı; yalnız settlement-projection takılı). 7092 tasarımına girdi-vakası.
+
+## DEVİR-PAKETİ 2026-08-21 (aktif handoff-pointer'ı — protokol §4.1)
+- handoffId: ah-2026-08-21-codex-rotation · state: PREPARED (epoch 1→2)
+- receipt: docs/execution/handoffs/ah-2026-08-21-codex-rotation/0001-prepared.json
+  digest sha256:eff13394ec14417a9503f84fc6bc5555dceb58a5925f615dd61ac426f70ff914
+- SIRA: Codex `node scripts/authority-handoff.mjs verify --handoff ah-2026-08-21-codex-rotation`
+  (fallback-rules/authority-handoff.md §6 doğrulama-prosedürüyle) → Fable `commit`.
+  COMMITTED'a dek yürütücü FABLE'dır (split-brain yasağı).
