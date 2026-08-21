@@ -461,6 +461,121 @@ export function taskKindToAdrDomain(kind: TaskKind): AdrTaskType {
   }
 }
 
+// ─── Task-class prompt profile (593-002 — one classifier, three call sites) ──
+//
+// Before 593-002 the "what class of work is this?" predicate lived THREE times,
+// each reading different inputs and drifting independently:
+//   (1) prompt-god-template `buildWorkerCoreSystemPrompt` — raw scope + task.type,
+//   (2) prompt-god-template `buildScopeBlock`            — sanitized write + raw read,
+//   (3) coverage-validator  `isDocOnlyTask`              — directory prefixes.
+// They are now ONE resolver living next to the existing kind-SSOT reverse helpers
+// (`taskKindToRubric` / `taskKindToAdrDomain`) — no second parallel taxonomy.
+//
+// ADR-D-004 C1 (core/ must not import orchestra/): the legacy doc-vs-code
+// FALLBACK heuristic is `rubric-registry.detectTaskType`, which lives in
+// orchestra/. It is therefore INJECTED by the caller as
+// {@link TaskProfileSignals.fallbackDocOnly} instead of imported here.
+//
+// ADR-G-027: the profile SELECTS prompt composition; it never truncates content.
+
+/**
+ * Canonical task-class as the prompt compiler and the coverage validator see it.
+ *
+ * - `inspection-only` — read targets, no write authority (read-only discipline),
+ * - `doc-only`        — documentation-class work (no source to type-check/test),
+ * - `code`            — everything else (the default, test-verified class).
+ *
+ * Precedence is fixed: inspection-only ▸ doc-only ▸ code. A task with an authored
+ * read list and no write targets is inspection-only even when its kind is a doc
+ * kind — write authority is the stronger signal (fail-closed).
+ */
+export type TaskPromptProfile = 'inspection-only' | 'doc-only' | 'code';
+
+/**
+ * The signals {@link resolveTaskPromptProfile} classifies from. Every field is
+ * OPTIONAL on purpose: each call site supplies only the signals it actually owns
+ * (the scope-block site has no task type; the coverage validator has only
+ * directories), and an absent signal is simply not consulted — so delegating a
+ * legacy predicate is behavior-identical rather than behavior-widening.
+ */
+export interface TaskProfileSignals {
+  /** Declared canonical kind (`task.type`). Empty/absent → {@link fallbackDocOnly}. */
+  type?: TaskKind | string | null;
+  /** Scope signals. `filesWrite` is whatever the caller owns — RAW or already sanitized. */
+  scope?: {
+    readonly filesWrite?: readonly string[];
+    readonly filesRead?: readonly string[];
+    readonly directories?: readonly string[];
+  } | null;
+  /**
+   * Doc-vs-code fallback used ONLY when `type` is absent (legacy/direct-run path).
+   * Injected by the caller because the canonical implementation
+   * (`rubric-registry.detectTaskType`) lives in orchestra/ (ADR-D-004 C1).
+   * Absent → the directory-prefix heuristic below is used instead.
+   */
+  fallbackDocOnly?: () => boolean;
+}
+
+/**
+ * Config surface for the profile resolver (`prompt.task_profiles`). Defaults
+ * reproduce the pre-593-002 hardcoded literals exactly, so the config skeleton
+ * changes NO behavior until an operator overrides it.
+ */
+export interface TaskProfileConfig {
+  /** `task.type` values classified as documentation-class. */
+  readonly doc_kinds: readonly string[];
+  /** Directory prefixes that mark source-code work (anything else is doc-only). */
+  readonly code_directories: readonly string[];
+}
+
+/** Behavior-preserving defaults — the literals the three legacy predicates carried. */
+export const DEFAULT_TASK_PROFILES: TaskProfileConfig = {
+  // buildWorkerCoreSystemPrompt / renderSegments verify-tier doc-kind set.
+  doc_kinds: ['documentation', 'design', 'audit'],
+  // coverage-validator `sourceCodeDirs`.
+  code_directories: ['src/', 'src', 'tests/', 'tests', 'lib/', 'lib'],
+};
+
+/**
+ * THE canonical task-class classifier — one predicate, three (now four) call sites.
+ *
+ * Pure and total: unknown/absent signals degrade to `'code'` (the conservative,
+ * fully-verified class) rather than throwing. Resolution order:
+ *   1. scope shape  → no write targets + an authored read list ⇒ `inspection-only`,
+ *   2. declared kind → member of `doc_kinds` ⇒ `doc-only`, otherwise ⇒ `code`,
+ *   3. injected fallback (`fallbackDocOnly`) when no kind was declared,
+ *   4. directory prefixes — no `code_directories` hit (and a non-empty list) ⇒ `doc-only`.
+ *
+ * @param profiles partial `prompt.task_profiles` override; missing fields fall
+ *        back per-field to {@link DEFAULT_TASK_PROFILES}.
+ */
+export function resolveTaskPromptProfile(
+  signals: TaskProfileSignals,
+  profiles: Partial<TaskProfileConfig> = DEFAULT_TASK_PROFILES,
+): TaskPromptProfile {
+  const scope = signals.scope;
+  // (1) Inspection-only — fail-closed: presence of an authored read list with no
+  // write target selects read-only mode (legacy sites 1 + 2, byte-identical).
+  if ((scope?.filesWrite?.length ?? 0) === 0 && (scope?.filesRead?.length ?? 0) > 0) {
+    return 'inspection-only';
+  }
+  // (2) Declared kind wins over every heuristic (legacy site 1).
+  const type = signals.type;
+  if (type) {
+    const docKinds = profiles.doc_kinds ?? DEFAULT_TASK_PROFILES.doc_kinds;
+    return docKinds.includes(type) ? 'doc-only' : 'code';
+  }
+  // (3) Caller-injected legacy fallback (rubric-registry detectTaskType).
+  if (signals.fallbackDocOnly) return signals.fallbackDocOnly() ? 'doc-only' : 'code';
+  // (4) Directory-prefix heuristic (legacy site 3). An empty directory list is
+  // NOT evidence of doc-only work → 'code'.
+  const dirs = scope?.directories ?? [];
+  if (dirs.length === 0) return 'code';
+  const codeDirs = profiles.code_directories ?? DEFAULT_TASK_PROFILES.code_directories;
+  const touchesCode = dirs.some(d => codeDirs.some(s => d.startsWith(s) || d === s));
+  return touchesCode ? 'code' : 'doc-only';
+}
+
 /** Canonical `TaskKind` → routing-types intent. */
 export function taskKindToIntent(kind: TaskKind): IntentType {
   switch (kind) {

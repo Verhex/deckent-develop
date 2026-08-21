@@ -409,25 +409,18 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
 
 // ─── Cursor parity family (FAZ-1, deliberately narrow) ────────────────────
 /**
- * Provider ownership label for the Cursor CLI (`cursor-agent`) family.
+ * Cursor CLI parity family. Part of `CANONICAL_MODELS` exactly like
+ * {@link CODEX_PARITY_MODELS} — still NOT part of `BUILTIN_MODELS`, so the
+ * 15-model bundled-builtin invariant holds unchanged, but every
+ * `ModelRegistry` (the singleton included) carries the family the moment it is
+ * CONSTRUCTED.
  *
- * TECH DEBT — DELETE ON UNION LANDING. `RegistryProviderName`
- * (`model-registry-types.ts`) does not carry `'cursor'` yet; that union edit is
- * the exclusive write authority of the sprint-565 provider-union spine task,
- * a file THIS task may not touch. The assertion below is the ONE place that
- * gap is absorbed, and it is compile-time only: every provider comparison in
- * this module and its consumers is plain string equality, so catalog behaviour
- * is already final. Once `'cursor'` joins the union the assertion becomes
- * redundant (it keeps compiling either way) and should be inlined back to a
- * bare `'cursor'` literal.
- */
-const CURSOR_PROVIDER = 'cursor' as RegistryProviderName;
-
-/**
- * Cursor CLI parity family. Opt-in exactly like {@link CODEX_PARITY_MODELS}:
- * NOT part of `BUILTIN_MODELS` / `CANONICAL_MODELS`, so the bundled-catalog
- * invariants (15 builtin models, 3 default providers) hold unchanged and no
- * default routing surface gains a cursor candidate implicitly.
+ * That determinism is the whole point. `CursorAdapter.supportedModels` reads
+ * `modelRegistry.getByProvider('cursor')`; while registration hung off a
+ * `getAllKnownModelIds()` side-effect the adapter saw an EMPTY list — and
+ * rejected every model — in any process that never happened to call that
+ * validation helper. Registry membership must not depend on which consumer ran
+ * first, so the canonical bootstrap owns it.
  *
  * FAZ-1 scope is intentionally narrow — only the `cursor-grok-4.6-*` effort
  * family, whose `cursor-` prefix is unambiguous for provider inference.
@@ -455,7 +448,7 @@ export const CURSOR_MODELS: readonly ModelDefinition[] = [
   {
     id: 'cursor-grok-4.6-low',
     apiId: 'cursor-grok-4.6-low',
-    provider: CURSOR_PROVIDER,
+    provider: 'cursor',
     tier: 'economy',
     // Sole GA model in cursor/economy — the designation is explicit anyway so a
     // later addition to this tier cannot silently inherit it by registration order.
@@ -477,7 +470,7 @@ export const CURSOR_MODELS: readonly ModelDefinition[] = [
   {
     id: 'cursor-grok-4.6-medium',
     apiId: 'cursor-grok-4.6-medium',
-    provider: CURSOR_PROVIDER,
+    provider: 'cursor',
     tier: 'standard',
     preferredForTier: true,
     contextWindow: 256_000,
@@ -488,7 +481,7 @@ export const CURSOR_MODELS: readonly ModelDefinition[] = [
   {
     id: 'cursor-grok-4.6-high',
     apiId: 'cursor-grok-4.6-high',
-    provider: CURSOR_PROVIDER,
+    provider: 'cursor',
     tier: 'premium',
     preferredForTier: true,
     contextWindow: 256_000,
@@ -499,7 +492,7 @@ export const CURSOR_MODELS: readonly ModelDefinition[] = [
   {
     id: 'cursor-grok-4.6-xhigh',
     apiId: 'cursor-grok-4.6-xhigh',
-    provider: CURSOR_PROVIDER,
+    provider: 'cursor',
     tier: 'premium_plus',
     preferredForTier: true,
     contextWindow: 256_000,
@@ -509,9 +502,15 @@ export const CURSOR_MODELS: readonly ModelDefinition[] = [
   },
 ] as const;
 
+// The canonical bootstrap set every `ModelRegistry` is constructed from. It is
+// deliberately wider than `BUILTIN_MODELS`: parity families whose provider CLI
+// resolves its supported models straight off the registry must be present
+// BEFORE any consumer asks, otherwise adapter support becomes a function of
+// module-import order rather than of the catalog.
 export const CANONICAL_MODELS: readonly ModelDefinition[] = [
   ...BUILTIN_MODELS,
   ...CODEX_PARITY_MODELS,
+  ...CURSOR_MODELS,
 ] as const;
 
 // ─── Tier ordering for comparison ──────────────────────────────────────────
@@ -545,7 +544,7 @@ export function inferProviderFromId(id: string): RegistryProviderNameExt | undef
   // attributed to the wrong provider. The prefix is exact — a bare `cursor`
   // or a `cursorless-…` id stays unowned rather than being claimed by substring.
   if (lid.startsWith('cursor-')) {
-    return CURSOR_PROVIDER;
+    return 'cursor';
   }
   if (lid.startsWith('claude-')) {
     return 'claude';
@@ -955,12 +954,15 @@ export function registerCodexParityModels(registry: ModelRegistry = modelRegistr
   }
 }
 
-// ─── Opt-in: register Cursor parity models on a target registry ───────────
-// Mirrors registerCodexParityModels() immediately above. Not called at module
-// load (see CURSOR_MODELS): a Cursor provider bootstrap calls this to make the
-// `cursor-grok-4.6-*` family first-class, so a registry that never bootstraps
-// Cursor keeps its bundled-catalog invariants byte-identical. Idempotent —
-// `register()` simply re-Map.sets each definition.
+// ─── Re-register Cursor parity models on a target registry ────────────────
+// CURSOR_MODELS is part of CANONICAL_MODELS, so every default-constructed
+// registry — the singleton included — already carries the family and NOTHING
+// in production needs to call this. It remains exported for registries built
+// from a narrowed builtin set (tests, catalog-replaced registries) that want
+// the family back. Idempotent — `register()` simply re-Map.sets each
+// definition. It is NOT a bootstrap hook: never make catalog membership
+// depend on some consumer remembering to invoke it (that defect is exactly
+// what moving the family into CANONICAL_MODELS fixed).
 export function registerCursorParityModels(registry: ModelRegistry = modelRegistry): void {
   for (const def of CURSOR_MODELS) {
     registry.register(def);

@@ -56,6 +56,15 @@
 | adr-g-040 | Normative Verdict Vocabulary (Single-Word Evaluation Statuses) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-595 Learnings** (sprint-595): ## Sprint sprint-595 Learnings
+- mesaj-katalog + komut-kayıt ratchet borçları: NO_GO — Authorized fix completed: repl...
+- **Sprint sprint-594 Learnings** (sprint-594): ## Sprint sprint-594 Learnings
+- F4 model-tier prompt-farklılaşması (7094-T5): GO_WITH_TECH_DEBT — LOCAL_VERIFIED / S...
+- **Sprint sprint-593 Learnings** (sprint-593): ## Sprint sprint-593 Learnings
+- F2c katalog/mount maskeleme (flag-gated): GO_WITH_TECH_DEBT — WHAT LANDED
+- src/core...
+- **Sprint sprint-592 Learnings** (sprint-592): ## Sprint sprint-592 Learnings
+- cursor Docker imaj-dilimi (INSTALL_CURSOR): GO_WITH_TECH_DEBT — Added `ARG INSTALL_C...
 - **Sprint sprint-591 Learnings** (sprint-591): ## Sprint sprint-591 Learnings
 
 ## Gains
@@ -78,22 +87,6 @@
 
 ## Gains
 - 585-001 — Mini not — Created deneme-kontrol/f3-kanit.md with 3-line Turkis...
-- **Sprint sprint-584 Learnings** (sprint-584): ## Sprint sprint-584 Learnings
-
-## Gains
-- 584-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-k...
-- **Sprint sprint-583 Learnings** (sprint-583): ## Sprint sprint-583 Learnings
-
-## Gains
-- 583-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-k...
-- **Sprint sprint-582 Learnings** (sprint-582): ## Sprint sprint-582 Learnings
-
-## Gains
-- 582-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — deneme-k...
-- **Sprint sprint-579 Learnings** (sprint-579): ## Sprint sprint-579 Learnings
-
-## Gains
-- 579-001 — Deckent araç rehberi (kapsamlı — cache'i dolduran iş) — Yeni dos...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -104,4 +97,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2073 | Generated: 2026-08-20_
+_Total entries: 2088 | Generated: 2026-08-21_

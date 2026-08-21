@@ -1,6 +1,11 @@
 // ─── Coverage Validator ────────────────────────────────────────────
 // Validates worker self-reported coverage against actual vitest output.
 
+import {
+  resolveTaskPromptProfile,
+  type TaskProfileConfig,
+} from '../core/work-model.js';
+
 export type CoverageWarningLevel = 'OK' | 'WARNING' | 'ERROR';
 
 export interface CoverageResult {
@@ -271,12 +276,22 @@ export function validateCoverage(
 /**
  * Returns true if a task is documentation-only (no source code directories).
  * Doc tasks skip coverage validation.
+ *
+ * 593-002: the directory-prefix predicate no longer lives here — it is one branch
+ * of the canonical {@link resolveTaskPromptProfile} classifier (`src/core/work-model.ts`),
+ * shared with the prompt compiler. Passing ONLY the `directories` signal selects
+ * exactly the legacy branch (no declared kind, no injected fallback), so the
+ * classification is byte-for-byte the pre-593-002 one: an empty directory list is
+ * not evidence of doc work → `'code'` → `false`.
  */
-export function isDocOnlyTask(scope: { directories: string[] }): boolean {
-  const sourceCodeDirs = ['src/', 'src', 'tests/', 'tests', 'lib/', 'lib'];
-  const dirs = scope?.directories ?? [];
-  if (dirs.length === 0) return false;
-  return !dirs.some(d => sourceCodeDirs.some(s => d.startsWith(s) || d === s));
+export function isDocOnlyTask(
+  scope: { directories: string[] },
+  taskProfiles?: Partial<TaskProfileConfig>,
+): boolean {
+  return resolveTaskPromptProfile(
+    { scope: { directories: scope?.directories ?? [] } },
+    taskProfiles,
+  ) === 'doc-only';
 }
 
 /**

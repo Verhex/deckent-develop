@@ -253,7 +253,10 @@ describe('runNervousCompensatingAction — honest applied:false for Brain-propos
       expect(result.applied).toBe(false);
       expect(result.actionId).toBe(actionId);
       expect(result.detail).toContain(actionId);
-      expect(result.detail).toContain('ADR-037');
+      // 595-003 stale-ADR sweep: the catalog text now cites the MECHANISM
+      // (advisory authority) instead of the numeric ADR id — the pin's intent
+      // (a specific "why nothing was reversed" reason) is unchanged.
+      expect(result.detail).toContain('advisory authority');
     },
   );
 

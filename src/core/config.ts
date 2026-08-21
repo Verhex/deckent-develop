@@ -15,6 +15,11 @@ import { needsMigration, migrateConfig, removeDuplicateKeys } from './config-mig
 import { canonicalizeProviderConfigAliases } from './provider-config-canonicalizer.js';
 import { canonicalizeModelConfigAliases } from './model-config-canonicalizer.js';
 import { modelRegistry } from './model-registry.js';
+// 593-002: the task-class profile defaults live in the work-model kind-SSOT, next
+// to the other reverse helpers; config only RE-EXPORTS them as the resolved
+// `prompt.task_profiles` default (import is type-erased-safe: work-model imports
+// only types, so no runtime cycle).
+import { DEFAULT_TASK_PROFILES } from './work-model.js';
 import { loadApprovalRules } from './approval-rules-load.js';
 // Import cycle note: routing3/config.ts imports deepMerge from THIS module. The
 // cycle is init-safe — each side references the other's bindings only inside
@@ -41,12 +46,18 @@ import type {
   TimeoutConfig,
 } from './types.js';
 import {
+  ALL_PROVIDER_NAMES,
   DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
   DEFAULT_LIFECYCLE_RECOVERY_CONFIG,
   getAllKnownModelIds,
   PROVIDER_MODEL_MAP,
 } from './types.js';
 import type { ProviderName } from './types.js';
+// core/ → cli/helpers/messages.ts is an established i18n-catalog exception
+// already used by cost-gate.ts, scope-gate.ts, directive-interrogator.ts —
+// see ADR-D-004 C1 background note (warn-level signal only on the scanned
+// core/→orchestra edge; this core/→cli edge is not yet mechanically gated).
+import { getMessage } from '../cli/helpers/messages.js';
 import { MODE_PRESETS } from './mode-presets.js';
 import type { ModelStrategy } from './mode-presets.js';
 import { metric } from './observability.js';
@@ -283,6 +294,13 @@ export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   // measurement rounds (582/583/584) met the owner's bar — deckent-owned
   // worker composition is now the default for every claude docker worker.
   worker_core_system_prompt: true,
+  // 593-001 F2c: catalog mount mask OFF by default — flag-gated, so worker
+  // `docker run` argv stays byte-identical until it is explicitly enabled.
+  catalog_mount_mask: false,
+  // 593-002: task-class profile SSOT (`resolveTaskPromptProfile`). The default IS
+  // the set of literals the three former inline predicates carried, so resolving
+  // through config changes NO classification — only where the values live.
+  task_profiles: DEFAULT_TASK_PROFILES,
 };
 
 /**
@@ -1153,6 +1171,15 @@ export function validateConfig(config: DeckentConfig): string[] {
             errors.push('cross_verify.verifier_priority must be an array of strings');
             break;
           }
+          // 592-003: a provider-name typo (e.g. "cursro") silently passed as a
+          // plain string before — surface it as a typed config error against
+          // the live ALL_PROVIDER_NAMES set instead of a quiet no-op verifier.
+          if (!(ALL_PROVIDER_NAMES as readonly string[]).includes(item)) {
+            errors.push(getMessage('config.cross_verify_unknown_verifier_priority', 'en', {
+              provider: item,
+              providers: ALL_PROVIDER_NAMES.join(', '),
+            }));
+          }
         }
       }
     }
@@ -1166,6 +1193,14 @@ export function validateConfig(config: DeckentConfig): string[] {
         errors.push('cross_verify.verifier_model must be an object mapping provider → exact model API ID');
       } else {
         for (const [provider, model] of Object.entries(cv.verifier_model)) {
+          // 592-003: the map's key is itself a provider name and gets the same
+          // typed membership check as verifier_priority — see above.
+          if (!(ALL_PROVIDER_NAMES as readonly string[]).includes(provider)) {
+            errors.push(getMessage('config.cross_verify_unknown_verifier_model_provider', 'en', {
+              provider,
+              providers: ALL_PROVIDER_NAMES.join(', '),
+            }));
+          }
           if (typeof model !== 'string' || model.trim() === '') {
             errors.push(`cross_verify.verifier_model.${provider} must be a non-empty exact model API ID`);
           }
@@ -1621,6 +1656,19 @@ export function clearConfigCache(): void {
   cachedConfig = null;
   cacheStamp = '';
   cachedProjectRoot = null;
+}
+
+/**
+ * Return the already-resolved config snapshot for an exact project root.
+ *
+ * This synchronous read is intentionally cache-only: synchronous construction
+ * seams must never reimplement the layered async config loader or observe a
+ * snapshot resolved for another project.
+ */
+export function getLoadedConfig(projectRoot: string): ResolvedConfig | undefined {
+  return cachedConfig !== null && cachedProjectRoot === resolve(projectRoot)
+    ? cachedConfig
+    : undefined;
 }
 
 /**
@@ -2506,6 +2554,8 @@ export function regenerateConfigSafe(projectRoot?: string): RegenConfigResult {
 /** Metadata descriptor for a single config parameter. */
 export interface ConfigMetadataEntry {
   description: string;
+  /** Turkish description for localized config-reference consumers. */
+  descriptionTr?: string;
   type: string;
   default: unknown;
   options?: string[];
@@ -2518,6 +2568,14 @@ export interface ConfigMetadataEntry {
  * Consumed by `getConfigHelp`, `listConfigByCategory`, and `generateConfigReference`.
  */
 export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
+  'prompt.catalog_mount_mask': {
+    description: 'Mask repository design catalogs inside Docker workers with empty read-only mounts.',
+    descriptionTr: 'Repository tasarım kataloglarını Docker worker’larında boş ve salt okunur mount’larla maskeler.',
+    type: 'boolean',
+    default: DEFAULT_PROMPT_CONFIG.catalog_mount_mask,
+    options: ['true', 'false'],
+    category: 'Prompt',
+  },
   mode: {
     description: 'Active plan mode — controls worker count and model tier.',
     type: "'performance' | 'balanced' | 'economic' | 'api'",

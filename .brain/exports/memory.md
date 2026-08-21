@@ -1,5 +1,49 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-595 Learnings
+- Sprint sprint-595 Learnings: ## Sprint sprint-595 Learnings
+- mesaj-katalog + komut-kayıt ratchet borçları: NO_GO — Authorized fix completed: replaced numeric ADR references in nervous.mcp.compensate.no_action_available and mcp.start.au
+- kod-ratchet + envanter borçları: NO_GO — LOCAL_VERIFIED: npx tsc --noEmit passed (exit 0).
+TARGETED_TESTS: failed (exit 1): 4 test failures remain across 2 root
+- Fix: Fix: mesaj-katalog + komut-kayıt ratchet borçları: NO_GO — LOCAL_VERIFIED typecheck: npx tsc --noEmit exit 0.
+Targeted verification: goCriteria Vitest command exit 1; 43 passed, 3
+- Fix: mesaj-katalog + komut-kayıt ratchet borçları: NO_GO — LOCAL_VERIFIED: npx tsc --noEmit exit 0. Targeted Vitest reproduction: 153 passed, 3 failed. tests/cli/command-registry.
+- Fix: Fix: kod-ratchet + envanter borçları: NO_GO — npx tsc --noEmit passed (exit 0).
+TARGETED_TESTS failed (exit 1): 4 failures, 218 passes. tests/core/error-registry-lint
+- Fix: kod-ratchet + envanter borçları: NO_GO — LOCAL_VERIFIED: npx tsc --noEmit passed (exit 0).
+TARGETED_TESTS: npx vitest run docs/layer-shims.test.ts tests/core/err
+
+## Gains
+- 595-001 — tier-çözümü fail-soft (kök-neden-1) — F4 model-tier resolution now fails soft at the prompt-composition boundary: unknown registry mode...
+- 595-002 — cursor-katalog sayım-pinleri — LOCAL_VERIFIED / SCOPED_GREEN: npx vitest run tests/core/model-equivalence.test.ts tests/core/mod...
+
+## Sprint sprint-594 Learnings
+- Sprint sprint-594 Learnings: ## Sprint sprint-594 Learnings
+- F4 model-tier prompt-farklılaşması (7094-T5): GO_WITH_TECH_DEBT — LOCAL_VERIFIED / SCOPED_GREEN: npx vitest run tests/orchestra/prompt-god-template.test.ts tests/orchestra/task-builder.t
+
+## Gains
+- 594-001 — codex çekirdek-kaybı düzeltmesi (7094-T4a, CANLI-KANITLI DEFEKT) — GO criteria satisfied at one documented decision seam: buildWorkerPrompt externalizes the worker ...
+- 594-003 — F2c wiring-kapanışı (593-001 debt'i) — LOCAL_VERIFIED / SCOPED_GREEN: npx vitest run tests/core/config.test.ts tests/orchestra/spawn-bac...
+
+## Sprint sprint-593 Learnings
+- Sprint sprint-593 Learnings: ## Sprint sprint-593 Learnings
+- F2c katalog/mount maskeleme (flag-gated): GO_WITH_TECH_DEBT — WHAT LANDED
+- src/core/config-types.ts: `PromptConfig.catalog_mount_mask?: boolean` with a doc block stating the measure
+
+## Gains
+- 593-002 — F5 görev-sınıfı profil SSOT'u (config-resolved) — SSOT: resolveTaskPromptProfile(signals, profiles?) added to src/core/work-model.ts as a NEIGHBOR ...
+- 593-003 — AI-operatör dersleri güncellemesi (iki dil senkron) — Added synchronized Lessons 22-25 and dated 2026-08-21 changelog entries in both authorized playbo...
+
+## Sprint sprint-592 Learnings
+- Sprint sprint-592 Learnings: ## Sprint sprint-592 Learnings
+- cursor Docker imaj-dilimi (INSTALL_CURSOR): GO_WITH_TECH_DEBT — Added `ARG INSTALL_CURSOR=false` plus a conditional RUN block to Dockerfile.worker, symmetric with the existing INSTALL_
+
+## Gains
+- 592-001 — 7094-F3 comment-drift temizliği (yorum-only) — Fixed all 8 flagged stale comments to match runtime truth (prompt.worker_core_system_prompt defau...
+- 592-003 — cross_verify config-şema sertleştirmesi — cross_verify config-schema hardening (592-003): verifier_priority entries and verifier_model keys...
+- 592-004 — cursor registry-bootstrap defekti — Defect fixed at the root: CURSOR_MODELS is now part of CANONICAL_MODELS (src/core/model-registry....
+- 592-005 — xverify cursor backend-simetrisi — needsSpawnBackend (cross-verify-runner.ts, formerly :1654) now includes 'cursor' alongside claude...
+
 ## Sprint sprint-591 Learnings
 - Sprint sprint-591 Learnings: ## Sprint sprint-591 Learnings
 

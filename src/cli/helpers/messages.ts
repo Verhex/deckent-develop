@@ -2508,8 +2508,8 @@ const MESSAGES: MessageMap = {
     tr: 'Bilinmeyen eylem: {action}',
   },
   'nervous.mcp.compensate.no_action_available': {
-    en: 'No compensating action available for "{actionId}" — Nervous only recommends this action (ADR-037); the underlying resource was never modified directly by Nervous, so there is nothing on disk to reverse.',
-    tr: '"{actionId}" için telafi eylemi yok — Nervous bu eylemi yalnızca önerir (ADR-037); ilgili kaynak Nervous tarafından doğrudan değiştirilmedi, bu yüzden diskte geri alınacak bir şey yok.',
+    en: 'No compensating action available for "{actionId}" — Nervous only recommends this action under its advisory authority; the underlying resource was never modified directly by Nervous, so there is nothing on disk to reverse.',
+    tr: '"{actionId}" için telafi eylemi yok — Nervous bu eylemi advisory authority kapsamında yalnızca önerir; ilgili kaynak Nervous tarafından doğrudan değiştirilmedi, bu yüzden diskte geri alınacak bir şey yok.',
   },
   'nervous.mcp.compensate.no_reversal_impl': {
     en: '"{actionId}" has no reversal implementation — treat as unavailable, not success.',
@@ -4931,6 +4931,18 @@ const MESSAGES: MessageMap = {
   'config.provider_alias_conflict': {
     en: 'Conflicting provider settings in the {layer} config: {flatKey}={flatValue} differs from {groupedKey}={groupedValue}. Remove one definition or make both values equal.',
     tr: '{layer} yapılandırmasında çakışan provider ayarları var: {flatKey}={flatValue}, {groupedKey}={groupedValue} değerinden farklı. Tanımlardan birini kaldırın veya iki değeri eşitleyin.',
+  },
+  // 592-003: cross_verify provider-name hardening — a typo in
+  // verifier_priority / verifier_model's keys (e.g. "cursro") used to pass
+  // silently as an inert string; both entries now fail typed config
+  // validation against the live ALL_PROVIDER_NAMES set (core/types.ts).
+  'config.cross_verify_unknown_verifier_priority': {
+    en: 'cross_verify.verifier_priority contains unknown provider "{provider}" — valid providers: {providers}.',
+    tr: 'cross_verify.verifier_priority bilinmeyen bir sağlayıcı içeriyor: "{provider}" — geçerli sağlayıcılar: {providers}.',
+  },
+  'config.cross_verify_unknown_verifier_model_provider': {
+    en: 'cross_verify.verifier_model contains unknown provider key "{provider}" — valid providers: {providers}.',
+    tr: 'cross_verify.verifier_model bilinmeyen bir sağlayıcı anahtarı içeriyor: "{provider}" — geçerli sağlayıcılar: {providers}.',
   },
   'config.key_not_found': { en: 'Key not found: {key}', tr: 'Anahtar bulunamadı: {key}' },
   'config.exported': { en: 'Config exported to {path}', tr: 'Yapılandırma {path} dosyasına dışa aktarıldı' },
@@ -7388,8 +7400,8 @@ const MESSAGES: MessageMap = {
   // ─── deckent_start (591-005 i18n) ───────────────────────────────────
   'mcp.start.title': { en: 'Start Run', tr: 'Run Başlat' },
   'mcp.start.auto_approve_desc': {
-    en: 'Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).',
-    tr: 'Worker araç çağrılarını --dangerously-skip-permissions ile otomatik onaylar. CLI varsayılanı false\'tur; yalnızca çağıran run\'ın güvenli olduğunu onayladığında true verin (CLI/MCP parity — ADR-022-V2).',
+    en: 'Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe under the CLI/MCP parity contract.',
+    tr: 'Worker araç çağrılarını --dangerously-skip-permissions ile otomatik onaylar. CLI varsayılanı false\'tur; yalnızca çağıran run\'ın CLI/MCP parity contractı kapsamında güvenli olduğunu onayladığında true verin.',
   },
   'mcp.start.acknowledge_cost_desc': {
     en: 'Acknowledge a numeric over-budget estimate. Unknown pricing or an unavailable gate still blocks. Equivalent to CLI --force from the cost-gate perspective.',

@@ -232,3 +232,14 @@ export function extractProtectedSegments(segments: readonly PromptSegment[]): Pr
 export function stablePrefixKey(tenantId: string, taskClass: string): string {
   return `${tenantId}::${taskClass}`;
 }
+
+/**
+ * Tenant identifier used when a caller supplies none (593-002).
+ *
+ * Single-tenant local/dev runs have no tenant to key on, but the cache key must
+ * still be total and deterministic — the compiler
+ * (`prompt-god-template.buildTaskPromptSegmented`) falls back to this sentinel so
+ * an unset tenant can never produce `undefined::<class>` keys that silently
+ * collide with, or fragment against, a real tenant's prefix entry.
+ */
+export const DEFAULT_PROMPT_TENANT_ID = 'local';

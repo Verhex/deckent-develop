@@ -8,6 +8,8 @@ import {
   taskKindToRubric,
   taskKindToAdrDomain,
   taskKindToIntent,
+  resolveTaskPromptProfile,
+  DEFAULT_TASK_PROFILES,
 } from '../../src/core/work-model.js';
 import type {
   TaskKind,
@@ -171,5 +173,170 @@ describe('work-model — canonical type construction compiles', () => {
     expect(request.requirements.capabilities).toContain('fs-write');
     expect(request.provider).toBe('codex');
     expect(request.kind).toBe('code-development');
+  });
+});
+
+// ─── resolveTaskPromptProfile (593-002 — task-class SSOT) ────────────────────
+//
+// The value of this block is the EQUIVALENCE pin: the three predicates that were
+// merged are re-implemented verbatim below as ORACLES, and the new SSOT is asserted
+// to agree with each of them on a snapshot matrix of the inputs each site sees. A
+// future edit that changes classification breaks these pins loudly instead of
+// silently shifting which composition a live worker prompt gets.
+
+/** ORACLE — legacy predicate (1): prompt-god-template `buildWorkerCoreSystemPrompt`. */
+function legacyCoreSystemPromptClass(
+  task: { type?: string; scope?: { filesWrite?: string[]; filesRead?: string[] } },
+  detected: string,
+): 'inspection-only' | 'doc-only' | 'code' {
+  const isInspectionOnly =
+    (task.scope?.filesWrite?.length ?? 0) === 0 && (task.scope?.filesRead?.length ?? 0) > 0;
+  if (isInspectionOnly) return 'inspection-only';
+  const isDocOnly = task.type
+    ? task.type === 'documentation' || task.type === 'design' || task.type === 'audit'
+    : detected !== 'code-development';
+  return isDocOnly ? 'doc-only' : 'code';
+}
+
+/** ORACLE — legacy predicate (2): prompt-god-template `buildScopeBlock`. */
+function legacyScopeBlockInspectionOnly(sanitizedWrite: string[], rawRead: string[]): boolean {
+  return sanitizedWrite.length === 0 && rawRead.length > 0;
+}
+
+/** ORACLE — legacy predicate (3): coverage-validator `isDocOnlyTask`. */
+function legacyIsDocOnlyTask(scope: { directories: string[] }): boolean {
+  const sourceCodeDirs = ['src/', 'src', 'tests/', 'tests', 'lib/', 'lib'];
+  const dirs = scope?.directories ?? [];
+  if (dirs.length === 0) return false;
+  return !dirs.some(d => sourceCodeDirs.some(s => d.startsWith(s) || d === s));
+}
+
+describe('work-model — resolveTaskPromptProfile: equivalence with legacy predicate (1)', () => {
+  const scopes: Array<{ filesWrite?: string[]; filesRead?: string[] }> = [
+    { filesWrite: ['src/a.ts'], filesRead: [] },
+    { filesWrite: [], filesRead: ['src/a.ts'] },
+    { filesWrite: [], filesRead: [] },
+    { filesWrite: ['src/a.ts'], filesRead: ['src/b.ts'] },
+    {},
+  ];
+  const types = [undefined, 'documentation', 'design', 'audit', 'code-development', 'test', 'security'];
+  const detections = ['code-development', 'document-write', 'audit'];
+
+  for (const scope of scopes) {
+    for (const type of types) {
+      for (const detected of detections) {
+        const label = `type=${type ?? '∅'} write=${scope.filesWrite?.length ?? '∅'} read=${scope.filesRead?.length ?? '∅'} detected=${detected}`;
+        it(`agrees with the legacy core-system-prompt classifier — ${label}`, () => {
+          expect(
+            resolveTaskPromptProfile({
+              type,
+              scope,
+              fallbackDocOnly: () => detected !== 'code-development',
+            }),
+          ).toBe(legacyCoreSystemPromptClass({ type, scope }, detected));
+        });
+      }
+    }
+  }
+});
+
+describe('work-model — resolveTaskPromptProfile: equivalence with legacy predicate (2)', () => {
+  const cases: Array<[string[], string[]]> = [
+    [[], ['src/a.ts']],
+    [[], []],
+    [['src/a.ts'], ['src/b.ts']],
+    [['src/a.ts'], []],
+  ];
+  it.each(cases)(
+    'agrees with the legacy scope-block inspection predicate (write=%j read=%j)',
+    (sanitizedWrite, rawRead) => {
+      const viaSsot =
+        resolveTaskPromptProfile({ scope: { filesWrite: sanitizedWrite, filesRead: rawRead } }) ===
+        'inspection-only';
+      expect(viaSsot).toBe(legacyScopeBlockInspectionOnly(sanitizedWrite, rawRead));
+    },
+  );
+});
+
+describe('work-model — resolveTaskPromptProfile: equivalence with legacy predicate (3)', () => {
+  const dirSets: string[][] = [
+    [],
+    ['docs/'],
+    ['docs/audits/sprint-593'],
+    ['src/core/'],
+    ['src'],
+    ['tests/'],
+    ['lib'],
+    ['docs/', 'src/core/'],
+    ['.deckent/'],
+    ['srcextra/'],
+  ];
+  it.each(dirSets.map(d => [d] as [string[]]))(
+    'agrees with the legacy coverage-validator doc-only predicate (dirs=%j)',
+    dirs => {
+      const viaSsot = resolveTaskPromptProfile({ scope: { directories: dirs } }) === 'doc-only';
+      expect(viaSsot).toBe(legacyIsDocOnlyTask({ directories: dirs }));
+    },
+  );
+});
+
+describe('work-model — resolveTaskPromptProfile: contract', () => {
+  it('precedence: no write targets + an authored read list wins over a doc kind', () => {
+    expect(
+      resolveTaskPromptProfile({
+        type: 'documentation',
+        scope: { filesWrite: [], filesRead: ['docs/x.md'] },
+      }),
+    ).toBe('inspection-only');
+  });
+
+  it('a declared kind wins over the injected fallback (fallback is never called)', () => {
+    let called = false;
+    const profile = resolveTaskPromptProfile({
+      type: 'code-development',
+      fallbackDocOnly: () => {
+        called = true;
+        return true;
+      },
+    });
+    expect(profile).toBe('code');
+    expect(called).toBe(false);
+  });
+
+  it('the directory heuristic only runs when there is no kind AND no fallback', () => {
+    expect(resolveTaskPromptProfile({ scope: { directories: ['docs/'] } })).toBe('doc-only');
+    expect(
+      resolveTaskPromptProfile({
+        scope: { directories: ['docs/'] },
+        fallbackDocOnly: () => false,
+      }),
+    ).toBe('code');
+  });
+
+  it('is total — an empty signal set degrades to the conservative code class', () => {
+    expect(resolveTaskPromptProfile({})).toBe('code');
+    expect(resolveTaskPromptProfile({ type: null, scope: null })).toBe('code');
+    expect(resolveTaskPromptProfile({ type: 'a-kind-nobody-declared-yet' })).toBe('code');
+  });
+
+  it('DEFAULT_TASK_PROFILES carries exactly the literals the legacy predicates used', () => {
+    expect(DEFAULT_TASK_PROFILES.doc_kinds).toEqual(['documentation', 'design', 'audit']);
+    expect(DEFAULT_TASK_PROFILES.code_directories).toEqual([
+      'src/', 'src', 'tests/', 'tests', 'lib/', 'lib',
+    ]);
+  });
+
+  it('config override is honored per-field; unspecified fields keep the default', () => {
+    // Only doc_kinds overridden → the directory branch still uses the defaults.
+    const profiles = { doc_kinds: ['runbook'] };
+    expect(resolveTaskPromptProfile({ type: 'runbook' }, profiles)).toBe('doc-only');
+    expect(resolveTaskPromptProfile({ type: 'documentation' }, profiles)).toBe('code');
+    expect(resolveTaskPromptProfile({ scope: { directories: ['src/core/'] } }, profiles)).toBe('code');
+    expect(resolveTaskPromptProfile({ scope: { directories: ['docs/'] } }, profiles)).toBe('doc-only');
+  });
+
+  it('an empty (undefined-field) override object still resolves as the default', () => {
+    expect(resolveTaskPromptProfile({ type: 'documentation' }, {})).toBe('doc-only');
+    expect(resolveTaskPromptProfile({ scope: { directories: ['docs/'] } }, {})).toBe('doc-only');
   });
 });

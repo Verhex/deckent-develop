@@ -27,6 +27,7 @@ import { createHash } from 'node:crypto';
 
 import type { TaskKind } from './work-model.js';
 import type { ConfirmationAdapter, DecidableVerdict } from './acceptance-matrix.js';
+import { DeckentError } from './errors.js';
 import type { NormativeVerdict } from './verdict-types.js';
 
 const CONFIRMATIONS_DIR = join('.deckent', 'runtime', 'confirmations');
@@ -144,7 +145,10 @@ export function settleConfirmation(
 ): SettledConfirmation {
   const pendingPath = join(pendingDir(projectRoot), `${id}.json`);
   if (!existsSync(pendingPath)) {
-    throw new Error(`confirmation ${id} is not pending (unknown or already settled)`);
+    throw new DeckentError(
+      'E_CONFIRMATION_NOT_PENDING',
+      `confirmation ${id} is not pending (unknown or already settled)`,
+    );
   }
   const request = JSON.parse(readFileSync(pendingPath, 'utf-8')) as ConfirmationRequest;
   const settled: SettledConfirmation = { ...request, outcome };

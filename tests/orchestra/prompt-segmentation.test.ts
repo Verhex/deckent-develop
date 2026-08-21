@@ -9,6 +9,7 @@ import {
   stablePrefixKey,
   PROTECTED_KINDS,
   DEFAULT_LEADING_T0_REORDER,
+  DEFAULT_PROMPT_TENANT_ID,
   type PromptSegment,
 } from '../../src/orchestra/prompt-segmentation.js';
 import {
@@ -298,6 +299,63 @@ describe('stablePrefixKey', () => {
     expect(stablePrefixKey('tenant-1', 'code-development::architect'))
       .toBe(stablePrefixKey('tenant-1', 'code-development::architect'));
     expect(stablePrefixKey('tenant-1', 'x')).not.toBe(stablePrefixKey('tenant-2', 'x'));
+  });
+});
+
+// ─── (7b) stablePrefixKey is WIRED to production (593-002) ──────────────────
+//
+// Before 593-002 `stablePrefixKey` had no production caller — the cache-key seam
+// was dead. `buildTaskPromptSegmented` now emits it, keyed on the canonical
+// task-class profile (`resolveTaskPromptProfile`) + agent. These pins lock the
+// wire itself AND its central safety property: computing the key must not move a
+// single byte of the compiled prompt.
+
+describe('stablePrefixKey — production wiring via buildTaskPromptSegmented', () => {
+  it('emits the (tenant, profile::agent) key for a code task', () => {
+    const out = buildTaskPromptSegmented(makeTask({ type: 'code-development' }), makeCtx());
+    expect(out.promptProfile).toBe('code');
+    expect(out.cachePrefixKey).toBe(stablePrefixKey('local', 'code::architect'));
+  });
+
+  it('keys a doc-only task apart from a code task (different T0 composition)', () => {
+    const doc = buildTaskPromptSegmented(makeTask({ type: 'documentation' }), makeCtx());
+    const code = buildTaskPromptSegmented(makeTask({ type: 'code-development' }), makeCtx());
+    expect(doc.promptProfile).toBe('doc-only');
+    expect(doc.cachePrefixKey).toBe(stablePrefixKey('local', 'doc-only::architect'));
+    expect(doc.cachePrefixKey).not.toBe(code.cachePrefixKey);
+  });
+
+  it('keys an inspection-only task apart (read-only discipline composition)', () => {
+    const inspection = buildTaskPromptSegmented(
+      makeTask({ scope: { directories: ['src/core/'], filesRead: ['src/core/config.ts'], filesWrite: [] } }),
+      makeCtx(),
+    );
+    expect(inspection.promptProfile).toBe('inspection-only');
+    expect(inspection.cachePrefixKey).toBe(stablePrefixKey('local', 'inspection-only::architect'));
+  });
+
+  it('honors the caller-supplied tenant and falls back to the local sentinel', () => {
+    const tenant = buildTaskPromptSegmented(makeTask(), makeCtx({ tenantId: 'tenant-7' }));
+    const local = buildTaskPromptSegmented(makeTask(), makeCtx());
+    expect(tenant.cachePrefixKey.startsWith('tenant-7::')).toBe(true);
+    expect(local.cachePrefixKey.startsWith(`${DEFAULT_PROMPT_TENANT_ID}::`)).toBe(true);
+    expect(tenant.cachePrefixKey).not.toBe(local.cachePrefixKey);
+  });
+
+  it('two tasks of the same class share the key AND the byte-stable prefix', () => {
+    const a = buildTaskPromptSegmented(makeTask({ id: 'aaa-001' }), makeCtx());
+    const b = buildTaskPromptSegmented(makeTask({ id: 'bbb-002' }), makeCtx());
+    expect(a.cachePrefixKey).toBe(b.cachePrefixKey);
+    expect(computeStablePrefix(a.segments)).toBe(computeStablePrefix(b.segments));
+  });
+
+  it('is metadata-only — the compiled prompt is unchanged by the key/profile', () => {
+    const task = makeTask();
+    expect(buildTaskPromptSegmented(task, makeCtx()).prompt)
+      .toBe(buildTaskPrompt(task, makeCtx()).prompt);
+    // A different tenant changes the KEY but never the prompt bytes.
+    expect(buildTaskPromptSegmented(task, makeCtx({ tenantId: 'tenant-9' })).prompt)
+      .toBe(buildTaskPromptSegmented(task, makeCtx()).prompt);
   });
 });
 

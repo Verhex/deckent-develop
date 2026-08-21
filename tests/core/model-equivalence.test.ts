@@ -310,19 +310,28 @@ describe('model-equivalence', () => {
     it('premium tier exposes every registered canonical API id', () => {
       expect(getModelsInTier('premium')).toEqual([
         'claude-opus-4-8', 'claude-opus-5', 'gpt-5.5', 'gemini-2.5-pro',
+        'cursor-grok-4.6-high',
       ]);
     });
 
     it('standard tier exposes every registered canonical API id', () => {
       expect(getModelsInTier('standard')).toEqual([
         'claude-sonnet-5', 'gpt-4.1', 'o4-mini', 'gemini-2.5-flash', 'gpt-5.6-terra',
+        'cursor-grok-4.6-medium',
       ]);
     });
 
     it('economy tier exposes every registered canonical API id', () => {
       expect(getModelsInTier('economy')).toEqual([
         'claude-haiku-4-5-20251001', 'gpt-5-mini', 'gpt-4.1-mini',
-        'gemini-2.0-flash', 'gpt-5.6-luna',
+        'gemini-2.0-flash', 'gpt-5.6-luna', 'cursor-grok-4.6-low',
+      ]);
+    });
+
+    it('premium_plus tier exposes every registered canonical API id', () => {
+      expect(getModelsInTier('premium_plus')).toEqual([
+        'claude-fable-5', 'o3', 'gemini-3.1-pro-preview', 'gpt-5.6-sol',
+        'cursor-grok-4.6-xhigh',
       ]);
     });
   });
@@ -354,9 +363,9 @@ describe('model-equivalence', () => {
       expect(Object.keys(MODEL_TIERS)).toEqual(['premium', 'standard', 'economy', 'premium_plus']);
     });
 
-    it('total model count includes the versioned 5.6 family and Opus 5', () => {
+    it('total model count includes the versioned 5.6 family, Opus 5, and Cursor Grok family', () => {
       const total = Object.values(MODEL_TIERS).reduce((sum, models) => sum + models.length, 0);
-      expect(total).toBe(18);
+      expect(total).toBe(22);
     });
 
     it('every model in MODEL_TIERS has a provider', () => {

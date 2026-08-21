@@ -5,6 +5,7 @@
     "attach",
     "bot",
     "chat",
+    "confirmations",
     "connect",
     "cu-status",
     "dashboard",
@@ -36,10 +37,10 @@
     "task",
     "test",
     "trace",
-    "upgrade",
-    "web"
+    "upgrade"
   ],
   "mcpOnly": [
     "deckent_feature_query"
-  ]
+  ],
+  "descriptionKeyGaps": []
 }

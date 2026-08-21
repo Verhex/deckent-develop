@@ -32,6 +32,7 @@ import { detectTaskType } from './rubric-registry.js';
 import { lintWorkerPromptContract } from './prompt-lint.js';
 import { rubricTypeToKind } from '../core/work-model.js';
 import { resolveCanonicalModelIdentity } from '../core/model-registry.js';
+import { getModelTier } from '../core/model-equivalence.js';
 import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
@@ -2703,6 +2704,17 @@ export function buildWorkerPrompt(
     debugLog('buildWorkerPrompt:projectContextSegment', e);
   }
 
+  // F4 tier guidance is optional prompt enrichment, not an admission gate.
+  // Legacy aliases and provider-local model IDs may be valid at their dispatch
+  // boundary without existing in the canonical model registry. In that case,
+  // omit only the tier-conditioned guidance and continue composing the prompt.
+  let modelTier: ReturnType<typeof getModelTier> | undefined;
+  try {
+    modelTier = getModelTier(task.model);
+  } catch (e) {
+    debugLog('buildWorkerPrompt:getModelTier', e);
+  }
+
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -2710,6 +2722,7 @@ export function buildWorkerPrompt(
     ...(projectContext !== undefined ? { projectContext } : {}),
     allAdrs,
     effort,
+    modelTier,
     dependencies: [...promptDependencyIds],
     tasksDir: join(projectRoot, TASKS_DIR),
     workerGuideContract: inspectWorkerGuideContract(projectRoot),
@@ -2722,10 +2735,13 @@ export function buildWorkerPrompt(
     verifyCommands,
     toolAllowlist,
     personaRenderMode: effectiveConfig?.prompt?.persona_render,
-    // 7094-F3 (flag-gated, default off): when the worker core rides
-    // --system-prompt-file, the inline T0 anchor blocks are suppressed here —
-    // the spawn path emits the same content via buildWorkerCoreSystemPrompt.
-    coreExternalized: effectiveConfig?.prompt?.worker_core_system_prompt === true,
+    // 7094-F3/7094-T4a: suppress the inline T0 core only for Claude, because
+    // Claude is currently the sole provider whose command path actually emits
+    // buildWorkerCoreSystemPrompt via --system-prompt-file. Other providers
+    // have no equivalent channel and must retain the core inline.
+    coreExternalized:
+      effectiveConfig?.prompt?.worker_core_system_prompt === true
+      && task.provider === 'claude',
     exactExecutionAuthority,
   };
   const artifact = buildTaskPrompt(task, ctx);

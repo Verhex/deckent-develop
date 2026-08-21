@@ -323,8 +323,58 @@ not counted as red.
 
 ---
 
+## 22. Approval watchers must be TIME-BOUNDED and cleaned up at session end
+
+**Mistake:** An "approve every incoming request" loop created for temporary automation
+kept running after the session. This zombie watcher approved later runs without their
+original context, creating both a security risk and polluted evidence.
+
+**Correct usage:** Give every watcher an explicit lifetime and run/session scope from
+the start; stop it at the session terminal and verify that it actually exited. Never
+use a watcher for durable automation: the productized replacement is the approval-rules
+engine. Every rule-made decision is recorded in an auditable `decidedBy: rule:<id>`
+envelope that preserves its origin.
+
+## 23. LIVE outcome evidence catches integration defects even when the impl seal is green
+
+**Case (D2b-2a):** The implementation seal was green, yet gaps in the ingress precheck
+and consumer validation surfaced only in a real run. Static, implementation-focused
+evidence did not close the production chain at its consumer end.
+
+**Correct usage:** Never substitute an impl seal for live outcome evidence. Exercise
+the path from real ingress to the real consumer and record the observed result. Write
+consumer-validation pins SEPARATELY from implementation pins; this independently
+catches a consumer misreading the contract while the producer appears correct.
+
+## 24. Run `wc -l` and READ its output before writing an XVerify target range
+
+**Mistake:** A target line range was written without measuring the file length; the
+same range error recurred three times and automatically drove verification to UNCLEAR.
+
+**Correct usage:** First run `wc -l <file>` on the target file, actually read the
+returned count, then write a target range containing only existing lines. An unmeasured
+target is not decidable evidence: target without measurement = automatic UNCLEAR.
+
+## 25. If source changed, `npm run build:all` is REQUIRED before process completion
+
+**Mistake:** A source change was dogfooded without a build; the running `dist/` stayed
+stale, so the new feature was invisible during the run.
+
+**Correct usage (Alperen, 2026-08-21):** When source changes, run
+`npm run build:all` before process completion and verify `dist = src`. The prohibition
+on builds WHILE a sprint is running remains unchanged; let the sprint reach a terminal
+first. After the build, apply the active host adapter's restart/reconnect ritual to
+long-lived bot and MCP processes, then produce dogfood evidence from the fresh binary.
+
+---
+
 ## Changelog (update after every sprint experience)
 
+- **2026-08-21 — live-evidence and operational-hygiene update**: Lessons 22–25 added
+  (time-bounded watchers and the approval-rules `decidedBy: rule:<id>` envelope;
+  live consumer evidence separate from the impl seal; a read `wc -l` before XVerify
+  targets; after source changes, post-sprint-terminal `npm run build:all`, bot/MCP
+  restart, and fresh-binary dogfooding).
 - **2026-08-20 — EVALUATION-001 first brick + cadence reconciliation**: Added
   Lesson 21 (a wide-surface landing resets the cadence counter; classify
   mine-vs-accumulated first on a cadence red; align while preserving fixture

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { buildTaskPrompt, buildTaskPromptSegmented, buildBehaviorPrecedenceNote } from '../../src/orchestra/prompt-god-template.js';
+import {
+  buildTaskPrompt,
+  buildTaskPromptSegmented,
+  buildBehaviorPrecedenceNote,
+  buildWorkerCoreSystemPrompt,
+} from '../../src/orchestra/prompt-god-template.js';
 import type { SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
@@ -69,6 +74,48 @@ function makeCtx(overrides: Partial<SprintContext> = {}): SprintContext {
 // ─── Tests ─────────────────────────────────────────────────────────────
 
 describe('buildTaskPrompt', () => {
+  it('adds stricter turn guidance only for the registry-resolved economy tier', () => {
+    const economy = buildTaskPrompt(
+      makeTask({ model: 'gpt-5.6-luna' }),
+      makeCtx({ modelTier: 'economy' }),
+    ).prompt;
+    const premium = buildTaskPrompt(
+      makeTask({ model: 'gpt-5.5' }),
+      makeCtx({ modelTier: 'premium' }),
+    ).prompt;
+
+    expect(economy).toContain('Economy-tier discipline: use fewer, broader tool-call batches');
+    expect(economy).toContain('terminate as soon as the complete goCriteria evidence is available');
+    expect(premium).not.toContain('Economy-tier discipline:');
+    expect(premium).toContain('6. A simple single-deliverable task is TWO turns total');
+  });
+
+  it('keeps turn-economy v2 output and termination guidance in inspection-only prompts', () => {
+    const prompt = buildTaskPrompt(
+      makeTask({
+        type: 'audit',
+        scope: { directories: ['src/core/'], filesRead: ['src/core/config.ts'], filesWrite: [] },
+      }),
+      makeCtx({ modelTier: 'premium' }),
+    ).prompt;
+
+    expect(prompt).toContain('5. Produce each NEW output file in ONE Write call');
+    expect(prompt).toContain('Never grow a file through chained Write/Edit turns');
+    expect(prompt).toContain('6. A simple single-deliverable inspection is TWO turns total');
+    expect(prompt).toContain('turn 1 = heartbeat + complete batched evidence collection');
+  });
+
+  it('externalizes the complete worker core when the provider seam requests it', () => {
+    const task = makeTask({ provider: 'claude' });
+    const result = buildTaskPrompt(task, makeCtx({ coreExternalized: true }));
+    const systemPromptCore = buildWorkerCoreSystemPrompt(task);
+
+    expect(result.prompt).not.toContain('## Karpathy Discipline');
+    expect(result.prompt).not.toContain('## Turn Economy');
+    expect(systemPromptCore).toContain('## Karpathy Discipline');
+    expect(systemPromptCore).toContain('## Turn Economy');
+  });
+
   it('binds the worker guide by verified digest and fails closed on HOLD', () => {
     const verified = buildTaskPrompt(makeTask(), makeCtx({
       workerGuideContract: { state: 'VERIFIED', schemaVersion: 1, digest: 'a'.repeat(64) },

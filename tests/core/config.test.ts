@@ -1755,3 +1755,58 @@ describe('Plan tier generalization (sprint-072)', () => {
     expect(config.activeModeConfig.brain_model).toBe('claude-sonnet-5'); // preserved from default
   });
 });
+
+// ─── validateConfig — cross_verify provider-name hardening (592-003) ─────────
+describe('validateConfig — cross_verify provider-name hardening (592-003)', () => {
+  it('accepts a valid cross_verify config with real provider names (regression pin)', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = {
+      enabled: true,
+      high_stakes_only: true,
+      verifier_priority: ['codex', 'gemini', 'claude'],
+      verifier_model: { codex: 'gpt-5.6-sol', gemini: 'gemini-3-pro' },
+    };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('accepts a cross_verify config with no verifier_priority/verifier_model set', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = { enabled: true };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('rejects a typo\'d provider name in verifier_priority (["cursro"]) as a typed config error', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = { enabled: true, verifier_priority: ['cursro'] };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('cross_verify.verifier_priority contains unknown provider "cursro"');
+  });
+
+  it('rejects a mix of valid and typo\'d provider names in verifier_priority', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = { enabled: true, verifier_priority: ['claude', 'cursro'] };
+    expect(() => validateConfig(config)).toThrow('cross_verify.verifier_priority contains unknown provider "cursro"');
+  });
+
+  it('still rejects a non-string entry in verifier_priority (existing shape check preserved)', () => {
+    const config = getDefaultConfig();
+    (config.cross_verify as unknown as Record<string, unknown>) = {
+      enabled: true,
+      verifier_priority: [42],
+    };
+    expect(() => validateConfig(config)).toThrow('cross_verify.verifier_priority must be an array of strings');
+  });
+
+  it('rejects an unknown provider key in verifier_model', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = { enabled: true, verifier_model: { cursro: 'some-model-id' } };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('cross_verify.verifier_model contains unknown provider key "cursro"');
+  });
+
+  it('still rejects an empty verifier_model value for a known provider (existing shape check preserved)', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = { enabled: true, verifier_model: { claude: '' } };
+    expect(() => validateConfig(config)).toThrow('cross_verify.verifier_model.claude must be a non-empty exact model API ID');
+  });
+});

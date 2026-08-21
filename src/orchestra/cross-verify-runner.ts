@@ -1651,7 +1651,15 @@ export async function runCrossVerify(
       )
       : undefined;
     const spawnBackend = directMeteredBackend ?? rerouteBackend;
-    const needsSpawnBackend = verifierProvider === 'claude' || verifierProvider === 'codex' || verifierProvider === 'gemini';
+    // Every CLI-spawn verifier belongs in this set, cursor included: `cursor-agent`
+    // is dispatched through the same spawn path as claude/codex/gemini, so the
+    // metered-backend hold directly below and the exact-backend-evidence match
+    // further down must bind it identically. Leaving cursor out would let a cursor
+    // verification settle on an unmetered default backend, with no requirement that
+    // its admitted eligibility evidence name the backend it actually ran on — a
+    // weaker evidence chain than its peers must buy, for no stated reason (592-005).
+    const needsSpawnBackend = verifierProvider === 'claude' || verifierProvider === 'codex'
+      || verifierProvider === 'gemini' || verifierProvider === 'cursor';
     if (needsSpawnBackend && !spawnBackend) {
       const reason = `verifier-metered-backend-hold:${verifierProvider}-default-backend-is-unmetered`;
       const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {

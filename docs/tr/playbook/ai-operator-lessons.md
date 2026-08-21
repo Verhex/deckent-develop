@@ -305,8 +305,57 @@ izole tekrar-kosumla teyit edilir — kirmizi sayilmaz, kayda gecer.
 
 ---
 
+## 22. Onay watcher'ları ZAMAN-SINIRLI kurulur ve oturum sonunda temizlenir
+
+**Hata:** Geçici otomasyon için kurulan "gelen her onayı ver" döngüsü oturumdan sonra
+çalışmaya devam etti. Bu zombi-watcher, sonraki koşuların onaylarını bağlamdan bağımsız
+vererek hem güvenlik riski hem de kanıt kirliliği üretti.
+
+**Doğru kullanım:** Watcher'a baştan açık bir süre ve koşu/oturum kapsamı ver; oturumun
+terminalinde watcher'ı durdur ve gerçekten kapandığını doğrula. Kalıcı otomasyon için
+watcher kullanma: ürünleşmiş ikame approval-rules motorudur. Kural tarafından verilen
+her karar, kökenini denetlenebilir biçimde taşıyan `decidedBy: rule:<id>` zarfıyla
+kaydedilir.
+
+## 23. Impl mührü yeşil olsa bile CANLI sonuç kanıtı bütünleşme defektini yakalar
+
+**Vaka (D2b-2a):** Implementation mührü yeşildi; buna rağmen ingress ön-kontrolü ile
+tüketici doğrulamasındaki eksikler ancak gerçek koşuda görünür oldu. Statik ve
+implementasyon-odaklı kanıt, üretim zincirinin tüketici ucunu tek başına kapatmadı.
+
+**Doğru kullanım:** Impl mührünü canlı sonuç kanıtının yerine koyma. Gerçek ingress'ten
+gerçek tüketiciye kadar koşuyu çalıştır ve gözlenen sonucu kaydet. Consumer doğrulama
+pinlerini implementasyon pinlerinden AYRI yaz; böylece üretici doğru görünürken
+tüketicinin sözleşmeyi yanlış yorumlaması bağımsız olarak yakalanır.
+
+## 24. XVerify target aralığını yazmadan önce `wc -l` çalıştır ve çıktısını OKU
+
+**Hata:** Dosya uzunluğu ölçülmeden target satır aralığı yazıldı; aynı aralık hatası üç
+kez tekrarlandı ve doğrulama otomatik olarak UNCLEAR'a düştü.
+
+**Doğru kullanım:** Önce hedef dosyada `wc -l <dosya>` çalıştır, dönen sayıyı gerçekten
+oku, sonra yalnız mevcut satırları kapsayan target aralığını yaz. Ölçülmeden seçilmiş
+bir target doğrulanabilir kanıt değildir: ölçmeden target = otomatik-UNCLEAR.
+
+## 25. Kaynak değiştiyse süreç tamamlanmadan `npm run build:all` ZORUNLUDUR
+
+**Hata:** Kaynak değişikliği build alınmadan dogfood edildi; çalışan `dist/` eski
+kaldığı için yeni özellik koşuda görünmedi.
+
+**Doğru kullanım (Alperen, 2026-08-21):** Kaynak değiştiyse süreç-tamamlama öncesinde
+`npm run build:all` çalıştır ve `dist = src` eşitliğini doğrula. Sprint ÇALIŞIRKEN
+build alma yasağı aynen geçerlidir; önce sprint terminal olur. Build sonrasında
+long-lived bot ve MCP süreçlerine aktif host adapterının restart/reconnect ritüelini
+uygula, ardından dogfood kanıtını taze binary üzerinden üret.
+
+---
+
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-08-21 — canlı kanıt ve operasyon hijyeni güncellemesi**: Ders 22–25 eklendi
+  (zaman-sınırlı watcher ve `decidedBy: rule:<id>` approval-rules zarfı; impl mühründen
+  ayrı canlı consumer kanıtı; XVerify target öncesi okunmuş `wc -l`; kaynak değişikliğinde
+  sprint-terminalinden sonra `npm run build:all`, bot/MCP restart ve taze-binary dogfood).
 - **2026-08-20 — EVALUATION-001 ilk tugla + kadans mutabakati**: Ders 21 eklendi
   (genis-yuzeyli landing kadans-sayacini sifirlar; kadans kirmizisinda once
   benim-mi-birikmis-mi siniflandirmasi; fixture-amaci korunarak hizalama;

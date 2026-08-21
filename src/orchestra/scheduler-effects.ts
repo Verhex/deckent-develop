@@ -630,7 +630,7 @@ export async function executeSpawnTask(
     && !finalOnlyUsageContainment;
   const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
   const excludeDynamicPromptSections = config?.prompt?.exclude_dynamic_system_prompt_sections !== false;
-  // 7094-F3 (default off): externalized worker core → --bare --system-prompt-file.
+  // 7094-F3 (default true): externalized worker core → --system-prompt-file.
   const systemPromptCore = config?.prompt?.worker_core_system_prompt === true
     ? buildWorkerCoreSystemPrompt(task)
     : undefined;

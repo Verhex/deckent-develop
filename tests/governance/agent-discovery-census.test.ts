@@ -111,7 +111,7 @@ const KNOWN_AGENT_DISCOVERY_SITES = [
   'raw-agent-directory-read:src/monitor/auditor.ts:1101',
   'raw-agent-directory-read:src/orchestra/planner.ts:1596',
   // Line shifted by the phantom-tail suppressor documentation block (7096/7097 era).
-  'raw-agent-directory-read:src/orchestra/task-builder.ts:1233',
+  'raw-agent-directory-read:src/orchestra/task-builder.ts:1234',
 ];
 
 afterEach(() => {

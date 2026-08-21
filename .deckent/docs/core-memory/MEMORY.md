@@ -28,6 +28,8 @@
 - [Worker model tier routing](feedback_worker_model_tier_routing.md) — sol > opus > sonnet; kritik yüzey→üst tier, sonnet→stabil/kesin akış; terra/luna=sonnet-eşdeğeri ve altı; plan atamaları başlatmadan önce bu kurala karşı doğrulanır (2026-08-18).
 - [AI-Operatör Dersleri dokümanı](feedback_ai_operator_lessons_doc.md) — docs/{tr,en}/playbook/ai-operator-lessons.md yaşayan doküman; her sprint deneyiminden sonra ders+changelog güncellenir, iki dil senkron (2026-08-18).
 - [Full-suite kadansı](feedback_full_suite_cadence.md) — full vitest suite her landing'de DEĞİL, 3 landing'de bir; arada scoped+gate'ler yeter (2026-08-19).
+- [Build-after-source-change](feedback_build_after_source_change.md) — sprint/el-kodu kaynak değiştirdiyse süreç-tamamlama `npm run build:all` ZORUNLU; dist=src eşitliği; sprint-koşarken build-yasağı aynen (2026-08-21).
+- [Fallback yetki-devri + codex-ağırlık](feedback_fallback_authority_handover.md) — Anthropic-limit dolunca worker'lar AĞIRLIKLI codex; anlık devir: fallback-rules/for-codex.md (Fable→Codex) + to-claude.md (geri-devir 9-bölüm paket-şeması); dokümanlar KALICI, güncel tutulur (Alperen 2026-08-21).
 ---
 
 **Referans kararlar (law değil — kalıcı proje-durumu):**

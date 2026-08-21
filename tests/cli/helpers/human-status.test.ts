@@ -299,7 +299,7 @@ describe('formatHumanStatus', () => {
       dashboard: makeDashboard({ progress: { done: 3, active: 2, blocked: 2, total: 10 } }),
     });
     const output = formatHumanStatus(input);
-    expect(output).toContain('Blocked: 2 tasks blocked by dependencies');
+    expect(output).toContain('Blocked: 2 task(s) waiting (dependencies or file-collision ordering)');
   });
 
   it('does not show blocked section when 0', () => {
@@ -390,7 +390,7 @@ describe('formatHumanStatus', () => {
     expect(output).toContain('Waiting for 007');
     expect(output).toContain('Queued');
     // Next section
-    expect(output).toContain('Next: 2 tasks will start as workers free up');
+    expect(output).toContain('Next: 2 task(s) will start as workers free up');
   });
 
   it('shows paused tasks correctly', () => {

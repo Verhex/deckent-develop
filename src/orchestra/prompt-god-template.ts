@@ -20,6 +20,7 @@ import {
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { personaCoreBody, selectGuidanceSlice } from '../core/persona-guidance.js';
+import type { ModelTier } from '../core/model-equivalence.js';
 import { evaluateScopeGate } from '../core/scope-gate.js';
 import { mirrorTestPath } from '../core/task-builder-scope.js';
 import { renderWorkerDodChecklist } from '../core/worker-dod-contract.js';
@@ -31,12 +32,22 @@ import { detectTaskType } from './rubric-registry.js';
 import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
 import {
   reorderLeadingT0,
+  stablePrefixKey,
   DEFAULT_LEADING_T0_REORDER,
+  DEFAULT_PROMPT_TENANT_ID,
   SEGMENT_SEPARATOR,
   type PromptTier,
   type PromptSegment,
   type PromptSegmentKind,
 } from './prompt-segmentation.js';
+// 593-002: THE canonical task-class classifier. The compiler's three former inline
+// predicates (core-system-prompt / scope-block / verify-tier) all delegate here.
+import {
+  resolveTaskPromptProfile,
+  type TaskProfileConfig,
+  type TaskProfileSignals,
+  type TaskPromptProfile,
+} from '../core/work-model.js';
 
 // ─── Public Types ──────────────────────────────────────────────────────
 
@@ -64,6 +75,18 @@ export interface SegmentedPrompt {
   prompt: string;
   segments: PromptSegment[];
   metadata: PromptArtifact['metadata'];
+  /**
+   * 593-002 — the canonical task-class this prompt was composed for
+   * (`resolveTaskPromptProfile`): the SAME value that selected the verify-steps /
+   * npm-advisory / read-only-discipline composition.
+   */
+  promptProfile: TaskPromptProfile;
+  /**
+   * 593-002 — the provider-agnostic prompt-cache key for this prompt's byte-stable
+   * (T0+T1) prefix: `stablePrefixKey(tenantId, '<profile>::<agent>')`. Purely
+   * derived metadata; it never changes the compiled prompt.
+   */
+  cachePrefixKey: string;
 }
 
 /**
@@ -87,6 +110,8 @@ export interface SprintContext {
   allAdrs?: MemoryEntryV2[];
   /** Worker effort level */
   effort?: 'max' | 'high' | 'medium' | 'low';
+  /** Registry-resolved model tier used only to add tier-appropriate guidance. */
+  modelTier?: ModelTier;
   /** Dependencies info (task IDs this task depends on) */
   dependencies?: string[];
   /** Directory containing `.tasks/` result files (defaults to `<cwd>/.tasks`). Used for enriching dependency block. */
@@ -231,10 +256,10 @@ export interface SprintContext {
    */
   leadingT0Reorder?: boolean;
   /**
-   * 7094-F3 (flag-gated, default OFF — `prompt.worker_core_system_prompt`):
+   * 7094-F3 (flag-gated, default TRUE — `prompt.worker_core_system_prompt`):
    * the task-invariant T0 cognitive-anchor blocks (karpathy/turn-economy/
    * pipe-exit/artifact-reuse + npm-advisory) are EXTERNALIZED to a stable
-   * system-prompt file (`claude --bare --system-prompt-file …`) and therefore
+   * system-prompt file (`claude --system-prompt-file …`) and therefore
    * skipped here, so the stdin prompt carries only task-specific content.
    * The externalized content comes from {@link buildWorkerCoreSystemPrompt} —
    * the SAME constants, one source. Never blind-default-on (F2a lesson:
@@ -256,6 +281,25 @@ export interface SprintContext {
   trackedFiles?: string[];
   /** Digest-bound execution directive for an approved exact RunFlow. */
   exactExecutionAuthority?: WorkerExactExecutionAuthority;
+  /**
+   * 593-002 — resolved `prompt.task_profiles` (`config.prompt.task_profiles`).
+   *
+   * Threaded by the caller exactly like {@link SprintContext.adrMinRelevance}: this
+   * compiler stays pure and only OBEYS the resolved value. `undefined` (today's
+   * default until the task-builder call site wires it) → `DEFAULT_TASK_PROFILES`,
+   * i.e. the literals the pre-593-002 inline predicates carried, so the compiled
+   * prompt is byte-for-byte unchanged.
+   */
+  taskProfiles?: Partial<TaskProfileConfig>;
+  /**
+   * 593-002 — tenant identifier for the prompt-cache prefix key.
+   *
+   * Feeds {@link stablePrefixKey} together with the resolved
+   * {@link TaskPromptProfile} (the task-class discriminator). `undefined` →
+   * {@link DEFAULT_PROMPT_TENANT_ID} (single-tenant local runs). Affects only the
+   * returned `cachePrefixKey` metadata — never a single byte of the prompt.
+   */
+  tenantId?: string;
 }
 
 export interface WorkerExactExecutionAuthority {
@@ -343,6 +387,8 @@ const READ_ONLY_DISCIPLINE_BLOCK = `## Karpathy Discipline (read-only)
 
 ## Turn Economy
 Every conversation turn re-sends cached context. Batch the scoped file reads and independent read-only checks in the SAME turn. Plan silently before acting — no plan file is required. Write the result once after the evidence set is complete.
+5. Produce each NEW output file in ONE Write call — compose the complete content silently first, then write it once. Never grow a file through chained Write/Edit turns or re-open a file solely to confirm a successful write.
+6. A simple single-deliverable inspection is TWO turns total: turn 1 = heartbeat + complete batched evidence collection; turn 2 = the result file. Aim for that shape whenever the task allows it.
 
 ## Command-Exit Honesty
 Do not pipe an evidentiary command to a pager such as \`tail\` or \`head\`, because that can mask the command's exit status. Capture the original command status and output directly.`;
@@ -369,6 +415,14 @@ Every conversation turn re-sends cached context — fewer turns beats fewer toke
 4. Plan silently before your first edit (Karpathy #1) — 7094-F1d: no separate plan file is written; gather every target file's content in ONE turn (parallel reads) before you start editing.
 5. Produce each NEW output file in ONE Write call — compose the complete content silently first, then write it once. Never grow a file through a chain of Write-then-Edit turns, and never re-open a file you just wrote to check it: the successful Write result IS the confirmation (7094-F4: every extra authoring turn replays the full cached context at cost).
 6. A simple single-deliverable task is TWO turns total: turn 1 = heartbeat + the complete deliverable (batched writes); turn 2 = the result file. Aim for that shape whenever the task allows it.`;
+
+const ECONOMY_TIER_TURN_GUIDANCE = `7. Economy-tier discipline: use fewer, broader tool-call batches and terminate as soon as the complete goCriteria evidence is available; do not spend an extra turn restating or re-checking already proven facts.`;
+
+function buildTurnEconomyBlock(modelTier: ModelTier | undefined): string {
+  return modelTier === 'economy'
+    ? `${TURN_ECONOMY_BLOCK}\n${ECONOMY_TIER_TURN_GUIDANCE}`
+    : TURN_ECONOMY_BLOCK;
+}
 
 /**
  * Pipe-exit honesty directive (TT555 — task 421-002, waste-class (a)).
@@ -423,27 +477,59 @@ If a pack/build artifact already exists under \`.tasks/artifacts/<sprint>/\`, RE
  * in every backend.
  */
 /**
+ * 593-002 — the compiler's projection of a {@link Task} onto the canonical
+ * task-class signals consumed by {@link resolveTaskPromptProfile}.
+ *
+ * Full signal set: scope shape (inspection-only) + declared `task.type` +
+ * the injected legacy fallback. `detectTaskType` (rubric-registry) is passed in
+ * rather than imported by core/ — ADR-D-004 C1 (core must not import orchestra).
+ */
+function taskProfileSignals(task: Task): TaskProfileSignals {
+  return {
+    type: task.type,
+    scope: task.scope,
+    fallbackDocOnly: () => detectTaskType(task) !== 'code-development',
+  };
+}
+
+/**
+ * 593-002 — the DOC-vs-CODE axis only: the same canonical classifier fed WITHOUT
+ * the scope signal.
+ *
+ * Deliberate, not an oversight: the verify-tier branch (`isDocOnlyTask`) and the
+ * read-only branch (`isInspectionOnlyTask`) are two INDEPENDENT booleans in
+ * {@link renderSegments} (a doc-kind task with a read-only scope is both), and
+ * collapsing them into one profile would flip `verificationMode` for that task.
+ * Omitting the scope signal reproduces the legacy predicate exactly while still
+ * resolving through the single SSOT.
+ */
+function taskDocProfileSignals(task: Task): TaskProfileSignals {
+  return {
+    type: task.type,
+    fallbackDocOnly: () => detectTaskType(task) !== 'code-development',
+  };
+}
+
+/**
  * 7094-F3 — the task-invariant worker CORE as a standalone system prompt.
  *
  * Renders the SAME constants the inline T0 path pushes (one source, two
  * projections — the F2a WORKER_TOOL_NAMES precedent): karpathy + turn-economy
  * + pipe-exit + artifact-reuse, plus the npm advisory for code-class tasks.
  * Consumed by the docker spawn path when `prompt.worker_core_system_prompt`
- * is on: the content rides `claude --bare --system-prompt-file <file>` while
+ * is on: the content rides `claude --system-prompt-file <file>` while
  * `ctx.coreExternalized` suppresses the duplicate inline blocks. Variants
  * mirror the inline classifier exactly: inspection-only tasks get the
  * read-only discipline, doc-only tasks drop the npm advisory.
  */
-export function buildWorkerCoreSystemPrompt(task: Task): string {
-  const isInspectionOnly =
-    (task.scope?.filesWrite?.length ?? 0) === 0 &&
-    (task.scope?.filesRead?.length ?? 0) > 0;
-  if (isInspectionOnly) return READ_ONLY_DISCIPLINE_BLOCK;
-  const isDocOnly = task.type
-    ? task.type === 'documentation' || task.type === 'design' || task.type === 'audit'
-    : detectTaskType(task) !== 'code-development';
+export function buildWorkerCoreSystemPrompt(
+  task: Task,
+  taskProfiles?: Partial<TaskProfileConfig>,
+): string {
+  const profile = resolveTaskPromptProfile(taskProfileSignals(task), taskProfiles);
+  if (profile === 'inspection-only') return READ_ONLY_DISCIPLINE_BLOCK;
   const core = `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`;
-  return isDocOnly ? core : `${core}\n\n${NPM_ADVISORY_BLOCK}`;
+  return profile === 'doc-only' ? core : `${core}\n\n${NPM_ADVISORY_BLOCK}`;
 }
 
 const NPM_ADVISORY_BLOCK = `## Dependency-Mutation Advisory (npm / yarn / pnpm)
@@ -623,6 +709,7 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     workerGuideContract: ctx.workerGuideContract,
     task,
     effort,
+    modelTier: ctx.modelTier,
     idempotencyKey,
     emitIdempotency: boilerplate.idempotency,
     preExistingFailures: ctx.preExistingFailures,
@@ -631,6 +718,8 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     // PCOMP-6 D1a: exact targeted-test set — pure (trackedFiles is ctx-injected).
     targetedTestPaths: resolveTargetedTestPaths(task, ctx.trackedFiles),
     toolAllowlist: ctx.toolAllowlist,
+    // 593-002: resolved `prompt.task_profiles`; undefined → legacy defaults.
+    taskProfiles: ctx.taskProfiles,
   });
 
   // Leading-T0 reorder (default-OFF): regroup tiers (T0→T1→T2) for the longest
@@ -643,9 +732,25 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   const charCount = prompt.length;
   const estimatedTokens = Math.ceil(charCount / CHARS_PER_TOKEN);
 
+  // ── 7. Prompt-cache prefix key (593-002 — dead seam wired to production) ──
+  // `stablePrefixKey` existed with no production caller, so nothing ever produced
+  // the (tenant, task-class) key its own stable-prefix contract is defined against.
+  // The task-class discriminator is the canonical {@link TaskPromptProfile} —
+  // the SAME classifier that decides which T0 blocks compose the prefix (the
+  // inspection/doc/code verify-steps + npm-advisory split), joined with the agent
+  // because the T1 tier carries that agent's persona. Metadata only: computing the
+  // key touches no segment, so the compiled prompt stays byte-for-byte identical.
+  const promptProfile = resolveTaskPromptProfile(taskProfileSignals(task), ctx.taskProfiles);
+  const cachePrefixKey = stablePrefixKey(
+    ctx.tenantId ?? DEFAULT_PROMPT_TENANT_ID,
+    `${promptProfile}::${agentId}`,
+  );
+
   return {
     prompt,
     segments,
+    promptProfile,
+    cachePrefixKey,
     metadata: {
       agent: agentId,
       skills: skillNames,
@@ -1061,7 +1166,13 @@ export function buildScopeBlock(
   // when every entry is rejected by sanitization. Falling back to directory-wide
   // write authority after a bad read path would turn invalid input into MORE
   // authority — the opposite of a safe compiler.
-  const isInspectionOnly = sanitized.filesWrite.length === 0 && scope.filesRead.length > 0;
+  // 593-002: same canonical classifier as every other call site, fed THIS site's
+  // own signals — the SANITIZED write list (post-sanitizer authority) against the
+  // RAW read list (authored-intent) — so the predicate is byte-for-byte the legacy
+  // one while the rule itself lives in exactly one place.
+  const isInspectionOnly = resolveTaskPromptProfile({
+    scope: { filesWrite: sanitized.filesWrite, filesRead: scope.filesRead },
+  }) === 'inspection-only';
 
   const scopeDirs = scope.directories.length > 0
     ? scope.directories.map(d => `  - ${d}`).join('\n')
@@ -1748,6 +1859,8 @@ interface RenderInput {
   workerGuideContract?: ManagedContractInspection;
   task: Task;
   effort: string;
+  /** Registry-resolved model tier; changes guidance only, never prompt completeness. */
+  modelTier?: ModelTier;
   /**
    * Pre-computed idempotency key threaded by {@link buildTaskPrompt}. Inlined
    * directly into the rendered "## Idempotency Key" section — Sprint 182 PQ-1
@@ -1770,6 +1883,8 @@ interface RenderInput {
   targetedTestPaths?: readonly string[];
   /** Task-scoped tool allowlist (born-664 / 559 ALLOW-WIRE); undefined → no tool-allowlist block. */
   toolAllowlist?: ToolAllowlistResult;
+  /** 593-002: resolved `prompt.task_profiles`; undefined → DEFAULT_TASK_PROFILES (legacy values). */
+  taskProfiles?: Partial<TaskProfileConfig>;
 }
 
 /**
@@ -2079,7 +2194,7 @@ export function resolveTargetedTestPaths(
 }
 
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { coreExternalized, agentBlock, skillBlock, projectContextBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
+  const { coreExternalized, agentBlock, skillBlock, projectContextBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, modelTier, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths, taskProfiles } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -2087,9 +2202,9 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   // pre-330-019 `sections.join('\n\n')`. The {@link PromptTier} tags drive the
   // optional (default-OFF) leading-T0 cache reorder and the protected-set guard.
   const segments: PromptSegment[] = [];
+  // 593-002: delegated to the canonical classifier (see {@link taskProfileSignals}).
   const isInspectionOnlyTask =
-    (task.scope?.filesWrite?.length ?? 0) === 0 &&
-    (task.scope?.filesRead?.length ?? 0) > 0;
+    resolveTaskPromptProfile(taskProfileSignals(task), taskProfiles) === 'inspection-only';
   // `kind` is widened to `PromptSegmentKind | string` (the same type PromptSegment.kind
   // already allows) so a task-specific, unregistered kind — e.g. TT555's volatile
   // 'env-probe' — can be emitted without editing the closed PromptSegmentKind registry
@@ -2237,19 +2352,13 @@ ${dodBlock}${idempotencyBlock}`);
   // `tsc`/vitest — racing parallel workers' in-flight state. 'audit' is one of
   // rubric-registry's own RubricTaskType values (AUDIT_RUBRIC / isAuditTask), so
   // adding it here closes the gap without inventing a second taxonomy.
-  const isDocKind = task.type === 'documentation' || task.type === 'design' || task.type === 'audit';
-  let isDocOnlyTask: boolean;
-  if (task.type) {
-    isDocOnlyTask = isDocKind;
-  } else {
-    // Fallback for tasks with no canonical task.type (legacy/direct-run path):
-    // reuse rubric-registry's own scope-shape classifier — the SAME function
-    // task-builder.ts's createTask() feeds through rubricTypeToKind to derive
-    // task.type in the first place — instead of a second, independently
-    // maintained doc/code heuristic (rubric-registry: audit | document-write |
-    // code-development; non-'code-development' == documentation-class here).
-    isDocOnlyTask = detectTaskType(task) !== 'code-development';
-  }
+  // 593-002: both branches (declared kind, and the rubric-registry `detectTaskType`
+  // fallback for tasks with no canonical task.type) now live in the ONE canonical
+  // classifier. The scope signal is intentionally NOT passed here — see
+  // {@link taskDocProfileSignals}: doc-vs-code and inspection-vs-writing are two
+  // independent axes at this call site, and this one asks only the doc question.
+  const isDocOnlyTask =
+    resolveTaskPromptProfile(taskDocProfileSignals(task), taskProfiles) === 'doc-only';
   // PROMPT-W1 (b): a doc-only task verifies by reading its file back; every other
   // task verifies via targeted tests, which is also the mode whose guidance must
   // take precedence over a persona's conflicting full-suite test-mandate.
@@ -2369,7 +2478,7 @@ CRITICAL: never exit without writing the .result file — even on failure, write
   if (!coreExternalized) {
     push('T0', 'karpathy', isInspectionOnlyTask
       ? READ_ONLY_DISCIPLINE_BLOCK
-      : `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
+      : `${KARPATHY_ESSENCE}\n\n${buildTurnEconomyBlock(modelTier)}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
   }
 
   // Shared Context (Sprint 278 COMM-1 / 278-003) — appended LAST, after every

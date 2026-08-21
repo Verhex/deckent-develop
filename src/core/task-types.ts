@@ -4,7 +4,7 @@
 
 import { createHash } from 'node:crypto';
 
-import { modelRegistry, registerCodexParityModels, registerCursorParityModels } from './model-registry.js';
+import { modelRegistry, registerCodexParityModels } from './model-registry.js';
 import type { TaskKind, ActorContext, ExecutionBudget } from './work-model.js';
 import type { ProviderBillingEvidence } from './provider-billing-evidence.js';
 import type { ExecutionBudgetRole, ExecutionLandingPolicyConfig } from './config-types.js';
@@ -129,10 +129,12 @@ export const ALL_MODELS: readonly ModelType[] = modelRegistry.getAllModelIds() a
  */
 export function getAllKnownModelIds(): readonly string[] {
   registerCodexParityModels();
-  // 7091 (565 hand-completion): the cursor family is the same opt-in class —
-  // without this validation-time registration `--verifier-model
-  // cursor-grok-4.6-*` resolved as "Unknown model" (live smoke 2026-08-19).
-  registerCursorParityModels();
+  // 592-004: cursor'ın registry-kaydı ARTIK burada DEĞİL. Kayıt bu çağrının
+  // yan-etkisine bağlıyken, bu fonksiyonu hiç çağırmayan bir process'te
+  // `CursorAdapter.supportedModels` boş kalıp her modeli reddediyordu; aile
+  // artık CANONICAL_MODELS'in parçası ve her registry kurulurken deterministik
+  // olarak yükleniyor. Buraya bir registerCursorParityModels() geri EKLEME —
+  // kayıt-sırasını yeniden çağrı-sırasına bağlar.
   return modelRegistry.getAllModelIds();
 }
 

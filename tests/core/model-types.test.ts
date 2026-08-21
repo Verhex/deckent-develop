@@ -76,8 +76,8 @@ describe('CLAUDE_MODELS', () => {
 // ─── ALL_MODELS ──────────────────────────────────────────────────────────────
 
 describe('ALL_MODELS', () => {
-  it('contains the complete 18-model canonical offline catalog', () => {
-    expect(ALL_MODELS).toHaveLength(18);
+  it('contains the complete 22-model canonical offline catalog', () => {
+    expect(ALL_MODELS).toHaveLength(22);
   });
 
   it('includes all Claude models', () => {
@@ -422,7 +422,7 @@ describe('Tier equivalence consistency', () => {
   });
 
   it('all canonical models have identity API IDs', () => {
-    expect(Object.keys(MODEL_API_IDS)).toHaveLength(18);
+    expect(Object.keys(MODEL_API_IDS)).toHaveLength(22);
     for (const [id, apiId] of Object.entries(MODEL_API_IDS)) {
       expect(apiId).toBe(id);
     }

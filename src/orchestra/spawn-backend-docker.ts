@@ -3470,6 +3470,74 @@ export function buildDistReadOnlyMountArgs(distExists: boolean, distHostPath: st
   return ['-v', `${distHostPath}:${CONTAINER_WORKSPACE}/dist:ro`];
 }
 
+// ─── 593-001 F2c: design-catalog mount mask (flag-gated, default OFF) ────────
+// Measured leak: the project root is bind-mounted whole at CONTAINER_WORKSPACE,
+// so the repo's DESIGN CATALOGS ride into every worker container — `.claude/skills/`
+// (11 SKILL.md, ~118.8KB) + `.claude/agents/` (3 files, ~8KB) — none of which the
+// typical worker task needs. Same overlay technique as buildDeckShadowMountArgs /
+// buildDistReadOnlyMountArgs: a nested read-only bind of an EMPTY host directory
+// over the catalog path makes the worker see it empty while the host tree is
+// untouched.
+//
+// ADR-G-027 boundary (binding): this masks MOUNT-side DISCOVERY only. The bodies of
+// the skills actually ASSIGNED to the task are injected verbatim INTO the prompt by
+// buildSkillBlock (prompt-god-template.ts) and are not touched here — no skill/ADR
+// content is truncated, and the worker's ACCESS to its own assigned skill is
+// unchanged. Only unassigned catalog browsing goes away.
+
+/** Project-relative catalog directories the mask empties in the worker's view. */
+export const CATALOG_MASK_RELATIVE_PATHS: readonly string[] = ['.claude/skills', '.claude/agents'];
+
+/** Name of the shared empty host directory the catalog mask overlays. */
+const CATALOG_MASK_DIR_NAME = '.catalog-mask';
+
+/**
+ * Build the read-only catalog-mask overlay mount args for `docker run`.
+ *
+ * **CONDITIONAL by design — the caller passes only catalog paths that EXIST on the
+ * host.** Mirrors {@link buildDeckShadowMountArgs} / {@link buildDistReadOnlyMountArgs}:
+ * a nested bind mount over a MISSING target materializes a phantom directory on the
+ * host underlying dir before mounting (CONTAINER_WORKSPACE IS the project root, same
+ * inode), so masking a non-existent `.claude/agents` would make docker CREATE an empty
+ * `.claude/agents/` in the user's repo that outlives the container. No catalog ⇒ no
+ * mount.
+ *
+ * **Flag-gated:** `enabled === false` (the default, `prompt.catalog_mount_mask`) returns
+ * an empty arg list, so the produced `docker run` argv stays byte-identical to the
+ * pre-mask behavior.
+ *
+ * Pure — exported for unit tests. The caller creates the empty mask source directory
+ * (see {@link ensureCatalogMaskDir}).
+ */
+export function buildCatalogMaskMountArgs(
+  enabled: boolean,
+  maskDirHostPath: string,
+  presentCatalogRelativePaths: readonly string[],
+): string[] {
+  if (!enabled) return [];
+  return presentCatalogRelativePaths.flatMap(
+    rel => ['-v', `${maskDirHostPath}:${CONTAINER_WORKSPACE}/${rel}:ro`],
+  );
+}
+
+/**
+ * Create/refresh the empty host directory that the catalog mask overlays, returning
+ * its path.
+ *
+ * The mask source lives at `${tasksDir}/.catalog-mask` — a single path shared by EVERY
+ * worker in a sprint, so the create MUST be idempotent (`recursive: true` never throws
+ * on an existing directory). It stays EMPTY: the overlay's whole purpose is that the
+ * container sees nothing at the catalog paths. Unlike the `.deck` shadow this needs no
+ * permission convergence — nothing ever writes into it.
+ *
+ * Exported for unit tests.
+ */
+export function ensureCatalogMaskDir(tasksDir: string): string {
+  const maskDir = join(tasksDir, CATALOG_MASK_DIR_NAME);
+  mkdirSync(maskDir, { recursive: true });
+  return maskDir;
+}
+
 // ─── Docker heartbeat wrapper compatibility ────────────────────────────────
 // Host observations are now published only through WorkerHeartbeatAuthorityStore.
 // Keep exported wrapper builders as inert compatibility seams; they must never
@@ -3978,6 +4046,14 @@ export interface DockerSpawnBackendConstructionOptions {
   /** WORKER-ENV-TMPFS-001: writable HOME tmpfs size (e.g. '256m'). */
   readonly homeTmpfsSize?: string;
   readonly verifyProviderCliInImage?: boolean;
+  /**
+   * 593-001 F2c: mask the repo design catalogs (`.claude/skills`, `.claude/agents`)
+   * from the worker's mount view. Config source: `prompt.catalog_mount_mask`
+   * (default false). Opt-in, exactly like {@link verifyProviderCliInImage}: the
+   * SpawnBackendFactory wiring that reads the config key lives outside this task's
+   * write scope, so today the flag is set by the constructor caller.
+   */
+  readonly catalogMountMask?: boolean;
   readonly crossVerifyRuntimeCommandRunner?: DockerCrossVerifyRuntimeCommandRunner;
   readonly reachabilityProbeCommandRunner?: DockerReachabilityProbeCommandRunner;
   /** Injectable host adapter selector for hermetic platform-matrix tests. */
@@ -4329,6 +4405,8 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly kindMemoryLimits: Record<string, string>;
   private readonly homeTmpfsSize: string;
   private readonly verifyProviderCliInImage: boolean;
+  /** 593-001 F2c: `prompt.catalog_mount_mask` — default false (byte-identical argv). */
+  private readonly catalogMountMask: boolean;
   private readonly crossVerifyRuntimeCommandRunner: DockerCrossVerifyRuntimeCommandRunner;
   private readonly reachabilityProbeCommandRunner: DockerReachabilityProbeCommandRunner;
   private readonly platform: NodeJS.Platform;
@@ -4393,6 +4471,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     // is out of this task's DISTINCT-FILE scope, and several existing docker-backend
     // test suites assert exactly one `docker run` call per spawn).
     this.verifyProviderCliInImage = opts?.verifyProviderCliInImage ?? false;
+    // 593-001 F2c: opt-in catalog mount mask; default false keeps `docker run`
+    // argv byte-identical (DEFAULT_PROMPT_CONFIG.catalog_mount_mask === false).
+    this.catalogMountMask = opts?.catalogMountMask ?? false;
     this.crossVerifyRuntimeCommandRunner =
       opts?.crossVerifyRuntimeCommandRunner ?? runBoundedCrossVerifyRuntimeCommand;
     this.reachabilityProbeCommandRunner =
@@ -5782,8 +5863,8 @@ export class DockerSpawnBackend implements SpawnBackend {
     // (token-usage capture unaffected) and why it does NOT touch the shared
     // spec (tmux.ts's claude command is untouched). codex/gemini keep spec as-is
     // (their docker-parity is a tracked follow-up, not silently changed here).
-    // 7094-F3 (flag-gated via opts.systemPromptCore, default absent): the
-    // task-invariant worker core rides `--bare --system-prompt-file <file>` —
+    // 7094-F3 (flag-gated via opts.systemPromptCore, default true): the
+    // task-invariant worker core rides `--system-prompt-file <file>` —
     // auto-discovery (CLAUDE.md/skills/hooks/MCP) off, composition fully
     // deckent-owned. The core file is content-addressed so an unchanged core
     // maps to the same path across workers (stable system-prompt identity).
@@ -6108,6 +6189,23 @@ export class DockerSpawnBackend implements SpawnBackend {
       ? []
       : buildDistReadOnlyMountArgs(existsSync(distHostPath), distHostPath);
 
+    // 593-001 F2c (flag-gated, default OFF): empty read-only overlays that hide the
+    // repo's design catalogs (.claude/skills, .claude/agents) from the worker's mount
+    // view — see buildCatalogMaskMountArgs. Only catalogs that EXIST on the host are
+    // masked (a nested bind over a missing target would phantom-create it in the repo).
+    // ADR-G-027: prompt-side skill injection (buildSkillBlock) is untouched.
+    const catalogMaskEnabled = !exactV2 && this.catalogMountMask;
+    const presentCatalogPaths = catalogMaskEnabled
+      ? CATALOG_MASK_RELATIVE_PATHS.filter(rel => existsSync(join(dir, rel)))
+      : [];
+    const catalogMaskMountArgs = buildCatalogMaskMountArgs(
+      catalogMaskEnabled,
+      catalogMaskEnabled && presentCatalogPaths.length > 0
+        ? ensureCatalogMaskDir(tasksDir)
+        : join(tasksDir, CATALOG_MASK_DIR_NAME),
+      presentCatalogPaths,
+    );
+
     const dockerArgs: string[] = [
       'run', '-d',
       '--name', containerName,
@@ -6139,6 +6237,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       // DECK-WORKER-ISOLATION (ADR-G-005): read-only empty overlay hiding .deck
       // (nested mount, applied after the project root so it shadows /workspace/.deck)
       ...deckShadowMountArgs,
+      // 593-001 F2c: flag-gated empty read-only overlays masking the design catalogs
+      // (nested mounts, applied after the project root so they shadow
+      // /workspace/.claude/skills + /workspace/.claude/agents). Zero args when
+      // `prompt.catalog_mount_mask` is false (the default).
+      ...catalogMaskMountArgs,
       // WORKER-GIT-GUARD (381-001): read-only git-shim overlay (see above).
       ...gitGuard.mountArgs,
       ...(exact ? exactCrossVerifyPromptMountArgs(exact.promptHostPath) : []),

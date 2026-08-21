@@ -139,6 +139,10 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   // the folded MCP tool `deckent_approvals` is a READ-ONLY pending inbox only — deciding stays
   // CLI-only behind interactive live-auth (no allow/deny/decide/self-approval over MCP).
   entry('approvals', 'Enterprise', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_approvals']),
+  // confirmations: ADR-G-040 Evaluation Surface adapter runtime — `list` + `decide`
+  // (interactive live-auth, approvals-decide TTY sözleşmesinin aynısı) + `run`
+  // (cross-provider LLM adjudication). CLI-only karar yüzeyi; MCP decide YOK (§12.2).
+  entry('confirmations', 'Enterprise', 'Değiştir', 'core', ['cli']),
 
   entry('xverify', 'Core', 'Oku', 'orchestra', ['cli', 'mcp'], ['deckent_xverify']), // XVERIFY-TOOL host-adjudicated cross-provider hakem
   entry('kpi', 'Core', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_kpi']),

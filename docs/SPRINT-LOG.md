@@ -14249,3 +14249,77 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 591-006: api/server approvals hata-metinleri i18n (DONE)
 
 ---
+## Sprint 592 — sprint-592
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 362s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 362140ms |
+
+### Tasks
+
+- 592-001: 7094-F3 comment-drift temizliği (yorum-only) (DONE)
+- 592-002: cursor Docker imaj-dilimi (INSTALL_CURSOR) (DONE)
+- 592-003: cross_verify config-şema sertleştirmesi (DONE)
+- 592-004: cursor registry-bootstrap defekti (DONE)
+- 592-005: xverify cursor backend-simetrisi (DONE)
+
+---
+## Sprint 593 — sprint-593
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 933s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 932684ms |
+
+### Tasks
+
+- 593-001: F2c katalog/mount maskeleme (flag-gated) (DONE)
+- 593-002: F5 görev-sınıfı profil SSOT'u (config-resolved) (DONE)
+- 593-003: AI-operatör dersleri güncellemesi (iki dil senkron) (DONE)
+
+---
+## Sprint 594 — sprint-594
+
+**Status:** COMPLETE
+**Date:** 2026-08-20
+**Duration:** 347s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 346993ms |
+
+### Tasks
+
+- 594-001: codex çekirdek-kaybı düzeltmesi (7094-T4a, CANLI-KANITLI DEFEKT) (DONE)
+- 594-002: F4 model-tier prompt-farklılaşması (7094-T5) (DONE)
+- 594-003: F2c wiring-kapanışı (593-001 debt'i) (DONE)
+
+---

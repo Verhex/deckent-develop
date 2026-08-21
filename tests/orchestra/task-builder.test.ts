@@ -425,6 +425,44 @@ describe('resolveWorkerEffort', () => {
 // ─── buildWorkerPrompt — human-friendly format ────────────────────────────
 
 describe('buildWorkerPrompt', () => {
+  it('keeps the worker core inline for Codex when system-prompt externalization is enabled', () => {
+    const task = makeTask({ provider: 'codex', model: 'gpt-4.1' });
+    const emptyRoot = makeEmptyProjectRoot();
+    try {
+      const prompt = buildWorkerPrompt(
+        task,
+        undefined,
+        undefined,
+        emptyRoot,
+        { prompt: { worker_core_system_prompt: true } },
+      );
+
+      expect(prompt).toContain('## Karpathy Discipline');
+      expect(prompt).toContain('## Turn Economy');
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('suppresses the inline worker core for Claude when system-prompt externalization is enabled', () => {
+    const task = makeTask({ provider: 'claude', model: 'claude-sonnet-5' });
+    const emptyRoot = makeEmptyProjectRoot();
+    try {
+      const prompt = buildWorkerPrompt(
+        task,
+        undefined,
+        undefined,
+        emptyRoot,
+        { prompt: { worker_core_system_prompt: true } },
+      );
+
+      expect(prompt).not.toContain('## Karpathy Discipline');
+      expect(prompt).not.toContain('## Turn Economy');
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
   it('includes task id and title in "Your Task" section', () => {
     const task = makeTask({ id: '025-007', title: 'My Special Task' });
     const prompt = buildWorkerPrompt(task);

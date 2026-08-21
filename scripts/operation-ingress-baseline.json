@@ -13,10 +13,10 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 705,
+  "total": 709,
   "mediated": 0,
-  "unmediated": 705,
-  "fileCount": 240,
+  "unmediated": 709,
+  "fileCount": 243,
   "byFile": {
     "src/agent/permission-store.ts": {
       "count": 1,
@@ -366,6 +366,10 @@
       "count": 2,
       "mediated": false
     },
+    "src/core/approval-rules.ts": {
+      "count": 1,
+      "mediated": false
+    },
     "src/core/approval-store.ts": {
       "count": 3,
       "mediated": false
@@ -384,6 +388,10 @@
     },
     "src/core/config.ts": {
       "count": 4,
+      "mediated": false
+    },
+    "src/core/confirmation-store.ts": {
+      "count": 2,
       "mediated": false
     },
     "src/core/cost-config-loader.ts": {
@@ -726,6 +734,10 @@
       "count": 2,
       "mediated": false
     },
+    "src/orchestra/approval-decision-federation.ts": {
+      "count": 1,
+      "mediated": false
+    },
     "src/orchestra/autonomous/approval-adapter.ts": {
       "count": 2,
       "mediated": false
@@ -979,5 +991,5 @@
       "mediated": false
     }
   },
-  "digest": "eb6d14cccc0d1a0b2256c1405acf6f6e0c37257e13080211de443754f89dc193"
+  "digest": "119d210f5c26c29b9c7db1fc89d1e88e8f6fcb62f74fccfc6f1d5da48df119f8"
 }

@@ -14,6 +14,60 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint595] - 2026-08-21
+
+### Added
+
+- tier-çözümü fail-soft (kök-neden-1)
+- cursor-katalog sayım-pinleri
+
+
+_Tasks: 4 total, 2 done, 0 tech debt, 2 no-go_
+
+## [sprint594] - 2026-08-20
+
+### Added
+
+- codex çekirdek-kaybı düzeltmesi (7094-T4a, CANLI-KANITLI DEFEKT)
+- F2c wiring-kapanışı (593-001 debt'i)
+
+### Changed
+
+- F4 model-tier prompt-farklılaşması (7094-T5) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
+## [sprint593] - 2026-08-20
+
+### Added
+
+- F5 görev-sınıfı profil SSOT'u (config-resolved)
+- AI-operatör dersleri güncellemesi (iki dil senkron)
+
+### Changed
+
+- F2c katalog/mount maskeleme (flag-gated) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
+## [sprint592] - 2026-08-20
+
+### Added
+
+- 7094-F3 comment-drift temizliği (yorum-only)
+- cross_verify config-şema sertleştirmesi
+- cursor registry-bootstrap defekti
+- xverify cursor backend-simetrisi
+
+### Changed
+
+- cursor Docker imaj-dilimi (INSTALL_CURSOR) (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 1 tech debt, 0 no-go_
+
 ## [sprint591] - 2026-08-20
 
 ### Added

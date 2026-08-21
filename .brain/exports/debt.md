@@ -9,6 +9,9 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-594-002 | Tech debt from 594-002: LOCAL_VERIFIED / SCOPED_GREEN: npx vitest run tests/orch | normal | sprint-594 | resolved |
+| debt-593-001 | Tech debt from 593-001: The config key is defined but not yet READ by any produc | normal | sprint-593 | resolved |
+| debt-592-002 | Tech debt from 592-002: The actual `docker build --build-arg INSTALL_CURSOR=true | normal | sprint-592 | resolved |
 | debt-590-001 | Tech debt from 590-001: tests/cli/helpers/human-status.test.ts has 2 failing ass | normal | sprint-590 | resolved |
 | debt-567-004 | Tech debt from 567-004: Created deneme-kontrol/selam.md with a '# Selam' heading | normal | sprint-567 | resolved |
 | debt-565-006 | Tech debt from 565-006: LOCAL_VERIFIED (unpiped exit codes, no pager): `npx tsc  | normal | sprint-565 | resolved |

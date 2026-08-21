@@ -435,8 +435,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-20 (D2b-2a live-proof fixes): same 14478 count, digest only —
   // the rules-engine suite gained the end-to-end broker/ingress and
   // consumer-validation pins (tracked content moved).
-  count: 14478,
-  digest: 'c1e6b03b4ca6bffeea0d5fab608383dede9a2fcaff3bbee1ecd54819432a5c5b',
+  // 2026-08-21 (7094 wave-2/3/4 + 7091): +5 — the docker-mounts suite's
+  // catalog-mask tmpdir fixtures, the work-model profile suite, and the
+  // wave-4 fail-soft/allowlist fixture writes.
+  count: 14483,
+  digest: 'f3128c6c2186d35e454d3b8c1ae0598b31bd50a360d9e8794918fc28db915097',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -765,8 +768,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-20 (D2b-2a live-proof fixes): same 1267 count, digest only —
   // ingress rule-actor pre-check branch + ruleSessions consumer routing +
   // runtime wiring moved tracked production content.
+  // 2026-08-21 (7094 wave-2/3/4 + 7091 + debt sweep): same 1267 count,
+  // digest only — catalog-mask/profile-SSOT/fail-soft/tier threading,
+  // provider-aware coreExternalized, confirmation-store typed error and the
+  // command-registry confirmations entry moved tracked production content.
   count: 1267,
-  digest: '2144bf01f608583e7af897a16d630d2ce51b1d802851416cda2c8d08b8a83c5b',
+  digest: 'b56f524a3a4a06d3437f7ed62648519510e3690e4bd095d56292b9370f3fbe0d',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

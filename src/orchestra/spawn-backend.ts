@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import type { ModelType } from '../core/types.js';
+import type { ModelType, ResolvedConfig } from '../core/types.js';
+import { getLoadedConfig } from '../core/config.js';
 import type { ProviderSpawnOptions } from '../core/provider.js';
 import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWorker, listWorkers as tmuxListWorkers } from './tmux.js';
 import { SubprocessSpawnBackend, CLAUDE_SUBPROCESS_CONFIG } from '../providers/subprocess.js';
@@ -130,7 +131,7 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
    */
   availableTools?: string;
   /** 7094-F3 (flag-gated): task-invariant worker core content for
-   *  `claude --bare --system-prompt-file <file>`; absent → today's args. */
+   *  `claude --system-prompt-file <file>`; absent → today's args. */
   systemPromptCore?: string;
   /**
    * Run with the provider's isolated finite-context flags. This is opt-in and
@@ -718,6 +719,12 @@ export interface SpawnBackendFactoryOptions {
   dockerKindMemoryLimits?: Record<string, string>;
 
   /**
+   * Already-resolved prompt config. Production normally uses the project-bound
+   * snapshot populated by loadConfig(); this seam keeps factory tests explicit.
+   */
+  effectiveConfig?: Pick<ResolvedConfig, 'prompt'>;
+
+  /**
    * Sandbox backend options (memory limit, allowed dirs, network block).
    * Only consulted when backend is 'sandbox'.
    */
@@ -743,6 +750,7 @@ export class SpawnBackendFactory {
     const resolved = resolveBackend(opts.backend ?? 'auto');
 
     if (resolved === 'docker') {
+      const effectiveConfig = opts.effectiveConfig ?? getLoadedConfig(opts.projectDir);
       return new DockerSpawnBackend(opts.projectDir, {
         image: opts.dockerImage,
         timeoutSeconds: opts.dockerTimeoutSeconds
@@ -754,6 +762,7 @@ export class SpawnBackendFactory {
         memorySwap: opts.dockerMemorySwap,
         kindMemoryLimits: opts.dockerKindMemoryLimits,
         homeTmpfsSize: opts.dockerHomeTmpfsSize, // WORKER-ENV-TMPFS-001: config-driven HOME tmpfs
+        catalogMountMask: effectiveConfig?.prompt?.catalog_mount_mask,
       });
     }
 

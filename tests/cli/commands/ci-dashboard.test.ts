@@ -80,6 +80,9 @@ vi.mock('../../../src/cli/helpers/config-reader.js', () => ({
 
 vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn().mockReturnValue('mock message'),
+  // status-i18n (sprint-590) routes formatHumanStatus text through the
+  // catalog; the language resolver must exist in the partial mock too.
+  getLanguage: vi.fn().mockReturnValue('en'),
 }));
 
 // ─── Imports ─────────────────────────────────────────────────────────

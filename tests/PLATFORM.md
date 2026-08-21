@@ -243,7 +243,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2637 of 2700 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2648 of 2711 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work

@@ -555,9 +555,9 @@ describe('ModelRegistry', () => {
   // ── getAllModelIds / getAllModels / getAllProviders ──
 
   describe('getAllModelIds()', () => {
-    it('returns the 15 core and 3 pinned Codex parity model ids', () => {
+    it('returns the 15 core, 3 Codex parity and 4 Cursor parity model ids', () => {
       const ids = registry.getAllModelIds();
-      expect(ids).toHaveLength(18);
+      expect(ids).toHaveLength(22);
       expect(ids).toContain('claude-fable-5');
       expect(ids).toContain('claude-opus-4-8');
       expect(ids).toContain('claude-opus-5');
@@ -565,13 +565,14 @@ describe('ModelRegistry', () => {
       expect(ids).toContain('gemini-2.5-pro');
       expect(ids).toContain('gpt-4.1-mini');
       expect(ids).toContain('gemini-3.1-pro-preview');
+      expect(ids).toContain('cursor-grok-4.6-low');
     });
   });
 
   describe('getAllModels()', () => {
     it('returns all canonical model definitions', () => {
       const models = registry.getAllModels();
-      expect(models).toHaveLength(18);
+      expect(models).toHaveLength(22);
       for (const m of models) {
         expect(m.id).toBeDefined();
         expect(m.apiId).toBeDefined();
@@ -581,12 +582,13 @@ describe('ModelRegistry', () => {
   });
 
   describe('getAllProviders()', () => {
-    it('returns 3 providers: claude, codex, gemini', () => {
+    it('returns 4 providers: claude, codex, gemini, cursor', () => {
       const providers = registry.getAllProviders();
-      expect(providers).toHaveLength(3);
+      expect(providers).toHaveLength(4);
       expect(providers).toContain('claude');
       expect(providers).toContain('codex');
       expect(providers).toContain('gemini');
+      expect(providers).toContain('cursor');
     });
   });
 
@@ -650,22 +652,42 @@ describe('ModelRegistry', () => {
   });
 });
 
-// ─── Cursor parity family (FAZ-1, opt-in) ────────────────────────────
-// Every assertion runs on a FRESH ModelRegistry: registerCursorParityModels()
-// defaults to the singleton, and mutating it here would leak into the
-// canonical-catalog pins below (and into every other suite sharing the module).
-//
-// `'cursor'` is asserted onto RegistryProviderName in one place per file until
-// the provider-union spine task lands it in model-registry-types.ts — see the
-// CURSOR_PROVIDER note in src/core/model-registry.ts.
-const CURSOR: RegistryProviderName = 'cursor' as RegistryProviderName;
+// ─── Cursor parity family (canonical bootstrap) ──────────────────────
+// The family is part of CANONICAL_MODELS, so a default-constructed
+// ModelRegistry already carries it — `registerCursorParityModels()` is NOT
+// called in the setup below on purpose: if construction alone did not supply
+// the models, these assertions must fail.
+const CURSOR: RegistryProviderName = 'cursor';
+
+// 592-004 REGRESSION PIN — captured at module-evaluation time, before any test
+// body runs and before anything in this file could have mutated the singleton.
+// This file imports ONLY src/core/model-registry.js, so `getAllKnownModelIds()`
+// (src/core/task-types.ts) has never been called in this process. While cursor
+// registration hung off that helper's side-effect, this snapshot was empty and
+// CursorAdapter.supportedModels rejected every model.
+const CURSOR_IDS_WITHOUT_ANY_BOOTSTRAP_CALL = modelRegistry
+  .getByProvider(CURSOR)
+  .map(m => m.id)
+  .sort();
 
 describe('Cursor parity family', () => {
   let registry: ModelRegistry;
 
   beforeEach(() => {
     registry = new ModelRegistry();
-    registerCursorParityModels(registry);
+  });
+
+  it('resolves all four ids off a fresh process without any bootstrap call', () => {
+    expect(CURSOR_IDS_WITHOUT_ANY_BOOTSTRAP_CALL).toEqual([
+      'cursor-grok-4.6-high',
+      'cursor-grok-4.6-low',
+      'cursor-grok-4.6-medium',
+      'cursor-grok-4.6-xhigh',
+    ]);
+    // Identity lookups resolve too — not merely provider-list membership.
+    for (const id of CURSOR_IDS_WITHOUT_ANY_BOOTSTRAP_CALL) {
+      expect(modelRegistry.getOrThrow(id).provider).toBe(CURSOR);
+    }
   });
 
   it('registers exactly the four cursor-grok-4.6 effort ids', () => {
@@ -714,21 +736,29 @@ describe('Cursor parity family', () => {
     }
   });
 
-  it('is opt-in: the bundled catalog invariants are untouched', () => {
-    // The registration helper above ran on `registry`, never on the singleton.
+  it('joins CANONICAL_MODELS without entering the bundled builtin set', () => {
+    // BUILTIN_MODELS stays the 15-model bundled snapshot — canonical bootstrap
+    // membership is a separate, wider set.
     expect(BUILTIN_MODELS.some(m => (m.provider as string) === 'cursor')).toBe(false);
-    expect(modelRegistry.getByProvider(CURSOR)).toHaveLength(0);
-    expect(modelRegistry.getAllProviders()).toHaveLength(3);
+    expect(BUILTIN_MODELS).toHaveLength(15);
 
-    const untouched = new ModelRegistry();
-    expect(untouched.getByProvider(CURSOR)).toHaveLength(0);
-    expect(untouched.getAllProviders()).toHaveLength(3);
-    // Opting in adds the family without displacing any canonical entry.
-    expect(registry.getAllModelIds()).toHaveLength(untouched.getAllModelIds().length + 4);
-    expect(registry.getAllProviders()).toHaveLength(4);
+    // Every registry built the default way carries the family identically —
+    // membership is a property of the catalog, not of call order.
+    expect(modelRegistry.getByProvider(CURSOR)).toHaveLength(4);
+    expect(modelRegistry.getAllProviders()).toHaveLength(4);
+    expect(new ModelRegistry().getByProvider(CURSOR)).toHaveLength(4);
+
+    // A registry narrowed to the builtin snapshot has no cursor entry, and the
+    // exported helper puts the family back without displacing anything.
+    const builtinOnly = new ModelRegistry(BUILTIN_MODELS);
+    expect(builtinOnly.getByProvider(CURSOR)).toHaveLength(0);
+    registerCursorParityModels(builtinOnly);
+    expect(builtinOnly.getAllModelIds()).toHaveLength(BUILTIN_MODELS.length + 4);
+    expect(builtinOnly.getByProvider(CURSOR)).toHaveLength(4);
   });
 
-  it('is idempotent', () => {
+  it('re-registration is idempotent', () => {
+    registerCursorParityModels(registry);
     registerCursorParityModels(registry);
     expect(registry.getByProvider(CURSOR)).toHaveLength(4);
   });
@@ -742,6 +772,6 @@ describe('modelRegistry singleton', () => {
   });
 
   it('has the complete canonical offline catalog', () => {
-    expect(modelRegistry.getAllModelIds()).toHaveLength(18);
+    expect(modelRegistry.getAllModelIds()).toHaveLength(22);
   });
 });

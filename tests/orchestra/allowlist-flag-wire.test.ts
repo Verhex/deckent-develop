@@ -63,6 +63,24 @@ describe('allowlist-flag-wire (born-674 / 428-002)', () => {
     expect(prompt).not.toContain(TOOL_SURFACE_HEADER);
   });
 
+  it('fails soft without tier guidance when the task model is absent from the registry', () => {
+    root = mkdtempSync(join(tmpdir(), 'allowlist-unknown-model-'));
+    const task = makeTask('428-208', { model: 'fixture-only-model' as ModelType });
+
+    expect(() => buildWorkerPrompt(task, undefined, undefined, root)).not.toThrow();
+    const prompt = buildWorkerPrompt(task, undefined, undefined, root);
+    expect(prompt).not.toContain('Economy-tier discipline:');
+  });
+
+  it('keeps tier guidance enabled for a canonical economy model', () => {
+    root = mkdtempSync(join(tmpdir(), 'allowlist-canonical-model-'));
+    const task = makeTask('428-209', { model: 'gpt-5.6-luna' });
+
+    const prompt = buildWorkerPrompt(task, undefined, undefined, root);
+
+    expect(prompt).toContain('Economy-tier discipline:');
+  });
+
   it('stays off (no Tool Surface block) when the config file has no tools block', () => {
     root = mkdtempSync(join(tmpdir(), 'allowlist-noblock-'));
     writeProjectConfig(root, { mode: 'default' });

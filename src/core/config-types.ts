@@ -12,7 +12,7 @@ import type { BotCapabilitiesConfig } from '../connectors/capabilities/types.js'
 import type { ApprovalPolicyRule } from './approval-policy.js';
 import type { ToolRiskLevel } from './tool-registry.js';
 import type { ComputerUseConfig } from './computer-use-contract.js';
-import type { ExecutionBudget, TaskKind } from './work-model.js';
+import type { ExecutionBudget, TaskKind, TaskProfileConfig } from './work-model.js';
 import type {
   InvocationAuthMode,
   InvocationExecutionBackend,
@@ -1634,6 +1634,42 @@ export interface PromptConfig {
    * byte-for-byte (the pre-F3 spawn args and prompt).
    */
   worker_core_system_prompt?: boolean;
+  /**
+   * 593-001 F2c catalog mount mask (default: **false** — behavior stays
+   * byte-identical until the flag is explicitly turned on).
+   *
+   * The docker backend bind-mounts the WHOLE project root read-write at
+   * `/workspace`, so the repo's design catalogs travel into every worker
+   * container: `.claude/skills/` (11 SKILL.md, ~118.8KB measured) and
+   * `.claude/agents/` (3 files, ~8KB) — irrelevant to a typical worker task and
+   * pure discovery surface. When true, the docker backend overlays an empty
+   * read-only directory on those two paths, so a worker sees them EMPTY.
+   *
+   * **ADR-G-027 safe by construction:** the assigned skill bodies and the agent
+   * persona are injected VERBATIM into the prompt itself (`buildSkillBlock`,
+   * `prompt-god-template.ts`) — the mask only closes MOUNT-side discovery of
+   * catalogs the task was never assigned. Prompt-side injection is untouched, so
+   * content-completeness (skill + scope-relevant ADR never truncated) holds.
+   *
+   * Default stays false until the mask is validated on a live sprint; flipping
+   * the default is a separate decision.
+   */
+  catalog_mount_mask?: boolean;
+  /**
+   * 593-002: task-class profile SSOT surface (`prompt.task_profiles`).
+   *
+   * Tunes the ONE canonical classifier (`resolveTaskPromptProfile`,
+   * `src/core/work-model.ts`) that the prompt compiler (core system prompt /
+   * scope block / verify tier) and the coverage validator now share instead of
+   * three drifting inline predicates. Partial: every unspecified field falls back
+   * to `DEFAULT_TASK_PROFILES`, whose values are exactly the literals those
+   * predicates carried — so the default resolution is behavior-identical to the
+   * pre-593-002 output.
+   *
+   * ADR-G-027: the profile selects prompt COMPOSITION; it never truncates skill,
+   * ADR or task content.
+   */
+  task_profiles?: Partial<TaskProfileConfig>;
 }
 
 // ─── Nervous System Config Types ────────────────────────────────────

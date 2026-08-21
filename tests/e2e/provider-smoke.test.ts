@@ -466,12 +466,11 @@ describe('Provider Detection Smoke Tests', () => {
       // Ollama models are registered lazily by providers/ollama.ts side-effect
       // and may be empty if the adapter module has not been imported in this
       // test environment — accept empty for ollama only.
-      // ddc523bf0 cursor adapter: CURSOR_MODELS is an opt-in catalog family
-      // (not part of CANONICAL_MODELS), so the registry carries no cursor
-      // model by default yet (7091 FAZ-1) — same zero-model exemption as
-      // ollama. Remove 'cursor' from this exemption once the 7091 model
-      // registration lands in the default registry.
-      if (p.name === 'ollama' || p.name === 'cursor') {
+      // 592-004: `cursor` NO LONGER has that exemption. CURSOR_MODELS joined
+      // CANONICAL_MODELS, so every registry carries the family at construction
+      // and CursorAdapter.supportedModels is non-empty in ANY process — which
+      // is precisely the regression this assertion now guards.
+      if (p.name === 'ollama') {
         expect(p.models.length).toBeGreaterThanOrEqual(0);
       } else {
         expect(p.models.length).toBeGreaterThan(0);

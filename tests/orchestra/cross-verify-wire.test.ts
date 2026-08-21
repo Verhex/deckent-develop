@@ -25,7 +25,11 @@ import type {
 import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult, ResolvedConfig, ProviderName, CrossVerifyConfig } from '../../src/core/types.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
-import { ensureOllamaModelRegistered, modelRegistry } from '../../src/core/model-registry.js';
+import {
+  ensureOllamaModelRegistered,
+  modelRegistry,
+  registerCursorParityModels,
+} from '../../src/core/model-registry.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
@@ -2309,6 +2313,147 @@ describe('runCrossVerify — honest-skip paths', () => {
     expect(res.outcome).toBe('confirmed');
     expect(calls[0]?.verifierProvider).toBe('claude');
     expect(calls[0]?.finalOnlyUsageContainment).toBeUndefined();
+  });
+
+  // ── Cursor backend symmetry (Task 592-005) ────────────────────────────────
+  // `cursor-agent` is a CLI-spawn verifier exactly like claude/codex/gemini, so
+  // every spawn-backend gate must bind it identically. These tests pin that
+  // symmetry so a later edit cannot quietly drop cursor out of the set and buy a
+  // cursor verification a weaker evidence chain than its peers must pay for.
+  describe('cursor verifier backend symmetry', () => {
+    const CURSOR_PROVIDERS: readonly ProviderName[] = ['claude', 'cursor'];
+
+    /** Cursor models are opt-in catalog entries; the runner resolves them by tier. */
+    function cursorVerifierModel(): string {
+      registerCursorParityModels();
+      return modelRegistry.getEquivalent('claude-sonnet-5', 'cursor');
+    }
+
+    /** A config whose backends are all unmetered — no docker to select or reroute to. */
+    function unmeteredConfig(): ResolvedConfig {
+      return makeConfig({ enabled: true }, {
+        spawn_backend: 'tmux',
+        execution_budget: {
+          roles: { auditor: { default: { maxCacheReadTokens: 1_000_000, maxTurns: 12 } } },
+          landing: { reserve_ratio: 0.25 },
+          unmetered_backend: { action: 'reroute-or-hold', ordered_backends: ['subprocess'] },
+          final_only_usage: {
+            action: 'allow-wall-clock-containment',
+            roles: ['auditor'],
+            max_wall_clock_seconds: 300,
+          },
+        },
+      } as Partial<ResolvedConfig>);
+    }
+
+    it('cursor is in needsSpawnBackend → unmetered default backend HOLDs, codex-symmetric', async () => {
+      cursorVerifierModel();
+      writeResultFile('276-001', makeResult());
+      const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+      const res = await runCrossVerify(
+        root, makeTask(), makeResult(), TaskEvaluation.DONE, unmeteredConfig(),
+        { availableProviders: CURSOR_PROVIDERS, spawnVerifier: fn },
+      );
+      expect(res.ran).toBe(false);
+      expect(res.outcome).toBe('unavailable');
+      expect(res.skippedReason).toBe(
+        'verifier-metered-backend-hold:cursor-default-backend-is-unmetered',
+      );
+      expect(calls).toHaveLength(0);
+      expect(readResultFile('276-001').crossVerify).toMatchObject({
+        outcome: 'unavailable',
+        verifier: 'cursor',
+        reason: 'verifier-metered-backend-hold:cursor-default-backend-is-unmetered',
+      });
+
+      // The same config, same gate, codex verifier — identical reason shape.
+      writeResultFile('276-001', makeResult());
+      const codex = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+      const codexRes = await runCrossVerify(
+        root, makeTask(), makeResult(), TaskEvaluation.DONE, unmeteredConfig(),
+        { availableProviders: TWO_PROVIDERS, spawnVerifier: codex.fn },
+      );
+      expect(codexRes.skippedReason).toBe(
+        'verifier-metered-backend-hold:codex-default-backend-is-unmetered',
+      );
+      expect(codex.calls).toHaveLength(0);
+    });
+
+    it('cursor eligibility evidence must name the exact spawn backend, codex-symmetric', async () => {
+      const model = cursorVerifierModel();
+      writeResultFile('276-001', makeResult());
+      const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+      const res = await runCrossVerify(
+        root, makeTask(), makeResult(), TaskEvaluation.DONE,
+        makeConfig({ enabled: true }),
+        {
+          availableProviders: CURSOR_PROVIDERS,
+          spawnVerifier: fn,
+          verifierCandidates: [exactCandidate({
+            provider: 'cursor',
+            model,
+            backend: {
+              transport: 'cli',
+              executionBackend: 'subprocess', // not the configured docker backend
+              endpointRefHash: null,
+              executionProfileRef: 'profile-cursor-subprocess',
+            },
+          })],
+        },
+      );
+      expect(res.ran).toBe(false);
+      expect(res.skippedReason).toBe('verifier-exact-backend-evidence-mismatch');
+      expect(calls).toHaveLength(0);
+      expect(readResultFile('276-001').crossVerify).toMatchObject({
+        outcome: 'unavailable',
+        verifier: 'cursor',
+        reason: 'verifier-exact-backend-evidence-mismatch',
+      });
+    });
+
+    it('final-only cursor without owner authorization → durable HOLD before any spend', async () => {
+      cursorVerifierModel();
+      writeResultFile('276-001', makeResult());
+      const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+      const config = makeConfig({ enabled: true });
+      // Same removal the codex fail-closed test performs: `cursor-agent` also
+      // reports usage only at call end, so the hold must fire identically.
+      delete (config.execution_budget as { final_only_usage?: unknown }).final_only_usage;
+      const res = await runCrossVerify(
+        root, makeTask(), makeResult(), TaskEvaluation.DONE, config,
+        { availableProviders: CURSOR_PROVIDERS, spawnVerifier: fn },
+      );
+      expect(res.ran).toBe(false);
+      expect(res.outcome).toBe('unavailable');
+      expect(res.skippedReason).toBe('verifier-final-only-usage-hold:cursor:final-only');
+      expect(calls).toHaveLength(0);
+      expect(readResultFile('276-001').crossVerify).toMatchObject({
+        outcome: 'unavailable',
+        verifier: 'cursor',
+        reason: 'verifier-final-only-usage-hold:cursor:final-only',
+      });
+    });
+
+    it('authorized cursor draws its containment from the same grant codex does', async () => {
+      const model = cursorVerifierModel();
+      writeResultFile('276-001', makeResult());
+      const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED cursor verified the bounded evidence');
+      const res = await runCrossVerify(
+        root, makeTask(), makeResult(), TaskEvaluation.DONE,
+        makeConfig({ enabled: true }),
+        { availableProviders: CURSOR_PROVIDERS, spawnVerifier: fn },
+      );
+      expect(res.outcome).toBe('confirmed');
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toMatchObject({
+        verifierProvider: 'cursor',
+        verifierModel: model,
+        finalOnlyUsageContainment: {
+          maxWallClockSeconds: 300,
+          profileRef: 'execution_budget.final_only_usage',
+        },
+      });
+    });
   });
 
   it('missing auditor budget policy → durable HOLD before verifier dispatch', async () => {
