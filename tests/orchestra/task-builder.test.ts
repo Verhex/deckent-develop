@@ -425,7 +425,13 @@ describe('resolveWorkerEffort', () => {
 // ─── buildWorkerPrompt — human-friendly format ────────────────────────────
 
 describe('buildWorkerPrompt', () => {
-  it('keeps the worker core inline for Codex when system-prompt externalization is enabled', () => {
+  it.each([
+    { workerCore: false, codexChannel: false, externalized: false },
+    { workerCore: true, codexChannel: false, externalized: false },
+    { workerCore: true, codexChannel: true, externalized: true },
+  ])(
+    'resolves Codex core externalization when worker_core_system_prompt=$workerCore and codex_core_channel=$codexChannel',
+    ({ workerCore, codexChannel, externalized }) => {
     const task = makeTask({ provider: 'codex', model: 'gpt-4.1' });
     const emptyRoot = makeEmptyProjectRoot();
     try {
@@ -434,17 +440,31 @@ describe('buildWorkerPrompt', () => {
         undefined,
         undefined,
         emptyRoot,
-        { prompt: { worker_core_system_prompt: true } },
+        {
+          prompt: {
+            worker_core_system_prompt: workerCore,
+            codex_core_channel: codexChannel,
+          },
+        },
       );
 
-      expect(prompt).toContain('## Karpathy Discipline');
-      expect(prompt).toContain('## Turn Economy');
+      if (externalized) {
+        expect(prompt).not.toContain('## Karpathy Discipline');
+        expect(prompt).not.toContain('## Turn Economy');
+      } else {
+        expect(prompt).toContain('## Karpathy Discipline');
+        expect(prompt).toContain('## Turn Economy');
+      }
     } finally {
       rmSync(emptyRoot, { recursive: true, force: true });
     }
-  });
+    },
+  );
 
-  it('suppresses the inline worker core for Claude when system-prompt externalization is enabled', () => {
+  it.each([
+    { enabled: false, externalized: false },
+    { enabled: true, externalized: true },
+  ])('preserves Claude core externalization when worker_core_system_prompt=$enabled', ({ enabled, externalized }) => {
     const task = makeTask({ provider: 'claude', model: 'claude-sonnet-5' });
     const emptyRoot = makeEmptyProjectRoot();
     try {
@@ -453,11 +473,16 @@ describe('buildWorkerPrompt', () => {
         undefined,
         undefined,
         emptyRoot,
-        { prompt: { worker_core_system_prompt: true } },
+        { prompt: { worker_core_system_prompt: enabled } },
       );
 
-      expect(prompt).not.toContain('## Karpathy Discipline');
-      expect(prompt).not.toContain('## Turn Economy');
+      if (externalized) {
+        expect(prompt).not.toContain('## Karpathy Discipline');
+        expect(prompt).not.toContain('## Turn Economy');
+      } else {
+        expect(prompt).toContain('## Karpathy Discipline');
+        expect(prompt).toContain('## Turn Economy');
+      }
     } finally {
       rmSync(emptyRoot, { recursive: true, force: true });
     }

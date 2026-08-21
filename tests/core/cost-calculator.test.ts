@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calculateRegimeCost,
   estimateSprintCost,
   formatEstimate,
   resolveActualBillingMode,
@@ -7,6 +8,7 @@ import {
   type TaskCostInput,
   type SprintCostEstimate,
 } from '../../src/core/cost-calculator.js';
+import { ModelRegistry, modelRegistry } from '../../src/core/model-registry.js';
 import type { CostConfig } from '../../src/core/cost-config-loader.js';
 
 // ─── Test Config ────────────────────────────────────────────────────────────
@@ -131,6 +133,32 @@ describe('cost-calculator', () => {
   });
 
   describe('cache math', () => {
+    it('uses gpt-5.6-sol explicit registry cache-read pricing with fallback-equivalent cost', () => {
+      const usage = {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 1_000_000,
+        cacheCreationTokens: 0,
+      };
+      const explicit = calculateRegimeCost(usage, 'gpt-5.6-sol', 'api', TEST_CONFIG);
+      const sol = modelRegistry.getOrThrow('gpt-5.6-sol');
+      const fallbackRegistry = new ModelRegistry([{
+        ...sol,
+        costPerMillion: { input: sol.costPerMillion.input, output: sol.costPerMillion.output },
+      }]);
+      const fallback = calculateRegimeCost(
+        usage,
+        'gpt-5.6-sol',
+        'api',
+        TEST_CONFIG,
+        fallbackRegistry,
+      );
+
+      expect(sol.costPerMillion.cacheReadInput).toBe(0.5);
+      expect(explicit.value).toBe(0.5);
+      expect(explicit.value).toBeCloseTo(fallback.value, 12);
+    });
+
     it('applies cache read discount (90% savings)', () => {
       const tasks: TaskCostInput[] = [
         {

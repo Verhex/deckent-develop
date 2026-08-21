@@ -763,6 +763,8 @@ export class SpawnBackendFactory {
         kindMemoryLimits: opts.dockerKindMemoryLimits,
         homeTmpfsSize: opts.dockerHomeTmpfsSize, // WORKER-ENV-TMPFS-001: config-driven HOME tmpfs
         catalogMountMask: effectiveConfig?.prompt?.catalog_mount_mask,
+        codexCoreChannel: effectiveConfig?.prompt?.codex_core_channel,
+        codexSuppressProjectDoc: effectiveConfig?.prompt?.codex_suppress_project_doc,
       });
     }
 

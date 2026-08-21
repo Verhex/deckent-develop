@@ -1,5 +1,27 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-598 Learnings
+- Sprint sprint-598 Learnings: ## Sprint sprint-598 Learnings
+
+## Gains
+- 598-001 — AI-operatör dersi 26 (pgrep kendi-desen tuzağı; iki dil senkron) — Added lesson 26 with equivalent Turkish and English guidance covering self-matching pgrep/grep wa...
+
+## Sprint sprint-597 Learnings
+- Sprint sprint-597 Learnings: ## Sprint sprint-597 Learnings
+
+## Gains
+- 597-001 — docker-backend prefix-bileşimi (T2, tek-sahip) — Implemented capability-based Docker prefix composition: disabled Codex argv remains pinned, enabl...
+- 597-002 — registry cache-read fiyat-girişleri (T4) — LOCAL_VERIFIED / SCOPED_GREEN: npx vitest run tests/core/cost-calculator.test.ts tests/core/model...
+- 597-003 — coreExternalized yetenek-tabanlı gate (T5) — Implemented capability-based coreExternalized resolution with provider-specific flag mapping: Cod...
+- 597-004 — Dockerfile codex sürüm-pini (T6) — LOCAL_VERIFIED / SCOPED_GREEN: npx tsc --noEmit exited 0.
+
+## Sprint sprint-596 Learnings
+- Sprint sprint-596 Learnings: ## Sprint sprint-596 Learnings
+
+## Gains
+- 596-001 — ProviderCommandSpec prefix-alanları (T3 arayüz-mührü) — Codex ProviderCommandSpec now declares systemPromptCoreArgs and contextSuppressionArgs with the r...
+- 596-002 — config şema-mührü (T7) — PromptConfig now types codex_core_channel and codex_suppress_project_doc with explicit canary/own...
+
 ## Sprint sprint-595 Learnings
 - Sprint sprint-595 Learnings: ## Sprint sprint-595 Learnings
 - mesaj-katalog + komut-kayıt ratchet borçları: NO_GO — Authorized fix completed: replaced numeric ADR references in nervous.mcp.compensate.no_action_available and mcp.start.au

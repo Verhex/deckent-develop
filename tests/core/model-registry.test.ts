@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ModelRegistry,
   BUILTIN_MODELS,
+  CODEX_PARITY_MODELS,
   modelRegistry,
   registerCursorParityModels,
   type ModelDefinition,
@@ -72,6 +73,17 @@ describe('BUILTIN_MODELS catalog', () => {
     for (const m of BUILTIN_MODELS) {
       expect(m.costPerMillion.input).toBeGreaterThanOrEqual(0);
       expect(m.costPerMillion.output).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe('CODEX_PARITY_MODELS pricing', () => {
+  it('pins explicit cache-read prices at 0.1x uncached input for the gpt-5.6 family', () => {
+    const family = CODEX_PARITY_MODELS.filter(model => model.id.startsWith('gpt-5.6-'));
+
+    expect(family).toHaveLength(3);
+    for (const model of family) {
+      expect(model.costPerMillion.cacheReadInput).toBe(model.costPerMillion.input * 0.1);
     }
   });
 });

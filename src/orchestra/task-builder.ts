@@ -99,6 +99,37 @@ import { resolveVerifyCommands } from './worker-verify-tool.js';
 import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
 import { computeToolAllowlist } from '../core/tool-allowlist.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
+import { getProviderCommandSpec } from '../core/provider-command-spec.js';
+
+type CoreExternalizationPolicy = {
+  /** Claude's established system-prompt-file seam predates the capability field. */
+  legacyCoreChannel?: boolean;
+  enabled: (flags: NonNullable<ResolvedConfig['prompt']>) => boolean;
+};
+
+const providerCoreExternalizationPolicies: Partial<Record<ProviderName, CoreExternalizationPolicy>> = {
+  claude: {
+    legacyCoreChannel: true,
+    enabled: flags => flags.worker_core_system_prompt === true,
+  },
+  codex: {
+    enabled: flags => flags.worker_core_system_prompt === true && flags.codex_core_channel === true,
+  },
+};
+
+function shouldExternalizeWorkerCore(
+  provider: ProviderName | undefined,
+  flags: ResolvedConfig['prompt'] | undefined,
+): boolean {
+  const policy = provider ? providerCoreExternalizationPolicies[provider] : undefined;
+  const commandSpec = provider ? getProviderCommandSpec(provider) : undefined;
+  const hasCoreChannel = commandSpec != null
+    && ('systemPromptCoreArgs' in commandSpec || policy?.legacyCoreChannel === true);
+  if (!policy || !flags || !hasCoreChannel) {
+    return false;
+  }
+  return policy.enabled(flags);
+}
 
 function exactDependencyPath(value: string): boolean {
   if (value.length === 0 || value.startsWith('/') || value.startsWith('\\') || /^[A-Za-z]:/u.test(value)) {
@@ -2735,13 +2766,9 @@ export function buildWorkerPrompt(
     verifyCommands,
     toolAllowlist,
     personaRenderMode: effectiveConfig?.prompt?.persona_render,
-    // 7094-F3/7094-T4a: suppress the inline T0 core only for Claude, because
-    // Claude is currently the sole provider whose command path actually emits
-    // buildWorkerCoreSystemPrompt via --system-prompt-file. Other providers
-    // have no equivalent channel and must retain the core inline.
-    coreExternalized:
-      effectiveConfig?.prompt?.worker_core_system_prompt === true
-      && task.provider === 'claude',
+    // Suppress inline T0 only when the provider spec exposes a core channel and
+    // every provider-specific rollout flag for that channel is enabled.
+    coreExternalized: shouldExternalizeWorkerCore(task.provider, effectiveConfig?.prompt),
     exactExecutionAuthority,
   };
   const artifact = buildTaskPrompt(task, ctx);

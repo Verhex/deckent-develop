@@ -438,8 +438,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-21 (7094 wave-2/3/4 + 7091): +5 — the docker-mounts suite's
   // catalog-mask tmpdir fixtures, the work-model profile suite, and the
   // wave-4 fail-soft/allowlist fixture writes.
+  // 2026-08-21 (codex-prefix waves + handoff tooling): same 14483 count,
+  // digest only — the authority-handoff CLI sandbox suite and the prefix
+  // spec/config pin realignments moved tracked test content.
   count: 14483,
-  digest: 'f3128c6c2186d35e454d3b8c1ae0598b31bd50a360d9e8794918fc28db915097',
+  digest: '5cc76269412207604025eb23f675251ac9729ec627697b77ef2d0e94a183006e',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -772,8 +775,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // digest only — catalog-mask/profile-SSOT/fail-soft/tier threading,
   // provider-aware coreExternalized, confirmation-store typed error and the
   // command-registry confirmations entry moved tracked production content.
+  // 2026-08-21 (codex-prefix waves): same 1267 count, digest only — spec
+  // prefix fields, config flags, spec-driven core-emit branch, capability
+  // gate and the tmux dead-seam removal moved tracked production content.
   count: 1267,
-  digest: 'b56f524a3a4a06d3437f7ed62648519510e3690e4bd095d56292b9370f3fbe0d',
+  digest: '87d8e7f8ab93fb57179c4f61451b4d956489d461285654265201108fcae1ed10',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

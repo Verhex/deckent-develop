@@ -4,7 +4,7 @@
 # Closure OS — Level × Lane classification & re-triage: owner disposition proposal **v2.1**
 
 > Read-only, non-authoritative. Codex final disposition (2026-08-14): owner-declared semantics outrank topology; ID-regex is not a classification authority; `check-proof ⇒ proof`; priority changes this phase = 0.
-> Source: `master-plan-active.json` @ sourceDigest `a45bc251c7d54d06…` · registryIntegrity `b3f9f916a493f8d8…`
+> Source: `master-plan-active.json` @ sourceDigest `9d4d73df6e62e9a3…` · registryIntegrity `d65b74960edd6c54…`
 > Enum + override SSOT: `src/core/closure-classification-schema.json` (schemaVersion 1). Rows scanned: 452 active.
 > check-proof⇒proof invariant on this output: **HOLDS**. Override-vs-invariant conflicts: 0.
 
@@ -103,7 +103,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 
 ```jsonc
 { "schemaVersion":1, "seq":<n>, "eventId":"…", "recordedAt":"<owner-batch-ts>",
-  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"a45bc251c7d5…" },
+  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"9d4d73df6e62…" },
   "decision":{ "kind":"level-lane-disposition", "level":"<enum>", "lane":"<enum>", "ruleId":"<rule>", "confidence":"<h|m|l>" },
   "authorityProof":{ "ownerReceipt":"<authenticated durable receipt ref>" }, "previousEventDigest":"…", "eventDigest":"…" }
 // priority-retriage events this phase: 0 (priority unchanged). lane-resolution candidates: 3 HOLD rows if owner assigns.

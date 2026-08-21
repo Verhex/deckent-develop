@@ -149,6 +149,11 @@ docs/execution/handoffs/<handoffId>/
   0003-committed.json
 ```
 
+Receipt'ler elle DEĞİL, `scripts/authority-handoff.mjs`
+(prepare/verify/commit/abort/recovery-commit/status) ile üretilir — digest'i
+makine hesaplar, create-only yazar, transition-sırasını ve recovery'nin owner
+authority-ref şartını mekanik zorlar (tooling 2026-08-21, owner-onaylı;
+policyDigest kaynağı `lint-operating-policy.mjs --digest`).
 Recovery/abort transition'ı bir sonraki sequence numarasını kullanır. `current-flow.md` yalnız
 aktif `handoffId` ve son receipt digest'ine pointer taşıyabilir; receipt'in kendisi değildir ve
 tek kanıt kaynağı olamaz. `.tasks/handoffs/` bu amaçla kullanılmaz.
@@ -286,7 +291,7 @@ Receiver'ın ilk görevi işe devam etmek değil, paketi doğrulamaktır.
    Alias veya “yakın model” kabul etmez.
 2. **Authority chain:** Owner live instruction → latest committed receipt → control block sırasını,
    current/proposed epoch'i ve previous digest chain'i doğrular.
-3. **Canonical refresh:** Kendi host entry contract'ını ve §5.2'deki aynı canonical kaynakları
+3. **Canonical refresh:** Kendi host entry contract'ını ve §5'in 2. adımındaki aynı canonical kaynakları
    tazeler. Transferor'ın transcript/özetini instruction saymaz.
 4. **Disk reconciliation:** Git SHA/status, canlı süreç, approval, receipt, build ve SSOT
    beyanlarını bağımsız read-only ölçümlerle karşılaştırır.

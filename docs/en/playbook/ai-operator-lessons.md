@@ -366,10 +366,28 @@ on builds WHILE a sprint is running remains unchanged; let the sprint reach a te
 first. After the build, apply the active host adapter's restart/reconnect ritual to
 long-lived bot and MCP processes, then produce dogfood evidence from the fresh binary.
 
+## 26. A `pgrep`/`grep` wait pattern can match its own command line
+
+**Mistake:** A process-waiting `bash -c "... pgrep -f 'X' ..."` chain carried the
+`X` pattern in its own command line, found itself, and waited forever. This happened
+twice today: the settlement chain found the `dist/cli/entry.js start` pattern in its
+own bot-start text; the watcher also waited on its own verdict pattern.
+
+**Why:** `pgrep -f` and similar `grep` checks scan full command lines, not only the
+target process name. The waiting shell that carries the search pattern can therefore
+enter the result set.
+
+**Correct usage:** Filter your own PID or pattern-carrying shells from `pgrep` output
+(`grep -v $$`), split the pattern so it does not appear verbatim in the command line
+(`'st''art'`), or wait on a captured PID instead of a process name (`kill -0 <pid>`).
+
 ---
 
 ## Changelog (update after every sprint experience)
 
+- **2026-08-21 — process waiter matching its own pattern**: Lesson 26 added (a
+  `pgrep -f`/`grep` waiter matching its own command line and waiting forever; filter
+  its own PID/shells, split the pattern, or use `kill -0 <pid>`).
 - **2026-08-21 — live-evidence and operational-hygiene update**: Lessons 22–25 added
   (time-bounded watchers and the approval-rules `decidedBy: rule:<id>` envelope;
   live consumer evidence separate from the impl seal; a read `wc -l` before XVerify

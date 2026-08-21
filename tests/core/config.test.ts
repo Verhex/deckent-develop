@@ -1170,7 +1170,56 @@ describe('extended config validation', () => {
 
 // ─── New Config Fields (Sprint 052) ──────────────────────────────────
 
-import { CONFIG_METADATA, listConfigByCategory } from '../../src/core/config.js';
+import {
+  CONFIG_METADATA,
+  DEFAULT_PROMPT_CONFIG,
+  generateConfigReference,
+  getConfigHelp,
+  listConfigByCategory,
+} from '../../src/core/config.js';
+
+describe('prompt Codex schema seal (596-002)', () => {
+  it('keeps both Codex prompt flags default-off', () => {
+    expect(DEFAULT_PROMPT_CONFIG.codex_core_channel).toBe(false);
+    expect(DEFAULT_PROMPT_CONFIG.codex_suppress_project_doc).toBe(false);
+
+    const config = getDefaultConfig();
+    expect(config.prompt.codex_core_channel).toBe(false);
+    expect(config.prompt.codex_suppress_project_doc).toBe(false);
+  });
+
+  it('continues to accept valid configs carrying either boolean value', () => {
+    const config = getDefaultConfig();
+    config.prompt = {
+      ...config.prompt,
+      codex_core_channel: true,
+      codex_suppress_project_doc: true,
+    };
+
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('publishes localized help and generated-reference metadata for both keys', () => {
+    for (const key of [
+      'prompt.codex_core_channel',
+      'prompt.codex_suppress_project_doc',
+    ]) {
+      const metadata = getConfigHelp(key);
+      expect(metadata).toMatchObject({
+        type: 'boolean',
+        default: false,
+        options: ['true', 'false'],
+        category: 'Prompt',
+      });
+      expect(metadata?.description).toBeTruthy();
+      expect(metadata?.descriptionTr).toBeTruthy();
+    }
+
+    const reference = generateConfigReference();
+    expect(reference).toContain('### `prompt.codex_core_channel`');
+    expect(reference).toContain('### `prompt.codex_suppress_project_doc`');
+  });
+});
 
 describe('memory config defaults', () => {
   it('default config has memory_budget=5000 (Sprint 140 pre-flight 5.5x increase)', () => {

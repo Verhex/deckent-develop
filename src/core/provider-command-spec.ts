@@ -73,6 +73,16 @@ export interface ProviderCommandSpec {
    */
   reasoningEffortArgs: ((level: string) => readonly string[]) | null;
   /**
+   * Builds provider args that load the immutable system-prompt core from its
+   * container path. Undefined when the provider has no approved core channel.
+   */
+  systemPromptCoreArgs?: (containerCorePath: string) => string[];
+  /**
+   * Provider args that suppress project-context discovery around the immutable
+   * system-prompt core. Undefined when no measured suppression channel exists.
+   */
+  contextSuppressionArgs?: string[];
+  /**
    * F3.1: the CLI flag that moves per-machine system-prompt sections (cwd, env,
    * git status) into the first user message for a byte-stable cache prefix, or null
    * for a provider whose CLI has no equivalent. claude →
@@ -134,6 +144,8 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     promptFeed: 'stdin',
     oauthHomeDir: '.codex',
     reasoningEffortArgs: (level) => ['-c', `model_reasoning_effort=${level}`], // minimal|low|medium|high
+    systemPromptCoreArgs: (containerCorePath) => ['-c', `model_instructions_file=${containerCorePath}`],
+    contextSuppressionArgs: ['-c', 'project_doc_max_bytes=0'],
     excludeDynamicPromptSectionsFlag: null, // codex CLI has no equivalent flag
     liveUsage: 'final-only',
   },

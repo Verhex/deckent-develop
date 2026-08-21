@@ -348,10 +348,28 @@ build alma yasağı aynen geçerlidir; önce sprint terminal olur. Build sonras�
 long-lived bot ve MCP süreçlerine aktif host adapterının restart/reconnect ritüelini
 uygula, ardından dogfood kanıtını taze binary üzerinden üret.
 
+## 26. `pgrep`/`grep` bekleme deseni kendi komut satırını eşleyebilir
+
+**Hata:** Süreç bekleyen bir `bash -c "... pgrep -f 'X' ..."` zinciri, `X` desenini
+kendi komut satırında taşıdığı için kendini buldu ve sonsuza kadar bekledi. Bugün iki
+kez görüldü: settlement zinciri `dist/cli/entry.js start` desenini kendi bot-start
+metninde buldu; watcher da kendi verdict desenini bekledi.
+
+**Neden:** `pgrep -f` ve benzer `grep` kontrolleri yalnız hedef sürecin adını değil,
+tam komut satırını tarar. Arama desenini taşıyan bekleyici shell de sonuç kümesine
+girebilir.
+
+**Doğru kullanım:** `pgrep` çıktısından kendi PID'ini veya deseni taşıyan shell'leri
+çıkar (`grep -v $$`), deseni komut satırında birebir bulunmayacak şekilde parçala
+(`'st''art'`) ya da süreç-adı yerine yakalanmış PID'i bekle (`kill -0 <pid>`).
+
 ---
 
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-08-21 — kendi-desenini eşleyen süreç bekleyicisi**: Ders 26 eklendi
+  (`pgrep -f`/`grep` bekleyicisinin kendi komut satırını eşleyip sonsuz beklemesi;
+  kendi PID'ini/shell'leri eleme, deseni parçalama veya `kill -0 <pid>` kullanma).
 - **2026-08-21 — canlı kanıt ve operasyon hijyeni güncellemesi**: Ders 22–25 eklendi
   (zaman-sınırlı watcher ve `decidedBy: rule:<id>` approval-rules zarfı; impl mühründen
   ayrı canlı consumer kanıtı; XVerify target öncesi okunmuş `wc -l`; kaynak değişikliğinde

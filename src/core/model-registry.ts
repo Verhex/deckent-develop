@@ -14,6 +14,13 @@ import type {
   ParametricResolveOptions,
 } from './model-registry-types.js';
 
+declare module './model-registry-types.js' {
+  interface ModelCost {
+    /** Cached-input read price in USD per million tokens, when published. */
+    cacheReadInput?: number;
+  }
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 // The type declarations now live in `model-registry-types.ts` (the project
 // `*-types.ts` convention). They are re-exported here so every existing importer
@@ -368,7 +375,7 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
     // real consumption, unlike `gpt-4.1` which the same account refuses with 400.
     preferredForTier: true,
     contextWindow: 1_050_000,
-    costPerMillion: { input: 5, output: 30 },
+    costPerMillion: { input: 5, output: 30, cacheReadInput: 0.5 },
     pricingEvidenceRef: 'https://platform.openai.com/docs/pricing',
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
     status: 'ga',
@@ -385,7 +392,7 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
     // that MASTER-PLAN 671(b) records rather than something the catalog asserts.
     preferredForTier: true,
     contextWindow: 1_050_000,
-    costPerMillion: { input: 2.5, output: 15 },
+    costPerMillion: { input: 2.5, output: 15, cacheReadInput: 0.25 },
     pricingEvidenceRef: 'https://platform.openai.com/docs/pricing',
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
     status: 'ga',
@@ -399,7 +406,7 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
     // MASTER-PLAN 670 (owner-approved 2026-07-26), replacing `gpt-5-mini`.
     preferredForTier: true,
     contextWindow: 1_050_000,
-    costPerMillion: { input: 1, output: 6 },
+    costPerMillion: { input: 1, output: 6, cacheReadInput: 0.1 },
     pricingEvidenceRef: 'https://platform.openai.com/docs/pricing',
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
     status: 'ga',

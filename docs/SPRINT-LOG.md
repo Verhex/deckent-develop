@@ -14323,3 +14323,73 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 594-003: F2c wiring-kapanışı (593-001 debt'i) (DONE)
 
 ---
+## Sprint 596 — sprint-596
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 157s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 157439ms |
+
+### Tasks
+
+- 596-001: ProviderCommandSpec prefix-alanları (T3 arayüz-mührü) (DONE)
+- 596-002: config şema-mührü (T7) (DONE)
+
+---
+## Sprint 597 — sprint-597
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 477s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 476540ms |
+
+### Tasks
+
+- 597-001: docker-backend prefix-bileşimi (T2, tek-sahip) (DONE)
+- 597-002: registry cache-read fiyat-girişleri (T4) (DONE)
+- 597-003: coreExternalized yetenek-tabanlı gate (T5) (DONE)
+- 597-004: Dockerfile codex sürüm-pini (T6) (DONE)
+
+---
+## Sprint 598 — sprint-598
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 82s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 82142ms |
+
+### Tasks
+
+- 598-001: AI-operatör dersi 26 (pgrep kendi-desen tuzağı; iki dil senkron) (DONE)
+
+---

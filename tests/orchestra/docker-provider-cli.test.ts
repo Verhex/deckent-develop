@@ -89,7 +89,7 @@ vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importAct
 }));
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   DockerSpawnBackend,
   probeProviderCliPresentInImage,
@@ -106,7 +106,14 @@ import {
 } from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
+const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
+const mockWriteFileSync = vi.mocked(writeFileSync);
+const FINAL_ONLY_TEST_CONTAINMENT = {
+  maxWallClockSeconds: 60,
+  profileRef: 'test-final-only-containment',
+  policyDigest: 'sha256:test-final-only-containment',
+} as const;
 
 // Heartbeat-authority identity readbacks must surface ENOENT: the full node:fs
 // mock cannot carry the WorkerHeartbeatAuthorityStore write→readback chain, and
@@ -184,6 +191,10 @@ async function workerScriptFor(taskId: string): Promise<string> {
   const call = wf.mock.calls.find(c =>
     String(c[0]).includes(`.worker-${taskId}`) && String(c[0]).endsWith('.sh'));
   return call ? String(call[1]) : '';
+}
+
+function providerCommandFrom(script: string): string {
+  return script.split('\n').find(line => line.startsWith('timeout -k 30 $TIMEOUT ')) ?? '';
 }
 
 function spawnExpectMessage(backend: DockerSpawnBackend, taskId: string, model: string): string {
@@ -270,6 +281,81 @@ describe('DockerSpawnBackend: provider→cmd table (shared PROVIDER_COMMAND_SPEC
     expect(script).toContain('gpt-5.6-sol');
     for (const arg of spec.approvalArgs) expect(script).toContain(arg);
     expect(script).not.toContain('--dangerously-skip-permissions'); // claude-only flag
+  });
+
+  it('keeps the default-off codex argv byte-identical', async () => {
+    mockReadFileSync.mockImplementation(budgetedTaskRead('gpt-5.6-sol'));
+    new DockerSpawnBackend('/test/project').spawn(
+      'codex-prefix-off',
+      'gpt-5.6-sol' as ModelType,
+      'prompt-body',
+      {
+        ...TEST_DOCKER_EXECUTION_OPTIONS,
+        systemPromptCore: 'stable worker core',
+        finalOnlyUsageContainment: FINAL_ONLY_TEST_CONTAINMENT,
+      },
+    );
+
+    const command = providerCommandFrom(await workerScriptFor('codex-prefix-off'))
+      .replace(/\.prompt-codex-prefix-off-[a-f0-9]+\.txt/, '.prompt-<task-id>-<digest>.txt');
+    expect(command).toBe(
+      'timeout -k 30 $TIMEOUT codex exec --skip-git-repo-check --json --model gpt-5.6-sol '
+      + '--dangerously-bypass-approvals-and-sandbox < "/workspace/.tasks/.prompt-<task-id>-<digest>.txt" &',
+    );
+    expect(command).not.toContain('model_instructions_file=');
+    expect(command).not.toContain('project_doc_max_bytes=0');
+  });
+
+  it('emits the codex core file and composes spec-defined core + suppression argv when enabled', async () => {
+    const core = 'stable worker core';
+    const corePath = '/test/project/.tasks/.worker-core-b938cc65a51b.md';
+    mockExistsSync.mockImplementation(path => String(path) !== corePath);
+    mockReadFileSync.mockImplementation(budgetedTaskRead('gpt-5.6-sol'));
+    new DockerSpawnBackend('/test/project', {
+      codexCoreChannel: true,
+      codexSuppressProjectDoc: true,
+    }).spawn(
+      'codex-prefix-on',
+      'gpt-5.6-sol' as ModelType,
+      'prompt-body',
+      {
+        ...TEST_DOCKER_EXECUTION_OPTIONS,
+        systemPromptCore: core,
+        finalOnlyUsageContainment: FINAL_ONLY_TEST_CONTAINMENT,
+      },
+    );
+
+    const command = providerCommandFrom(await workerScriptFor('codex-prefix-on'));
+    expect(command).toContain(
+      'codex -c model_instructions_file=/workspace/.tasks/.worker-core-b938cc65a51b.md '
+      + '-c project_doc_max_bytes=0 exec --skip-git-repo-check --json',
+    );
+    expect(mockWriteFileSync).toHaveBeenCalledWith(
+      corePath,
+      core,
+      'utf-8',
+    );
+    mockExistsSync.mockReturnValue(true);
+  });
+
+  it('keeps claude argv identical when the codex prefix flags toggle', async () => {
+    const spawnClaude = async (taskId: string, enabled: boolean): Promise<string> => {
+      mockReadFileSync.mockImplementation(budgetedTaskRead('claude-sonnet-5'));
+      new DockerSpawnBackend('/test/project', {
+        codexCoreChannel: enabled,
+        codexSuppressProjectDoc: enabled,
+      }).spawn(
+        taskId,
+        'claude-sonnet-5' as ModelType,
+        'prompt-body',
+        { ...TEST_DOCKER_EXECUTION_OPTIONS, systemPromptCore: 'stable worker core' },
+      );
+      return providerCommandFrom(await workerScriptFor(taskId))
+        .replace(new RegExp(`\\.prompt-${taskId}-[a-f0-9]+\\.txt`), '.prompt-<task-id>-<digest>.txt');
+    };
+
+    expect(await spawnClaude('claude-prefix-off', false))
+      .toBe(await spawnClaude('claude-prefix-on', true));
   });
 
   it('gemini command is built from its shared spec with a canonical API ID', () => {

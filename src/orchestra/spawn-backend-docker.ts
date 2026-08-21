@@ -4054,6 +4054,10 @@ export interface DockerSpawnBackendConstructionOptions {
    * write scope, so today the flag is set by the constructor caller.
    */
   readonly catalogMountMask?: boolean;
+  /** Enable the spec-defined system-prompt core channel for capable providers. */
+  readonly codexCoreChannel?: boolean;
+  /** Suppress project-document auto-loading through the provider command spec. */
+  readonly codexSuppressProjectDoc?: boolean;
   readonly crossVerifyRuntimeCommandRunner?: DockerCrossVerifyRuntimeCommandRunner;
   readonly reachabilityProbeCommandRunner?: DockerReachabilityProbeCommandRunner;
   /** Injectable host adapter selector for hermetic platform-matrix tests. */
@@ -4407,6 +4411,8 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly verifyProviderCliInImage: boolean;
   /** 593-001 F2c: `prompt.catalog_mount_mask` — default false (byte-identical argv). */
   private readonly catalogMountMask: boolean;
+  private readonly codexCoreChannel: boolean;
+  private readonly codexSuppressProjectDoc: boolean;
   private readonly crossVerifyRuntimeCommandRunner: DockerCrossVerifyRuntimeCommandRunner;
   private readonly reachabilityProbeCommandRunner: DockerReachabilityProbeCommandRunner;
   private readonly platform: NodeJS.Platform;
@@ -4474,6 +4480,8 @@ export class DockerSpawnBackend implements SpawnBackend {
     // 593-001 F2c: opt-in catalog mount mask; default false keeps `docker run`
     // argv byte-identical (DEFAULT_PROMPT_CONFIG.catalog_mount_mask === false).
     this.catalogMountMask = opts?.catalogMountMask ?? false;
+    this.codexCoreChannel = opts?.codexCoreChannel ?? false;
+    this.codexSuppressProjectDoc = opts?.codexSuppressProjectDoc ?? false;
     this.crossVerifyRuntimeCommandRunner =
       opts?.crossVerifyRuntimeCommandRunner ?? runBoundedCrossVerifyRuntimeCommand;
     this.reachabilityProbeCommandRunner =
@@ -5894,10 +5902,29 @@ export class DockerSpawnBackend implements SpawnBackend {
         '--system-prompt-file', `${CONTAINER_WORKSPACE}/.tasks/${coreName}`,
         '--disable-slash-commands',
       ];
+    } else if (
+      spec.systemPromptCoreArgs
+      && this.codexCoreChannel
+      && opts?.systemPromptCore
+    ) {
+      const coreDigest = createHash('sha256').update(opts.systemPromptCore, 'utf-8')
+        .digest('hex').slice(0, 12);
+      const coreName = `.worker-core-${coreDigest}.md`;
+      const coreHostPath = join(tasksDir, coreName);
+      if (!existsSync(coreHostPath)) writeFileSync(coreHostPath, opts.systemPromptCore, 'utf-8');
+      const containerCorePath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/${coreName}`;
+      coreArgs = spec.systemPromptCoreArgs(containerCorePath);
     }
     const dockerSpec: ProviderCommandSpec = providerBinary === 'claude'
       ? { ...spec, baseArgs: [...coreArgs, ...claudeStreamJsonBaseArgs(spec.baseArgs)] }
-      : spec;
+      : {
+          ...spec,
+          baseArgs: [
+            ...coreArgs,
+            ...(this.codexSuppressProjectDoc ? spec.contextSuppressionArgs ?? [] : []),
+            ...spec.baseArgs,
+          ],
+        };
     // IMMUTABLE — deckent workers run with full autonomy (autoApprove). The spec
     // maps that to the correct per-provider flag (claude --dangerously-skip-
     // permissions, codex --dangerously-bypass-approvals-and-sandbox, gemini yolo).

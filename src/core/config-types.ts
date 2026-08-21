@@ -1635,6 +1635,20 @@ export interface PromptConfig {
    */
   worker_core_system_prompt?: boolean;
   /**
+   * Design §c T7 schema seal for the Codex-owned core prompt channel.
+   * This wave intentionally adds no consumer: false preserves the current
+   * prompt path. Enabling the default is a separate owner decision after the
+   * canary evidence is accepted; it must never be flipped on blindly.
+   */
+  codex_core_channel?: boolean;
+  /**
+   * Design §c T7 schema seal for suppressing Codex project-document loading.
+   * This wave intentionally adds no consumer: false preserves current project
+   * document discovery. Enabling the default is a separate owner decision
+   * after the canary evidence is accepted; it must never be flipped on blindly.
+   */
+  codex_suppress_project_doc?: boolean;
+  /**
    * 593-001 F2c catalog mount mask (default: **false** — behavior stays
    * byte-identical until the flag is explicitly turned on).
    *

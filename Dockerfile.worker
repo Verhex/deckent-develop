@@ -35,10 +35,11 @@ RUN npm i -g @anthropic-ai/claude-code
 # RUN curl -fsSL https://ollama.ai/install.sh | sh
 # RUN curl https://cursor.com/install -fsS | bash
 ARG INSTALL_CODEX=false
+ARG CODEX_VERSION=0.148.0
 ARG INSTALL_GEMINI=false
 ARG INSTALL_OLLAMA=false
 ARG INSTALL_CURSOR=false
-RUN if [ "$INSTALL_CODEX" = "true" ]; then npm i -g @openai/codex; fi
+RUN if [ "$INSTALL_CODEX" = "true" ]; then npm i -g "@openai/codex@$CODEX_VERSION"; fi
 RUN if [ "$INSTALL_GEMINI" = "true" ]; then npm i -g @google/gemini-cli; fi
 RUN if [ "$INSTALL_OLLAMA" = "true" ]; then curl -fsSL https://ollama.ai/install.sh | sh; fi
 # cursor-agent is binary-only (src/core/provider-packages.ts:71 — not an npm

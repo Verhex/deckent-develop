@@ -14,6 +14,43 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint598] - 2026-08-21
+
+### Added
+
+- AI-operatör dersi 26 (pgrep kendi-desen tuzağı; iki dil senkron)
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint597] - 2026-08-21
+
+### Added
+
+- registry cache-read fiyat-girişleri (T4)
+- coreExternalized yetenek-tabanlı gate (T5)
+- Dockerfile codex sürüm-pini (T6)
+
+### Fixed
+
+- docker-backend prefix-bileşimi (T2, tek-sahip)
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
+## [sprint596] - 2026-08-21
+
+### Added
+
+- config şema-mührü (T7)
+
+### Fixed
+
+- ProviderCommandSpec prefix-alanları (T3 arayüz-mührü)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [sprint595] - 2026-08-21
 
 ### Added

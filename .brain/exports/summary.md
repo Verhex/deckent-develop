@@ -56,6 +56,18 @@
 | adr-g-040 | Normative Verdict Vocabulary (Single-Word Evaluation Statuses) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-598 Learnings** (sprint-598): ## Sprint sprint-598 Learnings
+
+## Gains
+- 598-001 — AI-operatör dersi 26 (pgrep kendi-desen tuzağı; iki dil senkron)...
+- **Sprint sprint-597 Learnings** (sprint-597): ## Sprint sprint-597 Learnings
+
+## Gains
+- 597-001 — docker-backend prefix-bileşimi (T2, tek-sahip) — Implemented cap...
+- **Sprint sprint-596 Learnings** (sprint-596): ## Sprint sprint-596 Learnings
+
+## Gains
+- 596-001 — ProviderCommandSpec prefix-alanları (T3 arayüz-mührü) — Codex Pr...
 - **Sprint sprint-595 Learnings** (sprint-595): ## Sprint sprint-595 Learnings
 - mesaj-katalog + komut-kayıt ratchet borçları: NO_GO — Authorized fix completed: repl...
 - **Sprint sprint-594 Learnings** (sprint-594): ## Sprint sprint-594 Learnings
@@ -75,18 +87,6 @@
 
 ## Gains
 - 589-001 — MCP nervous karar-mesajları i18n — Scanned src/mcp/tools/nervous...
-- **Sprint sprint-587 Learnings** (sprint-587): ## Sprint sprint-587 Learnings
-
-## Gains
-- 587-001 — V3 assignedSkills force-preserving merge (kaynak-tarafı) — Force...
-- **Sprint sprint-586 Learnings** (sprint-586): ## Sprint sprint-586 Learnings
-
-## Gains
-- 586-001 — Mini not — Successfully created deneme-kontrol/f3-kanit.md with ...
-- **Sprint sprint-585 Learnings** (sprint-585): ## Sprint sprint-585 Learnings
-
-## Gains
-- 585-001 — Mini not — Created deneme-kontrol/f3-kanit.md with 3-line Turkis...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -97,4 +97,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2088 | Generated: 2026-08-21_
+_Total entries: 2097 | Generated: 2026-08-21_

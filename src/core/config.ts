@@ -294,6 +294,10 @@ export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   // measurement rounds (582/583/584) met the owner's bar — deckent-owned
   // worker composition is now the default for every claude docker worker.
   worker_core_system_prompt: true,
+  // Design §c T7: schema-only flags. Both stay OFF until canary evidence supports
+  // a separate owner decision; this wave deliberately adds no consumer.
+  codex_core_channel: false,
+  codex_suppress_project_doc: false,
   // 593-001 F2c: catalog mount mask OFF by default — flag-gated, so worker
   // `docker run` argv stays byte-identical until it is explicitly enabled.
   catalog_mount_mask: false,
@@ -2568,6 +2572,22 @@ export interface ConfigMetadataEntry {
  * Consumed by `getConfigHelp`, `listConfigByCategory`, and `generateConfigReference`.
  */
 export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
+  'prompt.codex_core_channel': {
+    description: 'Enable the Codex-owned core prompt channel after an owner-approved canary default decision.',
+    descriptionTr: 'Owner onaylı canary default kararından sonra Codex-owned core prompt kanalını etkinleştirir.',
+    type: 'boolean',
+    default: DEFAULT_PROMPT_CONFIG.codex_core_channel,
+    options: ['true', 'false'],
+    category: 'Prompt',
+  },
+  'prompt.codex_suppress_project_doc': {
+    description: 'Suppress Codex project-document loading after an owner-approved canary default decision.',
+    descriptionTr: 'Owner onaylı canary default kararından sonra Codex project-document yüklemesini baskılar.',
+    type: 'boolean',
+    default: DEFAULT_PROMPT_CONFIG.codex_suppress_project_doc,
+    options: ['true', 'false'],
+    category: 'Prompt',
+  },
   'prompt.catalog_mount_mask': {
     description: 'Mask repository design catalogs inside Docker workers with empty read-only mounts.',
     descriptionTr: 'Repository tasarım kataloglarını Docker worker’larında boş ve salt okunur mount’larla maskeler.',

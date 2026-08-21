@@ -10,8 +10,41 @@ import {
 // backend builds its container worker command from this instead of hardcoding
 // claude (Sprint 249 root cause). apiId (not the deckent alias) is passed in.
 
+describe('ProviderCommandSpec prefix fields', () => {
+  it('codex declares the measured system-core and project-context suppression argv', () => {
+    expect(PROVIDER_COMMAND_SPECS.codex.systemPromptCoreArgs?.('/container/core.md'))
+      .toEqual(['-c', 'model_instructions_file=/container/core.md']);
+    expect(PROVIDER_COMMAND_SPECS.codex.contextSuppressionArgs)
+      .toEqual(['-c', 'project_doc_max_bytes=0']);
+  });
+
+  it('leaves prefix fields undefined for every other provider spec', () => {
+    for (const provider of ['claude', 'gemini', 'cursor']) {
+      expect(PROVIDER_COMMAND_SPECS[provider].systemPromptCoreArgs).toBeUndefined();
+      expect(PROVIDER_COMMAND_SPECS[provider].contextSuppressionArgs).toBeUndefined();
+    }
+  });
+});
+
 describe('buildProviderCommand', () => {
   const P = '/workspace/.tasks/task-x.prompt.txt';
+
+  it('does not consume prefix fields: every provider command remains byte-identical', () => {
+    expect({
+      claude: buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, {
+        autoApprove: true,
+        allowedTools: 'Read,Write',
+      }),
+      codex: buildProviderCommand(PROVIDER_COMMAND_SPECS.codex, 'gpt-5.5', P, { autoApprove: true }),
+      gemini: buildProviderCommand(PROVIDER_COMMAND_SPECS.gemini, 'gemini-2.5-flash', P, { autoApprove: true }),
+      cursor: buildProviderCommand(PROVIDER_COMMAND_SPECS.cursor, 'grok-4.6', P),
+    }).toEqual({
+      claude: 'claude -p - --output-format json --model claude-opus-4-8 --allowedTools "Read,Write" --dangerously-skip-permissions',
+      codex: 'codex exec --skip-git-repo-check --json --model gpt-5.5 --dangerously-bypass-approvals-and-sandbox',
+      gemini: `gemini -p "$(cat ${P})" --output-format json -m gemini-2.5-flash --approval-mode yolo --skip-trust`,
+      cursor: `cursor-agent --mode ask -p --trust --output-format json --model grok-4.6 -- "$(cat ${P})"`,
+    });
+  });
 
   it('codex: exec with current flags (validated vs codex-cli 0.137.0 --help), apiId, stdin prompt', () => {
     // Authoritative flags from `codex exec --help`: `--full-auto` is deprecated;

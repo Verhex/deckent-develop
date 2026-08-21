@@ -308,13 +308,22 @@ function resolveInOutPricePerToken(
   model: string,
   config: CostConfig,
   registry: ModelRegistry,
-): { input: number; output: number; source: string; configPricing: ModelPricing | null } | null {
+): {
+  input: number;
+  output: number;
+  cacheRead: number | undefined;
+  source: string;
+  configPricing: ModelPricing | null;
+} | null {
   const def = registry.get(model);
   const found = findModel(config, model);
   if (def) {
     return {
       input: def.costPerMillion.input / 1_000_000,
       output: def.costPerMillion.output / 1_000_000,
+      cacheRead: def.costPerMillion.cacheReadInput === undefined
+        ? undefined
+        : def.costPerMillion.cacheReadInput / 1_000_000,
       source: `registry:${model}`,
       configPricing: found?.pricing ?? null,
     };
@@ -323,6 +332,7 @@ function resolveInOutPricePerToken(
     return {
       input: found.pricing.input_cost_per_token,
       output: found.pricing.output_cost_per_token,
+      cacheRead: found.pricing.cache_read_input_token_cost ?? undefined,
       source: `cost-config:${found.provider}/${found.modelId}`,
       configPricing: found.pricing,
     };
@@ -386,7 +396,13 @@ export function calculateRegimeCost(
       outputUnmeasured,
     };
   }
-  const { input: inUsd, output: outUsd, source, configPricing } = price;
+  const {
+    input: inUsd,
+    output: outUsd,
+    cacheRead: cacheReadPrice,
+    source,
+    configPricing,
+  } = price;
 
   if (regime === 'subscription') {
     // Weekly-limit burn unit (F1-TOK): cacheRead is FREE (zero weight); cacheWrite is
@@ -401,7 +417,9 @@ export function calculateRegimeCost(
   // regime === 'api' — standard metered economics. Cache prices come from the
   // per-model cost-config when present; otherwise fall back to archetype-B weights
   // relative to the (registry-sourced) input price.
-  const cacheReadUsd = configPricing?.cache_read_input_token_cost ?? inUsd * CACHE_READ_DISCOUNT;
+  const cacheReadUsd = cacheReadPrice
+    ?? configPricing?.cache_read_input_token_cost
+    ?? inUsd * CACHE_READ_DISCOUNT;
   const cacheWriteUsd = configPricing?.cache_creation_input_token_cost ?? inUsd * CACHE_WRITE_PREMIUM;
   const value =
     safeCost(input, inUsd, `${model}.input`) +
@@ -635,9 +653,12 @@ function calculateTaskCost(
   const pricing: ModelPricing = found?.pricing ?? {
     input_cost_per_token: dynamic!.costPerMillion.input / 1_000_000,
     output_cost_per_token: dynamic!.costPerMillion.output / 1_000_000,
+    cache_read_input_token_cost: dynamic!.costPerMillion.cacheReadInput === undefined
+      ? undefined
+      : dynamic!.costPerMillion.cacheReadInput / 1_000_000,
     max_input_tokens: dynamic!.contextWindow,
     max_output_tokens: dynamic!.maxOutputTokens,
-    supports_prompt_caching: false,
+    supports_prompt_caching: dynamic!.costPerMillion.cacheReadInput !== undefined,
     enabled: true,
     _source: dynamic!.pricingEvidenceRef
       ?? `model-registry-capability:${dynamic!.id}`,
