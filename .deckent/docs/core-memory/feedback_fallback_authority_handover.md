@@ -1,17 +1,22 @@
-# Fallback yetki-devri + codex-ağırlık (Alperen, 2026-08-21)
+# Provider-independent fallback execution-authority handoff (Alperen, 2026-08-21)
 
-Anthropic limitleri dolduğunda: (1) worker'lar AĞIRLIKLI OLARAK codex modellerine
-atanır; (2) gerekirse EXECUTION_AUTHORITY anlık olarak Fable→gpt-5.6-sol'a
-devredilir. Devir-prosedürü KALICI dokümanlardadır:
-- `fallback-rules/for-codex.md` — Codex tek-okumayla çalışma-mentaline girer,
-  durum-tespiti yapar, kaldığı yerden sürdürür.
-- `fallback-rules/to-claude.md` — geri-devir 9-bölümlük paket-şeması (simetrik;
-  Fable→Codex bırakışında da aynı şema) + Fable'ın doğrulama-prosedürü.
+Provider limit/capacity, auth/reachability, context exhaustion, host failure,
+owner-directed rotation veya başka typed decision blocker durumunda execution
+continuity tek yön-spesifik dokümanla değil, iki tarafın da bütünüyle okuduğu
+`fallback-rules/authority-handoff.md` ile yürür.
 
-**Why:** Fabrika limit-pencerelerinde durmamalı; devir profesyonel ve anlık
-olmalı ("owner mesaj-taşıyıcısı değildir" — handoff receipt ilkesi).
+Target provider/model/host instruction metninden seçilmez; effective config,
+registry, role policy, account/auth, reachability, usage/limit, finite-budget ve
+capability evidence'ın kesişiminden çözülür. Configured tercih availability
+iddiası değildir.
 
-**How to apply:** Dalga-planlamasında Model satırları codex-öncelikli seçilir
-(kritik → gpt-5.6-sol); xverify hakemi same-provider yasağı gereği
-claude/cursor'a döner. Dokümanlar bayatlarsa güncelleyen taraf Alperen'e
-tek-satır raporlar.
+Authority dokümanı okumakla veya `PREPARED` görmekle geçmez. Normal cutover
+append-only `PREPARED → VERIFIED → COMMITTED` receipt chain'iyle; transferor
+unavailable ise yalnız explicit owner-authorized `RECOVERY_COMMITTED` ile olur.
+Rollback state rewind değil, daha yüksek epoch'lu yeni handoff'tur. Transcript
+authority değildir; owner message bus değildir; approval, destructive/external,
+live-sprint, build/auth-mutation, secret ve cross-provider xverify sınırları aynen
+korunur.
+
+Bu manual disk-backed contract runtime fencing sevk edilmiş gibi sunulmaz.
+Doküman bayatlarsa güncelleyen taraf Alperen'e tek satır rapor verir.

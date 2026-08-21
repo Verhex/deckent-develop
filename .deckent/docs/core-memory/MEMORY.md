@@ -29,7 +29,7 @@
 - [AI-Operatör Dersleri dokümanı](feedback_ai_operator_lessons_doc.md) — docs/{tr,en}/playbook/ai-operator-lessons.md yaşayan doküman; her sprint deneyiminden sonra ders+changelog güncellenir, iki dil senkron (2026-08-18).
 - [Full-suite kadansı](feedback_full_suite_cadence.md) — full vitest suite her landing'de DEĞİL, 3 landing'de bir; arada scoped+gate'ler yeter (2026-08-19).
 - [Build-after-source-change](feedback_build_after_source_change.md) — sprint/el-kodu kaynak değiştirdiyse süreç-tamamlama `npm run build:all` ZORUNLU; dist=src eşitliği; sprint-koşarken build-yasağı aynen (2026-08-21).
-- [Fallback yetki-devri + codex-ağırlık](feedback_fallback_authority_handover.md) — Anthropic-limit dolunca worker'lar AĞIRLIKLI codex; anlık devir: fallback-rules/for-codex.md (Fable→Codex) + to-claude.md (geri-devir 9-bölüm paket-şeması); dokümanlar KALICI, güncel tutulur (Alperen 2026-08-21).
+- [Provider-independent fallback yetki-devri](feedback_fallback_authority_handover.md) — limit/auth/reachability/context/host veya owner-directed engelde target effective config+kanıttan çözülür; iki taraf aynı `fallback-rules/authority-handoff.md` protokolünü uygular. Authority yalnız digest-chain'li `COMMITTED`/owner-recovery transition'ıyla geçer; dokümanı okumak devir değildir (Alperen 2026-08-21).
 ---
 
 **Referans kararlar (law değil — kalıcı proje-durumu):**

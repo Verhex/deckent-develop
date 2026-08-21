@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "441810ccaaba6726b94b670be906f97506a1c71ed1902850149ea990cbe20f45"
+    "value": "a45bc251c7d54d0636a5eb6bef591219d92828357be0a42eb47c9ab9321b9704"
   },
   "summary": {
     "total": 517,
-    "active": 453,
-    "terminal": 64,
+    "active": 452,
+    "terminal": 65,
     "receipts": 187,
     "byState": {
       "OPEN": 359,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 26,
-      "DONE": 64,
+      "VERIFY": 25,
+      "DONE": 65,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -4898,11 +4898,11 @@
       "id": "TOKEN-ACCOUNTING-TRUTH-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-21",
       "definitionDigest": "c040cad1927723f3b354c7744cc9baf49c83cc3c1a726f72dbe85cc0806ca5d6",
-      "progressDigest": "b3ddf82992a91f05bbd05377fc3cf5fc219633c578f146ef0c16429ac54502b1",
-      "terminalClosureDigest": null
+      "progressDigest": "2be8646c8ab682822800a4843cee71d23c4ad72e2d35d13fc5f485b01eb080d9",
+      "terminalClosureDigest": "8d3ab1c19ea29b9b66537cbc42238aa661292907e77a7887d70aea27b3b82609"
     },
     {
       "order": 7094,
@@ -22341,7 +22341,6 @@
         "ORPHAN-WIRE-001",
         "CURSOR-PROVIDER-001",
         "RECOVERY-TRUTH-001",
-        "TOKEN-ACCOUNTING-TRUTH-001",
         "WORKER-PROMPT-COST-ARCHITECTURE-001",
         "AGENT-PERMISSION-MATRIX-001",
         "DEBT-DEPENDENCY-REPAIR-7094R-001",
@@ -23609,40 +23608,6 @@
       "acceptance": "Her defekt: reproducer test + fix + gerçek-koşu kanıtı; paket zorla-feature taşımaz; (3) için clean-gate'in receipt-yokluğu kilidi hem üretici (xverify) hem tüketici (gate mesajı remediation yolu gösterir) ucundan çözülür",
       "evidence": "Owner admission 2026-08-19 (\"Evet — tek paket satırı\"); kanıt zinciri MASTER 7089 LANDED bloğu + sprint-564 E091 kurtarma kaydı (corrupt-result forensik yedeği scratchpad, closure `…947df2e5` dönemi)",
       "updated": "2026-08-19"
-    },
-    {
-      "order": 7093,
-      "id": "TOKEN-ACCOUNTING-TRUTH-001",
-      "parent": "ECOSYSTEM-001",
-      "program": "KERNEL",
-      "outcome": "Cross-provider token-sayaç doğruluğu: worker result/status/kpi/cost görünümlerine akan tokenUsage TEK kanonik semantikte birleşir (inputTokens=FRESH cache-DIŞI, cacheReadTokens ayrı, totalTokens her zaman dolu). Kanıtlı defekt (2026-08-19, sprint-565 canlı verisi): `source: host-runtime-budget` yolu (docker budget-monitor akışı) codex `input_tokens`ını CACHE-DAHİL ham haliyle inputTokens alanına yazıyor — adapter extractUsage yolundaki sprint-497 normalizasyonu (codex.ts:707-730, input−cached) bu katmanda ATLANIYOR; claude yolu (`source: cli-log`) ise kanonik-doğru (disjoint). Sonuç: aynı sütun codex-task'ta cache-dahil (örn. in=243.965/cacheRead=205.312 → gerçek fresh≈38.653), claude-task'ta fresh (in=8.952/cacheRead=4.528.245) — karşılaştırma ve maliyet %500+ yanıltıcı. İkincil: totalTokens her iki yolda undefined kalıyor",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1",
-        "G2"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-21-CLOSURE-BATCH-03"
-      ],
-      "acceptance": "(1) host-runtime-budget observe/settle zinciri normalizeUsage kanonik sözleşmesinden geçer (codex: fresh=input−cached; tek dönüşüm noktası, çift-sayım yok); (2) totalTokens her result'ta dolu (provider-toplamı öncelikli); (3) status/kpi/cost görünümleri fresh+cacheRead+cacheCreate+out ayrımını etiketli gösterir; (4) regresyon: iki provider fixture'ıyla aynı formül pinlenir; mevcut budget-eşik semantiği (hangi sayıya karşı ölçülüyor) davranış-değişikliği ayrı owner-onayına tabi — bu iş ÖNCE raporlar",
-      "evidence": "Owner admission 2026-08-19 (token-sayaç uçurumu sorusu; \"analiz et, çözüm önerilerini iş planına dahil et\"). Analiz kanıtı: sprint-565 canlı result.tokenUsage verileri (9 codex + 2 claude task) + codex.ts:707-730 normalize yorumu (sprint-497 %78-overstatement vakası) + token-usage.ts kanonik sözleşme. **OWNER-BLOCKING (2026-08-19): bu analiz neticelenmeden yeni görev alınmaz; elle düzeltme YOK; landing-sonrası xverify'lı doğrulanmış kök-neden zorunlu. Owner hipotezi analiz-sorusu: turn-toplama çift-sayım mı (90+100=190) yoksa per-call billing gerçeği mi (n×cache-read) — tek-worker izole deney + toplama-kodu kanıtı + CLI-envelope semantiği üçlüsüyle karara bağlanacak; claude cache 1-worker mı üst-üste 2-worker mı sorusu dahil.** **ANALİZ NETİCELENDİ 2026-08-19 (xverify-mühürlü 3/3 CONFIRMED — `…b4fd8b8` `…9837fb3` `…fd0c6102`):** (S2-çift-sayım) YOK — claude yolu TEK final envelope okur, turn-toplamaz (token-counter.ts, T1-CONFIRMED); birincil kanıt: 565-007 result.tokenUsage == CLI kendi billing-envelope BAYT-AYNI (opus in:9.486/out:81.865/cacheRead:7.247.569/cacheCreate:179.063 + providerReportedUsd $6.849 — provider-envelope kaynak, deckent hesaplamadı). (S1-üst-üste-binme) YOK — her attempt kendi konteyner-log fd'si + kendi settlement receipt'i; 006 ($4.35) ve 007 ($6.85) ayrı sayılar taşıyor. (S3-billing-gerçeği) EVET: agent-loop her model-çağrısında tüm transkripti yeniden gönderir, her çağrının cache-read'i ayrı faturalanır — \"90+10=100\" değil \"n-çağrı × bağlam\" Anthropic fiyat-modelinin kendisi (repo-belgeli: 496 kaydı tek turn.completed input 101.859 içinde cached 66.560, T3-CONFIRMED). MALİYET GERÇEĞİ: claude-opus worker-task ≈ $4-7/task API-fiyat karşılığı (subscription'da flat; API-anahtarlı üründe gerçek fatura). DÜZELTME işi (2026-08-20'de landed) bu satırın (1)-(4) kabulü: codex host-runtime-budget yolu ham cache-dahil input yazıyor (in:1.451.577/cacheRead:1.336.064 → gerçek taze 115.513; adapter-normalize sprint-497 yolu atlanıyor, T2-CONFIRMED normalize doğru YERDE var) + totalTokens boş. MALİYET-AZALTIM ürün-mimarisi (turn-başı-tam-bağlam pahalılığı: compaction/trimming, tool-batching, tier-routing, cache-write sabitleme) AYRI owner-karar paketi — bu satır yalnız sayaç-doğruluğunu taşır. Ön-not: Claude-içi \"uçurum\" DEFEKT DEĞİL doğrulandı — Anthropic disjoint raporlar, cache verimli çalışıyor; sayaç doğru. **DUZELTME UYGULANDI 2026-08-20 (kabul 1-2-4):** usageCounts SEMA-bazli fresh-input (inclusive-cache anahtari — cached_input_tokens / prompt_tokens_details.cached_tokens / cachedContentTokenCount — varsa input−cached; provider-adi-bazli degil; sprint-565 canli sekli 1.451.577→115.513 pinli; anthropic disjoint korunur; gemini alt-kume duzeltildi — eski pin yanlis semantigi kodluyordu); host-runtime-budget uc projeksiyonu + cli-log yolunda totalTokens dolu; 53+73 test yesil. Kabul-3: normalize sonrasi sutunlar provider-bagimsiz ayni anlamda — etiket ihtiyacinin koku kalkti (goruntu-etiketi kozmetige dustu, ayri is degil) **TERMINAL SETTLEMENT 2026-08-21 (Closure OS authenticated batch seq3):** ; `receipt=GR-2026-08-21-CLOSURE-BATCH-03` ; kabul (1)(2)(4) landed+wired; `proof=commit:0d3cf6909` ; LOCAL_VERIFIED 9 test-dosyasi 165/165; sprint-565 sekli 1.451.577→115.513 pinli; kabul (3) gorunum-etiketi owner-ratifikasyonuyla MOOT (normalize sonrasi sutunlar provider-bagimsiz ayni anlamda; owner-signed proposal 2c30aa3c); budget-esik semantigi degisikligi bu kapanisin DISINDA ayri owner-paketidir. Truth C/W/E/H/L=1 (kod+wiring+etkin+hermetik+gercek-binary), X/S uygulanamaz. Ledger: seq3 evt-2026-08-21-7093-token-accounting-settlement-01 (level outcome / lane runtime), ed25519 owner-imzali",
-      "updated": "2026-08-21"
     },
     {
       "order": 7094,
@@ -26634,6 +26599,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "cfae593c39c4ed03df918e3ffb418c99168a74c353296aa5c944178fa6492797"
+    "value": "b3f9f916a493f8d8c870487b058b2d407f770252005ae396df9a2777de0d2c67"
   }
 }
