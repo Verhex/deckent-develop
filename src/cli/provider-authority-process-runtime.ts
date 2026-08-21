@@ -9,7 +9,10 @@ import { getEquivalentModel } from '../core/model-equivalence.js';
 import { orderedRoleProviders } from '../core/provider.js';
 import { registerOpenRouterModelFromCache } from '../core/openrouter-models.js';
 import { resolveExecutionModelIdentity } from '../orchestra/execution-request-builder.js';
-import { DockerSpawnBackend } from '../orchestra/spawn-backend-docker.js';
+import {
+  DockerSpawnBackend,
+  type DockerSpawnBackendConstructionOptions,
+} from '../orchestra/spawn-backend-docker.js';
 import type { BoundedReachabilityProbeTransport } from '../core/provider-evidence-probe-contract.js';
 import { openLocalProviderAuthorityRuntimeIfConfigured } from '../providers/provider-authority-runtime-bootstrap.js';
 
@@ -64,20 +67,27 @@ export function preflightCliBrainProviderAuthority(
 }
 
 /**
- * Lazy canonical Docker probe transport for the codex docker reachability
- * slot. Nothing is constructed until a probe actually dispatches; the backend
+ * Lazy canonical Docker probe transport shared by every provider Docker
+ * reachability slot. Nothing is constructed until a probe actually dispatches; the backend
  * is memoized so repeated probes share one canonical builder. Every credential,
  * image-identity, containment and network decision stays inside
  * {@link DockerSpawnBackend.invokeBoundedReachabilityProbe} — this resolver
  * exposes no argv, image or mount surface to callers.
  */
-function createLazyDockerReachabilityTransportResolver(
+export type DockerReachabilityProbeBackendFactory = (
+  projectRoot: string,
+  options: DockerSpawnBackendConstructionOptions,
+) => Pick<DockerSpawnBackend, 'invokeBoundedReachabilityProbe'>;
+
+export function createLazyDockerReachabilityTransportResolver(
   projectRoot: string,
   config: ResolvedConfig,
+  createBackend: DockerReachabilityProbeBackendFactory =
+    (root, options) => new DockerSpawnBackend(root, options),
 ): () => BoundedReachabilityProbeTransport | null {
-  let backend: DockerSpawnBackend | null = null;
+  let backend: ReturnType<DockerReachabilityProbeBackendFactory> | null = null;
   return () => {
-    backend ??= new DockerSpawnBackend(projectRoot, {
+    backend ??= createBackend(projectRoot, {
       image: config.docker_image,
       timeoutSeconds: config.docker_timeout,
       memoryLimit: config.worker_memory_limit,
@@ -112,7 +122,7 @@ export async function withCliProviderAuthority<T>(
     options.projectRoot,
     config,
     {
-      codexDockerReachabilityTransport:
+      dockerReachabilityTransport:
         createLazyDockerReachabilityTransportResolver(options.projectRoot, config),
     },
   );

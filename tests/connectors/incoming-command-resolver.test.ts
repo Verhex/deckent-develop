@@ -28,7 +28,7 @@ function seedAutonomousPending(triggerId: string): void {
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'pending.json'),
-    JSON.stringify([{ triggerId, action: 'do-x', requestedBy: 'nervous', enqueuedAt: '2026-06-05T00:00:00.000Z' }]) + '\n',
+    JSON.stringify([{ triggerId, action: 'do-x', requestedBy: 'nervous', enqueuedAt: new Date().toISOString() }]) + '\n',
   );
 }
 function readDecisions(): Record<string, { outcome: string }> {
@@ -66,11 +66,11 @@ describe('makeCommandResolver — autonomous ownership (durable decisions.json)'
     expect(readDecisions()['trig-2']?.outcome).toBe('rejected');
   });
 
-  it('is idempotent — resolving twice stays resolved (platform re-sends)', async () => {
+  it('fails closed on a replay after the first durable resolution', async () => {
     seedAutonomousPending('trig-3');
     const resolve = makeCommandResolver(root);
     expect(await resolve('trig-3', 'approve')).toMatchObject({ status: 'resolved' });
-    expect(await resolve('trig-3', 'approve')).toMatchObject({ status: 'resolved' });
+    expect(await resolve('trig-3', 'approve')).toBe('not-found');
     expect(readDecisions()['trig-3']?.outcome).toBe('approved');
   });
 

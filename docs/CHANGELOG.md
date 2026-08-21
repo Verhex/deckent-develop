@@ -14,6 +14,33 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint606] - 2026-08-21
+
+### Added
+
+- Claude Docker evidence-source ve authoring composition tasarimi
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint605] - 2026-08-21
+
+### Added
+
+- D4 blueprint canonical-path ve closure-DAG düzeltmesi
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint604] - 2026-08-21
+
+### Added
+
+- D4 olculmus lifecycle blueprint ve closure matrisi
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [sprint603] - 2026-08-21
 
 ### Added

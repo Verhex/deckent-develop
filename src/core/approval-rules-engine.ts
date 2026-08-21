@@ -9,8 +9,8 @@
 // record (decidedBy carries the rule id — no invisible automation).
 //
 // Safety model (typed, not prose):
-//  - Only request kinds in REQUEST_KIND_TIERS are automatable; anything the
-//    table does not know — including decision-federation mirrors, which are
+//  - Only explicitly allowlisted request kinds are automatable; anything the
+//    allowlist does not know — including decision-federation mirrors, which are
 //    human work by definition — is untouchable (fail-closed).
 //  - A rule authenticates ONLY while it is still live on disk: reauthenticate
 //    and isSessionActive both re-load approval-rules.json and re-match; a
@@ -32,6 +32,8 @@ import type {
   LiveApprovalSessionProof,
 } from './approval-decision-ingress.js';
 import type { ApprovalRequest } from './approval-contract.js';
+import type { ApprovalRiskTier } from './config-types.js';
+import { approvalRiskTierFor } from './approval-channel-authenticator.js';
 import {
   approvalRulesPath,
   loadApprovalRules,
@@ -49,23 +51,23 @@ export const APPROVAL_RULES_ENGINE_AUTHORITY_REF = 'approval-rules-engine:v1';
 export const RULE_ACTOR_PREFIX = 'rule:';
 
 /**
- * Which request kinds may EVER be rule-decided, and at which tier. This is
- * the automation allowlist: an unknown kind — or a request without a typed
- * details.kind — can never be automated. Mirrors of human work are excluded
- * on purpose.
+ * Request kinds that may EVER be rule-decided. Tier authority comes only from
+ * the normalized lifecycle envelope (or its central legacy reader), never
+ * from a consumer-local kind-to-risk table.
  */
-export const REQUEST_KIND_TIERS: Readonly<Record<string, RuleRiskTierMax>> = Object.freeze({
-  'provider-evidence-probe': 'routine',
-});
+export const AUTOMATABLE_REQUEST_KINDS: ReadonlySet<string> = new Set([
+  'provider-evidence-probe',
+]);
 
-export function requestTierFor(request: ApprovalRequest): RuleRiskTierMax | null {
+export function requestTierFor(request: ApprovalRequest): ApprovalRiskTier | null {
   const kind = (request.details as { kind?: unknown } | undefined)?.kind;
-  if (typeof kind !== 'string') return null;
-  return REQUEST_KIND_TIERS[kind] ?? null;
+  if (typeof kind !== 'string' || !AUTOMATABLE_REQUEST_KINDS.has(kind)) return null;
+  return approvalRiskTierFor(request);
 }
 
-function tierAllows(ruleMax: RuleRiskTierMax, requestTier: RuleRiskTierMax): boolean {
-  if (ruleMax === 'elevated') return true;
+function tierAllows(ruleMax: RuleRiskTierMax, requestTier: ApprovalRiskTier): boolean {
+  if (requestTier === 'critical') return false;
+  if (ruleMax === 'elevated') return requestTier === 'routine' || requestTier === 'elevated';
   return requestTier === 'routine';
 }
 

@@ -444,8 +444,28 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-21 (D3+DE3 waves 599-603 + live-defect fixes): +22 — the channel
   // authenticator / bot-relay / bootstrap / callback / clients suites' tmpdir
   // and mock-transport fixtures across the five waves.
-  count: 14505,
-  digest: '246159205fecd99b730e5b812cfa2fcc7bec6029652963e3cb70baac56a73af1',
+  // 2026-08-21 (3322 Docker evidence recovery closure): +11 — the provider-
+  // limits authoring and Claude-Docker integration suites' tmpdir cleanup,
+  // Codex evidence/config and provider-bootstrap tmpdir fixtures, plus the two
+  // task-artifact projection-parity fixture writes. Every site is bounded to a
+  // suite-owned tmpdir or injected filesystem seam; the 10-file scoped battery
+  // passed 122/122 and the registry attribution was measured from these exact
+  // changed test paths. Prior: D3+DE3 waves (14505).
+  // 2026-08-21 (3322 observe-only/CAS correction): +8 — the producer's
+  // source-revision cooldown regression and the Docker probe's provider-exit /
+  // response-envelope classification pins extend the same injected-store,
+  // injected-runner and suite-owned tmpdir family. The combined final battery
+  // passed 15 files / 201 tests; no live .tasks, .brain or owner runtime path
+  // entered test authority. Prior: 3322 Docker evidence recovery (14516).
+  // 2026-08-21 (4056 D4 approval lifecycle): +139 — 65 lifecycle suites cover
+  // private/FWW CAS, injected clocks, restart-safe stores, child-process
+  // pairing proof, read-only projections and suite-owned tmpdir cleanup across
+  // confirmation, autonomous, pairing and broker-native origins. The combined
+  // battery passed 298/298; the scanner measured 0 confirmed violations and no
+  // test writes to the repository's live .tasks/.brain/runtime authority.
+  // Prior: 3322 observe-only/CAS correction (14524).
+  count: 14663,
+  digest: '3a4913076e2681dcad2dabf4b049f377dee449faaa10e0b2c9636fef8d98afbf',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -784,8 +804,23 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-21 (D3+DE3): +1 REAL production module —
   // src/core/approval-channel-authenticator.ts; relay/bootstrap/bot/rpc
   // surfaces moved tracked production content.
-  count: 1268,
-  digest: '4e21d9ce7665228b02b24b5678435f22101354ac42b888982611fb1748a7e2d6',
+  // 2026-08-21 (3322 Docker evidence recovery closure): +1 REAL production
+  // module — src/providers/docker-bounded-reachability-evidence.ts; the
+  // Claude/Codex evidence registrations, provider-authority runtime factory,
+  // CLI consumer and task-artifact classifier moved already-inventoried
+  // production content. Prior: D3+DE3 (1268).
+  // 2026-08-21 (3322 observe-only/CAS correction): same 1269 count, digest
+  // only — explicit ratio mode, additive/CAS publication, source-versioned
+  // cooldown and bounded Docker envelope classification moved already-
+  // inventoried production modules; no second production module was added.
+  // 2026-08-21 (4056 D4 approval lifecycle): +4 inventoried modules — three
+  // new canonical core authorities (lifecycle policy, deterministic migration
+  // and durable SLA journal) plus one newly reachable existing production
+  // module through the full-correlation test graph. Every changed production
+  // path is inside the frozen D4 manifest; 65 files / 298 tests and tsc passed.
+  // Prior: 3322 observe-only/CAS correction (1269).
+  count: 1273,
+  digest: 'fdfd7a682dd0183cdd5629572b1a593dff8a23ac689f4be20c177ae3dd2799c6',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

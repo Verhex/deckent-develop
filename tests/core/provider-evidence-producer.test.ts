@@ -157,11 +157,15 @@ function sources(overrides: Partial<ProviderEvidenceSources> = {}): ProviderEvid
   };
 }
 
-function fixture(sourceOverrides: Partial<ProviderEvidenceSources> = {}): {
+function fixture(
+  sourceOverrides: Partial<ProviderEvidenceSources> = {},
+  policy: ProviderLimitPolicy = POLICY,
+): {
   producer: ProviderEvidenceProducer;
   truthStore: ProviderTruthStore;
   limitStore: ProviderLimitStore;
   receiptStore: InvocationReceiptStore;
+  keyring: ProviderAuthorityKeyring;
   globalRoot: string;
   projectRoot: string;
 } {
@@ -180,7 +184,7 @@ function fixture(sourceOverrides: Partial<ProviderEvidenceSources> = {}): {
   });
   const limitStore = new ProviderLimitStore(globalRoot, {
     integrityAuthority: keyring,
-    policyResolver: () => POLICY,
+    policyResolver: () => policy,
     terminationEvidenceVerifier: () => true,
     now: () => T0,
   });
@@ -214,12 +218,13 @@ function fixture(sourceOverrides: Partial<ProviderEvidenceSources> = {}): {
           sources: selectedSources,
         },
       ]),
-      policyResolver: () => POLICY,
+      policyResolver: () => policy,
       now: () => T0,
     }),
     truthStore,
     limitStore,
     receiptStore,
+    keyring,
     globalRoot,
     projectRoot,
   };
@@ -543,6 +548,170 @@ describe('ProviderEvidenceProducer', () => {
     const result = await fx.producer.refresh(request());
     expect(result).toMatchObject({ state: 'hold', reasonCode: 'limit_hold' });
     expect(exactProbe).not.toHaveBeenCalled();
+  });
+
+  it('runs the bounded probe above the ratio threshold only under explicit observe-only policy', async () => {
+    const exactProbe = vi.fn(async input => ({
+      outcome: 'succeeded' as const,
+      calledProvider: input.provider,
+      calledModel: input.model,
+      providerRequestRefHash: 'b'.repeat(64),
+      latencyMs: 2,
+    }));
+    const fx = fixture({
+      limit: {
+        ...sources().limit,
+        authority: 'advisory',
+        observe: async () => ({
+          state: 'known' as const,
+          requiredWindowIds: ['session'],
+          windows: [limitWindow(98)],
+          source: {
+            operatorApprovalRef: null,
+            evidenceRef: 'provider-limit:source-observe-only',
+            fetchedAt: T0.toISOString(),
+            expiresAt: T1,
+            incorporatedReservationEventRefs: [],
+          },
+        }),
+      },
+      reachability: { ...sources().reachability, probe: exactProbe },
+    }, { ...POLICY, ratioEnforcement: 'observe_only' });
+
+    const result = await fx.producer.refresh(request());
+
+    expect(result.state).toBe('ready');
+    expect(exactProbe).toHaveBeenCalledOnce();
+    // Durable advisory truth remains unknown/HOLD; observe-only changes only
+    // the bounded ratio gate, never source authority.
+    expect(result.limit).toMatchObject({
+      state: 'unknown', decision: 'hold', pressure: 'unknown',
+      policy: { ratioEnforcement: 'observe_only' },
+    });
+  });
+
+  it('reports a failed observe-only probe as probe_unreachable, never durable advisory limit_hold', async () => {
+    const fx = fixture({
+      limit: {
+        ...sources().limit,
+        authority: 'advisory',
+        observe: async () => ({
+          state: 'known' as const,
+          requiredWindowIds: ['session'],
+          windows: [limitWindow(98)],
+          source: {
+            operatorApprovalRef: null,
+            evidenceRef: 'provider-limit:source-observe-only-failed-probe',
+            fetchedAt: T0.toISOString(),
+            expiresAt: T1,
+            incorporatedReservationEventRefs: [],
+          },
+        }),
+      },
+      reachability: {
+        ...sources().reachability,
+        probe: async () => ({
+          outcome: 'backend-unreachable' as const,
+          calledProvider: null,
+          calledModel: null,
+          providerRequestRefHash: null,
+          latencyMs: 2,
+        }),
+      },
+    }, { ...POLICY, ratioEnforcement: 'observe_only' });
+
+    const result = await fx.producer.refresh(request());
+
+    expect(result).toMatchObject({
+      state: 'hold',
+      reasonCode: 'probe_unreachable',
+      limit: {
+        state: 'unknown',
+        decision: 'hold',
+        policy: { ratioEnforcement: 'observe_only' },
+      },
+      reachability: { liveProven: false, reasonCode: 'backend_unreachable' },
+    });
+  });
+
+  it('does not let a fresh cooldown from an older reachability source suppress the current source revision', async () => {
+    const advisoryLimit = {
+      ...sources().limit,
+      authority: 'advisory' as const,
+      observe: async () => ({
+        state: 'known' as const,
+        requiredWindowIds: ['session'],
+        windows: [limitWindow(98)],
+        source: {
+          operatorApprovalRef: null,
+          evidenceRef: 'provider-limit:source-revision-cooldown',
+          fetchedAt: T0.toISOString(),
+          expiresAt: T1,
+          incorporatedReservationEventRefs: [],
+        },
+      }),
+    };
+    const v1Probe = vi.fn(async () => ({
+      outcome: 'backend-unreachable' as const,
+      calledProvider: null,
+      calledModel: null,
+      providerRequestRefHash: null,
+      latencyMs: 2,
+    }));
+    const fx = fixture({
+      limit: advisoryLimit,
+      reachability: {
+        authorityRef: 'reachability-authority:test-source-v1',
+        probe: v1Probe,
+      },
+    }, { ...POLICY, ratioEnforcement: 'observe_only' });
+
+    const first = await fx.producer.refresh(request());
+    expect(first).toMatchObject({
+      state: 'hold',
+      reasonCode: 'probe_unreachable',
+      reachability: { liveProven: false, reasonCode: 'backend_unreachable' },
+    });
+    expect(v1Probe).toHaveBeenCalledOnce();
+
+    const v2Probe = vi.fn(async input => ({
+      outcome: 'succeeded' as const,
+      calledProvider: input.provider,
+      calledModel: input.model,
+      providerRequestRefHash: 'd'.repeat(64),
+      latencyMs: 3,
+    }));
+    const revisedSources = sources({
+      limit: advisoryLimit,
+      reachability: {
+        authorityRef: 'reachability-authority:test-source-v2',
+        probe: v2Probe,
+      },
+    });
+    const revisedProducer = new ProviderEvidenceProducer({
+      tenantId: 'tenant-a',
+      projectId: 'project-evidence-0001',
+      keyring: fx.keyring,
+      truthStore: fx.truthStore,
+      limitStore: fx.limitStore,
+      receiptLedger: fx.receiptStore,
+      sourceResolver: new ProviderEvidenceSourceRegistry([{
+        provider: 'claude',
+        authMode: 'subscription',
+        transport: 'cli',
+        executionBackend: 'host-subprocess',
+        sources: revisedSources,
+      }]),
+      policyResolver: () => ({ ...POLICY, ratioEnforcement: 'observe_only' }),
+      now: () => T0,
+    });
+
+    const second = await revisedProducer.refresh(request());
+    expect(second).toMatchObject({
+      state: 'ready',
+      reachability: { liveProven: true, reachable: true },
+    });
+    expect(v2Probe).toHaveBeenCalledOnce();
   });
 
   it('threads exact model and verified account provenance into the limit source', async () => {

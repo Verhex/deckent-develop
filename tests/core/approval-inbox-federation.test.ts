@@ -14,6 +14,7 @@ import { join } from 'node:path';
 
 import { listFederatedPendingItems } from '../../src/core/approval-inbox-federation.js';
 import { createConfirmationRequest } from '../../src/core/confirmation-store.js';
+import { resolveApprovalLifecyclePolicy } from '../../src/core/approval-lifecycle-policy.js';
 
 function fixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'federated-inbox-'));
@@ -27,33 +28,36 @@ describe('listFederatedPendingItems', () => {
     createConfirmationRequest(root, {
       sprintId: 's-1', taskId: 't-1', itemIds: [], kind: 'security',
       verdict: 'QUALIFIED', adapter: 'human', statements: ['sign-off?'],
-      evidenceRequirements: [], requestedAt: '2026-08-20T10:00:00.000Z',
+      evidenceRequirements: [], requestedAt: '2999-08-20T10:00:00.000Z',
       source: 'acceptance-matrix',
+    }, {
+      lifecycle: resolveApprovalLifecyclePolicy({ enabled: true }),
+      clock: () => new Date('2999-08-20T10:00:00.000Z'),
     });
     mkdirSync(join(root, '.deckent', 'autonomous'), { recursive: true });
     writeFileSync(join(root, '.deckent', 'autonomous', 'pending.json'), JSON.stringify([
-      { triggerId: 'trg-1', action: 'run-audit', requestedBy: 'detector', enqueuedAt: '2026-08-20T09:00:00.000Z' },
+      { triggerId: 'trg-1', action: 'run-audit', requestedBy: 'detector', enqueuedAt: '2999-08-20T09:00:00.000Z' },
     ]), 'utf-8');
     mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
     writeFileSync(join(root, '.deckent', 'nervous', 'nervous-pending.json'), JSON.stringify([
-      { id: 'ntf-1', shortCode: 'AB12C', title: 'stale lock detected', createdAt: '2026-08-20T11:00:00.000Z' },
+      { id: 'ntf-1', shortCode: 'AB12C', title: 'stale lock detected', createdAt: '2999-08-20T11:00:00.000Z' },
     ]), 'utf-8');
     mkdirSync(join(root, '.deckent', 'panic-ipc', 'pending'), { recursive: true });
     writeFileSync(join(root, '.deckent', 'panic-ipc', 'pending', '900-001-123.json'), '{}', 'utf-8');
     mkdirSync(join(root, '.deckent', 'checkpoints'), { recursive: true });
     writeFileSync(join(root, '.deckent', 'checkpoints', 'checkpoint-sprint-9-plan.json'),
-      JSON.stringify({ status: 'pending', createdAt: '2026-08-20T08:00:00.000Z' }), 'utf-8');
+      JSON.stringify({ status: 'pending', createdAt: '2999-08-20T08:00:00.000Z' }), 'utf-8');
     writeFileSync(join(root, '.deckent', 'checkpoints', 'checkpoint-sprint-8-plan.json'),
-      JSON.stringify({ status: 'approved', createdAt: '2026-08-20T07:00:00.000Z' }), 'utf-8');
+      JSON.stringify({ status: 'approved', createdAt: '2999-08-20T07:00:00.000Z' }), 'utf-8');
     mkdirSync(join(root, '.deckent', 'bot-actions'), { recursive: true });
     writeFileSync(join(root, '.deckent', 'bot-actions', 'act-1.json'), JSON.stringify({
-      id: 'act-1', tool: 'deckent_kill', parkedAt: '2026-08-20T12:00:00.000Z',
-      expiresAt: '2026-08-20T13:00:00.000Z',
+      id: 'act-1', tool: 'deckent_kill', parkedAt: '2999-08-20T12:00:00.000Z',
+      expiresAt: '2999-08-20T13:00:00.000Z',
     }), 'utf-8');
     const gatewayHomeDir = join(root, 'gateway-home');
     mkdirSync(gatewayHomeDir, { recursive: true });
     writeFileSync(join(gatewayHomeDir, 'pairings.json'), JSON.stringify([
-      { code: 'PAIR42', chatKey: 'telegram:123', requestedAt: '2026-08-20T06:00:00.000Z' },
+      { code: 'PAIR42', chatKey: 'telegram:123', requestedAt: '2999-08-20T06:00:00.000Z' },
     ]), 'utf-8');
 
     const items = listFederatedPendingItems(root, { gatewayHomeDir });

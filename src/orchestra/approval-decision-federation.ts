@@ -17,22 +17,39 @@
 // is per-mirror). Origins beyond these two stay on their own surfaces until
 // D2b — the bridge refuses them with a typed miss, never guesses.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 
 import type { ApprovalBroker } from '../core/approval-broker.js';
 import type { ApprovalRequest } from '../core/approval-contract.js';
+import {
+  createPrivateJsonFileFirstWriterWins,
+  isApprovalFileAclHold,
+  type ApprovalFileAclOptions,
+} from '../core/approval-file-cas.js';
+import type { ApprovalTimeoutReceipt } from '../core/approval-store.js';
+import {
+  approvalLifecycleProfileDigest,
+  maxApprovalRiskTier,
+  resolveApprovalLifecyclePolicy,
+} from '../core/approval-lifecycle-policy.js';
 import { settleConfirmation, readConfirmation } from '../core/confirmation-store.js';
 import type { FederatedPendingItem } from '../core/approval-inbox-federation.js';
 import { makeApprovalGate } from './autonomous/approval-adapter.js';
+import {
+  loadGatewayAccess,
+  parseGatewayPairingStore,
+} from '../connectors/gateway/gateway-access.js';
+import { gatewayHome } from '../connectors/gateway/gateway-paths.js';
 import { NervousIpcQueue } from '../nervous/ipc-queue.js';
 
 /** Origins whose decision path this bridge federates today (D2a+D2b-1).
  * panic-guard stays out deliberately: it is a safety floor with its own
  * explicit surface; bot-action/gateway-pairing wait for their D2b-2 turn. */
 export const DECISION_FEDERATED_ORIGINS = Object.freeze(
-  ['confirmation', 'checkpoint', 'nervous', 'autonomous-trigger'] as const);
+  ['confirmation', 'checkpoint', 'nervous', 'autonomous-trigger', 'gateway-pairing'] as const);
 export type DecisionFederatedOrigin = (typeof DECISION_FEDERATED_ORIGINS)[number];
 
 export function isDecisionFederatedOrigin(
@@ -41,8 +58,40 @@ export function isDecisionFederatedOrigin(
   return (DECISION_FEDERATED_ORIGINS as readonly string[]).includes(origin);
 }
 
-/** Bounded decision window for a lazily mirrored legacy item (D4 interim). */
-const MIRROR_DECISION_WINDOW_MS = 24 * 60 * 60 * 1000;
+function digestFederatedSource(item: FederatedPendingItem): string {
+  return createHash('sha256').update(JSON.stringify({
+    origin: item.origin,
+    id: item.id,
+    requestedAt: item.requestedAt ?? null,
+    expiresAt: item.expiresAt ?? null,
+    tenantId: item.tenantId ?? null,
+    projectPath: item.projectPath ?? null,
+    lifecycleGeneration: item.lifecycleGeneration ?? null,
+    policySnapshotDigest: item.policySnapshotDigest ?? null,
+    sourceRequestDigest: item.sourceRequestDigest ?? null,
+    sourceContractVersion: item.sourceContractVersion ?? null,
+    sourceSchema: item.sourceSchema ?? null,
+    sourceReference: item.sourceReference ?? null,
+  })).digest('hex');
+}
+
+function assertFederatedMirrorIdentity(
+  request: ApprovalRequest,
+  item: FederatedPendingItem,
+  tenantId: string,
+  sourceDigest: string,
+): void {
+  if (request.id !== item.id
+    || request.tenantId !== tenantId
+    || request.details['kind'] !== 'decision-federation-mirror'
+    || request.details['origin'] !== item.origin
+    || request.details['legacyId'] !== item.id
+    || (request.version === '2.0'
+      && (request.source.requestDigest !== sourceDigest
+        || request.source.reference !== (item.sourceReference ?? `federated:${item.origin}:${item.id}`)))) {
+    throw new Error(`federated mirror identity collision: ${item.id}`);
+  }
+}
 
 /**
  * Idempotently mirror a federated pending item into the broker under its own
@@ -50,17 +99,41 @@ const MIRROR_DECISION_WINDOW_MS = 24 * 60 * 60 * 1000;
  * on non-duplicate submit failures — a duplicate means an earlier mirror
  * already carries the decision authority for this id.
  */
-export function mirrorFederatedItemToBroker(
+export async function mirrorFederatedItemToBroker(
   broker: ApprovalBroker,
   item: FederatedPendingItem,
   input: { readonly tenantId: string; readonly now?: Date },
-): ApprovalRequest {
+): Promise<ApprovalRequest> {
+  const projectionDigest = digestFederatedSource(item);
+  const sourceDigest = item.sourceRequestDigest ?? projectionDigest;
   const existing = broker.getRequest(item.id);
-  if (existing) return existing;
+  if (existing) {
+    assertFederatedMirrorIdentity(existing, item, input.tenantId, sourceDigest);
+    return existing;
+  }
   const now = input.now ?? new Date();
+  const origin = item.origin === 'confirmation'
+    ? 'confirmation'
+    : item.origin === 'autonomous-trigger'
+      ? 'autonomous-trigger'
+      : item.origin === 'gateway-pairing'
+        ? 'gateway-pairing'
+        : 'broker-native';
+  const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
+  const profile = lifecycle.profiles[origin];
+  const createdAtMs = item.requestedAt === undefined ? now.getTime() : Date.parse(item.requestedAt);
+  if (!Number.isFinite(createdAtMs)) throw new Error(`invalid federated source timestamp: ${item.id}`);
+  const producerExpiryMs = item.expiresAt === undefined ? Number.POSITIVE_INFINITY : Date.parse(item.expiresAt);
+  if (item.expiresAt !== undefined && !Number.isFinite(producerExpiryMs)) {
+    throw new Error(`invalid federated producer expiry: ${item.id}`);
+  }
+  const expiresAtMs = Math.min(producerExpiryMs, createdAtMs + profile.ttlMs);
+  const riskTier = maxApprovalRiskTier(profile.riskTier, item.riskTier ?? 'routine');
+  const risk = riskTier === 'critical' ? 'critical' : riskTier === 'elevated' ? 'high' : 'low';
   try {
-    return broker.submit({
+    const submitted = await broker.submitLifecycle({
       id: item.id,
+      version: '2.0',
       requester: { role: 'brain', instanceId: `decision-federation:${item.origin}` },
       summary: item.summary.slice(0, 200),
       details: {
@@ -68,24 +141,48 @@ export function mirrorFederatedItemToBroker(
         kind: 'decision-federation-mirror',
         origin: item.origin,
         legacyId: item.id,
+        federationProjectionDigest: projectionDigest,
+        sourceLifecycleGeneration: item.lifecycleGeneration ?? null,
+        sourcePolicySnapshotDigest: item.policySnapshotDigest ?? null,
+        sourceRequestDigest: sourceDigest,
+        sourceSchema: item.sourceSchema ?? null,
       },
       scopeId: item.origin,
       scope: 'lifecycle',
-      risk: 'medium',
+      risk,
       policy: 'require-approval',
       defaultAction: 'deny',
       tenantId: input.tenantId,
       userId: userInfo().username,
-      createdAt: now.toISOString(),
-      expiresAt: new Date(now.getTime() + MIRROR_DECISION_WINDOW_MS).toISOString(),
+      createdAt: new Date(createdAtMs).toISOString(),
+      expiresAt: new Date(expiresAtMs).toISOString(),
       maskedArgs: null,
       rawArgsRef: null,
+      origin,
+      riskTier,
+      blocking: profile.blocking,
+      lifecycleProfile: profile,
+      policySnapshotDigest: approvalLifecycleProfileDigest(origin, profile),
+      source: {
+        contractVersion: item.sourceContractVersion ?? '1.0',
+        requestDigest: sourceDigest,
+        reference: item.sourceReference ?? `federated:${item.origin}:${item.id}`,
+      },
+      lifecycleGeneration: item.lifecycleGeneration ?? `federated-${projectionDigest.slice(0, 24)}`,
+      slaStage: item.lifecycleStage ?? 'initial',
     });
+    if (isApprovalFileAclHold(submitted)) {
+      throw new Error(`federated mirror private-store HOLD: ${submitted.reasonCode}`);
+    }
+    return submitted;
   } catch (error) {
     // A concurrent mirror can win the first write; the stored request is
     // then the authority. Anything else propagates.
     const raced = broker.getRequest(item.id);
-    if (raced) return raced;
+    if (raced) {
+      assertFederatedMirrorIdentity(raced, item, input.tenantId, sourceDigest);
+      return raced;
+    }
     throw error;
   }
 }
@@ -93,6 +190,230 @@ export function mirrorFederatedItemToBroker(
 export type SettleBackOutcome =
   | { readonly state: 'settled'; readonly origin: DecisionFederatedOrigin }
   | { readonly state: 'failed'; readonly reason: string };
+
+export interface FederatedTimeoutSettleOptions {
+  readonly gatewayPairingsPath?: string;
+  readonly gatewayAllowlistPath?: string;
+  readonly gatewayBindingsPath?: string;
+  readonly aclOptions?: ApprovalFileAclOptions;
+}
+
+export type FederatedTimeoutSettleOutcome =
+  | { readonly state: 'settled' | 'already-settled'; readonly origin: 'confirmation' | 'autonomous-trigger' | 'gateway-pairing' }
+  | { readonly state: 'ignored'; readonly origin: 'broker-native' }
+  | { readonly state: 'failed'; readonly reason: string };
+
+interface FederatedTimeoutAck {
+  readonly schemaVersion: 1;
+  readonly kind: 'federated-timeout-settle-back';
+  readonly requestId: string;
+  readonly origin: 'confirmation' | 'autonomous-trigger' | 'gateway-pairing';
+  readonly receiptDigest: string;
+  readonly sourceReference: string;
+  readonly settledAt: string;
+}
+
+function timeoutReceiptDigest(receipt: ApprovalTimeoutReceipt): string {
+  return createHash('sha256').update(JSON.stringify(receipt)).digest('hex');
+}
+
+function timeoutAckPath(projectRoot: string, receipt: ApprovalTimeoutReceipt): string {
+  const key = createHash('sha256')
+    .update(`${receipt.tenantId}\u0000${receipt.origin}\u0000${receipt.requestId}\u0000${receipt.lifecycleGeneration}`)
+    .digest('hex');
+  return join(projectRoot, '.deckent', 'approvals', 'federation-settle', `${key}.json`);
+}
+
+function hasMatchingTimeoutAck(projectRoot: string, receipt: ApprovalTimeoutReceipt): boolean {
+  try {
+    const parsed = JSON.parse(readFileSync(timeoutAckPath(projectRoot, receipt), 'utf8')) as Partial<FederatedTimeoutAck>;
+    return parsed.schemaVersion === 1
+      && parsed.kind === 'federated-timeout-settle-back'
+      && parsed.requestId === receipt.requestId
+      && parsed.origin === receipt.origin
+      && parsed.receiptDigest === timeoutReceiptDigest(receipt)
+      && parsed.sourceReference === receipt.sourceReference;
+  } catch {
+    return false;
+  }
+}
+
+function parseTimeoutReceipt(value: unknown): ApprovalTimeoutReceipt | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const receipt = value as Partial<ApprovalTimeoutReceipt>;
+  if (receipt.schemaVersion !== 1
+    || typeof receipt.requestId !== 'string'
+    || typeof receipt.tenantId !== 'string'
+    || typeof receipt.scopeId !== 'string'
+    || typeof receipt.sourceReference !== 'string'
+    || !['confirmation', 'autonomous-trigger', 'gateway-pairing', 'broker-native'].includes(String(receipt.origin))
+    || typeof receipt.lifecycleGeneration !== 'string'
+    || receipt.actor !== 'system:expiry'
+    || receipt.kind !== 'timeout-disposition'
+    || !['park', 'deny', 'proceed-warn'].includes(String(receipt.action))
+    || !['UNDECIDABLE', 'EXPIRED'].includes(String(receipt.terminalState))
+    || !['routine', 'elevated', 'critical'].includes(String(receipt.riskTier))
+    || typeof receipt.expiresAt !== 'string'
+    || !Number.isFinite(Date.parse(receipt.expiresAt))
+    || typeof receipt.decidedAt !== 'string'
+    || !Number.isFinite(Date.parse(receipt.decidedAt))
+    || typeof receipt.authoredPolicyDigest !== 'string'
+    || typeof receipt.appliedPolicyDigest !== 'string'
+    || receipt.replayAllowed !== false
+    || receipt.accessGrantAllowed !== false) return null;
+  return receipt as ApprovalTimeoutReceipt;
+}
+
+function expectedTimeoutSemantics(receipt: ApprovalTimeoutReceipt): boolean {
+  if (receipt.origin === 'confirmation') {
+    return receipt.action === 'park' && receipt.terminalState === 'UNDECIDABLE';
+  }
+  if (receipt.origin === 'autonomous-trigger') {
+    return receipt.action === 'park' && receipt.terminalState === 'EXPIRED';
+  }
+  if (receipt.origin === 'gateway-pairing') {
+    return receipt.action === 'deny' && receipt.terminalState === 'EXPIRED'
+      && receipt.riskTier === 'critical';
+  }
+  return true;
+}
+
+async function publishTimeoutAck(
+  projectRoot: string,
+  receipt: ApprovalTimeoutReceipt,
+  options: FederatedTimeoutSettleOptions,
+): Promise<FederatedTimeoutSettleOutcome> {
+  const result = await createPrivateJsonFileFirstWriterWins(
+    timeoutAckPath(projectRoot, receipt),
+    {
+      schemaVersion: 1,
+      kind: 'federated-timeout-settle-back',
+      requestId: receipt.requestId,
+      origin: receipt.origin as FederatedTimeoutAck['origin'],
+      receiptDigest: timeoutReceiptDigest(receipt),
+      sourceReference: receipt.sourceReference,
+      settledAt: receipt.decidedAt,
+    } satisfies FederatedTimeoutAck,
+    options.aclOptions,
+  );
+  if (result.state === 'HOLD') return { state: 'failed', reason: result.reasonCode };
+  return {
+    state: result.created ? 'settled' : 'already-settled',
+    origin: receipt.origin as FederatedTimeoutAck['origin'],
+  };
+}
+
+/**
+ * Settle a broker-owned system timeout back into the legacy origin authority.
+ * The legacy terminal state is verified before the private FWW ACK is written,
+ * so a crash between origin settlement and ACK is safely retried after restart.
+ */
+export async function settleFederatedTimeoutReceipt(
+  projectRoot: string,
+  receipt: ApprovalTimeoutReceipt,
+  options: FederatedTimeoutSettleOptions = {},
+): Promise<FederatedTimeoutSettleOutcome> {
+  if (receipt.origin === 'broker-native') return { state: 'ignored', origin: 'broker-native' };
+  if (!expectedTimeoutSemantics(receipt)) {
+    return { state: 'failed', reason: 'timeout-receipt-semantics-mismatch' };
+  }
+  if (hasMatchingTimeoutAck(projectRoot, receipt)) {
+    return { state: 'already-settled', origin: receipt.origin };
+  }
+  const at = new Date(receipt.decidedAt);
+  const clock = (): Date => new Date(at.getTime());
+
+  if (receipt.origin === 'confirmation') {
+    const found = readConfirmation(projectRoot, receipt.requestId, { clock });
+    if (!found || found.state !== 'settled'
+      || found.request.outcome.decidedBy !== 'system:expiry'
+      || found.request.outcome.closureReason !== 'expired'
+      || found.request.outcome.verdict !== 'UNDECIDABLE') {
+      return { state: 'failed', reason: 'confirmation-timeout-not-settled' };
+    }
+    return await publishTimeoutAck(projectRoot, receipt, options);
+  }
+
+  if (receipt.origin === 'autonomous-trigger') {
+    try {
+      const gate = makeApprovalGate({
+        pendingPath: join(projectRoot, '.deckent', 'autonomous', 'pending.json'),
+        projectRoot,
+        now: () => receipt.decidedAt,
+        principal: {
+          id: 'system:expiry',
+          identityClass: 'service',
+          assurance: 'unverified',
+          provenance: 'scheduled',
+          verifiedBy: 'durable-timeout-receipt',
+          tenantId: receipt.tenantId,
+        },
+        strictTenantIsolation: true,
+      });
+      const existing = gate.readTerminal?.(receipt.requestId);
+      if (!existing) gate.settleTimeout(receipt.requestId, receipt.decidedAt);
+      const terminal = gate.readTerminal?.(receipt.requestId);
+      if (!terminal || terminal.kind !== 'timeout'
+        || terminal.closureReason !== 'expired'
+        || terminal.replayAllowed !== false) {
+        return { state: 'failed', reason: 'autonomous-timeout-not-settled' };
+      }
+    } catch (error) {
+      return {
+        state: 'failed',
+        reason: error instanceof Error && 'code' in error
+          ? String((error as { code: unknown }).code)
+          : 'autonomous-timeout-settle-failed',
+      };
+    }
+    return await publishTimeoutAck(projectRoot, receipt, options);
+  }
+
+  const home = gatewayHome();
+  const pairingsPath = options.gatewayPairingsPath ?? join(home, 'pairings.json');
+  try {
+    const access = await loadGatewayAccess({
+      pairingsPath,
+      allowlistPath: options.gatewayAllowlistPath ?? join(home, 'allowlist.json'),
+      bindingsPath: options.gatewayBindingsPath ?? join(home, 'bindings.json'),
+      clock,
+      aclOptions: options.aclOptions,
+    });
+    await access.sweepExpiredPairings();
+    const parsed = parseGatewayPairingStore(JSON.parse(readFileSync(pairingsPath, 'utf8')) as unknown);
+    const record = parsed.records.find((entry) => entry.pairingId === receipt.requestId);
+    if (!record || record.state !== 'EXPIRED' || record.decidedAt !== receipt.decidedAt) {
+      return { state: 'failed', reason: 'pairing-timeout-not-settled' };
+    }
+  } catch {
+    return { state: 'failed', reason: 'pairing-timeout-settle-failed' };
+  }
+  return await publishTimeoutAck(projectRoot, receipt, options);
+}
+
+/** Retry durable timeout receipts that lost their settle-back ACK before a
+ * previous process exited. Invalid receipt files are ignored, never mutated. */
+export async function settlePendingFederatedTimeoutReceipts(
+  projectRoot: string,
+  options: FederatedTimeoutSettleOptions = {},
+): Promise<FederatedTimeoutSettleOutcome[]> {
+  const approvalDir = join(projectRoot, '.deckent', 'approvals');
+  if (!existsSync(approvalDir)) return [];
+  const receipts = readdirSync(approvalDir)
+    .filter((name) => name.endsWith('.timeout.json'))
+    .sort()
+    .flatMap((name) => {
+      try {
+        const parsed = parseTimeoutReceipt(JSON.parse(readFileSync(join(approvalDir, name), 'utf8')) as unknown);
+        return parsed ? [parsed] : [];
+      } catch {
+        return [];
+      }
+    });
+  const results: FederatedTimeoutSettleOutcome[] = [];
+  for (const receipt of receipts) results.push(await settleFederatedTimeoutReceipt(projectRoot, receipt, options));
+  return results;
+}
 
 /**
  * Write the broker-made decision BACK into the legacy store so existing

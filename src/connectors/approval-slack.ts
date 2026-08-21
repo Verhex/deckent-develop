@@ -41,9 +41,11 @@ import type {
   ChannelDecisionInput,
   RelayChannel,
   RelayCrossDecidedNotification,
+  RelayLifecycleNotification,
   RelayNotification,
 } from '../core/approval-relay.js';
 import type { ApprovalAction, ApprovalRequest } from '../core/approval-contract.js';
+import { approvalMayUseChannel } from '../core/approval-channel-authenticator.js';
 
 // ─── Slack Block Kit — minimal local subset (section + actions block) ────────
 
@@ -112,6 +114,8 @@ export interface ApprovalSlackChannelOptions {
   channelId: string;
   /** UI language for this channel's two fixed labels (header, buttons). Default 'en'. */
   lang?: string;
+  /** Caller-owned i18n projection for lifecycle events. */
+  formatLifecycleStage?: (notification: RelayLifecycleNotification) => string;
 }
 
 /** callback value action -> broker decision vocabulary (approve/reject stays the
@@ -123,6 +127,10 @@ const DECISION_BY_ACTION: Readonly<Record<'approve' | 'reject', ApprovalAction>>
 
 const ACTIONS_BLOCK_ID = 'deckent_approval_actions';
 
+function assertNeverNotification(_notification: never): never {
+  throw new Error('unsupported approval notification kind');
+}
+
 /**
  * Slack channel adapter (APR-CLIENTS-CORE). One instance targets one fixed
  * Slack channel; attach it to an `ApprovalRelay` via
@@ -132,20 +140,29 @@ export class ApprovalSlackChannel implements RelayChannel {
   private readonly transport: SlackApprovalTransport;
   private readonly channelId: string;
   private readonly lang: string;
+  private readonly formatLifecycleStage: (notification: RelayLifecycleNotification) => string;
   /** requestId -> Slack message ts, so a later cross-decided can update in place. */
   private readonly tsByRequestId = new Map<string, string>();
   /** short-code + nonce -> raw broker id; raw ids never leave this process. */
   private readonly requestIdByCallbackKey = new Map<string, string>();
+  /** Only requests for which this instance emitted a live decision control. */
+  private readonly interactiveRequestIds = new Set<string>();
 
   constructor(opts: ApprovalSlackChannelOptions) {
     this.transport = opts.transport;
     this.channelId = opts.channelId;
     this.lang = opts.lang ?? 'en';
+    this.formatLifecycleStage = opts.formatLifecycleStage ?? ((notification) =>
+      getMessage(`approval.lifecycle.stage.${notification.evidence.stage}`, this.lang));
   }
 
   send(notification: RelayNotification): Promise<void> {
-    if (notification.kind === 'pending') return this.sendPending(notification.request);
-    return this.sendCrossDecided(notification);
+    switch (notification.kind) {
+      case 'pending': return this.sendPending(notification.request);
+      case 'cross-decided': return this.sendCrossDecided(notification);
+      case 'lifecycle-stage': return this.sendLifecycleStage(notification);
+    }
+    return assertNeverNotification(notification);
   }
 
   onDecision(handler: (input: ChannelDecisionInput) => void): void {
@@ -160,6 +177,7 @@ export class ApprovalSlackChannel implements RelayChannel {
         if (!mappedRequestId) return;
         requestId = mappedRequestId;
       }
+      if (!this.interactiveRequestIds.has(requestId)) return;
       handler({
         requestId,
         decision: DECISION_BY_ACTION[parsed.action],
@@ -204,15 +222,16 @@ export class ApprovalSlackChannel implements RelayChannel {
     const header = getMessage('cap.approval.header', this.lang);
     const shortCode = shortCodeFor(request.id);
     const body = this.renderBody(request);
-    const isCritical = request.risk === 'critical';
-    const criticalHint = isCritical ? `\ndeckent approvals decide #${shortCode}` : '';
+    const mayDecideHere = approvalMayUseChannel(request);
+    const criticalHint = mayDecideHere ? '' : `\ndeckent approvals decide #${shortCode}`;
     const text = `🔐 ${header}\n${body}${criticalHint}`;
     const blocks: SlackBlock[] = [
       { type: 'section', text: { type: 'mrkdwn', text: `🔐 *${header}*\n${body}${criticalHint}` } },
     ];
-    if (!isCritical) {
+    if (mayDecideHere) {
       const nonce = randomBytes(4).toString('hex');
       this.requestIdByCallbackKey.set(`${shortCode}:${nonce}`, request.id);
+      this.interactiveRequestIds.add(request.id);
       blocks.push(this.buildActionsBlock(shortCode, nonce));
     }
     return {
@@ -245,6 +264,23 @@ export class ApprovalSlackChannel implements RelayChannel {
     const ts = this.tsByRequestId.get(requestId);
     const payload = this.buildCrossDecidedPayload(notification.message);
     if (ts && this.transport.updateMessage) {
+      await this.transport.updateMessage(this.channelId, ts, payload);
+      this.tsByRequestId.delete(requestId);
+      this.interactiveRequestIds.delete(requestId);
+      return;
+    }
+    this.interactiveRequestIds.delete(requestId);
+    await this.transport.postMessage(payload);
+  }
+
+  private async sendLifecycleStage(notification: RelayLifecycleNotification): Promise<void> {
+    const requestId = notification.request.id;
+    const text = this.formatLifecycleStage(notification);
+    const payload = this.buildCrossDecidedPayload(text);
+    const expired = notification.evidence.stage === 'expired';
+    const ts = this.tsByRequestId.get(requestId);
+    if (expired) this.interactiveRequestIds.delete(requestId);
+    if (expired && ts && this.transport.updateMessage) {
       await this.transport.updateMessage(this.channelId, ts, payload);
       this.tsByRequestId.delete(requestId);
       return;

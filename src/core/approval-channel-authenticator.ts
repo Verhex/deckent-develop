@@ -1,28 +1,52 @@
 import { createHash } from 'node:crypto';
 
 import type { ApprovalRisk } from './approval-contract.js';
+import type { ApprovalRiskTier } from './config-types.js';
 import type {
   LiveApprovalAuthentication,
   LiveApprovalAuthenticator,
   LiveApprovalReauthenticationContext,
   LiveApprovalSessionProof,
 } from './approval-decision-ingress.js';
+import {
+  isApprovalRiskTierAtLeast,
+  mapLegacyApprovalRisk,
+} from './approval-lifecycle-policy.js';
 
 export const APPROVAL_CHANNEL_AUTHORITY_REF = 'approval-channel:v1';
 
-export type ChannelApprovalTier = 'routine' | 'elevated' | 'critical';
+export type ChannelApprovalTier = ApprovalRiskTier;
 
-const CHANNEL_TIER_BY_RISK: Readonly<Record<ApprovalRisk, ChannelApprovalTier>> = Object.freeze({
-  none: 'routine',
-  low: 'routine',
-  medium: 'elevated',
-  high: 'elevated',
-  critical: 'critical',
-});
-
-/** D3-delta's five approval risks collapsed onto the three channel tiers. */
+/** Legacy compatibility delegates to the lifecycle resolver's single mapping authority. */
 export function channelTierFor(risk: ApprovalRisk): ChannelApprovalTier {
-  return CHANNEL_TIER_BY_RISK[risk];
+  return mapLegacyApprovalRisk(risk);
+}
+
+/** Structural input shared by consumers without widening ApprovalRequest's exact v1 source shape. */
+export interface ApprovalRiskTierInput {
+  readonly risk: ApprovalRisk;
+  readonly riskTier?: unknown;
+}
+
+/**
+ * Resolve the authoritative envelope tier. Legacy v1 sources derive it through
+ * the lifecycle resolver without mutating the signed source object. An invalid
+ * explicit tier, including a producer downgrade below the canonical legacy
+ * floor, is not treated as legacy absence: it fails closed as `null`.
+ */
+export function approvalRiskTierFor(input: ApprovalRiskTierInput): ApprovalRiskTier | null {
+  const legacyFloor = mapLegacyApprovalRisk(input.risk);
+  if (input.riskTier === undefined) return legacyFloor;
+  if (input.riskTier === 'routine' || input.riskTier === 'elevated' || input.riskTier === 'critical') {
+    return isApprovalRiskTierAtLeast(input.riskTier, legacyFloor) ? input.riskTier : null;
+  }
+  return null;
+}
+
+/** Channel buttons/live identities never carry critical or malformed tier authority. */
+export function approvalMayUseChannel(input: ApprovalRiskTierInput): boolean {
+  const tier = approvalRiskTierFor(input);
+  return tier !== null && tier !== 'critical';
 }
 
 export interface ChannelApprovalPrincipal {
@@ -81,7 +105,7 @@ export class ChannelLiveApprovalAuthenticator implements LiveApprovalAuthenticat
   async reauthenticate(
     context: LiveApprovalReauthenticationContext,
   ): Promise<LiveApprovalAuthentication | null> {
-    if (channelTierFor(context.request.risk) === 'critical') return null;
+    if (!approvalMayUseChannel(context.request)) return null;
     if (!this.hasValidBinding(context) || !this.options.isAuthorized(this.options.chatKey)) return null;
 
     const now = this.now();
@@ -104,7 +128,8 @@ export class ChannelLiveApprovalAuthenticator implements LiveApprovalAuthenticat
     context: LiveApprovalReauthenticationContext,
     now: Date,
   ): boolean {
-    return proof.authorityRef === APPROVAL_CHANNEL_AUTHORITY_REF
+    return approvalMayUseChannel(context.request)
+      && proof.authorityRef === APPROVAL_CHANNEL_AUTHORITY_REF
       && proof.actorId === `channel:${this.options.connector}:${this.options.principal.userId}`
       && proof.tenantId === context.request.tenantId
       && proof.sessionRefHash === sha256(this.options.bindingDigest)

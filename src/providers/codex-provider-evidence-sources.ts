@@ -30,9 +30,9 @@ import {
   type ReachabilityProbeRequest,
 } from '../core/provider-truth.js';
 import {
-  isExecutionProfileRef,
   type BoundedReachabilityProbeTransport,
 } from '../core/provider-evidence-probe-contract.js';
+import { DockerBoundedReachabilityEvidenceSource } from './docker-bounded-reachability-evidence.js';
 
 // ─── Codex durable on-disk state contract ────────────────────────────────────
 //
@@ -718,119 +718,25 @@ implements ProviderReachabilityEvidenceSource {
 }
 
 /**
- * Live codex reachability over the canonical Docker bounded-probe transport
- * (§12.2 clause 4).
- *
- * Exact scope: subscription · cli · docker with a resolvable execution profile
- * ref. Anything else — and any probe arriving without a resolvable canonical
- * transport or a billing-mode budget projection — is a typed non-live outcome,
- * never a fabricated verdict. The source emits provider-native observations
- * only; `reachable`/`liveProven` promotion stays in canonical core
- * (provider-truth), which also enforces called-identity match.
+ * Backward-compatible codex facade over the provider-neutral canonical Docker
+ * bounded-probe source. Scope validation, prompt construction, and native
+ * outcome projection intentionally have one decision authority in that shared
+ * primitive; this class preserves the existing public export and constructor.
  */
-const DOCKER_PROBE_PROMPT = 'Reply with exactly DECKENT_REACHABILITY_OK. Do not use tools.';
-
 export class CodexDockerReachabilityEvidenceSource
 implements ProviderReachabilityEvidenceSource {
+  private readonly delegate: DockerBoundedReachabilityEvidenceSource;
   readonly authorityRef = reachabilityRef('authority', 'codex-docker-bounded-probe-v1');
 
   constructor(
-    private readonly resolveTransport: () => BoundedReachabilityProbeTransport | null,
-  ) {}
+    resolveTransport: () => BoundedReachabilityProbeTransport | null,
+  ) {
+    this.delegate = new DockerBoundedReachabilityEvidenceSource('codex', resolveTransport);
+  }
 
-  readonly probe = async (
+  readonly probe = (
     request: Readonly<ReachabilityProbeRequest>,
-  ): Promise<ReachabilityProbeObservation> => {
-    const scopeRefs = [reachabilityRef(
-      'scope',
-      request.provider,
-      request.model,
-      request.auth.mode,
-      request.backend.transport,
-      request.backend.executionBackend,
-      request.backend.executionProfileRef,
-    )];
-    const notLive = (
-      outcome: 'unsupported' | 'not-run',
-      detail: string,
-    ): ReachabilityProbeObservation => ({
-      outcome,
-      calledProvider: null,
-      calledModel: null,
-      providerRequestRefHash: null,
-      latencyMs: null,
-      evidenceRefs: [...scopeRefs, reachabilityRef('hold', detail)],
-    });
-
-    if (request.provider !== 'codex'
-      || request.auth.mode !== 'subscription'
-      || request.backend.transport !== 'cli'
-      || request.backend.executionBackend !== 'docker'
-      || !isExecutionProfileRef(request.backend.executionProfileRef)) {
-      return notLive('unsupported', 'scope-mismatch');
-    }
-    const projection = request.admission.budget.projection;
-    if (!projection) return notLive('not-run', 'budget-projection-unavailable');
-    const transport = this.resolveTransport();
-    if (!transport) return notLive('unsupported', 'no-canonical-docker-transport');
-
-    const native = await transport.invoke({
-      provider: request.provider,
-      model: request.model,
-      executionProfileRef: request.backend.executionProfileRef,
-      promptBytes: new TextEncoder().encode(DOCKER_PROBE_PROMPT),
-      timeoutMs: projection.timeoutMs,
-      maxOutputTokens: projection.maxOutputTokens,
-    });
-
-    switch (native.outcome) {
-      case 'completed':
-        // Called identity is structurally pinned: the canonical builder derives
-        // argv from the provider command spec + registry apiId for exactly this
-        // request, so echoing the requested identity is backed by the executed
-        // command, not by parsing provider output.
-        return {
-          outcome: 'succeeded',
-          calledProvider: request.provider,
-          calledModel: request.model,
-          providerRequestRefHash: native.providerRequestRef
-            ? digest('provider-request-ref', native.providerRequestRef)
-            : null,
-          latencyMs: native.latencyMs,
-          evidenceRefs: scopeRefs,
-        };
-      case 'timed-out':
-        return {
-          outcome: 'timeout',
-          calledProvider: null,
-          calledModel: null,
-          providerRequestRefHash: null,
-          latencyMs: native.elapsedMs,
-          evidenceRefs: scopeRefs,
-        };
-      case 'rejected':
-        return {
-          outcome: 'invalid-response',
-          calledProvider: null,
-          calledModel: null,
-          providerRequestRefHash: null,
-          latencyMs: native.latencyMs,
-          evidenceRefs: [...scopeRefs, reachabilityRef('rejected', native.providerCode ?? 'unclassified')],
-        };
-      case 'transport-error':
-        return {
-          outcome: native.errorCode === 'backend_unreachable' ? 'backend-unreachable'
-            : native.errorCode === 'backend_unsupported' ? 'unsupported'
-              : native.errorCode === 'credential_unavailable' ? 'auth-rejected'
-                : 'transport-error',
-          calledProvider: null,
-          calledModel: null,
-          providerRequestRefHash: null,
-          latencyMs: native.elapsedMs,
-          evidenceRefs: [...scopeRefs, reachabilityRef('transport-error', native.errorCode)],
-        };
-    }
-  };
+  ): Promise<ReachabilityProbeObservation> => this.delegate.probe(request);
 }
 
 // ─── Registrations ───────────────────────────────────────────────────────────

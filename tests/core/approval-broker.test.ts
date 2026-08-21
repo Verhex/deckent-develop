@@ -61,7 +61,7 @@ let broker: ApprovalBroker;
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'approval-broker-'));
   storeDir = join(projectRoot, 'approvals');
-  broker = new ApprovalBroker(projectRoot, { storeDir });
+  broker = new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW });
 });
 
 afterEach(() => {
@@ -133,7 +133,7 @@ describe('ApprovalBroker.submit', () => {
 
   it('rejects the same request id from a fresh broker without overwriting the first request', () => {
     const first = broker.submit(buildRequest('apr-cross-process-request', { summary: 'first request' }));
-    const brokerB = new ApprovalBroker(projectRoot, { storeDir });
+    const brokerB = new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW });
 
     expect(() => brokerB.submit(buildRequest('apr-cross-process-request', { summary: 'second request' })))
       .toThrow(ApprovalBrokerError);
@@ -260,7 +260,7 @@ describe('ApprovalBroker.decide / awaitDecision', () => {
 
   it('a fresh broker cannot overwrite the durable winner and hydrates it for waiters', async () => {
     const req = broker.submit(buildRequest('apr-decision-race'));
-    const brokerB = new ApprovalBroker(projectRoot, { storeDir });
+    const brokerB = new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW });
     const waitingB = brokerB.awaitDecision(req.id);
 
     const winner = broker.decide(req.id, {
@@ -290,7 +290,7 @@ describe('ApprovalBroker.decide / awaitDecision', () => {
       decision: 'deny', decidedBy: 'first', channel: 'terminal', decidedAt: FIXED_NOW.toISOString(),
     });
 
-    const restarted = new ApprovalBroker(projectRoot, { storeDir });
+    const restarted = new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW });
     expect(restarted.list('pending')).toEqual([pending]);
     expect(restarted.list('decided')).toEqual([decided]);
     await expect(restarted.awaitDecision(decided.id)).resolves.toEqual(decision);
@@ -306,14 +306,14 @@ describe('ApprovalBroker.decide / awaitDecision', () => {
     };
     writeFileSync(join(storeDir, 'APR-LEGACY-1.request.json'), JSON.stringify(legacy), 'utf-8');
 
-    const restarted = new ApprovalBroker(projectRoot, { storeDir });
+    const restarted = new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW });
     expect(restarted.list('pending')).toEqual([legacy]);
     expect(() => restarted.submit(buildRequest('APR-LEGACY-2'))).toThrowError(ApprovalBrokerError);
 
     const decision = restarted.decide(legacy.id, {
       decision: 'allow', decidedBy: 'operator', channel: 'terminal', decidedAt: FIXED_NOW.toISOString(),
     });
-    await expect(new ApprovalBroker(projectRoot, { storeDir }).awaitDecision(legacy.id)).resolves.toEqual(decision);
+    await expect(new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW }).awaitDecision(legacy.id)).resolves.toEqual(decision);
   });
 
   it('rejects an invalid decision (unknown decision value)', () => {
@@ -341,7 +341,7 @@ describe('ApprovalBroker.expire', () => {
     expect(produced[0]!.requestId).toBe(req.id);
     expect(produced[0]!.decision).toBe('deny');
     expect(produced[0]!.channel).toBe('ttl-expire');
-    expect(produced[0]!.decidedBy).toBe('system');
+    expect(produced[0]!.decidedBy).toBe('system:expiry');
 
     expect(broker.list('pending')).toEqual([]);
     expect(broker.list('decided')).toEqual([req]);
@@ -377,7 +377,7 @@ describe('ApprovalBroker.expire', () => {
     };
     writeFileSync(join(storeDir, 'APR-LEGACY-TTL.request.json'), JSON.stringify(legacy), 'utf-8');
 
-    const restarted = new ApprovalBroker(projectRoot, { storeDir });
+    const restarted = new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW });
     const produced = restarted.expire(new Date('2026-07-01T21:20:00.000Z'));
     expect(produced).toHaveLength(1);
     expect(produced[0]).toMatchObject({
@@ -436,7 +436,7 @@ describe('ApprovalBroker.checkForExternalDecisions — second-process-decide sim
   });
 
   it('a decision made by a second broker instance (simulated second process) is picked up by the first', async () => {
-    const brokerB = new ApprovalBroker(projectRoot, { storeDir });
+    const brokerB = new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW });
 
     const req = broker.submit(buildRequest('apr-ext-2'));
     const waiting = broker.awaitDecision(req.id);

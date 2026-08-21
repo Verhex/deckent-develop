@@ -14486,3 +14486,101 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 603-002: orphan-delisting + kanal-matrisi i18n (T12) (DONE)
 
 ---
+## Sprint 604 — sprint-604
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 196s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 195640ms |
+
+### Tasks
+
+- 604-001: D4 olculmus lifecycle blueprint ve closure matrisi (DONE)
+
+---
+## Sprint 605 — sprint-605
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 150s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 149507ms |
+
+### Tasks
+
+- 605-001: D4 blueprint canonical-path ve closure-DAG düzeltmesi (DONE)
+
+---
+## Sprint 606 — sprint-606
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 225s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 224504ms |
+
+### Tasks
+
+- 606-001: Claude Docker evidence-source ve authoring composition tasarimi (DONE)
+
+---
+## Sprint 608 — sprint-608
+
+**Status:** ABORTED
+**Date:** 2026-08-21
+**Duration:** 353s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 353057ms |
+
+### Tasks
+
+- 608-001: Provider-neutral Docker bounded reachability evidence source (DONE)
+- 608-002-fix-fix-fix-fix: Fix: Fix: Fix: Fix: Codex Docker source'u ortak primitive'e refactor et (PENDING)
+- 608-002-fix-fix-fix: Fix: Fix: Fix: Codex Docker source'u ortak primitive'e refactor et (EXECUTING)
+- 608-002-fix-fix: Fix: Fix: Codex Docker source'u ortak primitive'e refactor et (NO_GO)
+- 608-002-fix: Fix: Codex Docker source'u ortak primitive'e refactor et (NO_GO)
+- 608-002: Codex Docker source'u ortak primitive'e refactor et (NO_GO)
+- 608-003: Claude dual-backend exact source registration (DONE)
+- 608-004: Local provider source bootstrap'i tek Docker transport seam'ine cek (PAUSED)
+- 608-005: CLI process runtime'da generic lazy Docker resolver factory (PAUSED)
+- 608-006: limits init default resolver'ini effective-config Docker composition'a bagla (PAUSED)
+- 608-007: Claude Docker authoring-to-runtime production-chain integration proof (PAUSED)
+
+---

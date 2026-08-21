@@ -64,6 +64,10 @@ function writePendingFixture(root: string, entries: unknown[]): void {
   writeFileSync(pendingFilePath(root), JSON.stringify(entries, null, 2), 'utf-8');
 }
 
+function freshEnqueuedAt(): string {
+  return new Date().toISOString();
+}
+
 // ─── registry-unit smoke ─────────────────────────────────────────────────────
 
 describe('registerAutonomousApprovalTools', () => {
@@ -100,7 +104,7 @@ describe('deckent_autonomous_approve', () => {
 
   it('approves a fixture-parked trigger and writes an approved decision to disk', async () => {
     writePendingFixture(tmpDir, [
-      { triggerId: 't-1', action: 'sprint.run', requestedBy: 'policy-gate', enqueuedAt: '2026-01-01T00:00:00.000Z' },
+      { triggerId: 't-1', action: 'sprint.run', requestedBy: 'policy-gate', enqueuedAt: freshEnqueuedAt() },
     ]);
 
     const handler = getHandler();
@@ -119,7 +123,7 @@ describe('deckent_autonomous_approve', () => {
 
   it('propagates a custom reason into the recorded decision', async () => {
     writePendingFixture(tmpDir, [
-      { triggerId: 't-2', action: 'sprint.run', requestedBy: 'policy-gate', enqueuedAt: '2026-01-01T00:00:00.000Z' },
+      { triggerId: 't-2', action: 'sprint.run', requestedBy: 'policy-gate', enqueuedAt: freshEnqueuedAt() },
     ]);
 
     const handler = getHandler();
@@ -131,7 +135,7 @@ describe('deckent_autonomous_approve', () => {
 
   it('prefers triggerId over id when both are supplied', async () => {
     writePendingFixture(tmpDir, [
-      { triggerId: 't-preferred', action: 'a', requestedBy: 'r', enqueuedAt: '2026-01-01T00:00:00.000Z' },
+      { triggerId: 't-preferred', action: 'a', requestedBy: 'r', enqueuedAt: freshEnqueuedAt() },
     ]);
 
     const handler = getHandler();
@@ -154,7 +158,7 @@ describe('deckent_autonomous_approve', () => {
     const result = await handler({ id: 'ghost', root: tmpDir });
 
     expect(result.isError).toBe(true);
-    expect(parseResult(result).message).toContain('not a known pending request');
+    expect(parseResult(result)).toMatchObject({ code: 'APR_UNKNOWN_REQUEST', triggerId: 'ghost' });
     expect(existsSync(decisionsFilePath(tmpDir))).toBe(false);
   });
 
@@ -180,7 +184,7 @@ describe('deckent_autonomous_reject', () => {
 
   it('rejects a fixture-parked trigger and writes a rejected decision to disk', async () => {
     writePendingFixture(tmpDir, [
-      { triggerId: 't-3', action: 'sprint.run', requestedBy: 'policy-gate', enqueuedAt: '2026-01-01T00:00:00.000Z' },
+      { triggerId: 't-3', action: 'sprint.run', requestedBy: 'policy-gate', enqueuedAt: freshEnqueuedAt() },
     ]);
 
     const handler = getHandler();
@@ -198,7 +202,7 @@ describe('deckent_autonomous_reject', () => {
 
   it('propagates a custom reason into the recorded decision', async () => {
     writePendingFixture(tmpDir, [
-      { triggerId: 't-4', action: 'sprint.run', requestedBy: 'policy-gate', enqueuedAt: '2026-01-01T00:00:00.000Z' },
+      { triggerId: 't-4', action: 'sprint.run', requestedBy: 'policy-gate', enqueuedAt: freshEnqueuedAt() },
     ]);
 
     const handler = getHandler();
@@ -215,7 +219,7 @@ describe('deckent_autonomous_reject', () => {
     const result = await handler({ id: 'ghost-2', root: tmpDir });
 
     expect(result.isError).toBe(true);
-    expect(parseResult(result).message).toContain('not a known pending request');
+    expect(parseResult(result)).toMatchObject({ code: 'APR_UNKNOWN_REQUEST', triggerId: 'ghost-2' });
     expect(existsSync(decisionsFilePath(tmpDir))).toBe(false);
   });
 

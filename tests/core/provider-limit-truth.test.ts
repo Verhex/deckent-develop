@@ -143,6 +143,42 @@ describe('provider limit truth', () => {
     expect(toLimitEvidence(block, new Date(T0)).limited).toBe(true);
   });
 
+  it('keeps crossed ratios visible but non-blocking in explicit observe-only mode', () => {
+    const result = createProviderLimitResult(observation({
+      windows: [
+        window('session', 98, 2, 100),
+        window('week-all', 20, 80, 100, { kind: 'week-all' }),
+      ],
+    }), { ...POLICY, ratioEnforcement: 'observe_only' });
+
+    expect(result).toMatchObject({
+      state: 'known',
+      decision: 'allow',
+      pressure: 'block',
+      reasonCode: 'threshold_observed',
+      policy: { ratioEnforcement: 'observe_only' },
+    });
+    expect(toLimitEvidence(result, new Date(T0)).limited).toBe(false);
+  });
+
+  it('keeps absolute floors fail-closed while ratio enforcement is observe-only', () => {
+    const result = createProviderLimitResult(observation({
+      requiredWindowIds: ['requests'],
+      windows: [window('requests', 99, 1, 100, {
+        kind: 'rate-window', unit: 'requests', reset: { state: 'known', at: T1, displayRefHash: null },
+      })],
+      source: {
+        kind: 'http-headers', authority: 'authoritative', operatorApprovalRef: null,
+        evidenceRef: 'limit-source:observe-floor', fetchedAt: T0, expiresAt: T1,
+        incorporatedReservationEventRefs: [],
+      },
+    }), { ...POLICY, ratioEnforcement: 'observe_only' });
+
+    expect(result).toMatchObject({
+      decision: 'hold', pressure: 'block', reasonCode: 'remaining_floor',
+    });
+  });
+
   it('uses remaining floors for absolute request/token windows', () => {
     const result = createProviderLimitResult(observation({
       requiredWindowIds: ['requests'],

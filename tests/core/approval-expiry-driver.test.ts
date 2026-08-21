@@ -40,7 +40,10 @@ let store: ApprovalStore;
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'approval-expiry-driver-'));
   storeDir = join(projectRoot, 'approvals');
-  broker = new ApprovalBroker(projectRoot, { storeDir });
+  broker = new ApprovalBroker(projectRoot, {
+    storeDir,
+    clock: () => new Date('2026-07-01T21:05:00.000Z'),
+  });
   store = new ApprovalStore(projectRoot, { storeDir });
 });
 
@@ -230,7 +233,9 @@ describe('ApprovalExpiryDriver.start/stop', () => {
       const driver = new ApprovalExpiryDriver({ broker, store, clock: () => now });
 
       driver.start(1_000);
-      expect(existsSync(join(storeDir, 'apr-periodic.decision.json'))).toBe(false);
+      // Startup sweep closes overdue work immediately; the interval is only
+      // the subsequent scheduled safety net.
+      expect(existsSync(join(storeDir, 'apr-periodic.decision.json'))).toBe(true);
 
       vi.advanceTimersByTime(1_000);
 

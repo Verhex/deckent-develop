@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  BOUNDED_REACHABILITY_CAPTURE_CEILING_BYTES,
   DockerSpawnBackend,
   type DockerReachabilityProbeCommandRunner,
 } from '../../src/orchestra/spawn-backend-docker.js';
@@ -66,7 +67,7 @@ describe('DockerSpawnBackend bounded reachability probe', () => {
     expect(JSON.stringify(observation)).not.toContain('docker');
     expect(received?.stdin).toEqual(new TextEncoder().encode('secret probe prompt'));
     expect(received?.timeoutMs).toBe(37);
-    expect(received?.outputCeiling).toBe(19);
+    expect(received?.outputCeiling).toBe(BOUNDED_REACHABILITY_CAPTURE_CEILING_BYTES);
     expect(received?.args).not.toContain('--network');
     // `-i` MUST be present so the prompt bytes reach the provider CLI's stdin;
     // without it the CLI exits "no prompt" and the probe misreads a dead
@@ -84,7 +85,22 @@ describe('DockerSpawnBackend bounded reachability probe', () => {
       .resolves.toMatchObject({ outcome: 'transport-error', errorCode: 'backend_unreachable' });
   });
 
-  it('preserves the request ceilings for the injected containment runner', async () => {
+  it('keeps an ordinary provider non-zero exit distinct from Docker daemon failure', async () => {
+    const dir = root();
+    const backend = new DockerSpawnBackend(dir, {
+      homeDir: authenticatedHome(dir), crossVerifyRuntimeCommandRunner: runtimeRunner(),
+      reachabilityProbeCommandRunner: async () => ({
+        status: 1,
+        stdout: '',
+        stderr: 'provider subscription request rejected',
+      }),
+    });
+
+    await expect(backend.invokeBoundedReachabilityProbe(await requestFor(backend)))
+      .resolves.toMatchObject({ outcome: 'rejected', retryable: false });
+  });
+
+  it('keeps the transport envelope bounded independently of the provider token budget', async () => {
     const dir = root();
     const calls: Parameters<DockerReachabilityProbeCommandRunner>[0][] = [];
     const backend = new DockerSpawnBackend(dir, {
@@ -97,7 +113,29 @@ describe('DockerSpawnBackend bounded reachability probe', () => {
     await expect(backend.invokeBoundedReachabilityProbe(await requestFor(backend)))
       .resolves.toMatchObject({ outcome: 'timed-out' });
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ timeoutMs: 37, outputCeiling: 19 });
+    expect(calls[0]).toMatchObject({
+      timeoutMs: 37,
+      outputCeiling: BOUNDED_REACHABILITY_CAPTURE_CEILING_BYTES,
+    });
+  });
+
+  it('classifies transport-envelope overflow without claiming the Docker daemon is unreachable', async () => {
+    const dir = root();
+    const backend = new DockerSpawnBackend(dir, {
+      homeDir: authenticatedHome(dir), crossVerifyRuntimeCommandRunner: runtimeRunner(),
+      reachabilityProbeCommandRunner: async () => ({
+        status: null,
+        stdout: '',
+        stderr: 'probe output ceiling exceeded',
+      }),
+    });
+
+    await expect(backend.invokeBoundedReachabilityProbe(await requestFor(backend)))
+      .resolves.toMatchObject({
+        outcome: 'transport-error',
+        errorCode: 'response_too_large',
+        retryable: false,
+      });
   });
 
   it('reports absent isolated credentials as unavailable rather than unreachable', async () => {

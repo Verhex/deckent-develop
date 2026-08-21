@@ -27,9 +27,14 @@
 //    kills the relay or blocks the other channels.
 
 import { EventEmitter } from 'node:events';
-import type { ApprovalBroker, ApprovalDecisionInput } from './approval-broker.js';
+import {
+  isExpiredDecideResult,
+  type ApprovalBroker,
+  type ApprovalDecisionInput,
+} from './approval-broker.js';
 import type { ApprovalDecision, ApprovalRequest } from './approval-contract.js';
 import type { ApprovalNotifyDedup } from './approval-notify-dedup.js';
+import type { ApprovalSlaEvidence } from './approval-sla.js';
 
 // ─── Channel contract ─────────────────────────────────────────────────────────
 
@@ -53,7 +58,16 @@ export interface RelayCrossDecidedNotification {
   message: string;
 }
 
-export type RelayNotification = RelayPendingNotification | RelayCrossDecidedNotification;
+export interface RelayLifecycleNotification {
+  kind: 'lifecycle-stage';
+  request: ApprovalRequest;
+  evidence: ApprovalSlaEvidence;
+}
+
+export type RelayNotification =
+  | RelayPendingNotification
+  | RelayCrossDecidedNotification
+  | RelayLifecycleNotification;
 
 /**
  * A channel adapter's contract with the relay. Real adapters (telegram,
@@ -77,7 +91,7 @@ export interface RelayChannelErrorInfo {
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
-export type ApprovalRelayErrorCode = 'APR_RELAY_DUPLICATE_CHANNEL';
+export type ApprovalRelayErrorCode = 'APR_RELAY_DUPLICATE_CHANNEL' | 'APR_RELAY_LATE_DECISION';
 
 export class ApprovalRelayError extends Error {
   constructor(
@@ -110,6 +124,7 @@ export class ApprovalRelay extends EventEmitter {
   private readonly channels = new Map<string, RelayChannel>();
   private readonly handlePending: (request: ApprovalRequest) => void;
   private readonly handleDecided: (decision: ApprovalDecision, request: ApprovalRequest | undefined) => void;
+  private readonly dedup: ApprovalNotifyDedup | undefined;
 
   /**
    * @param dedup Optional persistent notify-state guard (APR-NOTIFY-DEDUP).
@@ -134,9 +149,11 @@ export class ApprovalRelay extends EventEmitter {
     dedup?: ApprovalNotifyDedup,
     private readonly formatCrossDecided: (decision: ApprovalDecision) => string =
       (decision) => `decision made on channel ${decision.channel}`,
+    private readonly clock: () => Date = () => new Date(),
   ) {
     super();
     this.broker = broker;
+    this.dedup = dedup;
     this.handlePending = (request) => {
       if (dedup?.wasNotified(request.id)) return;
       this.dispatch(undefined, { kind: 'pending', request });
@@ -190,12 +207,37 @@ export class ApprovalRelay extends EventEmitter {
     this.broker.off('decided', this.handleDecided);
   }
 
+  /**
+   * Fan one durable SLA/outbox event to every channel. The stable lifecycle
+   * event id is the dedup key, so restart/retry cannot redeliver an acknowledged
+   * stage. The caller persists its SLA cursor before invoking this method.
+   */
+  async dispatchLifecycleStage(request: ApprovalRequest, evidence: ApprovalSlaEvidence): Promise<boolean> {
+    if (evidence.requestId !== request.id) {
+      throw new ApprovalRelayError('lifecycle evidence request mismatch', 'APR_RELAY_LATE_DECISION');
+    }
+    if (this.dedup?.wasNotified(evidence.eventId)) return true;
+    const delivered = await this.dispatchAwaitable(undefined, { kind: 'lifecycle-stage', request, evidence });
+    if (delivered) this.dedup?.markNotified(evidence.eventId);
+    return delivered;
+  }
+
   // ─── internals ──────────────────────────────────────────────────────────
 
   private handleChannelDecision(channelName: string, input: ChannelDecisionInput): void {
     const { requestId, ...decisionInput } = input;
     try {
-      this.broker.decide(requestId, { ...decisionInput, channel: channelName });
+      const result = this.broker.decideChecked(
+        requestId,
+        { ...decisionInput, channel: channelName },
+        this.clock(),
+      );
+      if (isExpiredDecideResult(result)) {
+        this.reportChannelError(
+          channelName,
+          new ApprovalRelayError(`approval request is lifecycle-closed: ${requestId}`, 'APR_RELAY_LATE_DECISION'),
+        );
+      }
     } catch (error) {
       this.reportChannelError(channelName, error);
     }
@@ -214,6 +256,30 @@ export class ApprovalRelay extends EventEmitter {
         this.reportChannelError(name, error);
       }
     }
+  }
+
+  /** Awaitable SLA fan-out. Per-channel durable ACK wrappers suppress replay to
+   * channels that already succeeded when a sibling channel is retrying. */
+  private async dispatchAwaitable(
+    excludeChannel: string | undefined,
+    notification: RelayLifecycleNotification,
+  ): Promise<boolean> {
+    const pending: Promise<void>[] = [];
+    let firstError: unknown;
+    for (const [name, channel] of this.channels) {
+      if (name === excludeChannel) continue;
+      try {
+        pending.push(Promise.resolve(channel.send(notification)).catch((error: unknown) => {
+          this.reportChannelError(name, error);
+          if (firstError === undefined) firstError = error;
+        }));
+      } catch (error) {
+        this.reportChannelError(name, error);
+        if (firstError === undefined) firstError = error;
+      }
+    }
+    await Promise.all(pending);
+    return firstError === undefined;
   }
 
   private reportChannelError(channel: string, error: unknown): void {

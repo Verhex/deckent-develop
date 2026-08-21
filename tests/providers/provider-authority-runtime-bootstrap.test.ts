@@ -1,11 +1,15 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProviderLimitsConfig, ResolvedConfig } from '../../src/core/config-types.js';
+import type { BoundedReachabilityProbeRequest } from '../../src/core/provider-evidence-probe-contract.js';
+import type { ReachabilityProbeRequest } from '../../src/core/provider-truth.js';
 import { createProviderLimitPolicyAuthoritySnapshot } from '../../src/core/provider-limit-policy.js';
 import {
+  createLocalProviderEvidenceSourceRegistrations,
+  createLocalProviderEvidenceSourceResolver,
   hasAuthoredProviderLimitAuthority,
   openLocalProviderAuthorityRuntime,
   openLocalProviderAuthorityRuntimeIfConfigured,
@@ -53,11 +57,75 @@ function parentPolicy(): ProviderLimitsConfig {
   };
 }
 
+function dockerProbeRequest(provider: 'claude' | 'codex'): ReachabilityProbeRequest {
+  const profileRef = `execution-profile:${provider}-docker-0001`;
+  return {
+    idempotencyKey: `bootstrap-${provider}-docker-0001`,
+    tenantId: 'main',
+    projectId: 'project-bootstrap',
+    provider,
+    model: provider === 'claude' ? 'claude-fable-5' : 'gpt-5.6-sol',
+    auth: { mode: 'subscription', accountRefHash: 'a'.repeat(64) },
+    backend: {
+      transport: 'cli', executionBackend: 'docker', endpointRefHash: null,
+      runtimeFingerprint: 'f'.repeat(64), executionProfileRef: profileRef,
+    },
+    probeKind: 'model-invocation',
+    capability: 'inference',
+    admission: {
+      budget: {
+        evidenceRef: `execution-budget:${'b'.repeat(64)}`,
+        projection: {
+          billingMode: 'subscription', maxInputTokens: 100, maxOutputTokens: 20,
+          maxTokens: 120, timeoutMs: 4_000,
+        },
+      },
+    },
+    executionProfile: {
+      profileRef, provider,
+      allowed: [{ authMode: 'subscription', transport: 'cli', executionBackend: 'docker' }],
+    },
+    ttlMs: 60_000,
+  };
+}
+
 afterEach(() => {
   for (const value of roots.splice(0)) rmSync(value, { recursive: true, force: true });
 });
 
 describe('openLocalProviderAuthorityRuntime', () => {
+  it('builds one immutable six-slot inventory and shares the lazy Docker resolver', async () => {
+    const projectRoot = root();
+    const calls: BoundedReachabilityProbeRequest[] = [];
+    const dockerReachabilityTransport = vi.fn(() => ({
+      invoke: async (request: Readonly<BoundedReachabilityProbeRequest>) => {
+        calls.push(request as BoundedReachabilityProbeRequest);
+        return { outcome: 'completed' as const, providerRequestRef: null, outputBytes: 1, latencyMs: 2 };
+      },
+    }));
+    const options = { nodePlatform: 'linux', env: {}, dockerReachabilityTransport };
+    const registrations = createLocalProviderEvidenceSourceRegistrations(projectRoot, options);
+    const resolver = createLocalProviderEvidenceSourceResolver(projectRoot, options);
+
+    expect(registrations.map(({ provider, executionBackend }) => `${provider}:${executionBackend}`))
+      .toEqual([
+        'claude:host-subprocess', 'claude:docker',
+        'codex:host-subprocess', 'codex:docker',
+        'cursor:host-subprocess', 'cursor:docker',
+      ]);
+    expect(dockerReachabilityTransport).not.toHaveBeenCalled();
+
+    for (const provider of ['claude', 'codex'] as const) {
+      const selected = resolver.resolve({
+        provider, authMode: 'subscription', transport: 'cli', executionBackend: 'docker',
+      });
+      expect(await selected!.sources.reachability.probe(dockerProbeRequest(provider)))
+        .toMatchObject({ outcome: 'succeeded', calledProvider: provider });
+    }
+    expect(dockerReachabilityTransport).toHaveBeenCalledTimes(2);
+    expect(calls.map(({ provider }) => provider)).toEqual(['claude', 'codex']);
+  });
+
   it('keeps rollout disabled without an authored parent or project layer', () => {
     expect(hasAuthoredProviderLimitAuthority({})).toBe(false);
     expect(openLocalProviderAuthorityRuntimeIfConfigured(root(), {})).toBeUndefined();

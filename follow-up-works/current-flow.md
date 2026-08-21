@@ -27,7 +27,7 @@
 - [ ] D2b-2a mikro-wiring: xverify-poll'e otomatik rules-apply (pending-aprp görülünce motor tetiklenir; CLI-elle değil).
 - [ ] D2b-2b (GEREKİRSE): tam `kind:'rule'` union'ı approval-contract'ta — staged authorityRef-ayrımı yeterliyse İPTAL edilir, owner-karar.
 - [x] BİTTİ — D3+DE3 (5 dalga 599-603 + canlı-defekt fix'leri): GERÇEK-CİHAZ kanıtı disk-zarfında (decidedBy channel:telegram:7374744018); sonuç-mühür `…b1d04afc`; MASTER-blok yazıldı. Residual (dürüst): Slack/Teams app-provizyonu owner-işi; OTP tam-kimlik ayrı-dilim; riskTier-zarf D4.
-- [ ] D4: TTL/SLA normalizasyonu (confirmations/autonomous/pairing süresiz-pending kalmaz).
+- [x] D4 UYGULAMA + LOCAL_VERIFIED: confirmation/autonomous/pairing/broker-native config-resolved TTL+SLA, typed timeout settle-back, no-replay/no-grant, riskTier authority ve read-only MCP parity kapandi; 65 dosya 298/298, tsc 0, 10k 290.3ms, build+dist CLI/API+bot restart kanitli. Formal Opus xverify provider-tier admission'da typed HOLD; seal sayilmadi, toplu owner-verification'a ertelendi. Ayrinti: `docs/evidence/APPROVAL-SURFACE-UNIFICATION-001-evidence-archive-2026-08-21.md` §D4.
 - [ ] D5: legacy karar-yüzeyi emekliliği + i18n-kalanı.
 
 ## Örgülü

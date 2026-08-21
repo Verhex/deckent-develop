@@ -195,6 +195,7 @@ describe('provider-limit policy authority', () => {
       parentAuthorityRef: parent.authorityRef,
       projectAuthorityRef: null,
       policy: {
+        ratioEnforcement: 'enforce',
         warnAtRatio: 0.7,
         blockAtRatio: 0.9,
         minimumRemaining: { tokens: 100, requests: 2 },
@@ -231,7 +232,34 @@ describe('provider-limit policy authority', () => {
     });
   });
 
+  it('resolves owner-authored observe-only and lets a project tighten it back to enforce', () => {
+    const parent = parentConfig();
+    parent.policies[0]!.values.ratioEnforcement = 'observe_only';
+    const inherited = resolveProviderLimitPolicy({
+      selector: selector(),
+      parent: { scope: 'global', config: parent },
+    });
+    expect(inherited).toMatchObject({
+      state: 'ready',
+      policy: { ratioEnforcement: 'observe_only' },
+    });
+
+    const tightened = resolveProviderLimitPolicy({
+      selector: selector(),
+      parent: { scope: 'global', config: parent },
+      project: {
+        scope: 'project',
+        config: projectConfig({ ratioEnforcement: 'enforce' }),
+      },
+    });
+    expect(tightened).toMatchObject({
+      state: 'ready',
+      policy: { ratioEnforcement: 'enforce' },
+    });
+  });
+
   it.each([
+    [{ ratioEnforcement: 'observe_only' }, 'ratioEnforcement'],
     [{ warnAtRatio: 0.75 }, 'warnAtRatio'],
     [{ blockAtRatio: 0.95 }, 'blockAtRatio'],
     [{ minimumRemaining: { tokens: 99 } }, 'minimumRemaining.tokens'],

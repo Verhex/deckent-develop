@@ -20,7 +20,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NERVOUS_PENDING_FILE } from '../core/constants.js';
 import { autonomousPendingPath } from '../core/constants.js';
-import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
+import {
+  ClosedApprovalRequestError,
+  UnknownApprovalRequestError,
+  makeApprovalGate,
+} from '../orchestra/autonomous/approval-adapter.js';
+import type { ResolvedApprovalLifecycleConfig } from '../core/config-types.js';
 import { NervousIpcQueue } from '../nervous/ipc-queue.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import { resolveShortCode } from '../core/approval-short-code.js';
@@ -41,6 +46,10 @@ export interface CommandResolverDeps {
   readonly readNervousPending?: (root: string) => readonly NervousPendingLike[];
   /** Deliver a nervous decision durably (default: NervousIpcQueue.writeApproval). */
   readonly writeNervousApproval?: (root: string, id: string, action: ApprovalAction) => Promise<void>;
+  /** Current lifecycle authority for fresh autonomous reads/transitions. */
+  readonly lifecycle?: ResolvedApprovalLifecycleConfig;
+  /** Shared clock seam. */
+  readonly now?: () => Date;
 }
 
 function readNervousPendingFile(root: string): NervousPendingLike[] {
@@ -88,12 +97,22 @@ export function makeCommandResolver(
     // 1. Autonomous gate — durable decisions.json (sibling of pending.json).
     const gate = makeApprovalGate({
       pendingPath: autonomousPendingPath(root),
+      projectRoot: root,
+      ...(deps.lifecycle ? { lifecycle: deps.lifecycle } : {}),
+      ...(deps.now ? { now: () => deps.now!().toISOString() } : {}),
     });
     const autonomousPending = gate.pending();
     const owned = autonomousPending.find((p) => p.triggerId === id || p.triggerId.startsWith(id));
     if (owned) {
-      if (action === 'approve') gate.accept(owned.triggerId);
-      else gate.reject(owned.triggerId);
+      try {
+        if (action === 'approve') gate.accept(owned.triggerId);
+        else gate.reject(owned.triggerId);
+      } catch (error) {
+        if (error instanceof ClosedApprovalRequestError || error instanceof UnknownApprovalRequestError) {
+          return 'not-found';
+        }
+        throw error;
+      }
       // The ack carries the action + who requested it, so the user knows what
       // they just decided (not a bare "Approved dz-9").
       const what = owned.requestedBy ? `${owned.action} (${owned.requestedBy})` : owned.action;
@@ -132,8 +151,15 @@ export function makeCommandResolver(
       ? autonomousPending.find((pending) => pending.triggerId === resolvedId)
       : undefined;
     if (autonomousShortMatch) {
-      if (action === 'approve') gate.accept(autonomousShortMatch.triggerId);
-      else gate.reject(autonomousShortMatch.triggerId);
+      try {
+        if (action === 'approve') gate.accept(autonomousShortMatch.triggerId);
+        else gate.reject(autonomousShortMatch.triggerId);
+      } catch (error) {
+        if (error instanceof ClosedApprovalRequestError || error instanceof UnknownApprovalRequestError) {
+          return 'not-found';
+        }
+        throw error;
+      }
       const what = autonomousShortMatch.requestedBy
         ? `${autonomousShortMatch.action} (${autonomousShortMatch.requestedBy})`
         : autonomousShortMatch.action;

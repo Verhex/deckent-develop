@@ -4,7 +4,7 @@
 # Closure OS — Level × Lane classification & re-triage: owner disposition proposal **v2.1**
 
 > Read-only, non-authoritative. Codex final disposition (2026-08-14): owner-declared semantics outrank topology; ID-regex is not a classification authority; `check-proof ⇒ proof`; priority changes this phase = 0.
-> Source: `master-plan-active.json` @ sourceDigest `c1327402f2fa1737…` · registryIntegrity `2f862ece009c706d…`
+> Source: `master-plan-active.json` @ sourceDigest `f63ae71308ea623a…` · registryIntegrity `15d625e73575e198…`
 > Enum + override SSOT: `src/core/closure-classification-schema.json` (schemaVersion 1). Rows scanned: 452 active.
 > check-proof⇒proof invariant on this output: **HOLDS**. Override-vs-invariant conflicts: 0.
 
@@ -103,7 +103,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 
 ```jsonc
 { "schemaVersion":1, "seq":<n>, "eventId":"…", "recordedAt":"<owner-batch-ts>",
-  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"c1327402f2fa…" },
+  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"f63ae71308ea…" },
   "decision":{ "kind":"level-lane-disposition", "level":"<enum>", "lane":"<enum>", "ruleId":"<rule>", "confidence":"<h|m|l>" },
   "authorityProof":{ "ownerReceipt":"<authenticated durable receipt ref>" }, "previousEventDigest":"…", "eventDigest":"…" }
 // priority-retriage events this phase: 0 (priority unchanged). lane-resolution candidates: 3 HOLD rows if owner assigns.
@@ -372,7 +372,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 | `PROD-SPAWNSYNC-ASYNC-001` | KERNEL | OPEN | P1 | task (m) | runtime (m) |  |
 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | KERNEL | OPEN | P0 | task (m) | runtime (m) |  |
 | `BOT-LIFECYCLE-HONESTY-001` | KERNEL | OPEN | P1 | task (m) | runtime (m) |  |
-| `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | OBS | OPEN | P1 | task (m) | runtime (m) |  |
+| `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | OBS | BLOCKED | P1 | task (m) | runtime (m) |  |
 | `RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001` | OBS | OPEN | P1 | task (h) | runtime (m) | ✱ |
 | `RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001` | OBS | OPEN | P1 | task (m) | runtime (m) |  |
 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | KERNEL | OPEN | P1 | task (m) | runtime (m) |  |

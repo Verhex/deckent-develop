@@ -4267,6 +4267,13 @@ function runBoundedReachabilityProbeCommand(input: Readonly<{
   });
 }
 
+// The provider token budget and the CLI transport envelope are different
+// units. Claude/Codex/Gemini can wrap a tiny answer in JSON metadata that is
+// much larger than maxOutputTokens bytes. Keep the transport independently
+// bounded against output floods while leaving token admission to the
+// owner-projected probe budget.
+export const BOUNDED_REACHABILITY_CAPTURE_CEILING_BYTES = 64 * 1024;
+
 /**
  * Stream `docker logs <container>` into memory with NO fixed 1 MiB cap — the core
  * fix for TT549. stdout+stderr chunks accumulate as they arrive; the only bound is
@@ -4667,7 +4674,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         args,
         stdin: request.promptBytes,
         timeoutMs: request.timeoutMs,
-        outputCeiling: request.maxOutputTokens,
+        outputCeiling: BOUNDED_REACHABILITY_CAPTURE_CEILING_BYTES,
       });
     } catch {
       return transportError('backend_unreachable', true);
@@ -4675,10 +4682,25 @@ export class DockerSpawnBackend implements SpawnBackend {
     if (result.status === null && result.stderr === 'probe timeout') {
       return Object.freeze({ outcome: 'timed-out', elapsedMs: elapsed() });
     }
-    const preflight = classifyDockerPreflight({ status: result.status, stderr: result.stderr });
-    if (preflight?.code === DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE
-      || preflight?.code === DOCKER_ERROR_CODES.DAEMON_PERMISSION
-      || preflight?.code === DOCKER_ERROR_CODES.DOCKER_ABSENT) {
+    if (result.status === null && result.stderr === 'probe output ceiling exceeded') {
+      return transportError('response_too_large', false);
+    }
+    // `classifyDockerPreflight` treats every unrecognized non-zero result as a
+    // daemon failure because its canonical caller is `docker info`. Here the
+    // command is a provider process inside an already-started container: a
+    // normal provider refusal is therefore `rejected`, not evidence that the
+    // daemon is down. Only runner-level failure or Docker's explicit daemon /
+    // socket language may become backend_unreachable.
+    const stderrLower = result.stderr.toLowerCase();
+    const explicitDockerTransportFailure = result.status === null
+      || stderrLower.includes('cannot connect to the docker daemon')
+      || stderrLower.includes('is the docker daemon running')
+      || stderrLower.includes('docker daemon is not running')
+      || stderrLower.includes('error during connect')
+      || stderrLower.includes('permission denied while trying to connect to the docker daemon')
+      || (stderrLower.includes('dial unix')
+        && stderrLower.includes('connect: permission denied'));
+    if (explicitDockerTransportFailure) {
       return transportError('backend_unreachable', true);
     }
     if (result.status === 0) {

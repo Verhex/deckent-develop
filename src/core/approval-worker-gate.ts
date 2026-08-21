@@ -36,10 +36,12 @@ import type {
   ApprovalScope,
   Requester,
 } from './approval-contract.js';
+import type { ApprovalRiskTier } from './config-types.js';
 import type { ApprovalRequestInput, ApprovalDecisionInput } from './approval-broker.js';
 import type { ApprovalRequest, ApprovalDecision } from './approval-contract.js';
 import { maskArgs } from './approval-masking.js';
 import type { ApprovalAllowScopeMatchInput, ApprovalAllowScopeRule } from './approval-allowscope.js';
+import { approvalRiskTierFor } from './approval-channel-authenticator.js';
 
 // ─── ApprovalAllowScope seam (357-005 store satisfies this — ALLOWSCOPE-COMPOSE) ──
 
@@ -75,6 +77,8 @@ export interface FallbackContext {
   summary: string;
   scope: ApprovalScope;
   risk: ApprovalRisk;
+  /** Effective normalized tier; omitted only by legacy external resolvers. */
+  riskTier?: ApprovalRiskTier;
   policy: ApprovalPolicy;
   defaultAction: ApprovalAction;
 }
@@ -203,19 +207,21 @@ export class WorkerApprovalGate {
     };
 
     const request = this.broker.submit(requestInput);
+    const riskTier = approvalRiskTierFor(request);
 
     if (request.policy === 'auto-approve') {
+      const mayAutoApprove = riskTier !== null && riskTier !== 'critical';
       const decision = this.broker.decide(request.id, {
-        decision: 'allow',
+        decision: mayAutoApprove ? 'allow' : 'deny',
         decidedBy: 'system',
-        channel: 'auto-approve',
+        channel: mayAutoApprove ? 'auto-approve' : 'risk-tier-guard',
         decidedAt: this.now().toISOString(),
-        reason: 'policy: auto-approve',
+        reason: mayAutoApprove ? 'policy: auto-approve' : 'policy: risk-tier guard',
       });
       return toVerdict(decision.decision);
     }
 
-    const allowGrant = this.matchAllowScope(action);
+    const allowGrant = this.matchAllowScope(request);
     if (allowGrant) {
       const decision = this.broker.decide(request.id, {
         decision: 'allow',
@@ -227,7 +233,7 @@ export class WorkerApprovalGate {
       return toVerdict(decision.decision);
     }
 
-    const decision = await this.awaitDecisionOrFallback(request.id, action);
+    const decision = await this.awaitDecisionOrFallback(request);
     return toVerdict(decision);
   }
 
@@ -237,21 +243,17 @@ export class WorkerApprovalGate {
    * — a second defense (alongside 357-005's never-global grant schema)
    * mirroring approval-policy.ts `decidePolicy`'s own critical clamp.
    */
-  private matchAllowScope(action: WorkerActionDescriptor): ApprovalAllowScopeRule | null {
+  private matchAllowScope(request: ApprovalRequest): ApprovalAllowScopeRule | null {
     if (!this.allowStore) return null;
-    if (action.risk === 'critical') return null;
-    return this.allowStore.matchesAllow({
-      scopeId: action.scopeId,
-      scope: action.scope,
-      risk: action.risk,
-    });
+    const riskTier = approvalRiskTierFor(request);
+    if (riskTier === null || riskTier === 'critical') return null;
+    return this.allowStore.matchesAllow(request);
   }
 
   /** Race the broker's external decision against the timeout. On timeout,
    *  invoke the fallback resolver and settle the broker with its verdict. */
   private awaitDecisionOrFallback(
-    requestId: string,
-    action: WorkerActionDescriptor,
+    request: ApprovalRequest,
   ): Promise<ApprovalAction> {
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -259,10 +261,10 @@ export class WorkerApprovalGate {
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
-        this.resolveViaFallback(requestId, action).then(resolve, reject);
+        this.resolveViaFallback(request).then(resolve, reject);
       }, this.timeoutMs);
 
-      this.broker.awaitDecision(requestId).then(
+      this.broker.awaitDecision(request.id).then(
         (decision) => {
           if (settled) return;
           settled = true;
@@ -284,21 +286,25 @@ export class WorkerApprovalGate {
    *  landed just before this call), defer to that real decision instead —
    *  never override a genuine decision with a stale fallback guess. */
   private async resolveViaFallback(
-    requestId: string,
-    action: WorkerActionDescriptor,
+    request: ApprovalRequest,
   ): Promise<ApprovalAction> {
+    const riskTier = approvalRiskTierFor(request);
     const fallbackAction = await this.fallbackResolver({
-      requestId,
-      summary: action.summary,
-      scope: action.scope,
-      risk: action.risk,
-      policy: action.policy,
-      defaultAction: action.defaultAction,
+      requestId: request.id,
+      summary: request.summary,
+      scope: request.scope,
+      risk: request.risk,
+      riskTier: riskTier ?? 'critical',
+      policy: request.policy,
+      defaultAction: request.defaultAction,
     });
+    const guardedFallbackAction = riskTier === null || riskTier === 'critical'
+      ? 'deny'
+      : fallbackAction;
 
     try {
-      const decision = this.broker.decide(requestId, {
-        decision: fallbackAction,
+      const decision = this.broker.decide(request.id, {
+        decision: guardedFallbackAction,
         decidedBy: 'system',
         channel: 'fallback',
         decidedAt: this.now().toISOString(),
@@ -306,7 +312,7 @@ export class WorkerApprovalGate {
       });
       return decision.decision;
     } catch {
-      const decision = await this.broker.awaitDecision(requestId);
+      const decision = await this.broker.awaitDecision(request.id);
       return decision.decision;
     }
   }

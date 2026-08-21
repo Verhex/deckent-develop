@@ -182,12 +182,24 @@ function normalizeValues(
   requireComplete: boolean,
 ): ProviderLimitPolicyValuesConfig {
   if (!isRecord(value)) throw createExecutionAdmissionError('provider_limits policy values must be an object');
-  assertExactKeys(value, [], ['warnAtRatio', 'blockAtRatio', 'minimumRemaining']);
+  assertExactKeys(value, [], [
+    'ratioEnforcement',
+    'warnAtRatio',
+    'blockAtRatio',
+    'minimumRemaining',
+  ]);
   if (requireComplete && (value.warnAtRatio === undefined || value.blockAtRatio === undefined)) {
     throw createExecutionAdmissionError('Parent provider_limits policy requires warnAtRatio and blockAtRatio');
   }
   if (value.warnAtRatio !== undefined) assertRatio('warnAtRatio', value.warnAtRatio);
   if (value.blockAtRatio !== undefined) assertRatio('blockAtRatio', value.blockAtRatio);
+  if (value.ratioEnforcement !== undefined
+    && value.ratioEnforcement !== 'enforce'
+    && value.ratioEnforcement !== 'observe_only') {
+    throw createExecutionAdmissionError(
+      'provider_limits ratioEnforcement must be enforce or observe_only',
+    );
+  }
   const minimumRemaining: Partial<Record<ProviderLimitUnit, number>> = {};
   if (value.minimumRemaining !== undefined) {
     if (!isRecord(value.minimumRemaining)) {
@@ -207,6 +219,7 @@ function normalizeValues(
     !requireComplete
     && value.warnAtRatio === undefined
     && value.blockAtRatio === undefined
+    && value.ratioEnforcement === undefined
     && Object.keys(minimumRemaining).length === 0
   ) {
     throw createExecutionAdmissionError('Project provider_limits policy must tighten at least one value');
@@ -219,6 +232,9 @@ function normalizeValues(
     throw createExecutionAdmissionError('warnAtRatio cannot exceed blockAtRatio');
   }
   return {
+    ...((requireComplete || value.ratioEnforcement !== undefined)
+      ? { ratioEnforcement: value.ratioEnforcement ?? 'enforce' }
+      : {}),
     ...(value.warnAtRatio !== undefined ? { warnAtRatio: value.warnAtRatio } : {}),
     ...(value.blockAtRatio !== undefined ? { blockAtRatio: value.blockAtRatio } : {}),
     ...(Object.keys(minimumRemaining).length > 0
@@ -513,6 +529,10 @@ function wideningDetail(
   parent: ProviderLimitPolicyValuesConfig,
   project: ProviderLimitPolicyValuesConfig,
 ): string | null {
+  const parentRatioEnforcement = parent.ratioEnforcement ?? 'enforce';
+  if (project.ratioEnforcement === 'observe_only' && parentRatioEnforcement === 'enforce') {
+    return 'project ratioEnforcement observe_only widens parent enforce authority';
+  }
   if (project.warnAtRatio !== undefined && project.warnAtRatio > parent.warnAtRatio!) {
     return `project warnAtRatio ${project.warnAtRatio} exceeds parent ${parent.warnAtRatio}`;
   }
@@ -664,6 +684,9 @@ export function resolveProviderLimitPolicy(
     }
   }
   const effectiveValues = {
+    ratioEnforcement: projectEntry?.values.ratioEnforcement
+      ?? parentEntry.values.ratioEnforcement
+      ?? 'enforce',
     warnAtRatio: projectEntry?.values.warnAtRatio ?? parentEntry.values.warnAtRatio!,
     blockAtRatio: projectEntry?.values.blockAtRatio ?? parentEntry.values.blockAtRatio!,
     minimumRemaining: {
@@ -692,6 +715,7 @@ export function resolveProviderLimitPolicy(
     state: 'ready',
     policy: {
       policyRef: `provider-limit-policy:${policyDigest}`,
+      ratioEnforcement: effectiveValues.ratioEnforcement,
       warnAtRatio: effectiveValues.warnAtRatio,
       blockAtRatio: effectiveValues.blockAtRatio,
       minimumRemaining: effectiveValues.minimumRemaining,

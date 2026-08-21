@@ -1,9 +1,48 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createLazyDockerReachabilityTransportResolver,
   preflightCliBrainProviderAuthority,
   withCliProviderAuthority,
 } from '../../src/cli/provider-authority-process-runtime.js';
+
+describe('createLazyDockerReachabilityTransportResolver', () => {
+  it('constructs one backend lazily from effective config and exposes only bounded invoke', async () => {
+    const invokeBoundedReachabilityProbe = vi.fn(async () => ({
+      outcome: 'completed' as const,
+      providerRequestRef: null,
+      outputBytes: 1,
+      latencyMs: 2,
+    }));
+    const createBackend = vi.fn(() => ({ invokeBoundedReachabilityProbe }));
+    const config = {
+      docker_image: 'deckent-worker@sha256:fixture',
+      docker_timeout: 91,
+      worker_memory_limit: '3g',
+      worker_memory_swap: '4g',
+      worker_memory_limit_by_kind: { verification: '5g' },
+    } as never;
+
+    const resolve = createLazyDockerReachabilityTransportResolver('/project', config, createBackend);
+    expect(createBackend).not.toHaveBeenCalled();
+
+    const first = resolve();
+    const second = resolve();
+    await first!.invoke({} as never);
+    await second!.invoke({} as never);
+
+    expect(createBackend).toHaveBeenCalledOnce();
+    expect(createBackend).toHaveBeenCalledWith('/project', {
+      image: 'deckent-worker@sha256:fixture',
+      timeoutSeconds: 91,
+      memoryLimit: '3g',
+      memorySwap: '4g',
+      kindMemoryLimits: { verification: '5g' },
+    });
+    expect(invokeBoundedReachabilityProbe).toHaveBeenCalledTimes(2);
+    expect(Object.keys(first!)).toEqual(['invoke']);
+  });
+});
 
 describe('withCliProviderAuthority', () => {
   it('does not load config or open authority for unrelated commands', async () => {
@@ -59,6 +98,9 @@ describe('withCliProviderAuthority', () => {
     expect(result).toBe('done');
     expect(loadConfig).toHaveBeenCalledOnce();
     expect(open).toHaveBeenCalledOnce();
+    expect(open.mock.calls[0]?.[2]).toMatchObject({
+      dockerReachabilityTransport: expect.any(Function),
+    });
     expect(authority.close).toHaveBeenCalledOnce();
     expect(events).toEqual(['load', 'open', 'action', 'close']);
     },

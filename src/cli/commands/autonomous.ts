@@ -23,12 +23,16 @@ import {
   runAutonomousLoop,
 } from '../../orchestra/autonomous/runtime-loop.js';
 import {
+  ClosedApprovalRequestError,
+  autonomousApprovalEffectClass,
+  autonomousApprovalRisk,
   makeApprovalGate,
   type ApprovalGateAdapter,
 } from '../../orchestra/autonomous/approval-adapter.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { notifyAsync } from '../../core/notify.js';
 import { autonomousPendingPath } from '../../core/constants.js';
+import { resolveLocalOsPrincipal } from '../../core/principal.js';
 import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
 import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '../../connectors/kpi-summary-dispatch.js';
 import { nextRun } from '../../core/scheduled-flow.js';
@@ -118,6 +122,8 @@ import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
 import { MissionWorkerInvocationCoordinator } from '../../orchestra/autonomous/mission-store/mission-worker-invocation-coordinator.js';
 import { MissionWorkerInvocationRecoveryReconciler } from '../../orchestra/autonomous/mission-store/mission-worker-invocation-recovery.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
+import { ApprovalBroker } from '../../core/approval-broker.js';
+import { ApprovalStore } from '../../core/approval-store.js';
 import { MissionApprovalCoordinator } from '../../orchestra/autonomous/mission-store/mission-approval-coordinator.js';
 
 function createLiveAutonomousExactSprintExecutor(input: {
@@ -1014,7 +1020,13 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
       ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
       : undefined;
     const providerAuthority = openLocalProviderAuthorityRuntime(root, resolvedConfig);
-    const approvalAuthority = bootstrapApprovalAuthority(root, resolvedConfig);
+    const approvalClock = (): Date => new Date();
+    const lifecycle = resolvedConfig.approval!.lifecycle;
+    const approvalAuthority = bootstrapApprovalAuthority(root, resolvedConfig, {
+      broker: new ApprovalBroker(root, { lifecycle, clock: approvalClock }),
+      store: new ApprovalStore(root, { lifecycle, clock: approvalClock }),
+      now: approvalClock,
+    });
     const missionStore = new SqliteMissionStore(root);
     const approvalCoordinator = approvalAuthority.state === 'ready'
       ? new MissionApprovalCoordinator({
@@ -1022,10 +1034,18 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
           publisher: approvalAuthority.runtime.broker,
           decisions: approvalAuthority.runtime.store,
           decisionAuthority: approvalAuthority.runtime.decisionAuthority,
-          requestFactory: (item, mission) => {
+          lifecycle,
+          requestFactory: (item, mission, requestedAt) => {
             if (!mission.createdBy) {
               throw createExecutionAuthorityError('MISSION_APPROVAL_VERIFIED_OWNER_MISSING');
             }
+            const effectClass = autonomousApprovalEffectClass({
+              kind: item.kind,
+              spec: item.spec,
+              policy: item.policy,
+            });
+            const risk = autonomousApprovalRisk(effectClass, item.policy === 'risk-tagged');
+            const profile = lifecycle.profiles['autonomous-trigger'];
             return {
               requester: {
                 role: 'brain',
@@ -1041,18 +1061,17 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
                 kind: item.kind,
                 policy: item.policy,
                 revision: item.revision,
+                effectClass,
               },
               scopeId: mission.id,
               scope: 'lifecycle',
-              risk: item.policy === 'risk-tagged' ? 'critical' : 'high',
+              risk,
               policy: 'require-approval',
               defaultAction: 'deny',
               tenantId: mission.tenant,
               userId: mission.createdBy,
-              createdAt: item.createdAt,
-              expiresAt: new Date(
-                Date.parse(item.createdAt) + 15 * 60_000,
-              ).toISOString(),
+              createdAt: requestedAt.toISOString(),
+              expiresAt: new Date(requestedAt.getTime() + profile.ttlMs).toISOString(),
               maskedArgs: {
                 missionId: mission.id,
                 workItemId: item.id,
@@ -1163,7 +1182,13 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     // getProviderAdapterForTask('ollama') resolves correctly for autonomous tasks.
     // bootstrapProviders is idempotent and safe-no-op when a provider is unreachable.
     if (!providerAuthority) await bootstrapProviders(resolvedConfig);
-    approvalAuthority = bootstrapApprovalAuthority(root, resolvedConfig);
+    const approvalClock = (): Date => new Date();
+    const lifecycle = resolvedConfig.approval!.lifecycle;
+    approvalAuthority = bootstrapApprovalAuthority(root, resolvedConfig, {
+      broker: new ApprovalBroker(root, { lifecycle, clock: approvalClock }),
+      store: new ApprovalStore(root, { lifecycle, clock: approvalClock }),
+      now: approvalClock,
+    });
 
   // Clear any stale stop marker before starting.
   const stopFile = stopMarkerPath(root);
@@ -1629,8 +1654,15 @@ export function makeAutonomousFlowReporter(
 // ─── approve / reject / pending (APPROVE-002, §4G) ─────────────────────
 
 /** Build a gate bound to this project's pending queue (decisions.json sibling). */
-function approvalGateFor(root: string): ApprovalGateAdapter {
-  return makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
+async function approvalGateFor(root: string): Promise<ApprovalGateAdapter> {
+  const config = await loadConfig(root);
+  return makeApprovalGate({
+    pendingPath: autonomousPendingPath(root),
+    projectRoot: root,
+    lifecycle: config.approval!.lifecycle,
+    principal: resolveLocalOsPrincipal('cli'),
+    strictTenantIsolation: config.strict_tenant_isolation ?? false,
+  });
 }
 
 export interface AutonomousResolveOptions {
@@ -1646,15 +1678,15 @@ export interface AutonomousResolveOptions {
  * running loop applies it on its next cycle. ADR-040: only an explicit
  * approve/reject resolves — never auto-approve.
  */
-export function handleApprove(opts: AutonomousResolveOptions): void {
-  resolveTrigger(opts, 'approve');
+export async function handleApprove(opts: AutonomousResolveOptions): Promise<void> {
+  await resolveTrigger(opts, 'approve');
 }
 
-export function handleReject(opts: AutonomousResolveOptions): void {
-  resolveTrigger(opts, 'reject');
+export async function handleReject(opts: AutonomousResolveOptions): Promise<void> {
+  await resolveTrigger(opts, 'reject');
 }
 
-function resolveTrigger(opts: AutonomousResolveOptions, kind: 'approve' | 'reject'): void {
+async function resolveTrigger(opts: AutonomousResolveOptions, kind: 'approve' | 'reject'): Promise<void> {
   const lang = getLanguage(opts.lang);
   const root = opts.root ?? resolveProjectRoot();
   if (!opts.triggerId) {
@@ -1662,19 +1694,21 @@ function resolveTrigger(opts: AutonomousResolveOptions, kind: 'approve' | 'rejec
     process.exitCode = 1;
     return;
   }
-  const gate = approvalGateFor(root);
-  const isPending = gate.pending().some((p) => p.triggerId === opts.triggerId);
-  if (!isPending) {
-    printError(new Error(getMessage('autonomous.resolve_not_found', lang, { triggerId: opts.triggerId })));
+  const gate = await approvalGateFor(root);
+  try {
+    if (kind === 'approve') {
+      gate.accept(opts.triggerId, opts.reason);
+      print(getMessage('autonomous.approve_done', lang, { triggerId: opts.triggerId }));
+    } else {
+      gate.reject(opts.triggerId, opts.reason);
+      print(getMessage('autonomous.reject_done', lang, { triggerId: opts.triggerId }));
+    }
+  } catch (error) {
+    const message = error instanceof ClosedApprovalRequestError && error.reasonCode === 'expired'
+      ? getMessage('approval.channel.expired', lang, { id: opts.triggerId })
+      : getMessage('autonomous.resolve_not_found', lang, { triggerId: opts.triggerId });
+    printError(new Error(message));
     process.exitCode = 1;
-    return;
-  }
-  if (kind === 'approve') {
-    gate.accept(opts.triggerId, opts.reason);
-    print(getMessage('autonomous.approve_done', lang, { triggerId: opts.triggerId }));
-  } else {
-    gate.reject(opts.triggerId, opts.reason);
-    print(getMessage('autonomous.reject_done', lang, { triggerId: opts.triggerId }));
   }
 }
 
@@ -1684,10 +1718,10 @@ export interface AutonomousPendingOptions {
 }
 
 /** List parked approvals awaiting a human accept/reject. */
-export function handlePending(opts: AutonomousPendingOptions): void {
+export async function handlePending(opts: AutonomousPendingOptions): Promise<void> {
   const lang = getLanguage(opts.lang);
   const root = opts.root ?? resolveProjectRoot();
-  const items = approvalGateFor(root).pending();
+  const items = (await approvalGateFor(root)).pending();
   if (items.length === 0) {
     print(getMessage('autonomous.pending_none', lang));
     return;
@@ -1816,9 +1850,9 @@ export function registerAutonomous(program: Command): void {
     .description(getMessage('cli.autonomous.pending.desc', getLanguage(undefined)))
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
-    .action((opts: AutonomousPendingOptions) => {
+    .action(async (opts: AutonomousPendingOptions) => {
       try {
-        handlePending(opts);
+        await handlePending(opts);
       } catch (err) {
         printError(err);
         process.exitCode = 1;
@@ -1831,9 +1865,9 @@ export function registerAutonomous(program: Command): void {
     .option('--reason <text>', 'Optional reason recorded with the decision')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
-    .action((triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
+    .action(async (triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
       try {
-        handleApprove({ triggerId, ...opts });
+        await handleApprove({ triggerId, ...opts });
       } catch (err) {
         printError(err);
         process.exitCode = 1;
@@ -1846,9 +1880,9 @@ export function registerAutonomous(program: Command): void {
     .option('--reason <text>', 'Optional reason recorded with the decision')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
-    .action((triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
+    .action(async (triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
       try {
-        handleReject({ triggerId, ...opts });
+        await handleReject({ triggerId, ...opts });
       } catch (err) {
         printError(err);
         process.exitCode = 1;

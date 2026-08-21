@@ -15,11 +15,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { enrichResponse } from '../helpers/enrich.js';
 import { backlogAdd, backlogList, backlogRemove } from '../../cli/commands/autonomous.js';
-import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js';
+import {
+  makeApprovalGate,
+} from '../../orchestra/autonomous/approval-adapter.js';
 import { autonomousPendingPath } from '../../core/constants.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { getMessage } from '../../cli/helpers/messages.js';
+import { loadConfig } from '../../core/config.js';
+import { resolveLocalOsPrincipal } from '../../core/principal.js';
 import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
 
 // ─── Filesystem layout (mirrors cli/commands/autonomous.ts) ──────────────────
@@ -78,10 +82,9 @@ function isPidAlive(pid: number): boolean {
 
 /**
  * Raw `autonomous.enabled` read straight off the project config file.
- * Deliberately NOT `loadConfig()` (core/config.ts) — that module's fs surface
- * (statSync + friends) goes beyond the existsSync/readFileSync pair this file
- * already uses everywhere else, which would force every caller/test of this
- * tool to mock a much wider fs API just to exercise `action=start`.
+ * The start flag stays a narrow raw read so unrelated status/start calls do not
+ * pull the full config surface. Approval actions separately use `loadConfig()`
+ * because lifecycle and tenant policy must be the canonical resolved values.
  */
 function isAutonomousEnabled(root: string): boolean {
   const configPath = join(root, PROJECT_CONFIG_PATH);
@@ -95,6 +98,30 @@ function isAutonomousEnabled(root: string): boolean {
   } catch {
     return false;
   }
+}
+
+function autonomousApprovalError(error: unknown): {
+  readonly code: 'APR_APPROVAL_CLOSED' | 'APR_UNKNOWN_REQUEST';
+  readonly triggerId: string;
+  readonly reasonCode?: string;
+  readonly expiresAt?: string | null;
+} | null {
+  if (!error || typeof error !== 'object') return null;
+  const value = error as Record<string, unknown>;
+  if ((value['code'] !== 'APR_APPROVAL_CLOSED' && value['code'] !== 'APR_UNKNOWN_REQUEST')
+    || typeof value['triggerId'] !== 'string') return null;
+  return value as ReturnType<typeof autonomousApprovalError>;
+}
+
+async function autonomousApprovalGate(root: string) {
+  const config = await loadConfig(root);
+  return makeApprovalGate({
+    pendingPath: autonomousPendingPath(root),
+    projectRoot: root,
+    lifecycle: config.approval!.lifecycle,
+    principal: resolveLocalOsPrincipal('mcp'),
+    strictTenantIsolation: config.strict_tenant_isolation ?? false,
+  });
 }
 
 // ─── Tool registration ────────────────────────────────────────────────────────
@@ -354,7 +381,7 @@ export function registerAutonomousTool(server: McpServer): void {
 
         // ── pending ───────────────────────────────────────────────────────────
         if (action === 'pending') {
-          const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
+          const gate = await autonomousApprovalGate(root);
           const items = gate.pending();
           const enriched = enrichResponse('autonomous', {
             action: 'pending',
@@ -368,7 +395,7 @@ export function registerAutonomousTool(server: McpServer): void {
         if (action === 'approve') {
           const tid = triggerId ?? id;
           if (!tid) throw new Error(getMessage('autonomous.mcp_engine.id_required_approve', lang));
-          const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
+          const gate = await autonomousApprovalGate(root);
           gate.accept(tid, reason);
           const enriched = enrichResponse('autonomous', {
             action: 'approve',
@@ -382,7 +409,7 @@ export function registerAutonomousTool(server: McpServer): void {
         if (action === 'reject') {
           const tid = triggerId ?? id;
           if (!tid) throw new Error(getMessage('autonomous.mcp_engine.id_required_reject', lang));
-          const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root) });
+          const gate = await autonomousApprovalGate(root);
           gate.reject(tid, reason);
           const enriched = enrichResponse('autonomous', {
             action: 'reject',
@@ -403,9 +430,16 @@ export function registerAutonomousTool(server: McpServer): void {
           isError: true,
         };
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const tid = triggerId ?? id;
+        const approvalError = autonomousApprovalError(err);
+        const message = approvalError?.code === 'APR_APPROVAL_CLOSED' && approvalError.reasonCode === 'expired'
+          ? getMessage('approval.channel.expired', lang, { id: tid ?? approvalError.triggerId })
+          : approvalError
+            ? getMessage('autonomous.resolve_not_found', lang, { triggerId: tid ?? approvalError.triggerId })
+            : err instanceof Error ? err.message : String(err);
+        const detail = approvalError ?? {};
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message, ...detail }) }],
           isError: true,
         };
       }

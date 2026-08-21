@@ -19,12 +19,12 @@ export interface LocalProviderAuthorityRuntimeBootstrapOptions {
   readonly nodePlatform?: string;
   readonly now?: () => Date;
   /**
-   * Lazy resolver for the canonical Docker bounded-probe transport consumed by
-   * the codex docker reachability slot (§12.2 clause 4). Supplied by the CLI
+   * Lazy resolver for the canonical Docker bounded-probe transport shared by
+   * every exact provider Docker slot (§12.2 clause 4). Supplied by the CLI
    * composition root; registration stays lazy/provider-free — the resolver
    * runs only when a probe is actually dispatched.
    */
-  readonly codexDockerReachabilityTransport?:
+  readonly dockerReachabilityTransport?:
     () => BoundedReachabilityProbeTransport | null;
 }
 
@@ -52,7 +52,14 @@ export function createLocalProviderEvidenceSourceRegistrations(
   const env = options.env as NodeJS.ProcessEnv | undefined;
   const platform = options.nodePlatform as NodeJS.Platform | undefined;
   return Object.freeze([
-    ...createClaudeHostSubscriptionEvidenceSourceRegistrations({ projectRoot, env, platform }),
+    ...createClaudeHostSubscriptionEvidenceSourceRegistrations({
+      projectRoot,
+      env,
+      platform,
+      ...(options.dockerReachabilityTransport
+        ? { dockerReachabilityTransport: options.dockerReachabilityTransport }
+        : {}),
+    }),
     // Codex sources read only the CLI's durable on-disk state — no project tree,
     // so they take no projectRoot. The docker reachability slot additionally
     // receives the canonical bounded-probe transport when the composition root
@@ -60,8 +67,8 @@ export function createLocalProviderEvidenceSourceRegistrations(
     ...createCodexHostSubscriptionEvidenceSourceRegistrations({
       env,
       platform,
-      ...(options.codexDockerReachabilityTransport
-        ? { dockerReachabilityTransport: options.codexDockerReachabilityTransport }
+      ...(options.dockerReachabilityTransport
+        ? { dockerReachabilityTransport: options.dockerReachabilityTransport }
         : {}),
     }),
     // 7091 FAZ-1: cursor registers honest typed stubs on both backends (no

@@ -70,6 +70,16 @@ function baseOptions(
   };
 }
 
+function effectiveConfig(): never {
+  return {
+    docker_image: 'deckent-worker@sha256:fixture',
+    docker_timeout: 90,
+    worker_memory_limit: '2g',
+    worker_memory_swap: '3g',
+    worker_memory_limit_by_kind: {},
+  } as never;
+}
+
 function captureStdout(): { text: () => string } {
   let text = '';
   vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown): boolean => {
@@ -117,6 +127,7 @@ describe('runLimitsInit source wire', () => {
       dataDirOverride: dataDir,
       resolveProjectRootFn: () => projectRoot,
       projectIdFn: () => 'local-project',
+      loadConfigFn: async () => effectiveConfig(),
       // Defence in depth: this flow must hold long before either is reached.
       configPathOverride: join(dir('config'), 'config.json'),
       confirmFn: async () => false,
@@ -149,6 +160,7 @@ describe('runLimitsInit source wire', () => {
       dataDirOverride: dir('data'),
       resolveProjectRootFn: () => projectRoot,
       projectIdFn: () => 'local-project',
+      loadConfigFn: async () => effectiveConfig(),
     });
 
     expect(out.text()).toBe(`${SOURCES_UNAVAILABLE}\n`);
@@ -170,9 +182,17 @@ describe('runLimitsInit source wire', () => {
     };
 
     const projectRoot = dir('root');
+    const loadConfigFn = vi.fn(async () => {
+      throw new Error('injected resolver must bypass config');
+    });
+    const dockerReachabilityTransportResolverFactory = vi.fn(() => {
+      throw new Error('injected resolver must bypass Docker composition');
+    });
     const out = captureStdout();
     await runLimitsInit(baseOptions({ provider: 'gemini' }), {
       sourceResolver: injected,
+      loadConfigFn,
+      dockerReachabilityTransportResolverFactory,
       dataDirOverride: dir('data'),
       resolveProjectRootFn: () => projectRoot,
       projectIdFn: () => 'local-project',
@@ -180,6 +200,51 @@ describe('runLimitsInit source wire', () => {
 
     // Past the source gate, held by the next authority in line: no keyring.
     expect(out.text()).toBe(`${KEYRING_ABSENT}\n`);
+    expect(process.exitCode).toBe(1);
+    expect(loadConfigFn).not.toHaveBeenCalled();
+    expect(dockerReachabilityTransportResolverFactory).not.toHaveBeenCalled();
+  });
+
+  it('wires the default Claude Docker source through effective config without eager dispatch', async () => {
+    const projectRoot = dir('root');
+    const config = effectiveConfig();
+    const dockerReachabilityTransport = vi.fn(() => null);
+    const loadConfigFn = vi.fn(async () => config);
+    const dockerReachabilityTransportResolverFactory = vi.fn(
+      () => dockerReachabilityTransport,
+    );
+    const out = captureStdout();
+
+    await runLimitsInit(baseOptions({
+      provider: 'claude',
+      model: 'claude-fable-5',
+      executionBackend: 'docker',
+      executionProfileRef: 'execution-profile:claude-docker-0001',
+      tenant: 'main',
+    }), {
+      dataDirOverride: dir('data'),
+      resolveProjectRootFn: () => projectRoot,
+      projectIdFn: () => 'project-default-docker',
+      loadConfigFn,
+      dockerReachabilityTransportResolverFactory,
+    });
+
+    expect(out.text()).toBe(`${KEYRING_ABSENT}\n`);
+    expect(out.text()).not.toContain(SOURCES_UNAVAILABLE);
+    expect(loadConfigFn).toHaveBeenCalledWith(projectRoot);
+    expect(dockerReachabilityTransportResolverFactory).toHaveBeenCalledWith(projectRoot, config);
+    expect(dockerReachabilityTransport).not.toHaveBeenCalled();
+  });
+
+  it('turns default config/factory failure into the typed source refusal', async () => {
+    const out = captureStdout();
+    await runLimitsInit(baseOptions(), {
+      dataDirOverride: dir('data'),
+      resolveProjectRootFn: () => dir('root'),
+      loadConfigFn: async () => { throw new Error('config unavailable'); },
+    });
+
+    expect(out.text()).toBe(`${SOURCES_UNAVAILABLE}\n`);
     expect(process.exitCode).toBe(1);
   });
 });

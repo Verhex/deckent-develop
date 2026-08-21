@@ -39,6 +39,7 @@ import type {
   ApprovalRequest,
   ApprovalRisk,
 } from '../core/approval-contract.js';
+import { approvalRiskTierFor } from '../core/approval-channel-authenticator.js';
 import type {
   ApprovalPolicy as NervousApprovalPolicy,
   NervousNotification,
@@ -183,12 +184,13 @@ function buildMessage(request: ApprovalRequest): string {
 }
 
 function toNotificationAction(request: ApprovalRequest): NotificationAction {
+  const riskTier = approvalRiskTierFor(request);
   return {
     id: request.id,
     label: request.summary,
     policy: NERVOUS_POLICY_BY_REQUEST_POLICY[request.policy],
     risk: RISK_LEVEL_BY_APPROVAL_RISK[request.risk],
-    isSafetyFloor: request.risk === 'critical',
+    isSafetyFloor: riskTier === null || riskTier === 'critical',
     payload: request.maskedArgs ?? undefined,
   };
 }

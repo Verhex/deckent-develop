@@ -13,6 +13,7 @@ export type NonTaskArtifactReason =
   | 'result'
   | 'heartbeat'
   | 'proposal'
+  | 'skill-delivery'
   | 'lock'
   | 'temporary'
   | 'partial'
@@ -49,6 +50,7 @@ function residueReason(filename: string): NonTaskArtifactReason | null {
   if (/\.result$/.test(filename)) return 'result';
   if (/\.hb$/.test(filename)) return 'heartbeat';
   if (/\.landing-proposal\.json$/.test(filename)) return 'proposal';
+  if (/\.skill-delivery\.json$/.test(filename)) return 'skill-delivery';
   if (/\.lock$|\.spawnlock$/.test(filename)) return 'lock';
   if (/\.tmp$|\.temp$/.test(filename)) return 'temporary';
   if (/\.partial$/.test(filename)) return 'partial';

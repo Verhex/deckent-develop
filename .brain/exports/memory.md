@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-606 Learnings
+- Sprint sprint-606 Learnings: ## Sprint sprint-606 Learnings
+
+## Gains
+- 606-001 — Claude Docker evidence-source ve authoring composition tasarimi — Created the scoped governance design and passed the required test -f plus rg marker check.
+
+## Sprint sprint-605 Learnings
+- Sprint sprint-605 Learnings: ## Sprint sprint-605 Learnings
+
+## Gains
+- 605-001 — D4 blueprint canonical-path ve closure-DAG düzeltmesi — Updated the existing single D4 blueprint to use canonical production paths and a granular file-di...
+
+## Sprint sprint-604 Learnings
+- Sprint sprint-604 Learnings: ## Sprint sprint-604 Learnings
+
+## Gains
+- 604-001 — D4 olculmus lifecycle blueprint ve closure matrisi — Appended a separately named, dated D4 implementation-stage blueprint while preserving the SEALED ...
+
 ## Sprint sprint-603 Learnings
 - Sprint sprint-603 Learnings: ## Sprint sprint-603 Learnings
 

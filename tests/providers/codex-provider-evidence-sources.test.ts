@@ -541,6 +541,10 @@ describe('CodexDockerReachabilityEvidenceSource', () => {
         ...(base.backend as Record<string, unknown>),
         executionBackend: 'docker',
       },
+      executionProfile: {
+        ...(base.executionProfile as Record<string, unknown>),
+        allowed: [{ authMode: 'subscription', transport: 'cli', executionBackend: 'docker' }],
+      },
       admission: {
         budget: {
           evidenceRef: `execution-budget:${'b'.repeat(64)}`,
@@ -738,7 +742,7 @@ describe('createLocalProviderEvidenceSourceRegistrations', () => {
     // 7091 FAZ-1 (ddc523bf0): the cursor adapter registers its account +
     // reachability sources through the same single bootstrap producer.
     expect(registrations.map(registration => registration.provider).sort())
-      .toEqual(['claude', 'codex', 'codex', 'cursor', 'cursor']);
+      .toEqual(['claude', 'claude', 'codex', 'codex', 'cursor', 'cursor']);
     expect(registry.resolve(EXACT_SCOPE)).toMatchObject({
       provider: 'codex',
       sources: {

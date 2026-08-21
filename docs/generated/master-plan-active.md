@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):bfffecc81220f0ab234d15141f64d17dca9508c5d55abf11c90bccb3872a1c4f`
+**Source digest:** `sha256(normalized-lf-utf8):f63ae71308ea623a7f1c6a4003c6af7bb2f276249e869fbb9b13fe6c23b8b865`
 
 **Rows:** 517 total · 452 active · 65 terminal
 
@@ -13,10 +13,10 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 359 |
+| OPEN | 358 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
-| BLOCKED | 68 |
+| BLOCKED | 69 |
 | VERIFY | 25 |
 | DONE | 65 |
 | DEFERRED | 0 |
@@ -280,7 +280,7 @@
 | 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3316 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | OPEN | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001` | — | Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
-| 3322 | `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | OPEN | P1 | OBS | — | — | `deckent doctor` provider-limit-authority kapısını görmüyor ve operatörü yanlış remedy'ye (`keyring init`) yönlendiriyor |
+| 3322 | `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | BLOCKED | P1 | OBS | — | `OWNER_CLOSURE_SIGNATURE_REQUIRED` | `deckent doctor` provider-limit-authority kapısını görmüyor ve operatörü yanlış remedy'ye (`keyring init`) yönlendiriyor |
 | 3323 | `RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001` | OPEN | P1 | OBS | — | — | Sprint-içi mandatory cross-verify üç nesildir hiç çalışmadı: settlement-sonrası result-zenginleştirme producer-fencing'i sistemik kırıyor |
 | 3324 | `RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001` | OPEN | P1 | OBS | — | — | Provider-limit ölümüyle sıfır-yazım attempt'te claim-time attribution ölçülemiyor; lineage FIX'e ham teşhisle düşüyor |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |

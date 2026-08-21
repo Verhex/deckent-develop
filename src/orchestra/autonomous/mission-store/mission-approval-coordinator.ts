@@ -2,11 +2,25 @@ import { createHash } from 'node:crypto';
 
 import type { ApprovalRequestInput } from '../../../core/approval-broker.js';
 import {
+  APPROVAL_CONTRACT_V2_VERSION,
   validateApprovalRequest,
   type ApprovalRequest,
+  type ApprovalRequestV2,
 } from '../../../core/approval-contract.js';
+import { isApprovalFileAclHold, type ApprovalFileAclHold } from '../../../core/approval-file-cas.js';
+import type { ResolvedApprovalLifecycleConfig } from '../../../core/config-types.js';
+import {
+  DEFAULT_APPROVAL_LIFECYCLE_POLICY,
+  approvalLifecycleProfileDigest,
+  resolveEffectiveApprovalExpiry,
+  resolveEffectiveApprovalRiskTier,
+} from '../../../core/approval-lifecycle-policy.js';
 import type { ApprovalStoreSnapshot } from '../../../core/approval-store.js';
 import type { ApprovalDecisionAuthority } from '../../../core/approval-decision-ingress.js';
+import {
+  autonomousApprovalEffectClass,
+  autonomousApprovalRisk,
+} from '../approval-adapter.js';
 import type {
   Mission,
   MissionStore,
@@ -18,11 +32,11 @@ import type {
 export type MissionApprovalRequestDraft = Omit<ApprovalRequestInput, 'id'>;
 
 export interface MissionApprovalRequestFactory {
-  (item: WorkItem, mission: Mission): MissionApprovalRequestDraft;
+  (item: WorkItem, mission: Mission, requestedAt: Date): MissionApprovalRequestDraft;
 }
 
 export interface MissionApprovalPublisher {
-  submit(request: ApprovalRequestInput): ApprovalRequest;
+  submitLifecycle(request: ApprovalRequestV2): Promise<ApprovalRequestV2 | ApprovalFileAclHold>;
 }
 
 export interface MissionApprovalDecisionSource {
@@ -37,6 +51,8 @@ export interface MissionApprovalCoordinatorOptions {
   requestFactory: MissionApprovalRequestFactory;
   /** Host-only live-session + integrity authority. Absent means human allow stays HOLD. */
   decisionAuthority?: ApprovalDecisionAuthority;
+  /** Resolved origin policy; disabled/missing blocks new governed requests. */
+  lifecycle?: ResolvedApprovalLifecycleConfig;
   now?: () => Date;
 }
 
@@ -113,6 +129,7 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
   private readonly decisions: MissionApprovalDecisionSource;
   private readonly requestFactory: MissionApprovalRequestFactory;
   private readonly decisionAuthority?: ApprovalDecisionAuthority;
+  private readonly lifecycle: ResolvedApprovalLifecycleConfig;
   private readonly now: () => Date;
 
   constructor(opts: MissionApprovalCoordinatorOptions) {
@@ -121,6 +138,8 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
     this.decisions = opts.decisions;
     this.requestFactory = opts.requestFactory;
     this.decisionAuthority = opts.decisionAuthority;
+    this.lifecycle = opts.lifecycle
+      ?? (DEFAULT_APPROVAL_LIFECYCLE_POLICY as ResolvedApprovalLifecycleConfig);
     this.now = opts.now ?? (() => new Date());
   }
 
@@ -134,7 +153,7 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
     return this.decisionAuthority.validate(binding.request, binding.decision, this.now()).ok;
   }
 
-  tick(): MissionApprovalTickSummary {
+  async tick(): Promise<MissionApprovalTickSummary> {
     const now = this.now();
     this.decisions.sweepExpired(now);
     let snapshot = this.decisions.index(now);
@@ -174,9 +193,70 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
       let request: ApprovalRequest | null = null;
       let invalidReason = '';
       try {
-        const draft = this.requestFactory(item, mission);
-        const parsed = validateApprovalRequest({ ...draft, id });
+        if (!this.lifecycle.enabled) {
+          throw new Error('APPROVAL_LIFECYCLE_DISABLED');
+        }
+        const draft = this.requestFactory(item, mission, now);
+        const effectClass = autonomousApprovalEffectClass({
+          kind: item.kind,
+          spec: item.spec,
+          policy: item.policy,
+        });
+        const riskTagged = item.policy === 'risk-tagged';
+        const risk = autonomousApprovalRisk(effectClass, riskTagged);
+        const profile = this.lifecycle.profiles['autonomous-trigger'];
+        const createdAt = now.toISOString();
+        const effectiveExpiry = resolveEffectiveApprovalExpiry({
+          createdAt,
+          producerExpiresAt: draft.expiresAt,
+          profile,
+          clock: () => now,
+        });
+        const riskTier = resolveEffectiveApprovalRiskTier({
+          origin: 'autonomous-trigger',
+          producerRisk: risk,
+          policy: this.lifecycle,
+          destructive: effectClass === 'critical-irreversible',
+          riskTagged,
+        });
+        const sourceRecord = {
+          schemaVersion: 1,
+          missionId: mission.id,
+          workItemId: item.id,
+          revision: item.revision,
+          kind: item.kind,
+          policy: item.policy,
+          effectClass,
+          createdAt,
+        };
+        const sourceDigest = createHash('sha256').update(canonical(sourceRecord)).digest('hex');
+        const parsed = validateApprovalRequest({
+          ...draft,
+          id,
+          version: APPROVAL_CONTRACT_V2_VERSION,
+          details: {
+            ...draft.details,
+            effectClass,
+            effectiveRisk: risk,
+          },
+          risk,
+          createdAt,
+          expiresAt: effectiveExpiry.expiresAt,
+          origin: 'autonomous-trigger',
+          riskTier,
+          blocking: profile.blocking,
+          lifecycleProfile: { ...profile, slaMs: [...profile.slaMs] },
+          policySnapshotDigest: approvalLifecycleProfileDigest('autonomous-trigger', profile),
+          source: {
+            contractVersion: APPROVAL_CONTRACT_V2_VERSION,
+            requestDigest: sourceDigest,
+            reference: `mission:${mission.id}:work-item:${item.id}:revision:${item.revision}`,
+          },
+          lifecycleGeneration: `mission-${item.revision}-${sourceDigest.slice(0, 24)}`,
+          slaStage: 'initial',
+        });
         if (!parsed.ok) invalidReason = parsed.errors.join('; ');
+        else if (parsed.value.version !== APPROVAL_CONTRACT_V2_VERSION) invalidReason = 'request version must be 2.0';
         else if (parsed.value.policy !== 'require-approval') invalidReason = 'request policy must be require-approval';
         else if (parsed.value.defaultAction === 'allow') invalidReason = 'defaultAction allow is not fail-closed';
         else request = parsed.value;
@@ -202,7 +282,12 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
       }
       if (!durable) {
         try {
-          durable = this.publisher.submit(binding.request);
+          if (binding.request.version !== APPROVAL_CONTRACT_V2_VERSION) {
+            throw new Error(`MISSION_APPROVAL_V2_REQUIRED: ${binding.requestId}`);
+          }
+          const publishedRequest = await this.publisher.submitLifecycle(binding.request);
+          if (isApprovalFileAclHold(publishedRequest)) continue;
+          durable = publishedRequest;
         } catch (error) {
           snapshot = this.decisions.index(now);
           durable = requestMap(snapshot).get(binding.requestId)?.request;

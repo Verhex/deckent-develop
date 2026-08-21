@@ -726,7 +726,10 @@ export class ProviderEvidenceProducer {
     // This is deliberately re-read before every probe attempt. The latest exact
     // scope is independent of a caller's idempotency key.
     let priorReachability = this.options.truthStore.getLatestReachability(exactReachabilityScope, startedAt);
-    if (priorReachability && priorReachability.state !== 'stale') {
+    const priorUsesCurrentReachabilityAuthority = priorReachability?.evidenceRefs
+      .includes(sources.reachability.authorityRef) === true;
+    if (priorReachability && priorReachability.state !== 'stale'
+      && priorUsesCurrentReachabilityAuthority) {
       const priorReceipt = this.receiptRefFromReachability(priorReachability);
       // Reuse gates on the SAME probe-scoped admission as a fresh probe
       // (§12.2 Öneri-A): an advisory usage read under the block ratio admits
@@ -761,6 +764,13 @@ export class ProviderEvidenceProducer {
       // block ratio): an honest limit_hold, never authority_failure.
       return hold('limit_hold', priorReachability.reasonCode, limit, priorReachability, priorReceipt);
     }
+    if (priorReachability && !priorUsesCurrentReachabilityAuthority) {
+      // Source semantics are versioned authority. A fresh row produced by an
+      // older source revision is audit evidence, not cooldown authority for the
+      // current source. Keep it durable but start a distinct source-bound
+      // freshness generation instead of deleting or overwriting history.
+      priorReachability = null;
+    }
 
     // 7081 layer-2: past this point a REAL probe fires — the one-shot owner
     // approval is required exactly here (fresh-evidence reuse above never
@@ -769,7 +779,11 @@ export class ProviderEvidenceProducer {
     if (request.approval.evidenceRef === null || request.approval.evidenceRef === '') {
       return hold('probe_approval_required', 'probe-approval-missing', limit, priorReachability ?? null, null);
     }
-    const identity = this.probeInvocationIdentity(exactReachabilityScope, priorReachability);
+    const identity = this.probeInvocationIdentity(
+      exactReachabilityScope,
+      priorReachability,
+      sources.reachability.authorityRef,
+    );
     const invocationId = this.invocationId(identity);
     const reachabilityId = `reach-${digest(identity.scopeDigest, identity.freshnessEpoch).slice(0, 32)}`;
     const scope = { tenantId: this.options.tenantId, projectId: this.options.projectId };
@@ -946,7 +960,7 @@ export class ProviderEvidenceProducer {
     }
     if (!reachability.liveProven || !receiptRef) {
       return hold(
-        limit.decision === 'hold' ? 'limit_hold' : 'probe_unreachable',
+        probeLimitAdmission.decision === 'hold' ? 'limit_hold' : 'probe_unreachable',
         reachability.reasonCode,
         limit,
         reachability,
@@ -965,6 +979,7 @@ export class ProviderEvidenceProducer {
   private probeInvocationIdentity(
     scope: ExactReachabilityQuery,
     priorReachability: ReachabilityResult | null,
+    reachabilitySourceAuthorityRef: string,
   ): ProbeInvocationIdentity {
     const scopeDigest = digest(
       scope.tenantId,
@@ -979,6 +994,7 @@ export class ProviderEvidenceProducer {
       scope.runtimeFingerprint ?? 'none',
       scope.executionProfileRef,
       scope.capability,
+      reachabilitySourceAuthorityRef,
     ) as ProbeScopeDigest;
     const freshnessEpoch = digest(
       'provider-reachability-freshness-epoch',

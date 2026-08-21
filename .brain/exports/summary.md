@@ -56,6 +56,18 @@
 | adr-g-040 | Normative Verdict Vocabulary (Single-Word Evaluation Statuses) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-606 Learnings** (sprint-606): ## Sprint sprint-606 Learnings
+
+## Gains
+- 606-001 — Claude Docker evidence-source ve authoring composition tasarimi ...
+- **Sprint sprint-605 Learnings** (sprint-605): ## Sprint sprint-605 Learnings
+
+## Gains
+- 605-001 — D4 blueprint canonical-path ve closure-DAG düzeltmesi — Updated ...
+- **Sprint sprint-604 Learnings** (sprint-604): ## Sprint sprint-604 Learnings
+
+## Gains
+- 604-001 — D4 olculmus lifecycle blueprint ve closure matrisi — Appended a ...
 - **Sprint sprint-603 Learnings** (sprint-603): ## Sprint sprint-603 Learnings
 
 ## Gains
@@ -85,13 +97,6 @@
 
 ## Gains
 - 596-001 — ProviderCommandSpec prefix-alanları (T3 arayüz-mührü) — Codex Pr...
-- **Sprint sprint-595 Learnings** (sprint-595): ## Sprint sprint-595 Learnings
-- mesaj-katalog + komut-kayıt ratchet borçları: NO_GO — Authorized fix completed: repl...
-- **Sprint sprint-594 Learnings** (sprint-594): ## Sprint sprint-594 Learnings
-- F4 model-tier prompt-farklılaşması (7094-T5): GO_WITH_TECH_DEBT — LOCAL_VERIFIED / S...
-- **Sprint sprint-593 Learnings** (sprint-593): ## Sprint sprint-593 Learnings
-- F2c katalog/mount maskeleme (flag-gated): GO_WITH_TECH_DEBT — WHAT LANDED
-- src/core...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -102,4 +107,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2109 | Generated: 2026-08-21_
+_Total entries: 2118 | Generated: 2026-08-21_

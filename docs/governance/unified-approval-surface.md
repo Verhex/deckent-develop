@@ -317,3 +317,189 @@ MEVCUT `ApprovalRequest.risk` alanından türetilir (ikinci-şema açılmaz):
 riskTier-zarfı indiğinde bu fonksiyonun tek gövdesi değişir (geri-alınabilirlik).
 Callback-payload'ları nonce'lu + ad-uzaylı + KISA-KOD tabanlıdır (Telegram
 callback_data 64B sınırı; ham request-id asla payload'a binmez).
+
+## D4 implementation blueprint (2026-08-21) — lifecycle normalization ve closure matrisi
+
+> 2026-08-21 measured-inventory correction: D4.7'nin 22-task taslağı confirmation,
+> autonomous direct-decision ve gateway cross-process closure dosyalarını eksik
+> bırakıyordu. D4'ün implementation authority'si artık
+> `docs/governance/approval-lifecycle-d4-execution.md` içindeki ölçülmüş 50-task
+> DAG'dır; aşağıdaki bölüm tarihsel ilk tasarım ve parent design bağlamı olarak
+> korunur.
+
+Bu bölüm, SEALED ana tasarımın veya receipt'inin yerine geçmez. D4 için tek additive
+blueprint'tir. Kabul birimi config ingress'ten timeout settle-back, audit ve read
+view'lara uzanan kapalı production zinciridir; yalnız TTL alanı veya projection
+üretmek tamamlanmış sayılmaz.
+
+### D4.1 Tek lifecycle authority ve config görev sınırları
+
+Tek authority, config resolver'ın ürettiği `approval.lifecycle` policy'sidir.
+`confirmation`, `autonomous-trigger`, `gateway-pairing` ve `broker-native` origin
+profilleri `ttlMs`, `riskTier`, typed `blocking` disposition ve strictly increasing
+`slaMs` eşiklerini taşır.
+
+Görev sınırları çakışmaz:
+
+- `src/core/config-types.ts`, public config shape ve input tiplerinin tek sahibidir;
+  lifecycle alanları burada additive olarak tanımlanır.
+- `src/core/config.ts`, schema admission, defaults, environment/tenant override
+  parsing ve ham config ingress'inin sahibidir; resolved policy üretmez.
+- `src/core/approval-lifecycle-policy.ts` (**NEW**), admitted config'i tek
+  `resolveApprovalLifecycle` yolunda validate/merge eder ve immutable snapshot ile
+  `policySnapshotDigest` üretir; config schema/default kopyası tutmaz.
+
+Producer, broker, expiry driver ve relay yalnız resolved snapshot'ı tüketir. Origin
+veya consumer-local TTL/default/eşik tabloları yasaktır. Admission positive/finite
+TTL ve SLA, SLA'nın strict artması ve TTL'den küçük olması, UTC instant kullanımı ve
+critical profilin `proceed-warn`/`allow` olamaması kurallarını doğrular. Override;
+risk'i düşüremez, TTL'yi uzatamaz, SLA'yı geciktiremez veya timeout sonucunu daha
+izin verici kılamaz. İhlaller typed error ile fail eder; clamp edilmez. Durable
+`lastStage` ve injected epoch clock authority'dir; process timer yalnız sweep'i
+uyandırabilir.
+
+### D4.2 Contract, broker mirror ve üç producer
+
+`src/core/approval-contract.ts`, `ApprovalRequest` için additive versioned
+`riskTier`, `blocking`, `expiresAt` ve digest zarfını tanımlar. Legacy `risk` yalnız
+backward-compatible input'tur ve tek policy resolver üzerinden normalize edilir.
+`src/core/approval-store.ts`, v1'i side-effect olmadan okuyup source version'ı korur;
+yeni write/mirror yalnız normalized versioned envelope yazar. Parse failure'ı
+routine'a düşürmek veya eksik alanları tekrar v1 olarak yazmak yasaktır.
+
+Üç producer yeni kayıt anında `expiresAt = createdAt + ttlMs` ve digest üretir:
+
+- Confirmation producer **ve store aynı mevcut yüzeydedir**:
+  `src/core/confirmation-store.ts` içindeki `createConfirmationRequest`.
+- Autonomous pending store ve producer mevcut
+  `src/orchestra/autonomous/approval-adapter.ts` içindedir. Ayrı store extraction'ı
+  ancak ölçülmüş bir modül sınırı ihtiyacıyla ileride gerekçelendirilebilir; D4'ün
+  default wiring target'ı değildir.
+- Pairing producer/store/parser'ın canonical mevcut yolu
+  `src/connectors/gateway/gateway-access.ts`'dir. Production object-map
+  `Record<pairingId, PendingPairing>` burada parse edilir ve yazılır.
+
+Overflow/invalid instant typed write error'dür. `src/core/approval-lifecycle-migration.ts`
+(**NEW**) expiry'siz legacy kayıtları deterministik ve idempotent biçimde sınıflandırır;
+sweep anını yeni başlangıç yapamaz. Invalid timestamp quarantine + audit üretir.
+
+### D4.3 Pairing parser parity — BLOCKS_CURRENT_DONE
+
+Pairing object-map parity D4 kapsamında **BLOCKS_CURRENT_DONE**'dır. Canonical parser
+`src/connectors/gateway/gateway-access.ts` içinde kalır; hem production store hem
+`src/core/approval-inbox-federation.ts` federated object-map consumer'ı aynı parser
+contract'ını kullanır. Federation içinde ikinci schema, array-only fixture parser'ı
+veya shape reimplementation açılamaz. Gerekli legacy array branch'i canonical
+parser'da duplicate/missing id ve invalid timestamp'i typed fail-honest quarantine
+sonucuna çevirir; sonraki write object-map'tir. Bu production call-site ve fixture
+kanıtı kapanmadan D4 done olamaz.
+
+### D4.4 Timeout closure, SLA ve audit
+
+Timeout insan kararı değildir. Receipt `actor: 'system:expiry'`,
+`kind: 'timeout-disposition'`, policy digest ve önceki SLA stage'ini taşır; insan
+allow/deny veya `decidedBy` gibi render edilmez.
+
+| Origin | Timeout settle-back | Yasak sonuç |
+|---|---|---|
+| confirmation | typed `UNDECIDABLE`, confirmation `park` | allow/proceed veya sahte insan deny'ı |
+| autonomous-trigger | replay çağırmadan `park-with-alert` | trigger replay/approve |
+| gateway-pairing | `deny/expire`, access grant çağırmadan | pairing/token/access verme |
+| broker-native | resolved blocking; critical için deny/park/escalate→park | critical allow/proceed |
+
+`src/core/pending-approvals.ts` pending ingress'i sağlar;
+`src/core/approval-expiry-driver.ts` first-writer-wins timeout closure ve critical
+exhaustive guard'ı uygular. Mevcut
+`src/orchestra/approval-decision-federation.ts`, timeout sonucunu origin adapter'ına
+settle-back eden consumer'dır. Böylece no-proceed, no-expiry-less pending,
+no-replay ve no-access-grant yolları production sınırlarında korunur.
+
+`src/core/approval-sla.ts` (**NEW**) durable `initial -> renotify ->
+alternate-channel -> park-alert -> expired` state/outbox zincirini kurar. Stable
+`eventId = requestId + policySnapshotDigest + stage`, first-writer-wins receipt ve
+outbox cursor restart/retry spam'ini önler; missed stages ordinal sırayla birer kez
+catch-up edilir. Audit ikinci authority kurmaz: timeout ve stage receipt'leri mevcut
+`src/core/audit-writer.ts` primitive'iyle yazılır. Ayrı durable schema/sink için
+kanıtlanmış ihtiyaç oluşmadıkça yeni audit modülü yoktur.
+
+Relay core canonical yolu `src/core/approval-relay.ts`'dir; durable SLA event'ini
+route/idempotency contract'ıyla tüketir. Gerçek channel attach ingress'i
+`src/connectors/approval-clients-wire.ts` üzerinden mevcut client'lara bağlanır ve
+ack/cursor'ı durable kaydeder. CLI ve MCP yalnız read-only consumer'dır.
+
+### D4.5 production wiring — exact closure chain
+
+**production wiring** şu exact sırada kapanır:
+
+1. `src/core/config-types.ts` → `src/core/config.ts` →
+   `src/core/approval-lifecycle-policy.ts` (**NEW**): typed ingress, schema/default,
+   validation/merge ve immutable resolve/digest.
+2. Policy → `src/core/confirmation-store.ts#createConfirmationRequest` +
+   `src/orchestra/autonomous/approval-adapter.ts` +
+   `src/connectors/gateway/gateway-access.ts`: üç producer expiry/digest yazar.
+3. Producers → `src/core/approval-contract.ts` → `src/core/approval-store.ts`:
+   normalized broker mirror/store ve legacy source reference.
+4. Pairing parser → `src/core/approval-inbox-federation.ts`: canonical object-map
+   federated read; parity closure bu kenarda zorunludur.
+5. Store/status → `src/core/pending-approvals.ts` →
+   `src/core/approval-expiry-driver.ts` → `src/core/approval-sla.ts` (**NEW**):
+   startup/scheduled sweep, durable SLA state, expiry receipt ve outbox.
+6. Outbox → `src/core/approval-relay.ts` →
+   `src/connectors/approval-clients-wire.ts`: relay routing ve gerçek channel attach.
+7. Timeout → `src/orchestra/approval-decision-federation.ts` → üç mevcut origin
+   adapter/store: typed settle-back; replay ve access-grant kenarları yoktur.
+8. Closure → `src/core/audit-writer.ts` →
+   `src/cli/commands/approvals.ts` ve `src/mcp/tools/approvals.ts`: shared durable
+   audit primitive ve read-only views.
+
+Tek enablement gate `approval.lifecycle.enabled`'dır. Gate açılmadan config validation
+ve migration dry-run geçer. Origin-local hidden flag yoktur. Production proof aynı
+request id için config→producer→broker→federated read→SLA/outbox→relay/channel→
+settle-back→audit/read-view correlation'ını ve bütün fail-closed negative yolları
+göstermelidir.
+
+### D4.6 Geriye uyumluluk ve negative space
+
+Stored v1 ve expiry'siz legacy kayıtlar tek adapter/migration yolundan okunur; yeni
+write geriye dönmez. D5 decision-surface retirement/i18n, Slack/Teams credential
+provision, L1–L4/L6–L7 ve 24h canary D4'e alınmaz. CLI/MCP stage, event veya decision
+üretmez. D4, SEALED ana tasarımı ya da receipt'i değiştirmez.
+
+### D4.7 File-disjoint micro-task DAG
+
+**File-disjoint** kuralı: her production ve test dosyası yalnız bir task write-set'inde
+bulunur. Shared choke-point'ler dependency ile serialize edilir. `NEW` etiketi yalnız
+var olmayan yeni modülleri gösterir. Her task kendi scoped testini çalıştırır; hiçbir
+task repo-global `tsc` çalıştırmaz. Bağımsız satırlar worker pool'da paralel yürür.
+
+| Task / wave | Tekil write set | Hedef / proof | Depends | Scoped test |
+|---|---|---|---|---|
+| A / W1 config types | `src/core/config-types.ts`; `tests/core/config-types-approval-lifecycle.test.ts` | typed lifecycle ingress | — | `npx vitest run tests/core/config-types-approval-lifecycle.test.ts` |
+| B / W1 config schema | `src/core/config.ts`; `tests/core/config-approval-lifecycle.test.ts` | schema/default/override admission | A | `npx vitest run tests/core/config-approval-lifecycle.test.ts` |
+| C / W2 policy | `src/core/approval-lifecycle-policy.ts` (**NEW**); `tests/core/approval-lifecycle-policy.test.ts` | validate/resolve/digest; critical/weak override rejection | A, B | `npx vitest run tests/core/approval-lifecycle-policy.test.ts` |
+| D / W1 contract | `src/core/approval-contract.ts`; `tests/core/approval-contract-lifecycle.test.ts` | additive versioned envelope | — | `npx vitest run tests/core/approval-contract-lifecycle.test.ts` |
+| E / W2 broker store | `src/core/approval-store.ts`; `tests/core/approval-store-lifecycle.test.ts` | v1 read, normalized next-write/mirror | C, D | `npx vitest run tests/core/approval-store-lifecycle.test.ts` |
+| F / W3 confirmation | `src/core/confirmation-store.ts`; `tests/core/confirmation-lifecycle.test.ts` | `createConfirmationRequest`, expiry/digest, park hook | C, E | `npx vitest run tests/core/confirmation-lifecycle.test.ts` |
+| G / W3 autonomous | `src/orchestra/autonomous/approval-adapter.ts`; `tests/orchestra/autonomous/approval-lifecycle.test.ts` | pending producer/store, settle hook, no replay | C, E | `npx vitest run tests/orchestra/autonomous/approval-lifecycle.test.ts` |
+| H / W3 pairing parser | `src/connectors/gateway/gateway-access.ts`; `tests/connectors/gateway/gateway-access-lifecycle.test.ts` | producer/store/parser, object-map + legacy branch, no grant | C, E | `npx vitest run tests/connectors/gateway/gateway-access-lifecycle.test.ts` |
+| I / W4 federated inbox | `src/core/approval-inbox-federation.ts`; `tests/core/approval-inbox-federation-parity.test.ts` | canonical parser consumer; object-map parity | H | `npx vitest run tests/core/approval-inbox-federation-parity.test.ts` |
+| J / W4 migration | `src/core/approval-lifecycle-migration.ts` (**NEW**); `tests/core/approval-lifecycle-migration.test.ts` | deterministic expiry-less sweep/quarantine | F, G, H | `npx vitest run tests/core/approval-lifecycle-migration.test.ts` |
+| K / W4 pending ingress | `src/core/pending-approvals.ts`; `tests/core/pending-approvals-lifecycle.test.ts` | no-expiry-less status/startup ingress | E, J | `npx vitest run tests/core/pending-approvals-lifecycle.test.ts` |
+| L / W5 expiry closure | `src/core/approval-expiry-driver.ts`; `tests/core/approval-expiry-driver-lifecycle.test.ts` | first-writer-wins matrix + critical no-proceed | C, K | `npx vitest run tests/core/approval-expiry-driver-lifecycle.test.ts` |
+| M / W5 SLA/outbox | `src/core/approval-sla.ts` (**NEW**); `tests/core/approval-sla.test.ts` | monotonic durable stage/outbox, retry/restart | C, L | `npx vitest run tests/core/approval-sla.test.ts` |
+| N / W6 settle-back | `src/orchestra/approval-decision-federation.ts`; `tests/orchestra/approval-decision-federation-timeout.test.ts` | confirmation/autonomous/pairing typed settle-back | F, G, H, L | `npx vitest run tests/orchestra/approval-decision-federation-timeout.test.ts` |
+| O / W6 audit reuse | `src/core/audit-writer.ts`; `tests/core/audit-writer-approval-timeout.test.ts` | system-expiry/stage receipt on shared primitive | L, M | `npx vitest run tests/core/audit-writer-approval-timeout.test.ts` |
+| P / W6 relay core | `src/core/approval-relay.ts`; `tests/core/approval-relay-sla.test.ts` | exact event route, durable idempotency contract | M | `npx vitest run tests/core/approval-relay-sla.test.ts` |
+| Q / W7 channel attach | `src/connectors/approval-clients-wire.ts`; `tests/connectors/approval-clients-wire-sla.test.ts` | real client attach, ack/cursor, no-spam | P | `npx vitest run tests/connectors/approval-clients-wire-sla.test.ts` |
+| R / W7 CLI view | `src/cli/commands/approvals.ts`; `tests/cli/approvals-sla-view.test.ts` | read-only receipt/audit view | I, N, O | `npx vitest run tests/cli/approvals-sla-view.test.ts` |
+| S / W7 MCP view | `src/mcp/tools/approvals.ts`; `tests/mcp/approvals-sla-view.test.ts` | read-only receipt/audit view | I, N, O | `npx vitest run tests/mcp/approvals-sla-view.test.ts` |
+| T / W7 pairing negative proof | `tests/connectors/gateway/pairing-no-access-grant.integration.test.ts` | parser→federation→timeout no-access-grant | H, I, L, N | `npx vitest run tests/connectors/gateway/pairing-no-access-grant.integration.test.ts` |
+| U / W7 autonomous negative proof | `tests/orchestra/autonomous/approval-no-replay.integration.test.ts` | timeout settle-back never invokes replay | G, L, N | `npx vitest run tests/orchestra/autonomous/approval-no-replay.integration.test.ts` |
+| V / W7 closure correlation | `tests/core/approval-lifecycle-closure.integration.test.ts` | config→three producers→broker→SLA→relay→settle→audit | F, G, H, I, M, N, O, P, Q | `npx vitest run tests/core/approval-lifecycle-closure.integration.test.ts` |
+
+W1–W3 policy/contract ve producer hazırlığını geniş paralel dallarda kurar; W4 parity,
+migration ve pending choke-point'lerini; W5 expiry/SLA'yı; W6 settle/audit/relay'i;
+W7 channel, iki read view ve bağımsız negative/correlation proof'larını kapatır.
+Pairing parity `I` ve `T` geçmeden current done değildir. Wave-sonu Brain gate ayrı
+orchestrator adımıdır; repo-global typecheck yalnız orada, bütün file-disjoint
+micro-task'lar tamamlandıktan sonra çalıştırılabilir.

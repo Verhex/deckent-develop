@@ -13,7 +13,9 @@
 // providers/subprocess.ts (MOAT-2).
 
 import type { ApprovalBroker } from './approval-broker.js';
-import type { ApprovalStore } from './approval-store.js';
+import type { ApprovalStore, ApprovalTimeoutReceipt } from './approval-store.js';
+import type { ApprovalRequestV2 } from './approval-contract.js';
+import type { ApprovalSlaEvidence, ApprovalSlaJournal } from './approval-sla.js';
 
 /** Decided approval records (approved/denied/swept-expired) are pruned from
  *  disk one week after their decision — long enough for audit/debugging,
@@ -33,6 +35,14 @@ export interface ApprovalExpiryDriverOptions {
    *  failure is logged, never thrown — the driver must survive a broken
    *  broker/store call without killing the interval loop. */
   onTickError?: (error: unknown) => void;
+  /** Idempotent downstream settlement hook. Durable receipt bytes are written
+   * before this callback is invoked; async failures are routed to onTickError. */
+  onTimeoutReceipt?: (receipt: ApprovalTimeoutReceipt) => void | Promise<void>;
+  /** Scheduled sweep for durable origin stores that predate ApprovalStore.
+   * Production composition supplies confirmation/autonomous/pairing adapters. */
+  onLegacyLifecycleSweep?: (observedAt: Date) => void | Promise<void>;
+  slaJournal?: ApprovalSlaJournal;
+  onLifecycleStage?: (request: ApprovalRequestV2, evidence: ApprovalSlaEvidence) => void | Promise<void>;
 }
 
 /**
@@ -48,8 +58,16 @@ export class ApprovalExpiryDriver {
   private readonly pruneOlderThanMs: number;
   private readonly clock: () => Date;
   private readonly onTickError: (error: unknown) => void;
+  private readonly onTimeoutReceipt: ((receipt: ApprovalTimeoutReceipt) => void | Promise<void>) | undefined;
+  private readonly onLegacyLifecycleSweep: ((observedAt: Date) => void | Promise<void>) | undefined;
+  private readonly slaJournal: ApprovalSlaJournal | undefined;
+  private readonly onLifecycleStage:
+    ((request: ApprovalRequestV2, evidence: ApprovalSlaEvidence) => void | Promise<void>) | undefined;
 
   private timer: ReturnType<typeof setInterval> | undefined;
+  private lifecycleTickInFlight: Promise<string[]> | undefined;
+  private readonly deliveredTimeoutReceipts = new Set<string>();
+  private readonly timeoutReceiptDeliveryInFlight = new Set<string>();
 
   constructor(options: ApprovalExpiryDriverOptions) {
     this.broker = options.broker;
@@ -58,6 +76,38 @@ export class ApprovalExpiryDriver {
     this.clock = options.clock ?? (() => new Date());
     this.onTickError =
       options.onTickError ?? ((error) => console.error('[approval-expiry-driver] tick failed:', error));
+    this.onTimeoutReceipt = options.onTimeoutReceipt;
+    this.onLegacyLifecycleSweep = options.onLegacyLifecycleSweep;
+    this.slaJournal = options.slaJournal;
+    this.onLifecycleStage = options.onLifecycleStage;
+  }
+
+  private receiptDeliveryKey(receipt: ApprovalTimeoutReceipt): string {
+    return `${receipt.requestId}\u0000${receipt.lifecycleGeneration}\u0000${receipt.decidedAt}`;
+  }
+
+  private deliverTimeoutReceipt(receipt: ApprovalTimeoutReceipt): void | Promise<void> {
+    if (!this.onTimeoutReceipt) return;
+    const key = this.receiptDeliveryKey(receipt);
+    if (this.deliveredTimeoutReceipts.has(key) || this.timeoutReceiptDeliveryInFlight.has(key)) return;
+    try {
+      const result = this.onTimeoutReceipt(receipt);
+      if (result instanceof Promise) {
+        this.timeoutReceiptDeliveryInFlight.add(key);
+        return result.then(() => {
+          this.deliveredTimeoutReceipts.add(key);
+        }).finally(() => {
+          this.timeoutReceiptDeliveryInFlight.delete(key);
+        });
+      }
+      this.deliveredTimeoutReceipts.add(key);
+    } catch (error) {
+      this.onTickError(error);
+    }
+  }
+
+  private recoveredTimeoutReceipts(): ApprovalTimeoutReceipt[] {
+    return this.store.listTimeoutReceipts();
   }
 
   /**
@@ -79,8 +129,73 @@ export class ApprovalExpiryDriver {
   tick(): string[] {
     try {
       const now = this.clock();
-      this.broker.expire(now);
-      const swept = this.store.sweepExpired(now);
+      if (this.onLegacyLifecycleSweep) {
+        try {
+          const result = this.onLegacyLifecycleSweep(now);
+          if (result instanceof Promise) result.catch(this.onTickError);
+        } catch (error) {
+          this.onTickError(error);
+        }
+      }
+      this.store.persistPolicyTransitions?.(now);
+      const brokerSwept = this.broker.expire(now).map((decision) => decision.requestId);
+      const storeSwept = this.store.sweepExpired(now);
+      const swept = [...new Set([...brokerSwept, ...storeSwept])];
+      for (const receipt of this.recoveredTimeoutReceipts()) {
+        const delivery = this.deliverTimeoutReceipt(receipt);
+        if (delivery instanceof Promise) delivery.catch(this.onTickError);
+      }
+      this.store.prune(new Date(now.getTime() - this.pruneOlderThanMs));
+      return swept;
+    } catch (error) {
+      this.onTickError(error);
+      return [];
+    }
+  }
+
+  /** Full lifecycle tick used by production composition. SLA audit/outbox
+   * bytes are durable before delivery; ACK is durable only after the channel
+   * callback succeeds. Overdue closure and receipt settle after stage advance. */
+  async tickLifecycle(): Promise<string[]> {
+    try {
+      const now = this.clock();
+      if (this.onLegacyLifecycleSweep) {
+        try {
+          await this.onLegacyLifecycleSweep(now);
+        } catch (error) {
+          this.onTickError(error);
+        }
+      }
+      this.store.persistPolicyTransitions?.(now);
+      const snapshot = this.store.index(now);
+      if (this.slaJournal && this.onLifecycleStage) {
+        for (const entry of [...snapshot.pending, ...snapshot.expired]) {
+          if (entry.request.version !== '2.0' || !entry.lifecycle || entry.decision) continue;
+          const advanced = this.slaJournal.advance({
+            requestId: entry.request.id,
+            lifecycleGeneration: entry.request.lifecycleGeneration,
+            createdAt: entry.request.createdAt,
+            expiresAt: entry.lifecycle.effectiveExpiresAt,
+            policy: {
+              slaMs: entry.lifecycle.appliedProfile.slaMs,
+              authoredPolicyDigest: entry.lifecycle.authoredPolicyDigest,
+              appliedPolicyDigest: entry.lifecycle.appliedPolicyDigest,
+            },
+            clock: { now: () => now },
+          });
+          for (const evidence of advanced.outbound) {
+            await this.onLifecycleStage(entry.request, evidence);
+            this.slaJournal.acknowledge(evidence);
+          }
+        }
+      }
+      const brokerSwept = this.broker.expire(now).map((decision) => decision.requestId);
+      const storeSwept = this.store.sweepExpired(now);
+      const swept = [...new Set([...brokerSwept, ...storeSwept])];
+      for (const receipt of this.recoveredTimeoutReceipts()) {
+        const delivery = this.deliverTimeoutReceipt(receipt);
+        if (delivery instanceof Promise) await delivery;
+      }
       this.store.prune(new Date(now.getTime() - this.pruneOlderThanMs));
       return swept;
     } catch (error) {
@@ -96,7 +211,15 @@ export class ApprovalExpiryDriver {
    */
   start(intervalMs: number): void {
     if (this.timer !== undefined) return;
-    const timer = setInterval(() => this.tick(), intervalMs);
+    const run = (): void => {
+      if ((this.slaJournal && this.onLifecycleStage) || this.onLegacyLifecycleSweep) {
+        if (this.lifecycleTickInFlight) return;
+        this.lifecycleTickInFlight = this.tickLifecycle()
+          .finally(() => { this.lifecycleTickInFlight = undefined; });
+      } else this.tick();
+    };
+    run();
+    const timer = setInterval(run, intervalMs);
     timer.unref?.();
     this.timer = timer;
   }
@@ -106,6 +229,11 @@ export class ApprovalExpiryDriver {
     if (this.timer === undefined) return;
     clearInterval(this.timer);
     this.timer = undefined;
+  }
+
+  /** Await the currently admitted async tick during graceful shutdown. */
+  async settleInFlight(): Promise<void> {
+    await this.lifecycleTickInFlight;
   }
 
   /** Whether the periodic sweep is currently running. */

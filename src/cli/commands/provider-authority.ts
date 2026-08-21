@@ -21,6 +21,7 @@
 
 import type { Command } from 'commander';
 
+import { loadConfig } from '../../core/config.js';
 import {
   ProviderAuthorityKeyring,
   ProviderAuthorityKeyringError,
@@ -42,10 +43,12 @@ import type {
   ProviderEvidenceSourceScope,
 } from '../../core/provider-evidence-producer.js';
 import {
+  prepareProviderLimitsAuthorityWrite,
   proposeProviderLimitsAuthoring,
   writeProviderLimitsAuthority,
 } from '../../core/provider-limit-authoring.js';
 import { createLocalProviderEvidenceSourceResolver } from '../../providers/provider-authority-runtime-bootstrap.js';
+import { createLazyDockerReachabilityTransportResolver } from '../provider-authority-process-runtime.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
@@ -230,6 +233,10 @@ export interface ProviderAuthorityLimitsDeps extends ProviderAuthorityKeyringDep
    * values.
    */
   sourceResolver?: ProviderEvidenceSourceResolver;
+  /** Hermetic seams for the production effective-config Docker composition. */
+  loadConfigFn?: typeof loadConfig;
+  dockerReachabilityTransportResolverFactory?:
+    typeof createLazyDockerReachabilityTransportResolver;
   /** Hermetic seam: the global config path the authored block is written to. */
   configPathOverride?: string;
   /** Owner-confirmation seam; defaults to the interactive prompt. */
@@ -249,6 +256,7 @@ export interface ProviderAuthorityLimitsInitOptions {
   tenant?: string;
   warnAtRatio?: string;
   blockAtRatio?: string;
+  ratioEnforcement?: string;
 }
 
 function isRatio(value: number): boolean {
@@ -311,6 +319,12 @@ export async function runLimitsInit(
     process.exitCode = 1;
     return;
   }
+  const ratioEnforcement = opts.ratioEnforcement?.trim() || 'enforce';
+  if (ratioEnforcement !== 'enforce' && ratioEnforcement !== 'observe_only') {
+    print(getMessage('provider_authority.limits.invalid_enforcement', lang));
+    process.exitCode = 1;
+    return;
+  }
   const scope = resolveScope(deps);
   const transport = opts.transport as InvocationTransport;
   const executionBackend = opts.executionBackend as InvocationExecutionBackend;
@@ -319,11 +333,24 @@ export async function runLimitsInit(
   // Production injects nothing here, so the host's OWN registered evidence
   // sources — the same registrations the provider-authority runtime opens with —
   // are the one authority to ask. The injected seam still wins when supplied.
-  const sourceResolver = deps.sourceResolver
-    ?? createLocalProviderEvidenceSourceResolver(scope.projectRoot, {
-      env: process.env,
-      nodePlatform: process.platform,
-    });
+  let sourceResolver = deps.sourceResolver;
+  if (!sourceResolver) {
+    try {
+      const config = await (deps.loadConfigFn ?? loadConfig)(scope.projectRoot);
+      const dockerReachabilityTransport =
+        (deps.dockerReachabilityTransportResolverFactory
+          ?? createLazyDockerReachabilityTransportResolver)(scope.projectRoot, config);
+      sourceResolver = createLocalProviderEvidenceSourceResolver(scope.projectRoot, {
+        env: process.env,
+        nodePlatform: process.platform,
+        dockerReachabilityTransport,
+      });
+    } catch {
+      print(getMessage('provider_authority.limits.sources_unavailable', lang));
+      process.exitCode = 1;
+      return;
+    }
+  }
   // A non-exact scope is the authoring module's typed `scope_not_exact` refusal;
   // asking a source registry about `unknown` would answer a different question.
   const exactScope = authMode !== 'unknown' && executionBackend !== 'unknown';
@@ -370,7 +397,7 @@ export async function runLimitsInit(
       provider,
       allowed: [{ authMode, transport, executionBackend }],
     },
-    values: { warnAtRatio, blockAtRatio },
+    values: { ratioEnforcement, warnAtRatio, blockAtRatio },
     sourceResolver,
     keyring,
   });
@@ -379,6 +406,19 @@ export async function runLimitsInit(
       reasonCode: proposal.reasonCode,
       detail: proposal.detail,
       evidenceRef: proposal.authorityEvidenceRef,
+    }));
+    process.exitCode = 1;
+    return;
+  }
+
+  const plan = await prepareProviderLimitsAuthorityWrite({
+    proposal,
+    configPath: deps.configPathOverride,
+  });
+  if (plan.state === 'refused') {
+    print(getMessage('provider_authority.limits.refused', lang, {
+      reasonCode: plan.reasonCode,
+      detail: plan.detail,
     }));
     process.exitCode = 1;
     return;
@@ -395,7 +435,10 @@ export async function runLimitsInit(
     windows: proposal.selector.requiredWindowIds.join(', '),
     warnAtRatio: String(warnAtRatio),
     blockAtRatio: String(blockAtRatio),
-    authorityRef: proposal.config.authorityRef,
+    ratioEnforcement,
+    action: plan.action,
+    expectedAuthorityRef: plan.expectedAuthorityRef ?? 'none',
+    authorityRef: plan.authorityRef,
     policyRef: proposal.policyRef,
   }));
   const confirm = deps.confirmFn ?? ((question: string) => promptConfirm(question, false));
@@ -405,9 +448,8 @@ export async function runLimitsInit(
     return;
   }
   const written = await writeProviderLimitsAuthority({
-    proposal,
+    plan,
     ownerConfirmed: confirmed,
-    configPath: deps.configPathOverride,
   });
   if (written.state === 'refused') {
     print(getMessage('provider_authority.limits.refused', lang, {
@@ -418,6 +460,7 @@ export async function runLimitsInit(
     return;
   }
   print(getMessage('provider_authority.limits.written', lang, {
+    action: written.action,
     authorityRef: written.authorityRef,
     configPath: written.configPath,
   }));
@@ -490,6 +533,7 @@ export function registerProviderAuthorityCommand(
     .option('--tenant <id>', getMessage('provider_authority.limits.opt_tenant', lang))
     .option('--warn-at-ratio <ratio>', getMessage('provider_authority.limits.opt_warn_at_ratio', lang))
     .option('--block-at-ratio <ratio>', getMessage('provider_authority.limits.opt_block_at_ratio', lang))
+    .option('--ratio-enforcement <mode>', getMessage('provider_authority.limits.opt_ratio_enforcement', lang))
     .action(async (opts: ProviderAuthorityLimitsInitOptions) => {
       try {
         await runLimitsInit(opts, deps);

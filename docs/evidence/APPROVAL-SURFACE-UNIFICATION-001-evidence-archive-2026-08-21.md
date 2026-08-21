@@ -21,3 +21,131 @@ Tasarim: docs/governance/unified-approval-surface.md (owner-komisyonu 2026-08-20
 **D5-ON-KAPANIS (sprint-589 DOGFOOD-FABRIKA paketi, 2026-08-20):** envanterin olctugu 4 i18n-ihlali Deckent'in kendi 8-faz akisiyla kapatildi (4/4 DONE, 0 fix, 0 NO_GO; sonnet worker'lar; messages.ts collision-serilesmesi tasarlandigi gibi): mcp nervous+autonomous karar-mesajlari, sprint-lifecycle 'Onay bekleniyor' TR-hardcode'u, checkpoint CLI option-desc'leri kataloga (en+tr) tasindi. Brain-dogrulama: tsc 0 · 38/38 scoped · hardcode-grep 0. Sonuc-muhru: codex CONFIRMED `cross-verify-verdict:sha256:be611473dcb2737cd526b2bd0dfa039c784306a2cdabdf423e905a9c15b6e8a8`. FABRIKA-DERSLERI (DIRECTIVES-kontrati): gorev-basliklari `## Task N:` + kanonik model-id (legacy-alias E_LEGACY_MODEL_ALIAS fail-closed) + prose'da tam-yol; yanlis-formatta bullet-fallback her satiri gorev yapar (588 vakasi, arsivde). FINDING (admission bekler): status collision-blokajini 'blocked by dependencies' diye etiketliyor.
 
 **KAPANDI (sprint-590 fabrika, yetki-devriyle admission):** status blocked/next/stale satirlari i18n'e tasindi ve blocked-metni neden-durust ('bagimlilik ya da dosya-cakismasi siralamasi'); yeni tests/cli/status-output.test.ts 9/9; worker GWTD verdi ama Brain-tanisi KOZMETIK (kod tam: hardcode-grep 0, tsc 0; rubrik-tavani) — DONE-esdegeri kapanis. 
+
+## D4 TTL/SLA normalizasyonu - uygulama ve LOCAL_VERIFIED (Codex, 2026-08-21)
+
+### Dogfood izi ve bounded recovery
+
+Sprint 609, onayli D4 execution DAG'ini 50 task olarak Deckent fabrikasinda
+baslatti. Disk dogrulamasi ilk foundation task'larinin origin-bazli TTL/SLA
+profili yerine eski channel-policy matrisini kurdugunu gosterdiginde kalan DAG'i
+ilerletmek yanlis contracti yayacakti. Run 5 DONE ve 45 INTERRUPTED durumda
+owner-onayli olarak kesildi; task artefact'lari silinmeden
+`.tasks/archive/sprint-609-interrupted-2026-08-21/` altinda korundu.
+
+Uygulama `docs/execution/active/APPROVAL-LIFECYCLE-D4-RECOVERY.md` ile typed
+ADR-D-007 bounded recovery'ye alindi. Frozen tasarim
+`docs/governance/approval-lifecycle-d4-execution.md` oldu. Uc file-disjoint
+workstream config/contract/confirmation, autonomous/risk ve pairing/view/scale
+zincirlerini izole `recovery/d4-609` worktree'sinde kapatti. Recovery'deki 116
+D4 yolu root `main` calisma agacina base-root-recovery uc-yollu merge ile
+tasindi; ayni dosyalardaki provider-authority ve ratio-observe-only degisiklikleri
+korundu, Sprint 609'un yarim D4 API taslagi tasinmadi.
+
+### Onceki sistem gercegi
+
+- Confirmation, autonomous-trigger ve gateway-pairing depolari broker TTL
+  tasisa bile kendi durable truth'larinda suresiz pending kalabiliyordu.
+- Autonomous lazy mirror TTL'yi original request saatinden degil mirror anindan
+  baslatiyor, broker timeout'unu legacy trigger'a settle etmiyor ve direct
+  CLI/MCP/API/bot karar yollari gec karari kabul edebiliyordu.
+- Pairing production store object-map iken federated inbox array-only parse
+  ediyor; daemon allowlist/pairing snapshot'ini startup'ta cache'liyordu.
+- Goal-v2 Mission TTL'si request publish saatine degil work-item createdAt'e
+  bagliydi; gec acilan dependency dogustan expired olabiliyordu.
+- Stored v1 request'e enumerable lifecycle defaultu eklemek, daha once imzalanmis
+  decision MAC digestini restart sonrasinda bozma riski tasiyordu.
+- SLA stage, durable outbox/ACK, timeout settle-back ve tum direct surface'lerde
+  tek FWW late-decision authority'si yoktu.
+
+### Yeni canonical cozum
+
+1. `approval.lifecycle` config'i tek resolver/policy authority'sine baglandi.
+   Owner-onayli profiller confirmation icin 8 saat ve 5 dakika/30 dakika/2 saat;
+   autonomous-trigger icin 1 saat ve 2 dakika/10 dakika/30 dakika;
+   gateway-pairing icin 10 dakika ve 1 dakika/3 dakika/7 dakika; broker-native
+   icin 30 dakika ceiling ve 2 dakika/10 dakika/20 dakika olarak cozuluyor.
+   Kisa producer expiry asla uzatilmiyor; policy reload yalniz tightening
+   uyguluyor, weakening typed olarak reddediliyor veya in-flight kayitta
+   ignore-evidence uretiyor.
+2. Approval contract versionlandi. V1 read ve signed-digest byte-shape'i
+   degismedi. Yeni V2 envelope origin, effective riskTier, blocking scope,
+   embedded lifecycle profile, policy snapshot digest, generation ve source
+   lineage tasiyor. Producer schema family bilgisi canonical contract version
+   alanina karistirilmiyor.
+3. ApprovalStore ve Broker expiry-aware first-writer-wins CAS kullaniyor.
+   Human decision ve system timeout ayni durable decision slotu icin yarisiyor;
+   kaybeden late decision replay/grant/diriltme uretemiyor. Timeout decision,
+   typed receipt ve audit correlation ayni lineage'i koruyor.
+4. Runtime expiry driver dort origin'i startup ve scheduled tick'te supuruyor.
+   SLA journal initial, renotify, alternate, park-alert ve expired stage'lerini
+   monotonic eventId ile persist ediyor; restart catch-up en yuksek actionable
+   stage'e coalesce oluyor, durable client ACK tekrar bildirimi engelliyor.
+5. Confirmation timeout system:expiry tarafindan UNDECIDABLE park/tombstone'a
+   donuyor; yeni evidence/revision explicit successor uretebiliyor. Autonomous
+   timeout EXPIRED terminal truth ve park-alert ile replay'i kapatiyor. Pairing
+   timeout deny-expire ile request'i kaldiriyor ve access grant vermiyor.
+6. Pairing opaque pairingId, tenant/project/principal scope, object-map ve
+   legacy-array parser parity, cross-process CAS ve daemon fresh-read kazandi.
+   Requesting chat critical pairing kararini veremiyor.
+7. Unified CLI lifecycle/quarantine/receipt gorunumu authenticated karar yolunu
+   kullaniyor; MCP inbox salt read-only projection ve read sirasinda sweep,
+   migration, stage veya decision write yapmiyor.
+8. Shared effective riskTier authority channel authenticator, rules engine,
+   Telegram/Slack/Teams, bot precheck, policy, fallback, WorkerGate, allow-scope
+   ve Nervous safety floor'a baglandi. Critical hicbir auto-approve, fallback
+   allow, channel button veya scope-grant reuse uretemiyor.
+9. Production wiring config -> producer -> store/broker -> SLA/outbox -> relay ->
+   timeout settle-back -> origin terminal truth -> audit -> CLI/MCP/API zinciri
+   olarak kapandi. Slack/Teams app-secret provizyonu ve closure imzalari owner
+   authority'sinde kaldi; recovery secret mutation yapmadi.
+
+### Gercek-binary smoke'un yakaladigi son BLOCKS_CURRENT_DONE
+
+Ilk landing build'inden sonra bot restart'i, 429 approval dosyasinda mevcut 11
+valid timeout receipt'ini her startup'ta FWW EEXIST yoluna tekrar soktu. Bu yol
+her prior winner icin file ve directory fsync yaptigindan iki process
+`jbd2_log_wait_commit` D-state'ine girdi; yaklasik 1.3 GB read ve binlerce write
+syscall olculdu. Unit testler yetki dogrulugunu kanitliyor fakat bu startup I/O
+amplification'ini gostermiyordu.
+
+`ApprovalStore.sweepExpired()` artik mevcut receipt'i once parse ediyor. Receipt
+valid ise onu read-only restart authority sayiyor ve FWW publisher'a tekrar
+girmiyor; malformed/missing bytes ise fail-closed recovery publication yolunda
+kaliyor. Read-only directory altinda restart sweep'in sifir write yaptigini
+kanitlayan regression eklendi. Yeniden build sonrasinda bot PID kaydini dorduncu
+250 ms poll'da yazdi ve iki saniyelik stability kontrolunu gecti.
+
+### Lokal kanit manifesti
+
+- `npx tsc --noEmit`: exit 0.
+- D4 combined battery: 65 test file, 298/298 PASS.
+- 10k canonical pairing pending: 10,000 unique EXPIRED receipt, 290.3 ms,
+  21,929,069 bytes; second sweep no-op ve revision-stable.
+- Existing-timeout restart regression: 6/6 PASS; read-only store'da write yok.
+- `node scripts/lint-approval-lifecycle-authority.mjs`: OK.
+- `git diff --check`: exit 0.
+- `npm run build:all`: core TypeScript, asset copy ve Vite dashboard build PASS.
+- Dist CLI: confirmation, autonomous, approvals ve isolated gateway list
+  yuzeyleri empty-state ile exit 0.
+- Dist API: `/api/approvals` HTTP 200; pending, expired ve quarantined alanlari
+  array olarak dondu.
+- Bot stop/build/start: yeni dist ile PID 733570, official status running ve
+  exact `kill -0` stability proof PASS.
+- Global configte lifecycle gate enabled; owner-instructed ratioEnforcement
+  field count sifir.
+
+### XVerify ve closure siniri
+
+Target'lar okunmadan once satir sayilari olculdu: design 291, policy 465,
+contract 493, store 777, federation 490, closure integration 541. Farkli
+provider icin `claude/claude-opus-5` istendi; provider call admission'dan once
+`xverify_verifier_tier_below_author` reason code'u ile typed HOLD oldu cunku
+verifier premium, author `gpt-5.6-sol` premium_plus olarak cozuldu. XVerify id:
+`xv-1787330284838-fe68ecaf-d8fb-46f3-87fc-872ab5fe0a15`. Receipt'ler
+`.tasks/archive/xverify-2026-08-21/`, rapor `.analysis/xverify/` altinda.
+
+Bu HOLD seal degildir ve tekrar denenmedi. Owner'in bu tur icin verdigi
+"verify basarisizsa islere devam et, sonra toplu analiz" karariyla implementation
+LOCAL_VERIFIED olarak tamamlandi; 4056 parent satiri formal uc-asama seal ve D5
+nedeniyle OPEN kalir. Commit/push owner tarafindan istenmedigi icin yapilmadi.

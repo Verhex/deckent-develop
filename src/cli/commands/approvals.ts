@@ -21,6 +21,8 @@ import { userInfo } from 'node:os';
 import type { Command } from 'commander';
 
 import { loadConfig } from '../../core/config.js';
+import { ApprovalStore } from '../../core/approval-store.js';
+import type { ApprovalRequest } from '../../core/approval-contract.js';
 import { openApprovalAuthorityRuntime } from '../../core/approval-authority-runtime.js';
 import type { LocalTerminalReauthenticationProvider } from '../../core/approval-terminal-authenticator.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
@@ -49,6 +51,32 @@ interface ApprovalsDecideOpts {
   deny?: boolean;
   reason?: string;
   always?: boolean;
+}
+
+function lifecycleAuditView(
+  request: ApprovalRequest,
+  store: ApprovalStore,
+): Record<string, unknown> | null {
+  if (request.version !== '2.0') return null;
+  const entry = store.load().pending.find(candidate => candidate.request.id === request.id)
+    ?? store.load().expired.find(candidate => candidate.request.id === request.id);
+  const applied = entry?.lifecycle;
+  return {
+    origin: applied?.origin ?? request.origin,
+    riskTier: applied?.riskTier ?? request.riskTier,
+    lifecycleStage: request.slaStage,
+    effectiveExpiresAt: applied?.effectiveExpiresAt ?? request.expiresAt,
+    lifecycleGeneration: request.lifecycleGeneration,
+    policySnapshotDigest: request.policySnapshotDigest,
+    appliedPolicyDigest: applied?.appliedPolicyDigest ?? request.policySnapshotDigest,
+    sourceReference: request.source.reference,
+    policyTransitionChanged: applied?.policyTransitionChanged ?? false,
+    weakeningIgnored: applied?.weakeningIgnored ?? false,
+  };
+}
+
+function quarantineRequestId(file: string): string | null {
+  return file.endsWith('.request.json') ? file.slice(0, -'.request.json'.length) : null;
 }
 
 /**
@@ -105,42 +133,47 @@ export function registerApprovalsCommand(program: Command): void {
         process.exitCode = 1;
         return;
       }
-      const opened = openApprovalAuthorityRuntime({
-        projectRoot: root,
-        tenantId: authority.tenant_id,
-      });
-      if (opened.state !== 'ready') {
-        printError(new Error(getMessage('approvals.runtime_hold', language, {
-          reason: opened.reasonCode,
-          detail: opened.detailCode,
-        })));
-        process.exitCode = 1;
-        return;
-      }
+      // A list is a strictly read-only projection. ApprovalStore's index applies
+      // the current lifecycle policy to the durable bytes without writing the
+      // expiry decision/receipt; the scheduled driver or an authenticated
+      // decision attempt owns closure writes.
+      const store = new ApprovalStore(root, config.approval?.lifecycle
+        ? { lifecycle: config.approval.lifecycle }
+        : {});
       const rules = loadApprovalRules(root);
       if (rules.fault) print(getMessage('approvals.rules_fault', language));
-      try {
-        const pending = opened.service.broker.list('pending');
-        if (pending.length === 0) {
-          print(getMessage('approvals.none_pending', language));
-        } else {
-          for (const request of pending) {
-            print(getMessage('approvals.pending_line', language, {
-              code: shortCodeFor(request.id),
-              id: request.id,
-              summary: request.summary,
-              expiresAt: request.expiresAt,
+      const pending = store.load().pending
+        .map(entry => entry.request)
+        .filter(request => request.tenantId === authority.tenant_id);
+      if (pending.length === 0) {
+        print(getMessage('approvals.none_pending', language));
+      } else {
+        for (const request of pending) {
+          const lifecycle = lifecycleAuditView(request, store);
+          print(getMessage('approvals.pending_line', language, {
+            code: shortCodeFor(request.id),
+            id: request.id,
+            summary: request.summary,
+            expiresAt: String(lifecycle?.['effectiveExpiresAt'] ?? request.expiresAt),
+          }));
+          if (lifecycle) {
+            print(getMessage('approvals.lifecycle_detail', language, {
+              origin: String(lifecycle['origin']),
+              riskTier: String(lifecycle['riskTier']),
+              stage: String(lifecycle['lifecycleStage']),
+              expiresAt: String(lifecycle['effectiveExpiresAt']),
             }));
-            const matched = matchApprovalRule(request, rules.rules);
-            if (matched) {
-              print(getMessage('approvals.rule_advice', language, {
-                ruleId: matched.id, decision: matched.decision,
-              }));
-            }
+            // Stable field names are a machine-readable audit projection,
+            // not user-facing prose. Human labels remain exclusively i18n.
+            print(JSON.stringify(lifecycle));
+          }
+          const matched = matchApprovalRule(request, rules.rules);
+          if (matched) {
+            print(getMessage('approvals.rule_advice', language, {
+              ruleId: matched.id, decision: matched.decision,
+            }));
           }
         }
-      } finally {
-        opened.service.close();
       }
       // D1 federated inbox (APPROVAL-SURFACE-UNIFICATION-001): surface every
       // OTHER surface's pending decisions here too — read-only, origin-tagged,
@@ -148,7 +181,22 @@ export function registerApprovalsCommand(program: Command): void {
       // untouched (migration is D2).
       const federated = listFederatedPendingItems(root, {
         gatewayHomeDir: gatewayHome(),
-      });
+      }).filter(item => item.tenantId === undefined || item.tenantId === authority.tenant_id);
+      for (const item of store.load().quarantined) {
+        print(getMessage('approvals.federated.row_quarantined', language, {
+          origin: 'broker-native',
+          id: quarantineRequestId(item.file) ?? item.file,
+          reason: item.reasonCode,
+          sourceReference: item.sourceReference,
+        }));
+      }
+      for (const entry of store.load().expired
+        .filter(candidate => candidate.request.tenantId === authority.tenant_id)) {
+        const receipt = store.getTimeoutReceipt(entry.request.id);
+        if (!receipt) continue;
+        print(getMessage('approval.lifecycle.stage.expired', language));
+        print(JSON.stringify(receipt));
+      }
       print(getMessage('approvals.federated.header', language));
       if (federated.length === 0) {
         print(getMessage('approvals.federated.none', language));
@@ -159,6 +207,24 @@ export function registerApprovalsCommand(program: Command): void {
           ? getMessage('approvals.federated.row_unreadable', language, {
             origin: item.origin, id: item.id,
           })
+          : item.quarantined
+            ? getMessage('approvals.federated.row_quarantined', language, {
+              origin: item.origin,
+              id: item.id,
+              reason: item.lifecycleReasonCode ?? '-',
+              sourceReference: item.sourceReference ?? '-',
+            })
+            : item.expiresAt || item.riskTier || item.lifecycleStage
+              ? getMessage('approvals.federated.row_lifecycle', language, {
+                code: shortCodeFor(item.id),
+                origin: item.origin,
+                id: item.id,
+                summary: item.summary,
+                hint: getMessage(item.decideHintKey, language),
+                expiresAt: item.expiresAt ?? '-',
+                riskTier: item.riskTier ?? '-',
+                stage: item.lifecycleStage ?? '-',
+              })
           : getMessage('approvals.federated.row', language, {
             code: shortCodeFor(item.id),
             origin: item.origin,
@@ -192,6 +258,13 @@ export function registerApprovalsCommand(program: Command): void {
         process.exitCode = 1;
         return;
       }
+      const store = new ApprovalStore(root, config.approval?.lifecycle
+        ? { lifecycle: config.approval.lifecycle }
+        : {});
+      // The authenticated decision surface closes every overdue durable row
+      // before target resolution. This is the canonical store/CAS path; no
+      // CLI-local lifecycle table or decision write exists here.
+      store.sweepExpired();
       const maxAuthAgeSeconds = authority.terminal?.max_auth_age_seconds;
       if (!maxAuthAgeSeconds || maxAuthAgeSeconds <= 0) {
         printError(new Error(getMessage('approvals.terminal_window_missing', language)));
@@ -216,9 +289,41 @@ export function registerApprovalsCommand(program: Command): void {
         // renders everywhere, so it must resolve everywhere). A full id that
         // the broker does not know is likewise looked up in the federated
         // set. Unknown/stale fails closed; ambiguity demands the full id.
-        const federatedPending = listFederatedPendingItems(root, {
+        const federatedAll = listFederatedPendingItems(root, {
           gatewayHomeDir: gatewayHome(),
-        }).filter(item => item.unreadable !== true);
+        }).filter(item => item.tenantId === undefined || item.tenantId === authority.tenant_id);
+        const federatedQuarantine = federatedAll.filter(item => item.quarantined === true);
+        const brokerQuarantine = store.load().quarantined;
+        const federatedQuarantinedById = federatedQuarantine.find(item => item.id === requestId);
+        const brokerQuarantinedById = brokerQuarantine
+          .find(item => quarantineRequestId(item.file) === requestId);
+        if (federatedQuarantinedById || brokerQuarantinedById) {
+          printError(new Error(getMessage('approvals.federated.row_quarantined', language, {
+            origin: federatedQuarantinedById?.origin ?? 'broker-native',
+            id: federatedQuarantinedById?.id
+              ?? quarantineRequestId(brokerQuarantinedById!.file)
+              ?? brokerQuarantinedById!.file,
+            reason: federatedQuarantinedById?.lifecycleReasonCode
+              ?? brokerQuarantinedById?.reasonCode
+              ?? '-',
+            sourceReference: federatedQuarantinedById?.sourceReference
+              ?? brokerQuarantinedById?.sourceReference
+              ?? '-',
+          })));
+          process.exitCode = 1;
+          return;
+        }
+        const expiredById = store.load().expired.find(entry =>
+          entry.request.id === requestId && entry.request.tenantId === authority.tenant_id);
+        if (expiredById) {
+          printError(new Error(getMessage('approval.decide.expired', language, {
+            expiresAt: expiredById.lifecycle?.effectiveExpiresAt ?? expiredById.request.expiresAt,
+          })));
+          process.exitCode = 1;
+          return;
+        }
+        const federatedPending = federatedAll
+          .filter(item => item.unreadable !== true && item.quarantined !== true);
         let federatedTarget = federatedPending.find(item => item.id === requestId);
         if (looksLikeShortCode(requestId)) {
           const brokerIds = opened.service.broker.list('pending').map(r => r.id);
@@ -256,7 +361,7 @@ export function registerApprovalsCommand(program: Command): void {
             process.exitCode = 1;
             return;
           }
-          mirrorFederatedItemToBroker(opened.service.broker, federatedTarget, {
+          await mirrorFederatedItemToBroker(opened.service.broker, federatedTarget, {
             tenantId: authority.tenant_id ?? 'main',
           });
           settleBackOrigin = federatedTarget.origin;
@@ -348,6 +453,13 @@ export function registerApprovalsCommand(program: Command): void {
               ruleId: rule.id, decision: rule.decision, idPrefix: rule.match.idPrefix,
             }));
           }
+          return;
+        }
+        if (outcome.kind === 'expired') {
+          printError(new Error(getMessage('approval.decide.expired', language, {
+            expiresAt: outcome.expiresAt,
+          })));
+          process.exitCode = 1;
           return;
         }
         printError(new Error(getMessage('approvals.decision_refused', language, {

@@ -18,8 +18,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { resolveApiCallerTenant } from './tenant-scope.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { makeApprovalGate, UnknownApprovalRequestError } from '../orchestra/autonomous/approval-adapter.js';
+import {
+  ClosedApprovalRequestError,
+  makeApprovalGate,
+  UnknownApprovalRequestError,
+} from '../orchestra/autonomous/approval-adapter.js';
 import { autonomousPendingPath } from '../core/constants.js';
+import type { ResolvedApprovalLifecycleConfig } from '../core/config-types.js';
+import type { VerifiedPrincipal } from '../core/principal.js';
+import { getMessage } from '../cli/helpers/messages.js';
 import { loadBacklog } from '../orchestra/autonomous/backlog.js';
 import type { BacklogEntry } from '../orchestra/autonomous/backlog-types.js';
 import { deriveRequestPrincipal } from './auth-me-endpoint.js';
@@ -33,6 +40,42 @@ export interface AutonomousRouteOptions {
    * in ResolvedConfig. Default false → all entries (backward-compat).
    */
   strictTenantIsolation?: boolean;
+  /** Current lifecycle authority, injected by the API composition root. */
+  lifecycle?: ResolvedApprovalLifecycleConfig;
+  /** Shared clock for expiry-aware transition tests/runtime. */
+  now?: () => Date;
+  /** API response language. */
+  lang?: string;
+  /** Optional localized audit reasons; mechanism code owns no display strings. */
+  decisionReasons?: { readonly approve: string; readonly reject: string };
+  /** True only when the server auth middleware verified this request bearer. */
+  authGateVerified?: boolean;
+}
+
+function approvalPrincipal(
+  req: IncomingMessage | undefined,
+  authGateVerified: boolean,
+): VerifiedPrincipal {
+  if (!req) {
+    return {
+      id: 'api-autonomous',
+      identityClass: 'service',
+      assurance: 'unverified',
+      provenance: 'api',
+      verifiedBy: 'request-unavailable',
+    };
+  }
+  const caller = deriveRequestPrincipal(req, { authGateVerified });
+  const trustedClaims = caller.claimsVerified === true;
+  return {
+    id: caller.id,
+    identityClass: caller.id === 'api-static' ? 'service' : 'oidc',
+    assurance: trustedClaims ? 'token-verified' : 'unverified',
+    provenance: 'api',
+    verifiedBy: trustedClaims ? 'api-auth-gate' : 'unverified-request-claims',
+    ...(trustedClaims && caller.tenantId ? { tenantId: caller.tenantId } : {}),
+    ...(trustedClaims && caller.role ? { role: caller.role } : {}),
+  };
 }
 
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
@@ -108,6 +151,11 @@ export function registerAutonomousRoutes(
 ): boolean {
   const path = new URL(url, 'http://localhost').pathname;
   if (!path.startsWith('/api/autonomous/')) return false;
+  const principal = approvalPrincipal(req, opts?.authGateVerified ?? false);
+  if (opts?.strictTenantIsolation && !principal.tenantId) {
+    sendJson(res, { error: 'TENANT_SCOPE_UNRESOLVED', code: 'TENANT_SCOPE_UNRESOLVED' }, 403);
+    return true;
+  }
 
   // GET /api/autonomous/lineage/:correlationId (ENT-3 causal-lineage endpoint)
   // Must be checked before the approval/reject prefix matchers to avoid false conflicts.
@@ -145,7 +193,15 @@ export function registerAutonomousRoutes(
     return true;
   }
 
-  const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(projectRoot), projectRoot });
+  const gate = makeApprovalGate({
+    pendingPath: autonomousPendingPath(projectRoot),
+    projectRoot,
+    ...(opts?.lifecycle ? { lifecycle: opts.lifecycle } : {}),
+    ...(opts?.now ? { now: () => opts.now!().toISOString() } : {}),
+    principal,
+    strictTenantIsolation: opts?.strictTenantIsolation ?? false,
+  });
+  const lang = opts?.lang ?? 'en';
 
   // GET /api/autonomous/pending
   if (method === 'GET' && path === '/api/autonomous/pending') {
@@ -204,8 +260,20 @@ export function registerAutonomousRoutes(
   if (method === 'POST' && path.startsWith('/api/autonomous/approve/')) {
     const triggerId = decodeURIComponent(path.slice('/api/autonomous/approve/'.length));
     try {
-      gate.accept(triggerId, 'approved via dashboard');
+      gate.accept(triggerId, opts?.decisionReasons?.approve);
     } catch (err) {
+      if (err instanceof ClosedApprovalRequestError) {
+        sendJson(res, {
+          error: err.reasonCode === 'expired'
+            ? getMessage('api.approval.request_expired', lang)
+            : getMessage('autonomous.resolve_not_found', lang, { triggerId }),
+          code: err.code,
+          reasonCode: err.reasonCode,
+          triggerId,
+          expiresAt: err.expiresAt,
+        }, 409);
+        return true;
+      }
       if (err instanceof UnknownApprovalRequestError) {
         // APPROVAL-001 T1: never silent-success a decision the gate cannot tie
         // to a real pending request — that is a forged/stale approval.
@@ -222,8 +290,20 @@ export function registerAutonomousRoutes(
   if (method === 'POST' && path.startsWith('/api/autonomous/reject/')) {
     const triggerId = decodeURIComponent(path.slice('/api/autonomous/reject/'.length));
     try {
-      gate.reject(triggerId, 'rejected via dashboard');
+      gate.reject(triggerId, opts?.decisionReasons?.reject);
     } catch (err) {
+      if (err instanceof ClosedApprovalRequestError) {
+        sendJson(res, {
+          error: err.reasonCode === 'expired'
+            ? getMessage('api.approval.request_expired', lang)
+            : getMessage('autonomous.resolve_not_found', lang, { triggerId }),
+          code: err.code,
+          reasonCode: err.reasonCode,
+          triggerId,
+          expiresAt: err.expiresAt,
+        }, 409);
+        return true;
+      }
       if (err instanceof UnknownApprovalRequestError) {
         sendJson(res, { error: err.message, code: err.code, triggerId }, 403);
         return true;

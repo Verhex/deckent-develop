@@ -23,6 +23,8 @@ import {
   settleConfirmation,
 } from '../../src/core/confirmation-store.js';
 import { registerConfirmationsCommand } from '../../src/cli/commands/confirmations.js';
+import { loadConfig } from '../../src/core/config.js';
+import { resolveApprovalLifecyclePolicy } from '../../src/core/approval-lifecycle-policy.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
 import type { EvaluationResult } from '../../src/core/task-types.js';
@@ -122,53 +124,61 @@ describe('confirmation store + human CLI decide', () => {
       statements: ['process owner signs off'], evidenceRequirements: [],
       requestedAt: '2026-08-20T12:00:00.000Z', source: 'acceptance-matrix',
     } as const;
-    const first = createConfirmationRequest(root, base);
+    const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
+    const clock = () => new Date('2026-08-20T12:00:00.000Z');
+    const storeOptions = { lifecycle, clock };
+    const first = createConfirmationRequest(root, base, storeOptions);
     expect(first.created).toBe(true);
-    expect(createConfirmationRequest(root, base)).toEqual({ id: first.id, created: false });
-    expect(listPendingConfirmations(root)).toHaveLength(1);
+    expect(createConfirmationRequest(root, base, storeOptions)).toEqual({ id: first.id, created: false });
+    expect(listPendingConfirmations(root, storeOptions)).toHaveLength(1);
 
     const settled = settleConfirmation(root, first.id, {
       verdict: 'CONFIRMED', decidedBy: 'human', reason: 'signed', decidedAt: '2026-08-20T12:01:00.000Z',
-    });
+    }, storeOptions);
     expect(settled.outcome.verdict).toBe('CONFIRMED');
-    expect(listPendingConfirmations(root)).toHaveLength(0);
-    expect(readConfirmation(root, first.id)?.state).toBe('settled');
+    expect(listPendingConfirmations(root, storeOptions)).toHaveLength(0);
+    expect(readConfirmation(root, first.id, storeOptions)?.state).toBe('settled');
     expect(() => settleConfirmation(root, first.id, {
       verdict: 'FAILED', decidedBy: 'human', reason: 'again', decidedAt: '2026-08-20T12:02:00.000Z',
-    })).toThrow(/not pending/);
+    }, storeOptions)).toThrow(/not pending/);
     // A settled id can never be re-created as pending.
-    expect(createConfirmationRequest(root, base)).toEqual({ id: first.id, created: false });
+    expect(createConfirmationRequest(root, base, storeOptions)).toEqual({ id: first.id, created: false });
   });
 
   it('CLI decide settles a human request behind the interactive seam; wrong adapter refused', async () => {
     const root = mkdtempSync(join(tmpdir(), 'confirmation-cli-'));
     onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
+    const clock = () => new Date('2026-08-20T12:00:02.000Z');
+    const storeOptions = { lifecycle, clock };
     const human = createConfirmationRequest(root, {
       sprintId: 's', taskId: 't', itemIds: [], kind: 'audit', verdict: 'QUALIFIED',
       adapter: 'human', statements: ['ok?'], evidenceRequirements: [],
       requestedAt: '2026-08-20T12:00:00.000Z', source: 'acceptance-matrix',
-    });
+    }, storeOptions);
     const llm = createConfirmationRequest(root, {
       sprintId: 's', taskId: 't2', itemIds: [], kind: 'audit', verdict: 'UNDECIDABLE',
       adapter: 'llm', statements: ['?'], evidenceRequirements: [],
       requestedAt: '2026-08-20T12:00:01.000Z', source: 'acceptance-matrix',
-    });
+    }, storeOptions);
 
     const program = new Command();
     program.exitOverride();
     registerConfirmationsCommand(program, {
       resolveProjectRootFn: () => root,
       confirmInteractiveFn: async () => true,
+      clock,
+      loadConfigFn: (async () => ({ approval: { lifecycle } })) as unknown as typeof loadConfig,
     });
     await program.parseAsync(['node', 'deckent', 'confirmations', 'decide', human.id,
       '--confirm', '--reason', 'reviewed and approved']);
-    expect(readConfirmation(root, human.id)?.state).toBe('settled');
+    expect(readConfirmation(root, human.id, storeOptions)?.state).toBe('settled');
 
     process.exitCode = 0;
     await program.parseAsync(['node', 'deckent', 'confirmations', 'decide', llm.id,
       '--confirm', '--reason', 'nope']);
     expect(process.exitCode).toBe(1);
-    expect(readConfirmation(root, llm.id)?.state).toBe('pending');
+    expect(readConfirmation(root, llm.id, storeOptions)?.state).toBe('pending');
     process.exitCode = 0;
   });
 });

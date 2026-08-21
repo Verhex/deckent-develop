@@ -40,6 +40,7 @@ export type ProviderLimitReasonCode =
   | 'source_unavailable'
   | 'incomplete_windows'
   | 'threshold_block'
+  | 'threshold_observed'
   | 'remaining_floor'
   | 'evidence_not_yet_valid'
   | 'evidence_expired';
@@ -64,6 +65,8 @@ export interface ProviderLimitWindow {
 
 export interface ProviderLimitPolicy {
   readonly policyRef: string;
+  /** Absent on legacy callers and therefore resolved as `enforce`. */
+  readonly ratioEnforcement?: 'enforce' | 'observe_only';
   readonly warnAtRatio: number;
   readonly blockAtRatio: number;
   readonly minimumRemaining: Partial<Record<ProviderLimitUnit, number>>;
@@ -367,6 +370,11 @@ function assertWindowIdentity(windowId: string): void {
 
 function assertPolicy(policy: ProviderLimitPolicy): void {
   assertOpaqueEvidenceRef('limit policyRef', policy.policyRef, true);
+  if (policy.ratioEnforcement !== undefined
+    && policy.ratioEnforcement !== 'enforce'
+    && policy.ratioEnforcement !== 'observe_only') {
+    throw new Error('Invalid provider limit ratio enforcement mode');
+  }
   if (!Number.isFinite(policy.warnAtRatio) || !Number.isFinite(policy.blockAtRatio)
     || policy.warnAtRatio < 0 || policy.warnAtRatio >= policy.blockAtRatio
     || policy.blockAtRatio > 1) {
@@ -458,6 +466,7 @@ function evaluateKnownWindows(
   }
 
   let pressure: ProviderLimitPressure = 'ok';
+  const ratioEnforcement = policy.ratioEnforcement ?? 'enforce';
   for (const windowId of requiredWindowIds) {
     const window = byId.get(windowId)!;
     const floor = policy.minimumRemaining[window.unit];
@@ -466,11 +475,20 @@ function evaluateKnownWindows(
     }
     const ratio = window.consumed! / window.limit!;
     if (ratio >= policy.blockAtRatio) {
-      return { state: 'known', decision: 'hold', pressure: 'block', reasonCode: 'threshold_block' };
+      if (ratioEnforcement === 'enforce') {
+        return { state: 'known', decision: 'hold', pressure: 'block', reasonCode: 'threshold_block' };
+      }
+      pressure = 'block';
+      continue;
     }
-    if (ratio >= policy.warnAtRatio) pressure = 'warn';
+    if (ratio >= policy.warnAtRatio && pressure !== 'block') pressure = 'warn';
   }
-  return { state: 'known', decision: 'allow', pressure, reasonCode: 'none' };
+  return {
+    state: 'known',
+    decision: 'allow',
+    pressure,
+    reasonCode: pressure === 'block' ? 'threshold_observed' : 'none',
+  };
 }
 
 export function createProviderLimitResult(
