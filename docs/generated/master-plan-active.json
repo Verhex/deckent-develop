@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "138796c1d614449e62f73b227bea02c4e1d2e2c94d68d1f7f3d781422bd59f9f"
+    "value": "441810ccaaba6726b94b670be906f97506a1c71ed1902850149ea990cbe20f45"
   },
   "summary": {
     "total": 517,
     "active": 453,
     "terminal": 64,
-    "receipts": 186,
+    "receipts": 187,
     "byState": {
-      "OPEN": 360,
+      "OPEN": 359,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 25,
+      "VERIFY": 26,
       "DONE": 64,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -4898,10 +4898,10 @@
       "id": "TOKEN-ACCOUNTING-TRUTH-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-20",
+      "state": "VERIFY",
+      "updated": "2026-08-21",
       "definitionDigest": "c040cad1927723f3b354c7744cc9baf49c83cc3c1a726f72dbe85cc0806ca5d6",
-      "progressDigest": "7d2864ef0b78339898544078ff866d48f916b8cffca343672bf4ed0b6b95a66b",
+      "progressDigest": "b3ddf82992a91f05bbd05377fc3cf5fc219633c578f146ef0c16429ac54502b1",
       "terminalClosureDigest": null
     },
     {
@@ -7610,6 +7610,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-17T16:26:09Z"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-21-CLOSURE-BATCH-03",
+      "authorityDigest": "9fcffae78293dfd6c5097886475944b7ace357b7656aed6df335d43351d73933",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-21T06:38:31Z"
       },
       "g7AttemptIdentity": null
     }
@@ -23614,23 +23624,25 @@
         "G1",
         "G2"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "0",
-        "L": "0",
-        "X": "?",
-        "S": "?"
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-21-CLOSURE-BATCH-03"
+      ],
       "acceptance": "(1) host-runtime-budget observe/settle zinciri normalizeUsage kanonik sözleşmesinden geçer (codex: fresh=input−cached; tek dönüşüm noktası, çift-sayım yok); (2) totalTokens her result'ta dolu (provider-toplamı öncelikli); (3) status/kpi/cost görünümleri fresh+cacheRead+cacheCreate+out ayrımını etiketli gösterir; (4) regresyon: iki provider fixture'ıyla aynı formül pinlenir; mevcut budget-eşik semantiği (hangi sayıya karşı ölçülüyor) davranış-değişikliği ayrı owner-onayına tabi — bu iş ÖNCE raporlar",
-      "evidence": "Owner admission 2026-08-19 (token-sayaç uçurumu sorusu; \"analiz et, çözüm önerilerini iş planına dahil et\"). Analiz kanıtı: sprint-565 canlı result.tokenUsage verileri (9 codex + 2 claude task) + codex.ts:707-730 normalize yorumu (sprint-497 %78-overstatement vakası) + token-usage.ts kanonik sözleşme. **OWNER-BLOCKING (2026-08-19): bu analiz neticelenmeden yeni görev alınmaz; elle düzeltme YOK; landing-sonrası xverify'lı doğrulanmış kök-neden zorunlu. Owner hipotezi analiz-sorusu: turn-toplama çift-sayım mı (90+100=190) yoksa per-call billing gerçeği mi (n×cache-read) — tek-worker izole deney + toplama-kodu kanıtı + CLI-envelope semantiği üçlüsüyle karara bağlanacak; claude cache 1-worker mı üst-üste 2-worker mı sorusu dahil.** **ANALİZ NETİCELENDİ 2026-08-19 (xverify-mühürlü 3/3 CONFIRMED — `…b4fd8b8` `…9837fb3` `…fd0c6102`):** (S2-çift-sayım) YOK — claude yolu TEK final envelope okur, turn-toplamaz (token-counter.ts, T1-CONFIRMED); birincil kanıt: 565-007 result.tokenUsage == CLI kendi billing-envelope BAYT-AYNI (opus in:9.486/out:81.865/cacheRead:7.247.569/cacheCreate:179.063 + providerReportedUsd $6.849 — provider-envelope kaynak, deckent hesaplamadı). (S1-üst-üste-binme) YOK — her attempt kendi konteyner-log fd'si + kendi settlement receipt'i; 006 ($4.35) ve 007 ($6.85) ayrı sayılar taşıyor. (S3-billing-gerçeği) EVET: agent-loop her model-çağrısında tüm transkripti yeniden gönderir, her çağrının cache-read'i ayrı faturalanır — \"90+10=100\" değil \"n-çağrı × bağlam\" Anthropic fiyat-modelinin kendisi (repo-belgeli: 496 kaydı tek turn.completed input 101.859 içinde cached 66.560, T3-CONFIRMED). MALİYET GERÇEĞİ: claude-opus worker-task ≈ $4-7/task API-fiyat karşılığı (subscription'da flat; API-anahtarlı üründe gerçek fatura). Kalan DÜZELTME işi bu satırın (1)-(4) kabulü: codex host-runtime-budget yolu ham cache-dahil input yazıyor (in:1.451.577/cacheRead:1.336.064 → gerçek taze 115.513; adapter-normalize sprint-497 yolu atlanıyor, T2-CONFIRMED normalize doğru YERDE var) + totalTokens boş. MALİYET-AZALTIM ürün-mimarisi (turn-başı-tam-bağlam pahalılığı: compaction/trimming, tool-batching, tier-routing, cache-write sabitleme) AYRI owner-karar paketi — bu satır yalnız sayaç-doğruluğunu taşır. Ön-not: Claude-içi \"uçurum\" DEFEKT DEĞİL doğrulandı — Anthropic disjoint raporlar, cache verimli çalışıyor; sayaç doğru. **DUZELTME UYGULANDI 2026-08-20 (kabul 1-2-4):** usageCounts SEMA-bazli fresh-input (inclusive-cache anahtari — cached_input_tokens / prompt_tokens_details.cached_tokens / cachedContentTokenCount — varsa input−cached; provider-adi-bazli degil; sprint-565 canli sekli 1.451.577→115.513 pinli; anthropic disjoint korunur; gemini alt-kume duzeltildi — eski pin yanlis semantigi kodluyordu); host-runtime-budget uc projeksiyonu + cli-log yolunda totalTokens dolu; 53+73 test yesil. Kabul-3: normalize sonrasi sutunlar provider-bagimsiz ayni anlamda — etiket ihtiyacinin koku kalkti (goruntu-etiketi kozmetige dustu, ayri is degil)",
-      "updated": "2026-08-20"
+      "evidence": "Owner admission 2026-08-19 (token-sayaç uçurumu sorusu; \"analiz et, çözüm önerilerini iş planına dahil et\"). Analiz kanıtı: sprint-565 canlı result.tokenUsage verileri (9 codex + 2 claude task) + codex.ts:707-730 normalize yorumu (sprint-497 %78-overstatement vakası) + token-usage.ts kanonik sözleşme. **OWNER-BLOCKING (2026-08-19): bu analiz neticelenmeden yeni görev alınmaz; elle düzeltme YOK; landing-sonrası xverify'lı doğrulanmış kök-neden zorunlu. Owner hipotezi analiz-sorusu: turn-toplama çift-sayım mı (90+100=190) yoksa per-call billing gerçeği mi (n×cache-read) — tek-worker izole deney + toplama-kodu kanıtı + CLI-envelope semantiği üçlüsüyle karara bağlanacak; claude cache 1-worker mı üst-üste 2-worker mı sorusu dahil.** **ANALİZ NETİCELENDİ 2026-08-19 (xverify-mühürlü 3/3 CONFIRMED — `…b4fd8b8` `…9837fb3` `…fd0c6102`):** (S2-çift-sayım) YOK — claude yolu TEK final envelope okur, turn-toplamaz (token-counter.ts, T1-CONFIRMED); birincil kanıt: 565-007 result.tokenUsage == CLI kendi billing-envelope BAYT-AYNI (opus in:9.486/out:81.865/cacheRead:7.247.569/cacheCreate:179.063 + providerReportedUsd $6.849 — provider-envelope kaynak, deckent hesaplamadı). (S1-üst-üste-binme) YOK — her attempt kendi konteyner-log fd'si + kendi settlement receipt'i; 006 ($4.35) ve 007 ($6.85) ayrı sayılar taşıyor. (S3-billing-gerçeği) EVET: agent-loop her model-çağrısında tüm transkripti yeniden gönderir, her çağrının cache-read'i ayrı faturalanır — \"90+10=100\" değil \"n-çağrı × bağlam\" Anthropic fiyat-modelinin kendisi (repo-belgeli: 496 kaydı tek turn.completed input 101.859 içinde cached 66.560, T3-CONFIRMED). MALİYET GERÇEĞİ: claude-opus worker-task ≈ $4-7/task API-fiyat karşılığı (subscription'da flat; API-anahtarlı üründe gerçek fatura). DÜZELTME işi (2026-08-20'de landed) bu satırın (1)-(4) kabulü: codex host-runtime-budget yolu ham cache-dahil input yazıyor (in:1.451.577/cacheRead:1.336.064 → gerçek taze 115.513; adapter-normalize sprint-497 yolu atlanıyor, T2-CONFIRMED normalize doğru YERDE var) + totalTokens boş. MALİYET-AZALTIM ürün-mimarisi (turn-başı-tam-bağlam pahalılığı: compaction/trimming, tool-batching, tier-routing, cache-write sabitleme) AYRI owner-karar paketi — bu satır yalnız sayaç-doğruluğunu taşır. Ön-not: Claude-içi \"uçurum\" DEFEKT DEĞİL doğrulandı — Anthropic disjoint raporlar, cache verimli çalışıyor; sayaç doğru. **DUZELTME UYGULANDI 2026-08-20 (kabul 1-2-4):** usageCounts SEMA-bazli fresh-input (inclusive-cache anahtari — cached_input_tokens / prompt_tokens_details.cached_tokens / cachedContentTokenCount — varsa input−cached; provider-adi-bazli degil; sprint-565 canli sekli 1.451.577→115.513 pinli; anthropic disjoint korunur; gemini alt-kume duzeltildi — eski pin yanlis semantigi kodluyordu); host-runtime-budget uc projeksiyonu + cli-log yolunda totalTokens dolu; 53+73 test yesil. Kabul-3: normalize sonrasi sutunlar provider-bagimsiz ayni anlamda — etiket ihtiyacinin koku kalkti (goruntu-etiketi kozmetige dustu, ayri is degil) **TERMINAL SETTLEMENT 2026-08-21 (Closure OS authenticated batch seq3):** ; `receipt=GR-2026-08-21-CLOSURE-BATCH-03` ; kabul (1)(2)(4) landed+wired; `proof=commit:0d3cf6909` ; LOCAL_VERIFIED 9 test-dosyasi 165/165; sprint-565 sekli 1.451.577→115.513 pinli; kabul (3) gorunum-etiketi owner-ratifikasyonuyla MOOT (normalize sonrasi sutunlar provider-bagimsiz ayni anlamda; owner-signed proposal 2c30aa3c); budget-esik semantigi degisikligi bu kapanisin DISINDA ayri owner-paketidir. Truth C/W/E/H/L=1 (kod+wiring+etkin+hermetik+gercek-binary), X/S uygulanamaz. Ledger: seq3 evt-2026-08-21-7093-token-accounting-settlement-01 (level outcome / lane runtime), ed25519 owner-imzali",
+      "updated": "2026-08-21"
     },
     {
       "order": 7094,
@@ -26622,6 +26634,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "35cd74128a854c5e472c3a827483d91aa6a1afb9dfd7dfc79230ceee58752725"
+    "value": "cfae593c39c4ed03df918e3ffb418c99168a74c353296aa5c944178fa6492797"
   }
 }

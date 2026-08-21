@@ -4,7 +4,7 @@
 # Closure OS — Level × Lane classification & re-triage: owner disposition proposal **v2.1**
 
 > Read-only, non-authoritative. Codex final disposition (2026-08-14): owner-declared semantics outrank topology; ID-regex is not a classification authority; `check-proof ⇒ proof`; priority changes this phase = 0.
-> Source: `master-plan-active.json` @ sourceDigest `138796c1d614449e…` · registryIntegrity `35cd74128a854c5e…`
+> Source: `master-plan-active.json` @ sourceDigest `441810ccaaba6726…` · registryIntegrity `cfae593c39c4ed03…`
 > Enum + override SSOT: `src/core/closure-classification-schema.json` (schemaVersion 1). Rows scanned: 453 active.
 > check-proof⇒proof invariant on this output: **HOLDS**. Override-vs-invariant conflicts: 0.
 
@@ -103,7 +103,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 
 ```jsonc
 { "schemaVersion":1, "seq":<n>, "eventId":"…", "recordedAt":"<owner-batch-ts>",
-  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"138796c1d614…" },
+  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"441810ccaaba…" },
   "decision":{ "kind":"level-lane-disposition", "level":"<enum>", "lane":"<enum>", "ruleId":"<rule>", "confidence":"<h|m|l>" },
   "authorityProof":{ "ownerReceipt":"<authenticated durable receipt ref>" }, "previousEventDigest":"…", "eventDigest":"…" }
 // priority-retriage events this phase: 0 (priority unchanged). lane-resolution candidates: 3 HOLD rows if owner assigns.
@@ -498,7 +498,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 | `ORPHAN-WIRE-001` | TRUTH | BLOCKED | P0 | task (m) | contract (m) |  |
 | `CURSOR-PROVIDER-001` | TERMINAL | OPEN | P1 | task (m) | terminal (m) |  |
 | `RECOVERY-TRUTH-001` | KERNEL | OPEN | P0 | task (m) | runtime (m) |  |
-| `TOKEN-ACCOUNTING-TRUTH-001` | KERNEL | OPEN | P0 | task (m) | runtime (m) |  |
+| `TOKEN-ACCOUNTING-TRUTH-001` | KERNEL | VERIFY | P0 | task (m) | runtime (m) |  |
 | `WORKER-PROMPT-COST-ARCHITECTURE-001` | KERNEL | OPEN | P0 | task (m) | runtime (m) |  |
 | `AGENT-PERMISSION-MATRIX-001` | PRODUCT | OPEN | P2 | task (m) | hold-unassigned (l) |  |
 | `DEBT-DEPENDENCY-REPAIR-7094R-001` | KERNEL | OPEN | P0 | task (m) | runtime (m) |  |
