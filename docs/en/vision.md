@@ -42,7 +42,7 @@ The moment they diverge into three engines, the product is dead — so the share
 
 The audience spans **from a solo user to the largest enterprises on earth: millions of users, projects, tenants, and environments**. [Evidence: `.deckent/workspace/IDENTITY.md:6`]
 
-That is a design constraint, not a marketing range. The same installed product must serve both ends without a fork, a rewrite, or a separate "enterprise edition."
+That is a design constraint, not a marketing range. Both ends share one versioned Core kernel, runtime, application contract, and evidence lineage without a fork or rewrite. Distribution may differ additively: the MIT Community product is complete and standalone, while separately licensed Verhex Enterprise modules add organization-scale governance, operations, and assurance. Enterprise does not create the governance or security that Core lacks; it deepens controls already structural to Core. [Decision: ADR-G-041]
 
 | Face / Audience | Individual | Team and developer | Enterprise |
 |---|---|---|---|
@@ -138,7 +138,7 @@ A vision that cannot be wrong is decoration. These signals would mean Deckent is
 - Autonomous runs cannot complete end to end without human intervention at a rate that makes the automation net-negative.
 - Evidence becomes ceremony — settlement passes while the artifacts do not prove the outcome, and completion turns into self-report again.
 - Neutrality erodes — the product only really works on one provider, and the others are demo-grade.
-- Governance becomes an enterprise add-on rather than a structural property, forcing a fork between the solo and the enterprise product.
+- Core governance ceases to be structural, or Enterprise modules introduce a second kernel, policy authority, or evidence chain and thereby fork the solo and enterprise products.
 - Learning stops changing execution — memory accumulates, but planning and routing do not improve because of it.
 - Scale is achieved by narrowing — the engine works only on code-shaped work, and the other execution contexts quietly fall out of the roadmap.
 

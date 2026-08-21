@@ -54,6 +54,7 @@
 | ADR-G-038 | Goal-v2 Normalized Dependency Authority & Bounded Reconciliation | accepted |
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 | adr-g-040 | Normative Verdict Vocabulary (Single-Word Evaluation Statuses) | accepted |
+| adr-g-041 | Deckent Core ve Verhex Enterprise Modüler Ürün Mimarisi | accepted |
 
 ## Recent Learnings
 - **Sprint sprint-606 Learnings** (sprint-606): ## Sprint sprint-606 Learnings
@@ -107,4 +108,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2118 | Generated: 2026-08-21_
+_Total entries: 2119 | Generated: 2026-08-21_

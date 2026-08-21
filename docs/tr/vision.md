@@ -42,7 +42,7 @@ Bu üçü ayrı motorlara ayrıştığı an ürün ölür — bu yüzden paylaş
 
 Hedef kitle **solo kullanıcıdan dünyanın en büyük kurumlarına: milyonlarca kullanıcı, proje, tenant ve environment** aralığını kapsar. [Kanıt: `.deckent/workspace/IDENTITY.md:6`]
 
-Bu bir pazarlama aralığı değil, bir tasarım kısıtıdır. Aynı kurulu ürün her iki ucu da fork, yeniden yazım veya ayrı bir "enterprise edition" olmadan karşılamak zorundadır.
+Bu bir pazarlama aralığı değil, bir tasarım kısıtıdır. Her iki uç; fork veya yeniden yazım olmadan tek versioned Core kernel, runtime, application contract ve evidence lineage paylaşır. Dağıtımlar additive biçimde farklılaşabilir: MIT Community ürünü eksiksiz ve bağımsızdır; ayrı lisanslı Verhex Enterprise modülleri organization-scale governance, operations ve assurance ekler. Enterprise, Core'da bulunmayan governance veya security'yi ilk kez yaratmaz; Core'da yapısal olan kontrolleri derinleştirir. [Karar: ADR-G-041]
 
 | Yüz / Kitle | Bireysel | Takım ve geliştirici | Enterprise |
 |---|---|---|---|
@@ -138,7 +138,7 @@ Yanlışlanamayan vizyon süstür. Aşağıdaki sinyaller, Deckent'in iddia etti
 - Otonom koşumların, otomasyonu net-negatif yapacak sıklıkta insan müdahalesi olmadan uçtan uca tamamlanamaması.
 - Kanıtın törene dönüşmesi — artifact'lar sonucu kanıtlamadığı halde settlement'ın geçmesi ve tamamlanmanın yeniden self-report'a düşmesi.
 - Bağımsızlığın aşınması — ürünün gerçekte yalnız tek provider'da çalışması, diğerlerinin demo seviyesinde kalması.
-- Yönetişimin yapısal bir özellik olmaktan çıkıp enterprise eklentisine dönüşmesi ve solo ile enterprise ürün arasında fork'a zorlaması.
+- Core governance'in yapısal özellik olmaktan çıkması veya Enterprise modüllerinin ikinci kernel, policy authority ya da evidence chain yaratarak solo ve enterprise ürünleri fork'laması.
 - Öğrenmenin yürütmeyi değiştirmeyi bırakması — memory birikir ama planlama ve routing bu yüzden iyileşmez.
 - Ölçeğin daraltarak elde edilmesi — motorun yalnız kod-biçimli işte çalışması ve diğer yürütme bağlamlarının sessizce yol haritasından düşmesi.
 

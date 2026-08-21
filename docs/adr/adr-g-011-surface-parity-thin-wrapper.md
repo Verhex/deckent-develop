@@ -73,4 +73,4 @@ The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") a
 - **Structure substrate:** ADR-D-004 (Brain Central Import — one-way dependency) + ADR-D-006 (Code Architecture Conventions) — the import-direction LAYER-1 cleans.
 - **Governance:** ADR-G-019 (taxonomy), ADR-G-020 (authority / enforcement).
 - **Born work-items:** LAYER-1 (core→surface inversion cleanup, MASTER-PLAN P1), WATCH-W (backend-agnostic watch + CLI/MCP parity, P1), CLI-ONLY-GENERATED (generated/explicit CLI-only allowlist + alias-map), CLI-COMMANDS-DOC-SYNC (`cli-commands.md` generate-or-non-canonical), PARITY-LINT-GATE (`lint-cli-mcp-parity.mjs` report-only → CI gate + alias-map).
-- **Direction:** `.analysis/adr-review-crosswalk.md` (row 022 → ADR-G-011), `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal-center pivot).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (row 022 → ADR-G-011); owner-approved terminal-center, shared-application-service direction.

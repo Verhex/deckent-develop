@@ -442,7 +442,7 @@ pending those.
 
 ADR-010 was written at Sprint 044 when deckent was CLI-only and declared a **single runtime dependency** (`commander`), with `chalk`/`inquirer`/`prompts` explicitly excluded. That CLI-era dogma drifted as the product grew: the Sprint-172 inventory recorded 9 runtime deps, and `package.json` today carries **13 runtime + 3 optional** — each ADR-justified (MCP server, Memory V2 / SQLite, connectors, crypto identity, embedded terminal, native REPL, dashboard).
 
-The 2026-06-30 review made the drift official policy: **artificially constraining the dependency surface is wrong.** "We can't manage one-time deps" is a false economy — the LLM/AI provider integrations, MCP transport, FTS5 memory, and rich terminal/dashboard are core capabilities that *require* real, well-chosen dependencies. The Hermes lesson is not minimalism but **discipline**: every dependency chosen on merit, version-pinned, source-audited, security surface justified. ADR-010's count-based framing is retired; the governing artifact becomes a **dependency policy + living inventory**. ADR-011 (the built-in `node:readline` prompt) folds in as one applied instance of "use a built-in where it genuinely suffices."
+The 2026-06-30 review made the drift official policy: **artificially constraining the dependency surface is wrong.** "We can't manage one-time deps" is a false economy — the LLM/AI provider integrations, MCP transport, FTS5 memory, and rich terminal/dashboard are core capabilities that *require* real, well-chosen dependencies. The repository evidence points to **discipline**, not minimalism: every dependency is chosen on merit, version-pinned, source-audited, and security-surface justified. ADR-010's count-based framing is retired; the governing artifact becomes a **dependency policy + living inventory**. ADR-011 (the built-in `node:readline` prompt) folds in as one applied instance of "use a built-in where it genuinely suffices."
 
 ---
 
@@ -509,7 +509,7 @@ The 2026-06-30 review made the drift official policy: **artificially constrainin
 
 Deckent's source is held together by a few durable structural conventions. As the codebase grew, three recurring concerns were captured piecemeal across four ADRs: command registration consistency (ADR-012), god-object growth (ADR-024 sprint-controller split, ADR-026 phased split strategy), and dead-code accumulation (ADR-038 disposition audit). The point-in-time figures in those records drifted badly (orchestra module counts, controller LoC) and the Sprint-139 audit's specific module list is now historical.
 
-This ADR consolidates the **durable conventions** and discards the snapshots. Crucially, the 2026-06-30 review corrected the god-object framing: the boundary is **functional cohesion / correct responsibility**, **not a line-count dogma** — Hermes runs 15-18K-LOC files fine; a long file is not the problem, a *mixed-responsibility* file is.
+This ADR consolidates the **durable conventions** and discards the snapshots. Crucially, the 2026-06-30 review corrected the god-object framing: the boundary is **functional cohesion / correct responsibility**, **not a line-count dogma** — a long but cohesive module can be valid; a mixed-responsibility module is the defect.
 
 ---
 
@@ -656,11 +656,13 @@ This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual S
 
 # ADR-D-008: Develop / Product Repo Strategy
 
-**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=single-repo development (no develop→product sync script) + audit-immutable via managed-docs registry-absence (`docs/audits/**` unregistered in `.deckent/docs.json`) → tomorrow=GA-2 one-time `deckent-develop`→`deckent` migration (sensitive-scrub) + enterprise-layer repo decision (ENTERPRISE-REPO-STRATEGY)
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=single-repo compact-monolith development (no develop→product sync script) + audit-immutable via managed-docs registry-absence (`docs/audits/**` unregistered in `.deckent/docs.json`) → tomorrow=GA-2 one-time public Core migration + ADR-G-041 private Enterprise add-on repo, no Core fork/copy
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs / Rewrites:** ADR-065 (Develop/Product Two-Repo Split)
 **Crosswalk:** ADR-065 → ADR-D-008 (REWRITE)
 
 > **Decision change (Alperen, 2026-06-30):** ADR-065's continuous-sync two-repo model will NOT be applied. We continue from a SINGLE repo; when the product reaches its final state we MOVE the code to the `deckent` repo — a one-time migration, not an ongoing sync script.
+
+> **Amendment — 2026-08-21 (ADR-G-041):** `ENTERPRISE-REPO-STRATEGY` is no longer open. Physical separation remains deferred until product/contract stability gates pass; the target is a public MIT `deckent` Core/community repo plus a private commercial Enterprise add-on repo containing no Core source copy. The repositories compose through published semver contracts/module manifests, not continuous source sync or a product fork. [Normative decision](./adr-g-041-core-enterprise-modular-architecture.md).
 
 ---
 
@@ -692,7 +694,7 @@ Old ADR-065 proposed two continuously-synced repos: a private `deckent-develop` 
 
 ## Intent / Roadmap (Tomorrow)
 
-- **🔴 ENTERPRISE-REPO-STRATEGY (open):** how to manage the enterprise layer — candidate: `deckent` (open community/solo) + `deck-ent` (private enterprise layer). Undecided; ties ADR-G-016 MODULARIZE + the CODE-LAYERS 5-layer architecture (deckent-core → deckent-custom), discussed separately.
+- **ENTERPRISE-REPO-STRATEGY (resolved by ADR-G-041):** public `deckent` Core/community repo + private Enterprise add-on repo; no Core source copy, no fork, published semver contracts/module manifests only. Physical extraction waits for the declared product/contract stability gates.
 - **GA-2:** the one-time public migration (`deckent-develop` → `deckent`) at product-final + sensitive-scrub + monorepo/split decision.
 - Possible literal `docs/audits/**` path-guard (defense-in-depth over registry-absence).
 
@@ -987,7 +989,7 @@ Today, per `package.json:6-9` and `docs/guide/installation.md:24-44`, deckent sh
 
 deckent already has exactly **one** daemon-shaped subsystem, and it is scoped narrowly: `src/connectors/gateway/gateway-daemon.ts` (152 lines) + `src/connectors/bot-daemon.ts` (112 lines) run the messaging-connector inbound listener (Telegram/Discord) as a long-lived, detached child process, because polling cannot receive inbound bot messages. Its own header comment is disarmingly honest about the model's limits: *"a detached process does NOT survive a reboot or a crash — that needs an OS supervisor (systemd/pm2). This is 'always-on while the machine is up', not 'survives reboot'"* (`bot-daemon.ts:1-7`). It is tracked by pid file **per project root** (`botPidPath(root)` → `.deckent/bot.pid`, `bot-daemon.ts:16-18`), liveness-checked by a portable, no-throw cross-platform helper (`src/core/pid-liveness.ts`, `isPidAlive`), and stale instances are detected — never auto-killed — by `src/core/daemon-hygiene.ts` (`detectStaleDaemons`, pure detector over an injected process snapshot; `listDeckentProcesses`, an injectable spawn-based cross-platform adapter that returns an honest empty list with `supported:false` on an unrecognized platform rather than guessing).
 
-The reason this axis can no longer stay implicit: **`.analysis/hermes-vs-deckent-direction-decisions.md` §3 (APPROVAL-CONTROL, P0)** commits deckent to a **runtime-wide ApprovalBroker** — an approval-request emitted by any surface (worker/tool/MCP elicitation) must broadcast live to *every* connected channel (terminal, Telegram, WhatsApp, dashboard), and a decision made in any one of them must cross-broadcast "approved in X" to all the others, in real time. §0 (strategic pivot) additionally makes the **terminal** the primary, conversational, tool-driven surface — a UX shape that assumes a live, addressable session, not a one-shot CLI invocation. Both of these push toward *some* durable, addressable process; neither the existing config-precedence work nor the existing file-location work answers what that process's scope and lifecycle should be. That is this document's decision.
+The reason this axis can no longer stay implicit: the owner-approved **runtime-wide ApprovalBroker** direction requires an approval-request emitted by any surface (worker/tool/MCP elicitation) to broadcast live to *every* connected channel (terminal, Telegram, WhatsApp, dashboard), and a decision made in any one of them to cross-broadcast "approved in X" to all the others, in real time. The same product direction makes the **terminal** the primary, conversational, tool-driven surface — a UX shape that assumes a live, addressable session, not a one-shot CLI invocation. Both requirements push toward *some* durable, addressable process; neither the existing config-precedence work nor the existing file-location work answers what that process's scope and lifecycle should be. That is this document's decision.
 
 ---
 
@@ -1172,7 +1174,7 @@ Phased build, gated on Alperen's acceptance of this ADR (nothing below ships wit
 - **Sibling document (file-location axis, not duplicated here):** `docs/design/onb-global-install.md` (Sprint 361-008) — its own §8 ADR draft covers "where do global files live on disk" (flat vs platform-correct XDG/AppData/Library); `src/core/global-scope-resolver.ts`, `src/core/global-store.ts` (Sprint 362-010), `src/core/global-config.ts`, `src/core/state-paths.ts`.
 - **Existing daemon precedent (this document's Option C foundation):** `src/connectors/gateway/gateway-daemon.ts` (152 lines), `src/connectors/bot-daemon.ts` (112 lines, header comment on reboot-survival honesty, `botPidPath` per-project pid file), `src/core/daemon-hygiene.ts` (354 lines, `detectStaleDaemons` pure detector + `listDeckentProcesses` injectable cross-platform adapter, Sprint 331 B-ZOMBIE), `src/core/pid-liveness.ts` (portable no-throw liveness check, Sprint 178).
 - **Install-model evidence:** `package.json:6-9` (`bin.deckent`, `bin.deckent-mcp`); `docs/guide/installation.md:24-44` (npx zero-install / `npm install -g` — both CLI-invocation models).
-- **Direction driver:** `.analysis/hermes-vs-deckent-direction-decisions.md` §0 (strategic pivot — terminal as primary, conversational, tool-driven surface) and §3 (APPROVAL-CONTROL, P0 — runtime-wide multi-channel live-approval broker; this is the concrete requirement that makes the daemon-vs-CLI axis undecidable-by-silence any longer).
+- **Direction driver:** ADR-G-034 (terminal as primary, conversational, tool-driven surface) and ADR-G-020 (runtime-wide multi-channel approval authority); these are the concrete requirements that make the daemon-vs-CLI axis undecidable-by-silence any longer.
 - **MASTER-PLAN:** Row-200 (ONB-GLOBAL, P0, "kesinlikle revize edilecek") — this document is the daemon-vs-CLI sub-decision of that row; the file-location sub-decision (361-008/362-010/363-006) is separate and already in-flight toward its own ADR acceptance.
 - **Born work-items (not yet filed in MASTER-PLAN, pending Alperen's acceptance of this ADR):** ONB-GLOBAL-DAEMON-CORE (Phase 1 — extract/generalize the coordination-daemon module), ONB-GLOBAL-APPROVAL-WIRE (Phase 2 — wire approval emitters + channel subscribers through it), ONB-GLOBAL-DAEMON-SUPERVISOR-EVAL (Phase 3 — future per-machine supervisor evaluation, gated on usage signal per Open Question 5).
 
@@ -2158,7 +2160,7 @@ The gateway scopes inbound sessions per-project and brokers a pairing handshake 
 - **Surface parity:** **ADR-G-011** (Surface Parity & Thin-Wrapper) — bot tool-surface ≡ CLI ≡ MCP ≡ terminal.
 - **Wiring contracts:** WIRE-001 (`NotificationAdapter` notify dispatcher), BOT-1 (humanized bot-agent), BOT-2d (bounded chat history).
 - **Born work-items:** MSG-1 (integration layer), APR-2 (multi-channel approval relay), MSG-3 (WhatsApp wire — incl. `notify_connectors` config-type so whatsapp is first-class = CONNECTOR-CONFIG-TYPE), PAIRING-AUTH (onCallback + hard-auth gate), BOT-TOOL-SURFACE (cost/usage/kpi + group-button approval), CONNECTOR-PLATFORM-REGISTRY (zero-core-change platform registry under MSG-1), SECRET-INLINE-ENFORCE (fail-closed schema rejection of inline tokens).
-- **Direction:** memory `project_messaging_gateway_rearch` (gateway in main, build+T9 pending, ⚠️ auth-gate-less — do not expose publicly), `project_bot_tool_surface_and_group_buttons`, `feedback_telegram_rich_approval_bot`; `.analysis/hermes-vs-deckent-direction-decisions.md` (runtime-wide ApprovalBroker = P0).
+- **Direction:** memory `project_messaging_gateway_rearch` (gateway in main, build+T9 pending, ⚠️ auth-gate-less — do not expose publicly), `project_bot_tool_surface_and_group_buttons`, `feedback_telegram_rich_approval_bot`; runtime-wide ApprovalBroker ownership in ADR-G-020.
 
 
 ---
@@ -2410,7 +2412,7 @@ Sprint output is **rich + multi-section** (not a single-line metric), with ANSI 
 - **Surface partners:** ADR-G-033 (Dashboard — rich detail; absorbed `083D`), ADR-G-034 (Native Agentic Terminal — absorbed ADR-083 REPL-UX), ADR-G-025 (Process Resilience & Live Observability — TERM-LIVE / worker-live-trace).
 - **Parity:** ADR-G-011 (Surface Parity & Thin-Wrapper — output consistent across CLI/MCP/terminal).
 - **Born work-items:** ADR-021-W (`output_splash` real-gate-or-remove = DORMANT-2, MASTER-PLAN P1), TERM-LIVE (live run-status footer, P0).
-- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 020/021 → ADR-G-010), `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal-center pivot).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 020/021 → ADR-G-010); owner-approved terminal-center product direction.
 
 
 ---
@@ -2494,7 +2496,7 @@ The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") a
 - **Structure substrate:** ADR-D-004 (Brain Central Import — one-way dependency) + ADR-D-006 (Code Architecture Conventions) — the import-direction LAYER-1 cleans.
 - **Governance:** ADR-G-019 (taxonomy), ADR-G-020 (authority / enforcement).
 - **Born work-items:** LAYER-1 (core→surface inversion cleanup, MASTER-PLAN P1), WATCH-W (backend-agnostic watch + CLI/MCP parity, P1), CLI-ONLY-GENERATED (generated/explicit CLI-only allowlist + alias-map), CLI-COMMANDS-DOC-SYNC (`cli-commands.md` generate-or-non-canonical), PARITY-LINT-GATE (`lint-cli-mcp-parity.mjs` report-only → CI gate + alias-map).
-- **Direction:** `.analysis/adr-review-crosswalk.md` (row 022 → ADR-G-011), `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal-center pivot).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (row 022 → ADR-G-011); owner-approved terminal-center, shared-application-service direction.
 
 
 ---
@@ -2555,7 +2557,7 @@ Tier selection is real-in-code: a chosen tier maps to actual model-equivalence b
 - **Implementation:** `src/core/config.ts` (`VALID_MODES`, `autoMigrateOnLoad`, legacy-alias map).
 - **Born work-items:** CONFIG-CUSTOMIZE (common/standard + custom mode/tier + NL-terminal customize-ALL via ONB-CHAT + ease/consistency + every-knob-real-in-code), CFG-1, DORMANT-2 (config-knob honesty audit), CONFIG-MIGRATE-UNLIMITED (add `unlimited→api` to the persistent `config-migration.ts` map), CONFIG-REF-CUSTOM-FIX (correct the stale "custom mode fallback" in `config-reference.md`).
 - **Cross-ref:** ADR-G-008 (Provider Abstraction, Fleet & Native-Usage — tier→model-equivalence resolution; original merge-candidate 066/077), ADR-G-001 (Layered Config & Scope), ADR-G-019 (ADR-AUTHORING-STD today+tomorrow framing), ADR-G-030 (Consent / Onboarding — ONB-CHAT NL-setup).
-- **Direction:** terminal-as-primary-surface pivot (`.analysis/hermes-vs-deckent-direction-decisions.md`); `.analysis/adr-review-crosswalk.md` row 023.
+- **Direction:** owner-approved terminal-as-primary-surface pivot; `.analysis/adr-review-crosswalk.md` row 023.
 
 
 ---
@@ -2630,7 +2632,7 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean
 - **Backend partner:** ADR-G-014 (Spawn Backend, Options & Observation — backend-agnostic worker kill).
 - **Authority partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement — ROLE-GUARD process-role teardown).
 - **Born work-items:** MOAT-2 (ORPHAN-START-PROC — normal-completion coordinator linger, MASTER-PLAN P0 — ✅ **done 2026-07-01**: root cause = un-unref'd worker child handle [empirically verified, NOT the timer]; `child.unref()` + SIGTERM→SIGKILL escalation + heartbeat/kill-timeout/`snapshotInterval`/`scanInterval` unref'd DiD + `getActiveResourcesInfo` debug audit; unit + real-binary e2e proven), **WORKER-PGID-TEARDOWN** (born — SIGKILL reaps the direct worker but not its grandchildren; spawn `detached` + `kill(-pid)` for full process-group teardown; ROLE-GUARD-adjacent), SIGTERM-CLEANUP (✅ done 2026-07-02, sprint-350-005 — SIGTERM now runs the SAME interrupt+session-kill cleanup path as SIGINT in entry.ts onSignal; test proves shared path without real signals).
-- **Direction:** `.analysis/adr-review-crosswalk.md` (row 025 → ADR-G-013), `.analysis/hermes-vs-deckent-direction-decisions.md`.
+- **Direction:** `.analysis/adr-review-crosswalk.md` (row 025 → ADR-G-013); runtime lifecycle and recovery requirements in this ADR.
 
 
 ---
@@ -2754,7 +2756,7 @@ The array-args security invariant (ADR-G-002) is carried uniformly for the **out
 - **Absorbs:** ADR-027 (Hybrid Spawn Backend — role-split red-line preserved; single-backend-per-sprint superseded) · ADR-007 (SpawnOptions Interface — folded; **ADR-D-003 intentionally vacant**) · ADR-089 (Backend-Agnostic Worker Observation + per-worker independent backends + CLI/MCP watch-parity).
 - **Cross-ref:** ADR-G-011 (Surface Parity & Thin-Wrapper — CLI≡MCP, WATCH-W) · ADR-G-018 (Verification Protocol & Event-Stream — cross-backend observability substrate) · ADR-G-020 (Authority, Roles, Flow & Enforcement — worktree/scope enforcement, autoApprove security) · ADR-G-025 (Process Resilience & Live Observability — WORKER-LIVE-TRACE) · ADR-G-002 (spawnSync Security Pattern — array-args invariant, uniform per backend) · ADR-G-008 (Provider Abstraction & Fleet — per-provider bypass flags).
 - **Born work-items:** WATCH-W (backend-agnostic watch + CLI/MCP unify, P1) · ORCH-BE (firecracker/cloud/ollama-host backends + per-worker backend declaration) · WORKER-LIVE-TRACE (with ADR-G-025) · WORKER-CMD-ARRAY (inner worker-command string→array-args, G-002 family) · BACKEND-AUTO-ALIGN (`monitor-adapter` `auto` ↔ spawn-factory `auto`, under WATCH-W).
-- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 027 + 007 + 089 → ADR-G-014), `.analysis/hermes-vs-deckent-direction-decisions.md`.
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 027 + 007 + 089 → ADR-G-014); provider-neutral spawn, isolation and observation requirements in this ADR.
 
 
 ---
@@ -2884,11 +2886,13 @@ The "sprint-log" is **to be renamed "deckent-log"** spanning multiple modes (tas
 
 # ADR-G-016: Product Vision — Product, Not Service
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=identity-constitution — every feature/decision validated against the 4 inviolable principles (community-core = ALL features MIT; local-first/free/privacy; core never phones home) — discipline, not yet a CI gate (PRODUCT-IDENTITY-GUARD) → tomorrow=MOD-SPLIT-CLARIFY + license-taxonomy (features-MIT vs governance-assurance-licensed) + MODULARIZE (deckent-solo/enterprise, single codebase, governance-depth NOT feature-gating) + NEVER-PHONE-HOME-POLICY (marketplace/model-catalog network carve-out) + CODE-LAYERS
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=identity-constitution — local-first/free/privacy, complete standalone MIT Core, Core never phones home, no runtime fork — discipline, not yet a CI gate (PRODUCT-IDENTITY-GUARD); Core/Enterprise ownership and commercial module boundary=ADR-G-041 → tomorrow=logical-boundary ratchet + behavior-neutral Core package extraction + separately licensed Enterprise add-ons + NEVER-PHONE-HOME-POLICY
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-033 (Product Vision — Product Not Service, + MOD-SPLIT amendment)
 **Crosswalk:** ADR-033 → ADR-G-016
 
 > **Identity note (Alperen, 2026-06-30):** "Bunu geliştikçe netleştireceğiz ama temel tüm özellikleri içeren katmanımız deckent-core'dur — onu her zaman koruyup geliştireceğiz. Enterprise katman aslında daha katı kontrollü ve disiplinli bir üründür; **işlev farkı yoktur**, denetim ve yönetim mekanizması farkı vardır." This is the product-identity constitution; it evolves and sharpens as the product matures, but its core principles are inviolable.
+
+> **Amendment — 2026-08-21 (ADR-G-041):** The historical `ALL features`, `SAME functionality`, `byte-identical`, `single codebase` and “not a separate repo” wording below is superseded only for the Core/Enterprise ownership and commercial packaging boundary. The preserved invariants are a complete standalone MIT Core, local-first/no-required-cloud, provider neutrality, no degraded Core security and one kernel/runtime/evidence lineage without forks. Enterprise may contain separately licensed additive governance, operations and assurance modules in a private add-on repo. [Normative decision](./adr-g-041-core-enterprise-modular-architecture.md).
 
 ---
 
@@ -3103,7 +3107,7 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 - **Enterprise layer:** **ADR-G-031** (Enterprise Foundation) — multi-tenancy as a modular layer atop this model.
 - **Consent / telemetry:** **ADR-G-030** (Consent-Based Provisioning & Install) — FB-1 opt-in telemetry consent gate.
 - **Born work-items:** **CRED-PER-PROJECT** (per-project `.deckent/credentials.enc` + projectRoot/HKDF key-derivation + sibling-cross-read-fail — the planned-not-built Layer-2; P1) · **SYMLINK-AUTHORITY-WIRE** (wire `isWithinScope` realpathSync into `checkWorkerAuthority`/`checkAuthority` — close symlink-bypass in enforcement; P1) · **ROOT-DISCIPLINE** (explicit `ctx.projectRoot`/`--root` for MCP/REPL/daemon; cwd-fallback non-canonical) · TOOL-SCOPE (scope analyze/approve/edit tool + hard-enforce) · ENTERPRISE-MULTI-TENANCY (ADR-G-031 ENT-* modular layer) · FB-1 (consent-gated opt-in telemetry sender).
-- **Direction:** `docs/design/multi-project-isolation.md`, memory `project_air_gapped_offline_pillar`, `feedback_zero_hardcode_live_data`; `.analysis/hermes-vs-deckent-direction-decisions.md` (global-install + project-scope = P0).
+- **Direction:** `docs/design/multi-project-isolation.md`, memory `project_air_gapped_offline_pillar`, `feedback_zero_hardcode_live_data`; owner-approved global-install + project-scope priority.
 
 
 ---
@@ -3306,6 +3310,8 @@ Context  →  Decision (Today: current-state)  →  Intent/Roadmap (Tomorrow: ta
 
 Static "this is how it is now" is insufficient; an ADR must also state "this is where we are going, and why," so LLM-agents, contributors, and users all work aligned with the evolution direction. Large/complex ADRs (e.g. ADR-G-020, ADR-G-031, ADR-G-035) additionally use **XML-schema / explicit-heading section separation** for unambiguous structure. Format is MADR-v3 hybrid. **Validation scope (today):** `lint:adr` validates the `**Status:**` field, the required sections (Context / Decision / Consequence), and duplicate ids — it does **NOT** yet hard-validate the class-metadata header (Class / Scope / Immutable / Source / Enforcement) or the today/tomorrow authoring-standard (ADR-VALIDATOR-HARDEN). The class-metadata header is mandatory by convention, enforced at review, not by the validator.
 
+**Marka-bağımsız ADR yazımı (owner amendment, 2026-08-22):** Normatif ADR metni rakip veya dış ürün adını mimari imza, benzetme, ödünç-model ya da karar otoritesi olarak taşımaz. Karar; Deckent'in kendi problem tanımı, invariants, repository evidence ve trade-off'larından türetilir. Bir üçüncü taraf adı yalnız gerçekten entegre edilen protocol/provider/service'in teknik subject'i olarak zorunluysa kullanılabilir; o durumda da ürün karşılaştırması veya mimari gerekçe değildir. Bu kural ADR-G, ADR-D, ADR-UG ve ADR-UP'nin tamamı için authoring/review gate'idir.
+
 ### 5. Storage, Recall & Injection (DB-first — see ADR-G-035)
 
 ADRs live **DB-first** in `memory.db` (SSOT); `docs/adr/*.md` + `.brain/exports/decisions.md` are generated views. The `entries` schema carries class-aware columns — `adr_class` (G/D/UG/UP), `scope` (global/project), `immutable`, `source`, `enforcement_level` (ADR-G-035). **State-of-code (honest):** these columns are currently **WRITE-ONLY** — `insert` populates them, but `rowToEntry` does not map them back and `upsert` does not diff them, so structured **class/scope-aware recall is not yet wired** (TAXONOMY-READPATH). Today the **id-prefix** (`adr-g-NNN` / `adr-d-NNN`) carries the class, and recall is FTS5 + Task-DNA relevance over id/content. Injection into brain/worker/auditor prompts runs through `adr-selector.ts`, which still uses **legacy-flat id presets** (`adr-001`, `adr-087`, …) + numeric-only explicit-extraction (`ADR-012`, not `ADR-G-019`) — stale post-migration (ADR-SELECTOR-MIGRATE). The **class/scope-aware recall described next is the TARGET**, not today's behavior: a worker in a user project gets ADR-G (always) + relevant ADR-UG/UP and never ADR-D; a deckent-dev worker also gets ADR-D. Editing an ADR means updating **both** the `.md` and the DB so doc == DB (ADR-G-035 sync invariant).
@@ -3340,7 +3346,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 - **Storage substrate:** ADR-G-035 (Memory Architecture — class-aware schema columns, FTS5, sync invariant).
 - **Governs:** every ADR-G-*, ADR-D-*, and runtime ADR-UG-*/ADR-UP-*.
 - **Born work-items:** ADR-AUTHORING-STD (this doc §4), ADR-LAYER (install-wiring), POLICY-ENGINE-EVAL, **ADR-VALIDATOR-HARDEN** (lint:adr → hard-validate class-metadata + today/tomorrow standard), **TAXONOMY-READPATH** (map `adr_class`/`scope`/`immutable`/… in `rowToEntry` + `upsert` → real class-aware recall), **ADR-SELECTOR-MIGRATE** (`adr-selector.ts` legacy-flat ids → class-aware `adr-g/d-NNN` scheme).
-- **Direction:** `.analysis/adr-governance-redesign-plan.md`, `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `feedback_adr_documents_today_and_tomorrow` · `feedback_governance_aligns_with_direction_pivot`.
+- **Direction:** `.analysis/adr-governance-redesign-plan.md`, memory `feedback_adr_documents_today_and_tomorrow` · `feedback_governance_aligns_with_direction_pivot`.
 
 ---
 
@@ -4548,7 +4554,7 @@ iframe/separate-server xterm — cross-origin auth complexity, no shared token. 
 - **Dashboard host:** **ADR-G-033** (Dashboard — Observability Surface) — hosts the dock; pivot makes the dashboard observability-only.
 - **Governance / lifecycle context:** **ADR-G-019** (ADR Governance — runtime constraint record), **ADR-G-021** (Self-Modifying Detection — terminal touches `src/api/`+`src/dashboard/` → dogfood mode), **ADR-G-026** (Dependency-Wave Execution — implemented over a 5-wave sequence), **ADR-D-007** (Manual Subagent Dispatch — wave-gate transitions during dogfood).
 - **Born work-items:** DESK (desktop-app integration), TERM-RPC (terminal RPC unification across web/native/CLI/MCP), ENTERPRISE-REMOTE (sub-#3 k8s/SSH/SSO backends, sub-#4 audit-export/SIEM), DOCK-UI-FIX (collapsed dock-bar z-index — product sprint).
-- **Direction:** `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`, memory `project_embedded_web_terminal`; `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal=primary surface, dashboard=monitoring-only).
+- **Direction:** `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`, memory `project_embedded_web_terminal`; terminal-primary/dashboard-observe-only ownership in ADR-G-034 and ADR-G-033.
 
 
 ---
@@ -4652,7 +4658,7 @@ Silent auto-install (no consent) — violates user trust and the security DNA. K
 - **Scope / install:** **ADR-G-001** (Layered Config & Scope Precedence) + **ADR-G-017** (Multi-Project Isolation) — global-install + project-scope; FB-1 opt-in telemetry inherits this consent gate.
 - **Governance:** **ADR-G-019** (ADR Governance) — runtime contract record for the provisioning capability.
 - **Born work-items:** ONB-CHAT (NL setup), ONB-1 (onboarding wizard), PSL-6 (consent-gated provider auth-probe), GLOBAL-INSTALL (seed consent-anchored provisioning across projects), PKG-NAME-SSOT (centralize the 13+ hardcoded provider install-hint literals onto planInstall/NPM_PKG), DEAD-PROVISION-PURGE (purge or consent-gate the dead consent-less docker-build helpers `maybeProvisionDockerImage` / `reprovisionWorkerImageAfterUpgrade`).
-- **Direction:** memory `project_air_gapped_offline_pillar`, `project_deckent_everyone_everywhere`, `feedback_proactive_blocker_disclosure`; `.analysis/hermes-vs-deckent-direction-decisions.md` (ONB = P0, global-install + project-scope = P0).
+- **Direction:** memory `project_air_gapped_offline_pillar`, `project_deckent_everyone_everywhere`, `feedback_proactive_blocker_disclosure`; owner-approved ONB and global-install + project-scope priorities.
 
 
 ---
@@ -4663,11 +4669,13 @@ Silent auto-install (no consent) — violates user trust and the security DNA. K
 
 # ADR-G-031: Enterprise Foundation (Tenant · RBAC · Audit · Scheduled-Flows · Connector-Identity)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=opt-in (enterprise-config default-off; community byte-identical) → tomorrow=god-level enterprise governance-depth layer (ADR-G-016 MOD-SPLIT; ENT-* gaps in the modular enterprise layer)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=enterprise concerns are opt-in/default-off but physically dispersed through the compact monolith → tomorrow=ADR-G-041 public Core hooks/contracts + separately licensed Enterprise governance/operations/assurance add-ons
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-068 (Enterprise Foundation) + ADR-069 (Event-Driven Triggers + RBAC) + ADR-071 Part-F4 (RBAC hierarchy + audit-writer + enterprise-config) + ADR-074 Part-B (enterprise RBAC-enforce + audit-export + rate-limiter + RBAC-CLI) + ADR-092 (Connector Social Identity RBAC)
 **Crosswalk:** 068 (+069+071F4+074B+092) → ADR-G-031
 
 > **Note (Alperen, 2026-06-30):** This foundation takes its FINAL form inside the enterprise layer (MOD-SPLIT / deck-ent). The community core has the same functionality; enterprise = depth of governance/audit/management (ADR-G-016), not gated features.
+
+> **Amendment — 2026-08-21 (ADR-G-041):** The inventory and honesty statements in this ADR remain valid. Its `same functionality`, `byte-identical` and final-form ownership language is superseded: Core retains complete standalone execution and all safety/governance invariants; separately licensed Enterprise add-ons may provide additive organization-scale governance, operations and assurance capabilities. They must consume public Core contracts and may not introduce a second kernel, scheduler, policy authority or evidence chain. [Normative decision](./adr-g-041-core-enterprise-modular-architecture.md).
 
 ---
 
@@ -4963,7 +4971,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
   - **ADR-G-009** (Evaluation Integrity / Proof-of-Function) — the dashboard is Tier-1 user-surface; the freeze and hollow-page defects were `wired ≠ working` failures caught by real-binary smoke.
   - **ADR-G-016** (Product Vision) / **ADR-G-010** (Output, Terminal-UX & Brand) — god-level / no-MVP bar; no-emoji + lucide-react + shared theme tokens.
 - **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **DASH-EMOJI-FIX** (2 residual ⚠ → lucide-react) · **DESK-1** (Desktop app) — all to MASTER-PLAN. (The old Chat/Dashboard product-sprint items — chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise read→write — are largely resolved; see Consequences.)
-- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), memory `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`; terminal-primary/dashboard-observe-only ownership in ADR-G-034.
 
 
 ---
@@ -4978,7 +4986,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 **Status:** accepted (provisional — primary terminal-surface shipped; slash-mode-filter + NL-dispatch not wired to the default Ink path [SLASH-MODE-WIRE / NL-DISPATCH-DECISION], slash-registry is a static catalog not capability-derived) · **Date:** 2026-06-30 · **Absorbs:** ADR-081 (Native Agentic Deckent) + ADR-074 Part-A (native-chat round-trip) + ADR-082 Part-A (real-LLM-wire) + ADR-083 (REPL-UX + provider-parity + local-model) + ADR-086 (Native CLI Parity F11)
 **Crosswalk:** 081 (+074A+082A+083+086) → ADR-G-034
 
-> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality is non-negotiable (flexibility/cutting-corners is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). At the level of Claude Code / Hermes / Codex / OpenClaw. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
+> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality is non-negotiable (flexibility/cutting-corners is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). Its quality bar comes from Deckent's own declared workflows, control depth and evidence requirements. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
 
 ---
 
@@ -5028,7 +5036,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 ## Intent / Roadmap (Tomorrow)
 
-- **TOOL progressive-disclosure** (Hermes-rolemodel + better): deckent's functions move to a tool-surface; core tool-set eager + a searchable bridge (search/describe/call). Terminal is tool-driven; CLI/MCP optional. (MASTER-PLAN: TOOL-1/TOOL-2.)
+- **TOOL progressive-disclosure:** deckent's functions move to a tool-surface; core tool-set eager + a searchable bridge (search/describe/call). Terminal is tool-driven; CLI/MCP optional. (MASTER-PLAN: TOOL-1/TOOL-2.)
 - **WORKER-LIVE-TRACE** in-terminal (ADR-G-025): live per-worker run-status footer (TERM-LIVE).
 - **Runtime-wide ApprovalBroker integration** (APR): risky tool/worker actions emit → terminal live → suspend/resume; multi-channel relay.
 - **Scope-enforcement via TOOL, not prompt** (TOOL-SCOPE): worker out-of-scope is tool-gated → shrinks worker prompts (WP-OPT).
@@ -5040,7 +5048,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 **(+)** The product's primary individual surface is a real, agentic, multi-provider, polished terminal at parity with the best CLIs — the pivot's "terminal runs" thesis is shipped. Local-model foundation enables offline/air-gapped + cost-free dogfooding. Enterprise capability is reachable but unobtrusive.
 
-**(−)** TOOL progressive-disclosure, WORKER-LIVE-TRACE, ApprovalBroker integration, and TOOL-SCOPE are roadmap (the "must be BETTER than Hermes at tool+terminal" bar is forward work). Several pieces are delivered-but-not-default: the `src/agent/*` native-agent engine is flag-gated (`DECKENT_NATIVE_AGENT=1` / `--native`, default OFF — M4 cutover pending); `entry.ts` keeps an inline `buildReplProvider` vs the `resolveChatAdapter` SSOT (born PROVIDER-SSOT); the mode-filter + NL-dispatch are not wired to the default Ink path (born SLASH-MODE-WIRE / NL-DISPATCH-DECISION). Dashboard-chat is being de-emphasized in favor of this surface + the desktop app.
+**(−)** TOOL progressive-disclosure, WORKER-LIVE-TRACE, ApprovalBroker integration, and TOOL-SCOPE are roadmap; the declared tool+terminal acceptance bar is forward work. Several pieces are delivered-but-not-default: the `src/agent/*` native-agent engine is flag-gated (`DECKENT_NATIVE_AGENT=1` / `--native`, default OFF — M4 cutover pending); `entry.ts` keeps an inline `buildReplProvider` vs the `resolveChatAdapter` SSOT (born PROVIDER-SSOT); the mode-filter + NL-dispatch are not wired to the default Ink path (born SLASH-MODE-WIRE / NL-DISPATCH-DECISION). Dashboard-chat is being de-emphasized in favor of this surface + the desktop app.
 
 ---
 
@@ -5090,7 +5098,7 @@ from a single undifferentiated "roadmap" bucket into the matrix above.
 - **Absorbs:** ADR-081 + ADR-074A + ADR-082A + ADR-083 + ADR-086.
 - **Cross-ref:** ADR-G-033 (dashboard = observability; chat→DESK) · ADR-G-025 (WORKER-LIVE-TRACE) · ADR-G-008 (provider-parity/fleet) · ADR-G-022 (/nervous) · ADR-G-031 (enterprise slash) · ADR-G-009 (proof-of-function for surface tasks).
 - **Born / MASTER-PLAN:** TERM-* · TOOL-1/2 (progressive-disclosure) · APR (ApprovalBroker) · TOOL-SCOPE · WP-OPT · DESK-1.
-- **Memory:** `project_deckent_native_terminal_agent` · `project_hermes_deckent_direction_2026_06`.
+- **Memory:** `project_deckent_native_terminal_agent` · `feedback_governance_aligns_with_direction_pivot`.
 
 
 ---
@@ -5402,3 +5410,133 @@ Status: accepted. Owner: Alperen. Date: 2026-08-20.
 **Context:** The evaluation surface grew beyond the original 3-value task verdict (GO / NO_GO / GO_WITH_TECH_DEBT): the criterion kernel speaks satisfied/unsatisfied/undecidable, cross-verify speaks CONFIRMED/REFUTED/UNCLEAR/HOLD, workers self-report DONE/GO_WITH_TECH_DEBT/NO_GO, and the surface-equalization programme (EVALUATION-001) needs one vocabulary that reads identically for an ERP process evaluation and a solo assistant task. Multi-word composites were rejected by the owner: every status must be a single word.
 
 **Decision:** One normative verdict vocabulary of exactly five single words — CONFIRMED (proven pass) · QUALIFIED (pass with a typed reservation, audit-sense "qualified opinion"; the reservation travels in TaskResult.residualDebt) · UNDECIDABLE (honestly undecidable on present evidence; the routing signal toward a code/llm/human confirmation adapter, never a penalty) · FAILED (proven fail) · HOLD (procedural: authority/evidence chain incomplete; never a closure). SSOT module: src/core/verdict-types.ts (frozen list + total legacy→normative converters; the lossy normative→legacy direction returns null instead of guessing — a silent substitution is a fabricated verdict). Migration is layered, never big-bang: legacy vocabularies remain authoritative on their surfaces and each surface migrates by carrying the normative projection alongside first (evaluation audit records carry normativeVerdict since this slice), then flipping readers. Acceptance-policy widening (task-kind x verdict routing matrix) builds on this vocabulary in the Evaluation Surface slices.
+
+---
+
+## adr-g-041: Deckent Core ve Verhex Enterprise Modüler Ürün Mimarisi
+
+**Status:** accepted
+
+# ADR-G-041: Deckent Core ve Verhex Enterprise Modüler Ürün Mimarisi
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** no · **Source:** publisher · **Enforcement:** today=logical ownership boundary + no-new-crossing ratchet direction; compact modular monolith remains physically intact → tomorrow=public MIT Core packages/repo + private commercial Enterprise add-ons, one kernel lineage and no fork
+**Status:** accepted · **Date:** 2026-08-21 · **Amends:** ADR-G-016 §§2–3 · ADR-G-031 community/enterprise ownership language · ADR-D-008 enterprise repo strategy · **Refines:** ADR-D-006 MOD-SPLIT/GODOBJ
+**Decision authority:** Alperen live direction, 2026-08-21/22
+
+> Bu ADR önceki kararların geçmişini silmez. `ALL features`, `SAME functionality`, `byte-identical`, `single codebase` ve “enterprise repo strategy open” ifadelerinin normatif yorumunu bu ADR'nin exact amendment scope'u içinde değiştirir. Local-first, free MIT Core, no required cloud, no fork, provider neutrality ve Core'da güvenlik/yönetişim invariants ilkeleri aynen korunur.
+
+---
+
+## Context
+
+Deckent bugün tek root npm package, tek MIT lisansı ve compact `src/` graph'ı olarak gelişiyor. Core runtime, orchestra, workers, providers, surfaces ve enterprise foundation fiziksel package sınırlarıyla ayrılmamış durumda. 2026-08-21 ölçümünde `orchestra→core` 986, `cli→core` 596 ve `cli→orchestra` 157 import görüldü; 51-file core ve 46-file orchestra/CLI strongly connected component bulundu. Bu sayılar kalıcı eşik değil, responsibility/state/composition coupling snapshot'ıdır.
+
+ADR-G-016 community'nin “ALL features” ve Enterprise'ın “SAME functionality” taşıdığını; ADR-G-031 community deployment'ın byte-identical olduğunu; ADR-D-008 ise olası `deckent` + `deck-ent` repo modelini açık karar olarak bırakıyordu. Bu dil, ayrı lisanslı ve gerçek değer üreten additive Enterprise modules hedefiyle gereğinden katıdır. Aynı zamanda enterprise ayrımının Core'u bilinçli olarak eksik veya güvensiz bırakmasına izin vermemek gerekir.
+
+Owner yönü iki ticari katmandır: ücretsiz/MIT Deckent Core ve Verhex Enterprise Layer giydirilmiş ücretli Deckent Enterprise. Fiziksel modüler ayırma, yaklaşık iki aylık product-surface kapanışından sonra yapılacaktır. Karar verilmeden beklemek ise coupling'i büyütüp gelecekteki ayırmayı big-bang rewrite'a dönüştürür.
+
+## Decision (Today)
+
+### 1. İki offering, tek kernel lineage
+
+```text
+Deckent Core / Community (MIT, free, complete standalone product)
+                         +
+Verhex Deckent Enterprise (commercial additive modules)
+                         =
+Enterprise deployment using the same Core kernel/runtime/contracts
+```
+
+“Tek ürün” artık byte-identical installation veya tek package/repo demek değildir. Tek ürün lineage'ı; aynı deterministic kernel, work ontology, provider/tool contracts, application services, evidence chain ve compatibility policy demektir. Community ile Enterprise arasında runtime fork'u, kopyalanmış Core source'u veya ikinci scheduler/policy/evidence authority yasaktır.
+
+### 2. Core boundary
+
+Core şunların tamamını kapsar:
+
+- versioned contracts/schemas/events/errors;
+- deterministic kernel, state machines ve safety invariants;
+- orchestration/runtime, workers, tools, recovery ve evidence;
+- transport-independent application services/read models;
+- provider/model/MCP/tool/connector/storage/platform SPI'ları;
+- local-first persistence ve standart adapterlar;
+- Terminal/CLI/API/MCP/Desktop/Dashboard community composition yüzeyleri;
+- basic identity context, scope, approval, audit, secret safety ve provider-neutral policy hooks.
+
+Core tek başına kurulabilir, güvenli ve işlevsel kalır. Enterprise, temel güvenlik veya doğru execution için zorunlu değildir.
+
+### 3. Enterprise boundary
+
+Enterprise yalnız additive organization-scale governance, operations ve assurance uygular: tenant/org management, SSO/SAML/OIDC/SCIM adapters, custom RBAC/ABAC/policy packs, compliance/audit export, residency/retention, fleet/HA/distributed adapters, enterprise connectors/admin console, commercial entitlement ve support operations.
+
+Enterprise yalnız published Core contracts/SPI/application APIs tüketir. Core internals'a deep import, Core state machine override'ı ve parallel authority yasaktır. License checks kernel/runtime business logic'ine dağılmaz; module admission/composition boundary'sinde kalır.
+
+### 4. Bugünkü fiziksel durum
+
+Yaklaşık iki aylık product-surface hedefi tamamlanana ve contract-stability gates geçilene kadar repository fiziksel olarak bölünmez. Compact modular monolith korunur. Buna rağmen bugünden:
+
+- her yeni capability için target owner yazılır;
+- yeni cross-layer import baseline'ı büyütemez;
+- enterprise concern public port arkasında doğar;
+- surfaces business/state authority sahibi olamaz;
+- yeni parallel config, registry, runtime veya framework kurulamaz.
+
+### 5. Hedef package/repo topolojisi
+
+Dependency yönü:
+
+```text
+@deckent/contracts
+        ↓
+@deckent/kernel
+        ↓
+@deckent/runtime
+        ↓
+@deckent/application
+        ├─ provider/integration/storage/platform SDK + adapters
+        ├─ deckent community distribution
+        └─ @verhex/deckent-enterprise-* add-ons
+```
+
+Hedef repo topolojisi:
+
+- public `deckent`: MIT Core packages ve community distribution;
+- private enterprise repo: yalnız commercial add-ons, Core source kopyası yok;
+- customer/partner repos: public versioned contracts'a bağlı özel modules.
+
+Mevcut root `deckent` package, physical extraction sırasında versioned compatibility facade olarak korunur.
+
+### 6. Kararın marka-bağımsızlığı
+
+Bu architecture Deckent'in kendi product, kernel, contract, licensing ve no-fork gereksinimlerinden türetilmiştir; dış ürün/marka analojisi normatif gerekçe değildir ve ADR içinde taşınmaz. Kesin commercial license koşulları ayrı hukuk/ticaret kararıdır.
+
+Normatif ayrıntı, gates ve migration sırası: [Deckent Core ve Verhex Enterprise Modüler Mimarisi](../design/DECKENT-CORE-ENTERPRISE-MODULAR-ARCHITECTURE.md).
+
+## Intent / Roadmap (Tomorrow)
+
+1. `MODULAR-BOUNDARY-FREEZE-001`: logical ownership map, module manifests ve source-graph ratchet.
+2. Product/contract stability: kernel ontology, application services, surface protocol ve adapter ports kapanışı.
+3. `CORE-PACKAGE-EXTRACTION-001`: contracts → kernel → runtime → application/SPI sırasıyla davranış-nötr extraction.
+4. `ENTERPRISE-ADDON-EXTRACTION-001`: private add-on repo, entitlement loader ve isolated state migrations.
+5. `MODULAR-CUTOVER-ASSURANCE-001`: compatibility, upgrade/rollback, every-environment ve supply-chain proof.
+
+Takvim başlangıç sinyalidir; physical split admission'ı contract stability ve behavior proof belirler. Big-bang taşıma yapılmaz; consumer-by-consumer strangler extraction uygulanır.
+
+## Consequences
+
+**(+)** Ticari sınır açıklaşır: Community complete ve güvenli kalırken Enterprise gerçek additive değer satabilir. Tek kernel/evidence lineage korunur. Private repo Core fork'una dönüşmez. Fiziksel ayırma product delivery'yi bugün kesmez, fakat gelecek coupling bugünden sınırlanır.
+
+**(+)** Verhex AI Layer'ın ownership'i netleşir: enterprise control/governance plane Deckent Core runtime'ın üstünde compose olur; ERP, IdP, SIEM, KMS, vector DB ve provider infrastructure dış servis/adapter olarak kalır.
+
+**(−)** “ALL features / SAME functionality / byte-identical” sloganı artık normatif değildir; Community ve Enterprise additive capability setleri farklı olabilir. Korunan invariant feature eşitliği değil, complete standalone Core + no degraded security + no fork'tur.
+
+**(−)** İki repo ve iki license; compatibility matrix, release coordination, entitlement lifecycle, cross-repo CI ve legal review yükü getirir. Bu yükü azaltmak için Enterprise yalnız semver'li public contracts'a bağlanır.
+
+**Risk:** Mantıksal ratchet physical split'e kadar uygulanmazsa iki ay sonra package extraction yerine rewrite gerekir. `LAYER-BOUNDARY-GATE-001` bu nedenle commercial packaging'den önce gelir.
+
+## References
+
+- [ADR-G-016](./adr-g-016-product-vision.md) — local-first/free/no-required-cloud identity korunur; §§2–3 exact scope'ta amended.
+- [ADR-G-031](./adr-g-031-enterprise-foundation.md) — mevcut enterprise foundation inventory korunur; ownership/final-form language amended.
+- [ADR-D-008](./adr-d-008-repo-strategy.md) — enterprise repo strategy bu ADR ile çözüldü.
+- [ADR-D-006](./adr-d-006-code-architecture-conventions.md) — cohesion-not-LoC ve behavior-preserving split.
+- `ENTERPRISE-MODULARITY-001`, `LAYER-BOUNDARY-GATE-001`, `APP-SERVICE-001`, `SURFACE-CONTRACT-001`, `STORAGE-001`.

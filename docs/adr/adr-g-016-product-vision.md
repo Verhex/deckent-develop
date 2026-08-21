@@ -1,10 +1,12 @@
 # ADR-G-016: Product Vision — Product, Not Service
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=identity-constitution — every feature/decision validated against the 4 inviolable principles (community-core = ALL features MIT; local-first/free/privacy; core never phones home) — discipline, not yet a CI gate (PRODUCT-IDENTITY-GUARD) → tomorrow=MOD-SPLIT-CLARIFY + license-taxonomy (features-MIT vs governance-assurance-licensed) + MODULARIZE (deckent-solo/enterprise, single codebase, governance-depth NOT feature-gating) + NEVER-PHONE-HOME-POLICY (marketplace/model-catalog network carve-out) + CODE-LAYERS
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=identity-constitution — local-first/free/privacy, complete standalone MIT Core, Core never phones home, no runtime fork — discipline, not yet a CI gate (PRODUCT-IDENTITY-GUARD); Core/Enterprise ownership and commercial module boundary=ADR-G-041 → tomorrow=logical-boundary ratchet + behavior-neutral Core package extraction + separately licensed Enterprise add-ons + NEVER-PHONE-HOME-POLICY
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-033 (Product Vision — Product Not Service, + MOD-SPLIT amendment)
 **Crosswalk:** ADR-033 → ADR-G-016
 
 > **Identity note (Alperen, 2026-06-30):** "Bunu geliştikçe netleştireceğiz ama temel tüm özellikleri içeren katmanımız deckent-core'dur — onu her zaman koruyup geliştireceğiz. Enterprise katman aslında daha katı kontrollü ve disiplinli bir üründür; **işlev farkı yoktur**, denetim ve yönetim mekanizması farkı vardır." This is the product-identity constitution; it evolves and sharpens as the product matures, but its core principles are inviolable.
+
+> **Amendment — 2026-08-21 (ADR-G-041):** The historical `ALL features`, `SAME functionality`, `byte-identical`, `single codebase` and “not a separate repo” wording below is superseded only for the Core/Enterprise ownership and commercial packaging boundary. The preserved invariants are a complete standalone MIT Core, local-first/no-required-cloud, provider neutrality, no degraded Core security and one kernel/runtime/evidence lineage without forks. Enterprise may contain separately licensed additive governance, operations and assurance modules in a private add-on repo. [Normative decision](./adr-g-041-core-enterprise-modular-architecture.md).
 
 ---
 

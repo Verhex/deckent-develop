@@ -82,4 +82,4 @@ Sprint output is **rich + multi-section** (not a single-line metric), with ANSI 
 - **Surface partners:** ADR-G-033 (Dashboard — rich detail; absorbed `083D`), ADR-G-034 (Native Agentic Terminal — absorbed ADR-083 REPL-UX), ADR-G-025 (Process Resilience & Live Observability — TERM-LIVE / worker-live-trace).
 - **Parity:** ADR-G-011 (Surface Parity & Thin-Wrapper — output consistent across CLI/MCP/terminal).
 - **Born work-items:** ADR-021-W (`output_splash` real-gate-or-remove = DORMANT-2, MASTER-PLAN P1), TERM-LIVE (live run-status footer, P0).
-- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 020/021 → ADR-G-010), `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal-center pivot).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 020/021 → ADR-G-010); owner-approved terminal-center product direction.

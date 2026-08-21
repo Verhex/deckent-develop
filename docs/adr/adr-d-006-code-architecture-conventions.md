@@ -12,7 +12,7 @@
 
 Deckent's source is held together by a few durable structural conventions. As the codebase grew, three recurring concerns were captured piecemeal across four ADRs: command registration consistency (ADR-012), god-object growth (ADR-024 sprint-controller split, ADR-026 phased split strategy), and dead-code accumulation (ADR-038 disposition audit). The point-in-time figures in those records drifted badly (orchestra module counts, controller LoC) and the Sprint-139 audit's specific module list is now historical.
 
-This ADR consolidates the **durable conventions** and discards the snapshots. Crucially, the 2026-06-30 review corrected the god-object framing: the boundary is **functional cohesion / correct responsibility**, **not a line-count dogma** — Hermes runs 15-18K-LOC files fine; a long file is not the problem, a *mixed-responsibility* file is.
+This ADR consolidates the **durable conventions** and discards the snapshots. Crucially, the 2026-06-30 review corrected the god-object framing: the boundary is **functional cohesion / correct responsibility**, **not a line-count dogma** — a long but cohesive module can be valid; a mixed-responsibility module is the defect.
 
 ---
 

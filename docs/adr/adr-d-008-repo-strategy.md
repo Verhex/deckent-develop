@@ -1,10 +1,12 @@
 # ADR-D-008: Develop / Product Repo Strategy
 
-**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=single-repo development (no develop→product sync script) + audit-immutable via managed-docs registry-absence (`docs/audits/**` unregistered in `.deckent/docs.json`) → tomorrow=GA-2 one-time `deckent-develop`→`deckent` migration (sensitive-scrub) + enterprise-layer repo decision (ENTERPRISE-REPO-STRATEGY)
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=single-repo compact-monolith development (no develop→product sync script) + audit-immutable via managed-docs registry-absence (`docs/audits/**` unregistered in `.deckent/docs.json`) → tomorrow=GA-2 one-time public Core migration + ADR-G-041 private Enterprise add-on repo, no Core fork/copy
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs / Rewrites:** ADR-065 (Develop/Product Two-Repo Split)
 **Crosswalk:** ADR-065 → ADR-D-008 (REWRITE)
 
 > **Decision change (Alperen, 2026-06-30):** ADR-065's continuous-sync two-repo model will NOT be applied. We continue from a SINGLE repo; when the product reaches its final state we MOVE the code to the `deckent` repo — a one-time migration, not an ongoing sync script.
+
+> **Amendment — 2026-08-21 (ADR-G-041):** `ENTERPRISE-REPO-STRATEGY` is no longer open. Physical separation remains deferred until product/contract stability gates pass; the target is a public MIT `deckent` Core/community repo plus a private commercial Enterprise add-on repo containing no Core source copy. The repositories compose through published semver contracts/module manifests, not continuous source sync or a product fork. [Normative decision](./adr-g-041-core-enterprise-modular-architecture.md).
 
 ---
 
@@ -36,7 +38,7 @@ Old ADR-065 proposed two continuously-synced repos: a private `deckent-develop` 
 
 ## Intent / Roadmap (Tomorrow)
 
-- **🔴 ENTERPRISE-REPO-STRATEGY (open):** how to manage the enterprise layer — candidate: `deckent` (open community/solo) + `deck-ent` (private enterprise layer). Undecided; ties ADR-G-016 MODULARIZE + the CODE-LAYERS 5-layer architecture (deckent-core → deckent-custom), discussed separately.
+- **ENTERPRISE-REPO-STRATEGY (resolved by ADR-G-041):** public `deckent` Core/community repo + private Enterprise add-on repo; no Core source copy, no fork, published semver contracts/module manifests only. Physical extraction waits for the declared product/contract stability gates.
 - **GA-2:** the one-time public migration (`deckent-develop` → `deckent`) at product-final + sensitive-scrub + monorepo/split decision.
 - Possible literal `docs/audits/**` path-guard (defense-in-depth over registry-absence).
 

@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f63ae71308ea623a7f1c6a4003c6af7bb2f276249e869fbb9b13fe6c23b8b865`
+**Source digest:** `sha256(normalized-lf-utf8):dc45b9a6034097531caf13003e993257aea53e3f394fa8ba31f27ceb541bdbad`
 
-**Rows:** 517 total · 452 active · 65 terminal
+**Rows:** 521 total · 456 active · 65 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 358 |
+| OPEN | 362 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -477,4 +477,8 @@
 | 10060 | `COST-001` | OPEN | P1 | COST | `LIMIT-001`, `SLO-001` | — | Provider, compute, storage and operator cost authority |
 | 10061 | `COST-CONFIG-RECONCILIATION-001` | OPEN | P1 | COST | `CONFIG-TRUTH-001`, `LIMIT-001` | — | Bundled pricing catalog, project policy ve learned estimator için versioned field-ownership/reconciliation authority |
 | 10070 | `ENTERPRISE-MODULARITY-001` | OPEN | P1 | ENTERPRISE | `ENTERPRISE-AUTH-001`, `STORAGE-001` | — | Solo/community/enterprise module boundaries without core forks |
+| 10071 | `MODULAR-BOUNDARY-FREEZE-001` | OPEN | P1 | ENTERPRISE | — | — | Compact monolith korunurken Deckent Core, community distribution ve Verhex Enterprise ownership sınırı ile yeni dependency-crossing ratchet'i executable hale gelir |
+| 10072 | `CORE-PACKAGE-EXTRACTION-001` | OPEN | P2 | ENTERPRISE | `MODULAR-BOUNDARY-FREEZE-001`, `KERNEL-ONTOLOGY-001`, `APP-SERVICE-001`, `SURFACE-CONTRACT-001` | — | Product ve public contract stability kapılarından sonra Core contracts, kernel, runtime, application ve SPI katmanları davranış-nötr package'lara çıkarılır |
+| 10073 | `ENTERPRISE-ADDON-EXTRACTION-001` | OPEN | P2 | ENTERPRISE | `CORE-PACKAGE-EXTRACTION-001`, `ENTERPRISE-AUTH-001`, `STORAGE-001`, `P02-654` | — | Verhex Deckent Enterprise, public Core üzerine ayrı lisanslı private add-on packages/repo ve tek composition boundary olarak çıkarılır |
+| 10074 | `MODULAR-CUTOVER-ASSURANCE-001` | OPEN | P2 | ASSURANCE | `CORE-PACKAGE-EXTRACTION-001`, `ENTERPRISE-ADDON-EXTRACTION-001`, `ENV-ADAPTER-001`, `PLATFORM-PROOF-001`, `PACKAGING-001` | — | Core-only ve Core+Enterprise dağıtımları için compatibility, migration, rollback, every-environment ve supply-chain cutover kanıtı kapanır |
 | 10080 | `ASSURANCE-PACK-001` | OPEN | P0 | ASSURANCE | `DATA-GOV-001`, `LOAD-CHAOS-001`, `P02-655` | — | Security, privacy, reliability, performance and compliance evidence pack |

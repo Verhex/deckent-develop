@@ -50,4 +50,4 @@ Tier selection is real-in-code: a chosen tier maps to actual model-equivalence b
 - **Implementation:** `src/core/config.ts` (`VALID_MODES`, `autoMigrateOnLoad`, legacy-alias map).
 - **Born work-items:** CONFIG-CUSTOMIZE (common/standard + custom mode/tier + NL-terminal customize-ALL via ONB-CHAT + ease/consistency + every-knob-real-in-code), CFG-1, DORMANT-2 (config-knob honesty audit), CONFIG-MIGRATE-UNLIMITED (add `unlimited→api` to the persistent `config-migration.ts` map), CONFIG-REF-CUSTOM-FIX (correct the stale "custom mode fallback" in `config-reference.md`).
 - **Cross-ref:** ADR-G-008 (Provider Abstraction, Fleet & Native-Usage — tier→model-equivalence resolution; original merge-candidate 066/077), ADR-G-001 (Layered Config & Scope), ADR-G-019 (ADR-AUTHORING-STD today+tomorrow framing), ADR-G-030 (Consent / Onboarding — ONB-CHAT NL-setup).
-- **Direction:** terminal-as-primary-surface pivot (`.analysis/hermes-vs-deckent-direction-decisions.md`); `.analysis/adr-review-crosswalk.md` row 023.
+- **Direction:** owner-approved terminal-as-primary-surface pivot; `.analysis/adr-review-crosswalk.md` row 023.

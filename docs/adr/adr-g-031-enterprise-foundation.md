@@ -1,10 +1,12 @@
 # ADR-G-031: Enterprise Foundation (Tenant · RBAC · Audit · Scheduled-Flows · Connector-Identity)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=opt-in (enterprise-config default-off; community byte-identical) → tomorrow=god-level enterprise governance-depth layer (ADR-G-016 MOD-SPLIT; ENT-* gaps in the modular enterprise layer)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=enterprise concerns are opt-in/default-off but physically dispersed through the compact monolith → tomorrow=ADR-G-041 public Core hooks/contracts + separately licensed Enterprise governance/operations/assurance add-ons
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-068 (Enterprise Foundation) + ADR-069 (Event-Driven Triggers + RBAC) + ADR-071 Part-F4 (RBAC hierarchy + audit-writer + enterprise-config) + ADR-074 Part-B (enterprise RBAC-enforce + audit-export + rate-limiter + RBAC-CLI) + ADR-092 (Connector Social Identity RBAC)
 **Crosswalk:** 068 (+069+071F4+074B+092) → ADR-G-031
 
 > **Note (Alperen, 2026-06-30):** This foundation takes its FINAL form inside the enterprise layer (MOD-SPLIT / deck-ent). The community core has the same functionality; enterprise = depth of governance/audit/management (ADR-G-016), not gated features.
+
+> **Amendment — 2026-08-21 (ADR-G-041):** The inventory and honesty statements in this ADR remain valid. Its `same functionality`, `byte-identical` and final-form ownership language is superseded: Core retains complete standalone execution and all safety/governance invariants; separately licensed Enterprise add-ons may provide additive organization-scale governance, operations and assurance capabilities. They must consume public Core contracts and may not introduce a second kernel, scheduler, policy authority or evidence chain. [Normative decision](./adr-g-041-core-enterprise-modular-architecture.md).
 
 ---
 

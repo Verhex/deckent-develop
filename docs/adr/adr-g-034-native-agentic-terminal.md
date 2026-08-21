@@ -4,7 +4,7 @@
 **Status:** accepted (provisional — primary terminal-surface shipped; slash-mode-filter + NL-dispatch not wired to the default Ink path [SLASH-MODE-WIRE / NL-DISPATCH-DECISION], slash-registry is a static catalog not capability-derived) · **Date:** 2026-06-30 · **Absorbs:** ADR-081 (Native Agentic Deckent) + ADR-074 Part-A (native-chat round-trip) + ADR-082 Part-A (real-LLM-wire) + ADR-083 (REPL-UX + provider-parity + local-model) + ADR-086 (Native CLI Parity F11)
 **Crosswalk:** 081 (+074A+082A+083+086) → ADR-G-034
 
-> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality is non-negotiable (flexibility/cutting-corners is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). At the level of Claude Code / Hermes / Codex / OpenClaw. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
+> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality is non-negotiable (flexibility/cutting-corners is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). Its quality bar comes from Deckent's own declared workflows, control depth and evidence requirements. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
 
 ---
 
@@ -54,7 +54,7 @@
 
 ## Intent / Roadmap (Tomorrow)
 
-- **TOOL progressive-disclosure** (Hermes-rolemodel + better): deckent's functions move to a tool-surface; core tool-set eager + a searchable bridge (search/describe/call). Terminal is tool-driven; CLI/MCP optional. (MASTER-PLAN: TOOL-1/TOOL-2.)
+- **TOOL progressive-disclosure:** deckent's functions move to a tool-surface; core tool-set eager + a searchable bridge (search/describe/call). Terminal is tool-driven; CLI/MCP optional. (MASTER-PLAN: TOOL-1/TOOL-2.)
 - **WORKER-LIVE-TRACE** in-terminal (ADR-G-025): live per-worker run-status footer (TERM-LIVE).
 - **Runtime-wide ApprovalBroker integration** (APR): risky tool/worker actions emit → terminal live → suspend/resume; multi-channel relay.
 - **Scope-enforcement via TOOL, not prompt** (TOOL-SCOPE): worker out-of-scope is tool-gated → shrinks worker prompts (WP-OPT).
@@ -66,7 +66,7 @@
 
 **(+)** The product's primary individual surface is a real, agentic, multi-provider, polished terminal at parity with the best CLIs — the pivot's "terminal runs" thesis is shipped. Local-model foundation enables offline/air-gapped + cost-free dogfooding. Enterprise capability is reachable but unobtrusive.
 
-**(−)** TOOL progressive-disclosure, WORKER-LIVE-TRACE, ApprovalBroker integration, and TOOL-SCOPE are roadmap (the "must be BETTER than Hermes at tool+terminal" bar is forward work). Several pieces are delivered-but-not-default: the `src/agent/*` native-agent engine is flag-gated (`DECKENT_NATIVE_AGENT=1` / `--native`, default OFF — M4 cutover pending); `entry.ts` keeps an inline `buildReplProvider` vs the `resolveChatAdapter` SSOT (born PROVIDER-SSOT); the mode-filter + NL-dispatch are not wired to the default Ink path (born SLASH-MODE-WIRE / NL-DISPATCH-DECISION). Dashboard-chat is being de-emphasized in favor of this surface + the desktop app.
+**(−)** TOOL progressive-disclosure, WORKER-LIVE-TRACE, ApprovalBroker integration, and TOOL-SCOPE are roadmap; the declared tool+terminal acceptance bar is forward work. Several pieces are delivered-but-not-default: the `src/agent/*` native-agent engine is flag-gated (`DECKENT_NATIVE_AGENT=1` / `--native`, default OFF — M4 cutover pending); `entry.ts` keeps an inline `buildReplProvider` vs the `resolveChatAdapter` SSOT (born PROVIDER-SSOT); the mode-filter + NL-dispatch are not wired to the default Ink path (born SLASH-MODE-WIRE / NL-DISPATCH-DECISION). Dashboard-chat is being de-emphasized in favor of this surface + the desktop app.
 
 ---
 
@@ -116,4 +116,4 @@ from a single undifferentiated "roadmap" bucket into the matrix above.
 - **Absorbs:** ADR-081 + ADR-074A + ADR-082A + ADR-083 + ADR-086.
 - **Cross-ref:** ADR-G-033 (dashboard = observability; chat→DESK) · ADR-G-025 (WORKER-LIVE-TRACE) · ADR-G-008 (provider-parity/fleet) · ADR-G-022 (/nervous) · ADR-G-031 (enterprise slash) · ADR-G-009 (proof-of-function for surface tasks).
 - **Born / MASTER-PLAN:** TERM-* · TOOL-1/2 (progressive-disclosure) · APR (ApprovalBroker) · TOOL-SCOPE · WP-OPT · DESK-1.
-- **Memory:** `project_deckent_native_terminal_agent` · `project_hermes_deckent_direction_2026_06`.
+- **Memory:** `project_deckent_native_terminal_agent` · `feedback_governance_aligns_with_direction_pivot`.
