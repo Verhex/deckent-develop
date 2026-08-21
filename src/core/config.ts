@@ -699,6 +699,38 @@ export function validateConfig(config: DeckentConfig): string[] {
     errors.push(`Invalid value '${config.brain_planning}' for field 'brain_planning'. Valid: ${VALID_BRAIN_PLANNING.join(', ')}`);
   }
 
+  // ─── Approval channel config validation ────────────────────────────
+  if (config.approval_channels !== undefined) {
+    const channels: unknown = config.approval_channels;
+    if (!isPlainObject(channels)) {
+      errors.push('approval_channels must be an object');
+    } else {
+      for (const name of ['slack', 'teams', 'telegram'] as const) {
+        const entry = channels[name];
+        if (entry === undefined) continue;
+        if (!isPlainObject(entry)) {
+          errors.push(`approval_channels.${name} must be an object`);
+          continue;
+        }
+        if (entry['enabled'] !== undefined && typeof entry['enabled'] !== 'boolean') {
+          errors.push(`approval_channels.${name}.enabled must be a boolean`);
+        }
+        const idField = name === 'telegram' ? 'chat_id' : 'channel_id';
+        if (entry[idField] !== undefined && typeof entry[idField] !== 'string') {
+          errors.push(`approval_channels.${name}.${idField} must be a string`);
+        }
+        if (name !== 'telegram') {
+          if (entry['token'] !== undefined && typeof entry['token'] !== 'string') {
+            errors.push(`approval_channels.${name}.token must be a string`);
+          }
+          if (entry['lang'] !== undefined && typeof entry['lang'] !== 'string') {
+            errors.push(`approval_channels.${name}.lang must be a string`);
+          }
+        }
+      }
+    }
+  }
+
   // ─── Skills config validation ───────────────────────────────────────
   if (config.skills !== undefined) {
     const skills = config.skills;
@@ -2327,6 +2359,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     tools: config.tools,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
+    approval_channels: config.approval_channels,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
     // Bot capabilities config — passed through (opt-in, default-off).
     bot_capabilities: (config as DeckentConfig).bot_capabilities,

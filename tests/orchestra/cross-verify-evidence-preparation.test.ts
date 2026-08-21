@@ -285,6 +285,52 @@ describe('prepareCrossVerifyCandidateEvidence', () => {
     });
   });
 
+  it('D2b-2a micro-wiring: the poll tries the rules engine per tick and stays fail-soft', async () => {
+    const root = projectRoot();
+    const { saveApprovalRules } = await import('../../src/core/approval-rules.js');
+    saveApprovalRules(root, [{
+      id: 'rule-poll-01', createdAt: '2026-08-21T00:00:00.000Z', createdBy: 'alperen',
+      reason: 'probe approvals are routine',
+      match: { idPrefix: 'aprp-', riskTierMax: 'routine' },
+      decision: 'allow', source: 'manual',
+    }]);
+    let clock = NOW.getTime();
+    const decideByRules = vi.fn(async () => ({ kind: 'decided' }));
+    const result = await prepareCrossVerifyCandidateEvidence(baseInput(root, {
+      now: () => new Date(clock),
+      sleepFn: async () => { clock += 25; },
+      approvalRuntime: {
+        broker: {
+          getRequest: vi.fn((id: string) => ({
+            version: 1, id, requester: { role: 'brain', instanceId: 'xverify' },
+            summary: 'probe', details: { schemaVersion: 1, kind: 'provider-evidence-probe' },
+            scopeId: 'p', scope: 'network', risk: 'high', policy: 'require-approval',
+            defaultAction: 'deny', tenantId: 'main', userId: 'alperen',
+            createdAt: new Date(clock - 1000).toISOString(),
+            expiresAt: new Date(clock + 600_000).toISOString(),
+            maskedArgs: null, rawArgsRef: null,
+          })),
+        },
+        decideByRules,
+        attendedExecutionApprovalAuthority: {
+          submitProviderEvidenceProbe: vi.fn(() => ({ id: 'ignored' })),
+          verifyAndClaimProviderEvidenceProbe: vi.fn(() => {
+            throw new AttendedExecutionApprovalError('DECISION_NOT_FOUND', 'no decision yet');
+          }),
+        },
+      },
+    }));
+    // The engine was invoked with the exact rule-derived command…
+    expect(decideByRules).toHaveBeenCalledWith(root, expect.objectContaining({
+      action: 'allow',
+      idempotencyKey: expect.stringMatching(/^rules-engine:aprp-[a-f0-9]{64}:allow$/u),
+      reason: 'probe approvals are routine',
+    }));
+    // …and with no decision materializing (mock), the window still closes as
+    // the honest typed hold — the wiring never blocks the human path.
+    expect(result).toMatchObject({ state: 'hold', reasonCode: 'approval_undecided' });
+  });
+
   it('drives claim → refresh with the owner projection and reports producer holds typed', async () => {
     const root = projectRoot();
     const refresh = vi.fn(async () => ({

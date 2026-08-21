@@ -52,8 +52,8 @@ describe('makeSendApproval', () => {
     // buttons row
     expect(msg.buttons).toHaveLength(1);
     const row = msg.buttons![0]!;
-    expect(row[0]!.callbackData).toBe('approve:act-7');
-    expect(row[1]!.callbackData).toBe('reject:act-7');
+    expect(row[0]!.callbackData).toMatch(/^dk1:bot:approve:[0-9A-HJ-NP-TV-Z]{5}:[0-9a-f]{8}$/u);
+    expect(row[1]!.callbackData).toMatch(/^dk1:bot:reject:[0-9A-HJ-NP-TV-Z]{5}:[0-9a-f]{8}$/u);
   });
 
   it('falls back to sendMessage when sendMessageReturningId is absent — returns empty string (sent, no id)', async () => {
@@ -71,7 +71,7 @@ describe('makeSendApproval', () => {
     expect(mid).not.toBe(false); // not false → sent
     expect(connector.sendMessage).toHaveBeenCalledTimes(1);
     expect(sent[0]!.channelId).toBe('chan-42');
-    expect(sent[0]!.buttons![0]![0]!.callbackData).toBe('approve:act-8');
+    expect(sent[0]!.buttons![0]![0]!.callbackData).toMatch(/^dk1:bot:approve:[0-9A-HJ-NP-TV-Z]{5}:[0-9a-f]{8}$/u);
   });
 
   it('returns false when connector has no sendMessage', async () => {

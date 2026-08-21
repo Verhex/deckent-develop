@@ -1,4 +1,4 @@
-// ─── attachConfiguredApprovalChannels — config-driven Slack/Teams registration ─
+// ─── attachConfiguredApprovalChannels — config-driven channel registration ─
 // (CLIENTS-RELAY-WIRE, task 362-007). Finishes 361-010's Slack/Teams adapters
 // (approval-slack.ts / approval-teams.ts) with the same config-gated
 // registration `notify_connectors` already established (connector-bootstrap.ts
@@ -7,7 +7,7 @@
 // skip + log (id only — the value is NEVER logged or forwarded), one
 // misconfigured channel never blocks the other.
 //
-// This module owns ZERO ApprovalRelay/ApprovalSlackChannel/ApprovalTeamsChannel
+// This module owns ZERO ApprovalRelay or approval-channel adapter internals
 // internals — it only constructs the adapters from their PUBLIC options shape
 // and calls `relay.attachChannel(name, channel)`. Building a REAL Slack/Teams
 // transport from the resolved token (a live SDK client / Bot Framework
@@ -18,6 +18,7 @@
 
 import { ApprovalSlackChannel, type SlackApprovalTransport } from './approval-slack.js';
 import { ApprovalTeamsChannel, type TeamsApprovalTransport } from './approval-teams.js';
+import { ApprovalTelegramChannel, type TelegramApprovalTransport } from './approval-telegram.js';
 import type { ApprovalRelay } from '../core/approval-relay.js';
 
 /**
@@ -42,6 +43,10 @@ export interface ApprovalChannelEntryConfig {
 export interface ApprovalChannelsConfig {
   slack?: ApprovalChannelEntryConfig;
   teams?: ApprovalChannelEntryConfig;
+  telegram?: {
+    enabled?: boolean;
+    chat_id?: string;
+  };
 }
 
 /** Minimal config shape this module reads — a duck-typed slice of
@@ -56,6 +61,7 @@ export interface ApprovalClientsWireConfig {
 export interface ApprovalClientsWireTransports {
   slack?: SlackApprovalTransport;
   teams?: TeamsApprovalTransport;
+  telegram?: TelegramApprovalTransport;
 }
 
 function skip(name: string, reason: string): void {
@@ -96,9 +102,20 @@ function attachTeams(
   relay.attachChannel('teams', channel);
 }
 
+function attachTelegram(
+  relay: ApprovalRelay,
+  cfg: ApprovalChannelsConfig['telegram'],
+  transport: TelegramApprovalTransport | undefined,
+): void {
+  if (!cfg?.enabled || !cfg.chat_id || !transport) return;
+
+  const channel = new ApprovalTelegramChannel({ transport, channelId: cfg.chat_id });
+  relay.attachChannel('telegram', channel);
+}
+
 /**
  * Attach every configured+enabled approval channel (`approval_channels.slack`,
- * `approval_channels.teams`) onto `relay`, given already-built transports.
+ * `.teams`, and `.telegram`) onto `relay`, given already-built transports.
  * Absent config block / disabled entry / unresolved secret / missing transport
  * -> that channel is silently skipped (logged, never thrown) — one channel's
  * misconfiguration never prevents the other from attaching.
@@ -120,5 +137,10 @@ export function attachConfiguredApprovalChannels(
     attachTeams(relay, channels.teams, transports.teams);
   } catch (error) {
     console.error(`[approval-clients-wire] teams: attach failed — ${error instanceof Error ? error.message : String(error)}`);
+  }
+  try {
+    attachTelegram(relay, channels.telegram, transports.telegram);
+  } catch (error) {
+    console.error(`[approval-clients-wire] telegram: attach failed — ${error instanceof Error ? error.message : String(error)}`);
   }
 }

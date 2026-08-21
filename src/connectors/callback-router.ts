@@ -8,32 +8,117 @@
 import { isExpiredDecideResult, type ApprovalDecideResult } from '../core/approval-broker.js';
 import { getMessage } from '../cli/helpers/messages.js';
 
-/** A parsed approval button press. */
+export type ApprovalCallbackNamespace = 'bot' | 'brk';
+export type ApprovalCallbackAction = 'approve' | 'reject';
+
+/** A parsed approval button press from the versioned callback contract. */
+export interface VersionedApprovalCallback {
+  readonly version: 'dk1';
+  readonly ns: ApprovalCallbackNamespace;
+  readonly action: ApprovalCallbackAction;
+  readonly shortCode: string;
+  readonly nonce: string;
+}
+
+/** A callback emitted before the versioned callback contract was introduced. */
+export interface LegacyApprovalCallback {
+  readonly state: 'legacy';
+  readonly action: ApprovalCallbackAction;
+  readonly id: string;
+}
+
+export interface InvalidApprovalCallback {
+  readonly state: 'invalid';
+}
+
+export type ApprovalCallbackParseResult =
+  | VersionedApprovalCallback
+  | LegacyApprovalCallback
+  | InvalidApprovalCallback;
+
+/** A parsed approval button press (compatibility view for existing consumers). */
 export interface ApprovalCallback {
-  readonly action: 'approve' | 'reject';
+  readonly action: ApprovalCallbackAction;
   /** The trigger/approval id to resolve (autonomous trigger id or nervous code). */
   readonly triggerId: string;
 }
 
-/** Build the callback_data payload for an approve/reject button. */
-export function approvalCallbackData(action: 'approve' | 'reject', triggerId: string): string {
-  return `${action}:${triggerId}`;
+const SHORT_CODE_RE = /^[0-9A-HJKMNP-TV-Z]{5}$/i;
+const NONCE_RE = /^[0-9a-f]{8}$/i;
+
+/** Build a compact, versioned callback payload containing no raw approval id. */
+export function approvalCallbackData(
+  ns: ApprovalCallbackNamespace,
+  action: ApprovalCallbackAction,
+  shortCode: string,
+  nonce: string,
+): string;
+/**
+ * Build the legacy `action:id` callback payload.
+ * @deprecated Use the four-argument versioned signature. Raw ids must not be used
+ * in newly produced callback payloads.
+ */
+export function approvalCallbackData(action: ApprovalCallbackAction, triggerId: string): string;
+export function approvalCallbackData(
+  nsOrAction: ApprovalCallbackNamespace | ApprovalCallbackAction,
+  actionOrId: ApprovalCallbackAction | string,
+  shortCode?: string,
+  nonce?: string,
+): string {
+  if (shortCode === undefined && nonce === undefined) {
+    return `${nsOrAction}:${actionOrId}`;
+  }
+  if (
+    (nsOrAction !== 'bot' && nsOrAction !== 'brk') ||
+    (actionOrId !== 'approve' && actionOrId !== 'reject') ||
+    shortCode === undefined ||
+    !SHORT_CODE_RE.test(shortCode) ||
+    nonce === undefined ||
+    !NONCE_RE.test(nonce)
+  ) {
+    throw new RangeError('Invalid approval callback payload fields');
+  }
+  return `dk1:${nsOrAction}:${actionOrId}:${shortCode}:${nonce}`;
 }
 
 /**
- * Parse a connector callback payload into an {@link ApprovalCallback}.
- * Recognizes `approve:<id>` and `reject:<id>` (the id may itself contain colons).
- * Returns null for any other shape so the caller can ignore non-approval presses.
+ * Parse either the versioned callback contract or the legacy `action:id` shape.
+ * The generic return preserves the old view for existing wide-string consumers;
+ * literal inputs receive the new discriminated result type during migration.
  */
-export function parseApprovalCallback(data: string): ApprovalCallback | null {
-  if (typeof data !== 'string') return null;
+export function parseApprovalCallback<const T extends string>(
+  data: T,
+): string extends T ? ApprovalCallback | null : ApprovalCallbackParseResult;
+export function parseApprovalCallback(data: string): ApprovalCallbackParseResult | ApprovalCallback | null {
+  const parts = data.split(':');
+  if (parts.length === 5 && parts[0] === 'dk1') {
+    const [, ns, action, shortCode, nonce] = parts;
+    if (
+      (ns === 'bot' || ns === 'brk') &&
+      (action === 'approve' || action === 'reject') &&
+      shortCode !== undefined &&
+      SHORT_CODE_RE.test(shortCode) &&
+      nonce !== undefined &&
+      NONCE_RE.test(nonce)
+    ) {
+      const result: VersionedApprovalCallback = { version: 'dk1', ns, action, shortCode, nonce };
+      Object.defineProperty(result, 'triggerId', { value: shortCode, enumerable: false });
+      return result;
+    }
+    return { state: 'invalid' };
+  }
+
   const sep = data.indexOf(':');
-  if (sep <= 0) return null;
-  const action = data.slice(0, sep);
-  const triggerId = data.slice(sep + 1);
-  if (action !== 'approve' && action !== 'reject') return null;
-  if (triggerId.length === 0) return null;
-  return { action, triggerId };
+  if (sep > 0) {
+    const action = data.slice(0, sep);
+    const id = data.slice(sep + 1);
+    if ((action === 'approve' || action === 'reject') && id.length > 0) {
+      const result: LegacyApprovalCallback = { state: 'legacy', action, id };
+      Object.defineProperty(result, 'triggerId', { value: id, enumerable: false });
+      return result;
+    }
+  }
+  return { state: 'invalid' };
 }
 
 /**

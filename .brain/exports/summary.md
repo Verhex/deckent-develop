@@ -56,6 +56,23 @@
 | adr-g-040 | Normative Verdict Vocabulary (Single-Word Evaluation Statuses) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-603 Learnings** (sprint-603): ## Sprint sprint-603 Learnings
+
+## Gains
+- 603-001 — VS Code decide istemci-ucu (T11) — npx tsc --noEmit passed.
+- 60...
+- **Sprint sprint-602 Learnings** (sprint-602): ## Sprint sprint-602 Learnings
+
+## Gains
+- 602-001 — bot-sürecinde relay + kanal-karar zinciri (T7) — npx tsc --noEmi...
+- **Sprint sprint-601 Learnings** (sprint-601): ## Sprint sprint-601 Learnings
+
+## Gains
+- 601-001 — bootstrap callback-dallanması (T3 — 'brk' rotası) — npx tsc --no...
+- **Sprint sprint-599 Learnings** (sprint-599): ## Sprint sprint-599 Learnings
+
+## Gains
+- 599-001 — callback-payload sözleşmesi (nonce + ad-uzayı + kısa-kod) — Impl...
 - **Sprint sprint-598 Learnings** (sprint-598): ## Sprint sprint-598 Learnings
 
 ## Gains
@@ -75,18 +92,6 @@
 - **Sprint sprint-593 Learnings** (sprint-593): ## Sprint sprint-593 Learnings
 - F2c katalog/mount maskeleme (flag-gated): GO_WITH_TECH_DEBT — WHAT LANDED
 - src/core...
-- **Sprint sprint-592 Learnings** (sprint-592): ## Sprint sprint-592 Learnings
-- cursor Docker imaj-dilimi (INSTALL_CURSOR): GO_WITH_TECH_DEBT — Added `ARG INSTALL_C...
-- **Sprint sprint-591 Learnings** (sprint-591): ## Sprint sprint-591 Learnings
-
-## Gains
-- 591-001 — cost-gate kullanıcı-metinleri i18n — Moved every human-readable ...
-- **Sprint sprint-590 Learnings** (sprint-590): ## Sprint sprint-590 Learnings
-- status blocked-satırı — i18n + neden-dürüst ifade: GO_WITH_TECH_DEBT — Moved the 3 h...
-- **Sprint sprint-589 Learnings** (sprint-589): ## Sprint sprint-589 Learnings
-
-## Gains
-- 589-001 — MCP nervous karar-mesajları i18n — Scanned src/mcp/tools/nervous...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -97,4 +102,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2097 | Generated: 2026-08-21_
+_Total entries: 2109 | Generated: 2026-08-21_

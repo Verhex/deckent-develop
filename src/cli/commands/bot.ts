@@ -12,6 +12,8 @@
  */
 
 import type { Command } from 'commander';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import { loadConfig } from '../../core/config.js';
 import { loadDeckSecrets } from '../../core/deck-file.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -35,6 +37,18 @@ import {
   type StopBotResult,
 } from '../../connectors/bot-daemon.js';
 import type { DeckentConfig } from '../../core/types.js';
+import { ApprovalRelay } from '../../core/approval-relay.js';
+import { ApprovalTelegramChannel, type TelegramApprovalTransport } from '../../connectors/approval-telegram.js';
+import {
+  attachConfiguredApprovalChannels,
+  type ApprovalClientsWireTransports,
+} from '../../connectors/approval-clients-wire.js';
+import { openApprovalAuthorityRuntime, type ApprovalAuthorityRuntimeOpenResult } from '../../core/approval-authority-runtime.js';
+import { ChannelLiveApprovalAuthenticator, channelTierFor } from '../../core/approval-channel-authenticator.js';
+import { resolveShortCode } from '../../core/approval-short-code.js';
+import { createApprovalStoreWatch, type ApprovalStoreWatchHandle } from '../../core/approval-store-watch.js';
+import type { ApprovalDecisionIngressOutcome } from '../../core/approval-decision-ingress.js';
+import type { BrkDecider, ConnectorCommandsDeps } from '../../connectors/connector-bootstrap.js';
 import { createNervousSystemIfEnabled } from '../../nervous/bootstrap.js';
 import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js';
 
@@ -45,7 +59,12 @@ export interface BotListenOptions {
   bootstrap?: (
     root: string,
     notifyConnectors: DeckentConfig['notify_connectors'],
+    approvalDeps?: Pick<ConnectorCommandsDeps, 'brkDecider' | 'onConnectorReady'>,
   ) => Promise<ConnectorCommandsHandle>;
+  /** Optional pre-built approval clients; missing transports are skipped fail-soft. */
+  approvalTransports?: ApprovalClientsWireTransports;
+  /** Hermetic authority-runtime seam. */
+  openApprovalRuntime?: (input: { projectRoot: string; tenantId: string }) => ApprovalAuthorityRuntimeOpenResult;
   /** Test seam: block until stopped. Default: resolve on SIGINT/SIGTERM. */
   waitForever?: () => Promise<void>;
   /** Output sink (default: console.log) — injectable for tests. */
@@ -70,6 +89,176 @@ interface BotStatusOptions extends BotCommandOptions {
   inspect?: (root: string) => BotPidInspection;
 }
 
+interface BotApprovalConfig {
+  approval?: {
+    relay_enabled?: boolean;
+    authority?: { enabled?: boolean; tenant_id?: string };
+  };
+  approval_channels?: Parameters<typeof attachConfiguredApprovalChannels>[1] extends infer T
+    ? T extends { approval_channels?: infer C } ? C : never
+    : never;
+}
+
+interface BotApprovalRelayHandle {
+  readonly relay: ApprovalRelay;
+  readonly brkDecider: BrkDecider;
+  attachTelegram(transport: TelegramApprovalTransport, channelId: string): void;
+  dispose(): void;
+}
+
+function renderChannelDecision(
+  outcome: ApprovalDecisionIngressOutcome,
+  lang: string,
+  requestId: string,
+): string {
+  switch (outcome.kind) {
+    case 'decided':
+      return getMessage('approval.channel.decided', lang, { id: requestId });
+    case 'idempotent':
+      return getMessage('approval.channel.idempotent', lang, { id: requestId });
+    case 'expired':
+      return getMessage('approval.channel.expired', lang, { id: requestId });
+    case 'rejected':
+      return getMessage(
+        outcome.reason === 'unauthorized'
+          ? 'approval.channel.unauthorized'
+          : 'approval.channel.rejected',
+        lang,
+        { id: requestId, reason: outcome.reason },
+      );
+  }
+}
+
+/** Flag-gated composition root for the bot-hosted approval relay and authority. */
+export function setupBotApprovalRelay(input: {
+  root: string;
+  config: DeckentConfig;
+  lang: string;
+  print: (line: string) => void;
+  transports?: ApprovalClientsWireTransports;
+  openRuntime?: (input: { projectRoot: string; tenantId: string }) => ApprovalAuthorityRuntimeOpenResult;
+}): BotApprovalRelayHandle | null {
+  const rawConfig = input.config as DeckentConfig & BotApprovalConfig;
+  if (rawConfig.approval?.relay_enabled !== true || rawConfig.approval.authority?.enabled !== true) {
+    return null;
+  }
+  const opened = (input.openRuntime ?? openApprovalAuthorityRuntime)({
+    projectRoot: input.root,
+    tenantId: rawConfig.approval.authority.tenant_id ?? 'main',
+  });
+  if (opened.state !== 'ready') {
+    input.print(getMessage('approval.channel.runtime_hold', input.lang, {
+      reason: opened.reasonCode,
+      detail: opened.detailCode,
+    }));
+    return null;
+  }
+
+  const service = opened.service;
+  const relay = new ApprovalRelay(
+    service.broker,
+    undefined,
+    (decision) => getMessage('approval.channel.cross_decided', input.lang, { channel: decision.channel }),
+  );
+  relay.on('channel-error', ({ channel, error }) => {
+    input.print(getMessage('approval.channel.transport_error', input.lang, {
+      channel,
+      detail: error instanceof Error ? error.message : String(error),
+    }));
+  });
+
+  const consumedNonces = new Set<string>();
+  const brkDecider: BrkDecider = async (parsed, chatCtx) => {
+    const resolution = resolveShortCode(
+      parsed.shortCode,
+      service.broker.list('pending').map((request) => request.id),
+    );
+    if (resolution.state === 'ambiguous') {
+      return getMessage('approval.channel.ambiguous', input.lang, {
+        code: parsed.shortCode,
+        ids: resolution.ids.join(', '),
+      });
+    }
+    if (resolution.state === 'unknown') {
+      return getMessage('approval.channel.unknown', input.lang, { code: parsed.shortCode });
+    }
+    const pendingRequest = service.broker.getRequest(resolution.id);
+    if (pendingRequest && channelTierFor(pendingRequest.risk) === 'critical') {
+      return getMessage('approval.channel.critical_cli_only', input.lang, { id: parsed.shortCode });
+    }
+    const principal = chatCtx.resolvePrincipal();
+    if (!principal) {
+      return getMessage('approval.channel.unauthorized', input.lang, { id: resolution.id });
+    }
+    const bindingDigest = createHash('sha256')
+      .update([chatCtx.connector, chatCtx.channelId, principal.tenantId, principal.userId, principal.role].join('\0'))
+      .digest('hex');
+    const authenticator = new ChannelLiveApprovalAuthenticator({
+      connector: chatCtx.connector,
+      principal: { userId: principal.userId, role: principal.role },
+      chatKey: chatCtx.connector + ':' + chatCtx.channelId,
+      bindingDigest,
+      nonce: parsed.nonce,
+      isAuthorized: () => chatCtx.isAuthorized(),
+      consumeNonce: (nonce) => {
+        if (consumedNonces.has(nonce)) return false;
+        consumedNonces.add(nonce);
+        return true;
+      },
+    });
+    const outcome = await service.decideChannel(input.root, authenticator, {
+      requestId: resolution.id,
+      action: parsed.action === 'approve' ? 'allow' : 'deny',
+      idempotencyKey: 'channel:' + chatCtx.connector + ':' + chatCtx.channelId + ':' + parsed.nonce,
+    });
+    return renderChannelDecision(outcome, input.lang, resolution.id);
+  };
+
+  const transports = input.transports ?? {};
+  attachConfiguredApprovalChannels(
+    relay,
+    { approval_channels: rawConfig.approval_channels },
+    { slack: transports.slack, teams: transports.teams },
+  );
+  const watch: ApprovalStoreWatchHandle = createApprovalStoreWatch(
+    join(input.root, '.deckent', 'approvals'),
+    {
+      onPending: (request) => service.broker.emit('pending', request),
+      onDecided: (_id, decision) =>
+        service.broker.emit('decided', decision, service.broker.getRequest(decision.requestId) ?? undefined),
+    },
+  );
+
+  return {
+    relay,
+    brkDecider,
+    attachTelegram(transport, channelId) {
+      if (relay.channelNames.includes('telegram')) return;
+      const pushTransport: TelegramApprovalTransport = {
+        sendMessage: (message) => transport.sendMessage(message),
+        onCallback: () => {},
+        ...(transport.sendMessageReturningId
+          ? { sendMessageReturningId: (message) => transport.sendMessageReturningId!(message) }
+          : {}),
+        ...(transport.editMessage
+          ? { editMessage: (cid, mid, text, mode) => transport.editMessage!(cid, mid, text, mode) }
+          : {}),
+      };
+      relay.attachChannel('telegram', new ApprovalTelegramChannel({
+        transport: pushTransport,
+        channelId,
+        lang: input.lang,
+      }));
+      for (const request of service.broker.list('pending')) service.broker.emit('pending', request);
+    },
+    dispose() {
+      watch.dispose();
+      relay.dispose();
+      service.close();
+    },
+  };
+}
+
 export async function handleBotListen(opts: BotListenOptions = {}): Promise<void> {
   const lang = getLanguage(opts.lang);
   const root = opts.root ?? resolveProjectRoot();
@@ -86,7 +275,7 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
 
   const bootstrap =
     opts.bootstrap ??
-    ((r, n): Promise<ConnectorCommandsHandle> => {
+    ((r, n, approvalDeps): Promise<ConnectorCommandsHandle> => {
       // Per-channel map of in-flight partial sinks: keyed by channelId, holds the
       // onPartial callback supplied by the streaming path in connector-bootstrap so
       // the responder's output hook reaches the right active Telegram edit closure.
@@ -163,9 +352,28 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
         // Finding 2: pass the shared voice adapter — bootstrap's handleInboundVoice
         // and tryReplyWithVoice now use this instance (previously always null).
         voiceAdapter,
+        ...(approvalDeps?.brkDecider ? { brkDecider: approvalDeps.brkDecider } : {}),
+        ...(approvalDeps?.onConnectorReady ? { onConnectorReady: approvalDeps.onConnectorReady } : {}),
       });
     });
-  const handle = await bootstrap(root, config.notify_connectors);
+  const approvalRelay = setupBotApprovalRelay({
+    root,
+    config,
+    lang,
+    print,
+    transports: opts.approvalTransports,
+    openRuntime: opts.openApprovalRuntime,
+  });
+  const handle = approvalRelay
+    ? await bootstrap(root, config.notify_connectors, {
+        brkDecider: approvalRelay.brkDecider,
+        onConnectorReady: (id, connector, chatId) => {
+          if (id === 'telegram') {
+            approvalRelay.attachTelegram(connector as unknown as TelegramApprovalTransport, chatId);
+          }
+        },
+      })
+    : await bootstrap(root, config.notify_connectors);
 
   // Voice health-check: when voice is explicitly enabled, verify the backend is
   // reachable on start-up. Non-fatal — the bot continues regardless (Pillar-1
@@ -188,6 +396,7 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
   if (handle.active.length === 0) {
     print(getMessage('bot.listen_none', lang));
     await handle.dispose();
+    approvalRelay?.dispose();
     return;
   }
 
@@ -199,6 +408,7 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
     print(getMessage('bot.daemon_pid_record_failed', lang));
     process.exitCode = 1;
     await handle.dispose();
+    approvalRelay?.dispose();
     return;
   }
 
@@ -234,6 +444,9 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
     } catch { /* pid cleanup below must still run */ }
     try {
       await handle.dispose();
+    } catch { /* pid cleanup below must still run */ }
+    try {
+      approvalRelay?.dispose();
     } catch { /* pid cleanup below must still run */ }
     clearBotPid(root);
     print(getMessage('bot.listen_stopped', lang));

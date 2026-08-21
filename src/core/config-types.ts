@@ -1108,6 +1108,27 @@ export interface DeckentConfig {
     chat_id: string;
   }>>;
 
+  /** Approval relay delivery channels. Telegram reuses an already-built
+   * transport, so no bot token is authored in this block. */
+  approval_channels?: {
+    slack?: {
+      enabled?: boolean;
+      token?: string;
+      channel_id?: string;
+      lang?: string;
+    };
+    teams?: {
+      enabled?: boolean;
+      token?: string;
+      channel_id?: string;
+      lang?: string;
+    };
+    telegram?: {
+      enabled?: boolean;
+      chat_id?: string;
+    };
+  };
+
   // ─── Bot Capabilities (flag-gate + per-capability policies + mail/.deck) ──
   /** Bot capability framework configuration (flag-gate, opt-in default-off).
    *  Controls which bot capabilities are active, their approval policies per capability,
@@ -1952,6 +1973,8 @@ export interface ResolvedConfig {
   project_identity_enabled?: boolean;
   /** Outbound messaging connectors (BOT-001, §4G) — passed through from project config, tokens .deck-resolved. */
   notify_connectors?: DeckentConfig['notify_connectors'];
+  /** Approval relay delivery channels — passed through without secrets for Telegram. */
+  approval_channels?: DeckentConfig['approval_channels'];
   /** Bot capability framework config — passed through from project config (opt-in, default-off). */
   bot_capabilities?: BotCapabilitiesConfig;
   /** Per-user identity↔RBAC config (ADR-092) — passed through from project config

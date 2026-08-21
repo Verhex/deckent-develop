@@ -1,6 +1,6 @@
 // ─── attachConfiguredApprovalChannels tests (CLIENTS-RELAY-WIRE, task 362-007) ─
 // Fake-transport + real ApprovalBroker/ApprovalRelay coverage for the
-// config-driven Slack/Teams registration layer: config-on+transport -> attach,
+// config-driven Slack/Teams/Telegram registration layer: config-on+transport -> attach,
 // off/absent -> nothing, unresolved/missing secret -> skip, one channel's
 // misconfiguration never blocks the other, secret value never leaks into any
 // log call, and a full pending -> decision roundtrip through the wired channel.
@@ -24,6 +24,7 @@ import type {
   TeamsAdaptiveCardActionInvocation,
   TeamsMessagePayload,
 } from '../../src/connectors/approval-teams.js';
+import type { TelegramApprovalTransport } from '../../src/connectors/approval-telegram.js';
 
 const CREATED_AT = '2026-07-02T21:00:00.000Z';
 const EXPIRES_AT = '2026-07-02T21:15:00.000Z';
@@ -105,6 +106,13 @@ function makeFakeTeamsTransport() {
   };
 }
 
+function makeFakeTelegramTransport(): TelegramApprovalTransport {
+  return {
+    async sendMessage() {},
+    onCallback() {},
+  };
+}
+
 function setup() {
   const projectRoot = mkdtempSync(join(tmpdir(), 'approval-clients-wire-'));
   const broker = new ApprovalBroker(projectRoot, { storeDir: join(projectRoot, 'approvals') });
@@ -146,6 +154,38 @@ describe('attachConfiguredApprovalChannels — config-on + fake transport -> att
     attachConfiguredApprovalChannels(relay, config, { teams: teams.transport });
 
     expect(relay.channelNames).toContain('teams');
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('attaches telegram when enabled with chat_id + transport', () => {
+    const { relay, projectRoot } = setup();
+    const telegram = makeFakeTelegramTransport();
+
+    const config: ApprovalClientsWireConfig = {
+      approval_channels: {
+        telegram: { enabled: true, chat_id: 'TG-1' },
+      },
+    };
+
+    attachConfiguredApprovalChannels(relay, config, { telegram });
+
+    expect(relay.channelNames).toContain('telegram');
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('silently skips telegram when no transport is provided', () => {
+    const { relay, projectRoot } = setup();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const config: ApprovalClientsWireConfig = {
+      approval_channels: {
+        telegram: { enabled: true, chat_id: 'TG-1' },
+      },
+    };
+
+    expect(() => attachConfiguredApprovalChannels(relay, config, {})).not.toThrow();
+    expect(relay.channelNames).not.toContain('telegram');
+    expect(errorSpy).not.toHaveBeenCalled();
     rmSync(projectRoot, { recursive: true, force: true });
   });
 

@@ -14393,3 +14393,96 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 598-001: AI-operatör dersi 26 (pgrep kendi-desen tuzağı; iki dil senkron) (DONE)
 
 ---
+## Sprint 599 — sprint-599
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 305s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 304526ms |
+
+### Tasks
+
+- 599-001: callback-payload sözleşmesi (nonce + ad-uzayı + kısa-kod) (DONE)
+- 599-002: approval_channels config — telegram girdisi + tipler (T8) (DONE)
+- 599-003: y/n grameri + DE1 kısa-kod absorbe (T9) (DONE)
+
+---
+## Sprint 601 — sprint-601
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 227s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 227018ms |
+
+### Tasks
+
+- 601-001: bootstrap callback-dallanması (T3 — 'brk' rotası) (DONE)
+- 601-002: ingress 4. slot + decideChannel (T5) (DONE)
+
+---
+## Sprint 602 — sprint-602
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 549s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 548691ms |
+
+### Tasks
+
+- 602-001: bot-sürecinde relay + kanal-karar zinciri (T7) (DONE)
+- 602-002: VS Code decide sunucu-ucu (T10) (DONE)
+
+---
+## Sprint 603 — sprint-603
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 244s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 244480ms |
+
+### Tasks
+
+- 603-001: VS Code decide istemci-ucu (T11) (DONE)
+- 603-002: orphan-delisting + kanal-matrisi i18n (T12) (DONE)
+
+---

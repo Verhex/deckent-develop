@@ -1,5 +1,5 @@
 // ─── Deckent Status Panel — data-binding (VS Code extension, dilim-1) ─────────
-// Sıra-64 / Task 363-012: read-only status+limits+approvals panel. This
+// Sıra-64 / Task 363-012: status+limits+approvals panel. This
 // module owns data-loading and webview data-binding only — it never imports
 // the real `vscode` module. The webview surface is injected (`WebviewLike`),
 // the same dependency-injection convention `extension.ts`/`commands.ts` use
@@ -140,14 +140,38 @@ function renderLimits(data: TermRpcMethodTable['limits.get']['result']): string 
   return `<ul>${items}</ul>`;
 }
 
+function approvalField(approval: unknown, ...names: string[]): string | undefined {
+  if (typeof approval !== 'object' || approval === null) return undefined;
+  const record = approval as Record<string, unknown>;
+  for (const name of names) {
+    const value = record[name];
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+  return undefined;
+}
+
 function renderApprovals(data: TermRpcMethodTable['approval.list']['result']): string {
   if (data.approvals.length === 0) return '<p class="empty">No pending approvals</p>';
-  const items = data.approvals.map((approval) => `<li>${escapeHtml(JSON.stringify(approval))}</li>`).join('');
+  const items = data.approvals
+    .map((approval) => {
+      const id = approvalField(approval, 'id') ?? '';
+      const code = approvalField(approval, 'shortCode', 'code') ?? id;
+      const risk = approvalField(approval, 'risk', 'riskLevel') ?? '';
+      const label = approvalField(approval, 'summary', 'title', 'description') ?? id;
+      const prefix = `<code>#${escapeHtml(code)}</code> ${escapeHtml(label)}`;
+
+      if (risk.toLowerCase() === 'critical') {
+        return `<li class="approval critical">${prefix} <strong>critical</strong> <span class="hint">CLI: deckent approvals decide #${escapeHtml(code)}</span></li>`;
+      }
+
+      return `<li class="approval">${prefix} <button type="button" data-approval-id="${escapeHtml(id)}" data-action="approve">Approve</button> <button type="button" data-approval-id="${escapeHtml(id)}" data-action="reject">Reject</button></li>`;
+    })
+    .join('');
   return `<ul>${items}</ul>`;
 }
 
 /**
- * Render the read-only panel body from a loaded {@link DeckentPanelData}
+ * Render the panel body from a loaded {@link DeckentPanelData}
  * snapshot. Pure and side-effect-free — every interpolated string is
  * HTML-escaped regardless of provenance (session labels, limit keys/values,
  * approval payloads), since the RPC data is opaque and must never be trusted

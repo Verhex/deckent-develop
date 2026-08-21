@@ -1499,7 +1499,27 @@ async function handleRequest(
         sendError(res, 400, `Invalid RPC request: ${parsedRpc.error.message}`);
         return;
       }
-      const rpcResponse = await dispatchRpcRequest(parsedRpc.data, buildRpcHandlerMap(projectRoot, terminalManager));
+      const rpcHandlers = buildRpcHandlerMap(projectRoot, terminalManager);
+      if (isApprovalApiDecideEnabled(projectRoot)) {
+        const { buildRpcWriteHandlerMap } = await import('./rpc-write-handlers.js');
+        const authorization = req.headers['authorization'];
+        const [scheme, approvalToken] = typeof authorization === 'string'
+          ? authorization.split(' ', 2)
+          : [];
+        const idempotencyHeader = req.headers['idempotency-key'];
+        const approvalIdempotencyKey = Array.isArray(idempotencyHeader)
+          ? idempotencyHeader[0]
+          : idempotencyHeader;
+        const approvalDecideHandler = buildRpcWriteHandlerMap({
+          projectRoot,
+          requester: deriveRequestPrincipal(req).id,
+          approvalAuthority,
+          ...(scheme === 'Bearer' && approvalToken ? { approvalToken } : {}),
+          ...(approvalIdempotencyKey ? { approvalIdempotencyKey } : {}),
+        })['approval.decide'];
+        if (approvalDecideHandler) rpcHandlers['approval.decide'] = approvalDecideHandler;
+      }
+      const rpcResponse = await dispatchRpcRequest(parsedRpc.data, rpcHandlers);
       sendJson(res, rpcResponse);
       return;
     }

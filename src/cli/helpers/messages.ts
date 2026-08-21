@@ -4105,6 +4105,54 @@ const MESSAGES: MessageMap = {
     en: 'Messaging-connector bot — listen/start/stop/status for inbound approve/reject',
     tr: 'Mesaj-connector botu — gelen approve/reject için listen/start/stop/status',
   },
+  'approval.channel.decided': {
+    en: 'Approval {id} was decided.',
+    tr: '{id} onayı karara bağlandı.',
+  },
+  'approval.channel.idempotent': {
+    en: 'Approval {id} already has this decision.',
+    tr: '{id} onayı için bu karar zaten kaydedildi.',
+  },
+  'approval.channel.expired': {
+    en: 'Approval {id} has expired.',
+    tr: '{id} onayının süresi doldu.',
+  },
+  'approval.channel.rejected': {
+    en: 'Approval decision was rejected ({reason}).',
+    tr: 'Onay kararı reddedildi ({reason}).',
+  },
+  'approval.channel.unauthorized': {
+    en: 'This channel is not authorized to decide approval {id} (unknown chat binding or identity). Use: deckent approvals decide #{id}',
+    tr: 'Bu kanal {id} onayı için yetkili değil (tanımsız chat-bağı ya da kimlik). CLI: deckent approvals decide #{id}',
+  },
+  'approval.channel.critical_cli_only': {
+    en: 'Approval {id} is critical-tier: channels are view-only. Decide via CLI: deckent approvals decide #{id}',
+    tr: '{id} onayı critical-seviye: kanallar yalnızca görüntüler. Karar CLI ile: deckent approvals decide #{id}',
+  },
+  'approval.channel.ambiguous': {
+    en: 'Approval code {code} is ambiguous; use the CLI with a full id: {ids}.',
+    tr: '{code} onay kodu belirsiz; CLI üzerinde tam kimlik kullanın: {ids}.',
+  },
+  'approval.channel.nonce_exhausted': {
+    en: 'This approval action has expired or was already used. Request a new approval message.',
+    tr: 'Bu onay eyleminin süresi doldu veya eylem daha önce kullanıldı. Yeni bir onay mesajı isteyin.',
+  },
+  'approval.channel.unknown': {
+    en: 'Approval code {code} is unknown or no longer pending.',
+    tr: '{code} onay kodu bilinmiyor veya artık beklemede değil.',
+  },
+  'approval.channel.runtime_hold': {
+    en: 'Approval relay unavailable ({reason}/{detail}); bot connectors continue.',
+    tr: 'Onay relay kullanılamıyor ({reason}/{detail}); bot connector’ları çalışmaya devam ediyor.',
+  },
+  'approval.channel.cross_decided': {
+    en: 'Decision made on channel {channel}.',
+    tr: 'Karar {channel} kanalında verildi.',
+  },
+  'approval.channel.transport_error': {
+    en: 'Approval channel {channel} failed: {detail}',
+    tr: 'Onay kanalı {channel} başarısız oldu: {detail}',
+  },
   'bot.listen_none': {
     en: 'No messaging connectors configured for inbound commands — nothing to listen on. Set notify_connectors.{telegram|discord}.{enabled,token,chat_id} (token via .deck).',
     tr: 'Inbound komutlar için yapılandırılmış mesaj connector\'ı yok — dinlenecek bir şey yok. notify_connectors.{telegram|discord}.{enabled,token,chat_id} ayarla (token .deck ile).',
@@ -5157,6 +5205,10 @@ const MESSAGES: MessageMap = {
   'approval.decide.expired': {
     en: 'This approval request expired at {expiresAt} — no action was taken.',
     tr: 'Bu onay isteğinin süresi {expiresAt} tarihinde doldu — herhangi bir işlem yapılmadı.',
+  },
+  'approval.broker_authority_pending': {
+    en: 'Decision channel authority is pending; CLI: deckent approvals decide #{code}',
+    tr: 'Karar kanal-otoritesi bekliyor; CLI: deckent approvals decide #{code}',
   },
 
   // ─── capability: screenshot ──────────────────────────────────────────

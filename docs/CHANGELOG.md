@@ -14,6 +14,47 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint603] - 2026-08-21
+
+### Added
+
+- VS Code decide istemci-ucu (T11)
+- orphan-delisting + kanal-matrisi i18n (T12)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
+## [sprint602] - 2026-08-21
+
+### Added
+
+- bot-sürecinde relay + kanal-karar zinciri (T7)
+- VS Code decide sunucu-ucu (T10)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
+## [sprint601] - 2026-08-21
+
+### Added
+
+- bootstrap callback-dallanması (T3 — 'brk' rotası)
+- ingress 4. slot + decideChannel (T5)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
+## [sprint599] - 2026-08-21
+
+### Added
+
+- callback-payload sözleşmesi (nonce + ad-uzayı + kısa-kod)
+- approval_channels config — telegram girdisi + tipler (T8)
+- y/n grameri + DE1 kısa-kod absorbe (T9)
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint598] - 2026-08-21
 
 ### Added

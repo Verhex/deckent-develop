@@ -5,11 +5,9 @@
 // after src/api/server.ts's own POST route and src/cli/repl/rpc-client.ts's
 // in-process local transport.
 //
-// Read-only by design: only the 4 non-mutating TERM_RPC_METHODS are exposed
-// (run.status, session.list, limits.get, approval.list). The 3 mutating
-// methods (session.resume, run.start-detached, approval.decide) are
-// deliberately absent from this bridge's public API — this dilim's panel
-// only displays state, it never changes it.
+// The four read methods plus the narrowly-scoped approval.decide mutation are
+// exposed. Structured server errors (including a disabled decide endpoint)
+// remain typed RpcBridgeResult failures rather than thrown exceptions.
 //
 // No `vscode` module import — fetch is injectable (production defaults to
 // globalThis.fetch), matching the DI convention in
@@ -44,6 +42,8 @@ export type RpcBridgeError =
   | { kind: 'rpc'; error: RpcError };
 
 export type RpcBridgeResult<T> = { ok: true; value: T } | { ok: false; error: RpcBridgeError };
+
+export type ApprovalAction = 'approve' | 'reject';
 
 export interface RpcBridgeOptions {
   /** Base URL of the deckent API server, e.g. "http://127.0.0.1:3100". */
@@ -93,6 +93,21 @@ export class RpcBridge {
   /** `approval.list` — pending/known approval requests, optionally scoped. */
   async listApprovals(scopeId?: string): Promise<RpcBridgeResult<TermRpcMethodTable['approval.list']['result']>> {
     return this.call('approval.list', scopeId === undefined ? {} : { scopeId });
+  }
+
+  /** `approval.decide` — approve or reject one approval request. */
+  async decideApproval(
+    id: string,
+    action: ApprovalAction,
+    reason?: string,
+  ): Promise<RpcBridgeResult<TermRpcMethodTable['approval.decide']['result']>> {
+    const params: TermRpcMethodTable['approval.decide']['params'] = {
+      requestId: id,
+      decision: action === 'approve' ? 'allow' : 'deny',
+      decidedBy: 'vscode',
+      ...(reason === undefined ? {} : { reason }),
+    };
+    return this.call('approval.decide', params);
   }
 
   private async call<M extends keyof TermRpcMethodTable>(

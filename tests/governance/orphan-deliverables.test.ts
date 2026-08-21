@@ -448,7 +448,6 @@ const KNOWN_ORPHANS = [
   'src/agents/prompt-ab-test.ts',
   'src/agents/prompt-evolution.ts',
   'src/agents/prompt-metrics.ts',
-  'src/api/rpc-write-handlers.ts',
   'src/cli/commands/agentic-session.ts',
   'src/cli/commands/chat-status-line.ts',
   'src/cli/commands/retro-formatter.ts',
@@ -463,8 +462,6 @@ const KNOWN_ORPHANS = [
   'src/cli/repl/native-flag.ts',
   // 'src/cli/repl/plan-preview-card.tsx' — KAPANDI sprint-426 TERM4B (2026-07-12):
   // app.tsx canlı-mount → artık orphan değil (5d94a831'deki geçici pin düştü).
-  'src/connectors/approval-clients-wire.ts',
-  'src/connectors/approval-telegram.ts',
   'src/connectors/identity/verify-bind.ts',
   // 'src/core/approval-expiry-driver.ts' — KAPANDI born-631 (405-004, 2026-07-11):
   // server-start'ta canlı-sürücü (unref'd + dispose) → artık orphan değil.
@@ -555,7 +552,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(93); // 2026-08-18 sweep: -2 wired (operation-catalog/index, corpus-lint) +3 new (recover-helpers, closure-ledger-types, error-registry — 7090 disposition bekler)
+    expect(KNOWN_ORPHANS.length).toBe(90); // 2026-08-21 sweep: -2 wired approval connectors, -1 wired RPC handler
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

@@ -43,6 +43,8 @@ import { getMessage } from '../cli/helpers/messages.js';
 import type { PerTurnConnector, ConnectorId } from './types.js';
 import type { CapabilityRegistry } from './capabilities/registry.js';
 import type { ResolvedPrincipal } from './identity/provider.js';
+import { randomBytes } from 'node:crypto';
+import { shortCodeFor } from '../core/approval-short-code.js';
 
 /**
  * Build an out-of-band approval sender bound to a specific connector and capability
@@ -75,10 +77,12 @@ export function makeSendApproval(
     const cap = registry.get(capId);
     const previewMd = cap ? cap.preview(args as never, lang) : `${capId}(${JSON.stringify(args)})`;
     const header = getMessage('cap.approval.header', lang);
-    const html = markdownToTelegramHtml(`🔐 ${header}\n${previewMd}`);
+    const shortCode = shortCodeFor(id);
+    const nonce = randomBytes(4).toString('hex');
+    const html = markdownToTelegramHtml(`🔐 ${header}\n${previewMd}\n#${shortCode}`);
     const buttons: ReadonlyArray<ReadonlyArray<{ text: string; callbackData: string }>> = [[
-      { text: getMessage('cap.btn.approve', lang), callbackData: approvalCallbackData('approve', id) },
-      { text: getMessage('cap.btn.reject', lang), callbackData: approvalCallbackData('reject', id) },
+      { text: getMessage('cap.btn.approve', lang), callbackData: approvalCallbackData('bot', 'approve', shortCode, nonce) },
+      { text: getMessage('cap.btn.reject', lang), callbackData: approvalCallbackData('bot', 'reject', shortCode, nonce) },
     ]];
     const msg = { connector: connector.id as ConnectorId, channelId, text: html, parseMode: 'HTML' as const, buttons };
     if (connector.sendMessageReturningId) {
@@ -94,8 +98,8 @@ export function makeSendApproval(
  * Tool-side analogue of `makeSendApproval`: build a buttoned approval sender for a
  * risky deckent_* TOOL (not a capability — there is no CapabilityRegistry preview,
  * so the body is `tool(args-summary)`). Same Approve/Reject inline buttons + same
- * `approvalCallbackData` contract, so a button press resolves through the identical
- * `approve <id>` path that text already uses. This is what gives risky deckent_*
+ * `approvalCallbackData` contract, so a button press carries the compact bot
+ * approval reference consumed by the callback router. This is what gives risky deckent_*
  * tools a buttoned approval (in groups too) — previously only capabilities had one.
  *
  * Returns the platform message-id when available, `''` when sent without an id, or
@@ -109,10 +113,12 @@ export function makeSendToolApproval(
     if (typeof connector.sendMessage !== 'function') return false;
     const header = getMessage('cap.approval.header', lang); // generic "Approval required — not executed"
     const argStr = summarizeArgs(args);
-    const html = markdownToTelegramHtml(`🔐 ${header}\n${tool}(${argStr})`);
+    const shortCode = shortCodeFor(id);
+    const nonce = randomBytes(4).toString('hex');
+    const html = markdownToTelegramHtml(`🔐 ${header}\n${tool}(${argStr})\n#${shortCode}`);
     const buttons: ReadonlyArray<ReadonlyArray<{ text: string; callbackData: string }>> = [[
-      { text: getMessage('cap.btn.approve', lang), callbackData: approvalCallbackData('approve', id) },
-      { text: getMessage('cap.btn.reject', lang), callbackData: approvalCallbackData('reject', id) },
+      { text: getMessage('cap.btn.approve', lang), callbackData: approvalCallbackData('bot', 'approve', shortCode, nonce) },
+      { text: getMessage('cap.btn.reject', lang), callbackData: approvalCallbackData('bot', 'reject', shortCode, nonce) },
     ]];
     const msg = { connector: connector.id as ConnectorId, channelId, text: html, parseMode: 'HTML' as const, buttons };
     if (connector.sendMessageReturningId) {

@@ -23,6 +23,7 @@ import { autonomousPendingPath } from '../core/constants.js';
 import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
 import { NervousIpcQueue } from '../nervous/ipc-queue.js';
 import { getMessage } from '../cli/helpers/messages.js';
+import { resolveShortCode } from '../core/approval-short-code.js';
 import type { ApprovalAction, CommandResolver, ResolveOutcome } from './incoming-command-router.js';
 
 /** Minimal shape the resolver needs from a nervous pending entry. */
@@ -82,11 +83,14 @@ export function makeCommandResolver(
   const writeNervous = deps.writeNervousApproval ?? writeNervousApprovalReal;
 
   return async (id: string, action: ApprovalAction): Promise<ResolveOutcome> => {
+    const nervousPending = readNervous(root);
+
     // 1. Autonomous gate — durable decisions.json (sibling of pending.json).
     const gate = makeApprovalGate({
       pendingPath: autonomousPendingPath(root),
     });
-    const owned = gate.pending().find((p) => p.triggerId === id || p.triggerId.startsWith(id));
+    const autonomousPending = gate.pending();
+    const owned = autonomousPending.find((p) => p.triggerId === id || p.triggerId.startsWith(id));
     if (owned) {
       if (action === 'approve') gate.accept(owned.triggerId);
       else gate.reject(owned.triggerId);
@@ -98,9 +102,45 @@ export function makeCommandResolver(
 
     // 2. Nervous gate — durable IPC, consumed by the executor poller. Match the
     //    full id, an id-prefix, OR the short approval code (phone-friendly).
-    const match = readNervous(root).find(
-      (n) => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase(),
-    );
+    const directNervousMatch = nervousPending.find((n) => n.id === id || n.id.startsWith(id));
+    if (directNervousMatch) {
+      await writeNervous(root, directNervousMatch.id, action);
+      return resolvedWith(action, directNervousMatch.id, directNervousMatch.title ?? directNervousMatch.id, lang);
+    }
+
+    // DE1 is the single short-code resolver for both approval domains. It owns
+    // normalization (including confusable characters) and refuses to guess when
+    // a code identifies more than one pending id.
+    const byShortCode = resolveShortCode(id, [
+      ...autonomousPending.map((pending) => pending.triggerId),
+      ...nervousPending.map((pending) => pending.id),
+    ]);
+    if (byShortCode.state === 'ambiguous') {
+      return { status: 'ambiguous', candidates: byShortCode.ids };
+    }
+
+    // Keep accepting the nervous producer's persisted legacy code until that
+    // producer is migrated in its own slice. Unlike the old `.find`, collisions
+    // are rejected rather than silently selecting the first entry.
+    const legacyMatches = nervousPending.filter((n) => n.shortCode?.toLowerCase() === id.toLowerCase());
+    if (byShortCode.state === 'unknown' && legacyMatches.length > 1) {
+      return { status: 'ambiguous', candidates: legacyMatches.map((match) => match.id) };
+    }
+
+    const resolvedId = byShortCode.state === 'resolved' ? byShortCode.id : legacyMatches[0]?.id;
+    const autonomousShortMatch = resolvedId
+      ? autonomousPending.find((pending) => pending.triggerId === resolvedId)
+      : undefined;
+    if (autonomousShortMatch) {
+      if (action === 'approve') gate.accept(autonomousShortMatch.triggerId);
+      else gate.reject(autonomousShortMatch.triggerId);
+      const what = autonomousShortMatch.requestedBy
+        ? `${autonomousShortMatch.action} (${autonomousShortMatch.requestedBy})`
+        : autonomousShortMatch.action;
+      return resolvedWith(action, autonomousShortMatch.triggerId, what, lang);
+    }
+
+    const match = resolvedId ? nervousPending.find((pending) => pending.id === resolvedId) : undefined;
     if (match) {
       await writeNervous(root, match.id, action);
       return resolvedWith(action, match.id, match.title ?? match.id, lang);

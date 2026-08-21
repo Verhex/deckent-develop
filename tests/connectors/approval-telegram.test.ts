@@ -81,7 +81,7 @@ function makeFakeTransport(opts: { withReturningId?: boolean; withEditMessage?: 
 }
 
 describe('ApprovalTelegramChannel — pending -> message payload', () => {
-  it('sends masked-args + risk/scope summary with Approve/Deny inline buttons, never a raw value', async () => {
+  it('sends the source/reason/short-code triple with versioned buttons and no raw request id in payloads', async () => {
     const fake = makeFakeTransport();
     const channel = new ApprovalTelegramChannel({ transport: fake.transport, channelId: 'chat-1' });
 
@@ -93,19 +93,46 @@ describe('ApprovalTelegramChannel — pending -> message payload', () => {
     expect(msg.connector).toBe('telegram');
     expect(msg.channelId).toBe('chat-1');
     expect(msg.parseMode).toBe('HTML');
-    expect(msg.text).toContain('approval request apr-tg-1');
-    expect(msg.text).toContain('shell-exec');
-    expect(msg.text).toContain('high');
-    expect(msg.text).toContain('[REDACTED]');
-    // No raw-args field exists on the contract at all — only maskedArgs — so this
-    // is the strongest "raw never leaks" guarantee available (same as approval-relay).
-    expect(Object.keys(req)).not.toContain('rawArgs');
+    expect(msg.text).toContain('source: worker/w-355-003');
+    expect(msg.text).toContain('reason: approval request apr-tg-1');
+    expect(msg.text).toMatch(/#[0-9A-HJKMNP-TV-Z]{5}/i);
 
     expect(msg.buttons).toHaveLength(1);
     const row = msg.buttons![0]!;
     expect(row).toHaveLength(2);
-    expect(row[0]!.callbackData).toBe('approve:apr-tg-1');
-    expect(row[1]!.callbackData).toBe('reject:apr-tg-1');
+    expect(row[0]!.callbackData).toMatch(/^dk1:brk:approve:[0-9A-HJKMNP-TV-Z]{5}:[0-9a-f]{8}$/i);
+    expect(row[1]!.callbackData).toMatch(/^dk1:brk:reject:[0-9A-HJKMNP-TV-Z]{5}:[0-9a-f]{8}$/i);
+    expect(row[0]!.callbackData.split(':')[3]).toBe(row[1]!.callbackData.split(':')[3]);
+    expect(row[0]!.callbackData.split(':')[4]).toBe(row[1]!.callbackData.split(':')[4]);
+    for (const button of row) expect(button.callbackData).not.toContain(req.id);
+  });
+
+  it('generates one fresh 8-hex nonce per card', async () => {
+    const fake = makeFakeTransport();
+    const channel = new ApprovalTelegramChannel({ transport: fake.transport, channelId: 'chat-1' });
+
+    await channel.send({ kind: 'pending', request: buildRequest('apr-tg-nonce-1') as never });
+    await channel.send({ kind: 'pending', request: buildRequest('apr-tg-nonce-2') as never });
+
+    const firstNonce = fake.sent[0]!.buttons![0]![0]!.callbackData.split(':')[4];
+    const secondNonce = fake.sent[1]!.buttons![0]![0]!.callbackData.split(':')[4];
+    expect(firstNonce).toMatch(/^[0-9a-f]{8}$/);
+    expect(secondNonce).toMatch(/^[0-9a-f]{8}$/);
+    expect(secondNonce).not.toBe(firstNonce);
+  });
+
+  it('renders critical requests view-only with the short-code CLI decision hint', async () => {
+    const fake = makeFakeTransport();
+    const channel = new ApprovalTelegramChannel({ transport: fake.transport, channelId: 'chat-1' });
+
+    await channel.send({
+      kind: 'pending',
+      request: buildRequest('raw-critical-request-id', { risk: 'critical' }) as never,
+    });
+
+    const msg = fake.sent[0]!;
+    expect(msg.buttons).toBeUndefined();
+    expect(msg.text).toMatch(/deckent approvals decide #[0-9A-HJKMNP-TV-Z]{5}/i);
   });
 
   it('falls back to sendMessage (no id captured) when the transport lacks sendMessageReturningId', async () => {
@@ -161,13 +188,15 @@ describe('ApprovalTelegramChannel — cross-decided -> edit in place or fallback
 });
 
 describe('ApprovalTelegramChannel — onDecision (callback -> decision)', () => {
-  it('maps an approve press to an allow decision', () => {
+  it('maps an approve press to an allow decision for the raw broker request', async () => {
     const fake = makeFakeTransport();
     const channel = new ApprovalTelegramChannel({ transport: fake.transport, channelId: 'chat-1' });
 
     const handler = vi.fn();
     channel.onDecision(handler);
-    fake.fireCallback({ connector: 'telegram', channelId: 'chat-1', fromUser: 'u-1', data: 'approve:apr-tg-5' });
+    await channel.send({ kind: 'pending', request: buildRequest('apr-tg-5') as never });
+    const data = fake.sent[0]!.buttons![0]![0]!.callbackData;
+    fake.fireCallback({ connector: 'telegram', channelId: 'chat-1', fromUser: 'u-1', data });
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
@@ -175,13 +204,15 @@ describe('ApprovalTelegramChannel — onDecision (callback -> decision)', () => 
     );
   });
 
-  it('maps a reject press to a deny decision', () => {
+  it('maps a reject press to a deny decision for the raw broker request', async () => {
     const fake = makeFakeTransport();
     const channel = new ApprovalTelegramChannel({ transport: fake.transport, channelId: 'chat-1' });
 
     const handler = vi.fn();
     channel.onDecision(handler);
-    fake.fireCallback({ connector: 'telegram', channelId: 'chat-1', fromUser: 'u-2', data: 'reject:apr-tg-6' });
+    await channel.send({ kind: 'pending', request: buildRequest('apr-tg-6') as never });
+    const data = fake.sent[0]!.buttons![0]![1]!.callbackData;
+    fake.fireCallback({ connector: 'telegram', channelId: 'chat-1', fromUser: 'u-2', data });
 
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({ requestId: 'apr-tg-6', decision: 'deny', decidedBy: 'u-2' }),
@@ -252,7 +283,9 @@ describe('ApprovalTelegramChannel — wired into a real ApprovalRelay + Approval
     const req = broker.submit(buildRequest('apr-tg-8'));
     const waiting = broker.awaitDecision(req.id);
 
-    fake.fireCallback({ connector: 'telegram', channelId: 'chat-1', fromUser: 'alperen', data: `approve:${req.id}` });
+    const callbackData = fake.sent[0]!.buttons![0]![0]!.callbackData;
+    expect(callbackData).not.toContain(req.id);
+    fake.fireCallback({ connector: 'telegram', channelId: 'chat-1', fromUser: 'alperen', data: callbackData });
 
     const decision = await waiting;
     expect(decision.decision).toBe('allow');

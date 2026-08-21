@@ -307,3 +307,13 @@ channel itself was repaired (the probe-debris shadowing defect below) and after
 the verifier corrected the stop-marker attribution — both corrections are part
 of this document's §1.3 now. The intermediate HOLD/REFUTED reports remain in
 `.analysis/xverify/` as the honest chain.
+
+## D3-delta (2026-08-21, yürütücü-kararı; owner-rapor edildi): risk→tier eşlemesi
+
+Kanal-matrisi "critical view-only" kapısı, zarf-riskTier dilimi (§3.1) inene dek
+MEVCUT `ApprovalRequest.risk` alanından türetilir (ikinci-şema açılmaz):
+`critical → view-only (deep-link, kanal-karar YOK)`; `high | medium → elevated`;
+`low | none → routine`. Tek çevirim-fonksiyonu `channelTierFor(risk)` —
+riskTier-zarfı indiğinde bu fonksiyonun tek gövdesi değişir (geri-alınabilirlik).
+Callback-payload'ları nonce'lu + ad-uzaylı + KISA-KOD tabanlıdır (Telegram
+callback_data 64B sınırı; ham request-id asla payload'a binmez).

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { ApprovalBroker } from './approval-broker.js';
 import { RuleEngineApprovalAuthenticator } from './approval-rules-engine.js';
+import type { ChannelLiveApprovalAuthenticator } from './approval-channel-authenticator.js';
 import {
   ApprovalDecisionAuthority,
   ApprovalDecisionIngress,
@@ -253,6 +254,29 @@ export class ApprovalAuthorityRuntimeService {
       authenticator: new RuleEngineApprovalAuthenticator(projectRoot, this.now),
       integrity: this.custody,
       channel: 'rules-engine',
+      now: this.now,
+    }).decide(command);
+  }
+
+  /** Decide through a connector-bound live authenticator using the shared envelope path. */
+  async decideChannel(
+    projectRoot: string,
+    authenticator: ChannelLiveApprovalAuthenticator,
+    command: ApprovalDecisionCommand,
+  ): Promise<ApprovalDecisionIngressOutcome> {
+    if (this.closed) throw createExecutionAuthorityError('APPROVAL_AUTHORITY_RUNTIME_CLOSED');
+    if (realpathSync(projectRoot) !== this.projectRoot) {
+      return { kind: 'rejected', reason: 'unauthorized' };
+    }
+    const request = this.broker.getRequest(command.requestId);
+    if (!request || request.tenantId !== this.tenantId) {
+      return { kind: 'rejected', reason: request ? 'unauthorized' : 'unknown-request' };
+    }
+    return new ApprovalDecisionIngress({
+      broker: this.broker,
+      authenticator,
+      integrity: this.custody,
+      channel: 'channel',
       now: this.now,
     }).decide(command);
   }

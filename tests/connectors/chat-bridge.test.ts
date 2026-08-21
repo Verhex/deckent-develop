@@ -8,14 +8,62 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { makeChatResponder, chunkMessage } from '../../src/connectors/chat-bridge.js';
+import {
+  makeChatResponder,
+  chunkMessage,
+  makeSendApproval,
+  makeSendToolApproval,
+} from '../../src/connectors/chat-bridge.js';
 import type { ChatProviderAdapter, McpToolDispatcher } from '../../src/cli/commands/chat-native.js';
+import { CapabilityRegistry } from '../../src/connectors/capabilities/registry.js';
+import type { OutgoingMessage } from '../../src/connectors/types.js';
 
 function fakeProvider(reply: string): ChatProviderAdapter {
   return { async send() { return { text: reply, stopReason: 'end_turn' as const }; } };
 }
 // Hermetic dispatcher — never spawn the real CLI bridge in unit tests.
 const noopDispatcher: McpToolDispatcher = { async dispatch() { return ''; } };
+
+function expectBotApprovalCard(message: OutgoingMessage): void {
+  const row = message.buttons?.[0];
+  expect(row).toHaveLength(2);
+  const approve = row?.[0]?.callbackData ?? '';
+  const reject = row?.[1]?.callbackData ?? '';
+  expect(approve).toMatch(/^dk1:bot:approve:[0-9A-HJKMNP-TV-Z]{5}:[0-9a-f]{8}$/);
+  const [, , , shortCode, nonce] = approve.split(':');
+  expect(reject).toBe(`dk1:bot:reject:${shortCode}:${nonce}`);
+  expect(approve.length).toBeLessThan(64);
+  expect(reject.length).toBeLessThan(64);
+  expect(message.text).toContain(`#${shortCode}`);
+}
+
+describe('approval card producers', () => {
+  it('makes capability approval buttons with bot namespace, short code, and nonce', async () => {
+    const sent: OutgoingMessage[] = [];
+    const connector = {
+      id: 'telegram' as const,
+      sendMessage: async (message: OutgoingMessage) => { sent.push(message); },
+    };
+    const send = makeSendApproval(connector, new CapabilityRegistry(), 'en');
+
+    await send('channel-1', 'capability-action-123', 'send_mail', { to: 'a@example.com' });
+
+    expectBotApprovalCard(sent[0]!);
+  });
+
+  it('makes risky-tool approval buttons with bot namespace, short code, and nonce', async () => {
+    const sent: OutgoingMessage[] = [];
+    const connector = {
+      id: 'telegram' as const,
+      sendMessage: async (message: OutgoingMessage) => { sent.push(message); },
+    };
+    const send = makeSendToolApproval(connector, 'en');
+
+    await send('channel-2', 'tool-action-456', 'deckent_plan', { directive: 'Sprint 600' });
+
+    expectBotApprovalCard(sent[0]!);
+  });
+});
 
 describe('makeChatResponder', () => {
   it('returns the model reply for a plain chat message', async () => {

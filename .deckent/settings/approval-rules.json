@@ -6,7 +6,10 @@
       "createdAt": "2026-08-20T20:45:00.000Z",
       "createdBy": "alperen",
       "reason": "xverify provider-evidence probe onayları rutindir (owner-delegated-2026-08-19)",
-      "match": { "idPrefix": "aprp-", "riskTierMax": "routine" },
+      "match": {
+        "idPrefix": "aprp-",
+        "riskTierMax": "routine"
+      },
       "decision": "allow",
       "source": "manual"
     }

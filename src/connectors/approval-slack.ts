@@ -33,9 +33,10 @@
 //    ApprovalRelay.dispatch is the single place that catches it and reports
 //    'channel-error'; this adapter must never swallow it silently.
 
-import { summarizeArgs } from './bot-agentic.js';
+import { randomBytes } from 'node:crypto';
 import { approvalCallbackData, parseApprovalCallback } from './callback-router.js';
 import { getMessage } from '../cli/helpers/messages.js';
+import { shortCodeFor } from '../core/approval-short-code.js';
 import type {
   ChannelDecisionInput,
   RelayChannel,
@@ -55,7 +56,7 @@ export interface SlackButtonElement {
   readonly type: 'button';
   readonly action_id: 'approve' | 'reject';
   readonly text: SlackTextObject;
-  /** Opaque payload delivered back on press — `approve:<id>` / `reject:<id>`. */
+  /** Opaque versioned payload delivered back on press. */
   readonly value: string;
   readonly style?: 'primary' | 'danger';
 }
@@ -133,6 +134,8 @@ export class ApprovalSlackChannel implements RelayChannel {
   private readonly lang: string;
   /** requestId -> Slack message ts, so a later cross-decided can update in place. */
   private readonly tsByRequestId = new Map<string, string>();
+  /** short-code + nonce -> raw broker id; raw ids never leave this process. */
+  private readonly requestIdByCallbackKey = new Map<string, string>();
 
   constructor(opts: ApprovalSlackChannelOptions) {
     this.transport = opts.transport;
@@ -148,9 +151,17 @@ export class ApprovalSlackChannel implements RelayChannel {
   onDecision(handler: (input: ChannelDecisionInput) => void): void {
     this.transport.onBlockAction((interaction) => {
       const parsed = parseApprovalCallback(interaction.actionValue);
-      if (!parsed) return; // not an approval press — ignore (e.g. a foreign action value)
+      if (!parsed || !('action' in parsed) || !('triggerId' in parsed)) return;
+      let requestId = parsed.triggerId;
+      if ('version' in parsed) {
+        const versioned = parseApprovalCallback(interaction.actionValue as `dk1:${string}`);
+        if (!('version' in versioned) || versioned.ns !== 'brk') return;
+        const mappedRequestId = this.requestIdByCallbackKey.get(`${versioned.shortCode}:${versioned.nonce}`);
+        if (!mappedRequestId) return;
+        requestId = mappedRequestId;
+      }
       handler({
-        requestId: parsed.triggerId,
+        requestId,
         decision: DECISION_BY_ACTION[parsed.action],
         decidedBy: interaction.userId,
         decidedAt: new Date().toISOString(),
@@ -160,16 +171,13 @@ export class ApprovalSlackChannel implements RelayChannel {
 
   // ─── internals ──────────────────────────────────────────────────────────
 
-  /** Label-free `key: value` request-data summary — same convention `summarizeArgs`
-   *  already uses for dynamic tool args, extended to risk/scope (also request data,
-   *  not fixed UI copy) so no new i18n keys are required for this adapter. */
+  /** Compact relay card triple: source · reason · human-facing short code. */
   private renderBody(request: ApprovalRequest): string {
-    const meta = `scope: ${request.scope} · risk: ${request.risk}`;
-    const argsLine = request.maskedArgs ? summarizeArgs(request.maskedArgs) : '';
-    return [request.summary, meta, argsLine].filter((line) => line.length > 0).join('\n');
+    const source = `${request.requester.role}/${request.requester.instanceId}`;
+    return `source: ${source} · reason: ${request.summary} · #${shortCodeFor(request.id)}`;
   }
 
-  private buildActionsBlock(requestId: string): SlackActionsBlock {
+  private buildActionsBlock(shortCode: string, nonce: string): SlackActionsBlock {
     return {
       type: 'actions',
       block_id: ACTIONS_BLOCK_ID,
@@ -178,14 +186,14 @@ export class ApprovalSlackChannel implements RelayChannel {
           type: 'button',
           action_id: 'approve',
           text: { type: 'plain_text', text: getMessage('cap.btn.approve', this.lang) },
-          value: approvalCallbackData('approve', requestId),
+          value: approvalCallbackData('brk', 'approve', shortCode, nonce),
           style: 'primary',
         },
         {
           type: 'button',
           action_id: 'reject',
           text: { type: 'plain_text', text: getMessage('cap.btn.reject', this.lang) },
-          value: approvalCallbackData('reject', requestId),
+          value: approvalCallbackData('brk', 'reject', shortCode, nonce),
           style: 'danger',
         },
       ],
@@ -194,14 +202,23 @@ export class ApprovalSlackChannel implements RelayChannel {
 
   private buildPendingPayload(request: ApprovalRequest): SlackMessagePayload {
     const header = getMessage('cap.approval.header', this.lang);
-    const text = `🔐 ${header}\n${this.renderBody(request)}`;
+    const shortCode = shortCodeFor(request.id);
+    const body = this.renderBody(request);
+    const isCritical = request.risk === 'critical';
+    const criticalHint = isCritical ? `\ndeckent approvals decide #${shortCode}` : '';
+    const text = `🔐 ${header}\n${body}${criticalHint}`;
+    const blocks: SlackBlock[] = [
+      { type: 'section', text: { type: 'mrkdwn', text: `🔐 *${header}*\n${body}${criticalHint}` } },
+    ];
+    if (!isCritical) {
+      const nonce = randomBytes(4).toString('hex');
+      this.requestIdByCallbackKey.set(`${shortCode}:${nonce}`, request.id);
+      blocks.push(this.buildActionsBlock(shortCode, nonce));
+    }
     return {
       channel: this.channelId,
       text,
-      blocks: [
-        { type: 'section', text: { type: 'mrkdwn', text: `🔐 *${header}*\n${this.renderBody(request)}` } },
-        this.buildActionsBlock(request.id),
-      ],
+      blocks,
     };
   }
 

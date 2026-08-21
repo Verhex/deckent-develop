@@ -17,7 +17,7 @@ import {
   type RpcSpawnFn,
   type RpcSpawnHandle,
 } from '../../src/api/rpc-write-handlers.js';
-import { ApprovalBroker, type ApprovalRequestInput } from '../../src/core/approval-broker.js';
+import { startTestServer } from './test-server-helper.js';
 
 let projectRoot: string;
 
@@ -32,27 +32,6 @@ afterEach(() => {
 function fakeSpawnHandle(pid: number | undefined): { handle: RpcSpawnHandle; unref: ReturnType<typeof vi.fn> } {
   const unref = vi.fn();
   return { handle: { pid, unref }, unref };
-}
-
-function buildApprovalInput(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
-  return {
-    id,
-    requester: { role: 'worker', instanceId: 'w-363-003' },
-    summary: `approval request ${id}`,
-    details: { note: 'test' },
-    scopeId: 'sprint-363',
-    scope: 'shell-exec',
-    risk: 'high',
-    policy: 'require-approval',
-    defaultAction: 'deny',
-    tenantId: 'local',
-    userId: 'alperen',
-    createdAt: '2026-07-03T00:00:00.000Z',
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    maskedArgs: { command: '[REDACTED]' },
-    rawArgsRef: null,
-    ...overrides,
-  };
 }
 
 // ─── buildRpcWriteHandlerMap — mandatory requester ──────────────────────────
@@ -76,6 +55,59 @@ describe('buildRpcWriteHandlerMap — requester is mandatory', () => {
 describe('RPC_WRITE_METHODS_STILL_UNSUPPORTED', () => {
   it('names session.resume as the one write method still left unwired', () => {
     expect(RPC_WRITE_METHODS_STILL_UNSUPPORTED).toEqual(['session.resume']);
+  });
+});
+
+describe('approval.decide HTTP RPC gate', () => {
+  it('keeps approval.decide METHOD_NOT_IMPLEMENTED when approval.api_decide is off', async () => {
+    const server = await startTestServer({ disableAuth: true });
+    try {
+      const response = await fetch(`${server.baseUrl}/api/rpc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          version: '1.0',
+          id: 'flag-off',
+          method: 'approval.decide',
+          params: { requestId: 'apr-off', decision: 'allow', decidedBy: 'owner' },
+        }),
+      });
+      const responseBody: unknown = await response.json();
+      expect(response.status, JSON.stringify(responseBody)).toBe(200);
+      expect(responseBody).toMatchObject({
+        id: 'flag-off',
+        error: { code: 'METHOD_NOT_IMPLEMENTED' },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects an invalid bearer when approval.api_decide is on', async () => {
+    const server = await startTestServer({
+      apiToken: 'valid-api-token',
+      seed: { config: { approval: { api_decide: true } } },
+    });
+    try {
+      const response = await fetch(`${server.baseUrl}/api/rpc`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer invalid-token',
+          'Idempotency-Key': 'rpc-invalid-token',
+        },
+        body: JSON.stringify({
+          version: '1.0',
+          id: 'invalid-token',
+          method: 'approval.decide',
+          params: { requestId: 'apr-invalid', decision: 'allow', decidedBy: 'owner' },
+        }),
+      });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: 'forbidden' });
+    } finally {
+      await server.close();
+    }
   });
 });
 
@@ -185,10 +217,27 @@ describe('run.start-detached', () => {
 // ─── approval.decide ─────────────────────────────────────────────────────────
 
 describe('approval.decide', () => {
-  it('decides a pending approval via broker.decide, channel "rpc"', async () => {
-    const broker = new ApprovalBroker(projectRoot, { storeDir: join(projectRoot, 'approvals') });
-    broker.submit(buildApprovalInput('apr-363-1'));
-    const map = buildRpcWriteHandlerMap({ projectRoot, requester: 'w-363-003', approvalBroker: broker });
+  function authorityWith(outcome: unknown) {
+    const decideOidc = vi.fn().mockResolvedValue(outcome);
+    return {
+      authority: {
+        runtime: { decideOidc },
+        policy: { authorityRef: 'test' },
+        verifier: {},
+      } as unknown as NonNullable<Parameters<typeof buildRpcWriteHandlerMap>[0]['approvalAuthority']>,
+      decideOidc,
+    };
+  }
+
+  it('routes decisions through the OIDC authority ingress, never ApprovalBroker.decide directly', async () => {
+    const { authority, decideOidc } = authorityWith({ kind: 'decided' });
+    const map = buildRpcWriteHandlerMap({
+      projectRoot,
+      requester: 'w-363-003',
+      approvalAuthority: authority,
+      approvalToken: 'fresh-oidc-token',
+      approvalIdempotencyKey: 'rpc-decision-1',
+    });
 
     const result = await map['approval.decide']!({
       requestId: 'apr-363-1',
@@ -198,44 +247,34 @@ describe('approval.decide', () => {
     });
 
     expect(result).toEqual({ ok: true });
-    const decided = broker.list('decided');
-    expect(decided.map((r) => r.id)).toEqual(['apr-363-1']);
-    const decision = await broker.awaitDecision('apr-363-1');
-    expect(decision.decision).toBe('allow');
-    expect(decision.decidedBy).toBe('alperen');
-    expect(decision.channel).toBe('rpc');
+    expect(decideOidc).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'fresh-oidc-token', channel: 'api-oidc' }),
+      { requestId: 'apr-363-1', action: 'allow', idempotencyKey: 'rpc-decision-1', reason: 'looks fine' },
+    );
   });
 
-  it('rejects a request with a blank decidedBy without calling the broker', async () => {
-    const broker = new ApprovalBroker(projectRoot, { storeDir: join(projectRoot, 'approvals') });
-    broker.submit(buildApprovalInput('apr-363-2'));
-    const decideSpy = vi.spyOn(broker, 'decide');
-    const map = buildRpcWriteHandlerMap({ projectRoot, requester: 'w-363-003', approvalBroker: broker });
+  it('rejects a request with a blank decidedBy without entering authority', async () => {
+    const { authority, decideOidc } = authorityWith({ kind: 'decided' });
+    const map = buildRpcWriteHandlerMap({ projectRoot, requester: 'w-363-003', approvalAuthority: authority, approvalToken: 'token', approvalIdempotencyKey: 'key' });
 
     await expect(
       map['approval.decide']!({ requestId: 'apr-363-2', decision: 'allow', decidedBy: '   ' }),
     ).rejects.toThrow(/decidedBy/i);
-    expect(decideSpy).not.toHaveBeenCalled();
+    expect(decideOidc).not.toHaveBeenCalled();
   });
 
-  it('propagates ApprovalBrokerError (e.g. already-decided) as a thrown error, never a fabricated ok:true', async () => {
-    const broker = new ApprovalBroker(projectRoot, { storeDir: join(projectRoot, 'approvals') });
-    broker.submit(buildApprovalInput('apr-363-3'));
-    const map = buildRpcWriteHandlerMap({ projectRoot, requester: 'w-363-003', approvalBroker: broker });
-
-    await map['approval.decide']!({ requestId: 'apr-363-3', decision: 'allow', decidedBy: 'alperen' });
+  it('pins flag-open/invalid-token behavior as unauthorized at the ingress', async () => {
+    const { authority } = authorityWith({ kind: 'rejected', reason: 'invalid-assertion' });
+    const map = buildRpcWriteHandlerMap({ projectRoot, requester: 'w-363-003', approvalAuthority: authority, approvalToken: 'invalid', approvalIdempotencyKey: 'key' });
     await expect(
-      map['approval.decide']!({ requestId: 'apr-363-3', decision: 'deny', decidedBy: 'someone-else' }),
-    ).rejects.toThrow(/already decided/i);
+      map['approval.decide']!({ requestId: 'apr-363-3', decision: 'deny', decidedBy: 'someone' }),
+    ).rejects.toThrow(/Unauthorized/i);
   });
 
-  it('defaults to a real ApprovalBroker rooted at projectRoot when none is injected', async () => {
-    const seedBroker = new ApprovalBroker(projectRoot);
-    seedBroker.submit(buildApprovalInput('apr-363-4'));
+  it('fails closed when no approval authority/token context was supplied', async () => {
     const map = buildRpcWriteHandlerMap({ projectRoot, requester: 'w-363-003' });
-
-    const result = await map['approval.decide']!({ requestId: 'apr-363-4', decision: 'deny', decidedBy: 'alperen' });
-
-    expect(result).toEqual({ ok: true });
+    await expect(
+      map['approval.decide']!({ requestId: 'apr-363-4', decision: 'deny', decidedBy: 'alperen' }),
+    ).rejects.toThrow(/Unauthorized/i);
   });
 });

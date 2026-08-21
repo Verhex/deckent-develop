@@ -45,6 +45,7 @@ import type {
 } from '../core/provider-evidence-producer.js';
 import type { DockerSpawnBackend } from './spawn-backend-docker.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
+import { liveRuleFor } from '../core/approval-rules-engine.js';
 
 const DEFAULT_DECISION_WINDOW_MS = 120_000;
 const DEFAULT_DECISION_POLL_MS = 2_000;
@@ -313,6 +314,23 @@ export async function prepareCrossVerifyCandidateEvidence(
           if (now().getTime() >= deadline) {
             return hold('approval_undecided', requestId, [], { approvalRequestId: requestId });
           }
+          // D2b-2a micro-wiring: before sleeping, let the approval rules
+          // engine try the pending probe. Fail-soft by design — no matching
+          // live rule means nothing happens, and any engine refusal leaves
+          // the normal human-decision poll untouched (the engine can only
+          // ADD a decision through the same MAC'd ingress, never block one).
+          try {
+            const pending = approvalRuntime.broker.getRequest(requestId);
+            const rule = pending ? liveRuleFor(input.projectRoot, pending, now()) : null;
+            if (rule) {
+              await approvalRuntime.decideByRules(input.projectRoot, {
+                requestId,
+                action: rule.decision,
+                idempotencyKey: `rules-engine:${requestId}:${rule.decision}`,
+                reason: rule.reason,
+              });
+            }
+          } catch { /* fail-soft: keep polling for a human decision */ }
           await sleep(pollMs);
           continue;
         case 'DECISION_NOT_ALLOWED':

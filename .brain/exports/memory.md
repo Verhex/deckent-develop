@@ -1,5 +1,34 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-603 Learnings
+- Sprint sprint-603 Learnings: ## Sprint sprint-603 Learnings
+
+## Gains
+- 603-001 — VS Code decide istemci-ucu (T11) — npx tsc --noEmit passed.
+- 603-002 — orphan-delisting + kanal-matrisi i18n (T12) — Implemented the requested two-entry orphan delisting and bilingual nonce-exhausted channel messag...
+
+## Sprint sprint-602 Learnings
+- Sprint sprint-602 Learnings: ## Sprint sprint-602 Learnings
+
+## Gains
+- 602-001 — bot-sürecinde relay + kanal-karar zinciri (T7) — npx tsc --noEmit passed.
+- 602-002 — VS Code decide sunucu-ucu (T10) — npx tsc --noEmit passed.
+
+## Sprint sprint-601 Learnings
+- Sprint sprint-601 Learnings: ## Sprint sprint-601 Learnings
+
+## Gains
+- 601-001 — bootstrap callback-dallanması (T3 — 'brk' rotası) — npx tsc --noEmit passed.
+- 601-002 — ingress 4. slot + decideChannel (T5) — npx tsc --noEmit passed.
+
+## Sprint sprint-599 Learnings
+- Sprint sprint-599 Learnings: ## Sprint sprint-599 Learnings
+
+## Gains
+- 599-001 — callback-payload sözleşmesi (nonce + ad-uzayı + kısa-kod) — Implemented dk1 callback generation and typed parsing; retained deprecated legacy producer overlo...
+- 599-002 — approval_channels config — telegram girdisi + tipler (T8) — Targeted Vitest passed: 3 files, 287 tests.
+- 599-003 — y/n grameri + DE1 kısa-kod absorbe (T9) — Targeted Vitest passed: 2 files, 33 tests.
+
 ## Sprint sprint-598 Learnings
 - Sprint sprint-598 Learnings: ## Sprint sprint-598 Learnings
 

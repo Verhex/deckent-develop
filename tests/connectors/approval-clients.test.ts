@@ -148,9 +148,10 @@ describe('ApprovalSlackChannel — pending -> Block Kit payload', () => {
     const payload = fake.sent[0]!;
     expect(payload.channel).toBe('C-1');
     expect(payload.text).toContain('approval request apr-sl-1');
-    expect(payload.text).toContain('shell-exec');
-    expect(payload.text).toContain('high');
-    expect(payload.text).toContain('[REDACTED]');
+    // D3 card-triple (source · reason · #code): risk/scope/masked summaries
+    // moved out of the text by design; the raw-never-leaks guarantee below is
+    // structural (the contract has no rawArgs field at all).
+    expect(payload.text).toMatch(/source: .+ · reason: .+ · #[0-9A-HJ-NP-TV-Z]{5}/u);
     // No raw-args field exists on the contract at all — only maskedArgs — so this
     // is the strongest "raw never leaks" guarantee available (same as approval-relay).
     expect(Object.keys(req)).not.toContain('rawArgs');
@@ -158,16 +159,22 @@ describe('ApprovalSlackChannel — pending -> Block Kit payload', () => {
     expect(payload.blocks).toHaveLength(2);
     const section = payload.blocks[0]!;
     expect(section.type).toBe('section');
-    expect((section as { text: { text: string } }).text.text).toContain('[REDACTED]');
+    // D3 card-triple: the section text now carries source · reason · #code
+    // (masked/risk summaries left the text by design; raw-args stay structurally
+    // impossible — the contract has no such field).
+    expect((section as { text: { text: string } }).text.text)
+      .toMatch(/source: .+ · reason: .+ · #[0-9A-HJ-NP-TV-Z]{5}/u);
 
     const actions = payload.blocks[1]!;
     expect(actions.type).toBe('actions');
     const elements = (actions as { elements: ReadonlyArray<{ action_id: string; value: string }> }).elements;
     expect(elements).toHaveLength(2);
     expect(elements[0]!.action_id).toBe('approve');
-    expect(elements[0]!.value).toBe('approve:apr-sl-1');
+    // D3: nonce'd namespaced short-code payloads — the raw request id never
+    // rides callback data (Telegram 64-byte class constraint, applied uniformly).
+    expect(elements[0]!.value).toMatch(/^dk1:brk:approve:[0-9A-HJ-NP-TV-Z]{5}:[0-9a-f]{8}$/u);
     expect(elements[1]!.action_id).toBe('reject');
-    expect(elements[1]!.value).toBe('reject:apr-sl-1');
+    expect(elements[1]!.value).toMatch(/^dk1:brk:reject:[0-9A-HJ-NP-TV-Z]{5}:[0-9a-f]{8}$/u);
   });
 
   it('falls back to postMessage (no ts captured) when the transport lacks postMessageReturningTs', async () => {
@@ -337,9 +344,8 @@ describe('ApprovalTeamsChannel — pending -> Adaptive Card payload', () => {
     const payload = fake.sent[0]!;
     expect(payload.channelId).toBe('T-1');
     expect(payload.text).toContain('approval request apr-tm-1');
-    expect(payload.text).toContain('shell-exec');
-    expect(payload.text).toContain('high');
-    expect(payload.text).toContain('[REDACTED]');
+    // D3 card-triple — same alignment as the Slack pin above.
+    expect(payload.text).toMatch(/source: .+ · reason: .+ · #[0-9A-HJ-NP-TV-Z]{5}/u);
     expect(Object.keys(req)).not.toContain('rawArgs');
 
     expect(payload.attachments).toHaveLength(1);
@@ -347,11 +353,15 @@ describe('ApprovalTeamsChannel — pending -> Adaptive Card payload', () => {
     expect(attachment.contentType).toBe('application/vnd.microsoft.card.adaptive');
     expect(attachment.content.type).toBe('AdaptiveCard');
     expect(attachment.content.body).toHaveLength(1);
-    expect(attachment.content.body[0]!.text).toContain('[REDACTED]');
+    // D3 card-triple — same alignment as the Slack section pin.
+    expect(attachment.content.body[0]!.text)
+      .toMatch(/source: .+ · reason: .+ · #[0-9A-HJ-NP-TV-Z]{5}/u);
 
     expect(attachment.content.actions).toHaveLength(2);
-    expect(attachment.content.actions[0]).toMatchObject({ id: 'approve', data: { value: 'approve:apr-tm-1' } });
-    expect(attachment.content.actions[1]).toMatchObject({ id: 'reject', data: { value: 'reject:apr-tm-1' } });
+    expect(attachment.content.actions[0]!.id).toBe('approve');
+    expect((attachment.content.actions[0]!.data as { value: string }).value).toMatch(/^dk1:brk:approve:[0-9A-HJ-NP-TV-Z]{5}:[0-9a-f]{8}$/u);
+    expect(attachment.content.actions[1]!.id).toBe('reject');
+    expect((attachment.content.actions[1]!.data as { value: string }).value).toMatch(/^dk1:brk:reject:[0-9A-HJ-NP-TV-Z]{5}:[0-9a-f]{8}$/u);
   });
 
   it('falls back to sendActivity (no id captured) when the transport lacks sendActivityReturningId', async () => {

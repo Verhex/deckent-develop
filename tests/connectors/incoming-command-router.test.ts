@@ -45,6 +45,11 @@ describe('parseCommand', () => {
     expect(parseCommand('/ACCEPT  Trig-9 ')).toEqual({ action: 'approve', id: 'Trig-9' });
   });
 
+  it('normalizes short y/n verbs to approve/reject', () => {
+    expect(parseCommand('y a3f9c')).toEqual({ action: 'approve', id: 'a3f9c' });
+    expect(parseCommand('/N A3F9C')).toEqual({ action: 'reject', id: 'A3F9C' });
+  });
+
   it('default-denies anything that is not exactly verb + one id', () => {
     expect(parseCommand('hello there')).toBeNull();
     expect(parseCommand('approve')).toBeNull();            // no id
@@ -99,6 +104,17 @@ describe('makeIncomingCommandRouter — authorized dispatch', () => {
     });
     handler(msg({ text: 'reject t-9' }));
     await vi.waitFor(() => expect(resolve).toHaveBeenCalledWith('t-9', 'reject'));
+  });
+
+  it('authorized y/n commands dispatch their normalized actions', async () => {
+    const resolve = vi.fn(async () => 'resolved' as const);
+    const handler = makeIncomingCommandRouter({ authorizedChatIds: ['7374744018'], resolve });
+    handler(msg({ text: 'y code-y' }));
+    handler(msg({ text: 'n code-n' }));
+    await vi.waitFor(() => {
+      expect(resolve).toHaveBeenCalledWith('code-y', 'approve');
+      expect(resolve).toHaveBeenCalledWith('code-n', 'reject');
+    });
   });
 
   it('resolver returns "not-found" → authorized sender still gets a (distinct) ack', async () => {

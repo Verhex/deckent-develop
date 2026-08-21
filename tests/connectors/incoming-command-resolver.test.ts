@@ -123,6 +123,22 @@ describe('makeCommandResolver — nervous ownership (durable IPC)', () => {
     expect(await resolve('A3F9C', 'approve')).toMatchObject({ status: 'resolved' });
     expect(writeNervousApproval).toHaveBeenCalledWith(root, 'n-xyz', 'approve');
   });
+
+  it('ambiguous persisted short code is rejected with typed candidates and never written', async () => {
+    const writeNervousApproval = vi.fn(async () => {});
+    const resolve = makeCommandResolver(root, {
+      readNervousPending: () => [
+        { id: 'n-first', shortCode: 'same1' },
+        { id: 'n-second', shortCode: 'same1' },
+      ],
+      writeNervousApproval,
+    });
+    expect(await resolve('same1', 'approve')).toEqual({
+      status: 'ambiguous',
+      candidates: ['n-first', 'n-second'],
+    });
+    expect(writeNervousApproval).not.toHaveBeenCalled();
+  });
 });
 
 describe('makeCommandResolver — routing precedence + not-found', () => {

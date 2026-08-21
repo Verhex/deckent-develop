@@ -31,7 +31,11 @@ export interface ParsedCommand {
  * when approving a parked bot-action EXECUTES it and the user should see the
  * execution result, not a generic "approved".
  */
-export type ResolveOutcome = 'resolved' | 'not-found' | { readonly status: 'resolved'; readonly reply: string };
+export type ResolveOutcome =
+  | 'resolved'
+  | 'not-found'
+  | { readonly status: 'resolved'; readonly reply: string }
+  | { readonly status: 'ambiguous'; readonly candidates: readonly string[] };
 
 /**
  * Resolves an approval gate. Injected so the router stays pure and gate-agnostic;
@@ -73,7 +77,7 @@ export interface IncomingCommandRouterOptions {
 // `accept` is an alias for `approve` (BOT-VERB) so a user copying the nervous
 // CLI verb (`deckent nervous accept <id>`) commands successfully over Telegram —
 // autonomous uses `approve`, nervous uses `accept`, both resolve the same way.
-const COMMAND_RE = /^\/?(approve|accept|reject)\s+(\S+)$/i;
+const COMMAND_RE = /^\/?(approve|accept|reject|y|n)\s+(\S+)$/i;
 
 /**
  * Parse an inbound message into a command, or null if it is not exactly
@@ -84,7 +88,7 @@ export function parseCommand(text: string): ParsedCommand | null {
   const match = COMMAND_RE.exec(text.trim());
   if (!match) return null;
   const verb = match[1]!.toLowerCase();
-  const action: ApprovalAction = verb === 'reject' ? 'reject' : 'approve';
+  const action: ApprovalAction = verb === 'reject' || verb === 'n' ? 'reject' : 'approve';
   return { action, id: match[2]! };
 }
 
@@ -138,6 +142,10 @@ async function resolveAndAck(
     const outcome = await resolve(cmd.id, cmd.action);
     if (!reply) return;
     if (typeof outcome === 'object') {
+      if (outcome.status === 'ambiguous') {
+        await reply(channelId, getMessage('bot.not_found', lang, { id: cmd.id }));
+        return;
+      }
       // Resolver supplied its own reply (e.g. a bot-action execution result).
       await reply(channelId, outcome.reply);
       return;

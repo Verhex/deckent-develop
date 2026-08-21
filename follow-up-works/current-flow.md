@@ -26,7 +26,7 @@
 - [x] BİTTİ — D2b-2a (kod+impl-mühür `…8fc6e4417` + canlı-kanıt + sonuç-mühür `…0baeac92` + MASTER-blok).
 - [ ] D2b-2a mikro-wiring: xverify-poll'e otomatik rules-apply (pending-aprp görülünce motor tetiklenir; CLI-elle değil).
 - [ ] D2b-2b (GEREKİRSE): tam `kind:'rule'` union'ı approval-contract'ta — staged authorityRef-ayrımı yeterliyse İPTAL edilir, owner-karar.
-- [ ] D3+DE3: Telegram/Slack/Teams relay CANLI wiring + VS Code decide + buton/y·n.
+- [x] BİTTİ — D3+DE3 (5 dalga 599-603 + canlı-defekt fix'leri): GERÇEK-CİHAZ kanıtı disk-zarfında (decidedBy channel:telegram:7374744018); sonuç-mühür `…b1d04afc`; MASTER-blok yazıldı. Residual (dürüst): Slack/Teams app-provizyonu owner-işi; OTP tam-kimlik ayrı-dilim; riskTier-zarf D4.
 - [ ] D4: TTL/SLA normalizasyonu (confirmations/autonomous/pairing süresiz-pending kalmaz).
 - [ ] D5: legacy karar-yüzeyi emekliliği + i18n-kalanı.
 

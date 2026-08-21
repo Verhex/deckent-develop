@@ -441,8 +441,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-21 (codex-prefix waves + handoff tooling): same 14483 count,
   // digest only — the authority-handoff CLI sandbox suite and the prefix
   // spec/config pin realignments moved tracked test content.
-  count: 14483,
-  digest: '5cc76269412207604025eb23f675251ac9729ec627697b77ef2d0e94a183006e',
+  // 2026-08-21 (D3+DE3 waves 599-603 + live-defect fixes): +22 — the channel
+  // authenticator / bot-relay / bootstrap / callback / clients suites' tmpdir
+  // and mock-transport fixtures across the five waves.
+  count: 14505,
+  digest: '246159205fecd99b730e5b812cfa2fcc7bec6029652963e3cb70baac56a73af1',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -778,8 +781,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-21 (codex-prefix waves): same 1267 count, digest only — spec
   // prefix fields, config flags, spec-driven core-emit branch, capability
   // gate and the tmux dead-seam removal moved tracked production content.
-  count: 1267,
-  digest: '87d8e7f8ab93fb57179c4f61451b4d956489d461285654265201108fcae1ed10',
+  // 2026-08-21 (D3+DE3): +1 REAL production module —
+  // src/core/approval-channel-authenticator.ts; relay/bootstrap/bot/rpc
+  // surfaces moved tracked production content.
+  count: 1268,
+  digest: '4e21d9ce7665228b02b24b5678435f22101354ac42b888982611fb1748a7e2d6',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

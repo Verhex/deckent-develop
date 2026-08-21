@@ -26,13 +26,18 @@ import {
 } from './connector-notify-adapter.js';
 import { makeIncomingCommandRouter, type CommandResolver, type ResolveOutcome } from './incoming-command-router.js';
 import { makeCommandResolver } from './incoming-command-resolver.js';
-import { parseApprovalCallback } from './callback-router.js';
+import {
+  parseApprovalCallback,
+  type ApprovalCallbackParseResult,
+  type VersionedApprovalCallback,
+} from './callback-router.js';
 import type { IncomingCallback } from './types.js';
 import { type ChatResponder, type PerTurnMediaConnector } from './chat-bridge.js';
 import { chunkMessage } from './message-format.js';
 import { makeStreamThrottle } from './stream-throttle.js';
 import { isBotSlash, handleBotSlash } from './bot-commands.js';
-import { takeBotAction, checkExecutable } from './bot-action-store.js';
+import { takeBotAction, checkExecutable, listBotActions } from './bot-action-store.js';
+import { resolveShortCode } from '../core/approval-short-code.js';
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
 import { killSprintById } from '../cli/commands/kill.js';
@@ -348,9 +353,26 @@ export type ChatStreamResponder = (
   principal?: ResolvedPrincipal,
 ) => Promise<string>;
 
+export interface BrkDecisionChatContext {
+  readonly connector: ConnectorId;
+  readonly fromUser: string;
+  readonly channelId: string;
+  resolvePrincipal(): ResolvedPrincipal | null;
+  isAuthorized(): boolean;
+}
+
+export type BrkDecider = (
+  parsed: VersionedApprovalCallback & { readonly ns: 'brk' },
+  chatCtx: BrkDecisionChatContext,
+) => Promise<string>;
+
 export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
   /** Resolve an approval command. Default: disk-backed resolver bound to `root`. */
   resolve?: CommandResolver;
+  /** Optional authority-backed resolver for versioned broker approval callbacks. */
+  brkDecider?: BrkDecider;
+  /** Exposes an already-started connector to the composition root. */
+  onConnectorReady?: (id: ConnectorId, connector: IMessageConnector, chatId: string) => void;
   /**
    * Full agentic chat responder for authorized non-command messages (Telegram as
    * a conversation head). Omit → non-command messages stay silently ignored.
@@ -964,14 +986,50 @@ export async function bootstrapConnectorCommands(
         const cbCapable = connector as unknown as { onCallback?: (h: (cb: IncomingCallback) => void) => void };
         if (typeof cbCapable.onCallback === 'function') {
           cbCapable.onCallback((cb: IncomingCallback) => {
-            const parsed = parseApprovalCallback(cb.data);
-            if (!parsed) return;
+            const parsed = parseApprovalCallback(cb.data) as ApprovalCallbackParseResult | null;
+            if (!parsed || ('state' in parsed && parsed.state === 'invalid')) {
+              console.debug(`[connector-bootstrap] ignored invalid approval callback: ${cb.data}`);
+              return;
+            }
+            if ('version' in parsed && parsed.ns === 'brk') {
+              if (!deps.brkDecider) {
+                void send(
+                  cb.channelId,
+                  getMessage('approval.broker_authority_pending', lang, { code: parsed.shortCode }),
+                ).catch(() => undefined);
+                return;
+              }
+              const chatKey = chatKeyOf(cb.connector, cb.channelId);
+              const resolveCallbackPrincipal = (): ResolvedPrincipal | null => {
+                if (!resolveIdentity || !identityAccess) return null;
+                const binding = identityAccess.getBinding(chatKey);
+                return binding
+                  ? resolveIdentity({ connector: cb.connector, fromUser: cb.fromUser }, binding)
+                  : null;
+              };
+              void deps.brkDecider(parsed as VersionedApprovalCallback & { readonly ns: 'brk' }, {
+                connector: cb.connector,
+                fromUser: cb.fromUser,
+                channelId: cb.channelId,
+                resolvePrincipal: resolveCallbackPrincipal,
+                isAuthorized: () => resolveCallbackPrincipal() !== null,
+              }).then(
+                (reply) => send(cb.channelId, reply),
+                () => send(cb.channelId, getMessage('approval.channel.rejected', lang)),
+              ).catch(() => undefined);
+              return;
+            }
+            let triggerId = 'version' in parsed ? parsed.shortCode : parsed.id;
+            if ('version' in parsed) {
+              const mapped = resolveShortCode(parsed.shortCode, listBotActions(root).map((action) => action.id));
+              if (mapped.state === 'resolved') triggerId = mapped.id;
+            }
             commandRouter({
               id: `cb-${cb.data}`,
               connector: connector.id,
               fromUser: cb.fromUser,
               channelId: cb.channelId,
-              text: `${parsed.action} ${parsed.triggerId}`,
+              text: `${parsed.action} ${triggerId}`,
               timestamp: new Date().toISOString(),
               raw: { callback: cb.data },
             });
@@ -981,6 +1039,7 @@ export async function bootstrapConnectorCommands(
         await connector.start({ enabled: true, token: cfg.token });
         started.push(connector);
         targets.push({ connector, chatId });
+        deps.onConnectorReady?.(connector.id, connector, chatId);
       } catch (err) {
         console.error(
           `[connector-bootstrap] ${id} inbound start failed — skipping: ` +

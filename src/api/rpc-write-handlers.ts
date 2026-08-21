@@ -39,8 +39,12 @@ import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RECENT_WORKS_DIR } from '../core/constants.js';
-import { ApprovalBroker } from '../core/approval-broker.js';
 import type { RpcHandler, RpcHandlerMap } from '../core/term-rpc.js';
+import type { ApprovalAuthorityRuntimeService } from '../core/approval-authority-runtime.js';
+import type {
+  ApprovalOidcAssertionVerifier,
+  ApprovalOidcPolicy,
+} from '../core/approval-oidc-authenticator.js';
 
 // ─── Injectable detached-spawn seam (hermetic tests supply a fake) ──────────
 
@@ -104,10 +108,20 @@ export interface RpcWriteHandlerDeps {
    * and server.ts's own POST /api/approvals/:id/decision.
    */
   requester: string;
-  /** Inject a fake ApprovalBroker for hermetic tests; defaults to a real one rooted at projectRoot. */
-  approvalBroker?: ApprovalBroker;
+  /** Shared MAC-backed approval ingress composed by the API server. */
+  approvalAuthority?: RpcApprovalAuthority;
+  /** Fresh OIDC bearer taken from the current HTTP request's auth context. */
+  approvalToken?: string;
+  /** Request-scoped replay key forwarded to the authority ingress. */
+  approvalIdempotencyKey?: string;
   /** Inject a fake spawn for hermetic tests; omit for the real node:child_process spawn. */
   spawnFn?: RpcSpawnFn;
+}
+
+export interface RpcApprovalAuthority {
+  readonly runtime: ApprovalAuthorityRuntimeService;
+  readonly policy: ApprovalOidcPolicy;
+  readonly verifier: ApprovalOidcAssertionVerifier;
 }
 
 /**
@@ -158,7 +172,6 @@ function buildRunStartDetachedHandler(deps: RpcWriteHandlerDeps): RpcHandler<'ru
 // ─── approval.decide ─────────────────────────────────────────────────────────
 
 function buildApprovalDecideHandler(deps: RpcWriteHandlerDeps): RpcHandler<'approval.decide'> {
-  const broker = deps.approvalBroker ?? new ApprovalBroker(deps.projectRoot);
   return async (params) => {
     // Defense-in-depth beyond TERM_RPC_METHOD_SCHEMAS' own `decidedBy: z.string().min(1)` — a
     // hermetic test (or a future caller) invoking this handler directly bypasses
@@ -168,13 +181,32 @@ function buildApprovalDecideHandler(deps: RpcWriteHandlerDeps): RpcHandler<'appr
     if (decidedBy.length === 0) {
       throw new Error('approval.decide requires a non-empty decidedBy (requester) for the audit trail');
     }
-    broker.decide(params.requestId, {
-      decision: params.decision,
-      decidedBy,
-      channel: 'rpc',
-      decidedAt: new Date().toISOString(),
-      reason: params.reason ?? '',
+    const token = deps.approvalToken?.trim();
+    const idempotencyKey = deps.approvalIdempotencyKey?.trim();
+    if (!deps.approvalAuthority || !token) {
+      throw new Error('Unauthorized: approval.decide requires fresh OIDC authority');
+    }
+    if (!idempotencyKey) {
+      throw new Error('approval.decide requires an Idempotency-Key');
+    }
+
+    const outcome = await deps.approvalAuthority.runtime.decideOidc({
+      token,
+      policy: deps.approvalAuthority.policy,
+      verifier: deps.approvalAuthority.verifier,
+      channel: 'api-oidc',
+    }, {
+      requestId: params.requestId,
+      action: params.decision,
+      idempotencyKey,
+      ...(params.reason ? { reason: params.reason } : {}),
     });
+    if (outcome.kind === 'rejected') {
+      throw new Error(`Unauthorized: approval decision rejected (${outcome.reason})`);
+    }
+    if (outcome.kind === 'expired') {
+      throw new Error('approval request expired');
+    }
     return { ok: true as const };
   };
 }

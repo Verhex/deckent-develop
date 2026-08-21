@@ -35,9 +35,10 @@
 //    ApprovalRelay.dispatch is the single place that catches it and reports
 //    'channel-error'; this adapter must never swallow it silently.
 
-import { summarizeArgs } from './bot-agentic.js';
+import { randomBytes } from 'node:crypto';
 import { approvalCallbackData, parseApprovalCallback } from './callback-router.js';
 import { getMessage } from '../cli/helpers/messages.js';
+import { shortCodeFor } from '../core/approval-short-code.js';
 import type {
   ChannelDecisionInput,
   RelayChannel,
@@ -138,6 +139,8 @@ export class ApprovalTeamsChannel implements RelayChannel {
   private readonly lang: string;
   /** requestId -> Teams activity id, so a later cross-decided can update in place. */
   private readonly activityIdByRequestId = new Map<string, string>();
+  /** short-code + nonce -> raw broker id; raw ids never leave this process. */
+  private readonly requestIdByCallbackKey = new Map<string, string>();
 
   constructor(opts: ApprovalTeamsChannelOptions) {
     this.transport = opts.transport;
@@ -153,9 +156,17 @@ export class ApprovalTeamsChannel implements RelayChannel {
   onDecision(handler: (input: ChannelDecisionInput) => void): void {
     this.transport.onCardAction((invocation) => {
       const parsed = parseApprovalCallback(invocation.actionValue);
-      if (!parsed) return; // not an approval submit — ignore (e.g. a foreign action value)
+      if (!parsed || !('action' in parsed) || !('triggerId' in parsed)) return;
+      let requestId = parsed.triggerId;
+      if ('version' in parsed) {
+        const versioned = parseApprovalCallback(invocation.actionValue as `dk1:${string}`);
+        if (!('version' in versioned) || versioned.ns !== 'brk') return;
+        const mappedRequestId = this.requestIdByCallbackKey.get(`${versioned.shortCode}:${versioned.nonce}`);
+        if (!mappedRequestId) return;
+        requestId = mappedRequestId;
+      }
       handler({
-        requestId: parsed.triggerId,
+        requestId,
         decision: DECISION_BY_ACTION[parsed.action],
         decidedBy: invocation.userId,
         decidedAt: new Date().toISOString(),
@@ -165,35 +176,35 @@ export class ApprovalTeamsChannel implements RelayChannel {
 
   // ─── internals ──────────────────────────────────────────────────────────
 
-  /** Label-free `key: value` request-data summary — same convention `summarizeArgs`
-   *  already uses for dynamic tool args, extended to risk/scope (also request data,
-   *  not fixed UI copy) so no new i18n keys are required for this adapter. */
+  /** Compact relay card triple: source · reason · human-facing short code. */
   private renderBody(request: ApprovalRequest): string {
-    const meta = `scope: ${request.scope} · risk: ${request.risk}`;
-    const argsLine = request.maskedArgs ? summarizeArgs(request.maskedArgs) : '';
-    return [request.summary, meta, argsLine].filter((line) => line.length > 0).join('\n');
+    const source = `${request.requester.role}/${request.requester.instanceId}`;
+    return `source: ${source} · reason: ${request.summary} · #${shortCodeFor(request.id)}`;
   }
 
-  private buildCard(bodyText: string, requestId: string | undefined): AdaptiveCard {
+  private buildCard(bodyText: string, request: ApprovalRequest | undefined, nonce?: string): AdaptiveCard {
     const actions: AdaptiveCardSubmitAction[] =
-      requestId === undefined
+      request === undefined || request.risk === 'critical' || nonce === undefined
         ? []
         : [
             {
               type: 'Action.Submit',
               id: 'approve',
               title: getMessage('cap.btn.approve', this.lang),
-              data: { value: approvalCallbackData('approve', requestId) },
+              data: { value: approvalCallbackData('brk', 'approve', shortCodeFor(request.id), nonce) },
               style: 'positive',
             },
             {
               type: 'Action.Submit',
               id: 'reject',
               title: getMessage('cap.btn.reject', this.lang),
-              data: { value: approvalCallbackData('reject', requestId) },
+              data: { value: approvalCallbackData('brk', 'reject', shortCodeFor(request.id), nonce) },
               style: 'destructive',
             },
           ];
+    if (request !== undefined && nonce !== undefined) {
+      this.requestIdByCallbackKey.set(`${shortCodeFor(request.id)}:${nonce}`, request.id);
+    }
     return {
       type: 'AdaptiveCard',
       $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
@@ -205,14 +216,18 @@ export class ApprovalTeamsChannel implements RelayChannel {
 
   private buildPendingPayload(request: ApprovalRequest): TeamsMessagePayload {
     const header = getMessage('cap.approval.header', this.lang);
-    const bodyText = `🔐 **${header}**\n${this.renderBody(request)}`;
+    const criticalHint = request.risk === 'critical'
+      ? `\ndeckent approvals decide #${shortCodeFor(request.id)}`
+      : '';
+    const bodyText = `🔐 **${header}**\n${this.renderBody(request)}${criticalHint}`;
+    const nonce = request.risk === 'critical' ? undefined : randomBytes(4).toString('hex');
     return {
       channelId: this.channelId,
       text: bodyText,
       attachments: [
         {
           contentType: 'application/vnd.microsoft.card.adaptive',
-          content: this.buildCard(bodyText, request.id),
+          content: this.buildCard(bodyText, request, nonce),
         },
       ],
     };
