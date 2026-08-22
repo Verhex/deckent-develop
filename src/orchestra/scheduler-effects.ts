@@ -973,7 +973,10 @@ function persistCascadeSkipResultAtomic(projectRoot: string, result: TaskResult)
  * CascadeSkip (SCHED6-EFF persist-before-commit contract): the synthetic
  * `.result` is written to disk FIRST (atomically); task status/collected
  * state is only "committed" (status → NO_GO, task json persisted, id added to
- * `cascadeSkippedTaskIds`) AFTER that persist succeeds. If the `.result`
+ * `cascadeSkippedTaskIds`) AFTER that persist succeeds. PENDING and PAUSED
+ * tasks are both eligible for that commit: the continuous-quiescence reducer
+ * deliberately emits CascadeSkip for a PAUSED descendant once repair is
+ * disabled and the branch is proven dead. If the `.result`
  * already exists on disk (a replay of an already-applied — or
  * crash-interrupted — decision), the persist step is skipped entirely so a
  * duplicate skip is never written; the commit step still runs if-and-only-if
@@ -990,6 +993,7 @@ export async function executeSchedulerDecision(
   const cascadeSkippedTaskIds: string[] = [];
   const spawnSkips: SchedulerSpawnSkip[] = [];
   let checkpointsWritten = 0;
+  let terminalPersistenceFailed = false;
 
   for (const effect of decision.orderedEffects) {
     if (effect.kind === 'KillWorker') {
@@ -1010,10 +1014,11 @@ export async function executeSchedulerDecision(
           persistCascadeSkipResultAtomic(deps.projectRoot, buildCascadeSkipResult(task, effect.failedDependencyId));
         } catch (e) {
           debugLog('executeSchedulerDecision:cascadeSkip:persist', `${effect.idempotencyKey}: ${String(e)}`);
+          terminalPersistenceFailed = true;
           continue; // persist failed — task stays PENDING, retryable next tick with the same key
         }
       }
-      if (task.status === TaskStatus.PENDING) {
+      if (task.status === TaskStatus.PENDING || task.status === TaskStatus.PAUSED) {
         task.status = TaskStatus.NO_GO;
         persistTask(deps.projectRoot, task);
         cascadeSkippedTaskIds.push(task.id);
@@ -1021,6 +1026,10 @@ export async function executeSchedulerDecision(
       continue;
     }
     if (effect.kind === 'WriteCheckpoint') {
+      // A checkpoint must never claim this ordered decision landed when an
+      // earlier terminal receipt in the same tick did not persist. The next
+      // bounded tick will re-decide it with the same idempotency key.
+      if (terminalPersistenceFailed) continue;
       try {
         if (deps.writeCheckpoint) {
           deps.writeCheckpoint(effect.reason);

@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { TaskEvaluation } from '../../src/core/types.js';
@@ -25,13 +25,14 @@ function publishReceipt(
   sprintId: string,
   taskId: string,
   attemptNum = 1,
+  decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' = 'DONE',
 ): void {
   writeEvaluationAudit(root, sprintId, taskId, attemptNum, {
     ruleSet: 'CODE',
     schemaValidation: { valid: true, missingFields: [], coverageRelaxed: false },
     criterionScores: [],
     totalScore: 100,
-    decision: 'DONE',
+    decision,
     decisionRationale: 'immutable host settlement',
   });
 }
@@ -64,6 +65,53 @@ describe('controller settlement consumption', () => {
       taskId,
       expectedEvaluation: TaskEvaluation.DONE,
     })).toMatchObject({ state: 'SETTLED' });
+  });
+
+  it('replays the immutable exact-attempt verdict without recomputing it after restart', () => {
+    const { root, sprintId, taskId } = fixture();
+    publishReceipt(root, sprintId, taskId, 1, 'GO_WITH_TECH_DEBT');
+    const receiptPath = evaluationAuditPath(root, sprintId, taskId, 1);
+    const receiptBytes = readFileSync(receiptPath, 'utf8');
+
+    expect(consumeControllerEvaluationSettlement({
+      projectRoot: root,
+      sprintId,
+      taskId,
+    })).toMatchObject({
+      state: 'SETTLED',
+      evaluation: TaskEvaluation.GO_WITH_TECH_DEBT,
+      receipt: { decision: 'GO_WITH_TECH_DEBT' },
+    });
+    expect(readFileSync(receiptPath, 'utf8')).toBe(receiptBytes);
+  });
+
+  it('holds a structurally corrupt receipt instead of projecting its result prose', () => {
+    const { root, sprintId, taskId } = fixture();
+    const receiptPath = evaluationAuditPath(root, sprintId, taskId, 1);
+    mkdirSync(dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, JSON.stringify({
+      sprintId,
+      taskId,
+      attemptNum: 1,
+      evaluator: 'brain',
+      timestamp: new Date().toISOString(),
+      ruleSet: 'CODE',
+      decision: 'DONE',
+      normativeVerdict: 'GO',
+      totalScore: 100,
+      criterionScores: [],
+      decisionRationale: 'result prose says DONE',
+      // schemaValidation is deliberately absent: this is not a complete receipt.
+    }));
+
+    expect(consumeControllerEvaluationSettlement({
+      projectRoot: root,
+      sprintId,
+      taskId,
+    })).toMatchObject({
+      state: 'HOLD',
+      reason: 'SETTLEMENT_RECEIPT_CONFLICT',
+    });
   });
 
   it('holds a raw DONE when its settlement receipt is missing', () => {

@@ -6,6 +6,7 @@
 import {
   readFileSync, writeFileSync, existsSync,
   mkdirSync, readdirSync, renameSync, unlinkSync, rmdirSync, statSync,
+  openSync, closeSync, fsyncSync,
 } from 'node:fs';
 import { promises as fsPromises } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -29,8 +30,27 @@ import {
   projectSprintWorkAttribution,
 } from '../core/sprint-work-attribution.js';
 import { resolveHostPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
+import {
+  createTaskTerminalProjection,
+  reduceTaskTerminalProjection,
+} from '../core/task-terminal-projection.js';
+import type {
+  TaskTerminalEvidence,
+  TaskTerminalProjection,
+} from '../core/task-terminal-projection.js';
 
 import type { TaskDNA } from '../core/routing-types.js';
+import {
+  createSprintFinalizerGateAuthority,
+  deriveSprintFinalizerGateInputDigest,
+  invalidateSprintFinalizerGate,
+  publishSprintFinalizerGate,
+  resolveSprintFinalizerGate,
+} from '../core/sprint-finalizer-gate-authority.js';
+import type {
+  SprintFinalizerGateAuthority,
+  SprintFinalizerGateInput,
+} from '../core/sprint-finalizer-gate-authority.js';
 
 type CatalogStatsEntry = Record<string, unknown> & {
   totalUses?: number;
@@ -1028,6 +1048,70 @@ export function applyGateStatus(currentStatus: string, gate: Pick<SelfAuditResul
   return currentStatus;
 }
 
+/** Clear only the obsolete gate-derived downgrade after a fresh product-green pass. */
+export function applyAuthoritativeGateStatus(
+  currentStatus: string,
+  outcome: 'PASS' | 'FAIL',
+  logicalProductGreen: boolean,
+): string {
+  if (outcome === 'FAIL') return GO_WITH_GATE_FAILURE;
+  if (logicalProductGreen && currentStatus === GO_WITH_GATE_FAILURE) return 'DONE';
+  return currentStatus;
+}
+
+export class FinalizerFreshGateHoldError extends Error {
+  constructor(readonly reasonCode: string) {
+    super(reasonCode);
+    this.name = 'FinalizerFreshGateHoldError';
+  }
+}
+
+export interface FreshFinalizerGateResolution {
+  readonly authority: SprintFinalizerGateAuthority;
+  readonly outcome: 'PASS' | 'FAIL';
+  readonly reused: boolean;
+}
+
+/** Resolve an exact gate or invalidate stale evidence and compute one fresh gate. */
+export async function resolveOrEvaluateFreshFinalizerGate(input: {
+  readonly authority: SprintFinalizerGateAuthority;
+  readonly currentInput: SprintFinalizerGateInput;
+  readonly evaluate: () => Promise<'PASS' | 'FAIL'>;
+  readonly now?: () => string;
+}): Promise<FreshFinalizerGateResolution> {
+  const resolution = resolveSprintFinalizerGate(input.authority, input.currentInput);
+  if (resolution.decision === 'authoritative') {
+    return { authority: input.authority, outcome: resolution.receipt.outcome, reused: true };
+  }
+
+  const inputDigest = deriveSprintFinalizerGateInputDigest(input.currentInput);
+  let authority = input.authority;
+  if (resolution.reasonCode === 'stale-input') {
+    const invalidated = invalidateSprintFinalizerGate(authority, {
+      expectedRevision: authority.revision,
+      invalidatedInputDigest: authority.gate!.inputDigest,
+      replacementInputDigest: inputDigest,
+      observedAt: (input.now ?? (() => new Date().toISOString()))(),
+    });
+    if (invalidated.decision === 'hold') {
+      throw new FinalizerFreshGateHoldError(`FINALIZER_GATE_INVALIDATION_HOLD:${invalidated.reasonCode}`);
+    }
+    authority = invalidated.state;
+  }
+
+  const outcome = await input.evaluate();
+  const published = publishSprintFinalizerGate(authority, {
+    input: input.currentInput,
+    inputDigest,
+    outcome,
+    expectedRevision: authority.revision,
+  });
+  if (published.decision === 'hold') {
+    throw new FinalizerFreshGateHoldError(`FINALIZER_GATE_PUBLISH_HOLD:${published.reasonCode}`);
+  }
+  return { authority: published.state, outcome: published.receipt.outcome, reused: false };
+}
+
 
 // ═══ Adaptive Thresholds ══════════════════════════════════════════
 
@@ -1414,6 +1498,139 @@ interface PersistedSprintTerminalReceipt {
   readonly logicalProgress: LogicalProgressProjection;
   readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
   readonly writtenAt: string;
+}
+
+type PersistedTerminalTask = Record<string, unknown> & {
+  readonly id?: unknown;
+  readonly terminalProjection?: unknown;
+};
+
+function isTaskTerminalProjection(value: unknown): value is TaskTerminalProjection {
+  if (value === null || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.logicalTaskId === 'string'
+    && Number.isSafeInteger(candidate.generation)
+    && (typeof candidate.winnerAttemptId === 'string' || candidate.winnerAttemptId === null)
+    && (candidate.terminal === null
+      || candidate.terminal === 'DONE'
+      || candidate.terminal === 'NO_GO'
+      || candidate.terminal === 'ABORTED'
+      || candidate.terminal === 'CASCADE_SKIPPED'
+      || candidate.terminal === 'NEVER_DISPATCHED')
+    && (candidate.status === null
+      || candidate.status === 'DONE'
+      || candidate.status === 'NO_GO'
+      || candidate.status === 'ABORTED')
+    && typeof candidate.cascadeSkipped === 'boolean'
+    && typeof candidate.neverDispatched === 'boolean';
+}
+
+/** Persist CAS-fenced terminal task read models before publishing a sprint receipt. */
+export function persistFinalizerTaskTerminalProjections(input: {
+  readonly projectRoot: string;
+  readonly truth: FinalizerTerminalTruth;
+  readonly coordinatorGeneration: number;
+  readonly terminalOutcome: SprintTerminalOutcome;
+}): void {
+  const tasksDir = join(input.projectRoot, TASKS_DIR);
+  const targets = [...input.truth.terminalEvidence.logicalTasks]
+    .sort((left, right) => left.logicalTaskId.localeCompare(right.logicalTaskId))
+    .flatMap(logicalTask => logicalTask.attempts.map(identity => ({
+      logicalTask,
+      identity,
+      path: join(tasksDir, `task-${identity.taskId}.json`),
+      lockPath: join(tasksDir, `task-${identity.taskId}.terminal-projection.lock`),
+    }))).sort((left, right) => left.path.localeCompare(right.path));
+  const locks: Array<{ readonly path: string; readonly fd: number }> = [];
+
+  try {
+    // Acquire the complete sorted fence set before the first replacement.
+    for (const target of targets) {
+      try {
+        locks.push({ path: target.lockPath, fd: openSync(target.lockPath, 'wx', 0o600) });
+      } catch (cause) {
+        throw new FinalizerTerminalEvidenceError(
+          `TASK_TERMINAL_PROJECTION_CAS_HOLD:${target.identity.taskId}:${(cause as NodeJS.ErrnoException).code ?? 'LOCK_FAILED'}`,
+        );
+      }
+    }
+
+    for (const target of targets) {
+      let task: PersistedTerminalTask;
+      try {
+        task = JSON.parse(readFileSync(target.path, 'utf-8')) as PersistedTerminalTask;
+      } catch (cause) {
+        throw new FinalizerTerminalEvidenceError(
+          `TASK_TERMINAL_PROJECTION_READ_HOLD:${target.identity.taskId}:${cause instanceof Error ? cause.message : String(cause)}`,
+        );
+      }
+      if (task.id !== target.identity.taskId) {
+        throw new FinalizerTerminalEvidenceError(
+          `TASK_TERMINAL_PROJECTION_IDENTITY_HOLD:${target.identity.taskId}`,
+        );
+      }
+
+      const winnerAttemptId = target.logicalTask.resolvingAttempt?.attemptId ?? null;
+      const current = task.terminalProjection === undefined
+        ? createTaskTerminalProjection({
+            logicalTaskId: target.logicalTask.logicalTaskId,
+            generation: input.coordinatorGeneration,
+            winnerAttemptId,
+          })
+        : isTaskTerminalProjection(task.terminalProjection)
+          ? task.terminalProjection
+          : (() => { throw new FinalizerTerminalEvidenceError(
+              `TASK_TERMINAL_PROJECTION_MALFORMED_HOLD:${target.identity.taskId}`,
+            ); })();
+      const cascadeSkipped = input.truth.attempts.some(attempt =>
+        attempt.identity.taskId === target.identity.taskId
+        && (attempt.result.state === 'COMPLETE' || attempt.result.state === 'PARTIAL')
+        && attempt.result.payload?.cascadeSkipped === true);
+      const evidence: TaskTerminalEvidence = input.terminalOutcome === 'ABORTED'
+        ? { kind: 'gate-terminal', logicalTaskId: target.logicalTask.logicalTaskId,
+            generation: input.coordinatorGeneration, attemptId: winnerAttemptId, outcome: 'ABORTED' }
+        : cascadeSkipped
+          ? { kind: 'gate-terminal', logicalTaskId: target.logicalTask.logicalTaskId,
+              generation: input.coordinatorGeneration, attemptId: winnerAttemptId, outcome: 'CASCADE_SKIPPED' }
+          : winnerAttemptId === null
+            ? { kind: 'gate-terminal', logicalTaskId: target.logicalTask.logicalTaskId,
+                generation: input.coordinatorGeneration, attemptId: null, outcome: 'NEVER_DISPATCHED' }
+            : { kind: 'attempt-result', logicalTaskId: target.logicalTask.logicalTaskId,
+                generation: input.coordinatorGeneration, attemptId: winnerAttemptId,
+                outcome: target.logicalTask.state === 'COMPLETED' ? 'DONE' : 'NO_GO' };
+      const reduced = reduceTaskTerminalProjection(current, evidence);
+      if (reduced.decision === 'hold') {
+        throw new FinalizerTerminalEvidenceError(
+          `TASK_TERMINAL_PROJECTION_${reduced.reasonCode.toUpperCase().replaceAll('-', '_')}_HOLD:${target.identity.taskId}`,
+        );
+      }
+      const projected = {
+        ...task,
+        status: reduced.projection.status,
+        cascadeSkipped: reduced.projection.cascadeSkipped,
+        neverDispatched: reduced.projection.neverDispatched,
+        terminalProjection: reduced.projection,
+      };
+      const tempPath = `${target.path}.terminal-${process.pid}-${randomUUID()}.tmp`;
+      const fd = openSync(tempPath, 'wx', 0o600);
+      try {
+        writeFileSync(fd, JSON.stringify(projected, null, 2) + '\n', 'utf-8');
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+      renameSync(tempPath, target.path);
+    }
+    if (targets.length > 0) {
+      const dirFd = openSync(tasksDir, 'r');
+      try { fsyncSync(dirFd); } finally { closeSync(dirFd); }
+    }
+  } finally {
+    for (const lock of locks.reverse()) {
+      try { closeSync(lock.fd); } catch { /* best-effort descriptor retirement */ }
+      try { unlinkSync(lock.path); } catch { /* projection failure remains a HOLD */ }
+    }
+  }
 }
 
 function canonicalJson(value: unknown): string {
@@ -1983,6 +2200,14 @@ function publishFencedTerminalReceipt(
   const terminalEvidence = assembleSprintTerminalEvidence({
     attempts: input.truth.attempts,
     coordinatorEvidence: [receiptEvidence],
+  });
+  // Receipt publication cannot outrun its task projections. Any reducer/CAS/
+  // durability failure propagates as a typed HOLD before receipt bytes exist.
+  persistFinalizerTaskTerminalProjections({
+    projectRoot: input.projectRoot,
+    truth: input.truth,
+    coordinatorGeneration,
+    terminalOutcome,
   });
   // A′ / ADR-D-007 bounded recovery (owner onayı, 2026-08-17): a COMPLETE
   // terminal receipt asserts settled WORK. The sprint-535/536 chronology showed
@@ -3557,31 +3782,92 @@ export async function finalizeSprint(
     if (richOutput) console.log(richOutput);
   } catch (e) { debugLog('finalizeSprint:richOutput', e); }
 
-  // 10b. Self-audit gate: run tsc + vitest + honesty checks, propagate status
+  // 10b. Self-audit gate: reuse only exact authority; stale evidence is archived
+  // and replaced by an on-demand evaluation before status can be projected.
   debugLog('finalizeSprint:breadcrumb', 'Step 10b (selfAuditGate) — entering');
   let gateResult: SelfAuditResult | null = null;
+  const recentWorksDir = join(projectRoot, RECENT_WORKS_DIR);
+  const gateAuthorityPath = join(recentWorksDir, `${sprint.id}-gate-authority.json`);
+  type PersistedGateAuthority = {
+    readonly authority: SprintFinalizerGateAuthority;
+    readonly evidence: SelfAuditResult;
+  };
   try {
-    gateResult = await runSelfAuditGate(sprint.id, projectRoot, {
-      scopedManifest: deriveScopedSelfAuditManifest(attemptTasks, results),
-      selfAuditEcosystem: resolveSelfAuditEcosystem(projectRoot ?? process.cwd()),
+    await fsPromises.mkdir(recentWorksDir, { recursive: true });
+    const persisted = readJsonSafe<PersistedGateAuthority>(gateAuthorityPath);
+    const initialAuthority = persisted?.authority
+      ?? createSprintFinalizerGateAuthority(sprint.id);
+    const taskSetDigest = createHash('sha256')
+      .update(JSON.stringify(attemptTasks.map(task => task.id).sort()))
+      .digest('hex');
+    const attemptWinners = Object.fromEntries(
+      terminalTruth.terminalEvidence.logicalTasks
+        .flatMap(task => task.resolvingAttempt
+          ? [[task.logicalTaskId, task.resolvingAttempt.attemptId] as const]
+          : []),
+    );
+    const codeDigest = terminalTruth.logicalSettlementDigest;
+    const configDigest = createHash('sha256')
+      .update(JSON.stringify(opts?.config ?? null))
+      .digest('hex');
+    const snapshot = {
+      runId: opts?.flowId ?? sprint.id,
+      generation: opts?.coordinatorGeneration ?? 1,
+      taskSetDigest,
+      attemptWinners,
+      codeDigest,
+      configDigest,
+    };
+    const priorInput = initialAuthority.gate?.input;
+    const observedAt = priorInput
+      && priorInput.runId === snapshot.runId
+      && priorInput.generation === snapshot.generation
+      && priorInput.taskSetDigest === snapshot.taskSetDigest
+      && JSON.stringify(priorInput.attemptWinners) === JSON.stringify(snapshot.attemptWinners)
+      && priorInput.codeDigest === snapshot.codeDigest
+      && priorInput.configDigest === snapshot.configDigest
+        ? priorInput.observedAt
+        : new Date().toISOString();
+    const currentInput: SprintFinalizerGateInput = { ...snapshot, observedAt };
+    let evaluatedEvidence: SelfAuditResult | null = null;
+    const resolved = await resolveOrEvaluateFreshFinalizerGate({
+      authority: initialAuthority,
+      currentInput,
+      evaluate: async () => {
+        evaluatedEvidence = await runSelfAuditGate(sprint.id, projectRoot, {
+          scopedManifest: deriveScopedSelfAuditManifest(attemptTasks, results),
+          selfAuditEcosystem: resolveSelfAuditEcosystem(projectRoot ?? process.cwd()),
+        });
+        return evaluatedEvidence.overallGate === 'PASS' ? 'PASS' : 'FAIL';
+      },
     });
-    debugLog('finalizeSprint:selfAuditGate', `Gate completed: overallGate=${gateResult.overallGate}`);
+    gateResult = evaluatedEvidence ?? persisted?.evidence ?? null;
+    if (gateResult === null || (gateResult.overallGate === 'PASS') !== (resolved.outcome === 'PASS')) {
+      throw new FinalizerFreshGateHoldError('FINALIZER_GATE_EVIDENCE_HOLD');
+    }
+    const authorityTempPath = `${gateAuthorityPath}.${process.pid}.${randomUUID()}.tmp`;
+    await fsPromises.writeFile(
+      authorityTempPath,
+      JSON.stringify({ authority: resolved.authority, evidence: gateResult }, null, 2),
+    );
+    await fsPromises.rename(authorityTempPath, gateAuthorityPath);
+    debugLog('finalizeSprint:selfAuditGate', `${resolved.reused ? 'Reused' : 'Computed'} authoritative gate: overallGate=${gateResult.overallGate}`);
     const currentStatus = sprint.status ?? '';
-    const newStatus = applyGateStatus(currentStatus, gateResult);
+    const newStatus = applyAuthoritativeGateStatus(
+      currentStatus,
+      resolved.outcome,
+      terminalTruth.logicalMetrics.noGoTasks === 0
+        && terminalTruth.logicalMetrics.unevaluatedTasks === 0,
+    );
     if (newStatus !== currentStatus) {
       sprint.status = newStatus as Sprint['status'];
       debugLog('finalizeSprint:selfAuditGate', `Status updated: ${currentStatus} → ${newStatus}`);
     }
   } catch (e) {
-    debugLog('finalizeSprint:selfAuditGate', `Gate check failed (will write fallback gate.json): ${e}`);
-    // Produce a fallback gate result so gate.json is always written
-    gateResult = {
-      tsc: { status: 'FAIL', errors: [`Gate execution failed: ${e}`] },
-      vitest: { status: 'FAIL', delta: { files: 0, pass: 0, fail: 0, skipped: 0 } },
-      honesty: { violations: 0, flaggedTasks: [] },
-      observability: { metricsJsonlExists: false, lineCount: 0 },
-      overallGate: 'GATE_FAILURE',
-    };
+    if (e instanceof FinalizerFreshGateHoldError) throw e;
+    throw new FinalizerFreshGateHoldError(
+      `FINALIZER_GATE_EVALUATION_HOLD:${e instanceof Error ? e.message : String(e)}`,
+    );
   }
   // Write gate.json to .deckent/recently-works/ — ALWAYS (even on gate failure or fallback).
   // Canonical location since the Sprint 150 de-scatter (gate/seq/events/pre-archive all live
@@ -3589,7 +3875,6 @@ export async function finalizeSprint(
   // CLI + MCP writers; the legacy `.deckent/` root path was outside retention (files piled up
   // un-pruned and invisible to listSprintFiles).
   try {
-    const recentWorksDir = join(projectRoot, RECENT_WORKS_DIR);
     await fsPromises.mkdir(recentWorksDir, { recursive: true });
     const gatePath = join(recentWorksDir, `${sprint.id}-gate.json`);
     await fsPromises.writeFile(gatePath, JSON.stringify(gateResult, null, 2));

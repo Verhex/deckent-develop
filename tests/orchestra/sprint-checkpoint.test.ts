@@ -20,6 +20,7 @@ import {
   hasValidResult,
   readResumeTaskResultAuthority,
   buildPreplannedResumeSprint,
+  restoreSprintFromCheckpoint,
 } from '../../src/orchestra/sprint-checkpoint.js';
 import type { SprintCheckpoint } from '../../src/orchestra/sprint-checkpoint.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
@@ -550,7 +551,7 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('re-queues markerless cascade PAUSED tasks proven by the v2 checkpoint', () => {
+  it('does not re-queue an unrelated markerless PAUSED task', () => {
     const root = setupRoot();
     writeTaskJson(root, '455-003b', TaskStatus.PAUSED);
     const cp = baseCp({
@@ -559,13 +560,13 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
     });
     writeCp(root, cp);
 
-    expect(deriveResumableTaskIds(root, cp)).toEqual(['455-003b']);
+    expect(deriveResumableTaskIds(root, cp)).toEqual([]);
     const reset = resetInterruptedWorkersToPending(root, cp);
     expect(reset).toMatchObject({
-      resetIds: ['455-003b'],
+      resetIds: [],
       committed: true,
     });
-    expect(statusOf(root, '455-003b')).toBe(TaskStatus.PENDING);
+    expect(statusOf(root, '455-003b')).toBe(TaskStatus.PAUSED);
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -625,6 +626,77 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
     const ids = deriveResumableTaskIds(root, cp);
 
     expect(ids).toEqual(['455-020', '455-011']);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('keeps a checkpoint-pending task resumable after a failed run projected it PAUSED', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-021', TaskStatus.PAUSED);
+    const cp = baseCp({
+      pendingTasks: ['455-021'],
+      schemaVersion: 2,
+      taskStates: [{ id: '455-021', status: TaskStatus.PENDING }],
+    });
+
+    expect(deriveResumableTaskIds(root, cp)).toEqual(['455-021']);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('restores checkpoint-PENDING disk-PAUSED work without false-completing it', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-022', TaskStatus.PAUSED);
+    const cp = baseCp({
+      pendingTasks: ['455-022'],
+      schemaVersion: 2,
+      taskStates: [{ id: '455-022', status: TaskStatus.PENDING }],
+    });
+    writeCp(root, cp);
+
+    const restored = restoreSprintFromCheckpoint(root, SID);
+
+    expect(restored.action).toBe('resume-evaluate');
+    expect(restored.restoredSprint?.tasks[0]?.status).toBe(TaskStatus.PENDING);
+    expect(existsSync(join(root, '.tasks', 'task-455-022.result'))).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('projects an absent-result active task to PENDING instead of synthetic NO_GO', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-023', TaskStatus.PAUSED);
+    const cp = baseCp({
+      activeWorkers: [activeWorker('455-023')],
+      schemaVersion: 2,
+      taskStates: [{ id: '455-023', status: TaskStatus.EXECUTING }],
+    });
+    writeCp(root, cp);
+
+    const restored = restoreSprintFromCheckpoint(root, SID);
+
+    expect(restored.action).toBe('resume-evaluate');
+    expect(restored.staleTasksMarkedNoGo).toEqual([]);
+    expect(statusOf(root, '455-023')).toBe(TaskStatus.PENDING);
+    expect(existsSync(join(root, '.tasks', 'task-455-023.result'))).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('keeps the complete action for a fully terminal checkpoint with real result evidence', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-024', TaskStatus.DONE);
+    writeResultFile(root, '455-024', 'DONE');
+    const cp = baseCp({
+      completedTasks: ['455-024'],
+      schemaVersion: 2,
+      taskStates: [{ id: '455-024', status: TaskStatus.DONE }],
+    });
+    writeCp(root, cp);
+
+    const restored = restoreSprintFromCheckpoint(root, SID);
+
+    expect(restored.action).toBe('complete');
+    expect(restored.restoredSprint).toMatchObject({
+      status: SprintStatus.COMPLETE,
+      phase: SprintPhase.COMPLETE,
+    });
     rmSync(root, { recursive: true, force: true });
   });
 

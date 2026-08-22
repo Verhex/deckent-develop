@@ -1,110 +1,123 @@
-# DIRECTIVES — 9040 ENFORCE-CANARY AUTHORITY-RESTART CLOSURE
+# DIRECTIVES — 7092 RECOVERY-TRUTH CONTINUATION CLOSURE
 
 ## Outcome
 
-Sprint-618'in `ABORTED` terminal receipt'indeki iki unresolved lineage'i, diskte zaten
-LOCAL_VERIFIED olan acceptance-confirmation foundation'i yeniden yazmadan tamamla. Yeni disk
-kaniti: human kararinin restart verifier'i broker MAC authority'sine baglandi; ancak LLM terminal
-karari terminal store'a yazildiktan sonra PREPARED/APPLIED'dan once process duserse yalniz
-`cross-verify-verdict:sha256:*` ref'i kalir ve restart reconciler exact settlement ref'i bulamaz.
-Bu boslugu bounded, indexed, fail-closed authority binding ile kapat; sonra serve ownership ve
-authority duplication ratchet'ini tamamla.
+Sprint-621'in kanitli ABORTED settlement'indan kalan dort unresolved lineage'i ve bu
+recovery sirasinda canli yakalanan uc engine seam'ini ayni RECOVERY-TRUTH-001 outcome'u
+icinde kapat. Onceki sprintte landed production degisikliklerini yeniden yazma;
+current disk truth ile `already-closed` ise exact testle pinle. Yeni feature admission yok.
 
 ## Global invariants
 
-- Source evaluation verdict immutable kalir. Yalniz source `UNDECIDABLE` ve non-expired,
-  authenticated, exact-lineage `CONFIRMED` karari provisional acceptance debt'ini resolve eder.
-- Full lineage zorunlu: `tenantId`, `projectId`, `sprintId`, `taskId`, `attemptId`, `generation`,
-  `confirmationId`, `resultDigest`, `evaluationDigest`, `policyDigest`, `sourceDigest`.
-- PREPARED receipt debt CAS'tan once, APPLIED receipt CAS'tan sonra yazilir. APPLIED yoksa
-  CLI/API/audit success yazamaz.
-- Human authority yalniz authenticated ApprovalDecision MAC envelope'idir. LLM authority yalniz
-  genuine `cross-verify-verdict:sha256:*` + typed host adjudication + exact task settlement ref'tir.
-  Provider prose, bool seam veya filesystem scan authority degildir.
-- LLM binding terminal confirmation write'inden ONCE private, immutable, first-writer-wins ve
-  canonical-digestli yazilir; restart read O(1) indexed olur. Foreign tenant/project/lineage,
-  mismatched verdict/ref veya corrupt binding fail-closed kalir.
-- Origin first-writer-wins terminal truth'tur. Late/replayed/foreign karar effect uretemez.
-- Read surface mutation yapmaz. MCP decision surface eklenmez.
-- `deckent serve`, approval human authority disabled/HOLD olsa bile mevcut LLM settlement
-  intent'lerini reconcile edebilir; human branch bu durumda fail-closed kalir.
-- User-facing string hardcode edilmez; EN/TR `getMessage` kullanilir.
-- ADR-G-041: tek kernel/runtime lineage; Enterprise icin ikinci authority, scheduler veya
-  evidence chain yoktur.
-- Task Test komutlarinda repo-global `tsc`, `npm run build`, `build:all`, sprint
-  start/kill/cleanup veya auth mutation YOK. Wave sonunda Brain bunlari ayri kosar.
+- Tek ACTIVE product outcome RECOVERY-TRUTH-001; baska MASTER isi bu run'a girmez.
+- Source/test/artifact delete YOK. Canonical archive + digest-bound snapshot disinda task
+  artifact tasinmaz.
+- Canonical resume checkpoint explicit successor veya terminal receipt olmadan tasinmaz,
+  temizlenmez ve yeniden uydurulmaz.
+- Immutable exact-attempt evaluation receipt restartta replay edilir; changed shared-worktree
+  uzerinde ayni attempt yeniden rubric degerlendirmesine sokulmaz.
+- Checkpoint PENDING ile disk PAUSED drift'i terminal completion degildir.
+- Result/checkpoint/status/finalizer authority CAS-fenced, FWW, restart-safe ve typed HOLD olur.
+- Read-only status hicbir dosya veya DB olusturmaz.
+- User-facing metin yalniz i18n katalogdan gelir.
+- Task Test komutlarinda repo-global tsc/build/start/kill/cleanup/auth mutation YOK.
+  Wave sonunda Brain root tsc, scoped battery, ratchet, real-binary smoke ve diff-check kosar.
 
-## Foundation evidence
+## Task 1: Continuation current-truth inventory
 
-- Sprint-618 terminal receipt: `ABORTED`; Task 2 DONE, Task 3 exact battery 2 files/7 tests green;
-  controller eski 618-001 receipt identity ile `SETTLEMENT_RECEIPT_CONFLICT` verdi.
-- Root bounded recovery: `npx tsc --noEmit` green; serve/API exact battery 2 files/7 tests green.
-- Task 3 scale: 10,000 APPLIED first pass 4.431s, replay 2.409s; unchanged 10s bound.
+Files: docs/evidence/RECOVERY-TRUTH-001-continuation-inventory-2026-08-22.md
+Implement: Sprint-621 ABORTED receipt, archive/snapshot digest, dort unresolved lineage ve canli
+recovery seam'lerini current diskten olc. Her biri icin producer, durable authority, consumer,
+entrypoint, reproducer ve exact owner yaz. Secret/task payload kopyalama.
+Test: `test -s docs/evidence/RECOVERY-TRUTH-001-continuation-inventory-2026-08-22.md && rg -n "621-015|621-016|621-019|621-020|ABORTED|snapshot" docs/evidence/RECOVERY-TRUTH-001-continuation-inventory-2026-08-22.md`
+GO: Continuation DAG exact current truth ve file ownership ile kanitli.
+NO_GO: Chat anlatimini disk kaniti yerine kullanmak.
 
-## Task 1: Durable LLM authority binding and restart verifier
+## Task 2: Recovery sidecar projection parity pin
 
-Provider: codex
-Model: gpt-5.6-sol
-Files: src/core/acceptance-decision-authority.ts, src/orchestra/acceptance-confirmation-composition.ts, src/cli/commands/xverify.ts, src/cli/commands/confirmations.ts, tests/core/acceptance-decision-authority.test.ts, tests/cli/confirmations-acceptance-service.test.ts, tests/orchestra/acceptance-confirmation-composition.test.ts
-Implement: `XverifyResult` yalniz runner'in `validatedAdjudicationReceipt.receipt` bytes'indan exact
-`TaskResultSettlementRefV1` projekte etsin. LLM settlement oncesi confirmation full-lineage + verdict
-+ receiptRef + settlementRef private FWW binding'e yazilsin. Canonical verifier indexed binding'i
-fresh-read edip `readCrossVerifyVerdictReceipt` ile genuine host receipt, effective verdict,
-receipt ref, tenant/project/full-lineage ve digest parity'yi yeniden dogrulasin. Human broker MAC
-verifier ayni canonical factory'nin ayri branch'i olsun. Scan, provider prose, prefix-only kabul,
-consumer-local digest veya fake receipt yasak.
-Test: `npx vitest run tests/core/acceptance-decision-authority.test.ts tests/cli/confirmations-acceptance-service.test.ts tests/orchestra/acceptance-confirmation-composition.test.ts`
-GO: Crash terminal-write ile PREPARED arasinda olsa bile restart exact LLM receipt'i O(1) bulur ve
-APPLIED'a ilerler; corrupt/foreign/mismatch/replay fail-closed kanitli.
-NO_GO: Yalniz in-memory boolean, directory scan, unverifiable ref veya raw store settle.
-
-## Task 2: Serve dual-authority default composition and ownership
-
-Provider: codex
-Model: gpt-5.6-sol
 Dependencies: Task 1
-Files: src/cli/commands/serve.ts, src/api/server.ts, tests/cli/commands/serve-acceptance-composition.test.ts, tests/api/acceptance-confirmation-runtime-wire.test.ts
-Implement: `deckent serve` resolved tenant/project/lifecycle/clock ile production reconciler'i her
-zaman acar; verifier Task 1 canonical factory'sidir. Approval runtime ready ise human MAC branch'i
-eklenir, disabled/HOLD ise yalniz human branch fail-closed olur ve durable LLM drain calisir. API
-tick production reconciler'i dogrudan tuketir; structured audit durable yazilir. Shutdown sirasi API
-driver stop + in-flight drain, sonra reconciler/approval/provider exactly-once close'dur. Startup
-partial ownership all-settled kapanir.
-Test: `npx vitest run tests/cli/commands/serve-acceptance-composition.test.ts tests/api/acceptance-confirmation-runtime-wire.test.ts`
-GO: Default serve restart drain, dual authority, audit ve ownership closure behavior ile kanitli.
-NO_GO: OIDC verifier'i decision verifier sanmak, injection-only runtime veya concurrent early close.
+Files: src/core/task-artifact-classifier.ts, tests/core/task-artifact-classifier.test.ts, tests/orchestra/projection-parity-artifacts.test.ts
+Implement: `replan-proposal` dahil task protocol sidecar'lari shared classifier ile task-record'dan
+ayir. Foreign/corrupt gercek `task-*.json` fail-closed kalir. Mevcut implementation already-closed
+ise yeniden yazma, exact regressioni kosup kaniti raporla.
+Test: `npx vitest run tests/core/task-artifact-classifier.test.ts tests/orchestra/projection-parity-artifacts.test.ts`
+GO: Resume phantom task uretmez; foreign task projection parity'yi hala durdurur.
+NO_GO: Broad suffix ignore veya tum malformed JSON'i yutmak.
 
-## Task 3: Authority duplication ratchet
+## Task 3: Immutable evaluation receipt restart replay pin
 
-Provider: codex
-Model: gpt-5.6-sol
-Dependencies: Task 2
-Files: scripts/lint-acceptance-confirmation-authority.mjs, tests/scripts/lint-acceptance-confirmation-authority.test.ts
-Implement: Duplicate identity/receipt/reducer/digest/authority-binding declarationlarini, forbidden
-casts'i, direct confirmation/debt settlement bypass'ini, unindexed reconciler adapterini,
-prefix-only xverify trust'ini ve non-i18n surface textini syntax-aware ratchet ile engelle. Exact
-allowlist comment zorunlu; broad baseline suppression yok. Closure battery komutunu outputta listele.
-Test: `npx vitest run tests/scripts/lint-acceptance-confirmation-authority.test.ts && node scripts/lint-acceptance-confirmation-authority.mjs`
-GO: Current tree clean ve seeded violations cross-platform deterministic fail.
-NO_GO: Broad grep false positive, baseline suppression veya canonical authority duplication survives.
+Dependencies: Task 1
+Files: src/orchestra/sprint-controller.ts, tests/orchestra/acceptance-controller-settlement.test.ts, tests/orchestra/dependency-pipeline.test.ts
+Implement: Exact-attempt immutable receipt restartta evaluation authority olarak replay edilir;
+receipt missing ise tek evaluation, corrupt/conflict ise typed HOLD. Existing receipt varken rubric
+yeniden kosmaz ve dependent ayni verdict ile release olur. Already-closed ise yalniz proof pinle.
+Test: `npx vitest run tests/orchestra/acceptance-controller-settlement.test.ts tests/orchestra/dependency-pipeline.test.ts`
+GO: Receipt replay idempotent; verdict conflict overwrite edilmez.
+NO_GO: Conflict ignore, result prose authority veya receipt rewrite.
 
-## Task 4: End-to-end restart, race and real composition proof
+## Task 4: Checkpoint PENDING to disk PAUSED resume parity
 
-Provider: codex
-Model: gpt-5.6-sol
-Dependencies: Task 3
-Files: tests/orchestra/acceptance-authority-restart.integration.test.ts, tests/orchestra/acceptance-all-surface-closure.integration.test.ts, tests/core/acceptance-confirmation-race-scale.integration.test.ts
-Implement: Production imports ile human broker-MAC ve LLM typed-host receipt yollarinda
-producer -> confirmation -> authority binding/decision -> process restart -> PREPARED -> debt CAS
--> APPLIED -> audit zincirini; expiry race, foreign tenant/project, corrupt binding, duplicate tick,
-no replay/no leak ve mevcut 10,000 <=10s sinirini kanitla. Fixture-local canonicalization yok.
-Test: `npx vitest run tests/orchestra/acceptance-authority-restart.integration.test.ts tests/orchestra/acceptance-all-surface-closure.integration.test.ts tests/core/acceptance-confirmation-race-scale.integration.test.ts`
-GO: Her iki authority yolu restart sonrasi production composition ile exact APPLIED veya typed HOLD.
-NO_GO: Mock-only end-to-end, relaxed threshold, fabricated receipt veya bypass.
+Dependencies: Task 1
+Files: src/orchestra/sprint-checkpoint.ts, tests/orchestra/sprint-checkpoint.test.ts, tests/orchestra/completed-checkpoint-terminalizer-events.test.ts
+Implement: Durable checkpoint PENDING/stale-active authority, onceki failed run disk projectionini
+PAUSED biraksa da resumable kalir; absent result completion sayilmaz. Fully terminal checkpoint
+terminalizer semantigi korunur. Already-closed ise exact regressioni pinle.
+Test: `npx vitest run tests/orchestra/sprint-checkpoint.test.ts tests/orchestra/completed-checkpoint-terminalizer-events.test.ts`
+GO: Absent PENDING task terminalizer'a false-complete olarak gitmez.
+NO_GO: Tum PAUSED tasklari kosmak veya absent result icin sentetik DONE/NO_GO yazmak.
+
+## Task 5: Recover force checkpoint-policy production wiring
+
+Dependencies: Task 1, Task 4
+Files: src/orchestra/sprint-recovery-operation.ts, src/cli/commands/recover.ts, src/cli/helpers/messages.ts, tests/orchestra/sprint-recovery-checkpoint-preservation.test.ts, tests/cli/recover-force-checkpoint-preservation.test.ts
+Reads: src/core/recovery-artifact-policy.ts, tests/core/recovery-artifact-policy.test.ts
+Implement: Canonical recovery mutation authority Task-14 policy decisionini ve digest-bound manifesti
+kullanir. Resume checkpoint explicit distinct successor veya terminal receipt olmadan clear/move
+edilmez. Dry-run ve apply ayni manifest/preservation dispositionini raporlar. PAUSED remediation
+EN/TR i18n ile canonical resume/finalize commandini verir. Task residue archive davranisi korunur.
+Test: `npx vitest run tests/orchestra/sprint-recovery-checkpoint-preservation.test.ts tests/cli/recover-force-checkpoint-preservation.test.ts`
+GO: Sprint-595 reproducer recover-force sonrasinda checkpoint byte/digest ve resumability korunur.
+NO_GO: Archive-then-recreate, suffix authority, silent checkpoint clear veya hardcoded string.
+
+## Task 6: Status projection recovery reconciliation
+
+Dependencies: Task 5
+Files: src/core/sprint-status-authority.ts, tests/core/sprint-status-recovery-reconciliation.test.ts
+Implement: PAUSED projection ile checkpoint/terminal receipt uyusmazligini side-effect-free read
+modelde typed `projection-stale`, `checkpoint-missing`, `successor-available` olarak ayir.
+Remediation canonical recover/resume/finalize commandini verir; read path byte-identical kalir.
+Test: `npx vitest run tests/core/sprint-status-recovery-reconciliation.test.ts`
+GO: Sprint-595 artigi ACTIVE/resumable diye yanlis gosterilmez.
+NO_GO: Read-time repair/write veya generic ORPHANED etiketi.
+
+## Task 7: Recovery truth nine-case end-to-end matrix
+
+Dependencies: Task 2, Task 3, Task 5, Task 6
+Files: tests/orchestra/recovery-truth-nine-case.integration.test.ts, tests/cli/recovery-truth-real-binary.integration.test.ts
+Implement: Production imports ve hermetic async child process ile dokuz vakanin producer→authority→
+consumer→entrypoint→terminal zincirini kanitla. Restart, duplicate process, corrupt bytes, foreign
+generation, Windows path adapteri, checkpoint preservation, stale gate ve 10k bounded projection/
+replay olcumu dahil. Mock-only canonicalization veya fixture-local reimplementation yok.
+Test: `npx vitest run tests/orchestra/recovery-truth-nine-case.integration.test.ts tests/cli/recovery-truth-real-binary.integration.test.ts`
+GO: Dokuz vaka exact terminal/typed-HOLD verir; replay/no-delete ve real binary kanitli.
+NO_GO: Fake CLI, relaxed threshold, sync child process veya fixed-clock flake.
+
+## Task 8: Recovery authority ratchet and result evidence
+
+Dependencies: Task 7
+Files: scripts/lint-recovery-truth-authority.mjs, tests/scripts/lint-recovery-truth-authority.test.ts, docs/evidence/RECOVERY-TRUTH-001-result-2026-08-22.md
+Implement: Direct task-result writer, exit-code success authority, checkpoint glob-clear/archive,
+stale gate reuse, unconsumed proposal, receipt re-evaluation ve unbounded recovery scan siniflarini
+syntax-aware fail-closed ratchetle engelle. Result evidence dokuz vaka, scale, binary, snapshot,
+ABORTED→continuation lineage ve honest residual dispositionunu kaydetsin.
+Test: `npx vitest run tests/scripts/lint-recovery-truth-authority.test.ts && node scripts/lint-recovery-truth-authority.mjs`
+GO: Current tree clean; seeded ihlaller deterministic fail ve evidence tam.
+NO_GO: Comment-only lint, baseline suppression, false DONE veya MASTER mutation.
 
 ## Wave closure
 
-Brain, Task 4 sonrasinda tek dalga olarak `npx tsc --noEmit`, tum 9040 scoped battery,
-authority ratchet ve `git diff --check` kosar. XVerify same-provider kullanmaz; available
-different-provider verifier author capability'sinden dusukse typed unavailable/HOLD yazilir. Build,
-bot restart ve real-binary smoke yalniz terminal settlement sonrasinda root landing tarafinda yapilir.
+Brain Task 8 sonrasinda `npx tsc --noEmit`, tum 7092 scoped battery, authority ratchet,
+`git diff --check`, targeted writer/gate/checkpoint grep ve real-binary recovery smoke kosar.
+Formal XVerify same-provider kullanmaz; equal-or-higher different-provider yoksa typed
+`unavailable/HOLD` kaydeder. Sprint terminal olmadan build yok. MASTER/current-flow/evidence,
+landing gates, commit ve bot restart root landing tarafinda yapilir.

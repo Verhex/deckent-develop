@@ -26,6 +26,24 @@ export interface ReviewState {
   updatedAt: string;
 }
 
+export type ReviewSettlementReferenceView =
+  | { kind: 'valid'; taskId: string; attemptId: string }
+  | { kind: 'missing' }
+  | { kind: 'corrupt' }
+  | { kind: 'legacy' };
+
+export interface ReviewTaskView {
+  taskId: string;
+  status: string;
+  decision: ReviewDecision;
+  assessment: TaskResult['selfAssessment'] | null;
+  settlementReference: ReviewSettlementReferenceView;
+}
+
+export interface ReviewViewModel extends ReviewState {
+  tasks: ReviewTaskView[];
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function getReviewPath(root: string, sprintId: string): string {
@@ -86,6 +104,75 @@ function loadTasks(root: string): Task[] {
 
 function loadResult(root: string, taskId: string): TaskResult | null {
   return readAuthoritativeTaskResult<TaskResult>(root, taskId).result;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Reduces a host settlement reference to the only identifiers valid in the
+ * reviewed task's scope. Unknown fields (including tenant/project/run data)
+ * are deliberately never copied to the CLI view.
+ */
+export function toReviewSettlementReference(
+  value: unknown,
+  taskId: string,
+): ReviewSettlementReferenceView {
+  if (value === null || value === undefined) return { kind: 'missing' };
+  if (!isRecord(value)) return { kind: 'corrupt' };
+
+  if (value['version'] !== 1) {
+    return value['version'] === undefined || typeof value['version'] === 'number'
+      ? { kind: 'legacy' }
+      : { kind: 'corrupt' };
+  }
+
+  const referencedTaskId = value['taskId'];
+  const attemptId = value['attemptId'];
+  if (
+    typeof referencedTaskId !== 'string'
+    || referencedTaskId !== taskId
+    || typeof attemptId !== 'string'
+    || attemptId.length === 0
+  ) {
+    return { kind: 'corrupt' };
+  }
+  return { kind: 'valid', taskId: referencedTaskId, attemptId };
+}
+
+export function buildReviewViewModel(
+  root: string,
+  tasks: Task[],
+  state: ReviewState,
+): ReviewViewModel {
+  const reviews = new Map(state.reviews.map((review) => [review.taskId, review]));
+  return {
+    ...state,
+    tasks: tasks.map((task) => {
+      const review = reviews.get(task.id);
+      try {
+        const authority = readAuthoritativeTaskResult<TaskResult>(root, task.id);
+        return {
+          taskId: task.id,
+          status: task.status,
+          decision: review?.decision ?? 'pending',
+          assessment: authority.result?.selfAssessment ?? null,
+          settlementReference: toReviewSettlementReference(authority.settlementRef, task.id),
+        };
+      } catch {
+        // A malformed/unreadable reference is a typed read-side condition. It
+        // must not turn review into a stack trace or trigger repair writes.
+        return {
+          taskId: task.id,
+          status: task.status,
+          decision: review?.decision ?? 'pending',
+          assessment: null,
+          settlementReference: { kind: 'corrupt' },
+        };
+      }
+    }),
+  };
 }
 
 function detectSprintId(tasks: Task[]): string {
@@ -232,7 +319,7 @@ export function registerReview(program: Command): void {
 
         // --json without modification flags: show current state and return
         if (opts.json && !opts.auto && !opts.approveAll && !opts.rejectAll) {
-          print(JSON.stringify(state, null, 2));
+          print(JSON.stringify(buildReviewViewModel(root, tasks, state), null, 2));
           return;
         }
 

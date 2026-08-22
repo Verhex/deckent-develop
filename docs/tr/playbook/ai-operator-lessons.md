@@ -363,10 +363,28 @@ girebilir.
 çıkar (`grep -v $$`), deseni komut satırında birebir bulunmayacak şekilde parçala
 (`'st''art'`) ya da süreç-adı yerine yakalanmış PID'i bekle (`kill -0 <pid>`).
 
+## 27. Dogfood terminali landing kaniti degildir — root consumer bataryasi ayri bir gate'tir
+
+**Vaka (Sprint-622):** Run 8/8 `COMPLETE` oldu ve task-scope testleri yesildi. Buna
+ragmen root landing denetimi uc production acigi yakaladi: digest-bound recovery
+manifesti gercek mutation tarafindan tuketilmiyordu; status reconciliation modulu
+canonical status entrypoint'ine bagli degildi; strict TaskResultV1 writer legacy
+top-level result contractini kirip adjacent worker testlerinde 22 failure uretiyordu.
+
+**Dogru kullanim:** Dogfood terminal receipt'i orchestration surecinin bittigini
+kanitlar; production closure'i tek basina kanitlamaz. Landing oncesi (1) yeni authority
+icin gercek production import/call-site ara, (2) producer ve consumer'i ayni testte
+calistir, (3) degisen public contractin komsu legacy bataryasini kos, (4) ancak bu
+root consumer gate'i yesilse MASTER'a `LOCAL_VERIFIED` yaz. Task-scope yesili ile
+root-wiring yesilini raporda ayri adlandir.
+
 ---
 
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-08-22 — Sprint-622 root landing denetimi**: Ders 27 eklendi (dogfood
+  `COMPLETE` orchestration terminalidir, production landing kaniti degildir; root
+  import/call-site, producer-consumer ve adjacent legacy bataryasi ayri gate'tir).
 - **2026-08-21 — kendi-desenini eşleyen süreç bekleyicisi**: Ders 26 eklendi
   (`pgrep -f`/`grep` bekleyicisinin kendi komut satırını eşleyip sonsuz beklemesi;
   kendi PID'ini/shell'leri eleme, deseni parçalama veya `kill -0 <pid>` kullanma).

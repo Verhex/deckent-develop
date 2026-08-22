@@ -1141,7 +1141,13 @@ export function consumeControllerEvaluationSettlement(input: {
   readonly sprintId: string;
   readonly taskId: string;
   readonly attemptNum?: number;
-  readonly expectedEvaluation: TaskEvaluation;
+  /**
+   * Present on first publication, when the just-computed verdict must match
+   * the immutable receipt. Omitted on restart replay, where the receipt is
+   * itself the exact-attempt verdict authority and evaluation must not run a
+   * second time against a changed shared-worktree projection.
+   */
+  readonly expectedEvaluation?: TaskEvaluation;
 }): ControllerEvaluationSettlementConsumption {
   const attemptNum = input.attemptNum ?? 1;
   const path = evaluationAuditPath(
@@ -1149,12 +1155,13 @@ export function consumeControllerEvaluationSettlement(input: {
   );
   const receipt = readJsonSafe<EvaluationAuditRecord>(path);
   if (!receipt) {
+    const receiptExists = existsSync(path);
     return {
       state: 'HOLD',
-      reason: existsSync(path)
+      reason: receiptExists
         ? 'SETTLEMENT_RECEIPT_CONFLICT'
         : 'SETTLEMENT_RECEIPT_MISSING',
-      detail: existsSync(path)
+      detail: receiptExists
         ? `immutable evaluation receipt is unreadable at ${path}`
         : `no immutable evaluation receipt at ${path}`,
     };
@@ -1167,18 +1174,50 @@ export function consumeControllerEvaluationSettlement(input: {
   const validPayload = typeof receipt.timestamp === 'string'
     && receipt.timestamp.length > 0
     && (receipt.ruleSet === 'CODE' || receipt.ruleSet === 'AUDIT' || receipt.ruleSet === 'DOC_WRITE')
+    && (receipt.decision === 'DONE'
+      || receipt.decision === 'GO_WITH_TECH_DEBT'
+      || receipt.decision === 'NO_GO')
+    && typeof receipt.normativeVerdict === 'string'
+    && receipt.normativeVerdict.length > 0
     && typeof receipt.totalScore === 'number'
     && Number.isFinite(receipt.totalScore)
+    && typeof receipt.schemaValidation === 'object'
+    && receipt.schemaValidation !== null
+    && typeof receipt.schemaValidation.valid === 'boolean'
+    && Array.isArray(receipt.schemaValidation.missingFields)
+    && receipt.schemaValidation.missingFields.every(field => typeof field === 'string')
+    && typeof receipt.schemaValidation.coverageRelaxed === 'boolean'
     && Array.isArray(receipt.criterionScores)
+    && receipt.criterionScores.every(criterion =>
+      typeof criterion === 'object'
+      && criterion !== null
+      && typeof criterion.name === 'string'
+      && typeof criterion.score === 'number'
+      && Number.isFinite(criterion.score)
+      && typeof criterion.threshold === 'number'
+      && Number.isFinite(criterion.threshold)
+      && typeof criterion.weight === 'number'
+      && Number.isFinite(criterion.weight)
+      && typeof criterion.passed === 'boolean'
+      && typeof criterion.reason === 'string')
     && typeof receipt.decisionRationale === 'string';
-  if (!validIdentity || !validPayload || receipt.decision !== input.expectedEvaluation) {
+  const receiptEvaluation = receipt.decision === 'DONE'
+    ? TaskEvaluation.DONE
+    : receipt.decision === 'GO_WITH_TECH_DEBT'
+      ? TaskEvaluation.GO_WITH_TECH_DEBT
+      : TaskEvaluation.NO_GO;
+  if (
+    !validIdentity
+    || !validPayload
+    || (input.expectedEvaluation !== undefined && receiptEvaluation !== input.expectedEvaluation)
+  ) {
     return {
       state: 'HOLD',
       reason: 'SETTLEMENT_RECEIPT_CONFLICT',
       detail: `receipt identity/verdict conflicts with ${input.sprintId}/${input.taskId}/attempt-${attemptNum}`,
     };
   }
-  return { state: 'SETTLED', evaluation: input.expectedEvaluation, receipt };
+  return { state: 'SETTLED', evaluation: receiptEvaluation, receipt };
 }
 
 /**
@@ -2302,6 +2341,21 @@ export async function runSprint(
       task: Task,
       result: TaskResult,
     ): Promise<TaskEvaluation> => {
+      const replay = consumeControllerEvaluationSettlement({
+        projectRoot,
+        sprintId: sprint.id,
+        taskId: task.id,
+      });
+      if (replay.state === 'SETTLED') {
+        evaluations.set(task.id, replay.evaluation);
+        return replay.evaluation;
+      }
+      if (replay.reason === 'SETTLEMENT_RECEIPT_CONFLICT') {
+        throw new DeckentError(
+          'DECKENT_E091',
+          `controller-evaluation-settlement-hold:${task.id}:${replay.reason}:${replay.detail}`,
+        );
+      }
       await runEvaluatePhase(
         projectRoot,
         sprint,

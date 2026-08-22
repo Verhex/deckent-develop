@@ -106,6 +106,9 @@ export interface SchedulerSnapshot {
 
 // ─── Decision (output) ───────────────────────────────────────────────────
 
+/** Stable explanation for a skip discovered only at continuous-mode quiescence. */
+export type SchedulerQuiescenceReason = 'continuous-dead-dependency';
+
 export type SchedulerEffect =
   | { readonly kind: 'SpawnTask'; readonly taskId: string; readonly reason: 'queue-drain' | 'pending-slot-fill' }
   | { readonly kind: 'KillWorker'; readonly taskId: string; readonly reason: 'legacy-fifo-replace' }
@@ -113,6 +116,8 @@ export type SchedulerEffect =
       readonly kind: 'CascadeSkip';
       readonly taskId: string;
       readonly failedDependencyId: string;
+      /** Present when a PAUSED descendant is terminalized by the quiescence pass. */
+      readonly quiescenceReason?: SchedulerQuiescenceReason;
       /**
        * Deterministic — derived ONLY from `taskId` + `failedDependencyId`,
        * never from `snapshot.trigger.sequence`/`nowMs`. The design doc's
@@ -240,12 +245,70 @@ export function reduceSchedulerTick(snapshot: SchedulerSnapshot): SchedulerDecis
       ? reduceLegacyFifo(snapshot, orderedEffects, dispositions, cascadeSkippedIds)
       : reduceContinuous(snapshot, orderedEffects, dispositions, cascadeSkippedIds);
 
+  // PAUSED is deliberately absent from the ordinary cascade pass: pause can
+  // represent repair, approval, or an operator-controlled hold.  It becomes
+  // safe to close only at deterministic continuous-mode quiescence: this tick
+  // found no spawnable task, no worker is live, repair is not deferred, and a
+  // scheduling-terminal dependency proves the paused branch can never reopen.
+  // This is state-based (never elapsed-time/iteration-based), so replaying the
+  // same snapshot yields the same effects and reason.
+  if (
+    snapshot.strategy === 'continuous'
+    && !snapshot.deferTerminalDependencyFailure
+    && !orderedEffects.some(e => e.kind === 'SpawnTask')
+    && !hasLiveWork(snapshot)
+  ) {
+    cascadePausedAtQuiescence(snapshot, orderedEffects, dispositions, cascadeSkippedIds);
+  }
+
   const spawnedThisTick = orderedEffects.some(e => e.kind === 'SpawnTask');
   if (spawnedThisTick || cascadeSkippedIds.size > 0) {
     orderedEffects.push({ kind: 'WriteCheckpoint', reason: 'tick-progressed' });
   }
 
   return { nextQueue, dispositions, orderedEffects };
+}
+
+function hasLiveWork(snapshot: SchedulerSnapshot): boolean {
+  return snapshot.tasks.some(t =>
+    t.status === TaskStatus.CLAIMED
+    || t.status === TaskStatus.EXECUTING
+    || t.status === TaskStatus.TESTING,
+  ) || [...snapshot.assignedTaskIds].some(id => !snapshot.collectedIds.has(id));
+}
+
+function cascadePausedAtQuiescence(
+  snapshot: SchedulerSnapshot,
+  effects: SchedulerEffect[],
+  dispositions: Map<string, SchedulerDisposition>,
+  alreadySkippedIds: Set<string>,
+): void {
+  const failedIds = new Set(snapshot.effectiveDependencyState.terminalFailureIds);
+  for (const id of alreadySkippedIds) failedIds.add(id);
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const task of snapshot.tasks) {
+      if (task.status !== TaskStatus.PAUSED) continue;
+      if (snapshot.collectedIds.has(task.id) || alreadySkippedIds.has(task.id)) continue;
+      if (snapshot.assignedTaskIds.has(task.id)) continue;
+      const failedDependencyId = task.dependencies.find(id => failedIds.has(id));
+      if (!failedDependencyId) continue;
+
+      effects.push({
+        kind: 'CascadeSkip',
+        taskId: task.id,
+        failedDependencyId,
+        quiescenceReason: 'continuous-dead-dependency',
+        idempotencyKey: `cascade-skip:${task.id}:${failedDependencyId}`,
+      });
+      dispositions.set(task.id, 'cascade-skip');
+      alreadySkippedIds.add(task.id);
+      failedIds.add(task.id);
+      changed = true;
+    }
+  }
 }
 
 // ─── Block classification (shared by both strategies) ────────────────────

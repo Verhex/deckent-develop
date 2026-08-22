@@ -1,18 +1,34 @@
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  linkSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
 
 import { loadConfig } from '../core/config.js';
 import { DEFAULT_LIFECYCLE_RECOVERY_CONFIG } from '../core/config-types.js';
 import { decideExecutionRecovery } from '../core/execution-recovery.js';
-import { postFinalizeCleanup, previewFinalizeCleanup } from '../core/orphan-cleaner.js';
+import { previewFinalizeCleanup } from '../core/orphan-cleaner.js';
 import { readCanonicalRunStatus } from '../core/run-status-authority.js';
+import {
+  RECOVERY_ARTIFACT_POLICY_VERSION,
+  evaluateForceArchive,
+  type ForceArchiveManifestV1,
+} from '../core/recovery-artifact-policy.js';
 import {
   applyFencedEffect,
   deriveFencedEffects,
   type ExecutionRecoveryPlatform,
 } from './execution-recovery-adapter.js';
 import { createSprintRecoveryAdapter } from './recovery-adapters/sprint-recovery-adapter.js';
-import { cleanupCheckpointFiles, readCheckpoint } from './sprint-checkpoint.js';
+import { readCheckpoint } from './sprint-checkpoint.js';
 import { runSelfAuditGate } from './sprint-finalizer.js';
 import {
   clearPid,
@@ -54,6 +70,20 @@ export interface SprintRecoveryReport {
   staleSpawnLocksCleaned: number;
   taskFilesArchived: number;
   taskFilesPreserved: number;
+  artifactPolicy: {
+    readonly policyVersion: typeof RECOVERY_ARTIFACT_POLICY_VERSION;
+    readonly archiveManifests: readonly ForceArchiveManifestV1[];
+    readonly checkpoint: {
+      readonly disposition: 'absent' | 'preserved';
+      readonly digest: string | null;
+      readonly reason: 'not-present' | 'CHECKPOINT_SUPERSESSION_REQUIRED';
+    };
+  };
+  remediation: {
+    readonly lifecycle: 'PAUSED';
+    readonly resumeCommand: string;
+    readonly finalizeCommand: string;
+  } | null;
 }
 
 export interface SprintRecoveryOperationOptions {
@@ -118,6 +148,185 @@ function assertSprintId(sprintId: string): void {
 
 function digest(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function fileDigest(path: string): string {
+  return `sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}`;
+}
+
+function checkpointPolicyDisposition(
+  root: string,
+  sprintId: string,
+  identity: SprintRecoverySettlementIdentity,
+): SprintRecoveryReport['artifactPolicy']['checkpoint'] {
+  const source = join(root, '.deckent', `${sprintId}-checkpoint.json`);
+  if (!existsSync(source)) return { disposition: 'absent', digest: null, reason: 'not-present' };
+  const checkpointDigest = fileDigest(source);
+  const decision = evaluateForceArchive({
+    artifact: {
+      policyVersion: RECOVERY_ARTIFACT_POLICY_VERSION,
+      artifactClass: 'canonical-resume-checkpoint', source, digest: checkpointDigest,
+      owner: { taskId: identity.taskId, attemptId: identity.attemptId, fence: identity.fenceToken },
+    },
+    destination: join(root, '.deckent', 'archive', sprintId, `${sprintId}-checkpoint.json`),
+    requestedBy: 'sprint-recovery-operation',
+  });
+  if (decision.allowed || decision.code !== 'CHECKPOINT_SUPERSESSION_REQUIRED') {
+    throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+      sprintId, disposition: 'HOLD',
+      reason: decision.allowed ? 'checkpoint-policy-unexpected-allow' : decision.code,
+    });
+  }
+  return { disposition: 'preserved', digest: checkpointDigest, reason: decision.code };
+}
+
+function taskArchiveManifests(
+  root: string,
+  sprintId: string,
+  files: readonly string[],
+  identity: SprintRecoverySettlementIdentity,
+): ForceArchiveManifestV1[] {
+  return files.map(file => {
+    const source = join(root, '.tasks', file);
+    const decision = evaluateForceArchive({
+      artifact: {
+        policyVersion: RECOVERY_ARTIFACT_POLICY_VERSION,
+        artifactClass: 'task-residue', source, digest: fileDigest(source),
+        owner: { taskId: identity.taskId, attemptId: identity.attemptId, fence: identity.fenceToken },
+      },
+      destination: join(root, '.tasks', 'archive', sprintId, file),
+      requestedBy: 'sprint-recovery-operation',
+    });
+    if (!decision.allowed) {
+      throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+        sprintId, disposition: 'HOLD', reason: decision.code,
+      });
+    }
+    return decision.manifest;
+  });
+}
+
+/**
+ * Apply only manifests already authorized by the semantic recovery policy.
+ *
+ * Destination publication is first-writer-wins: a same-directory temporary
+ * file is fsync'd and then linked into the absent destination. A restart may
+ * observe an already-published destination, but only byte-identical content is
+ * accepted. Sources are retired only after every destination has been
+ * independently verified, so a partial crash never turns archive presence into
+ * false settlement authority.
+ */
+export function applyForceArchiveManifests(
+  manifests: readonly ForceArchiveManifestV1[],
+): number {
+  const prepared = manifests.map((manifest, index) => {
+    if (
+      manifest.manifestVersion !== 1
+      || manifest.policyVersion !== RECOVERY_ARTIFACT_POLICY_VERSION
+      || manifest.operation !== 'force-archive'
+      || manifest.artifactClass !== 'task-residue'
+      || manifest.successor !== null
+      || manifest.source === manifest.destination
+    ) {
+      throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+        disposition: 'HOLD', reason: 'archive-manifest-invalid', index: String(index),
+      });
+    }
+    if (!existsSync(manifest.source)) {
+      if (existsSync(manifest.destination) && fileDigest(manifest.destination) === manifest.digest) {
+        return { manifest, bytes: null };
+      }
+      throw new SprintRecoveryOperationError('ARCHIVE_INCOMPLETE', {
+        disposition: 'HOLD', reason: 'archive-source-missing', source: manifest.source,
+      });
+    }
+    const bytes = readFileSync(manifest.source);
+    const observedDigest = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+    if (observedDigest !== manifest.digest) {
+      throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+        disposition: 'HOLD', reason: 'archive-source-digest-mismatch', source: manifest.source,
+      });
+    }
+    if (existsSync(manifest.destination) && fileDigest(manifest.destination) !== manifest.digest) {
+      throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+        disposition: 'HOLD', reason: 'archive-destination-conflict', destination: manifest.destination,
+      });
+    }
+    return { manifest, bytes };
+  });
+
+  for (const [index, entry] of prepared.entries()) {
+    if (entry.bytes === null || existsSync(entry.manifest.destination)) continue;
+    const directory = dirname(entry.manifest.destination);
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const temporary = join(directory, `.recovery-archive-${process.pid}-${index}.tmp`);
+    let descriptor: number | undefined;
+    try {
+      descriptor = openSync(temporary, 'wx', 0o600);
+      writeFileSync(descriptor, entry.bytes);
+      fsyncSync(descriptor);
+      closeSync(descriptor);
+      descriptor = undefined;
+      try {
+        linkSync(temporary, entry.manifest.destination);
+      } catch (error) {
+        if (
+          (error as NodeJS.ErrnoException).code !== 'EEXIST'
+          || fileDigest(entry.manifest.destination) !== entry.manifest.digest
+        ) {
+          throw error;
+        }
+      }
+      if (fileDigest(entry.manifest.destination) !== entry.manifest.digest) {
+        throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+          disposition: 'HOLD', reason: 'archive-publication-digest-mismatch',
+          destination: entry.manifest.destination,
+        });
+      }
+      const directoryDescriptor = openSync(directory, 'r');
+      try { fsyncSync(directoryDescriptor); } finally { closeSync(directoryDescriptor); }
+    } catch (error) {
+      if (error instanceof SprintRecoveryOperationError) throw error;
+      throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+        disposition: 'HOLD', reason: 'archive-publication-failed',
+        destination: entry.manifest.destination,
+        cause: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+      try { unlinkSync(temporary); } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          // The destination is already durable; a visible temp is safer than
+          // hiding cleanup uncertainty behind a successful settlement.
+          throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+            disposition: 'HOLD', reason: 'archive-temporary-cleanup-failed', temporary,
+          });
+        }
+      }
+    }
+  }
+
+  for (const entry of prepared) {
+    if (!existsSync(entry.manifest.source)) continue;
+    if (
+      fileDigest(entry.manifest.source) !== entry.manifest.digest
+      || !existsSync(entry.manifest.destination)
+      || fileDigest(entry.manifest.destination) !== entry.manifest.digest
+    ) {
+      throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+        disposition: 'HOLD', reason: 'archive-retirement-precondition-failed',
+        source: entry.manifest.source,
+      });
+    }
+  }
+  for (const entry of prepared) {
+    if (existsSync(entry.manifest.source)) unlinkSync(entry.manifest.source);
+  }
+  if (prepared.length > 0) {
+    const sourceDirectoryDescriptor = openSync(dirname(prepared[0]!.manifest.source), 'r');
+    try { fsyncSync(sourceDirectoryDescriptor); } finally { closeSync(sourceDirectoryDescriptor); }
+  }
+  return prepared.length;
 }
 
 export function readSprintRecoverySettlementIdentity(
@@ -250,6 +459,10 @@ export async function runSprintRecoveryOperation(
 ): Promise<SprintRecoveryReport> {
   assertSprintId(sprintId);
   const identity = readSprintRecoverySettlementIdentity(root, sprintId);
+  const authorityBeforeMutation = readCanonicalRunStatus(root, { sprintIdHint: sprintId });
+  const checkpointDisposition = checkpointPolicyDisposition(root, sprintId, identity);
+  const preview = previewFinalizeCleanup(root, sprintId);
+  const archiveManifests = taskArchiveManifests(root, sprintId, preview.archivedFiles, identity);
   const report: SprintRecoveryReport = {
     identity,
     audit: { overallGate: 'SKIPPED' },
@@ -258,8 +471,23 @@ export async function runSprintRecoveryOperation(
     staleSpawnLocksCleaned: 0,
     taskFilesArchived: 0,
     taskFilesPreserved: 0,
+    artifactPolicy: {
+      policyVersion: RECOVERY_ARTIFACT_POLICY_VERSION,
+      archiveManifests,
+      checkpoint: checkpointDisposition,
+    },
+    remediation: authorityBeforeMutation.sprintId === sprintId
+      && authorityBeforeMutation.lifecycle === 'PAUSED'
+      && authorityBeforeMutation.resumable
+      && authorityBeforeMutation.recoveryCommand
+      && authorityBeforeMutation.finalizeCommand
+      ? {
+          lifecycle: 'PAUSED',
+          resumeCommand: authorityBeforeMutation.recoveryCommand,
+          finalizeCommand: authorityBeforeMutation.finalizeCommand,
+        }
+      : null,
   };
-  const preview = previewFinalizeCleanup(root, sprintId);
   if (opts.dryRun) {
     report.taskFilesArchived = preview.archivedFiles.length;
     report.taskFilesPreserved = preview.preservedFiles.length;
@@ -314,9 +542,8 @@ export async function runSprintRecoveryOperation(
     }
   }
 
-  const cleanupResult = postFinalizeCleanup(root, sprintId, { cleanStaleLocks: false });
-  report.taskFilesArchived = cleanupResult.archivedFiles.length;
-  report.taskFilesPreserved = cleanupResult.preservedFiles.length;
+  report.taskFilesArchived = applyForceArchiveManifests(archiveManifests);
+  report.taskFilesPreserved = preview.preservedFiles.length;
   if (report.taskFilesArchived !== preview.archivedFiles.length) {
     throw new SprintRecoveryOperationError('ARCHIVE_INCOMPLETE', {
       sprintId,
@@ -327,7 +554,9 @@ export async function runSprintRecoveryOperation(
 
   if (snapshotOk || report.taskFilesArchived === 0) {
     const adapter = createSprintRecoveryAdapter(opts.platform ?? platformDefault(), {
-      clearCheckpoint: id => cleanupCheckpointFiles(root, id),
+      // Task-14 policy preserves exact checkpoint bytes until an explicit
+      // distinct successor or terminal receipt owns retirement.
+      clearCheckpoint: () => undefined,
       clearPid: id => clearPid(root, id),
       clearMatchingSprintState: id => {
         const state = readSprintState(root);

@@ -321,11 +321,10 @@ export async function finalizeShadowSchedulerTick(
 //     the resulting SpawnTask/KillWorker effects through
 //     `executeSchedulerDecision` (scheduler-effects.ts) — the SAME canonical
 //     `executeSpawnTask` every other trigger has routed through since SCHED3.
-//     `runLegacyTick` is never invoked. CascadeSkip/Blocked/checkpoint
-//     effects are intentionally NOT executed here (dilim-6/7 scope, see
-//     scheduler-effects.ts's doc comment) — the pre-existing
-//     cascadeSkipDeadBlocked/DEPENDENCY_BLOCKED/checkpoint mechanisms keep
-//     running unconditionally in result-collector.ts, independent of engine.
+//     `runLegacyTick` is never invoked. CascadeSkip and WriteCheckpoint are
+//     executed by that same ordered executor; the driver supplies the live
+//     checkpoint closure when its composition root has one. Blocked and
+//     ClearBlocked remain later-slice effects.
 
 export type SchedulerEngine = 'legacy' | 'reducer';
 
@@ -380,6 +379,10 @@ export interface SchedulerDriverDeps {
   readonly getCostStop: () => boolean;
   readonly spawnDeps: SpawnTaskDeps;
   readonly killWorker: (taskId: string) => void;
+  /** Live checkpoint/journal closure. It runs only after every preceding
+   * ordered effect (notably CascadeSkip receipt persistence + transition)
+   * has completed. Optional for legacy composition roots and older callers. */
+  readonly writeCheckpoint?: (reason: string) => void;
 }
 
 /**
@@ -447,6 +450,7 @@ export function createSchedulerDriver(
       taskMap,
       assignedTaskIds: deps.assignedTaskIds,
       killWorker: deps.killWorker,
+      writeCheckpoint: deps.writeCheckpoint,
     });
 
     // Mirror the reducer's nextQueue back onto the live queue — splice in

@@ -474,8 +474,17 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-22 runtime hygiene follow-up: count unchanged; digest-only update
   // because the existing hermetic gitignore suite now enumerates the new
   // acceptance-reconciliation SQLite DB plus WAL/SHM sidecars.
-  count: 14818,
-  digest: '1c5d342c3bdc0a6b3515f53a75c5a4c4a8f81370e37a09105f13a158b381ad35',
+  // 2026-08-22 (7092 RECOVERY-TRUTH): +128 — the result-write, corrupt-result,
+  // immutable-receipt, task-terminal, landing-consumer, review, continuous-
+  // quiescence, recovery-policy/status/finalizer and nine-case/real-binary
+  // suites add suite-owned tmpdir fixtures, injected platform adapters and
+  // bounded async child-process proof. Root verification passed the 27-file
+  // recovery battery (200 pass, 2 skip) plus 253 adjacent regressions; the
+  // measured 10k case remained below ten seconds and no live repo task,
+  // memory or runtime authority entered test ownership. Prior: 9040 runtime
+  // hygiene follow-up (14818).
+  count: 14946,
+  digest: '737f51a44de8369fd190444860ee1bd1d4920c7413955c309eeb2bfa81957a12',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -836,8 +845,16 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // controller, CLI/API and debt-store modules moved content to consume this
   // single production chain; 531 scoped tests, tsc, build and real serve tick
   // passed. Prior: 4056 D4 (1273).
-  count: 1281,
-  digest: '57e4657651371d3d077618677d56f824fd2d00783d1f1dfe9dadb5a3d41a1c6e',
+  // 2026-08-22 (7092 RECOVERY-TRUTH): +7 inventoried modules — six canonical
+  // core authorities (artifact policy, finalizer gate, status reconciliation,
+  // result writer, terminal projection, xverify settlement) plus the recovery
+  // authority ratchet imported by its CLI suite. Existing worker, Docker,
+  // collector, scheduler, checkpoint, controller, finalizer, CLI and status
+  // modules moved content to consume those authorities. Root proof: 200 pass,
+  // 2 skip scoped; 253 adjacent; tsc and real compiled CLI green. Prior: 9040
+  // acceptance authority-restart closure (1281).
+  count: 1288,
+  digest: '7397e78f64aa738d5e46ce26436405da1cab4fd313da8f52e936c1f45a34780f',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

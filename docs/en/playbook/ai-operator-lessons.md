@@ -381,10 +381,29 @@ enter the result set.
 (`grep -v $$`), split the pattern so it does not appear verbatim in the command line
 (`'st''art'`), or wait on a captured PID instead of a process name (`kill -0 <pid>`).
 
+## 27. A dogfood terminal is not landing proof — the root consumer battery is a separate gate
+
+**Case (Sprint 622):** The run reached `COMPLETE` at 8/8 and task-scoped tests were
+green. The root landing review still found three production gaps: the digest-bound
+recovery manifest was not consumed by the actual mutation; the status reconciliation
+module was not wired into the canonical status entrypoint; and the strict TaskResultV1
+writer broke the legacy top-level result contract, producing 22 adjacent worker-test
+failures.
+
+**Correct usage:** A dogfood terminal receipt proves that orchestration ended; it does
+not by itself prove production closure. Before landing, (1) find a real production
+import/call site for every new authority, (2) exercise producer and consumer in one
+test, (3) run the adjacent legacy battery for every changed public contract, and (4)
+write `LOCAL_VERIFIED` to MASTER only after this root consumer gate is green. Report
+task-scope green and root-wiring green as separate evidence classes.
+
 ---
 
 ## Changelog (update after every sprint experience)
 
+- **2026-08-22 — Sprint 622 root landing review**: Lesson 27 added (dogfood
+  `COMPLETE` is an orchestration terminal, not production landing proof; root
+  import/call-site, producer-consumer, and adjacent legacy batteries are a separate gate).
 - **2026-08-21 — process waiter matching its own pattern**: Lesson 26 added (a
   `pgrep -f`/`grep` waiter matching its own command line and waiting forever; filter
   its own PID/shells, split the pattern, or use `kill -0 <pid>`).

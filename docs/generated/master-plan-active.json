@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9e1651338b578748849045b9db165369cafb626c403bd3bc1cf19409baa6d199"
+    "value": "bc668686ee47ebba48d46a23d535cd39d34ddd04a6d84898cf8644798ac04d35"
   },
   "summary": {
     "total": 521,
@@ -11,11 +11,11 @@
     "terminal": 65,
     "receipts": 187,
     "byState": {
-      "OPEN": 362,
+      "OPEN": 361,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 25,
+      "VERIFY": 26,
       "DONE": 65,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -4887,10 +4887,10 @@
       "id": "RECOVERY-TRUTH-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-19",
+      "state": "VERIFY",
+      "updated": "2026-08-22",
       "definitionDigest": "79a2ae78edb697329300455380f7e4aba2448c604a3b70be9a2ce3b3f4bf8dcf",
-      "progressDigest": "e562fc53a727e10f111a6559d27f3df2b562758ecca878d091f3e737d631530f",
+      "progressDigest": "815af6c230e148bdcff051b2fe3ac11ba7324593ef63d3e9b71fa045ae827979",
       "terminalClosureDigest": null
     },
     {
@@ -23640,23 +23640,23 @@
         "G1",
         "G2"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "0",
-        "L": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
         "X": "?",
-        "S": "?"
+        "S": "1"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Her defekt: reproducer test + fix + gerçek-koşu kanıtı; paket zorla-feature taşımaz; (3) için clean-gate'in receipt-yokluğu kilidi hem üretici (xverify) hem tüketici (gate mesajı remediation yolu gösterir) ucundan çözülür",
-      "evidence": "Owner admission 2026-08-19 (\"Evet — tek paket satırı\"); kanıt zinciri MASTER 7089 LANDED bloğu + sprint-564 E091 kurtarma kaydı (corrupt-result forensik yedeği scratchpad, closure `…947df2e5` dönemi)",
-      "updated": "2026-08-19"
+      "evidence": "`historical-authority=sprint-622-terminal-b53e4fce31569edb19e95314965a197104a1176f3c17e1a9938654a5b1fc37e6;historical-gates=G1,G2;proof=recovery-truth-001-local-2026-08-22`; Owner admission 2026-08-19 (\"Evet — tek paket satırı\"). LOCAL_VERIFIED 2026-08-22: sprint-620 ve sprint-621 owner-approved recovery ile durust ABORTED terminaline tasindi; sprint-622 ayni outcome'un 8/8 continuation DAG'ini 1271 saniyede COMPLETE settlement'a getirdi. Yedi asil kusur ile Sprint-595 checkpoint-surukleme ve Sprint-619 stale-finalizer canli vakalari; canonical result/settlement authorities, immutable evaluation replay, task-terminal projection, landing-proposal consumer, review projection, continuous-quiescence ve fresh finalizer gate zincirleriyle kapandi. Root landing audit dogfood beyaninin kacirdigi uc BLOCKS_CURRENT_DONE acigini bulup kapatti: digest-bound archive manifesti apply mutation authority oldu; recovery reconciliation canonical status entrypoint'ine wire edildi; versioned TaskResultV1 strict attempt writer legacy raw-shape consumerlarini bozmadan ayrildi. Kanit: tsc 0; 27 dosyalik recovery bataryasi 200 pass, 2 skip; 10 dosyalik adjacent regression 253 pass; authority ratchet exit 0; compiled CLI smoke; 10k replay 1.731 saniye ve 10 saniye tavaninin altinda. Formal equal-or-higher different-provider XVerify yok: Fable limiti ve Opus-5 capability-floor nedeniyle typed unavailable/HOLD, same-provider fallback yapilmadi. Sprint-621'in kayip eski task-byte manifestleri tarihsel evidence-unavailable olarak korunur ve yeni Sprint-622 production proof'u yerine gecmez. Ayrinti `docs/evidence/RECOVERY-TRUTH-001-result-2026-08-22.md`",
+      "updated": "2026-08-22"
     },
     {
       "order": 7094,
@@ -26831,6 +26831,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "de041ee3541753db339f5ef527175cdbff54b4db65b263592ad5c916a138f2ee"
+    "value": "9c1f9493d090fca8c937ee81e719bb14a728de2e395496b5c296f2cb150dfeae"
   }
 }

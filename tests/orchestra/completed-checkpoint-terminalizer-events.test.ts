@@ -231,4 +231,25 @@ describe('completed-checkpoint recovery event path', () => {
     expect(mockRunCleanupPhase).not.toHaveBeenCalled();
     expect(mockPublishFinalSprintAuthority).not.toHaveBeenCalled();
   });
+
+  it('never terminalizes a checkpoint task whose result authority is absent', async () => {
+    const root = makeRoot();
+    mockReadAuthoritativeTaskResult.mockReturnValue({
+      state: 'ABSENT',
+      result: null,
+    });
+
+    await expect(terminalizeCompletedCheckpointRun(
+      root,
+      checkpoint,
+      { auth_mode: 'subscription', language: 'en' } as never,
+    )).rejects.toThrow('TERMINALIZATION_RESULT_AUTHORITY_MISSING:901-001:ABSENT');
+
+    expect(mockFinalizeSprint).not.toHaveBeenCalled();
+    expect(mockPublishTestModeSprintTerminalReceipt).not.toHaveBeenCalled();
+    expect(readEvents(root, checkpoint.sprintId).at(-1)).toMatchObject({
+      channel: CHANNELS.RECOVERY_TERMINALIZATION_HELD,
+      payload: { stage: 'evidence' },
+    });
+  });
 });

@@ -36,14 +36,20 @@
 
 ## Fabrika-kuyruğu (sıradaki dogfood-paket adayları)
 - [ ] BÜYÜK-PAKET (owner-talimatı: çok-görevli, 6'lı-worker sürekli-akış) — status-sprinti bitince başlat: i18n-genişleme dalgası, dosya-ayrık 6-10 görev: src/core/cost-gate.ts · src/orchestra/prompt-gate.ts · src/core/scope-gate.ts · src/mcp/tools/autonomous.ts · src/mcp/tools/start.ts · src/api/server.ts hata-stringleri · (tarama-tabanlı ekler). Her görev kendi test-hedefiyle; messages.ts ortak (collision-serileşir).
-- [ ] 7092 RECOVERY-TRUTH.
+- [x] 7092 RECOVERY-TRUTH LOCAL_VERIFIED / VERIFY — sprint-622 8/8 COMPLETE; root landing auditte manifest-mutation, canonical-status wire ve legacy-result parity aciklari kapandi. 200 pass/2 skip scoped + 253/253 adjacent, tsc ve authority ratchet yesil; formal cross-provider seal typed unavailable/HOLD oldugu icin DONE degil VERIFY.
 - [ ] status "blocked by dependencies" yanlış-etiketi (collision-blokajı ayrı gösterilmeli) — owner-admission alındı sayılır mı? SOR.
 - [ ] 7091 cursor-docker hakem-CLI (hakem-çeşitliliği).
 
 ## Blocker/not
 - [x] MINI-İŞ BİTTİ: bot-daemon listen-child logu `.deckent/runtime/bot-listen.log` altında görünür; 2026-08-22 build sonrası PID/start-token ve Telegram listener satırı canlı doğrulandı.
-- FINDING (7092 RECOVERY-TRUTH canlı-vakası, 2026-08-21): `recover <id> --force` task-dosyalarını arşivlerken resume-checkpoint'i de taşıyor → status-projection PAUSED-artığı kalıyor ama `--resume` "checkpoint bulunamadı" veriyor. Sprint-595'te yaşandı (işin kendisi el-fix+worker-fix'le kapandı; yalnız settlement-projection takılı). 7092 tasarımına girdi-vakası.
-- FINDING (7092 RECOVERY-TRUTH ikinci canlı-vaka, 2026-08-22): sprint-619 dört logical taski DONE ve 0 unresolved iken RETRO eski pre-fix `sprint-619-gate.json` TSC failure/projectionını kullandı, `TERMINAL_EVIDENCE_HOLD` verdi; force-finalize dürüst ABORTED receipt yazdı. Product LOCAL_VERIFIED, run settlement COMPLETE değil.
+- [x] BİTTİ — Sprint-595 checkpoint-surukleme vakasi: `recover --force` artik semantic artifact policy + digest-bound manifest kullanir, canonical resume checkpoint explicit successor/terminal authority olmadan tasinmaz; status read modeli checkpoint/terminal receipt uyusmazligini side-effect-free ayirir.
+- [x] BİTTİ — Sprint-619 stale-finalizer vakasi: finalizer exact-input-digest gate'i stale projectioni gecersiz kilar, fresh canonical result generation'ini yeniden okur ve terminal task projectionini cleanup'tan once CAS/FWW ile yayinlar.
+
+## Sonraki execution — owner onayi bekliyor
+- [ ] 7091 CURSOR-PROVIDER residual: `INSTALL_CURSOR=true` production worker image rebuild + `latest` tag + config-resolved `verifier_priority` cursor sirasi + gercek `--verifier cursor` end-to-end smoke. Cursor kota API'si yoksa limit-admission typed stub olarak durust kalir.
+- [ ] D5 approval surface retirement: legacy direct karar ingress'lerini canonical authenticated CLI karar yuzeyine tasima, kalan i18n ve no-bypass ratchet; Slack/Teams secret provisioning owner-adimidir.
+- [ ] 7094 ek prefix/F2c olcumu: ratio enforcement owner karariyla kapali kalir; bayraklar degistirilmeden measuredHitRatio + provider-reported USD karar paketi uretilir.
+- [ ] 3112 L1-L7 yalniz 3111 v2 runTask closure on-kosulu saglandiktan sonra admission alir.
 
 ## DEVİR-PAKETİ 2026-08-21 (aktif handoff-pointer'ı — protokol §4.1)
 - handoffId: ah-2026-08-21-codex-rotation · state: PREPARED (epoch 1→2)

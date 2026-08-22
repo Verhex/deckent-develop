@@ -10,6 +10,10 @@ import {
   TASKS_DIR,
 } from './constants.js';
 import { isPidAlive } from './pid-liveness.js';
+import {
+  readSprintStatusRecoveryReconciliation,
+  type SprintStatusRecoveryReconciliation,
+} from './sprint-status-authority.js';
 
 export type CanonicalRunLifecycle =
   | 'IDLE'
@@ -44,6 +48,8 @@ export interface CanonicalRunStatus {
   readonly finalizeCommand: string | null;
   readonly coordinator: 'alive' | 'dead' | 'absent' | 'unknown';
   readonly conflicts: readonly RunStatusConflict[];
+  /** Side-effect-free reconciliation of PAUSED projection and durable successors. */
+  readonly recoveryReconciliation?: SprintStatusRecoveryReconciliation;
 }
 
 interface RawSprintState {
@@ -190,7 +196,7 @@ function readCoordinatorState(
  * non-terminal sprint-state wins over display-only dashboard data; terminal
  * dashboard data is used only when no resumable/live authority remains.
  */
-export function readCanonicalRunStatus(
+function readCanonicalRunStatusBase(
   projectRoot: string,
   options: { sprintIdHint?: string | null; nowMs?: number } = {},
 ): CanonicalRunStatus {
@@ -391,5 +397,17 @@ export function readCanonicalRunStatus(
     finalizeCommand: null,
     coordinator: 'absent',
     conflicts,
+  };
+}
+
+/** Canonical status plus the durable, read-only recovery reconciliation view. */
+export function readCanonicalRunStatus(
+  projectRoot: string,
+  options: { sprintIdHint?: string | null; nowMs?: number } = {},
+): CanonicalRunStatus {
+  const authority = readCanonicalRunStatusBase(projectRoot, options);
+  return {
+    ...authority,
+    recoveryReconciliation: readSprintStatusRecoveryReconciliation(projectRoot, authority),
   };
 }

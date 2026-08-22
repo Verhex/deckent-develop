@@ -22,6 +22,12 @@ import type {
   LockInfo,
   TaskScope,
 } from '../core/types.js';
+import type { TaskResultV1 } from '../core/task-result-schema.js';
+import {
+  TaskResultWriteError,
+  writeTaskResultAtomic,
+} from '../core/task-result-write-authority.js';
+import { atomicWriteFileSync as writeLegacyResultAtomic } from './worker-lifecycle.js';
 import { TASKS_DIR, RUNTIME_DIR } from '../core/constants.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
 import { ErrorRegistry, createExecutionAuthorityError } from '../core/errors.js';
@@ -44,9 +50,7 @@ import {
 import type { WorkerHeartbeatAuthorityIdentity } from '../core/worker-heartbeat-authority.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
-import { sanitizeResultJsonControlCharacters } from '../orchestra/result-evaluator.js';
 import { emitWorkerActivity } from './worker-activity.js';
-import { atomicWriteFileSync as _atomicWrite } from './worker-lifecycle.js';
 import { SharedMemory } from '../orchestra/shared-memory.js';
 export type { SharedMemoryEntry } from '../orchestra/shared-memory.js';
 export { SharedMemory };
@@ -493,7 +497,12 @@ export function submitInProcessWorkerHeartbeatObservation(
  *
  * **Verify Loop Gate:** Callers MUST run `enforceVerifyLoop()` before calling this function.
  */
-export function writeResult(projectRoot: string, result: TaskResult, sprintId?: string): void {
+export function writeResult(
+  projectRoot: string,
+  result: TaskResult | TaskResultV1,
+  sprintId?: string,
+  attemptId?: string,
+): void {
   ensureDir(join(projectRoot, TASKS_DIR));
 
   // 7094-F1d (2026-08-19): the .plan file is no longer part of the worker
@@ -507,14 +516,16 @@ export function writeResult(projectRoot: string, result: TaskResult, sprintId?: 
   // shape never reaches Brain's EVALUATE pipeline. The stripped
   // codeVerified field guarantees the legacy auto-promote path cannot
   // re-fire on a second-chance read.
-  const linesAdded = result.linesAdded ?? 0;
-  const testsPassed = result.testsPassed === true;
+  const legacyResult = result as TaskResult;
+  const linesAdded = legacyResult.linesAdded ?? ('totalLinesAdded' in result ? result.totalLinesAdded : 0);
+  const testsPassed = legacyResult.testsPassed === true
+    || ('tests' in result && result.tests.failed === 0);
   const codeVerified = (result as TaskResult & { codeVerified?: string }).codeVerified;
   const looksLikeStub =
     (result.selfAssessment === 'DONE' && linesAdded === 0 && !testsPassed) ||
     (codeVerified === 'CODE_VERIFIED_DONE' && linesAdded === 0 && !testsPassed);
   if (looksLikeStub) {
-    const stripped: TaskResult & { codeVerified?: string } = { ...result };
+    const stripped = { ...result } as (TaskResult | TaskResultV1) & { codeVerified?: string };
     delete stripped.codeVerified;
     const origNotes = (result.notes ?? '').slice(0, 400);
     result = {
@@ -523,11 +534,34 @@ export function writeResult(projectRoot: string, result: TaskResult, sprintId?: 
       notes:
         `[honest-gate] worker-self-stub: linesAdded=${linesAdded} testsPassed=${testsPassed} — ` +
         `DONE claim downgraded to NO_GO. Original: ${origNotes}`,
-    };
+    } as TaskResult | TaskResultV1;
   }
 
   const path = resultFilePath(projectRoot, result.taskId);
-  _atomicWrite(path, sanitizeResultJsonControlCharacters(JSON.stringify(result, null, 2)));
+  if ('schemaVersion' in result && result.schemaVersion === '1.0') {
+    const resolvedAttemptId = attemptId
+      ?? result.workAttribution?.attemptId
+      ?? process.env.DECKENT_ATTEMPT_ID;
+    if (!resolvedAttemptId) {
+      throw new TaskResultWriteError(
+        'invalid-identity',
+        'canonical worker terminal result requires an attemptId',
+      );
+    }
+    writeTaskResultAtomic({
+      path,
+      taskId: result.taskId,
+      attemptId: resolvedAttemptId,
+      result,
+    });
+  } else {
+    // TaskResultV1 is the attempt-bound canonical contract. The deliberately
+    // retained legacy TaskResult API remains raw-shape compatible for existing
+    // in-process/auth-preflight callers, whose consumers read top-level fields.
+    // It still uses the established fsync+rename writer and JSON escaping; the
+    // strict authority path above must never wrap a legacy result by accident.
+    writeLegacyResultAtomic(path, JSON.stringify(result, null, 2));
+  }
 
   const newStatus: TaskStatus =
     result.selfAssessment === 'NO_GO'
@@ -954,22 +988,18 @@ export function authHealthCheck(
     ? stderr.slice(0, 400)
     : statusDiagnostic || `claude auth status exitCode=${exitCode ?? 'null'}`;
 
-  try {
-    const result: TaskResult = {
-      taskId,
-      workerId: env.DECKENT_WORKER_ID ?? `w-${taskId}`,
-      filesChanged: [],
-      linesAdded: 0,
-      linesRemoved: 0,
-      testsPassed: false,
-      coverage: 0,
-      selfAssessment: 'NO_GO',
-      notes: `AUTH_FAILED: ${diag}`,
-    };
-    writeResult(projectRoot, result, sprintId);
-  } catch (err) {
-    console.warn(`[deckent] authHealthCheck: writeResult failed for ${taskId}: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  const result: TaskResult = {
+    taskId,
+    workerId: env.DECKENT_WORKER_ID ?? `w-${taskId}`,
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    coverage: 0,
+    selfAssessment: 'NO_GO',
+    notes: `AUTH_FAILED: ${diag}`,
+  };
+  writeResult(projectRoot, result, sprintId);
 
   const sid = sprintId ?? getCurrentSprintId(projectRoot);
   if (sid) {

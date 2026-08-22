@@ -14,6 +14,25 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint622] - 2026-08-22
+
+### Added
+
+- Continuation current-truth inventory
+- Recovery sidecar projection parity pin
+- Checkpoint PENDING to disk PAUSED resume parity
+- Status projection recovery reconciliation
+- Recovery truth nine-case end-to-end matrix
+- Recovery authority ratchet and result evidence
+
+### Changed
+
+- Immutable evaluation receipt restart replay pin (completed with tech debt)
+- Recover force checkpoint-policy production wiring (completed with tech debt)
+
+
+_Tasks: 8 total, 8 done, 2 tech debt, 0 no-go_
+
 ## [sprint619] - 2026-08-22
 
 ### Added

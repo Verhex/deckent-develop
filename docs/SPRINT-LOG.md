@@ -14903,3 +14903,98 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 619-004: End-to-end restart, race and real composition proof (DONE)
 
 ---
+## Sprint 621 — sprint-621
+
+**Status:** ABORTED
+**Date:** 2026-08-22
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 621-015-fix: Fix: Recover --force checkpoint preservation wiring (NO_GO)
+- 621-016: Status projection recovery reconciliation (PAUSED)
+- 621-019: Nine-case recovery end-to-end matrix (PAUSED)
+- 621-020: Recovery authority ratchet and result evidence (PAUSED)
+
+---
+## Sprint 620 — sprint-620
+
+**Status:** ABORTED
+**Date:** 2026-08-22
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 620-001: Nine-case current-truth inventory and closure matrix (PENDING)
+- 620-002: Canonical task-result byte/write authority (PENDING)
+- 620-003: Worker result producer wiring (PENDING)
+- 620-004: Docker exit-zero corrupt-result settlement (PENDING)
+- 620-005: Result collector parse-truth consumer (PENDING)
+- 620-006: XVerify internal task settlement contract (PENDING)
+- 620-007: XVerify runner terminal receipt wiring (PENDING)
+- 620-008: Terminal task-projection reducer (PENDING)
+- 620-009: Finalizer task-projection wiring (PENDING)
+- 620-010: Landing-proposal consumer truth (PENDING)
+- 620-011: Review read-only settlement-reference safety (PENDING)
+- 620-012: Continuous scheduler quiescence reducer (PENDING)
+- 620-013: Scheduler effect/driver production closure (PENDING)
+- 620-014: Recovery artifact ownership policy (PENDING)
+- 620-015: Recover --force checkpoint preservation wiring (PENDING)
+- 620-016: Status projection recovery reconciliation (PENDING)
+- 620-017: Fresh finalizer-gate authority (PENDING)
+- 620-018: Finalizer fresh-gate production wiring (PENDING)
+- 620-019: Nine-case recovery end-to-end matrix (PENDING)
+- 620-020: Recovery authority ratchet and result evidence (PENDING)
+
+---
+## Sprint 622 — sprint-622
+
+**Status:** COMPLETE
+**Date:** 2026-08-22
+**Duration:** 1271s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1270773ms |
+
+### Tasks
+
+- 622-001: Continuation current-truth inventory (DONE)
+- 622-002: Recovery sidecar projection parity pin (DONE)
+- 622-003: Immutable evaluation receipt restart replay pin (DONE)
+- 622-004: Checkpoint PENDING to disk PAUSED resume parity (DONE)
+- 622-005: Recover force checkpoint-policy production wiring (DONE)
+- 622-006: Status projection recovery reconciliation (DONE)
+- 622-007: Recovery truth nine-case end-to-end matrix (DONE)
+- 622-008: Recovery authority ratchet and result evidence (DONE)
+
+---

@@ -57,6 +57,12 @@
 | adr-g-041 | Deckent Core ve Verhex Enterprise Modüler Ürün Mimarisi | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-622 Learnings** (sprint-622): ## Sprint sprint-622 Learnings
+- Immutable evaluation receipt restart replay pin: GO_WITH_TECH_DEBT — Receipt replay ...
+- **Sprint sprint-619 Learnings** (sprint-619): ## Sprint sprint-619 Learnings
+
+## Gains
+- 619-001 — Durable LLM authority binding and restart verifier — Declared ta...
 - **Sprint sprint-613 Learnings** (sprint-613): ## Sprint sprint-613 Learnings
 
 ## Gains
@@ -91,14 +97,6 @@
 
 ## Gains
 - 602-001 — bot-sürecinde relay + kanal-karar zinciri (T7) — npx tsc --noEmi...
-- **Sprint sprint-601 Learnings** (sprint-601): ## Sprint sprint-601 Learnings
-
-## Gains
-- 601-001 — bootstrap callback-dallanması (T3 — 'brk' rotası) — npx tsc --no...
-- **Sprint sprint-599 Learnings** (sprint-599): ## Sprint sprint-599 Learnings
-
-## Gains
-- 599-001 — callback-payload sözleşmesi (nonce + ad-uzayı + kısa-kod) — Impl...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -109,4 +107,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2129 | Generated: 2026-08-21_
+_Total entries: 2165 | Generated: 2026-08-22_

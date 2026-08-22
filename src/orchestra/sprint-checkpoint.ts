@@ -34,9 +34,6 @@ import {
   serializeDependencyGraph,
 } from './dependency-scheduler.js';
 import type { DependencyGraph } from './dependency-scheduler.js';
-// Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before recovery NO_GO.
-import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
-import { writeEvent } from './event-stream.js';
 // TT553 adoption (task 420-001) — the checkpoint kill-path defers to the canonical
 // host-primary liveness decision via its single adopter, instead of judging solely
 // from the worker's own `.hb` timestamp (the 412-003 wrong-kill).
@@ -909,7 +906,7 @@ export function deriveResumeDisposition(
   const ids: string[] = [];
   const parkedSettlements: ResumeDisposition['parkedSettlements'] = [];
   const seen = new Set<string>();
-  const consider = (id: string, checkpointProvesPaused = false): void => {
+  const consider = (id: string, checkpointProvesResumable = false): void => {
     if (seen.has(id)) return;
     seen.add(id);
     const authority = readResumeTaskResultAuthority(projectRoot, id);
@@ -928,7 +925,7 @@ export function deriveResumeDisposition(
       || task.status === TaskStatus.CLAIMED
       || task.status === TaskStatus.EXECUTING
       || (task.status === TaskStatus.PAUSED
-        && (checkpointProvesPaused
+        && (checkpointProvesResumable
           || existsSync(join(projectRoot, TASKS_DIR, `task-${id}.paused`))));
     if (resumableStatus) ids.push(id);
   };
@@ -939,14 +936,18 @@ export function deriveResumeDisposition(
   const pendingIds = new Set(checkpoint.pendingTasks ?? []);
   if (checkpoint.taskStates && checkpoint.taskStates.length > 0) {
     for (const state of checkpoint.taskStates) {
-      if (pendingIds.has(state.id) || staleActiveIds.has(state.id) || state.status === TaskStatus.PAUSED) {
-        consider(state.id, state.status === TaskStatus.PAUSED);
+      if (pendingIds.has(state.id) || staleActiveIds.has(state.id)) {
+        consider(
+          state.id,
+          pendingIds.has(state.id)
+            || staleActiveIds.has(state.id),
+        );
       }
     }
   } else {
-    for (const id of checkpoint.pendingTasks ?? []) consider(id);
+    for (const id of checkpoint.pendingTasks ?? []) consider(id, true);
     for (const worker of checkpoint.activeWorkers ?? []) {
-      if (staleActiveIds.has(worker.taskId)) consider(worker.taskId);
+      if (staleActiveIds.has(worker.taskId)) consider(worker.taskId, true);
     }
   }
 
@@ -1208,7 +1209,7 @@ export interface RestoreResult {
   restoredSprint?: Sprint;
   /** Stale EXECUTING task IDs that already produced a .result on disk. */
   staleTasksWithResult: string[];
-  /** Stale EXECUTING task IDs that had no .result and were marked NO_GO on disk. */
+  /** Legacy compatibility field; absent-result workers are now restored as PENDING. */
   staleTasksMarkedNoGo: string[];
   /**
    * v2 (SCHED2 checkpoint-v2 dilim-2): PENDING task IDs cascade-skipped
@@ -1434,17 +1435,15 @@ function cascadeSkipPendingDescendants(
  *      159 forensic showed restart was clobbering this with the new wall clock,
  *      producing negative durations.
  *   4. Classify activeWorkers:
- *        - `.result` exists → push to `staleTasksWithResult` (EVALUATE can consume it)
- *        - `.result` missing → mark task.json status=NO_GO on disk and push to `staleTasksMarkedNoGo`
+ *        - terminal result authority → push to `staleTasksWithResult`
+ *        - terminal result absent → persist task.json status=PENDING; never synthesize a verdict
  *   5. Cascade-skip (`cascadeSkipPendingDescendants`): every PENDING task
  *      transitively depending on a NO_GO/MANUAL_REVIEW_REQUIRED task — old or
  *      freshly classified in step 4 — gets a synthetic `cascadeSkipped:true`
  *      NO_GO `.result` written, since the resume path never runs the live
  *      `cascadeSkipDeadBlocked` closure (it skips PLAN/SPAWN/EXECUTE).
  *   6. Decide action:
- *        - No pending tasks AND no active workers (per the checkpoint's OWN
- *          buckets — deliberately not re-derived from step 5's outcome, see
- *          the inline comment at the call site) → 'complete'
+ *        - every durable task has terminal status AND terminal result authority → 'complete'
  *        - Otherwise → 'resume-evaluate'
  *   7. Sync `.deckent/sprint-state.json` via writeSprintState so external observers
  *      see the resumed phase immediately.
@@ -1528,7 +1527,12 @@ export function restoreSprintFromCheckpoint(
     // pending task. Marker-guarded: a no-op for every task that was never
     // paused, so the common resume path stays byte-identical.
     const pausedMarker = join(projectRoot, TASKS_DIR, `task-${id}.paused`);
-    if (t.status === TaskStatus.PAUSED && existsSync(pausedMarker)) {
+    const checkpointProvesUnfinished = (cp.pendingTasks ?? []).includes(id)
+      || (cp.activeWorkers ?? []).some(worker => worker.taskId === id);
+    if (
+      t.status === TaskStatus.PAUSED
+      && (checkpointProvesUnfinished || existsSync(pausedMarker))
+    ) {
       t.status = TaskStatus.PENDING;
       try { writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8'); }
       catch (e) { debugLog('restoreSprintFromCheckpoint:unpause', e); }
@@ -1590,8 +1594,9 @@ export function restoreSprintFromCheckpoint(
 
   // Classify active workers against the host settlement authority. A raw
   // worker-writable `.result` is terminal only on the legacy non-Docker path;
-  // pending/corrupt Docker authority must HOLD recovery instead of becoming
-  // either stale-complete or synthetic NO_GO.
+  // pending/corrupt Docker authority must HOLD recovery. Missing terminal
+  // evidence is unfinished work: durably project it back to PENDING rather
+  // than manufacturing a terminal result that could enter terminalization.
   const staleTasksWithResult: string[] = [];
   const staleTasksMarkedNoGo: string[] = [];
 
@@ -1605,50 +1610,21 @@ export function restoreSprintFromCheckpoint(
       staleTasksWithResult.push(worker.taskId);
       continue;
     }
-    // No .result — mark task NO_GO on disk so EVALUATE has a deterministic input.
+    // No terminal result — preserve this task as resumable work. Checkpoint
+    // activeWorkers is durable interrupted-work authority even when a failed
+    // run left a PAUSED/EXECUTING projection in task.json.
     const taskPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.json`);
     const t = readJsonSafe<Task>(taskPath);
     if (!t) {
-      staleTasksMarkedNoGo.push(worker.taskId);
       continue;
     }
-    // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate: if the worker
-    // actually produced code on disk before crashing, demote the NO_GO to
-    // MANUAL_REVIEW_REQUIRED instead of silently losing the partial work.
-    const dv = verifyDiskAgainstClaim(projectRoot, t.scope);
-    if (dv.hasDiskEvidence) {
-      t.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
-      const inMemory = tasks.find(x => x.id === worker.taskId);
-      if (inMemory) inMemory.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
-      try {
-        writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8');
-      } catch (e) {
-        debugLog('restoreSprintFromCheckpoint:writeTask', e);
-      }
-      try {
-        writeEvent(
-          projectRoot,
-          sprintId,
-          'brain',
-          'auditor',
-          DISK_VS_CLAIM_MISMATCH_CHANNEL,
-          {
-            taskId: worker.taskId,
-            linesAdded: dv.linesAdded,
-            untrackedFiles: dv.untrackedFiles,
-            cause: 'checkpoint-recovery-stale-executing',
-            emittedAt: new Date().toISOString(),
-          },
-        );
-      } catch (e) {
-        debugLog('restoreSprintFromCheckpoint:diskVerifyEmit', e);
-      }
-      continue;
-    }
-    staleTasksMarkedNoGo.push(worker.taskId);
-    t.status = TaskStatus.NO_GO;
+    t.status = TaskStatus.PENDING;
+    delete t.assignedWorker;
     const inMemory = tasks.find(x => x.id === worker.taskId);
-    if (inMemory) inMemory.status = TaskStatus.NO_GO;
+    if (inMemory) {
+      inMemory.status = TaskStatus.PENDING;
+      delete inMemory.assignedWorker;
+    }
     try {
       writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8');
     } catch (e) {
@@ -1669,19 +1645,18 @@ export function restoreSprintFromCheckpoint(
   // entirely — zero workers are spawned here, by construction, not by flag).
   const cascadeSkippedTasks = cascadeSkipPendingDescendants(projectRoot, tasks);
 
-  // Action decision stays anchored to the checkpoint's OWN pendingTasks/
-  // activeWorkers buckets (unchanged from pre-v2 behavior) — NOT re-derived
-  // from the post-cascade-skip `tasks[]` state. This is deliberately
-  // conservative: touching the 'complete' vs 'resume-evaluate' decision is
-  // out of this slice's scope (dilim-2 is checkpoint schema + restore
-  // cascade-skip, not the resume control-flow itself), and 'complete' short-
-  // circuits straight past EVALUATE/FIX — the cascade-skip `.result` files
-  // just written above still need that pipeline to run.
-  const hasActiveWorkers = (cp.activeWorkers ?? []).length > 0;
-  const hasPending = (cp.pendingTasks ?? []).length > 0;
-  const action: RestoreAction = !hasPending && !hasActiveWorkers
-    ? 'complete'
-    : 'resume-evaluate';
+  // Terminalization is allowed only when the complete durable task universe
+  // has genuine terminal result authority. Empty legacy buckets, a PAUSED disk
+  // projection, or a missing task/result must never masquerade as completion.
+  // This preserves the existing terminalization-only path for an actually
+  // closed checkpoint while keeping unfinished work on the resume path.
+  const fullyTerminal = taskIds.size > 0
+    && tasks.length === taskIds.size
+    && tasks.every(task => {
+    if (!isTerminalStatus(task.status)) return false;
+    return readResumeTaskResultAuthority(projectRoot, task.id).state === 'terminal';
+  });
+  const action: RestoreAction = fullyTerminal ? 'complete' : 'resume-evaluate';
 
   const resumedPhase = action === 'complete' ? SprintPhase.COMPLETE : SprintPhase.EVALUATE;
   const resumedStatus = action === 'complete' ? SprintStatus.COMPLETE : SprintStatus.EVALUATING;

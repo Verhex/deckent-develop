@@ -504,6 +504,22 @@ const MESSAGES: MessageMap = {
     en: 'none',
     tr: 'yok',
   },
+  'review.settlement_reference.valid': {
+    en: 'Settlement reference valid: task={taskId} · attempt={attemptId}',
+    tr: 'Settlement referansı geçerli: görev={taskId} · deneme={attemptId}',
+  },
+  'review.settlement_reference.missing': {
+    en: 'Settlement reference missing',
+    tr: 'Settlement referansı eksik',
+  },
+  'review.settlement_reference.corrupt': {
+    en: 'Settlement reference invalid or unreadable',
+    tr: 'Settlement referansı geçersiz veya okunamıyor',
+  },
+  'review.settlement_reference.legacy': {
+    en: 'Legacy settlement reference',
+    tr: 'Eski biçimli settlement referansı',
+  },
   'task.execution_fence_conflict': {
     en: 'Task {taskId} changed execution state concurrently; dispatch or settlement was refused.',
     tr: '{taskId} görevinin execution durumu eşzamanlı değişti; dispatch veya settlement reddedildi.',
@@ -4936,6 +4952,8 @@ const MESSAGES: MessageMap = {
   'recover.preview_stale_locks': { en: '  Stale locks:     {count} would be cleared', tr: '  Bayat kilitler:  {count} temizlenecek' },
   'recover.preview_stale_spawnlocks': { en: '  Stale spawnlocks:{count} would be cleared', tr: '  Bayat spawnlock: {count} temizlenecek' },
   'recover.preview_task_files': { en: '  Task files:      {count} would be archived', tr: '  Görev dosyaları: {count} arşivlenecek' },
+  'recover.checkpoint_disposition': { en: '  Resume checkpoint: {disposition} ({digest})', tr: '  Sürdürme checkpoint’i: {disposition} ({digest})' },
+  'recover.paused_remediation': { en: '  Run is PAUSED. Resume with `{resumeCommand}` or finalize with `{finalizeCommand}`.', tr: '  Run PAUSED durumda. `{resumeCommand}` ile sürdürün veya `{finalizeCommand}` ile sonlandırın.' },
   'recover.preview_run_to_execute': { en: '\n  Run without --dry-run to execute.\n', tr: '\n  Çalıştırmak için --dry-run olmadan tekrar deneyin.\n' },
   'recover.confirm_header': { en: '\n  ⚠ Recovery will clean up run {sprintId}:', tr: '\n  ⚠ Kurtarma, {sprintId} run\'ını temizleyecek:' },
   'recover.confirm_remove_ipc': { en: '    - Remove orphan IPC directories (dead PIDs only)', tr: '    - Artık IPC dizinlerini kaldır (yalnızca ölü PID\'ler)' },

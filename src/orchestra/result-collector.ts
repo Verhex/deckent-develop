@@ -458,6 +458,51 @@ export function normalizeIngestedTaskId(
   result.taskId = expectedTaskId;
 }
 
+interface CollectorResultRead {
+  readonly result: TaskResult | null;
+  readonly corruptEvidence: boolean;
+}
+
+/** Single parse/identity authority for the live, timeout-race, and final sweeps. */
+function readCollectorResult(
+  authority: TaskResultAuthorityRead<TaskResult>,
+  expectedTaskId: string,
+): CollectorResultRead {
+  if (authority.state === 'pending-settlement') {
+    return { result: null, corruptEvidence: false };
+  }
+  let candidate: TaskResult | null = null;
+  if (authority.state === 'settled') {
+    candidate = normalizeAuthoritativeTaskResult(authority, expectedTaskId);
+  } else if (existsSync(authority.rawResultPath)) {
+    const parsed = parseTaskResultJsonTolerantly(readFileSync(authority.rawResultPath, 'utf-8'));
+    if (parsed.state === 'parse-failure') {
+      return { result: createResultJsonParseFailure(expectedTaskId, parsed.reason), corruptEvidence: true };
+    }
+    candidate = normalizeTaskResultShape(parsed.result);
+    if (!candidate) {
+      return {
+        result: createResultJsonParseFailure(expectedTaskId, 'parsed JSON is not a TaskResult object'),
+        corruptEvidence: true,
+      };
+    }
+  }
+  if (!candidate) return { result: null, corruptEvidence: false };
+  if (candidate.taskId !== expectedTaskId) {
+    return {
+      result: {
+        ...createResultJsonParseFailure(
+          expectedTaskId,
+          `RESULT_IDENTITY_DRIFT: expected taskId ${JSON.stringify(expectedTaskId)}, received ${JSON.stringify(candidate.taskId)}`,
+        ),
+        workerId: 'brain-result-identity-authority',
+      },
+      corruptEvidence: true,
+    };
+  }
+  return { result: candidate, corruptEvidence: false };
+}
+
 function normalizeAuthoritativeTaskResult(
   authority: TaskResultAuthorityRead<TaskResult>,
   taskId: string,
@@ -1325,7 +1370,6 @@ export async function waitForResults(
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
       let authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
-      let recoveredRawResult: TaskResult | undefined;
       if (
         !terminalRecoveryAttempted
         && authority.state === 'pending-settlement'
@@ -1340,27 +1384,9 @@ export async function waitForResults(
           debugLog('collectResults:liveTerminalRecovery', e);
         }
       }
-      const resultPath = authority.rawResultPath;
-      // Tolerant raw recovery applies ONLY when the raw file IS the authority
-      // (legacy path whose strict parse failed → state 'absent'). A
-      // 'pending-settlement' task must keep WAITING for the host settlement —
-      // an early untrusted raw Docker DONE preempting it was the exact trust
-      // bypass this collector's settlement authority exists to prevent
-      // (regression pinned by result-collector-settlement-authority.test.ts).
-      if (!authority.result && authority.state !== 'pending-settlement' && existsSync(resultPath)) {
-        const parsed = parseTaskResultJsonTolerantly(readFileSync(resultPath, 'utf-8'));
-        if (parsed.state === 'parsed') {
-          recoveredRawResult = parsed.result;
-          if (parsed.sanitized) debugLog('collectResults:tolerantResultParse', `taskId=${taskId}`);
-        } else {
-          recoveredRawResult = createResultJsonParseFailure(taskId, parsed.reason);
-          debugLog('collectResults:resultParseFailure', `taskId=${taskId} ${parsed.reason}`);
-        }
-      }
-      if (authority.result || recoveredRawResult) {
-        const result = authority.result
-          ? normalizeAuthoritativeTaskResult(authority, taskId)
-          : recoveredRawResult;
+      const collectorRead = readCollectorResult(authority, taskId);
+      if (collectorRead.result) {
+        const result = collectorRead.result;
         if (result) {
           // born-655 (TT550D): normalize the worker-reported taskId against the
           // filename-derived (authoritative) id at THIS single ingest chokepoint,
@@ -1368,7 +1394,6 @@ export async function waitForResults(
           // (or otherwise drifted) content id would otherwise lookup-miss in the
           // downstream buildResultsMap index (handleEvaluation) → phantom fix + lost
           // trace/NO_GO label (live: 412-003, 409-002).
-          normalizeIngestedTaskId(result, taskId, resultPath);
           // Sprint 231 T1 — synthetic exit-0-no-result uniform disk-verify gate.
           // Docker EXIT trap (spawn-backend-docker.ts) writes a NO_GO `.result`
           // when the worker exits cleanly without producing one. Shape:
@@ -1431,10 +1456,12 @@ export async function waitForResults(
             // (returns the instant the .log appears, so prompt dumps cost nothing).
             await waitForCliLog(projectRoot, taskId, 45000);
           }
-          await waitForBudgetTerminal(enrichTask, taskId, result);
-          enrichResultTokenUsage(result, enrichTask, projectRoot);
-          enrichResultCost(result, enrichTask, projectRoot, config?.auth_mode);
-          applyBudgetEvidence(enrichTask, result, taskId);
+          if (!collectorRead.corruptEvidence) {
+            await waitForBudgetTerminal(enrichTask, taskId, result);
+            enrichResultTokenUsage(result, enrichTask, projectRoot);
+            enrichResultCost(result, enrichTask, projectRoot, config?.auth_mode);
+            applyBudgetEvidence(enrichTask, result, taskId);
+          }
           // LP-10 (2026-07-08): populate filesChanged/linesAdded/linesRemoved from
           // host-side git ground truth, not the worker's self-report (which arrived
           // as filesChanged=[] / linesAdded=null — an LLM cannot count its own diff).
@@ -1456,7 +1483,7 @@ export async function waitForResults(
           // Persist the orchestrator-enriched tokenUsage + cost back to the .result FILE.
           // enrichResultTokenUsage/enrichResultCost mutate the in-memory result only;
           // without this write the on-disk .result keeps the worker's 0/0 placeholder.
-          persistEnrichedResult(projectRoot, result);
+          if (!collectorRead.corruptEvidence) persistEnrichedResult(projectRoot, result);
           reportResultContractDrift(projectRoot, sprint.id, taskId, result, config);
           await syncTaskStatusFromResult(taskId, result);
           // Transactional commit boundary: a result is not collected until its
@@ -1500,15 +1527,18 @@ export async function waitForResults(
         // before overwriting with synthetic NO_GO. The EXIT trap runs between timeout kill
         // and result collection, so .result may appear after the first resultExists check.
         const lateAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
-        const lateResult = normalizeAuthoritativeTaskResult(lateAuthority, taskId);
+        const lateRead = readCollectorResult(lateAuthority, taskId);
+        const lateResult = lateRead.result;
         if (lateResult) {
-          await waitForBudgetTerminal(taskMap.get(taskId), taskId, lateResult);
-          enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
-          enrichResultCost(lateResult, taskMap.get(taskId), projectRoot, config?.auth_mode);
-          applyBudgetEvidence(taskMap.get(taskId), lateResult, taskId);
+          if (!lateRead.corruptEvidence) {
+            await waitForBudgetTerminal(taskMap.get(taskId), taskId, lateResult);
+            enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
+            enrichResultCost(lateResult, taskMap.get(taskId), projectRoot, config?.auth_mode);
+            applyBudgetEvidence(taskMap.get(taskId), lateResult, taskId);
+          }
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
           // Persist enriched tokenUsage + cost to the .result FILE (see above).
-          persistEnrichedResult(projectRoot, lateResult);
+          if (!lateRead.corruptEvidence) persistEnrichedResult(projectRoot, lateResult);
           reportResultContractDrift(projectRoot, sprint.id, taskId, lateResult, config);
           await syncTaskStatusFromResult(taskId, lateResult);
           results.push(lateResult);
@@ -2503,20 +2533,23 @@ export async function waitForResults(
   for (const taskId of taskIds) {
     if (collected.has(taskId)) continue;
     const finalAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
-    if (finalAuthority.result) {
-      const result = normalizeAuthoritativeTaskResult(finalAuthority, taskId);
+    const finalRead = readCollectorResult(finalAuthority, taskId);
+    if (finalRead.result) {
+      const result = finalRead.result;
       if (result) {
-        await waitForBudgetTerminal(taskMap.get(taskId), taskId, result);
-        enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
-        enrichResultCost(result, taskMap.get(taskId), projectRoot, config?.auth_mode);
-        applyBudgetEvidence(taskMap.get(taskId), result, taskId);
+        if (!finalRead.corruptEvidence) {
+          await waitForBudgetTerminal(taskMap.get(taskId), taskId, result);
+          enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
+          enrichResultCost(result, taskMap.get(taskId), projectRoot, config?.auth_mode);
+          applyBudgetEvidence(taskMap.get(taskId), result, taskId);
+        }
         // Sprint 201 review-feedback — close the final-sweep race window: a
         // worker whose real .result lands only after the watcher closed is a
         // genuine worker-sourced filesChanged, same source as branches (a)/(b).
         // The helper is idempotent + guarded, so this is harmless if already swept.
         sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
         // Persist enriched tokenUsage + cost to the .result FILE (see above).
-        persistEnrichedResult(projectRoot, result);
+        if (!finalRead.corruptEvidence) persistEnrichedResult(projectRoot, result);
         await syncTaskStatusFromResult(taskId, result);
         results.push(result);
         collected.add(taskId);

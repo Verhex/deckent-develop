@@ -27,7 +27,7 @@
 
 import { join } from 'node:path';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { ALL_PROVIDER_NAMES, TaskEvaluation } from '../core/types.js';
 import type {
@@ -111,6 +111,11 @@ import type {
   CrossVerifyInvocationCoordinatorInput,
   CrossVerifyStrictLauncher,
 } from './cross-verify-invocation-coordinator.js';
+import {
+  createXVerifyTaskSettlement,
+  type XVerifyTaskDispatchOutcome,
+  type XVerifyTaskSettlementReceipt,
+} from '../core/xverify-task-settlement.js';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -208,6 +213,8 @@ export interface CrossVerifyRunResult {
    * This envelope is never copied into the provider-authored TaskResult.
    */
   validatedAdjudicationReceipt?: CrossVerifyVerdictReceiptEnvelopeV1;
+  /** Durable terminal projection for the internal verifier task. */
+  taskSettlementReceipt?: Readonly<XVerifyTaskSettlementReceipt>;
 }
 
 /** Input passed to a {@link SpawnVerifierFn}. */
@@ -381,6 +388,59 @@ export const CROSS_VERIFY_TIMEOUT_MS = 120_000;
  */
 const CROSS_VERIFY_LOG_FINALIZE_GRACE_MS = 2_000;
 const CROSS_VERIFY_RAW_OUTPUT_MAX_CHARS = 256 * 1024;
+
+function xverifyDigest(value: unknown): string {
+  return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
+}
+
+function sameXverifySettlementIdentity(
+  left: Readonly<XVerifyTaskSettlementReceipt>,
+  right: Readonly<XVerifyTaskSettlementReceipt>,
+): boolean {
+  return left.schemaVersion === right.schemaVersion
+    && left.taskId === right.taskId
+    && left.invocationId === right.invocationId
+    && left.attemptId === right.attemptId
+    && left.generation === right.generation
+    && left.settlementDigest === right.settlementDigest;
+}
+
+/**
+ * Atomically correlate an internal verifier task result with its invocation-bound
+ * terminal receipt. A restart reads the already committed receipt back instead
+ * of reducing the same invocation a second time.
+ */
+export function persistCrossVerifyTaskSettlement(input: {
+  readonly projectRoot: string;
+  readonly taskId: string;
+  readonly invocationId: string;
+  readonly attemptId: string;
+  readonly generation: number;
+  readonly producerProvider: string;
+  readonly verifierProvider: string;
+  readonly dispatchOutcome: XVerifyTaskDispatchOutcome;
+}): Readonly<XVerifyTaskSettlementReceipt> {
+  const receipt = createXVerifyTaskSettlement(input);
+  const path = join(input.projectRoot, TASKS_DIR, `task-${input.taskId}.result`);
+  let result: Record<string, unknown> = {};
+  if (existsSync(path)) {
+    result = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    const prior = result.xverifyTaskSettlement as XVerifyTaskSettlementReceipt | undefined;
+    if (prior) {
+      if (!sameXverifySettlementIdentity(prior, receipt)) {
+        throw new DeckentError('E_XVERIFY_TASK_SETTLEMENT_REPLAY',
+          `Conflicting XVerify task settlement for ${input.taskId}`);
+      }
+      return prior;
+    }
+  }
+  result.taskId ??= input.taskId;
+  result.status = receipt.projection.status;
+  result.xverifyTaskSettlement = receipt;
+  mkdirSync(join(input.projectRoot, TASKS_DIR), { recursive: true });
+  atomicWriteFileSync(path, `${JSON.stringify(result, null, 2)}\n`);
+  return receipt;
+}
 
 interface CrossVerifyDetailRecord {
   readonly reasonCode: string;
@@ -1174,6 +1234,7 @@ export async function runCrossVerify(
     outcome: Extract<CrossVerifyOutcome, 'disabled' | 'not-applicable' | 'unavailable'>,
     evidencePersisted?: boolean,
     blocked = false,
+    taskSettlementReceipt?: Readonly<XVerifyTaskSettlementReceipt>,
   ): CrossVerifyRunResult => ({
     outcome,
     disposition: blocked
@@ -1189,6 +1250,7 @@ export async function runCrossVerify(
     ...(dispatchedVerifier !== undefined ? { verifier: dispatchedVerifier } : {}),
     ...(dispatchedVerifierModel !== undefined ? { verifierModel: dispatchedVerifierModel } : {}),
     ...(dispatchRejection !== undefined ? { rejection: dispatchRejection } : {}),
+    ...(taskSettlementReceipt ? { taskSettlementReceipt } : {}),
   });
 
   // Guard 1 — config-gated default-OFF.
@@ -1287,6 +1349,32 @@ export async function runCrossVerify(
       );
       if (coordinated.state !== 'settled') {
         const reason = `verifier-exact-invocation-${coordinated.state}:${coordinated.reasonCode}`;
+        const identity = mandatory.input.executionContract;
+        const resumeSeed = xverifyDigest({
+          taskId: identity.verifierTaskId,
+          invocationId: mandatory.input.projection.invocationReceipt.receipt.invocationId,
+          attemptId: identity.attemptId,
+          reason,
+        }).slice(7, 39);
+        const taskSettlementReceipt = persistCrossVerifyTaskSettlement({
+          projectRoot,
+          taskId: identity.verifierTaskId,
+          invocationId: mandatory.input.projection.invocationReceipt.receipt.invocationId,
+          attemptId: identity.attemptId,
+          generation: 0,
+          producerProvider: task.provider ?? getDefaultProviderName(),
+          verifierProvider: identity.provider,
+          dispatchOutcome: {
+            kind: 'hold',
+            reason,
+            evidenceRef: coordinated.authorityEvidenceRef,
+            resumeAuthority: {
+              resumeToken: `resume-${resumeSeed}`,
+              nextAttemptId: `attempt-${resumeSeed}`,
+              nextGeneration: 1,
+            },
+          },
+        });
         const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
           outcome: 'unavailable',
           reason,
@@ -1294,7 +1382,8 @@ export async function runCrossVerify(
             ? { invocationReceiptRef: coordinated.invocationReceiptRef }
             : {}),
         });
-        return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
+        return skip(reason, 'unavailable', evidencePersisted, verificationRequired,
+          taskSettlementReceipt);
       }
       if (!(ALL_PROVIDER_NAMES as readonly string[]).includes(coordinated.calledProvider)) {
         const reason = 'verifier-exact-invocation-called-provider-unsupported';
@@ -1306,6 +1395,20 @@ export async function runCrossVerify(
         return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
       }
       const verifierProvider = coordinated.calledProvider as ProviderName;
+      const transportReceipt = {
+        taskId: mandatory.input.executionContract.verifierTaskId,
+        invocationId: coordinated.invocationReceiptRef.invocationId,
+        attemptId: coordinated.terminalSettlementRef.attemptId,
+        generation: 0,
+        terminal: true as const,
+        provider: verifierProvider,
+        evidenceRef: coordinated.hostObservationEvidenceRef,
+        receiptDigest: xverifyDigest({
+          invocationReceiptRef: coordinated.invocationReceiptRef,
+          terminalSettlementRef: coordinated.terminalSettlementRef,
+          hostObservationEvidenceRef: coordinated.hostObservationEvidenceRef,
+        }),
+      };
       // Floor check #2 — the composition authority resolves the called model
       // itself, so the requested-model check above cannot speak for it. A
       // below-tier judge never gains verdict authority, whatever it returned.
@@ -1387,6 +1490,22 @@ export async function runCrossVerify(
           task.id,
           { ...advisory, outcome },
         );
+        const taskSettlementReceipt = persistCrossVerifyTaskSettlement({
+          projectRoot,
+          ...transportReceipt,
+          producerProvider: task.provider ?? getDefaultProviderName(),
+          verifierProvider,
+          dispatchOutcome: {
+            kind: 'adjudicated',
+            transportReceipt,
+            hostAdjudication: {
+              verdict: outcome,
+              disposition: outcome === 'unclear' ? 'fail-closed' : 'accepted',
+              evidenceRef: adjudicationReceiptRef,
+              adjudicationDigest: xverifyDigest(adjudication),
+            },
+          },
+        });
         if (!evidencePersisted) {
           return {
             outcome: 'unavailable',
@@ -1410,6 +1529,7 @@ export async function runCrossVerify(
           refuted,
           blocked: verificationRequired && requiredDisposition !== 'allow',
           evidencePersisted,
+          taskSettlementReceipt,
           ...(validatedAdjudicationReceipt
             ? { validatedAdjudicationReceipt }
             : {}),
@@ -1438,6 +1558,29 @@ export async function runCrossVerify(
         task.id,
         { ...advisory, outcome },
       );
+      const taskSettlementReceipt = persistCrossVerifyTaskSettlement({
+        projectRoot,
+        ...transportReceipt,
+        producerProvider: task.provider ?? getDefaultProviderName(),
+        verifierProvider,
+        dispatchOutcome: executionCompleted
+          ? {
+              kind: 'adjudicated',
+              transportReceipt,
+              hostAdjudication: {
+                verdict: verdict.verdict,
+                disposition: verdict.verdict === 'unclear' ? 'fail-closed' : 'accepted',
+                evidenceRef: coordinated.outputArtifactRef,
+                adjudicationDigest: xverifyDigest(verdict),
+              },
+            }
+          : {
+              kind: 'unavailable',
+              transportReceipt,
+              reason: verdict.reason,
+              evidenceRef: coordinated.hostObservationEvidenceRef,
+            },
+      });
       if (!evidencePersisted) {
         const persistenceAdvisory: CrossVerifyAdvisory = {
           ...advisory,
@@ -1468,6 +1611,7 @@ export async function runCrossVerify(
         refuted,
         blocked: verificationRequired && verdict.verdict !== 'confirmed',
         evidencePersisted,
+        taskSettlementReceipt,
       };
     }
 

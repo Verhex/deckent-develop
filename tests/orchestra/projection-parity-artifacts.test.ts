@@ -52,13 +52,17 @@ describe('KN3 — projection parity vs. settled-task artifacts (landing-proposal
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
-  it('a mix of settled-task residue (.result, .hb, landing-proposal.json, skill-delivery.json) is fully excluded — parity passes', () => {
+  it('a mix of settled-task residue (.result, .hb, proposal sidecars, skill-delivery.json) is fully excluded — parity passes', () => {
     const root = mkdtempSync(join(tmpdir(), 'kn3-artifacts-'));
     try {
       seedTasks(root, ['523-004']);
       writeArtifact(root, 'task-523-001.landing-proposal.json', JSON.stringify({ taskId: '523-001' }));
       writeArtifact(root, 'task-523-002.result', JSON.stringify({ taskId: '523-002', selfAssessment: 'DONE' }));
       writeArtifact(root, 'task-523-003.hb', JSON.stringify({ taskId: '523-003', status: 'EXECUTING' }));
+      writeArtifact(root, 'task-523-003.replan-proposal.json', JSON.stringify({
+        taskId: '523-003',
+        reason: 'retry-budget-exhausted',
+      }));
       writeArtifact(root, 'task-523-001.skill-delivery.json', JSON.stringify({
         schemaVersion: 1,
         taskId: '523-001',

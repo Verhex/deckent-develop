@@ -9,6 +9,36 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-622-003 | Tech debt from 622-003: Receipt replay is idempotent: an existing exact-attempt  | normal | sprint-622 | resolved |
+| debt-622-005 | Tech debt from 622-005: Task-14 recovery-artifact policy is now the production p | normal | sprint-622 | resolved |
+| debt-621-008 | Tech debt from 621-008: Implemented an immutable, replay-stable terminal reducer | normal | sprint-621 | resolved |
+| debt-621-010 | Tech debt from 621-010: Inventory found the canonical producer→consumer→settleme | normal | sprint-621 | resolved |
+| debt-621-006 | Tech debt from 621-006: Implemented a strict internal XVerify settlement reducer | normal | sprint-621 | resolved |
+| debt-621-012 | Tech debt from 621-012: Implemented a deterministic, state-based continuous quie | normal | sprint-621 | resolved |
+| debt-621-011 | Tech debt from 621-011: Added a typed, read-only review view for valid, missing, | normal | sprint-621 | resolved |
+| debt-621-014 | Tech debt from 621-014: Implemented policy v1 with six semantic artifact classes | normal | sprint-621 | resolved |
+| debt-621-017 | Tech debt from 621-017: Implemented exact-input-digest finalizer-gate authority  | normal | sprint-621 | resolved |
+| debt-621-013 | Tech debt from 621-013: Production reducer driver now closes a continuous-idle P | normal | sprint-621 | resolved |
+| debt-621-007 | Tech debt from 621-007: Implemented atomic, invocation/attempt/generation-bound  | normal | sprint-621 | resolved |
+| debt-621-003 | Tech debt from 621-003: Rewired the real worker terminal result producer to writ | normal | sprint-621 | resolved |
+| debt-617-003 | Tech debt from 617-003: Declared vitest command passed: 2 files, 8 tests. Contro | normal | sprint-617 | resolved |
+| debt-617-004 | Tech debt from 617-004: Mirror details now preserve the exact origin source refe | normal | sprint-617 | resolved |
+| debt-616-004 | Tech debt from 616-004: Indexed readTenantPage uses tenant/project/sequence keys | normal | sprint-616 | resolved |
+| debt-616-010 | Tech debt from 616-010: Producer computes distinct evaluation, result, policy, a | normal | sprint-616 | resolved |
+| debt-616-007 | Tech debt from 616-007: Full-lineage confirmation identity is derived and valida | normal | sprint-616 | resolved |
+| debt-614-001 | Tech debt from 614-001: Implemented one versioned canonical contract containing  | normal | sprint-614 | resolved |
+| debt-614-002 | Tech debt from 614-002: Implemented canonical acceptance settlement truth table  | normal | sprint-614 | resolved |
+| debt-614-004 | Tech debt from 614-004: Declared targeted test passed: 1 file, 9 tests. Strict a | normal | sprint-614 | resolved |
+| debt-614-005 | Tech debt from 614-005: Added tenant_id-required acceptance-route debt creation  | normal | sprint-614 | resolved |
+| debt-614-006 | Tech debt from 614-006: Implemented recordAcceptanceRouteDebt and transitionAcce | normal | sprint-614 | resolved |
+| debt-614-003 | Tech debt from 614-003: SQLite WAL/FULL authority now lives at .deckent/runtime/ | normal | sprint-614 | resolved |
+| debt-614-008 | Tech debt from 614-008: Targeted verification passed: 1 file, 2 tests. The defau | normal | sprint-614 | resolved |
+| debt-614-009 | Tech debt from 614-009: Targeted verification passed: npx vitest run tests/orche | normal | sprint-614 | resolved |
+| debt-614-010 | Tech debt from 614-010: Implemented canonical full-lineage ROUTE claims using Ta | normal | sprint-614 | resolved |
+| debt-614-011 | Tech debt from 614-011: Declared targeted verification passed: 1 file, 2 tests.  | normal | sprint-614 | resolved |
+| debt-614-012 | Tech debt from 614-012: Controller collector ingest and controller-only post-col | normal | sprint-614 | resolved |
+| debt-614-013 | Tech debt from 614-013: Exact broker-mirror lineage is checked before the canoni | normal | sprint-614 | resolved |
+| debt-614-014 | Tech debt from 614-014: Added EN/TR catalog copy for create/route, PREPARED, APP | normal | sprint-614 | resolved |
 | debt-610-008 | Tech debt from 610-008: npx tsc --noEmit passed.
 npx vitest run tests/orchestra/ | normal | sprint-610 | resolved |
 | debt-594-002 | Tech debt from 594-002: LOCAL_VERIFIED / SCOPED_GREEN: npx vitest run tests/orch | normal | sprint-594 | resolved |

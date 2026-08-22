@@ -894,14 +894,23 @@ export function persistDockerTaskResultSettlement(
   tasksDir: string,
   ref: TaskResultSettlementRefV1 | undefined,
   exitCode: number | null,
+  model = 'unknown',
 ): boolean {
   if (!ref) return false;
   assertTaskResultSettlementRef(projectRoot, ref.taskId, ref);
   const resultPath = join(tasksDir, `task-${ref.taskId}.result`);
   if (!existsSync(resultPath)) return false;
-  const parsed = JSON.parse(readFileSync(resultPath, 'utf-8')) as unknown;
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new DeckentError('E_DOCKER_RESULT_SETTLEMENT_IS_NOT_A_JSON_OBJECT', `Docker result settlement is not a JSON object: ${resultPath}`);
+  const raw = readFileSync(resultPath);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.toString('utf-8')) as unknown;
+  } catch {
+    persistDockerCorruptResultRecovery({ ref, raw, exitCode, model });
+    return true;
+  }
+  if (!isValidDockerWorkerResult(parsed, ref)) {
+    persistDockerCorruptResultRecovery({ ref, raw, exitCode, model });
+    return true;
   }
   const result = normalizeTaskResultShape(
     parsed as Record<string, unknown> & { notes?: unknown },
@@ -913,6 +922,96 @@ export function persistDockerTaskResultSettlement(
 }
 
 const MAX_RECOVERY_FORENSIC_BYTES = 1024 * 1024;
+
+function isValidDockerWorkerResult(
+  value: unknown,
+  ref: TaskResultSettlementRefV1,
+): value is Record<string, unknown> & { notes?: unknown } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const result = value as Record<string, unknown>;
+  if (result['taskId'] !== ref.taskId) return false;
+  if (result['attemptId'] !== undefined && result['attemptId'] !== ref.attemptId) return false;
+  if (!['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO'].includes(String(result['selfAssessment']))) return false;
+  if (result['workerId'] !== undefined && typeof result['workerId'] !== 'string') return false;
+  if (result['filesChanged'] !== undefined && !Array.isArray(result['filesChanged'])) return false;
+  if (result['testsPassed'] !== undefined && typeof result['testsPassed'] !== 'boolean'
+    && !Array.isArray(result['testsPassed'])) return false;
+  for (const field of ['linesAdded', 'linesRemoved'] as const) {
+    const count = result[field];
+    if (count !== undefined && (!Number.isSafeInteger(count) || Number(count) < 0)) return false;
+  }
+  const coverage = result['coverage'];
+  if (coverage !== undefined && (typeof coverage !== 'number' || !Number.isFinite(coverage)
+    || coverage < 0 || coverage > 100)) return false;
+  return true;
+}
+
+function persistDockerCorruptResultRecovery(input: {
+  readonly ref: TaskResultSettlementRefV1;
+  readonly raw: Buffer;
+  readonly exitCode: number | null;
+  readonly model: string;
+}): void {
+  const rawSha256 = createHash('sha256').update(input.raw).digest('hex');
+  const captured = input.raw.subarray(0, MAX_RECOVERY_FORENSIC_BYTES);
+  const forensicPath = join(dirname(taskResultSettlementPath(input.ref)), 'invalid-worker-result.json');
+  let capturedAt: string;
+  if (existsSync(forensicPath)) {
+    const existing = JSON.parse(readFileSync(forensicPath, 'utf-8')) as {
+      rawSha256?: string; taskId?: string; attemptId?: string; capturedAt?: string;
+    };
+    if (existing.rawSha256 !== rawSha256 || existing.taskId !== input.ref.taskId
+      || existing.attemptId !== input.ref.attemptId || typeof existing.capturedAt !== 'string') {
+      throw new SpawnBackendError(
+        `DECKENT_E091:recovery-forensic-conflict:${input.ref.taskId}/${input.ref.attemptId}`,
+        'docker',
+      );
+    }
+    capturedAt = existing.capturedAt;
+  } else {
+    capturedAt = new Date().toISOString();
+    atomicWriteFileSync(forensicPath, `${JSON.stringify({
+      schemaVersion: 1,
+      taskId: input.ref.taskId,
+      attemptId: input.ref.attemptId,
+      artifactState: 'corrupt',
+      rawSha256,
+      rawBytes: input.raw.byteLength,
+      capturedBytes: captured.byteLength,
+      truncated: captured.byteLength !== input.raw.byteLength,
+      rawBase64: captured.toString('base64'),
+      capturedAt,
+    }, null, 2)}\n`);
+  }
+  const provider = modelRegistry.get(input.model)?.provider ?? 'unknown';
+  const evidenceRef = `invalid-worker-result:sha256:${rawSha256}`;
+  const result = {
+    taskId: input.ref.taskId,
+    workerId: `docker-recovery-${input.ref.taskId}`,
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    coverage: 0,
+    selfAssessment: 'NO_GO',
+    markerType: 'RECOVERY_RESULT_INVALID',
+    exitCode: input.exitCode,
+    recovery: {
+      attemptId: input.ref.attemptId,
+      resultArtifactState: 'corrupt',
+      resultArtifactSha256: rawSha256,
+      forensicEvidenceRef: evidenceRef,
+    },
+    notes: `Host rejected an invalid Docker worker result and contained the attempt as NO_GO; container exit ${input.exitCode ?? 'unknown'} is not success authority. attemptId=${input.ref.attemptId}. evidence=${evidenceRef}.`,
+    tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider, model: input.model },
+  };
+  writeTaskResultSettlementAtomic(createTaskResultSettlement({
+    ref: input.ref,
+    exitCode: input.exitCode,
+    result,
+    settledAt: capturedAt,
+  }));
+}
 
 /**
  * Make a proven-absent Docker attempt settleable without inventing success.
@@ -945,11 +1044,8 @@ export function ensureDockerRecoveryResultFile(input: {
         throw new SyntaxError('worker result root is not a JSON object');
       }
       const record = parsed as Record<string, unknown> & { notes?: unknown };
-      if (record.taskId !== input.ref.taskId) {
-        throw new SpawnBackendError(
-          `DECKENT_E091:recovery-result-task-mismatch:${input.ref.taskId}/${input.ref.attemptId}`,
-          'docker',
-        );
+      if (!isValidDockerWorkerResult(record, input.ref)) {
+        throw new SyntaxError('worker result failed schema or attempt identity validation');
       }
       const normalized = normalizeTaskResultShape(record) as Record<string, unknown>;
       atomicWriteFileSync(resultPath, `${JSON.stringify(normalized, null, 2)}\n`);
@@ -957,43 +1053,9 @@ export function ensureDockerRecoveryResultFile(input: {
     } catch (error) {
       if (error instanceof SpawnBackendError) throw error;
       artifactState = 'malformed';
-      const captured = raw.subarray(0, MAX_RECOVERY_FORENSIC_BYTES);
-      const forensicReceipt = {
-        schemaVersion: 1,
-        taskId: input.ref.taskId,
-        attemptId: input.ref.attemptId,
-        artifactState,
-        rawSha256,
-        rawBytes: raw.byteLength,
-        capturedBytes: captured.byteLength,
-        truncated: captured.byteLength !== raw.byteLength,
-        rawBase64: captured.toString('base64'),
-        capturedAt: new Date().toISOString(),
-      };
-      const forensicPath = join(
-        dirname(taskResultSettlementPath(input.ref)),
-        'invalid-worker-result.json',
-      );
-      if (existsSync(forensicPath)) {
-        const existing = JSON.parse(readFileSync(forensicPath, 'utf-8')) as {
-          rawSha256?: string;
-          taskId?: string;
-          attemptId?: string;
-        };
-        if (
-          existing.rawSha256 !== rawSha256
-          || existing.taskId !== input.ref.taskId
-          || existing.attemptId !== input.ref.attemptId
-        ) {
-          throw new SpawnBackendError(
-            `DECKENT_E091:recovery-forensic-conflict:${input.ref.taskId}/${input.ref.attemptId}`,
-            'docker',
-          );
-        }
-      } else {
-        atomicWriteFileSync(forensicPath, `${JSON.stringify(forensicReceipt, null, 2)}\n`);
-      }
       forensicEvidenceRef = `invalid-worker-result:sha256:${rawSha256}`;
+      persistDockerCorruptResultRecovery({ ref: input.ref, raw, exitCode: null, model: input.model });
+      return 'recovered-malformed';
     }
   }
 
@@ -7910,7 +7972,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       // registry, locks and transient baseline are settled earns a receipt.
       if (lifecycleSettled) {
         try {
-          if (!persistDockerTaskResultSettlement(projectDir, tasksDir, settlementRef, exitCode)) {
+          if (!persistDockerTaskResultSettlement(projectDir, tasksDir, settlementRef, exitCode, model)) {
             lifecycleSettled = false;
             debugLog('docker-backend:result-settlement', `taskId=${taskId} result receipt was not persisted`);
           }

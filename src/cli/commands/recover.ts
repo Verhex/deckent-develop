@@ -256,6 +256,8 @@ export function registerRecover(program: Command): void {
             staleSpawnLocksCleaned: report.staleSpawnLocksCleaned,
             taskFilesArchived: report.taskFilesArchived,
             taskFilesPreserved: report.taskFilesPreserved,
+            artifactPolicy: report.artifactPolicy,
+            remediation: report.remediation,
           }));
           return;
         }
@@ -273,6 +275,11 @@ export function registerRecover(program: Command): void {
           print(getMessage('recover.preview_stale_locks', lang, { count: String(report.staleLocksCleaned) }));
           print(getMessage('recover.preview_stale_spawnlocks', lang, { count: String(report.staleSpawnLocksCleaned) }));
           print(getMessage('recover.preview_task_files', lang, { count: String(report.taskFilesArchived) }));
+          print(getMessage('recover.checkpoint_disposition', lang, {
+            disposition: report.artifactPolicy.checkpoint.disposition,
+            digest: report.artifactPolicy.checkpoint.digest ?? '-',
+          }));
+          if (report.remediation) print(getMessage('recover.paused_remediation', lang, report.remediation));
           print(getMessage('recover.separator', lang));
           print(getMessage('recover.preview_run_to_execute', lang));
           return;
@@ -312,6 +319,11 @@ export function registerRecover(program: Command): void {
           archived: String(report.taskFilesArchived),
           preserved: String(report.taskFilesPreserved),
         }));
+        print(getMessage('recover.checkpoint_disposition', lang, {
+          disposition: report.artifactPolicy.checkpoint.disposition,
+          digest: report.artifactPolicy.checkpoint.digest ?? '-',
+        }));
+        if (report.remediation) print(getMessage('recover.paused_remediation', lang, report.remediation));
         print(getMessage('recover.separator', lang));
         print(getMessage('recover.complete', lang, { sprintId }));
       } catch (error) {

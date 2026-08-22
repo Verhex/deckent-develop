@@ -1,5 +1,27 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-622 Learnings
+- Sprint sprint-622 Learnings: ## Sprint sprint-622 Learnings
+- Immutable evaluation receipt restart replay pin: GO_WITH_TECH_DEBT — Receipt replay is idempotent: an existing exact-attempt receipt is consumed as verdict authority without evaluation or r
+- Recover force checkpoint-policy production wiring: GO_WITH_TECH_DEBT — Task-14 recovery-artifact policy is now the production planning authority for task residue and canonical checkpoints. Fo
+
+## Gains
+- 622-001 — Continuation current-truth inventory — Created a bounded, redacted continuation inventory from current docs/evidence bytes.
+- 622-002 — Recovery sidecar projection parity pin — Already closed; no scoped files were rewritten.
+- 622-004 — Checkpoint PENDING to disk PAUSED resume parity — Checkpoint restore now treats durable pending/stale-active authority as resumable PENDING even wh...
+- 622-006 — Status projection recovery reconciliation — Added a side-effect-free sprint recovery reconciliation read model with typed projection-stale, c...
+- 622-007 — Recovery truth nine-case end-to-end matrix — Nine cases assert exact terminal or typed fail-closed outcomes through production imports, includ...
+- 622-008 — Recovery authority ratchet and result evidence — Declared verification passed: targeted Vitest 14/14 and current-tree binary ratchet clean (exit 0).
+
+## Sprint sprint-619 Learnings
+- Sprint sprint-619 Learnings: ## Sprint sprint-619 Learnings
+
+## Gains
+- 619-001 — Durable LLM authority binding and restart verifier — Declared targeted verification passed: 3 files, 14 tests.
+- 619-002 — Serve dual-authority default composition and ownership
+- 619-003 — Authority duplication ratchet
+- 619-004 — End-to-end restart, race and real composition proof
+
 ## Sprint sprint-613 Learnings
 - Sprint sprint-613 Learnings: ## Sprint sprint-613 Learnings
 
