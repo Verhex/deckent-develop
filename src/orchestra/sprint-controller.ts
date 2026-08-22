@@ -39,6 +39,10 @@ import { RECENT_WORKS_DIR, TASKS_DIR } from '../core/constants.js';
 import { DeckentError } from '../core/errors.js';
 import { SPRINT_TERMINAL_PUBLICATION_VERSION } from '../core/sprint-terminal-publication.js';
 import type { SprintTerminalReceiptV1 } from '../core/sprint-terminal-publication.js';
+import {
+  evaluationAuditPath,
+  type EvaluationAuditRecord,
+} from './evaluation-audit-trail.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog, readJsonSafe, updateLastSprintId } from '../core/utils.js';
@@ -1117,6 +1121,64 @@ export function evaluateResultSync(result: TaskResult, task: Task, vitestJsonOut
   } finally {
     metric('eval.duration_ms', Date.now() - evalStart, { taskId: task.id });
   }
+}
+
+export type ControllerEvaluationSettlementConsumption =
+  | {
+      readonly state: 'SETTLED';
+      readonly evaluation: TaskEvaluation;
+      readonly receipt: EvaluationAuditRecord;
+    }
+  | {
+      readonly state: 'HOLD';
+      readonly reason: 'SETTLEMENT_RECEIPT_MISSING' | 'SETTLEMENT_RECEIPT_CONFLICT';
+      readonly detail: string;
+    };
+
+/** Consume the immutable attempt receipt before dependency release. */
+export function consumeControllerEvaluationSettlement(input: {
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly taskId: string;
+  readonly attemptNum?: number;
+  readonly expectedEvaluation: TaskEvaluation;
+}): ControllerEvaluationSettlementConsumption {
+  const attemptNum = input.attemptNum ?? 1;
+  const path = evaluationAuditPath(
+    input.projectRoot, input.sprintId, input.taskId, attemptNum,
+  );
+  const receipt = readJsonSafe<EvaluationAuditRecord>(path);
+  if (!receipt) {
+    return {
+      state: 'HOLD',
+      reason: existsSync(path)
+        ? 'SETTLEMENT_RECEIPT_CONFLICT'
+        : 'SETTLEMENT_RECEIPT_MISSING',
+      detail: existsSync(path)
+        ? `immutable evaluation receipt is unreadable at ${path}`
+        : `no immutable evaluation receipt at ${path}`,
+    };
+  }
+
+  const validIdentity = receipt.sprintId === input.sprintId
+    && receipt.taskId === input.taskId
+    && receipt.attemptNum === attemptNum
+    && receipt.evaluator === 'brain';
+  const validPayload = typeof receipt.timestamp === 'string'
+    && receipt.timestamp.length > 0
+    && (receipt.ruleSet === 'CODE' || receipt.ruleSet === 'AUDIT' || receipt.ruleSet === 'DOC_WRITE')
+    && typeof receipt.totalScore === 'number'
+    && Number.isFinite(receipt.totalScore)
+    && Array.isArray(receipt.criterionScores)
+    && typeof receipt.decisionRationale === 'string';
+  if (!validIdentity || !validPayload || receipt.decision !== input.expectedEvaluation) {
+    return {
+      state: 'HOLD',
+      reason: 'SETTLEMENT_RECEIPT_CONFLICT',
+      detail: `receipt identity/verdict conflicts with ${input.sprintId}/${input.taskId}/attempt-${attemptNum}`,
+    };
+  }
+  return { state: 'SETTLED', evaluation: input.expectedEvaluation, receipt };
 }
 
 /**
@@ -2236,6 +2298,48 @@ export async function runSprint(
     const aggregateCrossVerifyInvocationFactory =
       await ensureCrossVerifyInvocationFactory();
 
+    const evaluateAndConsumeCollectedAttempt = async (
+      task: Task,
+      result: TaskResult,
+    ): Promise<TaskEvaluation> => {
+      await runEvaluatePhase(
+        projectRoot,
+        sprint,
+        [result],
+        evaluations,
+        config.coverage_hard_floor,
+        config,
+        undefined,
+        undefined,
+        {
+          incrementalTaskIds: new Set([task.id]),
+          providerAuthority: opts?.providerAuthority,
+          crossVerifyInvocationFactory: aggregateCrossVerifyInvocationFactory,
+          runtimeState: evaluationRuntimeState,
+        },
+      );
+      const evaluation = evaluations.get(task.id);
+      if (!evaluation) {
+        throw new DeckentError(
+          'DECKENT_E091',
+          `aggregate-evaluation-receipt-absent:${task.id}`,
+        );
+      }
+      const settlement = consumeControllerEvaluationSettlement({
+        projectRoot,
+        sprintId: sprint.id,
+        taskId: task.id,
+        expectedEvaluation: evaluation,
+      });
+      if (settlement.state === 'HOLD') {
+        throw new DeckentError(
+          'DECKENT_E091',
+          `controller-evaluation-settlement-hold:${task.id}:${settlement.reason}:${settlement.detail}`,
+        );
+      }
+      return settlement.evaluation;
+    };
+
     // Phase 3: EXECUTE
     try {
       sprint.phase = SprintPhase.EXECUTE;
@@ -2253,32 +2357,7 @@ export async function runSprint(
           spawnBackend,
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
-          evaluateCollectedResult: async (task, result) => {
-            await runEvaluatePhase(
-              projectRoot,
-              sprint,
-              [result],
-              evaluations,
-              config.coverage_hard_floor,
-              config,
-              undefined,
-              undefined,
-              {
-                incrementalTaskIds: new Set([task.id]),
-                providerAuthority: opts?.providerAuthority,
-                crossVerifyInvocationFactory: aggregateCrossVerifyInvocationFactory,
-                runtimeState: evaluationRuntimeState,
-              },
-            );
-            const evaluation = evaluations.get(task.id);
-            if (!evaluation) {
-              throw new DeckentError(
-                'DECKENT_E091',
-                `aggregate-evaluation-receipt-absent:${task.id}`,
-              );
-            }
-            return evaluation;
-          },
+          evaluateCollectedResult: evaluateAndConsumeCollectedAttempt,
         },
         config,
       );
@@ -2510,6 +2589,22 @@ export async function runSprint(
       }
     } catch (e) { debugLog('graceKill:main', e); }
 
+    // Results discovered outside the collector callback (post-collect,
+    // controller grace and synthetic kill settlement) cross the identical
+    // evaluation/application boundary before any dependency-visible handoff.
+    // A missing receipt is a hard HOLD: no raw worker claim is publishable.
+    for (const result of results) {
+      if (evaluations.has(result.taskId)) continue;
+      const task = sprint.tasks.find(candidate => candidate.id === result.taskId);
+      if (!task) {
+        throw new DeckentError(
+          'DECKENT_E091',
+          `controller-evaluation-task-absent:${result.taskId}`,
+        );
+      }
+      await evaluateAndConsumeCollectedAttempt(task, result);
+    }
+
     // Wire handoffs for completed tasks → dependent tasks (EXECUTE/WAVE_BUILD transition)
     try {
       wireHandoffsForCompletedTasks(projectRoot, sprint, results);
@@ -2566,23 +2661,24 @@ export async function runSprint(
     }
   } catch (e) { debugLog('runSprint:computeDeferred', e); }
 
+  // Collected attempts were evaluated and receipt-settled at ingest. Re-enter
+  // EVALUATE only for tasks that still need a missing/deferred branch.
   const aggregateCrossVerifyInvocationFactory =
     await ensureCrossVerifyInvocationFactory();
-  await runEvaluatePhase(
-    projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
-    // born-614 yarım-wire dersi (a778151a tool_surface'ın ölüm-biçimi): opsiyonel
-    // config-param'ı undefined geçmek = flag'in tüketicisiz kalması. Sprint-400
-    // canlı-kanıtı tam bu satır yüzünden İLK seferde başarısız oldu.
-    config, undefined, deferredTaskIds, {
-      enforceDispatchGate: true,
-      ...(opts?.providerAuthority
-        ? { providerAuthority: opts.providerAuthority }
-        : {}),
-      crossVerifyInvocationFactory: aggregateCrossVerifyInvocationFactory,
-      skipPreviouslyEvaluated: true,
-      runtimeState: evaluationRuntimeState,
-    },
-  );
+  if (evaluations.size < sprint.tasks.length) {
+    await runEvaluatePhase(
+      projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
+      config, undefined, deferredTaskIds, {
+        enforceDispatchGate: true,
+        ...(opts?.providerAuthority
+          ? { providerAuthority: opts.providerAuthority }
+          : {}),
+        crossVerifyInvocationFactory: aggregateCrossVerifyInvocationFactory,
+        skipPreviouslyEvaluated: true,
+        runtimeState: evaluationRuntimeState,
+      },
+    );
+  }
 
   // Sprint 370 Task 370-001: EVALUATE_PREMATURE gate can return with `evaluations`
   // still empty while `results` is populated — retry once, then abort loudly.

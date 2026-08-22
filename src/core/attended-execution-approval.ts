@@ -601,7 +601,7 @@ export class AttendedExecutionApprovalAuthority {
       details: { schemaVersion: 1, kind: PROVIDER_EVIDENCE_PROBE_APPROVAL_KIND, subject, subjectDigest },
       scopeId: subject.projectId,
       scope: 'network',
-      risk: 'high',
+      risk: 'low',
       policy: 'require-approval',
       defaultAction: 'deny',
       tenantId: subject.tenantId,

@@ -246,6 +246,9 @@ examples/voice-wrapper/
 .deckent/runtime/invocations.db
 .deckent/runtime/invocations.db-shm
 .deckent/runtime/invocations.db-wal
+.deckent/runtime/acceptance-reconciliation.db
+.deckent/runtime/acceptance-reconciliation.db-shm
+.deckent/runtime/acceptance-reconciliation.db-wal
 .deckent/runtime/resource-log-dogfood.jsonl
 .deckent/runtime/scheduler-shadow/
 .deckent/recovery-snapshots/

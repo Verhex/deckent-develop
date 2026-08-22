@@ -6,7 +6,7 @@
 
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, posix, resolve } from 'node:path';
 import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult, NoGoCategory } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, ARCHIVE_DIR } from '../core/constants.js';
@@ -32,6 +32,10 @@ import type { DiskVerifyResult } from './disk-verify.js';
 import { verifyDiskAgainstClaim } from './disk-verify.js';
 import { evaluateGoNogoCriteria, hasUnsalvageableContractFailure } from './criterion-evaluation.js';
 import {
+  buildAcceptanceFailureFingerprint,
+  type AcceptanceFailureEvidence,
+} from './fix-failure-classification.js';
+import {
   detectDishonestResult,
   emitDishonestResultEvent,
   type DishonestyReason,
@@ -42,6 +46,73 @@ import {
 export type TolerantResultJsonParse =
   | { state: 'parsed'; result: TaskResult; sanitized: boolean }
   | { state: 'parse-failure'; reason: string };
+
+function parseTypedEvidenceRequirement(
+  requirement: string,
+): { kind: AcceptanceFailureEvidence['evidenceKind']; subject: string } | null {
+  const match = /^(file|command|assertion):(.*)$/su.exec(requirement);
+  if (!match) return null;
+  try {
+    const subject: unknown = JSON.parse(match[2]!);
+    return typeof subject === 'string'
+      ? { kind: match[1] as AcceptanceFailureEvidence['evidenceKind'], subject }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function observeTypedFileSubject(subject: string, result: TaskResult, projectRoot: string): 'present' | 'absent' | null {
+  const candidate = subject.trim();
+  if (!candidate || candidate.includes('\\') || isAbsolute(candidate)) return null;
+  const normalized = posix.normalize(candidate);
+  if (normalized !== candidate || normalized === '.' || normalized.startsWith('../')) return null;
+  const absoluteRoot = resolve(projectRoot);
+  const absoluteSubject = resolve(absoluteRoot, normalized);
+  if (!absoluteSubject.startsWith(`${absoluteRoot}/`)) return null;
+  return result.filesChanged?.some(changed => changed.trim() === normalized)
+    || existsSync(absoluteSubject)
+    ? 'present'
+    : 'absent';
+}
+
+/** Typed provenance for decisive deterministic go/no-go failures only. */
+export function deriveAcceptanceFailureEvidence(
+  task: Task,
+  result: TaskResult,
+  projectRoot: string,
+): readonly AcceptanceFailureEvidence[] {
+  const outcome = evaluateGoNogoCriteria(task, result, projectRoot);
+  if (!outcome) return [];
+  const evidence: AcceptanceFailureEvidence[] = [];
+  for (const verdict of outcome.items) {
+    const failed = (verdict.polarity === 'go' && verdict.status === 'unsatisfied')
+      || (verdict.polarity === 'no-go' && verdict.status === 'satisfied');
+    if (!failed || verdict.mode !== 'deterministic') continue;
+    const item = task.goNogo?.items?.find(candidate => candidate.id === verdict.itemId);
+    for (const requirement of item?.evidenceRequirements ?? []) {
+      const typed = parseTypedEvidenceRequirement(requirement);
+      if (!typed || typed.kind !== 'file') continue;
+      const observedState = observeTypedFileSubject(typed.subject, result, projectRoot);
+      if (!observedState) continue;
+      evidence.push({
+        criterionId: verdict.itemId,
+        evidenceKind: typed.kind,
+        subject: typed.subject,
+        observedState,
+      });
+    }
+  }
+  return evidence;
+}
+
+export function deriveAcceptanceFailureFingerprint(
+  task: Task,
+  result: TaskResult,
+  projectRoot: string,
+): string | null {
+  return buildAcceptanceFailureFingerprint(deriveAcceptanceFailureEvidence(task, result, projectRoot));
+}
 
 /** Escapes literal C0 characters inside JSON strings without changing payload values. */
 export function sanitizeResultJsonControlCharacters(raw: string): string {

@@ -57,6 +57,19 @@
 | adr-g-041 | Deckent Core ve Verhex Enterprise Modüler Ürün Mimarisi | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-613 Learnings** (sprint-613): ## Sprint sprint-613 Learnings
+
+## Gains
+- 613-001 — Hermetic provider-probe broker clock — Injected the fixture muta...
+- **Sprint sprint-612 Learnings** (sprint-612): ## Sprint sprint-612 Learnings
+
+## Gains
+- 612-001 — Canonical bounded probe risk envelope — Exact declared Vitest co...
+- **Sprint sprint-611 Learnings** (sprint-611): ## Sprint sprint-611 Learnings
+
+## Gains
+- 611-001 — Wave-level verification placement — npx tsc --noEmit passed.
+- 6...
 - **Sprint sprint-606 Learnings** (sprint-606): ## Sprint sprint-606 Learnings
 
 ## Gains
@@ -86,18 +99,6 @@
 
 ## Gains
 - 599-001 — callback-payload sözleşmesi (nonce + ad-uzayı + kısa-kod) — Impl...
-- **Sprint sprint-598 Learnings** (sprint-598): ## Sprint sprint-598 Learnings
-
-## Gains
-- 598-001 — AI-operatör dersi 26 (pgrep kendi-desen tuzağı; iki dil senkron)...
-- **Sprint sprint-597 Learnings** (sprint-597): ## Sprint sprint-597 Learnings
-
-## Gains
-- 597-001 — docker-backend prefix-bileşimi (T2, tek-sahip) — Implemented cap...
-- **Sprint sprint-596 Learnings** (sprint-596): ## Sprint sprint-596 Learnings
-
-## Gains
-- 596-001 — ProviderCommandSpec prefix-alanları (T3 arayüz-mührü) — Codex Pr...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -108,4 +109,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2119 | Generated: 2026-08-21_
+_Total entries: 2129 | Generated: 2026-08-21_

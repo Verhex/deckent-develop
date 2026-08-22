@@ -646,8 +646,8 @@ export function extractGoNogoCriteria(
   description: string,
   testTarget?: string,
   // WM-7: optional kind×stack context. When supplied, the BASE criteria are
-  // derived from the task kind + detected project stack (doc→disk-verify,
-  // code→stack commands, never `tsc` on a non-TS project). When ABSENT, the
+  // derived from the task kind + detected project stack. Stack commands remain
+  // wave-verification inputs and are not copied into every task. When ABSENT, the
   // legacy TypeScript-centric output is preserved verbatim (backward compatible).
   opts?: { kind?: TaskKind; stack?: TechStackKind; commands?: { build?: string; test?: string; typecheck?: string } },
 ): GoNoGoCriteria {
@@ -710,15 +710,22 @@ export function extractGoNogoCriteria(
   // ── WM-7 path: kind × stack aware base ──────────────────────────────────
   if (opts?.kind) {
     const base = deriveBaseCriteria(opts.kind, opts.stack ?? 'generic', opts.commands);
+    const scopedTestCriteria = testTarget?.trim();
+    const taskSpecificItems = scopedTestCriteria
+      ? [genericCriterionItem('go', scopedTestCriteria), ...specificItems]
+      : specificItems;
+    const withScopedTest = scopedTestCriteria
+      ? { ...base, goCriteria: `${base.goCriteria}; ${scopedTestCriteria}` }
+      : base;
     if (authored.go) {
-      const authoredGo = appendBoundedCriterion(authored.go, base.goCriteria);
+      const authoredGo = appendBoundedCriterion(authored.go, withScopedTest.goCriteria);
       const authoredNoGo = authored.noGo ?? base.noGoCriteria;
       const display = {
         goCriteria: authoredGo,
         noGoCriteria: authoredNoGo,
         techDebtAcceptable: authored.techDebt ?? base.techDebtAcceptable,
       };
-      return attachStructuredCriteria(display, display, specificItems);
+      return attachStructuredCriteria(display, display, taskSpecificItems);
     }
     if (hasSpecific) {
       // Compose the task-specific GO proof lines + NO-GO prohibitions on top of
@@ -727,18 +734,18 @@ export function extractGoNogoCriteria(
       // `tsc` onto a doc task.
       return attachStructuredCriteria(
         {
-          goCriteria: proofLines.length > 0 ? `${base.goCriteria}; ${specificCriteria}` : base.goCriteria,
+          goCriteria: proofLines.length > 0 ? `${withScopedTest.goCriteria}; ${specificCriteria}` : withScopedTest.goCriteria,
           noGoCriteria: specificNoGo ? `${base.noGoCriteria}; ${specificNoGo}` : base.noGoCriteria,
           techDebtAcceptable: authored.techDebt ?? base.techDebtAcceptable,
         },
         base,
-        specificItems,
+        taskSpecificItems,
       );
     }
     const display = authored.techDebt
-      ? { ...base, techDebtAcceptable: authored.techDebt }
-      : base;
-    return attachStructuredCriteria(display, base, []);
+      ? { ...withScopedTest, techDebtAcceptable: authored.techDebt }
+      : withScopedTest;
+    return attachStructuredCriteria(display, base, taskSpecificItems);
   }
 
   // ── Legacy path (no kind context): preserved verbatim ───────────────────

@@ -14584,3 +14584,322 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 608-007: Claude Docker authoring-to-runtime production-chain integration proof (PAUSED)
 
 ---
+## Sprint 609 — sprint-609
+
+**Status:** ABORTED
+**Date:** 2026-08-21
+**Duration:** 22987s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 22987382ms |
+
+### Tasks
+
+- 609-005: 609-005 (NO_GO)
+- 609-008: 609-008 (NO_GO)
+
+---
+## Sprint 610 — sprint-610
+
+**Status:** ABORTED
+**Date:** 2026-08-21
+**Duration:** 1062s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 19 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1061893ms |
+
+### Tasks
+
+- 610-001: Acceptance confirmation contract (DONE)
+- 610-002: Pure acceptance disposition reducer (DONE)
+- 610-003: Durable reconciliation receipt store (DONE)
+- 610-004: Tenant-bound debt transaction authority (DONE)
+- 610-005: Acceptance route debt authority (DONE)
+- 610-006: Confirmation lineage and terminal truth (DONE)
+- 610-007: Canonical acceptance confirmation service (DONE)
+- 610-008: Enforcement intent parity (DONE)
+- 610-009: All sprint evaluation branches wiring (DONE)
+- 610-010: Controller settlement consumption (DONE)
+- 610-011: Acceptance lifecycle i18n (DONE)
+- 610-012: Confirmation CLI service cutover (DONE)
+- 610-013: Federation origin-truth reconciliation (DONE)
+- 610-014-fix: Fix: Authenticated approvals ingress binding (DONE)
+- 610-014: Authenticated approvals ingress binding (DONE)
+- 610-015-fix: Fix: Restart reconciliation worker (DONE)
+- 610-015: Restart reconciliation worker (DONE)
+- 610-016: Runtime lifecycle composition (DONE)
+- 610-017: Main enforce canary integration (DONE)
+- 610-018: Extension grace fix parity integration (DONE)
+- 610-019-fix-fix-fix: Fix: Fix: Fix: Multi-tenant race restart proof (PAUSED)
+- 610-019-fix-fix: Fix: Fix: Multi-tenant race restart proof (NO_GO)
+- 610-019-fix: Fix: Multi-tenant race restart proof (NO_GO)
+- 610-019: Multi-tenant race restart proof (DONE)
+- 610-020: Authority ratchet and real-binary canary (PAUSED)
+
+---
+## Sprint 611 — sprint-611
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 1131s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1131175ms |
+
+### Tasks
+
+- 611-001: Wave-level verification placement (DONE)
+- 611-002: Worker prompt verification placement (DONE)
+- 611-003: Typed criterion evidence grammar (DONE)
+- 611-004: FIX provenance circuit breaker (DONE)
+- 611-005: Planner to evaluator recovery integration (DONE)
+
+---
+## Sprint 612 — sprint-612
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 329s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 328522ms |
+
+### Tasks
+
+- 612-001: Canonical bounded probe risk envelope (DONE)
+- 612-002: Rule application production-chain proof (DONE)
+
+---
+## Sprint 613 — sprint-613
+
+**Status:** COMPLETE
+**Date:** 2026-08-21
+**Duration:** 88s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 87929ms |
+
+### Tasks
+
+- 613-001: Hermetic provider-probe broker clock (DONE)
+
+---
+## Sprint 614 — sprint-614
+
+**Status:** ABORTED
+**Date:** 2026-08-22
+**Duration:** 517s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 15 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 516734ms |
+
+### Tasks
+
+- 614-001: Canonical full-lineage confirmation contract (DONE)
+- 614-002: Single acceptance settlement reducer (DONE)
+- 614-003-fix: Fix: Transactional reconciliation receipt store (DONE)
+- 614-003: Transactional reconciliation receipt store (DONE)
+- 614-004: Strict confirmation-store acceptance adapter (DONE)
+- 614-005: Tenant-project debt CAS authority (DONE)
+- 614-006: Debt-manager canonical adapter (DONE)
+- 614-007-fix-fix: Fix: Fix: Canonical acceptance application service (DONE)
+- 614-007-fix: Fix: Canonical acceptance application service (PENDING)
+- 614-007: Canonical acceptance application service (DONE)
+- 614-008: Production composition root (DONE)
+- 614-009: Indexed restart reconciler wiring (DONE)
+- 614-010: Full-lineage enforcement intent (DONE)
+- 614-011: Main EVALUATE create-route wiring (DONE)
+- 614-012: Secondary branch and controller parity (DONE)
+- 614-013: Federation origin-FWW settlement (DONE)
+- 614-014: Acceptance confirmation i18n contract (DONE)
+- 614-015-fix: Fix: Confirmations CLI default production composition (PENDING)
+- 614-015: Confirmations CLI default production composition (NO_GO)
+- 614-016: Unified approvals receipt closure (DONE)
+- 614-017-fix: Fix: HTTP and serve runtime composition (EXECUTING)
+- 614-017: HTTP and serve runtime composition (NO_GO)
+- 614-018: Production-chain all-surface integration (PAUSED)
+- 614-019: Multi-tenant race restart and 10k scale (PAUSED)
+- 614-020: Authority ratchet and closure proof (PAUSED)
+
+---
+## Sprint 616 — sprint-616
+
+**Status:** ABORTED
+**Date:** 2026-08-22
+**Duration:** 1485s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 9 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1484957ms |
+
+### Tasks
+
+- 616-001: Canonical full-lineage contract v2 (DONE)
+- 616-002: Single normative settlement reducer (DONE)
+- 616-003-fix: Fix: Indexed confirmation authority (PENDING)
+- 616-003: Indexed confirmation authority (DONE)
+- 616-004: Reconciliation receipt projection authority (DONE)
+- 616-005-fix: Fix: Canonical application service (DONE)
+- 616-005: Canonical application service (DONE)
+- 616-006: Tenant-project debt CAS (DONE)
+- 616-007: Debt-manager canonical adapter (DONE)
+- 616-008-fix: Fix: Single production composition root (EXECUTING)
+- 616-008: Single production composition root (NO_GO)
+- 616-009: Indexed restart reconciler (PAUSED)
+- 616-010: Full-lineage enforcement intent (DONE)
+- 616-011: Main EVALUATE production wiring (PAUSED)
+- 616-012: Controller and secondary branch parity (PAUSED)
+- 616-013: Federation origin settlement (PAUSED)
+- 616-014: Unified approvals CLI receipt closure (PAUSED)
+- 616-015: Confirmation CLI default composition (PAUSED)
+- 616-016: HTTP runtime bounded drain (PAUSED)
+- 616-017: Serve default composition and resource ownership (PAUSED)
+- 616-018-fix: Fix: Acceptance lifecycle i18n (DONE)
+- 616-018: Acceptance lifecycle i18n (DONE)
+- 616-019: All-surface race restart and scale proof (PAUSED)
+- 616-020: Authority duplication ratchet and closure battery (PAUSED)
+
+---
+## Sprint 617 — sprint-617
+
+**Status:** ABORTED
+**Date:** 2026-08-22
+**Duration:** 703s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 702546ms |
+
+### Tasks
+
+- 617-001-fix: Fix: Indexed restart reconciler (PENDING)
+- 617-001: Indexed restart reconciler (DONE)
+- 617-002: Main EVALUATE production wiring (DONE)
+- 617-003: Controller and secondary branch parity (DONE)
+- 617-004: Federation origin settlement (DONE)
+- 617-005-fix: Fix: Unified approvals CLI receipt closure (DONE)
+- 617-005: Unified approvals CLI receipt closure (DONE)
+- 617-006-fix: Fix: Confirmation CLI default composition (DONE)
+- 617-006: Confirmation CLI default composition (DONE)
+- 617-007-fix: Fix: HTTP runtime bounded drain (EXECUTING)
+- 617-007: HTTP runtime bounded drain (NO_GO)
+- 617-008: Serve default composition and ownership (PAUSED)
+- 617-009: All-surface race, restart and scale proof (PAUSED)
+- 617-010: Authority duplication ratchet (PAUSED)
+
+---
+## Sprint 618 — sprint-618
+
+**Status:** ABORTED
+**Date:** 2026-08-22
+**Duration:** 914s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 913677ms |
+
+### Tasks
+
+- 618-001-fix: Fix: Serve default composition and ownership (DONE)
+- 618-001: Serve default composition and ownership (DONE)
+- 618-002: Authenticated settlement adapter proof (DONE)
+- 618-003-fix: Fix: All-surface race, restart and scale proof (EXECUTING)
+- 618-003: All-surface race, restart and scale proof (NO_GO)
+- 618-004: Authority duplication ratchet (PAUSED)
+
+---
+## Sprint 619 — sprint-619
+
+**Status:** ABORTED
+**Date:** 2026-08-22
+**Duration:** 1255s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1254983ms |
+
+### Tasks
+
+- 619-001-fix: Fix: Durable LLM authority binding and restart verifier (DONE)
+- 619-001: Durable LLM authority binding and restart verifier (DONE)
+- 619-002: Serve dual-authority default composition and ownership (DONE)
+- 619-003: Authority duplication ratchet (DONE)
+- 619-004: End-to-end restart, race and real composition proof (DONE)
+
+---

@@ -101,4 +101,28 @@ describe('composition: full prompt carries the exact set when resolvable', () =>
     expect(prompt).toContain('npx vitest run tests/core/run-flow-event-log.test.ts tests/core/run-flow-store.test.ts');
     expect(prompt).not.toContain('<path-to-the-test-file');
   });
+
+  it('renders only a plain task-local Test command and hides wave-level commands', () => {
+    const prompt = buildTaskPrompt(makeTask({
+      description: '- Test: npx vitest run tests/orchestra/prompt-verify-exact-paths.test.ts',
+    }), {
+      verifyCommands: { test: 'npm run wave:test', check: 'npm run wave:check' },
+    } as never).prompt;
+
+    expect(prompt).toContain('`npx vitest run tests/orchestra/prompt-verify-exact-paths.test.ts`');
+    expect(prompt).not.toContain('npm run wave:test');
+    expect(prompt).not.toContain('npm run wave:check');
+    expect(prompt).not.toContain('<path-to-the-test-file');
+  });
+
+  it('renders a typed HOLD instead of generic checks when scoped proof is absent', () => {
+    const prompt = buildTaskPrompt(makeTask({ description: '- Test:' }), {
+      verifyCommands: { test: 'npm run wave:test', check: 'npm run wave:check' },
+    } as never).prompt;
+
+    expect(prompt).toContain('SCOPED_PROOF_HOLD');
+    expect(prompt).not.toContain('npm run wave:test');
+    expect(prompt).not.toContain('npm run wave:check');
+    expect(prompt).not.toContain('Examples: `tsc --noEmit`');
+  });
 });

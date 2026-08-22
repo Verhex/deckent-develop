@@ -23,7 +23,7 @@ import { join } from 'node:path';
 import { userInfo } from 'node:os';
 
 import type { ApprovalBroker } from '../core/approval-broker.js';
-import type { ApprovalRequest } from '../core/approval-contract.js';
+import type { ApprovalDecision, ApprovalRequest } from '../core/approval-contract.js';
 import {
   createPrivateJsonFileFirstWriterWins,
   isApprovalFileAclHold,
@@ -35,7 +35,8 @@ import {
   maxApprovalRiskTier,
   resolveApprovalLifecyclePolicy,
 } from '../core/approval-lifecycle-policy.js';
-import { settleConfirmation, readConfirmation } from '../core/confirmation-store.js';
+import { readConfirmation } from '../core/confirmation-store.js';
+import type { ResolvedApprovalLifecycleConfig } from '../core/config-types.js';
 import type { FederatedPendingItem } from '../core/approval-inbox-federation.js';
 import { makeApprovalGate } from './autonomous/approval-adapter.js';
 import {
@@ -44,6 +45,15 @@ import {
 } from '../connectors/gateway/gateway-access.js';
 import { gatewayHome } from '../connectors/gateway/gateway-paths.js';
 import { NervousIpcQueue } from '../nervous/ipc-queue.js';
+import {
+  reconcileAcceptanceConfirmation,
+  type AcceptanceConfirmationServiceDeps,
+  type AcceptanceServiceResult,
+} from './acceptance-confirmation-service.js';
+import {
+  openAcceptanceConfirmationComposition,
+} from './acceptance-confirmation-composition.js';
+import type { AcceptanceConfirmationReceipt } from '../core/acceptance-confirmation-contract.js';
 
 /** Origins whose decision path this bridge federates today (D2a+D2b-1).
  * panic-guard stays out deliberately: it is a safety floor with its own
@@ -86,9 +96,19 @@ function assertFederatedMirrorIdentity(
     || request.details['kind'] !== 'decision-federation-mirror'
     || request.details['origin'] !== item.origin
     || request.details['legacyId'] !== item.id
+    || request.details['federationProjectionDigest'] !== digestFederatedSource(item)
+    || request.details['sourceLifecycleGeneration'] !== (item.lifecycleGeneration ?? null)
+    || request.details['sourcePolicySnapshotDigest'] !== (item.policySnapshotDigest ?? null)
+    || request.details['sourceRequestDigest'] !== sourceDigest
+    || request.details['sourceSchema'] !== (item.sourceSchema ?? null)
+    || request.details['sourceReference'] !== (item.sourceReference ?? null)
+    || request.details['sourceProjectionPredecessor'] !== digestFederatedSource(item)
     || (request.version === '2.0'
-      && (request.source.requestDigest !== sourceDigest
-        || request.source.reference !== (item.sourceReference ?? `federated:${item.origin}:${item.id}`)))) {
+      && (request.source.contractVersion !== (item.sourceContractVersion ?? '1.0')
+        || request.source.requestDigest !== sourceDigest
+        || request.source.reference !== (item.sourceReference ?? `federated:${item.origin}:${item.id}`)
+        || request.lifecycleGeneration !== (item.lifecycleGeneration
+          ?? `federated-${digestFederatedSource(item).slice(0, 24)}`)))) {
     throw new Error(`federated mirror identity collision: ${item.id}`);
   }
 }
@@ -146,6 +166,10 @@ export async function mirrorFederatedItemToBroker(
         sourcePolicySnapshotDigest: item.policySnapshotDigest ?? null,
         sourceRequestDigest: sourceDigest,
         sourceSchema: item.sourceSchema ?? null,
+        // Retain both lineage links instead of collapsing them into the
+        // request digest: the origin reference and the projection predecessor.
+        sourceReference: item.sourceReference ?? null,
+        sourceProjectionPredecessor: projectionDigest,
       },
       scopeId: item.origin,
       scope: 'lifecycle',
@@ -187,9 +211,45 @@ export async function mirrorFederatedItemToBroker(
   }
 }
 
+/**
+ * Reconcile an acceptance confirmation only after proving that the broker
+ * mirror still represents the exact origin lineage. The canonical service
+ * owns fresh terminal reads, decision-digest FWW, receipt ordering, and debt
+ * reduction; this bridge never manufactures settlement state.
+ */
+export async function reconcileFederatedAcceptanceDecision(
+  deps: AcceptanceConfirmationServiceDeps,
+  brokerRequest: ApprovalRequest,
+  item: FederatedPendingItem,
+): Promise<AcceptanceServiceResult> {
+  if (item.origin !== 'confirmation' || !item.tenantId) {
+    return { state: 'HOLD', reasonCode: 'CONFIRMATION_LINEAGE_MISMATCH', receiptRef: `${item.id}:prepared` };
+  }
+  const sourceDigest = item.sourceRequestDigest ?? digestFederatedSource(item);
+  try {
+    assertFederatedMirrorIdentity(brokerRequest, item, item.tenantId, sourceDigest);
+  } catch {
+    return { state: 'HOLD', reasonCode: 'CONFIRMATION_LINEAGE_MISMATCH', receiptRef: `${item.id}:prepared` };
+  }
+  return reconcileAcceptanceConfirmation(deps, item.id);
+}
+
 export type SettleBackOutcome =
-  | { readonly state: 'settled'; readonly origin: DecisionFederatedOrigin }
+  | { readonly state: 'settled'; readonly origin: Exclude<DecisionFederatedOrigin, 'confirmation'> }
+  | { readonly state: 'settled'; readonly origin: 'confirmation'; readonly receipt: AcceptanceConfirmationReceipt }
+  | { readonly state: 'held'; readonly origin: 'confirmation'; readonly reason: string; readonly receiptRef: string }
   | { readonly state: 'failed'; readonly reason: string };
+
+export interface FederatedConfirmationSettlementContext {
+  readonly brokerRequest: ApprovalRequest;
+  readonly item: FederatedPendingItem;
+  readonly brokerDecision: ApprovalDecision;
+  readonly lifecycle: ResolvedApprovalLifecycleConfig;
+  readonly verifyBrokerDecision: (
+    request: ApprovalRequest,
+    decision: ApprovalDecision,
+  ) => boolean;
+}
 
 export interface FederatedTimeoutSettleOptions {
   readonly gatewayPairingsPath?: string;
@@ -425,19 +485,71 @@ export async function settleFederatedDecision(
   legacyId: string,
   action: 'allow' | 'deny',
   reason: string,
+  confirmationContext?: FederatedConfirmationSettlementContext,
 ): Promise<SettleBackOutcome> {
   if (origin === 'confirmation') {
-    const found = readConfirmation(projectRoot, legacyId);
-    if (!found || found.state !== 'pending') {
-      return { state: 'failed', reason: 'confirmation-not-pending' };
+    if (!confirmationContext) {
+      return { state: 'failed', reason: 'confirmation-authority-unavailable' };
     }
-    settleConfirmation(projectRoot, legacyId, {
-      verdict: action === 'allow' ? 'CONFIRMED' : 'FAILED',
-      decidedBy: 'human',
-      reason,
-      decidedAt: new Date().toISOString(),
+    const { brokerRequest, item, brokerDecision, lifecycle, verifyBrokerDecision } = confirmationContext;
+    if (item.origin !== 'confirmation'
+      || item.id !== legacyId
+      || brokerRequest.id !== legacyId
+      || brokerDecision.requestId !== legacyId
+      || brokerDecision.decision !== action
+      || !brokerDecision.authorization
+      || !verifyBrokerDecision(brokerRequest, brokerDecision)) {
+      return { state: 'failed', reason: 'confirmation-authority-invalid' };
+    }
+    try {
+      assertFederatedMirrorIdentity(
+        brokerRequest,
+        item,
+        item.tenantId ?? brokerRequest.tenantId,
+        item.sourceRequestDigest ?? digestFederatedSource(item),
+      );
+    } catch {
+      return { state: 'failed', reason: 'confirmation-lineage-mismatch' };
+    }
+    const decidedAt = brokerDecision.decidedAt;
+    const clock = (): Date => new Date(decidedAt);
+    const found = readConfirmation(projectRoot, legacyId, { lifecycle, clock });
+    const lineage = found?.request.acceptanceLineage;
+    if (!found || !lineage
+      || lineage.tenantId !== brokerRequest.tenantId
+      || (item.tenantId !== undefined && lineage.tenantId !== item.tenantId)) {
+      return { state: 'failed', reason: 'confirmation-lineage-mismatch' };
+    }
+    const authorityReceipt = [
+      'approval-decision',
+      brokerDecision.authorization.integrityKeyId,
+      brokerDecision.authorization.integrityMac,
+    ].join(':');
+    const composition = openAcceptanceConfirmationComposition({
+      projectRoot,
+      tenantId: lineage.tenantId,
+      projectId: lineage.projectId,
+      lifecycle,
+      clock,
+      verifyAuthority: candidate => candidate.confirmationId === legacyId
+        && candidate.lineage.tenantId === lineage.tenantId
+        && candidate.lineage.projectId === lineage.projectId
+        && candidate.decidedAt === decidedAt
+        && candidate.authorityReceipt === authorityReceipt,
     });
-    return { state: 'settled', origin };
+    try {
+      const settled = await composition.decideAndSettle({
+        confirmationId: legacyId,
+        verdict: action === 'allow' ? 'CONFIRMED' : 'FAILED',
+        decidedBy: 'human',
+        reason,
+        authorityReceipt,
+      });
+      if (settled.state === 'DONE') return { state: 'settled', origin, receipt: settled.receipt };
+      return { state: 'held', origin, reason: settled.reasonCode, receiptRef: settled.receiptRef };
+    } finally {
+      composition.close();
+    }
   }
   if (origin === 'nervous') {
     // ABSORB the nervous decision channel: the same IPC queue the CLI/MCP

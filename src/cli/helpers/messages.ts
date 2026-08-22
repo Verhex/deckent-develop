@@ -3341,6 +3341,100 @@ const MESSAGES: MessageMap = {
     en: 'No pending llm-adapter confirmations.',
     tr: 'Bekleyen llm-adapter confirmation yok.',
   },
+  // Acceptance-confirmation lifecycle copy belongs to the presentation catalog;
+  // the typed confirmation mechanism exposes states and evidence only.
+  'acceptance.confirmation.list': {
+    en: 'Acceptance confirmations awaiting review: {count}',
+    tr: 'İnceleme bekleyen kabul doğrulamaları: {count}',
+  },
+  'acceptance.confirmation.route': {
+    en: 'Route acceptance confirmation {confirmationId} through the authenticated {surface} surface.',
+    tr: '{confirmationId} kabul doğrulamasını kimliği doğrulanmış {surface} yüzeyi üzerinden yönlendirin.',
+  },
+  'acceptance.confirmation.hold': {
+    en: 'Acceptance confirmation {confirmationId} is on HOLD ({reason}). No result was applied.',
+    tr: '{confirmationId} kabul doğrulaması HOLD durumunda ({reason}). Hiçbir sonuç uygulanmadı.',
+  },
+  'acceptance.confirmation.corrupt': {
+    en: 'Acceptance confirmation {confirmationId} is corrupt and cannot be used. No result was applied.',
+    tr: '{confirmationId} kabul doğrulaması bozuk ve kullanılamaz. Hiçbir sonuç uygulanmadı.',
+  },
+  'acceptance.confirmation.foreign': {
+    en: 'Acceptance confirmation {confirmationId} belongs to another tenant and cannot be used on this surface.',
+    tr: '{confirmationId} kabul doğrulaması başka bir tenant\'a ait ve bu yüzeyde kullanılamaz.',
+  },
+  'acceptance.confirmation.provider_separation': {
+    en: 'Acceptance confirmation {confirmationId} is independent of the provider and model used to perform the work.',
+    tr: '{confirmationId} kabul doğrulaması, işi gerçekleştiren sağlayıcı ve modelden bağımsızdır.',
+  },
+  'acceptance.confirmation.runtime_audit': {
+    en: 'Runtime audit recorded acceptance confirmation {confirmationId} with outcome {outcome}.',
+    tr: 'Runtime denetimi {confirmationId} kabul doğrulamasını {outcome} sonucuyla kaydetti.',
+  },
+  'acceptance.confirmation.created': {
+    en: 'Acceptance confirmation {confirmationId} was created. Continue on the authenticated {surface} surface.',
+    tr: '{confirmationId} kabul doğrulaması oluşturuldu. Kimliği doğrulanmış {surface} yüzeyinde devam edin.',
+  },
+  'acceptance.confirmation.routed': {
+    en: 'Acceptance confirmation {confirmationId} was routed to the authenticated {surface} surface.',
+    tr: '{confirmationId} kabul doğrulaması, kimliği doğrulanmış {surface} yüzeyine yönlendirildi.',
+  },
+  'acceptance.confirmation.prepared': {
+    en: 'Acceptance confirmation {confirmationId} is PREPARED; its result has not been applied yet.',
+    tr: '{confirmationId} kabul doğrulaması PREPARED durumunda; sonucu henüz uygulanmadı.',
+  },
+  'acceptance.confirmation.applied': {
+    en: 'Acceptance confirmation {confirmationId} is APPLIED.',
+    tr: '{confirmationId} kabul doğrulaması APPLIED durumunda.',
+  },
+  'acceptance.confirmation.replay': {
+    en: 'Acceptance confirmation {confirmationId} was already applied; the existing result was replayed without another change.',
+    tr: '{confirmationId} kabul doğrulaması daha önce uygulandı; mevcut sonuç yeni bir değişiklik yapılmadan yeniden gösterildi.',
+  },
+  'acceptance.confirmation.tenant_mismatch': {
+    en: 'Acceptance confirmation {confirmationId} belongs to another tenant and cannot be used on this surface.',
+    tr: '{confirmationId} kabul doğrulaması başka bir tenant\'a ait ve bu yüzeyde kullanılamaz.',
+  },
+  'acceptance.confirmation.corruption': {
+    en: 'Acceptance confirmation {confirmationId} could not be read safely. No result was applied.',
+    tr: '{confirmationId} kabul doğrulaması güvenli biçimde okunamadı. Hiçbir sonuç uygulanmadı.',
+  },
+  'acceptance.confirmation.authority_hold': {
+    en: 'Acceptance confirmation {confirmationId} is on authority HOLD. Try again after authority is restored.',
+    tr: '{confirmationId} kabul doğrulaması authority HOLD durumunda. Yetki yeniden sağlandıktan sonra tekrar deneyin.',
+  },
+  'acceptance.confirmation.service_unavailable': {
+    en: 'The acceptance confirmation service is unavailable. No result was applied; try again later.',
+    tr: 'Kabul doğrulama servisi kullanılamıyor. Hiçbir sonuç uygulanmadı; daha sonra tekrar deneyin.',
+  },
+  'acceptance.confirmation.pending': {
+    en: 'Acceptance confirmation {confirmationId} is pending. Continue on the authenticated {surface} surface.',
+    tr: '{confirmationId} kabul doğrulaması beklemede. Kimliği doğrulanmış {surface} yüzeyinde devam edin.',
+  },
+  'acceptance.confirmation.confirmed': {
+    en: 'Acceptance confirmation {confirmationId} was confirmed on the authenticated {surface} surface.',
+    tr: '{confirmationId} kabul doğrulaması, kimliği doğrulanmış {surface} yüzeyinde onaylandı.',
+  },
+  'acceptance.confirmation.residual': {
+    en: 'Acceptance confirmation {confirmationId} has residual evidence ({reason}); review it on the authenticated {surface} surface.',
+    tr: '{confirmationId} kabul doğrulamasında artık kanıt var ({reason}); kimliği doğrulanmış {surface} yüzeyinde inceleyin.',
+  },
+  'acceptance.confirmation.expired': {
+    en: 'Acceptance confirmation {confirmationId} expired. Start a new request from the authenticated {surface} surface.',
+    tr: '{confirmationId} kabul doğrulamasının süresi doldu. Kimliği doğrulanmış {surface} yüzeyinden yeni bir istek başlatın.',
+  },
+  'acceptance.confirmation.conflict': {
+    en: 'Acceptance confirmation {confirmationId} conflicts with existing evidence ({reason}); no decision was recorded.',
+    tr: '{confirmationId} kabul doğrulaması mevcut kanıtla çelişiyor ({reason}); karar kaydedilmedi.',
+  },
+  'acceptance.confirmation.reconciliation_hold': {
+    en: 'Acceptance confirmation {confirmationId} is on reconciliation HOLD ({reason}). Resolve it on the authenticated {surface} surface.',
+    tr: '{confirmationId} kabul doğrulaması uzlaştırma HOLD durumunda ({reason}). Kimliği doğrulanmış {surface} yüzeyinde çözümleyin.',
+  },
+  'acceptance.confirmation.authenticated_surface_route': {
+    en: 'Open the authenticated {surface} surface to review acceptance confirmation {confirmationId}.',
+    tr: '{confirmationId} kabul doğrulamasını incelemek için kimliği doğrulanmış {surface} yüzeyini açın.',
+  },
   'approval.lifecycle.stage.initial': {
     en: 'Approval requested',
     tr: 'Onay istendi',

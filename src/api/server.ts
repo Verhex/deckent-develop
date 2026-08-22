@@ -98,7 +98,10 @@ import { resolveApprovalLifecyclePolicy } from '../core/approval-lifecycle-polic
 import type { ApprovalLifecycleConfig, ResolvedApprovalLifecycleConfig } from '../core/config-types.js';
 import { approvalSlaEventId, ApprovalSlaJournal } from '../core/approval-sla.js';
 import { writeApprovalLifecycleAuditEvent } from '../core/audit-writer.js';
-import { sweepExpiredConfirmations } from '../core/confirmation-store.js';
+import {
+  ACCEPTANCE_CONFIRMATION_MAX_CANDIDATES,
+  sweepExpiredConfirmations,
+} from '../core/confirmation-store.js';
 import { ApprovalRelay } from '../core/approval-relay.js';
 import { ApprovalNotifyDedup } from '../core/approval-notify-dedup.js';
 import {
@@ -110,6 +113,12 @@ import { loadGatewayAccess } from '../connectors/gateway/gateway-access.js';
 import { gatewayHome } from '../connectors/gateway/gateway-paths.js';
 import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
 import { settleFederatedTimeoutReceipt } from '../orchestra/approval-decision-federation.js';
+import {
+  runAcceptanceConfirmationReconciliation,
+  type AcceptanceConfirmationProductionReconciler,
+  type AcceptanceConfirmationReconcilerDeps,
+  type AcceptanceReconciliationRunResult,
+} from '../orchestra/acceptance-confirmation-reconciler.js';
 import type {
   ApprovalAuthorityRuntimeService,
 } from '../core/approval-authority-runtime.js';
@@ -2025,6 +2034,40 @@ export interface HttpApi {
   close(): Promise<void>;
 }
 
+interface AcceptanceConfirmationRuntimeAuditBase {
+  readonly kind: 'acceptance-confirmation-reconciliation';
+  /** Correlates the start-to-terminal outcome of exactly one bounded tick. */
+  readonly correlationId: string;
+  readonly tenantId: string;
+  readonly projectRoot: string;
+  readonly observedAt: string;
+}
+
+export interface AcceptanceConfirmationRuntimeSuccessAuditEvent
+  extends AcceptanceConfirmationRuntimeAuditBase {
+  readonly status: 'succeeded';
+  readonly result: AcceptanceReconciliationRunResult;
+}
+
+export interface AcceptanceConfirmationRuntimeFailureAuditEvent
+  extends AcceptanceConfirmationRuntimeAuditBase {
+  readonly status: 'failed';
+  readonly error: string;
+}
+
+export type AcceptanceConfirmationRuntimeAuditEvent =
+  | AcceptanceConfirmationRuntimeSuccessAuditEvent
+  | AcceptanceConfirmationRuntimeFailureAuditEvent;
+
+export interface AcceptanceConfirmationRuntimeOptions {
+  /** Exact tenant/project partition this process is authorized to drain. */
+  readonly authority: { readonly tenantId: string; readonly projectRoot: string };
+  readonly reconciler: AcceptanceConfirmationReconcilerDeps | AcceptanceConfirmationProductionReconciler;
+  readonly pageSize?: number;
+  readonly clock: () => Date;
+  readonly writeAudit: (event: AcceptanceConfirmationRuntimeAuditEvent) => Promise<void> | void;
+}
+
 export interface HttpServerOptions {
   port?: number;
   staticDir?: string;
@@ -2086,6 +2129,12 @@ export interface HttpServerOptions {
    * open result at provider-backed orchestration ingress.
    */
   providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  /**
+   * Durable acceptance-confirmation restart drain. It intentionally remains
+   * active when the lifecycle creation policy is disabled: gate-off prevents
+   * new pending work, but cannot abandon already-durable settlement intent.
+   */
+  acceptanceConfirmation?: AcceptanceConfirmationRuntimeOptions;
 }
 
 // ─── SEC-03: token-fingerprint + runtime token-file persistence ────────────
@@ -2214,6 +2263,7 @@ export function createHttpServer(
   let approvalTransports: ApprovalClientsWireTransports | undefined;
   let approvalChannelsConfigOpt: ApprovalClientsWireConfig | undefined;
   let providerAuthority: HttpServerOptions['providerAuthority'];
+  let acceptanceConfirmation: AcceptanceConfirmationRuntimeOptions | undefined;
 
   // TERM-CONFIG-WIRE (357-009): `terminal.bind` fallback for the server's
   // listen host. Same raw sync-read pattern as the token/OIDC blocks below
@@ -2267,6 +2317,7 @@ export function createHttpServer(
     approvalChannelsConfigOpt = portOrOpts.approvalChannelsConfig;
     approvalAuthority = portOrOpts.approvalAuthority;
     providerAuthority = portOrOpts.providerAuthority;
+    acceptanceConfirmation = portOrOpts.acceptanceConfirmation;
   } else {
     listenPort = portOrOpts ?? DEFAULT_PORT;
     resolvedStaticDir = staticDir;
@@ -2455,6 +2506,56 @@ export function createHttpServer(
   let approvalStore: ApprovalStore | undefined;
   let approvalExpiryDriver: ApprovalExpiryDriver | undefined;
   let approvalRelay: ApprovalRelay | undefined;
+  let acceptanceReconciliationInFlight: Promise<void> | undefined;
+
+  const runAcceptanceReconciliationTick = (): Promise<void> => {
+    if (!acceptanceConfirmation) return Promise.resolve();
+    if (acceptanceReconciliationInFlight) return acceptanceReconciliationInFlight;
+
+    const runtime = acceptanceConfirmation;
+    const correlationId = randomUUID();
+    const auditBase: AcceptanceConfirmationRuntimeAuditBase = {
+      kind: 'acceptance-confirmation-reconciliation',
+      correlationId,
+      tenantId: runtime.authority.tenantId,
+      projectRoot: runtime.authority.projectRoot,
+      observedAt: runtime.clock().toISOString(),
+    };
+    const operation = (async (): Promise<void> => {
+      try {
+        if (resolve(runtime.authority.projectRoot) !== resolve(projectRoot)) {
+          throw new Error('acceptance reconciliation project authority mismatch');
+        }
+        const result = 'run' in runtime.reconciler
+          ? await runtime.reconciler.run({
+              limit: runtime.pageSize ?? ACCEPTANCE_CONFIRMATION_MAX_CANDIDATES,
+            })
+          : await runAcceptanceConfirmationReconciliation(
+              runtime.reconciler,
+              {
+                tenantId: runtime.authority.tenantId,
+                limit: runtime.pageSize ?? ACCEPTANCE_CONFIRMATION_MAX_CANDIDATES,
+              },
+            );
+        await runtime.writeAudit({ ...auditBase, status: 'succeeded', result });
+      } catch (error) {
+        const failure = error instanceof Error ? error.message : String(error);
+        try {
+          await runtime.writeAudit({ ...auditBase, status: 'failed', error: failure });
+        } catch (auditError) {
+          throw new AggregateError(
+            [error, auditError],
+            `acceptance reconciliation and failure audit failed (${correlationId})`,
+          );
+        }
+        throw error;
+      }
+    })();
+    acceptanceReconciliationInFlight = operation.finally(() => {
+      acceptanceReconciliationInFlight = undefined;
+    });
+    return acceptanceReconciliationInFlight;
+  };
   try {
     approvalBroker = approvalAuthority?.runtime.broker ?? new ApprovalBroker(projectRoot, {
       lifecycle: resolvedApprovalLifecycle,
@@ -2501,6 +2602,7 @@ export function createHttpServer(
             now: () => observedAt.toISOString(),
           }).pending();
         })];
+        if (acceptanceConfirmation) operations.push(runAcceptanceReconciliationTick());
         const home = gatewayHome();
         const pairingsPath = join(home, 'pairings.json');
         if (existsSync(pairingsPath)) {
@@ -3078,6 +3180,7 @@ export function createHttpServer(
       outputCollector?.dispose();
       return (async () => {
         await approvalExpiryDriver?.settleInFlight();
+        await acceptanceReconciliationInFlight;
         approvalRelay?.dispose();
         await new Promise<void>((resolve) => {
           server.close(() => resolve());

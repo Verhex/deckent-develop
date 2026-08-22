@@ -464,8 +464,18 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // battery passed 298/298; the scanner measured 0 confirmed violations and no
   // test writes to the repository's live .tasks/.brain/runtime authority.
   // Prior: 3322 observe-only/CAS correction (14524).
-  count: 14663,
-  digest: '3a4913076e2681dcad2dabf4b049f377dee449faaa10e0b2c9636fef8d98afbf',
+  // 2026-08-22 (9040 acceptance authority-restart closure): +155 — the
+  // confirmation contract/store/reconciler/composition, tenant-CAS debt,
+  // controller-branch, CLI/API and 10k restart/race suites add only
+  // suite-owned tmpdir/SQLite fixtures, injected clocks and hermetic child
+  // process proof. The 33-file acceptance family passed 226/226 and the 17-file
+  // evaluator/routing neighbour battery passed 305/305; no live repo task,
+  // memory or runtime authority is admitted. Prior: 4056 D4 (14663).
+  // 2026-08-22 runtime hygiene follow-up: count unchanged; digest-only update
+  // because the existing hermetic gitignore suite now enumerates the new
+  // acceptance-reconciliation SQLite DB plus WAL/SHM sidecars.
+  count: 14818,
+  digest: '1c5d342c3bdc0a6b3515f53a75c5a4c4a8f81370e37a09105f13a158b381ad35',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -819,8 +829,15 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // module through the full-correlation test graph. Every changed production
   // path is inside the frozen D4 manifest; 65 files / 298 tests and tsc passed.
   // Prior: 3322 observe-only/CAS correction (1269).
-  count: 1273,
-  digest: 'fdfd7a682dd0183cdd5629572b1a593dff8a23ac689f4be20c177ae3dd2799c6',
+  // 2026-08-22 (9040 acceptance authority-restart closure): +8 inventoried
+  // modules — canonical confirmation contract, settlement reducer,
+  // reconciliation store, decision authority, service, composition,
+  // reconciler and its syntax-aware authority ratchet. Existing evaluator,
+  // controller, CLI/API and debt-store modules moved content to consume this
+  // single production chain; 531 scoped tests, tsc, build and real serve tick
+  // passed. Prior: 4056 D4 (1273).
+  count: 1281,
+  digest: '57e4657651371d3d077618677d56f824fd2d00783d1f1dfe9dadb5a3d41a1c6e',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

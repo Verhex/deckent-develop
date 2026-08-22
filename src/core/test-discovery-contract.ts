@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix, win32 } from 'node:path';
 
 import type { Task } from './task-types.js';
 import { matchGlob } from './doc-tracking/glob.js';
@@ -211,10 +211,31 @@ export const DEFAULT_TEST_DISCOVERY_ADAPTERS: readonly TestDiscoveryAdapter[] = 
   vitestDiscoveryAdapter,
 ];
 
-export function extractPlannedTestPaths(task: Task): string[] {
+function relativeToProjectRoot(path: string, projectRoot?: string): string {
+  const candidate = path.replaceAll('\\', '/').replace(/^\.\//, '');
+  if (!projectRoot) return candidate;
+  const root = projectRoot.replaceAll('\\', '/').replace(/\/+$/, '');
+  for (const implementation of [posix, win32] as const) {
+    if (!implementation.isAbsolute(candidate) || !implementation.isAbsolute(root)) continue;
+    const relative = implementation.relative(root, candidate).replaceAll('\\', '/');
+    if (relative && relative !== '..' && !relative.startsWith('../') && !implementation.isAbsolute(relative)) {
+      return relative;
+    }
+  }
+  // task-builder's bounded path scavenger can retain the same absolute path
+  // without its leading slash. Treat that lexical projection exactly like the
+  // canonical absolute path, but never strip an unrelated prefix.
+  const rootWithoutLeadingSlash = root.replace(/^\/+/, '');
+  if (candidate.startsWith(`${rootWithoutLeadingSlash}/`)) {
+    return candidate.slice(rootWithoutLeadingSlash.length + 1);
+  }
+  return candidate;
+}
+
+export function extractPlannedTestPaths(task: Task, projectRoot?: string): string[] {
   const paths = new Set<string>();
   for (const path of task.scope?.filesWrite ?? []) {
-    if (TEST_FILE_RE.test(path)) paths.add(path.replace(/^\.\//, ''));
+    if (TEST_FILE_RE.test(path)) paths.add(relativeToProjectRoot(path, projectRoot));
   }
   for (const text of [
     task.description,
@@ -225,7 +246,7 @@ export function extractPlannedTestPaths(task: Task): string[] {
     TEST_PATH_RE.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = TEST_PATH_RE.exec(text)) !== null) {
-      const path = match[1]?.replace(/^\.\//, '');
+      const path = match[1] ? relativeToProjectRoot(match[1], projectRoot) : undefined;
       if (path) paths.add(path);
     }
   }
@@ -261,10 +282,11 @@ export function resolveTestDiscoveryContracts(
 export function evaluateTestDiscoverability(
   tasks: readonly Task[],
   contracts: readonly TestDiscoveryContract[],
+  projectRoot?: string,
 ): TestDiscoverabilityIssue[] {
   const issues: TestDiscoverabilityIssue[] = [];
   for (const task of tasks) {
-    for (const testPath of extractPlannedTestPaths(task)) {
+    for (const testPath of extractPlannedTestPaths(task, projectRoot)) {
       for (const contract of contracts) {
         if (contract.include.some(pattern => matchGlob(testPath, pattern))) continue;
         issues.push({

@@ -20,6 +20,7 @@ import {
   createAttendedExecutionApprovalBinding,
 } from '../../src/core/attended-execution-approval.js';
 import { assertExecutionLandingSupport } from '../../src/core/live-execution-budget.js';
+import { requestTierFor } from '../../src/core/approval-rules-engine.js';
 import { createAttendedExecutionProposalDigests } from '../../src/core/attended-execution-proposal.js';
 
 const NOW = new Date('2026-07-24T09:00:00.000Z');
@@ -67,7 +68,10 @@ function fixture() {
   const base = mkdtempSync(join(tmpdir(), 'attended-execution-approval-'));
   roots.push(base);
   const root = join(base, 'project');
-  const broker = new ApprovalBroker(root, { storeDir: join(base, 'host-broker') });
+  const broker = new ApprovalBroker(root, {
+    storeDir: join(base, 'host-broker'),
+    clock: () => NOW,
+  });
   const authenticator = new TestAuthenticator();
   const integrity = new TestIntegrityAuthority();
   const decisionAuthority = new ApprovalDecisionAuthority(integrity, authenticator);
@@ -151,6 +155,42 @@ afterEach(() => {
 });
 
 describe('AttendedExecutionApprovalAuthority', () => {
+  it('authors only the bounded provider probe at the canonical routine risk', () => {
+    const f = fixture();
+    const probe = f.authority.submitProviderEvidenceProbe({
+      requester: { role: 'brain', instanceId: 'brain-probe' },
+      userId: 'owner-a',
+      summary: 'Approve bounded provider probe',
+      subject: {
+        kind: 'provider-evidence-probe',
+        tenantId: 'tenant-a',
+        projectId: attendedExecutionProjectId(f.root),
+        provider: 'codex',
+        model: 'gpt-5.6-sol',
+        backendScope: 'subprocess',
+        executionProfileRef: 'probe.profile',
+        attemptNonce: 'b'.repeat(64),
+        budget: {
+          billingMode: 'subscription',
+          maxInputTokens: 100,
+          maxOutputTokens: 10,
+          maxTokens: 110,
+          timeoutMs: 5_000,
+        },
+        ttl: {
+          startsAt: new Date(NOW.getTime() - 5_000).toISOString(),
+          expiresAt: new Date(NOW.getTime() + 90_000).toISOString(),
+        },
+      },
+      createdAt: NOW.toISOString(),
+    });
+
+    expect(probe.risk).toBe('low');
+    expect(requestTierFor(probe)).toBe('routine');
+    expect(f.request.risk).toBe('high');
+    expect(requestTierFor(f.request)).toBeNull();
+  });
+
   it('binds a live-session allow to the exact final dispatch and writes one immutable receipt', async () => {
     const f = fixture();
     const decision = await f.ingress.decide({

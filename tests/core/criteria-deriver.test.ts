@@ -8,43 +8,39 @@ import {
 // ─── deriveBaseCriteria — test phrasing (Sprint 273 T-009) ──────────────────
 
 describe('deriveBaseCriteria — code kind', () => {
-  it('uses "targeted test file(s)" phrase when test command given but no testFiles', () => {
+  it('does not project repository-wide commands into task acceptance', () => {
     const result = deriveBaseCriteria('code-development', 'typescript', {
       build: 'npx tsc',
       test: 'npx vitest run',
     });
-    // Must NOT say `npx vitest run` passes (full suite implication)
-    expect(result.goCriteria).not.toContain('`npx vitest run` passes');
-    expect(result.goCriteria).toContain('targeted test file(s)');
-    expect(result.goCriteria).toContain('`npx tsc` succeeds');
+    expect(result.goCriteria).toBe('Implementation satisfies the task requirements for the typescript stack');
+    expect(result.goCriteria).not.toContain('vitest');
+    expect(result.goCriteria).not.toContain('tsc');
   });
 
-  it('uses specific test file command when testFiles are provided', () => {
+  it('does not project discovered test files into task acceptance', () => {
     const result = deriveBaseCriteria('code-development', 'typescript', {
       build: 'npx tsc',
       test: 'npx vitest run',
       testFiles: ['tests/core/criteria-deriver.test.ts'],
     });
-    expect(result.goCriteria).toContain('`npx vitest run tests/core/criteria-deriver.test.ts` passes');
-    expect(result.goCriteria).not.toContain('targeted test file(s)');
+    expect(result.goCriteria).not.toContain('vitest');
   });
 
-  it('joins multiple testFiles with spaces in the command', () => {
+  it('does not project multiple discovered test files into task acceptance', () => {
     const result = deriveBaseCriteria('code-development', 'typescript', {
       test: 'npx vitest run',
       testFiles: ['tests/core/foo.test.ts', 'tests/core/bar.test.ts'],
     });
-    expect(result.goCriteria).toContain(
-      '`npx vitest run tests/core/foo.test.ts tests/core/bar.test.ts` passes',
-    );
+    expect(result.goCriteria).not.toContain('foo.test.ts');
   });
 
-  it('preserves build phrase when no testFiles', () => {
+  it('does not project a build command when no testFiles are known', () => {
     const result = deriveBaseCriteria('code-development', 'typescript', {
       build: 'npx tsc',
       test: 'npx vitest run',
     });
-    expect(result.goCriteria.startsWith('`npx tsc` succeeds')).toBe(true);
+    expect(result.goCriteria).not.toContain('npx tsc');
   });
 
   it('falls back to stack-neutral phrase when no commands at all', () => {
@@ -54,51 +50,45 @@ describe('deriveBaseCriteria — code kind', () => {
 
   it('uses generic phrase for generic stack with no commands', () => {
     const result = deriveBaseCriteria('code-development', 'generic');
-    expect(result.goCriteria).toBe('Build succeeds; tests pass');
+    expect(result.goCriteria).toBe('Implementation satisfies the task requirements');
   });
 });
 
-// ─── deriveBaseCriteria — typecheck preference chain (Sprint 399 T-002) ─────
-// STACK_COMMANDS.typescript.build = 'npx tsc' has no --noEmit + tsconfig has no noEmit/outDir
-// guard, so a bare "`npx tsc` succeeds" goCriteria line instructs a dist-emit mid-sprint
-// (ESM-cache hazard). When a dedicated `typecheck` command is supplied it must REPLACE the
-// build proof line, never accompany it.
+// ─── deriveBaseCriteria — wave verification placement ───────────────────────
 
-describe('deriveBaseCriteria — typecheck preference', () => {
-  it('uses typecheck command instead of build when both are provided', () => {
+describe('deriveBaseCriteria — wave verification separation', () => {
+  it('does not include typecheck when both typecheck and build are discovered', () => {
     const result = deriveBaseCriteria('code-development', 'typescript', {
       build: 'npx tsc',
       typecheck: 'npx tsc --noEmit',
       test: 'npx vitest run',
     });
-    expect(result.goCriteria).toContain('`npx tsc --noEmit` passes');
-    expect(result.goCriteria).not.toContain('`npx tsc` succeeds');
+    expect(result.goCriteria).not.toContain('tsc');
   });
 
-  it('falls back to build succeeds when typecheck is absent', () => {
+  it('does not project build when typecheck is absent', () => {
     const result = deriveBaseCriteria('code-development', 'go', {
       build: 'go build ./...',
       test: 'go test ./...',
     });
-    expect(result.goCriteria).toContain('`go build ./...` succeeds');
+    expect(result.goCriteria).not.toContain('go build');
   });
 
-  it('falls back to build succeeds when typecheck is an empty string (honest-empty stack)', () => {
+  it('does not project test when typecheck is an empty string', () => {
     const result = deriveBaseCriteria('code-development', 'python', {
       build: '',
       typecheck: '',
       test: 'pytest',
     });
-    expect(result.goCriteria).not.toContain('passes');
-    expect(result.goCriteria).toContain('targeted test file(s)');
+    expect(result.goCriteria).not.toContain('pytest');
   });
 
-  it('uses typecheck alone when build is absent', () => {
+  it('does not project typecheck when build is absent', () => {
     const result = deriveBaseCriteria('code-development', 'rust', {
       typecheck: 'cargo check',
       test: 'cargo test',
     });
-    expect(result.goCriteria).toContain('`cargo check` passes');
+    expect(result.goCriteria).not.toContain('cargo check');
   });
 });
 

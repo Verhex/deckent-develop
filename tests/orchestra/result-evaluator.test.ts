@@ -18,6 +18,8 @@ import {
   classifyFailure,
   decideCascadeAction,
   reconstructFromDurableEvidence,
+  deriveAcceptanceFailureEvidence,
+  deriveAcceptanceFailureFingerprint,
 } from '../../src/orchestra/result-evaluator.js';
 import type {
   FailureContext,
@@ -56,6 +58,42 @@ function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
     ...overrides,
   };
 }
+
+describe('typed acceptance-failure provenance', () => {
+  const taskWithRequiredArtifact = () => makeTask(['src/'], {
+    goNogo: {
+      goCriteria: 'artifact exists',
+      noGoCriteria: 'artifact absent',
+      techDebtAcceptable: 'none',
+      items: [{
+        id: 'artifact-produced',
+        statement: 'output exists',
+        polarity: 'go',
+        evidenceRequirements: ['file:"src/generated.ts"'],
+      }],
+    },
+  } as Partial<Task>);
+
+  it('binds a decisive failure to criterion, evidence kind, normalized subject and observed state', () => {
+    const task = taskWithRequiredArtifact();
+    const evidence = deriveAcceptanceFailureEvidence(task, makeResult(), '/definitely-absent-project');
+    expect(evidence).toEqual([{
+      criterionId: 'artifact-produced',
+      evidenceKind: 'file',
+      subject: 'src/generated.ts',
+      observedState: 'absent',
+    }]);
+    expect(deriveAcceptanceFailureFingerprint(task, makeResult(), '/definitely-absent-project'))
+      .toMatch(/^sha256:[a-f0-9]{64}$/u);
+  });
+
+  it('does not fingerprint a green criterion probe', () => {
+    const task = taskWithRequiredArtifact();
+    const result = makeResult({ filesChanged: ['src/generated.ts'] });
+    expect(deriveAcceptanceFailureEvidence(task, result, '/definitely-absent-project')).toEqual([]);
+    expect(deriveAcceptanceFailureFingerprint(task, result, '/definitely-absent-project')).toBeNull();
+  });
+});
 
 // ─── isDocTask() ─────────────────────────────────────────────────────
 

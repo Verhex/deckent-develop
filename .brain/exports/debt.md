@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-610-008 | Tech debt from 610-008: npx tsc --noEmit passed.
+npx vitest run tests/orchestra/ | normal | sprint-610 | resolved |
 | debt-594-002 | Tech debt from 594-002: LOCAL_VERIFIED / SCOPED_GREEN: npx vitest run tests/orch | normal | sprint-594 | resolved |
 | debt-593-001 | Tech debt from 593-001: The config key is defined but not yet READ by any produc | normal | sprint-593 | resolved |
 | debt-592-002 | Tech debt from 592-002: The actual `docker build --build-arg INSTALL_CURSOR=true | normal | sprint-592 | resolved |

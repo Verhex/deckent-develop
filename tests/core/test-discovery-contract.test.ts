@@ -88,6 +88,18 @@ describe('test discovery contract preflight', () => {
     )).toEqual([]);
   });
 
+  it('normalizes canonical and scavenged absolute workspace paths before matching', () => {
+    const root = '/home/alperen/deckent-dev';
+    const absolute = task('absolute', `${root}/tests/unit/example.test.ts`);
+    absolute.scope.filesWrite.push('home/alperen/deckent-dev/tests/unit/example.test.ts');
+    const contracts = [{
+      runner: 'vitest', configPath: 'vitest.config.ts',
+      include: ['tests/**/*.test.ts'], evidence: 'static-config' as const,
+    }];
+    expect(extractPlannedTestPaths(absolute, root)).toEqual(['tests/unit/example.test.ts']);
+    expect(evaluateTestDiscoverability([absolute], contracts, root)).toEqual([]);
+  });
+
   it('does not mistake coverage.include for the test discovery contract', () => {
     const root = mkdtempSync(join(tmpdir(), 'deckent-test-contract-coverage-'));
     onTestFinished(() => rmSync(root, { recursive: true, force: true }));

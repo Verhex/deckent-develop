@@ -261,10 +261,6 @@ export function registerApprovalsCommand(program: Command): void {
       const store = new ApprovalStore(root, config.approval?.lifecycle
         ? { lifecycle: config.approval.lifecycle }
         : {});
-      // The authenticated decision surface closes every overdue durable row
-      // before target resolution. This is the canonical store/CAS path; no
-      // CLI-local lifecycle table or decision write exists here.
-      store.sweepExpired();
       const maxAuthAgeSeconds = authority.terminal?.max_auth_age_seconds;
       if (!maxAuthAgeSeconds || maxAuthAgeSeconds <= 0) {
         printError(new Error(getMessage('approvals.terminal_window_missing', language)));
@@ -289,9 +285,11 @@ export function registerApprovalsCommand(program: Command): void {
         // renders everywhere, so it must resolve everywhere). A full id that
         // the broker does not know is likewise looked up in the federated
         // set. Unknown/stale fails closed; ambiguity demands the full id.
-        const federatedAll = listFederatedPendingItems(root, {
+        const federatedInbox = listFederatedPendingItems(root, {
           gatewayHomeDir: gatewayHome(),
-        }).filter(item => item.tenantId === undefined || item.tenantId === authority.tenant_id);
+        });
+        const federatedAll = federatedInbox
+          .filter(item => item.tenantId === undefined || item.tenantId === authority.tenant_id);
         const federatedQuarantine = federatedAll.filter(item => item.quarantined === true);
         const brokerQuarantine = store.load().quarantined;
         const federatedQuarantinedById = federatedQuarantine.find(item => item.id === requestId);
@@ -327,8 +325,13 @@ export function registerApprovalsCommand(program: Command): void {
         let federatedTarget = federatedPending.find(item => item.id === requestId);
         if (looksLikeShortCode(requestId)) {
           const brokerIds = opened.service.broker.list('pending').map(r => r.id);
-          const federatedIds = federatedPending.map(item => item.id);
-          const resolution = resolveShortCode(requestId, [...brokerIds, ...federatedIds]);
+          // Tenant lineage must participate in short-code resolution. If it
+          // were filtered first, a stale broker mirror could resolve the code
+          // and bypass the foreign source row that owns the exact id.
+          const federatedIds = federatedInbox
+            .filter(item => item.unreadable !== true && item.quarantined !== true)
+            .map(item => item.id);
+          const resolution = resolveShortCode(requestId, [...new Set([...brokerIds, ...federatedIds])]);
           if (resolution.state === 'resolved') {
             requestId = resolution.id;
             federatedTarget = federatedPending.find(item => item.id === resolution.id);
@@ -346,12 +349,32 @@ export function registerApprovalsCommand(program: Command): void {
             return;
           }
         }
+        // Do not hide a same-id row owned by another tenant and then fall
+        // through to a (possibly stale) broker mirror. This check deliberately
+        // follows short-code resolution but precedes every lifecycle, mirror,
+        // or live-decision mutation.
+        const foreignTenantTarget = federatedInbox.find(item =>
+          item.id === requestId
+          && item.tenantId !== undefined
+          && item.tenantId !== authority.tenant_id);
+        if (foreignTenantTarget) {
+          printError(new Error(getMessage('approvals.decision_refused', language, {
+            id: requestId,
+            kind: 'lineage-mismatch',
+            reason: 'tenant-mismatch',
+          })));
+          process.exitCode = 1;
+          return;
+        }
+        // Only after the exact target tenant has been checked may the
+        // authenticated surface perform its canonical expiry reconciliation.
+        store.sweepExpired();
         // D2a decision federation: a confirmation/checkpoint target is
         // lazily mirrored into the broker and decided through the SAME
         // live-session ingress (auth asymmetry closed); other origins stay
         // on their surfaces until D2b — typed refusal, never a guess.
         let settleBackOrigin: DecisionFederatedOrigin | undefined;
-        if (federatedTarget && !opened.service.broker.getRequest(federatedTarget.id)) {
+        if (federatedTarget) {
           if (!isDecisionFederatedOrigin(federatedTarget.origin)) {
             printError(new Error(getMessage('approvals.origin_not_migrated', language, {
               id: federatedTarget.id,
@@ -361,11 +384,23 @@ export function registerApprovalsCommand(program: Command): void {
             process.exitCode = 1;
             return;
           }
-          await mirrorFederatedItemToBroker(opened.service.broker, federatedTarget, {
-            tenantId: authority.tenant_id ?? 'main',
-          });
-          settleBackOrigin = federatedTarget.origin;
-        } else if (federatedTarget && isDecisionFederatedOrigin(federatedTarget.origin)) {
+          // Always pass the exact inbox row through the federation service,
+          // even when a broker row with the same id already exists.  Its
+          // idempotent path verifies tenant/source/contract lineage; skipping
+          // it would let a stale or colliding mirror reach live auth.
+          try {
+            await mirrorFederatedItemToBroker(opened.service.broker, federatedTarget, {
+              tenantId: authority.tenant_id ?? 'main',
+            });
+          } catch (error) {
+            printError(new Error(getMessage('approvals.decision_refused', language, {
+              id: requestId,
+              kind: 'lineage-mismatch',
+              reason: error instanceof Error ? error.message : String(error),
+            })));
+            process.exitCode = 1;
+            return;
+          }
           settleBackOrigin = federatedTarget.origin;
         }
         const action = opts.allow ? 'allow' as const : 'deny' as const;
@@ -418,25 +453,53 @@ export function registerApprovalsCommand(program: Command): void {
           },
         );
         if (outcome.kind === 'decided' || outcome.kind === 'idempotent') {
+          if (settleBackOrigin) {
+            const settled = await settleFederatedDecision(
+              root, settleBackOrigin, requestId, action,
+              opts.reason ?? 'decided via unified approvals surface',
+              settleBackOrigin === 'confirmation' && federatedTarget && request
+                ? {
+                    brokerRequest: request,
+                    item: federatedTarget,
+                    brokerDecision: outcome.decision,
+                    lifecycle: config.approval!.lifecycle,
+                    verifyBrokerDecision: (candidateRequest, candidateDecision) =>
+                      opened.service.decisionAuthority.validate(
+                        candidateRequest,
+                        candidateDecision,
+                        new Date(candidateDecision.decidedAt),
+                      ).ok,
+                  }
+                : undefined);
+            if (settled.state === 'settled'
+              && (settled.origin !== 'confirmation' || settled.receipt.state === 'APPLIED')) {
+              print(getMessage('approvals.settleback_done', language, {
+                origin: settleBackOrigin, legacyId: requestId,
+              }));
+              // The CLI success contract carries the canonical immutable
+              // receipt itself.  Replays therefore expose the service's exact
+              // winning receipt rather than synthesizing CLI-local evidence.
+              if (settled.origin === 'confirmation') print(JSON.stringify(settled.receipt));
+            } else {
+              printError(new Error(getMessage('approvals.settleback_failed', language, {
+                origin: settleBackOrigin,
+                reason: settled.state === 'settled'
+                  ? 'receipt-not-applied'
+                  : settled.reason,
+              })));
+              process.exitCode = 1;
+              return;
+            }
+          }
+          // A federated decision is not successful at the CLI boundary until
+          // the reconciliation service has returned its settled receipt.
+          // Consequently no allow-effect or durable rule can escape while the
+          // legacy source is unreconciled.
           print(getMessage('approvals.decided', language, {
             id: requestId,
             action: actionLabel,
           }));
           if (action === 'allow') print(getMessage('approvals.decided_effect', language));
-          if (settleBackOrigin) {
-            const settled = await settleFederatedDecision(
-              root, settleBackOrigin, requestId, action,
-              opts.reason ?? 'decided via unified approvals surface');
-            if (settled.state === 'settled') {
-              print(getMessage('approvals.settleback_done', language, {
-                origin: settleBackOrigin, legacyId: requestId,
-              }));
-            } else {
-              printError(new Error(getMessage('approvals.settleback_failed', language, {
-                origin: settleBackOrigin, reason: settled.reason,
-              })));
-            }
-          }
           // DE2a --always promotion: an EXPLICIT owner decision becomes a
           // persistent, removable routine-tier rule. Never system-minted;
           // advisory until the rule authorization envelope lands (D2b).

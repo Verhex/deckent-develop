@@ -1,6 +1,10 @@
 import type { Command } from 'commander';
 import { existsSync, readdirSync } from 'node:fs';
-import { createHttpServer } from '../../api/server.js';
+import {
+  createHttpServer,
+  type AcceptanceConfirmationRuntimeAuditEvent,
+  type AcceptanceConfirmationRuntimeOptions,
+} from '../../api/server.js';
 import { writeServeDaemonMeta, clearServeDaemonMeta } from '../../api/serve-daemon-meta.js';
 import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 import { LocalPtyBackend } from '../../api/terminal/session-backend.js';
@@ -20,6 +24,16 @@ import {
 import type {
   ProviderAuthorityRuntimeServiceOpenResult,
 } from '../../core/provider-authority-composition.js';
+import { resolveTenant } from '../../core/tenant-context.js';
+import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
+import {
+  openAcceptanceConfirmationReconciler,
+  type AcceptanceConfirmationProductionReconciler,
+} from '../../orchestra/acceptance-confirmation-reconciler.js';
+import type { VerifyAcceptanceAuthority } from '../../orchestra/acceptance-confirmation-service.js';
+import { writeAuditEvent } from '../../core/audit-writer.js';
+import { createAcceptanceDecisionAuthorityVerifier } from '../../core/acceptance-decision-authority.js';
+import { ACCEPTANCE_CONFIRMATION_MAX_CANDIDATES } from '../../core/confirmation-store.js';
 
 /** Extended MIME types for static file serving (superset of server.ts defaults) */
 export const EXTENDED_MIME_TYPES: Record<string, string> = {
@@ -135,6 +149,16 @@ export function registerServe(program: Command): void {
       // ortamda API-only mod aynen çalışmaya devam eder, propose dürüst hata verir.
       let approvalAuthority: Extract<ApprovalAuthorityBootstrapResult, { state: 'ready' }> | undefined;
       let providerAuthority: ProviderAuthorityRuntimeServiceOpenResult | undefined;
+      let acceptanceReconciler: AcceptanceConfirmationProductionReconciler | undefined;
+      let acceptanceConfirmation: AcceptanceConfirmationRuntimeOptions | undefined;
+      let acceptanceCompositionStarted = false;
+      const closeOwnedResources = async (): Promise<void> => {
+        await Promise.allSettled([
+          Promise.resolve().then(() => acceptanceReconciler?.close()),
+          Promise.resolve().then(() => approvalAuthority?.runtime.close()),
+          Promise.resolve().then(() => providerAuthority?.close()),
+        ]);
+      };
       try {
         const config = await loadConfig(root);
         providerAuthority = openLocalProviderAuthorityRuntimeIfConfigured(root, config);
@@ -142,19 +166,101 @@ export function registerServe(program: Command): void {
           process.stderr.write(`[serve] provider bootstrap skipped: ${err instanceof Error ? err.message : String(err)}\n`);
         });
         const approvalBootstrap = bootstrapApprovalAuthority(root, config);
-        if (approvalBootstrap.state === 'ready') {
-          approvalAuthority = approvalBootstrap;
-        } else if (approvalBootstrap.state === 'hold') {
+        if (approvalBootstrap.state === 'ready') approvalAuthority = approvalBootstrap;
+        if (approvalBootstrap.state === 'hold') {
           process.stderr.write(getMessage(
             'serve.approval_authority_hold',
             getLanguage(),
-            {
-              reason: approvalBootstrap.reasonCode,
-              detail: approvalBootstrap.detailCode,
-            },
+            { reason: approvalBootstrap.reasonCode, detail: approvalBootstrap.detailCode },
           ) + '\n');
         }
+
+        // Restart reconciliation is never creation-policy gated. The durable
+        // LLM verifier is always present; a ready approval runtime adds the
+        // independent human-MAC branch. OIDC authenticates callers only and
+        // is deliberately not accepted as decision evidence.
+        acceptanceCompositionStarted = true;
+        const tenantId = resolveTenant(root, {
+          ...(config.approval?.authority?.tenant_id
+            ? { tenantId: config.approval.authority.tenant_id }
+            : {}),
+        }).tenantId;
+        const receiptStore = new InvocationReceiptStore(root);
+        let projectId: string;
+        try {
+          projectId = receiptStore.projectId;
+        } finally {
+          receiptStore.close();
+        }
+        const clock = (): Date => new Date();
+        const verifyLlm = createAcceptanceDecisionAuthorityVerifier({
+          branch: 'llm',
+          projectRoot: root,
+        });
+        const verifyHuman = approvalBootstrap.state === 'ready'
+          ? createAcceptanceDecisionAuthorityVerifier({
+              branch: 'human',
+              verify: candidate => {
+                const request = approvalBootstrap.runtime.broker.getRequest(candidate.confirmationId);
+                const decision = approvalBootstrap.runtime.broker.getDecision(candidate.confirmationId);
+                if (!request || !decision || !decision.authorization) return false;
+                const receipt = [
+                  'approval-decision',
+                  decision.authorization.integrityKeyId,
+                  decision.authorization.integrityMac,
+                ].join(':');
+                return decision.requestId === candidate.confirmationId
+                  && decision.decision === (candidate.verdict === 'CONFIRMED' ? 'allow' : 'deny')
+                  && decision.decidedAt === candidate.decidedAt
+                  && receipt === candidate.authorityReceipt
+                  && approvalBootstrap.runtime.decisionAuthority.validate(
+                    request,
+                    decision,
+                    new Date(candidate.decidedAt),
+                  ).ok;
+              },
+            })
+          : undefined;
+        const verifyAuthority: VerifyAcceptanceAuthority = candidate =>
+          candidate.authorityReceipt.startsWith('approval-decision:')
+            ? (verifyHuman?.(candidate) ?? false)
+            : verifyLlm(candidate);
+        acceptanceReconciler = openAcceptanceConfirmationReconciler({
+          projectRoot: root,
+          tenantId,
+          projectId,
+          lifecycle: config.approval!.lifecycle,
+          clock,
+          verifyAuthority,
+        });
+        const writeAudit = (event: AcceptanceConfirmationRuntimeAuditEvent): void => {
+          const written = writeAuditEvent(root, 'runtime-acceptance-confirmation', {
+            tenantId,
+            actor: 'system:acceptance-reconciler',
+            action: `acceptance-confirmation.reconciliation.${event.status}`,
+            target: event.status === 'succeeded'
+              ? `${event.result.reconciled}:${event.result.held}:${event.result.denied}`
+              : event.error,
+            correlationId: event.correlationId,
+            metadata: { ...event },
+          });
+          if (!written) throw new Error('ACCEPTANCE_CONFIRMATION_AUDIT_WRITE_FAILED');
+        };
+        acceptanceConfirmation = Object.freeze({
+          authority: Object.freeze({ tenantId, projectRoot: root }),
+          reconciler: acceptanceReconciler,
+          pageSize: ACCEPTANCE_CONFIRMATION_MAX_CANDIDATES,
+          clock,
+          writeAudit,
+        });
       } catch (err) {
+        // Once approval ownership has been acquired, failure to finish the
+        // canonical reconciliation composition is a startup failure. Serving
+        // without it would create an injection-only, non-reconciling runtime.
+        if (acceptanceCompositionStarted || approvalAuthority || providerAuthority) {
+          await closeOwnedResources();
+          throw err;
+        }
         process.stderr.write(`[serve] provider bootstrap skipped: ${err instanceof Error ? err.message : String(err)}\n`);
       }
 
@@ -175,10 +281,10 @@ export function registerServe(program: Command): void {
               }
             : {}),
           ...(providerAuthority ? { providerAuthority } : {}),
+          ...(acceptanceConfirmation ? { acceptanceConfirmation } : {}),
         });
       } catch (error) {
-        approvalAuthority?.runtime.close();
-        providerAuthority?.close();
+        await closeOwnedResources();
         throw error;
       }
 
@@ -220,18 +326,27 @@ export function registerServe(program: Command): void {
       // cleanup (incl. api.close()) never ran on a real signal. The hook is
       // awaited by onSignal (bounded) on SIGINT+SIGTERM (win32: SIGINT+SIGBREAK).
       // Idempotent by contract: clear swallows ENOENT, close resolves twice.
-      registerShutdownHook(async () => {
+      let shutdown: Promise<void> | undefined;
+      registerShutdownHook(() => {
+        if (shutdown) return shutdown;
         // Sync file-clear FIRST so a hung close can never block it.
         clearServeDaemonMeta(root);
-        const outcomes = await Promise.allSettled([
-          Promise.resolve().then(() => approvalAuthority?.runtime.close()),
-          Promise.resolve().then(() => providerAuthority?.close()),
-          api.close(),
-        ]);
-        const failed = outcomes.find(
-          (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
-        );
-        if (failed) throw failed.reason;
+        shutdown = (async () => {
+          // Stop the driver and await its in-flight reconciliation before the
+          // process-owned reconciler/authority handles are closed.
+          const outcomes = await Promise.allSettled([api.close()]);
+          const ownedOutcomes = await Promise.allSettled([
+            Promise.resolve().then(() => acceptanceReconciler?.close()),
+            Promise.resolve().then(() => approvalAuthority?.runtime.close()),
+            Promise.resolve().then(() => providerAuthority?.close()),
+          ]);
+          outcomes.push(...ownedOutcomes);
+          const failed = outcomes.find(
+            (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
+          );
+          if (failed) throw failed.reason;
+        })();
+        return shutdown;
       });
     });
 }

@@ -16,7 +16,7 @@
 // (the same honesty contract as D2/B3: undecidable is NEVER a penalty).
 
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, posix, resolve } from 'node:path';
 
 import type { Task, TaskResult } from '../core/types.js';
 import type { GoNoGoCriterionItem } from '../core/task-types.js';
@@ -55,24 +55,40 @@ export interface CriterionEvaluationOutcome {
   readonly total: number;
 }
 
-/** `path:START-END` — the shared bounded-target grammar (xverify / bootstrap). */
-const RANGED_REQUIREMENT_RE = /^(.+):(\d+)-(\d+)$/u;
-
 /**
- * A requirement string this deterministic kernel can decide: a repo-relative
- * file path (optionally ranged). Anything else (prose acceptance language)
- * belongs to the llm/human confirmation adapters and stays undecidable here.
+ * Return the sole deterministic locator: a normalized, repo-relative path
+ * authored with the explicit `file` kind. Legacy strings and unsafe paths do
+ * not gain filesystem authority through pattern matching.
  */
+function parseExplicitRequirement(
+  requirement: string,
+): { kind: 'file' | 'command' | 'assertion'; value: string } | null {
+  const match = /^(file|command|assertion):(.*)$/su.exec(requirement);
+  if (!match) return null;
+  try {
+    const value: unknown = JSON.parse(match[2]!);
+    return typeof value === 'string'
+      ? { kind: match[1] as 'file' | 'command' | 'assertion', value }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function requirementPath(requirement: string): string | null {
-  const trimmed = requirement.trim();
-  if (!trimmed || trimmed.includes('\n')) return null;
-  const ranged = RANGED_REQUIREMENT_RE.exec(trimmed);
-  const candidate = ranged ? ranged[1]! : trimmed;
-  // Path shape: contains a separator or a dot-extension, no spaces — the
-  // narrow, false-positive-averse subset (prose almost always has spaces).
-  if (/\s/u.test(candidate)) return null;
-  if (!candidate.includes('/') && !/\.[A-Za-z0-9]+$/u.test(candidate)) return null;
-  return candidate;
+  const explicit = parseExplicitRequirement(requirement);
+  if (explicit?.kind !== 'file') return null;
+  const candidate = explicit.value.trim();
+  if (!candidate || candidate.includes('\n') || candidate.includes('\\')) return null;
+  if (isAbsolute(candidate) || /^[A-Za-z]:/u.test(candidate)) return null;
+  const normalized = posix.normalize(candidate);
+  if (normalized !== candidate || normalized === '.' || normalized.startsWith('../')) return null;
+  return normalized;
+}
+
+function displayRequirement(requirement: string): string {
+  const explicit = parseExplicitRequirement(requirement);
+  return explicit ? `${explicit.kind}: ${explicit.value}` : requirement;
 }
 
 function requirementHolds(
@@ -81,7 +97,10 @@ function requirementHolds(
   result: TaskResult,
 ): boolean {
   if (result.filesChanged?.some(changed => changed.trim() === path)) return true;
-  return existsSync(join(projectRoot, path));
+  const absoluteRoot = resolve(projectRoot);
+  const absolutePath = resolve(absoluteRoot, path);
+  if (absolutePath === absoluteRoot || !absolutePath.startsWith(`${absoluteRoot}/`)) return false;
+  return existsSync(absolutePath);
 }
 
 function evaluateItem(
@@ -106,7 +125,7 @@ function evaluateItem(
   for (const requirement of requirements) {
     const path = requirementPath(requirement);
     if (path === null) {
-      evidence.push(`undecidable (non-deterministic requirement): ${requirement}`);
+      evidence.push(`undecidable (non-deterministic requirement): ${displayRequirement(requirement)}`);
       continue;
     }
     decidable += 1;

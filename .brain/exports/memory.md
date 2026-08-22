@@ -1,5 +1,28 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-613 Learnings
+- Sprint sprint-613 Learnings: ## Sprint sprint-613 Learnings
+
+## Gains
+- 613-001 — Hermetic provider-probe broker clock — Injected the fixture mutable currentTime clock into the real ApprovalBroker; no production TTL, D...
+
+## Sprint sprint-612 Learnings
+- Sprint sprint-612 Learnings: ## Sprint sprint-612 Learnings
+
+## Gains
+- 612-001 — Canonical bounded probe risk envelope — Exact declared Vitest command passed (3 files, 11 tests).
+- 612-002 — Rule application production-chain proof — Declared Vitest command passed: 1 file, 3 tests.
+
+## Sprint sprint-611 Learnings
+- Sprint sprint-611 Learnings: ## Sprint sprint-611 Learnings
+
+## Gains
+- 611-001 — Wave-level verification placement — npx tsc --noEmit passed.
+- 611-002 — Worker prompt verification placement — npx tsc --noEmit passed.
+- 611-003 — Typed criterion evidence grammar — npx tsc --noEmit passed.
+- 611-004 — FIX provenance circuit breaker — npx tsc --noEmit passed.
+- 611-005 — Planner to evaluator recovery integration — npx tsc --noEmit passed on all three attempts.
+
 ## Sprint sprint-606 Learnings
 - Sprint sprint-606 Learnings: ## Sprint sprint-606 Learnings
 

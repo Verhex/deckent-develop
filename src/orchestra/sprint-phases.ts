@@ -186,10 +186,19 @@ import { resolveAcceptance } from '../core/acceptance-matrix.js';
 import { applyAcceptanceEnforcement, type AcceptanceEnforcementResult } from './acceptance-enforcement.js';
 import {
   confirmationContentDigest,
-  createConfirmationRequest,
+  createAcceptanceConfirmationRequest,
   type CreateConfirmationOptions,
 } from '../core/confirmation-store.js';
 import { resolveApprovalLifecyclePolicy } from '../core/approval-lifecycle-policy.js';
+import { attendedExecutionProjectId } from '../core/attended-execution-approval.js';
+import {
+  openAcceptanceConfirmationComposition,
+  type AcceptanceConfirmationComposition,
+} from './acceptance-confirmation-composition.js';
+import type {
+  AcceptanceRouteRecord,
+  AcceptanceServiceResult,
+} from './acceptance-confirmation-service.js';
 
 // ─── Dependency Cascade / Unblock Wire (Sprint 156 — Task 003) ───
 // applyCascadeToSprint + applyUnblockToSprint were exported from
@@ -937,12 +946,16 @@ export interface DurableAcceptanceConfirmationInput {
   readonly enforcement: AcceptanceEnforcementResult;
   readonly requestedAt: string;
   readonly lifecycle?: CreateConfirmationOptions['lifecycle'];
-  readonly createFn?: typeof createConfirmationRequest;
+  /** Test seam for a fault-injected production composition. */
+  readonly openComposition?: (
+    authority: Parameters<typeof openAcceptanceConfirmationComposition>[0],
+  ) => AcceptanceConfirmationComposition;
 }
 
 export interface DurableAcceptanceConfirmationResult {
   readonly enforcement: AcceptanceEnforcementResult;
   readonly confirmation?: { readonly id: string; readonly created: boolean };
+  readonly routeResult?: AcceptanceServiceResult;
   readonly writeError?: unknown;
 }
 
@@ -951,11 +964,12 @@ export interface DurableAcceptanceConfirmationResult {
  * before allowing the post-rubric downgrade to become authoritative. A failed
  * or disabled lifecycle write leaves the original rubric decision untouched.
  */
-export function persistDurableAcceptanceConfirmation(
+export async function persistDurableAcceptanceConfirmation(
   input: DurableAcceptanceConfirmationInput,
-): DurableAcceptanceConfirmationResult {
+): Promise<DurableAcceptanceConfirmationResult> {
   const pending = input.enforcement.pendingConfirmation;
-  if (!pending) return { enforcement: input.enforcement };
+  const claim = input.enforcement.routeClaim;
+  if (!pending || !claim) return { enforcement: input.enforcement };
 
   const attemptId = input.result.workAttribution?.attemptId
     ?? `result:${confirmationContentDigest({
@@ -966,45 +980,59 @@ export function persistDurableAcceptanceConfirmation(
       selfAssessment: input.result.selfAssessment,
       notes: input.result.notes,
     })}`;
-  const tasksById = new Map(input.sprint.tasks.map(candidate => [candidate.id, candidate]));
-  const generation = resolveFixAttemptDepth(input.task, tasksById) + 1;
+  const generation = claim.lineage.generation;
   const identity = {
     attemptId,
     generation,
-    sourceDigest: confirmationContentDigest(pending),
-    evidenceDigest: confirmationContentDigest({
-      evidenceRequirements: [...pending.evidenceRequirements].sort(),
-      workAttribution: input.result.workAttribution,
-      filesChanged: [...input.result.filesChanged].sort(),
-      testCommands: input.result.testCommands ?? [],
-      testsPassed: input.result.testsPassed,
-      coverage: input.result.coverage,
-      selfAssessment: input.result.selfAssessment,
-    }),
-    revisionDigest: confirmationContentDigest({
-      taskId: input.task.id,
-      title: input.task.title,
-      description: input.task.description,
-      scope: input.task.scope,
-      dependencies: [...input.task.dependencies].sort(),
-      goNogo: input.task.goNogo,
-      fixForTaskId: input.task.fixForTaskId,
-    }),
+    sourceDigest: claim.lineage.sourceDigest,
+    evidenceDigest: claim.evaluationDigest,
+    revisionDigest: claim.claimDigest,
   };
+  const lifecycle = input.lifecycle ?? resolveApprovalLifecyclePolicy();
+  const clock = () => new Date(input.requestedAt);
+  let composition: AcceptanceConfirmationComposition | undefined;
+  let confirmation: { readonly id: string; readonly created: boolean } | undefined;
   try {
-    const confirmation = (input.createFn ?? createConfirmationRequest)(input.projectRoot, {
+    confirmation = createAcceptanceConfirmationRequest(input.projectRoot, {
       ...pending,
       identity,
+      acceptanceLineage: claim.lineage,
       requestedAt: input.requestedAt,
     }, {
-      identity,
-      // Passing the resolved default explicitly is the fail-closed gate: an
-      // absent/disabled config cannot mint a governed pending record.
-      lifecycle: input.lifecycle ?? resolveApprovalLifecyclePolicy(),
-      clock: () => new Date(input.requestedAt),
+      tenantId: claim.lineage.tenantId,
+      projectId: claim.lineage.projectId,
+      lifecycle,
+      clock,
     });
-    return { enforcement: input.enforcement, confirmation };
+    const route: AcceptanceRouteRecord = {
+      confirmationId: confirmation.id,
+      lineage: claim.lineage,
+      sourceVerdict: 'UNDECIDABLE',
+    };
+    const authority = {
+      projectRoot: input.projectRoot,
+      tenantId: claim.lineage.tenantId,
+      projectId: claim.lineage.projectId,
+      lifecycle,
+      clock,
+      // Creation does not consume terminal authority. A later settlement must
+      // open its own composition with a real verifier.
+      verifyAuthority: () => false,
+    };
+    composition = (input.openComposition ?? openAcceptanceConfirmationComposition)(authority);
+    const routeResult = await composition.createAndRoute(route);
+    if (routeResult.state !== 'HOLD'
+      || routeResult.reasonCode !== 'VERIFIED_DECISION_UNAVAILABLE') {
+      throw Object.assign(new Error(`acceptance route durability incomplete: ${routeResult.state}`), {
+        routeResult,
+      });
+    }
+    return { enforcement: input.enforcement, confirmation, routeResult };
   } catch (writeError) {
+    const failedRoute = typeof writeError === 'object' && writeError !== null
+      && 'routeResult' in writeError
+      ? (writeError as { readonly routeResult?: AcceptanceServiceResult }).routeResult
+      : undefined;
     const { postRubricCause: _discardedCause, ...unenforced } = input.enforcement;
     void _discardedCause;
     return {
@@ -1013,9 +1041,135 @@ export function persistDurableAcceptanceConfirmation(
         evaluation: input.baselineEvaluation,
         enforced: false,
       },
+      ...(confirmation ? { confirmation } : {}),
+      ...(failedRoute ? { routeResult: failedRoute } : {}),
       writeError,
     };
+  } finally {
+    composition?.close();
   }
+}
+
+export type ResultEvaluationBranch =
+  | 'main'
+  | 'extension'
+  | 'alive-grace'
+  | 'fix-ingest'
+  | 'not-dispatched-redispatch'
+  | 'postfix';
+
+export interface PreparedResultEvaluationAttempt {
+  readonly rubric: EvaluationResult;
+  readonly evaluation: TaskEvaluation;
+  readonly acceptanceEnforcement?: AcceptanceEnforcementResult;
+  readonly postRubricCauses: readonly string[];
+  readonly runtimeBudgetAuthorityReason?: string;
+}
+
+/**
+ * The single result-bearing attempt service.  Every lifecycle branch enters
+ * through this boundary before its verdict is allowed to affect scheduling.
+ * It owns rubric selection, immutable runtime-budget precedence, acceptance
+ * enforcement, and durable confirmation creation.  Callers may add their
+ * branch-specific terminal vetoes, but must finish through
+ * {@link completeResultEvaluationAttempt}, which emits the audit receipt.
+ */
+export async function prepareResultEvaluationAttempt(input: {
+  readonly projectRoot: string;
+  readonly sprint: Sprint;
+  readonly task: Task;
+  readonly result: TaskResult;
+  readonly config?: ResolvedConfig;
+  readonly branch: ResultEvaluationBranch;
+}): Promise<PreparedResultEvaluationAttempt> {
+  const runtimeBudgetAuthority = readRuntimeBudgetEvaluationAuthority(
+    input.projectRoot, input.task.id,
+  );
+  let rubric = runtimeBudgetAuthority
+    ? evaluateWithRubric(input.result, input.task, undefined, input.projectRoot)
+    : await safeRubricReconcile(input.projectRoot, input.sprint.id, input.task, input.result);
+  const postRubricCauses: string[] = [`path:${input.branch}`];
+  let acceptanceEnforcement: AcceptanceEnforcementResult | undefined;
+  if (runtimeBudgetAuthority) {
+    postRubricCauses.push('runtime-budget-authority:NO_GO');
+  } else {
+    const baselineEvaluation = rubric;
+    acceptanceEnforcement = applyAcceptanceEnforcement(
+      rubric, input.task, input.result, input.sprint.id, input.config, {
+        tenantId: input.task.actor?.tenantId ?? 'local',
+        projectId: attendedExecutionProjectId(input.projectRoot),
+        generation: resolveFixAttemptDepth(
+          input.task,
+          new Map(input.sprint.tasks.map(candidate => [candidate.id, candidate])),
+        ) + 1,
+      },
+    );
+    const durable = await persistDurableAcceptanceConfirmation({
+      projectRoot: input.projectRoot,
+      sprint: input.sprint,
+      task: input.task,
+      result: input.result,
+      baselineEvaluation,
+      enforcement: acceptanceEnforcement,
+      requestedAt: now(),
+      lifecycle: input.config?.approval?.lifecycle,
+    });
+    acceptanceEnforcement = durable.enforcement;
+    rubric = acceptanceEnforcement.evaluation;
+    const receiptRef = durable.routeResult?.state === 'HOLD'
+      ? durable.routeResult.receiptRef
+      : undefined;
+    if (acceptanceEnforcement.postRubricCause) {
+      postRubricCauses.push(receiptRef
+        ? `${acceptanceEnforcement.postRubricCause}:receipt=${receiptRef}`
+        : acceptanceEnforcement.postRubricCause);
+    } else if (durable.routeResult?.state === 'HOLD') {
+      postRubricCauses.push(
+        `acceptance-route-hold:${durable.routeResult.reasonCode}:receipt=${durable.routeResult.receiptRef}`,
+      );
+    }
+    if (durable.writeError) debugLog('acceptance-enforcement:persist', durable.writeError);
+  }
+  return {
+    rubric,
+    evaluation: runtimeBudgetAuthority ? TaskEvaluation.NO_GO : toTaskEvaluation(rubric),
+    acceptanceEnforcement,
+    postRubricCauses,
+    ...(runtimeBudgetAuthority
+      ? { runtimeBudgetAuthorityReason: `host_runtime_budget_exhausted:${runtimeBudgetAuthority.settlementRef.attemptId}` }
+      : {}),
+  };
+}
+
+/** Finish the service transaction: repair authority first, then one audit receipt. */
+export function completeResultEvaluationAttempt(input: {
+  readonly projectRoot: string;
+  readonly sprint: Sprint;
+  readonly task: Task;
+  readonly result: TaskResult;
+  readonly prepared: PreparedResultEvaluationAttempt;
+  readonly evaluation?: TaskEvaluation;
+  readonly fixPolicy?: { allowPriorityFixCreation?: boolean };
+  readonly additionalCauses?: readonly string[];
+}): TaskEvaluation {
+  const evaluation = settleEvaluationWithRepairAuthority(
+    input.projectRoot,
+    input.task,
+    input.evaluation ?? input.prepared.evaluation,
+    input.result,
+    input.fixPolicy,
+  );
+  writeTaskEvaluationAudit(
+    input.projectRoot,
+    input.sprint.id,
+    input.task,
+    evaluation,
+    input.prepared.rubric,
+    input.prepared.runtimeBudgetAuthorityReason,
+    [...input.prepared.postRubricCauses, ...(input.additionalCauses ?? [])],
+    input.prepared.acceptanceEnforcement,
+  );
+  return evaluation;
 }
 
 /** Write error dashboard state — mirrors sprint-controller's private helper */
@@ -1967,62 +2121,13 @@ export async function runEvaluatePhase(
           debugLog('runEvaluatePhase:honestGate', `task=${task.id} violation=${gated.violation} → forced NO_GO`);
         }
 
-        const runtimeBudgetAuthority = readRuntimeBudgetEvaluationAuthority(
-          projectRoot,
-          task.id,
-        );
-
-        // Sprint 191 P191-1: pass projectRoot so OOM-killed / partial-result
-        // workers can be reconciled via reconcileSpuriousNoGo (git diff fallback).
-        // 369-001: fault-armor (born-484) extracted to safeRubricReconcile —
-        // single source shared by every evaluateWithRubric call site in this
-        // module (see helper doc comment). Exact host runtime-budget authority
-        // skips that recovery probe: immutable containment is not a spurious
-        // worker NO_GO and must not spend more host work trying to promote it.
-        let rubricResult: EvaluationResult = runtimeBudgetAuthority
-          ? evaluateWithRubric(result, task, undefined, projectRoot)
-          : await safeRubricReconcile(projectRoot, sprint.id, task, result);
-        // 7097-B1: every layer below that overrides the rubric verdict pushes
-        // a typed cause here; writeTaskEvaluationAudit appends the chain to
-        // the audit rationale so the deciding layer is traceable from disk.
+        const preparedAttempt = await prepareResultEvaluationAttempt({
+          projectRoot, sprint, task, result, config, branch: 'main',
+        });
+        let rubricResult = preparedAttempt.rubric;
         const postRubricCauses: string[] = [];
-        if (runtimeBudgetAuthority) {
-          postRubricCauses.push('runtime-budget-authority:NO_GO');
-        }
-        // ADR-G-040 acceptance-enforcement (post-rubric policy layer, main
-        // EVALUATE branch only in this slice — extension/grace/ingest stay
-        // observe-stamped). Immutable runtime-budget containment is never
-        // policy-adjustable, so that authority skips the layer entirely.
-        let acceptanceEnforcement: AcceptanceEnforcementResult | undefined;
-        if (!runtimeBudgetAuthority) {
-          const baselineEvaluation = rubricResult;
-          acceptanceEnforcement = applyAcceptanceEnforcement(
-            rubricResult, task, result, sprint.id, config);
-          const durable = persistDurableAcceptanceConfirmation({
-            projectRoot,
-            sprint,
-            task,
-            result,
-            baselineEvaluation,
-            enforcement: acceptanceEnforcement,
-            requestedAt: now(),
-            lifecycle: config?.approval?.lifecycle,
-          });
-          acceptanceEnforcement = durable.enforcement;
-          rubricResult = acceptanceEnforcement.evaluation;
-          if (acceptanceEnforcement.postRubricCause) {
-            postRubricCauses.push(acceptanceEnforcement.postRubricCause);
-          }
-          if (durable.confirmation) {
-            debugLog('acceptance-enforcement',
-              `task=${task.id} confirmation ${durable.confirmation.id} ${durable.confirmation.created ? 'created' : 'already-known'} (adapter=${acceptanceEnforcement.outcome.adapter})`);
-          } else if (durable.writeError) {
-            debugLog('acceptance-enforcement:persist', durable.writeError);
-          }
-        }
-        let evaluation = runtimeBudgetAuthority
-          ? TaskEvaluation.NO_GO
-          : toTaskEvaluation(rubricResult);
+        const runtimeBudgetAuthority = preparedAttempt.runtimeBudgetAuthorityReason !== undefined;
+        let evaluation = preparedAttempt.evaluation;
 
         // PROMOTE-W1b: flag-gated partial promotion (default-off).
         // Runs BEFORE the honest-gate lock so genuine rubric-NO_GO+isPartialPromotable
@@ -2456,14 +2561,13 @@ export async function runEvaluatePhase(
             );
           }
         }
-        const runtimeBudgetAuthorityReason = runtimeBudgetAuthority
-          ? `host_runtime_budget_exhausted:${runtimeBudgetAuthority.settlementRef.attemptId}`
-          : undefined;
+        const runtimeBudgetAuthorityReason = preparedAttempt.runtimeBudgetAuthorityReason;
 
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
-        evaluation = settleEvaluationWithRepairAuthority(
-          projectRoot, task, evaluation, result, initialFixPolicy,
-        );
+        evaluation = completeResultEvaluationAttempt({
+          projectRoot, sprint, task, result, prepared: preparedAttempt,
+          evaluation, fixPolicy: initialFixPolicy, additionalCauses: postRubricCauses,
+        });
         evaluations.set(task.id, evaluation);
         evaluatedThisInvocation.add(task.id);
 
@@ -2487,16 +2591,7 @@ export async function runEvaluatePhase(
         // .deckent/runtime/evaluations/<sprintId>/<taskId>-attempt-1.json.
         // 352-003: shared writer — see writeTaskEvaluationAudit doc comment
         // for why this can no longer be an inline block local to this branch.
-        writeTaskEvaluationAudit(
-          projectRoot,
-          sprint.id,
-          task,
-          evaluation,
-          rubricResult,
-          runtimeBudgetAuthorityReason,
-          postRubricCauses,
-          acceptanceEnforcement,
-        );
+
 
         // DECKENT→USER:NOTIFY (Hot Fix H6) — task-done / task-no-go, fail-safe
         try {
@@ -2623,27 +2718,15 @@ export async function runEvaluatePhase(
               'runEvaluatePhase:extension-hit',
               `task=${task.id} produced .result during extension window`,
             );
-            const rubricResult = await safeRubricReconcile(projectRoot, sprint.id, task, lateResult);
-            // 7097-B1: this late-result branch writes its own audit record —
-            // tag the path and any settle-driven verdict change so a chronic
-            // "5/5 passed but NO_GO" here is traceable to THIS branch.
-            const lateCauses: string[] = ['path:late-result-extension'];
-            const preSettle = toTaskEvaluation(rubricResult);
-            const evaluation = settleEvaluationWithRepairAuthority(
-              projectRoot,
-              task,
-              preSettle,
-              lateResult,
-              initialFixPolicy,
-            );
-            if (evaluation !== preSettle) {
-              lateCauses.push(`repair-authority:${toAuditDecision(preSettle)}→${toAuditDecision(evaluation)}`);
-            }
+            const prepared = await prepareResultEvaluationAttempt({
+              projectRoot, sprint, task, result: lateResult, config, branch: 'extension',
+            });
+            const evaluation = completeResultEvaluationAttempt({
+              projectRoot, sprint, task, result: lateResult, prepared,
+              fixPolicy: initialFixPolicy,
+            });
             evaluations.set(task.id, evaluation);
             evaluatedThisInvocation.add(task.id);
-            writeTaskEvaluationAudit(
-              projectRoot, sprint.id, task, evaluation, rubricResult, undefined, lateCauses,
-            );
             continue;
           }
           debugLog(
@@ -2732,25 +2815,15 @@ export async function runEvaluatePhase(
               'runEvaluatePhase:alive-grace-hit',
               `task=${task.id} produced .result during grace window`,
             );
-            const graceRubric = await safeRubricReconcile(projectRoot, sprint.id, task, graceResult);
-            // 7097-B1: tag this branch too (see the late-result-extension twin).
-            const graceCauses: string[] = ['path:alive-grace-poll'];
-            const preGrace = toTaskEvaluation(graceRubric);
-            const graceEval = settleEvaluationWithRepairAuthority(
-              projectRoot,
-              task,
-              preGrace,
-              graceResult,
-              initialFixPolicy,
-            );
-            if (graceEval !== preGrace) {
-              graceCauses.push(`repair-authority:${toAuditDecision(preGrace)}→${toAuditDecision(graceEval)}`);
-            }
+            const prepared = await prepareResultEvaluationAttempt({
+              projectRoot, sprint, task, result: graceResult, config, branch: 'alive-grace',
+            });
+            const graceEval = completeResultEvaluationAttempt({
+              projectRoot, sprint, task, result: graceResult, prepared,
+              fixPolicy: initialFixPolicy,
+            });
             evaluations.set(task.id, graceEval);
             evaluatedThisInvocation.add(task.id);
-            writeTaskEvaluationAudit(
-              projectRoot, sprint.id, task, graceEval, graceRubric, undefined, graceCauses,
-            );
             continue;
           }
           debugLog(
@@ -3320,15 +3393,29 @@ export async function runFixPhase(
     // therefore phase-scoped: every wave ingests under the same authority, and
     // the verdict cache spans them so each attempt is scored exactly once (the
     // post-wave loops reuse it instead of re-running the rubric).
-    const fixVerdicts = new Map<string, { evaluation: TaskEvaluation; rubric: EvaluationResult }>();
+    const fixVerdicts = new Map<string, { evaluation: TaskEvaluation; rubric: EvaluationResult; prepared: PreparedResultEvaluationAttempt }>();
     const evaluateFixIngest = async (
       ingestTask: Task,
       ingestResult: TaskResult,
     ): Promise<TaskEvaluation> => {
       try {
-        const rubric = await safeRubricReconcile(projectRoot, sprint.id, ingestTask, ingestResult);
-        const evaluation = toTaskEvaluation(rubric);
-        fixVerdicts.set(ingestTask.id, { evaluation, rubric });
+        const branch: ResultEvaluationBranch = ingestTask.fixForTaskId
+          ? 'fix-ingest'
+          : evaluations.get(ingestTask.id) === TaskEvaluation.NOT_DISPATCHED
+            ? 'not-dispatched-redispatch'
+            : 'postfix';
+        const prepared = await prepareResultEvaluationAttempt({
+          projectRoot, sprint, task: ingestTask, result: ingestResult, config, branch,
+        });
+        const evaluation = completeResultEvaluationAttempt({
+          projectRoot, sprint, task: ingestTask, result: ingestResult, prepared,
+          fixPolicy: ingestTask.fixForTaskId
+            ? { allowPriorityFixCreation: resolveFixAttemptDepth(
+                ingestTask, new Map(sprint.tasks.map(task => [task.id, task])),
+              ) < maxFixRetries }
+            : undefined,
+        });
+        fixVerdicts.set(ingestTask.id, { evaluation, rubric: prepared.rubric, prepared });
         return evaluation;
       } catch (e) {
         // Fail-honest: an unscoreable attempt is DEFERRED (→ PAUSED), never a
@@ -3596,14 +3683,14 @@ export async function runFixPhase(
           // once, so the status that authorized dependency scheduling and the
           // verdict recorded here can never diverge.
           const ingestVerdict = fixVerdicts.get(fixTask.id);
-          const fixRubricResult = ingestVerdict?.rubric
-            ?? await safeRubricReconcile(projectRoot, sprint.id, fixTask, fixResult);
-          let fixEval = ingestVerdict?.evaluation ?? toTaskEvaluation(fixRubricResult);
+          if (!ingestVerdict) {
+            debugLog('runFixPhase:cacheHold', `task=${fixTask.id} missing service receipt — HOLD`);
+            evaluations.set(fixTask.id, TaskEvaluation.DEFERRED);
+            continue;
+          }
+          const fixRubricResult = ingestVerdict.rubric;
+          let fixEval = ingestVerdict.evaluation;
           const fixAttempt = resolveFixAttemptDepth(fixTask, tasksById);
-          fixEval = settleEvaluationWithRepairAuthority(
-            projectRoot, fixTask, fixEval, fixResult,
-            { allowPriorityFixCreation: fixAttempt < maxFixRetries },
-          );
           evaluations.set(fixTask.id, fixEval);
           if (!results.some(result => result.taskId === fixResult.taskId)) {
             results.push(fixResult);
@@ -3886,14 +3973,13 @@ export async function runFixPhase(
             // Reuse the ingest-time verdict: the verdict that authorized this
             // task's status can never diverge from the one recorded here.
             const rIngest = fixVerdicts.get(rTask.id);
-            const rRubricResult = rIngest?.rubric
-              ?? await safeRubricReconcile(projectRoot, sprint.id, rTask, rResult);
-            const rEval = settleEvaluationWithRepairAuthority(
-              projectRoot,
-              rTask,
-              rIngest?.evaluation ?? toTaskEvaluation(rRubricResult),
-              rResult,
-            );
+            if (!rIngest) {
+              debugLog('runFixPhase:cacheHold', `task=${rTask.id} missing service receipt — HOLD`);
+              evaluations.set(rTask.id, TaskEvaluation.DEFERRED);
+              failed += 1;
+              continue;
+            }
+            const rEval = rIngest.evaluation;
             evaluations.set(rTask.id, rEval);
             // TT551: a NOT_DISPATCHED task re-run is the ORIGINAL work-item's
             // 2nd honest attempt (no fix task, so retryOf stays undefined).
@@ -3998,14 +4084,14 @@ export async function runFixPhase(
           if (!pResult) continue;
           // Reuse the ingest-time verdict (one attempt is scored once).
           const pIngest = fixVerdicts.get(pTask.id);
-          const pRubricResult = pIngest?.rubric
-            ?? await safeRubricReconcile(projectRoot, sprint.id, pTask, pResult);
-          const pEval = settleEvaluationWithRepairAuthority(
-            projectRoot,
-            pTask,
-            pIngest?.evaluation ?? toTaskEvaluation(pRubricResult),
-            pResult,
-          );
+          if (!pIngest) {
+            debugLog('runFixPhase:cacheHold', `task=${pTask.id} missing service receipt — HOLD`);
+            evaluations.set(pTask.id, TaskEvaluation.DEFERRED);
+            failed += 1;
+            continue;
+          }
+          const pRubricResult = pIngest.rubric;
+          const pEval = pIngest.evaluation;
           evaluations.set(pTask.id, pEval);
           persistBrainVerdict(
             projectRoot, pTask.id, pEval, pRubricResult.totalScore, { honest: true }, pResult,

@@ -30,17 +30,49 @@ import {
   type AcceptanceOutcome,
 } from '../core/acceptance-matrix.js';
 import type { ConfirmationRequest } from '../core/confirmation-store.js';
+import {
+  reduceAcceptanceSettlement,
+  type AcceptanceSettlement,
+} from '../core/acceptance-settlement.js';
 import { fromRubricDecision } from '../core/verdict-types.js';
 import { resolveCanonicalTaskKind } from './rubric-registry.js';
 import { debugLog } from '../core/utils.js';
+import {
+  ACCEPTANCE_CONFIRMATION_SCHEMA_VERSION,
+  acceptanceConfirmationDigest,
+  deriveAcceptanceConfirmationId,
+  parseAcceptanceConfirmationLineage,
+  type AcceptanceConfirmationLineage,
+} from '../core/acceptance-confirmation-contract.js';
+
+export interface AcceptanceRouteAuthority {
+  readonly tenantId: string;
+  readonly projectId: string;
+  readonly generation: number;
+}
+
+export interface AcceptanceRouteClaim {
+  readonly schemaVersion: typeof ACCEPTANCE_CONFIRMATION_SCHEMA_VERSION;
+  readonly confirmationId: string;
+  readonly lineage: AcceptanceConfirmationLineage;
+  /** Compatibility projection of the canonical lineage evaluation digest. */
+  readonly evaluationDigest: AcceptanceConfirmationLineage['evaluationDigest'];
+  readonly sourceVerdict: AcceptanceOutcome['verdict'];
+  readonly adapter: NonNullable<AcceptanceOutcome['adapter']>;
+  readonly claimDigest: string;
+}
 
 export interface AcceptanceEnforcementResult {
   readonly evaluation: EvaluationResult;
   /** The policy outcome that was observed/enforced (audit stamp input). */
   readonly outcome: AcceptanceOutcome;
+  /** Pure source-verdict/debt projection for the exact matrix cell. */
+  readonly settlement: AcceptanceSettlement;
   readonly enforced: boolean;
   /** Set when ROUTE fired in enforce mode — sprint-phases persists it. */
   readonly pendingConfirmation?: Omit<ConfirmationRequest, 'id' | 'requestedAt'>;
+  /** Canonical, content-addressed lineage for the pending ROUTE intent. */
+  readonly routeClaim?: AcceptanceRouteClaim;
   /** Typed cause for the B1 verdict-source chain when the verdict changed. */
   readonly postRubricCause?: string;
 }
@@ -58,6 +90,7 @@ export function applyAcceptanceEnforcement(
   result: TaskResult,
   sprintId: string,
   config?: AcceptanceConfig,
+  routeAuthority?: AcceptanceRouteAuthority,
 ): AcceptanceEnforcementResult {
   const kind = resolveCanonicalTaskKind(task);
   const { override, rejected } = normalizeAcceptanceOverride(config?.acceptance_matrix);
@@ -72,17 +105,35 @@ export function applyAcceptanceEnforcement(
   const verdict = undecidable.length > 0 ? 'UNDECIDABLE' : fromRubricDecision(evaluation.decision);
   if (verdict === 'HOLD') {
     // Unreachable with the current 3-value decision surface; typed guard.
-    return { evaluation, outcome: resolveAcceptance(kind, 'FAILED', override), enforced: false };
+    const outcome = resolveAcceptance(kind, 'FAILED', override);
+    return {
+      evaluation,
+      outcome,
+      settlement: reduceAcceptanceSettlement({
+        sourceVerdict: outcome.verdict,
+        matrixDecision: outcome,
+        confirmation: { status: 'MISSING' },
+      }),
+      enforced: false,
+    };
   }
   const outcome = resolveAcceptance(kind, verdict, override);
+  // Keep the immutable rubric verdict and the exact resolved cell together.
+  // This is intent only: the EVALUATE service remains the durability boundary
+  // that decides whether a routed downgrade can become authoritative.
+  const settlement = reduceAcceptanceSettlement({
+    sourceVerdict: verdict,
+    matrixDecision: outcome,
+    confirmation: { status: 'MISSING' },
+  });
 
   const enforce = config?.acceptance_enforcement === 'enforce';
   if (!enforce || outcome.action === 'ACCEPT') {
-    return { evaluation, outcome, enforced: false };
+    return { evaluation, outcome, settlement, enforced: false };
   }
 
   if (outcome.action === 'REJECT') {
-    if (evaluation.decision === 'NO_GO') return { evaluation, outcome, enforced: false };
+    if (evaluation.decision === 'NO_GO') return { evaluation, outcome, settlement, enforced: false };
     const cause = `acceptance-policy:reject:${kind}·${verdict}`;
     return {
       evaluation: {
@@ -96,13 +147,68 @@ export function applyAcceptanceEnforcement(
         }],
       },
       outcome,
+      settlement,
       enforced: true,
       postRubricCause: cause,
     };
   }
 
   // ROUTE — never on a NO_GO (there is nothing to confirm into acceptance).
-  if (evaluation.decision === 'NO_GO') return { evaluation, outcome, enforced: false };
+  if (evaluation.decision === 'NO_GO') return { evaluation, outcome, settlement, enforced: false };
+  const attemptId = result.workAttribution?.state === 'VERIFIED'
+    ? result.workAttribution.attemptId
+    : undefined;
+  if (!routeAuthority || !attemptId) {
+    // A route without explicit tenancy/project/generation and verified attempt
+    // identity cannot be made canonical. Do not manufacture defaults and do
+    // not withhold the baseline verdict for an intent that cannot be persisted.
+    return { evaluation, outcome, settlement, enforced: false };
+  }
+  let evaluationDigest: string;
+  let lineage: AcceptanceConfirmationLineage;
+  try {
+    const resultDigest = acceptanceConfirmationDigest(result);
+    evaluationDigest = acceptanceConfirmationDigest(evaluation);
+    const policyDigest = acceptanceConfirmationDigest(outcome);
+    // Each authority binds its own source bytes. In particular, never alias
+    // the result and evaluation digests: they attest different producer
+    // inputs even when those inputs happen to describe the same verdict.
+    const sourceDigest = acceptanceConfirmationDigest({
+      verdict,
+      undecidableItems: undecidable,
+    });
+    const parsed = parseAcceptanceConfirmationLineage({
+      tenantId: routeAuthority.tenantId,
+      projectId: routeAuthority.projectId,
+      sprintId,
+      taskId: task.id,
+      attemptId,
+      generation: routeAuthority.generation,
+      evaluationDigest,
+      resultDigest,
+      policyDigest,
+      sourceDigest,
+    });
+    if (!parsed.ok) return { evaluation, outcome, settlement, enforced: false };
+    lineage = parsed.value;
+  } catch {
+    // Non-canonical input bytes cannot authorize a route intent.
+    return { evaluation, outcome, settlement, enforced: false };
+  }
+  const confirmationId = deriveAcceptanceConfirmationId(lineage);
+  const unsignedRouteClaim = {
+    schemaVersion: ACCEPTANCE_CONFIRMATION_SCHEMA_VERSION,
+    confirmationId,
+    lineage,
+    evaluationDigest: lineage.evaluationDigest,
+    sourceVerdict: verdict,
+    adapter: outcome.adapter!,
+  };
+  const routeClaim: AcceptanceRouteClaim = Object.freeze({
+    ...unsignedRouteClaim,
+    lineage: Object.freeze(lineage),
+    claimDigest: acceptanceConfirmationDigest(unsignedRouteClaim),
+  });
   const statements = undecidable.length > 0
     ? undecidable.map(item => item.statement)
     : [task.goNogo?.goCriteria ?? task.title];
@@ -118,7 +224,9 @@ export function applyAcceptanceEnforcement(
       }],
     },
     outcome,
+    settlement,
     enforced: true,
+    routeClaim,
     pendingConfirmation: {
       sprintId,
       taskId: task.id,

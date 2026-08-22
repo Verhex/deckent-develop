@@ -25,6 +25,9 @@ const PROJECT_GITIGNORE = readFileSync(join(PROJECT_ROOT, '.gitignore'), 'utf-8'
 
 const REQUIRED_RUNTIME_IGNORE_ENTRIES = [
   '.deckent/runtime/jobs/',
+  '.deckent/runtime/acceptance-reconciliation.db',
+  '.deckent/runtime/acceptance-reconciliation.db-shm',
+  '.deckent/runtime/acceptance-reconciliation.db-wal',
   '.deckent/runtime/invocations.db-shm',
   '.deckent/runtime/invocations.db-wal',
   '.deckent/prompts/',
@@ -89,6 +92,9 @@ describe('runtime gitignore hygiene (359-014)', () => {
     });
 
     it.each([
+      'acceptance-reconciliation.db',
+      'acceptance-reconciliation.db-shm',
+      'acceptance-reconciliation.db-wal',
       'invocations.db-shm',
       'invocations.db-wal',
     ])('ignores SQLite runtime sidecar %s', async (fileName) => {

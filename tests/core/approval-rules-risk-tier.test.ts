@@ -11,7 +11,7 @@ import { saveApprovalRules, type ApprovalRule } from '../../src/core/approval-ru
 
 const NOW = new Date('2026-08-21T10:00:00.000Z');
 
-function request(riskTier?: ApprovalRiskTier, risk: ApprovalRequest['risk'] = 'high'): ApprovalRequest {
+function request(riskTier?: ApprovalRiskTier, risk: ApprovalRequest['risk'] = 'low'): ApprovalRequest {
   const value: ApprovalRequest & { riskTier?: ApprovalRiskTier } = {
     version: '1.0', id: 'aprp-' + 'a'.repeat(64),
     requester: { role: 'brain', instanceId: 'xverify' }, summary: 'provider probe',
@@ -48,10 +48,11 @@ describe('approval rules effective risk tier', () => {
     const root = mkdtempSync(join(tmpdir(), 'approval-rules-tier-'));
     onTestFinished(() => rmSync(root, { recursive: true, force: true }));
     saveApprovalRules(root, [rule('routine')]);
-    expect(liveRuleFor(root, request('routine', 'low'), NOW)?.id).toBe('rule-tier-01');
-    expect(liveRuleFor(root, request(), NOW)).toBeNull();
-    saveApprovalRules(root, [rule('elevated')]);
-    expect(requestTierFor(request())).toBe('elevated');
+    expect(requestTierFor(request())).toBe('routine');
     expect(liveRuleFor(root, request(), NOW)?.id).toBe('rule-tier-01');
+    expect(requestTierFor(request('elevated'))).toBe('elevated');
+    expect(liveRuleFor(root, request('elevated'), NOW)).toBeNull();
+    saveApprovalRules(root, [rule('elevated')]);
+    expect(liveRuleFor(root, request('elevated'), NOW)?.id).toBe('rule-tier-01');
   });
 });

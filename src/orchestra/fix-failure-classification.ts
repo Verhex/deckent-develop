@@ -24,7 +24,43 @@
 //
 // Pure and side-effect free: callers own persistence, events and task creation.
 
+import { createHash } from 'node:crypto';
+import { posix } from 'node:path';
+
 import { PROVIDER_LIMIT_DEATH_ZERO_WRITE, type TaskResult } from '../core/task-types.js';
+
+/** Typed, provider-independent evidence for one decisive acceptance failure. */
+export interface AcceptanceFailureEvidence {
+  readonly criterionId: string;
+  readonly evidenceKind: 'file' | 'command' | 'assertion';
+  readonly subject: string;
+  readonly observedState: 'present' | 'absent' | 'passed' | 'failed';
+}
+
+function normalizeFailureSubject(kind: AcceptanceFailureEvidence['evidenceKind'], subject: string): string {
+  const trimmed = subject.normalize('NFC').trim();
+  if (kind !== 'file') return trimmed.replace(/\s+/gu, ' ');
+  const slashNormalized = trimmed.replace(/\\/gu, '/').replace(/^\.\//u, '');
+  return posix.normalize(slashNormalized);
+}
+
+/**
+ * Stable fingerprint of the failure itself, not of task scope or worker prose.
+ * Sorting makes requirement order irrelevant while retaining every typed
+ * provenance coordinate named by the acceptance contract.
+ */
+export function buildAcceptanceFailureFingerprint(
+  evidence: readonly AcceptanceFailureEvidence[],
+): string | null {
+  if (evidence.length === 0) return null;
+  const canonical = evidence.map(item => ({
+    criterionId: item.criterionId.normalize('NFC').trim(),
+    evidenceKind: item.evidenceKind,
+    subject: normalizeFailureSubject(item.evidenceKind, item.subject),
+    observedState: item.observedState,
+  })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return `sha256:${createHash('sha256').update(JSON.stringify(canonical)).digest('hex')}`;
+}
 
 /**
  * What the run should do with a failed task. Ordered from cheapest to most
@@ -116,6 +152,10 @@ export interface ClassifyFixFailureInput {
    * work; counting outcomes cannot be talked into anything.
    */
   readonly priorZeroDiffAttempts?: number;
+  /** Current decisive acceptance failure, derived from typed criterion evidence. */
+  readonly acceptanceFailureFingerprint?: string | null;
+  /** Fingerprint persisted on the FIX task when its parent failed. */
+  readonly priorAcceptanceFailureFingerprint?: string | null;
 }
 
 /**
@@ -175,7 +215,23 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
     };
   }
 
-  // 3. The task cannot succeed as written — no worker can repair its definition.
+  // 3. A FIX that observes the exact same typed acceptance failure as its
+  //    parent made no semantic progress. Stop after that one bounded attempt.
+  //    Scope/authority fingerprints never enter these fields, and changed
+  //    evidence deliberately falls through to an ordinary bounded FIX.
+  if (input.acceptanceFailureFingerprint
+    && input.priorAcceptanceFailureFingerprint
+    && input.acceptanceFailureFingerprint === input.priorAcceptanceFailureFingerprint) {
+    return {
+      disposition: 'escalateReplan',
+      code: 'REPEATED_ACCEPTANCE_FAILURE',
+      reason: 'the FIX reproduced the identical typed acceptance failure, so another '
+        + 'fix-of-fix is refused and the task must be re-planned',
+      allowsFixTask: false,
+    };
+  }
+
+  // 4. The task cannot succeed as written — no worker can repair its definition.
   //    Either the caller established that directly, or the lineage has already
   //    proven it by producing repeated NO_GOs that changed nothing.
   const futileRepetition = (input.priorZeroDiffAttempts ?? 0) >= ZERO_DIFF_FUTILITY_THRESHOLD

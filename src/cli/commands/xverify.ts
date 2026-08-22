@@ -43,6 +43,8 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import type { VerifierDispatchRejection } from '../../core/cross-verify-prompt.js';
+import type { TaskResultSettlementRefV1 } from '../../core/task-result-settlement.js';
+import { crossVerifyVerdictReceiptRef } from '../../core/cross-verify-evidence-broker.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import {
   createCrossVerifyProductionIngressAuthority,
@@ -370,6 +372,8 @@ export interface XverifyResult {
   execution: CrossVerifyExecutionEvidence | null;
   assurance: 'typed-host-adjudicated' | null;
   adjudicationReceiptRef: string | null;
+  /** Exact settlement identity projected only from validated host-receipt bytes. */
+  settlementRef: TaskResultSettlementRefV1 | null;
   /**
    * Structured provider refusal when the dispatch was rejected — the same
    * (provider, model, why) triple that `skippedReason` states in prose, in a
@@ -920,8 +924,21 @@ export async function runXverifyForResult(
     skippedReason: outcome.skippedReason ?? null,
     reason,
     execution,
-    assurance: outcome.advisory?.assurance ?? null,
-    adjudicationReceiptRef: outcome.advisory?.adjudicationReceiptRef ?? null,
+    // Authority-bearing fields come only from the runner's freshly validated
+    // host receipt.  The advisory is display data and may contain provider
+    // prose (or a stale/prefix-only reference), so it must not be projected
+    // into a settlement-capable result.
+    assurance: outcome.validatedAdjudicationReceipt?.receipt.assurance ?? null,
+    adjudicationReceiptRef: outcome.validatedAdjudicationReceipt
+      ? crossVerifyVerdictReceiptRef(outcome.validatedAdjudicationReceipt)
+      : null,
+    settlementRef: outcome.validatedAdjudicationReceipt ? {
+      schemaVersion: outcome.validatedAdjudicationReceipt.receipt.schemaVersion,
+      taskId: outcome.validatedAdjudicationReceipt.receipt.taskId,
+      backend: outcome.validatedAdjudicationReceipt.receipt.backend,
+      projectRootSha256: outcome.validatedAdjudicationReceipt.receipt.projectRootSha256,
+      attemptId: outcome.validatedAdjudicationReceipt.receipt.attemptId,
+    } : null,
     remedy,
     rejection: outcome.rejection ?? null,
     report: reportPath,

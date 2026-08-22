@@ -30,7 +30,7 @@ function sandbox(): string {
 }
 
 describe('confirmations CLI lifecycle', () => {
-  it('rejects an expired human decision and leaves the UNDECIDABLE tombstone authoritative', async () => {
+  it('routes the legacy human command and leaves the expired UNDECIDABLE tombstone authoritative', async () => {
     const root = sandbox();
     const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
     let at = new Date('2026-08-21T08:00:00.000Z');
@@ -54,7 +54,7 @@ describe('confirmations CLI lifecycle', () => {
       'node', 'deckent', 'confirmations', 'decide', created.id,
       '--confirm', '--reason', 'too late',
     ]);
-    expect(process.exitCode).toBe(1);
+    expect(process.exitCode).toBe(0);
     const found = readConfirmation(root, created.id, { lifecycle, clock: () => at });
     expect(found?.state).toBe('settled');
     if (!found || found.state !== 'settled') throw new Error('expected settled confirmation');
@@ -62,7 +62,7 @@ describe('confirmations CLI lifecycle', () => {
     process.exitCode = 0;
   });
 
-  it('rejects an llm verdict that loses the race to expiry', async () => {
+  it('does not invoke an llm after expiry has already won the read-side race', async () => {
     const root = sandbox();
     const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
     let at = new Date('2026-08-21T08:00:00.000Z');
@@ -75,18 +75,21 @@ describe('confirmations CLI lifecycle', () => {
     }, { lifecycle, identity: idn, clock: () => at });
 
     const program = new Command().exitOverride();
+    let xverifyCalls = 0;
+    at = new Date('2026-08-21T16:00:00.001Z');
     registerConfirmationsCommand(program, {
       resolveProjectRootFn: () => root,
       clock: () => at,
       loadConfigFn: (async () => ({ approval: { lifecycle } })) as unknown as typeof loadConfig,
       runXverifyForResultFn: (async () => {
-        at = new Date('2026-08-21T16:00:00.001Z');
+        xverifyCalls += 1;
         return { verdict: 'CONFIRMED' };
       }) as never,
     });
     process.exitCode = 0;
     await program.parseAsync(['node', 'deckent', 'confirmations', 'run', '--id', created.id]);
-    expect(process.exitCode).toBe(1);
+    expect(process.exitCode).toBe(0);
+    expect(xverifyCalls).toBe(0);
     const found = readConfirmation(root, created.id, { lifecycle, clock: () => at });
     expect(found?.state).toBe('settled');
     if (!found || found.state !== 'settled') throw new Error('expected settled confirmation');

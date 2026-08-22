@@ -1,0 +1,10 @@
+{
+  "bundleId": "e9718b5ac2c1f036b3ee9f479fcf39f3333ff28ec0c8bf9d2aa98395c39d3ce8",
+  "schemaVersion": 1,
+  "views": {
+    "level-lane.json": "c782bddefcacb3fc985f3dd62f48b9347d599d371f1b3022c41002c39deb0a64",
+    "active.json": "f28d310089f229262a2bfa6ff71a18bd1585aa43c82c1817a060740c181653dd",
+    "born.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "closure-health.json": "b75f58b7bd1bcc4a609c42872869ea5223d8a951d9939a27dd102818f54fd0e8"
+  }
+}

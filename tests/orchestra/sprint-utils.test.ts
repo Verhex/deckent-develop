@@ -11,7 +11,7 @@ const context = {
 };
 
 describe('extractGoNogoCriteria — authored acceptance contracts', () => {
-  it('keeps authored GO and NO_GO verbatim while appending derived verification', () => {
+  it('keeps authored GO and NO_GO while omitting wave verification commands', () => {
     const result = extractGoNogoCriteria([
       '**GO:** preserve this sentence; including punctuation.',
       'And this continuation exactly.',
@@ -22,7 +22,7 @@ describe('extractGoNogoCriteria — authored acceptance contracts', () => {
     expect(result.goCriteria).toBe([
       'preserve this sentence; including punctuation.',
       'And this continuation exactly.',
-      '`npx tsc --noEmit` passes; the targeted test file(s) for the modules you changed pass',
+      'Implementation satisfies the task requirements for the typescript stack',
     ].join('\n'));
     expect(result.noGoCriteria).toBe('reject when the wire is absent.');
     expect(result.techDebtAcceptable).toBe('only wording polish is acceptable.');
@@ -31,18 +31,18 @@ describe('extractGoNogoCriteria — authored acceptance contracts', () => {
   it('uses the derived NO_GO fallback when only GO is authored', () => {
     const result = extractGoNogoCriteria('GO: authored success contract', undefined, context);
 
-    expect(result.goCriteria).toContain('authored success contract\n`npx tsc --noEmit` passes');
-    expect(result.noGoCriteria).toBe('Build fails or tests fail');
-    expect(result.techDebtAcceptable).toBe('Minor style issues if build and tests pass');
+    expect(result.goCriteria).toContain('authored success contract\nImplementation satisfies the task requirements');
+    expect(result.noGoCriteria).toBe('Implementation does not satisfy the task requirements');
+    expect(result.techDebtAcceptable).toContain('Minor style issues');
   });
 
-  it('preserves the existing derived result byte-for-byte without an authored GO', () => {
+  it('derives task acceptance without global verification when GO is not authored', () => {
     const result = extractGoNogoCriteria('ordinary task description', undefined, context);
 
     expect(result).toEqual({
-      goCriteria: '`npx tsc --noEmit` passes; the targeted test file(s) for the modules you changed pass',
-      noGoCriteria: 'Build fails or tests fail',
-      techDebtAcceptable: 'Minor style issues if build and tests pass',
+      goCriteria: 'Implementation satisfies the task requirements for the typescript stack',
+      noGoCriteria: 'Implementation does not satisfy the task requirements',
+      techDebtAcceptable: 'Minor style issues that do not affect the task requirements',
       items: expect.any(Array),
     });
     expect(result.items).toHaveLength(2);
@@ -57,8 +57,22 @@ describe('extractGoNogoCriteria — authored acceptance contracts', () => {
     ].join('\n'), undefined, context);
 
     expect(result.goCriteria).toHaveLength(2_000);
-    expect(result.goCriteria).toContain('`npx tsc --noEmit` passes');
+    expect(result.goCriteria).not.toContain('tsc');
     expect(result.noGoCriteria).toHaveLength(2_000);
     expect(result.techDebtAcceptable).toHaveLength(2_000);
+  });
+
+  it('adds an explicitly authored scoped Test only to that task acceptance contract', () => {
+    const scoped = extractGoNogoCriteria(
+      'ordinary task description',
+      'npx vitest run tests/core/criteria-deriver.test.ts',
+      context,
+    );
+    const unscoped = extractGoNogoCriteria('ordinary task description', undefined, context);
+
+    expect(scoped.goCriteria).toContain('npx vitest run tests/core/criteria-deriver.test.ts');
+    expect(scoped.items.some(item => item.statement.includes('criteria-deriver.test.ts'))).toBe(true);
+    expect(unscoped.goCriteria).not.toContain('vitest');
+    expect(unscoped.items.some(item => item.statement.includes('vitest'))).toBe(false);
   });
 });

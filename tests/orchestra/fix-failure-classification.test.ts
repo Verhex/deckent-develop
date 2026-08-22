@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { classifyFixFailure } from '../../src/orchestra/fix-failure-classification.js';
+import {
+  buildAcceptanceFailureFingerprint,
+  classifyFixFailure,
+} from '../../src/orchestra/fix-failure-classification.js';
 import type { TaskResult } from '../../src/core/task-types.js';
 
 // The FIX phase used to route every NO_GO that was not a cascade-skip or a
@@ -26,6 +29,48 @@ function makeResult(over: Partial<TaskResult> = {}): TaskResult {
 }
 
 describe('classifyFixFailure', () => {
+  it('fingerprints normalized typed provenance stably', () => {
+    const first = buildAcceptanceFailureFingerprint([
+      { criterionId: 'artifact', evidenceKind: 'file', subject: './src\\output.ts', observedState: 'absent' },
+    ]);
+    const reordered = buildAcceptanceFailureFingerprint([
+      { criterionId: 'artifact', evidenceKind: 'file', subject: 'src/output.ts', observedState: 'absent' },
+    ]);
+    expect(first).toBe(reordered);
+    expect(first).toMatch(/^sha256:[a-f0-9]{64}$/u);
+  });
+
+  it('stops an identical typed failure after one FIX', () => {
+    const fingerprint = buildAcceptanceFailureFingerprint([
+      { criterionId: 'artifact', evidenceKind: 'file', subject: 'src/output.ts', observedState: 'absent' },
+    ]);
+    const c = classifyFixFailure({
+      result: makeResult({ notes: 'still missing' }),
+      acceptanceFailureFingerprint: fingerprint,
+      priorAcceptanceFailureFingerprint: fingerprint,
+    });
+    expect(c).toMatchObject({
+      disposition: 'escalateReplan',
+      code: 'REPEATED_ACCEPTANCE_FAILURE',
+      allowsFixTask: false,
+    });
+  });
+
+  it('allows a bounded FIX when typed failure evidence changed', () => {
+    const prior = buildAcceptanceFailureFingerprint([
+      { criterionId: 'artifact', evidenceKind: 'file', subject: 'src/a.ts', observedState: 'absent' },
+    ]);
+    const current = buildAcceptanceFailureFingerprint([
+      { criterionId: 'artifact', evidenceKind: 'file', subject: 'src/b.ts', observedState: 'absent' },
+    ]);
+    const c = classifyFixFailure({
+      result: makeResult({ notes: 'different remaining gap' }),
+      acceptanceFailureFingerprint: current,
+      priorAcceptanceFailureFingerprint: prior,
+    });
+    expect(c.code).toBe('ACCEPTANCE_SHORTFALL');
+    expect(c.allowsFixTask).toBe(true);
+  });
   it('routes a SIGKILL/OOM exit to an unchanged re-run', () => {
     const c = classifyFixFailure({ result: makeResult(), exitCode: 137 });
     expect(c.disposition).toBe('retrySame');

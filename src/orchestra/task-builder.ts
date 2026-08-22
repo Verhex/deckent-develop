@@ -77,7 +77,7 @@ export function logInjectionAudit(
   } catch (e) { debugLog('logInjectionAudit', e); }
 }
 import { readBaseline } from './baseline-tracker.js';
-import { buildTaskPrompt } from './prompt-god-template.js';
+import { buildTaskPrompt, hasTaskScopedTestDirective } from './prompt-god-template.js';
 import { generateProjectContextSegment } from './temp-skill-generator.js';
 import { detectProjectStack } from '../core/stack-detector.js';
 import type {
@@ -2632,10 +2632,15 @@ export function buildWorkerPrompt(
   }
 
   let verifyCommands: ResolvedVerifyCommands | undefined;
-  try {
-    verifyCommands = resolveVerifyCommands(projectRoot);
-  } catch (e) {
-    debugLog('buildWorkerPrompt:resolveVerifyCommands', e);
+  // A task-local Test directive is the worker's complete verification authority.
+  // Stack-resolved commands are wave-level orchestration inputs and must not leak
+  // into that worker prompt or widen its proof obligation.
+  if (!hasTaskScopedTestDirective(task)) {
+    try {
+      verifyCommands = resolveVerifyCommands(projectRoot);
+    } catch (e) {
+      debugLog('buildWorkerPrompt:resolveVerifyCommands', e);
+    }
   }
 
   // born-674 (428-002, W674B): task-scoped tool allowlist via 427-013's pure

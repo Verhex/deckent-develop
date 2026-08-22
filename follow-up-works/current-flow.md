@@ -31,7 +31,7 @@
 - [ ] D5: legacy karar-yüzeyi emekliliği + i18n-kalanı.
 
 ## Örgülü
-- [ ] 9040: enforce-modlu dogfood-canary (UNDECIDABLE→ROUTE→confirmations uçtan-uca) · extension/grace-enforce · confirmation→debt geri-besleme.
+- [x] 9040 ENFORCE-CANARY LOCAL_VERIFIED: UNDECIDABLE→ROUTE→confirmation→tenant-CAS debt→PREPARED/APPLIED zinciri; human broker-MAC + LLM typed-host receipt restart authority; serve/API production reconciler; AST authority ratchet; 33 dosya/226 acceptance testi + 17 dosya/305 komşu regression + tsc/build/real-binary smoke yeşil; 10k 4.786s/replay 2.403s. Dogfood sprint-619 dört logical task DONE olmasına rağmen stale finalizer gate nedeniyle dürüst `ABORTED`; formal cross-provider seal Opus capability-floor nedeniyle typed HOLD. Ayrıntı: `docs/evidence/EVALUATION-001-9040-enforce-canary-evidence-2026-08-22.md`.
 - [ ] 3112 L1-L7 (ön-koşul: 3111 v2 runTask closure).
 
 ## Fabrika-kuyruğu (sıradaki dogfood-paket adayları)
@@ -41,8 +41,9 @@
 - [ ] 7091 cursor-docker hakem-CLI (hakem-çeşitliliği).
 
 ## Blocker/not
-- MINI-İŞ (devir-öncesi kayıt 2026-08-21): bot-daemon listen-child stdout'u /dev/null — relay/karar logları görünmez (D3-tanısını zorlaştırdı); bot-daemon.ts spawn'ına log-dosyası ver. D5/temizlik-dalgası adayı.
+- [x] MINI-İŞ BİTTİ: bot-daemon listen-child logu `.deckent/runtime/bot-listen.log` altında görünür; 2026-08-22 build sonrası PID/start-token ve Telegram listener satırı canlı doğrulandı.
 - FINDING (7092 RECOVERY-TRUTH canlı-vakası, 2026-08-21): `recover <id> --force` task-dosyalarını arşivlerken resume-checkpoint'i de taşıyor → status-projection PAUSED-artığı kalıyor ama `--resume` "checkpoint bulunamadı" veriyor. Sprint-595'te yaşandı (işin kendisi el-fix+worker-fix'le kapandı; yalnız settlement-projection takılı). 7092 tasarımına girdi-vakası.
+- FINDING (7092 RECOVERY-TRUTH ikinci canlı-vaka, 2026-08-22): sprint-619 dört logical taski DONE ve 0 unresolved iken RETRO eski pre-fix `sprint-619-gate.json` TSC failure/projectionını kullandı, `TERMINAL_EVIDENCE_HOLD` verdi; force-finalize dürüst ABORTED receipt yazdı. Product LOCAL_VERIFIED, run settlement COMPLETE değil.
 
 ## DEVİR-PAKETİ 2026-08-21 (aktif handoff-pointer'ı — protokol §4.1)
 - handoffId: ah-2026-08-21-codex-rotation · state: PREPARED (epoch 1→2)

@@ -70,7 +70,7 @@ describe('evaluateGoNogoCriteria — deterministic kernel', () => {
       createGoNoGoCriterionItem({
         polarity: 'go',
         statement: 'deliverable exists',
-        evidenceRequirements: ['docs/delivered.md'],
+        evidenceRequirements: [{ kind: 'file', value: 'docs/delivered.md' }],
       }),
     ]), makeResult(), root)!;
     expect(outcome.items[0]).toMatchObject({ status: 'satisfied', mode: 'deterministic' });
@@ -83,7 +83,7 @@ describe('evaluateGoNogoCriteria — deterministic kernel', () => {
       createGoNoGoCriterionItem({
         polarity: 'go',
         statement: 'report exists',
-        evidenceRequirements: ['docs/never-written.md'],
+        evidenceRequirements: [{ kind: 'file', value: 'docs/never-written.md' }],
       }),
     ]), makeResult({ filesChanged: [] }), root)!;
     expect(outcome.items[0]!.status).toBe('unsatisfied');
@@ -95,7 +95,7 @@ describe('evaluateGoNogoCriteria — deterministic kernel', () => {
       createGoNoGoCriterionItem({
         polarity: 'no-go',
         statement: 'forbidden artifact appears',
-        evidenceRequirements: ['docs/delivered.md'],
+        evidenceRequirements: [{ kind: 'file', value: 'docs/delivered.md' }],
       }),
     ]), makeResult(), root)!;
     expect(outcome.items[0]!.status).toBe('satisfied');
@@ -120,15 +120,47 @@ describe('evaluateGoNogoCriteria — deterministic kernel', () => {
     expect(outcome.decided).toBe(0);
   });
 
-  it('supports the shared ranged grammar path:START-END', () => {
+  it('does not infer file authority from slashy legacy prose', () => {
     const outcome = evaluateGoNogoCriteria(makeTask([
       createGoNoGoCriterionItem({
         polarity: 'go',
-        statement: 'section delivered',
-        evidenceRequirements: ['docs/delivered.md:1-1'],
+        statement: 'slashy prose remains ambiguous',
+        evidenceRequirements: ['Run lint/test before release'],
       }),
     ]), makeResult(), root)!;
-    expect(outcome.items[0]!.status).toBe('satisfied');
+    expect(outcome.items[0]).toMatchObject({ status: 'undecidable', mode: 'llm' });
+    expect(outcome.decisiveNoGo).toBe(false);
+  });
+
+  it.each([
+    '/etc/passwd',
+    '../outside.md',
+    'docs/../outside.md',
+    'C:/Windows/system.ini',
+  ])('rejects unsafe explicit file locator %s as undecidable', value => {
+    const outcome = evaluateGoNogoCriteria(makeTask([
+      createGoNoGoCriterionItem({
+        polarity: 'go',
+        statement: 'unsafe locator is not authority',
+        evidenceRequirements: [{ kind: 'file', value }],
+      }),
+    ]), makeResult({ filesChanged: [] }), root)!;
+    expect(outcome.items[0]!.status).toBe('undecidable');
+    expect(outcome.decisiveNoGo).toBe(false);
+  });
+
+  it.each([
+    { kind: 'command' as const, value: 'npx vitest run' },
+    { kind: 'assertion' as const, value: 'The feature behaves correctly' },
+  ])('leaves explicit $kind requirements for a non-deterministic adapter', requirement => {
+    const outcome = evaluateGoNogoCriteria(makeTask([
+      createGoNoGoCriterionItem({
+        polarity: 'go',
+        statement: 'adapter-specific requirement',
+        evidenceRequirements: [requirement],
+      }),
+    ]), makeResult(), root)!;
+    expect(outcome.items[0]).toMatchObject({ status: 'undecidable', mode: 'llm' });
   });
 
   it('returns null for tasks without typed items (no behaviour change)', () => {
@@ -142,7 +174,7 @@ describe('rubric bridge — typed contract caps the verdict', () => {
       createGoNoGoCriterionItem({
         polarity: 'go',
         statement: 'report exists',
-        evidenceRequirements: ['docs/never-written.md'],
+        evidenceRequirements: [{ kind: 'file', value: 'docs/never-written.md' }],
       }),
     ]);
     const evaluation = evaluateWithRubric(makeResult({ filesChanged: [] }), task, undefined, root);
@@ -176,7 +208,7 @@ describe('rubric bridge — typed contract caps the verdict', () => {
       createGoNoGoCriterionItem({
         polarity: 'go',
         statement: 'report exists',
-        evidenceRequirements: ['docs/never-written.md'],
+        evidenceRequirements: [{ kind: 'file', value: 'docs/never-written.md' }],
       }),
     ]);
     const evaluation = evaluateWithRubric(
@@ -200,7 +232,7 @@ describe('rubric bridge — typed contract caps the verdict', () => {
       createGoNoGoCriterionItem({
         polarity: 'go',
         statement: 'report exists',
-        evidenceRequirements: ['docs/never-written.md'],
+        evidenceRequirements: [{ kind: 'file', value: 'docs/never-written.md' }],
       }),
     ]);
     const evaluation = evaluateWithRubric(makeResult(), task);

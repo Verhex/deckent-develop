@@ -1,5 +1,5 @@
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,7 +7,8 @@ import { TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
 import type { EvaluationResult } from '../../src/core/task-types.js';
 import { resolveApprovalLifecyclePolicy } from '../../src/core/approval-lifecycle-policy.js';
-import { createConfirmationRequest, readConfirmation } from '../../src/core/confirmation-store.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
+import { readConfirmation } from '../../src/core/confirmation-store.js';
 import { applyAcceptanceEnforcement } from '../../src/orchestra/acceptance-enforcement.js';
 import { persistDurableAcceptanceConfirmation } from '../../src/orchestra/sprint-phases.js';
 
@@ -43,14 +44,17 @@ function fixture(): { task: Task; result: TaskResult; baseline: EvaluationResult
 }
 
 describe('EVALUATE durable confirmation boundary', () => {
-  it('applies the DONE downgrade only after a durable v2 create', () => {
+  it('applies the DONE downgrade only after a durable v2 create', async () => {
     const root = mkdtempSync(join(tmpdir(), 'confirmation-durable-'));
     onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    mkdirSync(join(root, '.brain'), { recursive: true });
+    new MemoryStore(join(root, '.brain', 'memory.db')).close();
     const { task, result, baseline } = fixture();
     const enforcement = applyAcceptanceEnforcement(
       baseline, task, result, 'sprint-609', { acceptance_enforcement: 'enforce' },
+      { tenantId: 'tenant-durable', projectId: 'project-durable', generation: 1 },
     );
-    const durable = persistDurableAcceptanceConfirmation({
+    const durable = await persistDurableAcceptanceConfirmation({
       projectRoot: root,
       sprint: { id: 'sprint-609', tasks: [task] },
       task, result, baselineEvaluation: baseline, enforcement,
@@ -69,18 +73,18 @@ describe('EVALUATE durable confirmation boundary', () => {
     expect(found.request.approval.version).toBe('2.0');
   });
 
-  it('retains the rubric DONE and removes the route cause when durable create fails', () => {
+  it('retains the rubric DONE and removes the route cause when durable create fails', async () => {
     const { task, result, baseline } = fixture();
     const enforcement = applyAcceptanceEnforcement(
       baseline, task, result, 'sprint-609', { acceptance_enforcement: 'enforce' },
+      { tenantId: 'tenant-durable', projectId: 'project-durable', generation: 1 },
     );
-    const durable = persistDurableAcceptanceConfirmation({
+    const durable = await persistDurableAcceptanceConfirmation({
       projectRoot: '/not-used',
       sprint: { id: 'sprint-609', tasks: [task] },
       task, result, baselineEvaluation: baseline, enforcement,
       requestedAt: '2026-08-21T08:00:00.000Z',
-      lifecycle: resolveApprovalLifecyclePolicy({ enabled: true }),
-      createFn: (() => { throw new Error('durability unavailable'); }) as typeof createConfirmationRequest,
+      lifecycle: resolveApprovalLifecyclePolicy({ enabled: false }),
     });
     expect(durable.confirmation).toBeUndefined();
     expect(durable.writeError).toBeInstanceOf(Error);

@@ -11,6 +11,12 @@ import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { turkishNormalize } from './memory-normalize.js';
 import { DeckentError } from './errors.js';
+import {
+  canonicalAcceptanceConfirmationJson,
+  deriveAcceptanceConfirmationId,
+  parseAcceptanceConfirmationLineage,
+  type AcceptanceConfirmationLineage,
+} from './acceptance-confirmation-contract.js';
 import type {
   MemoryEntryV2,
   CreateEntryInput,
@@ -24,6 +30,36 @@ import type {
 } from './memory-types.js';
 
 const SCHEMA_VERSION = 1;
+
+export interface AcceptanceRouteDebtAuthority {
+  readonly tenantId: string;
+  readonly projectId: string;
+  readonly confirmationId: string;
+  readonly lineage: AcceptanceConfirmationLineage;
+}
+export interface CreateAcceptanceRouteDebtInput extends AcceptanceRouteDebtAuthority {
+  readonly id: string; readonly title: string; readonly content: string; readonly status: string;
+  readonly priority?: string; readonly metadata?: Readonly<Record<string, unknown>>; readonly changedBy?: string;
+}
+export type CreateAcceptanceRouteDebtResult =
+  | { readonly state: 'CREATED'; readonly entry: MemoryEntryV2 }
+  | { readonly state: 'REPLAYED'; readonly entry: MemoryEntryV2 }
+  | { readonly state: 'CONFLICT' };
+export interface TransitionAcceptanceRouteDebtInput extends AcceptanceRouteDebtAuthority {
+  readonly id: string; readonly expectedStatus: string; readonly nextStatus: string;
+  readonly expectedMetadata?: Readonly<Record<string, unknown>>;
+  readonly nextMetadata?: Readonly<Record<string, unknown>>; readonly changedBy?: string;
+}
+
+function acceptanceDebtMetadata(authority: AcceptanceRouteDebtAuthority, metadata?: Readonly<Record<string, unknown>>): string | null {
+  const lineage = parseAcceptanceConfirmationLineage(authority.lineage);
+  if (!lineage.ok || authority.tenantId !== lineage.value.tenantId
+    || authority.projectId !== lineage.value.projectId
+    || authority.confirmationId !== deriveAcceptanceConfirmationId(lineage.value)) return null;
+  return canonicalAcceptanceConfirmationJson({
+    ...(metadata ?? {}), kind: 'acceptance-route-debt', confirmationId: authority.confirmationId, lineage: lineage.value,
+  });
+}
 
 // ─── Row type from SQLite (decay_exempt is INTEGER 0/1) ──────────
 
@@ -748,6 +784,113 @@ export class MemoryStore {
         insertHistory.run(id, diff.field, diff.oldVal, diff.newVal, changedBy, 'patch');
       }
     })();
+  }
+
+  /**
+   * Atomically transition a debt row owned by one tenant.
+   *
+   * The expected status is the compare-and-swap token. Both the read and the
+   * conditional update execute in the same SQLite transaction; tenant_id is
+   * only a predicate and is never assigned, so a transition cannot move or
+   * downgrade a tenant-owned row.
+   */
+  updateDebtStatusCas(
+    id: string,
+    tenantId: string,
+    expectedStatus: string,
+    nextStatus: string,
+    changedBy = 'system',
+  ): boolean {
+    if (tenantId.length === 0) return false;
+
+    const selectDebt = this.db.prepare(`
+      SELECT * FROM entries
+      WHERE id = ? AND type = 'debt' AND tenant_id = ? AND deleted_at IS NULL
+    `);
+    const updateDebt = this.db.prepare(`
+      UPDATE entries
+      SET status = ?, updated_at = datetime('now')
+      WHERE id = ? AND type = 'debt' AND tenant_id = ?
+        AND status = ? AND deleted_at IS NULL
+    `);
+    const insertHistory = this.db.prepare(`
+      INSERT INTO entry_history (entry_id, field, old_value, new_value, changed_by, change_type)
+      VALUES (?, 'status', ?, ?, ?, 'patch')
+    `);
+
+    return this.db.transaction(() => {
+      const existing = selectDebt.get(id, tenantId) as EntryRow | undefined;
+      if (!existing || existing.status !== expectedStatus) return false;
+      if (expectedStatus === nextStatus) return true;
+
+      const result = updateDebt.run(nextStatus, id, tenantId, expectedStatus);
+      if (result.changes !== 1) return false;
+      insertHistory.run(id, expectedStatus, nextStatus, changedBy);
+      return true;
+    })();
+  }
+
+  /** Tenant/project/confirmation-bound first-writer-wins acceptance debt creation. */
+  createAcceptanceRouteDebtFww(input: CreateAcceptanceRouteDebtInput): CreateAcceptanceRouteDebtResult {
+    if (!input.id || !input.title || !input.content || !input.status || !input.tenantId) return { state: 'CONFLICT' };
+    const metadata = acceptanceDebtMetadata(input, input.metadata);
+    if (metadata === null) return { state: 'CONFLICT' };
+    const transact = this.db.transaction((): CreateAcceptanceRouteDebtResult => {
+      const existing = this.db.prepare(`SELECT * FROM entries WHERE id = ?`).get(input.id) as EntryRow | undefined;
+      if (existing) {
+        const exact = existing.type === 'debt' && existing.tenant_id === input.tenantId
+          && existing.title === input.title && existing.content === input.content
+          && existing.status === input.status && existing.priority === (input.priority ?? 'normal')
+          && existing.metadata === metadata && existing.deleted_at === null;
+        return exact ? { state: 'REPLAYED', entry: rowToEntry(existing) } : { state: 'CONFLICT' };
+      }
+      this.insert({ id: input.id, type: 'debt', title: input.title, content: input.content,
+        source: 'brain', status: input.status, priority: input.priority, tenant_id: input.tenantId,
+        metadata: JSON.parse(metadata) as Record<string, unknown> });
+      if (input.changedBy && input.changedBy !== 'system') {
+        this.db.prepare(`UPDATE entry_history SET changed_by = ? WHERE entry_id = ? AND change_type = 'create'`)
+          .run(input.changedBy, input.id);
+      }
+      const created = this.db.prepare(`SELECT * FROM entries WHERE id = ?`).get(input.id) as EntryRow;
+      return { state: 'CREATED', entry: rowToEntry(created) };
+    });
+    return transact.immediate();
+  }
+
+  /** Atomically compare and swap status plus metadata, with history in the same transaction. */
+  transitionAcceptanceRouteDebtCas(input: TransitionAcceptanceRouteDebtInput): boolean {
+    if (!input.id || !input.tenantId || !input.expectedStatus || !input.nextStatus) return false;
+    const expectedMetadata = acceptanceDebtMetadata(input, input.expectedMetadata);
+    const nextMetadata = acceptanceDebtMetadata(input, input.nextMetadata ?? input.expectedMetadata);
+    if (expectedMetadata === null || nextMetadata === null) return false;
+    const update = this.db.prepare(`
+      UPDATE entries SET status = ?, metadata = ?, updated_at = datetime('now')
+      WHERE id = ? AND type = 'debt' AND tenant_id = ? AND status = ? AND metadata = ? AND deleted_at IS NULL
+        AND json_extract(metadata, '$.confirmationId') = ?
+        AND json_extract(metadata, '$.lineage.tenantId') = ? AND json_extract(metadata, '$.lineage.projectId') = ?
+        AND json_extract(metadata, '$.lineage.attemptId') = ? AND json_extract(metadata, '$.lineage.generation') = ?
+        AND json_extract(metadata, '$.lineage.resultDigest') = ? AND json_extract(metadata, '$.lineage.policyDigest') = ?
+        AND json_extract(metadata, '$.lineage.sourceDigest') = ?
+    `);
+    const history = this.db.prepare(`INSERT INTO entry_history
+      (entry_id, field, old_value, new_value, changed_by, change_type) VALUES (?, ?, ?, ?, ?, 'patch')`);
+    const transact = this.db.transaction(() => {
+      if (input.expectedStatus === input.nextStatus && expectedMetadata === nextMetadata) {
+        return this.db.prepare(`SELECT 1 FROM entries WHERE id = ? AND type = 'debt' AND tenant_id = ?
+          AND status = ? AND metadata = ? AND deleted_at IS NULL`)
+          .get(input.id, input.tenantId, input.expectedStatus, expectedMetadata) !== undefined;
+      }
+      const lineage = input.lineage;
+      const result = update.run(input.nextStatus, nextMetadata, input.id, input.tenantId,
+        input.expectedStatus, expectedMetadata, input.confirmationId, input.tenantId, input.projectId,
+        lineage.attemptId, lineage.generation, lineage.resultDigest, lineage.policyDigest, lineage.sourceDigest);
+      if (result.changes !== 1) return false;
+      const changedBy = input.changedBy ?? 'system';
+      if (input.expectedStatus !== input.nextStatus) history.run(input.id, 'status', input.expectedStatus, input.nextStatus, changedBy);
+      if (expectedMetadata !== nextMetadata) history.run(input.id, 'metadata', expectedMetadata, nextMetadata, changedBy);
+      return true;
+    });
+    return transact.immediate();
   }
 
   getById(id: string, opts?: { includeDeleted?: boolean; tenantId?: string }): MemoryEntryV2 | null {

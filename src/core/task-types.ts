@@ -310,6 +310,17 @@ export interface TaskScope {
 export type GoNoGoCriterionPolarity = 'go' | 'no-go';
 
 /**
+ * Authored evidence with an explicit confirmation grammar. Legacy strings are
+ * retained as read-compatible, untyped requirements; they never acquire file
+ * authority merely because their prose resembles a path.
+ */
+export type CriterionEvidenceRequirement =
+  | string
+  | { readonly kind: 'file'; readonly value: string }
+  | { readonly kind: 'command'; readonly value: string }
+  | { readonly kind: 'assertion'; readonly value: string };
+
+/**
  * One machine-addressable acceptance criterion.
  *
  * The legacy display strings remain canonical user-facing summaries. `items`
@@ -321,17 +332,29 @@ export interface GoNoGoCriterionItem {
   id: string;
   polarity: GoNoGoCriterionPolarity;
   statement: string;
+  /** Canonical wire form; typed inputs are encoded as `<kind>:<JSON string>`. */
   evidenceRequirements: string[];
 }
 
 export interface GoNoGoCriterionItemInput {
   polarity: GoNoGoCriterionPolarity;
   statement: string;
-  evidenceRequirements?: readonly string[];
+  evidenceRequirements?: readonly CriterionEvidenceRequirement[];
 }
 
 function normalizeCriterionText(value: string): string {
   return value.replace(/\r\n?/g, '\n').trim();
+}
+
+function normalizeEvidenceRequirement(
+  requirement: CriterionEvidenceRequirement,
+): string | null {
+  if (typeof requirement === 'string') {
+    const value = normalizeCriterionText(requirement);
+    return value || null;
+  }
+  const value = normalizeCriterionText(requirement.value);
+  return value ? `${requirement.kind}:${JSON.stringify(value)}` : null;
 }
 
 /**
@@ -346,11 +369,15 @@ export function createGoNoGoCriterionItem(
 ): GoNoGoCriterionItem {
   const statement = normalizeCriterionText(input.statement);
   if (!statement) throw new TypeError('GO/NO-GO criterion statement must not be empty');
-  const evidenceRequirements = [...new Set(
-    (input.evidenceRequirements ?? [])
-      .map(normalizeCriterionText)
-      .filter(Boolean),
-  )].sort();
+  const evidenceByIdentity = new Map<string, string>();
+  for (const authored of input.evidenceRequirements ?? []) {
+    const requirement = normalizeEvidenceRequirement(authored);
+    if (requirement === null) continue;
+    evidenceByIdentity.set(requirement, requirement);
+  }
+  const evidenceRequirements = [...evidenceByIdentity.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, requirement]) => requirement);
   const digest = createHash('sha256')
     .update(JSON.stringify([input.polarity, statement, evidenceRequirements]))
     .digest('hex');

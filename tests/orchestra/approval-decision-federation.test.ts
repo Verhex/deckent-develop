@@ -73,7 +73,7 @@ describe('decision federation bridge', () => {
     if (forged.state === 'failed') expect(forged.reason).toBe('APR_UNKNOWN_REQUEST');
   });
 
-  it('settles a confirmation back exactly as its consumers expect', async () => {
+  it('refuses raw confirmation settlement without canonical broker authority', async () => {
     const root = fixtureRoot();
     const requestedAt = new Date().toISOString();
     const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
@@ -84,17 +84,9 @@ describe('decision federation bridge', () => {
       source: 'acceptance-matrix',
     }, { lifecycle, clock: () => new Date(requestedAt) });
     const out = await settleFederatedDecision(root, 'confirmation', id, 'allow', 'unified surface');
-    expect(out).toEqual({ state: 'settled', origin: 'confirmation' });
+    expect(out).toEqual({ state: 'failed', reason: 'confirmation-authority-unavailable' });
     const settled = readConfirmation(root, id);
-    expect(settled?.state).toBe('settled');
-    if (settled?.state === 'settled') {
-      expect(settled.request.outcome).toMatchObject({
-        verdict: 'CONFIRMED', decidedBy: 'human', reason: 'unified surface',
-      });
-    }
-    // Single-shot: a second settle reports non-pending, never throws.
-    expect(await settleFederatedDecision(root, 'confirmation', id, 'deny', 'again'))
-      .toEqual({ state: 'failed', reason: 'confirmation-not-pending' });
+    expect(settled?.state).toBe('pending');
   });
 
   it('flips a pending checkpoint file in place; deny rejects; guards are typed', async () => {

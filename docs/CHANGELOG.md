@@ -14,6 +14,53 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint619] - 2026-08-22
+
+### Added
+
+- Durable LLM authority binding and restart verifier
+- Serve dual-authority default composition and ownership
+- Authority duplication ratchet
+- End-to-end restart, race and real composition proof
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
+## [sprint613] - 2026-08-21
+
+### Added
+
+- Hermetic provider-probe broker clock
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint612] - 2026-08-21
+
+### Added
+
+- Canonical bounded probe risk envelope
+- Rule application production-chain proof
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
+## [sprint611] - 2026-08-21
+
+### Added
+
+- Wave-level verification placement
+- Worker prompt verification placement
+- Typed criterion evidence grammar
+- Planner to evaluator recovery integration
+
+### Fixed
+
+- FIX provenance circuit breaker
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [sprint606] - 2026-08-21
 
 ### Added

@@ -21,9 +21,19 @@ import { extractSprintFromDebtId } from '../core/memory-import.js';
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { getAgentRole } from '../core/agent-role-contract.js';
 import { classifyFixFailure } from './fix-failure-classification.js';
+import { deriveAcceptanceFailureFingerprint } from './result-evaluator.js';
 import { buildReplanProposal } from './replan-proposal.js';
 import { writeEvent } from './event-stream.js';
 import { resolveTaskLineageRootId } from '../core/task-lineage.js';
+import {
+  deriveAcceptanceConfirmationId,
+  type AcceptanceConfirmationLineage,
+} from '../core/acceptance-confirmation-contract.js';
+import type { AcceptanceSettlement } from '../core/acceptance-settlement.js';
+import {
+  createAcceptanceRouteDebt as createAcceptanceRouteDebtTransaction,
+  transitionAcceptanceRouteDebt as transitionAcceptanceRouteDebtTransaction,
+} from '../core/debt-store.js';
 import { resolveFixRepairAuthority } from './fix-repair-authority.js';
 import type {
   FixRepairAuthorityInput, FixRepairEvidence, FixRepairAuthorityResult,
@@ -284,6 +294,102 @@ function getSprintNumber(sprintId: string): number {
  * declaration; that self-knowledge must still reach the ledger).
  */
 type DebtSource = 'evaluator' | 'self';
+
+export interface RecordAcceptanceRouteDebtInput {
+  readonly confirmationId: string;
+  readonly lineage: AcceptanceConfirmationLineage;
+  readonly sprintId: string;
+}
+
+export interface TransitionAcceptanceRouteDebtInput extends RecordAcceptanceRouteDebtInput {
+  /** Canonical Task-2 reducer output; callers cannot author a RESOLVE command. */
+  readonly settlement: AcceptanceSettlement;
+  readonly resolvedInSprintId?: string;
+}
+
+export type AcceptanceRouteDebtTransition =
+  | { readonly status: 'active'; readonly debtId: string }
+  | { readonly status: 'resolved'; readonly debtId: string }
+  | { readonly status: 'not_found'; readonly debtId: string }
+  | { readonly status: 'lineage_mismatch'; readonly debtId: string };
+
+function acceptanceRouteDebtMetadata(input: RecordAcceptanceRouteDebtInput): Readonly<Record<string, unknown>> {
+  return {
+    class: 'acceptance-route',
+    provisional: true,
+    originSprintId: input.sprintId,
+    sprintsOpen: 0,
+  };
+}
+
+function hasCanonicalAcceptanceRouteIdentity(input: RecordAcceptanceRouteDebtInput): boolean {
+  return input.confirmationId === deriveAcceptanceConfirmationId(input.lineage);
+}
+
+/**
+ * Persist the one provisional debt belonging to an acceptance confirmation.
+ * Its primary key is deliberately confirmation-bound rather than task-bound:
+ * multiple attempts/generations of a task can never alias one another.
+ */
+export function recordAcceptanceRouteDebt(
+  projectRoot: string,
+  input: RecordAcceptanceRouteDebtInput,
+): boolean {
+  if (!hasCanonicalAcceptanceRouteIdentity(input)) return false;
+  const debtId = `debt-${input.confirmationId}`;
+  const result = createAcceptanceRouteDebtTransaction(projectRoot, {
+    id: debtId,
+    tenantId: input.lineage.tenantId,
+    projectId: input.lineage.projectId,
+    confirmationId: input.confirmationId,
+    lineage: input.lineage,
+    title: `Acceptance confirmation pending: ${input.confirmationId}`.slice(0, 80),
+    content: `Acceptance confirmation ${input.confirmationId} is pending for its exact canonical lineage.`,
+    status: 'active',
+    priority: 'normal',
+    metadata: acceptanceRouteDebtMetadata(input),
+    changedBy: 'brain',
+  });
+  return result.state === 'CREATED';
+}
+
+/**
+ * Apply the acceptance reducer's debt disposition to the exact routed row.
+ * KEEP_ACTIVE (including QUALIFIED and expiry outcomes) is intentionally a
+ * no-write result. RESOLVE additionally requires every persisted lineage byte
+ * to match, preventing task-id-only or broad-tag closure.
+ */
+export function transitionAcceptanceRouteDebt(
+  projectRoot: string,
+  input: TransitionAcceptanceRouteDebtInput,
+): AcceptanceRouteDebtTransition {
+  const debtId = `debt-${input.confirmationId}`;
+  if (!hasCanonicalAcceptanceRouteIdentity(input)) return { status: 'lineage_mismatch', debtId };
+  if (input.settlement.sourceVerdict !== 'UNDECIDABLE'
+    || input.settlement.acceptanceDisposition !== 'active'
+    || input.settlement.debtDisposition !== 'resolved'
+    || input.settlement.reasonCode !== 'CONFIRMATION_APPLIED'
+    || input.settlement.receiptDisposition !== 'APPLIED') return { status: 'active', debtId };
+  const expectedMetadata = acceptanceRouteDebtMetadata(input);
+  const applied = transitionAcceptanceRouteDebtTransaction(projectRoot, {
+    id: debtId,
+    tenantId: input.lineage.tenantId,
+    projectId: input.lineage.projectId,
+    confirmationId: input.confirmationId,
+    lineage: input.lineage,
+    expectedStatus: 'active',
+    nextStatus: 'resolved',
+    expectedMetadata,
+    nextMetadata: {
+      ...expectedMetadata,
+      provisional: false,
+      resolvedInSprintId: input.resolvedInSprintId,
+      resolutionAuthority: 'acceptance-settlement-reducer',
+    },
+    changedBy: 'brain',
+  });
+  return applied ? { status: 'resolved', debtId } : { status: 'lineage_mismatch', debtId };
+}
 
 // ─── Success-echo classification (sprint-573/574) ─────────────────────
 // Verification-evidence markers workers actually write (observed in the live
@@ -684,10 +790,16 @@ export function handleEvaluation(
   // path yet, so they park as typed PAUSED for an operator/Brain decision rather
   // than silently degrading into the retry this gate exists to prevent. That is
   // the conservative direction: fewer fix tasks, more honest stops.
+  const acceptanceFailureFingerprint = deriveAcceptanceFailureFingerprint(task, result, projectRoot);
+  const priorAcceptanceFailureFingerprint = (task as Task & {
+    acceptanceFailureFingerprint?: string;
+  }).acceptanceFailureFingerprint;
   const failureClass = classifyFixFailure({
     result,
     exitCode: (result as { exitCode?: number | null } | null | undefined)?.exitCode ?? null,
     priorZeroDiffAttempts: countZeroDiffAttempts(projectRoot, task.id),
+    acceptanceFailureFingerprint,
+    priorAcceptanceFailureFingerprint,
   });
   if (!failureClass.allowsFixTask) {
     updateTaskStatus(projectRoot, task.id, TaskStatus.PAUSED);
@@ -851,6 +963,7 @@ export function handleEvaluation(
     ...fixTask,
     rotationStrategy,
     repairAuthority,
+    ...(acceptanceFailureFingerprint ? { acceptanceFailureFingerprint } : {}),
   };
 
   mkdirSync(join(projectRoot, TASKS_DIR), { recursive: true });
@@ -1026,6 +1139,10 @@ export function resolveDebt(projectRoot: string, debtId: string, resolvedInSprin
       const entry = store.getById(debtId);
       if (!entry || entry.status === 'resolved') return false;
       const meta = JSON.parse(entry.metadata || '{}') as Record<string, unknown>;
+      // Acceptance-route debt is immutable outside its tenant/project/full-lineage
+      // CAS adapter. Generic task/sprint closure must not turn metadata knowledge
+      // into authority to settle a confirmation.
+      if (meta.class === 'acceptance-route') return false;
       store.upsert({
         ...debtEntryToInput(entry),
         status: 'resolved',

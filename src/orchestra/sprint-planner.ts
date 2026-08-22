@@ -616,15 +616,13 @@ export async function planSprint(
     const patternsRaw = typeof context.patterns === 'string' ? context.patterns : '';
     const parsedPatterns = deduplicatePatterns(parsePatterns(patternsRaw));
 
-    // WM-7: resolve the project tech stack ONCE so each task's GO/NO-GO criteria
-    // are kind × stack aware — a doc task isn't judged by a build, and a code
-    // task is judged against ITS stack's exact build/test commands (never `tsc`
-    // on a Go/Python/C++ project). detectFullStack adds the resolved commands;
-    // unknown stack → 'generic' (deriver stays neutral). (WM-7 E4)
+    // WM-7: resolve the project tech stack ONCE. Classification remains task-level,
+    // while repository-wide commands are retained for wave verification rather
+    // than copied into every generated task's acceptance criteria.
     const wm7Stack = detectFullStack(projectRoot);
     const wm7StackKind = normalizeTechStack(wm7Stack?.language);
-    // sprint-399 G6a: carry `typecheck` through so criteria-deriver can prefer it over
-    // `build` (a bare `npx tsc` in a DoD is a mid-sprint dist-emit instruction — N5).
+    // Retain the detected command set as stack metadata. The criteria deriver
+    // deliberately does not project these wave-level checks into each task.
     const wm7Commands = {
       build: wm7Stack?.commands?.build,
       test: wm7Stack?.commands?.test,
@@ -977,7 +975,7 @@ export async function planSprint(
       }
     }
     const testDiscoveryContracts = resolveTestDiscoveryContracts(projectRoot);
-    const testDiscoverabilityIssues = evaluateTestDiscoverability(tasks, testDiscoveryContracts);
+    const testDiscoverabilityIssues = evaluateTestDiscoverability(tasks, testDiscoveryContracts, projectRoot);
     const gateLang = detectLang(projectRoot);
     promptGate = evaluatePromptGate({
       tasks,

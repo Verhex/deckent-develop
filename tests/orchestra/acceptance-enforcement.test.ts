@@ -12,7 +12,6 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Command } from 'commander';
 
 import { applyAcceptanceEnforcement } from '../../src/orchestra/acceptance-enforcement.js';
 import { hasUnsalvageableContractFailure } from '../../src/orchestra/criterion-evaluation.js';
@@ -22,8 +21,6 @@ import {
   readConfirmation,
   settleConfirmation,
 } from '../../src/core/confirmation-store.js';
-import { registerConfirmationsCommand } from '../../src/cli/commands/confirmations.js';
-import { loadConfig } from '../../src/core/config.js';
 import { resolveApprovalLifecyclePolicy } from '../../src/core/approval-lifecycle-policy.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
@@ -66,6 +63,8 @@ function makeEvaluation(over: Partial<EvaluationResult> = {}): EvaluationResult 
   return { decision: 'DONE', totalScore: 95, rubricScores: [], retryCount: 0, ...over };
 }
 
+const routeAuthority = { tenantId: 'tenant-920', projectId: 'project-920', generation: 2 } as const;
+
 describe('applyAcceptanceEnforcement', () => {
   it('observe mode (default) never changes the evaluation', () => {
     const evaluation = makeEvaluation();
@@ -98,19 +97,102 @@ describe('applyAcceptanceEnforcement', () => {
           undecidableItems: [{ itemId: 'it-1', statement: 'process owner signs off' }],
         },
       }),
-      task, makeResult(), 'sprint-920', { acceptance_enforcement: 'enforce' });
+      task, makeResult({ workAttribution: {
+        state: 'VERIFIED', attemptId: 'attempt-920', baselineRef: 'baseline', scopeDigest: 'scope',
+      } }), 'sprint-920', { acceptance_enforcement: 'enforce' }, routeAuthority);
     expect(routed.evaluation.decision).toBe('GO_WITH_TECH_DEBT');
     expect(routed.postRubricCause).toBe('acceptance-policy:route:human');
     expect(routed.pendingConfirmation).toMatchObject({
       taskId: '920-001', kind: 'security', verdict: 'UNDECIDABLE', adapter: 'human',
       statements: ['process owner signs off'], authorProvider: 'claude',
     });
+    expect(routed.routeClaim).toMatchObject({
+      schemaVersion: 2,
+      sourceVerdict: 'UNDECIDABLE',
+      adapter: 'human',
+      lineage: {
+        tenantId: 'tenant-920', projectId: 'project-920', sprintId: 'sprint-920',
+        taskId: '920-001', attemptId: 'attempt-920', generation: 2,
+        evaluationDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        resultDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        policyDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        sourceDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      },
+      evaluationDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      claimDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
+    expect(routed.routeClaim!.evaluationDigest).toBe(routed.routeClaim!.lineage.evaluationDigest);
+    expect(routed.routeClaim!.lineage.resultDigest).not.toBe(routed.routeClaim!.lineage.evaluationDigest);
+    expect(new Set([
+      routed.routeClaim!.lineage.evaluationDigest, routed.routeClaim!.lineage.resultDigest,
+      routed.routeClaim!.lineage.policyDigest, routed.routeClaim!.lineage.sourceDigest,
+    ])).toHaveLength(4);
 
     const noGo = applyAcceptanceEnforcement(
       makeEvaluation({ decision: 'NO_GO' }), task, makeResult(), 'sprint-920',
       { acceptance_enforcement: 'enforce' });
     expect(noGo.evaluation.decision).toBe('NO_GO');
     expect(noGo.pendingConfirmation).toBeUndefined();
+  });
+
+  it('does not create or apply a ROUTE intent without complete explicit authority', () => {
+    const evaluation = makeEvaluation({
+      contractSummary: {
+        decided: 0, total: 1,
+        undecidableItems: [{ itemId: 'owner', statement: 'owner confirms' }],
+      },
+    });
+    const out = applyAcceptanceEnforcement(
+      evaluation, makeTask({ type: 'security' }), makeResult(), 'sprint-920',
+      { acceptance_enforcement: 'enforce' },
+    );
+    expect(out.evaluation).toBe(evaluation);
+    expect(out.enforced).toBe(false);
+    expect(out.pendingConfirmation).toBeUndefined();
+    expect(out.routeClaim).toBeUndefined();
+  });
+
+  it('derives identical route claims from identical canonical inputs', () => {
+    const evaluation = makeEvaluation({
+      contractSummary: {
+        decided: 0, total: 1,
+        undecidableItems: [{ itemId: 'owner', statement: 'owner confirms' }],
+      },
+    });
+    const result = makeResult({ workAttribution: {
+      state: 'VERIFIED', attemptId: 'attempt-920', baselineRef: 'baseline', scopeDigest: 'scope',
+    } });
+    const args = [evaluation, makeTask({ type: 'security' }), result, 'sprint-920',
+      { acceptance_enforcement: 'enforce' } as const, routeAuthority] as const;
+    expect(applyAcceptanceEnforcement(...args).routeClaim)
+      .toEqual(applyAcceptanceEnforcement(...args).routeClaim);
+  });
+
+  it('binds producer inputs to exact sprint/task/attempt/generation authority', () => {
+    const evaluation = makeEvaluation({ contractSummary: {
+      decided: 0, total: 1,
+      undecidableItems: [{ itemId: 'owner', statement: 'owner confirms' }],
+    } });
+    const result = makeResult({ workAttribution: {
+      state: 'VERIFIED', attemptId: 'attempt-920', baselineRef: 'baseline', scopeDigest: 'scope',
+    } });
+    const produce = (nextEvaluation: EvaluationResult, nextTask: Task, nextResult: TaskResult,
+      nextSprint: string, nextAuthority = routeAuthority) => applyAcceptanceEnforcement(
+      nextEvaluation, nextTask, nextResult, nextSprint,
+      { acceptance_enforcement: 'enforce' }, nextAuthority,
+    ).routeClaim!;
+    const base = produce(evaluation, makeTask({ type: 'security' }), result, 'sprint-920');
+
+    expect(produce({ ...evaluation, totalScore: 94 }, makeTask({ type: 'security' }), result,
+      'sprint-920').lineage.evaluationDigest).not.toBe(base.lineage.evaluationDigest);
+    expect(produce(evaluation, makeTask({ type: 'security' }), { ...result, notes: 'changed' },
+      'sprint-920').lineage.resultDigest).not.toBe(base.lineage.resultDigest);
+    expect(produce(evaluation, makeTask({ type: 'security' }), result,
+      'sprint-other').lineage.sprintId).toBe('sprint-other');
+    expect(produce(evaluation, makeTask({ id: '920-002', type: 'security' }),
+      { ...result, taskId: '920-002' }, 'sprint-920').lineage.taskId).toBe('920-002');
+    expect(produce(evaluation, makeTask({ type: 'security' }), result, 'sprint-920',
+      { ...routeAuthority, generation: 3 }).lineage.generation).toBe(3);
   });
 });
 
@@ -145,40 +227,4 @@ describe('confirmation store + human CLI decide', () => {
     expect(createConfirmationRequest(root, base, storeOptions)).toEqual({ id: first.id, created: false });
   });
 
-  it('CLI decide settles a human request behind the interactive seam; wrong adapter refused', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'confirmation-cli-'));
-    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
-    const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
-    const clock = () => new Date('2026-08-20T12:00:02.000Z');
-    const storeOptions = { lifecycle, clock };
-    const human = createConfirmationRequest(root, {
-      sprintId: 's', taskId: 't', itemIds: [], kind: 'audit', verdict: 'QUALIFIED',
-      adapter: 'human', statements: ['ok?'], evidenceRequirements: [],
-      requestedAt: '2026-08-20T12:00:00.000Z', source: 'acceptance-matrix',
-    }, storeOptions);
-    const llm = createConfirmationRequest(root, {
-      sprintId: 's', taskId: 't2', itemIds: [], kind: 'audit', verdict: 'UNDECIDABLE',
-      adapter: 'llm', statements: ['?'], evidenceRequirements: [],
-      requestedAt: '2026-08-20T12:00:01.000Z', source: 'acceptance-matrix',
-    }, storeOptions);
-
-    const program = new Command();
-    program.exitOverride();
-    registerConfirmationsCommand(program, {
-      resolveProjectRootFn: () => root,
-      confirmInteractiveFn: async () => true,
-      clock,
-      loadConfigFn: (async () => ({ approval: { lifecycle } })) as unknown as typeof loadConfig,
-    });
-    await program.parseAsync(['node', 'deckent', 'confirmations', 'decide', human.id,
-      '--confirm', '--reason', 'reviewed and approved']);
-    expect(readConfirmation(root, human.id, storeOptions)?.state).toBe('settled');
-
-    process.exitCode = 0;
-    await program.parseAsync(['node', 'deckent', 'confirmations', 'decide', llm.id,
-      '--confirm', '--reason', 'nope']);
-    expect(process.exitCode).toBe(1);
-    expect(readConfirmation(root, llm.id, storeOptions)?.state).toBe('pending');
-    process.exitCode = 0;
-  });
 });

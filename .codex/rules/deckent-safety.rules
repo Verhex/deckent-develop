@@ -1,15 +1,28 @@
 # Owner-approval gates for commands that must remain possible but never run
-# without an explicit prompt. Project-local execpolicy rules are loaded only
-# for trusted projects and can be bypassed with `--ignore-rules`; enterprise
+# without authorization. Project-local execpolicy rules are loaded only for
+# trusted projects and can be bypassed with `--ignore-rules`; enterprise
 # installations that need an unbypassable boundary must promote these rules to
-# managed requirements.
+# managed requirements. Commit authorization is enforced by the repository
+# contract because a `prompt` decision deadlocks headless/never-approval hosts;
+# push remains an interactive execpolicy boundary.
 
 prefix_rule(
-    pattern = ["git", ["commit", "push"]],
-    decision = "prompt",
-    justification = "Commit/push yalnız Alperen isteyince; önce `git branch -vv` ile shared-worktree HEAD-drift kontrol edilir.",
+    pattern = ["git", "commit"],
+    decision = "allow",
     match = [
         "git commit -m example",
+    ],
+    not_match = [
+        "git push",
+        "git status --short",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "Push yalnız Alperen isteyince; önce `git branch -vv` ile shared-worktree HEAD-drift kontrol edilir.",
+    match = [
         "git push",
         "git push origin main",
     ],

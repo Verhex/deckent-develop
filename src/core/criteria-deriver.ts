@@ -1,12 +1,12 @@
 // ═══ Criteria Deriver — kind × stack aware GO/NO-GO base (WM-7) ══════════════
 // Replaces the hardcoded `Tests pass; tsc clean` base in extractGoNogoCriteria.
-// A doc/mail/audit task must NOT be judged by a build/test; a Go/Python/C++ code
-// task must be judged by ITS stack's commands, never `tsc`. Pure + total: unknown
-// kind/stack degrade to a neutral, stack-agnostic phrasing (never re-hardcodes tsc).
+// Task acceptance describes the task result; repository-wide verification belongs
+// to the wave-level Brain contract. Pure + total: unknown stacks degrade to a
+// neutral result criterion (never a language-specific command).
 //
-// This module is the KIND→shape mapper only. The build/test COMMANDS come from
-// the single source (stack-detector STACK_COMMANDS) and are passed in — no second
-// command table here (avoids drift). See ADR-019 (language-agnostic verify),
+// This module is the KIND→shape mapper only. Stack commands may be passed for API
+// compatibility but are deliberately ignored at task-criteria placement. See
+// ADR-019 (language-agnostic verify),
 // ADR-070 (evaluation integrity / zero-hard-code), ADR-053 (TaskKind).
 
 import type { TaskKind, TechStackKind } from './work-model.js';
@@ -18,6 +18,7 @@ export interface DerivedBaseCriteria {
 }
 
 export interface StackCommands {
+  /** Wave-level verification metadata. Task criteria derivation does not emit it. */
   build?: string;
   test?: string;
   /** Dedicated no-emit/no-artifact verification command (e.g. `npx tsc --noEmit`, `cargo check`),
@@ -26,9 +27,7 @@ export interface StackCommands {
    *  (a passing typecheck already implies the build compiles; naming both would be redundant and,
    *  for languages where `build` emits dist artifacts mid-sprint, actively unsafe to suggest). */
   typecheck?: string;
-  /** Specific test file paths to target (e.g. extracted from task Files/Kanıt). When absent
-   *  the test criterion uses the "targeted test file(s)" generic phrase rather than the bare
-   *  run-all command, avoiding a "run the full suite" implication in goCriteria. */
+  /** Wave-level targeted test metadata; authored task Test criteria are composed by the caller. */
   testFiles?: string[];
 }
 
@@ -81,38 +80,14 @@ export function deriveBaseCriteria(
 }
 
 function deriveCodeCriteria(stack: TechStackKind, commands?: StackCommands): DerivedBaseCriteria {
-  const build = commands?.build?.trim();
-  const typecheck = commands?.typecheck?.trim();
-  const test = commands?.test?.trim();
-  const testFiles = commands?.testFiles;
-  const parts: string[] = [];
-  // Preference chain: a dedicated typecheck command REPLACES the build proof line (never both —
-  // e.g. `npx tsc --noEmit` passes, not `npx tsc` succeeds); absent that, fall back to build.
-  if (typecheck) {
-    parts.push(`\`${typecheck}\` passes`);
-  } else if (build) {
-    parts.push(`\`${build}\` succeeds`);
-  }
-  if (test) {
-    // Use a targeted-file command when file paths are known; otherwise use the
-    // generic "targeted" phrase so goCriteria never implies running the full suite
-    // (bare `npx vitest run` would trigger that implication — Sprint 273 T-009).
-    if (testFiles && testFiles.length > 0) {
-      parts.push(`\`${test} ${testFiles.join(' ')}\` passes`);
-    } else {
-      parts.push('the targeted test file(s) for the modules you changed pass');
-    }
-  }
-  // No detected commands → neutral phrasing naming the stack (never hardcode tsc).
-  const goCriteria = parts.length > 0
-    ? parts.join('; ')
-    : stack !== 'generic'
-      ? `Project builds and tests pass for the ${stack} stack`
-      : 'Build succeeds; tests pass';
+  // Commands remain part of stack discovery for wave verification, but they are
+  // intentionally not projected into every task's acceptance contract.
+  void commands;
+  const stackContext = stack === 'generic' ? '' : ` for the ${stack} stack`;
   return {
-    goCriteria,
-    noGoCriteria: 'Build fails or tests fail',
-    techDebtAcceptable: 'Minor style issues if build and tests pass',
+    goCriteria: `Implementation satisfies the task requirements${stackContext}`,
+    noGoCriteria: 'Implementation does not satisfy the task requirements',
+    techDebtAcceptable: 'Minor style issues that do not affect the task requirements',
   };
 }
 

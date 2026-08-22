@@ -7,7 +7,10 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { BRAIN_DIR, MEMORY_DB_FILE } from './constants.js';
-import { MemoryStore } from './memory-store.js';
+import { canonicalAcceptanceConfirmationJson, deriveAcceptanceConfirmationId,
+  parseAcceptanceConfirmationLineage } from './acceptance-confirmation-contract.js';
+import { MemoryStore, type CreateAcceptanceRouteDebtInput, type CreateAcceptanceRouteDebtResult,
+  type TransitionAcceptanceRouteDebtInput } from './memory-store.js';
 import { DebtPriority } from './types.js';
 import type { DebtItem } from './types.js';
 import type { MemoryEntryV2 } from './memory-types.js';
@@ -22,6 +25,42 @@ function openStore(projectRoot: string): MemoryStore | null {
   } catch {
     return null;
   }
+}
+
+/** Project-local facade for authoritative first-writer acceptance debt creation. */
+export function createAcceptanceRouteDebt(projectRoot: string, input: CreateAcceptanceRouteDebtInput): CreateAcceptanceRouteDebtResult {
+  const store = openStore(projectRoot);
+  if (!store) return { state: 'CONFLICT' };
+  try { return store.createAcceptanceRouteDebtFww(input); }
+  catch { return { state: 'CONFLICT' }; }
+  finally { store.close(); }
+}
+
+/** Project-local facade for the tenant/project/full-lineage debt CAS. */
+export function transitionAcceptanceRouteDebt(projectRoot: string, input: TransitionAcceptanceRouteDebtInput): boolean {
+  const store = openStore(projectRoot);
+  if (!store) return false;
+  try {
+    if (store.transitionAcceptanceRouteDebtCas(input)) return true;
+
+    // A retry of the exact command is successful only when the authoritative
+    // post-state is already present. Keep this read tenant-qualified and bind
+    // the replay to every lineage byte; a merely similar terminal row must not
+    // turn a stale or foreign command into success.
+    const lineage = parseAcceptanceConfirmationLineage(input.lineage);
+    if (!lineage.ok || input.tenantId !== lineage.value.tenantId
+      || input.projectId !== lineage.value.projectId
+      || input.confirmationId !== deriveAcceptanceConfirmationId(lineage.value)) return false;
+    const row = store.getById(input.id, { tenantId: input.tenantId });
+    if (!row || row.type !== 'debt' || row.status !== input.nextStatus) return false;
+    const replayMetadata = canonicalAcceptanceConfirmationJson({
+      ...(input.nextMetadata ?? input.expectedMetadata ?? {}),
+      kind: 'acceptance-route-debt', confirmationId: input.confirmationId, lineage: lineage.value,
+    });
+    return row.metadata === replayMetadata;
+  }
+  catch { return false; }
+  finally { store.close(); }
 }
 
 /** Map a Memory V2 `debt` entry row to the legacy DebtItem shape. */
@@ -54,29 +93,57 @@ function debtEntryToDebtItem(entry: MemoryEntryV2): DebtItem {
  * @param opts.activeOnly - When true, resolved debt is excluded
  * @returns DebtItem[]; empty array when no DB is present
  */
-export function getDebtItems(projectRoot: string, opts?: { activeOnly?: boolean }): DebtItem[] {
+export function getDebtItems(
+  projectRoot: string,
+  opts?: { activeOnly?: boolean; tenantId?: string },
+): DebtItem[] {
   const store = openStore(projectRoot);
   if (!store) return [];
   try {
-    const entries = store.getByType('debt');
-    // Lazy reconciliation: a rollback that succeeded is a closed historical
-    // event, not active debt. Auto-resolve any stale entries written before
-    // recordRollbackDebt set the correct status (see ADR-009 / debt-store fix).
-    for (const e of entries) {
-      if (e.status === 'resolved') continue;
-      let meta: Record<string, unknown>;
-      try { meta = JSON.parse(e.metadata || '{}') as Record<string, unknown>; } catch { continue; }
-      if (meta.kind === 'rollback' && meta.rollbackSuccess === true) {
-        store.update(e.id, { status: 'resolved' });
-        e.status = 'resolved';
-      }
-    }
+    // Projection only: reads must never reconcile or otherwise mutate debt.
+    const entries = store.getByType('debt', opts?.tenantId);
     const filtered = opts?.activeOnly
       ? entries.filter(e => e.status !== 'resolved')
       : entries;
     return filtered.map(debtEntryToDebtItem);
   } catch {
     return []; // corrupt or locked DB — debt is non-critical, degrade gracefully
+  } finally {
+    store.close();
+  }
+}
+
+/**
+ * Reconcile legacy successful-rollback debt for exactly one tenant/project.
+ * The project is bound by its Memory DB and every transition is an atomic,
+ * tenant-qualified status CAS. Tenantless and cross-tenant mutation is not
+ * available through this API.
+ */
+export function reconcileSuccessfulRollbackDebt(projectRoot: string, tenantId: string): number {
+  if (tenantId.length === 0) return 0;
+  const store = openStore(projectRoot);
+  if (!store) return 0;
+  try {
+    let resolved = 0;
+    for (const entry of store.getByType('debt', tenantId)) {
+      if (entry.status === 'resolved') continue;
+      let metadata: Record<string, unknown>;
+      try {
+        metadata = JSON.parse(entry.metadata || '{}') as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      if (
+        metadata.kind === 'rollback'
+        && metadata.rollbackSuccess === true
+        && store.updateDebtStatusCas(entry.id, tenantId, entry.status, 'resolved', 'debt-reconciliation')
+      ) {
+        resolved++;
+      }
+    }
+    return resolved;
+  } catch {
+    return 0;
   } finally {
     store.close();
   }
@@ -97,12 +164,16 @@ export function recordRollbackDebt(
   sprintId: string,
   success: boolean,
   message: string,
+  tenantId?: string,
 ): void {
   const store = openStore(projectRoot);
   if (!store) return;
   try {
     const id = `rollback-${sprintId}`;
-    if (store.getById(id)) return; // idempotent
+    // A supplied tenant is always part of the authority check. A same-id row
+    // owned by another tenant therefore cannot be read or mutated here; the
+    // global primary-key collision makes the subsequent insert fail closed.
+    if (store.getById(id, tenantId === undefined ? undefined : { tenantId })) return;
     const label = success ? 'SUCCESS' : 'FAILED';
     // A successful rollback is a closed historical event — record it as resolved
     // so it does not accumulate as active critical debt over subsequent sprints.
@@ -125,6 +196,7 @@ export function recordRollbackDebt(
         kind: 'rollback',
         rollbackSuccess: success,
       },
+      tenant_id: tenantId,
     });
   } catch {
     // best-effort — recording a rollback event must never crash the caller

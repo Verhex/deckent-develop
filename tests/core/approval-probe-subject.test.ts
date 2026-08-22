@@ -55,7 +55,7 @@ function fixture(authExpiresAt = new Date(NOW.getTime() + 45_000)): ProbeFixture
   const projectRoot = join(root, 'project');
   mkdirSync(projectRoot);
   const host = join(root, 'host');
-  const broker = new ApprovalBroker(projectRoot);
+  const broker = new ApprovalBroker(projectRoot, { clock: () => currentTime });
   const sessions = new ApprovalLiveSessionStore({
     projectRoot,
     stateDir: join(host, 'state'),

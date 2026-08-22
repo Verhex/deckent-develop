@@ -335,6 +335,34 @@ describe('handleEvaluation', () => {
     handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
     expect(releaseAllLocks).not.toHaveBeenCalled();
   });
+
+  it('identical typed acceptance failure after one FIX pauses instead of creating fix-fix', () => {
+    const goNogo = {
+      goCriteria: 'artifact exists', noGoCriteria: 'artifact absent', techDebtAcceptable: 'none',
+      items: [{
+        id: 'artifact-produced', statement: 'artifact exists', polarity: 'go' as const,
+        evidenceRequirements: ['file:"src/generated.ts"'],
+      }],
+    };
+    const original = makeTask({ goNogo });
+    const originalResult = makeTaskResult({
+      selfAssessment: 'NO_GO', filesChanged: [], linesAdded: 0, testsPassed: false,
+    });
+    handleEvaluation('/root', original, TaskEvaluation.NO_GO, originalResult);
+    const firstFix = JSON.parse(vi.mocked(writeFileSync).mock.calls[0]![1] as string) as Task & {
+      acceptanceFailureFingerprint: string;
+    };
+
+    vi.mocked(writeFileSync).mockClear();
+    handleEvaluation('/root', firstFix, TaskEvaluation.NO_GO, {
+      ...originalResult,
+      taskId: firstFix.id,
+    });
+
+    expect(updateTaskStatus).toHaveBeenLastCalledWith('/root', firstFix.id, TaskStatus.PAUSED);
+    const taskPaths = vi.mocked(writeFileSync).mock.calls.map(call => String(call[0]));
+    expect(taskPaths.some(path => path.endsWith(`task-${firstFix.id}-fix.json`))).toBe(false);
+  });
 });
 
 // ─── handleCrossDependencies ────────────────────────────────────────
@@ -641,6 +669,21 @@ describe('resolveDebt', () => {
     const upsertArg = mockMemoryStore.upsert.mock.calls[0]![0];
     expect(upsertArg.status).toBe('resolved');
     expect(upsertArg.metadata.resolvedInSprintId).toBe('sprint-005');
+  });
+
+  it('does not resolve acceptance-route debt through the generic unscoped path', () => {
+    mockDbEntries.set('debt-confirmation-001', {
+      id: 'debt-confirmation-001', type: 'debt', title: 'Acceptance route', content: 'pending',
+      source: 'brain', status: 'active', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: JSON.stringify({ class: 'acceptance-route', provisional: true }),
+      tag_text: 'debt', created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(), deleted_at: null,
+    });
+
+    expect(resolveDebt('/root', 'debt-confirmation-001', 'sprint-002')).toBe(false);
+    expect(mockMemoryStore.upsert).not.toHaveBeenCalled();
+    expect(mockDbEntries.get('debt-confirmation-001')?.status).toBe('active');
   });
 });
 

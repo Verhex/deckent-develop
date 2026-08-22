@@ -81,6 +81,20 @@ describe('ctx-population-wire (born-674 / 428-001)', () => {
   });
 
   describe('verifyCommands (resolveVerifyCommands wire)', () => {
+    it('keeps wave-level stack commands out when a task-local Test command exists', () => {
+      root = mkdtempSync(join(tmpdir(), 'ctx-pop-scoped-verify-'));
+      writeFileSync(join(root, 'tsconfig.json'), '{}', 'utf-8');
+      const task = makeTask('428-106', {
+        description: '- Test: npx vitest run tests/orchestra/ctx-population-wire.test.ts',
+      });
+
+      const prompt = buildWorkerPrompt(task, undefined, undefined, root);
+
+      expect(prompt).toContain('`npx vitest run tests/orchestra/ctx-population-wire.test.ts`');
+      expect(prompt).not.toContain('Run: `npx tsc --noEmit`');
+      expect(prompt).not.toContain('<path-to-the-test-file(s)-you-changed>');
+    });
+
     it('cites the stack-resolved check/test commands in CRITICAL VERIFY STEPS', () => {
       root = mkdtempSync(join(tmpdir(), 'ctx-pop-verify-'));
       // A bare tsconfig.json is sufficient for stack-detector.ts detectFresh to

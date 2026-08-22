@@ -1,5 +1,5 @@
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Command } from 'commander';
@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import { registerConfirmationsCommand } from '../../src/cli/commands/confirmations.js';
 import { loadConfig } from '../../src/core/config.js';
 import { resolveApprovalLifecyclePolicy } from '../../src/core/approval-lifecycle-policy.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 import {
   readConfirmation,
   settleConfirmation,
@@ -19,9 +20,11 @@ import { applyAcceptanceEnforcement } from '../../src/orchestra/acceptance-enfor
 import { persistDurableAcceptanceConfirmation } from '../../src/orchestra/sprint-phases.js';
 
 describe('confirmation expiry park integration', () => {
-  it('mints from EVALUATE, expires FWW to UNDECIDABLE, and rejects CLI/direct revival', async () => {
+  it('mints from EVALUATE, expires FWW to UNDECIDABLE, and prevents CLI/direct revival', async () => {
     const root = mkdtempSync(join(tmpdir(), 'confirmation-expiry-park-'));
     onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    mkdirSync(join(root, '.brain'), { recursive: true });
+    new MemoryStore(join(root, '.brain', 'memory.db')).close();
     const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
     const task = {
       id: '609-042', title: 'owner security confirmation', description: 'integration',
@@ -50,9 +53,10 @@ describe('confirmation expiry park integration', () => {
     };
     const enforcement = applyAcceptanceEnforcement(
       baseline, task, result, 'sprint-609', { acceptance_enforcement: 'enforce' },
+      { tenantId: 'tenant-expiry', projectId: 'project-expiry', generation: 1 },
     );
     let at = new Date('2026-08-21T08:00:00.000Z');
-    const durable = persistDurableAcceptanceConfirmation({
+    const durable = await persistDurableAcceptanceConfirmation({
       projectRoot: root,
       sprint: { id: 'sprint-609', tasks: [task] },
       task, result, baselineEvaluation: baseline, enforcement,
@@ -68,6 +72,7 @@ describe('confirmation expiry park integration', () => {
     const pinnedSource = authored.request.approval.source;
 
     at = new Date('2026-08-21T16:00:00.000Z');
+    expect(sweepExpiredConfirmations(root, { lifecycle, clock: () => at })).toHaveLength(1);
     let interactiveCalls = 0;
     const program = new Command().exitOverride();
     registerConfirmationsCommand(program, {
@@ -81,7 +86,7 @@ describe('confirmation expiry park integration', () => {
       'node', 'deckent', 'confirmations', 'decide', id,
       '--confirm', '--reason', 'late approval must lose',
     ]);
-    expect(process.exitCode).toBe(1);
+    expect(process.exitCode).toBe(0);
     expect(interactiveCalls).toBe(0);
     expect(existsSync(pendingPath)).toBe(false);
     expect(existsSync(settledPath)).toBe(true);

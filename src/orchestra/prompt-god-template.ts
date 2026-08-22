@@ -2148,12 +2148,17 @@ export function buildTestCommandLine(
 export function extractDeclaredTestCommands(task: Pick<Task, 'description'>): readonly string[] {
   const source = task.description ?? '';
   const commands: string[] = [];
-  const pattern = /\*\*Test:\*\*\s*`([^`\r\n]+)`/gi;
+  const pattern = /^\s*(?:[-*]\s*)?(?:\*\*)?Test:(?:\*\*)?\s*(?:`([^`\r\n]+)`|([^\r\n]+))$/gim;
   for (const match of source.matchAll(pattern)) {
-    const command = match[1]?.trim();
+    const command = (match[1] ?? match[2])?.trim();
     if (command && !commands.includes(command)) commands.push(command);
   }
   return Object.freeze(commands);
+}
+
+/** True when the task author supplied a task-local `Test:` proof surface. */
+export function hasTaskScopedTestDirective(task: Pick<Task, 'description'>): boolean {
+  return /^\s*(?:[-*]\s*)?(?:\*\*)?Test:(?:\*\*)?(?:\s|$)/im.test(task.description ?? '');
 }
 
 /**
@@ -2364,6 +2369,7 @@ ${dodBlock}${idempotencyBlock}`);
   // take precedence over a persona's conflicting full-suite test-mandate.
   const verificationMode: 'targeted' | 'doc' = isDocOnlyTask ? 'doc' : 'targeted';
   const declaredTestCommands = extractDeclaredTestCommands(task);
+  const hasScopedTestDirective = hasTaskScopedTestDirective(task);
   if (isInspectionOnlyTask) {
     push('T0', 'verify-steps', `## VERIFY STEPS (inspection-only)
 This task has no project write authority. Do not run a build, type check, test suite, package-manager command, or other mutation-oriented verification unless the task's written acceptance criteria explicitly name that exact read-only command.
@@ -2384,6 +2390,9 @@ This is a Tier-0 documentation task: there is no source code to type-check or te
 1. Read your file back from disk (the path in your scope) and confirm its content satisfies the goCriteria above.
 2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.${declaredCheckBlock}
 Mark selfAssessment = "DONE" when the file exists (and any check above passes) and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
+  } else if (hasScopedTestDirective && declaredTestCommands.length === 0) {
+    push('T0', 'verify-steps', `## SCOPED VERIFICATION HOLD
+SCOPED_PROOF_HOLD: this task declares a task-local Test proof surface, but no scoped command was captured. Do not substitute a repository-wide type check, build, or test command and do not claim DONE. Report the missing scoped proof in your result notes.`);
   } else if (declaredTestCommands.length > 0) {
     const commandList = declaredTestCommands
       .map((command, index) => `${index + 1}. \`${command}\``)
