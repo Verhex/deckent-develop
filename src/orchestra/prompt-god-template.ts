@@ -1227,6 +1227,20 @@ export function buildScopeBlock(
     + ` genuinely cannot locate what you need inside your scope, say so in your \`.result\` notes and`
     + ` return NO_GO — do not widen the search. An unbounded scan has killed real workers here.`;
 
+  // Exact read targets remain part of the worker authority even when the task
+  // also has a project write target. Previously only inspection-only prompts
+  // rendered `filesRead`; write-capable prompts rendered directories +
+  // filesWrite and then ordered the worker to search only the paths "listed
+  // above". With an exact-file-only read scope that erased every source input
+  // from the prompt and caused deterministic NO_GO/FIX exhaustion. Keep the
+  // sanitized exact reads visibly separate from write authority so they can
+  // never be mistaken for writable paths.
+  const exactReadContext = scope.filesRead.length > 0
+    ? `\n\nExact read-only project files:\n${sanitizedRead.filesRead.length > 0
+      ? sanitizedRead.filesRead.map(f => `  - ${f}`).join('\n')
+      : '  - (no valid exact read targets remain after path validation — STOP and report NO_GO)'}`
+    : '';
+
   if (isInspectionOnly) {
     const readFiles = sanitizedRead.filesRead.length > 0
       ? sanitizedRead.filesRead.map(f => `  - ${f}`).join('\n')
@@ -1258,7 +1272,7 @@ PROJECT WRITE authority: NONE. No project source, test, config, documentation, c
       : scopeFiles;
     return `## Scope Rules
 READ/context scope — you may read these directories to understand the code:
-${scopeDirs}
+${scopeDirs}${exactReadContext}
 
 WRITE authority (canonical — the ONLY files you may create or modify):
 ${writeAuthority}

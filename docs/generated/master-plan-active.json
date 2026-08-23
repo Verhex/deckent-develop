@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3df2cfc88d206430cb86ca81d7155a80f2aba74efe1891bbdb3509efa2545c51"
+    "value": "9c953ab6f3d9022b718b0a8541e3889823f3b848e20df93995d7b8ec05c9425a"
   },
   "summary": {
     "total": 521,
@@ -565,9 +565,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-22",
+      "updated": "2026-08-23",
       "definitionDigest": "4171048871ae812f8f1a1440c6193f2370d477bc0d688777a1ae8dc1519d7da2",
-      "progressDigest": "0fb4bdddf8e7c30422e7227a617eb2c29e3cea1dbdbfbff8e4e4571403c8c858",
+      "progressDigest": "acf21248b8424d4be72f4538d76b087463e9ae299dcd090436b154c98b21ebca",
       "terminalClosureDigest": null
     },
     {
@@ -1291,9 +1291,9 @@
       "program": "CODEX",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-23",
       "definitionDigest": "9465f12491ddd413c40a25e7b9cd875dc6cc1461cf7a4c133d7be80de07128fc",
-      "progressDigest": "af19d9b5c75c1179d962d24ba2aa2109c06ff4209707160e2d8cb83b8d5f3387",
+      "progressDigest": "b85695f4521fc430d96f648939aa3ccbe18cf3160a39e2cf2a864a577c4e3233",
       "terminalClosureDigest": null
     },
     {
@@ -1313,9 +1313,9 @@
       "program": "CODEX",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-23",
       "definitionDigest": "c3552d20ba564664b841cc4963dda65ebd3011209a102a052a9953733ec90d70",
-      "progressDigest": "0914e818db12d9e1bb42c1dfc4f87bbf8fe328a6aefa8d19c3d0317b2d651153",
+      "progressDigest": "a5c215463cda68b0eec55101cf81f2abb757f53e8f7cd6b8e1f0142dae3f8f35",
       "terminalClosureDigest": null
     },
     {
@@ -1401,9 +1401,9 @@
       "program": "CODEX",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-23",
       "definitionDigest": "6b5ffd926bf590dd5302b699961751c990169dd570904ed529aba6f08e08ef04",
-      "progressDigest": "a1debc5a9201cf558541415868bbaa838462e333a6e72758e46914e5ecad2501",
+      "progressDigest": "6d73181b564ed4cd625831bbd4395600913ae4558e05bd8f4acc25aac73f4feb",
       "terminalClosureDigest": null
     },
     {
@@ -9169,8 +9169,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Versioned manifest/schema registry every archived artifactı tenant/project/run identity, producer, retention class, digest and restore target ile binds; restore hem `recently-works` hem cold archiveı path-safe, hash-verified, no-clobber ve crash-recoverable okur; usage/lineage canonical `.brain/archive` authoritysini tüketir; terminal receipt canonical-location migrationı fallback ile monotonic kalır; confidentiality, legal hold, failure injection ve Linux/macOS/Windows-native/WSL proofs pass",
-      "evidence": "2026-08-10 disk/code truth: 311 tar+sha pair checksum/gzip/path-safe olsa da `restoreFromSnapshot` yalnız `recently-works` okuduğundan cold archive restore dokümanı fiilen yanlış; `usage --lineage` `.deckent/archive` altında mevcut olmayan direct task JSON/result arıyor, gerçek task authority `.brain/archive/sprints/*-tasks`; 448 JSON içinde sprint-168 sonucu invalid; archive 0755/0644; iki ignored analysis corpusunda 662 doküman topology disposition bekliyor. 2026-08-11 recovery-snapshot RCA: repo-local path için production producer/reader/restore ingressi yok; product `restoreFromSnapshot` yalnız `.deckent/recently-works/<sprint>-pre-archive.*` basename formatını tüketiyor ve iki manuel repo-local formatla uyumsuz. Dört kayıtlı digest eşleşti, iki tar gzip/path/link güvenlik taramasından geçti ve main-dirty artifactı exact base üzerinde izole restore edildi; buna rağmen sprint tar'ındaki yalnız 6/60 entry canonical arşivde exact duplicate kanıtlandı, kalan legacy kapsam için silme güvenli değil. Repo-local ve host-global recovery yollarındaki format/authority ayrışmasının exact closure'ı RECOVERY-SNAPSHOT-AUTHORITY-001 childındadır 2026-08-11 recently-works proof: on warm pre-archive tar+sha çiftinin checksum ve path/link taraması temiz; buna rağmen external `tar` başarısızlığı archiveı fail-closed durdurmuyor, same-sprint snapshot generation taşımıyor ve restore cold archiveı okumuyor. Sprint-520 task archive+event+snapshot taşıdığı halde terminal receipt/gate yok; outcome uydurulmadan HOLD. Closure RECENT-WORKS-ARTIFACT-AUTHORITY-001 ve SPRINT-EVENT-STREAM-AUTHORITY-001 ile bağlandı. 2026-08-22 canonical sprint-archive dilimi: raw authority `.deckent/archive/sprints/<sprint-id>/` altinda tekillesti; legacy dual-read, non-clobber conflict preservation, manifest/integrity verify, Brain semantic index ve finalizer fail-closed wiring landed. Copy-only live reconcile 653 sprintte 27,169 artifact ve 664,365,957 byte icin 0 failure; verify 653/653 green, 4 sprint-619 conflict varyanti kayipsiz korundu, ikinci apply published=0 ve Memory DB byte-stable. Parent OPEN kalir: restore, legal-hold, ACL/confidentiality ve native-platform closure tamamlanmadi. Kanit: `docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md`.",
-      "updated": "2026-08-22"
+      "evidence": "2026-08-10 disk/code truth: 311 tar+sha pair checksum/gzip/path-safe olsa da `restoreFromSnapshot` yalnız `recently-works` okuduğundan cold archive restore dokümanı fiilen yanlış; `usage --lineage` `.deckent/archive` altında mevcut olmayan direct task JSON/result arıyor, gerçek task authority `.brain/archive/sprints/*-tasks`; 448 JSON içinde sprint-168 sonucu invalid; archive 0755/0644; iki ignored analysis corpusunda 662 doküman topology disposition bekliyor. 2026-08-11 recovery-snapshot RCA: repo-local path için production producer/reader/restore ingressi yok; product `restoreFromSnapshot` yalnız `.deckent/recently-works/<sprint>-pre-archive.*` basename formatını tüketiyor ve iki manuel repo-local formatla uyumsuz. Dört kayıtlı digest eşleşti, iki tar gzip/path/link güvenlik taramasından geçti ve main-dirty artifactı exact base üzerinde izole restore edildi; buna rağmen sprint tar'ındaki yalnız 6/60 entry canonical arşivde exact duplicate kanıtlandı, kalan legacy kapsam için silme güvenli değil. Repo-local ve host-global recovery yollarındaki format/authority ayrışmasının exact closure'ı RECOVERY-SNAPSHOT-AUTHORITY-001 childındadır 2026-08-11 recently-works proof: on warm pre-archive tar+sha çiftinin checksum ve path/link taraması temiz; buna rağmen external `tar` başarısızlığı archiveı fail-closed durdurmuyor, same-sprint snapshot generation taşımıyor ve restore cold archiveı okumuyor. Sprint-520 task archive+event+snapshot taşıdığı halde terminal receipt/gate yok; outcome uydurulmadan HOLD. Closure RECENT-WORKS-ARTIFACT-AUTHORITY-001 ve SPRINT-EVENT-STREAM-AUTHORITY-001 ile bağlandı. 2026-08-22 canonical sprint-archive dilimi: raw authority `.deckent/archive/sprints/<sprint-id>/` altinda tekillesti; legacy dual-read, non-clobber conflict preservation, manifest/integrity verify, Brain semantic index ve finalizer fail-closed wiring landed. Copy-only live reconcile 653 sprintte 27,169 artifact ve 664,365,957 byte icin 0 failure; verify 653/653 green, 4 sprint-619 conflict varyanti kayipsiz korundu, ikinci apply published=0 ve Memory DB byte-stable. Parent OPEN kalir: restore, legal-hold, ACL/confidentiality ve native-platform closure tamamlanmadi. Kanit: `docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md`. 2026-08-23 acceptance HOLD: sprint-628 manifest verify kendi 230 artifact snapshot'i icin green ve Brain compact row okunuyor; ancak archive 123 eventte kalirken `.deckent/recently-works` hot journalı 127 evente ilerleyerek archive-sonrası yeni raw write üretti. Recovery terminal eventleri seq 124-127 nedeniyle fresh inspect iki conflict (`events.jsonl`, `seq`) öneriyor; sprint-627 aynı ordering sınıfını taşıyor. Sıradaki package terminal publication ile archive snapshot/manifest ordering'ini atomik kapatıp iki sprintte conflict-free inspect+verify kanıtı üretmeden complete-archive veya legacy-no-new-raw-write iddiası yok.",
+      "updated": "2026-08-23"
     },
     {
       "order": 306,
@@ -10801,8 +10801,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Owner policy and digest reach host plan; worker-writable task data never grants authority",
-      "evidence": "Current grant is not projected to Worker plan",
-      "updated": "2026-07-26"
+      "evidence": "2026-08-23 bounded parity proof: canonical producer `resolveExecutionBudgetPolicy` → `applyWorkerExecutionBudgetPolicy` stamps role/provider/profile/digest + exact `finalOnlyUsage` under `Task.budgetPolicy`; root audit rejected a schema-external worker-writable grant. Full executable-permit provenance remains OPEN because tenant/run/task/attempt/deadline binding is FO-04 scope. Evidence: `docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md`",
+      "updated": "2026-08-23"
     },
     {
       "order": 1110,
@@ -10881,8 +10881,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Scheduler, continuation, retry, FIX, autonomous, process and xverify use one verified grant",
-      "evidence": "Current Worker dispatch omits grant",
-      "updated": "2026-07-26"
+      "evidence": "2026-08-23 sprint-628 bounded slice LOCAL_VERIFIED: manual `spawn --force`, initial scheduler and retry/FIX/continuation consumers use one shared resolver over each task's canonical `budgetPolicy.finalOnlyUsage`; valid exact grant reaches resolved Docker, missing/mismatch/non-Docker typed HOLDs before provider work; `maxUsd` stays on separate pricing gate. 74/74 scoped battery + lint/typecheck green. Row remains OPEN: autonomous/process/xverify convergence, FO-04 durable grant bindings and FO-11 real-process matrix are not claimed. Evidence: `docs/evidence/final-only-usage-containment-parity-2026-08-23/`",
+      "updated": "2026-08-23"
     },
     {
       "order": 1130,
@@ -11217,8 +11217,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Normal, hang, child fork, missing/malformed/duplicate final, replay and crash matrix; zero orphan",
-      "evidence": "Required before any paid canary",
-      "updated": "2026-07-26"
+      "evidence": "2026-08-23 parity inventory measures 11/18 named hermetic cells ve 1/18 real-process cell: fresh built CLI missing-grant manual canary exit 1 ile provider/Docker öncesi durdu. Valid paid completion, hang/child/crash/missing-final/duplicate-dispatch proof remains required. Exact plan: `docs/evidence/final-only-usage-containment-parity-2026-08-23/04-adversarial-proof-plan.md`",
+      "updated": "2026-08-23"
     },
     {
       "order": 1185,
@@ -26831,6 +26831,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e2a800c3320a16a3895a6e214fe321f4ec8bee565a8a4b23f788c4115654439b"
+    "value": "4e570ac3627e0a50442a0313781f612bfe5bcdf114ec69ae2aa951533cd3387c"
   }
 }

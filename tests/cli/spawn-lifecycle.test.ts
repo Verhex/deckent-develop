@@ -109,6 +109,26 @@ function writeTaskJson(taskId: string, overrides?: Record<string, unknown>): voi
   );
 }
 
+function finalOnlyBudgetPolicy(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    state: 'allow',
+    role: 'worker',
+    taskKind: 'code-development',
+    resolvedProvider: 'codex',
+    executionCostClass: 'remote',
+    profileRef: 'tests.cli.spawn-lifecycle',
+    policyDigest: 'a'.repeat(64),
+    admissionMode: 'unattended',
+    landingPolicy: { reserve_ratio: 0.25 },
+    finalOnlyUsage: {
+      maxWallClockSeconds: 60,
+      profileRef: 'execution_budget.final_only_usage',
+      policyDigest: 'a'.repeat(64),
+    },
+    ...overrides,
+  };
+}
+
 function writeResult(taskId: string, selfAssessment: string): void {
   writeFileSync(
     join(state.root, '.tasks', `task-${taskId}.result`),
@@ -270,6 +290,61 @@ describe('registerSpawn — task-json modelEffort path', () => {
     expect(backendSpawn).toHaveBeenCalledOnce();
     const opts = backendSpawn.mock.calls[0]?.[3] as { reasoningEffort?: string };
     expect(opts.reasoningEffort).toBeUndefined();
+  });
+});
+
+
+// ─── 3. registerSpawn — final-only containment ───────────────────────────────
+
+describe('registerSpawn — final-only containment', () => {
+  it('uses the task-stamped exact grant to route a forced final-only task through Docker', async () => {
+    writeTaskJson('628-005-valid', {
+      model: 'gpt-4.1',
+      provider: 'codex',
+      status: TaskStatus.NO_GO,
+      budgetPolicy: finalOnlyBudgetPolicy(),
+    });
+
+    await runCommand(['spawn', '628-005-valid', '--force']);
+
+    expect(backendSpawn).toHaveBeenCalledOnce();
+    const backendOptions = backendSpawn.mock.calls[0]?.[3] as {
+      finalOnlyUsageContainment?: unknown;
+    };
+    expect(backendOptions.finalOnlyUsageContainment).toEqual(
+      finalOnlyBudgetPolicy().finalOnlyUsage,
+    );
+  });
+
+  it('fails closed before provider work when a final-only task has no grant', async () => {
+    writeTaskJson('628-005-missing', {
+      model: 'gpt-4.1',
+      provider: 'codex',
+      budgetPolicy: finalOnlyBudgetPolicy({ finalOnlyUsage: undefined }),
+    });
+
+    await runCommand(['spawn', '628-005-missing']);
+
+    expect(backendSpawn).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before provider work when a final-only grant resolves to non-Docker', async () => {
+    vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'subprocess' } as never);
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+      name: 'subprocess',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'checkpoint-stop',
+      spawn: backendSpawn,
+    } as never);
+    writeTaskJson('628-005-nondocker', {
+      model: 'gpt-4.1',
+      provider: 'codex',
+      budgetPolicy: finalOnlyBudgetPolicy(),
+    });
+
+    await runCommand(['spawn', '628-005-nondocker']);
+
+    expect(backendSpawn).not.toHaveBeenCalled();
   });
 });
 

@@ -529,8 +529,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // digest-only update after the existing run-flow decision suite began
   // pinning that an approved but unstarted exact plan consumes its ordinal
   // identity when durably retired. The proof remains suite-owned tmpdir state.
-  count: 15117,
-  digest: '2f36f0b3390d771b2e8f1941193b5168032c3cfdb249d9a2a45b6823da3fde99',
+  // 2026-08-23 (final-only manual-spawn real-binary canary): +1 — the new
+  // built-CLI proof launches one bounded child process against a suite-owned
+  // tmpdir project/host fixture and fails before Docker/provider dispatch when
+  // the canonical task lacks its owner grant. No live repo config or runtime
+  // authority is read or mutated.
+  count: 15118,
+  digest: 'cf5f3260dc195f9bbe82797db19abc980a2a35ee0dc7912d276026f01a7bfe04',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -937,8 +942,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-23 (retired-plan identity floor recovery): count unchanged;
   // digest-only update for shared run-flow coordinator retirement wiring to
   // the existing canonical config-floor authority. No module was added.
-  count: 1304,
-  digest: '58de4868317a0bc076ab5ce1a6e4f044bdba8d657297b0240d093f0203da919d',
+  // 2026-08-23 (final-only containment parity): +1 — the shared canonical
+  // final-only-usage resolver enters inventory; manual spawn, initial
+  // scheduler and retry/FIX/continuation consumers now fail closed over the
+  // exact task-stamped grant before provider work.
+  count: 1305,
+  digest: '898f6ffbf5b73058eccd4d571370420cd25bf2b616bd6eba496593d019b57526',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

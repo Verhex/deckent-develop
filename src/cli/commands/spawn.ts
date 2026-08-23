@@ -1,7 +1,13 @@
 import { existsSync, statSync, writeFileSync, watch as fsWatch } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import type { Task, ModelType, ProviderName, TaskResult } from '../../core/types.js';
+import type {
+  Task,
+  ModelType,
+  ProviderName,
+  TaskResult,
+  TaskExecutionBudgetPolicySnapshot,
+} from '../../core/types.js';
 import { readTask } from '../../agents/worker.js';
 import { ensureSession, spawnWorker } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
@@ -18,6 +24,10 @@ import { SpawnBackendError, SpawnBackendFactory, type HostTerminalResultContract
 import { isAdapterProvider, getProviderAdapterForTask } from '../../orchestra/sprint-utils.js';
 import { getProviderCommandSpec } from '../../core/provider-command-spec.js';
 import type { FinalOnlyUsageAuthorization } from '../../core/execution-budget-policy.js';
+import {
+  FinalOnlyUsageContainmentHoldError,
+  requireFinalOnlyUsageContainment,
+} from '../../core/final-only-usage-containment.js';
 import { ensureOllamaModelRegistered } from '../../core/model-registry.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { resolveReasoningEffort } from '../../core/reasoning-effort.js';
@@ -148,8 +158,10 @@ export interface SpawnWorkerMultiProviderOptions {
   /** Exact open invocation permitted to cross the dispatch boundary. */
   executionInvocationId?: string;
   hostTerminalResultContract?: HostTerminalResultContractV1;
-  /** Owner authorization for a final-only-usage provider; absent = fail closed. */
+  /** Non-task ingress grant (for example XVerify); task surfaces use the canonical snapshot below. */
   finalOnlyUsageContainment?: FinalOnlyUsageAuthorization;
+  /** Presence marks a task ingress; null is an explicit missing-snapshot fail-closed input. */
+  taskBudgetPolicy?: Readonly<TaskExecutionBudgetPolicySnapshot> | null;
   /** Persist dispatch authority immediately before the first external spawn side effect. */
   onDispatchBoundary?: (boundary: WorkerDispatchBoundary) => void | Promise<void>;
 }
@@ -356,6 +368,33 @@ async function spawnWorkerMultiProviderUnderFence(
   // deckent run) silently dropped task.modelEffort.
   const reasoningEffort = resolveReasoningEffort(provider, opts.modelEffort);
 
+  const providerCommand = getProviderCommandSpec(provider);
+  // Resolve the configured backend before routing an adapter: a final-only
+  // provider with a live ceiling is allowed only through Docker containment.
+  const configuredBackend = opts.taskBudgetPolicy !== undefined && opts.spawnBackend
+    ? SpawnBackendFactory.create({
+      backend: opts.spawnBackend as 'docker' | 'tmux' | 'subprocess' | 'auto',
+      projectDir: root,
+      dockerImage: opts.dockerImage,
+      dockerTimeoutSeconds: opts.dockerTimeout,
+    })
+    : undefined;
+  const taskFinalOnlyUsageContainment = opts.taskBudgetPolicy !== undefined
+    ? requireFinalOnlyUsageContainment({
+      role: 'worker',
+      provider,
+      providerCommand,
+      executor: configuredBackend?.name === 'docker'
+        ? { executor: 'docker', finalOnlyUsageContainment: 'wall-clock' }
+        : undefined,
+      budget: executionBudget,
+      budgetPolicy: opts.taskBudgetPolicy,
+    })
+    : undefined;
+  const finalOnlyUsageContainment = taskFinalOnlyUsageContainment
+    ?? opts.finalOnlyUsageContainment;
+  const requiresFinalOnlyContainment = taskFinalOnlyUsageContainment !== undefined;
+
   // Host-HTTP adapter providers (e.g. ollama) run via their host adapter
   // (agentic-worker-entry on localhost:11434), NOT a docker/tmux/subprocess backend —
   // even when config.spawn_backend is set. Mirrors sprint-spawner.ts's adapterRouted
@@ -376,14 +415,14 @@ async function spawnWorkerMultiProviderUnderFence(
   // openrouter) have no container binary authority (`getProviderCommandSpec` →
   // null) and keep failing honestly here, before any provider work.
   const containerRoutableAdapter = opts.spawnBackend !== undefined
-    && getProviderCommandSpec(provider) !== null;
+    && providerCommand !== null;
   if (isAdapterProvider(provider) && opts.hostTerminalResultContract && !containerRoutableAdapter) {
     throw new SpawnBackendError(
       `Host terminal result protocol ${opts.hostTerminalResultContract.protocol} requires an immutable-settlement backend; host-adapter does not provide one.`,
       'host-adapter',
     );
   }
-  if (isAdapterProvider(provider) && !opts.hostTerminalResultContract) {
+  if (isAdapterProvider(provider) && !opts.hostTerminalResultContract && !requiresFinalOnlyContainment) {
     let adapter = getProviderAdapterForTask(provider);
     // OPENROUTER-PROVIDER (row 477): lazy re-bootstrap, mirroring
     // sprint-spawner.ts's `wantsHostAdapter && !adapterRouted` recovery. Unlike the
@@ -450,7 +489,7 @@ async function spawnWorkerMultiProviderUnderFence(
 
   // If config specifies a backend, use SpawnBackendFactory for all providers
   if (opts.spawnBackend) {
-    const backend = SpawnBackendFactory.create({
+    const backend = configuredBackend ?? SpawnBackendFactory.create({
       backend: opts.spawnBackend as 'docker' | 'tmux' | 'subprocess' | 'auto',
       projectDir: root,
       dockerImage: opts.dockerImage,
@@ -518,7 +557,7 @@ async function spawnWorkerMultiProviderUnderFence(
       executionApprovalExpectedDispatch: attendedExpectedDispatch(provider, backend.name),
       settlementRef,
       hostTerminalResultContract: opts.hostTerminalResultContract,
-      finalOnlyUsageContainment: opts.finalOnlyUsageContainment,
+      finalOnlyUsageContainment,
     });
     return {
       backend: backend.name,
@@ -682,11 +721,12 @@ export function registerSpawn(program: Command): void {
     .option('--auto-approve', 'Enable auto-approve mode for the worker')
     .action(async (taskId: string, opts: { force?: boolean; autoApprove?: boolean }) => {
       const root = resolveProjectRoot();
+      let lang = getLanguage(undefined);
 
       try {
         const task = readTask(root, taskId);
         const config = await loadConfig(root).catch(() => ({ language: 'en' }));
-        const lang = (config as Record<string, unknown>).language as string ?? 'en';
+        lang = (config as Record<string, unknown>).language as string ?? 'en';
 
         // Status checks
         if (task.status === TaskStatus.EXECUTING) {
@@ -755,6 +795,7 @@ export function registerSpawn(program: Command): void {
           // — ollama tags included. Unlike `deckent run`, this path never calls
           // `resolveExecutionModelIdentity`, so nothing else registers the model here.
           provider: task.provider,
+          taskBudgetPolicy: task.budgetPolicy ?? null,
           executionTenantId: resolveTenant(root, {
             ...(task.actor?.tenantId ? { tenantId: task.actor.tenantId } : {}),
           }).tenantId,
@@ -826,7 +867,9 @@ export function registerSpawn(program: Command): void {
           }
         }
       } catch (error) {
-        printError(error);
+        printError(error instanceof FinalOnlyUsageContainmentHoldError
+          ? getMessage('spawn.final_only_containment_hold', lang, { reasonCode: error.reasonCode })
+          : error);
         process.exitCode = 1;
       }
     });

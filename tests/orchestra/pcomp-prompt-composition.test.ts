@@ -47,6 +47,36 @@ describe('PCOMP-W1: scope block has a single write authority', () => {
     expect(out).toMatch(/does NOT grant write permission/i);
   });
 
+  it('renders sanitized exact filesRead beside directory context for a write-capable task', () => {
+    const out = buildScopeBlock({
+      directories: [],
+      filesRead: ['src/cli/commands/spawn.ts', 'src/orchestra/sprint-spawner.ts'],
+      filesWrite: ['docs/evidence/manual-spawn.md'],
+    }, [], false);
+
+    const readBlock = out.slice(
+      out.indexOf('Exact read-only project files:'),
+      out.indexOf('WRITE authority (canonical'),
+    );
+    expect(readBlock).toContain('  - src/cli/commands/spawn.ts');
+    expect(readBlock).toContain('  - src/orchestra/sprint-spawner.ts');
+    expect(readBlock).not.toContain('docs/evidence/manual-spawn.md');
+  });
+
+  it('keeps an authored but fully rejected exact read list visibly fail-closed', () => {
+    const warnings: string[] = [];
+    const out = buildScopeBlock({
+      directories: [],
+      filesRead: ['../outside.ts', 'src/**/*.ts'],
+      filesWrite: ['docs/evidence/manual-spawn.md'],
+    }, warnings, false);
+
+    expect(out).toContain('no valid exact read targets remain after path validation — STOP and report NO_GO');
+    expect(out).not.toContain('  - ../outside.ts');
+    expect(out).not.toContain('  - src/**/*.ts');
+    expect(warnings.some(warning => warning.startsWith('Rejected read path:'))).toBe(true);
+  });
+
   it('keeps the directory-fallback wording when no filesWrite list exists (PQ-4 F5)', () => {
     const out = buildScopeBlock({ directories: ['src/x/'], filesRead: [], filesWrite: [] }, [], false);
     expect(out).toContain('You may ONLY modify files in these directories');

@@ -41,7 +41,6 @@ import { DeckentError } from '../core/errors.js';
 import {
   assertExecutionLandingSupport,
   assertLiveUsageBudgetSupport,
-  hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
 import { getProviderCommandSpec } from '../core/provider-command-spec.js';
 import {
@@ -51,6 +50,7 @@ import {
 } from '../core/attended-execution-approval.js';
 import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
 import { createHostPreDispatchNoGoResult } from '../core/pre-dispatch-settlement.js';
+import { requireFinalOnlyUsageContainment } from '../core/final-only-usage-containment.js';
 import {
   assertAttendedExecutionProposalMaterial,
   createAttendedExecutionProposalMaterialFromTask,
@@ -621,16 +621,17 @@ export async function executeSpawnTask(
           dockerKindMemoryLimits: config?.worker_memory_limit_by_kind,
           })
       : backend;
-  const finalOnlyUsageContainment =
-    effectiveBackend?.name === 'docker'
-    && getProviderCommandSpec(taskProvider)?.liveUsage === 'final-only'
-    && hasLiveUsageCeiling(task.budget)
-      ? task.budgetPolicy?.finalOnlyUsage
-      : undefined;
-  const wantsHostAdapter =
-    isAdapterProvider(taskProvider)
-    && !task.backend
-    && !finalOnlyUsageContainment;
+  const finalOnlyUsageContainment = requireFinalOnlyUsageContainment({
+    role: 'worker',
+    provider: taskProvider,
+    providerCommand: getProviderCommandSpec(taskProvider),
+    executor: effectiveBackend?.name === 'docker'
+      ? { executor: 'docker', finalOnlyUsageContainment: 'wall-clock' }
+      : undefined,
+    budget: task.budget,
+    budgetPolicy: task.budgetPolicy,
+  });
+  const wantsHostAdapter = isAdapterProvider(taskProvider) && !task.backend && !finalOnlyUsageContainment;
   const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
   const excludeDynamicPromptSections = config?.prompt?.exclude_dynamic_system_prompt_sections !== false;
   // 7094-F3 (default true): externalized worker core → --system-prompt-file.

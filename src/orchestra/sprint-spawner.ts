@@ -30,7 +30,6 @@ import { debugLog } from '../core/utils.js';
 import {
   assertExecutionLandingSupport,
   assertLiveUsageBudgetSupport,
-  hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
 import { getProviderCommandSpec, resolveToolScopeEnforcement, resolveWriteScopeShellEscape } from '../core/provider-command-spec.js';
@@ -41,6 +40,7 @@ import {
 } from '../core/attended-execution-approval.js';
 import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
 import { createHostPreDispatchNoGoResult } from '../core/pre-dispatch-settlement.js';
+import { requireFinalOnlyUsageContainment } from '../core/final-only-usage-containment.js';
 import { sweepStaleSpawnLocksForDispatch } from './spawn-coordinator.js';
 import {
   assertAttendedExecutionProposalMaterial,
@@ -1239,19 +1239,17 @@ export async function spawnWorkers(
             dockerKindMemoryLimits: config.worker_memory_limit_by_kind,
           })
         : backend;
-    const finalOnlyUsageContainment =
-      effectiveBackend?.name === 'docker'
-      && getProviderCommandSpec(taskProvider)?.liveUsage === 'final-only'
-      && hasLiveUsageCeiling(task.budget)
-        ? task.budgetPolicy?.finalOnlyUsage
-        : undefined;
-    // An owner grant for a final-only provider is executable only inside the
-    // Docker wall-clock containment boundary. Without that exact grant, the
-    // normal host-adapter path remains fail-closed at live-usage admission.
-    const wantsHostAdapter =
-      isAdapterProvider(taskProvider)
-      && !task.backend
-      && !finalOnlyUsageContainment;
+    const finalOnlyUsageContainment = requireFinalOnlyUsageContainment({
+      role: 'worker',
+      provider: taskProvider,
+      providerCommand: getProviderCommandSpec(taskProvider),
+      executor: effectiveBackend?.name === 'docker'
+        ? { executor: 'docker', finalOnlyUsageContainment: 'wall-clock' }
+        : undefined,
+      budget: task.budget,
+      budgetPolicy: task.budgetPolicy,
+    });
+    const wantsHostAdapter = isAdapterProvider(taskProvider) && !task.backend && !finalOnlyUsageContainment;
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
     // validated) once; passed to every spawn path below. undefined → no flag.
     const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
@@ -1332,25 +1330,12 @@ export async function spawnWorkers(
       if (typeof refresh === 'function') {
         await refresh.call(adapterRouted);
       }
-      // Final-only wall-clock containment for HOST-ADAPTER providers (owner
-      // grant execution_budget.final_only_usage, roles-scoped — the exact same
-      // authority the docker branch consumes below). An OpenAI-compatible
-      // adapter reports usage only at stream end, so live token metering is
-      // impossible; with the owner's grant the HARD host-enforced containment
-      // is the adapter's SIGKILL timeout, bounded by the grant's wall clock.
-      const adapterFinalOnlyContainment =
-        adapterRouted.liveUsageBudgetSupport !== 'measured-stream'
-        && hasLiveUsageCeiling(task.budget)
-          ? task.budgetPolicy?.finalOnlyUsage
-          : undefined;
-      if (!adapterFinalOnlyContainment) {
-        assertLiveUsageBudgetSupport(
-          task.budget,
-          adapterRouted.liveUsageBudgetSupport,
-          adapterRouted.name,
-          adapterRouted.executionCostClass,
-        );
-      }
+      assertLiveUsageBudgetSupport(
+        task.budget,
+        adapterRouted.liveUsageBudgetSupport,
+        adapterRouted.name,
+        adapterRouted.executionCostClass,
+      );
       assertExecutionLandingSupport({
         budget: task.budget,
         policy: task.budgetPolicy?.landingPolicy,
@@ -1368,14 +1353,7 @@ export async function spawnWorkers(
         projectDir: projectRoot,
         reasoningEffort,
         excludeDynamicPromptSections,
-        // Under a final-only grant the wall clock IS the containment: never
-        // exceed the owner-authored ceiling, never disable the timeout.
-        taskTimeoutSeconds: adapterFinalOnlyContainment
-          ? Math.min(
-              taskTimeoutSeconds || adapterFinalOnlyContainment.maxWallClockSeconds,
-              adapterFinalOnlyContainment.maxWallClockSeconds,
-            )
-          : taskTimeoutSeconds,
+        taskTimeoutSeconds,
         executionBudget: task.budget,
         executionLandingPolicy: task.budgetPolicy?.landingPolicy,
         executionAdmissionMode: task.budgetPolicy?.admissionMode,

@@ -17,22 +17,23 @@
 // caller so this module is trivially unit-testable and replay-safe.
 
 import type { Task } from '../core/types.js';
+import { foldTaskLineages, resolveFixAncestorIds } from '../core/task-lineage.js';
 import { isDependencySatisfying, isSchedulingTerminalFailure } from './scheduler-truth.js';
 
 export interface EffectiveDependencyState {
   /**
    * Task IDs that satisfy a dependent's `dependencies` entry: DONE tasks,
-   * PLUS — one-level fix aggregation — the `fixForTaskId` a DONE `<id>-fix`
-   * task points at. The original task's OWN status is irrelevant to this
-   * aggregation (mirrors the pre-existing planContinuous /
-   * findReadyUndispatchedTasks semantics verbatim — a DONE fix rescues its
-   * original for dependents regardless of what the original's status is).
+   * plus the logical root of a FIX lineage whose canonical resolving attempt
+   * is DONE. Multi-hop FIX-of-FIX chains therefore settle the same dependency
+   * ID authored by downstream tasks; raw intermediate attempts never compete
+   * with that logical-tip authority.
    */
   satisfyingIds: ReadonlySet<string>;
   /**
    * Task IDs whose dependents can never become eligible in this run
-   * (NO_GO / MANUAL_REVIEW_REQUIRED), through the same one-level
-   * fix-aggregation lens.
+   * (NO_GO / MANUAL_REVIEW_REQUIRED), through the same canonical logical-tip
+   * projection. A completed repair removes its root from this set so the
+   * reducer cannot both satisfy and cascade-skip the same dependency.
    */
   terminalFailureIds: ReadonlySet<string>;
   /**
@@ -54,6 +55,7 @@ export function computeEffectiveDependencyState(
   tasks: readonly Task[],
   nowMs: number,
 ): EffectiveDependencyState {
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
   const satisfyingIds = new Set<string>();
   const terminalFailureIds = new Set<string>();
   const retryEligibleIds = new Set<string>();
@@ -61,16 +63,45 @@ export function computeEffectiveDependencyState(
   for (const t of tasks) {
     if (isDependencySatisfying(t.status)) {
       satisfyingIds.add(t.id);
-      if (t.fixForTaskId) satisfyingIds.add(t.fixForTaskId);
     }
     if (isSchedulingTerminalFailure(t.status)) {
       terminalFailureIds.add(t.id);
-      if (t.fixForTaskId) terminalFailureIds.add(t.fixForTaskId);
     }
 
     const retryAfter = (t as Task & { retryAfter?: number }).retryAfter;
     if (retryAfter === undefined || retryAfter <= nowMs) {
       retryEligibleIds.add(t.id);
+    }
+  }
+
+  // Fold every raw attempt through the core lineage authority. Dependency
+  // references target logical work-items, not individual repair attempts. In
+  // particular, `root NO_GO -> fix NO_GO -> fix-fix DONE` must make `root`
+  // satisfying and non-terminal-failed after a restart, even when the live FIX
+  // phase was interrupted before it could persist `root.status = DONE`.
+  for (const lineage of foldTaskLineages(tasks)) {
+    const { resolvedTask } = lineage;
+    const projectedIds = new Set([
+      ...lineage.attemptIds,
+      ...resolveFixAncestorIds(resolvedTask, tasksById),
+    ]);
+    if (isDependencySatisfying(resolvedTask.status)) {
+      for (const id of projectedIds) {
+        satisfyingIds.add(id);
+        terminalFailureIds.delete(id);
+      }
+    } else if (isSchedulingTerminalFailure(resolvedTask.status)) {
+      for (const id of projectedIds) {
+        terminalFailureIds.add(id);
+        satisfyingIds.delete(id);
+      }
+    } else {
+      // A repair is still in flight (or otherwise unsettled). Its failed/raw
+      // ancestor is neither permission to spawn nor permission to cascade-skip.
+      for (const id of projectedIds) {
+        satisfyingIds.delete(id);
+        terminalFailureIds.delete(id);
+      }
     }
   }
 

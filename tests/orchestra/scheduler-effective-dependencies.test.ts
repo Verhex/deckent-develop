@@ -5,7 +5,7 @@
  *
  * Coverage:
  *   1. Exhaustive table: upstream status x fix-state x pipeline-flag -> the
- *      resulting satisfyingIds/terminalFailureIds membership, AND the actual
+ *      resulting logical-tip satisfyingIds/terminalFailureIds membership, AND the actual
  *      selectEligibleForSpawn eligibility outcome for a PENDING dependent.
  *   2. retryEligibleIds unit cases (undefined / future / exactly-now / past).
  *   3. Pinning tests for the ONE named, intentional behavior change: a DONE
@@ -123,20 +123,20 @@ function fixTaskStatus(fixState: FixState): TaskStatus | undefined {
 const EXPECTATION_TABLE: Record<string, Record<FixState, [boolean, boolean]>> = {
   [TaskStatus.DONE]: {
     'none': [true, false],
-    'pending-fix': [true, false],
+    'pending-fix': [false, false],
     'done-fix': [true, false],
-    'no_go-fix': [true, true], // fix's OWN NO_GO status independently marks terminal too
+    'no_go-fix': [false, true],
   },
   [TaskStatus.NO_GO]: {
     'none': [false, true],
-    'pending-fix': [false, true],
-    'done-fix': [true, true], // DONE fix rescues (satisfying) — original's NO_GO still terminal too
+    'pending-fix': [false, false],
+    'done-fix': [true, false],
     'no_go-fix': [false, true],
   },
   [TaskStatus.MANUAL_REVIEW_REQUIRED]: {
     'none': [false, true],
-    'pending-fix': [false, true],
-    'done-fix': [true, true],
+    'pending-fix': [false, false],
+    'done-fix': [true, false],
     'no_go-fix': [false, true],
   },
   [TaskStatus.PENDING]: {
@@ -223,6 +223,31 @@ describe('computeEffectiveDependencyState — retryEligibleIds', () => {
     const t = { ...makeTask('r-past'), retryAfter: NOW_MS - 60_000 } as Task;
     const state = computeEffectiveDependencyState([t], NOW_MS);
     expect(state.retryEligibleIds.has('r-past')).toBe(true);
+  });
+});
+
+describe('computeEffectiveDependencyState — canonical multi-hop FIX lineage', () => {
+  it('projects a DONE FIX-of-FIX onto the logical root without a contradictory terminal failure', () => {
+    const original = makeTask('lineage-root', { status: TaskStatus.NO_GO });
+    const firstFix = makeTask('lineage-root-fix', {
+      status: TaskStatus.NO_GO,
+      isPriorityFix: true,
+      fixForTaskId: original.id,
+    });
+    const resolvingFix = makeTask('lineage-root-fix-fix', {
+      status: TaskStatus.DONE,
+      isPriorityFix: true,
+      fixForTaskId: firstFix.id,
+    });
+
+    const state = computeEffectiveDependencyState(
+      [original, firstFix, resolvingFix],
+      NOW_MS,
+    );
+
+    expect(state.satisfyingIds.has(original.id)).toBe(true);
+    expect(state.terminalFailureIds.has(original.id)).toBe(false);
+    expect(state.satisfyingIds.has(firstFix.id)).toBe(true);
   });
 });
 

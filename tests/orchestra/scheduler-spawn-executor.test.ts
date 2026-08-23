@@ -437,7 +437,7 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
     const backend = makeMockBackend();
     Object.defineProperties(backend, {
       name: { value: 'docker' },
-      liveUsageBudgetSupport: { value: undefined },
+      liveUsageBudgetSupport: { value: 'measured-stream' },
     });
 
     const disposition = await executeSpawnTask(
@@ -453,6 +453,28 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
     expect(backend.calls[0]?.opts?.finalOnlyUsageContainment).toEqual(
       task.budgetPolicy?.finalOnlyUsage,
     );
+  });
+
+  it('blocks a continuation Docker dispatch when the task-stamped grant is missing', async () => {
+    const task = makeTask('700-FINAL-ONLY-MISSING', {
+      model: 'gpt-5.6-sol',
+      provider: 'codex',
+      budgetPolicy: {
+        ...makeTask('final-only-missing-template').budgetPolicy!,
+        resolvedProvider: 'codex',
+      },
+    });
+    const backend = makeMockBackend();
+    Object.defineProperties(backend, {
+      name: { value: 'docker' },
+      liveUsageBudgetSupport: { value: 'measured-stream' },
+    });
+
+    await expect(executeSpawnTask(
+      { task },
+      baseDeps(root, { backend, config: { spawn_backend: 'docker' } as ResolvedConfig }),
+    )).rejects.toThrow();
+    expect(backend.calls).toHaveLength(0);
   });
 
   it('blocks queued/respawn dispatch when attended authority is only a raw reference', async () => {

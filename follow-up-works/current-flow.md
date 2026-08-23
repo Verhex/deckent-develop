@@ -9,20 +9,22 @@
 - `DOGFOOD_MODE=ON` — canonical control-block kararı:
   `owner-live-2026-08-23-repo-hygiene-complete-dogfood-on`.
 - `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`; execution ve analysis authority Codex'te.
-- Aktif product run yok. Son outcome normal dogfood finalizer acceptance canary idi;
-  `sprint-627` honest terminal `ABORTED` olarak settle edildi ve eksik debt kanıtı typed
-  recovery seam'inde elle tamamlandı.
+- Aktif product run yok. Son run `sprint-628`, normal multi-task dogfood parity package'i
+  olarak 7/7 logical DONE ve terminal `COMPLETE` settle edildi. Root acceptance sırasında
+  test-only grant producer'ı reddedildi; canonical task-policy wiring typed recovery seam'inde
+  post-terminal düzeltildi.
 - Runtime hygiene formal different-provider XVerify, owner kararıyla
   `2026-08-24 20:00 Europe/Istanbul` sonrasına ertelendi; bu sınırdan önce formal
   runtime-hygiene DONE/Closure iddiası yok.
 
 ## Fresh başlangıç ground truth'u
 
-- [x] `HEAD == origin/main == 6cc1835e93bd2a579c735e9cc30b4a2c3d99ea54`;
-  worktree başlangıçta clean; landing `feat(runtime): land canonical archive and hygiene authority`.
+- [x] Session preflight: `origin/main=6cc1835e93bd2a579c735e9cc30b4a2c3d99ea54`,
+  local `HEAD=a29c9a8404264f54758dc21b627d1c5447c5b345` ile main bir commit ahead ve
+  worktree başlangıçta clean; unpushed landing `fix(runtime): preserve retired plan identity after canary`.
 - [x] Sprint-625 terminal authority: `ABORTED`, coordinator absent, active=false,
   resumable=false, terminal receipt consistent.
-- [x] Broker-native pending approval yok; bot daemon PID 2946124 ile çalışıyor.
+- [x] Broker-native pending approval yok; post-build restart sonrası bot daemon PID 3114591 ile çalışıyor.
 - [x] İki pending Nervous scope-collision kaydı fresh disk truth'ta stale bulundu:
   payload yalnız terminal/retired 623/624/625 task lineage'larını hedefliyordu; kör accept
   edilmeden canonical reject disposition uygulandı ve pending inbox boşaldı.
@@ -35,9 +37,9 @@
 - [x] `sprint-627`: beş bağımsız task tek dalgada/çoklu worker ile koştu; 4 original task
   tamamlandı, bir debt task `NO_GO`, onun fix'i repair-authority HOLD nedeniyle hiç dispatch
   edilmedi. Owner-authorized force-finalize unresolved lineage'ı koruyarak `ABORTED` yayınladı.
-- [x] Canonical archive acceptance: 68/68 artifact verified; manifest digest valid; missing,
-  mismatched, untracked ve conflict yok; live `.tasks` sprint-627 residue'su 0; legacy
-  `.brain/archive/sprints/sprint-*-tasks` ve `.tasks/archive` baseline'ları değişmedi.
+- [x] Sprint-627 archive manifesti kendi 68-artifact snapshot'ı için valid; live `.tasks`
+  residue'su ve legacy raw write yok. Fresh inspect sonradan yazılmış 3 terminal event nedeniyle
+  archived/live journal drift'i gösterdi; complete-archive acceptance artık HOLD.
 - [x] Brain compact `archive-sprint-627` row'u ve guarded exports yenilendi; ikinci applied
   reconcile `published=0`, DB digest unchanged verdi.
 - [x] Eksik provider-observation compiled-consumer ölçümü gerçek binary ile green:
@@ -46,10 +48,23 @@
 - [x] FIX non-dispatch RCA `RUNFLOW-001` evidence'ına owner-admitted finding olarak eklendi:
   `do --run` ve `runs --start` aynı exact-start service'ine converge ediyor; gap, injected
   directory read-scope → exact repair-authority HOLD → PAUSED fix → empty recovery queue zincirinde.
+- [x] `sprint-628`: canonical allocator ile ayrılan 7-task DAG, ilk inventory wave'inin compiled
+  prompt `filesRead` kaybı ve FIX-of-FIX/checkpoint/post-FIX aggregate recovery'lerinden sonra
+  7/7 logical DONE, 19 attempt, 0 unresolved terminal receipt üretti.
+- [x] Sprint-628 archive verify kendi 230 artifact snapshot'ı için green ve Brain compact row okunuyor.
+  Ancak fresh inspect archived 123 event'e karşı `.deckent/recently-works` hot journalında 127 event
+  ölçtü; archive sonrası yazılan seq 124-127 terminal eventleri yeni raw write ve 2 conflict üretti.
+  Canonical complete-archive ve legacy-no-new-raw-write acceptance'ları HOLD.
+- [x] Manual/initial-sprint/continuation final-only parity root audit'i, producer'ı olmayan test-only
+  authorization wrapper'ını reddetti. Shared resolver canonical `task.budgetPolicy.finalOnlyUsage`
+  tüketimine çevrildi; 74/74 scoped battery, lint/typecheck ve fresh-dist real-binary missing-grant
+  canary green. Tenant/run/task/attempt/expiry
+  single-use authority ile real-process FO-11 matrisi bu bounded slice'ın dışında OPEN.
 
 ## Owner-admitted continuation sırası
 
-1. Manual spawn ile sprint executor arasındaki final-only usage containment parity gap.
+1. Finalizer'ın archive-sonrası terminal eventlerini canonical manifest/journal'a atomik dahil etmesi;
+   sprint-627/628 conflict-free fresh inspect + verify canary.
 2. Provider observation tarafındaki 19 unresolved interval'in authority-temelli reconciliation'ı.
 3. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
 4. D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
@@ -71,40 +86,27 @@
 - Commit/push owner tarafından bu continuation için yetkilidir; öncesinde `git branch -vv`,
   local/remote HEAD SHA ve scoped diff yeniden doğrulanır.
 
-## Sıradaki multi-task dogfood package — manual spawn parity
+## Son multi-task package — manual spawn parity
 
-Run ID canonical allocator/config authority'den plan anında çözülür; bu dosyada ID yazılmaz.
-Package owner outcome'u final-only usage containment'ın manual `deckent spawn --force` ile normal
-sprint executor arasında tek authority olmasıdır. Measured code truth: `spawnWorkerMultiProvider()`
-ve Docker backend typed `finalOnlyUsageContainment` alabiliyor; sprint spawner task'ın immutable
-`budgetPolicy.finalOnlyUsage` grant'ını geçiriyor, manual CLI registration ise aynı task projectionını
-okuduğu halde grant'ı call options'a taşımıyor ve provider work öncesi fail-closed HOLD oluyor.
+Canonical allocator `sprint-628` kimliğini ayırdı; 3 paralel inventory → shared resolver → manual
+ve sprint consumers → fan-in proof DAG'ı yürüdü. Worker sonucu ilk bakışta 7/7 terminal olsa da root
+consumer audit'i, yalnız testlerin ürettiği schema-dışı authorization wrapper'ını yakaladı. Host
+correction mevcut owner policy producer'ını tek authority yaptı:
 
-Önerilen dependency waves:
+- producer: `resolveExecutionBudgetPolicy` → `applyWorkerExecutionBudgetPolicy` →
+  `task.budgetPolicy.finalOnlyUsage`;
+- consumers: manual `registerSpawn`, initial `spawnWorkers`, continuation `executeSpawnTask`;
+- backend: yalnız resolved Docker, exact nested grant; missing/mismatch/non-Docker typed HOLD;
+- `maxUsd`: wall-clock grant yoluna girmez, separate incremental-pricing gate'te fail-closed;
+- XVerify'ın mevcut auditor runtime-grant seam'i korunur.
+- Fresh built CLI negative canary, grant'sız canonical manual taskı exit 1 ve
+  `owner-authorization-missing` ile Docker/provider work öncesi durdurur.
 
-1. Wave A — paralel, read/evidence:
-   - ingress inventory: manual spawn, sprint scheduler, retry/FIX/continuation ve xverify producer →
-     consumer zincirlerini exact source references ile ölç;
-   - policy/provenance inventory: task snapshot digest, role, tenant/run/attempt/deadline binding ve
-     replay/expiry negative-space'ini ölç;
-   - conformance inventory: mevcut Docker final-only, manual-spawn, settlement ve real-process test
-     matrisini çıkar; eksik normal/hang/child/missing-final/replay/crash vakalarını say.
-2. Wave B — Wave A çıktısına dependency-bound implementation:
-   - tek shared resolver ile provider live-usage capability ∧ immutable task policy ∧ owner grant
-     kesişimini üret; manual ve sprint adapters yalnız thin wrapper olsun;
-   - manual `spawn --force` consumer'ını aynı resolver, dispatch-boundary receipt, wall-clock minimum
-     timeout ve exactly-once terminal settlement'a bağla;
-   - retry/FIX/continuation yollarının mevcut shared authority'yi kullandığını parity ratchet ile
-     kanıtla; ikinci grant veya surface-local fallback üretme.
-3. Wave C — closure proof:
-   - hermetic parity/adversarial battery ve every-environment process-tree adapter contractı;
-   - owner-authorized bounded real-binary manual-spawn canary, canlı PID/log/receipt/usage izlemesi,
-     sıfır orphan ve replay fail-closed kanıtı;
-   - docs/MASTER (`FO-03`→`FO-11`, özellikle `FO-05`) truth-sync. Formal verifier gerekiyorsa output
-     producer'dan farklı provider; unavailable ise typed HOLD.
-
-Package aynı task üzerinde iki worker veya tek-task Deckent run'ı üretmez. File-collision ve gerçek
-dependency nedeniyle boş kalan worker slotları zorlanmaz.
+Bounded parity slice LOCAL_VERIFIED'dir; full FO-05 tüm autonomous/process/xverify surface
+convergence'ı, FO-04 durable single-use bindings ve FO-11 real-process matrix tamamlanmadan OPEN kalır.
+Sıradaki dogfood package tek-task değildir: finalizer terminal-event ordering/reconciliation RCA,
+normal+recovery terminal producers, atomic archive refresh ve iki archived sprint regression
+kanıtını paralel dependency waves halinde işler.
 
 ## Korunan authority
 

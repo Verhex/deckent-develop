@@ -14,6 +14,29 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint628] - 2026-08-23
+
+
+### Fixed
+
+- FO01 ingress wiring inventory (logical lineage settled through FIX recovery)
+- FO02 policy and provenance inventory (logical lineage settled through FIX recovery)
+- FO03 conformance matrix inventory (logical lineage settled through FIX recovery)
+- FO04 shared containment authority resolver
+- FO05 manual spawn production consumer
+- FO06 sprint and continuation consumer parity
+- FO07 adversarial parity fan-in proof
+
+### Changed
+
+- Root acceptance replaced the worker's producer-less authorization wrapper with the
+  canonical task-stamped `budgetPolicy.finalOnlyUsage` authority and preserved the
+  independent XVerify runtime-grant seam.
+- Mixed `filesRead` + `filesWrite` prompts now preserve both authority sets; checkpoint
+  and post-FIX aggregation recover correctly from terminal FIX lineages.
+
+_Tasks: 7 logical total, 7 done, 0 tech debt, 0 unresolved_
+
 ## [sprint1780659451558] - 2026-08-22
 
 ### Added

@@ -4082,6 +4082,15 @@ export async function runFixPhase(
         for (const pTask of postFixTasks) {
           const pResult = postFixResults.find(r => r.taskId === pTask.id);
           if (!pResult) continue;
+          // POSTFIX work is ordinary approved DAG work, not an observability-
+          // only side wave. Its durable result must reach the outer aggregate
+          // consumed by gate/finalizer/terminal-evidence authority. Omitting it
+          // left disk tasks DONE while the terminal winner set stopped at the
+          // pre-scan roots, producing a false TERMINAL_EVIDENCE_HOLD after an
+          // otherwise successful dependency continuation.
+          if (!results.some(result => result.taskId === pResult.taskId)) {
+            results.push(pResult);
+          }
           // Reuse the ingest-time verdict (one attempt is scored once).
           const pIngest = fixVerdicts.get(pTask.id);
           if (!pIngest) {

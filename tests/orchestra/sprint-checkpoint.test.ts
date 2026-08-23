@@ -570,6 +570,49 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
     rmSync(root, { recursive: true, force: true });
   });
 
+  it('re-queues a markerless PAUSED dependent after a multi-hop FIX lineage settles', () => {
+    const root = setupRoot();
+    const original = makeMinimalTask('455-100', TaskStatus.NO_GO);
+    const firstFix = makeMinimalTask('455-100-fix', TaskStatus.NO_GO);
+    const resolvingFix = makeMinimalTask('455-100-fix-fix', TaskStatus.DONE);
+    const dependent = makeMinimalTask('455-101', TaskStatus.PAUSED);
+    for (const task of [original, firstFix, resolvingFix, dependent]) task.sprintId = SID;
+    firstFix.isPriorityFix = true;
+    firstFix.fixForTaskId = original.id;
+    resolvingFix.isPriorityFix = true;
+    resolvingFix.fixForTaskId = firstFix.id;
+    dependent.dependencies = [original.id];
+    for (const task of [original, firstFix, resolvingFix, dependent]) {
+      writeFileSync(
+        join(root, '.tasks', `task-${task.id}.json`),
+        JSON.stringify(task, null, 2),
+        'utf-8',
+      );
+    }
+    writeResultFile(root, original.id, 'NO_GO');
+    writeResultFile(root, firstFix.id, 'NO_GO');
+    writeResultFile(root, resolvingFix.id, 'DONE');
+    const cp = baseCp({
+      completedTasks: [original.id, firstFix.id, resolvingFix.id],
+      schemaVersion: 2,
+      taskStates: [original, firstFix, resolvingFix, dependent].map(task => ({
+        id: task.id,
+        status: task.status,
+        ...(task.fixForTaskId ? { fixForTaskId: task.fixForTaskId } : {}),
+      })),
+    });
+
+    expect(deriveResumeDisposition(root, cp)).toEqual({
+      resumableIds: [dependent.id],
+      parkedSettlements: [],
+    });
+    const reset = resetInterruptedWorkersToPending(root, cp, [dependent.id]);
+    expect(reset).toMatchObject({ resetIds: [dependent.id], committed: true });
+    expect(statusOf(root, dependent.id)).toBe(TaskStatus.PENDING);
+
+    rmSync(root, { recursive: true, force: true });
+  });
+
   it('restores terminal status from Brain verdict instead of worker self-assessment', () => {
     const root = setupRoot();
     writeTaskJson(root, '455-003c', TaskStatus.DONE);

@@ -432,10 +432,30 @@ test into the implementation node or into a completed prerequisite, then execute
 new recovery lineage against the retained evidence. This is a dependency-boundary
 defect, not blame assigned to a worker, provider, or later task.
 
+## 30. Mixed read/write scope must survive compiled-prompt composition
+
+**Evidence (sprint-628):** The first three workers had exact `filesRead` entries in
+their persisted task projections, but the write-capable prompt branch rendered only
+the not-yet-created evidence directory. Each worker correctly returned `NO_GO` because
+the sources it was authorized to inspect were absent from the compiled prompt. FIX
+attempts inherited the same defective composition, so retrying could not repair it.
+
+**Rule:** Treat `filesRead` and `filesWrite` as independent authority sets. Sanitize and
+render both; the presence of writes must never erase reads. If an authored non-empty
+read set is entirely rejected during normalization, fail prompt compilation explicitly
+instead of dispatching a worker with silently narrowed context. Before a multi-task run,
+compile one representative mixed-scope prompt and assert that every exact read and write
+target survives. A worker's scope-based `NO_GO` is evidence of a host composition defect,
+not a reason to spend another provider attempt on the same prompt.
+
 ---
 
 ## Changelog (update after every sprint experience)
 
+- **2026-08-23 — sprint-628 mixed-scope recovery**: Lesson 30 added (`filesRead`
+  and `filesWrite` are independent compiled-prompt authorities; representative
+  mixed-scope conformance runs before dispatch; retrying an unchanged bad prompt is
+  not recovery).
 - **2026-08-22 — dependency-local acceptance recovery**: Lesson 29 added (mandatory
   task-local tests must exist at execution or be co-owned; forward acceptance edges
   settle as typed `ABORTED` and recover through a corrected DAG without rewriting the

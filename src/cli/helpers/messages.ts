@@ -2693,6 +2693,10 @@ const MESSAGES: MessageMap = {
     en: 'Worker spawned for task {taskId} (model: {model}).',
     tr: '{taskId} görevi için worker başlatıldı (model: {model}).',
   },
+  'spawn.final_only_containment_hold': {
+    en: 'Final-only live-usage containment is unavailable ({reasonCode}); spawn was blocked before provider work.',
+    tr: 'Final-only canlı kullanım containment kullanılamıyor ({reasonCode}); spawn provider çalışmasından önce engellendi.',
+  },
 
   // ─── init command ────────────────────────────────────────────────────
   'init.select_language': {

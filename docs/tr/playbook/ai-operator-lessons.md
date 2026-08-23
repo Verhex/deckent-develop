@@ -393,10 +393,52 @@ current state'e karşı adoption prepare/proof akışını kullan. Authority'ler
 veya eksikse HOLD'da dur. MASTER metni ve sayıları yalnız discovery ipucudur, mutation
 authority'si değildir; HOLD mühür değildir.
 
+## 29. Acceptance görevin execution boundary'sinde bulunur
+
+**Kanıt (sprint-1780659451557):** Archived manifest `terminalOutcome: ABORTED`
+kaydeder; recovery directive'i 20 görevin 7'sinin tamamlandığını, 13'ünün unresolved
+kaldığını gösterir. Çünkü implementation görevinin mandatory testi, blocked durumdaki
+gelecek bir göreve verilmişti. Retained terminal/recovery kanıtı authority'dir;
+recovery predecessor'ı geriye dönük COMPLETE yapmaz.
+
+**Kural:** Mandatory task-local test, o görevin execution boundary'sinde zaten var
+olmalı veya görev tarafından co-owned edilmelidir. Gelecek dependent, predecessor'ın
+acceptance kanıtını sağlayamaz. Implementation ile exact testini tek node yap ya da
+implementation'ı testi daha önce üreten completed prerequisite'e bağla. Acceptance'ı
+gelecekteki dependent'a yönlendirme.
+
+**Recovery:** Zorunlu test yoksa typed failure'ı koru ve unresolved descendants ile
+run'ı `ABORTED` settle et. Testi implementation node'una veya completed prerequisite'e
+taşıyan düzeltilmiş DAG ile yeni recovery lineage çalıştır. Bu worker/provider suçu
+değil, dependency-boundary kusurudur.
+
+## 30. Mixed read/write scope compiled prompt'ta eksiksiz korunur
+
+**Kanıt (sprint-628):** İlk üç worker'ın persisted task projection'ında exact
+`filesRead` girdileri vardı; write-capable prompt branch'i ise yalnız henüz oluşmamış
+evidence dizinini render etti. Worker'lar authorized source'ları compiled prompt'ta
+göremediği için doğru biçimde `NO_GO` verdi. FIX girişimleri aynı bozuk composition'ı
+miras aldı; retry onarım üretmedi.
+
+**Kural:** `filesRead` ve `filesWrite` bağımsız authority kümeleridir; ikisini ayrı
+sanitize ve render et. Write varlığı reads'i asla silmemeli. Authored non-empty read
+kümesinin tamamı normalization sırasında reddedilirse sessiz daraltılmış prompt'la
+dispatch etmek yerine compilation açıkça fail-closed olmalı. Multi-task run öncesinde
+temsilî bir mixed-scope prompt compile et ve bütün exact read/write hedeflerinin
+korunduğunu doğrula. Scope kaynaklı worker `NO_GO`'su aynı prompt'a yeni provider
+attempt harcama gerekçesi değil, host composition defect kanıtıdır.
+
 ---
 
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-08-23 — sprint-628 mixed-scope recovery**: Ders 30 eklendi (`filesRead`
+  ve `filesWrite` bağımsız compiled-prompt authority'leridir; dispatch öncesi temsilî
+  mixed-scope conformance koşar; aynı bozuk prompt'u retry etmek recovery değildir).
+- **2026-08-22 — dependency-local acceptance recovery**: Ders 29 eklendi (mandatory
+  task-local test execution anında var veya co-owned olmalı; forward acceptance edge
+  typed `ABORTED` settle olur ve predecessor yeniden yazılmadan düzeltilmiş DAG ile
+  recovery yürür).
 - **2026-08-22 — provider-observation migrasyon doğrulaması**: Ders 28 eklendi
   (migrasyon seçmeden önce SQLite header/schema/row ve Git preimage ölçümü; zaten
   mutate edilmiş fakat receipt'siz adoption ayrımı; HOLD mühür değildir).

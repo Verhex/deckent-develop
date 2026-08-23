@@ -956,6 +956,28 @@ export function deriveResumeDisposition(
   if (checkpoint.sprintId) {
     const durableTaskIds = new Set<string>();
     supplementLegacyCheckpointTaskIds(projectRoot, checkpoint.sprintId, durableTaskIds);
+
+    // A resume may have just completed the final attempt of a multi-hop FIX
+    // lineage while its logical root and downstream tasks still carry the
+    // pre-repair NO_GO/PAUSED disk projection. The checkpoint buckets contain
+    // no pending work in that state, so a bucket-only resume incorrectly
+    // terminalizes instead of continuing the approved DAG. Re-open only
+    // markerless PAUSED tasks whose authored dependencies are NOW satisfied by
+    // the canonical scheduler lineage projection. Approval/operator pauses
+    // (no dependency edge) and still-blocked descendants remain untouched.
+    const durableTasks = [...durableTaskIds]
+      .map(id => readJsonSafe<Task>(join(projectRoot, TASKS_DIR, `task-${id}.json`)))
+      .filter((task): task is Task => task !== null);
+    const { satisfyingIds } = computeEffectiveDependencyState(durableTasks, Date.now());
+    for (const task of durableTasks) {
+      if (
+        task.status === TaskStatus.PAUSED
+        && (task.dependencies?.length ?? 0) > 0
+        && task.dependencies!.every(dependencyId => satisfyingIds.has(dependencyId))
+      ) {
+        consider(task.id, true);
+      }
+    }
     for (const id of durableTaskIds) consider(id);
   }
   return { resumableIds: ids, parkedSettlements };

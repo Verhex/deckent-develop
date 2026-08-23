@@ -234,6 +234,24 @@ function postFixScanEvent(): Record<string, unknown> | undefined {
   return call?.[5] as Record<string, unknown> | undefined;
 }
 
+function mockCollectedWave(results: TaskResult[]): void {
+  vi.mocked(waitForResults).mockImplementation(async (
+    _projectRoot,
+    waitedSprint,
+    _timeout,
+    _queue,
+    spawnOptions,
+  ) => {
+    for (const result of results) {
+      const task = waitedSprint.tasks.find(candidate => candidate.id === result.taskId);
+      if (task && spawnOptions?.evaluateCollectedResult) {
+        await spawnOptions.evaluateCollectedResult(task, result);
+      }
+    }
+    return results;
+  });
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────────
 
 describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
@@ -260,12 +278,13 @@ describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
     const child = makeTask({ id: '361-008', status: TaskStatus.PENDING, dependencies: ['361-003'] });
     const sprint = makeSprint([parent, child]);
     const evaluations = new Map<string, TaskEvaluation>();
+    const aggregateResults: TaskResult[] = [];
 
     vi.mocked(respawnEligibleTasks).mockResolvedValueOnce(['361-008']);
-    vi.mocked(waitForResults).mockResolvedValue([makeResult('361-008')]);
+    mockCollectedWave([makeResult('361-008')]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
-    await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
+    await runFixPhase(root, sprint, evaluations, aggregateResults, makeConfig(), undefined, 'v1', undefined);
 
     // Wave 1 dispatches the stalled child; the bounded re-scan (wave 2) finds
     // nothing further eligible and terminates without a second dispatch.
@@ -275,6 +294,7 @@ describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
     expect(waitedSprint.tasks.map(t => t.id)).toEqual(['361-008']);
 
     expect(evaluations.get('361-008')).toBe(TaskEvaluation.DONE);
+    expect(aggregateResults.map(result => result.taskId)).toEqual(['361-008']);
     expect(handleEvaluation).toHaveBeenCalledTimes(1);
 
     expect(postFixScanEvent()).toMatchObject({
@@ -305,7 +325,7 @@ describe('FIX Phase — postfix-pending-scan (361-004, born-475)', () => {
     const evaluations = new Map<string, TaskEvaluation>();
 
     vi.mocked(respawnEligibleTasks).mockResolvedValueOnce(['361-011']);
-    vi.mocked(waitForResults).mockResolvedValue([makeResult('361-011', {
+    mockCollectedWave([makeResult('361-011', {
       testsPassed: false,
       selfAssessment: 'NO_GO',
       notes: 'build failed',

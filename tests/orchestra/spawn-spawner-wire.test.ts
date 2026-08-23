@@ -189,7 +189,7 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     const backend = makeMockBackend();
     Object.defineProperties(backend, {
       name: { value: 'docker' },
-      liveUsageBudgetSupport: { value: undefined },
+      liveUsageBudgetSupport: { value: 'measured-stream' },
     });
 
     const origCwd = process.cwd();
@@ -209,6 +209,36 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     expect(backend.calls[0]?.opts?.finalOnlyUsageContainment).toEqual(
       task.budgetPolicy.finalOnlyUsage,
     );
+  });
+
+  it('blocks a final-only Docker dispatch when the task-stamped grant is missing', async () => {
+    const task = createTask('469-FINAL-ONLY-MISSING', []);
+    task.model = 'gpt-5.6-sol';
+    task.provider = 'codex';
+    task.budgetPolicy = {
+      ...task.budgetPolicy!,
+      resolvedProvider: 'codex',
+    };
+    persistTasks([task]);
+    const backend = makeMockBackend();
+    Object.defineProperties(backend, {
+      name: { value: 'docker' },
+      liveUsageBudgetSupport: { value: 'measured-stream' },
+    });
+
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await expect(spawnWorkers(
+        testRoot,
+        makeSprint('sprint-168-final-only-missing', [task]),
+        { ...makeConfig(), spawn_backend: 'docker' } as ResolvedConfig,
+        { spawnBackend: backend },
+      )).rejects.toThrow();
+    } finally {
+      process.chdir(origCwd);
+    }
+    expect(backend.calls).toHaveLength(0);
   });
 
   it('does not retry a provider-authority composition HOLD and never reaches prompt/task assignment/backend', async () => {

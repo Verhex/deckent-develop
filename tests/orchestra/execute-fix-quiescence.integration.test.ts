@@ -195,7 +195,18 @@ describe('Sprint-486 EXECUTE/FIX quiescence replay', () => {
 
     const fix = task(`${exhausted.id}-fix`, { isPriorityFix: true, fixForTaskId: exhausted.id });
     writeFileSync(join(root, '.tasks', `task-${fix.id}.json`), JSON.stringify(fix), 'utf8');
-    fixWait.mockResolvedValue([result(fix.id)]);
+    const settledFixResult = result(fix.id);
+    fixWait.mockImplementation(async (...args: unknown[]) => {
+      const waitedSprint = args[1] as Sprint;
+      const spawnOptions = args[4] as {
+        evaluateCollectedResult?: (task: Task, taskResult: TaskResult) => Promise<TaskEvaluation>;
+      } | undefined;
+      const waitedTask = waitedSprint.tasks.find(item => item.id === settledFixResult.taskId);
+      if (waitedTask && spawnOptions?.evaluateCollectedResult) {
+        await spawnOptions.evaluateCollectedResult(waitedTask, settledFixResult);
+      }
+      return [settledFixResult];
+    });
     vi.mocked(evaluateWithRubric).mockReturnValue({ decision: 'DONE', totalScore: 100, rubricScores: [], retryCount: 0 });
 
     await runFixPhase(root, sprint, evaluations, executeResults, config(root), { autoApprove: true }, 'v1', backend);

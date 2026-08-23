@@ -118,6 +118,24 @@ Ev
 - 1780659451539-009 — Health and ETA readiness — Created a source-backed Closure Health and ETA readiness assessment.
 - …and 9 more delivered
 
+## Sprint sprint-628 Learnings
+- Sprint sprint-628 Learnings: ## Sprint sprint-628 Learnings
+- FO01 ingress wiring inventory: NO_GO — Created the declared evidence file and `git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-23
+- FO02 policy and provenance inventory: NO_GO — Created and read back the declared evidence file; git diff --check passed. The only permitted evidence directory was abs
+- FO03 conformance matrix inventory: NO_GO — Created and read back the declared evidence file; `git diff --check -- docs/evidence/final-only-usage-containment-parity
+- Fix: Fix: Fix: FO01 ingress wiring inventory: NO_GO — Read the entire authorized evidence directory and the required worker contract. The existing declared inventory identifi
+- Fix: Fix: FO01 ingress wiring inventory: NO_GO — Verified the declared evidence file exists and  passes. The file inventories manual spawn, initial sprint scheduling, sc
+- Fix: FO01 ingress wiring inventory: NO_GO — Verified the scoped evidence file by reading it back; git diff --check -- docs/evidence/final-only-usage-containment-par
+- Fix: Fix: Fix: FO02 policy and provenance inventory: NO_GO — Wrote and read back the declared FO02 evidence file; scoped git diff --check passed. The declared evidence directory con
+- Fix: Fix: FO02 policy and provenance inventory: NO_GO — Rewrote the declared FO02 evidence file and verified it with git diff --check (passed). The bounded authorized directory
+- Fix: FO02 policy and provenance inventory: NO_GO — Verified the target document exists and `git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-2
+- Fix: Fix: FO03 conformance matrix inventory: NO_GO — Verified the declared evidence file exists and contains a 9-axis × 2-mode matrix with explicit per-cell test-name record
+
+## Gains
+- 628-001-fix-fix-fix-fix — Fix: Fix: Fix: Fix: FO01 ingress wiring inventory — Created the declared source-backed ingress inventory.
+- 628-002-fix-fix-fix-fix — Fix: Fix: Fix: Fix: FO02 policy and provenance inventory — Verified declared evidence file content and git diff --check.
+- 628-003-fix-fix-fix — Fix: Fix: Fix: FO03 conformance matrix inventory — Read back the authorized FO03 file and ran `git diff --check -- docs/evidence/final-only-usage-co...
+
 ## Sprint sprint-622 Learnings
 - Sprint sprint-622 Learnings: ## Sprint sprint-622 Learnings
 - Immutable evaluation receipt restart replay pin: GO_WITH_TECH_DEBT — Receipt replay is idempotent: an existing exact-attempt receipt is consumed as verdict authority without evaluation or r

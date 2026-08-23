@@ -1,53 +1,120 @@
-# DIRECTIVES — FINALIZER-ACCEPTANCE-CANARY MULTI-TASK WAVE
+# DIRECTIVES — FINAL-ONLY USAGE CONTAINMENT PARITY
 
-## Outcome
+## Goal
 
-Normal dogfood finalizer zincirini üç bağımsız acceptance faceti ve planner admissionını bloke eden iki fresh-stale critical debt revalidation taskı ile paralel çalıştır. Bu wave tek product outcome taşır: canonical archive finalizer acceptance. Worker faceti yalnız bounded evidence document üretir. Terminal settlement sonrasında host gerçek run arşivini, manifest ve hash integrity durumunu, Brain archive index ve summary refresh durumunu, idempotent reconcile sonucunu ve legacy raw-write negative space durumunu bağımsız doğrular.
+Manual `deckent spawn --force` ile normal sprint executor arasındaki final-only usage
+containment authority farkını kapat. Tek product outcome budur. Provider live-usage
+capability, immutable task budget policy ve owner-authored final-only grant tek shared
+resolver üzerinden kesişmeli; manual, initial sprint, retry, FIX ve continuation yolları
+surface-local fallback veya ikinci grant üretmeden aynı kararı tüketmelidir.
 
-Runtime hygiene formal different-provider XVerify 2026-08-24 20:00 Europe/Istanbul sonrasına ertelenmiştir. Bu run formal runtime-hygiene DONE, Closure veya release iddiası üretmez.
+Aktif run sırasında build, provider auth mutation ve XVerify çalıştırma. `.brain/memory.db`
+silinmez veya taşınmaz; `.tasks` içeriği `rm` ile temizlenmez. Başka outcome'a ait finding
+yalnız `RELATED_BUT_NONBLOCKING` olarak raporlanır.
 
-## Invariants
+## Task 1: FO01 ingress wiring inventory
+- Files: docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md
+- Reads: src/cli/commands/spawn.ts, src/orchestra/sprint-spawner.ts, src/orchestra/scheduler-effects.ts, src/orchestra/cross-verify-runner.ts, src/orchestra/task-mode-runner.ts
+- Dependencies: none
+- Priority: HIGH
+- Test: git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md
+### Description
+Manual spawn, initial sprint scheduler, scheduler retry/FIX/continuation, task mode ve XVerify
+producer-to-consumer-to-backend zincirlerini fresh source references ile ölç. Her ingress'in
+provider route seçimi, live-usage admission, grant forwarding, dispatch boundary ve terminal
+settlement davranışını tablo halinde kaydet. Kod veya başka dosya değiştirme.
+### goNogo
+- goCriteria: Exact production references ile tüm execution ingressleri ve manual-vs-sprint divergence noktası kaydedilir; yalnız declared evidence file değişir
+- nogo: Tahmini wiring yazılır; başka file değiştirilir; formal closure veya runtime-hygiene DONE iddia edilir
 
-- Üç canary task bağımsızdır, dependency taşımaz ve exact ayrı evidence file yazar.
-- Product source, tests, config, auth ve provider state canary taskları tarafından değiştirilmez.
-- Planner tarafından canonical biçimde injected stale-debt revalidation taskları yalnız kendi inherited exact scope sınırında fresh disk truth ölçer. Green truth varsa no-op settlement üretir; yeni unrelated implementation yapmaz.
-- Aktif run sırasında build, provider auth mutation ve XVerify çağrısı yapılmaz.
-- .brain/memory.db silinmez veya taşınmaz. .tasks içeriği rm ile temizlenmez.
-- Finding başka outcome kapsamındaysa result notes içinde RELATED_BUT_NONBLOCKING olarak raporlanır.
+## Task 2: FO02 policy and provenance inventory
+- Files: docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md
+- Reads: src/core/execution-budget-policy.ts, src/core/execution-plan-digest.ts, src/core/task-types.ts, src/orchestra/spawn-backend-docker.ts, src/core/task-execution-settlement.ts
+- Dependencies: none
+- Priority: HIGH
+- Test: git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md
+### Description
+Final-only authorization'ın provider live-usage capability, immutable task budget snapshot,
+policy digest, role, tenant, run, task, attempt, deadline ve wall-clock binding zincirini ölç.
+Replay, expiry, missing grant, provider mismatch, backend mismatch ve stale task projection
+negative-space'ini exact source references ile kaydet. Kod veya başka dosya değiştirme.
+### goNogo
+- goCriteria: Authority inputs and fail-closed negative space exact production references ile kaydedilir; yalnız declared evidence file değişir
+- nogo: Yeni authority uydurulur; replay veya expiry sessiz kabul edilir; başka file değiştirilir
 
-## Task 1: FAC01-ARCHIVE Canonical archive wiring and integrity contract
+## Task 3: FO03 conformance matrix inventory
+- Files: docs/evidence/final-only-usage-containment-parity-2026-08-23/03-conformance-matrix.md
+- Reads: tests/orchestra/docker-final-only-containment.test.ts, tests/orchestra/spawn-spawner-wire.test.ts, tests/orchestra/scheduler-spawn-executor.test.ts, tests/cli/spawn-lifecycle.test.ts, tests/cli/commands/multi-provider-spawn-kill-run.test.ts, tests/cli/spawn-settlement-attempt.test.ts
+- Dependencies: none
+- Priority: HIGH
+- Test: git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-23/03-conformance-matrix.md
+### Description
+Mevcut final-only ve manual-spawn test coverage'ını normal completion, hang, child process,
+missing-final usage, missing grant, replay, crash, stale result ve exactly-once settlement
+eksenlerinde say. Covered ve missing hücreleri test isimleriyle kaydet; implementation önerisini
+yalnız measured gap ile sınırla. Kod veya başka dosya değiştirme.
+### goNogo
+- goCriteria: Test matrix gerçek test isimleri ve measured covered-missing counts taşır; yalnız declared evidence file değişir
+- nogo: Çalışmayan test varmış gibi gösterilir; başka file değiştirilir; mock-only proof COMPLETE sayılır
 
-Files: docs/evidence/finalizer-acceptance-canary-2026-08-23/01-archive-wiring.md
-Reads: docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md, src/core/sprint-archive.ts, src/orchestra/sprint-finalizer.ts, src/cli/commands/archive.ts
-Implement: Fresh source truth ile canonical raw archive producer to consumer to finalizer to CLI verification zincirini incele. Exact source references, manifest family and digest invariants, targeted archive verify acceptance, terminal-outcome honesty and archive failure false-COMPLETE guardını bounded evidence document olarak kaydet. Kod veya başka doküman değiştirme.
-Test: git diff --check -- docs/evidence/finalizer-acceptance-canary-2026-08-23/01-archive-wiring.md
-GO: Evidence document exact production wiring zincirini ve post-terminal live checks listesini source-backed taşır; yalnız exact file değişir; build, XVerify ve auth mutation yok.
-NO_GO: Wiring uydurulur, başka file değişir, legacy path yazılır veya formal DONE ya da Closure iddia edilir.
+## Task 4: FO04 shared containment authority resolver
+- Files: src/core/final-only-usage-containment.ts, tests/core/final-only-usage-containment.test.ts
+- Reads: docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md, docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md, src/core/execution-budget-policy.ts, src/core/provider-command-spec.ts, src/orchestra/spawn-backend.ts
+- Dependencies: Task 1, Task 2
+- Priority: CRITICAL
+- Test: npx vitest run tests/core/final-only-usage-containment.test.ts
+### Description
+Provider live-usage mode, resolved executor capability, immutable execution budget ve task-stamped
+owner authorization kesişimini tek pure shared resolver'da üret. Resolver only-if-exact semantics,
+typed reason code ve fail-closed negative-space taşısın; grant üretmesin veya genişletmesin.
+Cross-platform `auto` backend sonucu caller tarafından resolved executor olarak verilmelidir.
+### goNogo
+- goCriteria: Shared resolver final-only plus live ceiling plus eligible executor plus exact authorization kesişiminde grant döndürür; missing or mismatch cases typed fail-closed olur; scoped unit tests green
+- nogo: Resolver owner grant üretir; backend tahmin eder; non-final-only provider'a containment verir; expiry or mismatch kabul eder; scoped tests fail
 
-## Task 2: FAC02-BRAIN Brain archive index, summary and idempotency contract
+## Task 5: FO05 manual spawn production consumer
+- Files: src/cli/commands/spawn.ts, tests/cli/spawn-lifecycle.test.ts
+- Reads: docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md, docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md, src/core/final-only-usage-containment.ts, src/orchestra/spawn-backend-docker.ts
+- Dependencies: Task 4
+- Priority: CRITICAL
+- Test: npx vitest run tests/cli/spawn-lifecycle.test.ts
+### Description
+Manual `registerSpawn` task snapshotındaki final-only authorization'ı shared resolver inputuna
+taşısın. `spawnWorkerMultiProvider` gerçek configured backend'i resolve ettikten sonra containment
+kararını versin; geçerli Docker containment varken host-adapter short-circuit etmesin. Dispatch
+boundary receipt backend spawn'dan önce, terminal settlement exact attempttan ve stale result guard
+korunarak çalışsın. Missing grant veya uygun olmayan executor provider work öncesi fail-closed olsun.
+### goNogo
+- goCriteria: Manual force spawn valid final-only taskı shared resolver ile Docker containment'a yollar ve exact grant backend optionına ulaşır; missing grant and non-Docker paths provider work öncesi fail-closed; scoped tests green
+- nogo: Surface-local grant üretilir; host-adapter bypass sürer; wall-clock cap düşer; dispatch receipt veya stale-result guard zayıflar; scoped tests fail
 
-Files: docs/evidence/finalizer-acceptance-canary-2026-08-23/02-brain-index-summary.md
-Reads: docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md, src/core/sprint-archive.ts, src/orchestra/sprint-finalizer.ts, src/core/memory-store.ts
-Implement: Fresh source truth ile compact archive index producer, Memory DB upsert identity, guarded summary export ordering ve second reconcile idempotency contractını incele. Post-terminal host proof için searchable archive row, raw-payload exclusion, summary refresh ve zero-publish plus unchanged Memory DB digest acceptanceını bounded evidence document olarak kaydet. Kod veya başka doküman değiştirme.
-Test: git diff --check -- docs/evidence/finalizer-acceptance-canary-2026-08-23/02-brain-index-summary.md
-GO: Evidence document Brain index and summary chain ile idempotency acceptanceını exact source references ile taşır; yalnız exact file değişir; build, XVerify ve auth mutation yok.
-NO_GO: Raw task payloadın Brain rowunda olması kabul edilir, ordering uydurulur, başka file değişir veya formal DONE ya da Closure iddia edilir.
+## Task 6: FO06 sprint and continuation consumer parity
+- Files: src/orchestra/sprint-spawner.ts, src/orchestra/scheduler-effects.ts, tests/orchestra/spawn-spawner-wire.test.ts, tests/orchestra/scheduler-spawn-executor.test.ts
+- Reads: docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md, docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md, src/core/final-only-usage-containment.ts
+- Dependencies: Task 4
+- Priority: CRITICAL
+- Test: npx vitest run tests/orchestra/spawn-spawner-wire.test.ts tests/orchestra/scheduler-spawn-executor.test.ts
+### Description
+Initial sprint spawner ile scheduler retry/FIX/continuation executor'ındaki duplicate final-only
+kararlarını shared resolver consumerlarına çevir. Her iki yol provider, resolved backend, immutable
+budget ve task authorization'ın aynı kesişimini kullansın. Existing dispatch, approval, timeout,
+settlement ve provider-unavailable semantics değişmesin; ikinci grant veya fallback oluşmasın.
+### goNogo
+- goCriteria: Initial and continuation paths shared resolver kullanır ve identical valid plus missing-grant outcomes üretir; existing routing and settlement tests green
+- nogo: Consumerlardan biri local predicate tutar; FIX or retry farklı grant semantics alır; approval or settlement ordering değişir; scoped tests fail
 
-## Task 3: FAC03-NEGATIVE-SPACE Legacy raw-write and residue negative-space contract
-
-Files: docs/evidence/finalizer-acceptance-canary-2026-08-23/03-legacy-negative-space.md
-Reads: docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md, src/core/sprint-archive.ts, src/core/sprint-file-retention.ts, src/orchestra/sprint-finalizer.ts
-Implement: Fresh source truth ile live task retirement, conflict preservation, canonical-only publication ve legacy archive negative-space contractını incele. Host baseline comparisonı için live .tasks residue, .brain/archive task pathleri, .tasks/archive, recently-works ve canonical archive root acceptanceını bounded evidence document olarak kaydet. Kod veya başka doküman değiştirme.
-Test: git diff --check -- docs/evidence/finalizer-acceptance-canary-2026-08-23/03-legacy-negative-space.md
-GO: Evidence document cleanup safety, conflict preservation ve legacy no-new-raw-write acceptanceını source-backed taşır; yalnız exact file değişir; build, XVerify ve auth mutation yok.
-NO_GO: rm cleanup önerilir, conflict kaybı kabul edilir, başka file değişir, legacy path yazılır veya formal DONE ya da Closure iddia edilir.
-
-## Host post-terminal acceptance
-
-- Live .tasks rootunda settled sprint-owned task, result, log, prompt veya worker residue kalmaz.
-- Canonical .deckent/archive/sprints allocated-id manifest gerçek terminal outcome ve family counts taşır.
-- Targeted deckent archive verify sonucu ok true, missing, mismatched ve untracked boş, manifestDigestValid true olur.
-- Compact archive allocated-id Brain rowu ve refreshed summary or index searchable olur; raw payload Brain rowuna kopyalanmaz.
-- İkinci reconcile zero-publish olur ve Memory DB digestini değiştirmez.
-- Legacy .brain/archive task pathleri, .tasks/archive ve recently-works baseline count and digest değerleri değişmez.
-- Archive or finalizer failure false COMPLETE yerine typed terminal-evidence failure üretir.
+## Task 7: FO07 adversarial parity fan-in proof
+- Files: tests/cli/spawn-final-only-parity.test.ts, docs/evidence/final-only-usage-containment-parity-2026-08-23/04-adversarial-proof-plan.md
+- Reads: docs/evidence/final-only-usage-containment-parity-2026-08-23/03-conformance-matrix.md, src/core/final-only-usage-containment.ts, src/cli/commands/spawn.ts, src/orchestra/sprint-spawner.ts, src/orchestra/scheduler-effects.ts, src/orchestra/spawn-backend-docker.ts
+- Dependencies: Task 3, Task 5, Task 6
+- Priority: HIGH
+- Test: npx vitest run tests/cli/spawn-final-only-parity.test.ts
+### Description
+Manual ve sprint ingresslerini aynı immutable task projectionıyla conformance-test et. Valid grant,
+missing grant, final-only mismatch, non-Docker executor, `auto` platform resolution, stale result,
+replay ve exactly-once dispatch/settlement vakalarını hermetic test et. Hang, child process, crash ve
+missing-final gerçek-process kanıtlarının mevcut Docker suite ile bağlantısını evidence planında
+kaydet; gerçek binary canary'yi post-terminal host adımı olarak bırak.
+### goNogo
+- goCriteria: Hermetic parity battery manual and sprint authority kararlarının eşitliğini ve adversarial fail-closed vakaları kanıtlar; proof plan remaining real-binary checks'i authority requirements ile tanımlar; scoped suite green
+- nogo: Mock result real-process proof diye sunulur; replay accepted olur; process-tree negative space kaybolur; başka file değiştirilir; scoped suite fail
